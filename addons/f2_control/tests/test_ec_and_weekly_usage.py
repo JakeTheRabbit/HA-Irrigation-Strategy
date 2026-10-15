@@ -8,6 +8,9 @@ import controller
 import fake_ha
 
 
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
+
 class FixedDateTime(datetime):
     instant = datetime(2026, 9, 8, 12)
 
@@ -25,7 +28,7 @@ def rig(monkeypatch, tmp_path):
                "hardware": {"pump": "switch.p", "mainline": "switch.m",
                             "valves": {"1": "switch.v1"}}}
     monkeypatch.setattr(controller, "load_options", lambda: options)
-    for name in ("ha_get", "ha_call", "ha_get_all", "ha_set"):
+    for name in ("ha_get", "ha_get_status", "ha_call", "ha_get_all", "ha_set"):
         monkeypatch.setattr(controller, name, getattr(fake, name))
     with monkeypatch.context() as setup:
         setup.setattr(controller.Controller, "_read_state_file", lambda self: {})
@@ -59,17 +62,15 @@ def probe(fake, entity, value, timestamp="current"):
     ("6", None), ("6", "bad timestamp"), ("6", "2026-09-08T12:00:00"),
     ("6", "2026-09-08T11:39:00+00:00"), ("6", "2026-09-08T12:01:01+00:00"),
 ])
-@pytest.mark.parametrize("pid", [False, True])
-def test_invalid_ec_real_loop_uses_base_vwc_and_pauses_learning(rig, value, stamp, pid):
+def test_invalid_ec_real_loop_uses_base_vwc_and_pauses_learning(rig, value, stamp):
     c, fake, room, _ = rig
     probe(fake, "sensor.crop_steering_vwc_zone_1", "44")
     probe(fake, "sensor.crop_steering_ec_zone_1", value, stamp)
     fake.set_state("switch.crop_steering_ec_stacking_enabled", "on")
-    fake.set_state("input_boolean.crop_steering_ec_pid_enabled", "on" if pid else "off")
     fake.set_state(room.enable_flag, "off")  # decision allowed; physical gate must still hold
     st = room.state[1]
-    st.update(ec_offset=-8, ec_smooth=1, ec_integral=2, ec_prev_err=3)
-    before = {key: st[key] for key in ("ec_offset", "ec_smooth", "ec_integral", "ec_prev_err", "last_ec_steer")}
+    st.update(ec_offset=-8, ec_smooth=1)
+    before = {key: st[key] for key in ("ec_offset", "ec_smooth", "last_ec_steer")}
     pub = c._loop_room(room, FixedDateTime.now())
     assert pub[1]["ec"] is None
     assert pub[1]["fire"] and pub[1]["p"].p2_threshold == 45
@@ -114,7 +115,7 @@ def test_sensor_accepts_valid_aware_time_and_small_clock_skew(rig):
     c, fake, _, _ = rig
     for stamp in ("2026-09-08T12:00:59+00:00", "2026-09-09T00:00:00+12:00"):
         probe(fake, "sensor.ec", 4.2, stamp)
-        assert c._read_sensor("sensor.ec", 0, 20) == 4.2
+        assert c._read_sensor("sensor.ec", "ec") == 4.2
 
 
 def test_weekly_total_rolls_at_lights_on_and_survives_restart(rig):
@@ -195,7 +196,7 @@ def test_aborted_shot_records_only_delivered_volume_in_weekly_total(rig, monkeyp
     c._execute_shot(room, 1, 10, 10)
     assert room.state[1]["daily_vol"] == pytest.approx(2)
     assert c._water_usage(room, 1, FixedDateTime.now())[0] == 2
-    assert any("delivered so far is counted" in data.get("message", "") for _, _, data in fake.calls)
+    assert any("counts the water of the shot up to the stop" in data.get("message", "") for _, _, data in fake.calls)
 
 
 @pytest.mark.parametrize("month", [1, 9])

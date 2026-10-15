@@ -67,6 +67,16 @@ class _Hold(ValueError):
     """
 
 
+class _Waiting(ValueError):
+    """What keeps the plan from moving on for now, by kind (the published `degraded_kind`): probe_stale,
+    heartbeat, flags, lights_hour or hydraulics. Recoverable: the plan tries again every tick.
+    """
+
+    def __init__(self, kind, message):
+        super().__init__(message)
+        self.kind = kind
+
+
 class StrategyManager:
     """Per-entry persistent document, coherent snapshots and guarded scheduler."""
 
@@ -83,6 +93,9 @@ class StrategyManager:
         # Home Assistant down across it, an unreadable lights_on_hour). The plan keeps publishing
         # its last valid snapshot meanwhile and tries again every tick.
         self.degraded_reason = None
+        self.degraded_kind = (
+            None  # _Waiting.kind, "other" for anything else, None when not degraded
+        )
 
     def _fresh_document(self):
         return {
@@ -274,6 +287,7 @@ class StrategyManager:
             "armed_after": self._takes_effect("armed", now),
             "disarm_after": self._takes_effect("disarm", now),
             "degraded_reason": self.degraded_reason,
+            "degraded_kind": self.degraded_kind,
             "disarm_policy": "Return to legacy setpoints at the next lights-on boundary; no hardware flag is enabled.",
         }
 
@@ -362,7 +376,7 @@ class StrategyManager:
         02:00 straight to 03:00, is 03:30."""
         hour = _number(self._state("lights_on_hour", "number"))
         if hour is None or not 0 <= hour < 24:
-            raise ValueError("Readable room lights_on_hour is required")
+            raise _Waiting("lights_hour", "Readable room lights_on_hour is required")
         wall = datetime.combine(day, time()) + timedelta(seconds=int(hour * 3600))
         return _utc(wall.replace(tzinfo=tz)).astimezone(tz)
 
@@ -391,27 +405,30 @@ class StrategyManager:
         return bool(due) and _utc(boundary) >= _utc(datetime.fromisoformat(due))
 
     def _readiness(self, now, zone_ids):
+        """Raise for what holds the whole room; -> {zone: why} for each zone whose moisture reading is
+        unusable. A zone's root-zone EC is never waited for: the engine waters a zone without one on
+        moisture alone, with only its EC rules paused."""
         if not self.controller_supported(now):
-            raise ValueError(
-                "A fresh controller heartbeat with strategy_snapshot_version=1 is required"
+            raise _Waiting(
+                "heartbeat",
+                "A fresh controller heartbeat with strategy_snapshot_version=1 is required",
             )
         heartbeat = self._state("ai_heartbeat")
         flag = heartbeat.attributes.get("enable_flag")
         flag_state = self.hass.states.get(flag) if isinstance(flag, str) else None
         if getattr(flag_state, "state", None) not in ("on", "off"):
-            raise ValueError("The current room engine flag is unreadable")
+            raise _Waiting("flags", "The current room engine flag is unreadable")
+        stale = {}
         for zone in zone_ids:
             enabled = self._state(f"zone_{zone}_enabled", "switch")
             if getattr(enabled, "state", None) not in ("on", "off"):
-                raise ValueError(f"Zone {zone} enable configuration is unreadable")
-            for metric in ("vwc", "ec"):
-                state = self._state(f"{metric}_zone_{zone}") or self._state(
-                    f"zone_{zone}_{metric}"
+                raise _Waiting(
+                    "flags", f"Zone {zone} enable configuration is unreadable"
                 )
-                if _number(state) is None or not -60 <= _age(state, now) <= 1200:
-                    raise ValueError(
-                        f"Zone {zone} {metric.upper()} is unavailable or stale"
-                    )
+            state = self._state(f"vwc_zone_{zone}") or self._state(f"zone_{zone}_vwc")
+            if _number(state) is None or not -60 <= _age(state, now) <= 1200:
+                stale[zone] = f"Zone {zone} VWC is unavailable or stale"
+        return stale
 
     async def activate(self, expected_revision, now=None):
         now = now or _now()
@@ -421,7 +438,9 @@ class StrategyManager:
             if self.document["status"] != "draft":
                 raise ValueError("Only a saved draft can be armed")
             preview = self.preview()
-            self._readiness(now, [row["zone_id"] for row in preview["zones"]])
+            stale = self._readiness(now, [row["zone_id"] for row in preview["zones"]])
+            if stale:  # arming needs every zone's moisture reading
+                raise ValueError("; ".join(stale.values()))
             if any(row["errors"] for row in preview["zones"]):
                 raise ValueError(
                     "Resolve hydraulic configuration errors before activation"
@@ -475,7 +494,7 @@ class StrategyManager:
     async def tick(self, now=None):
         now = now or _now()
         async with self._lock:
-            self.degraded_reason = None
+            self.degraded_reason = self.degraded_kind = None
             if self.document["status"] != "draft":
                 prior = copy.deepcopy(self.document)
                 try:
@@ -493,7 +512,23 @@ class StrategyManager:
                     # Recoverable: the plan keeps its last valid snapshot and tries again next tick.
                     self.document = prior
                     self.degraded_reason = str(error)
+                    self.degraded_kind = getattr(error, "kind", "other")
+                else:
+                    self.degraded_reason = self._held_reason()
+                    self.degraded_kind = "probe_stale" if self.degraded_reason else None
             self._publish(now)
+
+    def _held_reason(self):
+        """Why some zones are still on an earlier day's targets, or None."""
+        held = [z for z in self.document["active"]["zones"] if z.get("held")]
+        return (
+            "; ".join(
+                f"{z['held']}: zone {z['zone_id']} stays on the targets of "
+                f"{z.get('applied_day') or 'an earlier day'} until it reads again"
+                for z in held
+            )
+            or None
+        )
 
     async def _advance(self, now):
         """Move the plan on to the latest lights-on, on whichever tick first sees it: a lights-on
@@ -528,22 +563,74 @@ class StrategyManager:
         # An error/reload must never invent an activation that was not explicitly armed and
         # successfully stored by the user. A day already applied is never applied again, and a
         # lights_on_hour moved later never takes the plan back a day.
-        if (
-            not self._due("armed", boundary)
-            or (self.document["active"].get("grow_day") or "") >= day
-        ):
+        if not self._due("armed", boundary):
+            return
+        applied = self.document["active"].get("grow_day") or ""
+        if applied > day:
+            return
+        if applied == day:
+            await self._release_held(now, day)
             return
         preview = self.preview(grow_day=day)
-        self._readiness(now, [row["zone_id"] for row in preview["zones"]])
+        stale = self._readiness(now, [row["zone_id"] for row in preview["zones"]])
         if any(row["errors"] for row in preview["zones"]):
-            raise ValueError(
-                "Hydraulic preview failed; the day is applied once it passes"
+            raise _Waiting(
+                "hydraulics",
+                "Hydraulic preview failed; the day is applied once it passes",
             )
+        # The day moves on for every zone whose moisture reads. A zone whose does not keeps the
+        # targets it had until it reads again, unless no zone reads or it has none to keep.
+        before = {row["zone_id"]: row for row in self.document["active"]["zones"]}
+        if stale and (
+            len(stale) == len(preview["zones"]) or any(z not in before for z in stale)
+        ):
+            raise _Waiting("probe_stale", "; ".join(stale.values()))
+        zones = [
+            (
+                {
+                    **before[row["zone_id"]],
+                    "applied_day": before[row["zone_id"]].get("applied_day") or applied,
+                    "held": stale[row["zone_id"]],
+                }
+                if row["zone_id"] in stale
+                else {**row, "applied_day": day}
+            )
+            for row in preview["zones"]
+        ]
         self.document.update(
             status="active",
-            active={"grow_day": day, "zones": preview["zones"]},
+            active={"grow_day": day, "zones": zones},
             error=None,
         )
+        await self._persist()
+
+    async def _release_held(self, now, day):
+        """Apply `day` to each zone kept on an earlier day's targets whose moisture reads again."""
+        rows = self.document["active"]["zones"]
+        waiting = [row["zone_id"] for row in rows if row.get("held")]
+        if not waiting:
+            return
+        stale = self._readiness(now, waiting)
+        ready = {z for z in waiting if z not in stale}
+        if not ready:
+            return
+        preview = {row["zone_id"]: row for row in self.preview(grow_day=day)["zones"]}
+        if any(preview[z]["errors"] for z in ready):
+            raise _Waiting(
+                "hydraulics",
+                "Hydraulic preview failed; the day is applied once it passes",
+            )
+        self.document["active"] = {
+            "grow_day": day,
+            "zones": [
+                (
+                    {**preview[row["zone_id"]], "applied_day": day}
+                    if row["zone_id"] in ready
+                    else row
+                )
+                for row in rows
+            ],
+        }
         await self._persist()
 
     def _publish(self, now):
@@ -567,6 +654,7 @@ class StrategyManager:
             ],
             "error": self.document["error"],
             "degraded_reason": self.degraded_reason,
+            "degraded_kind": self.degraded_kind,
             "status": status,
         }
         self.hass.states.async_set(self.entity_id, status, attributes)

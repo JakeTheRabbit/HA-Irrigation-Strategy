@@ -165,7 +165,7 @@ try {
     const exported = await downloadPlan(
       page.getByRole("button", { name: "Export recipe My saved plan", exact: true }),
     );
-    await page.locator("#desktop-room").selectOption("room:f1_");
+    await page.locator("#desktop-room").selectOption("room:room_b_");
     await page.getByRole("heading", { name: "Schedule", exact: true }).waitFor();
     await openLibrary();
     assert.equal(await library().locator(".recipe-list li").count(), 2);
@@ -216,8 +216,8 @@ try {
         window.location.hash = "#/compare";
       });
       await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
-      // The full-resolution chart is one tap down, under the weekly comparison.
-      await page.locator('details[data-section="chart"] > summary').click();
+      // The full-resolution chart is the Overlay view, one toggle from the weekly comparison.
+      await page.getByRole("button", { name: "Overlay", exact: true }).click();
       await page.waitForFunction(() =>
         document
           .querySelector('[aria-label="Current run"]')
@@ -225,13 +225,13 @@ try {
       );
       assert.match(
         await page
-          .getByLabel("Previous run", { exact: true })
+          .getByLabel("Past run", { exact: true })
           .locator("option:checked")
           .innerText(),
         /Demo • previous run/,
       );
       for (const period of ["day", "week", "month", "run"]) {
-        await page.getByLabel("Comparison history range", { exact: true }).selectOption(period);
+        await page.getByLabel("History range", { exact: true }).selectOption(period);
         await page.waitForFunction(() => {
           const button = [...document.querySelectorAll("button")].find((item) =>
             item.textContent.includes("Refresh history"),

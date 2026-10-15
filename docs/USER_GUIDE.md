@@ -1,8 +1,16 @@
 # User guide
 
-The menu has five entries. **Today** says whether the room is OK and which zone needs you. **Plan** holds the zones' **Targets** and the grow plan's **Schedule**. **History** holds the **Timeline**, **Water use** and **Compare runs**. **Equipment** holds **Probes**, **Stock tanks**, **Tank & pump**, **Dosing** and **Setup**. **Settings & help** holds **Settings**, **Notifications** and **Help**. Every zone has its own page, opened from its card on Today. Select the room before editing; zone numbers belong to that room.
+The menu has five items:
 
-Old bookmarks still work and open the page that holds their content now:
+- **Today** tells you if the room is correct and which zone needs you.
+- **Plan** has the **Targets** of the zones and the **Schedule** of the grow plan.
+- **History** has the **Timeline**, **Water use** and **Compare runs**.
+- **Equipment** has **Probes**, **Stock tanks**, **Tank and feed**, **Dosing** and **Setup**.
+- **Settings & help** has **Settings**, **Notifications** and **Help**.
+
+Each zone has its own page. Open it from the card of the zone on **Today**. Select the room before you change a value. The zone numbers belong to that room.
+
+Old bookmarks open the page that now has their content:
 
 | Old address                            | Opens                                   |
 | -------------------------------------- | --------------------------------------- |
@@ -17,325 +25,538 @@ Old bookmarks still work and open the page that holds their content now:
 | `#/settings`, `#/help`, `#/help?code=` | Settings, Help (and the code it names)  |
 | a retired dashboard's `?view=`         | the page that replaced that view        |
 
-New installation? Start with [Install, upgrade and rollback](INSTALL.md). To try the interface without connecting equipment, open the [interactive demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1).
+For a new installation, start with [Install, upgrade and rollback](INSTALL.md). To try the dashboard with no equipment, open the [interactive demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1).
 
 ## What each action changes
 
-| Action                                   | Where the change goes                                                  |
-| ---------------------------------------- | ---------------------------------------------------------------------- |
-| Edit targets (Plan › Targets)            | Local draft until reviewed and applied.                                |
-| Apply reviewed changes                   | Existing HA setpoint entities; inspect readback.                       |
-| Substrate, sizing, safety numbers        | Equipment › Setup; reviewed and applied the same way.                  |
-| Review & save a grow plan                | HA's stored draft plan; separate from arming.                          |
-| Arm plan                                 | Requests the eligible boundary activation; does not enable the engine. |
-| Save a library recipe                    | This browser/site/room library; no HA write.                           |
-| Save a run record (Settings › Run records) | Run metadata and its captured reference; no irrigation activation.   |
-| Save configuration (Equipment › Setup)   | HA room/zone setup; wait for controller acknowledgement.               |
-| Dose, make a batch, stop (Equipment › Dosing) | A request the controller carries out; the page switches nothing.  |
-| Save the dosing setup (Equipment › Dosing) | HA's stored dosing setup for the room; the controller reads it.      |
-| Save notifications (Settings & help › Notifications) | HA's stored notification setup for the whole site; the next push follows it. |
-| Send a test (Settings & help › Notifications) | One push to that phone; nothing is saved.                     |
+| Action | Where the change goes |
+| --- | --- |
+| Change targets (Plan › Targets) | A local draft. Nothing goes to Home Assistant before the review. |
+| Apply the reviewed changes | The setpoint entities in Home Assistant. Examine the readback. |
+| Substrate, sizing and safety numbers | Equipment › Setup. The same review applies. |
+| Review & save a grow plan | The stored draft plan in Home Assistant. This does not arm the plan. |
+| Arm plan | A request to start the plan at the next lights-on. It does not set the kill switch to on. |
+| Save a library recipe | The library of this browser, site and room. It writes nothing to Home Assistant. |
+| Save a run record (Settings › Run records) | The run data and its reference. It starts no shots. |
+| Save configuration (Equipment › Setup) | The setup of the room and its zones in Home Assistant. Wait until the controller accepts it. |
+| Dose, make a batch, stop (Equipment › Dosing) | A request that the controller does. The page itself operates nothing. |
+| Save the dosing setup (Equipment › Dosing) | The stored dosing setup of the room in Home Assistant. The controller reads it. |
+| Save notifications (Settings & help › Notifications) | The stored notification setup of the whole site. The next push follows it. |
+| Send a test (Settings & help › Notifications) | One push to that phone. Nothing is saved. |
 
 ## Try the demo
 
-The demo is an isolated software demonstration. Its readings, history, example plans and run records are synthetic; they are not a recommended configuration or evidence from a real grow. A demo tab cannot connect to live Home Assistant. It keeps the time of day: open it at night and the zones are in P3 with the pump resting.
+The demo is a software demonstration only. Its readings, history, plans and run records are sample data. They are not a recommended configuration, and they do not come from a real grow. A demo tab cannot connect to Home Assistant. The demo follows the time of day: at night, the zones are in P3 and the pump is off.
 
-1. Open **Today** and switch rooms with the chips in the top bar. Read the room's line, the zone cards and what Jev changed. Open a zone from its card.
-2. On the zone's page, point at the chart's shots and Jev's marks, choose **Compare with** yesterday or a typical day, and read the probes and controls.
-3. Open **Plan › Targets**, choose a zone and change its rescue level or re-water point. Compare the moving draft line with the saved reference, then use the review dialog to inspect the change.
-4. Open **Plan › Schedule**. Read the flower by stage, then open **Advanced** to change a week's steering balance, inspect an endpoint profile, or open **Recipes** and preview **Demo • steady schedule** or **Demo • week-by-week changes**. Loading a recipe affects a local draft; the normal review/save remains separate.
-5. Open **History**: filter the **Timeline**, read **Water use**, and open **Compare runs** to line up the demo's current run with the previous one by grow week.
-6. Open **Equipment › Setup** to try entity search, room/zone names and mapping review. Demo actions do not call your HA server.
-7. Open **Equipment › Dosing**: dose a pump, make a batch and stop it. The demo's pumps, valves and float move as real ones would, faster than real time.
-8. Open **Settings & help › Notifications**: tick a kind of alert for a phone, save it through the review, and send a test (the demo sends nothing). Add `&notify-user=callum` to the address to open it as Callum, who is not an administrator.
+1. Open **Today**. Select a room with the chips in the top bar.
+2. Read the room line, the zone cards and the changes of the AI assistant. Open a zone from its card.
+3. On the page of the zone, point at the shots and the marks of the AI assistant on the chart.
+4. Select **Compare with** yesterday or a typical day. Read the probes and the controls.
+5. Open **Plan › Targets**. Select a zone, and change its rescue floor or its re-water point.
+6. Compare the draft line with the saved reference. Then examine the change in the review.
+7. Open **Plan › Schedule** and read the flower by stage.
+8. Open **Advanced** to change the steering balance of a week, or to examine an endpoint profile.
+9. Open **Recipes**, and preview **Demo • steady schedule** or **Demo • week-by-week changes**. A recipe loads into a local draft only.
+10. Open **History**. Filter the **Timeline**, read **Water use**, and open **Compare runs**.
+11. Open **Equipment › Setup**. Try the entity search, the room and zone names and the mapping review.
+12. Open **Equipment › Dosing**. Dose a pump, make a batch and stop it. The demo moves faster than real time.
+13. Open **Settings & help › Notifications**. Tick a kind of alert for a phone, save it through the review, and send a test.
 
-A production recipe library starts empty. Demo recipes are interface examples and are stored separately from production libraries. Existing demo libraries, including deliberately empty or corrupt ones, are left unchanged.
+The demo sends nothing to your Home Assistant server and no push to a phone. To see the Notifications page as a grower who is not an administrator, add `&notify-user=grower` to the address.
 
-Use **Settings › Sample workspace › Reset demo session…** and review the confirmation to restore the sample rooms, readings, run records and planner drafts. This discards unsaved demo work and session changes to runs/room settings. All saved recipe libraries and live connection data are retained; reset does not restore recipes you deliberately removed. Export any session work you want to keep first.
+A production recipe library starts empty. The demo recipes are examples, and the dashboard keeps them apart from production libraries. It does not change the demo libraries that exist, also when they are empty or corrupt.
+
+To restore the sample rooms, readings, run records and planner drafts, use **Settings › Sample workspace › Reset demo session…** and confirm. The reset discards the demo work that you did not save. It keeps all saved recipe libraries and the live connection data. It does not restore a recipe that you removed. Export the session work that you want to keep before the reset.
 
 ## The top bar
 
-On every page the top bar shows each room as a chip with a dot and a word (watering, holding, not watering, stale, room off); the selected room's chip is pressed, and another room's chip opens that room. Beside them: how old the selected room's latest controller report is, **Recent activity** (the latest records in a panel beside any page, with **Open the timeline**), refresh, and the room's two safety switches, **Watering** and **Room**. Each switch asks for a review first. Neither is an emergency stop: use the installation's established physical shutdown procedure for an emergency.
+The top bar is on each page. It shows each room as a chip with a dot and a word: watering, holding, not watering, stale or room off. The chip of the selected room is pressed. Select the chip of a different room to open that room.
+
+Next to the chips, the top bar shows these items:
+
+- The age of the last report of the controller for the selected room.
+- **Recent activity**: the newest records, in a panel next to the page, with **Open the timeline**.
+- The refresh button.
+- The two safety switches of the room, **Watering** and **Room**. Each switch shows a review before it changes.
+
+> **WARNING:** Do not use the **Watering** switch or the **Room** switch as an emergency stop. In an emergency, use the physical shutdown procedure of your installation.
 
 ## Today
 
-Today is one screen on a laptop and about two on a phone.
+**Today** is one screen on a laptop and about two screens on a phone.
 
-- **The room's line**: watering on or off, the stage and day of flower (when the controller publishes Jev's stage arc), the steering, the stage's pore EC band, the lights, the phase the zones are in, and the open alerts. **N alerts** (or **N notes** for information such as a grow plan in control) opens the list. A room that is not watering says which switch stopped it, with a button to that switch in Settings.
-- **The tanks**, one line, only when a feed or stock tank is low or out of range.
-- **A card per zone**: its phase, moisture with the day's line and a bar against the rescue level, re-water point and peak, pore EC, water per plant against the room, the last shot, and what comes next. A card is flagged, with the reason in a line, only when the zone needs you:
+- **The room line** shows the **Watering** switch, the stage and the day of flower, and the steering mode. The stage shows only when the controller publishes the stage arc.
+- The room line also shows the pore EC band of the stage, the lights, the phases of the zones and the open alerts.
+- **N alerts** opens the list of alerts. **N notes** opens the list of notes, for example a grow plan in control.
+- When the room gives no shots, the room line tells you which switch stopped them. A button opens that switch in Settings.
+- **The tanks** show in one line only when a feed tank or a stock tank is low or out of range.
+- **The card of each zone** shows its phase and its VWC, with the line of the day. A bar shows the VWC against the rescue floor, the re-water point and the peak.
+- The card also shows the pore EC, the water for each plant against the room, the last shot and the next event.
 
-| Flag                                             | When                                                                                    |
-| ------------------------------------------------ | --------------------------------------------------------------------------------------- |
-| Pore EC under or over the stage's band           | The zone's pore EC is outside the band of today's stage.                                 |
-| Water per plant against the room                 | More than 140 % or less than 70 % of the room's median zone, once the day has started.   |
-| Under the re-water point with no shot (critical) | In P2, moisture has sat under the re-water point for over an hour without a shot.        |
-| A probe unusable or left out                     | A moisture probe cannot be used (critical); a pore EC probe or a probe left out (warning). |
-| The zone's own alert                             | A notice the controller raised for this zone.                                            |
-| A rescue shot                                    | One fired in the last 12 hours.                                                          |
-| Jev's setpoints paused                           | Jev put a change back after a rescue and waits before trying again.                      |
+A card has a flag, with the reason in one line, only when the zone needs you:
 
-- **What Jev changed today**, in a room running Jev: up to three changes, newest first, with **History** for the rest.
+| Flag | When |
+| --- | --- |
+| Pore EC below or above the band of the stage | The pore EC of the zone is outside the band of the stage of today. |
+| Water for each plant against the room | More than 140% or less than 70% of the median zone of the room, after the grow-day has started. |
+| Below the re-water point with no shot (critical) | In P2, VWC stayed below the re-water point for more than one hour with no shot. |
+| A probe that the zone cannot use, or leaves out | A VWC probe that the zone cannot use (critical). A pore EC probe that the zone cannot use, or a probe that the zone leaves out (warning). |
+| An alert of the zone | An alert that the controller sent for this zone. |
+| A rescue shot | A rescue shot in the last 12 hours. |
+| AI assistant setpoint changes paused | The AI assistant put a change back after a rescue shot, and it waits before it tries again. |
+
+- **AI assistant changes today** shows the last three changes of the AI assistant, newest first. **History** has the rest.
 
 ## A zone's page
 
-Open a zone from its card on Today (or `#/zone/N`); the switcher at the top moves between zones.
+Open a zone from its card on **Today**, or with the address `#/zone/N`. Use the switcher at the top to go to a different zone. The page has these parts.
 
-- **Today in numbers**: moisture and how fast it is drying, pore EC against the stage's band, water today (the zone's total and each plant's share, in the order Settings › Appearance chooses) with its share of the daily water limit (amber from 80 %: routine shots stop at the limit), shots and the last one's time, and the overnight dryback (last night's, or tonight's so far) against Athena's target for the stage. **Next** says what comes next in a few words.
-- **The day's chart**, from lights-on to the next lights-on, in the language of Athena's irrigation phase chart: the light cycle on top, Jev's decisions just below it (filled: code acted on it; outline: advice, no action or refused), P0 to P3 in columns with their badges along the bottom, field capacity as a dashed red line with the runoff zone of the zone's steering, the maintenance band from the re-water point to the peak target, the rescue floor overnight, VWC in blue with every shot as a dot where it started (a ring where a shot was held), the expected rest of the day dashed, and pore EC on the right-hand axis with the stage's band beside it. The VWC axis fits today's readings and the zone's targets. **Compare with** adds yesterday's line or the typical day of the last seven (the choice is remembered in the browser). Point at or tap the chart for the details of a shot, a decision, a phase or a moment.
-- **Jev on this zone**: which judges act on it now, the P2 shot size and re-water point Jev may move and within what range (yours, and now), its last change, and its latest decisions here with a tick or a cross where it checked how they worked. **History** opens the timeline on this zone.
-- **Targets**: the zone's targets as the controller uses them, by phase, with Jev's range beside the values it manages. **Edit in Plan** opens them on Plan › Targets.
-- **Probes**: each probe behind the zone's moisture and pore EC, its reading, and whether the zone's reading uses it (see [Probes](#probes)).
-- **Controls**: what the controller waits for next by its own numbers (for example: shot when VWC < 61 % (now 58 %) · dilution if pwEC > 3.84 · P3 by 20:36), **Pause zone scheduling** / **Enable zone scheduling**, and **Move to a phase**. Paused, the zone gets no water at all, not even a rescue shot, and a shot already running in it stops within a few seconds. A phase chosen by hand is reviewed first; the controller moves the zone within a minute and carries on from there (lights-off still moves it to P3 and lights-on to P0). Today's water and shot counts stay.
-- **History**: the zone's readings over **Yesterday** or **7 days**; **Recorded behaviour against the targets** (typical peak, trough and dryback over days) opens on request.
+**Today in numbers**
+
+- The VWC and its dryback rate.
+- The pore EC against the band of the stage.
+- The water today: the total of the zone and the water for each plant, in the order that Settings › Appearance selects.
+- The water today as a part of the daily water limit. It shows amber from 80%. The maintenance shots stop at the limit.
+- The shots today and the time of the last shot.
+- The overnight dryback, of last night or of tonight so far, against the reference dryback of the stage. The reference is a percentage of the peak of this zone.
+- **Next**: the next event, in some words.
+
+**The day chart**
+
+The chart shows the grow-day, from lights-on to the next lights-on:
+
+- The light cycle is at the top. The decisions of the AI assistant are below it. A filled mark is an action. An outline is advice, no action or a refusal.
+- P0 to P3 are columns, with their badges at the bottom.
+- A dashed red line shows field capacity, with the runoff zone of the steering mode above it.
+- A band shows the maintenance range, from the re-water point to the peak target. The rescue floor shows overnight.
+- A blue line shows VWC. A dot is the start of a shot. A ring is a shot that the controller held.
+- A dashed line shows the expected rest of the day.
+- The pore EC uses the scale at the right, with the band of the stage next to it.
+
+The VWC scale fits the readings of today and the targets of the zone. **Compare with** adds the line of yesterday, or the typical day of the last seven days. The browser keeps this choice. Point at the chart, or tap it, to see the details of a shot, a decision, a phase or a time.
+
+**AI assistant on this zone**
+
+This panel shows the judges that act on the zone now. It shows the P2 shot size and the re-water point that the AI assistant can move, and their range. It also shows the last change and the newest decisions on this zone. A tick or a cross shows the later check of the result. **History** opens the timeline of this zone.
+
+**Targets**
+
+The targets of the zone, by phase, as the controller uses them. The range of the AI assistant shows next to the values that it controls. **Edit in Plan** opens them in Plan › Targets.
+
+**Probes**
+
+Each VWC probe and pore EC probe of the zone, with its reading. The panel also tells if the zone uses the probe (see [Probes](#probes)).
+
+**Controls**
+
+- The next conditions of the controller, from its own numbers. Example: shot when VWC < 61% (now 58%) · dilution if pwEC > 3.84 · P3 by 20:36.
+- **Pause zone scheduling** and **Enable zone scheduling**: the switch of the zone. When the zone is paused, the controller gives the zone no shot, not even a rescue shot. A shot that runs in the zone stops within a few seconds.
+- **Move to a phase**: moves the zone to a phase by hand, after a review. The controller moves the zone within a minute and then continues by its rules. Lights-off still moves the zone to P3, and lights-on moves it to P0. The water and the shot count of the grow-day stay.
+
+> **CAUTION:** Do not pause a zone that has plants. The zone then gets no water, not even a rescue shot.
+
+**History**
+
+The readings of the zone for **Yesterday** or **7 days**. **Recorded behaviour against the targets** shows the typical peak, low point and dryback over some days. It opens when you select it.
 
 ## Plan › Targets
 
-When no grow plan owns the room, Targets edits the current targets. An armed grow plan replaces the inputs with its read-only targets; if its required snapshot is missing or stale, the targets show as unavailable rather than falling back to the manual values.
+When no grow plan controls the room, **Targets** changes the current targets. An armed grow plan shows its own targets, and you cannot change them here. When the plan has no current snapshot, the targets show as unavailable. They do not go back to the manual values.
 
-1. Select a room, open **Plan › Targets**, and choose a zone (or **Room** for shared timing).
-2. The zone's targets are one table by phase: P0 morning dryback, P1 ramp-up, P2 maintenance and P3 overnight dryback. Each setting's **?** says what it is, when it acts, what it affects, and what the Athena Handbook says. Where Jev manages a value, its range sits beside it. With Jev's Setpoints judge on the room, the **Auto** switch says what it lets Jev do: Jev manages the P2 shot size and re-water point. The same switch lets the engine's own learner keep the P1 target and field capacity in step with the peak the zone reaches, at most 2 points higher a day and only after the day's ramp reached the target.
-3. The other steering mode's own targets (its P3 dryback and EC targets) are one tap down. Substrate, plants, drippers, flow and safety limits are on **Equipment › Setup**.
-4. Type a value, or drag a target on the day's chart beside the table. Both edit the same local draft and respect the HA field's limits and step; the saved reference stays drawn for comparison, and the dark lines are what the zone's probe recorded.
-5. Select **Review changes**, inspect every before/after value, then apply. Only this step sends the reviewed values to HA. Readback errors and unapplied values remain visible; do not assume a partially failed batch succeeded. Drafts survive a refresh and a room change asks before discarding them.
+1. Select a room and open **Plan › Targets**.
+2. Select a zone, or select **Room** for the timing that all zones use.
+3. Read the targets of the zone. The table has one part for each phase: P0 morning dryback, P1 ramp, P2 maintenance and P3 overnight dryback.
+4. Select the **?** of a setting to read what it does, when it acts and what it changes.
+5. Type a value, or move a target on the day chart next to the table. Both change the same local draft.
+6. Select **Review changes**. Examine each old value and each new value.
+7. Apply the changes. Only this step sends the values to Home Assistant.
+8. Examine the readback. A value that Home Assistant did not accept stays visible with its error.
 
-Room changes can be previewed against a selected zone. A zone's own value takes precedence over a room fallback where the controller supports it. Missing or invalid inputs remain missing/invalid instead of becoming an invented curve.
+The draft follows the limits and the step of each Home Assistant number. The chart shows the saved values as a reference. The dark lines show what the probes of the zone recorded. A draft stays after a refresh. When you change the room, the dashboard asks before it discards the draft.
+
+The targets of the other steering mode (its P3 dryback and its EC targets) are one tap down. The substrate, the plants, the drippers, the flow and the safety limits are in **Equipment › Setup**.
+
+When the AI assistant controls a value, its range shows next to the value. The **Auto** switch is the Auto setpoints switch of the room. When the Setpoints judge of the AI assistant runs, the AI assistant controls the P2 shot size and the re-water point. The Auto setpoints learner of the controller controls the peak target and field capacity. It moves each by 1 point or less each grow-day.
+
+> **CAUTION:** Do not set the Auto switch to on while a probe gives wrong readings. The setpoints can then move in the wrong direction.
+
+You can preview a change of the room against a selected zone. The value of a zone overrides the value of the room for that zone. A value that is missing or not correct stays missing on the chart. The dashboard does not make up a curve.
 
 ## Plan › Schedule
 
-**This flower by stage** leads the page: the stages of this flower (flower setting, flower bulk, finish) with their flower days and weeks, what moves each on, steering, pore EC range, Athena's overnight dryback (40–50 % of the peak while setting, 30–40 % in the bulk, 40–50 % in the finish; as points of true water content under it) and runoff, today's week marked and when the next stage starts. Day 1 is the first day of 12/12; the arc is the one Jev steers by. **Validate preview** and **Arm plan** stay in view under it.
+**This flower by stage** is at the top of the page. It shows the stages of this flower: flower set, flower bulk and finish. For each stage, it shows the flower days and weeks, and what starts the next stage. It also shows the steering mode, the pore EC range, the overnight dryback and the runoff. The overnight dryback is in points of true water content: 15 to 25 in flower set, 10 to 15 in flower bulk and 20 to 25 in the finish. The table marks the week of today and the start of the next stage. Day 1 is the first day of 12 hours on and 12 hours off. The AI assistant uses this stage arc. **Validate preview** and **Arm plan** stay below it.
 
-The planner schedules user-defined profiles by zone and grow day, under **Advanced**. The balance slider interpolates between the profile's explicit vegetative and generative endpoints; it does not select a built-in agronomic prescription. Equal endpoints intentionally produce equal targets at every slider position.
+Under **Advanced**, the planner gives each zone a profile for each grow-day. You make these profiles. The balance slider sets a value between the vegetative endpoint and the generative endpoint of the profile. The slider does not select a crop recipe that is built in. When the two endpoints are equal, each position of the slider gives the same targets.
 
-1. Open **Advanced › Endpoint profiles**. Inspect both endpoints and select the correct **Zone limits**. Duplicate a profile when you need an independent copy. A shared profile affects all schedule blocks referring to it.
-2. Open **Advanced › Steering balance**. Select a zone and set **Zone grow start date**. Each zone can have its own start date.
-3. Select a day or week in the grid, or type a balance (0–100 % generative) into it: Enter applies, Esc cancels, arrows move. The panel beside the grid shows the setpoints at that balance next to both endpoints and the balance either side. Assign the block's **Endpoint profile**. Days 1–366 are supported; range edits preserve surrounding assignments by splitting existing blocks.
-4. Inspect **Zone schedule blocks** for coverage. Fill missing days and resolve overlap, parameter or zone-assignment errors.
-5. Choose **Review & save** to validate and persist the draft in HA. **Validate preview** checks an unchanged stored draft. **Export** downloads a portable plan; **Reload stored plan** retrieves the stored revision once local edits are saved or discarded.
-6. If you intend the controller to use the plan, review **Arm plan** separately. The controller must report support. Activation occurs at the eligible local lights-on boundary; arming does not enable the engine or pump.
+1. Open **Advanced › Endpoint profiles**.
+2. Examine the two endpoints, and select the correct **Zone limits**.
+3. To get an independent copy of a profile, duplicate it. A change to a profile changes each schedule block that uses that profile.
+4. Open **Advanced › Steering balance**.
+5. Select a zone, and set its **Zone start date**. Each zone can have a different start date.
+6. Select a day or a week in the grid, or type a balance (0–100 % generative) in the grid. In the grid, Enter applies the value, Esc cancels it and the arrow keys move the selection. The panel next to the grid shows the setpoints at that balance, the two endpoints and the balance on each side.
+7. Assign the **Endpoint profile** of the block. The grid accepts days 1–366. When you change a range, the planner splits the blocks that exist and keeps the days around the range.
+8. Examine **Zone schedule blocks** for the days that they cover.
+9. Fill the missing days. Correct the overlaps and the errors of the parameters and the zone assignments.
+10. Select **Review & save** to validate the draft and save it in Home Assistant. **Validate preview** checks a stored draft that has no local changes. **Export** downloads a plan file that you can move. **Reload stored plan** gets the stored revision again after you save or discard the local changes.
+11. To let the controller use the plan, select **Arm plan** and examine the review. The controller must report that it supports plans. The plan starts at the next local lights-on. The arm action does not set the kill switch to on, and it does not start the pump.
 
-An active/armed plan cannot be edited as a draft. **Disarm plan** requests the normal boundary handoff back to manual targets; wait for **draft** status before editing. The UI reports unsupported controllers, stale required snapshots and unfinished handoffs instead of claiming activation succeeded. Saving, arming and disarming a plan need a Home Assistant administrator login; any other login can open the plan and its previews, and is refused when it tries to change them.
+You cannot change an active or armed plan as a draft. **Disarm plan** asks the controller to go back to the manual targets at the next lights-on. Wait for the **draft** status before you change the plan. The dashboard reports a controller with no plan support, a stale snapshot and an incomplete handoff. It does not show the plan as active. Only a Home Assistant administrator can save, arm or disarm a plan. Other users can open the plan and its previews, but they cannot change them.
 
-After adding or archiving zones in setup, use **Update zones from setup** in a draft plan. It preserves existing active-zone schedules, removes archived assignments, and initializes new zones from their current settings. Export the previous plan first if you need those removed assignments.
+After you add or archive zones in Setup, select **Update zones from setup** in a draft plan. The update keeps the schedules of the active zones that exist, and removes the assignments of the archived zones. It gives each new zone a profile with the current settings of that zone. If you need the assignments that the update removes, export the plan before the update.
 
 ### Recipes
 
-**Advanced › Recipes** is the recipe library. A library item is a reusable copy, separate from the HA plan currently controlling the room.
+**Advanced › Recipes** is the recipe library. A recipe in the library is a copy that you can use again. It is not the plan in Home Assistant that controls the room now.
 
-- **Save current as recipe** creates a named browser copy with optional notes/source URL.
-- **Import recipe file** accepts the supported plan export format, validates it and lets you name the library copy.
-- **Preview recipe** shows its zones, retained current start dates, schedule spans and inspectable profiles. **Load into local draft** requires the exact current active-zone IDs and preserves current start dates. Replacing unsaved planner work requires explicit acknowledgement.
-- Loading is unavailable while active, armed, busy or disconnected. It does not save or arm the plan.
-- **Export recipe** downloads a copy. **Remove recipe** asks for confirmation and removes only the browser copy.
+- **Save current as recipe** saves a copy with a name in this browser. You can add notes and a source URL.
+- **Import recipe file** reads a plan file in the export format and validates it. Then you give the copy a name.
+- **Preview recipe** shows the zones, the current start dates that the recipe keeps, the schedule spans and the profiles.
+- **Load into local draft** needs the same active zone IDs as the room has now. It keeps the current start dates. Before it replaces planner work that you did not save, you must confirm.
+- You cannot load a recipe while the plan is active or armed, while the dashboard is busy, or while it is not connected. A load does not save or arm the plan.
+- **Export recipe** downloads a copy. **Remove recipe** asks you to confirm, and then removes only the copy in the browser.
 
-Libraries are isolated by site, browser, room and demo/live mode. They are not a shared HA database. Limits are 20 recipes per room, 500 KB per plan and 2 MB per library. Export important copies before clearing browser data or moving to another browser. Corrupt data is retained with a recovery-download action; storage denial, quota and stale-tab conflicts are reported rather than silently overwritten. See [Recipe library](RECIPE_LIBRARY.md).
+Each library is for one site, one browser, one room and one mode (demo or live). It is not a shared database in Home Assistant. The limits are 20 recipes for each room, 500 KB for each plan and 2 MB for each library. Export the important copies before you clear the browser data or move to a different browser. When the stored data is corrupt, the dashboard keeps it and gives a download to recover it. The dashboard reports a refused storage, a full storage and a conflict with an old tab, and it does not overwrite the data. See [Recipe library](RECIPE_LIBRARY.md).
 
 ## History
 
-**Timeline** is one list of the controller's records and Jev's decisions, newest first, by day. Jev's actions show by default; **All Jev decisions** adds every answer (with how sure it was, what it asked for, and what code did: acted, refused and why, advice, no action, waiting). A tick or a cross beside a decision is Jev's later check of whether it worked. A setpoint you changed by hand is marked yours; Jev only noted it. Filter by zone (or the room only), by type (water, phase, setpoints, alerts, Jev) and by words; **Export CSV** downloads what the filters show. It is not an immutable audit of every physical shot.
+**Timeline** is one list of the records of the controller and the decisions of the AI assistant, newest first, by day.
 
-**Water use** shows litres per zone today, this grow week, since the grow start and estimated for the whole grow, with a bar for each grow week and, under it, today's water per zone and per plant. It counts grow-days from lights-on to lights-on and reads Home Assistant's long-term statistics, which Home Assistant keeps indefinitely; opened outside Home Assistant it can only read recorded history, as far back as the recorder keeps it. The grow start is the zone's grow plan start date when the plan is armed or has been saved; without one it is inferred (the first day with water after at least five grow-days without any), and the panel says which. A day Home Assistant did not record is flagged, never counted as zero.
+- The actions of the AI assistant show by default. **All AI assistant decisions** adds each answer. Each answer shows the confidence, the request and the action of the code: acted, refused with the reason, advice, no action or waiting.
+- A tick or a cross next to a decision is the later check of the result.
+- A setpoint that you changed is marked as yours. The AI assistant only records it.
+- Filter by zone or by the room only, by type (water, phase, setpoints, alerts, AI assistant) and by words.
+- **Export CSV** downloads the records that the filters show.
 
-**Compare runs** lines the run in progress up against an earlier one by grow week:
+The timeline is not a full record of each physical shot.
 
-1. Choose **This run**, **Compare with** and the **Zone**. The latest ended run is chosen to start with.
-2. Read the weeks table: each week's typical day as moisture low–high, pore EC low–high and water per plant a day, this run's figure with the compared run's under it. **Biggest differences** names up to three weeks where they differ by more than a few points of moisture, a few tenths of pore EC or a fifth of the water per plant.
-3. **Full-resolution chart, with a target reference** (one tap down) draws the recorded VWC and EC for **Day**, **Week · 7 days**, **Calendar month**, **Run to date** or **Custom dates**. Choose a **Target reference**: **Current configured daily plan**, **Saved run daily reference**, or **Current phase reference**, and read its capture/source note. Use **Refresh history** to advance the window.
-4. **Data quality: daily ranges and history coverage** (one tap down) shows each day's recorded range as bars on one scale, the compared run grey, and where the weekly figures come from.
+**Water use** shows the litres of each zone for today, this grow week and the time since the grow start. It also shows an estimate for the whole grow. It has a bar for each grow week. Under the bars, it shows the water of today for each zone and for each plant. A grow-day is from lights-on to the next lights-on.
 
-Run records themselves are kept in **Settings › Run records** (**Run records** on Compare runs goes there): **Add run** with the actual name, start date and optional end date, then **Save run record**. This saves metadata and a timestamped reference configuration; it does not arm irrigation. **Export metadata** backs up run definitions and reference snapshots, not Recorder readings. **Archive** and **Restore** keep the registered run's identity. Saving, archiving and importing run records need a Home Assistant administrator login; any login can view them. Registering last month's run today captures today's reference configuration: it cannot recover last month's setpoints or expired Recorder data. Each room supports up to 100 run records; a completed run covers 1–366 inclusive calendar days.
+The page reads the long-term statistics of Home Assistant, which Home Assistant keeps with no time limit. When you open the page outside Home Assistant, it can read only the recorded history, for the time that the recorder keeps it. The grow start is the start date of the grow plan of the zone, when the plan is armed or saved. Without a plan, the page calculates the grow start: the first day with water after five or more grow-days with no water. The panel shows which source it uses. A day that Home Assistant did not record has a flag, and the page does not count it as zero.
+
+**Compare runs** compares the run in progress with an earlier run, by grow week:
+
+1. Select **This run**, **Compare with** and the **Zone**. At the start, the page selects the last run that ended.
+2. Read the weeks table. For each week, it shows the typical day: VWC low to high, pore EC low to high, and water for each plant in a day. The figure of this run is above the figure of the compared run. **Largest differences** names up to three weeks with a large difference. A large difference is more than a few points of VWC, a few tenths of pore EC, or a fifth of the water.
+3. Open **Full-resolution chart, with a target reference** (one tap down). It draws the recorded VWC and EC for **Day**, **Week · 7 days**, **Calendar month**, **Run to date** or **Custom dates**.
+4. Select a **Target reference**: **Current configured daily plan**, **Saved run daily reference**, or **Current phase reference**.
+5. Read the note of the reference about its capture and its source.
+6. To move the window forward, select **Refresh history**.
+7. Open **Data quality and history coverage** (one tap down). It shows the recorded range of each day as bars on one scale. The compared run is grey. The section also shows the source of the weekly figures.
+
+The run records are in **Settings › Run records**. **Run records** on Compare runs opens them. To record a run, do these steps:
+
+1. Select **Add run**.
+2. Type the actual name, the start date and, if you know it, the end date.
+3. Select **Save run record**.
+
+The save records the metadata and a reference configuration with a time stamp. It does not arm a plan, and it starts no shot. **Export metadata** makes a backup of the run definitions and the reference snapshots. It does not include the readings of the Recorder. **Archive** and **Restore** keep the identity of the run. To save, archive or import run records, you must be a Home Assistant administrator. Each signed-in user can read them.
+
+When you record the run of last month today, the record gets the reference configuration of today. It cannot get back the setpoints of last month, or Recorder data that Home Assistant removed. Each room can have up to 100 run records. A run that ended covers 1–366 calendar days, the first day and the last day included.
 
 ## Equipment
 
 ### Probes
 
-At the top: how many probes are OK, whether the controller is reporting, and Jev's state. Then each zone's probes, name first with the entity ID under it, with the reading, when it last reported, the last six hours, whether the zone's reading uses it, and its health:
+The top of the page shows the number of correct probes, the report status of the controller and the status of the AI assistant. Below that, each zone shows its probes. Each probe shows these items:
 
-| Health           | Meaning                                                                                              |
-| ---------------- | ---------------------------------------------------------------------------------------------------- |
-| OK               | Reporting, in range, and moving as a probe should.                                                   |
-| Silent / Not reporting | The integration says it stopped reporting (or the zone's own reading went stale); since when. |
-| Out of range     | A reading the integration's range (0–100 % VWC, 0–20 mS/cm EC) says cannot be real.                  |
-| No reading       | Unavailable, unknown or not a number.                                                                |
-| Unchanged for    | The same reading for over 3 h (moisture) or 6 h (pore EC): likely stuck.                             |
-| Left out         | The integration combined the zone's other probes without it, and says why.                           |
+- Its name, with the entity ID below it.
+- Its reading, the time of its last report and its line of the last six hours.
+- If the zone uses its reading.
+- Its health.
 
-An older integration publishes only each zone's combined reading, which then stands in for its probes. Each zone's valve is shown beside its probes. **Room map** and **Controller internals** (every sensor of the room with its reading, the last hours and its availability, searchable and filterable) are one tap down. **Map probes** opens Setup.
+| Health | Meaning |
+| --- | --- |
+| OK | The probe reports, the reading is in range, and the reading changes as a probe reading does. |
+| Silent / Not reporting | The integration says that the probe stopped its reports, or the zone reading is stale. The page shows since when. |
+| Out of range | The reading is outside the range of the integration (0 to 100% VWC, 0 to 20 mS/cm EC). It cannot be real. |
+| No reading | The reading is unavailable, unknown or not a number. |
+| Unchanged for | The reading did not change for more than 3 h (VWC) or 6 h (pore EC). The probe is probably stuck. |
+| Left out | The integration combined the other probes of the zone without this probe. It gives the reason. |
+
+An older integration publishes only the combined reading of each zone. The page then shows that reading in place of the probes. The valve of each zone shows next to its probes.
+
+**Room map** and **All sensors of this room** are one tap down. **All sensors of this room** shows each sensor of the room with its reading, its last hours and its availability. You can search and filter it. **Map probes** opens **Setup**.
 
 ### Stock tanks
 
-**Next to run out** leads: the tank with the fewest batches left. Each tank shows its level against its low mark (amber within half again of it, red at it), with **Refilled**, **Set level** and the batches left. A tank linked to a dosing pump (in **Equipment › Dosing › Dosing setup**) says **Drawn by** that pump **as it doses**, with its recent draws: Crop Steering takes what the pump actually ran off it, whoever started the dose (the controller, an automation, or someone at the doser), and the tank's fills no longer count against it; its batches left are at the pump's recipe amount. **Record a batch** takes the recipe's doses off every tank; recent draws are one tap down. **Edit stock tanks** adds, renames and removes tanks.
+**Next to run out** is at the top. It is the tank with the fewest batches left. Each tank shows its level against its low mark. The level is red at or below the low mark, and amber at or below 1.5 times the low mark. Each tank also shows **Refilled**, **Set level** and the number of batches left.
 
-### Tank and pump
+A stock tank can have a link to a dosing pump in **Equipment › Dosing › Dosing setup**. That tank shows **Drawn by** that pump **as it doses**, with its recent draws. The integration takes from the tank the volume that the pump ran: the run time of the motor multiplied by the calibrated flow. This applies to each dose of the pump, from the controller, from an automation or from a person at the doser. A fill of the batch tank does not take from a linked tank. The batches left of a linked tank use the dose of its pump in the recipe.
 
-**Equipment › Tank & pump** draws the feed tank's level, EC, pH and temperature with a last-day line beside EC and pH, the pump's state, and the last recorded fill. **History** opens both readings over 24 hours, 7 days or 30 days with the feed-water gate drawn where the room gates on those probes. Choose **Map sensors**, or open **Equipment › Setup › Shared room hardware**. These are explicit mappings; the dashboard does not guess that a room-temperature or feed-water probe is a tank probe.
+**Record a batch** takes the doses of one batch from the stock tanks. The recent draws are one tap down. **Edit stock tanks** adds, renames and removes tanks.
 
-**Tank level and watering**, under the tank, draws the level over 24 hours, 3 days or 7 days with what moved it: each zone's shots as dots on the line, the pump's runs and the tank filling as bars above it, and each recorded fill as a dashed line. Hover or tap a mark to see what it was: the zone, how long its valve was open and about how many litres that is at the configured flow, or how long the pump ran or the tank filled. The list under the chart names every event in the range. It reads Home Assistant's recorder, as a zone's Today chart does, and keeps up as new readings arrive. The level is what the mapped level sensor reports, and the chart says plainly that the dashboard cannot tell whether that sensor measures the water or works it out, for example from pump run time since the last fill. Shots are valve open times, the pump and filling bars are the switches' own reports, and a recorded fill is a newer time on the last-fill record: a restart recording the same time again is not a fill.
+### Tank and feed
+
+**Equipment › Tank and feed** shows the level, the EC, the pH and the temperature of the feed tank. EC and pH have a line of the last day. The page also shows the pump state and the last recorded fill. The old Tank & pump address still opens it. **History** opens the two readings over 24 hours, 7 days or 30 days. When the room uses those probes for the source-water gate, it also shows the gate. To map the sensors, select **Map sensors**, or open **Equipment › Setup › Shared room hardware**. Each mapping is explicit. The dashboard does not guess that a room-temperature probe or a feed probe is a tank probe.
+
+**Tank minimum** is under the tank. It tells in words what the [reservoir minimum](#reservoir-minimum) does now:
+
+- The room can water.
+- The shots are held at the minimum, or because the controller cannot read the level.
+- The fill is stopped above the full mark.
+
+The panel shows the alert code, with a link to Help. It shows the minimum and the level at which the shots start again. When the controller knows the litres for each 1% of level, the panel shows about how many litres are above the minimum. It also shows the batch in the tank (the step that runs now, or how the last batch ended), with a link to **Dosing**. When the room has no tank level mapped for the controller, the panel says that the minimum is off, and gives a link to Setup.
+
+**Tank level and shots**, under that, draws the level over 12 hours, 24 hours (the default), 3 days or 7 days. It also shows what moved the level:
+
+- The shots of each zone are dots on the line. Across 7 days, the shots in the same hour share one dot.
+- The pump runs and the tank fills are bars above the line.
+- Each recorded fill is a dashed line.
+
+Two levels go across the chart. One is the tank minimum, in a room whose tank level the controller reads. The other is the refill reminder, when the dosing setup reads its reminder on this level. Hover over a mark or tap it to see what it was. For a shot, it shows the zone, the valve open time and about how many litres that is at the configured flow. For the pump or a fill, it shows the run time. The list under the chart names each event in the range. The chart reads the Home Assistant recorder, as the Today chart of a zone does, and it updates when new readings come.
+
+The level is the value that the mapped level sensor reports. The dashboard cannot tell if that sensor measures the water or calculates it, for example from the pump run time since the last fill. The chart says this. Shots are valve open times. The pump bars and fill bars are the reports of the switches. A recorded fill is a newer time on the last-fill record. A restart that records the same time again is not a fill.
 
 | Setup label             | Configuration key         | Select                                                                                                                |
 | ----------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Room pump               | `pump_switch`             | The room pump's actual HA switch. The controller descriptor publishes this as `pump`.                                 |
-| Tank fill level (%)     | `water_level_sensor`      | A percentage sensor, 0-100. A litres value is not a percentage.                                                       |
-| Tank EC (display)       | `tank_ec_sensor`          | A tank conductivity sensor in mS/cm or dS/m accepted by setup.                                                        |
+| Room pump               | `pump_switch`             | The actual switch, `input_boolean` or valve of the room pump in Home Assistant. The controller descriptor publishes it as `pump`. |
+| Tank fill level (%)     | `water_level_sensor`      | A percentage sensor, 0-100. A value in litres is not a percentage.                                                    |
+| Tank EC (display)       | `tank_ec_sensor`          | A conductivity sensor of the tank, in mS/cm or dS/m, that the setup accepts.                                          |
 | Tank pH (display)       | `tank_ph_sensor`          | A pH sensor.                                                                                                          |
-| Tank temperature        | `tank_temperature_sensor` | A tank-water temperature sensor in °C, °F or K; its unit is retained.                                                 |
-| Tank filling status     | `tank_fill_entity`        | A fill-valve switch or binary sensor whose on/off state represents fill activity.                                     |
-| Last recorded tank fill | `tank_last_fill_sensor`   | A timestamp sensor with a dated, timezone-aware state, or an `input_datetime` helper with both date and time enabled. |
+| Tank temperature        | `tank_temperature_sensor` | A temperature sensor in the tank water, in °C, °F or K. The setup keeps its unit.                                     |
+| Tank filling status     | `tank_fill_entity`        | A fill-valve switch or binary sensor that is on while the tank fills.                                                 |
+| Last recorded tank fill | `tank_last_fill_sensor`   | A timestamp sensor with a date and a time zone, or an `input_datetime` helper that has the date and the time.         |
 
-**Tank EC (display)** and **Tank pH (display)** only populate the panel. **Feed-water EC** and **Feed-water pH** are separate mappings used by configured control gates. Mapping a tank display does not enable those gates or nutrient dosing.
+**Tank EC (display)** and **Tank pH (display)** only fill the panel. **Feed-water EC** and **Feed-water pH** are different mappings, which the source-water gate uses when you configure it. A mapping of a tank display does not start the source-water gate or the nutrient dosing.
 
-**Last recorded fill** has the meaning supplied by your existing recording automation: for example, a verified full-float event or an operator's explicit “mark filled” action. A full date/time helper uses its timestamp attribute; a sensor's `last_changed`, an automation's `last_triggered`, a fill-mode enable flag and a dosing interlock are not equivalent to a fill record. The panel does not create a fill-recording automation for you. A percentage source may itself be an estimate; drawing it as a tank does not turn it into a measured level. Tank readings and switch reports do not prove dose completion, water quality suitability or physical delivery.
+**Last recorded fill** has the meaning that your recording automation gives it. For example, it can be the event of a full float that you verified, or a "mark filled" action of an operator. The panel uses the timestamp attribute of a date and time helper. These items are not a fill record: the `last_changed` of a sensor, the `last_triggered` of an automation, a flag that starts a fill mode, and a dosing interlock. The panel does not make a fill-record automation for you.
 
-Unmapped inputs show **Not mapped**; invalid readings show **Unavailable**, **Check units** or **Out of range**. An unknown pump is not shown as off and an unknown tank is not drawn empty. When disconnected, the panel identifies retained readings as last received.
+A percentage source can itself be an estimate. When the panel draws it as a tank, it does not become a measured level. Tank readings and switch reports do not prove that a dose is complete or that the water quality is correct. They do not prove that the plants got the water.
+
+An input that is not mapped shows **Not mapped**. A reading that is not valid shows **Unavailable**, **Check units** or **Out of range**. The panel does not show an unknown pump as off, and it does not draw an unknown tank as empty. When the dashboard is not connected, the panel shows the readings that it kept as the last readings that it received.
+
+#### Tank level for the controller
+
+The percentage sensor above only draws the tank. To let the controller read the level of the tank, map one or both of these sensors:
+
+- A **tank distance sensor** (`tank_distance_sensor`): an ultrasonic or radar sensor that gives the distance down to the water.
+- A **low float** (`tank_low_float`): a binary sensor.
+
+Map them in the `hardware` of the setup API, with the `tank_level` of the room:
+
+| `tank_level` field | Meaning |
+| --- | --- |
+| `full_mm` | The distance from the distance sensor down to the water when the tank is full, in millimetres. Necessary with a distance sensor. |
+| `empty_mm` | The same distance when the tank is empty. It must be more than `full_mm`. Necessary with a distance sensor. |
+| `float_low_state` | `on` (the default) or `off`: the state of the float that shows a low tank. |
+
+The unit of the distance sensor must be mm, cm, m, in or ft. The controller converts it to millimetres through the device-unit table, so the level is the same for each unit of the sensor. The setup refuses a sensor with a different unit or with no unit. The level is 0% at `empty_mm` and 100% at `full_mm`. Above the full mark, the level is more than 100%. The controller reads the level one time in each loop and publishes it as `sensor.crop_steering_tank_level` ([ENTITIES.md](ENTITIES.md)). The reservoir minimum below uses this level.
+
+The full float of the batch tank in the dosing setup is not a level, and the controller does not read it here.
+
+The controller trusts the sensor unless it is unavailable. Many sensors send a reading only when it changes, so the sensor of a quiet tank can send no reading for some hours. Thus the controller does a drawdown check: it compares the litres that the shots take with the decrease of the level. Each time the level decreases by 5% or more, the controller learns the litres for each 1% of level.
+
+When the controller knows this value, it can find a stuck sensor. The litres of the shots can be equal to 5% or more of level. If the level then decreased by less than a quarter of that, the sensor is stuck. The controller then publishes the level as unknown and writes the reason in the log. It trusts the sensor again when the level decreases by 5% or more, or when a refill increases the level by 2% or more. Before the level decreases by 5% one time with the shots counted, the controller cannot tell a stuck sensor from a full tank.
+
+#### Reservoir minimum
+
+When a tank level is mapped, the controller does not let the pump empty the tank, and does not let a fill overflow it. A room with no tank level mapped never gets these holds. After an update, no room has a tank level mapped until a person maps one. The full float of a batch tank does not count as a tank level.
+
+| What | When | What occurs |
+| --- | --- | --- |
+| Minimum | The level is 8% or less, or the low float reads low. | The controller holds each zone (CS-901) until the level is 12% or more and the float does not read low. The two levels stop a level near 8% from starting and stopping the room each minute. |
+| Level unknown | The distance sensor or the float gives no usable reading, or the drawdown check finds a stuck sensor. | The controller holds each zone (CS-902) until the sensor reads again. |
+| Plan-ahead refill | One more round of shots would take the level to 8% or less, at the learned litres for each 1% of level. | CS-903 asks for a refill, and the shots continue. A shot that alone takes the level to 8% or less waits until the refill. The controller plans nothing before it learns the litres for each 1%. |
+| Overfill guard | The level is 102% or more. | The controller closes the fill valve of a batch, and opens no fill valve, until the level is 98% or less (CS-904). The shots continue. |
+
+> **CAUTION:** Keep the tank above 12%. At 8% or less, the room gets no shots, rescue shots included.
+
+The controller keeps the minimum and overfill states in `/data/state.json`, with the drawdown check. After a restart with the level between two marks, the hold stays as it was. The tank level sensor shows them in its `below_minimum`, `over_full` and `minimum_pct` attributes.
 
 ### Dosing
 
-**Equipment › Dosing** runs the room's batch tank: it doses one pump by hand, and it makes a batch (fill the tank, mix it, dose each nutrient in order, mix again). Each room has its own page for its own tank. The page switches nothing itself: every action is reviewed, then sent as a request that the controller carries out within a few seconds. A request the controller could not take within two minutes is dropped, so nothing starts later by surprise. The pumps' own firmware times each dose: Home Assistant sets the amount and presses start, and the controller switches a pump's power off only if it runs past its time.
+**Equipment › Dosing** operates the batch tank of the room. It doses one pump by hand, and it makes a batch: it fills the tank, mixes it, doses each nutrient in order, and mixes it again. Each room has its own page for its own tank. The page itself switches nothing. You examine each action in a review, and then the page sends it as a request. The controller does the request within a few seconds.
 
-- **The tank**, in one line: its level, whether the float reads full, EC, pH and temperature (from the room's tank mapping), and what the batch is doing.
-- **Stock**: every stock tank a pump is linked to, in pump order, with its level, its litres and about how many batches it has left, its low mark drawn. **Stock tanks** opens them.
-- **A card per pump**: the pump drawn (its rotor turns while it doses), its name and device, its state, its last dose, its calibrated flow in mL/s, and the stock tank it is linked to: drawn to scale, with its litres and about how many batches that is at its recipe amount (or doses at its last dose, when the recipe passes the pump by). The bottle turns amber, with **Low**, at the tank's low mark and red, with **Very low**, at half of it. A bar fills while it doses. Choose a card to dose that pump.
+The controller does not act on a request that is older than two minutes, so nothing starts later without warning. The firmware of each pump controls the time of each dose: Home Assistant sets the volume and presses start. The controller sets the power of a pump to off only when you stop the dose, or when the pump runs past its time.
+
+- **The tank**, in one line: its level, the state of the full float, the EC, the pH, the temperature and the step of the batch. The readings come from the tank mapping of the room.
+- **Stock**: each stock tank that has a link to a pump, in pump order. Each tank shows its level, its litres, about how many batches it has left, and its low mark. **Stock tanks** opens them.
+- **A card for each pump**: a picture of the pump, its name and device, its state, its last dose, its calibrated flow in mL/s, and its linked stock tank. The rotor of the picture turns while the pump doses. The card draws the stock tank to scale, with its litres and the number of batches at the recipe volume of the pump. When the recipe does not use the pump, the card shows the number of doses at the last dose. The bottle is amber, with **Low**, at the low mark of the tank, and red, with **Very low**, at half of the low mark. To dose a pump, select its card.
 
 | State          | Meaning                                                                                  |
 | -------------- | ---------------------------------------------------------------------------------------- |
 | Idle           | Ready to dose.                                                                           |
-| Dosing         | The controller or the pump itself says it is dosing.                                     |
-| Not calibrated | Its flow reads nothing or 0 mL/s, so the controller will not start it. Calibrate it first. |
-| Unavailable    | Greyed out with a question mark: the controller is not reporting, or one of the pump's entities is missing or unavailable. The card says which. |
+| Dosing         | The controller or the pump itself says that the pump doses.                              |
+| Not calibrated | Its flow reads nothing, or less than 0.05 mL/s. The controller does not start it. Calibrate the pump first. |
+| Unavailable    | Grey, with a question mark. The controller does not report, or an entity of the pump is missing or unavailable. The card tells which. |
 
-- **Dose a pump**: type the mL, up to the pump's largest dose; the page says how long it takes at the pump's flow. **Start** opens the review. The dose goes into the tank as it is, and watering carries on. While it runs, the pump's **status** shows the target, the elapsed time and the mL so far, worked out from the time and the flow.
-- **Make a batch**: the steps, each marked done, now, passed by or to come, beside the recipe with each pump's mL, the total and the time it takes. **Make a batch** opens the review. Watering is held in the room, and in any room whose pump or valves the batch uses, until the batch finishes or is stopped. A pump in the recipe that cannot dose now is named before you start: the batch would stop at its dose, after filling and mixing. An amount read from an entity that reads nothing is named too, and no batch is made: the controller would refuse it.
-- **Stop dosing** and **Stop the batch** send one stop: every dosing pump in the room is switched off, and a running batch ends with the fill valve closed, the mixing pump off and watering released. It replaces any request still waiting.
+- **Dose a pump**: type the mL, up to the largest dose of the pump. The page shows the time that the dose takes at the flow of the pump. **Start** opens the review. The dose goes into the tank as it is, and the shots continue. While the dose runs, the **status** of the pump shows the target, the time since the start and the mL so far. The page calculates the mL from the time and the flow.
+- **Make a batch**: the steps of the batch, each marked done, now, passed by or to come. Next to the steps is the recipe, with the mL of each pump, the total and the time. **Make a batch** opens the review. The controller holds the shots in the room until the batch ends or stops. It also holds the shots in each room whose pump, main-line valve or valves the batch uses. It holds the shots in each room that shares the pump or the main-line valve too. Before you start, the page names each pump in the recipe that cannot dose now. It also names each volume that comes from an entity that reads nothing. In these two conditions, the controller refuses the batch before anything moves.
+- **Stop dosing** and **Stop the batch** send one stop. The controller sets the power of each dosing pump of the room to off. A batch that runs then ends: the controller sets the fill valve, the mixing pump and the mixing valves to off, and then releases the shots. The stop replaces a request that still waits.
 - **History**: the last doses and batches, what each dosed and how it ended.
-- **Dosing setup** (one tap down): each pump's dose volume, start, dosing state, power switch, calibrated flow and stock tank (one pump to a tank); the batch hardware (fill valve and float, mixing pump, valves and power, what to switch off before filling, the timings); and the recipe in dose order, each amount fixed or read from an entity at the start of each batch. A Home Assistant administrator edits it and saves it after a review; anyone else can read it.
+- **Dosing setup** (one tap down): for each pump, its dose volume, start, dosing state, power switch, calibrated flow and stock tank (one pump for each tank). The batch hardware: the fill valve and the float, the mixing pump, the valves and the power, the equipment to switch off before the fill, and the times. The recipe, in dose order: each volume is fixed, or read from an entity at the start of each batch. A Home Assistant administrator edits the setup and saves it after a review. Other users can read it.
 
-A room without pumps says what dosing does, with **Set up dosing**. Dosing, batches and the setup need a Home Assistant administrator login; any login can watch. [Batch-tank dosing](DOSING.md) describes what the integration, the controller and this page each do.
+A room with no pumps tells what dosing does, and shows **Set up dosing**. To dose, make a batch or change the setup, you must be a Home Assistant administrator. Each signed-in user can watch the page and stop the dosing. [Batch-tank dosing](DOSING.md) tells what the integration, the controller and this page each do.
 
 ### Setup
 
-An HA administrator uses **Equipment › Setup**. Pair devices and expose their entities in HA first; this workspace maps existing entities.
+A Home Assistant administrator uses **Equipment › Setup**. Pair the devices and their entities in Home Assistant first. The setup maps entities that exist. It does not pair devices.
 
-1. Choose an existing room or **Add room**. Give it a clear name. Names may change without changing its stable identity. Say how the room is plumbed (zone valves only, or a pump and valves); nothing is guessed from empty fields.
-2. Map **Room pump** and **Mainline valve** where the plumbing has them, then each active zone's valve. Search by friendly name or exact entity ID; inspect the displayed value/unit before selecting.
-3. Select one or more VWC and EC probes per zone. **Clear mapping** removes the selected mapping; **Done** closes the picker. Multiple valid readings are combined by the integration, which leaves out a probe that is not reporting or out of range and says so (see [Probes](#probes)).
-4. Enter plant count, substrate litres **per plant** (or choose a pot or rockwool preset), drippers **per plant**, and flow in litres/hour **per dripper**. **Units** in Settings switch volume and flow to US gallons and GPH for typing; values are saved in litres. A zone's catch test works out the flow per dripper from a timed catch and fills only the draft.
-5. Map optional room equipment, tank displays and any feed-water safety probes as separate roles. Explicitly map shared equipment only where appropriate; never reuse a zone valve accidentally.
-6. Stop affected engines and verify the implicated irrigation equipment is OFF. **Review configuration** shows the changes and blockers; **Save configuration** persists the setup after backend validation.
-7. Wait for controller acknowledgement of the saved setup revision. A saved configuration and an adopted configuration are different states. Then verify **Today** and **Equipment › Probes** before restoring the prior scheduling state.
+1. Select a room, or select **Add room**. Give the room a clear name. You can change the name later, and the room keeps its ID.
+2. Tell the setup how the room is plumbed: zone valves only, or a pump and valves. The setup does not guess from empty fields.
+3. Map the **Room pump** and the **Mainline valve**, if the room has them.
+4. Map the valve of each active zone. Search by the friendly name or by the exact entity ID. Examine the value and the unit before you select an entity.
+5. Select one or more VWC probes and EC probes for each zone. **Clear mapping** removes the selected mapping. **Done** closes the picker.
+6. Enter the plant count of each zone.
+7. Enter the substrate volume **for each plant**, in litres. You can also select a pot preset or a rockwool preset.
+8. Enter the number of drippers **for each plant**, and the flow **of each dripper**, in litres per hour.
+9. Map the optional room equipment, the tank displays and the feed probes. Each has its own role.
+10. Set the kill switch of the affected rooms to off. Make sure that their pump, main-line valve and zone valves are off.
+11. Select **Review configuration**. Examine the changes and the problems that stop the save.
+12. Select **Save configuration**. The integration checks the setup before it saves it.
+13. Wait until the controller accepts the saved setup revision. A saved setup and an accepted setup are different states.
+14. Examine **Today** and **Equipment › Probes**. Then set the switches back to their earlier states.
 
-Zone and room removal archives stable IDs. **Restore zone** or **Restore room** reactivates the same identity after review; archived slots are not silently reused for different hardware. Adding/archiving a zone may require updating a draft grow plan's assignments.
+A pump, a main-line valve or a zone valve can be a switch, an `input_boolean` helper or a valve entity. The setup refuses other types, for example a cover or a light. A valve must read closed, and a switch must read off, before the setup saves.
 
-Under the rooms, **substrate, sizing and safety limits** are the numbers the controller works with, per zone and for the room: full saturation (with a suggestion from the zone's learned or typical daily peak, used only in the draft), substrate and hardware sizing, and, one tap down, the safety limits (daily water limit, maximum substrate EC, watchdog and the like). Each change is reviewed before it is written. **Water & calibration** (one tap down) shows what a shot of each phase delivers in litres per zone and millilitres per plant, the runtime and its caps, and a catch-test calculator that tries a measured flow in that calculation only; it does not write calibration or operate irrigation.
+When a zone has more than one correct reading, the integration combines them. It leaves out a probe that does not report or is out of range, and it tells you why (see [Probes](#probes)).
+
+**Units** in Settings changes the volume and the flow to US gallons and GPH for the input. The setup saves the values in litres. The catch test of a zone calculates the flow of each dripper from a timed catch. It changes only the draft.
+
+> **CAUTION:** Do not map a zone valve to two zones. Map shared equipment only when the rooms really share it.
+
+When you remove a zone or a room, the setup archives its ID. **Restore zone** or **Restore room** gives back the same ID, after a review. The setup does not use an archived ID for different hardware. When you add or archive a zone, update the zones of a draft grow plan.
+
+Below the rooms, **substrate, sizing and safety limits** shows the numbers that the controller uses, for each zone and for the room:
+
+- Full saturation, with a suggestion from the learned or typical daily peak of the zone. The suggestion goes only into the draft.
+- The substrate size and the hardware size.
+- One tap down, the safety limits: the daily water limit, the maximum EC, the watchdog and other limits.
+
+Each change shows a review before the dashboard writes it. **Water & calibration**, one tap down, shows the water of a shot of each phase, in litres for each zone and millilitres for each plant. It also shows the run time, its limits and a catch-test calculator. The calculator uses a measured flow only in that calculation. It does not write a calibration, and it starts no shot.
 
 ## Settings & help
 
 **Settings** holds:
 
-- **Home Assistant connection**. The native HA sidebar normally uses your existing HA session. An explicit URL and a long-lived access token also work for a standalone tab; the token is kept for that tab session and is never put in the URL. A hosted HTTPS page may be unable to access a local HTTP HA server because of browser origin/security rules; use the native sidebar for the normal installation.
-- **Room on / off**: switch the room off when nothing is growing in it. Off, the controller does not water it and raises no alerts for it, and a shot already running stops within a few seconds. On within a day it carries on where it was; on after longer, daily counters and learned phase state reset for a fresh run.
-- **Watering**: the room's engine switch ("Engine Enabled" in Home Assistant on a room made by the setup wizard). With watering off the controller opens no valve in the room and a shot already running stops within a few seconds; it keeps reading the probes and following the phases. A new room starts with watering off.
-- **Every zone's scheduling**: one switch for every zone of the room, as the header toggle of a Home Assistant entities card. It is on while any zone is on. Off pauses every zone; on switches every zone on, a zone you paused yourself included. Each zone still has its own switch on its page, and like them this one asks for a review first.
+- **Home Assistant connection**. The Home Assistant sidebar usually uses your current Home Assistant session. A separate browser tab can also use a URL and a long-lived access token. The tab keeps the token for its session only, and never puts it in the URL. A hosted HTTPS page can fail to connect to a local HTTP Home Assistant server, because of the security rules of the browser. For a normal installation, use the Home Assistant sidebar.
+- **Room on or off** (`room_active`): tells the controller that plants grow in the room. When the room is off, the controller gives no shots of any type in the room, rescue shots included, and sends no alerts for it. A shot that runs stops within a few seconds. After less than 24 h off, the controller continues from where it stopped. After 24 h or more off, it starts a new run with each zone in P3.
+- **Watering** (`engine_enabled`): the kill switch of the room. Home Assistant shows it as "Engine Enabled" on a room that the setup wizard made. When it is off, the controller starts no shot in the room, rescue shots and test shots included. A shot that runs stops within a few seconds. The controller continues to read the probes and follow the phases. A new room starts with the kill switch off.
+- **Every zone's scheduling**: one switch for all the zones of the room. It is on while one or more zones are on. Off pauses each zone. On sets each zone to on, also a zone that you paused. Each zone also has its own switch on its page. This switch also shows a review before it changes.
+
+> **WARNING:** Isolate the electrical power before you do work on a pump, a valve or the wiring. The kill switch stops the controller only. It does not isolate the power.
+
+> **CAUTION:** Do not set the room or the kill switch to off while plants grow in the room. The plants then get no water, not even a rescue shot.
 - **Run records**: see [History](#history).
-- **Appearance**: **Home Assistant / system** inherits the HA theme when embedded on the same origin, or the device theme in standalone mode; **Light** and **Dark** are explicit overrides. Cross-origin embedding cannot read the host theme. **Water today, shown as** chooses whether a zone's page leads with the zone's total, the default, or each plant's share (the zone's water today divided by its plant count from Setup, as if every plant got the same). The choice is the room's, kept in Home Assistant (`select.crop_steering_<prefix>water_today_view`): everyone who opens a zone's page sees water that way, and the controller's vitals notification follows it. Today compares the zones per plant either way; water use over the grow stays in litres per zone.
-- **Units**: how pot volume and dripper flow are shown and typed in this browser.
+- **Appearance**: **Home Assistant or system** uses the Home Assistant theme when the dashboard is embedded on the same origin. In standalone mode, it uses the device theme. **Light** and **Dark** override the theme. A cross-origin embed cannot read the theme of the host. **Water today display** selects how the page of a zone shows the water today: the zone total (the default), or the share of each plant. The share of each plant is the water today of the zone divided by its plant count from Setup. The room keeps the choice in Home Assistant (`select.crop_steering_<prefix>water_today_view`). Each person who opens the page of a zone sees water that way, and the vitals notification of the controller follows it. Today compares the zones for each plant in both cases. Water use over the grow stays in litres for each zone.
+- **Units**: the units that this browser uses to show and accept the substrate volume and the dripper flow.
 - **Sample workspace**, in the demo only.
 
-Inside a compatible same-origin HA shell, the workspace temporarily collapses HA's sidebar. Use **Home Assistant** at the bottom of the workspace navigation, or the house button labelled **Open Home Assistant menu** in the top bar, to reopen HA's menu. Leaving the workspace restores the prior temporary state; it does not change the saved HA sidebar preference. Standalone and unsupported embeddings keep normal navigation. See [Home Assistant sidebar](HA_SIDEBAR.md) for compatibility limits.
+In a compatible Home Assistant shell on the same origin, the workspace collapses the Home Assistant sidebar for a time. To open the Home Assistant menu again, select **Home Assistant** at the bottom of the workspace menu. You can also select the house button **Open Home Assistant menu** in the top bar. When you leave the workspace, the sidebar goes back to its earlier state. The workspace does not change the saved sidebar setting of Home Assistant. In standalone mode, and in an embedding that is not supported, the menu does not change. For the limits, see [Home Assistant sidebar](HA_SIDEBAR.md).
 
-After an update, the first person to open the dashboard sees **What's new**: the main changes of every release this installation had not yet shown, in a few plain lines each, with a link to the full release notes. It shows once for everyone, never on a new installation, and **Help › What's new** opens the latest releases again at any time.
+After an update, the first person who opens the dashboard sees **What's new**. It shows the main changes of each release that this installation did not show before, in some plain lines for each release. It also gives a link to the full release notes. It shows one time for all users, and it does not show on a new installation. **Help › What's new** shows the latest releases again at any time.
 
-**Help** lists every error code an alert or Repairs card can end with (such as CS-101), searchable, with what it means, what happens to watering meanwhile, likely causes and fixes; `#/help?code=CS-101` opens one. Its glossary explains VWC, pore EC, dryback, the four phases, steering and runoff.
+**Help** lists each alert code, for example CS-101. An alert or a Repairs card ends with one of these codes. You can search the list. For each code, Help tells what it means, its effect on the shots, the probable causes and the fixes. The address `#/help?code=CS-101` opens one code. The glossary of Help explains VWC, pore EC, dryback, the four phases, steering and runoff.
 
-For an existing timed zone hold, Home Assistant exposes the `crop_steering.set_manual_override` action. The action refuses a signed-in user who is not an administrator (automations can still call it); the switch itself follows Home Assistant's own user permissions. Its timeout defaults to 60 minutes and accepts 1-1440 minutes; specify the intended zone and room slug (omit the room for the legacy default room). Clearing the hold is distinct from enabling zone/room scheduling. Turning its switch on directly creates an indefinite hold. See the action's fields in HA and the [entity reference](ENTITIES.md).
+The manual override is a maintenance lockout for one zone. While it is on, the controller gives the zone no shot of any type, rescue shots and test shots included. It also stops a shot that runs in the zone.
+
+- The switch `switch.crop_steering_zone_N_manual_override` sets the override. It stays on until you set it to off. The switch follows the user permissions of Home Assistant.
+- The action `crop_steering.set_manual_override` sets a timed override. Its timeout is 1 to 1440 min, and the default is 60 min. Give the zone and the room slug. For the old default room, give no room. The action refuses a signed-in user who is not an administrator. An automation can still use it.
+
+To release the override is not the same as to set the zone switch or the room switch to on. See the fields of the action in Home Assistant and the [entity reference](ENTITIES.md).
+
+> **WARNING:** Isolate the electrical power before you do work on a pump or a valve. The override does not isolate the power. Shots in other zones can start the pump of the room.
+
+> **CAUTION:** Set the override to off after the work. While it is on, the zone gets no water, not even a rescue shot.
 
 ## Settings & help › Notifications
 
-Every alert is still a Home Assistant notification, as before. This page chooses who gets a phone push for what, for the whole site: a row per phone, a checkbox per kind of alert, and a push goes only to the phones whose row ticks its kind. An alert that falls under two ticked kinds reaches that phone once. [Notifications](NOTIFICATIONS.md) describes what the integration, the controller and this page each do.
+Each alert is still a Home Assistant notification. This page selects who gets a phone push for each kind of alert, for the whole site. The grid has one row for each phone and one checkbox for each kind of alert. A push goes only to the phones whose row ticks its kind. An alert of two ticked kinds goes to that phone one time. [Notifications](NOTIFICATIONS.md) tells what the integration, the controller and this page each do.
 
-- **The grid**: each row is a phone, named by whose it is and the device; a notify service that is not one of the site's phones, such as a group, shows its name (`notify.family`). Each column is a kind of alert: Emergencies, Hardware lockouts, Sensors and drift, Watering stopped, Phase changes, Stock tanks, Dosing, Jev, and Setup and settings. Open a column's heading for what it covers: its alert codes with their titles (each opens Help), and the pushes that are not alerts, a zone changing phase and Jev moving a setting.
-- **Rooms**: **All**, or the rooms you choose. Taking the last chosen room out covers every room again.
-- **High priority for emergencies**: critical alerts reach that phone as high-priority, time-sensitive pushes.
-- **Send a test**: one push to that phone, and beside the button whether it went.
-- **Watering stopped**: "Tell me when a room has watered nothing for 3 hours with the lights on", from 1 to 12 hours. The controller then raises CS-209 for the room and pushes it to the phones that tick Watering stopped, again every so many hours while it lasts; the next shot ends it. The clock runs only while a zone is in P1 or P2, not in the morning dryback or overnight.
-- **Add a phone** (administrators): one of the site's phones not listed yet, or any notify service by its name. A new row starts with Emergencies ticked for every room. The bin beside a row removes it.
+- **The grid**: each row is a phone, with the name of its owner and the device. A notify service that is not a phone of the site, for example a group, shows its name (`notify.family`).
+- Each column is a kind of alert: Emergencies, Hardware lockouts, Sensors and drift, Shots stopped, Phase changes, Stock tanks, Dosing, AI assistant, and Setup and settings.
+- Open the heading of a column to see what it contains. It lists its alert codes with their titles, and each code opens Help. It also lists the pushes that are not alerts: a zone that changes phase, and a setting that the AI assistant moves.
+- **Rooms**: **All**, or the rooms that you select. When you remove the last selected room, the row covers all rooms again.
+- **High priority for emergencies**: critical alerts go to that phone as high-priority pushes.
+- **Send a test**: one push to that phone. The page shows if the push went.
+- **Shots stopped**: set **Alert after no shot for** (for example 3 hours with the lights on). The value is 1 to 12 hours.
+- When that time passes, the controller sends CS-209 for the room to the phones that tick Shots stopped. It sends it again after the same time while no shot occurs. The next shot ends the alert.
+- The time counts only while a zone is in P1 or P2. It does not count in the morning dryback or overnight.
+- **Add a phone**: an administrator can add a phone of the site, or a notify service by its name. A new row starts with Emergencies ticked for all rooms. The bin next to a row removes it.
 
-Changes are a draft until **Review and save**: the review lists what changes for each phone, and nothing is saved before it. If someone else saved meanwhile, the page reads their setup again with your changes kept on top, and asks you to check them and save again. A room no row sends emergencies to is named above the grid: "Nobody gets emergencies for Flower 1". Its emergencies are not lost meanwhile: they go to every phone that gets emergencies, or to the controller app's `notify_service` option when none does. Tapping any push opens Crop Steering.
+The changes stay in a draft until **Review and save**. The review lists the changes for each phone, and nothing is saved before it. If a different person saved in the meantime, the page reads that setup again and keeps your changes on top. Examine them, and save again.
 
-A Home Assistant administrator changes every row, adds and removes phones and sets the threshold. Anyone else sees every row but ticks only their own phone's, and tests only that phone: "Only an administrator can change other people's phones". On a phone, the grid is a card per phone with the same checkboxes.
+Above the grid, the page names each room that no row sends emergencies to, for example "Nobody gets emergencies for Flower 1". The emergencies of that room go to each phone that gets emergencies. When no phone gets emergencies, they go to the `notify_service` option of the controller app. A tap on a push opens Crop Steering.
 
-With no phone listed, every push goes to the controller app's `notify_service` option, the way it always has, so an installation that never opens this page behaves as before.
+A Home Assistant administrator can change each row, add and remove phones, and set the time. Other users see each row, but they can tick and test only their own phone. They see "Only an administrator can change other people's phones". On a phone, the grid shows one card for each phone, with the same checkboxes.
+
+When no phone is in the list, each push goes to the `notify_service` option of the controller app, as before. An installation that never opens this page thus works as before.
 
 ## A daily routine
 
-1. Open **Today**. A room that is watering with no flagged card needs nothing; read what Jev changed.
-2. Open any flagged zone from its card: its numbers, the day's chart and **Controls** say what happened and what the controller waits for.
-3. Change targets on **Plan › Targets** only through the review; check the readback.
-4. Once a day or after a change, glance at **Equipment › Probes** and **Stock tanks**.
+1. Open **Today**. A room with shots in progress and no flagged card needs nothing.
+2. Read **AI assistant changes today**.
+3. Open each flagged zone from its card. Read its numbers, its day chart and its **Controls**.
+4. Change targets only in **Plan › Targets**, through the review.
+5. Examine the readback after each change.
+6. Once each day, or after a change, examine **Equipment › Probes** and **Stock tanks**.
 
 ## What the numbers mean
 
-- **Water per zone and per plant**: zone water is the controller's delivered estimate for all the zone's plants; per plant divides it by the plant count. Substrate litres describe the combined pot capacity; they are not water delivered. Runtime estimates multiply dripper flow by run time and respect the controller's duration limit.
-- **Dryback** is relative to the peak: (peak VWC − current VWC) ÷ peak VWC × 100. A 60 % peak and a 10 % dryback target mean 54 % VWC, not 50 %. Athena's overnight dryback targets are set the same way.
-- **Steering balance**: 0 % uses the vegetative endpoint, 100 % the generative one, and values between blend their explicit parameters. Pot size and dripper flow convert shot percentages to volume and time.
-- **Planning versus history**: the day's projected curve is drawn from targets; recorded history comes from Home Assistant's Recorder. Neither an event acknowledgement nor a modelled curve proves physical delivery.
-- **Run comparisons** align runs by grow age and stop the previous run at the current one's age. A saved target reference shows when it was captured; backdating a run does not recreate old targets or readings removed by Recorder retention.
-- **When changes take effect**: target writes use fresh bounds and state readback. Grow plans are saved as drafts, explicitly armed, then activated at a local lights-on boundary; disarming an active plan retains its targets until the next boundary. Mapping changes require disarmed engines and hardware OFF; saving configuration confirms Home Assistant storage, and the controller's revision acknowledgement comes after.
-- **What is not claimed**: this controller does not regulate room climate or predict yield or potency. Historical manual-shot and phase-event services have no verified execution consumer in the shipped polling engine and are not exposed as operating buttons. Missing or stale readings stay unavailable.
+- **Water for each zone and each plant**: the water of a zone is the calculated water for all the plants of the zone. The water for each plant is that value divided by the plant count. The litres of substrate are the volume of all the pots. They are not the water that the plants got. A run time estimate is the water divided by the zone flow, inside the longest shot limit of the controller.
+- **Dryback** is a percentage of the peak: (peak VWC − current VWC) ÷ peak VWC × 100. A peak of 60% and a dryback target of 10% give 54% VWC, not 50%.
+- **Steering balance**: 0% uses the vegetative endpoint and 100% uses the generative endpoint. A value between them mixes the values of the two endpoints. The pot size and the dripper flow change a shot size into a volume and a time.
+- **Plan and history**: the dashboard draws the expected curve of the day from the targets. The recorded history comes from the Recorder of Home Assistant. A modelled curve does not show the water that the plants got. A confirmed event does not show it either.
+- **Run comparisons** align the runs by grow age. They stop the earlier run at the age of the current run. A saved target reference shows when the dashboard recorded it. A run that you register later does not get back old targets, or readings that the Recorder removed.
+- **When changes start**: a target change reads the limits of the number again, and then reads the value back. A grow plan is saved as a draft, then armed, then started at a local lights-on. When you disarm an active plan, its targets stay until the next lights-on. A mapping change needs disarmed rooms and all the equipment off. The save confirms the storage in Home Assistant. The controller accepts the revision after that.
+- **What the controller does not do**: it does not control the climate of the room. It does not predict yield or potency. The old manual-shot and phase-event services have no confirmed use in the controller, so the dashboard does not show them as buttons. A missing or stale reading stays unavailable.
 
 ## Understand the graphs and water figures
 
 | View                          | What it shows                                                                                                            | What it does not establish                                                                  |
 | ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------- |
-| A zone's day chart            | Today's recorded VWC, pore EC, shots, phases and Jev's decisions, with the expected rest of the day dashed.              | Exact future shot times, uptake, runoff or EC accumulation.                                 |
-| Targets' day curve            | Configured targets, phase references and supported timing, with local draft changes where applicable.                    | A forecast of the physical VWC/EC trajectory.                                               |
-| Recorded behaviour, history   | Retained HA Recorder measurements on separate VWC and EC axes.                                                           | Measurements from periods Recorder did not retain.                                          |
-| Water delivered this grow-day | The controller's recorded estimate from its configured flow and elapsed shot runtime, including accounted partial shots. | Independent meter readings, uniform distribution, plant uptake or external irrigation.      |
-| Water use estimate            | Water used so far plus the last 7 full grow-days' average for every grow-day left in the grow plan.                      | A forecast of plant uptake, or a total for a grow whose plan length is unknown.             |
-| Average mL per plant          | Zone estimated water divided by configured plant count.                                                                  | A measurement from each emitter.                                                            |
-| Total substrate capacity      | Substrate volume per plant multiplied by plant count.                                                                    | Water delivered or water retained.                                                          |
-| Runtime/phase water preview   | A conditional calculation from supplied settings, showing requested versus effective runtime and caps.                   | A guaranteed daily total; feedback-dependent maintenance/emergency shot counts are unknown. |
+| A zone's day chart            | The recorded VWC, pore EC, shots and phases of today, and the decisions of the AI assistant. A dashed line shows the expected rest of the day. | The exact times of future shots, the uptake, the runoff or the EC that builds up.           |
+| Targets' day curve            | The configured targets, the phase references and the timing, with the local draft changes.                              | A forecast of the physical VWC and EC.                                                      |
+| Recorded behaviour, history   | The measurements that the HA Recorder kept, on separate VWC and EC axes.                                                 | Measurements from the periods that the Recorder did not keep.                               |
+| Water delivered this grow-day | The estimate that the controller records from its configured flow and the run time of each shot, partial shots included. | Meter readings, an equal distribution, plant uptake or water from other sources.            |
+| Water use estimate            | The water used so far, plus the average of the last 7 full grow-days for each grow-day that is left in the grow plan.   | A forecast of plant uptake, or a total for a grow with no known plan length.                |
+| Average mL per plant          | The estimated water of the zone divided by the configured plant count.                                                   | A measurement from each dripper.                                                            |
+| Total substrate capacity      | The substrate volume for each plant multiplied by the plant count.                                                       | The water that the plants got, or the water that the substrate kept.                        |
+| Runtime/phase water preview   | A calculation from the settings. It shows the requested run time against the effective run time and the limits.         | A daily total. The number of maintenance shots and rescue shots depends on the probes, so it is not known. |
 
-The targets' day curve uses separate axes for VWC (%) and root-zone EC, joining configured references across lights-off and overnight to the next lights-on. VWC joins the daytime reference to the relative dryback endpoint; the P3 rescue floor remains a separate protection reference. Dashed EC interpolates from the last daytime anchor to the next morning anchor. There is no P3 EC setpoint or prediction of the physical EC/salt trajectory. Missing values remain gaps rather than being filled with guessed readings. A graph handle changes configuration in a draft, not physical equipment.
+The day curve of the targets has separate axes for VWC (%) and EC. It joins the configured references across lights-off and the night to the next lights-on. The VWC line joins the reference of the day to the end point of the relative dryback. The P3 rescue floor stays a separate protection reference. The dashed EC line goes from the last anchor of the day to the anchor of the next morning.
 
-Use the catch test in **Equipment › Setup › Water & calibration** (or a zone's own catch test in its sizing) to enter an actual catch result and inspect the proposed dripper flow. Neither applies it by itself. Historical estimates are not retroactively corrected when flow settings change. For detailed software semantics, see [Steering and planning](GROW_PLANS.md).
+There is no P3 EC setpoint, and no prediction of the physical EC or salt. A missing value stays a gap, and the dashboard does not fill it with a guess. A handle on the graph changes the configuration in a draft. It does not change the physical equipment.
+
+To enter the result of a real catch test, use the catch test in **Equipment › Setup › Water & calibration**. Then examine the proposed dripper flow. You can also use the catch test in the sizing of a zone. Neither catch test applies the flow by itself. When the flow settings change, the old estimates do not change. For the details of the software, see [Steering and planning](GROW_PLANS.md).
 
 ## Connect an LLM with MCP
 
-The optional [MCP connection guide](MCP.md) describes the local stdio server, supported clients, token configuration and exact tools. It is separate from the dashboard and does not need to be enabled for normal use.
+The optional [MCP connection guide](MCP.md) tells about the local stdio server, the supported clients, the token configuration and the tools. The server is separate from the dashboard. You do not need it for normal use.
 
-The server uses `HA_URL` and `HA_TOKEN` from local configuration and starts read-only. Follow [MCP.md](MCP.md) for installation and your client's stdio command; do not paste the token into a chat message.
+The server gets `HA_URL` and `HA_TOKEN` from the local configuration. It starts in read-only mode. To install the server and get the stdio command of your client, follow [MCP.md](MCP.md). Do not paste the token into a chat message.
 
 | Tools                                       | Purpose                                                                                                                |
 | ------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| `list_rooms`                                | Discover real room IDs before selecting a scope.                                                                       |
-| `get_room_configuration`, `get_room_status` | Inspect the selected room's mappings/configuration and current state.                                                  |
-| `search_candidate_entities`                 | Find existing HA entities for a proposed mapping.                                                                      |
-| `get_room_plan`, `get_room_runs`            | Read the room's stored plan and run records.                                                                           |
-| `preview_setup`, `preview_plan`             | Prepare an exact setup change or draft-plan save and return its diff, room, revision, expiry and proposal token.       |
-| `apply_proposal`                            | Apply only the previously reviewed proposal using its token, room ID and expected revision, then read back the result. |
+| `list_rooms`                                | Finds the real room IDs before you select a scope.                                                                     |
+| `get_room_configuration`, `get_room_status` | Reads the mappings, the configuration and the current state of the selected room.                                      |
+| `search_candidate_entities`                 | Finds HA entities that exist, for a proposed mapping.                                                                  |
+| `get_room_plan`, `get_room_runs`            | Reads the stored plan and the run records of the room.                                                                 |
+| `preview_setup`, `preview_plan`             | Prepares an exact setup change or a save of a draft plan. Returns its diff, room, revision, expiry and proposal token.  |
+| `apply_proposal`                            | Applies only the proposal that you reviewed, with its token, room ID and expected revision. Then reads back the result. |
 
-A practical first request is: “List my rooms, inspect the selected room's mappings and report unavailable sources. Do not apply changes.” For editing, ask the model to prepare a proposal and show its entire diff before requesting approval.
+A good first request is: “List my rooms. Examine the mappings of the selected room and report the sources that are unavailable. Do not apply changes.” For a change, tell the model to prepare a proposal. Tell the model to show the full diff before it asks for your approval.
 
-Application is available only when you deliberately configure `CROP_STEERING_ALLOW_WRITES=true`. Proposals expire after ten minutes and are single-use; changed revisions or an expired proposal require a fresh preview/review. Existing-room setup can update names, mappings and sizing; plan writes save drafts only. Backend validation and equipment-OFF requirements still apply to setup.
+The server can apply a proposal only when you set `CROP_STEERING_ALLOW_WRITES=true`. A proposal expires after ten minutes, and you can use it only one time. When the revision changes or the proposal expires, make a new preview and review. For a room that exists, a setup change can change the names, the mappings and the sizing. A plan write saves only a draft. The validation of the backend, and the rule that the equipment must be off, still apply to the setup.
 
-Review the exact room, entities and revisions. A model's explanation is not evidence that HA accepted a change: inspect the tool's readback, and for setup wait for controller acknowledgement. Do not treat a failed or uncertain apply as permission to regenerate and apply a different proposal automatically.
+Examine the exact room, entities and revisions. The explanation of a model does not prove that HA accepted a change. Examine the readback of the tool. For a setup change, wait until the controller accepts it. When an apply fails or its result is not certain, do not let the model make and apply a different proposal automatically.
 
-The MCP server is not a generic HA actuator interface and does not enable engines, open valves or activate plans. Keep credentials in the local client/server configuration described in that guide, not in prompts, screenshots or repository files. Existing broadly privileged HA MCP integrations are separate products with different permissions.
+The MCP server is not a general interface that operates HA equipment. It does not set the kill switch to on, open valves or start plans. Keep the credentials in the local client and server configuration that the guide describes. Do not put them in prompts, screenshots or repository files. Other HA MCP integrations with wide permissions are separate products with different permissions.
 
 ## When something does not look right
 
-| Symptom                                        | Next step                                                                                                                                                                   |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| No rooms or missing workspace services         | Verify the integration loaded, the controller version matches, and the current HA account can access the entities/services. Refresh after upgrading.                        |
-| Tank **Not mapped**                            | Set that exact optional display mapping. A similarly named feed or ambient probe is not an implicit fallback.                                                               |
-| Last irrigation/fill is missing                | Check the event-producing source and its dated timestamp format. A state update time cannot substitute for the event.                                                       |
-| A reading shows **Check units**                | Inspect the actual HA unit and choose/repair the appropriate entity. Do not relabel an unrelated quantity to pass validation.                                               |
-| A probe is **Left out** or **Silent**          | Check the probe on Equipment › Probes: its last report, its reading and the integration's reason. The zone reads its other probes meanwhile.                                |
-| Setup is saved but adoption is pending         | Inspect heartbeat/setup blockers; keep affected engines off until the controller acknowledges the revision.                                                                 |
-| Slider appears to do nothing                   | Inspect both selected endpoint columns. Equal endpoints are deliberately equal at every balance.                                                                            |
-| Targets are read-only                          | Inspect the grow plan or connection state. An armed plan shows its effective read-only targets; use Schedule and the normal boundary handoff before manual editing.         |
-| Cannot load a recipe                           | Check active-zone IDs, current limits, plan state, connection and explicit replacement acknowledgement.                                                                     |
-| Comparison is blank                            | Check selected run/zone, recorded sensor IDs, dates, Recorder retention and coverage notices. Registering metadata cannot recreate readings.                                |
-| A pause was confirmed but equipment remains on | Pause affects scheduling. Inspect the active shot and use the site's established physical shutdown procedure if necessary.                                                  |
+| Symptom | What to do |
+| --- | --- |
+| No rooms, or the services of the dashboard are missing | Make sure that the integration loaded and that the controller has the same version. Make sure that your Home Assistant account can use the entities and the services. Refresh the page after an upgrade. |
+| A tank shows **Not mapped** | Map that optional display. The dashboard does not use a feed probe or a room probe with a similar name in its place. |
+| The last shot or the last fill is missing | Examine the source of the event and its date and time format. The update time of a state is not the time of the event. |
+| A reading shows **Check units** | Examine the unit in Home Assistant, and select or repair the correct entity. Do not change the unit of a different quantity to pass the check. |
+| A probe is **Left out** or **Silent** | Examine the probe in Equipment › Probes: its last report, its reading and the reason of the integration. The zone uses its other probes. |
+| The setup is saved, but the controller has not accepted it | Examine the heartbeat and the setup problems. Keep the kill switch of the affected rooms off until the controller accepts the revision. |
+| The slider does nothing | Examine the two selected endpoints. When they are equal, each balance gives the same values. |
+| The targets are read-only | Examine the grow plan and the connection. An armed plan shows its targets as read-only. Disarm the plan in Schedule, and wait for the next lights-on, before you change targets. |
+| A recipe does not load | Examine the active zone IDs, the limits, the plan state, the connection and the replacement confirmation. |
+| A comparison is blank | Examine the selected run and zone, the recorded sensor IDs, the dates, the Recorder retention and the coverage notes. A run record does not make readings that the Recorder did not keep. |
+| A pause is confirmed, but equipment stays on | A pause stops new shots. Examine the shot in progress. If necessary, use the physical shutdown procedure of your installation. |
 
-For source/test evidence and outstanding commissioning limits, use the [feature matrix](FEATURE_MATRIX.md) and [troubleshooting guide](troubleshooting.md). Software validation does not prove physical delivery or a complete live recipe handoff.
+For the test evidence and the known limits, see the [feature matrix](FEATURE_MATRIX.md) and the [troubleshooting guide](troubleshooting.md). A software test does not prove the water that the plants got.

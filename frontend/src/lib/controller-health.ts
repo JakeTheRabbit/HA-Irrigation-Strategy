@@ -11,9 +11,10 @@ export const AGE_RED_MS = 10 * 60_000;
 
 export interface Heartbeat {
   /** "missing": no heartbeat entity. The controller posts it over REST, so after a Home Assistant
-   * restart with the controller stopped it simply does not exist. "unreadable": no usable time. */
-  health: "fresh" | "stale" | "missing" | "unreadable";
-  /** When the controller last reported (epoch ms); null when unknown. */
+   * restart with the controller stopped it simply does not exist. "unreadable": no usable time.
+   * "stopped": the controller said it was stopping: the app was updated, restarted or stopped. */
+  health: "fresh" | "stale" | "missing" | "unreadable" | "stopped";
+  /** When the controller last reported, or said it was stopping (epoch ms); null when unknown. */
   at: number | null;
   attributes: Record<string, unknown>;
 }
@@ -38,6 +39,12 @@ export function readHeartbeat(entity: EntityState | undefined, now: number): Hea
   // Every beat changes last_beat, so Home Assistant restamps last_updated (UTC) on each post: the
   // clock the integration's own health check uses. The naive local last_beat is the fallback.
   const updated = entity.last_updated ? Date.parse(entity.last_updated) : NaN;
+  if (entity.state === "stopped")
+    return {
+      health: "stopped",
+      at: parseControllerTime(attributes.stopped_at) ?? (Number.isFinite(updated) ? updated : null),
+      attributes,
+    };
   const at = Number.isFinite(updated) ? updated : parseControllerTime(attributes.last_beat);
   if (at === null || ["unknown", "unavailable"].includes(entity.state))
     return { health: "unreadable", at: null, attributes };
@@ -49,6 +56,11 @@ export function ageText(ms: number): string {
   if (minutes < 1) return "<1 min";
   if (minutes < 120) return `${minutes} min`;
   return minutes < 2880 ? `${Math.floor(minutes / 60)} h` : `${Math.floor(minutes / 1440)} d`;
+}
+/** The header's data age in words: "Updated 20 s ago", then minutes, hours and days. */
+export function updatedText(ms: number): string {
+  const seconds = Math.floor(Math.max(0, ms) / 1000);
+  return `Updated ${seconds < 60 ? `${seconds} s` : ageText(ms)} ago`;
 }
 export function ageTone(ms: number | null): "fresh" | "amber" | "red" {
   return ms === null || ms > AGE_RED_MS ? "red" : ms > AGE_AMBER_MS ? "amber" : "fresh";
@@ -66,6 +78,22 @@ export const RESTING: Record<string, string> = {
   P2: "Optimal",
   P3: "Overnight dryback",
 };
+/** One zone's shot fired or held this cycle, from the room's decision record: its entries read
+ * "Z<zone> <phase> <reason or block>", and this returns the reason. Null when the zone has none. */
+export function decisionEntry(
+  decision: EntityState | undefined,
+  zoneId: number,
+  key: "fired" | "blocked",
+): string | null {
+  const list = decision?.attributes[key];
+  const hit = Array.isArray(list)
+    ? list.find(
+        (item): item is string => typeof item === "string" && item.startsWith(`Z${zoneId} `),
+      )
+    : undefined;
+  return hit === undefined ? null : hit.replace(/^Z\d+ \S+ /, "");
+}
+
 /** The controller's own zone label (`zone_status_label` in crop_steering_engine/core.py), rebuilt
  * from what it publishes beside the zone status sensor: the zone phase with its reason, and this
  * cycle's decision. The status sensor itself has a second writer, the integration's
@@ -77,16 +105,7 @@ export function controllerZoneLabel(
 ): string | null {
   if (!phase || !/^P[0-3]$/.test(phase.state)) return null;
   const reason = typeof phase.attributes.reason === "string" ? phase.attributes.reason : "";
-  // Decision entries read "Z<zone> <phase> <reason or block>".
-  const entry = (key: "fired" | "blocked") => {
-    const list = decision?.attributes[key];
-    const hit = Array.isArray(list)
-      ? list.find(
-          (item): item is string => typeof item === "string" && item.startsWith(`Z${zoneId} `),
-        )
-      : undefined;
-    return hit === undefined ? null : hit.replace(/^Z\d+ \S+ /, "");
-  };
+  const entry = (key: "fired" | "blocked") => decisionEntry(decision, zoneId, key);
   // A zone without a live probe copies a sibling or runs the blind schedule.
   if (/probe dead|no live probe|blind irrigation budget/i.test(reason))
     return "Probe dead — copying";

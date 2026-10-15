@@ -1,5 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import { discoverRooms, buildRoom, numeric, validateChange } from "./model";
+import {
+  discoverRooms,
+  buildRoom,
+  numeric,
+  roomSlug,
+  runningVersions,
+  validateChange,
+} from "./model";
 import { applyChanges, HaClient } from "./client";
 import { createDemo, demoHistory } from "./demo";
 import type { States, EntityState } from "./types";
@@ -17,21 +24,21 @@ function fixture(): States {
       num_zones: 1,
       enable_flag: "input_boolean.f2_control_enabled",
     }),
-    entity("sensor.crop_steering_f1_engine_config", "ready", {
-      prefix: "f1_",
-      slug: "f1",
+    entity("sensor.crop_steering_room_b_engine_config", "ready", {
+      prefix: "room_b_",
+      slug: "room_b",
       num_zones: 1,
     }),
     entity("sensor.crop_steering_vwc_zone_1", "60"),
-    entity("sensor.crop_steering_f1_vwc_zone_1", "unavailable"),
-    entity("sensor.crop_steering_f1_zone_1_phase", "P1"),
-    entity("sensor.crop_steering_system_zone_1_status", "F1 status"),
+    entity("sensor.crop_steering_room_b_vwc_zone_1", "unavailable"),
+    entity("sensor.crop_steering_room_b_zone_1_phase", "P1"),
+    entity("sensor.crop_steering_system_zone_1_status", "Older integration status"),
     entity("number.crop_steering_p1_target_vwc", "65", {
       min: 0,
       max: 100,
       step: 0.5,
     }),
-    entity("number.crop_steering_f1_p1_target_vwc", "72", {
+    entity("number.crop_steering_room_b_p1_target_vwc", "72", {
       min: 0,
       max: 100,
       step: 0.5,
@@ -50,50 +57,58 @@ describe("room model", () => {
       room_name: "Crop Steering",
       friendly_name: "Crop Steering Engine Configuration",
     });
-    Object.assign(states["sensor.crop_steering_f1_engine_config"].attributes, {
-      room_name: "  F1  ",
+    Object.assign(states["sensor.crop_steering_room_b_engine_config"].attributes, {
+      room_name: "  Room B  ",
       friendly_name: "Crop Steering Engine Configuration",
     });
     expect(discoverRooms(states)).toEqual([
       { id: "room:", prefix: "", name: "Crop Steering" },
-      { id: "room:f1_", prefix: "f1_", name: "F1" },
+      { id: "room:room_b_", prefix: "room_b_", name: "Room B" },
     ]);
-    states["sensor.crop_steering_f1_engine_config"].attributes.room_name = "Flower One";
-    expect(discoverRooms(states).find((room) => room.id === "room:f1_")).toEqual({
-      id: "room:f1_",
-      prefix: "f1_",
-      name: "Flower One",
+    states["sensor.crop_steering_room_b_engine_config"].attributes.room_name = "Back Room";
+    expect(discoverRooms(states).find((room) => room.id === "room:room_b_")).toEqual({
+      id: "room:room_b_",
+      prefix: "room_b_",
+      name: "Back Room",
     });
   });
   it.each([undefined, null, "", "   ", 42])(
     "keeps legacy friendly-name and slug fallbacks for an invalid configured name (%s)",
     (roomName) => {
       const states = fixture();
-      const attributes = states["sensor.crop_steering_f1_engine_config"].attributes;
-      Object.assign(attributes, { room_name: roomName, friendly_name: "Flower 1 Engine Config" });
-      expect(discoverRooms(states).find((room) => room.id === "room:f1_")?.name).toBe("Flower 1");
+      const attributes = states["sensor.crop_steering_room_b_engine_config"].attributes;
+      Object.assign(attributes, { room_name: roomName, friendly_name: "Room Two Engine Config" });
+      expect(discoverRooms(states).find((room) => room.id === "room:room_b_")?.name).toBe("Room Two");
       delete attributes.friendly_name;
-      expect(discoverRooms(states).find((room) => room.id === "room:f1_")?.name).toBe("F1");
+      expect(discoverRooms(states).find((room) => room.id === "room:room_b_")?.name).toBe("Room B");
       expect(discoverRooms(states)[0].name).toBe("Default room");
     },
   );
-  it("never replaces missing F1 data with default room data", () => {
+  it("never replaces missing Room B data with default room data", () => {
     const states = fixture();
     const rooms = discoverRooms(states);
-    const f1 = buildRoom(
+    const roomB = buildRoom(
       states,
-      rooms.find((r) => r.prefix === "f1_")!,
+      rooms.find((r) => r.prefix === "room_b_")!,
     );
-    expect(f1.zones[0].vwc.value).toBeNull();
-    expect(f1.zones[0].target.value).toBe(72);
-    expect(f1.zones[0].status).toBe("F1 status");
-    expect(f1.settings.map((s) => s.entityId)).not.toContain("number.crop_steering_p1_target_vwc");
+    expect(roomB.zones[0].vwc.value).toBeNull();
+    expect(roomB.zones[0].target.value).toBe(72);
+    expect(roomB.zones[0].status).not.toBe("Older integration status");
+    expect(roomB.settings.map((s) => s.entityId)).not.toContain("number.crop_steering_p1_target_vwc");
     expect(
       buildRoom(
         states,
         rooms.find((r) => r.prefix === "")!,
       ).entities.map((e) => e.entity_id),
     ).not.toContain("sensor.crop_steering_system_zone_1_status");
+    // The system_ sensors are an older integration's names for the room with prefix f1_, and only it.
+    const descriptor = "sensor.crop_steering_f1_engine_config";
+    states[descriptor] = entity(descriptor, "ready", { prefix: "f1_", num_zones: 1 });
+    const older = buildRoom(
+      states,
+      discoverRooms(states).find((r) => r.prefix === "f1_")!,
+    );
+    expect(older.zones[0].status).toBe("Older integration status");
   });
   it("requires an actual room descriptor", () => expect(discoverRooms({})).toEqual([]));
   it("selects phase-specific thresholds and leaves unresolved EC mode unknown", () => {
@@ -161,13 +176,13 @@ describe("room model", () => {
       "sensor.crop_steering_activity_log",
       "active",
       {
-        feed: "10:30 Z1 P2 shot\n10:29 f1 Z1 P2 shot\n10:28 absent_room Z1 P2 shot",
+        feed: "10:30 Z1 P2 shot\n10:29 room_b Z1 P2 shot\n10:28 absent_room Z1 P2 shot",
       },
     );
-    states["sensor.crop_steering_f1_activity_log"] = entity(
-      "sensor.crop_steering_f1_activity_log",
+    states["sensor.crop_steering_room_b_activity_log"] = entity(
+      "sensor.crop_steering_room_b_activity_log",
       "active",
-      { feed: "10:30 Z1 P2 shot\n10:29 f1 Z1 P2 shot" },
+      { feed: "10:30 Z1 P2 shot\n10:29 room_b Z1 P2 shot" },
     );
     const rooms = discoverRooms(states);
     const first = buildRoom(states, rooms[0]);
@@ -228,7 +243,7 @@ describe("room model", () => {
     ).toBeNull();
     expect(
       validateChange(room, states, {
-        entityId: "number.crop_steering_f1_p1_target_vwc",
+        entityId: "number.crop_steering_room_b_p1_target_vwc",
         value: 64.5,
       }),
     ).toBeTruthy();
@@ -251,6 +266,16 @@ describe("room model", () => {
     expect(validateChange(planned, states, { entityId: view, value: "Litres" })).toBeTruthy();
     const target = { entityId: "number.crop_steering_p1_target_vwc", value: 64.5 };
     expect(validateChange(planned, states, target)).toBeTruthy(); // targets stay the plan's
+  });
+  it("reads the room's Include Predictions in Notifications switch, which may be switched here", () => {
+    const states = fixture();
+    const id = "switch.crop_steering_notify_predictions";
+    const room = () => buildRoom(states, discoverRooms(states)[0]);
+    expect(room().notifyPredictions).toEqual({ entityId: null, enabled: null }); // an older integration
+    states[id] = entity(id, "on");
+    expect(room().notifyPredictions).toEqual({ entityId: id, enabled: true });
+    expect(validateChange(room(), states, { entityId: id, value: false })).toBeNull();
+    expect(validateChange(room(), states, { entityId: id, value: "off" })).toBeTruthy();
   });
   it("rejects a misconfigured engine flag that points directly at mapped hardware", () => {
     const states = fixture();
@@ -279,13 +304,13 @@ describe("zone valve and irrigation event telemetry", () => {
   it("uses only the selected room's exact valve mapping, including external entity namespaces", () => {
     const states = fixture();
     states["sensor.crop_steering_engine_config"].attributes.valves = { "1": "switch.rack_a" };
-    states["sensor.crop_steering_f1_engine_config"].attributes.valves = { "1": "switch.rack_b" };
+    states["sensor.crop_steering_room_b_engine_config"].attributes.valves = { "1": "switch.rack_b" };
     states["switch.rack_a"] = entity("switch.rack_a", "on");
     states["switch.rack_b"] = entity("switch.rack_b", "off");
     expect(zone(states)).toMatchObject({ valveEntity: "switch.rack_a", valveOn: true });
-    expect(zone(states, "f1_")).toMatchObject({ valveEntity: "switch.rack_b", valveOn: false });
-    delete states["sensor.crop_steering_f1_engine_config"].attributes.valves;
-    expect(zone(states, "f1_")).toMatchObject({ valveEntity: null, valveOn: null });
+    expect(zone(states, "room_b_")).toMatchObject({ valveEntity: "switch.rack_b", valveOn: false });
+    delete states["sensor.crop_steering_room_b_engine_config"].attributes.valves;
+    expect(zone(states, "room_b_")).toMatchObject({ valveEntity: null, valveOn: null });
     expect(zone(states).enabled).toBe(true);
   });
   it("finds a legacy engine descriptor by its declared room prefix, not its entity name", () => {
@@ -297,7 +322,7 @@ describe("zone valve and irrigation event telemetry", () => {
     states[config.entity_id] = config;
     states["switch.rack_a"] = entity("switch.rack_a", "on");
     expect(zone(states)).toMatchObject({ valveEntity: "switch.rack_a", valveOn: true });
-    expect(zone(states, "f1_").valveOn).toBeNull();
+    expect(zone(states, "room_b_").valveOn).toBeNull();
   });
   it.each([undefined, null, [], "switch.rack_a", {}, { "1": 12 }, { "1": "sensor.rack_a" }])(
     "does not guess a valve when its mapping is missing or malformed (%j)",
@@ -326,10 +351,10 @@ describe("zone valve and irrigation event telemetry", () => {
       timestamp: "2020-07-01T00:34:56.123Z",
       issue: null,
     });
-    expect(zone(states, "f1_").lastIrrigation.timestamp).toBeNull();
-    const f1Producer = "sensor.crop_steering_f1_zone_1_last_irrigation_app";
-    states[f1Producer] = entity(f1Producer, "2021-02-03T04:05:06Z");
-    expect(zone(states, "f1_").lastIrrigation.timestamp).toBe("2021-02-03T04:05:06.000Z");
+    expect(zone(states, "room_b_").lastIrrigation.timestamp).toBeNull();
+    const roomBProducer = "sensor.crop_steering_room_b_zone_1_last_irrigation_app";
+    states[roomBProducer] = entity(roomBProducer, "2021-02-03T04:05:06Z");
+    expect(zone(states, "room_b_").lastIrrigation.timestamp).toBe("2021-02-03T04:05:06.000Z");
   });
   it("uses the integration timestamp only when the producer entity is absent", () => {
     const states = fixture();
@@ -421,7 +446,7 @@ describe("verified transport and demo isolation", () => {
     expect(rooms).toHaveLength(2);
     for (const room of rooms) expect(buildRoom(states, room).zones).toHaveLength(3);
     expect(
-      demoHistory(states, ["sensor.crop_steering_f1_vwc_zone_1"], 24)[0].points.length,
+      demoHistory(states, ["sensor.crop_steering_room_b_vwc_zone_1"], 24)[0].points.length,
     ).toBeGreaterThan(10);
     expect(fetch).not.toHaveBeenCalled();
     fetch.mockRestore();
@@ -438,11 +463,11 @@ describe("verified transport and demo isolation", () => {
 
 it("exposes zone-specific dripper flow with the actual HA bounds", () => {
   const states = fixture();
-  const id = "number.crop_steering_f1_zone_1_dripper_flow_rate";
+  const id = "number.crop_steering_room_b_zone_1_dripper_flow_rate";
   states[id] = entity(id, "4", { min: 0.1, max: 20, step: 0.1 });
   const room = buildRoom(
     states,
-    discoverRooms(states).find((r) => r.prefix === "f1_")!,
+    discoverRooms(states).find((r) => r.prefix === "room_b_")!,
   );
   expect(room.zones[0].fields.find((field) => field.entityId === id)).toMatchObject({
     value: 4,
@@ -454,7 +479,7 @@ it("exposes zone-specific dripper flow with the actual HA bounds", () => {
 
 it("exposes the real same-room legacy duration entity as an editable room safety field", () => {
   const states = fixture();
-  const legacy = "number.crop_steering_f1_maximum_shot_duration";
+  const legacy = "number.crop_steering_room_b_maximum_shot_duration";
   states[legacy] = entity(legacy, "900", { min: 5, max: 3600, step: 1, unit_of_measurement: "s" });
   states["number.crop_steering_maximum_shot_duration"] = entity(
     "number.crop_steering_maximum_shot_duration",
@@ -463,7 +488,7 @@ it("exposes the real same-room legacy duration entity as an editable room safety
   );
   const room = buildRoom(
     states,
-    discoverRooms(states).find((r) => r.prefix === "f1_")!,
+    discoverRooms(states).find((r) => r.prefix === "room_b_")!,
   );
   const field = room.settings.find((s) => s.entityId === legacy);
   expect(field).toMatchObject({
@@ -483,14 +508,47 @@ it("exposes the real same-room legacy duration entity as an editable room safety
 
 it("does not offer a shadowed legacy cap as an effective room setting", () => {
   const states = fixture();
-  const legacy = "number.crop_steering_f1_maximum_shot_duration";
-  const canonical = "number.crop_steering_f1_max_shot_duration";
+  const legacy = "number.crop_steering_room_b_maximum_shot_duration";
+  const canonical = "number.crop_steering_room_b_max_shot_duration";
   states[legacy] = entity(legacy, "900", { min: 5, max: 3600, step: 1 });
   states[canonical] = entity(canonical, "unavailable", { min: 5, max: 3600, step: 1 });
   const room = buildRoom(
     states,
-    discoverRooms(states).find((r) => r.prefix === "f1_")!,
+    discoverRooms(states).find((r) => r.prefix === "room_b_")!,
   );
   expect(room.settings.find((s) => s.entityId === canonical)?.value).toBeNull();
   expect(room.settings.some((s) => s.entityId === legacy)).toBe(false);
+});
+describe("every new room has a slug", () => {
+  it("makes the slug the integration makes from the room's name", () => {
+    expect(roomSlug("Flower B")).toBe("flower_b");
+    expect(roomSlug("  Veg -- tent! ")).toBe("veg_tent");
+    expect(roomSlug("Room 2")).toBe("room_2");
+    expect(roomSlug("!!!")).toBe("room");
+    expect(roomSlug("Default")).toBe("default"); // reserved: the setup page refuses it
+  });
+  it("finds a new install whose only room has a slug, and an older install's un-prefixed room", () => {
+    const tent = entity("sensor.crop_steering_tent_engine_config", "ready", {
+      prefix: "tent_",
+      slug: "tent",
+      room_name: "Tent",
+      num_zones: 1,
+    });
+    const beat = entity("sensor.crop_steering_tent_ai_heartbeat", "healthy", {
+      controller_version: "9.9.9",
+    });
+    const fresh: States = { [tent.entity_id]: tent, [beat.entity_id]: beat };
+    const [room] = discoverRooms(fresh);
+    expect(discoverRooms(fresh)).toHaveLength(1);
+    expect(room).toMatchObject({ id: "room:tent_", prefix: "tent_", name: "Tent" });
+    expect(runningVersions(fresh, room).controller).toBe("9.9.9");
+    const upgraded = entity("sensor.crop_steering_engine_config", "ready", {
+      prefix: "",
+      slug: "default",
+      room_name: "Bench",
+      num_zones: 1,
+    });
+    const both = discoverRooms({ ...fresh, [upgraded.entity_id]: upgraded });
+    expect(both.map((r) => r.id)).toEqual(["room:", "room:tent_"]);
+  });
 });

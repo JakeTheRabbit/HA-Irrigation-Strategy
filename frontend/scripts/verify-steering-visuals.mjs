@@ -187,7 +187,7 @@ try {
     await shot.locator("details.zone-recorded > summary").click();
     const history = shot
       .locator("section")
-      .filter({ has: shot.getByRole("heading", { name: "Recorded sensor behaviour" }) })
+      .filter({ has: shot.getByRole("heading", { name: "Recorded probe behaviour" }) })
       .first();
     await history.locator(".sensor-chart").first().waitFor();
     await history.scrollIntoViewIfNeeded();
@@ -205,7 +205,7 @@ try {
     await open("overview");
     const banner = page.locator(".room-off-banner");
     await banner.waitFor();
-    assert.match(await banner.innerText(), /no irrigation, no alerts/i);
+    assert.match(await banner.innerText(), /no shots, no alerts/i);
     assert.match(await page.locator('.room-chip[data-room="room:"]').innerText(), /Room off/);
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
@@ -291,10 +291,10 @@ try {
       await page.locator("details.controller-settings-water > summary").click();
       const water = page.getByRole("region", { name: "Zone 1 water delivery" });
       // A labelled section is exposed as a region by the accessibility tree.
-      await water.getByLabel("Try a valve-open runtime · seconds").fill("120");
+      await water.getByLabel("Example valve-open time · s", { exact: true }).fill("120");
       assert.match(await water.locator(".wd-effective").innerText(), /133\.3 mL \/ plant/);
       assert.match(await water.locator(".wd-effective").innerText(), /4\.8(?:0)? L \/ zone/);
-      await water.getByLabel("Try a valve-open runtime · seconds").fill("60");
+      await water.getByLabel("Example valve-open time · s", { exact: true }).fill("60");
       assert.match(await water.locator(".wd-effective").innerText(), /66\.7 mL \/ plant/);
       assert.match(await water.locator(".wd-effective").innerText(), /2\.4(?:0)? L \/ zone/);
       assert.match(await water.innerText(), /Total substrate capacity/);
@@ -354,23 +354,23 @@ try {
         .getByRole("button", { name: "Compare runs", exact: true })
         .click();
       await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
-      await page.locator('details[data-section="chart"] > summary').click();
-      await page.getByRole("img", { name: /Recorded VWC and EC/ }).waitFor();
+      await page.getByRole("button", { name: "Overlay", exact: true }).click();
+      await page.getByRole("img", { name: /VWC and EC by age/ }).waitFor();
       await page
-        .getByLabel("Previous run", { exact: true })
+        .getByLabel("Past run", { exact: true })
         .selectOption({ label: "Previous room run" });
       const previous = page.locator(".comparison-chart path").filter({ hasText: "Previous VWC" });
       await previous.waitFor();
       assert.ok((await previous.getAttribute("d"))?.length > 10, "Previous retained curve");
       for (const period of ["day", "week", "month", "run"]) {
-        await page.getByLabel("Comparison history range", { exact: true }).selectOption(period);
+        await page.getByLabel("History range", { exact: true }).selectOption(period);
         await page
           .getByText("Loading selected-zone Recorder history…", { exact: true })
           .waitFor({ state: "hidden" });
-        await page.getByRole("img", { name: /Recorded VWC and EC/ }).waitFor();
+        await page.getByRole("img", { name: /VWC and EC by age/ }).waitFor();
         assert.ok((await page.locator(".comparison-chart path").count()) >= 4);
       }
-      await page.getByLabel("Comparison history range", { exact: true }).selectOption("week");
+      await page.getByLabel("History range", { exact: true }).selectOption("week");
       await page.getByLabel("Target reference", { exact: true }).selectOption("saved");
       await page
         .getByText("Loading selected-zone Recorder history…", { exact: true })
@@ -407,7 +407,7 @@ try {
         .filter({ hasText: "Previous room run" })
         .getByRole("button", { name: "Restore", exact: true })
         .click();
-      await page.locator("#desktop-room").selectOption("room:f1_");
+      await page.locator("#desktop-room").selectOption("room:room_b_");
       await page.waitForFunction(
         () => document.querySelectorAll(".comparison-run-list article").length >= 2,
       );
@@ -431,6 +431,14 @@ try {
       await noOverflow();
       await axe("mobile run comparison");
       await page.screenshot({ path: out + "visual-mobile-comparison.png", fullPage: true });
+      // The overlay view fits a phone as well.
+      await page.getByRole("button", { name: "Overlay", exact: true }).click();
+      await page
+        .getByText("Loading selected-zone Recorder history…", { exact: true })
+        .waitFor({ state: "hidden" });
+      assert.equal(await page.locator(".run-weeks").isVisible(), false);
+      await noOverflow();
+      await axe("mobile run comparison, overlay");
       await page.setViewportSize({ width: 1600, height: 1100 });
     },
   );

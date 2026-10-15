@@ -28,20 +28,35 @@ BASE_SWITCH_DESCRIPTIONS = [
     # after longer it starts a fresh run.
     SwitchEntityDescription(
         key="room_active",
-        name="Room Active (off = empty room: no irrigation, no alerts)",
+        name="Room active",
         icon="mdi:sprout",
     ),
     # Opt-in. ON lets the engine's setpoint supervisor rewrite this room's zone targets so they stay
     # attainable and follow the reference curve. The engine still fires every shot by its own rules.
     SwitchEntityDescription(
         key="auto_setpoints",
-        name="Auto Setpoints (supervisor rewrites zone targets)",
+        name="Auto setpoints",
         icon="mdi:auto-fix",
+    ),
+    # ON: a zone whose shots keep running into the room's longest allowed shot is stopped until
+    # someone resets it in Settings -> Repairs (CS-312). OFF: the same run is only reported. ON for
+    # a room the wizard sets up (it marks the entry), OFF for every room set up before the latch.
+    SwitchEntityDescription(
+        key="max_run_latch",
+        name="Max-run latch",
+        icon="mdi:timer-lock",
     ),
     SwitchEntityDescription(
         key="ec_stacking_enabled",
-        name="EC Stacking Enabled",
+        name="EC stacking",
         icon="mdi:chemistry-bottle",
+    ),
+    # ON: the controller's vitals notification says, under each zone, what it will do next (the
+    # dashboard's "Next:"). On until switched off.
+    SwitchEntityDescription(
+        key="notify_predictions",
+        name="Predictions in notifications",
+        icon="mdi:crystal-ball",
     ),
     # Retired: the room's engine switch ("Watering" on the dashboard) is the one switch that stops
     # watering. A controller from 2.24.0 or before still stops every shot while one of these reads
@@ -49,13 +64,13 @@ BASE_SWITCH_DESCRIPTIONS = [
     # a newer one switches the engine switch off while one of them is off (CS-208).
     SwitchEntityDescription(
         key="system_enabled",
-        name="System Enabled (retired)",
+        name="System enabled (retired)",
         icon="mdi:power",
         entity_registry_visible_default=False,
     ),
     SwitchEntityDescription(
         key="auto_irrigation_enabled",
-        name="Auto Irrigation Enabled (retired)",
+        name="Auto irrigation enabled (retired)",
         icon="mdi:auto-mode",
         entity_registry_visible_default=False,
     ),
@@ -70,7 +85,7 @@ def create_zone_switch_descriptions(num_zones: int) -> list[SwitchEntityDescript
         zone_switches.append(
             SwitchEntityDescription(
                 key=f"zone_{zone_num}_enabled",
-                name=f"Zone {zone_num} Enabled",
+                name=f"Zone {zone_num} enabled",
                 icon="mdi:water-pump",
             )
         )
@@ -79,8 +94,18 @@ def create_zone_switch_descriptions(num_zones: int) -> list[SwitchEntityDescript
         zone_switches.append(
             SwitchEntityDescription(
                 key=f"zone_{zone_num}_manual_override",
-                name=f"Zone {zone_num} Manual Override",
+                name=f"Zone {zone_num} manual override",
                 icon="mdi:hand-water",
+            )
+        )
+
+        # Opt-in, OFF on new and updated rooms. ON lets P3 hold the overnight dryback at its
+        # target with rescue-sized shots, instead of letting a fast night dry on to the rescue level.
+        zone_switches.append(
+            SwitchEntityDescription(
+                key=f"zone_{zone_num}_p3_dryback_hold",
+                name=f"Zone {zone_num} P3 dryback hold",
+                icon="mdi:weather-night",
             )
         )
 
@@ -115,7 +140,7 @@ async def async_setup_entry(
                 entry,
                 SwitchEntityDescription(
                     key="engine_enabled",
-                    name="Engine Enabled (room kill switch)",
+                    name="Engine Enabled (kill switch)",
                     icon="mdi:power-settings",
                 ),
             )
@@ -167,10 +192,17 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
             self._attr_is_on = True  # System enabled by default
         elif description.key == "auto_irrigation_enabled":
             self._attr_is_on = True  # Auto irrigation enabled by default
+        elif description.key == "notify_predictions":
+            self._attr_is_on = True  # the vitals say what comes next until switched off
         elif "zone_" in description.key and "_enabled" in description.key:
             self._attr_is_on = True  # Zones enabled by default
+        elif description.key == "max_run_latch":
+            self._attr_is_on = (entry.data or {}).get("max_run_latch") is True
         else:
             self._attr_is_on = False
+        # Max-run latch only: how many times Settings -> Repairs has reset it. The controller
+        # releases a zone it latched once this number moves.
+        self._resets = 0
 
     async def async_added_to_hass(self) -> None:
         """Restore state when added to hass."""
@@ -184,6 +216,13 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
             last_state = None
         if last_state is not None:
             self._attr_is_on = last_state.state == "on"
+        if self.entity_description.key == "max_run_latch":
+            resets = last_state.attributes.get("resets") if last_state else None
+            if type(resets) is int and resets >= 0:
+                self._resets = resets
+            self.hass.data.setdefault(DOMAIN, {}).setdefault("_max_run_latch", {})[
+                self._entry.entry_id
+            ] = self
         if not self._is_manual_override:
             return
         self._override_loaded = True
@@ -258,8 +297,17 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
         else:
             await self.async_turn_off()
 
+    @callback
+    def reset_latch(self) -> None:
+        """Release every zone of this room the controller has latched (the Repairs fix)."""
+        self._resets += 1
+        self.async_write_ha_state()
+
     async def async_will_remove_from_hass(self) -> None:
         """Stop callbacks while leaving the saved deadline available to RestoreEntity."""
+        latches = self.hass.data.get(DOMAIN, {}).get("_max_run_latch", {})
+        if latches.get(self._entry.entry_id) is self:
+            latches.pop(self._entry.entry_id)
         self._override_loaded = False
         self._cancel_override_timer()
         registry = self.hass.data.get(DOMAIN, {}).get("_manual_overrides", {})
@@ -269,6 +317,8 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
 
     @property
     def extra_state_attributes(self):
+        if self.entity_description.key == "max_run_latch":
+            return {"resets": self._resets}
         if not self._is_manual_override:
             return {}
         return {

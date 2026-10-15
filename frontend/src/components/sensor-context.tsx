@@ -12,6 +12,7 @@ import {
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { Pill } from "./mini-visuals";
 import { errorText } from "@/lib/utils";
 import type { Controller, Series, Zone } from "@/lib/types";
@@ -61,7 +62,6 @@ export interface SensorContextData {
   ec: MetricContext;
 }
 const REFRESH_MS = 60_000;
-const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
 /** Recorded VWC and pore EC for one zone. Fetches only while `enabled` (connected and
  * editable): the whole window on zone or window change, then each minute only the readings
@@ -136,13 +136,13 @@ export function useSensorContext(
   const metrics = useMemo(() => {
     const build = (entityId: string | null, live: number | null | undefined): MetricContext => {
       const series = held?.series.find((item) => item.entityId === entityId);
-      const options = { hours, now, timeZone: timeZone(), live };
+      const options = { hours, now, timeZone: controller.timeZone, live };
       return entityId && held
         ? { entityId, points: windowPoints(series, options), stats: sensorStats(series, options) }
         : { entityId, points: [], stats: null };
     };
     return { vwc: build(vwcId, liveVwc), ec: build(ecId, liveEc) };
-  }, [held, hours, now, vwcId, ecId, liveVwc, liveEc]);
+  }, [held, hours, now, vwcId, ecId, liveVwc, liveEc, controller.timeZone]);
   return {
     hours,
     setHours,
@@ -327,7 +327,7 @@ function SensorChart({
   const current = stats.current ?? stats.last;
   const markers = [
     { id: "peak", label: "Peak", reading: stats.peak, above: true },
-    { id: "trough", label: "Trough", reading: stats.trough, above: false },
+    { id: "trough", label: "Low point", reading: stats.trough, above: false },
   ].filter((marker, index, all) => index === 0 || marker.reading.time !== all[0].reading.time);
   // The Now tile above already carries the value; at phone width the plot has no room for it.
   const showNowLabel = !compact && markers.every((marker) => marker.reading.time !== current.time);
@@ -364,7 +364,7 @@ function SensorChart({
   const summary =
     `${zoneName} recorded ${name} over the last ${span}: ` +
     `${stats.current ? `now ${show(stats.current.value)}` : `live reading stale, last recorded ${show(stats.last.value)}`}, ` +
-    `peak ${show(stats.peak.value)}, trough ${show(stats.trough.value)}. ` +
+    `peak ${show(stats.peak.value)}, low point ${show(stats.trough.value)}. ` +
     (labels.length ? `Setpoints: ${labels.map((label) => label.text).join(", ")}.` : "");
 
   return (
@@ -395,7 +395,7 @@ function SensorChart({
         />
         <Stat label="Peak" value={show(stats.peak.value)} detail={clock(stats.peak.time, hours)} />
         <Stat
-          label="Trough"
+          label="Low point"
           value={show(stats.trough.value)}
           detail={clock(stats.trough.time, hours)}
         />
@@ -405,7 +405,7 @@ function SensorChart({
           detail={`median of ${stats.days} ${stats.days === 1 ? "day" : "days"}`}
         />
         <Stat
-          label="Typical daily trough"
+          label="Typical daily low point"
           value={stats.typicalDailyTrough === null ? "—" : show(stats.typicalDailyTrough)}
           detail={`median of ${stats.days} ${stats.days === 1 ? "day" : "days"}`}
         />
@@ -591,7 +591,7 @@ export function SensorContextCard({
     <section className="panel sensor-context" aria-labelledby={`${id}-title`}>
       <div className="panel-heading">
         <div>
-          <h2 id={`${id}-title`}>Recorded sensor behaviour</h2>
+          <h2 id={`${id}-title`}>Recorded probe behaviour</h2>
           <p>
             {context.zoneName} · {subtitle}
           </p>
@@ -617,17 +617,22 @@ export function SensorContextCard({
         </p>
       ) : !vwc.entityId && !ec.entityId ? (
         <Empty
-          title="No probes mapped for this zone"
-          detail="Map a VWC and an EC sensor in Rooms & setup to see how the substrate behaves beside these targets."
+          title="No probes for this zone"
+          detail="Map a VWC and an EC sensor in Rooms and setup to see how the substrate behaves beside these targets."
+          tip={<UiTip copyKey="no probes mapped for this zone" />}
         />
       ) : !hasData && context.error ? (
         <Empty
-          title="Recorded history could not load"
+          title="Recorded history did not load"
           detail={context.error}
+          tip={<UiTip copyKey="recorded history could not load" />}
           action={
-            <Button variant="outline" onClick={context.retry}>
-              Retry history
-            </Button>
+            <span className="label-with-tip">
+              <Button variant="outline" onClick={context.retry}>
+                Retry history
+              </Button>
+              <UiTip copyKey="retry history" />
+            </span>
           }
         />
       ) : !hasData ? (
@@ -677,7 +682,7 @@ export function SensorContextCard({
           )}
           <details className="sensor-table">
             <summary>Table view</summary>
-            <div className="table-scroll" tabIndex={0} aria-label="Recorded sensor statistics">
+            <div className="table-scroll" tabIndex={0} aria-label="Recorded probe statistics">
               <table className="data-table">
                 <thead>
                   <tr>
@@ -692,9 +697,9 @@ export function SensorContextCard({
                       ["Now (live)", "current"],
                       ["Last recorded", "last"],
                       ["Peak", "peak"],
-                      ["Trough", "trough"],
+                      ["Low point", "trough"],
                       ["Typical daily peak", "typicalDailyPeak"],
-                      ["Typical daily trough", "typicalDailyTrough"],
+                      ["Typical daily low point", "typicalDailyTrough"],
                       ["Days behind typical values", "days"],
                     ] as const
                   ).map(([label, pick]) => (
@@ -802,6 +807,9 @@ export function FieldSuggestionLine({
           Use {draftValue}
           {unit} {action}
         </Button>
+      )}
+      {draftValue !== null && (
+        <UiTip copyKey="use 60% …" label={`Use ${draftValue}${unit} ${action}`} />
       )}
     </p>
   );

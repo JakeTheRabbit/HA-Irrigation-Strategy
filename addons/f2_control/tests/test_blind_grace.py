@@ -1,6 +1,6 @@
 """A feed path that is offline holds the shot, and a probe out for minutes is a blip, not a dead probe.
 
-25 Sep 2026, F2, 14:04: the pump went unavailable, then the main line and every valve (back at 14:49),
+Observed on a production room (25 Sep 2026), 14:04: the pump went unavailable, then the main line and every valve (back at 14:49),
 and the zones' moisture sensors read unknown. The controller watered Zone 2 on its dead-probe timer at
 once, straight into the offline pump. Home Assistant took the commands, nothing switched, and the close
 could not be read back, so a hardware hold latched (CS-301) and the room was not watered again until
@@ -14,6 +14,9 @@ import pytest
 
 import controller
 from test_room_status import _room
+
+
+pytestmark = pytest.mark.usefixtures("settings_built_in")
 
 VWC = "sensor.crop_steering_vwc_zone_1"
 STATUS = "sensor.crop_steering_zone_1_status_app"

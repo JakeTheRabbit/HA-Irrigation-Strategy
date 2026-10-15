@@ -42,15 +42,15 @@ def test_the_stopped_shot_is_closed_counted_and_named(monkeypatch):
     assert c.rooms[0].state[1]["shots"] == 1  # it ran partway: the water it gave counts
     alerts = [d for dom, svc, d in fake.calls if dom == "persistent_notification" and svc == "create"]
     stopped = [d for d in alerts if "killshot" in d.get("notification_id", "")]
-    assert stopped and "because this zone was switched off" in stopped[0]["message"]
-    assert ZONE in stopped[0]["message"] and "stopped after 2 of 10 seconds" in stopped[0]["message"]
+    assert stopped and "because this zone was set to off" in stopped[0]["message"]
+    assert ZONE in stopped[0]["message"] and "stopped after 2 s of 10 s" in stopped[0]["message"]
 
 
 def test_the_engine_switch_is_still_named_as_the_engine_switch(monkeypatch):
     c, fake = _room(monkeypatch, switch_off=KILL)
     c._execute_shot(c.rooms[0], 1, 10, 6)
     alerts = [d for dom, svc, d in fake.calls if dom == "persistent_notification" and svc == "create"]
-    assert any("because the engine switch was turned off" in d["message"] for d in alerts)
+    assert any("because the kill switch was set to off" in d["message"] for d in alerts)
 
 
 def test_a_zone_left_on_or_without_a_switch_runs_the_shot_to_its_end(monkeypatch):

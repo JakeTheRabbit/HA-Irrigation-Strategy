@@ -195,7 +195,7 @@ export function zoneAttention(input: AttentionInput): Map<number, AttentionReaso
       add(
         "jev-paused",
         "warning",
-        `Jev’s setpoint changes paused until ${format.clock(zone.jevPausedUntil)} after a revert`,
+        `AI assistant setpoint changes paused until ${format.clock(zone.jevPausedUntil)} after a revert`,
       );
 
     if (reasons.length)

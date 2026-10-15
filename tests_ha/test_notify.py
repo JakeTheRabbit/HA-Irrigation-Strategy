@@ -131,6 +131,7 @@ async def test_the_services_and_the_sensor_the_controller_reads(hass, hass_admin
         "kinds": ["emergency", "stock"],
         "rooms": [],
         "urgent_high_priority": True,
+        "digest": False,
     }
     await hass.async_block_till_done()
     state = hass.states.get(SENSOR)
@@ -323,7 +324,7 @@ async def test_the_low_stock_card_reaches_the_phone_that_ticks_stock_once(
     stock = await hass.services.async_call(
         DOMAIN,
         "stock_get",
-        {"room_id": "room:"},
+        {"room_id": "room:tent_"},
         blocking=True,
         return_response=True,
     )
@@ -331,7 +332,7 @@ async def test_the_low_stock_card_reaches_the_phone_that_ticks_stock_once(
         DOMAIN,
         "stock_save",
         {
-            "room_id": "room:",
+            "room_id": "room:tent_",
             "expected_revision": stock["revision"],
             "tanks": [
                 {"name": "Bloom", "capacity_l": 10, "level_l": 1, "low_l": 2, "dose_ml": 500}
@@ -342,24 +343,24 @@ async def test_the_low_stock_card_reaches_the_phone_that_ticks_stock_once(
         context=Context(user_id=hass_admin_user.id),
     )
     await hass.async_block_till_done()
-    assert ir.async_get(hass).async_get_issue(DOMAIN, "stock_low") is not None
+    assert ir.async_get(hass).async_get_issue(DOMAIN, "stock_low_tent") is not None
     push = received[STAFF_PHONE][-1]
-    assert push["title"] == "Tent: 1 stock tank(s) running low (CS-608)"
+    assert push["title"] == "Tent: 1 stock tank(s) low (CS-608)"
     assert "- Bloom: 1 L of 10 L" in push["message"]
     assert push["message"].endswith(
         "Code CS-608. What it means and what to do: Crop Steering → Help & tools → Error codes."
     )
-    assert push["data"] == {"tag": "stock_low", **LINK}
+    assert push["data"] == {"tag": "stock_low_tent", **LINK}  # the card of the room that has the slug
     assert received[TABLET] == []  # not an emergency
 
     # Still raised, with new numbers: the card changes, the phone is not pushed again.
     stock = await hass.services.async_call(
-        DOMAIN, "stock_get", {"room_id": "room:"}, blocking=True, return_response=True
+        DOMAIN, "stock_get", {"room_id": "room:tent_"}, blocking=True, return_response=True
     )
     await hass.services.async_call(
         DOMAIN,
         "stock_record_batch",
-        {"room_id": "room:", "expected_revision": stock["revision"]},
+        {"room_id": "room:tent_", "expected_revision": stock["revision"]},
         blocking=True,
         return_response=True,
         context=Context(user_id=hass_admin_user.id),
@@ -380,3 +381,35 @@ async def test_an_install_from_before_notifications_loads_with_nobody_set_up(has
     # The controller app, calling anyway, is told nobody is set up: it pushes to its own option.
     answer = await _call(hass, None, "notify", key="k", code="CS-301", title="T", message="M")
     assert answer == {"sent_to": [], "error": "no phone is set up for notifications"}
+
+
+async def test_the_grow_plan_card_reaches_a_jev_phone_and_a_setup_phone(hass, hass_admin_user):
+    """CS-713 (the room not running its grow plan as written) is in two kinds: a phone that ticks only Jev and a
+    phone that ticks only Setup and settings both get it, and a phone that ticks neither does not."""
+    await _install(hass)
+    staff = await _staff(hass)
+    received = _phones(hass, [("Staff phone", staff), ("Office tablet", hass_admin_user)])
+    doc = await _call(
+        hass,
+        hass_admin_user,
+        "notify_save",
+        expected_revision=0,
+        recipients=[{"service": STAFF_PHONE, "kinds": ["jev"]}, {"service": TABLET, "kinds": ["setup"]}],
+    )
+    await hass.async_block_till_done()
+    answer = await _call(
+        hass, None, "notify", key="plan_transition_missed_tent", code="CS-713", room="tent_",
+        title="Tent: the room is not running its grow plan as written (CS-713)",
+        message="Today's plan day has not been applied.",
+    )
+    assert sorted(answer["sent_to"]) == sorted([STAFF_PHONE, TABLET]) and answer["error"] is None
+    assert received[STAFF_PHONE][-1]["data"]["tag"] == "plan_transition_missed_tent"
+    await _call(
+        hass,
+        hass_admin_user,
+        "notify_save",
+        expected_revision=doc["config"]["revision"],
+        recipients=[{"service": TABLET, "kinds": ["stock", "dosing"]}],
+    )
+    answer = await _call(hass, None, "notify", key="k", code="CS-713", room="tent_", title="T", message="M")
+    assert answer == {"sent_to": [], "error": None}

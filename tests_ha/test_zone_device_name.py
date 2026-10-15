@@ -34,12 +34,13 @@ async def test_the_entity_ids_do_not_follow_the_name(hass, monkeypatch):
     await _install(hass)
     registry = er.async_get(hass)
     for entity_id in (
-        "sensor.crop_steering_vwc_zone_1",
-        "switch.crop_steering_zone_1_enabled",
-        "number.crop_steering_zone_1_plant_count",
+        "sensor.crop_steering_tent_vwc_zone_1",
+        "switch.crop_steering_tent_zone_1_enabled",
+        "number.crop_steering_tent_zone_1_plant_count",
     ):
         assert registry.async_get(entity_id) is not None, entity_id
-    assert not [e for e in registry.entities if "gt1" in e]
+    # A probe's own EC type select is named after the probe (sensor.gt1_ec), not the zone.
+    assert not [e for e in registry.entities if "gt1" in e and "_ec_type_gt1_" not in e]
 
 
 async def test_renaming_the_zone_in_configure_renames_the_device(hass, monkeypatch):

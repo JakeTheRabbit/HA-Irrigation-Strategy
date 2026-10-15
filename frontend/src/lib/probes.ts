@@ -1,4 +1,5 @@
 import type { PillTone } from "@/components/mini-visuals";
+import type { SetupRoom } from "./operator-types";
 import type { EntityState, States, Zone } from "./types";
 
 /** Equipment › Probes: each probe behind a zone's moisture and pore EC, and whether to believe it.
@@ -15,7 +16,8 @@ export const PROBE_RANGE = { vwc: [0, 100], ec: [0, 20] } as const;
 export const STUCK_MS = { vwc: 3 * 3_600_000, ec: 6 * 3_600_000 } as const;
 
 export type ProbeKind = "vwc" | "ec";
-export type ProbeHealth = "ok" | "stale" | "stuck" | "out-of-range" | "no-reading" | "left-out";
+export type ProbeHealth =
+  "ok" | "stale" | "stuck" | "out-of-range" | "no-reading" | "left-out" | "not-counted";
 /** Each health as its pill's colour: amber to look at, red for a reading that cannot be used. */
 export const PROBE_TONE: Record<ProbeHealth, PillTone> = {
   ok: "on",
@@ -24,6 +26,16 @@ export const PROBE_TONE: Record<ProbeHealth, PillTone> = {
   "out-of-range": "off",
   "no-reading": "off",
   "left-out": "warn",
+  "not-counted": "neutral",
+};
+/** The integration's reason for each probe's reading quality (calculations.py fuse_probes `quality`),
+ * in words. */
+export const READING_REASON: Record<string, string> = {
+  fresh: "Fresh",
+  stale: "Stale",
+  out_of_range: "Out of range",
+  excluded_outlier: "Far from the others",
+  unknown_unit: "Unit not known",
 };
 export interface Probe {
   id: string;
@@ -37,6 +49,12 @@ export interface Probe {
   changed: number | null;
   /** The zone's reading uses it; null from an older integration, which does not say. */
   used: boolean | null;
+  /** The zone's setup names it primary: the controller says when it goes offline (CS-505). */
+  primary: boolean;
+  /** The integration's quality of its reading (good, suspect, bad) and why; null from an older
+   * integration, which does not say. */
+  quality: string | null;
+  reason: string | null;
   health: ProbeHealth;
   /** The health in a few words. */
   text: string;
@@ -68,6 +86,7 @@ export function probeHealth(input: {
 }): { health: ProbeHealth; text: string } {
   const { kind, state, unit, reported, changed, excluded, stale, now } = input;
   const reason = excluded?.toLowerCase() ?? "";
+  if (reason === "not counted") return { health: "not-counted", text: "Does not count" };
   const out = excluded ? ", left out of the zone's reading" : "";
   if (reason === "no reading" || !readable(state) || !Number.isFinite(Number(state)))
     return { health: "no-reading", text: `No reading${out}` };
@@ -97,6 +116,11 @@ export function zoneProbes(zone: Zone, states: States, now: number): Probe[] {
     const used = Array.isArray(fused?.attributes.used)
       ? (fused!.attributes.used as unknown[]).filter((id): id is string => typeof id === "string")
       : null;
+    const graded = fused?.attributes.quality;
+    const grades =
+      graded && typeof graded === "object" && !Array.isArray(graded)
+        ? (graded as Record<string, { quality?: unknown; reason?: unknown }>)
+        : {};
     const raw = fused?.attributes.excluded;
     const excluded =
       raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
@@ -133,6 +157,9 @@ export function zoneProbes(zone: Zone, states: States, now: number): Probe[] {
         reported,
         changed,
         used: used === null ? null : used.includes(id),
+        primary: fused?.attributes.primary === id,
+        quality: typeof grades[id]?.quality === "string" ? String(grades[id].quality) : null,
+        reason: typeof grades[id]?.reason === "string" ? String(grades[id].reason) : null,
         ...probeHealth({
           kind,
           state: entity?.state,
@@ -148,6 +175,29 @@ export function zoneProbes(zone: Zone, states: States, now: number): Probe[] {
   });
 }
 
+/** How the zone's reading is made from its probes, in words (calculations.py fuse_probes publishes
+ * the zone's choice as `method` and what it steered by as `steered_by`): Lowest or Highest with
+ * fewer than three probes that agree steers on the median instead (CS-502). Null from an older
+ * integration, which does not say. */
+export function fusionMethod(fused: EntityState | undefined): string | null {
+  const method = fused?.attributes.method;
+  const steered = fused?.attributes.steered_by;
+  if (typeof method !== "string" || typeof steered !== "string") return null;
+  return method === steered
+    ? `${steered.toLowerCase()} of its probes`
+    : `${steered.toLowerCase()} of its probes: ${method} needs three that agree`;
+}
+
+/** Which EC the zone steers on, in words, when it has both pore and bulk EC probes (calculations.py
+ * fuse_probes publishes `ec_type`; the two are never combined): bulk only while no pore probe
+ * reports (CS-504). Null otherwise, and from an older integration. */
+export function ecType(fused: EntityState | undefined): string | null {
+  const type = fused?.attributes.ec_type;
+  if (type === "pore") return "steers on its pore EC probes";
+  if (type === "bulk") return "steers on its bulk EC probes: no pore EC probe is reporting";
+  return null;
+}
+
 /** Every probe the room's combined sensors name: what the page watches and draws. */
 export function roomProbeIds(zones: readonly Zone[], states: States): string[] {
   const ids = new Set<string>();
@@ -161,4 +211,46 @@ export function roomProbeIds(zones: readonly Zone[], states: States): string[] {
         for (const id of Object.keys(excluded)) ids.add(id);
     }
   return [...ids].filter((id) => /^sensor\.[a-z0-9_]+$/.test(id)).sort();
+}
+
+/** What the zone's setup stores of its probes (setup_api.py PROBE_CHOICE): for each reading, the
+ * probes that do not count and the one that is primary. */
+export interface ProbeChoice {
+  unused: string[];
+  primary: string;
+}
+/** A zone's choice as the page shows it, keyed `zone:kind`: only where the integration names the
+ * zone's probes (an older one does not, and has nothing to choose). */
+export function probeChoices(probes: readonly Probe[]): Record<string, ProbeChoice> {
+  const choices: Record<string, ProbeChoice> = {};
+  for (const probe of probes) {
+    if (probe.used === null) continue;
+    const choice = (choices[`${probe.zone}:${probe.kind}`] ??= { unused: [], primary: "" });
+    if (probe.health === "not-counted") choice.unused.push(probe.id);
+    if (probe.primary) choice.primary = probe.id;
+  }
+  return choices;
+}
+/** The save the picker sends: each zone's id, whether it is active, and its choice, nothing else,
+ * so the integration takes it while the room waters. */
+export function probeChoicePayload(room: SetupRoom, choices: Record<string, ProbeChoice>) {
+  return {
+    entry_id: room.entry_id,
+    expected_revision: room.revision,
+    zones: room.zones.map((zone) => ({
+      id: zone.id,
+      active: zone.active,
+      ...Object.fromEntries(
+        (["vwc", "ec"] as const).flatMap((kind) => {
+          const choice = choices[`${zone.id}:${kind}`];
+          return choice
+            ? [
+                [`${kind}_unused`, choice.unused],
+                [`${kind}_primary`, choice.primary],
+              ]
+            : [];
+        }),
+      ),
+    })),
+  };
 }

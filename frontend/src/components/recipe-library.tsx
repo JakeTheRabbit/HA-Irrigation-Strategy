@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { UiTip } from "@/components/info-tip";
 import type { GrowPlan } from "@/lib/operator-types";
 import { errorText } from "@/lib/utils";
 import {
@@ -239,6 +240,7 @@ export function RecipeLibrary({
               <Upload size={15} />
               {reading ? "Reading file…" : "Import recipe file"}
             </Button>
+            <UiTip copyKey="import recipe file" />
             <Button variant="ghost" size="sm" onClick={reload}>
               <RefreshCw size={15} />
               Reload library
@@ -309,6 +311,7 @@ export function RecipeLibrary({
                     >
                       <Download size={16} />
                     </Button>
+                    <UiTip copyKey="export recipe {x}" values={[recipe.name]} />
                     <Button
                       size="sm"
                       variant="ghost"
@@ -321,6 +324,7 @@ export function RecipeLibrary({
                     >
                       <Trash2 size={16} />
                     </Button>
+                    <UiTip copyKey="remove recipe {x}" values={[recipe.name]} />
                   </div>
                 </li>
               ))}
@@ -361,7 +365,10 @@ export function RecipeLibrary({
           {dialog?.kind === "save" && (
             <div className="recipe-form">
               <div>
-                <Label htmlFor="recipe-name">Recipe name</Label>
+                <span className="label-with-tip">
+                  <Label htmlFor="recipe-name">Recipe name</Label>
+                  <UiTip copyKey="recipe name" />
+                </span>
                 <Input
                   id="recipe-name"
                   value={name}
@@ -371,7 +378,10 @@ export function RecipeLibrary({
                 />
               </div>
               <div>
-                <Label htmlFor="recipe-notes">Notes (optional)</Label>
+                <span className="label-with-tip">
+                  <Label htmlFor="recipe-notes">Notes (optional)</Label>
+                  <UiTip copyKey="notes (optional)" />
+                </span>
                 <textarea
                   id="recipe-notes"
                   value={notes}
@@ -381,7 +391,10 @@ export function RecipeLibrary({
                 />
               </div>
               <div>
-                <Label htmlFor="recipe-source">Source URL (optional)</Label>
+                <span className="label-with-tip">
+                  <Label htmlFor="recipe-source">Source URL (optional)</Label>
+                  <UiTip copyKey="source url (optional)" />
+                </span>
                 <Input
                   id="recipe-source"
                   type="url"
@@ -440,7 +453,7 @@ export function RecipeLibrary({
                 </table>
               </div>
               <details>
-                <summary>Inspect saved profiles and schedules</summary>
+                <summary>Show saved profiles and schedules</summary>
                 <pre tabIndex={0} role="region" aria-label="Saved recipe JSON">
                   {JSON.stringify(dialog.recipe.plan, null, 2)}
                 </pre>
@@ -484,22 +497,31 @@ export function RecipeLibrary({
               {dialog?.kind === "preview" ? "Keep current draft" : "Cancel"}
             </Button>
             {dialog?.kind === "save" && (
-              <Button onClick={persistRecipe} disabled={blocked || !name.trim() || !!validation}>
-                Save to library
-              </Button>
+              <>
+                <Button onClick={persistRecipe} disabled={blocked || !name.trim() || !!validation}>
+                  Save to library
+                </Button>
+                <UiTip copyKey="save to library" />
+              </>
             )}
             {dialog?.kind === "preview" && (
-              <Button
-                onClick={loadRecipe}
-                disabled={!canLoad || !candidate || !!validation || (dirty && !replace)}
-              >
-                Load into local draft
-              </Button>
+              <>
+                <Button
+                  onClick={loadRecipe}
+                  disabled={!canLoad || !candidate || !!validation || (dirty && !replace)}
+                >
+                  Load into local draft
+                </Button>
+                <UiTip copyKey="load into local draft" />
+              </>
             )}
             {dialog?.kind === "remove" && (
-              <Button variant="destructive" onClick={deleteRecipe} disabled={blocked}>
-                Remove recipe
-              </Button>
+              <>
+                <Button variant="destructive" onClick={deleteRecipe} disabled={blocked}>
+                  Remove recipe
+                </Button>
+                <UiTip copyKey="remove recipe" />
+              </>
             )}
           </DialogFooter>
         </DialogContent>

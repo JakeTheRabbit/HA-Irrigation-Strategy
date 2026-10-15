@@ -13,6 +13,7 @@ import {
   growDay,
   joinRows,
   levels,
+  maintenanceStop,
   morningDryback,
   nextShot,
   NOT_REPORTING,
@@ -25,6 +26,7 @@ import {
   revisionAt,
   setpointChanges,
   setpointSteps,
+  stoppedSegments,
   timelineEntities,
   typicalDay,
   unprojected,
@@ -40,6 +42,7 @@ import {
   type TimelineRow,
 } from "./day-timeline";
 import { createDemo, demoDay } from "./demo";
+import { recordWindows } from "./tank-level";
 import { buildRoom, discoverRooms } from "./model";
 import type { EntityState } from "./types";
 
@@ -55,6 +58,30 @@ const decision = (time: number, fired: string[] = [], blocked: string[] = []) =>
 describe("grow day", () => {
   const local = (day: number, hour: number, minute = 0) =>
     new Date(2026, 8, day, hour, minute).getTime();
+  it("marks the maintenance band from Auto setpoints' planned stop as stopped, not as a trigger", () => {
+    // Lights 07:00 to 20:00, the stop at 17:00: the band all day, then two lower levels from 17:00.
+    const day = { start: local(1, 7), end: local(2, 7) };
+    expect(maintenanceStop("17:00", day)).toBe(local(1, 17));
+    expect(maintenanceStop("01:30", day)).toBe(local(2, 1, 30)); // later in the grow day, past midnight
+    for (const bad of [null, "5pm", "17:0"]) expect(maintenanceStop(bad, day)).toBeNull();
+    const segment = (from: number, to: number) => ({ start: from, end: to, low: 60, high: 70 });
+    const band = [
+      segment(local(1, 9), local(1, 17)),
+      segment(local(1, 17), local(1, 17, 1)),
+      segment(local(1, 17, 1), local(1, 20)),
+    ];
+    const stop = maintenanceStop("17:00", day);
+    expect(stoppedSegments(band, stop).map((item) => item.stopped)).toEqual([false, true, true]);
+    // A level set within the minute before the stop still counts; two minutes before is the day's.
+    const early = (seconds: number) => [segment(local(1, 17) - seconds * 1000, local(1, 20))];
+    expect(stoppedSegments(early(30), stop)[0].stopped).toBe(true);
+    expect(stoppedSegments(early(120), stop)[0].stopped).toBe(false);
+    // No stop (a zone not on Auto setpoints) marks nothing; neither does one later in the grow day.
+    expect(stoppedSegments(band, null).some((item) => item.stopped)).toBe(false);
+    expect(stoppedSegments(band, maintenanceStop("01:30", day)).some((item) => item.stopped)).toBe(
+      false,
+    );
+  });
   it("runs from the last lights-on to the next, lights-off inside it", () => {
     expect(growDay(10, 22, local(23, 14))).toEqual({
       start: local(23, 10),
@@ -87,7 +114,47 @@ describe("grow day", () => {
   });
 });
 
-// Flower 2 on 23 September 2026 (UTC; lights-on 10:00 NZST is 22:00Z), as the recorder returned it.
+describe("grow day on Home Assistant's clock, viewed from another time zone", () => {
+  // The viewer is in New York; Home Assistant and the room are in Auckland.
+  let zone: string | undefined;
+  beforeAll(() => {
+    zone = process.env.TZ;
+    process.env.TZ = "America/New_York";
+  });
+  afterAll(() => {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  });
+  const z = (iso: string) => Date.parse(iso);
+  const now = z("2026-09-23T02:00:00Z"); // 14:00 NZST on the 23rd, 22:00 EDT on the 22nd
+  it("starts at lights-on on Home Assistant's clock, not the viewer's", () => {
+    expect(growDay(10, 22, now, "Pacific/Auckland")).toEqual({
+      start: z("2026-09-22T22:00:00Z"), // 10:00 NZST on the 23rd
+      lightsOff: z("2026-09-23T10:00:00Z"), // 22:00 NZST
+      end: z("2026-09-23T22:00:00Z"), // 10:00 NZST on the 24th
+    });
+    // On the viewer's own clock the same instant is in another grow-day.
+    expect(growDay(10, 22, now)!.start).toBe(z("2026-09-22T14:00:00Z")); // 10:00 EDT on the 22nd
+  });
+  it("keeps the 23-hour grow-day of Home Assistant's clock change", () => {
+    const day = growDay(10, 22, z("2026-09-27T01:00:00Z"), "Pacific/Auckland")!; // 14:00 NZDT
+    expect(day.start).toBe(z("2026-09-26T21:00:00Z")); // 10:00 NZDT
+    const [yesterday] = earlierDays(day, 1, () => ({ on: 10, off: 22 }), "Pacific/Auckland");
+    expect(yesterday).toEqual({
+      start: z("2026-09-25T22:00:00Z"), // 10:00 NZST
+      lightsOff: z("2026-09-26T10:00:00Z"), // 22:00 NZST
+      end: z("2026-09-26T21:00:00Z"), // 10:00 NZDT
+    });
+  });
+  it("reads the tank's record in Home Assistant's grow-days", () => {
+    expect(recordWindows(10, 22, 12, now, "Pacific/Auckland")).toEqual([
+      { start: z("2026-09-21T22:00:00Z"), end: z("2026-09-22T22:00:00Z") },
+      { start: z("2026-09-22T22:00:00Z"), end: now },
+    ]);
+  });
+});
+
+// Room A on 23 September 2026 (UTC; lights-on 10:00 NZST is 22:00Z), as the recorder returned it.
 const START = at("22:00:00");
 const decisions = [
   decision(START),
@@ -218,7 +285,7 @@ describe("shots", () => {
 });
 
 describe("blocks and holds", () => {
-  // Flower 2 on 22 September 2026: a dosing hold during the ramp, then two zones blocked at their
+  // Room A on 22 September 2026: a dosing hold during the ramp, then two zones blocked at their
   // daily budget until lights-off, and the kill switch off across a restart.
   const day = [
     decision(at("22:00:00", "2026-09-21")),
@@ -303,6 +370,18 @@ describe("blocks and holds", () => {
       ["hold", at("21:09:37.000"), at("21:10:37.000")],
     ]);
     expect(zoneBlocks(day, 4, from, START)).toEqual([]);
+  });
+  it("reads the kill switch hold under the product's name and under the old one", () => {
+    // History recorded before the update keeps the old wording; both are the same hold.
+    for (const text of [
+      "Crop Steering Controller disabled (kill switch off)",
+      "f2-control disabled (kill switch off)",
+    ]) {
+      const rows = [decision(at("12:00:00"), [], [`Z1 P3 ${text}`]), decision(at("12:01:00"))];
+      expect(zoneBlocks(rows, 1, at("11:00:00"), at("13:00:00"))).toEqual([
+        { kind: "hold", text, start: at("12:00:00"), end: at("12:01:00"), open: false },
+      ]);
+    }
   });
   it("keeps one interval while only the numbers move, and one still held open at the end", () => {
     const rows = [
@@ -561,13 +640,13 @@ describe("what a room's timeline reads", () => {
       "number.crop_steering_lights_on_hour",
     ])
       expect(read.entityIds).toContain(id);
-    expect(read.entityIds.some((id) => id.startsWith("number.crop_steering_f1_"))).toBe(false);
+    expect(read.entityIds.some((id) => id.startsWith("number.crop_steering_room_b_"))).toBe(false);
     expect(read.attributeIds).toEqual(["sensor.crop_steering_current_decision"]);
   });
 });
 
 describe("the demo's day", () => {
-  // Seven hours after Flower 2's demo lights-on, in whatever time zone the test runs.
+  // Seven hours after Room A's demo lights-on, in whatever time zone the test runs.
   const now = new Date(2026, 8, 23, 17, 0).getTime();
   const states = createDemo(now);
   const load = (prefix: string) => {
@@ -625,9 +704,9 @@ describe("the demo's day", () => {
       ["number.crop_steering_irrigation_ec_max", 3.4, 3.5],
     ]);
     expect(Math.abs(changes[1].time - hold.end)).toBeLessThan(60_000);
-    // Flower 1's zone 3, disabled for inspection, is held from then on.
-    const f1 = load("f1_");
-    expect(zoneBlocks(f1.decisions, 3, f1.day.start, now)).toEqual([
+    // Room B's zone 3, disabled for inspection, is held from then on.
+    const roomB = load("room_b_");
+    expect(zoneBlocks(roomB.decisions, 3, roomB.day.start, now)).toEqual([
       expect.objectContaining({ kind: "hold", text: "zone disabled", open: true }),
     ]);
   });

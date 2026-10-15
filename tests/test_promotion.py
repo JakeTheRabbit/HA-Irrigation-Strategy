@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -68,7 +69,9 @@ class FakeGitHub(promotion.GitHub):
                 "status": "completed",
                 "conclusion": "success",
             }
-            for number, name in enumerate(sorted(promotion.REQUIRED_JOBS), 100)
+            for number, name in enumerate(
+                sorted(names[0] for names in promotion.REQUIRED_JOBS), 100
+            )
         ]
         self.release = {"id": 56, "tag_name": TAG, "prerelease": True, "draft": False}
         self.missing_audit = False
@@ -262,6 +265,82 @@ def test_missing_required_job_rejects_green_workflow():
     assert not api.writes
 
 
+OLD_BUILD = "Build f2-control add-on image (amd64)"
+NEW_BUILD = "Build controller add-on image (amd64)"
+
+
+def build_job(api):
+    return next(job for job in api.jobs if job["name"] == OLD_BUILD)
+
+
+@pytest.mark.parametrize("name", [OLD_BUILD, NEW_BUILD])
+def test_the_add_on_build_job_passes_under_either_name(name):
+    api = FakeGitHub()
+    job = build_job(api)
+    job["name"] = name
+    plan = promotion.promote(api, TAG)
+    assert plan["validate_jobs"][name] == job["id"]
+    assert not api.writes
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda api: api.jobs.remove(build_job(api)),
+        lambda api: build_job(api).update(name="Build add-on image (amd64)"),
+        lambda api: build_job(api).update(name=NEW_BUILD, conclusion="failure"),
+        lambda api: api.jobs.append({**build_job(api), "id": 99, "name": NEW_BUILD}),
+    ],
+    ids=["neither-name", "other-name", "new-name-failed", "both-names"],
+)
+def test_the_add_on_build_job_is_required_under_one_name(mutate):
+    api = FakeGitHub()
+    mutate(api)
+    message = re.escape(
+        f"Required Validate job did not pass for the candidate: {OLD_BUILD} or {NEW_BUILD}"
+    )
+    with pytest.raises(promotion.Rejected, match=message):
+        promotion.promote(api, TAG, apply=True)
+    assert not api.writes
+
+
+SMOKE = "Controller container smoke (both modes)"
+
+
+def smoke_job(api):
+    return next(job for job in api.jobs if job["name"] == SMOKE)
+
+
+def test_the_container_smoke_job_is_in_validate_and_passes_when_green():
+    workflow = (ROOT / ".github" / "workflows" / "ci-validate.yml").read_text(
+        encoding="utf-8"
+    )
+    assert f"name: {SMOKE}\n" in workflow
+    api = FakeGitHub()
+    plan = promotion.promote(api, TAG)
+    assert plan["validate_jobs"][SMOKE] == smoke_job(api)["id"]
+    assert not api.writes
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda api: api.jobs.remove(smoke_job(api)),
+        lambda api: smoke_job(api).update(conclusion="failure"),
+    ],
+    ids=["missing", "failed"],
+)
+def test_the_container_smoke_job_is_required(mutate):
+    api = FakeGitHub()
+    mutate(api)
+    message = re.escape(
+        f"Required Validate job did not pass for the candidate: {SMOKE}"
+    )
+    with pytest.raises(promotion.Rejected, match=message):
+        promotion.promote(api, TAG, apply=True)
+    assert not api.writes
+
+
 def test_apply_needs_prior_read_only_plan_and_trusted_context(monkeypatch):
     api = FakeGitHub()
     with pytest.raises(promotion.Rejected, match="read-only preflight"):
@@ -450,3 +529,15 @@ def test_a_promotion_republishes_the_demo():
     assert "gh workflow run pages.yml" in promote and "--ref main" in promote
     assert promote.index("--apply") < promote.index("gh workflow run pages.yml")
     assert "actions: write" in promote and "actions: write" not in before
+
+
+def test_a_promotion_retags_the_controller_image_without_a_rebuild():
+    """The same token limit: the stable re-tag is a dispatch, made only after main moved."""
+    workflow = (ROOT / ".github/workflows/promote.yml").read_text(encoding="utf-8")
+    before, promote = workflow.split("  promote:")
+    dispatch = "gh workflow run container.yml"
+    assert dispatch in promote and dispatch not in before
+    assert promote.index("--apply") < promote.index(dispatch)
+    line = next(x for x in promote.splitlines() if dispatch in x)
+    assert "--ref main" in line and "-f channel=stable" in line
+    assert '-f tag="$CANDIDATE_TAG"' in line

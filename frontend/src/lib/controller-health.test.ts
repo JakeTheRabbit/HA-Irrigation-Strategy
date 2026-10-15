@@ -1,6 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { buildRoom, discoverRooms, leadingNotices, roomStatus } from "./model";
-import { ageText, ageTone, parseControllerTime, readHeartbeat } from "./controller-health";
+import { buildRoom, discoverRooms, leadingNotices, roomStatus, staleBanner } from "./model";
+import {
+  ageText,
+  ageTone,
+  parseControllerTime,
+  readHeartbeat,
+  updatedText,
+} from "./controller-health";
 import { createDemo, demoBeat } from "./demo";
 import type { EntityState, Notice, States } from "./types";
 
@@ -92,6 +98,44 @@ describe("controller heartbeat", () => {
     expect(stale.alerts[0].detail).toMatch(/last reported 11 min ago/);
     expect(stale.zones.every((zone) => zone.stale)).toBe(true);
   });
+  it("says the controller app stopped, and when, once the controller has said so", () => {
+    // SIGTERM: an update, a restart or a stop by hand. It starts again by itself after the first two.
+    const stopped = entity(HEARTBEAT, "stopped", { stopped_at: ago(3 * 60_000) }, ago(3 * 60_000));
+    const room = view(fixture([stopped]));
+    expect(room.alerts[0]).toMatchObject({ severity: "warning", title: "Controller stopped" });
+    expect(room.alerts[0].detail).toMatch(
+      /^The controller app stopped 3 min ago\. After an update or a restart it starts again by itself/,
+    );
+    expect(room.zones.map((zone) => zone.stale)).toEqual([true, true]);
+    expect(status(fixture([stopped]))).toMatchObject({
+      tone: "stopped",
+      text: "Not watering",
+      reportedAt: NOW - 3 * 60_000,
+    });
+    expect(status(fixture([stopped])).detail).toMatch(/^The controller app stopped 3 min ago\. /);
+    // Long after it stopped it still says stopped, not "data old".
+    const long = entity(
+      HEARTBEAT,
+      "stopped",
+      { stopped_at: ago(3 * 3_600_000) },
+      ago(3 * 3_600_000),
+    );
+    expect(view(fixture([long])).alerts[0].title).toBe("Controller stopped");
+    expect(status(fixture([long])).detail).toMatch(/^The controller app stopped 3 h ago\. /);
+  });
+  it("reads when it stopped from the controller, then from Home Assistant", () => {
+    const at = (attributes: Record<string, unknown>, updated?: string) =>
+      readHeartbeat({ ...entity(HEARTBEAT, "stopped", attributes), last_updated: updated }, NOW);
+    expect(at({ stopped_at: ago(60_000) }, ago(30_000))).toMatchObject({
+      health: "stopped",
+      at: NOW - 60_000,
+    });
+    expect(at({ stopped_at: "soon" }, ago(30_000)).at).toBe(NOW - 30_000);
+    expect(at({}).at).toBeNull();
+    expect(
+      status(fixture([{ ...entity(HEARTBEAT, "stopped"), last_updated: undefined }])).detail,
+    ).toMatch(/^The controller app has stopped\. /);
+  });
   describe("while a quiet controller has a zone valve open", () => {
     const VALVE = "switch.zone_1_valve";
     const quiet = (opened: number, extra: EntityState[] = []) =>
@@ -103,7 +147,12 @@ describe("controller heartbeat", () => {
           enable_flag: "input_boolean.f2_control_enabled",
           valves: { "1": VALVE, "2": "switch.zone_2_valve" },
         }),
-        entity(HEARTBEAT, "healthy", { enable_flag: "input_boolean.f2_control_enabled" }, ago(12 * 60_000)),
+        entity(
+          HEARTBEAT,
+          "healthy",
+          { enable_flag: "input_boolean.f2_control_enabled" },
+          ago(12 * 60_000),
+        ),
         { ...entity(VALVE, "on", {}, ago(opened)), last_changed: ago(opened) },
         entity("switch.zone_2_valve", "off"),
         ...extra,
@@ -316,12 +365,12 @@ describe("room status line", () => {
     [
       "watering is switched off",
       [entity("input_boolean.f2_control_enabled", "off")],
-      /^Watering is switched off for this room \(its engine switch\), so the controller opens no valve\./,
+      /^The kill switch \(Watering\) of this room is off, so the controller opens no valve\./,
     ],
     [
       "the engine switch is unavailable",
       [entity("input_boolean.f2_control_enabled", "unavailable")],
-      /^This room's engine switch, input_boolean\.f2_control_enabled, is missing or unavailable in Home Assistant\. The controller treats that as off/,
+      /^The kill switch of this room, input_boolean\.f2_control_enabled, is missing or unavailable in Home Assistant\. The controller operates as if it is off/,
     ],
     [
       "Home Assistant's System Enabled is off",
@@ -350,7 +399,7 @@ describe("room status line", () => {
     [
       "the setup is invalid",
       [entity(HEARTBEAT, "healthy", { setup_pending: "Invalid setup descriptor: bad valve" })],
-      /^Invalid setup descriptor: bad valve\. Correct the room in Rooms & setup\.$/,
+      /^Invalid setup descriptor: bad valve\. Correct the room in Rooms and setup\.$/,
     ],
     [
       "hardware is stuck",
@@ -420,6 +469,28 @@ describe("room status line", () => {
       text: "Data 14 min old",
       reportedAt: NOW - 14 * 60_000,
     });
+  });
+  it("puts a band under the header once the controller stops reporting, and only then", () => {
+    const banner = (states: States) => staleBanner(states, discoverRooms(states)[0], NOW);
+    expect(banner(fixture())).toBeNull();
+    expect(banner(fixture([entity(HEARTBEAT, "healthy", {}, ago(14 * 60_000))]))).toBe(
+      "The controller has not reported for 14 min. Moisture and phases below are its last report, not live. Watering is held by the controller's own safety rules.",
+    );
+    const missing = fixture();
+    delete missing[HEARTBEAT];
+    expect(banner(missing)).toBe(
+      "The controller is not running. Start the controller app and check its log. Moisture and phases below are its last report, not live.",
+    );
+    const off = fixture([
+      entity(HEARTBEAT, "healthy", {}, ago(14 * 60_000)),
+      entity("switch.crop_steering_room_active", "off"),
+    ]);
+    expect(banner(off)).toBeNull();
+  });
+  it("says how long ago the header's data was updated", () => {
+    expect(updatedText(20_000)).toBe("Updated 20 s ago");
+    expect(updatedText(3 * 60_000 + 5_000)).toBe("Updated 3 min ago");
+    expect(updatedText(-5_000)).toBe("Updated 0 s ago");
   });
   it("says Room off for a room with nothing growing", () => {
     const states = fixture([entity("switch.crop_steering_room_active", "off")]);

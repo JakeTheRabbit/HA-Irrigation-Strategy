@@ -2,11 +2,20 @@
 
 DOMAIN = "crop_steering"
 
+# The default room's kill switch on an installation from before the setup wizard: a helper the
+# operator made by hand, and the controller app's shipped `enable_flag` option. A room made by the
+# wizard stops on its own Engine Enabled switch instead. Named here once; room.room_gate decides.
+LEGACY_KILL_SWITCH = "input_boolean.f2_control_enabled"
+
 # Where a Repairs card's "Learn more" link goes: every card carries a CS code, explained there.
 REPAIRS_DOCS_URL = "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/ERROR_CODES.md"
 
 # Configuration keys
 CONF_NUM_ZONES = "num_zones"
+# The P0 additional dryback (%) each zone of a room starts with. A room set up from this release on
+# stores it; a room set up before has none, so its zones start at 0 (off) and P0 is unchanged.
+CONF_P0_ADDITIONAL_DRYBACK = "p0_additional_dryback"
+NEW_ROOM_P0_ADDITIONAL_DRYBACK = 3.0
 
 # Zone configuration
 MIN_ZONES = 1
@@ -25,6 +34,30 @@ VWC_ADJUSTMENT_PERCENT = 5.0
 # while another probe in the zone is still reporting.
 PROBE_RANGE = {"vwc": (0.0, 100.0), "ec": (0.0, 20.0)}
 PROBE_STALE_SECONDS = 20 * 60
+# How a zone's probes become its one reading, chosen per zone for moisture and EC apart. Median is
+# the first option, so the default. Lowest and Highest let one probe steer the zone, so they need
+# PROBE_EXTREME_MIN probes that agree; with fewer the zone steers on the Median (CS-502).
+PROBE_METHODS = ["Median", "Average", "Lowest", "Highest"]
+PROBE_EXTREME_MIN = 3
+# A probe further from the zone's median than the larger of this many units and this share of the
+# median reads something no probe beside it agrees with (pulled out of its cube, in a puddle).
+PROBE_FAR = {"vwc": (15.0, 0.4), "ec": (1.0, 0.4)}
+# What each EC probe measures, chosen per probe: the EC of the water in the substrate's pores, or
+# the bulk EC of substrate and water together, which reads lower. unknown is the first option, so
+# the default, and fuses as before; a zone never combines a bulk with a pore reading (CS-504).
+EC_TYPES = ["unknown", "pore", "bulk"]
+
+# The four moisture levels, (lowest, highest) %: each setting accepts exactly this, and grow plans,
+# Auto setpoints and the engine (crop-steering-engine _PARAM_BOUNDS) use the same range, so the
+# engine never clips a value its setting accepted (tests_ha/test_moisture_ranges.py). The tops are
+# 100 because the order between the levels bounds the water, not a fixed number. The floors are the
+# engine's long-standing ones: they catch a slipped digit (6.5 for 65).
+MOISTURE_RANGES = {
+    "p1_target_vwc": (20.0, 100.0),
+    "p2_vwc_threshold": (10.0, 100.0),
+    "field_capacity": (40.0, 100.0),
+    "p3_emergency_vwc_threshold": (10.0, 65.0),
+}
 
 
 # Software version - single source of truth
@@ -37,7 +70,17 @@ SET_PHASE_OPTIONS = ["Keep", *PHASES]
 # How Water today reads, in the dashboard and the controller's vitals notification: each zone's
 # total, or what each of its plants got. The controller matches "Per plant" by these words.
 WATER_TODAY_VIEWS = ["Zone total", "Per plant"]
+# How a room's runoff leaves it. The controller watches for a table backing up (CS-310) unless the
+# room drains freely, and matches "free_drain" by this id. Unknown, the first, is every room that has
+# not said, which is watched as before.
+DRAINAGE_TYPES = ["unknown", "flood_table", "free_drain"]
+# A room's no-touch window: Off, or how long the AI assistant asks nothing and changes nothing there
+# (an operator sampling or visiting). The controller matches these words and sets Off when it ends.
+NO_TOUCH_OPTIONS = ["Off", "1 h", "Until lights-on", "24 h"]
 STEERING_MODES = ["Vegetative", "Generative"]
+# What the room grows in, published in its descriptor for the controller. "generic" (the default,
+# and what every upgraded room reads) changes nothing; the ids match the doctrine pack's substrates.
+SUBSTRATES = ["generic", "rockwool", "coco"]
 
 # Growth stages (for growth_stage select entity)
 GROWTH_STAGES = ["Vegetative", "Generative", "Transition"]

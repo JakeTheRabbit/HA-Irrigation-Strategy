@@ -1,17 +1,10 @@
 """Multi-room namespacing — lock the contract that the DEFAULT room stays un-prefixed so
-existing single-room installs (e.g. F2) keep their exact entity ids, while named rooms get an
+existing single-room installs keep their exact entity ids, while named rooms get an
 isolated prefix."""
 
-import importlib.util
 import types
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-_spec = importlib.util.spec_from_file_location(
-    "cs_room", ROOT / "custom_components" / "crop_steering" / "room.py"
-)
-room = importlib.util.module_from_spec(_spec)
-_spec.loader.exec_module(room)
+from custom_components.crop_steering import room
 
 
 def _entry(data):
@@ -19,7 +12,7 @@ def _entry(data):
 
 
 def test_default_room_is_unprefixed():
-    # No room_prefix, or an explicit "" -> default room -> F2 entities unchanged.
+    # No room_prefix, or an explicit "" -> default room -> entity ids unchanged.
     assert room.room_prefix(_entry({})) == ""
     assert room.room_prefix(_entry({"room_prefix": ""})) == ""
 
@@ -69,12 +62,12 @@ def test_named_room_engine_config_has_own_kill_switch_and_hardware():
 
 def test_default_room_engine_config_uses_global_kill_switch():
     d = room.build_engine_config(
-        "", "default", 1, {"1": {"zone_switch": "switch.f2_row1"}}, {}
+        "", "default", 1, {"1": {"zone_switch": "switch.row1"}}, {}
     )
     assert (
         d["enable_flag"] == "input_boolean.f2_control_enabled"
     )  # default keeps the global kill switch
-    assert d["prefix"] == "" and d["valves"] == {1: "switch.f2_row1"}
+    assert d["prefix"] == "" and d["valves"] == {1: "switch.row1"}
     assert (
         d["feed_ec_sensor"] == "" and d["feed_ph_sensor"] == ""
     )  # unset -> gate disabled
@@ -112,6 +105,12 @@ def test_new_default_room_can_use_integration_engine_switch():
         "", "default", 1, {}, {}, {"enable_flag": "switch.crop_steering_engine_enabled"}
     )
     assert d["enable_flag"] == "switch.crop_steering_engine_enabled"
+
+
+def test_the_descriptor_carries_the_substrate_only_when_given():
+    given = room.build_engine_config("veg_", "veg", 2, _ZONES, _HW, substrate="coco")
+    assert given["substrate"] == "coco"
+    assert "substrate" not in room.build_engine_config("veg_", "veg", 2, _ZONES, _HW)
 
 
 # ---------------------------------------------------------------- whose restored state is it?
@@ -160,3 +159,19 @@ def test_with_nothing_to_compare_the_state_is_restored_never_thrown_away():
     assert (
         _ours(created=_at(1), written=_at(3, aware=False)) is True
     )  # naive against aware
+
+
+def test_the_light_entity_is_in_the_descriptor_only_when_mapped():
+    """A room without a grow light mapped publishes the descriptor it always did, key for key and value for value,
+    so the controller's saved setup fingerprint still matches and an update needs no disarm cycle.
+    """
+    before = room.build_engine_config("veg_", "veg", 2, _ZONES, _HW)
+    assert "light_entity" not in before
+    blank = room.build_engine_config(
+        "veg_", "veg", 2, _ZONES, {**_HW, "light_entity": ""}
+    )
+    assert blank == before
+    mapped = room.build_engine_config(
+        "veg_", "veg", 2, _ZONES, {**_HW, "light_entity": "light.veg_lights"}
+    )
+    assert mapped == {**before, "light_entity": "light.veg_lights"}

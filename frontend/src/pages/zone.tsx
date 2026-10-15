@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,34 +9,41 @@ import {
   time as clock,
   type Page,
 } from "@/components/dashboard";
+import { BrainOnZone } from "@/components/brain";
+import { UiTip } from "@/components/info-tip";
 import { ZoneDay } from "@/components/day-timeline";
+import { OverlayRows, useOverlays } from "@/components/overlay-row";
 import { Pill } from "@/components/mini-visuals";
 import { SensorContextCard, useSensorContext } from "@/components/sensor-context";
 import { rangeText, steeringOf } from "@/lib/day-chart";
 import {
   attachOutcomes,
+  brainWords,
   jevAnswer,
   jevIds,
   jevResult,
   JEV_TITLES,
   outcomeText,
+  parseBrainAnswers,
   parseJevSetpoints,
   parseJevZone,
   readJev,
   type JevSetpoints,
 } from "@/lib/jev";
 import { referenceLines } from "@/lib/sensor-context";
+import { zoneOverlays } from "@/lib/overlays";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { jevChip, TARGET_GROUPS } from "@/lib/targets";
-import { PROBE_TONE, zoneProbes } from "@/lib/probes";
+import { ecType, fusionMethod, PROBE_TONE, zoneProbes } from "@/lib/probes";
 import type { Controller, Zone } from "@/lib/types";
 import { dayWord } from "@/lib/utils";
 import { waitingText } from "@/lib/waiting-for";
+import { aiRead, zoneReasons } from "@/lib/zone-why";
 import "./zone.css";
 
 const PHASE_NAMES: Record<string, string> = {
   P0: "Morning dryback",
-  P1: "Ramp-up",
+  P1: "Ramp",
   P2: "Maintenance",
   P3: "Overnight dryback",
 };
@@ -59,10 +66,13 @@ export function ZonePage({
   if (!zone)
     return (
       <>
-        <h1 className="zone-empty-title">Zone</h1>
+        <div className="label-with-tip">
+          <h1 className="zone-empty-title">Zone</h1>
+          <UiTip copyKey="zone" />
+        </div>
         <section className="panel">
           <Empty
-            title="No zones discovered"
+            title="No zones found"
             detail="Zones appear once the room’s zones are configured in Equipment › Setup."
             action={<Button onClick={() => navigate("equipment/setup")}>Open setup</Button>}
           />
@@ -76,7 +86,8 @@ export function ZonePage({
   );
   // Jev on this zone shows while the room runs Jev (its journal, or its word on this zone).
   const jev =
-    !!readJev(states, room.room.prefix).log ||
+    !!readJev(states, room.room.prefix).room?.on ||
+    !!readJev(states, room.room.prefix).log?.entries.some((entry) => entry.zone === zone.id) ||
     !!parseJevZone(states[jevIds(room.room.prefix).zone(zone.id)]);
   return (
     <div className="zone-page" data-zone-page={zone.id}>
@@ -110,24 +121,15 @@ export function ZonePage({
         )}
         <Pill
           dot
-          tone={zone.valveOn === true ? "on" : zone.valveOn === false ? "off" : "unknown"}
+          tone={zone.valveOn === true ? "on" : zone.valveOn === false ? "neutral" : "unknown"}
           data-zone-valve={zone.id}
-          title={zone.valveEntity ?? "No valve mapped in this room's engine configuration"}
+          title={zone.valveEntity ?? "No valve is mapped in the configuration of this room"}
         >
-          Valve {zone.valveOn === true ? "open" : zone.valveOn === false ? "shut" : "unknown"}
+          Valve {zone.valveOn === true ? "open" : zone.valveOn === false ? "closed" : "unknown"}
         </Pill>
         {zone.enabled === false && (
           <Pill dot tone="warn">
             Scheduling paused
-          </Pill>
-        )}
-        {zone.stale && (
-          <Pill
-            dot
-            tone="warn"
-            title="The controller is not reporting: phase and status are its last report, not live."
-          >
-            Stale
           </Pill>
         )}
         {steering && (
@@ -137,32 +139,145 @@ export function ZonePage({
         )}
       </div>
       <ZoneDay key={zone.id} controller={controller} zone={zone} />
-      {/* Why it did what it did beside what happens next: Jev's decisions and the probes on the
-          left, the controller's next step, the controls and the targets on the right. Without Jev
-          the controls join the probes, so the columns stay about even. */}
+      <ZoneWhy key={`why-${zone.id}`} controller={controller} zone={zone} />
+      {/* The AI on this zone beside the controls; without it the controls take the width. */}
       <div className="zone-page-grid">
         <div className="zone-page-column">
+          <BrainOnZone controller={controller} zone={zone.id} navigate={navigate} />
           {jev && <JevOnZone controller={controller} zone={zone} navigate={navigate} />}
-          <ZoneProbes controller={controller} zone={zone} navigate={navigate} />
-          {!jev && <ZoneControls key={zone.id} controller={controller} zone={zone} />}
         </div>
-        <div className="zone-page-column">
-          {jev && <ZoneControls key={zone.id} controller={controller} zone={zone} />}
-          <ZoneTargets controller={controller} zone={zone} navigate={navigate} />
-        </div>
+        <ZoneControls key={zone.id} controller={controller} zone={zone} />
       </div>
-      <HistoryChart
-        key={`history-${zone.id}`}
-        controller={controller}
-        zones={[zone]}
-        title="History"
-        ranges={[
-          { hours: 48, label: "Yesterday" },
-          { hours: 168, label: "7 days" },
-        ]}
-      />
+      {/* The rest on request: the day chart above already shows today. */}
+      <Collapsed key={`targets-${zone.id}`} title="Targets (read only)">
+        {() => <ZoneTargets controller={controller} zone={zone} navigate={navigate} />}
+      </Collapsed>
+      <Collapsed key={`probes-${zone.id}`} title="Probes used and not used">
+        {() => <ZoneProbes controller={controller} zone={zone} navigate={navigate} />}
+      </Collapsed>
+      <Collapsed key={`history-${zone.id}`} title="7-day history">
+        {() => (
+          <HistoryChart
+            controller={controller}
+            zones={[zone]}
+            title="History"
+            ranges={[{ hours: 168, label: "7 days" }]}
+          />
+        )}
+      </Collapsed>
       <RecordedBehaviour key={`recorded-${zone.id}`} controller={controller} zone={zone} />
     </div>
+  );
+}
+
+/** Why this zone is doing what it is doing: the controller's reason from its decision record and what
+ * it waits for next; with the AI on, the AI's read and a "Why?" that asks it. On rules, the
+ * controller's reason only. */
+function ZoneWhy({ controller, zone }: { controller: Controller; zone: Zone }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const { states, room } = controller;
+  const ids = jevIds(room.room.prefix);
+  const reasons = zoneReasons(
+    zone,
+    states[`sensor.crop_steering_${room.room.prefix}current_decision`],
+  );
+  const waiting = zone.waiting
+    ? waitingText(zone.waiting, { number: (value) => number(value), clock })
+    : "";
+  const on = !!readJev(states, room.room.prefix).room?.on;
+  const sensor = on ? parseJevZone(states[ids.zone(zone.id)]) : null;
+  const read = sensor ? aiRead(sensor.judges, sensor.acting) : null;
+  // "Why?" needs a controller that answers (its answers sensor); asking costs from the AI budget.
+  const answers = on ? parseBrainAnswers(states[ids.answers]) : null;
+  const answer = answers?.answers.find((item) => item.zone === zone.id);
+  const locked = controller.admin === false;
+  async function ask() {
+    setBusy(true);
+    setError("");
+    try {
+      await controller.operator("brain_ask", {
+        question: `Why is ${zone.name} doing what it is doing now?`,
+        zone: zone.id,
+      });
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel zone-why-panel" aria-labelledby="zone-why-title" data-zone-why>
+      <div className="panel-heading">
+        <div>
+          <h2 id="zone-why-title">Reason for this action</h2>
+          <p>{on ? "The controller’s reason, then the AI’s read" : "The controller’s reason"}</p>
+        </div>
+        {answers && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy || locked || !!answers.pending}
+            onClick={() => void ask()}
+          >
+            Why?
+          </Button>
+        )}
+      </div>
+      <div className="zone-panel-body">
+        {reasons.length ? (
+          <ul className="zone-reasons" aria-label="Controller reason">
+            {reasons.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted small">The controller has not said anything about this zone yet.</p>
+        )}
+        {waiting && (
+          <p className="zone-waiting">
+            <span>The controller waits for</span> {waiting}
+          </p>
+        )}
+        {read && (
+          <p className="zone-ai-read">
+            <span>AI’s read · {read.title}</span> {read.why}
+          </p>
+        )}
+        {answers && locked && (
+          <p className="muted small">
+            Only an administrator can ask: each answer costs from the room’s AI budget.
+          </p>
+        )}
+        {error && (
+          <p className="jev-trouble" role="alert">
+            {error}
+          </p>
+        )}
+        {!!answers?.pending && <p className="muted small">Asking…</p>}
+        {answer && (
+          <p className="zone-ai-read" data-cannot={answer.cannotAnswer || undefined}>
+            <span>AI’s answer{answer.answeredAt !== null && ` · ${clock(answer.answeredAt)}`}</span>{" "}
+            {answer.answer}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
+/** A section left closed until asked for: it renders only while open. */
+function Collapsed({ title, children }: { title: string; children: () => ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details
+      className="zone-more"
+      open={open}
+      onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
+    >
+      <summary>{title}</summary>
+      {open && children()}
+    </details>
   );
 }
 
@@ -179,10 +294,13 @@ function JevOnZone({
 }) {
   const { states, room } = controller;
   const ids = jevIds(room.room.prefix);
-  const { log } = readJev(states, room.room.prefix);
+  const { log, room: brain } = readJev(states, room.room.prefix);
   const sensor = parseJevZone(states[ids.zone(zone.id)]);
+  const rules = brain && !brain.on ? brainWords(brain).subtitle : null;
   const setpoints = parseJevSetpoints(states[ids.zone(zone.id)]);
-  if (!log && !sensor) return null;
+  const { doc, reload } = useOverlays(controller);
+  const overlays = zoneOverlays(doc, controller.roomId, zone.id);
+  if (!log && !sensor && !overlays.length) return null;
   const { rest, outcomes } = attachOutcomes(log?.entries ?? []);
   const recent = rest.filter((entry) => entry.zone === zone.id).slice(0, 6);
   const now = Date.now();
@@ -190,11 +308,12 @@ function JevOnZone({
     <section className="panel zone-jev" aria-labelledby="zone-jev-title" data-zone-jev>
       <div className="panel-heading">
         <div>
-          <h2 id="zone-jev-title">Jev on this zone</h2>
+          <h2 id="zone-jev-title">AI assistant on this zone</h2>
           <p>
-            {sensor?.acting.length
-              ? `Acting now: ${sensor.acting.map((judge) => JEV_TITLES[judge] ?? judge).join(", ")}`
-              : "Watching: no judge acting on this zone now"}
+            {rules ??
+              (sensor?.acting.length
+                ? `Acting now: ${sensor.acting.map((judge) => JEV_TITLES[judge] ?? judge).join(", ")}`
+                : "Watching: no judge acting on this zone now")}
           </p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => navigate("history/timeline", zone.id)}>
@@ -203,8 +322,9 @@ function JevOnZone({
       </div>
       <div className="zone-panel-body">
         {setpoints && <JevSetpointsLine setpoints={setpoints} />}
+        <OverlayRows controller={controller} overlays={overlays} reload={reload} />
         {!!sensor?.judges.length && (
-          <ul className="zone-judges" aria-label="Each judge's last word on this zone">
+          <ul className="zone-judges" aria-label="Last answer of each judge">
             {sensor.judges.map((judge) => (
               <li key={judge.judge}>
                 <strong>{judge.title}</strong>{" "}
@@ -216,7 +336,7 @@ function JevOnZone({
           </ul>
         )}
         {recent.length > 0 && (
-          <ol className="zone-jev-list" aria-label="Jev's latest decisions on this zone">
+          <ol className="zone-jev-list" aria-label="Last AI assistant decisions">
             {recent.map((entry) => {
               const result = jevResult(entry);
               const checked = outcomes.get(entry.key)?.at(-1);
@@ -278,8 +398,8 @@ function JevSetpointsLine({ setpoints }: { setpoints: JevSetpoints }) {
   return (
     <p className="zone-jev-setpoints" data-managed={setpoints.managed}>
       {setpoints.managed
-        ? `Jev may move the P2 ${parts.filter(Boolean).join(" and ")}.`
-        : "Jev leaves this zone’s setpoints alone (Auto setpoints off, or a grow plan holds them)."}
+        ? `The AI assistant can change the P2 ${parts.filter(Boolean).join(" and ")}.`
+        : "The AI assistant does not change the setpoints of this zone (Auto setpoints is off, or a grow plan holds them)."}
       {setpoints.last && ` Last change ${lastChange(setpoints.last).replaceAll("->", "→")}.`}
       {paused && ` Paused until ${clock(setpoints.pausedUntil)} after a rescue put a change back.`}
     </p>
@@ -377,7 +497,10 @@ function ZoneProbes({
     <section className="panel zone-probes" aria-labelledby="zone-probes-title">
       <div className="panel-heading">
         <div>
-          <h2 id="zone-probes-title">Probes</h2>
+          <div className="label-with-tip">
+            <h2 id="zone-probes-title">Probes</h2>
+            <UiTip copyKey="probes" />
+          </div>
           <p>What each probe reads, and whether the zone’s reading uses it</p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => navigate("equipment/probes")}>
@@ -391,6 +514,8 @@ function ZoneProbes({
           const spread =
             typeof fused?.attributes.spread === "number" ? fused.attributes.spread : null;
           const mine = probes.filter((probe) => probe.kind === kind);
+          const method = fusionMethod(fused);
+          const steersOn = kind === "ec" ? ecType(fused) : null;
           return (
             <div className="zone-probe-group" key={kind}>
               <h3>
@@ -402,6 +527,8 @@ function ZoneProbes({
                   {spread !== null &&
                     mine.filter((probe) => probe.used).length > 1 &&
                     ` · probes ${number(spread, kind === "ec" ? 2 : 1)} apart`}
+                  {method && ` · the ${method}`}
+                  {steersOn && ` · ${steersOn}`}
                 </span>
               </h3>
               <ul className="zone-probe-list">
@@ -444,21 +571,12 @@ function ZoneControls({ controller, zone }: { controller: Controller; zone: Zone
   const connected = ["live", "demo"].includes(controller.connection);
   const pauseWords =
     "Paused, the zone gets no water at all, not even a rescue shot, and a shot already running in it stops within a few seconds. It is not an emergency stop: use the installation's physical shut-off for that.";
-  // The controller's own thresholds against the readings now: what moving a phase by hand skips.
-  const waiting = zone.waiting
-    ? waitingText(zone.waiting, { number: (value) => number(value), clock })
-    : "";
   return (
     <section className="panel zone-controls" aria-labelledby="zone-controls-title">
       <div className="panel-heading">
         <h2 id="zone-controls-title">Controls</h2>
       </div>
       <div className="zone-panel-body">
-        {waiting && (
-          <p className="zone-waiting">
-            <span>The controller waits for</span> {waiting}
-          </p>
-        )}
         <div className="zone-control-row">
           <span>
             Scheduling{" "}
@@ -493,7 +611,7 @@ function ZoneControls({ controller, zone }: { controller: Controller; zone: Zone
                   size="sm"
                   variant="outline"
                   aria-pressed={phase === zone.phase}
-                  title={`${phase} · ${name}: the controller moves the zone within a minute and carries on from there. Lights-off still moves it to P3, and lights-on to P0.`}
+                  title={`${phase} · ${name}: the controller moves the zone within a minute and continues from there. Lights-off still moves it to P3, and lights-on to P0.`}
                   disabled={phase === zone.phase || !connected}
                   onClick={() => setPhaseChoice(phase)}
                 >
@@ -509,7 +627,7 @@ function ZoneControls({ controller, zone }: { controller: Controller; zone: Zone
           open={review}
           onOpenChange={setReview}
           controller={controller}
-          title="Review zone scheduling"
+          title="Review zone switch"
           items={[
             {
               change: { entityId: zone.enabledEntity, value: !zone.enabled },
@@ -564,7 +682,7 @@ function RecordedBehaviour({ controller, zone }: { controller: Controller; zone:
       open={open}
       onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
     >
-      <summary>Recorded behaviour against the targets: typical peak, trough and dryback</summary>
+      <summary>Recorded behaviour against targets</summary>
       {open && (
         <SensorContextCard
           context={sensor}

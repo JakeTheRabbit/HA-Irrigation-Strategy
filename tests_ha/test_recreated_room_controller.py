@@ -10,20 +10,23 @@ controller's own tests; this is the two halves together, in a real Home Assistan
 import json
 from datetime import datetime
 
-from conftest import fixture, switch_calls
+from conftest import fixture, switch_calls, room_of
 from test_real_flow import VALVE, ZONES
 from test_setup_entry import _install
 from test_upgrade_in_place import _upgrade
 
 DOMAIN = "crop_steering"
-KILL = "switch.crop_steering_engine_enabled"
-DESCRIPTOR = "sensor.crop_steering_engine_config"
+KILL = "switch.crop_steering_tent_engine_enabled"
+DESCRIPTOR = "sensor.crop_steering_tent_engine_config"
 OTHER_VALVE = "switch.gt4_irrigation_switch"
+# A room installed before every new room got a slug keeps its un-prefixed ids.
+UPGRADED_KILL = "switch.crop_steering_engine_enabled"
+UPGRADED_DESCRIPTOR = "sensor.crop_steering_engine_config"
 ARMED = (
     KILL,
-    "switch.crop_steering_system_enabled",
-    "switch.crop_steering_auto_irrigation_enabled",
-    "switch.crop_steering_zone_1_enabled",
+    "switch.crop_steering_tent_system_enabled",
+    "switch.crop_steering_tent_auto_irrigation_enabled",
+    "switch.crop_steering_tent_zone_1_enabled",
 )
 
 
@@ -48,7 +51,7 @@ async def test_a_room_set_up_again_with_another_valve_is_driven_through_the_new_
 ):
     first = await _install(hass)
     c, fake, _clock = controller_for({"enable_flag": KILL})
-    room = c.rooms[0]
+    room = room_of(c)
     assert room.hw["valves"] == {1: VALVE} and room.setup_revision == 1
 
     # Setup is done again, this time on a different switch. The controller keeps running.
@@ -78,7 +81,7 @@ async def test_a_room_set_up_again_is_not_adopted_while_the_old_valve_is_on(
 ):
     first = await _install(hass)
     c, fake, _clock = controller_for({"enable_flag": KILL})
-    room = c.rooms[0]
+    room = room_of(c)
     assert await hass.config_entries.async_remove(first.entry_id)
     await hass.async_block_till_done()
     hass.states.async_set(OTHER_VALVE, "off")
@@ -103,9 +106,11 @@ async def test_an_upgraded_room_is_carried_straight_on_and_its_identity_is_writt
 
     entry, seed = await _upgrade(hass, "entry_2_18_one_switch_tent.json")
     assert "entry_id" not in json.dumps(seed["controller_saved"])
-    hass.states.async_set(KILL, "on")
-    c, _fake, _clock = controller_for({"enable_flag": KILL}, saved_state=seed["controller_saved"])
-    room = c.rooms[0]
+    hass.states.async_set(UPGRADED_KILL, "on")
+    c, _fake, _clock = controller_for(
+        {"enable_flag": UPGRADED_KILL}, saved_state=seed["controller_saved"]
+    )
+    room = room_of(c, "")
     assert room.setup_revision == seed["data"]["setup_revision"] and room._setup_pending is None
     assert "Setup" not in (c._blocked(room, 1) or "")
     saved = json.load(open(os.environ["F2_STATE_PATH"]))["default"]["_setup"]
@@ -116,8 +121,10 @@ async def test_the_new_attribute_does_not_move_an_upgraded_rooms_fingerprint(has
     import controller as controller_module
 
     _entry, seed = await _upgrade(hass, "entry_2_18_one_switch_tent.json")
-    attrs = json.loads(json.dumps(dict(hass.states.get(DESCRIPTOR).attributes), default=str))
-    room = type("R", (), {"enable_flag": KILL})()
+    attrs = json.loads(
+        json.dumps(dict(hass.states.get(UPGRADED_DESCRIPTOR).attributes), default=str)
+    )
+    room = type("R", (), {"enable_flag": UPGRADED_KILL})()
     now = controller_module.Controller._setup_fingerprint(attrs, room)
     assert now == seed["controller_saved"]["default"]["_setup"]["fingerprint"]
     assert fixture("entry_2_18_one_switch_tent.json")["data"] == seed["data"]

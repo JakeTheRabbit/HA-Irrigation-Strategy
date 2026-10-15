@@ -2,13 +2,13 @@
 import re
 
 import pytest
-from jev.doctrine import ALT_STAGE_ARC, ATHENA, RULES, SLAB, SOURCES, STAGE_ARC, Rule, doctrine, stage_intent
+from jev.doctrine import ALT_STAGE_ARC, ATHENA, RULES, SOURCES, STAGE_ARC, Rule, doctrine, stage_intent
 
 TOPICS = ("ramp", "dryback", "maintenance", "ec", "probe", "stage", "ripening", "closed_loop", "slab")
 ALL = [(t, i, r) for t, rules in RULES.items() for i, r in enumerate(rules)]
 
 # A moisture number (a % or points) must say how to read it: the wiki's numbers are true water content and the
-# F2 probes read about 33-41 at saturation, so a raw band is never presented as the truth. "of the water fed"
+# probes on a production room read about 33-41 at saturation, so a raw band is never presented as the truth. "of the water fed"
 # marks a runoff share and "of the substrate" a shot size: volumes, not probe readings.
 NUMBER = re.compile(r"\d\s*(?:%|points?\b)")
 MOISTURE = ("moisture", "water content", "vwc", "dryback", "field capacity", "full mark", "floor", "wetter", "drier")
@@ -81,7 +81,7 @@ def test_unknown_topic_is_an_error_and_no_topic_is_empty():
 
 
 def test_stage_arc_is_the_slab_guide_and_contiguous():
-    assert all(row["source"] == SLAB for row in STAGE_ARC)
+    assert all(row["source"].startswith("Stage arc `slab_default`") for row in STAGE_ARC)
     assert all(row["source"] in SOURCES for row in ALT_STAGE_ARC)
     assert [row["steering"] for row in STAGE_ARC] == ["vegetative", "generative", "vegetative", "ripening"]
     flower = [row for row in STAGE_ARC if row["days"]]
@@ -95,7 +95,7 @@ def test_stage_intent_covers_the_arc_and_nothing_else():
     for day in range(1, last + 1):
         row = stage_intent(day)
         assert row is not None and row["days"][0] <= day <= row["days"][1], day
-    assert stage_intent(1)["stage"] == stage_intent(21)["stage"] == "flower setting"
+    assert stage_intent(1)["stage"] == stage_intent(21)["stage"] == "flower setting (stretch)"
     assert stage_intent(22)["stage"] == stage_intent(42)["stage"] == "flower bulk"
     assert stage_intent(43)["stage"] == stage_intent(last)["stage"] == "finish"
     for day in (None, 0, -3, last + 1):

@@ -50,13 +50,15 @@ export function createDemo(now = Date.now()): States {
       unit_of_measurement: unit,
     });
   }
-  for (const [index, prefix] of ["", "f1_"].entries()) {
-    const name = index === 0 ? "Flower 2" : "Flower 1";
+  for (const [index, prefix] of ["", "room_b_"].entries()) {
+    const name = index === 0 ? "Room A" : "Room B";
     const enable =
-      index === 0 ? "input_boolean.f2_control_enabled" : "switch.crop_steering_f1_engine_enabled";
+      index === 0
+        ? "input_boolean.f2_control_enabled"
+        : "switch.crop_steering_room_b_engine_enabled";
     put(`sensor.crop_steering_${prefix}engine_config`, "ready", {
       prefix,
-      slug: index === 0 ? "" : "f1",
+      slug: index === 0 ? "" : "room_b",
       num_zones: 3,
       friendly_name: `${name} engine config`,
       enable_flag: enable,
@@ -72,8 +74,8 @@ export function createDemo(now = Date.now()): States {
       tank_temperature_sensor: `sensor.demo_${prefix}tank_temperature`,
       tank_last_fill_sensor: `sensor.demo_${prefix}tank_last_fill`,
       tank_fill_entity: `binary_sensor.demo_${prefix}tank_filling`,
-      // Flower 2 checks its feed water on the tank probes (the source-water gate); Flower 1 maps
-      // no feed-water probe, so its gate is off. Both have been saved in Rooms & setup.
+      // Room A checks its feed water on the tank probes (the source-water gate); Room B maps
+      // no feed-water probe, so its gate is off. Both have been saved in Rooms and setup.
       ...(index
         ? {}
         : { feed_ec_sensor: "sensor.demo_tank_ec", feed_ph_sensor: "sensor.demo_tank_ph" }),
@@ -93,8 +95,10 @@ export function createDemo(now = Date.now()): States {
     put(`binary_sensor.demo_${prefix}tank_filling`, "off");
     put(enable, "on");
     put(`switch.crop_steering_${prefix}room_active`, "on");
-    // Flower 2 demonstrates a running setpoint supervisor; Flower 1 keeps the default (off).
+    // Room A demonstrates a running setpoint supervisor; Room B keeps the default (off).
     put(`switch.crop_steering_${prefix}auto_setpoints`, index ? "off" : "on");
+    // The vitals notification says what each zone does next (Settings → Notifications) until switched off.
+    put(`switch.crop_steering_${prefix}notify_predictions`, "on");
     // How Water today reads in the room (Settings → Appearance): each zone's total until chosen.
     put(`select.crop_steering_${prefix}water_today_view`, "Zone total", {
       options: ["Zone total", "Per plant"],
@@ -104,7 +108,7 @@ export function createDemo(now = Date.now()): States {
       last_beat: new Date(now - 18_000).toISOString(),
     });
     put(`sensor.crop_steering_${prefix}app_status`, "safe_idle");
-    const fired = index ? [] : ["Z1 P1 ramp shot 3/6 (demo)"];
+    const fired = index ? [] : [`Z1 P1 ramp shot ${demoRampShot(now)}/6 (demo)`];
     put(
       `sensor.crop_steering_${prefix}current_decision`,
       fired[0] ?? "Holding — all zones in band",
@@ -122,10 +126,28 @@ export function createDemo(now = Date.now()): States {
     put(`sensor.demo_${prefix}tank_level`, demoTankModel(states, prefix, now)!.level(now), {
       unit_of_measurement: "%",
     });
+    // The controller's own reading of it, with the reservoir minimum's marks: the first room has
+    // its level mapped for the minimum, the second has not, so its minimum is off.
+    if (!index)
+      put(
+        `sensor.crop_steering_${prefix}tank_level`,
+        demoTankModel(states, prefix, now)!.level(now),
+        {
+          unit_of_measurement: "%",
+          friendly_name: "Tank level",
+          stuck: false,
+          litres_per_pct: 2.4,
+          low: null,
+          below_minimum: false,
+          over_full: false,
+          minimum_pct: 8,
+        },
+      );
     number(prefix, "irrigation_ec_min", 2.3, 0, 6, 0.1, "mS/cm");
     number(prefix, "irrigation_ec_max", 3.5, 0, 8, 0.1, "mS/cm");
     number(prefix, "irrigation_ph_min", 5.5, 3, 9, 0.05, "pH");
     number(prefix, "irrigation_ph_max", 6.5, 3, 9, 0.05, "pH");
+    number(prefix, "sump_power_threshold_w", 20, 1, 10000, 1, "W");
     for (let id = 1; id <= 3; id++) {
       put(`switch.demo_${prefix}valve_${id}`, !index && id === 1 ? "on" : "off");
       put(
@@ -186,6 +208,7 @@ export function createDemo(now = Date.now()): States {
         options: ["Keep", "P0", "P1", "P2", "P3"],
       });
       number(prefix, `${key}p0_maximum_wait_time`, 60, 5, 240, 1, "min");
+      number(prefix, `${key}p0_additional_dryback`, 3, 0, 40, 0.5, "%");
       number(prefix, `${key}generative_dryback_target`, 14, 2, 60, 0.5, "% of peak");
       number(prefix, `${key}p1_target_vwc`, 64 + index * 2, 20, 90, 0.5, "%");
       number(prefix, `${key}p2_vwc_threshold`, 61 + index * 2, 10, 90, 0.5, "%");
@@ -222,6 +245,11 @@ export function createDemo(now = Date.now()): States {
         hold_days: supervisor === "tracking" ? 3 : 0,
         frozen_reason:
           supervisor === "frozen" ? "probe response looks suspect after a sensor dropout" : null,
+        dryback_note:
+          supervisor === "tracking"
+            ? "8% dryback unreachable at this zone's uptake: about 6% tonight, with maintenance shots until 19:00"
+            : null,
+        p2_stop: supervisor === "tracking" ? "19:00" : null,
         managed: index
           ? []
           : [
@@ -263,7 +291,7 @@ export function createDemo(now = Date.now()): States {
     put(`sensor.crop_steering_${prefix}activity_log`, "Demo activity", {
       events: events.sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
     });
-    // Flower 2 runs Jev; Flower 1 is a room without it.
+    // Room A runs Jev; Room B is a room without it.
     if (!index) demoJev(put, prefix, now);
     demoDosing(put, prefix, name, now);
     // The integration's stock sensor: a tank per pump, each drawn by its pump.
@@ -276,28 +304,28 @@ export function createDemo(now = Date.now()): States {
   return states;
 }
 /** Each demo room's dosing pumps (id, name, calibrated flow in mL/s, the recipe's mL), each linked
- * to the stock tank of its nutrient (stock-demo.ts). Flower 1's Fade is new and not calibrated yet,
- * and its Core is dosed by hand: the recipe passes both by. */
+ * to the stock tank of its nutrient (stock-demo.ts). Room B's Finisher is new and not calibrated yet,
+ * and its Part A is dosed by hand: the recipe passes both by. */
 const DEMO_PUMPS: Record<string, [string, string, number, number][]> = {
   "": [
-    ["balance", "Balance", 11.06, 300],
-    ["bloom", "Bloom", 10.52, 1800],
-    ["core", "Core", 10.88, 1080],
-    ["cleanse", "Cleanse", 9.74, 200],
+    ["silica", "Silica", 11.06, 300],
+    ["part_b", "Part B", 10.52, 1800],
+    ["part_a", "Part A", 10.88, 1080],
+    ["cleaner", "Line cleaner", 9.74, 200],
   ],
-  f1_: [
-    ["grow", "Grow", 10.9, 1080],
-    ["cleanse", "Cleanse", 9.8, 200],
-    ["balance", "Balance", 11.2, 180],
-    ["fade", "Fade", 0, 0],
-    ["core", "Core", 10.6, 0],
-    ["bloom", "Bloom", 10.4, 1800],
+  room_b_: [
+    ["veg_base", "Veg base", 10.9, 1080],
+    ["cleaner", "Line cleaner", 9.8, 200],
+    ["silica", "Silica", 11.2, 180],
+    ["finisher", "Finisher", 0, 0],
+    ["part_a", "Part A", 10.6, 0],
+    ["part_b", "Part B", 10.4, 1800],
   ],
 };
 /** A demo room's batch-tank dosing (docs/DOSING.md): the pumps' hardware, the integration's
- * dosing_config sensor and the controller's dosing sensor. Flower 2's batch fills its tank, mixes
- * it with a pump and a recirculation valve, and doses four pumps; Flower 1's tank is filled by
- * hand. The last batch ended at each tank's last fill; Flower 2 has had a trim since. */
+ * dosing_config sensor and the controller's dosing sensor. Room A's batch fills its tank, mixes
+ * it with a pump and a recirculation valve, and doses four pumps; Room B's tank is filled by
+ * hand. The last batch ended at each tank's last fill; Room A has had a trim since. */
 function demoDosing(
   put: (id: string, state: string | number, attributes?: Record<string, unknown>) => void,
   prefix: string,
@@ -350,7 +378,7 @@ function demoDosing(
         full_entity: null,
         full_state: "on",
         fill_timeout_min: 20,
-        mix_pump: "switch.demo_f1_mix_pump",
+        mix_pump: "switch.demo_room_b_mix_pump",
         mix_valves: [],
         mix_power_sensor: null,
         mix_min_w: 0,
@@ -359,6 +387,9 @@ function demoDosing(
         close_entities: [],
         hold_entity: null,
         filled_at_entity: null,
+        // Nothing fills Room B's tank by itself: a person is reminded to at 20 %.
+        level_entity: "sensor.demo_room_b_tank_level",
+        remind_pct: 20,
         recipe,
       }
     : {
@@ -377,7 +408,7 @@ function demoDosing(
         filled_at_entity: null,
         recipe,
       };
-  if (prefix) put("switch.demo_f1_mix_pump", "off", { friendly_name: "Flower 1 mixing pump" });
+  if (prefix) put("switch.demo_room_b_mix_pump", "off", { friendly_name: "Room B mixing pump" });
   else {
     put("switch.demo_tank_fill_valve", "off", { friendly_name: "Batch tank fill valve" });
     put("binary_sensor.demo_tank_full", "off", { friendly_name: "Batch tank full float" });
@@ -396,7 +427,7 @@ function demoDosing(
     request: null,
     updated_at: at(24 * 6),
   });
-  // The last batch, and before it the one earlier (Flower 1 stopped one by hand while it mixed);
+  // The last batch, and before it the one earlier (Room B stopped one by hand while it mixed);
   // since, a dose by hand in each room.
   const doses = Object.fromEntries(list.flatMap(([id, , , ml]) => (ml > 0 ? [[id, ml]] : [])));
   const lastDose = (ml: number, hoursAgo: number) => ({
@@ -405,8 +436,8 @@ function demoDosing(
     result: "finished",
   });
   const byHand = prefix
-    ? { pump: "core", ml: 40, hours: 3 }
-    : { pump: "balance", ml: 25, hours: 0.8 };
+    ? { pump: "part_a", ml: 40, hours: 3 }
+    : { pump: "silica", ml: 25, hours: 0.8 };
   const history = [
     {
       kind: "dose",
@@ -468,7 +499,7 @@ function demoDosing(
     updated_at: new Date(now - 18_000).toISOString(),
   });
 }
-/** Flower 2's probes, front and back of each zone's row, and the combined sensor's attributes as
+/** Room A's probes, front and back of each zone's row, and the combined sensor's attributes as
  * the integration's fuse_probes publishes them (calculations.py): every probe used, except zone 3's
  * back EC probe, which stopped reporting. */
 function demoProbes(
@@ -497,7 +528,7 @@ function demoProbes(
     spread: out ? 0 : Math.round(step * 200) / 100,
   };
 }
-/** A demo zone's pore EC. Flower 2 is in the bulk (3.5-6): zone 1 reads under that band, as the
+/** A demo zone's pore EC. Room A is in the bulk (3.5-6): zone 1 reads under that band, as the
  * owner's own zone 1 did, and the others sit inside it. */
 const demoEc = (room: number, zone: number) =>
   room ? 2.9 + zone * 0.2 : ([2.8, 4.4, 4.1][zone - 1] ?? 4.2);
@@ -665,7 +696,7 @@ const JEV_DAY: [
     true,
     "P2 shot 4.5% -> 4%",
     "acted",
-    "inside Jev's range 3.5–5.5%",
+    "inside the AI assistant's range 3.5–5.5%",
   ],
   // Zone 2's re-water point set by hand (demoDay records it): Jev only notes it. Today only (22).
   [
@@ -677,7 +708,7 @@ const JEV_DAY: [
     null,
     "p2 vwc threshold 62 -> 61",
     "acted",
-    "your value is the new centre of Jev's range",
+    "your value is the new centre of the AI assistant's range",
   ],
 ];
 /** The controller's Jev sensors for a demo room: its usage and stage (flower day 37, the bulk), the
@@ -739,7 +770,7 @@ function demoJev(
     newest
       ? `${newest.t.slice(11, 16)} ${newest.zone === null ? "" : `Z${newest.zone} `}${newest.title}: ${newest.verdict} -> ${newest.action || newest.result}`
       : "no decisions yet",
-    { entries, friendly_name: "Jev decisions", engine: "f2-control" },
+    { entries, friendly_name: "AI assistant decisions", engine: "f2-control" },
   );
   const calls = Math.round(4 + 2.6 * Math.min(24, hours));
   put(`sensor.crop_steering_${prefix}jev`, "on", {
@@ -773,7 +804,7 @@ function demoJev(
       dryback_points: [10, 15],
       runoff_pct: [8, 16],
     },
-    friendly_name: "Jev",
+    friendly_name: "AI assistant",
     engine: "f2-control",
   });
   const judge = (answer: string, p: number, directive: string | null, why: string) => ({
@@ -806,7 +837,7 @@ function demoJev(
   put(`sensor.crop_steering_${prefix}zone_1_jev`, "watching", {
     judges: { dusk: judge("continue_p2", 0.77, null, "no action") },
     setpoints: setpoints(1),
-    friendly_name: "Zone 1 Jev",
+    friendly_name: "Zone 1 AI assistant",
     engine: "f2-control",
   });
   put(`sensor.crop_steering_${prefix}zone_2_jev`, "salt", {
@@ -819,16 +850,16 @@ function demoJev(
       ),
     },
     setpoints: setpoints(2),
-    friendly_name: "Zone 2 Jev",
+    friendly_name: "Zone 2 AI assistant",
     engine: "f2-control",
   });
   put(`sensor.crop_steering_${prefix}zone_3_jev`, "watching", {
     judges: {
       shot: judge("landed", 0.93, null, "no action"),
-      setpoints: judge("smaller_shots", 0.7, "setpoint p2_shot_size 4", "inside Jev's range"),
+      setpoints: judge("smaller_shots", 0.7, "setpoint p2_shot_size 4", "inside the AI assistant's range"),
     },
     setpoints: setpoints(3),
-    friendly_name: "Zone 3 Jev",
+    friendly_name: "Zone 3 AI assistant",
     engine: "f2-control",
   });
 }
@@ -1177,8 +1208,8 @@ function tankHistory(
 }
 /** One demo zone's shots on the grow-day from lights-on `start`, shifted like its probe so they land
  * where its readings jump: six P1 ramp shots from 1.5 h, then a P2 top-up every 75 minutes until P3,
- * each grow-day's a little longer or shorter than the day before's. Flower 2's zone 2 waits out a
- * feed-EC hold; Flower 1's zone 3 is disabled from 6 h. */
+ * each grow-day's a little longer or shorter than the day before's. Room A's zone 2 waits out a
+ * feed-EC hold; Room B's zone 3 is disabled from 6 h. */
 function demoZoneDay(prefix: string, zone: number, start: number, p3: number) {
   const vwc = `sensor.crop_steering_${prefix}vwc_zone_${zone}`;
   const at = (hour: number) => start + seedOf(vwc) * 180_000 + hour * 3_600_000;
@@ -1196,13 +1227,24 @@ function demoZoneDay(prefix: string, zone: number, start: number, p3: number) {
     shot(hour, Math.round(150 * drift), "P2 P2 top-up (demo)");
   return { vwc, at, hold, disabled, shots };
 }
+/** Which of its six ramp shots Room A's zone 1 has reached at `now` on its demo day (lights
+ * 10:00-22:00): the last one fired, the first before any. The controller's line follows the clock. */
+function demoRampShot(now: number): number {
+  const day = growDay(10, 22, now);
+  const fired = day
+    ? demoZoneDay("", 1, day.start, 10).shots.filter(
+        (shot) => shot.text.startsWith("P1") && shot.stop <= now,
+      ).length
+    : 0;
+  return Math.max(1, fired);
+}
 const FILL_MS = 20 * 60_000;
-/** How low each demo cycle runs before its refill, in %, give or take the last shot's few: F2's
- * own lows over a week ran 0 to 25. */
+/** How low each demo cycle runs before its refill, in %, give or take the last shot's few: a
+ * real batch tank's lows over a week ran 0 to 25. */
 const TANK_LOWS = [0, 15, 20, 1, 15, 0, 20, 0, 15, 2];
-/** The demo batch tank as F2's behaves: each fill takes 20 minutes and leaves it at 100 %, the
+/** The demo batch tank as a real one behaves: each fill takes 20 minutes and leaves it at 100 %, the
  * pump draws it down while a shot runs (started 3 s before the valve, as the controller primes it;
- * about 1.6 % a pump-minute in Flower 2, 1.3 % in Flower 1), and it is filled again once it has run
+ * about 1.6 % a pump-minute in Room A, 1.3 % in Room B), and it is filled again once it has run
  * low, to between 0 and 25 %: once or twice a day. The recorded last fill is the anchor; the fills
  * before it are worked back from it through the shots of the ten grow-days before. A shot while
  * the tank fills draws nothing. Null without a lights schedule or a recorded fill. */
@@ -1231,7 +1273,7 @@ function demoTankModel(states: States, prefix: string, now: number) {
   const rate = (prefix ? 1.3 : 1.6) / 60_000; // % of the tank per pump-millisecond
   // Back from the recorded fill: each cycle's pump runs drew 100 % down to its low, and the run
   // before them, the one that would have drawn it lower, ended the cycle before. That run left the
-  // tank low, so the fill started as it ended, as F2's is refilled, unless this cycle's first run
+  // tank low, so the fill started as it ended, as a real one is refilled, unless this cycle's first run
   // came too soon after; then the fill ended just before that first run.
   const fills = [last];
   for (let cycle = 0; ; cycle++) {
@@ -1254,7 +1296,7 @@ function demoTankModel(states: States, prefix: string, now: number) {
     runs,
     fills,
     draws,
-    /** The level at `time` in whole %, as F2's sensor reports it. */
+    /** The level at `time` in whole %, as a real level sensor reports it. */
     level(time: number): number {
       let index = -1;
       while (index + 1 < fills.length && fills[index + 1] <= time) index++;
@@ -1307,8 +1349,8 @@ function demoTank(
 }
 /** A recorded grow-day for the day timeline, on the demo probes' own day shape (P0 dryback, a
  * six-shot P1 ramp, P2 top-ups every 75 minutes, P3 two hours before lights-off), each zone shifted
- * like its probe so its shots land where its readings jump. Flower 2's zone 2 waits out a feed-EC
- * hold that ends when the feed band is widened; Flower 1's zone 3 is held since it was disabled.
+ * like its probe so its shots land where its readings jump. Room A's zone 2 waits out a feed-EC
+ * hold that ends when the feed band is widened; Room B's zone 3 is held since it was disabled.
  * Earlier grow-days, to compare today with, come from the same curve. */
 export function demoDay(states: States, request: TimelineRequest, now = Date.now()): TimelineRows {
   const end = Math.min(now, request.end);

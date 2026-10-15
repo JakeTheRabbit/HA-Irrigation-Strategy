@@ -8,6 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { UiTip } from "@/components/info-tip";
 import type { Controller } from "@/lib/types";
 import {
   compareVersions,
@@ -76,14 +77,17 @@ export function WhatsNewDialog({
           {newest && (
             <a
               className="whats-new-notes"
-              href={releaseUrl(newest.version)}
+              href={releaseUrl(newest)}
               target="_blank"
               rel="noopener noreferrer"
             >
               Full release notes <ArrowUpRight size={15} aria-hidden="true" />
             </a>
           )}
-          <Button onClick={onClose}>Got it</Button>
+          <span className="label-with-tip">
+            <Button onClick={onClose}>Close</Button>
+            <UiTip copyKey="got it" />
+          </span>
         </div>
       </DialogContent>
     </Dialog>

@@ -23,15 +23,16 @@ either gets it once.
 
 | Id | Checkbox | What it covers |
 |---|---|---|
-| `emergency` | Emergencies | Every alert whose severity is critical in docs/error-codes.json (CS-201 to 204, 207, 301, 308, 310, 311, 402, 601, 606, 801) |
-| `hardware` | Hardware lockouts | CS-301 to CS-309 (a pump or valve that did not do what it was told, a hardware hold, a shot cut), CS-310 (moisture rising with no water: a table not draining), CS-311 (the sump pump has not run) and CS-701 (water isn't reaching a zone) |
-| `sensors` | Sensors and drift | CS-101 to CS-104, CS-603, CS-604, CS-703, CS-704 |
-| `watering` | Watering stopped | CS-202 to CS-208, CS-602, and **CS-209** (new: no watering for a while) |
+| `emergency` | Emergencies | Every alert whose severity is critical in docs/error-codes.json (CS-201 to 204, 207, 301, 308, 310, 311, 402, 601, 606, 801, 901, 902) |
+| `hardware` | Hardware lockouts | CS-301 to CS-309 (a pump or valve that did not do what it was told, a hardware hold, a shot cut), CS-310 (moisture rising with no water: a table not draining), CS-311 (the sump pump has not run), CS-312 (a zone that keeps hitting its longest allowed shot), CS-313 (a valve or pump the controller can't switch), CS-701 (water isn't reaching a zone) and CS-710 (water may be bypassing the substrate or the probe) |
+| `sensors` | Sensors and drift | CS-101 to CS-104, CS-502 (a zone's probes disagree), CS-503 (a moisture probe set aside for its unit), CS-504 (a zone steering on bulk EC: no pore EC probe reporting), CS-505 (a zone's primary probe is offline), CS-603, CS-604, CS-703, CS-704 |
+| `watering` | Watering stopped | CS-202 to CS-208, CS-602, CS-609 (another controller on the room), **CS-209** (new: no watering for a while), and CS-901 to CS-904 (the tank at its minimum, its level unknown, a refill due before the next round of shots, a fill stopped over the full mark) and CS-906 (a batch tank to refill) |
 | `phases` | Phase changes | A zone moving P0 → P1 → P2 → P3 (new event, no card) |
+| `vitals` | Vitals | The controller's regular report on every zone (event `vitals`, no new card). Not ticked on any row until someone ticks it, an upgraded row included |
 | `stock` | Stock tanks | CS-608, CS-807 |
-| `dosing` | Dosing | CS-801 to CS-806 |
-| `jev` | Jev | CS-501, CS-702, CS-705, CS-706, CS-707, CS-404, and Jev moving a setting (new event, no card) |
-| `setup` | Setup and settings | CS-201, CS-401 to CS-405 (except 404), CS-601, CS-605, CS-606, CS-607 |
+| `dosing` | Dosing | CS-801 to CS-806, CS-808 |
+| `jev` | Jev | CS-501, CS-702, CS-705, CS-706, CS-707, CS-404, CS-708 (the AI assistant's budget is spent until lights-on), CS-709 (its key was refused or it is not answering), CS-711 (a proposal to change the feed, for a person to decide), CS-712 (a retired Jev route), CS-713 (the room not running its grow plan as written), and Jev moving a setting (new event, no card) |
+| `setup` | Setup and settings | CS-201, CS-401 to CS-405 (except 404), CS-601, CS-605, CS-606, CS-607, CS-610, CS-611, CS-713 (the room not running its grow plan as written: also under `jev`) |
 
 The mapping lives in one place in the integration (`notify_catalog.py`) and is returned by `notify_get`,
 so the page shows exactly what each checkbox covers. A code the catalog does not know goes to
@@ -43,7 +44,18 @@ docs/error-codes.json is in no kind at all.
 - **Phase change** (`event: "phase"`): the controller sends one when a zone's phase changes, with the room,
   zone, from and to (for example "F2 · Zone 2: P1 → P2, ramp target reached"). No card; a push only.
 - **Jev setting change** (`event: "jev_setpoint"`): when Jev moves a zone's P2 shot size or re-water point
-  (docs/JEV.md). No card; a push only.
+  (docs/JEV.md). No card; a push only. The move is an AI overlay that goes back to your own value by itself
+  at lights-on, and on a phone with the Home Assistant app the push carries two buttons: **Keep** keeps the
+  AI's value as your own, **Undo** puts your own value back now. The controller names the numbers it wrote
+  (`overlays`, their entity ids) and the integration adds the buttons; a tap comes back as the app's
+  `mobile_app_notification_action` event, as the phone's own user, and goes through `overlay_keep` or
+  `overlay_undo` exactly as the page does, so it needs a Home Assistant administrator. A setting whose
+  overlay has already run out or ended has nothing left to keep or undo. The controller names them only
+  to an integration whose `sensor.crop_steering_notify_config` says `overlay_actions: true`.
+- **Vitals** (`event: "vitals"`): the controller's report on every zone, every `notify_min` minutes, key
+  `vitals`, title "<name> vitals". Under each zone, while the room's `notify_predictions` switch is on (it
+  is until someone switches it off), a "Next:" line says what the zone does next, in the words of the
+  dashboard's Next: line. It is still the `f2_vitals` card and `sensor.f2_control_vitals`, as before.
 - **CS-209 No watering for a while** (a card and a push): a room that is active, with lights on, has watered
   nothing for `idle_hours` (default 3, set on the page, 1 to 12): no shot fired in any of its zones, whether
   because watering is switched off, a hold, or nothing called for water. Raised once per stretch and again
@@ -60,13 +72,16 @@ docs/error-codes.json is in no kind at all.
   "recipients": [
     {
       "service": "notify.mobile_app_pixel_7",   // any notify.* service; the page offers the site's phones first
-      "name": "Callum's phone",                   // shown on the page; defaults to the device name
+      "name": "Grower's phone",                   // shown on the page; defaults to the device name
       "user_id": "7f21…",                         // the Home Assistant user the phone belongs to, when known
       "kinds": ["stock", "dosing"],               // ids from the table above
       "rooms": [],                                // room prefixes ("" = the default room, "f1_"); empty = every room
-      "urgent_high_priority": true                // emergencies go out as high-priority / time-sensitive pushes
+      "urgent_high_priority": true,               // emergencies go out as high-priority / time-sensitive pushes
+      "digest": false                             // true: what is not an emergency waits for the digest
     }
-  ]
+  ],
+  "digest_hours": 4,                              // a digest phone gets one push this often (1 to 24)
+  "mutes": {"f1_": "2026-10-15T08:00:00+00:00"}   // room prefix -> when its mute ends (UTC)
 }
 ```
 
@@ -77,12 +92,16 @@ phone it is. Other notify services (a group, Supernotify) can be added as rows b
 A save checks every row: `service` is `notify.<name>`, each service once, at most 20 rows; a phone added
 now must be a notify service Home Assistant has, while one saved before may be away (an app not registered
 again since a restart never blocks a save); `kinds` are ids from the table; `rooms` are room prefixes;
-`urgent_high_priority` is true when left out; `idle_hours` is 1 to 12. A row an administrator saves
+`urgent_high_priority` is true when left out; `idle_hours` is 1 to 12; `digest_hours` is a whole number of
+hours from 1 to 24; `mutes` maps a room prefix to an ISO time with its offset, at most 30 days ahead, kept in
+UTC, and one already past is dropped. A row sent without `digest`, or a save without `digest_hours` or
+`mutes` (a page from before them), keeps what is stored. A store saved before them loads with no digest,
+`digest_hours` 4 and nothing muted. A row an administrator saves
 without a `name` or a `user_id` takes them from the phone's mobile_app registration.
 
 `sensor.crop_steering_notify_config` is written by the integration with the first room that loads and
 removed with the last (it is not a registry entity): state the revision, attributes `recipients` (how many
-rows) and `idle_hours`. While the store can't be read it is `unavailable`, with `error`, and the
+rows), `idle_hours`, and `muted` (the `mutes`, only while there are any). While the store can't be read it is `unavailable`, with `error`, and the
 controller pushes as with no recipients; Home Assistant's log says so at start-up. A kind a row names that
 this version does not know (saved by a newer one, before a rollback) is dropped when the store is read,
 not the whole setup.
@@ -92,13 +111,13 @@ not the whole setup.
 | Service | Who | Data | Response |
 |---|---|---|---|
 | `crop_steering.notify_get` | any signed-in user | none | `{schema_version: 1, config, kinds[{id, name, detail, codes[], events[]}], phones[{service, name, user_id, user_name}], can_edit_all, user_id}` |
-| `crop_steering.notify_save` | admin: any row; a non-admin: only rows whose `user_id` is their own (they cannot add or remove rows) | `expected_revision, recipients, idle_hours?` | as `notify_get`, or `error` ("revision", "not allowed: …", a readable message) |
+| `crop_steering.notify_save` | admin: any row; a non-admin: only rows whose `user_id` is their own (they cannot add or remove rows) | `expected_revision, recipients, idle_hours?, digest_hours?, mutes?` | as `notify_get`, or `error` ("revision", "not allowed: …", a readable message) |
 | `crop_steering.notify_test` | admin, or the phone's own user | `service` | `{sent: true}` or `error` |
-| `crop_steering.notify` | admin (the controller) | `key, code?, event?, room?, zone?, title, message, urgent?` | `{sent_to[], error}` |
+| `crop_steering.notify` | admin (the controller) | `key, code?, event?, room?, zone?, title, message, urgent?` | `{sent_to[], error}`, with `muted: true` or `held[]` (below) |
 
 - `notify` works out the push's kinds from `code` (the catalog) or `event`, then sends to every recipient
   that ticks one of them and whose `rooms` is empty or includes `room`, once per service. A push about no
-  room in particular (no `room`: the controller's dosing thread, its clock) goes to every recipient that
+  room in particular (no `room`: the controller's dosing as a whole, its clock) goes to every recipient that
   ticks one of its kinds. `urgent` (the controller sets it for critical codes) adds the high-priority data
   for a recipient with `urgent_high_priority`: Android
   `{"priority": "high", "channel": "Crop Steering urgent"}`, iOS
@@ -107,6 +126,15 @@ not the whole setup.
   Every push carries `data.tag = key`, so a repeat replaces the earlier one on the phone instead of piling up,
   and the link that opens the Crop Steering panel when it is tapped (`url` for iOS, `clickAction` for
   Android, both `/crop-steering`).
+- **A muted room** (`mutes`, until its time) gets no push but an emergency: a push for it that is not
+  `urgent` answers `{sent_to: [], error: null, muted: true}` (to nobody, on purpose). A push about no room in
+  particular is never muted.
+- **A digest.** A row with `digest` gets what is not `urgent` as one push, `digest_hours` after the first one it
+  holds (checked every minute): title "Crop Steering: 3 pushes held", and the held pushes' titles under
+  "Warnings", "For your information" (the info codes of docs/error-codes.json, `notify_catalog.INFO`) and
+  "Updates" (events), with `data.tag = "crop_steering_digest"`. A repeat of the same key replaces the one
+  waiting. The answer lists those rows in `held`. An emergency never waits. What waits is held in memory: a
+  restart of Home Assistant drops it (the cards stay).
 - A failed send to one phone never stops the others; failures are listed in the response and logged. A
   phone that has not answered in 8 s counts as failed.
 - With no recipients saved, or a store that can't be read, `notify` sends nothing and says why in `error`
@@ -124,10 +152,10 @@ not the whole setup.
   neither save nor test. `notify_get` and `notify_save` answer `error` too (null when all is well).
 - A non-administrator's save is matched to the stored rows by `service`, in any order. For a row that is
   not theirs, its kinds, rooms and high-priority flag must come back unchanged; for their own, only those
-  three change. They may not change `idle_hours`, which is the site's.
+  three and `digest` change. They may not change `idle_hours`, `digest_hours` or `mutes`, which are the site's.
 - `notify_test` sends at normal priority, with `data.tag = "crop_steering_test"`, and says what the phone's
   row ticks.
-- The integration's own Repairs cards (CS-601 to CS-608) go out through `notify` when a card is created,
+- The integration's own Repairs cards (CS-601 to CS-609) go out through `notify` when a card is created,
   with key = its issue id, its room, and the card's own title and text; not when a card still raised is
   updated, or raised again after Home Assistant restarts, and not again within 30 minutes when a card
   clears and comes back (a probe going on and off line), as the controller repeats an alert. The 30 minutes
@@ -135,23 +163,31 @@ not the whole setup.
 
 ## The controller
 
-- `_alert` still creates the card first, exactly as now, and Jev's Alerts judge still decides whether a
-  repeat pushes at all (docs/JEV.md). When it pushes:
+- `_alert` still creates the card first, exactly as now, and the code's severity in docs/error-codes.json
+  decides whether a repeat pushes at all (below). When it pushes:
   - with at least one recipient saved (the integration publishes `sensor.crop_steering_notify_config`,
-    state = the revision, attribute `recipients` = the count), it calls `crop_steering.notify` and sends
+    state = the revision, attribute `recipients` = the count, `kinds` = the kinds a row can tick), it calls `crop_steering.notify` and sends
     nothing itself;
   - with no recipients saved, when that call fails, or when an emergency reached no phone through it, it
     pushes to its `notify_service` option as it always has, so an install that never opens the page
     behaves exactly as before, and a push is never lost. With that option empty too, the controller's log
     says the push went to no phone.
+- A room muted in the sensor's `muted` pushes nothing but a critical code until its time, through
+  `crop_steering.notify` or to the `notify_service` option alike (the card is still raised). An integration
+  from before mutes publishes none.
 - Phase changes and Jev's setting changes are sent through `crop_steering.notify` only (never the fallback:
   they are not alerts).
 - CS-209 is raised by the controller like any alert (key `idle_<room>`), with its code written out.
 
 In detail:
 
-- Jev's Alerts judge is asked whenever a phone could get the push: a recipient saved, or the
-  `notify_service` option set (as before). A repeat it holds goes to nobody.
+- A standing alert's card is updated every 30 minutes; its push decays by severity, the same with Jev on or
+  off. A critical code, or a warning that means a zone is not being watered (the controller's
+  `NOT_WATERING_CODES`: CS-206, CS-208, CS-209, CS-602), pushes every 30 minutes for as long as it lasts. Any
+  other warning pushes after 15 minutes, then 1, 2 and 4 hours, then every 8 hours, each with the card's
+  first update at or after it. An info code pushes once. The schedule starts again with each episode: the
+  alert cleared and raised again, raised under another code, or back after an hour without being raised.
+  It is held in memory only, so a restart pushes once more. A repeat it holds goes to nobody.
 - The controller's loop reads `sensor.crop_steering_notify_config` at most once a minute, so a change on the
   page reaches it within a minute; an alert goes on the last reading and never waits on the read. No sensor
   (an integration from before this) counts as no recipients.
@@ -161,7 +197,11 @@ In detail:
   It counts as failed when Home Assistant can't be reached or does not answer in time, answers 4xx or 5xx,
   or answers that nothing was sent with an `error`; a push nobody ticked is not a failure, unless it is an
   emergency (a critical code): that one counts as failed whenever it reached no phone.
-- The vitals report (every `notify_min` minutes) is not an alert: it still goes to `notify_service` only.
+- The vitals report (every `notify_min` minutes) goes through `crop_steering.notify` as the `vitals` kind
+  once at least one recipient is saved and the integration lists `vitals` among the sensor's `kinds`; so,
+  with phones set up, it reaches only the phones that tick Vitals. With nobody set up, with an integration
+  that does not list the kind (older than this), or when that call fails, it goes to `notify_service` as it
+  always did.
 - Events are queued during a loop and sent after its shots, so a slow Home Assistant never holds one up: one
   push per room and kind (lights-off moves every zone at once), all of them within 10 s
   (`EVENTS_BUDGET_S`). An event that fails, or is left when the time is up, is dropped, never retried and

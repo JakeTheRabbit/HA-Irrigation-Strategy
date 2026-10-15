@@ -27,6 +27,7 @@ except ImportError:  # pragma: no cover - enables non-HA unit tests
         SWITCH = "switch"
         SELECT = "select"
         NUMBER = "number"
+        BUTTON = "button"
 
 
 from .const import DOMAIN
@@ -54,6 +55,7 @@ PLATFORMS: list[Platform] = [
     Platform.SWITCH,
     Platform.SELECT,
     Platform.NUMBER,
+    Platform.BUTTON,
 ]
 
 # Entities earlier versions created that nothing reads or sets any more, by platform and key. A key
@@ -162,6 +164,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the stock store
         _LOGGER.warning("Stock tanks unavailable: %s", err)
 
+    # Feed-probe calibration checks: two points each, stored per room as a history.
+    try:
+        from .calibration import async_setup_calibration
+
+        await async_setup_calibration(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on this store
+        _LOGGER.warning("Probe calibration history unavailable: %s", err)
+
     # Batch-tank dosing: each room's setup and its one request, stored; the dosing_config sensor
     # publishes them for the controller app, which does every action (docs/DOSING.md).
     try:
@@ -171,11 +181,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the dosing store
         _LOGGER.warning("Dosing unavailable: %s", err)
 
+    # Tests from the dashboard: a zone's test shot.
+    from .selftest import async_setup_selftest
+
+    await async_setup_selftest(hass)
+
+    # Ask why: the room's questions to the AI assistant, stored; the controller app answers them.
+    try:
+        from .brain_api import async_setup_brain
+
+        await async_setup_brain(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the questions
+        _LOGGER.warning("Ask why unavailable: %s", err)
+
     _remove_retired_entities(hass, entry)
     _hide_retired_switches(hass, entry)
 
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    _link_zone_devices(hass, entry)
+    # Every number has restored its value by now: name each one held above its zone's limit.
+    from .bounds import check_held_values
+
+    # A number platform that failed to set up leaves nothing to check, never a failed room.
+    numbers = hass.data[DOMAIN].get("_numbers", {}).get(entry.entry_id, {})
+    check_held_values(hass, entry, numbers.values())
 
     # Set up services
     await async_setup_services(hass)
@@ -188,6 +218,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .run_api import async_setup_runs
 
     await async_setup_runs(hass, entry)
+    from .setpoint_log import async_setup_setpoint_log
+
+    await async_setup_setpoint_log(hass, entry)
+    from .overlays import async_setup_overlays
+
+    await async_setup_overlays(hass, entry)
     await async_setup_panel(hass)
     # What's new: the release highlights the dashboard shows once after an update.
     try:
@@ -227,6 +263,30 @@ def _is_new_room(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from homeassistant.helpers import entity_registry as er
 
     return not er.async_entries_for_config_entry(er.async_get(hass), entry.entry_id)
+
+
+def _link_zone_devices(hass: HomeAssistant, entry: ConfigEntry) -> None:
+    """Show each zone's device under its room's device, as Home Assistant's device pages list it.
+
+    The zones' DeviceInfo used to name the room with `via_device`, which Home Assistant 2026.9
+    deprecates (it stops working in 2027.8.0). The device registry's `via_device_id` gives the same
+    link on every supported Home Assistant. The devices themselves are kept, ids and all, and a zone
+    already under its room is left alone.
+    """
+    from homeassistant.helpers import device_registry as dr
+
+    registry = dr.async_get(hass)
+    devices = dr.async_entries_for_config_entry(registry, entry.entry_id)
+    room = next((d for d in devices if (DOMAIN, entry.entry_id) in d.identifiers), None)
+    if room is None:
+        return
+    zone = f"{entry.entry_id}_zone_"
+    for device in devices:
+        if device.via_device_id != room.id and any(
+            domain == DOMAIN and str(key).startswith(zone)
+            for domain, key in device.identifiers
+        ):
+            registry.async_update_device(device.id, via_device_id=room.id)
 
 
 def _remove_retired_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
@@ -304,18 +364,31 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         pass
 
     hass.data.get(DOMAIN, {}).get("_recipe", {}).pop(entry.entry_id, None)
+    hass.data.get(DOMAIN, {}).get("_numbers", {}).pop(entry.entry_id, None)
     from .strategy import async_unload_strategy
 
     await async_unload_strategy(hass, entry)
     from .run_api import async_unload_runs
 
     await async_unload_runs(hass, entry)
+    from .setpoint_log import async_unload_setpoint_log
+
+    await async_unload_setpoint_log(hass, entry)
+    from .overlays import async_unload_overlays
+
+    await async_unload_overlays(hass, entry)
     from .stock_api import async_unload_stock
 
     await async_unload_stock(hass, entry)
+    from .calibration import async_unload_calibration
+
+    await async_unload_calibration(hass, entry)
     from .dosing_api import async_unload_dosing
 
     await async_unload_dosing(hass, entry)
+    from .brain_api import async_unload_brain
+
+    await async_unload_brain(hass, entry)
     from .notify_api import async_unload_notify
 
     await async_unload_notify(hass, entry)
@@ -333,6 +406,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ]
     if not others_loaded:
         await async_unload_services(hass)
+        from .selftest import async_unload_selftest
+
+        await async_unload_selftest(hass)
         from .setup_panel import async_unload_panel
 
         async_unload_panel(hass)

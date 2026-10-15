@@ -11,6 +11,7 @@ import {
   findSession,
   HaClient,
   haSessionToken,
+  haTimeZone,
   type HassSession,
 } from "./client";
 import {
@@ -74,6 +75,9 @@ export class ControllerStore {
   private updated: number | null = null;
   private writing = false;
   private admin: boolean | null = null;
+  private timeZone = haTimeZone();
+  /** The connection whose Home Assistant time zone has been asked for. */
+  private zoneOf?: HaClient;
   readonly demo: boolean;
   private snapshot!: Controller;
   private operatorDemo?: OperatorDemo;
@@ -100,7 +104,7 @@ export class ControllerStore {
         // ?whats-new=2.22.0: the demo as an installation updated from 2.22.0, ?whats-new=unknown
         // from one running before What's new existed. Otherwise it has nothing new to show.
         search?.get("whats-new") ?? null,
-        // ?notify-user=callum: Settings & help › Notifications as that phone's owner, who is not an
+        // ?notify-user=grower: Settings & help › Notifications as that phone's owner, who is not an
         // administrator.
         search?.get("notify-user") ?? null,
       );
@@ -127,6 +131,7 @@ export class ControllerStore {
       demo: this.demo,
       admin: this.admin,
       connection: this.connection,
+      timeZone: this.timeZone,
       error: this.error,
       lastUpdated: this.updated,
       roomId: this.roomId,
@@ -159,6 +164,7 @@ export class ControllerStore {
         saved.base || (typeof window !== "undefined" ? window.location.origin : "http://localhost");
       const session = saved.token ? undefined : findSession(base);
       this.admin = adminOf(session);
+      this.timeZone = haTimeZone(session?.config);
       const inheritedToken =
         typeof window !== "undefined" && base === window.location.origin ? haSessionToken() : "";
       try {
@@ -207,6 +213,7 @@ export class ControllerStore {
       this.states = states;
       this.settle();
       if (this.live) this.subscribeLive(this.live);
+      if (this.zoneOf !== client) void this.readTimeZone(client);
     } catch (error) {
       if (generation !== this.generation || request !== this.requestId) return;
       this.connection = "offline";
@@ -214,6 +221,18 @@ export class ControllerStore {
     }
     this.publish();
   };
+  /** Home Assistant's time zone, once per connection (again at the next refresh if it fails). */
+  private async readTimeZone(client: HaClient) {
+    this.zoneOf = client;
+    try {
+      const zone = await client.timeZone();
+      if (client !== this.client || zone === this.timeZone) return;
+      this.timeZone = zone;
+      this.publish();
+    } catch {
+      if (client === this.client) this.zoneOf = undefined;
+    }
+  }
   /** New states arrived: keep the selected room (or pick the requested or first one). */
   private settle() {
     const rooms = discoverRooms(this.states);
@@ -343,6 +362,7 @@ export class ControllerStore {
     const session = token.trim() ? undefined : findSession(base);
     const client = new HaClient(base, token.trim(), session);
     this.admin = adminOf(session);
+    this.timeZone = haTimeZone(session?.config);
     this.historyAborters.forEach((abort) => abort.abort());
     this.historyAborters.clear();
     this.generation++;
@@ -468,8 +488,12 @@ export class ControllerStore {
     const scoped =
       action.startsWith("strategy_") ||
       action.startsWith("runs_") ||
+      action.startsWith("setpoint_log_") ||
+      action.startsWith("overlay_") ||
       action.startsWith("stock_") ||
-      action.startsWith("dosing_");
+      action.startsWith("calibration_") ||
+      action.startsWith("dosing_") ||
+      action.startsWith("brain_");
     const payload = scoped ? { ...data, room_id: roomId } : data;
     if (scoped && !roomId) throw new Error("Select an available room.");
     // What's new's record and a test push change nothing a refresh would show, and must neither
@@ -481,7 +505,10 @@ export class ControllerStore {
         "strategy_preview",
         "setup_read",
         "runs_get",
+        "setpoint_log_get",
+        "overlay_get",
         "stock_get",
+        "calibration_get",
         "dosing_get",
         "notify_get",
         "notify_test",
@@ -647,7 +674,7 @@ export class ControllerStore {
     const allowed = new Set([
       ...room.entities.map((entity) => entity.entity_id),
       ...room.zones.flatMap((zone) => (zone.valveEntity ? [zone.valveEntity] : [])),
-      // The tank and pump its descriptor maps, charted on Equipment › Tank & pump.
+      // The tank and pump its descriptor maps, charted on Equipment › Tank & feed.
       ...Object.values(TANK_KEYS).flatMap((key) => {
         const id = mapped?.[key];
         return typeof id === "string" && id ? [id] : [];

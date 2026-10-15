@@ -12,6 +12,7 @@ import {
 } from "recharts";
 import { Button } from "@/components/ui/button";
 import { Empty, number } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { numeric } from "@/lib/model";
 import type { StrategyDocument } from "@/lib/operator-types";
 import type { Controller, Zone } from "@/lib/types";
@@ -100,7 +101,7 @@ export function WaterUsePanel({
 }) {
   const room = controller.room;
   const lightsOn = room.settings.find((field) => field.entityId.endsWith("_lights_on_hour"))?.value;
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+  const timeZone = controller.timeZone;
   const today =
     lightsOn === undefined || lightsOn === null ? null : growDayOf(Date.now(), lightsOn, timeZone);
   const series = room.zones.map((zone) => ({ zone, ids: counterIds(controller, zone) }));
@@ -189,12 +190,13 @@ export function WaterUsePanel({
         />
       ) : !today ? (
         <Empty
-          title="Lights-on hour unavailable"
+          title="No lights-on hour"
           detail="Water use is counted in grow-days from lights-on, and this room does not report its lights-on hour."
         />
       ) : error ? (
         <Empty
-          title="Water records could not load"
+          title="Water records did not load"
+          tip={<UiTip copyKey="water records could not load" />}
           detail={error}
           action={
             <Button variant="outline" onClick={() => setRetry((value) => value + 1)}>
@@ -214,7 +216,7 @@ export function WaterUsePanel({
         </div>
       ) : !recorded ? (
         <Empty
-          title="No water recorded yet"
+          title="No water recorded"
           detail="Totals appear once Home Assistant has recorded the zones’ water-today counters. Missing days are never counted as zero."
         />
       ) : (
@@ -291,17 +293,22 @@ function WaterUseBody({
         <table className="data-table wu-table">
           <thead>
             <tr>
-              <th scope="col">Zone</th>
+              <th scope="col">
+                <span className="wu-th">
+                  Zone
+                  <UiTip copyKey="zone" />
+                </span>
+              </th>
               <th scope="col">Today</th>
               <th scope="col">
                 <span className="wu-th">
                   This week
-                  <Hint label="How this week is counted">
+                  <Hint label="About this week">
                     {rows.every((row) => row.use.week.growWeek)
-                      ? "The current grow week: grow-days counted in sevens from the grow start, today included."
+                      ? "The current grow week: grow-days in groups of 7 from the grow start, today included."
                       : rows.some((row) => row.use.week.growWeek)
-                        ? "The current grow week where a zone has a grow start, otherwise the last 7 grow-days, today included."
-                        : "The last 7 grow-days, today included: there is no grow start to count weeks from."}
+                        ? "The current grow week of a zone with a grow start: grow-days in groups of 7, today included. A zone without a grow start uses the last 7 grow-days."
+                        : "The last 7 grow-days, today included. No zone has a grow start, so the dashboard cannot count grow weeks."}
                   </Hint>
                 </span>
               </th>
@@ -309,9 +316,10 @@ function WaterUseBody({
               <th scope="col">
                 <span className="wu-th">
                   Estimated total
-                  <Hint label="How the estimate is made">
-                    Used so far plus the last 7 full grow-days’ average for every grow-day left in
-                    the grow plan. Without a plan length: that average for 7 days, per week.
+                  <Hint label="About the estimate">
+                    The water used so far, plus the average of the last 7 full grow-days for each
+                    grow-day left in the grow plan. Without a plan length, the dashboard gives that
+                    average for 7 days, as the water for one week.
                   </Hint>
                 </span>
               </th>
@@ -411,7 +419,7 @@ function WaterUseBody({
           <div
             className="chart-wrap wu-bars"
             role="img"
-            aria-label={`Litres per grow week for ${rows.map((row) => row.zone.name).join(", ")}, weeks 1 to ${weeks}; the current week so far.`}
+            aria-label={`Litres per grow week for ${rows.map((row) => row.zone.name).join(", ")}, from week 1 to week ${weeks}. The bar of the current week shows the water so far.`}
           >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={chart} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>

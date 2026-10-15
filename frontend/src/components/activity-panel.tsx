@@ -11,6 +11,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { EventList } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import type { Controller } from "@/lib/types";
 
 /** The room's latest controller records beside any page, closed until asked for. */
@@ -26,13 +27,17 @@ export function ActivityPanel({
     <Sheet open={open} onOpenChange={setOpen}>
       {/* The trigger gets focus back when the panel closes and announces open or closed. */}
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Recent activity" title="Recent activity">
+        <Button variant="ghost" size="sm" aria-label="Recent activity">
           <Activity size={17} />
+          Activity
         </Button>
       </SheetTrigger>
       <SheetContent className="activity-sheet">
         <SheetHeader>
-          <SheetTitle>Recent activity</SheetTitle>
+          <div className="label-with-tip">
+            <SheetTitle>Recent activity</SheetTitle>
+            <UiTip copyKey="recent activity" />
+          </div>
           <SheetDescription>{controller.room.room.name}</SheetDescription>
         </SheetHeader>
         <div

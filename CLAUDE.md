@@ -12,8 +12,9 @@ runtime layers plus the React/shadcn operator workspace:
 2. **f2-control add-on** (`addons/f2_control/`) — the live autonomous coordinator.
    A single synchronous Python process that polls HA over REST every 60 s, imports
    the pure `crop-steering-engine` package, runs the per-zone P0→P1→P2→P3 logic,
-   and drives the hardware. Gated by kill switch
-   `input_boolean.f2_control_enabled` (OFF = safe, no actuation).
+   and drives the hardware. Gated per room by one kill switch (OFF = safe, no
+   actuation): the room's Engine Enabled switch, or `input_boolean.f2_control_enabled`
+   on a room from before the setup wizard (docs/INSTALL.md, "Moving a room's kill switch").
 
 The native UI source is frontend/src. Setup and strategy APIs persist revisioned data; active plans override canonical targets atomically at a local lights-on boundary. See docs/REPOSITORY_MAP.md and docs/GROW_PLANS.md.
 
@@ -60,7 +61,7 @@ local Python installs. CI is unaffected.
 - Responsibilities: phase transitions, hardware sequencing, dryback detection,
   source-water gate (pH + EC, fail-closed on dead probe), fail-closed hardware writes
   (aborts shot on valve/pump fault), P2 EC-correction min-interval (anti-short-cycle),
-  optional PID EC loop (`input_boolean.crop_steering_ec_pid_enabled`), daily caps,
+  daily caps,
   sensor-fusion republish, 30-min operator vitals.
 - Shot volume is substrate litres per plant x plants x shot fraction. Duration is shot litres divided by total flow L/s (plants x drippers/plant x L/h/dripper / 3600), followed by the explicit safety cap. Validate positive flow without a hidden clamp.
 - Add-on config: `addons/f2_control/config.yaml`. Options set via Supervisor UI.
@@ -108,7 +109,9 @@ the shot. Lives in the f2-control add-on (`addons/f2_control/`).
 
 - **Dependencies:** integration = pure HA + voluptuous (no external deps). Engine
   (`crop-steering-engine`) = pure Python, no scipy/numpy; the f2-control add-on image
-  installs its one dependency, `requests`, in `addons/f2_control/Dockerfile`.
+  installs `requests` and its pinned, hashed dependencies from `addons/f2_control/requirements.txt`,
+  plus the Anthropic SDK and its pinned, hashed dependencies from `requirements-brain.txt`, except
+  on armv7.
 - **Testing:** see `docs/TESTING.md`; run `bash tests/run_ci.sh` (mirrors CI). Anything that touches the
   config flow, entity ids/platforms or the integration-controller contract must be proven in `tests_ha/`
   (a real Home Assistant), not only against the stubs in `tests/`: the stubs cannot see a schema HA

@@ -57,16 +57,18 @@ const put = (entity_id, state, attributes = {}) =>
     last_changed: new Date().toISOString(),
     last_updated: new Date().toISOString(),
   });
-for (const prefix of ["", "f1_"]) {
-  const name = prefix ? "Flower 1" : "Flower 2",
-    flag = prefix ? "switch.crop_steering_f1_engine_enabled" : "input_boolean.f2_control_enabled";
+for (const prefix of ["", "room_b_"]) {
+  const name = prefix ? "Room B" : "Room A",
+    flag = prefix
+      ? "switch.crop_steering_room_b_engine_enabled"
+      : "input_boolean.f2_control_enabled";
   put(`sensor.crop_steering_${prefix}engine_config`, "ready", {
     prefix,
-    slug: prefix ? "f1" : "",
+    slug: prefix ? "room_b" : "",
     num_zones: 2,
     friendly_name: `${name} engine config`,
     enable_flag: flag,
-    // F1 runs a pair that reports its versions; the default room models an older pair that does not
+    // Room B's pair reports its versions; the default room models an older pair that does not
     ...(prefix ? { integration_version: "2.19.1" } : {}),
   });
   put(`sensor.crop_steering_${prefix}ai_heartbeat`, "online", {
@@ -76,7 +78,7 @@ for (const prefix of ["", "f1_"]) {
   });
   put(flag, "on");
   put(`sensor.crop_steering_${prefix}activity_log`, "active", {
-    feed: `12:30 ${prefix ? "f1 " : ""}Z1 P1 -> P2`,
+    feed: `12:30 ${prefix ? "room_b " : ""}Z1 P1 -> P2`,
   });
   for (let z = 1; z <= 2; z++) {
     const k = `crop_steering_${prefix}zone_${z}_`;
@@ -178,14 +180,15 @@ async function check(name, run) {
   checks.push(name);
   console.log("PASS " + name);
 }
-const field = (key) => page.locator(`input[id="setting-number.crop_steering_f1_zone_1_${key}"]`);
+const field = (key) =>
+  page.locator(`input[id="setting-number.crop_steering_room_b_zone_1_${key}"]`);
 try {
   await check("live connection selects requested room without showing demo", async () => {
-    await page.goto(`${base}/dashboard.html?room=f1#/strategy`, {
+    await page.goto(`${base}/dashboard.html?room=room_b#/strategy`, {
       waitUntil: "networkidle",
     });
     await connected();
-    assert.equal(await page.locator("#desktop-room").inputValue(), "room:f1_");
+    assert.equal(await page.locator("#desktop-room").inputValue(), "room:room_b_");
     assert.equal(await page.locator(".demo-pill").count(), 0);
     await visible(field("p1_target_vwc"));
   });
@@ -200,7 +203,7 @@ try {
       await page.locator("#desktop-room").selectOption("room:");
       await visible(versions.getByText("not reported").first());
       assert.equal((await versions.innerText()).match(/not reported/g).length, 2);
-      await page.locator("#desktop-room").selectOption("room:f1_");
+      await page.locator("#desktop-room").selectOption("room:room_b_");
       await visible(versions.getByText("2.19.1"));
     },
   );
@@ -211,7 +214,7 @@ try {
       const phone = await context.newPage();
       try {
         await phone.setViewportSize({ width: 390, height: 640 });
-        await phone.goto(`${base}/dashboard.html?room=f1#/today`, { waitUntil: "networkidle" });
+        await phone.goto(`${base}/dashboard.html?room=room_b#/today`, { waitUntil: "networkidle" });
         await phone.getByRole("button", { name: "Open navigation", exact: true }).click();
         const drawer = phone.locator(".mobile-sidebar");
         await drawer.waitFor({ state: "visible" });
@@ -235,7 +238,7 @@ try {
       const short = await context.newPage();
       try {
         await short.setViewportSize({ width: 1280, height: 480 });
-        await short.goto(`${base}/dashboard.html?room=f1#/today`, { waitUntil: "networkidle" });
+        await short.goto(`${base}/dashboard.html?room=room_b#/today`, { waitUntil: "networkidle" });
         const versions = short.locator(".desktop-sidebar .sidebar-versions");
         await versions.scrollIntoViewIfNeeded();
         const box = await versions.boundingBox();
@@ -261,7 +264,7 @@ try {
           return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
         };
         for (const route of ["plan/targets", "history/timeline", "zone/1", "history/compare"]) {
-          await themed.goto(`${base}/dashboard.html?room=f1#/${route}`, {
+          await themed.goto(`${base}/dashboard.html?room=room_b#/${route}`, {
             waitUntil: "networkidle",
           });
           await themed.evaluate(() => {
@@ -300,7 +303,7 @@ try {
     },
   );
   await check("partial failure keeps failed draft and writes only selected room", async () => {
-    failWrite = "number.crop_steering_f1_zone_1_p2_vwc_threshold";
+    failWrite = "number.crop_steering_room_b_zone_1_p2_vwc_threshold";
     await field("p1_target_vwc").fill("65");
     await field("p2_vwc_threshold").fill("55");
     await page.getByRole("button", { name: /^Review 2 changes/ }).click();
@@ -309,11 +312,11 @@ try {
       .getByRole("button", { name: "Apply 2 changes", exact: true })
       .click();
     await visible(page.getByText("Some changes were not applied.", { exact: true }));
-    assert.equal(states["number.crop_steering_f1_zone_1_p1_target_vwc"].state, "65");
+    assert.equal(states["number.crop_steering_room_b_zone_1_p1_target_vwc"].state, "65");
     assert.equal(states["number.crop_steering_zone_1_p1_target_vwc"].state, "64");
     assert.equal(calls.length, 2);
     assert.equal(
-      calls.every((c) => c.entity_id.startsWith("number.crop_steering_f1_")),
+      calls.every((c) => c.entity_id.startsWith("number.crop_steering_room_b_")),
       true,
     );
     await page.screenshot({
@@ -327,10 +330,10 @@ try {
       .click();
     await page.getByRole("dialog").waitFor({ state: "hidden" });
     assert.equal(calls.length, 3);
-    assert.equal(calls[2].entity_id, "number.crop_steering_f1_zone_1_p2_vwc_threshold");
+    assert.equal(calls[2].entity_id, "number.crop_steering_room_b_zone_1_p2_vwc_threshold");
   });
   await check("service acknowledgement without readback is a visible failure", async () => {
-    ignoreWrite = "number.crop_steering_f1_zone_1_p1_target_vwc";
+    ignoreWrite = "number.crop_steering_room_b_zone_1_p1_target_vwc";
     await field("p1_target_vwc").fill("66");
     await page.getByRole("button", { name: /^Review 1 change/ }).click();
     await page
@@ -344,10 +347,10 @@ try {
     ignoreWrite = "";
   });
   await check("missing live sensor stays unavailable and timestamps remain honest", async () => {
-    states["sensor.crop_steering_f1_ec_zone_1"].state = "unavailable";
+    states["sensor.crop_steering_room_b_ec_zone_1"].state = "unavailable";
     await page.getByRole("button", { name: "Refresh controller data" }).click();
     await menu("Today");
-    await visible(page.getByRole("heading", { name: "Flower 1 today", exact: true }));
+    await visible(page.getByRole("heading", { name: "Room B today", exact: true }));
     // The room's line counts the alert; opened, it says which zone and why.
     await page.locator(".today-alerts").click();
     await visible(
@@ -369,7 +372,7 @@ try {
   await check(
     "stale probe is unavailable on Equipment › Probes and in the controller's sensors",
     async () => {
-      const probe = "sensor.crop_steering_f1_vwc_zone_1";
+      const probe = "sensor.crop_steering_room_b_vwc_zone_1";
       states[probe].last_updated = "2020-01-01T00:00:00Z";
       await page.getByRole("button", { name: "Refresh controller data" }).click();
       await menu("Equipment");
@@ -381,16 +384,16 @@ try {
       await visible(health(probe));
       assert.equal(await health(probe).getAttribute("data-probe-health"), "stale");
       assert.equal(await health(probe).getAttribute("data-tone"), "warn");
-      const ec = "sensor.crop_steering_f1_ec_zone_1";
+      const ec = "sensor.crop_steering_room_b_ec_zone_1";
       assert.equal(await health(ec).getAttribute("data-probe-health"), "no-reading");
       assert.equal(await health(ec).getAttribute("data-tone"), "off");
       assert.equal(
-        await health("sensor.crop_steering_f1_ec_zone_2").getAttribute("data-tone"),
+        await health("sensor.crop_steering_room_b_ec_zone_2").getAttribute("data-tone"),
         "on",
       );
       assert.match(await page.locator(".probes-status").innerText(), /Probes\s+2 of 4 OK/);
       // The controller's own sensors, one tap down: stale is amber, reporting green, down red.
-      const internals = page.locator("details.probes-more", { hasText: "Controller internals" });
+      const internals = page.locator("details.probes-more", { hasText: "All sensors of this room" });
       await internals.locator("summary").click();
       const row = internals.locator(".sensors-table tr").filter({ hasText: probe });
       await visible(row.getByText("Stale or unverified", { exact: true }));
@@ -410,14 +413,14 @@ try {
       assert.equal(
         await internals
           .locator(".sensors-table tr")
-          .filter({ hasText: "sensor.crop_steering_f1_ec_zone_2" })
+          .filter({ hasText: "sensor.crop_steering_room_b_ec_zone_2" })
           .locator(".pill")
           .getAttribute("data-tone"),
         "on",
       );
       assert.match(await internals.locator("summary").innerText(), /\(\d+ of \d+ reporting\)/);
       await internals
-        .getByRole("combobox", { name: "Filter sensor availability" })
+        .getByRole("combobox", { name: "Sensor status filter" })
         .selectOption("unavailable");
       await visible(row);
     },
@@ -436,14 +439,14 @@ try {
       await page.waitForTimeout(1000);
       const probes = [1, 2]
         .flatMap((zone) => [
-          `sensor.crop_steering_f1_vwc_zone_${zone}`,
-          `sensor.crop_steering_f1_ec_zone_${zone}`,
+          `sensor.crop_steering_room_b_vwc_zone_${zone}`,
+          `sensor.crop_steering_room_b_ec_zone_${zone}`,
         ])
         .sort();
       const numeric = Object.values(states)
         .filter(
           (e) =>
-            e.entity_id.startsWith("sensor.crop_steering_f1_") &&
+            e.entity_id.startsWith("sensor.crop_steering_room_b_") &&
             e.state.trim() &&
             Number.isFinite(Number(e.state)),
         )
@@ -456,7 +459,7 @@ try {
       // The controller's sensors, once opened: one request for every numeric one. A later re-read may
       // repeat a request; it is never one request per row.
       history.length = 0;
-      const internals = page.locator("details.probes-more", { hasText: "Controller internals" });
+      const internals = page.locator("details.probes-more", { hasText: "All sensors of this room" });
       if ((await internals.getAttribute("open")) === null)
         await internals.locator("summary").click();
       await page.waitForFunction(() => document.querySelectorAll(".sensors-table tr").length > 1);
@@ -482,7 +485,7 @@ try {
       await menu("Equipment");
       await page
         .getByRole("navigation", { name: "Equipment views" })
-        .getByRole("button", { name: "Tank & pump", exact: true })
+        .getByRole("button", { name: "Tank and feed", exact: true })
         .click();
       await visible(
         page
@@ -503,12 +506,12 @@ try {
     noEntities = true;
     await page.getByRole("button", { name: "Refresh controller data" }).click();
     await menu("Today");
-    await visible(page.getByRole("heading", { name: "No zones discovered", exact: true }));
+    await visible(page.getByRole("heading", { name: "No zones found", exact: true }));
     await visible(page.getByRole("heading", { level: 1, name: "Today", exact: true }));
     assert.equal(await page.locator("#desktop-room").isDisabled(), true);
     // A zone's old address finds no zone either, and says so.
     await page.evaluate(() => (location.hash = "#/zone/1"));
-    await visible(page.getByRole("heading", { name: "No zones discovered", exact: true }));
+    await visible(page.getByRole("heading", { name: "No zones found", exact: true }));
     await visible(page.getByRole("heading", { level: 1, name: "Zone", exact: true }));
   });
   await check(
@@ -566,10 +569,10 @@ try {
       assert.equal(new URL(page.url()).hash, "#/help");
     },
   );
-  await check("classic roundtrip preserves default and F1 alongside a named F2", async () => {
+  await check("classic roundtrip keeps default, a second room and the old f1 link", async () => {
     for (const [query, expected] of [
       ["?room=f2", "room:"],
-      ["?room=f1", "room:f1_"],
+      ["?room=room:room_b_", "room:room_b_"],
       ["", "room:"],
     ]) {
       await page.goto(`${base}/f2-classic.html${query}`, { waitUntil: "networkidle" });
@@ -578,6 +581,10 @@ try {
       assert.equal(await page.locator("#desktop-room").inputValue(), expected);
       assert.equal(new URL(page.url()).searchParams.get("room"), expected);
     }
+    // An old ?room=f1 link still opens the dashboard on the room with prefix f1_.
+    const opened = page.waitForRequest((req) => new URL(req.url()).pathname === "/dashboard.html");
+    await page.goto(`${base}/f2-classic.html?room=f1`, { waitUntil: "networkidle" });
+    assert.equal(new URL((await opened).url()).searchParams.get("room"), "room:f1_");
   });
   await check("what's new: an update shows it once, and the integration is told", async () => {
     // Every check above ran against an integration without What's new: no window, no error.
@@ -593,7 +600,7 @@ try {
     };
     const told = () =>
       calls.filter((call) => call.path.startsWith("/api/services/crop_steering/whats_new_seen"));
-    await page.goto(`${base}/dashboard.html?room=f1#/today`, { waitUntil: "networkidle" });
+    await page.goto(`${base}/dashboard.html?room=room_b#/today`, { waitUntil: "networkidle" });
     await visible(dialog);
     assert.deepEqual(
       (await dialog.locator("section h3").allInnerTexts()).map((text) => text.split("\n")[0]),
@@ -603,7 +610,10 @@ try {
     assert.deepEqual(told(), [
       { path: "/api/services/crop_steering/whats_new_seen?return_response", version: "2.25.0" },
     ]);
-    await dialog.getByRole("button", { name: "Got it", exact: true }).click();
+    await dialog
+      .locator(".whats-new-actions")
+      .getByRole("button", { name: "Close", exact: true })
+      .click();
     await page.reload({ waitUntil: "networkidle" });
     await page.waitForTimeout(300);
     assert.equal(await dialog.count(), 0, "the next visit, by anyone, does not show it again");

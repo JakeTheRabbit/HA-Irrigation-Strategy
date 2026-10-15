@@ -36,6 +36,11 @@ def test_the_emergencies_are_exactly_the_critical_codes():
     assert set(catalog.EMERGENCY) == critical == set(_kind("emergency"))
 
 
+def test_the_info_codes_are_exactly_the_info_codes():
+    info = {code for code, entry in CODES.items() if entry["severity"] == "info"}
+    assert set(catalog.INFO) == info
+
+
 def test_the_table_is_the_contracts():
     assert catalog.KIND_IDS == (
         "emergency",
@@ -43,19 +48,31 @@ def test_the_table_is_the_contracts():
         "sensors",
         "watering",
         "phases",
+        "vitals",
         "stock",
         "dosing",
         "jev",
         "setup",
     )
-    assert catalog.EVENTS == {"phase": "phases", "jev_setpoint": "jev"}
+    assert catalog.EVENTS == {
+        "phase": "phases",
+        "vitals": "vitals",
+        "jev_setpoint": "jev",
+    }
     assert set(_kind("hardware")) == {f"CS-30{n}" for n in range(1, 10)} | {
         "CS-310",
         "CS-311",
+        "CS-312",
+        "CS-313",
         "CS-701",
+        "CS-710",
     }
     assert set(_kind("stock")) == {"CS-608", "CS-807"}
-    assert set(_kind("dosing")) == {f"CS-80{n}" for n in range(1, 7)}
+    assert set(_kind("dosing")) == {f"CS-80{n}" for n in range(1, 7)} | {"CS-808"}
+    # The reservoir's codes are CS-9xx, never Jev's CS-701 to CS-707, and a hold at the tank reaches a phone.
+    reservoir = {f"CS-90{n}" for n in range(1, 5)}
+    assert reservoir <= set(_kind("watering"))
+    assert reservoir & set(catalog.EMERGENCY) == {"CS-901", "CS-902"}
     assert "CS-404" not in _kind("setup") and "CS-404" in _kind("jev")
     for kind in catalog.serial():
         assert set(kind) == {"id", "name", "detail", "codes", "events"}
@@ -67,11 +84,14 @@ def test_a_code_in_two_kinds_is_in_both():
     assert catalog.kinds_for("CS-301") == {"emergency", "hardware"}
     assert catalog.kinds_for("CS-207") == {"emergency", "watering"}
     assert catalog.kinds_for("CS-608") == {"stock"}
+    # The grow plan not running as written: Jev's card, and a plan card beside CS-606/607.
+    assert catalog.kinds_for("CS-713") == {"jev", "setup"}
 
 
 def test_events_and_codes_the_catalog_does_not_know():
     assert catalog.kinds_for(event="phase") == {"phases"}
     assert catalog.kinds_for(event="jev_setpoint") == {"jev"}
+    assert catalog.kinds_for(event="vitals") == {"vitals"}
     assert catalog.kinds_for(event="something new") == set()  # not an alert: nobody
     # A newer controller's code: an emergency when it says the code is critical, else setup.
     assert catalog.kinds_for("CS-299", urgent=True) == {"emergency"}

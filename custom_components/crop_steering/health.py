@@ -14,24 +14,27 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN, REPAIRS_DOCS_URL
-from .room import room_prefix
+from .room import resolve_gate, room_prefix
 
 _LOGGER = logging.getLogger(__name__)
 
-_DEFAULT_KILL_SWITCH = "input_boolean.f2_control_enabled"
 _STALE_MIN = 10
 _DEAD = ("unavailable", "unknown", "none", "")
 ISSUE_IDS = (
     "kill_switch_missing",
+    "engine_switch_not_gate",
     "engine_offline",
     "zone_no_sensor",
     "fused_sensor_unavailable",
     "strategy_hold",
     "strategy_degraded",
     "entities_moved",
+    "max_run_latch",
     # Raised and cleared by stock_api.py, not by the checks here; listed so every card this
     # integration can show is in one place.
     "stock_low",
+    # Raised and cleared by bounds.py, when the room sets up and when a setting changes.
+    "outside_zone_bounds",
 )
 # The platforms whose entities the controller reads by exact id and has no other way to find.
 # Fused sensors are left out: the controller tolerates their legacy naming and an add-on option
@@ -51,14 +54,16 @@ def clear_all(hass: HomeAssistant, slug: str = "default") -> None:
         ir.async_delete_issue(hass, DOMAIN, _iid(base, slug))
 
 
-def _issue(hass, present, issue_id, severity, placeholders=None):
-    """Create the issue when `present` is True, otherwise clear it."""
+def _issue(hass, present, issue_id, severity, placeholders=None, fix=None):
+    """Create the issue when `present` is True, otherwise clear it. `fix`: the data its
+    fix flow gets (repairs.py); without it the card has no Fix button."""
     if present:
         ir.async_create_issue(
             hass,
             DOMAIN,
             issue_id,
-            is_fixable=False,
+            data=fix,
+            is_fixable=fix is not None,
             severity=severity,
             translation_key=_base_key(issue_id),
             translation_placeholders=placeholders or {},
@@ -74,37 +79,6 @@ def _base_key(issue_id: str) -> str:
         if issue_id == base or issue_id.startswith(base + "_"):
             return base
     return issue_id
-
-
-def _kill_switch(hass: HomeAssistant, prefix: str) -> str:
-    """Resolve the kill-switch entity id this room's engine actually uses.
-
-    Best source: the running engine itself — it publishes its configured ``enable_flag``
-    on the room's heartbeat sensor, which covers a custom add-on ``enable_flag`` option.
-    Fallbacks: the room's engine_config descriptor, then the per-room engine_enabled
-    switch (named rooms) or the documented default (default room).
-
-    Except while the engine is BEHIND: its heartbeat reports an older ``setup_revision`` than the
-    room publishes. It then holds every zone until it adopts the new setup, and adopting moves it
-    to the descriptor's flag, so the flag it names is the one being left behind. That is every
-    first install where the controller app was started before the integration was set up: the
-    app's shipped option names input_boolean.f2_control_enabled, a fresh install never creates
-    it, and this check used to send a new operator off to create a second kill switch that the
-    room would never use.
-    """
-    hb = hass.states.get(f"sensor.{DOMAIN}_{prefix}ai_heartbeat")
-    desc = hass.states.get(f"sensor.{DOMAIN}_{prefix}engine_config")
-    beat = (getattr(hb, "attributes", {}) or {}) if hb is not None else {}
-    room = (getattr(desc, "attributes", {}) or {}) if desc is not None else {}
-    have, want = beat.get("setup_revision"), room.get("setup_revision")
-    behind = type(have) is int and type(want) is int and want > have
-    if beat.get("enable_flag") and not (behind and room.get("enable_flag")):
-        return beat["enable_flag"]
-    if room.get("enable_flag"):
-        return room["enable_flag"]
-    if prefix:
-        return f"switch.{DOMAIN}_{prefix}engine_enabled"
-    return _DEFAULT_KILL_SWITCH
 
 
 def _strategy_hold(plan, heartbeat):
@@ -188,6 +162,45 @@ def _check_moved(hass: HomeAssistant, entry: ConfigEntry, slug: str) -> None:
     )
 
 
+def _check_max_run(hass, entry, prefix, slug, heartbeat):
+    """CS-312: zones whose last shots all ran into the room's longest allowed shot, as the
+    controller reports them on its heartbeat. A zone it latched (the room's max-run latch switch
+    is ON) is stopped until this card is fixed; otherwise the card only reports. A latched zone
+    whose reset the controller has not seen yet is left off the card."""
+    beat = (getattr(heartbeat, "attributes", {}) or {}) if heartbeat is not None else {}
+    zones = beat.get("max_run") if isinstance(beat.get("max_run"), dict) else {}
+    switch = hass.states.get(f"switch.{DOMAIN}_{prefix}max_run_latch")
+    resets = (getattr(switch, "attributes", {}) or {}).get("resets", 0)
+    latched, capped = [], []
+    for zone, row in sorted(zones.items()):
+        if not isinstance(row, dict):
+            continue
+        if row.get("latched"):
+            if row.get("resets") == resets:
+                latched.append(str(zone))
+        else:
+            capped.append(str(zone))
+    if latched:
+        what = (
+            "The controller has stopped watering zone(s) "
+            + ", ".join(latched)
+            + " until this card is fixed: open it and confirm."
+        )
+    else:
+        what = (
+            "Nothing has been stopped: the room's max-run latch switch is off, so the zones "
+            "keep watering."
+        )
+    _issue(
+        hass,
+        bool(latched or capped),
+        _iid("max_run_latch", slug),
+        ir.IssueSeverity.ERROR if latched else ir.IssueSeverity.WARNING,
+        {"zones": ", ".join(latched or capped), "what": what},
+        fix={"entry_id": entry.entry_id} if latched else None,
+    )
+
+
 def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Evaluate one room's setup health and create/clear its Repairs issues."""
     try:
@@ -204,20 +217,28 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
         if room is not None and str(room.state).lower() == "off":
             for base in ISSUE_IDS:
                 # Stock runs low whether or not anything grows, and only its own store
-                # raises that card again.
-                if base not in ("entities_moved", "stock_low"):
+                # raises that card again; the same goes for a setting held above its limit.
+                if base not in ("entities_moved", "stock_low", "outside_zone_bounds"):
                     _issue(hass, False, _iid(base, slug), ir.IssueSeverity.WARNING)
             return
 
         # Kill switch + engine heartbeat are per-room: the engine drives EVERY configured
         # room, each with its own kill switch and prefixed heartbeat. Resolve them per room
         # so a custom default kill switch and additional rooms are all monitored.
-        kill = _kill_switch(hass, prefix)
+        kill, reported = resolve_gate(hass, prefix)
         _issue(
             hass,
             hass.states.get(kill) is None,
             _iid("kill_switch_missing", slug),
             ir.IssueSeverity.ERROR,
+            {
+                "kill_switch": kill,
+                "source": (
+                    "the one its controller reports"
+                    if reported
+                    else "as the room's setup publishes it: the controller has not reported its own yet"
+                ),
+            },
         )
         hb = hass.states.get(f"sensor.{DOMAIN}_{prefix}ai_heartbeat")
         offline = hb is None
@@ -230,6 +251,20 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
             except Exception:  # pragma: no cover - defensive
                 offline = False
         _issue(hass, offline, _iid("engine_offline", slug), ir.IssueSeverity.WARNING)
+
+        # An operator who turns Engine Enabled OFF expects water to stop. Only the running
+        # controller knows its gate, so only a current heartbeat can say that switch is not it.
+        own = f"switch.{DOMAIN}_{prefix}engine_enabled"
+        _issue(
+            hass,
+            reported
+            and not offline
+            and kill != own
+            and hass.states.get(own) is not None,
+            _iid("engine_switch_not_gate", slug),
+            ir.IssueSeverity.WARNING,
+            {"kill_switch": kill, "engine_switch": own},
+        )
 
         # A zone with no VWC sensor mapped -> it can't be steered.
         no_sensor = []
@@ -260,6 +295,8 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
             ir.IssueSeverity.WARNING,
             {"zones": ", ".join(dead)},
         )
+
+        _check_max_run(hass, entry, prefix, slug, None if offline else hb)
 
         # Every hold of the room's grow-strategy plan, and a plan running on its last snapshot.
         plan = hass.states.get(f"sensor.{DOMAIN}_{prefix}strategy_plan")

@@ -9,15 +9,18 @@ import time
 from conftest import fixture
 from homeassistant.core import Context
 from homeassistant.helpers import issue_registry as ir
+from homeassistant.util import dt as dt_util
 from test_dosing import PUMP, _devices
 from test_setup_entry import _install
 from test_upgrade_in_place import _upgrade
 
 DOMAIN = "crop_steering"
-ROOM = "room:"
+ROOM = "room:tent_"
 FILL = "sensor.batch_tank_last_fill"
 DOSE = "number.doser_bloom_dose"
-SENSOR = "sensor.crop_steering_stock_low"
+SENSOR = "sensor.crop_steering_tent_stock_low"
+# A room installed before every new room got a slug keeps its un-prefixed ids.
+UPGRADED_ROOM, UPGRADED_SENSOR = "room:", "sensor.crop_steering_stock_low"
 
 
 async def _service(hass, admin, name, **data):
@@ -75,7 +78,7 @@ async def test_each_batch_draws_once_warns_when_low_and_a_refill_clears_it(
     assert doc["history"][0]["draw_ml"] == {"bloom": 1800.0}
 
     await _fill(hass, "2026-09-26T07:00:00+00:00")
-    issue = ir.async_get(hass).async_get_issue(DOMAIN, "stock_low")
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, "stock_low_tent")
     assert issue is not None and issue.translation_placeholders["count"] == "1"
     assert "about 3 batches left" in issue.translation_placeholders["tanks"]
     state = hass.states.get(SENSOR)
@@ -94,7 +97,7 @@ async def test_each_batch_draws_once_warns_when_low_and_a_refill_clears_it(
     )
     assert doc["tanks"][0]["level_l"] == 10
     await hass.async_block_till_done()
-    assert ir.async_get(hass).async_get_issue(DOMAIN, "stock_low") is None
+    assert ir.async_get(hass).async_get_issue(DOMAIN, "stock_low_tent") is None
     assert hass.states.get(SENSOR).state == "0"
 
 
@@ -224,7 +227,7 @@ async def test_an_upgraded_room_draws_each_linked_tank_by_what_its_pump_runs(
         hass.states.async_set(entity_id, state)
     await _upgrade(hass, "entry_2_17_wizard.json")
     stored = seed["stock"]
-    doc = await _service(hass, hass_admin_user, "stock_get")
+    doc = await _service(hass, hass_admin_user, "stock_get", room_id=UPGRADED_ROOM)
     assert (doc["revision"], doc["tanks"], doc["history"], doc["last_batch"]) == (
         stored["revision"],
         stored["tanks"],
@@ -241,12 +244,12 @@ async def test_an_upgraded_room_draws_each_linked_tank_by_what_its_pump_runs(
     hass.states.async_set(status, "Stopped", timestamp=start + 27.129)
     hass.states.async_set(power, "off", timestamp=start + 27.13)
     await hass.async_block_till_done()
-    doc = await _service(hass, hass_admin_user, "stock_get")
+    doc = await _service(hass, hass_admin_user, "stock_get", room_id=UPGRADED_ROOM)
     assert [t["level_l"] for t in doc["tanks"]] == [9.6999, 20, 18, 5]
     assert doc["history"][0]["source"] == "pump"
     assert doc["history"][0]["draw_ml"] == {"balance": 300.1}
     assert doc["history"][1:] == stored["history"][:29] and doc["revision"] == 299
-    tanks = {t["id"]: t for t in hass.states.get(SENSOR).attributes["tanks"]}
+    tanks = {t["id"]: t for t in hass.states.get(UPGRADED_SENSOR).attributes["tanks"]}
     assert (tanks["balance"]["level_l"], tanks["balance"]["pump"]) == (9.6999, "balance")
 
     # The controller app's report of a dose is left to the pump's run.
@@ -254,7 +257,7 @@ async def test_an_upgraded_room_draws_each_linked_tank_by_what_its_pump_runs(
         DOMAIN,
         "stock_draw",
         {
-            "room_id": ROOM,
+            "room_id": UPGRADED_ROOM,
             "key": f":balance:{doc['history'][0]['at']}",
             "draws": {"balance": 300},
             "source": "batch",
@@ -288,3 +291,82 @@ async def test_a_room_without_a_fill_entity_records_batches_by_hand(
     )
     assert doc["tanks"][0]["level_l"] == 4.75
     assert doc["history"][0]["source"] == "manual"
+
+
+async def test_an_upgraded_rooms_batches_left_follow_the_feed_schedules_recipe(
+    hass, hass_admin_user, hass_storage
+):
+    """UPGRADE IN PLACE (tests_ha/fixtures/stock_dosing_3_8.json): the 3.8 room's stock store loads
+    as it was, and what one batch takes from each tank linked to a pump is that pump's dose in the
+    recipe in use: the batch's own, read from its mL entities, until a feed schedule gives this week
+    a recipe of its own. Nothing is drawn by it: only the pumps' runs draw a linked tank."""
+    seed = fixture("stock_dosing_3_8.json")
+    entry_id = fixture("entry_2_17_wizard.json")["entry_id"]
+    for name in ("stock", "dosing"):
+        key = f"{DOMAIN}.{name}.{entry_id}"
+        hass_storage[key] = {
+            "version": 1,
+            "minor_version": 1,
+            "key": key,
+            "data": seed[name],
+        }
+    for entity_id, state in seed["states"].items():
+        hass.states.async_set(entity_id, state)
+    batch = seed["dosing"]["batch"]
+    for entity_id in (
+        batch["fill_valve"],
+        batch["full_entity"],
+        batch["mix_pump"],
+        *batch["mix_valves"],
+        batch["mix_power_sensor"],
+        *batch["close_entities"],
+        batch["hold_entity"],
+        batch["filled_at_entity"],
+    ):
+        hass.states.async_set(entity_id, "off")
+    await _upgrade(hass, "entry_2_17_wizard.json")
+    stored = seed["stock"]
+    doc = await _service(hass, hass_admin_user, "stock_get", room_id=UPGRADED_ROOM)
+    assert (doc["revision"], doc["tanks"], doc["history"]) == (
+        stored["revision"],
+        stored["tanks"],
+        stored["history"],
+    )
+    assert doc["doses"] == {"balance": 300, "bloom": 1800, "core": 1080, "cleanse": 200}
+
+    # Week 1 of a feed schedule from today doses Bloom and Core only, at amounts of its own.
+    today = dt_util.now().date().isoformat()
+    feed = {
+        "recipes": [
+            {
+                "id": "bloom",
+                "name": "Bloom",
+                "doses": [{"pump": "bloom", "ml": 900}, {"pump": "core", "ml": 540}],
+            }
+        ],
+        "schedule": {"start": today, "weeks": ["bloom"]},
+    }
+    saved = await _service(
+        hass,
+        hass_admin_user,
+        "dosing_save",
+        room_id=UPGRADED_ROOM,
+        expected_revision=seed["dosing"]["revision"],
+        pumps=seed["dosing"]["pumps"],
+        batch=batch,
+        feed=feed,
+    )
+    assert saved["error"] is None and saved["feed_now"]["recipe"] == "Bloom"
+    await hass.async_block_till_done()
+    doc = await _service(hass, hass_admin_user, "stock_get", room_id=UPGRADED_ROOM)
+    assert doc["doses"] == {"balance": 0, "bloom": 900, "core": 540, "cleanse": 0}
+    assert (doc["revision"], doc["tanks"]) == (stored["revision"], stored["tanks"])
+    tanks = {t["id"]: t for t in hass.states.get(UPGRADED_SENSOR).attributes["tanks"]}
+    assert [tanks[t]["batches_left"] for t in ("balance", "bloom", "core")] == [
+        None,
+        22,
+        33,
+    ]
+    # Cleanse sits at its low mark: the card says so, with no batches left to count.
+    card = ir.async_get(hass).async_get_issue(DOMAIN, "stock_low")
+    assert "- Cleanse: 5 L of 20 L\n" in card.translation_placeholders["tanks"] + "\n"

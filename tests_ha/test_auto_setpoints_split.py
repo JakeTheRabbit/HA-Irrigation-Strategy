@@ -1,8 +1,9 @@
 """The zone's setpoints follow its own highest readings, in a real Home Assistant, with the real controller.
 
 6 Oct 2026, the owner: the P1 target is the highest VWC of the grow-day before, field capacity rises as the sensor
-does, and the re-water threshold and the rescue floor move with field capacity, within each number's own min and max.
-No 2-points-a-day limit, and nothing is written until a lights-on has kept a day before. Jev's
+does, and the re-water threshold moves with field capacity, within each number's own min and max. Bounded: each moves
+at most a point a grow-day, the rescue floor never moves, and nothing is written until a lights-on has kept a day
+before. Jev's
 Setpoints judge keeps its P2 shot size (and centres its range on the moved threshold); the learner writes neither
 the P1 target nor field capacity.
 
@@ -73,7 +74,7 @@ async def test_the_p1_target_and_field_capacity_follow_the_highest_reading_and_t
     assert before == {"p1_target_vwc": 29.5, "field_capacity": 50.0, "p2_vwc_threshold": 27.5,
                       "p3_emergency_vwc_threshold": 20.0, "p2_shot_size": 6.0}
 
-    st["peak"] = 71.48  # F2 zone 2's highest reading of 5 Oct
+    st["peak"] = st["fc_follow"]["peak"] = 71.48  # a production zone's highest reading of 5 Oct
     _Clock.current = now = datetime(2026, 10, 6, 5, 0)
     st["phase"] = "P3"
     fake.calls.clear()
@@ -82,6 +83,7 @@ async def test_the_p1_target_and_field_capacity_follow_the_highest_reading_and_t
     assert not [d for dom, svc, d in fake.calls if (dom, svc) == ("number", "set_value") and d["entity_id"] in ladder]
 
     st["peak_prev"], st["peak"] = 71.48, 39.3  # the lights-on keeps the grow-day's peak as the day before's
+    st["fc_follow"]["peak"] = 39.3
     fake.calls.clear()
     c._auto_tick(room, 1, SimpleNamespace(vwc=39.3, ec=5.1, dryback_rate=0.0), c._params(room, 1), False, now)
     sent = [(d["entity_id"], d["value"]) for dom, svc, d in fake.calls if (dom, svc) == ("number", "set_value")]
@@ -89,36 +91,43 @@ async def test_the_p1_target_and_field_capacity_follow_the_highest_reading_and_t
         await hass.services.async_call("number", "set_value", {"entity_id": entity, "value": value}, blocking=True)
     _see(hass, fake)
 
-    # 50 -> 71.5 is 21.5 points: no 2-point limit, and the re-water threshold and the rescue floor move the same
-    assert sorted(sent) == sorted([(NUMBER + "field_capacity", 71.5), (NUMBER + "p1_target_vwc", 71.5),
-                                   (NUMBER + "p2_vwc_threshold", 49.0), (NUMBER + "p3_emergency_vwc_threshold", 41.5)])
+    # 50 -> 71.5 is 21.5 points: one point today, the re-water threshold with it, the rescue floor where it was
+    assert sent == [(NUMBER + "field_capacity", 51.0), (NUMBER + "p1_target_vwc", 30.5),
+                    (NUMBER + "p2_vwc_threshold", 28.5)]
     after = {s: _value(hass, s) for s in before}
-    assert after == {"p1_target_vwc": 71.5, "field_capacity": 71.5, "p2_vwc_threshold": 49.0,
-                     "p3_emergency_vwc_threshold": 41.5, "p2_shot_size": 6.0}  # the judge's shot size untouched
+    assert after == {"p1_target_vwc": 30.5, "field_capacity": 51.0, "p2_vwc_threshold": 28.5,
+                     "p3_emergency_vwc_threshold": 20.0, "p2_shot_size": 6.0}  # the judge's shot size untouched
 
     owners = fake.sets[SENSOR][1]["managed_by"]
     assert owners[NUMBER + "p1_target_vwc"] == "the zone's highest reading of the grow-day before"
     assert owners[NUMBER + "field_capacity"] == "the zone's highest reading of this grow-day or the one before"
     assert owners[NUMBER + "p2_shot_size"] == "Jev's Setpoints judge, one notch a night"
 
-    # The next lights-on keeps a lower day: 71.5 -> 48 is 23.5 down. The floor would be 18.0, under the real number's
-    # own minimum of 20, which Home Assistant refuses: it stops at 20, and the ladder is written from the bottom.
-    st["peak_prev"], st["peak"] = 48.0, 39.3
+    # The rest of the grow-day moves nothing more: its point is spent.
+    fake.calls.clear()
+    c._auto_tick(room, 1, SimpleNamespace(vwc=39.3, ec=5.1, dryback_rate=0.0), c._params(room, 1), False, now)
+    assert not [d for dom, svc, d in fake.calls if (dom, svc) == ("number", "set_value") and d["entity_id"] in ladder]
+
+    # The next grow-day keeps a lower day: 51 -> 48 is 3 down. One point, the ladder written from the bottom.
+    _Clock.current = now = datetime(2026, 10, 7, 5, 0)
+    st["peak_prev"], st["peak"], st["fc_follow"]["peak"] = 48.0, 39.3, 39.3
     fake.calls.clear()
     c._auto_tick(room, 1, SimpleNamespace(vwc=39.3, ec=5.1, dryback_rate=0.0), c._params(room, 1), False, now)
     sent = [(d["entity_id"], d["value"]) for dom, svc, d in fake.calls if (dom, svc) == ("number", "set_value")]
     for entity, value in sent:
         await hass.services.async_call("number", "set_value", {"entity_id": entity, "value": value}, blocking=True)
     _see(hass, fake)
-    assert sent == [(NUMBER + "p3_emergency_vwc_threshold", 20.0), (NUMBER + "p2_vwc_threshold", 25.5),
-                    (NUMBER + "p1_target_vwc", 48.0), (NUMBER + "field_capacity", 48.0)]
-    assert {s: _value(hass, s) for s in before} == {"p1_target_vwc": 48.0, "field_capacity": 48.0,
-                                                    "p2_vwc_threshold": 25.5, "p3_emergency_vwc_threshold": 20.0,
+    assert sent == [(NUMBER + "p2_vwc_threshold", 27.5), (NUMBER + "p1_target_vwc", 31.5),
+                    (NUMBER + "field_capacity", 50.0)]
+    assert {s: _value(hass, s) for s in before} == {"p1_target_vwc": 31.5, "field_capacity": 50.0,
+                                                    "p2_vwc_threshold": 27.5, "p3_emergency_vwc_threshold": 20.0,
                                                     "p2_shot_size": 6.0}
 
     c._save_state()
     saved = json.loads(open(os.environ["F2_STATE_PATH"], encoding="utf-8").read())
     zone = saved["default"]["1"]
     assert zone["peak"] == 39.3 and zone["peak_prev"] == 48.0
+    assert zone["fc_follow"] == {"peak": 39.3, "day": "2026-10-06",
+                                 "used": {"field_capacity": 1.0, "p1_target_vwc": 1.0, "p2_vwc_threshold": 1.0}}
     assert not {"day_ceiling", "p1_entry", "stale_target"} & set(zone["learn"])  # the 2-point limit is gone
     assert saved["default"]["_setup"] == seed["controller_saved"]["default"]["_setup"]

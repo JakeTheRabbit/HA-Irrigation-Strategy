@@ -3,6 +3,7 @@ import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UiTip } from "@/components/info-tip";
 import { ReviewDialog, number, type ReviewItem } from "@/components/dashboard";
 import { useSensorContext } from "@/components/sensor-context";
 import { SettingRow } from "@/components/setting-row";
@@ -194,7 +195,8 @@ export function ControllerSettings({
           )}
           {group("Safety").length > 0 && (
             <details className="controller-settings-group controller-settings-safety">
-              <summary>Safety limits: {GROUP_HELP.Safety.toLowerCase()}</summary>
+              <summary>Safety limits</summary>
+              <UiTip copyKey="safety limits:" />
               <table className="targets-table">
                 <tbody>{rows(group("Safety"))}</tbody>
               </table>
@@ -204,7 +206,7 @@ export function ControllerSettings({
       )}
       {zone && preview && (
         <details className="setpoint-water controller-settings-water">
-          <summary>Water & calibration: what a shot delivers, and a catch test</summary>
+          <summary>Water and calibration</summary>
           <WaterDelivery
             controller={controller}
             zoneId={zone.id}
@@ -219,14 +221,19 @@ export function ControllerSettings({
             <p className="notice-inline">Using your catch-test flow in this calculation only.</p>
           )}
           <div className="calibration">
-            <h3>Catch-test calibration</h3>
+            <h3>
+              Catch-test calibration <UiTip copyKey="catch-test calibration" />
+            </h3>
             <p className="small muted">
               Collect water from a representative dripper for a measured time, and enter what one
               dripper gave.
             </p>
             <div className="calibration-fields">
               <div>
-                <Label htmlFor="catch-volume">Collected water per dripper · mL</Label>
+                <span className="label-with-tip">
+                  <Label htmlFor="catch-volume">Water from one dripper · mL</Label>
+                  <UiTip copyKey="collected water per dripper · ml" />
+                </span>
                 <Input
                   id="catch-volume"
                   type="number"
@@ -241,7 +248,10 @@ export function ControllerSettings({
                 />
               </div>
               <div>
-                <Label htmlFor="catch-time">Collection time · minutes</Label>
+                <span className="label-with-tip">
+                  <Label htmlFor="catch-time">Catch test time · min</Label>
+                  <UiTip copyKey="collection time · minutes" />
+                </span>
                 <Input
                   id="catch-time"
                   type="number"

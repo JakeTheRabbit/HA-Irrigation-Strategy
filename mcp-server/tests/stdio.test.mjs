@@ -5,9 +5,9 @@ import { mockHa, stdio, call, data, planFixture, TOKEN } from "./mock-ha.mjs";
 const preview = async (client) =>
   data(
     await call(client, "preview_setup", {
-      room_id: "room:veg_",
+      room_id: "room:room_b_",
       changes: {
-        room_name: "Veg renamed",
+        room_name: "Room B renamed",
         zones: [{ id: 1, plant_count: 48 }],
       },
     }),
@@ -45,15 +45,15 @@ test("real stdio initialize, tools/list, bounded reads, exact room isolation, an
   assert.equal(rooms.writes_enabled, false);
   assert.deepEqual(
     rooms.rooms.map((r) => r.room_id),
-    ["room:", "room:veg_"],
+    ["room:", "room:room_b_"],
   );
   assert.ok(!JSON.stringify(rooms).includes(TOKEN));
   const cfg = data(
-    await call(client, "get_room_configuration", { room_id: "room:veg_" }),
+    await call(client, "get_room_configuration", { room_id: "room:room_b_" }),
   );
-  assert.equal(cfg.hardware.pump_switch, "switch.veg_pump");
+  assert.equal(cfg.hardware.pump_switch, "switch.room_b_pump");
   const status = data(
-    await call(client, "get_room_status", { room_id: "room:veg_" }),
+    await call(client, "get_room_status", { room_id: "room:room_b_" }),
   );
   assert.equal(
     status.readings.find((r) => r.entity_id.endsWith("last_irrigation_app"))
@@ -63,13 +63,13 @@ test("real stdio initialize, tools/list, bounded reads, exact room isolation, an
   assert.ok(!status.readings.some((r) => r.entity_id === "switch.pump"));
   assert.ok(!JSON.stringify(status).includes("internal_secret"));
   const search = data(
-    await call(client, "search_candidate_entities", { query: "veg", limit: 2 }),
+    await call(client, "search_candidate_entities", { query: "room_b", limit: 2 }),
   );
   assert.equal(search.candidates.length, 2);
   assert.equal(search.next_offset, 2);
   const runs = data(
     await call(client, "get_room_runs", {
-      room_id: "room:veg_",
+      room_id: "room:room_b_",
       limit: 2,
       offset: 3,
     }),
@@ -81,7 +81,7 @@ test("real stdio initialize, tools/list, bounded reads, exact room isolation, an
     /unknown/,
   );
   error(
-    await call(client, "get_room_status", { room_id: "room:veg_", zone_id: 2 }),
+    await call(client, "get_room_status", { room_id: "room:room_b_", zone_id: 2 }),
     /does not belong/,
   );
   assert.equal(ha.saveCount, 0);
@@ -112,7 +112,7 @@ test("reviewed setup saves exact server payload and reads back, preserving other
     row.path.includes("/setup_save?"),
   ).body;
   assert.deepEqual(submitted, {
-    entry_id: "entry-veg_",
+    entry_id: "entry-room_b_",
     expected_revision: 4,
     ...p.proposed_configuration,
   });
@@ -133,7 +133,7 @@ test("read-only default and strict input schema block saves and control flags", 
     { hardware: { pump_switch: "http://outside" } },
   ]) {
     error(
-      await call(client, "preview_setup", { room_id: "room:veg_", changes }),
+      await call(client, "preview_setup", { room_id: "room:room_b_", changes }),
       /Invalid|Unrecognized|integer/,
     );
   }
@@ -174,17 +174,17 @@ test("candidate existence, units, duplicate zones and foreign zones are checked 
   const ha = await mockHa(t),
     { client } = await stdio(t, ha);
   for (const [changes, pattern] of [
-    [{ hardware: { tank_ec_sensor: "sensor.veg_vwc" } }, /Incompatible ec/],
+    [{ hardware: { tank_ec_sensor: "sensor.room_b_vwc" } }, /Incompatible ec/],
     [{ hardware: { pump_switch: "switch.missing" } }, /existing switch/],
     [{ zones: [{ id: 2, plant_count: 20 }] }, /existing zone IDs/],
     [{ zones: [{ id: 1 }, { id: 1 }] }, /Duplicate/],
     [
-      { zones: [{ id: 1, vwc_sensors: ["sensor.veg_vwc", "sensor.veg_vwc"] }] },
+      { zones: [{ id: 1, vwc_sensors: ["sensor.room_b_vwc", "sensor.room_b_vwc"] }] },
       /unique/,
     ],
   ])
     error(
-      await call(client, "preview_setup", { room_id: "room:veg_", changes }),
+      await call(client, "preview_setup", { room_id: "room:room_b_", changes }),
       pattern,
     );
   assert.equal(ha.saveCount, 0);
@@ -196,14 +196,14 @@ test("HA validates plan preview, then only draft saved with exact readback; no a
   const plan = planFixture();
   plan.profiles[0].vegetative.p1_target_vwc = 65;
   const p = data(
-    await call(client, "preview_plan", { room_id: "room:veg_", plan }),
+    await call(client, "preview_plan", { room_id: "room:room_b_", plan }),
   );
   assert.equal(ha.saveCount, 0);
   assert.equal(p.preview.zones[0].parameters.p1_target_vwc, 65);
   const result = data(await apply(client, p));
   assert.equal(result.status, "draft");
   assert.equal(result.revision, 8);
-  assert.deepEqual(ha.plans["room:veg_"].plan, plan);
+  assert.deepEqual(ha.plans["room:room_b_"].plan, plan);
   assert.equal(ha.plans["room:"].revision, 7);
   assert.ok(ha.calls.some((row) => row.path.includes("/strategy_preview?")));
   assert.ok(
@@ -214,12 +214,12 @@ test("HA validates plan preview, then only draft saved with exact readback; no a
   const invalid = planFixture();
   invalid.profiles[0].vegetative.p1_target_vwc = 99;
   error(
-    await call(client, "preview_plan", { room_id: "room:veg_", plan: invalid }),
+    await call(client, "preview_plan", { room_id: "room:room_b_", plan: invalid }),
     /outside readable HA bounds/,
   );
-  ha.plans["room:veg_"].status = "active";
+  ha.plans["room:room_b_"].status = "active";
   error(
-    await call(client, "preview_plan", { room_id: "room:veg_", plan }),
+    await call(client, "preview_plan", { room_id: "room:room_b_", plan }),
     /not draft/,
   );
 });
@@ -230,14 +230,14 @@ test("changed plan bounds or active status after preview block draft save", asyn
   const plan = planFixture();
   plan.profiles[0].name = "New profile";
   let p = data(
-    await call(client, "preview_plan", { room_id: "room:veg_", plan }),
+    await call(client, "preview_plan", { room_id: "room:room_b_", plan }),
   );
-  ha.plans["room:veg_"].catalog = {
+  ha.plans["room:room_b_"].catalog = {
     1: { p1_target_vwc: { min: 20, max: 60 } },
   };
   error(await apply(client, p), /bounds changed/);
-  p = data(await call(client, "preview_plan", { room_id: "room:veg_", plan }));
-  ha.plans["room:veg_"].status = "armed";
+  p = data(await call(client, "preview_plan", { room_id: "room:room_b_", plan }));
+  ha.plans["room:room_b_"].status = "armed";
   error(await apply(client, p), /bounds changed/);
   assert.equal(ha.saveCount, 0);
 });
@@ -320,14 +320,14 @@ test("legacy default descriptor is default-only and its prefix must match the ro
     "off",
   );
   ha.calls.length = 0;
-  await call(client, "get_room_status", { room_id: "room:veg_" });
+  await call(client, "get_room_status", { room_id: "room:room_b_" });
   assert.ok(!ha.calls.some((row) => row.path.includes("system_engine_config")));
-  ha.states.set("sensor.crop_steering_veg_engine_config", {
+  ha.states.set("sensor.crop_steering_room_b_engine_config", {
     state: "configured",
     attributes: { prefix: "", enable_flag: "switch.legacy_engine" },
   });
   error(
-    await call(client, "get_room_status", { room_id: "room:veg_" }),
+    await call(client, "get_room_status", { room_id: "room:room_b_" }),
     /prefix does not match/,
   );
 });
@@ -337,17 +337,17 @@ test("legacy null mappings normalize only inbound, preserve setup, reject new nu
   ha.rooms[1].hardware.waste_switch = null;
   const { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
   const cfg = data(
-    await call(client, "get_room_configuration", { room_id: "room:veg_" }),
+    await call(client, "get_room_configuration", { room_id: "room:room_b_" }),
   );
   assert.equal(cfg.hardware.waste_switch, "");
   const p = await preview(client);
   assert.equal(p.proposed_configuration.hardware.waste_switch, "");
   const applied = data(await apply(client, p));
   assert.equal(applied.verified, true);
-  assert.equal(ha.rooms[1].hardware.pump_switch, "switch.veg_pump");
+  assert.equal(ha.rooms[1].hardware.pump_switch, "switch.room_b_pump");
   error(
     await call(client, "preview_setup", {
-      room_id: "room:veg_",
+      room_id: "room:room_b_",
       changes: { hardware: { waste_switch: null } },
     }),
     /Invalid/,
@@ -368,14 +368,14 @@ test("plumbing layout and the mapping it implies change together, and are read b
   const ha = await mockHa(t),
     { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
   const cfg = data(
-    await call(client, "get_room_configuration", { room_id: "room:veg_" }),
+    await call(client, "get_room_configuration", { room_id: "room:room_b_" }),
   );
   assert.equal(cfg.plumbing, "pump_valves");
   assert.equal(cfg.plumbing_inferred, "pump_valves");
 
   // The room loses its pump: layout and mapping in ONE reviewed proposal.
   const p = data(
-    await setup(client, "room:veg_", {
+    await setup(client, "room:room_b_", {
       plumbing: "valves_only",
       hardware: { pump_switch: "" },
     }),
@@ -383,7 +383,7 @@ test("plumbing layout and the mapping it implies change together, and are read b
   assert.deepEqual(
     p.diff.map((row) => [row.path, row.before, row.after]),
     [
-      ["/hardware/pump_switch", "switch.veg_pump", ""],
+      ["/hardware/pump_switch", "switch.room_b_pump", ""],
       ["/plumbing", "pump_valves", "valves_only"],
     ],
   );
@@ -396,11 +396,11 @@ test("plumbing layout and the mapping it implies change together, and are read b
 
   // ...and gains a pump and a main line again, the other way round.
   const q = data(
-    await setup(client, "room:veg_", {
+    await setup(client, "room:room_b_", {
       plumbing: "pump_mainline_valves",
       hardware: {
-        pump_switch: "switch.veg_pump",
-        main_line_switch: "switch.veg_main_line",
+        pump_switch: "switch.room_b_pump",
+        main_line_switch: "switch.room_b_main_line",
       },
     }),
   );
@@ -417,7 +417,7 @@ test("a mapping that contradicts the declared plumbing is refused at preview, be
     // hardware only: what used to preview cleanly and then fail on apply
     [{ hardware: { pump_switch: "" } }, /no pump switch is mapped/],
     [
-      { hardware: { main_line_switch: "switch.veg_main_line" } },
+      { hardware: { main_line_switch: "switch.room_b_main_line" } },
       /a main-line valve switch is mapped/,
     ],
     // layout only: the same contradiction from the other side
@@ -426,7 +426,7 @@ test("a mapping that contradicts the declared plumbing is refused at preview, be
     [{ plumbing: "gravity" }, /Invalid/],
     [{ plumbing: "" }, /Invalid/], // a declaration cannot be withdrawn, only changed
   ])
-    error(await setup(client, "room:veg_", changes), pattern);
+    error(await setup(client, "room:room_b_", changes), pattern);
   assert.equal(ha.saveCount, 0);
   assert.ok(!ha.calls.some((row) => row.path.includes("/setup_save?")));
 });
@@ -477,7 +477,7 @@ test("an integration from before declared plumbing is still read and saved", asy
     delete r.plumbing_inferred;
   }
   const cfg = data(
-    await call(client, "get_room_configuration", { room_id: "room:veg_" }),
+    await call(client, "get_room_configuration", { room_id: "room:room_b_" }),
   );
   assert.ok(!("plumbing" in cfg));
   const p = await preview(client);

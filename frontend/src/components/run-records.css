@@ -16,6 +16,10 @@
   gap: 6px;
   font-size: var(--text-sm);
 }
+.run-records-field {
+  display: grid;
+  gap: 6px;
+}
 .run-records .run-records-check {
   display: flex;
   flex-direction: row;

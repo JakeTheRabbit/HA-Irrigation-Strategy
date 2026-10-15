@@ -1,6 +1,6 @@
 """The controller's side of the grow-day: a day started late still gets its own budget, the EC rules act
 on settled pore EC, yesterday's EC steer stays in yesterday, and a routine shot only gets what is left of
-the budget. The live cases are F2, 21-22 Sep 2026."""
+the budget. The live cases were observed on a production room, 21-22 Sep 2026."""
 import json
 from datetime import date, datetime, timedelta, timezone
 
@@ -9,6 +9,9 @@ import pytest
 import controller
 import fake_ha
 from crop_steering_engine import Reason
+
+
+pytestmark = pytest.mark.usefixtures("settings_built_in")
 
 FLOW = 42 * 1 * 4 / 3600  # 42 plants x 1 dripper x 4 L/h, in L/s
 
@@ -46,7 +49,7 @@ def rig(monkeypatch, tmp_path):
         "enable_flag": "input_boolean.kill",
     }
     monkeypatch.setattr(controller, "load_options", lambda: options)
-    for name in ("ha_get", "ha_call", "ha_get_all", "ha_set"):
+    for name in ("ha_get", "ha_get_status", "ha_call", "ha_get_all", "ha_set"):
         monkeypatch.setattr(controller, name, getattr(fake, name))
     with monkeypatch.context() as setup:
         setup.setattr(controller.Controller, "_read_state_file", lambda self: {})
@@ -58,7 +61,7 @@ def rig(monkeypatch, tmp_path):
         fake.set_state(eid, "on")
     for eid in ("switch.p", "switch.m", "switch.v1", "switch.v2"):
         fake.set_state(eid, "off")
-    # F2's hydraulics: 42 plants in 6.75 L blocks, one 4 L/h dripper each
+    # a production room's hydraulics: 42 plants in 6.75 L blocks, one 4 L/h dripper each
     for key, value in {"plant_count": 42, "substrate_volume": 6.75,
                        "drippers_per_plant": 1, "dripper_flow_rate": 4}.items():
         fake.set_state(f"number.crop_steering_{key}", str(value))
@@ -176,13 +179,13 @@ def test_the_first_tick_of_the_day_runs_on_the_base_threshold_and_fires_no_watch
     Clock.instant = now = Clock(2026, 9, 23, 10, 0)
     probe(fake, 1, vwc=44, ec=5)
     probe(fake, 2, vwc=55, ec=5)
-    room.state[1].update(phase="P3", ec_offset=4.0, ec_integral=2.0, ec_prev_err=1.0,
+    room.state[1].update(phase="P3", ec_offset=4.0,
                          last_daily_reset=date(2026, 9, 22), last_shot=now - timedelta(hours=12))
     room._was_lights_on = False  # the loop has seen the dark
     pub = c._loop_room(room, now)
     st = room.state[1]
     assert pub[1]["p"].p2_threshold == 45  # the base threshold, not 45 + yesterday's 4
-    assert st["phase"] == "P0" and st["ec_offset"] == 0 and st["ec_integral"] == 0
+    assert st["phase"] == "P0" and st["ec_offset"] == 0
     assert pub[1]["fire"] is False and "WATCHDOG" not in pub[1]["reason"]
 
 

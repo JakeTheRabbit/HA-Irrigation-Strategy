@@ -46,13 +46,13 @@ test("proposal expiry and process-local memory prevent later replay", async (t) 
     writes: true,
   });
   const workspace = new Workspace(client, () => now, 1000);
-  const p = await workspace.previewSetup("room:veg_", { room_name: "Renamed" });
+  const p = await workspace.previewSetup("room:room_b_", { room_name: "Renamed" });
   now = 2000;
   await assert.rejects(
     workspace.apply(p.proposal_token, p.room_id, p.expected_revision),
     /expired/,
   );
-  const q = await workspace.previewSetup("room:veg_", { room_name: "Renamed" });
+  const q = await workspace.previewSetup("room:room_b_", { room_name: "Renamed" });
   await assert.rejects(
     new Workspace(client).apply(
       q.proposal_token,
@@ -73,14 +73,14 @@ test("proposal retention is bounded and expired entries free capacity", async (t
     1000,
   );
   for (let n = 0; n < 20; n++)
-    await workspace.previewSetup("room:veg_", { room_name: "Name " + n });
+    await workspace.previewSetup("room:room_b_", { room_name: "Name " + n });
   await assert.rejects(
-    workspace.previewSetup("room:veg_", { room_name: "Name 21" }),
+    workspace.previewSetup("room:room_b_", { room_name: "Name 21" }),
     /Twenty proposals/,
   );
   now = 2000;
   assert.ok(
-    (await workspace.previewSetup("room:veg_", { room_name: "Fresh" }))
+    (await workspace.previewSetup("room:room_b_", { room_name: "Fresh" }))
       .proposal_token,
   );
 });

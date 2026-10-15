@@ -1,5 +1,15 @@
 import { useState } from "react";
-import { Check, Droplets, LoaderCircle, Moon, Sprout, Sun, Monitor } from "lucide-react";
+import {
+  Check,
+  Droplets,
+  EyeOff,
+  LoaderCircle,
+  Moon,
+  Sprout,
+  Sun,
+  Monitor,
+  Telescope,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,6 +22,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Heading, ReviewDialog, Status } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
+import { UI_COPY } from "@/lib/ste-copy";
 import { Pill, type PillTone } from "@/components/mini-visuals";
 import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
@@ -26,7 +38,7 @@ import "./settings.css";
 const CONNECTION: Record<Controller["connection"], { label: string; tone: PillTone }> = {
   live: { label: "Connected", tone: "on" },
   demo: { label: "Demo mode", tone: "warn" },
-  connecting: { label: "Connecting…", tone: "warn" },
+  connecting: { label: "Connection pending", tone: "warn" },
   offline: { label: "Offline", tone: "off" },
 };
 
@@ -57,6 +69,22 @@ export function Settings({
       setWaterError(errorText(error));
     } finally {
       setWaterBusy(false);
+    }
+  }
+  const predictions = controller.room.notifyPredictions;
+  const [predictBusy, setPredictBusy] = useState(false);
+  const [predictError, setPredictError] = useState("");
+  async function choosePredictions(include: boolean) {
+    if (!predictions.entityId || predictions.enabled === include) return;
+    setPredictBusy(true);
+    setPredictError("");
+    try {
+      const result = await controller.write([{ entityId: predictions.entityId, value: include }]);
+      if (result.failed.length) setPredictError(result.failed.map((f) => f.reason).join(" "));
+    } catch (error) {
+      setPredictError(errorText(error));
+    } finally {
+      setPredictBusy(false);
     }
   }
   const [base, setBase] = useState("");
@@ -99,7 +127,10 @@ export function Settings({
           </div>
           <form onSubmit={connect} className="connection-form">
             <div>
-              <Label htmlFor="ha-url">Home Assistant URL</Label>
+              <span className="label-with-tip">
+                <Label htmlFor="ha-url">Home Assistant URL</Label>
+                <UiTip copyKey="home assistant url" />
+              </span>
               <Input
                 id="ha-url"
                 type="url"
@@ -112,12 +143,15 @@ export function Settings({
               </p>
             </div>
             <div>
-              <Label htmlFor="ha-token">Long-lived access token</Label>
+              <span className="label-with-tip">
+                <Label htmlFor="ha-token">Long-lived access token</Label>
+                <UiTip copyKey="long-lived access token" />
+              </span>
               <Input
                 id="ha-token"
                 type="password"
                 autoComplete="off"
-                placeholder="Paste token for this tab"
+                placeholder="Token for this tab"
                 value={token}
                 onChange={(e) => setToken(e.target.value)}
               />
@@ -165,29 +199,33 @@ export function Settings({
         {controller.room.roomActiveEntity && (
           <section className="panel settings-section">
             <div className="settings-label">
-              <h2>Room on / off</h2>
+              <h2>
+                Room on or off <UiTip copyKey="room on / off" />
+              </h2>
               <p>
-                Switch {controller.room.room.name} off when nothing is growing in it, and on again
-                when the next crop goes in.
+                Set {controller.room.room.name} to off when no plants are in it. Set it to on again
+                for the next crop.
               </p>
             </div>
             <div>
               <RoomPower controller={controller} />
               <p className="small muted mt-3">
-                Off: the controller will not water this room and raises no alerts for it, and a shot
-                already running stops within a few seconds. On within a day: it carries on where it
-                was. On after longer: daily counters and learned phase state reset for a fresh run.
-                This is not an emergency stop.
+                Off: the controller does not water this room and sends no alerts for it. A shot that
+                runs stops within a few seconds. On within one day: the room continues from where it
+                stopped. On after more than one day: the counters and the phase data reset. This is
+                not an emergency stop.
               </p>
             </div>
           </section>
         )}
         <section className="panel settings-section">
           <div className="settings-label">
-            <h2>Watering</h2>
+            <h2>
+              Watering <UiTip copyKey="watering" />
+            </h2>
             <p>
-              Lets the controller water {controller.room.room.name}. This is the room’s engine
-              switch
+              Lets the controller water {controller.room.room.name}. This is the kill switch of the
+              room
               {controller.room.engine.entityId ? ` (${controller.room.engine.entityId})` : ""}.
             </p>
           </div>
@@ -216,18 +254,18 @@ export function Settings({
               </Button>
             </div>
             <p className="small muted mt-3">
-              Off: the controller opens no valve in this room, and a shot already running stops
-              within a few seconds. It keeps reading the probes and following the phases. A new room
-              starts with watering off, so nothing is watered before its hardware has been checked.
-              This is not an emergency stop.
+              Off: the controller opens no valve in this room, and a shot that runs stops within a
+              few seconds. The controller continues to read the probes and to follow the phases. A
+              new room starts with the kill switch at off, so no water flows before you examine its
+              hardware. This is not an emergency stop.
             </p>
             {controller.room.zones.length > 0 && (
               <div className="settings-zones">
-                <h3>Every zone’s scheduling</h3>
+                <h3>All zone switches</h3>
                 <AllZonesSwitch controller={controller} />
                 <p className="small muted">
-                  Pause or switch on every zone of {controller.room.room.name} at once, through a
-                  review. Each zone also has its own switch on its page.
+                  Pause or start all the zones of {controller.room.room.name} at one time. The
+                  dashboard shows a review first. Each zone also has its own switch on its page.
                 </p>
               </div>
             )}
@@ -235,7 +273,9 @@ export function Settings({
         </section>
         <section className="panel settings-section">
           <div className="settings-label">
-            <h2>Run records</h2>
+            <h2>
+              Run records <UiTip copyKey="run records" />
+            </h2>
             <p>
               Each crop in {controller.room.room.name}, from its start date: what History › Compare
               runs lines up by grow week.
@@ -255,9 +295,9 @@ export function Settings({
             </p>
           </div>
           <div className="appearance-options">
-            <div className="theme-options" aria-label="Appearance preference">
+            <div className="theme-options" aria-label="Theme">
               {[
-                { value: "auto", label: "Home Assistant / system", icon: Monitor },
+                { value: "auto", label: "Home Assistant or system", icon: Monitor },
                 { value: "light", label: "Light", icon: Sun },
                 { value: "dark", label: "Dark", icon: Moon },
               ].map((option) => (
@@ -274,7 +314,10 @@ export function Settings({
               ))}
             </div>
             <div>
-              <h3 id="water-view-label">Water today, shown as</h3>
+              <div className="label-with-tip">
+                <h3 id="water-view-label">Water today display</h3>
+                <UiTip copyKey="water today, shown as" />
+              </div>
               <div
                 className="theme-options water-view-options"
                 role="group"
@@ -283,7 +326,7 @@ export function Settings({
                 {(
                   [
                     { value: "zone", label: "Zone total", icon: Droplets },
-                    { value: "plant", label: "Per plant", icon: Sprout },
+                    { value: "plant", label: "For each plant", icon: Sprout },
                   ] as const
                 ).map((option) => (
                   <button
@@ -317,6 +360,57 @@ export function Settings({
                 way; water use over the grow stays in litres per zone.
               </p>
             </div>
+          </div>
+        </section>
+        <section className="panel settings-section">
+          <div className="settings-label">
+            <h2>Notifications</h2>
+            <p>The controller&rsquo;s vitals report, for {controller.room.room.name}.</p>
+          </div>
+          <div>
+            <div className="label-with-tip">
+              <h3 id="predictions-label">Next action of each zone</h3>
+              <UiTip copyKey="include what each zone does next" />
+            </div>
+            <div
+              className="theme-options water-view-options"
+              role="group"
+              aria-labelledby="predictions-label"
+            >
+              {(
+                [
+                  { value: true, label: "Included", icon: Telescope },
+                  { value: false, label: "Not included", icon: EyeOff },
+                ] as const
+              ).map((option) => (
+                <button
+                  key={option.label}
+                  className={predictions.enabled === option.value ? "chosen" : ""}
+                  aria-pressed={predictions.enabled === option.value}
+                  disabled={
+                    !predictions.entityId ||
+                    predictions.enabled === null ||
+                    predictBusy ||
+                    !["live", "demo"].includes(controller.connection)
+                  }
+                  onClick={() => void choosePredictions(option.value)}
+                >
+                  <option.icon size={20} />
+                  <span>{option.label}</span>
+                  {predictions.enabled === option.value && <Check size={16} />}
+                </button>
+              ))}
+            </div>
+            {predictError && (
+              <p className="small error-text" role="alert">
+                {predictError}
+              </p>
+            )}
+            <p className="small muted mt-3">
+              {predictions.entityId
+                ? "Under each zone, what the controller will do next, as the zone’s Next: line says it: for example “shot when VWC < 61% (now 58%) · P3 by 22:00”. Which phones get the report is ticked under Notifications (Vitals)."
+                : "This needs the updated Crop Steering integration. Until then the controller includes them."}
+            </p>
           </div>
         </section>
         <section className="panel settings-section">
@@ -376,7 +470,7 @@ export function Settings({
         open={review}
         onOpenChange={setReview}
         controller={controller}
-        title="Review watering"
+        title="Review the kill switch"
         items={
           controller.room.engine.entityId
             ? [
@@ -392,7 +486,9 @@ export function Settings({
               ]
             : []
         }
-        note="Switching watering off also stops a running shot within a few seconds. It is not an emergency stop: use the installation's physical shut-off for that."
+        note={UI_COPY["review watering"].impact}
+        warning={UI_COPY["review watering"].warning}
+        caution={UI_COPY["review watering"].caution}
       />
     </>
   );

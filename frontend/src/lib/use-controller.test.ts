@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ControllerStore } from "./use-controller";
-import { HaClient } from "./client";
+import { HaClient, haTimeZone } from "./client";
+import { viewerTimeZone } from "./comparison";
 import { createDemo } from "./demo";
 import type { States } from "./types";
 
@@ -150,11 +151,11 @@ describe("controller lifecycle", () => {
     await store.connect("http://example.test", "test");
     read.mockReturnValueOnce(pending.promise).mockResolvedValue(states);
     const oldRefresh = store.refresh();
-    store.changeRoom("room:f1_");
+    store.changeRoom("room:room_b_");
     pending.resolve({});
     await oldRefresh;
     await Promise.resolve();
-    expect(store.getSnapshot().roomId).toBe("room:f1_");
+    expect(store.getSnapshot().roomId).toBe("room:room_b_");
     expect(store.getSnapshot().rooms).toHaveLength(2);
     store.disconnect();
   });
@@ -169,12 +170,12 @@ describe("controller lifecycle", () => {
       field.entityId,
     ]);
     const originalOther =
-      store.getSnapshot().states["number.crop_steering_f1_zone_1_p1_target_vwc"].state;
-    store.changeRoom("room:f1_");
-    expect(store.getSnapshot().states["number.crop_steering_f1_zone_1_p1_target_vwc"].state).toBe(
-      originalOther,
-    );
-    const series = await store.history(["sensor.crop_steering_f1_vwc_zone_1"], 24);
+      store.getSnapshot().states["number.crop_steering_room_b_zone_1_p1_target_vwc"].state;
+    store.changeRoom("room:room_b_");
+    expect(
+      store.getSnapshot().states["number.crop_steering_room_b_zone_1_p1_target_vwc"].state,
+    ).toBe(originalOther);
+    const series = await store.history(["sensor.crop_steering_room_b_vwc_zone_1"], 24);
     expect(series[0].points.length).toBeGreaterThan(0);
     expect((await store.write([{ entityId: field.entityId, value: 71 }])).failed).toHaveLength(1);
     await expect(store.history(["sensor.crop_steering_vwc_zone_1"], 24)).rejects.toThrow(
@@ -189,12 +190,14 @@ describe("controller lifecycle", () => {
     const [ec, ph] = await store.history(["sensor.demo_tank_ec", "sensor.demo_tank_ph"], 720);
     expect(ec.points.length).toBeGreaterThan(700);
     expect(ph.points.at(-1)!.value).toBeCloseTo(5.66, 2);
-    await expect(store.history(["sensor.demo_f1_tank_ec"], 24)).rejects.toThrow(/selected room/);
-    await expect(store.history(["sensor.demo_tank_ec"], 721)).rejects.toThrow(/720 hours/);
-    store.changeRoom("room:f1_");
-    expect((await store.history(["sensor.demo_f1_tank_ph"], 24))[0].points.length).toBeGreaterThan(
-      0,
+    await expect(store.history(["sensor.demo_room_b_tank_ec"], 24)).rejects.toThrow(
+      /selected room/,
     );
+    await expect(store.history(["sensor.demo_tank_ec"], 721)).rejects.toThrow(/720 hours/);
+    store.changeRoom("room:room_b_");
+    expect(
+      (await store.history(["sensor.demo_room_b_tank_ph"], 24))[0].points.length,
+    ).toBeGreaterThan(0);
   });
   it("reads a long history one day per request and joins the days in order", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -261,10 +264,10 @@ describe("controller lifecycle", () => {
     const store = new ControllerStore(false);
     await store.connect("http://example.test", "test");
     const first = store.history(["sensor.demo_tank_ec"], 720);
-    store.changeRoom("room:f1_");
+    store.changeRoom("room:room_b_");
     await expect(first).rejects.toThrow(/cancelled/);
     const caller = new AbortController();
-    const second = store.history(["sensor.demo_f1_tank_ec"], 720, caller.signal);
+    const second = store.history(["sensor.demo_room_b_tank_ec"], 720, caller.signal);
     caller.abort();
     await expect(second).rejects.toThrow(/cancelled/);
     expect(seen.map((signal) => signal.aborted)).toEqual([true, true]);
@@ -317,5 +320,77 @@ describe("controller lifecycle", () => {
       { state: "on", time: Date.parse("2026-09-23T00:01:00Z") },
     ]);
     expect(rows["sensor.crop_steering_current_decision"][1].attributes).toEqual({ a: 1 });
+  });
+});
+
+describe("Home Assistant's time zone", () => {
+  const elsewhere = () =>
+    viewerTimeZone() === "Pacific/Auckland" ? "Europe/Berlin" : "Pacific/Auckland";
+  it("is read from the Home Assistant page the dashboard runs in", async () => {
+    browser();
+    const session = {
+      callApi: vi.fn(),
+      callService: vi.fn(),
+      config: { time_zone: elsewhere() },
+    };
+    vi.stubGlobal("window", {
+      ...window,
+      document: {
+        querySelector: (name: string) => (name === "home-assistant" ? { hass: session } : null),
+      },
+    });
+    vi.spyOn(HaClient.prototype, "states").mockResolvedValue(createDemo());
+    const store = new ControllerStore(false);
+    await store.connect("http://example.test", "");
+    expect(store.getSnapshot().timeZone).toBe(session.config.time_zone);
+    expect(session.callApi).not.toHaveBeenCalled();
+    expect(haTimeZone({ time_zone: "Nowhere/Unknown" })).toBe(viewerTimeZone());
+    expect(haTimeZone({})).toBe(viewerTimeZone());
+  });
+  it("is asked of Home Assistant once per connection outside it, with the token", async () => {
+    browser();
+    const zone = elsewhere();
+    let configFails = true;
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (new URL(String(input)).pathname !== "/api/config")
+        return new Response(JSON.stringify(Object.values(createDemo())), { status: 200 });
+      if (configFails) return new Response("{}", { status: 500 });
+      return new Response(JSON.stringify({ time_zone: zone }), { status: 200 });
+    });
+    const asked = () => fetch.mock.calls.filter(([input]) => String(input).endsWith("/api/config"));
+    const store = new ControllerStore(false);
+    await store.connect("http://example.test", "test");
+    await vi.waitFor(() => expect(asked()).toHaveLength(1));
+    // Not answered yet: the viewer's own clock, and the next refresh asks again.
+    expect(store.getSnapshot().timeZone).toBe(viewerTimeZone());
+    configFails = false;
+    await store.refresh();
+    await vi.waitFor(() => expect(store.getSnapshot().timeZone).toBe(zone));
+    expect(asked()).toHaveLength(2);
+    expect(asked()[1][1]?.headers).toMatchObject({ Authorization: "Bearer test" });
+    await store.refresh();
+    expect(asked()).toHaveLength(2);
+    store.disconnect();
+  });
+  it("is asked with the Home Assistant login a page on its own origin inherits", async () => {
+    browser();
+    const zone = elsewhere();
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) =>
+        key === "hassTokens" ? JSON.stringify({ access_token: "inherited" }) : null,
+    });
+    const fetch = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const body =
+        new URL(String(input)).pathname === "/api/config"
+          ? { time_zone: zone }
+          : Object.values(createDemo());
+      return new Response(JSON.stringify(body), { status: 200 });
+    });
+    const store = new ControllerStore(false);
+    const stop = store.start();
+    await vi.waitFor(() => expect(store.getSnapshot().timeZone).toBe(zone));
+    const [, init] = fetch.mock.calls.find(([input]) => String(input).endsWith("/api/config"))!;
+    expect(init?.headers).toMatchObject({ Authorization: "Bearer inherited" });
+    stop();
   });
 });

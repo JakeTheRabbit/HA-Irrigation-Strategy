@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UiTip } from "@/components/info-tip";
 import { number } from "@/components/dashboard";
 import { settingWords } from "@/lib/setting-words";
 import type { Controller, Zone } from "@/lib/types";
@@ -49,12 +50,16 @@ export function DailyWaterSummary({
         className="table-scroll"
         tabIndex={0}
         role="region"
-        aria-label="Daily water by zone and per plant"
+        aria-label="Daily water by zone"
       >
         <table className="data-table">
           <thead>
             <tr>
-              <th>Zone</th>
+              <th>
+                <span className="label-with-tip">
+                  Zone <UiTip copyKey="zone" />
+                </span>
+              </th>
               <th>Configured plants</th>
               <th>Zone total · all plants</th>
               <th>Average per plant today</th>
@@ -183,7 +188,10 @@ export function WaterDelivery({
       )}
       <div className="wd-runtime">
         <div className="wd-runtime-input">
-          <Label htmlFor={`${id}-seconds`}>Try a valve-open runtime · seconds</Label>
+          <span className="label-with-tip">
+            <Label htmlFor={`${id}-seconds`}>Example valve-open time · s</Label>
+            <UiTip copyKey="try a valve-open runtime · seconds" />
+          </span>
           <Input
             id={`${id}-seconds`}
             type="number"
@@ -226,7 +234,7 @@ export function WaterDelivery({
           className="table-scroll"
           tabIndex={0}
           role="region"
-          aria-label="Phase shot runtimes and water volumes"
+          aria-label="Phase shot times and volumes"
         >
           <table className="data-table wd-shots">
             <caption>Nominal phase shots from these settings</caption>
@@ -276,7 +284,7 @@ export function WaterDelivery({
         </div>
         <div className="wd-budget">
           <div>
-            <h4>Conditional P1 ramp budget</h4>
+            <h4>Ramp water budget</h4>
             {budget ? (
               <>
                 <p>
@@ -313,7 +321,7 @@ export function WaterDelivery({
             </p>
           </div>
           <div>
-            <h4>Daily budget · all plants</h4>
+            <h4>Daily water limit · zone</h4>
             <strong>{quantity(dailyLimit.value, "L / zone", 2)}</strong>
             <CoreLimitNote limit={dailyLimit} unit="L / zone" />
             <p className="wd-note">

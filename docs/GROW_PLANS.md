@@ -14,13 +14,40 @@ A more vegetative irrigation approach generally keeps water more available; gene
 2. Open **Endpoint profiles**. Review both endpoint columns; duplicate a profile when a zone needs different bounds. A shared profile affects every schedule block referencing it.
 3. In **Schedule & curve**, select a zone row and week. Set its profile and steering slider. Switch to **Days** for exceptions. Editing a range splits existing blocks and preserves surrounding days.
 4. Review the combined planning curve and hydraulic estimates below. The same selected date, zone and interpolated parameters drive both the curve and preview.
-5. Choose **Review & save**. Resolve validation issues, inspect the per-zone preview and save the draft. Export JSON for a portable backup or another draft.
+5. Optionally give the plan a name (beside its status); the AI assistant's plan line shows it instead of the profile in force. Choose **Review & save**. Resolve validation issues, inspect the per-zone preview and save the draft. Export JSON for a portable backup or another draft.
 6. After adding or archiving zones in setup, use **Update zones from setup** in the draft planner. This keeps existing active-zone schedules, removes archived assignments and seeds new zones from current settings. Export the old draft first if you need those assignments. Review and save the reconciled draft. Setup refuses to add or archive zones, or to archive the room, while its plan is armed or running: disarm it first.
 7. **Arm plan** after the controller reports support. Activation happens at the next local lights-on after arming, by the room's lights-on hour at that time. Active plans must be disarmed before editing. Disarm transfers control back to manual setpoints at the next lights-on.
 
-Each new day is applied at lights-on. If it cannot be applied then (Home Assistant restarting, the controller's heartbeat or a probe a few minutes late), the plan keeps the previous day's targets and applies the day at the first minute it can; Settings → Repairs shows *has not moved on to today* with the reason meanwhile.
+Each new day is applied at lights-on. If it cannot be applied then (Home Assistant restarting, the controller's heartbeat a few minutes late), the plan keeps the previous day's targets and applies the day at the first minute it can; Settings → Repairs shows *has not moved on to today* with the reason meanwhile. The plan never waits for a zone's root-zone EC probe: the engine waters a zone without one on moisture alone, with its EC rules paused. A zone whose moisture probe is stale keeps the targets it had while every other zone moves on to the new day, and gets the day as soon as its probe reads again (Repairs names the zone meanwhile). Only a room where no zone's moisture reads, or a plan's first day, waits for every zone.
 
 The calendar supports grow days 1-366 per zone, distinct start dates and complete contiguous schedule ranges. Missing/finished/invalid schedules are visible and hold managed zones rather than inventing targets. A hold stops the plan's steering, never the zone's water safety: the overnight emergency shot, the lights-on watchdog and the minimum daily volume still water a held zone, and Repairs shows *holding irrigation* with the reason. Each room stores its plan in HA persistent storage with optimistic revision checks. Restart recovery uses the stored plan and controller latch.
+
+## How the controller checks the plan is running
+
+The plan is applied when the controller reads its targets, so an active plan's numbers are the ones the engine
+uses. What can still go wrong is that the plan does not move on, does not start, ends, or is quietly ignored. Every
+pass, under every brain (rules included), the controller compares what the plan expects since lights-on with what
+the room is doing, using the integration's own preview of the plan, and says plainly when they differ: one
+**CS-713** card per episode, and a one-line plan headline on the AI assistant panel ("Plan: Bulk · day 17 of 84
+(week 3) · on track"). It checks for:
+
+- today's plan day not in force for a zone (with the targets it changes and why it waits), or an armed plan that
+  did not start;
+- a plan saved and not armed for a whole day after its start dates, and a plan ending within three days;
+- a setting the plan controls changed by hand or by an automation: while the plan runs that change has no effect,
+  and it is **never overwritten**; the card says how to keep it (change the plan's days) or drop it;
+- what comes back when a plan is disarmed, where it differs from today's plan;
+- a steering select that disagrees with the plan's bias (under 40 % or over 60 % generative), lights hours
+  read from somewhere other than the integration, and a grow light mapped in setup that reads on while the hours
+  say off, or the reverse, for 15 minutes away from either edge (the engine follows the hours);
+- a zone that did not start its day at lights-on, did not stop at lights-off, or stayed in its morning dryback past
+  its maximum wait (each should never happen: please send the controller log), and a ramp that runs very long.
+
+Under the Claude Haiku brain the assistant may pick which suggestion the line shows. When today's plan day is held by a stale probe, it is also asked whether that probe matters for watering today: only on a firm *no*, and only once the envelope's rules all pass (lights on and away from lights-off, no shot running, fresh readings elsewhere, once a day), the controller applies today's plan values, the plan's own, until the plan applies the day itself or the next lights-on. The plan, its revision and every setting are left as they are, and a CS-713 card says so. Turn it off by leaving `plan` out of `jev_judges`, or try it with `brain_dry_run`.
+
+Nothing is checked in a room that is off, in the first 10 minutes after a start, or on plan data older than
+six hours. A plan with the same lights-on and lights-off hour has no lights-on edge, so the checks that wait for one
+are skipped.
 
 ## Read the combined graph
 

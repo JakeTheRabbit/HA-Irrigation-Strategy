@@ -62,7 +62,7 @@ def test_a_wizard_made_room_whose_operator_set_the_option_is_still_told(hours):
     """Somebody typed those hours. The engine is about to use different ones: say so."""
     options = {**SHIPPED, "lights_on_hour": hours[0], "lights_off_hour": hours[1]}
     (alert,) = _lights_alerts(_room(1), options)
-    assert "lights on at 7:00 and off at 20:00" in alert["message"]
+    assert "lights-on at 7:00 and lights-off at 20:00" in alert["message"]
     assert f"still says {hours[0]}:00-{hours[1]}:00" in alert["message"]
 
 

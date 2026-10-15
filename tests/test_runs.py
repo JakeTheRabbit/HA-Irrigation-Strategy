@@ -228,11 +228,11 @@ def test_archive_restore_and_room_bound_import():
             )
             assert result["runs"][0]["archived"] is value
         wrong = deepcopy(record)
-        wrong["room_id"] = "room:f2_"
+        wrong["room_id"] = "room:room_b_"
         with pytest.raises(ValueError, match="another room"):
             await store.mutate("runs_import", {"expected_revision": 3, "runs": [wrong]})
         wrong = deepcopy(record)
-        wrong["zones"][0]["vwc_sensor"] = "sensor.crop_steering_f2_vwc_zone_1"
+        wrong["zones"][0]["vwc_sensor"] = "sensor.crop_steering_room_b_vwc_zone_1"
         with pytest.raises(ValueError, match="not registered"):
             await store.mutate("runs_import", {"expected_revision": 3, "runs": [wrong]})
         assert store.document["revision"] == 3
@@ -282,7 +282,7 @@ def test_corrupt_store_is_readonly_and_unknown_or_ambiguous_room_rejected():
             await store.mutate("runs_save", {"expected_revision": 0, "record": raw()})
         store.hass.data["crop_steering"]["_runs"] = {"one": store}
         assert resolve_runs(store.hass, "room:") is store
-        for room in ["", "default", "room:f2_"]:
+        for room in ["", "default", "room:room_b_"]:
             with pytest.raises(ValueError):
                 resolve_runs(store.hass, room)
         store.hass.data["crop_steering"]["_runs"]["two"] = store

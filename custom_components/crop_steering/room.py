@@ -1,14 +1,17 @@
 """Multi-room helpers.
 
-Each config entry is a *room*. The first/default room uses **no** entity prefix, so existing
-single-room installs are completely unchanged. Additional rooms namespace their
-entities as ``crop_steering_<slug>_*`` so rooms are fully isolated — own zones, sensors,
-hardware and setpoints, nothing shared.
+Each config entry is a *room*. Every room namespaces its entities as
+``crop_steering_<slug>_*`` so rooms are fully isolated — own zones, sensors, hardware and
+setpoints, nothing shared. Only a room created before every new room got a slug, or imported
+from a .env file (the default room), keeps **no** entity prefix, so those installs are
+completely unchanged.
 """
 
 from __future__ import annotations
 
 import re
+
+from .const import DOMAIN, LEGACY_KILL_SWITCH
 
 
 def slugify_room(name: str) -> str:
@@ -27,6 +30,49 @@ def room_prefix(entry) -> str:
         return entry.data.get("room_prefix", "") or ""
     except Exception:  # pragma: no cover - defensive
         return ""
+
+
+def default_gate(prefix: str) -> str:
+    """The kill switch a room of this kind has when nothing names another: a named room its own
+    Engine Enabled switch, the default room the legacy helper."""
+    return f"switch.{DOMAIN}_{prefix}engine_enabled" if prefix else LEGACY_KILL_SWITCH
+
+
+def resolve_gate(hass, prefix: str, setup=None) -> tuple[str, bool]:
+    """The kill switch this room's controller stops on -> (entity id, reported by the controller).
+
+    The one rule the integration uses (health checks, setup, the setup API). Best source: the
+    running controller, which names its gate on the room's heartbeat; that covers a custom add-on
+    ``enable_flag`` option. Then the room's published setup (its engine_config descriptor), then
+    the room kind's default.
+
+    Except while the controller is BEHIND: its heartbeat reports an older ``setup_revision`` than
+    the room publishes. It then holds every zone until it adopts the new setup, and adopting moves
+    it to the descriptor's flag, so the flag it names is the one being left behind. That is every
+    first install where the controller app was started before the integration was set up: the
+    app's shipped option names the legacy helper, which a fresh install never creates.
+
+    ``setup`` is a setup the caller holds rather than the one Home Assistant publishes (the setup
+    API judging a save): its flag stands in for the descriptor's, and it has no published revision
+    for the heartbeat to be behind.
+    """
+    hb = hass.states.get(f"sensor.{DOMAIN}_{prefix}ai_heartbeat")
+    beat = (getattr(hb, "attributes", {}) or {}) if hb is not None else {}
+    if setup is None:
+        desc = hass.states.get(f"sensor.{DOMAIN}_{prefix}engine_config")
+        published = (getattr(desc, "attributes", {}) or {}) if desc is not None else {}
+    else:
+        published = {"enable_flag": setup.get("enable_flag")}
+    have, want = beat.get("setup_revision"), published.get("setup_revision")
+    behind = type(have) is int and type(want) is int and want > have
+    if beat.get("enable_flag") and not (behind and published.get("enable_flag")):
+        return beat["enable_flag"], True
+    return published.get("enable_flag") or default_gate(prefix), False
+
+
+def room_gate(hass, prefix: str, setup=None) -> str:
+    """The kill switch this room's controller stops on (see resolve_gate)."""
+    return resolve_gate(hass, prefix, setup)[0]
 
 
 def zone_device_name(entry, zone_num) -> str:
@@ -83,15 +129,17 @@ def build_engine_config(
     setup=None,
     integration_version=None,
     entry_id=None,
+    substrate=None,
 ):
     """PURE. The room descriptor the f2-control add-on reads from
     ``sensor.crop_steering_<prefix>engine_config`` to DISCOVER and drive an additional room
     (the add-on can't read the config entry directly). Maps each zone's valve switch, the
     shared pump/mainline, the per-room kill switch, and the optional source-water probes.
 
-    The default room (prefix "") publishes ``input_boolean.f2_control_enabled`` as its
-    kill switch (the add-on's ``enable_flag`` option overrides it; the engine's heartbeat
-    reports the flag actually in use). Since add-on 0.11.0 the default room's hardware map
+    The default room (prefix "") publishes the legacy helper (``LEGACY_KILL_SWITCH``) as its
+    kill switch unless its setup names one (the add-on's ``enable_flag`` option overrides it
+    until a revisioned setup is adopted; the engine's heartbeat reports the flag actually in
+    use, see ``room_gate``). Since add-on 0.11.0 the default room's hardware map
     is read from this descriptor too — explicit add-on options take precedence. A named
     room publishes its own ``switch.crop_steering_<slug>_engine_enabled``.
     """
@@ -102,19 +150,28 @@ def build_engine_config(
         sw = cfg.get("zone_switch", "")
         if sw:
             valves[z] = sw
-    enable_flag = (
-        "input_boolean.f2_control_enabled"
-        if prefix == ""
-        else f"switch.crop_steering_{prefix}engine_enabled"
-    )
+    enable_flag = default_gate(prefix)
     hw = hardware or {}
     setup = setup or {}
     # Only when DECLARED. A room that never declared its plumbing publishes byte-for-byte the
     # descriptor it always did, so the controller's saved setup fingerprint still matches and an
     # update does not strand the room behind a disarm cycle.
     declared = {"plumbing": setup["plumbing"]} if setup.get("plumbing") else {}
+    # The tank level, likewise only when mapped: a distance sensor and/or a low float, and how the
+    # controller turns them into a level (full and empty distances, the float's low state).
+    declared.update(
+        {k: hw[k] for k in ("tank_distance_sensor", "tank_low_float") if hw.get(k)}
+    )
+    # The room's light, likewise only when mapped: the controller checks it against the lights hours.
+    declared.update(
+        {"light_entity": hw["light_entity"]} if hw.get("light_entity") else {}
+    )
+    if setup.get("tank_level") and (
+        hw.get("tank_distance_sensor") or hw.get("tank_low_float")
+    ):
+        declared["tank_level"] = setup["tank_level"]
     # Which integration Home Assistant actually loaded, for the dashboard's sidebar and for pairing
-    # diagnostics. Passed in (this module stays import-free so it can be loaded on its own). The
+    # diagnostics. Passed in (this module reads nothing from Home Assistant itself). The
     # controller's setup fingerprint reads named keys only, so this does not disturb a
     # restart-resume (addons/f2_control/tests/test_versions.py pins that).
     versions = (
@@ -125,10 +182,15 @@ def build_engine_config(
     # it from the room it already adopted, and goes on driving the old map. Like the version, it
     # is not one of the keys the setup fingerprint reads.
     which = {"entry_id": entry_id} if entry_id else {}
+    # What the room grows in (its substrate select), passed in like the version. The controller
+    # reads it with "generic" as the default and adopts it with no disarm cycle: it is not one of
+    # the keys the setup fingerprint reads.
+    grown_in = {"substrate": substrate} if substrate else {}
     return {
         **declared,
         **versions,
         **which,
+        **grown_in,
         "setup_api_version": 1,
         "setup_revision": setup.get("setup_revision", 0),
         "active": setup.get("active", True),

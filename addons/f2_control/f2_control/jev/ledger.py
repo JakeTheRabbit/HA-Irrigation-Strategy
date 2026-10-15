@@ -1,4 +1,5 @@
-"""Every verdict Jev acted on, what code did, and how it turned out.
+"""Every verdict Jev acted on, what code did, and how it turned out, and each setpoint move code refused
+(action "refused": it starts the notch budget's cool-down, envelope.notch_budget).
 
 Entries go to a JSON-lines file in /data (it survives restarts and Rebuilds, like state.json). An entry
 that names an `outcome` check is revisited once its time comes; the check's result is written back. A
@@ -54,11 +55,13 @@ class Ledger:
             return [e for e in self.entries if e.get("check_at") and e.get("outcome") is None
                     and datetime.fromisoformat(e["check_at"]) <= now]
 
-    def resolve(self, entry_id, outcome, good):
+    def resolve(self, entry_id, outcome, good, at=None):
+        """Write a check's result back. `at` is when it was known (older entries have none: read check_at)."""
         with self._lock:
             for e in self.entries:
                 if e["id"] == entry_id:
-                    e["outcome"] = {"what": outcome, "good": bool(good)}
+                    e["outcome"] = {"what": outcome, "good": bool(good),
+                                    "at": (at or datetime.now()).isoformat(timespec="seconds")}
             self._trim_and_save()
 
     def track(self, judge, room, zone, label=None, last=3):

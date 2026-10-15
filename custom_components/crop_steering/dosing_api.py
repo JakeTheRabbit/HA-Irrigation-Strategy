@@ -6,13 +6,17 @@ any signed-in user, and so is a stop; saving the setup and asking for a dose or 
 administrator. Nothing here switches, presses or sets any hardware: the room's setup and its one
 request are published as sensor.crop_steering_<prefix>dosing_config, and the controller app, which
 reads that every 2 s, does the work and reports it as sensor.crop_steering_<prefix>dosing.
+
+The sensor's batch carries the recipe in use today (dosing.in_use: the feed schedule's week, a
+recipe picked by hand, else the batch's own), and is written again at Home Assistant's midnight, so
+the week moves on by itself.
 """
 
 from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 import uuid
 
 from . import dosing
@@ -28,6 +32,13 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+def _today() -> date:
+    """Today in Home Assistant's time zone: the feed schedule's day."""
+    from homeassistant.util import dt as dt_util
+
+    return dt_util.now().date()
+
+
 def _valid(value) -> dict:
     """A stored document, checked as strictly as a save except that its entities need not exist
     yet (a device that has not come back since Home Assistant started); anything else is refused.
@@ -39,6 +50,9 @@ def _valid(value) -> dict:
     data["pumps"], data["batch"] = dosing.clean(
         value.get("pumps", []), value.get("batch")
     )
+    data["feed"] = dosing.clean_feed(value.get("feed"), data["pumps"])
+    # A setup stored before the hardware profile has none: it takes the defaults, today's timings.
+    data["profile"] = dosing.clean_profile(value.get("profile"))
     request = value.get("request")
     data["request"] = (
         request if isinstance(request, dict) and request.get("id") else None
@@ -80,6 +94,19 @@ class DosingStore:
                 f"{error}"
             )
 
+    def start(self):
+        """Write the sensor again at each of Home Assistant's midnights, when the feed schedule's
+        week may move on. Returns the unsubscribe."""
+        from homeassistant.core import callback
+        from homeassistant.helpers.dispatcher import async_dispatcher_send
+        from homeassistant.helpers.event import async_track_time_change
+
+        @callback
+        def midnight(_now):
+            async_dispatcher_send(self.hass, f"{SIGNAL}_{self.entry.entry_id}")
+
+        return async_track_time_change(self.hass, midnight, hour=0, minute=0, second=0)
+
     def pending(self) -> bool:
         """Whether the stored request still waits for the controller (dosing.pending): it reads the
         request id the controller last published as handled."""
@@ -116,6 +143,7 @@ class DosingStore:
             "schema_version": 1,
             "room_id": self.room_id,
             "config": deepcopy(self.data),
+            "feed_now": dosing.feed_now(self.data["feed"], _today()),
             "candidates": self.candidates(),
             "can_edit": can_edit,
             "error": error or self.error,
@@ -123,15 +151,25 @@ class DosingStore:
 
     def sensor(self) -> tuple:
         """sensor.crop_steering_<prefix>dosing_config as (state, attributes): the setup's revision,
-        and its pumps, batch and request. Unknown while the stored setup cannot be read, so the
+        and its pumps, batch (its recipe the one in use today), hardware profile and request, and `feed`:
+        which recipe that is and why (dosing.feed_now). Unknown while the stored setup cannot be read, so the
         controller acts on nothing it cannot read."""
         if self.error:
             return None, {"error": self.error}
+        batch = deepcopy(self.data["batch"])
+        batch["recipe"] = self.recipe()
         return self.data["revision"], {
             "pumps": deepcopy(self.data["pumps"]),
-            "batch": deepcopy(self.data["batch"]),
+            "batch": batch,
+            "profile": deepcopy(self.data["profile"]),
             "request": deepcopy(self.data["request"]),
+            "feed": dosing.feed_now(self.data["feed"], _today()),
         }
+
+    def recipe(self) -> list[dict]:
+        """The doses of the recipe in use today (dosing.in_use), else the batch's own recipe."""
+        recipe = dosing.in_use(self.data["feed"], _today())
+        return deepcopy(recipe["doses"] if recipe else self.data["batch"]["recipe"])
 
     async def save(self, data, can_edit=False) -> dict:
         async with self._lock:
@@ -141,20 +179,45 @@ class DosingStore:
                 return self.response("revision", can_edit)
             if self.pending() or self.running():
                 return self.response("busy", can_edit)
+            stored = self.data["feed"]
+            # A save without the feed (a dashboard from before it) keeps the stored one.
+            sent = data.get("feed")
+            batch = data.get("batch")
+            if isinstance(batch, dict):
+                # A page from before recipe names, or one that does not send the refill reminder, keeps
+                # the stored ones.
+                kept = {
+                    key: self.data["batch"].get(key)
+                    for key in ("name", *dosing.REMINDER)
+                }
+                batch = {**kept, **batch}
             try:
                 pumps, batch = dosing.clean(
                     data.get("pumps"),
-                    data.get("batch"),
+                    batch,
                     self._exists,
                     self._stock_tanks(),
                 )
+                feed = dosing.clean_feed(
+                    stored if sent is None else sent, pumps, self._exists
+                )
+                # A save that sends no profile keeps the stored one.
+                profile = dosing.clean_profile(
+                    data.get("profile", self.data["profile"])
+                )
             except dosing.DosingError as error:
                 return self.response(str(error), can_edit)
+            if sent is not None and feed["stage"] != stored["stage"]:
+                dosing.pick(feed, feed["stage"], _today())
+            else:  # how long a pick holds is the store's to say, never the caller's
+                feed["held_until"] = stored["held_until"]
             draft = deepcopy(self.data)
             draft.update(
                 revision=self.data["revision"] + 1,
                 pumps=pumps,
                 batch=batch,
+                feed=feed,
+                profile=profile,
                 updated_at=_now().isoformat(),
             )
             await self._commit(draft)
@@ -162,7 +225,8 @@ class DosingStore:
 
     async def request(self, data, by) -> dict:
         """Store one request for the controller. A stop always replaces what is pending; a dose or a
-        batch waits for the one before it to be handled. The setup's revision does not move.
+        batch waits for the one before it to be handled. The setup's revision does not move. A batch
+        run anyway (an administrator's test refill) says so with `run_anyway`.
         """
         async with self._lock:
             if self.error:
@@ -172,7 +236,11 @@ class DosingStore:
                 return {"request": None, "error": "busy"}
             try:
                 pump, ml = dosing.check_request(
-                    self.data, action, data.get("pump"), data.get("ml")
+                    self.data,
+                    action,
+                    data.get("pump"),
+                    data.get("ml"),
+                    data.get("run_anyway", False),
                 )
             except dosing.DosingError as error:
                 return {"request": None, "error": str(error)}
@@ -184,6 +252,8 @@ class DosingStore:
                 "at": _now().isoformat(),
                 "by": by,
             }
+            if data.get("run_anyway"):
+                request["run_anyway"] = True
             draft = deepcopy(self.data)
             draft["request"] = request
             await self._commit(draft)
@@ -249,6 +319,9 @@ async def async_setup_dosing(hass, entry):
     manager = DosingStore(hass, entry)
     await manager.async_init()
     hass.data.setdefault(DOMAIN, {}).setdefault("_dosing", {})[entry.entry_id] = manager
+    unsubscribe = manager.start()
+    if unsubscribe:
+        entry.async_on_unload(unsubscribe)
     # The room's stock tanks, set up before it, follow the pumps linked to them (stock_api.py).
     from homeassistant.helpers.dispatcher import async_dispatcher_send
 
@@ -278,12 +351,15 @@ async def async_setup_dosing(hass, entry):
             vol.Required("expected_revision"): vol.All(int, vol.Range(min=0)),
             vol.Required("pumps"): list,
             vol.Required("batch"): dict,
+            vol.Optional("feed"): dict,
+            vol.Optional("profile"): dict,
         },
         "dosing_request": {
             vol.Required("room_id"): str,
             vol.Required("action"): vol.In(dosing.ACTIONS),
             vol.Optional("pump"): str,
             vol.Optional("ml"): vol.Coerce(float),
+            vol.Optional("run_anyway"): bool,
         },
     }
     for service in SERVICES:

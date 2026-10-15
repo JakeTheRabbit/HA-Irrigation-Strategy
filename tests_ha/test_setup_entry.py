@@ -44,6 +44,31 @@ async def test_the_entry_sets_up_on_a_home_assistant_that_has_no_async_panel_exi
     assert hass.http.async_register_static_paths.await_count == 1
 
 
+async def test_the_dashboard_is_a_custom_panel_on_the_same_url(hass):
+    """Home Assistant draws its own title bar above an iframe panel and none above a custom
+    panel. The page the panel shows is the one the iframe panel showed."""
+    from pathlib import Path
+
+    from custom_components.crop_steering.const import SOFTWARE_VERSION
+
+    entry = await _install(hass)
+    assert entry.state is ConfigEntryState.LOADED
+    panel = hass.data[frontend.DATA_PANELS][PANEL]
+    assert panel.component_name == "custom"
+    assert panel.config["url"] == f"/crop_steering/dashboard.html?v={SOFTWARE_VERSION}"
+    custom = panel.config["_panel_custom"]
+    assert custom["name"] == "crop-steering-panel"
+    assert custom["module_url"] == f"/crop_steering/panel.js?v={SOFTWARE_VERSION}"
+    assert custom["embed_iframe"] is False and custom["trust_external"] is False
+    # Both files are served from the integration's www/, which the panel's static path maps.
+    import custom_components.crop_steering as integration
+
+    www = Path(integration.__file__).parent / "www"
+    assert (www / "panel.js").is_file() and (www / "dashboard.html").is_file()
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    assert PANEL not in hass.data[frontend.DATA_PANELS]
+
+
 async def test_a_home_assistant_that_has_the_helper_is_asked_through_it(
     hass, monkeypatch
 ):
@@ -87,8 +112,8 @@ async def test_the_lights_hours_the_wizard_asked_for_are_the_ones_that_run(hass)
     the grow-day, the P3->P0 reset and the overnight dry-back all ran on the wrong clock."""
     entry = await _install(hass, {"lights_on_hour": 6, "lights_off_hour": 22})
     assert entry.data["parameters"]["lights_on_hour"] == 6
-    assert float(hass.states.get("number.crop_steering_lights_on_hour").state) == 6
-    assert float(hass.states.get("number.crop_steering_lights_off_hour").state) == 22
+    assert float(hass.states.get("number.crop_steering_tent_lights_on_hour").state) == 6
+    assert float(hass.states.get("number.crop_steering_tent_lights_off_hour").state) == 22
 
 
 async def test_the_sizing_the_wizard_accepted_is_a_value_the_entity_can_hold(hass):
@@ -96,8 +121,8 @@ async def test_the_sizing_the_wizard_accepted_is_a_value_the_entity_can_hold(has
     1-6, so a 0.65 L rockwool cube could be set up and then never adjusted."""
     await _install(hass)
     for entity_id, value in (
-        ("number.crop_steering_substrate_volume", 0.65),
-        ("number.crop_steering_drippers_per_plant", 12),
+        ("number.crop_steering_tent_substrate_volume", 0.65),
+        ("number.crop_steering_tent_drippers_per_plant", 12),
     ):
         await hass.services.async_call(
             "number", "set_value", {"entity_id": entity_id, "value": value}, blocking=True

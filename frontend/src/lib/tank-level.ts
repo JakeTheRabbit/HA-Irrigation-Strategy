@@ -9,7 +9,9 @@ import {
   type TimelineRow,
   type TimelineRows,
 } from "./day-timeline";
+import { dosingConfigId } from "./dosing";
 import { descriptor } from "./model";
+import { MINIMUM_PCT, RELEASE_PCT, tankLevelId } from "./reservoir";
 import { fillTime } from "./tank-telemetry";
 import type { RoomView, States } from "./types";
 
@@ -18,12 +20,15 @@ import type { RoomView, States } from "./types";
 
 const HOUR = 3_600_000;
 export const LEVEL_RANGES = [
+  { hours: 12, label: "12 h" },
   { hours: 24, label: "24 h" },
   { hours: 72, label: "3 days" },
   { hours: 168, label: "7 days" },
 ] as const;
+/** The range the chart opens on. */
+export const DEFAULT_LEVEL_HOURS = 24;
 
-/** The room descriptor's keys for the tank and pump mapped in Rooms & setup. */
+/** The room descriptor's keys for the tank and pump mapped in Rooms and setup. */
 export const TANK_KEYS = {
   level: "water_level_sensor",
   pump: "pump",
@@ -78,13 +83,16 @@ export function recordWindows(
   lightsOff: number | null,
   hours: number,
   now: number,
+  timeZone?: string,
 ): Span[] {
-  const lit = growDay(lightsOn, lightsOff, now);
+  const lit = growDay(lightsOn, lightsOff, now, timeZone);
   const schedule = lit ? { on: lightsOn, off: lightsOff } : { on: 0, off: 12 };
-  const today = lit ?? growDay(0, 12, now)!;
+  const today = lit ?? growDay(0, 12, now, timeZone)!;
   const from = now - hours * HOUR;
   const count = Math.max(0, Math.ceil((today.start - from) / (24 * HOUR)) + 1);
-  const earlier = earlierDays(today, count, () => schedule).filter((day) => day.end > from);
+  const earlier = earlierDays(today, count, () => schedule, timeZone).filter(
+    (day) => day.end > from,
+  );
   return [...earlier.reverse(), today].map((day) => ({
     start: day.start,
     end: Math.min(day.end, now),
@@ -211,4 +219,47 @@ export function shotMarks(
     else marks.push({ time: shot.start, level: levelAt(level, shot.start), shots: [shot] });
   }
   return marks;
+}
+
+/** How far apart shots may start and still share a mark: those the chart cannot tell apart at its
+ * width (`pixelMs`, the time one mark covers), and across a week every shot in the same hour. */
+export function shotGap(hours: number, pixelMs: number): number {
+  return hours >= 168 ? Math.max(HOUR, pixelMs) : pixelMs;
+}
+
+export interface LevelLine {
+  key: "minimum" | "remind";
+  value: number;
+  label: string;
+  /** What the line means, for its tooltip and key. */
+  title: string;
+}
+/** The levels drawn across the chart: the controller's reservoir minimum, for a room whose tank
+ * level it reads (sensor.crop_steering_<prefix>tank_level), and the batch tank's refill reminder,
+ * when the dosing setup reads it on the level charted here. */
+export function levelLines(states: States, prefix: string, levelId: string | null): LevelLine[] {
+  const lines: LevelLine[] = [];
+  const tank = states[tankLevelId(prefix)];
+  if (tank) {
+    const set = Number(tank.attributes.minimum_pct);
+    const value = Number.isFinite(set) && set > 0 ? set : MINIMUM_PCT;
+    lines.push({
+      key: "minimum",
+      value,
+      label: `Minimum ${value} %`,
+      title: `Watering is held at ${value} % on the controller's tank level, until it reads ${RELEASE_PCT} %`,
+    });
+  }
+  const batch = states[dosingConfigId(prefix)]?.attributes.batch;
+  const reminder =
+    batch && typeof batch === "object" ? (batch as Record<string, unknown>) : undefined;
+  const remind = Number(reminder?.remind_pct);
+  if (levelId && reminder?.level_entity === levelId && remind > 0 && remind <= 100)
+    lines.push({
+      key: "remind",
+      value: remind,
+      label: `Refill reminder ${remind} %`,
+      title: `A person is reminded to refill the tank at ${remind} %`,
+    });
+  return lines;
 }

@@ -23,13 +23,14 @@ export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
   equipment: [
     { page: "equipment/probes", label: "Probes" },
     { page: "equipment/stock", label: "Stock tanks" },
-    { page: "equipment/tank", label: "Tank & pump" },
+    { page: "equipment/feed", label: "Tank and feed" },
     { page: "equipment/dosing", label: "Dosing" },
     { page: "equipment/setup", label: "Setup" },
   ],
   settings: [
     { page: "settings", label: "Settings" },
     { page: "settings/notifications", label: "Notifications" },
+    { page: "settings/ai", label: "AI assistant" },
     { page: "help", label: "Help" },
   ],
 };
@@ -37,6 +38,7 @@ export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
 export function pageLabel(page: Page): string {
   if (page === "today") return "Today";
   if (page === "zone") return "Zone";
+  if (page === "today/ai") return "AI assistant";
   return TABS[sectionOf(page)]?.find((tab) => tab.page === page)?.label ?? SECTION_LABELS.today;
 }
 

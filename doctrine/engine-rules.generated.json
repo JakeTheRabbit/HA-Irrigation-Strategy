@@ -1,0 +1,370 @@
+{
+  "constants": {
+    "EC_SETTLE_MIN": 45.0,
+    "P1_RISE_PTS": 0.5,
+    "p2_min_interval_min_default": 10.0,
+    "watchdog_hours_default": 3.0,
+    "drown_ceiling_default": 90.0,
+    "min_floor_finish_h_default": 3.0
+  },
+  "cap_exempt": {
+    "flush_high_ec": true,
+    "p0_ec_flush": false,
+    "p1_ramp": true,
+    "p1_extra": false,
+    "p1_flush": false,
+    "p2_rescue": true,
+    "p2_dilute": false,
+    "p2_topup": false,
+    "p3_emergency": true,
+    "p3_hold": false,
+    "watchdog": true,
+    "min_daily": false
+  },
+  "param_bounds": {
+    "p1_target": [
+      20.0,
+      100.0
+    ],
+    "p2_threshold": [
+      10.0,
+      100.0
+    ],
+    "ec_target_p0": [
+      0.5,
+      9.0
+    ],
+    "ec_target_p1": [
+      0.5,
+      9.0
+    ],
+    "ec_target_p2": [
+      0.5,
+      9.0
+    ],
+    "dryback_target": [
+      2.0,
+      60.0
+    ],
+    "p3_emergency_floor": [
+      10.0,
+      65.0
+    ],
+    "field_capacity": [
+      40.0,
+      100.0
+    ],
+    "max_ec": [
+      3.0,
+      15.0
+    ],
+    "watchdog_hours": [
+      0.0,
+      12.0
+    ],
+    "p2_shot_size": [
+      0.5,
+      20.0
+    ],
+    "p1_initial": [
+      0.5,
+      15.0
+    ],
+    "p1_incr": [
+      0.0,
+      5.0
+    ],
+    "p1_max_shots": [
+      1.0,
+      40.0
+    ],
+    "p1_time_between_min": [
+      1.0,
+      120.0
+    ],
+    "p0_max_wait_min": [
+      5.0,
+      240.0
+    ],
+    "p3_emergency_shot": [
+      0.5,
+      15.0
+    ],
+    "max_daily_volume": [
+      10.0,
+      2000.0
+    ],
+    "min_daily_volume": [
+      0.0,
+      500.0
+    ],
+    "drown_ceiling": [
+      50.0,
+      100.0
+    ],
+    "min_floor_finish_h": [
+      0.0,
+      12.0
+    ],
+    "p1_rise_pts": [
+      0.1,
+      5.0
+    ],
+    "p1_max_extra_shots": [
+      1.0,
+      10.0
+    ],
+    "p0_additional_dryback": [
+      0.0,
+      40.0
+    ],
+    "p2_time_between_min": [
+      0.0,
+      120.0
+    ],
+    "p2_min_interval_min": [
+      1.0,
+      120.0
+    ]
+  },
+  "ec_adjust": "ec_adjust multiplies a shot by pore EC / target: ratio 0.4 -> x0.5; ratio 0.6 -> x0.7; ratio 0.9 -> x1; ratio 1.1 -> x1.2; ratio 1.3 -> x1.5; ratio 1.6 -> x2 (thresholds: >1.5 x2.0, >1.2 x1.5, >1.0 x1.2, <0.8 x0.7, <0.5 x0.5, else x1).",
+  "decide_rules": [
+    {
+      "id": "PH-1",
+      "text": "Lights-off forces any phase other than P3 to P3; nothing strands mid-cycle overnight.",
+      "verified": true
+    },
+    {
+      "id": "PH-2",
+      "text": "P3 returns to P0 on the lights-on edge, or on the first tick of a new grow-day if the edge was missed.",
+      "verified": true
+    },
+    {
+      "id": "PH-3",
+      "text": "A zone still in P1 or P2 when a new grow-day begins resets to P0 with fresh counters and budget.",
+      "verified": true
+    },
+    {
+      "id": "PH-4",
+      "text": "P0 ends at the first of: VWC at or below the P2 threshold (bypass), relative dryback at or above dryback_target, or p0_max_wait_min elapsed.",
+      "verified": true
+    },
+    {
+      "id": "PH-5",
+      "text": "P1 ends at p1_max_shots, or once the zone has read at or above min(p1_target, field_capacity), at least p1_min_shots have landed, one extra shot has fired, the shot interval has passed and that shot raised the day's peak by less than 0.5 points.",
+      "verified": true
+    },
+    {
+      "id": "PH-6",
+      "text": "P1 has no time-based exit and is not held open by high pore EC: a gate-blocked ramp waits in P1 and resumes.",
+      "verified": true
+    },
+    {
+      "id": "PH-7",
+      "text": "Predictive P3: in the last 3 h before lights-off (after 10 min uptime, VWC at or above the rescue floor), P2 hands over early when the points still needed to reach dryback_target from the day's peak, at the measured drying rate (0.1 points/h if unknown), would take at least the hours left until lights-on (and no more than 12 h).",
+      "verified": true
+    },
+    {
+      "id": "PH-8",
+      "text": "dryback_target changes nothing else: in P1, in P2 more than 3 h before lights-off and in P3, the same readings give the same phase and the same shot whatever its value. It never sets the overnight dryback.",
+      "verified": true
+    },
+    {
+      "id": "PH-9",
+      "text": "With a dark period of 12 h or more the predictive P3 never passes, whatever dryback_target says: P2 waters until lights-off.",
+      "verified": true
+    },
+    {
+      "id": "PH-10",
+      "text": "A larger dryback_target can switch the predictive P3 off: once reaching it would take more than 12 h at the measured rate, P2 keeps watering.",
+      "verified": true
+    },
+    {
+      "id": "IR-1",
+      "text": "Priority 1, anti-lockout: pore EC at or above max_ec flushes in any phase when the feed is dilutive (feed EC below pore EC), the zone is draining and VWC is under field_capacity - 2. Size = p2_shot_size x (1.5 + 0.3 x min(EC excess, 3)). It is cap-exempt.",
+      "verified": true
+    },
+    {
+      "id": "IR-2",
+      "text": "At max_ec with a non-dilutive feed or a backed-up (not draining) zone, the engine BLOCKS rather than adds salt or water; the block self-clears. On a tick that blocks, or holds (IR-3), nothing else fires: not the P3 emergency, the watchdog or the minimum floor.",
+      "verified": true
+    },
+    {
+      "id": "IR-3",
+      "text": "Anti-short-cycle: an EC correction waits p2_min_interval_min after the last shot (at least 45 min when judged on a settled reading); at max_ec inside that gap the zone HOLDS so the last flush can drain.",
+      "verified": true
+    },
+    {
+      "id": "IR-4",
+      "text": "P0 fires nothing routine: only an EC flush (a 10% shot) when pore EC is over 2.5x the P0 target, the feed is dilutive and the interval has passed. The room's substrate profile sets both numbers; these are the generic profile's.",
+      "verified": true
+    },
+    {
+      "id": "IR-5",
+      "text": "P1 ramp: every p1_time_between_min a shot of p1_initial + p1_incr x shots so far (capped at p1_initial + p1_incr x p1_max_shots, which in practice never binds because P1 ends at p1_max_shots), scaled by ec_adjust against the P1 EC target. Ramp shots are cap-exempt; the extra shots at the target count toward the daily water limit.",
+      "verified": true
+    },
+    {
+      "id": "IR-6",
+      "text": "P2, first match wins: rescue flush at pore EC >= max_ec - 1 (dilutive, under field_capacity - 2, interval ok; 1.5x shot, cap-exempt); dilute at EC > 1.2x the P2 target (dilutive, interval ok; 1.5x shot, inside the budget); top-up when VWC < the P2 threshold (shot scaled by ec_adjust).",
+      "verified": true
+    },
+    {
+      "id": "IR-7",
+      "text": "P3 is emergency-only: a p3_emergency_shot when VWC falls below p3_emergency_floor (the rescue floor). Cap-exempt.",
+      "verified": true
+    },
+    {
+      "id": "IR-8",
+      "text": "Watchdog: with lights on and outside P0, a zone with no water for watchdog_hours that sits under its P2 threshold gets a p2_shot_size shot, even over the daily budget. A probe reading at or above the threshold silences it.",
+      "verified": true
+    },
+    {
+      "id": "IR-9",
+      "text": "Minimum daily floor: outside P0 with lights on, a zone behind a straight line from nothing at lights-on to min_daily_volume at min_floor_finish_h before lights-off gets a p2_shot_size shot regardless of VWC, gated only by the drown ceiling and the p2_min_interval_min gap. It never exceeds the budget by construction. With min_daily_volume 0 it never fires.",
+      "verified": true
+    },
+    {
+      "id": "IR-10",
+      "text": "Daily budget: once daily_vol reaches max_daily_volume, non-exempt shots (top-up, dilute, P0 flush, floor) are blocked; flush_high_ec, p1_ramp, p1_extra, p2_rescue, p3_emergency and watchdog are exempt.",
+      "verified": true
+    },
+    {
+      "id": "IR-11",
+      "text": "While steering is held (a grow plan held, stale or missing) only the water-safety shots run: the P3 emergency, the watchdog and the minimum floor. Phases still move.",
+      "verified": true
+    },
+    {
+      "id": "IR-12",
+      "text": "When a settled pore-EC reading is supplied, every EC rule uses it instead of the raw reading.",
+      "verified": true
+    },
+    {
+      "id": "IR-13",
+      "text": "With pore EC unknown the zone waters by VWC alone; EC corrections do not fire and the reason says salt protection is unverified.",
+      "verified": true
+    },
+    {
+      "id": "PH-11",
+      "text": "At the integration's default dryback_target (45 % generative, 35 % vegetative) a morning drop of a few percent never ends P0: it waits for p0_max_wait_min (default 120 min), the bypass or a brain start.",
+      "verified": true
+    }
+  ],
+  "controller_rules": [
+    {
+      "id": "CT-1",
+      "text": "The P2 threshold the engine sees is p2_vwc_threshold plus the controller's EC offset (offset dropped while EC is unknown), clamped between rescue floor + 3 and min(p1_target, field_capacity) - 1.",
+      "verified": true
+    },
+    {
+      "id": "CT-2",
+      "text": "EC steer (only with EC stacking on, in P2, every 30 min, on the settled EC): step the offset toward +1 when EC > 110% of the P2 target, toward -1 when < 90%, else toward 0, within +/-20% of the base threshold. An optional PID replaces the step.",
+      "verified": true
+    },
+    {
+      "id": "CT-3",
+      "text": "At lights-on (P0) the day's counters, peak, EC offset and PID integral reset.",
+      "verified": true
+    },
+    {
+      "id": "CT-4",
+      "text": "Relative dryback the engine compares: (peak - vwc) / peak x 100. The peak restarts at the lights-on reading when the zone enters P0 and then follows the highest reading of the grow-day, so in P0 the figure is the drop since lights-on and later in the day it is the drop from the day's peak.",
+      "verified": true
+    },
+    {
+      "id": "CT-5",
+      "text": "Dead or set-aside probe: after a 15 min grace the zone copies the healthiest sibling's shot (closest p1_target) or, with no sibling, waters every blind_fallback_min (default 90) within its own budget; VWC-driven phase changes wait; the lights' edges, the P0 maximum wait (p0_max_wait_min) and the P1 maximum shots still move it.",
+      "verified": true
+    },
+    {
+      "id": "CT-6",
+      "text": "Source-water gate, two halves (feed EC, feed pH), each only when its feed sensor is configured and its band is set (feed sensors default to empty): a feed outside its band holds the zone; a dead feed probe holds after feed_grace_min (default 30). External holds apply only when configured (none by default). Offline pump or valve switches hold too.",
+      "verified": true
+    },
+    {
+      "id": "CT-7",
+      "text": "SIGTERM closes whatever is in flight, saves state and exits.",
+      "verified": true
+    },
+    {
+      "id": "CT-8",
+      "text": "With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller hands decide() an assumed feed EC of 3.0 mS/cm, not a measurement, for every dilutive test.",
+      "verified": true
+    },
+    {
+      "id": "CT-9",
+      "text": "The minimum daily floor is each zone's Min Daily Water Per Plant setting (min_daily_ml_per_plant, mL per plant per grow-day; an integration older than the setting has only the hand-made helper of the same name, read in its place) times the zone's plant count, defaulting to 0: a fresh install runs with the floor off. Its VWC ceiling is field capacity plus a margin, inside 50-100.",
+      "verified": true
+    },
+    {
+      "id": "CT-10",
+      "text": "A zone whose moisture rises with no water going in (a backed-up table) gets the floor set to 0 and no EC correction.",
+      "verified": true
+    },
+    {
+      "id": "CT-11",
+      "text": "dryback_target is read from vegetative_dryback_target or generative_dryback_target by the zone's steering mode; the integration's p0_dryback_drop_percent setting is not read by the controller.",
+      "verified": true
+    },
+    {
+      "id": "CT-12",
+      "text": "Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity follows the zone's highest counted reading of this grow-day or the one before, and the P1 target the highest reading of the grow-day before (no higher than field capacity); when field capacity moves by 1 point or more, the P2 re-water threshold moves by the same points, down as well as up. Each of the three moves at most 1 point a grow-day, counted from where it stood, so a drifting probe or a flood drags the ladder no further than that a day and an edit by hand is moved from, never undone; all within the engine's bounds and each number's own min and max. The readings counted are the trusted ones outside a day the table backed up (CS-310), and a zone without a usable probe is not followed. The rescue floor (the P3 emergency threshold) is the operator's and never moves. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity): then field capacity alone moves if that is valid (CT-13 says when the learner writes the threshold itself).",
+      "verified": true
+    },
+    {
+      "id": "CT-13",
+      "text": "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge holds it (with one running and able to act, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12; from the first loop the brain cannot act, in dry run, with its budget spent, paused, unavailable or its key refused, the learner writes the threshold again until a lights-on at which the brain can act). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.",
+      "verified": true
+    },
+    {
+      "id": "CT-14",
+      "text": "So with Auto Setpoints on, field capacity sits at the zone's own followed peak (moved at most 1 point a grow-day): the safety label (zone_safety_status) reads over_saturated whenever the zone reaches that field capacity, and approaching_saturation within 5 points of it. Under the switch those labels say where the zone sits against its own peak, not that it is over-watered.",
+      "verified": true
+    }
+  ],
+  "brain_rules": [
+    {
+      "id": "BR-1",
+      "text": "The brain's answers can cause only these directives: advance (a phase forward), distrust (a probe set aside), ec_mode (steer, hold or decay), setpoint (one notch) and catch_up (today's plan day, the plan's own previewed values, while a stale probe holds the plan's day: once a photoperiod, lights on, never during a shot); alerts and pushes are admitted because they never move water, and anything else is refused.",
+      "verified": true
+    },
+    {
+      "id": "BR-2",
+      "text": "advance moves only to the next phase, with the lights on and a usable probe. P0 -> P1 needs the drop since lights-on at half of dryback_target or a quarter of p0_max_wait_min gone, and is refused while the probe reading has not moved for 30 min. P1 -> P2 needs max(1, p1_min_shots) ramp shots and VWC within 3 points of min(p1_target, field_capacity). P2 -> P3 needs at most 3 h to lights-off, a zone steered generative (for any other zone the answer is advice), and VWC at least 3 points above the rescue floor.",
+      "verified": true
+    },
+    {
+      "id": "BR-3",
+      "text": "distrust needs two agreeing answers in a row plus code's own confirmation; a set-aside zone takes the blind path (CT-5).",
+      "verified": true
+    },
+    {
+      "id": "BR-4",
+      "text": "ec_mode is admitted only in P2. The controller applies it only while EC stacking is on: steer runs the base step or PID, hold keeps the offset, decay halves the offset (and the PID integral) every 30 min.",
+      "verified": true
+    },
+    {
+      "id": "BR-5",
+      "text": "setpoint moves one 0.5 notch, at most once per zone per grow-day, only with the room's Auto Setpoints switch on (so the learner of CT-12 and CT-13 is always running when a notch is possible) and no grow plan owning the room, never while paused, inside a band around the last value of that number the brain did not write: p2_shot_size within 1 and never under 3; p2_vwc_threshold from 2 under to 1 over, at least the rescue floor + 4 and at most min(p1_target, field_capacity) - 2. Any value the brain did not write becomes the band's new centre (the evidence calls it 'your value'), except the learner's own writes while it holds the two numbers (CT-13), which leave the centre where it was; a field-capacity shift then moves the centre with it. When the levers come back, the threshold is put inside the band, never where it would break the ladder. These two numbers are the only ones the brain writes (judge_levers).",
+      "verified": true
+    },
+    {
+      "id": "BR-6",
+      "text": "A P3 rescue shot within 30 h of a setpoint notch puts back the value from before the notch, if nothing has moved that number since, and pauses the brain's notches on that zone for 48 h; the Auto Setpoints learner is not paused.",
+      "verified": true
+    },
+    {
+      "id": "BR-7",
+      "text": "Every answer key the decision catalogue names exists in the code's questions.",
+      "verified": true
+    }
+  ],
+  "helpers": [
+    "cross_zone_outliers: a zone under 40% of the cross-zone median daily volume (median >= 5 L, 2+ zones) is flagged as under-drinking.",
+    "detect_vmax: P1 ceiling = highest reading once 2 consecutive shots add <= 0.6 points (>= 4 readings); advisory only, it never changes a decision.",
+    "pick_sibling: a blind zone copies the healthy zone with the nearest p1_target (ties: lowest zone).",
+    "zone_safety_status: over_saturated at VWC >= field_capacity; ec_limit_exceeded at EC >= max_ec; approaching_* within 5 VWC points / 1 mS/cm; ec_unknown when EC is missing. With Auto Setpoints on, field capacity is the zone's own peak (CT-14).",
+    "validate_params: out-of-range settings are clamped to the bounds below with a CS-401 alert; p1_min_shots <= p1_max_shots; min_daily_volume <= max_daily_volume.",
+    "zone_status_label (the grower's words on the status tile): waiting P0 'Drying back', P1 'Ramping', P2 'Optimal', P3 'Overnight dryback'; while a shot fires P0 'Flushing', P1 'Refilling', P2 'Topping up', P3 'Emergency'; a blind zone 'Probe dead \u2014 copying'."
+  ]
+}

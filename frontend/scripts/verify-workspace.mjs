@@ -182,21 +182,21 @@ async function liveSetup(run) {
     last_changed: stamp,
   });
   const states = [
-    entity("sensor.crop_steering_f1_engine_config", "ready", {
-      prefix: "f1_",
-      slug: "f1",
+    entity("sensor.crop_steering_room_b_engine_config", "ready", {
+      prefix: "room_b_",
+      slug: "room_b",
       num_zones: 1,
-      friendly_name: "Flower 1 engine config",
-      enable_flag: "switch.crop_steering_f1_engine_enabled",
+      friendly_name: "Room B engine config",
+      enable_flag: "switch.crop_steering_room_b_engine_enabled",
     }),
-    entity("switch.crop_steering_f1_engine_enabled", "off"),
+    entity("switch.crop_steering_room_b_engine_enabled", "off"),
   ];
   const room = {
     entry_id: "sizing-fixture-entry",
     revision: 1,
-    room_name: "Flower 1",
-    prefix: "f1_",
-    slug: "f1",
+    room_name: "Room B",
+    prefix: "room_b_",
+    slug: "room_b",
     active: true,
     num_zones: 1,
     active_zone_ids: [1],
@@ -231,6 +231,9 @@ async function liveSetup(run) {
     const reply = (data, status = 200) =>
       route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
     if (u.pathname === "/api/states") return reply(states);
+    // Home Assistant's time zone is a read, not a service: answer with the browser's own zone.
+    if (u.pathname === "/api/config")
+      return reply({ time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone });
     const action = u.pathname.split("/").at(-1),
       data = req.postDataJSON();
     calls.push({ action, data });
@@ -254,7 +257,7 @@ async function liveSetup(run) {
   lp.setDefaultTimeout(10000);
   lp.on("pageerror", (e) => pageErrors.push(e.message));
   try {
-    await lp.goto(origin + "/dashboard.html?room=f1#/setup");
+    await lp.goto(origin + "/dashboard.html?room=room_b#/setup");
     await visible(lp.locator("#room-name"));
     assert.equal(
       await lp.locator("#room-plumbing").count(),
@@ -427,7 +430,7 @@ try {
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(new URL(page.url()).hash, "#/plan/schedule");
-      await page.locator("#desktop-room").selectOption({ label: "Flower 1" });
+      await page.locator("#desktop-room").selectOption({ label: "Room B" });
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(await page.locator("#desktop-room").inputValue(), "room:");
@@ -461,7 +464,7 @@ try {
     await openPlanner("Steering balance");
     await page.getByRole("button", { name: "Review & save", exact: true }).click();
     await visible(page.getByRole("heading", { name: "Review grow plan", exact: true }));
-    assert.match(await page.getByRole("dialog").innerText(), /Flower 2 only/);
+    assert.match(await page.getByRole("dialog").innerText(), /Room A only/);
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
     assert.equal(
@@ -482,18 +485,40 @@ try {
     assert.equal(await page.locator("#steering-balance").isEnabled(), true);
     assert.equal(await gridCell.isEditable(), true);
   });
+  await check("Plan state says why a saved plan is or is not live, at 1440 and 390px", async () => {
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+      await fresh("plan/schedule");
+      await openPlanner();
+      const label = page.locator(".plan-state"),
+        why = page.locator(".plan-state-why");
+      assert.equal(await label.innerText(), "Draft");
+      assert.match(await why.innerText(), /^Saved, not running\./);
+      await page.getByRole("button", { name: "Arm plan", exact: true }).click();
+      await page.getByRole("button", { name: "Arm for next lights-on", exact: true }).click();
+      await visible(page.getByRole("button", { name: "Disarm plan", exact: true }));
+      await label.filter({ hasText: /^Scheduled$/ }).waitFor({ state: "visible" });
+      assert.match(await why.innerText(), /^Armed for the next lights-on\./);
+      await noOverflow();
+      await page.screenshot({ path: out + `workspace-plan-state-${width}.png`, fullPage: true });
+      await page.getByRole("button", { name: "Disarm plan", exact: true }).click();
+      await page.getByRole("button", { name: "Confirm disarm", exact: true }).click();
+      await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  });
   await check(
     "Setup room-change discard resets selected configuration and stale draft",
     async () => {
-      // An old address: Rooms & setup is Equipment › Setup.
+      // An old address: Rooms and setup is Equipment › Setup.
       await fresh("setup");
       await visible(page.locator("#room-name"));
       await page.locator("#room-name").fill("Must be discarded");
-      await page.locator("#desktop-room").selectOption({ label: "Flower 1" });
+      await page.locator("#desktop-room").selectOption({ label: "Room B" });
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Discard and continue" }).click();
-      assert.equal(await page.locator("#room-name").inputValue(), "Flower 1");
-      assert.equal(await page.locator("#setup-room option:checked").innerText(), "Flower 1");
+      assert.equal(await page.locator("#room-name").inputValue(), "Room B");
+      assert.equal(await page.locator("#setup-room option:checked").innerText(), "Room B");
     },
   );
   await check(
@@ -539,7 +564,7 @@ try {
       await page.getByRole("button", { name: "Restore zone", exact: true }).click();
       await saveSetup();
       assert.equal(await page.locator("#zone-4-plant_count").inputValue(), "12");
-      await page.locator("#setup-room").selectOption({ label: "Flower 1" });
+      await page.locator("#setup-room").selectOption({ label: "Room B" });
       assert.equal(
         await page.getByRole("textbox", { name: "Zone 4 name", exact: true }).count(),
         0,
@@ -600,7 +625,7 @@ try {
       assert.ok(id);
       await page.getByRole("button", { name: "Archive room", exact: true }).click();
       await page
-        .getByRole("textbox", { name: "Type the room name to confirm" })
+        .getByRole("textbox", { name: "Type the room name" })
         .fill("Verification room");
       await page
         .getByRole("dialog")
@@ -612,6 +637,81 @@ try {
       await saveSetup();
       assert.equal(await page.locator("#setup-room").inputValue(), id);
       assert.equal(await page.locator("#room-name").inputValue(), "Verification room");
+    },
+  );
+  await check(
+    "The setup wizard walks a new room to Switch on, which waits for every safety check and names it",
+    async () => {
+      await fresh("setup");
+      await visible(page.locator("#room-name"));
+      await page.getByRole("button", { name: "Add room", exact: true }).first().click();
+      await page.locator("#room-name").fill("Wizard room");
+      await page.getByRole("button", { name: "Map Zone 1 valve", exact: true }).click();
+      await page
+        .getByRole("textbox", { name: "Search Zone 1 valve entities" })
+        .fill("switch.demo_spare_4");
+      await page.locator(".mapping-result").filter({ hasText: "switch.demo_spare_4" }).click();
+      await page.locator("#room-plumbing").selectOption("valves_only");
+      await saveSetup();
+      const wizard = page.getByRole("region", { name: "Setup wizard" });
+      await visible(wizard);
+      const switchOn = wizard.getByRole("button", { name: "Switch on", exact: true });
+      await visible(wizard.getByText("Waiting for Probes: Zone 1: map a moisture probe"));
+      assert.ok(await switchOn.isDisabled(), "Switch on must wait for a moisture probe");
+
+      await page.getByRole("button", { name: "Map Zone 1 VWC probes", exact: true }).click();
+      await page
+        .getByRole("textbox", { name: "Search Zone 1 VWC probes entities" })
+        .fill("vwc_zone_1");
+      await page.locator(".mapping-result").first().click();
+      await page.keyboard.press("Escape");
+      await saveSetup();
+      await visible(wizard.getByText("Waiting for Test shot: Zone 1: run a test shot"));
+      assert.ok(await switchOn.isDisabled(), "Switch on must wait for a test shot");
+
+      await wizard.getByRole("button", { name: "Test shot · Zone 1", exact: true }).click();
+      await visible(wizard.getByText(/Watch a dripper on Zone 1/));
+      assert.ok(await switchOn.isDisabled(), "Switch on must wait for water to be seen");
+      await wizard.getByRole("button", { name: "Yes", exact: true }).click();
+      await visible(wizard.getByText("Water seen.", { exact: true }));
+      assert.ok(!(await switchOn.isDisabled()), "Every safety check passed: Switch on is enabled");
+      await switchOn.click();
+      await wizard.waitFor({ state: "hidden" });
+      // The first-run tour runs once, straight after Switch on, over the real pages.
+      const tour = page.getByRole("dialog", { name: "Today" });
+      await visible(tour.getByText("Stop 1 of 5"));
+      assert.equal(new URL(page.url()).hash, "#/today");
+      await noOverflow();
+      const stops = [
+        ["Plan", "#/plan/targets"],
+        ["History", "#/history/timeline"],
+        ["Equipment", "#/equipment/probes"],
+        ["Help", "#/help"],
+      ];
+      for (const [title, hash] of stops) {
+        await page.locator(".tour").getByRole("button", { name: "Next", exact: true }).click();
+        await visible(page.getByRole("dialog", { name: title }));
+        assert.equal(new URL(page.url()).hash, hash);
+      }
+      await page.locator(".tour").getByRole("button", { name: "Done", exact: true }).click();
+      await page.locator(".tour").waitFor({ state: "detached" });
+    },
+  );
+  await check(
+    "The tour never starts by itself on a room already set up, and Help takes it again",
+    async () => {
+      await fresh("today");
+      await visible(page.locator(".main-inner"));
+      assert.equal(await page.locator(".tour").count(), 0, "No tour on an upgraded installation");
+      await fresh("help");
+      await page.getByRole("button", { name: "Show the tour again", exact: true }).click();
+      await visible(page.getByRole("dialog", { name: "Today" }).getByText("Stop 1 of 5"));
+      assert.equal(new URL(page.url()).hash, "#/today");
+      await page.setViewportSize({ width: 390, height: 844 });
+      await noOverflow();
+      await page.locator(".tour").getByRole("button", { name: "End tour", exact: true }).click();
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.locator(".tour").waitFor({ state: "detached" });
     },
   );
   await check(
@@ -723,7 +823,13 @@ try {
       assert.deepEqual(options, [
         "Custom · type the pot volume",
         "Rockwool 4 in cube · 10 × 10 × 6.5 cm · 0.65 L",
+        "Rockwool Delta 10 · 10 × 10 × 10 cm · 1 L",
         "Rockwool Hugo · 15 × 15 × 14.2 cm · 3.2 L",
+        "Nutrifield 0.9 gal · 15 × 15 × 16 cm · 3.37 L",
+        "Nutrifield 1.5 gal · 18 × 18 × 18 cm · 5.8 L",
+        "Rockwool uni-slab · 5 L",
+        "Rockwool Mama block · 8 L",
+        "Rockwool slab · 10 L",
         "1 gal pot (nominal) · 3.8 L",
         "2 gal pot (nominal) · 7.6 L",
         "3 gal pot (nominal) · 11.4 L",
@@ -747,7 +853,7 @@ try {
       await page.locator("#zone-1-substrate_volume").fill("6.5");
       assert.equal(await preset.inputValue(), "custom", "Typing a volume is a custom entry");
       await page.locator("#zone-1-substrate_volume").fill("20");
-      assert.equal(await preset.inputValue(), "pot-20l", "A typed preset volume is recognised");
+      assert.equal(await preset.inputValue(), "custom", "A typed volume is never named as a preset, even when it matches one");
       await liveSetup(async (lp, calls) => {
         await lp.locator("#zone-1-substrate-preset").selectOption("pot-5gal");
         assert.equal(await lp.locator("#zone-1-substrate_volume").inputValue(), "18.9");
@@ -768,28 +874,28 @@ try {
       const catchTest = page.locator("#zone-1-catch-test");
       await catchTest.locator("summary").click();
       assert.match(await catchTest.innerText(), /never opens a valve or runs a pump/);
-      const use = catchTest.getByRole("button");
+      const use = catchTest.getByRole("button", { name: /^Use / });
       assert.equal(await use.isDisabled(), true);
-      await catchTest.getByLabel("Run time · seconds").fill("0");
-      await catchTest.getByLabel("Water caught from one dripper · mL").fill("65");
+      await catchTest.getByLabel("Run time · s", { exact: true }).fill("0");
+      await catchTest.getByLabel("Water from one dripper · mL", { exact: true }).fill("65");
       assert.equal(
         await page.locator("#zone-1-catch-test-result").innerText(),
         "Run time must be more than 0 seconds.",
       );
       assert.equal(
-        await catchTest.getByLabel("Run time · seconds").getAttribute("aria-invalid"),
+        await catchTest.getByLabel("Run time · s", { exact: true }).getAttribute("aria-invalid"),
         "true",
       );
       assert.equal(await use.isDisabled(), true);
-      await catchTest.getByLabel("Run time · seconds").fill("1");
-      await catchTest.getByLabel("Water caught from one dripper · mL").fill("5000");
+      await catchTest.getByLabel("Run time · s", { exact: true }).fill("1");
+      await catchTest.getByLabel("Water from one dripper · mL", { exact: true }).fill("5000");
       assert.match(
         await page.locator("#zone-1-catch-test-result").innerText(),
         /^That works out to 18000 L\/h, above the 50 L\/h maximum for a dripper\./,
       );
       assert.equal(await use.isDisabled(), true);
-      await catchTest.getByLabel("Run time · seconds").fill("60");
-      await catchTest.getByLabel("Water caught from one dripper · mL").fill("65");
+      await catchTest.getByLabel("Run time · s", { exact: true }).fill("60");
+      await catchTest.getByLabel("Water from one dripper · mL", { exact: true }).fill("65");
       assert.equal(
         await page.locator("#zone-1-catch-test-result").innerText(),
         "Flow per dripper: 3.9 L/h",
@@ -806,8 +912,8 @@ try {
       await liveSetup(async (lp, calls) => {
         const live = lp.locator("#zone-1-catch-test");
         await live.locator("summary").click();
-        await live.getByLabel("Run time · seconds").fill("47");
-        await live.getByLabel("Water caught from one dripper · mL").fill("100");
+        await live.getByLabel("Run time · s", { exact: true }).fill("47");
+        await live.getByLabel("Water from one dripper · mL", { exact: true }).fill("100");
         await lp.getByRole("button", { name: "Use 7.66 L/h as Zone 1 dripper flow" }).click();
         assert.equal(
           calls.some((call) => call.action === "setup_save"),
@@ -844,6 +950,44 @@ try {
     },
   );
   await check(
+    "The AI assistant page shows each of the demo's seven brain states at 390 and 1440 px",
+    async () => {
+      const states = [
+        ["rules", "Watering by rules"],
+        ["acting", "AI assistant is acting"],
+        ["advising", "AI assistant is advising only"],
+        ["budget", "Daily AI limit reached"],
+        ["not_answering", /^AI not answering/],
+        ["no_key", "No working Anthropic key"],
+        ["stale", "Readings too old to judge"],
+      ];
+      for (const width of [390, 1440]) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+        for (const [state, headline] of states) {
+          const target = new URL(url);
+          target.searchParams.set("verification", String(++freshId));
+          target.searchParams.set("brain", state);
+          target.hash = "/today/ai";
+          await page.goto(target.toString(), { waitUntil: "networkidle" });
+          await visible(page.getByRole("heading", { name: "AI assistant", exact: true }));
+          await visible(page.locator(".brain-page .brain-status strong").getByText(headline));
+          assert.equal(
+            await page.getByLabel("Sample AI state", { exact: true }).inputValue(),
+            state,
+            `${state}: the switcher shows the state`,
+          );
+          await noOverflow();
+          await axe(`brain-${state}-${width}`);
+          await page.screenshot({ path: out + `workspace-brain-${state}-${width}.png`, fullPage: true });
+        }
+      }
+      // The switcher moves the header chip with the page, with no reload.
+      await page.getByLabel("Sample AI state", { exact: true }).selectOption("budget");
+      await visible(page.locator(".brain-chip").getByText("AI paused: budget"));
+      await page.setViewportSize({ width: 1440, height: 1000 });
+    },
+  );
+  await check(
     "Strict response-bearing API contract, revision conflict draft retention, and active/stale plan overlay",
     async () => {
       const live = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
@@ -877,13 +1021,13 @@ try {
         p1_time_between_shots: 15,
         p1_maximum_shots: 8,
       };
-      for (const prefix of ["", "f1_"]) {
+      for (const prefix of ["", "room_b_"]) {
         const flag = `switch.crop_steering_${prefix}engine_enabled`;
         put(`sensor.crop_steering_${prefix}engine_config`, "ready", {
           prefix,
-          slug: prefix ? "f1" : "",
+          slug: prefix ? "room_b" : "",
           num_zones: 1,
-          friendly_name: prefix ? "Flower 1 engine config" : "Flower 2 engine config",
+          friendly_name: prefix ? "Room B engine config" : "Room A engine config",
           enable_flag: flag,
         });
         put(flag, "off");
@@ -913,12 +1057,12 @@ try {
             max: key.includes("time") ? 360 : 100,
             step: 0.1,
             unit: key.startsWith("ec_") ? "mS/cm" : "%",
-            entity_ids: [`number.crop_steering_f1_zone_1_${key}`],
+            entity_ids: [`number.crop_steering_room_b_zone_1_${key}`],
           },
         ]),
       );
       const document = {
-        room_id: "room:f1_",
+        room_id: "room:room_b_",
         revision: 1,
         status: "draft",
         error: null,
@@ -945,11 +1089,11 @@ try {
         capabilities: { strategy_snapshot_version: 1, controller_supported: true },
       };
       const setupRoom = {
-        entry_id: "fixture-f1-entry",
+        entry_id: "fixture-room-b-entry",
         revision: 1,
-        room_name: "Flower 1",
-        prefix: "f1_",
-        slug: "f1",
+        room_name: "Room B",
+        prefix: "room_b_",
+        slug: "room_b",
         active: true,
         num_zones: 1,
         active_zone_ids: [1],
@@ -959,8 +1103,8 @@ try {
             name: "Zone 1",
             active: true,
             valve: "switch.fixture_valve",
-            vwc_sensors: ["sensor.crop_steering_f1_vwc_zone_1"],
-            ec_sensors: ["sensor.crop_steering_f1_ec_zone_1"],
+            vwc_sensors: ["sensor.crop_steering_room_b_vwc_zone_1"],
+            ec_sensors: ["sensor.crop_steering_room_b_ec_zone_1"],
             plant_count: 12,
             substrate_volume: 6,
             drippers_per_plant: 1,
@@ -994,6 +1138,9 @@ try {
         if (req.headers().authorization !== "Bearer workspace-fixture-token")
           return reply({ message: "Fixture authentication missing" }, 401);
         if (u.pathname === "/api/states") return reply(Object.values(states));
+        // Home Assistant's time zone is a read, not a service: answer with the browser's own zone.
+        if (u.pathname === "/api/config")
+          return reply({ time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone });
         if (u.pathname.startsWith("/api/history/")) return reply([]);
         const action = u.pathname.split("/").at(-1),
           data = req.postDataJSON();
@@ -1029,7 +1176,7 @@ try {
         };
         if (!schemas[action] || Object.keys(data).some((k) => !schemas[action].includes(k)))
           return reply({ message: "Strict fixture schema rejected extra data" }, 400);
-        if (data.room_id !== "room:f1_")
+        if (data.room_id !== "room:room_b_")
           return reply({ message: "Wrong canonical room scope" }, 400);
         if (!u.searchParams.has("return_response"))
           return reply({ message: "Service response flag required" }, 400);
@@ -1071,7 +1218,7 @@ try {
       lp.setDefaultTimeout(10000);
       lp.on("pageerror", (e) => pageErrors.push(e.message));
       try {
-        await lp.goto(origin + "/dashboard.html?room=f1#/grow-plan");
+        await lp.goto(origin + "/dashboard.html?room=room_b#/grow-plan");
         await openPlanner("Steering balance", lp);
         await lp.locator("#steering-balance").fill("80");
         await lp.getByRole("button", { name: "Review & save", exact: true }).click();
@@ -1104,7 +1251,7 @@ try {
         await lp.getByRole("button", { name: "Confirm disarm", exact: true }).click();
         await lp.getByRole("dialog").waitFor({ state: "hidden" });
         assert.deepEqual(apiCalls.find((c) => c.action === "strategy_disarm").data, {
-          room_id: "room:f1_",
+          room_id: "room:room_b_",
         });
         const pendingRead = new Promise((resolve) => (readStarted = resolve));
         deferRead = true;
@@ -1140,10 +1287,10 @@ try {
           await lp.getByRole("button", { name: "Disarm plan", exact: true }).isEnabled(),
           true,
         );
-        put("sensor.crop_steering_f1_strategy_plan", "active", {
+        put("sensor.crop_steering_room_b_strategy_plan", "active", {
           enabled: true,
           snapshot_version: 1,
-          room_id: "room:f1_",
+          room_id: "room:room_b_",
           updated_at: stamp(),
           valid_until: new Date(Date.now() + 120000).toISOString(),
           zones: [
@@ -1165,6 +1312,7 @@ try {
         );
         // The zone's page shows the plan's targets, not the numbers kept for after it.
         await lp.evaluate(() => (location.hash = "#/zone/1"));
+        await lp.getByText("Targets (read only)", { exact: true }).click();
         const targets = lp.locator(".zone-targets");
         await visible(targets.getByText("Set by the armed grow plan", { exact: true }));
         const rewater = targets.locator("tr").filter({ hasText: "Re-water point" });
@@ -1198,7 +1346,7 @@ try {
           writesBeforeToday,
           "Reading scheduled targets must not write services",
         );
-        states["sensor.crop_steering_f1_strategy_plan"].attributes.valid_until = new Date(
+        states["sensor.crop_steering_room_b_strategy_plan"].attributes.valid_until = new Date(
           Date.now() - 1000,
         ).toISOString();
         await lp.getByRole("button", { name: "Refresh controller data" }).click();
@@ -1225,21 +1373,49 @@ try {
         await lp.getByRole("button", { name: "Refresh controller data" }).click();
         await visible(lp.locator(".today-critical").getByText("Grow plan snapshot unavailable."));
         await lp.evaluate(() => (location.hash = "#/zone/1"));
+        await lp.getByText("Targets (read only)", { exact: true }).click();
         await visible(rewater);
         assert.doesNotMatch(await rewater.innerText(), /77|54/);
         await lp.screenshot({ path: out + "workspace-stale-plan.png", fullPage: true });
         await navigateTo("Equipment", "Setup", lp);
         await visible(lp.locator("#room-name"));
-        await lp.locator("#room-name").fill("Flower 1 verified");
+        await lp.locator("#room-name").fill("Room B verified");
         await lp.getByRole("button", { name: "Review configuration", exact: true }).click();
         await lp.getByRole("button", { name: "Save configuration", exact: true }).click();
         await lp.getByRole("dialog").waitFor({ state: "hidden" });
-        assert.equal(await lp.locator("#room-name").inputValue(), "Flower 1 verified");
+        assert.equal(await lp.locator("#room-name").inputValue(), "Room B verified");
         assert.equal(setupRoom.revision, 2);
         assert.equal(
           apiCalls.find((c) => c.action === "setup_save").data.entry_id,
-          "fixture-f1-entry",
+          "fixture-room-b-entry",
         );
+        // A controller silent past its 10 min heartbeat: one band under the header, in words, on
+        // a phone too, linking to the probes; the labelled header keeps both switches in words.
+        states["sensor.crop_steering_room_b_ai_heartbeat"].last_updated = new Date(
+          Date.now() - 14 * 60_000,
+        ).toISOString();
+        await navigate("Today", lp);
+        await lp.getByRole("button", { name: "Refresh controller data" }).click();
+        await lp.setViewportSize({ width: 390, height: 844 });
+        const band = lp.locator(".stale-banner");
+        await visible(band);
+        assert.equal(
+          await band.locator("p").innerText(),
+          "The controller has not reported for 14 min. Moisture and phases below are its last report, not live. Watering is held by the controller's own safety rules.",
+        );
+        assert.equal(await lp.locator(".today-stopped").count(), 0, "the band, not a second line");
+        assert.equal(await lp.locator(".data-age").innerText(), "Updated 14 min ago");
+        // The fixture has no room switch: watering is the one switch, in words.
+        assert.deepEqual(await lp.locator(".safety-switch-text").allInnerTexts(), ["Watering off"]);
+        assert.ok(
+          await lp.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+          "The stale band and the header fit 390 px",
+        );
+        await lp.screenshot({ path: out + "workspace-stale-banner-390.png", fullPage: true });
+        await band.getByRole("button", { name: "Probes", exact: true }).click();
+        await visible(lp.getByRole("heading", { name: "Probes", exact: true }));
+        await visible(band);
+        await lp.setViewportSize({ width: 1440, height: 1000 });
       } finally {
         await live.close();
       }
@@ -1348,7 +1524,7 @@ try {
           await frame.evaluate(() => document.documentElement.classList.contains("dark")),
           false,
         );
-        await frame.getByRole("button", { name: "Home Assistant / system", exact: true }).click();
+        await frame.getByRole("button", { name: "Home Assistant or system", exact: true }).click();
         await frame.waitForFunction(
           () =>
             document.documentElement.dataset.themeSource === "home-assistant" &&

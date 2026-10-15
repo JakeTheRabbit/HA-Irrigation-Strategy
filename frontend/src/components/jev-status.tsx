@@ -1,14 +1,15 @@
-import { jevCost, JEV_TITLES, type JevRoom } from "@/lib/jev";
+import { brainWords, jevCost, JEV_TITLES, type JevRoom } from "@/lib/jev";
 import "./jev-status.css";
 
 /** Today's calls, tokens, errors and what they cost. */
 export function jevUsage(jev: JevRoom | null, short = false): string {
-  if (!jev) return short ? "" : "The controller does not report Jev’s usage.";
+  if (!jev) return short ? "" : "The controller does not report the usage of the AI assistant.";
+  if (!jev.on) return brainWords(jev).detail;
   const calls =
     jev.calls === null
       ? null
       : `${jev.calls.toLocaleString()} call${jev.calls === 1 ? "" : "s"} today`;
-  const cost = jevCost(jev.tokens);
+  const cost = jevCost(jev.tokens, jev.costUsd);
   if (short) return [calls, cost].filter(Boolean).join(" · ");
   return [
     calls,
@@ -29,7 +30,7 @@ export function JevTrouble({
   jev: JevRoom | null;
   lastError?: boolean;
 }) {
-  if (!jev) return null;
+  if (!jev || !jev.on) return null; // under rules the brain's words already say why
   const failing = Object.keys(jev.judgeErrors);
   const down = jev.state === "error";
   if (!down && !failing.length && !(lastError && jev.errors && jev.lastError)) return null;
@@ -41,9 +42,9 @@ export function JevTrouble({
   return (
     <p className="jev-trouble" role="note">
       {down
-        ? `Jev is not answering${why} The controller carries on without it.`
+        ? `The AI assistant does not answer${why} The controller continues without it.`
         : failing.length
-          ? `A judge failed: ${said(judges)} The others carry on.`
+          ? `A judge failed: ${said(judges)} The other judges continue.`
           : `Last error today${why}`}
     </p>
   );

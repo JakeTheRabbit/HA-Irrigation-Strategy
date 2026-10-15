@@ -32,23 +32,24 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "hardware",
     name: "Hardware lockouts",
     detail:
-      "A pump or valve that did not do what it was told, a hardware hold, a shot cut, water that isn't reaching a zone, a table that isn't draining and a sump pump that stopped.",
-    codes: [...codes(301, 311), "CS-701"],
+      "A pump or valve that did not do what it was told, a hardware hold, a shot cut, a zone that keeps hitting its longest allowed shot, water that does not get to a zone or that possibly goes around its substrate, a table that isn't draining, a sump pump that stopped and a pump or valve the controller can't switch.",
+    codes: [...codes(301, 312), "CS-313", "CS-701", "CS-710"],
     events: [],
   },
   {
     id: "sensors",
     name: "Sensors and drift",
-    detail: "A probe the controller cannot use, a zone without one, and a probe Jev set aside.",
-    codes: [...codes(101, 104), "CS-603", "CS-604", "CS-703", "CS-704"],
+    detail:
+      "A probe the controller cannot use, a probe set aside for its unit, a zone without one, a zone whose probes disagree or whose primary probe is offline, a zone steering on bulk EC, and a probe that the AI assistant set aside.",
+    codes: [...codes(101, 104), "CS-502", "CS-503", "CS-504", "CS-505", "CS-603", "CS-604", "CS-703", "CS-704"],
     events: [],
   },
   {
     id: "watering",
-    name: "Watering stopped",
+    name: "Shots stopped",
     detail:
-      "Something stopping the shots in a room or a zone, and a room that has watered nothing for a while with the lights on.",
-    codes: [...codes(202, 208), "CS-602", "CS-209"],
+      "Something stopping the shots in a room or a zone, a room that has watered nothing for a while with the lights on, the tank it waters from at its minimum, due a refill or over its full mark, and a batch tank to refill.",
+    codes: [...codes(202, 208), "CS-602", "CS-609", "CS-209", ...codes(901, 904), "CS-906"],
     events: [],
   },
   {
@@ -57,6 +58,14 @@ export const DEMO_KINDS: NotifyKind[] = [
     detail: "A push only, with no notification card.",
     codes: [],
     events: ["phase"],
+  },
+  {
+    id: "vitals",
+    name: "Vitals",
+    detail:
+      "The controller's regular report on every zone: moisture, EC, water today and, while the room's predictions switch is on, what each zone does next.",
+    codes: [],
+    events: ["vitals"],
   },
   {
     id: "stock",
@@ -68,32 +77,56 @@ export const DEMO_KINDS: NotifyKind[] = [
   {
     id: "dosing",
     name: "Dosing",
-    detail: "A dose or a batch that did not end as it should.",
-    codes: codes(801, 806),
+    detail: "A dose or a batch that did not end correctly, or a mix outside its EC or pH band.",
+    codes: [...codes(801, 806), "CS-808"],
     events: [],
   },
   {
     id: "jev",
-    name: "Jev",
-    detail: "Jev's advice, and Jev moving a zone's P2 shot size or re-water point (a push only).",
-    codes: ["CS-501", "CS-702", "CS-705", "CS-706", "CS-707", "CS-404"],
+    name: "AI assistant",
+    detail:
+      "The advice of the AI assistant, and its changes to the P2 shot size or the re-water point of a zone (a push only). Also its AI budget, key, retired route and feed proposals, and the grow plan state of the room.",
+    codes: [
+      "CS-501",
+      "CS-702",
+      "CS-705",
+      "CS-706",
+      "CS-707",
+      "CS-708",
+      "CS-709",
+      "CS-711",
+      "CS-712",
+      "CS-713",
+      "CS-404",
+    ],
     events: ["jev_setpoint"],
   },
   {
     id: "setup",
     name: "Setup and settings",
-    detail: "A setup change waiting, settings missing or out of range, and a grow plan holding.",
-    codes: ["CS-201", ...codes(401, 405, [404]), "CS-601", "CS-605", "CS-606", "CS-607"],
+    detail:
+      "A setup change waiting, settings missing or out of range, a grow plan holding, and an Engine Enabled switch that does not stop water.",
+    codes: [
+      "CS-201",
+      ...codes(401, 405, [404]),
+      "CS-601",
+      "CS-605",
+      "CS-606",
+      "CS-607",
+      "CS-610",
+      "CS-611",
+      "CS-713",
+    ],
     events: [],
   },
 ];
 /** The demo site's phones: made-up mobile apps, each registered by a made-up user. */
 export const DEMO_PHONES: NotifyPhone[] = [
-  ["s23ultra", "S23Ultra", "ben", "Ben"],
-  ["callum_phone", "Callum Phone", "callum", "Callum"],
-  ["stews_iphone", "Stews iPhone", "stewart", "Stewart"],
-  ["sean_iphone", "Sean iPhone", "sean", "Sean"],
-  ["pete", "Pete", "pete", "Pete"],
+  ["phone_1", "Phone 1", "owner", "Owner"],
+  ["phone_2", "Phone 2", "grower", "Grower"],
+  ["phone_3", "Phone 3", "manager", "Manager"],
+  ["phone_4", "Phone 4", "assistant", "Assistant"],
+  ["phone_5", "Phone 5", "visitor", "Visitor"],
 ].map(([device, name, user, userName]) => ({
   service: `notify.mobile_app_${device}`,
   name,
@@ -108,8 +141,8 @@ const row = (index: number, kinds: string[], urgent: boolean): NotifyRecipient =
   rooms: [],
   urgent_high_priority: urgent,
 });
-/** Saved before the demo starts: Ben gets everything, Callum stock tanks, dosing and hardware
- * lockouts, Stewart emergencies only. Sean and Pete are not listed yet. */
+/** Saved before the demo starts: the owner gets everything, the grower stock tanks, dosing and
+ * hardware lockouts, the manager emergencies only. The assistant and the visitor are not listed yet. */
 export const DEMO_NOTIFY: NotifyConfig = {
   revision: 3,
   idle_hours: 3,
@@ -123,7 +156,7 @@ export const DEMO_NOTIFY: NotifyConfig = {
     row(2, ["emergency"], true),
   ],
 };
-const ADMIN = "demo-user-ben";
+const ADMIN = "demo-user-owner";
 const rowKey = (item: NotifyRecipient) =>
   JSON.stringify([
     item.name,
@@ -133,8 +166,8 @@ const rowKey = (item: NotifyRecipient) =>
     item.urgent_high_priority,
   ]);
 
-/** The integration's notification services, in memory, for the demo. It answers as Ben, an
- * administrator, or with `user` (?demo&notify-user=callum) as that phone's owner, who is not: they
+/** The integration's notification services, in memory, for the demo. It answers as the owner, an
+ * administrator, or with `user` (?demo&notify-user=grower) as that phone's owner, who is not: they
  * may change only their own phone's row, as the integration allows. A test push is never sent. */
 export class NotifyDemo {
   private config: NotifyConfig = structuredClone(DEMO_NOTIFY);
@@ -214,7 +247,7 @@ export class NotifyDemo {
       hours > IDLE_HOURS.max
     )
       return this.document(
-        `Watering stopped needs ${IDLE_HOURS.min} to ${IDLE_HOURS.max} whole hours.`,
+        `Shots stopped needs ${IDLE_HOURS.min} to ${IDLE_HOURS.max} whole hours.`,
       );
     if (!this.user.admin) {
       const before = new Map(this.config.recipients.map((item) => [item.service, item]));

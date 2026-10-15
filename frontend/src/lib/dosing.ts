@@ -347,6 +347,8 @@ export function controllerReach(
       return { live: false, reason: "The controller is not running." };
     if (beat.health === "stale")
       return { live: false, reason: "The controller has stopped reporting." };
+    if (beat.health === "stopped")
+      return { live: false, reason: "The controller app has stopped." };
   }
   if (!status)
     return {
@@ -464,7 +466,7 @@ export function pumpView(
   return view("idle");
 }
 
-/** The device name the pump's entities share ("doser_1_balance"), else its start entity. */
+/** The device name the pump's entities share ("doser_1_silica"), else its start entity. */
 export function hardwareLabel(pump: DosingPump): string {
   const ids = [
     pump.volume_entity,

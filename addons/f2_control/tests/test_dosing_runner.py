@@ -58,7 +58,7 @@ BATCH = {
     "mix_min_w": 200,
     "premix_min": 2,
     "postmix_min": 5,
-    "close_entities": ["switch.f1_feed"],
+    "close_entities": ["switch.room_b_feed"],
     "hold_entity": "input_boolean.tank_hold",
     "filled_at_entity": "input_datetime.tank_filled",
     "recipe": [
@@ -82,7 +82,7 @@ DEVICES = {
     "switch.tank_mixer": "off",
     "switch.mix_valve": "off",
     "sensor.mixer_power": "0",
-    "switch.f1_feed": "on",
+    "switch.room_b_feed": "on",
     "input_boolean.tank_hold": "off",
     "input_datetime.tank_filled": "2026-09-27 19:00:00",
     "number.recipe_bloom": "150",
@@ -164,7 +164,18 @@ class Rig:
             now=self.clock.now,
             history=self.history,
             respond=self.respond,
+            actuators=controller.ACTUATORS,
         )
+
+    def poll(self, runner=None):
+        """What the controller's main loop does for dosing (Controller._sleep_for): every room's request
+        read now, then a wake whenever the dose or batch it took is due, until it has ended (each of its
+        waits is POLL_S at most, so every room is read again on the way)."""
+        runner = runner or self.runner
+        runner.poll()
+        while runner._steps is not None:
+            self.clock.sleep(runner._due - self.clock.t)
+            runner.step()
 
     def set(self, entity, state):
         now = self.clock.now().isoformat()
@@ -276,7 +287,7 @@ class Rig:
         self.fake.set_state(CONFIG, revision, json.loads(json.dumps(
             {"pumps": list(pumps), "batch": batch, "request": request})))
 
-    def ask(self, action="dose", age=0.0, by="Ben", **data):
+    def ask(self, action="dose", age=0.0, by="Alex", **data):
         if action == "dose":
             data = {"pump": "balance", "ml": 50, **data}
         request = {"id": uuid.uuid4().hex, "action": action, "pump": data.get("pump"),
@@ -345,7 +356,7 @@ def test_a_dose_sets_the_volume_presses_start_waits_for_it_and_puts_the_volume_b
     r = rig()
     r.config()
     request = r.ask(ml=50)
-    r.runner.poll()
+    r.poll()
     assert r.actions() == [
         ("set_value", "number.balance_volume"),
         ("press", "button.balance_start"),
@@ -357,15 +368,19 @@ def test_a_dose_sets_the_volume_presses_start_waits_for_it_and_puts_the_volume_b
     state, status = r.status()
     assert state == "idle"
     assert (status["handled"], status["handled_result"]) == (request["id"], "finished")
-    assert status["pumps"]["balance"]["last"] == {"ml": 50, "at": BASE.isoformat(), "result": "finished"}
+    assert status["pumps"]["balance"]["last"] == {"ml": 50, "given": 50, "at": BASE.isoformat(),
+                                                  "result": "finished"}
     assert status["pumps"]["balance"]["flow_ml_s"] == 10.0
     assert status["history"][0] == {"kind": "dose", "at": BASE.isoformat(), "ended_at": r.clock.now().isoformat(),
-                                    "result": "finished", "doses": {"balance": 50}, "by": "Ben"}
+                                    "result": "finished", "doses": {"balance": 50},
+                                    "dosed": [{"pump": "balance", "name": "Balance", "ml": 50, "given": 50,
+                                               "result": "finished", "at": BASE.isoformat()}],
+                                    "by": "Alex"}
     assert r.saved()["inflight"] is None and r.saved()["handled"] == request["id"]
     assert r.codes() == [] and ("turn_off", "switch.balance_power") not in r.actions()
     # Taken once: the same request read again does nothing.
     r.fake.calls.clear()
-    r.runner.poll()
+    r.poll()
     assert r.actions() == []
 
 
@@ -373,7 +388,7 @@ def test_a_pump_with_no_volume_to_put_back_and_a_text_status_sensor(rig):
     r = rig()
     r.config(pumps=(BALANCE, BLOOM))
     r.ask(pump="bloom", ml=100)
-    r.runner.poll()
+    r.poll()
     assert r.actions() == [("set_value", "input_number.bloom_volume"), ("turn_on", "script.bloom_start")]
     assert r.status()[1]["handled_result"] == "finished"
 
@@ -390,9 +405,9 @@ def test_the_dose_is_recorded_before_anything_moves(rig):
         return original(domain, service, **data)
 
     r.runner._call = watch
-    r.runner.poll()  # no request yet: nothing
+    r.poll()  # no request yet: nothing
     request = r.ask(ml=20)
-    r.runner.poll()
+    r.poll()
     assert seen[0]["kind"] == "dose" and seen[0]["request"] == request["id"]
     # The volume it is about to change is recorded too, so even a restart puts it back.
     assert seen[0]["dose"] == {
@@ -413,7 +428,7 @@ def test_a_pump_whose_flow_is_not_above_zero_is_refused(rig, flow):
     r = rig({"number.balance_flow": (flow, {})})
     r.config()
     r.ask()
-    r.runner.poll()
+    r.poll()
     assert r.actions() == []
     assert r.status()[1]["handled_result"] == f"refused: Balance is not calibrated (flow {flow})"
     assert r.status()[1]["history"] == [] and r.status()[1]["pumps"]["balance"]["last"] is None
@@ -423,14 +438,14 @@ def test_a_dose_over_the_maximum_or_onto_a_pump_already_dosing_is_refused(rig):
     r = rig()
     r.config()
     r.ask(ml=2500)
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "refused: 2500 mL is not more than 0 and at most 2000 mL"
     r.set("binary_sensor.balance_dosing", "on")
     r.ask(ml=10)
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "refused: Balance already reads dosing"
     r.ask(pump="bloom")
-    r.runner.poll()
+    r.poll()
     assert "there is no pump bloom" in r.status()[1]["handled_result"]
     assert r.actions() == []
 
@@ -441,7 +456,7 @@ def test_a_dose_that_runs_past_its_time_is_switched_off_and_read_back(rig):
     r.behaviour["button.balance_start"] = "overrun"
     r.stuck["switch.balance_power"] = 1  # the first off is lost: it is sent again once
     r.ask(ml=120)  # 12 s expected: a deadline of 12 x 1.25 + 20 = 35 s after the press
-    r.runner.poll()
+    r.poll()
     offs = [a for a in r.actions() if a == ("turn_off", "switch.balance_power")]
     assert len(offs) == 2 and r.fake.states["switch.balance_power"][0] == "off"
     assert 1 + 35 <= r.clock.t < 1 + 35 + 1 + 6 + 6 + 2  # pressed once the volume read back (1 s)
@@ -449,8 +464,8 @@ def test_a_dose_that_runs_past_its_time_is_switched_off_and_read_back(rig):
     assert status["handled_result"] == "ran past its time"
     assert status["pumps"]["balance"]["last"]["result"] == "ran past its time"
     alert = r.alert("CS-801")
-    assert alert["title"] == "A dosing pump ran past its time and was switched off (CS-801)"
-    assert "was still dosing after 35 seconds" in alert["message"]
+    assert alert["title"] == "A dosing pump ran past its time, power set to off (CS-801)"
+    assert "still dosed after 35 s" in alert["message"]
     assert "switch it off by hand" not in alert["message"]  # it reads off: the re-send worked
     assert r.actions()[-1] == ("set_value", "number.balance_volume")  # still put back
 
@@ -460,7 +475,7 @@ def test_a_dose_never_seen_dosing_is_not_confirmed(rig):
     r.config()
     r.behaviour["button.balance_start"] = "silent"
     r.ask(ml=50)  # 5 s expected: seen dosing by 5 + 15 s or not confirmed
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "not confirmed"
     assert 20 <= r.clock.t < 22 + 1 + 6
     assert r.codes() == ["CS-802"]
@@ -472,7 +487,7 @@ def test_a_dose_too_short_to_catch_between_two_reads_still_counts(rig):
     r.config()
     r.behaviour["button.balance_start"] = "quick"
     r.ask(ml=2)
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "finished" and r.codes() == []
 
 
@@ -489,7 +504,7 @@ def test_a_volume_that_does_not_read_back_is_never_started(rig):
 
     r.runner._call = deaf
     r.ask(ml=40)
-    r.runner.poll()
+    r.poll()
     assert ("press", "button.balance_start") not in r.actions()
     assert r.status()[1]["handled_result"].startswith("refused: number.balance_volume did not read back 40")
     assert r.saved()["inflight"] is None
@@ -499,11 +514,11 @@ def test_a_request_older_than_two_minutes_is_marked_handled_and_never_acted_on(r
     r = rig()
     r.config()
     request = r.ask(age=121)
-    r.runner.poll()
+    r.poll()
     assert r.actions() == []
     assert (r.status()[1]["handled"], r.status()[1]["handled_result"]) == (request["id"], "too old to act on")
     r.clock.t += 1  # and read again: still nothing
-    r.runner.poll()
+    r.poll()
     assert r.actions() == []
 
 
@@ -511,14 +526,14 @@ def test_a_request_is_taken_once_across_a_restart(rig, tmp_path):
     r = rig()
     r.config()
     r.ask(ml=10)
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "finished"
     again = dosing_runner.DosingRunner(  # the controller restarted a few seconds later
         r.c, get=r.fake.ha_get, call=r.call, publish=r.fake.ha_set, alert=r.c._dosing_alert,
         state_path=r.runner.path, sleep=r.clock.sleep, monotonic=r.clock.monotonic, now=r.clock.now)
     r.fake.calls.clear()
     assert again.recover()
-    again.poll()
+    r.poll(again)
     assert r.actions() == []
 
 
@@ -528,7 +543,7 @@ def test_a_stop_during_a_dose_switches_the_pumps_off(rig):
     r.ask(ml=500)  # 50 s
     stop = {}
     r.clock.at(10, lambda: stop.update(r.ask("stop", by="Sam")))
-    r.runner.poll()
+    r.poll()
     assert 10 <= r.clock.t < 20
     # Every pump's power in the room, whatever it reads: a stale OFF is never why one was not told.
     assert ("turn_off", "switch.balance_power") in r.actions()
@@ -548,7 +563,7 @@ def test_a_request_while_a_dose_runs_is_refused(rig):
     seen = []
     r.clock.at(13, lambda: seen.append(r.status()[1]["handled_result"]))
     r.clock.at(5, lambda: seen.append(r.status()[1]["handled_result"]))
-    r.runner.poll()
+    r.poll()
     assert seen == ["dosing", "refused: a dose is running"]
     assert r.status()[1]["handled"] == second["id"]
 
@@ -567,7 +582,7 @@ def test_each_dose_draws_from_its_stock_tank_what_it_dosed(rig, how, ml, drawn, 
     r.config(pumps=(LINKED,))
     r.behaviour["button.balance_start"] = how
     r.ask(ml=ml)
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == result
     assert r.status()[1]["pumps"]["balance"]["last"]["result"] == result
     if drawn is None:
@@ -585,7 +600,7 @@ def test_a_stopped_dose_draws_only_what_ran_before_the_stop(rig):
     r.config(pumps=(LINKED,))
     r.ask(ml=500)  # 50 s at 10 mL/s, pressed once the volume read back (t = 1 s)
     r.clock.at(10, lambda: r.ask("stop"))
-    r.runner.poll()
+    r.poll()
     [draw] = r.draws()
     assert draw["note"] == "Balance: stopped"
     # Timed to the moment the stop's off was sent, not to when its read-back ended.
@@ -600,16 +615,16 @@ def test_an_undelivered_draw_is_kept_and_sent_again_until_answered_and_never_twi
     r.config(pumps=(LINKED,))
     r.draw_ok = False  # Home Assistant is not answering
     r.ask(ml=50)
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "finished"
     [pending] = r.saved()["draws"]
     assert pending["draws"] == {"balance_stock": 50}
-    r.runner.poll()  # every tick, the same draw with the same key
+    r.poll()  # every tick, the same draw with the same key
     assert len(r.draws()) == 2 and {d["key"] for d in r.draws()} == {pending["key"]}
     r.draw_ok = True
-    r.runner.poll()
+    r.poll()
     assert r.saved()["draws"] == [] and len(r.draws()) == 3
-    r.runner.poll()
+    r.poll()
     assert len(r.draws()) == 3  # answered once: never sent again
 
 
@@ -618,14 +633,14 @@ def test_a_draw_not_yet_delivered_survives_a_restart(rig):
     r.config(pumps=(LINKED,))
     r.draw_ok = False
     r.ask(ml=50)
-    r.runner.poll()
+    r.poll()
     key = r.saved()["draws"][0]["key"]
     r.draw_ok = True
     again = dosing_runner.DosingRunner(  # the controller app restarted
         r.c, get=r.fake.ha_get, call=r.call, publish=r.fake.ha_set, alert=r.c._dosing_alert,
         state_path=r.runner.path, sleep=r.clock.sleep, monotonic=r.clock.monotonic, now=r.clock.now)
     assert again.recover()
-    again.poll()
+    r.poll(again)
     assert r.draws()[-1]["key"] == key and r.saved()["draws"] == []
 
 
@@ -633,7 +648,7 @@ def test_the_doses_of_a_batch_draw_one_by_one(rig):
     r = rig()
     r.config(pumps=(LINKED, dict(BLOOM, stock_tank="bloom_stock")), batch=BATCH)
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "finished"
     assert [(d["draws"], d["source"]) for d in r.draws()] == [
         ({"balance_stock": 300}, "batch"),
@@ -655,13 +670,13 @@ def test_a_whole_batch_in_order(rig):
     during = []
     r.clock.at(30, lambda: during.append((r.c._blocked(r.c.rooms[0], 1), r.status()[0])))
     request = r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.actions() == [
         ("turn_on", "input_boolean.tank_hold"),  # hold
         ("turn_off", "switch.row1"),  # close: the room's valve, main line and pump, then close_entities
         ("turn_off", "switch.main_line"),
         ("turn_off", "switch.main_pump"),
-        ("turn_off", "switch.f1_feed"),
+        ("turn_off", "switch.room_b_feed"),
         ("turn_on", "switch.tank_fill"),  # fill until full, then closed
         ("turn_off", "switch.tank_fill"),
         ("turn_on", "switch.mix_valve"),  # mix: the valves first, then the pump
@@ -702,14 +717,14 @@ def test_a_batch_with_no_fill_valve_or_a_full_tank_skips_the_fill(rig):
     r = rig()
     r.config(pumps=(BALANCE,), batch=dict(BATCH, recipe=[], fill_valve=None, full_entity=None))
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     steps = {s["step"]: (s["state"], s["note"]) for s in r.status()[1]["batch"]["steps"]}
     assert steps["fill"] == ("skipped", "no fill valve: the tank is filled already")
     assert steps["dose"] == ("skipped", "nothing to dose")
     r.set("binary_sensor.tank_full", "on")
     r.config(pumps=(BALANCE,), batch=dict(BATCH, recipe=[]))
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     steps = {s["step"]: s["note"] for s in r.status()[1]["batch"]["steps"]}
     assert steps["fill"] == "the tank reads full already"
     assert ("turn_on", "switch.tank_fill") not in r.actions()
@@ -720,7 +735,7 @@ def test_a_tank_that_does_not_fill_closes_the_valve_and_ends_the_batch(rig):
     _full_batch(r)
     r.full_after = None
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.fake.states["switch.tank_fill"][0] == "off"
     assert r.codes() == ["CS-804", "CS-806"]  # its own code first
     status = r.status()[1]
@@ -729,7 +744,7 @@ def test_a_tank_that_does_not_fill_closes_the_valve_and_ends_the_batch(rig):
     assert r.fake.states["input_boolean.tank_hold"][0] == "off"
     assert r.fake.states["input_datetime.tank_filled"][0] == "2026-09-27 19:00:00"  # not stamped
     assert r.runner.holds(r.c.rooms[0]) is None  # the room waters again
-    assert "the fill valve was switched off" in r.alert("CS-804")["message"].lower()
+    assert "the controller set the fill valve to off" in r.alert("CS-804")["message"].lower()
     assert r.alert("CS-804")["title"] == "The batch tank did not fill in time (CS-804)"
 
 
@@ -738,7 +753,7 @@ def test_a_mix_pump_that_does_not_draw_its_power_ends_the_batch(rig):
     _full_batch(r)
     r.watts = 0
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.codes() == ["CS-805", "CS-806"]
     assert r.status()[1]["handled_result"] == "stopped: mix: the mix pump did not draw 200 W within 20 s"
     assert r.fake.states["switch.tank_mixer"][0] == "off" and r.fake.states["switch.mix_valve"][0] == "off"
@@ -751,7 +766,7 @@ def test_a_mix_pump_that_does_not_start_is_switched_off_before_its_alert(rig):
     _full_batch(r)
     r.watts = 0
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     steps = [(service, data.get("entity_id") or data.get("title", "")[-7:-1])
              for _domain, service, data in r.fake.calls if service in ("turn_on", "turn_off", "create")]
     on, card = steps.index(("turn_on", "switch.tank_mixer")), steps.index(("create", "CS-805"))
@@ -763,7 +778,7 @@ def test_a_stop_in_the_middle_of_a_batch_switches_everything_off(rig):
     _full_batch(r)
     r.ask("batch")
     r.clock.at(150, lambda: r.ask("stop", by="Sam"))  # 60 s filling, 2 min premix: in the premix
-    r.runner.poll()
+    r.poll()
     for switch in ("switch.balance_power", "switch.bloom_power", "switch.tank_fill", "switch.tank_mixer",
                    "switch.mix_valve"):
         assert r.fake.states[switch][0] == "off", switch
@@ -774,7 +789,7 @@ def test_a_stop_in_the_middle_of_a_batch_switches_everything_off(rig):
     assert status["batch"]["result"] == "stopped: premix: stop requested by Sam"
     assert r.codes() == ["CS-806"]
     message = r.alert("CS-806")["message"]
-    assert "stopped in its premix step" in message and "Dosed before it stopped: nothing" in message
+    assert "stopped in its premix step" in message and "Dosed before the stop: nothing" in message
     assert r.runner.holds(r.c.rooms[0]) is None and r.saved()["inflight"] is None
 
 
@@ -783,12 +798,12 @@ def test_a_dose_that_fails_in_a_batch_ends_it_with_both_codes(rig):
     _full_batch(r)
     r.behaviour["script.bloom_start"] = "silent"
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.codes() == ["CS-802", "CS-806"]
     status = r.status()[1]
     assert status["handled_result"] == "stopped: dose: Bloom: not confirmed"
     assert status["history"][0]["doses"] == {"balance": 300, "bloom": 150.0}
-    assert "Dosed before it stopped: 300 mL of Balance, 150 mL of Bloom." in (
+    assert "Dosed before the stop: 300 mL of Balance, an unknown amount of Bloom." in (
         r.alert("CS-806")["message"])
 
 
@@ -797,37 +812,37 @@ def test_dosing_hardware_that_does_not_read_off_keeps_the_rooms_held_until_it_do
     _full_batch(r)
     r.stuck["switch.tank_mixer"] = 99  # it starts, and will not stop
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "stopped: finish: switch.tank_mixer did not read off"
     # Held, and saying why: it reads on.
     reason = "dosing hardware still on: switch.tank_mixer"
     assert r.runner.holds(r.c.rooms[0]) == reason and r.c._blocked(r.c.rooms[0], 1) == reason
     message = r.alert("CS-806")["message"]
     assert "switch.tank_mixer still does not read off" in message
-    assert "stay held, and its hold stays on, until they do" in message
+    assert "stay held, and its hold stays on, until they read off" in message
     # The hold stays on while it does not read off: other automations keep off the tank.
     assert r.fake.states["input_boolean.tank_hold"][0] == "on"
     assert r.saved()["inflight"]["kind"] == "batch"  # a restart would still switch it off
     assert r.fake.states["input_datetime.tank_filled"][0] == "2026-09-27 19:00:00"  # not finished
     r.ask(ml=5)
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "refused: switch.tank_mixer does not read off yet"
     r.stuck["switch.tank_mixer"] = 0
-    r.runner.poll()  # switched off again, and it goes this time
-    r.runner.poll()  # it reads off: the hold goes off
+    r.poll()  # switched off again, and it goes this time
+    r.poll()  # it reads off: the hold goes off
     assert r.fake.states["input_boolean.tank_hold"][0] == "off"
-    r.runner.poll()  # and reads off: released
+    r.poll()  # and reads off: released
     assert r.runner.holds(r.c.rooms[0]) is None and r.saved()["inflight"] is None
-    assert "Everything now reads off; the hold was released" in r.alert("CS-806")["message"]
+    assert "All the hardware now reads off, and the controller released the hold" in r.alert("CS-806")["message"]
 
 
 def test_a_switch_the_batch_cannot_close_ends_it_before_anything_is_filled(rig):
     r = rig()
     _full_batch(r)
-    r.stuck["switch.f1_feed"] = 99
+    r.stuck["switch.room_b_feed"] = 99
     r.ask("batch")
-    r.runner.poll()
-    assert r.status()[1]["handled_result"] == "stopped: close: switch.f1_feed did not read off"
+    r.poll()
+    assert r.status()[1]["handled_result"] == "stopped: close: switch.room_b_feed did not read off"
     assert ("turn_on", "switch.tank_fill") not in r.actions()
     assert r.codes() == ["CS-806"]
     assert r.runner.holds(r.c.rooms[0]) is None  # its own hardware reads off: the rooms water again
@@ -839,7 +854,7 @@ def test_a_batch_waits_for_a_shot_in_flight_before_closing_anything(rig):
     r.c._busy, r.c._shot_room = True, r.c.rooms[0]  # a shot is running in the room
     r.clock.at(45, lambda: setattr(r.c, "_busy", False))
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "finished"
     closed = datetime.fromisoformat(r.fake.changed["switch.row1"])
     assert closed >= BASE + timedelta(seconds=45)  # nothing closed while the shot ran
@@ -850,7 +865,7 @@ def test_a_batch_gives_up_on_a_shot_still_running_after_ten_minutes(rig):
     _full_batch(r)
     r.c._busy, r.c._shot_room = True, r.c.rooms[0]  # and this one never ends
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "stopped: hold: a shot was still running after 10 minutes"
     assert 600 <= r.clock.t < 600 + 30
     assert r.fake.states["switch.row1"][0] == "on"  # the shot's own valve was never touched
@@ -862,47 +877,47 @@ def test_a_room_with_a_latched_hardware_fault_or_its_hold_on_refuses_a_batch(rig
     _full_batch(r)
     r.c.rooms[0].hardware_fault = {"reason": "valve stuck", "entities": ["switch.row1"]}
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "refused: the room has a hardware fault latched"
     r.c.rooms[0].hardware_fault = None
     r.set("input_boolean.tank_hold", "on")
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == (
         "refused: input_boolean.tank_hold is on already: something else is dosing")
     r.set("input_boolean.tank_hold", "off")
     r.set("number.recipe_bloom", "unavailable")  # never replaced by the recipe's fixed 100 mL
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "refused: the recipe amount for Bloom can't be read"
     r.set("number.recipe_bloom", "150")
     r.set("sensor.bloom_flow", "0")
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "refused: Bloom is not calibrated (flow 0)"
     assert r.actions() == [] and r.runner.holds(r.c.rooms[0]) is None
     # A pump the recipe gives 0 mL is skipped, calibrated or not.
     r.set("number.recipe_bloom", "0")
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "finished"
     assert ("turn_on", "script.bloom_start") not in r.actions()
 
 
 def test_the_batch_holds_its_room_and_every_room_on_its_hardware_and_no_other(rig, capsys):
-    shared = _desc(prefix="f1_", slug="f1", pump=None, mainline="switch.f1_feed",
-                   valves={"1": "switch.f1_row1"})  # fed through a switch the batch closes
+    shared = _desc(prefix="room_b_", slug="room_b", pump=None, mainline="switch.room_b_feed",
+                   valves={"1": "switch.room_b_row1"})  # fed through a switch the batch closes
     same_pump = _desc(prefix="veg_", slug="veg", pump="switch.main_pump", mainline=None,
                       valves={"1": "switch.veg_row1"})  # shares the batch room's pump
     other = _desc(prefix="clone_", slug="clone", pump="switch.clone_pump", mainline=None,
                   valves={"1": "switch.clone_row1"})
-    r = rig({"sensor.crop_steering_f1_engine_config": ("ok", shared),
+    r = rig({"sensor.crop_steering_room_b_engine_config": ("ok", shared),
              "sensor.crop_steering_veg_engine_config": ("ok", same_pump),
              "sensor.crop_steering_clone_engine_config": ("ok", other),
-             "switch.f1_row1": ("off", {}), "switch.veg_row1": ("off", {}),
+             "switch.room_b_row1": ("off", {}), "switch.veg_row1": ("off", {}),
              "switch.clone_row1": ("off", {}), "switch.clone_pump": ("off", {})})
     rooms = {room.slug: room for room in r.c.rooms}
-    assert set(rooms) == {"default", "f1", "veg", "clone"}
+    assert set(rooms) == {"default", "room_b", "veg", "clone"}
     _full_batch(r)
     seen, shots = {}, []
 
@@ -914,14 +929,14 @@ def test_the_batch_holds_its_room_and_every_room_on_its_hardware_and_no_other(ri
 
     r.clock.at(100, during)
     r.ask("batch")
-    r.runner.poll()
-    assert seen["default"] == seen["f1"] == seen["veg"] == "making a batch"
+    r.poll()
+    assert seen["default"] == seen["room_b"] == seen["veg"] == "making a batch"
     assert seen["clone"] != "making a batch"
     assert shots == [] and not r.c._busy
     assert "[veg] Z1 shot held: making a batch" in capsys.readouterr().out
-    # f1's feed and every valve of the rooms it holds were closed; the clone room was left alone.
+    # room_b's feed and every valve of the rooms it holds were closed; the clone room was left alone.
     closed = {entity for service, entity in r.actions() if service == "turn_off"}
-    assert {"switch.f1_row1", "switch.f1_feed", "switch.veg_row1", "switch.row1"} <= closed
+    assert {"switch.room_b_row1", "switch.room_b_feed", "switch.veg_row1", "switch.row1"} <= closed
     assert not {"switch.clone_row1", "switch.clone_pump"} & closed
     assert all(r.c._blocked(room, 1) != "making a batch" for room in rooms.values())
 
@@ -934,7 +949,7 @@ def test_a_request_refused_while_a_batch_runs_is_never_taken_again(rig):
     r.clock.at(300, lambda: answers.append(r.status()[1]["handled_result"]))
     r.clock.at(520, lambda: dose.update(r.ask(ml=10)))  # in the postmix
     r.clock.at(525, lambda: answers.append(r.status()[1]["handled_result"]))
-    r.runner.poll()
+    r.poll()
     assert answers == ["making a batch", "refused: a batch is running"]
     status = r.status()[1]
     # The batch's end does not claim the request back: that dose must not run after it.
@@ -942,7 +957,7 @@ def test_a_request_refused_while_a_batch_runs_is_never_taken_again(rig):
     assert status["history"][0]["result"] == "finished" and batch["id"] != dose["id"]
     presses = r.actions().count(("press", "button.balance_start"))
     r.clock.t += 5
-    r.runner.poll()
+    r.poll()
     assert r.actions().count(("press", "button.balance_start")) == presses == 1
 
 
@@ -956,7 +971,7 @@ def test_an_unforeseen_error_in_a_batch_still_switches_everything_off(rig, monke
 
     monkeypatch.setattr(r.runner, "_mix", broken)
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     status = r.status()[1]
     assert status["handled_result"] == "stopped: mix: an error in the controller (RuntimeError('a bug'))"
     assert [(s["step"], s["state"]) for s in status["batch"]["steps"]][-1] == ("mix", "failed")
@@ -975,22 +990,22 @@ def test_a_cleanup_that_fails_keeps_the_rooms_held_until_everything_reads_off(ri
     monkeypatch.setattr(r.runner, "_ended", broken)
     r.set("switch.tank_fill", "on")  # say the fill valve was not closed
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.runner.holds(r.c.rooms[0]).startswith("dosing hardware still on: switch.balance_power")
     assert r.fake.states["input_boolean.tank_hold"][0] == "on"
     for _pass in range(3):  # the next passes read it all off, then switch the hold off, and let go
         r.clock.t += dosing_runner.POLL_S
-        r.runner.poll()
+        r.poll()
     assert r.runner.holds(r.c.rooms[0]) is None and r.saved()["inflight"] is None
     assert r.fake.states["input_boolean.tank_hold"][0] == "off"
     # The cleanup broke before its own alert: the release says what ended, and that it reads off.
     assert r.codes() == ["CS-804", "CS-806"]
     message = r.alert("CS-806")["message"]
     assert "ended (stopped: fill: the tank did not read full within 20 min)" in message
-    assert "Everything now reads off; the hold was released" in message
+    assert "All the hardware now reads off, and the controller released the hold" in message
 
 
-def test_the_thread_recovers_first_then_reads_every_two_seconds_and_survives_an_error(rig):
+def test_each_step_recovers_first_reads_every_two_seconds_and_survives_an_error(rig):
     r = rig()
     r.config()
     passes = []
@@ -1002,13 +1017,10 @@ def test_the_thread_recovers_first_then_reads_every_two_seconds_and_survives_an_
             raise RuntimeError("one bad pass")
         return real_poll(busy)
 
-    def sleep(seconds):
-        r.clock.t += seconds
-        if len(passes) == 3:
-            r.runner._exiting = True
-
-    r.runner.poll, r.runner._sleep = poll, sleep
-    r.runner._run()
+    r.runner.poll = poll
+    for _ in range(3):  # the main loop sleeps what each step says, then steps again
+        r.clock.t += r.runner.step()
+        assert r.runner._recovered
     assert passes == [0.0, 2.0, 4.0]
     assert any("one bad pass" in line for line in r.logs)
 
@@ -1016,16 +1028,16 @@ def test_the_thread_recovers_first_then_reads_every_two_seconds_and_survives_an_
 def test_a_batch_that_overruns_its_watchdog_is_ended(rig):
     r = rig()
     _full_batch(r)
-    r.runner._watchdog = lambda batch, plan: 100.0
+    r.runner._watchdog = lambda batch, plan, profile: 100.0
     r.ask("batch")
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["handled_result"] == "stopped: premix: it ran past its watchdog"
     assert r.codes() == ["CS-806"]
 
 
 # ------------------------------------------------------------------ restarts
 def _interrupted(tmp_path, kind="batch", **extra):
-    record = {"kind": kind, "at": BASE.isoformat(), "request": "abc", "by": "Ben",
+    record = {"kind": kind, "at": BASE.isoformat(), "request": "abc", "by": "Alex",
               "off": ["switch.balance_power", "switch.bloom_power", "switch.tank_fill", "switch.tank_mixer",
                       "switch.mix_valve"],
               "hold": "input_boolean.tank_hold", "doses": {"balance": 300}, **extra}
@@ -1044,13 +1056,13 @@ def test_a_batch_interrupted_by_a_restart_is_switched_off_and_never_resumed(rig,
     # Held until it reads off, and the batch's hold stays on until then.
     assert r.runner.holds(r.c.rooms[0]).startswith("dosing hardware still on: ")
     assert r.fake.states["input_boolean.tank_hold"][0] == "on" and r.codes() == []
-    r.runner.poll()  # it all reads off: the hold goes off
+    r.poll()  # it all reads off: the hold goes off
     assert r.fake.states["input_boolean.tank_hold"][0] == "off"
-    r.runner.poll()  # and reads off: released, and said once
+    r.poll()  # and reads off: released, and said once
     assert r.runner.holds(r.c.rooms[0]) is None
     assert r.codes() == ["CS-803"]
     message = r.alert("CS-803")["message"]
-    assert "never resumes" in message and "Everything now reads off; the hold was released" in message
+    assert "does not continue it" in message and "All the hardware now reads off, and the controller released the hold" in message
     saved = r.saved()
     assert saved["inflight"] is None
     assert saved["history"][0]["result"] == "interrupted by a restart"
@@ -1066,10 +1078,10 @@ def test_recovery_holds_while_home_assistant_is_down_and_the_exit_switches_off_f
     assert r.runner.recover() is True  # holding needs nothing from it
     assert r.runner.holds(r.c.rooms[0]).startswith("dosing hardware still on: ")
     r.runner._get = lambda entity, timeout=8: (None, {}, None)
-    r.runner.poll()
+    r.poll()
     assert r.saved()["inflight"]["kind"] == "dose" and r.codes() == []  # kept, and nothing to say yet
     r.runner._call, r.runner._get = r.call, r.fake.ha_get  # it answers: read off, released, said
-    r.runner.poll()
+    r.poll()
     assert r.runner.holds(r.c.rooms[0]) is None and r.codes() == ["CS-803"]
     # A dose's record never names a hold: the batch's hold was never touched.
     assert ("turn_off", "input_boolean.tank_hold") not in r.actions()
@@ -1091,7 +1103,7 @@ def test_recovery_holds_while_home_assistant_is_down_and_the_exit_switches_off_f
 def test_the_status_says_what_each_room_is_doing(rig):
     r = rig()
     r.config(pumps=(BALANCE, BLOOM))
-    r.runner.poll()
+    r.poll()
     state, status = r.status()
     assert state == "idle" and set(status["pumps"]) == {"balance", "bloom"}
     assert status["pumps"]["bloom"] == {"state": "idle", "flow_ml_s": 5.0, "target_ml": None,
@@ -1100,18 +1112,18 @@ def test_the_status_says_what_each_room_is_doing(rig):
     seen = []
     r.clock.at(3, lambda: seen.append(r.status()))
     r.ask(ml=100)
-    r.runner.poll()
+    r.poll()
     during_state, during = seen[0]
     assert during_state == "dosing"
     assert during["pumps"]["balance"] == {"state": "dosing", "flow_ml_s": 10.0, "target_ml": 100,
                                           "started_at": BASE.isoformat(), "expected_s": 10.0, "last": None}
     r.fake.set_state(CONFIG, "unknown", {})  # the integration can't read its store
-    r.runner.poll()
+    r.poll()
     assert r.status()[0] == "unavailable"
     r.set("binary_sensor.balance_dosing", "unavailable")
     r.config()
     r.clock.t += dosing_runner.REFRESH_S
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["pumps"]["balance"]["state"] == "unavailable"
 
 
@@ -1120,13 +1132,13 @@ def test_the_status_carries_when_it_was_published_and_is_published_every_minute(
     nothing changes, and not more often than things change."""
     r = rig()
     r.config()
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["updated_at"] == BASE.isoformat()
     r.clock.t = 30
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["updated_at"] == BASE.isoformat()  # nothing new to say
     r.clock.t = 61
-    r.runner.poll()
+    r.poll()
     assert r.status()[1]["updated_at"] == (BASE + timedelta(seconds=61)).isoformat()
 
 
@@ -1135,7 +1147,7 @@ def test_an_install_without_dosing_runs_exactly_as_before(rig):
     published or held."""
     r = rig()
     assert r.runner.recover() is True
-    r.runner.poll()
+    r.poll()
     assert r.fake.calls == [] and STATUS not in r.fake.sets
     room = r.c.rooms[0]
     with_dosing = r.c._blocked(room, 1)
@@ -1166,7 +1178,7 @@ def test_the_controller_builds_its_runner_and_recovers_before_the_first_loop(mon
         pass
 
     monkeypatch.setattr(c.dosing, "recover", lambda: order.append("recover"))
-    monkeypatch.setattr(c.dosing, "start", lambda: order.append("thread"))
+    monkeypatch.setattr(c.dosing, "step", lambda: order.append("dosing step") or 1.0)
     monkeypatch.setattr(c, "_log_timezone", lambda: None)
     monkeypatch.setattr(c, "loop_once", lambda now: order.append("loop"))
 
@@ -1176,25 +1188,25 @@ def test_the_controller_builds_its_runner_and_recovers_before_the_first_loop(mon
     monkeypatch.setattr(controller.time, "sleep", sleep)
     with pytest.raises(Stop):
         c.run()
-    assert order == ["recover", "thread", "loop"]
+    assert order == ["recover", "loop", "dosing step"]
 
     def broken():
         raise RuntimeError("a bug")
 
     order.clear()
-    monkeypatch.setattr(c.dosing, "recover", broken)  # the thread still starts, and tries again
+    monkeypatch.setattr(c.dosing, "recover", broken)  # the loop still runs, and dosing's steps try again
     with pytest.raises(Stop):
         c.run()
-    assert order == ["thread", "loop"]
+    assert order == ["loop", "dosing step"]
 
 
 def test_every_dosing_code_goes_out_through_the_alert_list():
     c, fake = _build({"num_zones": 1})
-    for code in ("CS-801", "CS-802", "CS-803", "CS-804", "CS-805", "CS-806", "CS-807"):
+    for code in ("CS-801", "CS-802", "CS-803", "CS-804", "CS-805", "CS-806", "CS-807", "CS-808"):
         assert c._dosing_alert(c.rooms[0], code, "a title", "a message") is True
     assert c._dosing_alert(c.rooms[0], "CS-899", "made up", "never shown") is True  # never kept
     ids = [d["notification_id"] for dom, svc, d in fake.calls if dom == "persistent_notification"]
-    assert ids == [f"f2_dosing_default_{n}" for n in (801, 802, 803, 804, 805, 806, 807)]
+    assert ids == [f"f2_dosing_default_{n}" for n in (801, 802, 803, 804, 805, 806, 807, 808)]
     # One notification per event: a second event within 30 minutes is its own card, and an update of
     # the same event (it reads off now) replaces its card at once: the runner paces the repeats.
     assert c._dosing_alert(c.rooms[0], "CS-801", "a title", "another", "balance_2026_09_28t02") is True

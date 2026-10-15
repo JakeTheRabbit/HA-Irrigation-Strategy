@@ -45,4 +45,25 @@ def test_a_live_install_still_defaults_to_the_ha_managed_data_path(monkeypatch):
     # Neutralise every read/write so asserting the default cannot itself touch /data.
     monkeypatch.setattr(controller.Controller, "_load_state", lambda self: None)
     monkeypatch.setattr(controller.Controller, "_apply_setup_descriptors", lambda self: None)
+    monkeypatch.setattr(controller, "_instance_id", lambda path: "an-id")
     assert _construct({})._state_path == "/data/state.json"
+
+
+def test_the_instance_id_is_written_beside_the_redirected_state_file_and_nowhere_else(tmp_path):
+    redirected = os.environ["F2_STATE_PATH"]
+    before = set(os.listdir(os.path.dirname(redirected)))
+    c = _construct({})
+    beside = os.path.join(os.path.dirname(redirected), "instance_id")
+    with open(beside) as handle:
+        assert handle.read().strip() == c.instance_id
+    assert set(os.listdir(os.path.dirname(redirected))) - before <= {"instance_id", "state.json"}
+    assert _construct({}).instance_id == c.instance_id  # a restart of one install is one identity
+
+
+def test_a_live_install_keeps_its_instance_id_in_the_ha_managed_data_folder(monkeypatch):
+    monkeypatch.delenv("F2_STATE_PATH")
+    monkeypatch.setattr(controller.Controller, "_load_state", lambda self: None)
+    monkeypatch.setattr(controller.Controller, "_apply_setup_descriptors", lambda self: None)
+    asked = []
+    monkeypatch.setattr(controller, "_instance_id", lambda path: asked.append(path) or "an-id")
+    assert _construct({}).instance_id == "an-id" and asked == ["/data/instance_id"]

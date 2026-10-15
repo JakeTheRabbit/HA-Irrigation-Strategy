@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PlanningCurve } from "../components/planning-curve";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   buildPlanningCurve,
   dryRates,
@@ -75,7 +75,7 @@ describe("setpoint planning curve", () => {
     const plan = buildPlanningCurve({ ...rest, p2_vwc_threshold: 75 }, 6, 18);
     expect(plan.morningDrybackVwc).toBeCloseTo(54.4);
     expect(plan.notes.join(" ")).toMatch(/peak VWC target.*reference/);
-    expect(plan.warnings.join(" ")).toMatch(/trigger.*above.*target/i);
+    expect(plan.warnings.join(" ")).toMatch(/re-water point.*above.*target/i);
   });
   it("draws only supplied eligible ramp-up windows before the P3 cutoff", () => {
     const plan = buildPlanningCurve(parameters, 6, 18);
@@ -119,7 +119,7 @@ describe("setpoint planning curve", () => {
     expect(draft.ec).toEqual(baseline.ec);
     expect(draft.emergencyReferenceActive).toBe(true);
     expect(baseline.emergencyReferenceActive).toBe(false);
-    expect(draft.warnings.join(" ")).toMatch(/rescue level.*does not predict or schedule one/);
+    expect(draft.warnings.join(" ")).toMatch(/rescue floor.*does not predict or schedule one/);
   });
   it("does not invent a night rise when the relative endpoint exceeds the daytime reference", () => {
     const plan = buildPlanningCurve({ ...parameters, dryback_target: 5 }, 6, 18);
@@ -239,7 +239,7 @@ describe("rendered planning curve", () => {
     expect(after).toContain("Rescue shot when below 42.5% VWC");
     for (const html of [before, after]) {
       expect(line(html, "baseline-p3-floor")).toBeDefined();
-      expect(html).toContain("Saved rescue level: 38% VWC");
+      expect(html).toContain("Saved rescue floor: 38% VWC");
     }
     expect(after).toContain('data-planning-line="baseline-vwc"');
     expect(after).toContain('data-planning-line="ec"');
@@ -335,6 +335,38 @@ describe("recorded readings on the plan graph", () => {
       [],
     );
   });
+  describe("viewed from another time zone", () => {
+    // The viewer is in New York; Home Assistant and the room are in Auckland.
+    let zone: string | undefined;
+    beforeAll(() => {
+      zone = process.env.TZ;
+      process.env.TZ = "America/New_York";
+    });
+    afterAll(() => {
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    });
+    const z = (iso: string) => Date.parse(iso);
+    const now = z("2026-09-23T02:00:00Z"); // 14:00 NZST on the 23rd, 22:00 EDT on the 22nd
+    const readings = [
+      { time: z("2026-09-22T12:00:00Z"), value: 34 }, // 00:00 NZST on the 23rd
+      { time: z("2026-09-22T21:30:00Z"), value: 30 }, // 09:30 NZST, before lights-on
+      { time: z("2026-09-22T22:30:00Z"), value: 32 }, // 10:30 NZST
+      { time: z("2026-09-23T01:00:00Z"), value: 36 }, // 13:00 NZST
+    ];
+    it("cuts grow-days at lights-on on Home Assistant's clock, not the viewer's", () => {
+      const folded = foldRecorded(readings, 10, now, "Pacific/Auckland");
+      expect(folded.today).toEqual([
+        { hour: 0.5, value: 32, time: readings[2].time },
+        { hour: 3, value: 36, time: readings[3].time },
+      ]);
+      expect(folded.previous.map((day) => day.map((point) => point.hour))).toEqual([[14, 23.5]]);
+      // On the viewer's own clock lights-on was 10:00 EDT, so three readings land in its today.
+      expect(foldRecorded(readings, 10, now).today.map((point) => point.hour)).toEqual([
+        7.5, 8.5, 11,
+      ]);
+    });
+  });
   it("scales the VWC axis to what is plotted instead of a fixed 0-100", () => {
     // the span is always 20/40/60/80/100, so the four grid intervals are whole multiples of 5
     expect(planningAxis([34, 40, 22, 31.2, 23.4])).toEqual({ min: 10, max: 50 });
@@ -369,7 +401,7 @@ describe("recorded readings on the plan graph", () => {
 });
 
 describe("the projected day: every phase drawn the way the engine runs it", () => {
-  // live F2 zone 1, 2026-09-20
+  // zone 1 of a production room, 2026-09-20
   const live = {
     field_capacity: 55,
     dryback_target: 10,
@@ -481,7 +513,7 @@ describe("the projected day: every phase drawn the way the engine runs it", () =
 });
 
 describe("the rest of today, projected from now on the same rules", () => {
-  // live F2 zone 1, 2026-09-20; lights 10:00-22:00, so hours count from lights-on
+  // zone 1 of a production room, 2026-09-20; lights 10:00-22:00, so hours count from lights-on
   const live = {
     dryback_target: 10,
     p1_target_vwc: 40,

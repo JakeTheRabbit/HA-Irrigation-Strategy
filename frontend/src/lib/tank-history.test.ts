@@ -226,7 +226,7 @@ describe("source-water gate", () => {
     // before that, in the default room only, its app's own option comes first.
     const copy = createDemo(now);
     delete copy["sensor.crop_steering_engine_config"].attributes.setup_revision;
-    delete copy["sensor.crop_steering_f1_engine_config"].attributes.setup_revision;
+    delete copy["sensor.crop_steering_room_b_engine_config"].attributes.setup_revision;
     expect(sourceGate(copy, f2, "ec").option).toBe(true);
     expect(sourceGate(copy, f1, "ec").option).toBe(false);
     expect(sourceGate(states, f2, "ec").option).toBe(false);
@@ -365,7 +365,7 @@ describe("demo tank history", () => {
   });
   it("is deterministic for a fixed clock and differs between rooms", () => {
     expect(demoHistory(states, ids, 24, now)).toEqual(demoHistory(states, ids, 24, now));
-    const [f1] = demoHistory(states, ["sensor.demo_f1_tank_ec"], 24, now);
+    const [f1] = demoHistory(states, ["sensor.demo_room_b_tank_ec"], 24, now);
     expect(f1.points.at(-1)!.value).toBeCloseTo(2.8, 2);
   });
 });

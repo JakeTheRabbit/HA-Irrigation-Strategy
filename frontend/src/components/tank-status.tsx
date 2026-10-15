@@ -36,7 +36,7 @@ export function TankStatus({
   return (
     <section className="panel tank-panel" aria-label="Tank and pump status" data-tank-status>
       <div className="panel-heading">
-        <h2>Tank & pump</h2>
+        <h2>Tank and pump</h2>
         {!connected && <span className="tank-stale">Disconnected · last received</span>}
         <div className="tank-actions">
           <TankHistory

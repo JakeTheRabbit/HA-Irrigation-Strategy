@@ -9,6 +9,9 @@ import pytest
 
 from test_controller import _build, _desc
 
+
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
 KILL = "input_boolean.kill"
 SYSTEM = "switch.crop_steering_system_enabled"
 AUTO = "switch.crop_steering_auto_irrigation_enabled"
@@ -47,7 +50,7 @@ def test_an_off_one_switches_watering_off_in_its_place(entity, name):
     assert c._carry_retired_switches(room) == [name]
     assert len(_engine_offs(fake)) == 1
     (note,) = _cs208(fake)
-    assert note["title"] == f"{name} is off, so watering was switched off (CS-208)"
+    assert note["title"] == f"{name} is off, so the kill switch is off (CS-208)"
     assert entity in note["message"] and "Settings → Watering" in note["message"]
     # Home Assistant may not read OFF yet this pass: the gate holds on the carried names meanwhile.
     room._retired_off = [name]

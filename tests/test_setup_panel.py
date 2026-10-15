@@ -40,6 +40,14 @@ def test_panel_registration_uses_async_paths_and_never_replaces_existing_panel(
         == f"/crop_steering/dashboard.html?v={SOFTWARE_VERSION}"
     )
     assert calls[0]["frontend_url_path"] == "crop-steering"
+    # A custom panel, so Home Assistant draws no title bar above it: its element holds the page.
+    assert calls[0]["config"]["_panel_custom"] == {
+        "name": "crop-steering-panel",
+        "module_url": f"/crop_steering/panel.js?v={SOFTWARE_VERSION}",
+        "embed_iframe": False,
+        "trust_external": False,
+    }
+    assert (setup_panel.WWW / "panel.js").is_file()
     assert paths[0][0] == "/crop_steering"
     assert paths[0][2] is False
     setup_panel.async_unload_panel(hass)
@@ -272,3 +280,21 @@ def test_home_assistant_before_2026_5_has_no_async_panel_exists(monkeypatch):
     # ...and the fallback still protects a panel somebody else already owns.
     asyncio.run(setup_panel.async_setup_panel(hass({"crop-steering": "another owner"})))
     assert registered == ["crop-steering"]
+
+
+def test_without_the_panel_element_the_iframe_panel_shows_the_same_page(
+    monkeypatch, tmp_path
+):
+    """`_panel_custom` is Home Assistant's internal shape; the built-in iframe panel is the
+    fallback, on the same URL, wherever the element's module is not shipped."""
+    panel, hass, observed = _panel_rig(monkeypatch)
+    monkeypatch.setattr(panel, "WWW", tmp_path)
+    asyncio.run(panel.async_setup_panel(hass))
+    from custom_components.crop_steering.const import SOFTWARE_VERSION
+
+    assert observed.paths[0][1] == str(tmp_path)
+    registered = observed.registrations[0]
+    assert registered["config"] == {
+        "url": f"/crop_steering/dashboard.html?v={SOFTWARE_VERSION}"
+    }
+    assert registered["frontend_url_path"] == panel.PANEL

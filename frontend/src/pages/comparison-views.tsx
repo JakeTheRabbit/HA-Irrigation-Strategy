@@ -1,5 +1,6 @@
 import type { ComparisonTarget } from "@/lib/comparison-target";
 import { Empty } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { Meter } from "@/components/mini-visuals";
 import type { HistoryPoint, HistoryWindow, RunRecord, RunZone } from "@/lib/comparison-types";
 import { addDays, ageAt, dateInZone, daysBetween, mergeDaily } from "@/lib/comparison";
@@ -136,7 +137,7 @@ export function ComparisonChart({
     <section className="panel comparison-chart">
       <div className="panel-heading">
         <div>
-          <h2>Recorded moisture & EC</h2>
+          <h2>Recorded VWC and EC</h2>
           <p>
             Both runs use elapsed grow days. Each local day is aligned as a fraction of its actual
             duration, including DST.
@@ -151,14 +152,15 @@ export function ComparisonChart({
       )}
       {!hasPoints && !dailyTarget?.vwc.length && !dailyTarget?.ec.length ? (
         <Empty
-          title="No retained history in this range"
+          title="No history in this range"
+          tip={<UiTip copyKey="no retained history in this range" />}
           detail="No curve has been invented. Check Recorder retention, sensor inclusion and the selected dates."
         />
       ) : (
         <svg
           viewBox="0 0 900 310"
           role="img"
-          aria-label="Recorded VWC and EC compared by grow age, with separate reference target lines"
+          aria-label="VWC and EC by age"
         >
           <text x="58" y="18">
             VWC (%) · left
@@ -334,7 +336,7 @@ export function ComparisonSummary({ loaded, monthly }: { loaded: Loaded; monthly
       <div
         className="comparison-table"
         tabIndex={0}
-        aria-label="Recorded range summary, scroll for more dates"
+        aria-label="Recorded range summary"
       >
         <table className="data-table">
           <thead>

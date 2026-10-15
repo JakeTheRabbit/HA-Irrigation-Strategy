@@ -82,8 +82,19 @@ describe("Help & tools", () => {
     expect(shown(recent(doc("2.30.0")))).toEqual(RELEASES.slice(0, MOST).map((r) => r.version));
   });
   it("links each release to its notes", () => {
-    expect(releaseUrl("2.24.0")).toBe(
+    expect(releaseUrl({ version: "2.24.0", date: "2026-09-25" })).toBe(
       "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/releases/tag/v2.24.0",
+    );
+    expect(releaseUrl({ version: "3.11.2", date: "2026-10-20" })).toBe(
+      "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/releases/tag/v3.11.2",
+    );
+  });
+  it("links 3.0.0 to 3.11.1, which have no release page here, to their changelog section", () => {
+    expect(releaseUrl({ version: "3.0.0", date: "2026-09-27" })).toBe(
+      "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md#300---2026-09-27",
+    );
+    expect(releaseUrl({ version: "3.11.1", date: "2026-10-06" })).toBe(
+      "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/CHANGELOG.md#3111---2026-10-06",
     );
   });
 });

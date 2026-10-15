@@ -4,7 +4,7 @@ Drives the real Controller against an in-memory fake HA (no live HA, no /data fi
 confirming the shipped add-on fixes:
 
   * #14  default room takes hardware from the integration's engine_config descriptor;
-         NO facility (F2) fallback — an unmapped room holds safe.
+         NO built-in facility fallback — an unmapped room holds safe.
   * #20  a shot is interruptible: the kill switch / manual override stops water mid-shot.
   * #21  facility-specific holds are configurable (empty by default); notify unset = no push.
   * #26  rooms added after startup (and a late default-room descriptor) join without a restart.
@@ -17,8 +17,11 @@ import tempfile
 from datetime import datetime
 
 import fake_ha
+import pytest
 
 import controller
+
+pytestmark = pytest.mark.usefixtures("settings_built_in")
 
 
 def _build(options, states=None):
@@ -60,7 +63,7 @@ def _desc(prefix="", pump="switch.p", mainline="switch.m", valves=None, num=1, *
 
 
 # --------------------------------------------------------------------- #14
-def test_default_room_hardware_comes_from_descriptor_not_f2():
+def test_default_room_hardware_comes_from_descriptor_not_hardcoded_ids():
     eid = "sensor.crop_steering_engine_config"
     c, _ = _build(
         {"num_zones": 1},
@@ -74,9 +77,6 @@ def test_default_room_hardware_comes_from_descriptor_not_f2():
     assert hw["pump"] == "switch.my_pump"
     assert hw["mainline"] == "switch.my_main"
     assert hw["valves"] == {1: "switch.my_valve"}
-    # the retired F2 defaults must NOT appear anywhere
-    assert "switch.veg_main_pump" not in (hw["pump"], hw["mainline"])
-    assert "switch.f2_row1" not in hw["valves"].values()
 
 
 def test_unmapped_default_room_holds_safe_and_does_not_crash():
@@ -168,7 +168,7 @@ def test_execute_shot_abort_closes_valve_and_alerts(monkeypatch):
 
 
 # --------------------------------------------------------------------- #21
-def test_hold_entities_are_configurable_and_f2_ids_no_longer_hardcoded():
+def test_hold_entities_are_configurable_and_site_ids_no_longer_hardcoded():
     base_states = {
         "sensor.crop_steering_engine_config":
             ("ok", _desc(pump="switch.p", mainline="switch.m", valves={"1": "switch.v1"})),
@@ -177,15 +177,15 @@ def test_hold_entities_are_configurable_and_f2_ids_no_longer_hardcoded():
         "switch.crop_steering_system_enabled": ("on", {}),
         "switch.crop_steering_auto_irrigation_enabled": ("on", {}),
         "switch.crop_steering_zone_1_enabled": ("on", {}),
-        # the OLD hardcoded F2 hold — must be IGNORED now
-        "input_boolean.f2_fill_mode": ("on", {}),
+        # an entity an older version held on by name — must be IGNORED now
+        "input_boolean.fill_mode": ("on", {}),
         # a configured hold
         "input_boolean.my_dose": ("off", {}),
     }
     c, fake = _build({"num_zones": 1, "hold_entities": ["input_boolean.my_dose"]},
                      states=base_states)
     room = c.rooms[0]
-    # f2_fill_mode is ON but not configured -> must NOT block
+    # fill_mode is ON but not configured -> must NOT block
     assert c._blocked(room, 1) is None
     # turn the configured hold on -> blocks with a generic label
     fake.set_state("input_boolean.my_dose", "on")

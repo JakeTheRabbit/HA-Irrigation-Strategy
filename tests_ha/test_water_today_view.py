@@ -7,7 +7,7 @@ from homeassistant.const import ATTR_OPTION
 from test_setup_entry import _install
 from test_upgrade_in_place import _upgrade
 
-VIEW = "select.crop_steering_water_today_view"
+VIEW = "select.crop_steering_tent_water_today_view"
 
 
 async def _choose(hass, option):
@@ -30,8 +30,8 @@ async def test_a_new_room_shows_each_zones_total_until_someone_chooses(hass):
 
 
 async def test_an_upgraded_room_gets_the_choice_at_zone_total(hass):
-    await _upgrade(hass, "entry_2_17_wizard.json")
-    assert hass.states.get(VIEW).state == "Zone total"
+    await _upgrade(hass, "entry_2_17_wizard.json")  # a room from before slugs: no prefix
+    assert hass.states.get("select.crop_steering_water_today_view").state == "Zone total"
 
 
 async def test_the_controllers_vitals_follow_the_rooms_choice(hass, controller_for):

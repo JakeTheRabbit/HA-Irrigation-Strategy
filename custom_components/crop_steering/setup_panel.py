@@ -7,6 +7,9 @@ from .const import DOMAIN, SOFTWARE_VERSION
 
 PANEL = "crop-steering"
 URL = "/crop_steering"
+WWW = Path(__file__).parent / "www"
+# The panel's element (www/panel.js): it holds the dashboard in a frame the size of the panel.
+ELEMENT = "crop-steering-panel"
 
 
 def _panel_exists(hass, frontend) -> bool:
@@ -37,7 +40,7 @@ async def async_setup_panel(hass):
         if state.get("panel_registered") or _panel_exists(hass, frontend):
             return
         if not state.get("static_registered"):
-            directory = str(Path(__file__).parent / "www")
+            directory = str(WWW)
             if hasattr(hass.http, "async_register_static_paths"):
                 from homeassistant.components.http import StaticPathConfig
 
@@ -53,15 +56,30 @@ async def async_setup_panel(hass):
         # Leave its panel unowned so our unload never removes it.
         if _panel_exists(hass, frontend):
             return
+        # The page is served without cache headers, so a browser can keep showing the
+        # previous release's copy for hours after an update. A new version is a new URL.
+        config = {"url": f"{URL}/dashboard.html?v={SOFTWARE_VERSION}"}
+        component = "iframe"
+        # A custom panel where its element ships: Home Assistant draws its own title bar above
+        # an iframe panel and none above a custom panel. `_panel_custom` is what
+        # panel_custom.async_register_panel registers, without depending on panel_custom. It is
+        # Home Assistant's internal shape, so the built-in iframe panel on the same URL stays
+        # the fallback.
+        if (WWW / "panel.js").is_file():
+            component = "custom"
+            config["_panel_custom"] = {
+                "name": ELEMENT,
+                "module_url": f"{URL}/panel.js?v={SOFTWARE_VERSION}",
+                "embed_iframe": False,
+                "trust_external": False,
+            }
         frontend.async_register_built_in_panel(
             hass,
-            "iframe",
+            component,
             sidebar_title="Crop Steering",
             sidebar_icon="mdi:sprout",
             frontend_url_path=PANEL,
-            # The page is served without cache headers, so a browser can keep showing the
-            # previous release's copy for hours after an update. A new version is a new URL.
-            config={"url": f"{URL}/dashboard.html?v={SOFTWARE_VERSION}"},
+            config=config,
             require_admin=False,
         )
         state["panel_registered"] = True

@@ -28,6 +28,7 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.restore_state import RestoredExtraData, RestoreEntity
 
 from .const import (
     DOMAIN,
@@ -36,23 +37,33 @@ from .const import (
     DEFAULT_EC_FALLBACK,
     VWC_ADJUSTMENT_PERCENT,
     SOFTWARE_VERSION,
+    PROBE_FAR,
     PROBE_RANGE,
     PROBE_STALE_SECONDS,
+    SUBSTRATES,
 )
 from .room import room_prefix, build_engine_config
 from . import stock
-from .calculations import ShotCalculator, fuse_probes
+from .calculations import ShotCalculator, ec_type_key, fuse_probes
 from .units import to_native
 from .zone_status import mirrored_status, status_app_entity
 
 _LOGGER = logging.getLogger(__name__)
+
+# The configured shot each shot-duration sensor times: P1's first ramp shot, P2's maintenance shot,
+# and P3's emergency (rescue) shot.
+SHOT_SIZE_KEYS = {
+    "p1_shot_duration_seconds": "p1_initial_shot_size",
+    "p2_shot_duration_seconds": "p2_shot_size",
+    "p3_shot_duration_seconds": "p3_emergency_shot_size",
+}
 
 
 # Base sensor descriptions (non-zone specific)
 BASE_SENSOR_DESCRIPTIONS = [
     SensorEntityDescription(
         key="current_phase",
-        name="Current Phase",
+        name="Current phase",
         icon="mdi:water-circle",
     ),
     # dryback_percentage is OWNED BY THE ENGINE (the add-on set_state from
@@ -63,41 +74,41 @@ BASE_SENSOR_DESCRIPTIONS = [
     # Critical Template Calculations - Ported from packages
     SensorEntityDescription(
         key="p1_shot_duration_seconds",
-        name="P1 Shot Duration",
+        name="P1 shot duration",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:timer-sand",
     ),
     SensorEntityDescription(
         key="p2_shot_duration_seconds",
-        name="P2 Shot Duration",
+        name="P2 shot duration",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:timer-sand",
     ),
     SensorEntityDescription(
         key="p3_shot_duration_seconds",
-        name="P3 Emergency Shot Duration",
+        name="Rescue shot duration",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:timer-sand",
     ),
     SensorEntityDescription(
         key="ec_ratio",
-        name="EC Ratio",
+        name="EC ratio",
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:division",
     ),
     SensorEntityDescription(
         key="p2_vwc_threshold_adjusted",
-        name="P2 VWC Threshold Adjusted",
+        name="Adjusted re-water point",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         icon="mdi:water-alert",
     ),
     SensorEntityDescription(
         key="configured_avg_vwc",
-        name="Average VWC All Zones",
+        name="Mean VWC of all zones",
         device_class=SensorDeviceClass.MOISTURE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
@@ -105,7 +116,7 @@ BASE_SENSOR_DESCRIPTIONS = [
     ),
     SensorEntityDescription(
         key="configured_avg_ec",
-        name="Average EC All Zones",
+        name="Mean EC of all zones",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="mS/cm",
         icon="mdi:flash",
@@ -145,7 +156,7 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
         zone_sensors.append(
             SensorEntityDescription(
                 key=f"zone_{zone_num}_status",
-                name=f"Zone {zone_num} Status",
+                name=f"Zone {zone_num} status",
                 icon="mdi:information",
             )
         )
@@ -154,7 +165,7 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
         zone_sensors.append(
             SensorEntityDescription(
                 key=f"zone_{zone_num}_last_irrigation",
-                name=f"Zone {zone_num} Last Irrigation",
+                name=f"Zone {zone_num} last shot",
                 device_class=SensorDeviceClass.TIMESTAMP,
                 icon="mdi:history",
             )
@@ -164,7 +175,7 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
         zone_sensors.append(
             SensorEntityDescription(
                 key=f"zone_{zone_num}_daily_water_usage",
-                name=f"Zone {zone_num} Daily Water Usage",
+                name=f"Zone {zone_num} water today",
                 device_class=SensorDeviceClass.VOLUME,
                 state_class=SensorStateClass.TOTAL_INCREASING,
                 native_unit_of_measurement=UnitOfVolume.LITERS,
@@ -175,7 +186,7 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
         zone_sensors.append(
             SensorEntityDescription(
                 key=f"zone_{zone_num}_weekly_water_usage",
-                name=f"Zone {zone_num} Weekly Water Usage",
+                name=f"Zone {zone_num} water over seven grow-days",
                 device_class=SensorDeviceClass.VOLUME,
                 # Rolling windows decrease when old grow-days leave the total.
                 state_class=SensorStateClass.TOTAL,
@@ -187,7 +198,7 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
         zone_sensors.append(
             SensorEntityDescription(
                 key=f"zone_{zone_num}_irrigation_count_today",
-                name=f"Zone {zone_num} Irrigations Today",
+                name=f"Zone {zone_num} shots today",
                 state_class=SensorStateClass.TOTAL_INCREASING,
                 icon="mdi:counter",
             )
@@ -222,7 +233,11 @@ async def async_setup_entry(
         cls = (
             CropSteeringZoneStatusSensor
             if re.fullmatch(r"zone_\d+_status", description.key)
-            else CropSteeringSensor
+            else (
+                CropSteeringProbeSensor
+                if re.fullmatch(r"(vwc|ec)_zone_\d+", description.key)
+                else CropSteeringSensor
+            )
         )
         sensors.append(cls(entry, description, zones_config, hardware_config))
 
@@ -233,6 +248,7 @@ async def async_setup_entry(
     )
     sensors.append(CropSteeringStockSensor(entry))
     sensors.append(CropSteeringDosingConfigSensor(entry))
+    sensors.append(CropSteeringBrainQuestionsSensor(entry))
 
     async_add_entities(sensors)
 
@@ -260,6 +276,29 @@ class CropSteeringEngineConfigSensor(SensorEntity):
         self._attr_object_id = f"{DOMAIN}_{self._prefix}engine_config"
         # Home Assistant ignores _attr_object_id; the controller finds a room by THIS id.
         self.entity_id = f"sensor.{self._attr_object_id}"
+        self._substrate_select = f"select.{DOMAIN}_{self._prefix}substrate"
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # Republish when the room's substrate is chosen, so the controller is told.
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass, [self._substrate_select], self._substrate_changed
+            )
+        )
+
+    @callback
+    def _substrate_changed(self, _event) -> None:
+        self.async_write_ha_state()
+
+    def _substrate(self) -> str:
+        hass = getattr(self, "hass", None)
+        state = hass.states.get(self._substrate_select) if hass else None
+        return (
+            state.state
+            if state is not None and state.state in SUBSTRATES
+            else "generic"
+        )
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -286,6 +325,7 @@ class CropSteeringEngineConfigSensor(SensorEntity):
             {**self._entry.data, **self._entry.options},
             integration_version=SOFTWARE_VERSION,
             entry_id=self._entry.entry_id,
+            substrate=self._substrate(),
         )
 
 
@@ -428,6 +468,62 @@ class CropSteeringDosingConfigSensor(SensorEntity):
         )
 
 
+class CropSteeringBrainQuestionsSensor(SensorEntity):
+    """The room's last questions to the AI assistant (crop_steering.brain_ask), for the
+    controller app, which answers each once as sensor.crop_steering_<prefix>brain_answers.
+    State: how many are kept; attribute: questions, oldest first (brain_api.py)."""
+
+    _attr_should_poll = False
+    _attr_icon = "mdi:chat-question-outline"
+
+    def __init__(self, entry):
+        self._entry = entry
+        self._prefix = room_prefix(entry)
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_brain_questions"
+        self._attr_name = "AI assistant questions"
+        self._attr_object_id = f"{DOMAIN}_{self._prefix}brain_questions"
+        # Home Assistant ignores _attr_object_id; the controller finds the questions by THIS id.
+        self.entity_id = f"sensor.{self._attr_object_id}"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name="Crop Steering System",
+            manufacturer="Home Assistant Community",
+            model="Professional Irrigation Controller",
+            sw_version=SOFTWARE_VERSION,
+        )
+
+    def _manager(self):
+        return (
+            self.hass.data.get(DOMAIN, {})
+            .get("_brain_questions", {})
+            .get(self._entry.entry_id)
+        )
+
+    @property
+    def native_value(self) -> Any:
+        manager = self._manager()
+        return manager.sensor()[0] if manager is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        manager = self._manager()
+        return manager.sensor()[1] if manager is not None else {}
+
+    async def async_added_to_hass(self) -> None:
+        from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
+        from .brain_api import SIGNAL
+
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, f"{SIGNAL}_{self._entry.entry_id}", self.async_write_ha_state
+            )
+        )
+
+
 class CropSteeringSensor(SensorEntity):
     """Crop Steering sensor."""
 
@@ -454,8 +550,9 @@ class CropSteeringSensor(SensorEntity):
         # (number.p1_target_vwc). Existing installs keep the id the registry already holds.
         self.entity_id = f"sensor.{self._attr_object_id}"
         # A zone VWC/EC sensor's memory of how its probes read against each other (fuse_probes),
-        # and what the last reading was made from.
+        # when every probe last reported together, and what the last reading was made from.
         self._probe_offsets: dict[str, float] = {}
+        self._offsets_at: str | None = None
         self._fusion: dict | None = None
 
         # Extract zone number from key if this is a zone sensor.
@@ -512,12 +609,9 @@ class CropSteeringSensor(SensorEntity):
                 return self._get_zone_irrigation_count_today(self._zone_number)
 
         # Implement critical calculations ported from template entities
-        if self.entity_description.key == "p1_shot_duration_seconds":
-            return self._calculate_p1_shot_duration()
-        elif self.entity_description.key == "p2_shot_duration_seconds":
-            return self._calculate_p2_shot_duration()
-        elif self.entity_description.key == "p3_shot_duration_seconds":
-            return self._calculate_p3_shot_duration()
+        if self.entity_description.key in SHOT_SIZE_KEYS:
+            seconds = self._shot_seconds_by_zone(self.entity_description.key)
+            return max(seconds.values()) if seconds else None
         elif self.entity_description.key == "ec_ratio":
             return self._calculate_ec_ratio()
         elif self.entity_description.key == "p2_vwc_threshold_adjusted":
@@ -532,32 +626,65 @@ class CropSteeringSensor(SensorEntity):
             # Other sensors return None (placeholder)
             return None
 
-    def _calculate_p1_shot_duration(self) -> float:
-        """Calculate P1 shot duration in seconds."""
-        dripper_flow = self._get_number_value("dripper_flow_rate")
-        substrate_vol = self._get_number_value("substrate_volume")
-        shot_size = self._get_number_value("p1_initial_shot_size")  # Simplified for now
-        return ShotCalculator.calculate_shot_duration(
-            dripper_flow, substrate_vol, shot_size
-        )
+    def _zone_setting(self, zone_num: int, key: str) -> float | None:
+        """A zone's setting as the controller reads it: the zone's own number, else the room's.
+        None when neither reads as a number."""
+        for entity_id in (
+            f"number.crop_steering_{self._prefix}zone_{zone_num}_{key}",
+            f"number.crop_steering_{self._prefix}{key}",
+        ):
+            state = self.hass.states.get(entity_id)
+            if state is None or state.state in ("unknown", "unavailable", "none", ""):
+                continue
+            try:
+                value = float(state.state)
+            except (TypeError, ValueError):
+                return None
+            return value if math.isfinite(value) else None
+        return None
 
-    def _calculate_p2_shot_duration(self) -> float:
-        """Calculate P2 shot duration in seconds."""
-        dripper_flow = self._get_number_value("dripper_flow_rate")
-        substrate_vol = self._get_number_value("substrate_volume")
-        shot_size = self._get_number_value("p2_shot_size")
-        return ShotCalculator.calculate_shot_duration(
-            dripper_flow, substrate_vol, shot_size
-        )
-
-    def _calculate_p3_shot_duration(self) -> float:
-        """Calculate P3 emergency shot duration in seconds."""
-        dripper_flow = self._get_number_value("dripper_flow_rate")
-        substrate_vol = self._get_number_value("substrate_volume")
-        shot_size = self._get_number_value("p3_emergency_shot_size")
-        return ShotCalculator.calculate_shot_duration(
-            dripper_flow, substrate_vol, shot_size
-        )
+    def _shot_seconds_by_zone(self, key: str) -> dict[int, int]:
+        """How long the controller runs the configured shot `key` times, in each of the room's
+        active zones: the zone's pot size, drippers per plant and dripper flow, in whole seconds
+        within the room's shot limits. A zone whose sizing doesn't give a flow is left out.
+        """
+        zones = sorted(
+            int(zone)
+            for zone, config in self._zones_config.items()
+            if str(zone).isdigit() and (config or {}).get("active", True)
+        ) or [1]
+        # The room's maximum shot length, or its older entity's, as the controller reads it.
+        cap = None
+        for suffix in ("max_shot_duration", "maximum_shot_duration"):
+            cap_state = self.hass.states.get(
+                f"number.crop_steering_{self._prefix}{suffix}"
+            )
+            if cap_state is None:
+                continue
+            try:
+                cap = float(cap_state.state)
+            except (TypeError, ValueError):
+                cap = None
+            break
+        seconds = {}
+        for zone in zones:
+            sizing = [
+                self._zone_setting(zone, setting)
+                for setting in (
+                    "substrate_volume",
+                    SHOT_SIZE_KEYS[key],
+                    "drippers_per_plant",
+                    "dripper_flow_rate",
+                )
+            ]
+            if any(value is None or value <= 0 for value in sizing):
+                continue
+            substrate, size, drippers, flow = sizing
+            raw = ShotCalculator.calculate_shot_duration(
+                flow, substrate, size, drippers
+            )
+            seconds[zone] = ShotCalculator.capped_shot_seconds(raw, cap)
+        return seconds
 
     def _calculate_ec_ratio(self) -> float:
         """Calculate current EC ratio vs target."""
@@ -688,8 +815,12 @@ class CropSteeringSensor(SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict | None:
-        """Expose the weekly producer's coverage so partial history stays visible, and which
-        probes a zone's VWC/EC reading was made from."""
+        """Expose the weekly producer's coverage so partial history stays visible, which probes
+        a zone's VWC/EC reading was made from, and a shot-duration sensor's seconds in each zone
+        (it shows the longest)."""
+        if self.entity_description.key in SHOT_SIZE_KEYS:
+            seconds = self._shot_seconds_by_zone(self.entity_description.key)
+            return {"zones": {str(zone): value for zone, value in seconds.items()}}
         if self._zone_number and self.entity_description.key in (
             f"vwc_zone_{self._zone_number}",
             f"ec_zone_{self._zone_number}",
@@ -740,9 +871,11 @@ class CropSteeringSensor(SensorEntity):
         """(entity_id, value, age in seconds) for every probe, each value first converted to the
         unit the room steers in (`kind` "ec" -> mS/cm, "vwc" -> %). Mixed probes are common: one
         Atlas in uS/cm beside one TEROS in mS/cm would otherwise average to nonsense far over any
-        EC target. Value None = no usable number; age None = the state carries no time.
+        EC target. Value None = no usable number; age None = the state carries no time. The probes
+        set aside for their unit are left in self._unit_set_aside as {entity_id: unit}.
         """
         readings = []
+        self._unit_set_aside = {}
         for sensor_id in sensor_ids:
             if not sensor_id:
                 continue
@@ -757,7 +890,9 @@ class CropSteeringSensor(SensorEntity):
                         unit = (getattr(state, "attributes", None) or {}).get(
                             "unit_of_measurement"
                         )
-                        value = to_native(kind, unit, value)
+                        value, aside = to_native(kind, unit, value, sensor_id)
+                        if aside:
+                            self._unit_set_aside[sensor_id] = unit or ""
                     # last_reported moves on every report, last_updated only on a change.
                     stamp = getattr(state, "last_reported", None) or getattr(
                         state, "last_updated", None
@@ -769,15 +904,72 @@ class CropSteeringSensor(SensorEntity):
             readings.append((sensor_id, value, age))
         return readings
 
+    def _probe_method_entity(self, kind: str) -> str:
+        """The zone's select of how its probes become its `kind` reading (select.py)."""
+        return f"select.{DOMAIN}_{self._prefix}zone_{self._zone_number}_{kind}_method"
+
+    def _ec_types(self, sensor_ids: list[str]) -> dict[str, str]:
+        """What each EC probe measures, from its select (select.py); unknown without one."""
+        types = {}
+        for probe in sensor_ids:
+            state = probe and self.hass.states.get(
+                f"select.{DOMAIN}_{self._prefix}{ec_type_key(probe)}"
+            )
+            if state:
+                types[probe] = state.state
+        return types
+
     def _fuse_zone(self, sensor_ids: list[str], kind: str) -> float | None:
-        """One zone's reading from its probes (calculations.fuse_probes)."""
+        """One zone's reading from its probes (calculations.fuse_probes), combined as the zone's
+        select says; Median without it. Probes the zone's setup leaves out (`<kind>_unused`) do not
+        count; the one it names primary (`<kind>_primary`) is published, for the controller to say
+        when it goes offline (CS-505)."""
         lo, hi = PROBE_RANGE[kind]
+        zone = (
+            self._zones_config.get(self._zone_number)
+            or self._zones_config.get(str(self._zone_number))
+            or {}
+        )
+        unused = set(zone.get(f"{kind}_unused") or ()) & set(sensor_ids)
+        if unused == set(sensor_ids):
+            unused = (
+                set()
+            )  # setup never leaves a zone none; an edited entry must not either
+        method = self.hass.states.get(self._probe_method_entity(kind))
         value, self._fusion = fuse_probes(
-            self._probe_readings(sensor_ids, kind),
+            self._probe_readings([s for s in sensor_ids if s not in unused], kind),
             self._probe_offsets,
             lo,
             hi,
             PROBE_STALE_SECONDS,
+            method.state if method is not None else "Median",
+            PROBE_FAR[kind],
+            self._ec_types(sensor_ids) if kind == "ec" else None,
+        )
+        if value is not None and not self._fusion["excluded"]:
+            self._offsets_at = dt_util.utcnow().isoformat()
+        self._fusion["offsets_learned"] = (
+            self._offsets_at if self._probe_offsets else None
+        )
+        # Say which probes were set aside for their unit, so the controller can name the probe and
+        # its unit (CS-503) rather than only that the zone has no reading.
+        aside = {
+            pid: unit
+            for pid, unit in self._unit_set_aside.items()
+            if pid in self._fusion["excluded"]
+        }
+        if aside:
+            self._fusion["excluded"].update(
+                {pid: "set aside for its unit" for pid in aside}
+            )
+            self._fusion["quality"].update(
+                {pid: {"quality": "bad", "reason": "unknown_unit"} for pid in aside}
+            )
+            self._fusion["unit_set_aside"] = aside
+        self._fusion["excluded"].update(dict.fromkeys(sorted(unused), "not counted"))
+        primary = zone.get(f"{kind}_primary")
+        self._fusion["primary"] = (
+            primary if primary in sensor_ids and primary not in unused else None
         )
         return value
 
@@ -912,6 +1104,44 @@ class CropSteeringSensor(SensorEntity):
     def available(self) -> bool:
         """Return if sensor is available."""
         return True
+
+
+class CropSteeringProbeSensor(CropSteeringSensor, RestoreEntity):
+    """A zone's moisture or EC reading from its probes. What it learned of how they read against each
+    other is kept over a restart, keyed by probe, with when every probe last reported together, so
+    a probe missing at start-up does not step the reading. A new choice in the zone's method select
+    shows at once, not at the next poll."""
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_extra_data()
+        data = last.as_dict() if last is not None else {}
+        offsets = data.get("probe_offsets")
+        if isinstance(offsets, dict) and all(
+            isinstance(pid, str) and isinstance(v, (int, float)) and math.isfinite(v)
+            for pid, v in offsets.items()
+        ):
+            self._probe_offsets.update(offsets)
+            self._offsets_at = data.get("offsets_learned")
+        kind = self.entity_description.key.split("_", 1)[0]
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass, [self._probe_method_entity(kind)], self._method_changed
+            )
+        )
+
+    @callback
+    def _method_changed(self, _event) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def extra_restore_state_data(self) -> RestoredExtraData:
+        return RestoredExtraData(
+            {
+                "probe_offsets": dict(self._probe_offsets),
+                "offsets_learned": self._offsets_at,
+            }
+        )
 
 
 class CropSteeringZoneStatusSensor(CropSteeringSensor):

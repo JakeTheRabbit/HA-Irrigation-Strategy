@@ -8,17 +8,18 @@ the zone's own numbers, inside a band around the operator's own value:
 - the P2 re-water threshold, 0.5 points a notch, from 2 points under to 1 point over the operator's value, always
   4 points above the rescue floor and 2 under the ramp's ceiling.
 
-Why this shape (26 Sep 2026): the old learner walked zone 1's shot from 3 % to 1 % one step a day (30-second
-shots every 96 seconds) and ratcheted zone 3's targets to 74.5 in four days. A band anchored on the operator's
-value can't ratchet, the floor stops machine-gun shots, the operator's own edits move the band (jev_bridge), and a
-rescue shot after a change puts the old value back and pauses the zone for two days. Nothing moves unless the
-room's Auto setpoints switch is on.
+Why this shape (observed on a production room, 26 Sep 2026): the old learner walked zone 1's shot from 3 % to 1 %
+one step a day (30-second shots every 96 seconds) and ratcheted zone 3's targets to 74.5 in four days. A band
+anchored on the operator's value can't ratchet, the floor stops machine-gun shots, the operator's own edits move the
+band (jev_bridge), and a rescue shot after a change puts the old value back and pauses the zone for two days.
+Nothing moves unless the room's Auto setpoints switch is on.
 """
 from __future__ import annotations
 
 from datetime import timedelta
 
 from ..doctrine import doctrine
+from ..envelope import notch_budget
 from .base import Judge, choice, common, with_doctrine
 from .zones import water_vs_room
 
@@ -101,6 +102,8 @@ class SetpointsJudge(Judge):
         sp = ctx.setpoints or {}
         if not sp.get("enabled") or sp.get("frozen") or sp.get("changed_today") or not sp.get("current"):
             return False
+        if all(notch_budget(sp, suffix, ctx.now) for suffix in sp["current"]):
+            return False  # nothing it could pick would be admitted: no ask
         if ctx.lights_on or ctx.since_lights_min > 180:  # the first three hours of the night
             return False
         return super().due(ctx, last_asked)
@@ -170,8 +173,9 @@ class SetpointsJudge(Judge):
 
     def decide(self, verdicts, ctx):
         """Both phrasings must pick the same lever. It acts when that lever alone, or its direction (less or more
-        water), holds 60 %: live, zone 1's heavy day read smaller shots 0.47 with the rest mostly on re-watering
-        later, a firm "less water" with the lever agreed. Split between two levers, nothing moves."""
+        water), holds 60 %: observed on a production room, one zone's heavy day read smaller shots 0.47 with the rest
+        mostly on re-watering later, a firm "less water" with the lever agreed. Split between two levers, nothing
+        moves."""
         v = verdicts.get("tomorrow")
         if v is None or v.label not in MOVES:
             return None

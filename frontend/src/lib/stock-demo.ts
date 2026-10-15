@@ -17,21 +17,21 @@ export type StockAction = OperatorAction | "stock_draw";
 
 /** Each demo room's stock tanks, one per dosing pump and named after its nutrient; the demo's dosing
  * setup links each pump to its own. [id, name, capacity L, level L, per batch mL (the recipe's), low
- * mark L]. Flower 2's Bloom is getting low; Flower 1's Fade is new and full. */
+ * mark L]. Room A's Part B is getting low; Room B's Finisher is new and full. */
 const DEMO_TANKS: Record<string, [string, string, number, number, number, number][]> = {
   "": [
-    ["balance", "Balance", 10, 6.9, 300, 2],
-    ["bloom", "Bloom", 20, 5.4, 1800, 4],
-    ["core", "Core", 20, 12.9, 1080, 4],
-    ["cleanse", "Cleanse", 5, 3.9, 200, 1],
+    ["silica", "Silica", 10, 6.9, 300, 2],
+    ["part_b", "Part B", 20, 5.4, 1800, 4],
+    ["part_a", "Part A", 20, 12.9, 1080, 4],
+    ["cleaner", "Line cleaner", 5, 3.9, 200, 1],
   ],
-  f1_: [
-    ["grow", "Grow", 20, 14.2, 1080, 4],
-    ["cleanse", "Cleanse", 5, 3.6, 200, 1],
-    ["balance", "Balance", 10, 7.4, 180, 2],
-    ["fade", "Fade", 10, 10, 0, 2],
-    ["core", "Core", 20, 11.5, 0, 4],
-    ["bloom", "Bloom", 20, 16.2, 1800, 4],
+  room_b_: [
+    ["veg_base", "Veg base", 20, 14.2, 1080, 4],
+    ["cleaner", "Line cleaner", 5, 3.6, 200, 1],
+    ["silica", "Silica", 10, 7.4, 180, 2],
+    ["finisher", "Finisher", 10, 10, 0, 2],
+    ["part_a", "Part A", 20, 11.5, 0, 4],
+    ["part_b", "Part B", 20, 16.2, 1800, 4],
   ],
 };
 const prefixOf = (roomId: string) => (roomId.startsWith("room:") ? roomId.slice(5) : "");

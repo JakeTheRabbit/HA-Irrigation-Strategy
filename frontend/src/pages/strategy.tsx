@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Check, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -16,13 +16,36 @@ import { smoothRecorded } from "@/lib/planning-curve";
 import { useSensorContext } from "@/components/sensor-context";
 import { AutoSetpointsControl, AutoZoneChip } from "@/components/room-controls";
 import { SettingRow } from "@/components/setting-row";
+import { UiTip } from "@/components/info-tip";
 import { managedBy } from "@/lib/auto-setpoints";
 import { jevIds, parseJevSetpoints } from "@/lib/jev";
 import { setpointParam } from "@/lib/sensor-context";
 import { settingWords } from "@/lib/setting-words";
-import { jevChip, SETUP_GROUPS, TARGET_GROUPS } from "@/lib/targets";
+import {
+  jevChip,
+  planSteering,
+  SETUP_GROUPS,
+  steeringConsequence,
+  TARGET_GROUPS,
+} from "@/lib/targets";
+import {
+  exportTargets,
+  loadTargets,
+  readTargets,
+  targetsFileName,
+  type LoadedTargets,
+} from "@/lib/targets-file";
 import "./setpoint-preview.css";
 import "./targets.css";
+
+function download(text: string, name: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export type Drafts = Record<
   string,
@@ -57,6 +80,10 @@ export function Strategy({
   const [saved, setSaved] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [roomPreviewZone, setRoomPreviewZone] = useState(room.zones[0]?.id);
+  // What the last targets file loaded into the draft, or why it could not be read.
+  const [loaded, setLoaded] = useState<{ from: string; result: LoadedTargets } | null>(null);
+  const [fileError, setFileError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (selectedZone !== undefined) setZoneId(String(selectedZone));
   }, [selectedZone]);
@@ -97,6 +124,22 @@ export function Strategy({
         ).test(field.entityId)
       : false,
   );
+  /** The other mode's value of a mode-dependent target, shown muted beside the one in use. */
+  const otherValue = (key: string) => {
+    const suffix =
+      key === "dryback_target"
+        ? `_${otherMode}_dryback_target`
+        : /^ec_target_p[012]$/.test(key)
+          ? `_ec_target_${otherMode?.slice(0, 3)}_${key.slice(-2)}`
+          : null;
+    const field = suffix ? otherFields.find((item) => item.entityId.endsWith(suffix)) : undefined;
+    const value = field ? (drafts[field.entityId]?.value ?? field.value) : null;
+    return value === null || value === "" ? null : `${number(Number(value))} ${field?.unit ?? ""}`;
+  };
+  const planSteers = zone
+    ? planSteering(states[`sensor.crop_steering_${prefix}strategy_plan`]?.attributes, zone.id)
+    : null;
+  const step = review ? 1 : saved && !Object.keys(drafts).length ? 2 : 0;
   const restFields = own.filter(
     (field) =>
       !tableIds.has(field.entityId) &&
@@ -114,8 +157,9 @@ export function Strategy({
       vwc: smoothRecorded(sensor.vwc.points, 10),
       ec: smoothRecorded(sensor.ec.points, 20),
       now: sensor.now,
+      timeZone: controller.timeZone,
     }),
-    [sensor.vwc.points, sensor.ec.points, sensor.now],
+    [sensor.vwc.points, sensor.ec.points, sensor.now, controller.timeZone],
   );
   const supervisors = room.zones.map((z) => z.auto);
   const errors = Object.entries(drafts)
@@ -190,8 +234,28 @@ export function Strategy({
       return next;
     });
   }
+  function exportFile() {
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    download(exportTargets(room, now.toISOString()), targetsFileName(room.room.name, date));
+  }
+  async function importFile(file: File | undefined) {
+    if (fileRef.current) fileRef.current.value = "";
+    if (!file) return;
+    setLoaded(null);
+    setFileError("");
+    try {
+      const targets = readTargets(await file.text());
+      const result = loadTargets(targets, room);
+      setSaved(false);
+      setDrafts(result.drafts);
+      setLoaded({ from: `${targets.room || "another room"}’s targets`, result });
+    } catch (e) {
+      setFileError(e instanceof Error ? e.message : String(e));
+    }
+  }
   /** One setting as a row, with Jev's range and the probe's hints. */
-  const row = (setting: Setting, label: string, unit: string) => {
+  const row = (setting: Setting, label: string, unit: string, other?: string | null) => {
     const param = setpointParam(setting.entityId, prefix);
     return (
       <SettingRow
@@ -207,6 +271,7 @@ export function Strategy({
         auto={managedBy(supervisors, setting.entityId)}
         readOnly={planEngaged}
         disabled={!canEdit}
+        other={other}
         onEdit={edit}
       />
     );
@@ -224,6 +289,31 @@ export function Strategy({
           <div className="heading-actions">
             <AutoSetpointsControl controller={controller} jevManaged={jevManaged} />
             <Button
+              variant="outline"
+              onClick={exportFile}
+              disabled={planEngaged || !allSettings.length}
+              title={
+                planEngaged
+                  ? "While a grow plan is armed the room follows it: export the plan instead"
+                  : "Save these targets to a file, both steering modes, for another room"
+              }
+            >
+              <Download size={16} /> Export
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => fileRef.current?.click()}
+              disabled={!canEdit || Object.keys(drafts).length > 0}
+              title={
+                Object.keys(drafts).length
+                  ? "Review or discard your draft first"
+                  : "Load a targets file into the draft, to review before anything changes"
+              }
+            >
+              <Upload size={16} /> Import
+            </Button>
+            <UiTip copyKey="import targets" />
+            <Button
               disabled={!items.length || Boolean(errors.length) || !canEdit}
               onClick={() => setReview(true)}
             >
@@ -240,6 +330,55 @@ export function Strategy({
             <a href="#/plan/schedule">Open schedule</a>
           </Button>
         </div>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/json,.json"
+        className="sr-only"
+        aria-label="Import targets"
+        onChange={(e) => void importFile(e.target.files?.[0])}
+      />
+      {fileError && (
+        <div className="workspace-message error" role="alert">
+          {fileError}
+        </div>
+      )}
+      {loaded && (
+        <div className="workspace-message targets-loaded" role="status">
+          <p>
+            <strong>
+              {Object.keys(loaded.result.drafts).length
+                ? `Loaded ${Object.keys(loaded.result.drafts).length} ${
+                    Object.keys(loaded.result.drafts).length === 1 ? "change" : "changes"
+                  } from ${loaded.from}.`
+                : `Nothing to change: ${loaded.from} match this room’s.`}
+            </strong>{" "}
+            {Object.keys(loaded.result.drafts).length > 0 &&
+              "They’re in your draft: nothing changes until you review and apply them."}
+          </p>
+          {loaded.result.zoneMismatch && <p>{loaded.result.zoneMismatch}</p>}
+          {loaded.result.left.length > 0 && (
+            <p>Left as this room has them: {loaded.result.left.join(", ")}.</p>
+          )}
+          {loaded.result.rounded.length > 0 && (
+            <p>Rounded to this room’s steps: {loaded.result.rounded.join("; ")}.</p>
+          )}
+          {loaded.result.skipped.length > 0 && <p>Skipped: {loaded.result.skipped.join("; ")}.</p>}
+          {loaded.result.missingZones.length > 0 && (
+            <p>Not in this room: {loaded.result.missingZones.join(", ")}.</p>
+          )}
+        </div>
+      )}
+      {!planEngaged && (
+        <ol className="workflow-steps" aria-label="Steps to change targets">
+          {["Edit draft", "Review changes", "Apply & verify"].map((label, index) => (
+            <li key={label} aria-current={step === index ? "step" : undefined}>
+              <i>{index + 1}</i>
+              {label}
+            </li>
+          ))}
+        </ol>
       )}
       <nav className="zone-switcher targets-zones" aria-label="Targets for">
         {room.zones.map((item) => {
@@ -310,14 +449,44 @@ export function Strategy({
                 {drafts[choice.entityId] && (
                   <span className="small muted">Currently {choice.value || "unavailable"}</span>
                 )}
+                {zone && /_steering_mode$/.test(choice.entityId) && preview.draft.mode && (
+                  <p className="targets-consequence">
+                    {steeringConsequence(
+                      preview.draft.mode,
+                      preview.draft.parameters.dryback_target,
+                    )}
+                  </p>
+                )}
               </div>
             ))}
+          {zone && planEngaged && (
+            <div className="targets-choice">
+              <p>
+                Steering comes from the grow plan{planSteers ? ` (${planSteers})` : ""}. Change it
+                in Schedule.
+              </p>
+            </div>
+          )}
           {zone && !planEngaged && (
             <table className="targets-table">
+              {otherMode && (
+                <thead>
+                  <tr>
+                    <th scope="col">Setting</th>
+                    <th scope="col">{preview.draft.mode} · in use</th>
+                    <th scope="col" className="targets-other">
+                      {otherMode === "generative" ? "Generative" : "Vegetative"}
+                    </th>
+                    <th scope="col">
+                      <span className="sr-only">Ranges</span>
+                    </th>
+                  </tr>
+                </thead>
+              )}
               {TARGET_GROUPS.map((group) => (
                 <tbody key={group.phase}>
                   <tr className="targets-phase">
-                    <th colSpan={3} scope="colgroup">
+                    <th colSpan={otherMode ? 4 : 3} scope="colgroup">
                       <span className="pill" data-phase={group.phase}>
                         {group.phase}
                       </span>{" "}
@@ -327,11 +496,16 @@ export function Strategy({
                   {group.rows.map((item) => {
                     const setting = preview.fields[item.key];
                     return setting ? (
-                      row(setting, item.label, setting.unit || item.unit)
+                      row(
+                        setting,
+                        item.label,
+                        setting.unit || item.unit,
+                        otherMode ? otherValue(item.key) : undefined,
+                      )
                     ) : (
                       <tr key={item.key} className="targets-missing">
                         <th scope="row">{item.label}</th>
-                        <td colSpan={2}>Not reported by this controller</td>
+                        <td colSpan={otherMode ? 3 : 2}>Not reported by this controller</td>
                       </tr>
                     );
                   })}
@@ -372,17 +546,6 @@ export function Strategy({
               ))}
             </table>
           )}
-          {!planEngaged && otherMode && otherFields.length > 0 && (
-            <details className="targets-more">
-              <summary>
-                {otherMode === "generative" ? "Generative" : "Vegetative"} targets: the P3 dryback
-                and EC targets used while the zone is steered {otherMode}
-              </summary>
-              <table className="targets-table">
-                <tbody>{otherFields.map(plain)}</tbody>
-              </table>
-            </details>
-          )}
           {!planEngaged && restFields.length > 0 && (
             <div className="targets-rest">
               {zone && <h3>Other settings</h3>}
@@ -406,7 +569,7 @@ export function Strategy({
         </section>
         <aside
           className={`setpoint-preview ${expanded ? "is-expanded" : ""}`}
-          aria-label="Setpoint planning preview"
+          aria-label="Setpoint preview"
         >
           <div className="setpoint-preview-context">
             <div>
@@ -432,7 +595,10 @@ export function Strategy({
           </div>
           {zoneId === "room" && (
             <div className="setpoint-preview-zone">
-              <label htmlFor="setpoint-preview-zone">Preview room changes in</label>
+              <span className="label-with-tip">
+                <label htmlFor="setpoint-preview-zone">Preview room changes in</label>
+                <UiTip copyKey="preview room changes in" />
+              </span>
               <select
                 id="setpoint-preview-zone"
                 value={previewZoneId ?? ""}
@@ -508,6 +674,7 @@ export function Strategy({
             onClick={() => {
               setDrafts({});
               setSaved(false);
+              setLoaded(null);
             }}
           >
             Discard draft

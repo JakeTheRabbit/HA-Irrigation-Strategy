@@ -26,7 +26,7 @@ async def _to_zones_step(hass):
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
     assert result["type"] is FlowResultType.FORM and result["step_id"] == "user"
-    result = await flow.async_configure(result["flow_id"], {"name": "Tent", "config_method": "manual"})
+    result = await flow.async_configure(result["flow_id"], {"name": "Tent"})
     assert result["step_id"] == "manual_zones"
     result = await flow.async_configure(result["flow_id"], {"num_zones": 1})
     assert result["type"] is FlowResultType.FORM and result["step_id"] == "zones"
@@ -71,20 +71,18 @@ async def test_a_one_switch_tent_becomes_a_room_and_its_switches_get_the_ids_the
 
     registry = er.async_get(hass)
     for entity_id in (
-        "switch.crop_steering_room_active",
-        "switch.crop_steering_auto_setpoints",
-        "switch.crop_steering_engine_enabled",
-        "switch.crop_steering_system_enabled",
+        "switch.crop_steering_tent_room_active",
+        "switch.crop_steering_tent_auto_setpoints",
+        "switch.crop_steering_tent_engine_enabled",
+        "switch.crop_steering_tent_system_enabled",
     ):
         assert registry.async_get(entity_id) is not None, f"{entity_id} is not registered under that id"
-    assert hass.states.get("switch.crop_steering_room_active").state == "on"  # a new room is growing
-    assert hass.states.get("switch.crop_steering_auto_setpoints").state == "off"  # nothing rewrites targets unasked
+    assert hass.states.get("switch.crop_steering_tent_room_active").state == "on"  # a new room is growing
+    assert hass.states.get("switch.crop_steering_tent_auto_setpoints").state == "off"  # nothing rewrites targets unasked
 
     # the fused pore-EC sensor converts the probe's uS/cm; the descriptor the controller reads has no pump
     await hass.async_block_till_done()
-    descriptor = hass.states.get("sensor.crop_steering_system_engine_config") or hass.states.get(
-        "sensor.crop_steering_engine_config"
-    )
+    descriptor = hass.states.get("sensor.crop_steering_tent_engine_config")
     assert descriptor is not None
     valves = {str(zone): valve for zone, valve in descriptor.attributes["valves"].items()}
     assert not descriptor.attributes.get("pump") and valves == {"1": VALVE}
@@ -115,7 +113,7 @@ async def test_a_fresh_install_registers_every_entity_under_the_id_its_code_asks
 
 
 async def test_an_existing_install_keeps_the_entity_ids_its_registry_already_holds(hass):
-    """Older installs hold ids the code no longer asks for (F2's fused probe is
+    """Older installs hold ids the code no longer asks for (one production room's fused probe is
     `sensor.crop_steering_zone_1_vwc`, the code asks for `..._vwc_zone_1`). Dashboards, automations and
     recorder history hang off the registered id, so setting `entity_id` must never move one."""
     _seed(hass)
@@ -124,7 +122,7 @@ async def test_an_existing_install_keeps_the_entity_ids_its_registry_already_hol
     result = await hass.config_entries.flow.async_configure(flow_id, {"plumbing": "valves_only"})
     await hass.async_block_till_done()
     registry = er.async_get(hass)
-    asked, held = "sensor.crop_steering_vwc_zone_1", "sensor.crop_steering_zone_1_vwc"
+    asked, held = "sensor.crop_steering_tent_vwc_zone_1", "sensor.crop_steering_tent_zone_1_vwc"
     unique_id = registry.async_get(asked).unique_id
     registry.async_update_entity(asked, new_entity_id=held)
     await hass.async_block_till_done()

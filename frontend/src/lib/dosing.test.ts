@@ -79,35 +79,40 @@ const runtime = (change: Partial<PumpRuntime> = {}): PumpRuntime => ({
 
 describe("reading the configuration and the controller's status", () => {
   it("reads each demo room's pumps, recipe and batch hardware from the integration's sensor", () => {
-    const f2 = demo().config;
-    expect(f2.revision).toBe(4);
-    expect(f2.pumps.map((pump) => pump.name)).toEqual(["Balance", "Bloom", "Core", "Cleanse"]);
-    expect(f2.batch.recipe.map((line) => line.ml)).toEqual([300, 1800, 1080, 200]);
-    expect(f2.batch).toMatchObject({
+    const roomA = demo().config;
+    expect(roomA.revision).toBe(4);
+    expect(roomA.pumps.map((pump) => pump.name)).toEqual([
+      "Silica",
+      "Part B",
+      "Part A",
+      "Line cleaner",
+    ]);
+    expect(roomA.batch.recipe.map((line) => line.ml)).toEqual([300, 1800, 1080, 200]);
+    expect(roomA.batch).toMatchObject({
       fill_valve: "switch.demo_tank_fill_valve",
       full_entity: "binary_sensor.demo_tank_full",
       mix_valves: ["switch.demo_recirc_valve"],
       premix_min: 2,
       postmix_min: 5,
     });
-    const f1 = demo("f1_").config;
-    expect(f1.pumps.map((pump) => pump.name)).toEqual([
-      "Grow",
-      "Cleanse",
-      "Balance",
-      "Fade",
-      "Core",
-      "Bloom",
+    const roomB = demo("room_b_").config;
+    expect(roomB.pumps.map((pump) => pump.name)).toEqual([
+      "Veg base",
+      "Line cleaner",
+      "Silica",
+      "Finisher",
+      "Part A",
+      "Part B",
     ]);
-    expect(f1.batch.recipe.map((line) => line.ml)).toEqual([1080, 200, 180, 0, 0, 1800]);
-    expect(f1.batch.fill_valve).toBeNull();
+    expect(roomB.batch.recipe.map((line) => line.ml)).toEqual([1080, 200, 180, 0, 0, 1800]);
+    expect(roomB.batch.fill_valve).toBeNull();
   });
 
   it("keeps what it can of garbled attributes and never throws", () => {
     const config = readConfig(
       entity("sensor.crop_steering_dosing_config", "7", {
         pumps: [
-          { id: "ok", name: "  Bloom ", flow_entity: "number.flow", max_ml: "900" },
+          { id: "ok", name: "  Part B ", flow_entity: "number.flow", max_ml: "900" },
           { id: "ok", name: "Duplicate" },
           { id: "Bad Id!", name: "Refused" },
           "not a pump",
@@ -119,7 +124,7 @@ describe("reading the configuration and the controller's status", () => {
     )!;
     expect(config.revision).toBe(7);
     expect(config.pumps.map((pump) => [pump.id, pump.name, pump.max_ml])).toEqual([
-      ["ok", "Bloom", 900],
+      ["ok", "Part B", 900],
       ["bare", "bare", 0],
     ]);
     expect(config.pumps[1]).toMatchObject({ dosing_prefix: "Dosing", restore_volume: true });
@@ -163,42 +168,47 @@ describe("reading the configuration and the controller's status", () => {
 
 describe("a pump's card", () => {
   it("is idle, dosing, not calibrated or unavailable, and a running motor always shows", () => {
-    const { states, config, status } = demo("f1_");
-    const reach = controllerReach(states, "f1_", status, NOW);
+    const { states, config, status } = demo("room_b_");
+    const reach = controllerReach(states, "room_b_", status, NOW);
     expect(reach.live).toBe(true);
     const view = (id: string, s: States = states, st: DosingStatus | null = status) =>
       pumpView(
         config.pumps.find((pump) => pump.id === id)!,
         st,
-        controllerReach(s, "f1_", st, NOW),
+        controllerReach(s, "room_b_", st, NOW),
         s,
         NOW,
       );
-    expect(view("grow").state).toBe("idle");
-    expect(view("fade")).toMatchObject({ state: "uncalibrated", flow: 0 });
-    expect(view("fade").reason).toMatch(/reads 0 mL\/s/);
+    expect(view("veg_base").state).toBe("idle");
+    expect(view("finisher")).toMatchObject({ state: "uncalibrated", flow: 0 });
+    expect(view("finisher").reason).toMatch(/reads 0 mL\/s/);
     // The pump reports dosing though the controller says nothing of it.
     const pressed = {
       ...states,
-      "binary_sensor.demo_f1_doser_grow_dosing": entity(
-        "binary_sensor.demo_f1_doser_grow_dosing",
+      "binary_sensor.demo_room_b_doser_veg_base_dosing": entity(
+        "binary_sensor.demo_room_b_doser_veg_base_dosing",
         "on",
       ),
     };
-    expect(view("grow", pressed).state).toBe("dosing");
+    expect(view("veg_base", pressed).state).toBe("dosing");
     const offline = {
       ...states,
-      "number.demo_f1_doser_core_flow": entity("number.demo_f1_doser_core_flow", "unavailable"),
+      "number.demo_room_b_doser_part_a_flow": entity(
+        "number.demo_room_b_doser_part_a_flow",
+        "unavailable",
+      ),
     };
-    expect(view("core", offline)).toMatchObject({ state: "unavailable" });
-    expect(view("core", offline).reason).toMatch(/number\.demo_f1_doser_core_flow is unavailable/);
+    expect(view("part_a", offline)).toMatchObject({ state: "unavailable" });
+    expect(view("part_a", offline).reason).toMatch(
+      /number\.demo_room_b_doser_part_a_flow is unavailable/,
+    );
     // No controller report: nothing can dose, so nothing reads idle.
     const stale = { ...status, updated_at: new Date(NOW - STATUS_STALE_MS - 1_000).toISOString() };
-    expect(view("grow", states, stale).state).toBe("unavailable");
+    expect(view("veg_base", states, stale).state).toBe("unavailable");
     const silent = { ...states };
-    delete silent["sensor.crop_steering_f1_ai_heartbeat"];
-    expect(view("grow", silent, { ...status, updated_at: null }).state).toBe("unavailable");
-    expect(view("grow", states, null).reason).toMatch(/update the controller app/);
+    delete silent["sensor.crop_steering_room_b_ai_heartbeat"];
+    expect(view("veg_base", silent, { ...status, updated_at: null }).state).toBe("unavailable");
+    expect(view("veg_base", states, null).reason).toMatch(/update the controller app/);
   });
 
   it("goes by the dosing report's time, and by the heartbeat only when it has none", () => {
@@ -218,6 +228,17 @@ describe("a pump's card", () => {
     const old = { ...status, updated_at: null };
     expect(controllerReach(states, "", old, NOW).live).toBe(true);
     expect(controllerReach(noBeat, "", old, NOW).reason).toBe("The controller is not running.");
+    const stopped = {
+      ...states,
+      "sensor.crop_steering_ai_heartbeat": {
+        ...states["sensor.crop_steering_ai_heartbeat"],
+        state: "stopped",
+      },
+    };
+    expect(controllerReach(stopped, "", old, NOW)).toEqual({
+      live: false,
+      reason: "The controller app has stopped.",
+    });
     // Python's naive local isoformat is read too.
     const naive = new Date(NOW - 30_000);
     const local = `${naive.getFullYear()}-${String(naive.getMonth() + 1).padStart(2, "0")}-${String(naive.getDate()).padStart(2, "0")}T${String(naive.getHours()).padStart(2, "0")}:${String(naive.getMinutes()).padStart(2, "0")}:${String(naive.getSeconds()).padStart(2, "0")}.123456`;
@@ -266,9 +287,9 @@ describe("a pump's card", () => {
 
   it("names the pump's device", () => {
     const pump = demo().config.pumps[0];
-    expect(hardwareLabel(pump)).toBe("demo_doser_balance");
+    expect(hardwareLabel(pump)).toBe("demo_doser_silica");
     expect(hardwareLabel({ ...pump, volume_entity: "number.other" })).toBe(
-      "button.demo_doser_balance_start",
+      "button.demo_doser_silica_start",
     );
   });
 });
@@ -277,22 +298,22 @@ describe("a pump's stock tank", () => {
   const sensor = (tanks: unknown[]) => ({
     [stockSensorId("")]: entity(stockSensorId(""), "0", { tanks }),
   });
-  const tank = { id: "bloom_a", name: "Bloom A", level_l: 5.4, capacity_l: 20, low_l: 4 };
+  const tank = { id: "bloom_a", name: "Part B A", level_l: 5.4, capacity_l: 20, low_l: 4 };
 
   it("is the tank the pump's stock_tank names, never one of the same name", () => {
     const { config, states } = demo();
-    // Bloom is linked to "Bloom A"; the tank called Bloom is not its.
+    // Part B is linked to "Part B A"; the tank called Part B is not its.
     const pump = { ...config.pumps[1], stock_tank: "bloom_a" };
     const tanks = stockTanks(
       sensor([
-        { ...tank, id: "bloom", name: "Bloom", level_l: 18 },
+        { ...tank, id: "part_b", name: "Part B", level_l: 18 },
         tank,
-        { name: "Bloom", level_l: 9, capacity_l: 20 }, // an integration from before dosing: no id
+        { name: "Part B", level_l: 9, capacity_l: 20 }, // an integration from before dosing: no id
         { id: "broken", name: "Broken", level_l: "x", capacity_l: 20 },
       ]),
       "",
     );
-    expect(tanks.map((item) => item.id)).toEqual(["bloom", "bloom_a"]);
+    expect(tanks.map((item) => item.id)).toEqual(["part_b", "bloom_a"]);
     const rows = recipeRows(config, states);
     expect(pumpStock(pump, tanks, rows, null)).toEqual({
       id: "bloom_a",
@@ -311,14 +332,14 @@ describe("a pump's stock tank", () => {
   });
 
   it("lasts its pump's recipe amount per batch, or its last dose while the recipe passes it by", () => {
-    const { config, states } = demo("f1_");
+    const { config, states } = demo("room_b_");
     const rows = recipeRows(config, states);
     const last = (ml: number) => ({ ml, at: null, result: "finished" });
     // In the recipe: batches at its amount, whatever it dosed last.
-    expect(pumpDraw("bloom", rows, last(60))).toEqual({ ml: 1800, per: "batch" });
-    // Core is in the recipe at 0 mL, Fade not calibrated: doses at the last one, else nothing.
-    expect(pumpDraw("core", rows, last(40))).toEqual({ ml: 40, per: "dose" });
-    expect(pumpDraw("fade", rows, null)).toBeNull();
+    expect(pumpDraw("part_b", rows, last(60))).toEqual({ ml: 1800, per: "batch" });
+    // Part A is in the recipe at 0 mL, Finisher not calibrated: doses at the last one, else nothing.
+    expect(pumpDraw("part_a", rows, last(40))).toEqual({ ml: 40, per: "dose" });
+    expect(pumpDraw("finisher", rows, null)).toBeNull();
     expect(pumpDraw("nope", rows, last(0))).toBeNull();
     // Whole batches, rounded as the integration rounds (0.36 L is 3 doses of 120 mL, not 2.99).
     expect(stockLeft(5.4, { ml: 1800, per: "batch" })).toEqual({ count: 3, per: "batch" });
@@ -347,7 +368,7 @@ describe("a pump's stock tank", () => {
   it("reads each demo pump's own tank from the demo's stock sensor", () => {
     const { config, states, status } = demo();
     const tanks = stockTanks(states, "");
-    expect(tanks.map((item) => item.name)).toEqual(["Balance", "Bloom", "Core", "Cleanse"]);
+    expect(tanks.map((item) => item.name)).toEqual(["Silica", "Part B", "Part A", "Line cleaner"]);
     const rows = recipeRows(config, states);
     const stock = (id: string, prefix = "") => {
       const room = prefix ? demo(prefix) : { config, states, status };
@@ -360,19 +381,19 @@ describe("a pump's stock tank", () => {
       );
     };
     expect(config.pumps.map((pump) => pump.stock_tank)).toEqual([
-      "balance",
-      "bloom",
-      "core",
-      "cleanse",
+      "silica",
+      "part_b",
+      "part_a",
+      "cleaner",
     ]);
     expect(rows).toHaveLength(4);
-    expect(stock("bloom")).toMatchObject({ tank: { level_l: 5.4 }, left: { count: 3 } });
-    expect(stock("core", "f1_")).toMatchObject({ left: { count: 287, per: "dose" } });
-    expect(stock("fade", "f1_")).toMatchObject({ tank: { level_l: 10 }, left: null });
+    expect(stock("part_b")).toMatchObject({ tank: { level_l: 5.4 }, left: { count: 3 } });
+    expect(stock("part_a", "room_b_")).toMatchObject({ left: { count: 287, per: "dose" } });
+    expect(stock("finisher", "room_b_")).toMatchObject({ tank: { level_l: 10 }, left: null });
     // The demo starts with nothing at or under its low mark: the Today page has nothing to say
     // about stock (a tank getting low is amber on the pages, not an alert).
     expect(
-      ["", "f1_"].flatMap((prefix) =>
+      ["", "room_b_"].flatMap((prefix) =>
         stockTanks(demo(prefix).states, prefix).filter((item) => stockState(item) === "very-low"),
       ),
     ).toEqual([]);
@@ -390,11 +411,14 @@ describe("the batch", () => {
     const time = batchTime(config, rows);
     expect(time.seconds).toBeCloseTo(recipeTotals(rows).seconds! + 7 * 60);
     expect(time.fillMax).toBe(20 * 60);
-    const f1 = demo("f1_");
-    const f1Rows = recipeRows(f1.config, f1.states);
-    expect(f1Rows.filter((row) => row.skipped).map((row) => row.name)).toEqual(["Fade", "Core"]);
-    expect(recipeTotals(f1Rows)).toMatchObject({ pumps: 4, ml: 3260 });
-    expect(batchTime(f1.config, f1Rows).fillMax).toBe(0);
+    const roomB = demo("room_b_");
+    const roomBRows = recipeRows(roomB.config, roomB.states);
+    expect(roomBRows.filter((row) => row.skipped).map((row) => row.name)).toEqual([
+      "Finisher",
+      "Part A",
+    ]);
+    expect(recipeTotals(roomBRows)).toMatchObject({ pumps: 4, ml: 3260 });
+    expect(batchTime(roomB.config, roomBRows).fillMax).toBe(0);
   });
 
   it("reads an amount entity at batch start, over the fixed amount", () => {
@@ -422,8 +446,8 @@ describe("the batch", () => {
   });
 
   it("lists the steps to come, passing by what the room does not have", () => {
-    const { states, config } = demo("f1_");
-    const steps = batchSteps(config, readStatus(states[dosingStatusId("f1_")]), states);
+    const { states, config } = demo("room_b_");
+    const steps = batchSteps(config, readStatus(states[dosingStatusId("room_b_")]), states);
     expect(steps.map((step) => [step.step, step.state])).toEqual([
       ["hold", "waiting"],
       ["close", "waiting"],
@@ -443,7 +467,7 @@ describe("the batch", () => {
     status.batch = {
       ...status.batch,
       step: "dose",
-      pump: "bloom",
+      pump: "part_b",
       steps: [
         { step: "hold", state: "done", at: null, note: null },
         { step: "close", state: "done", at: null, note: null },
@@ -471,7 +495,7 @@ describe("the batch", () => {
       "waiting",
       "waiting",
     ]);
-    expect(steps[5].detail).toBe("Dosing Bloom");
+    expect(steps[5].detail).toBe("Dosing Part B");
     expect(steps[2].note).toBe("the float read full");
   });
 });
@@ -480,10 +504,10 @@ describe("requests", () => {
   const request = (at: number) => ({
     id: "abc",
     action: "dose" as const,
-    pump: "bloom",
+    pump: "part_b",
     ml: 25,
     at: new Date(at).toISOString(),
-    by: "Ben",
+    by: "Owner",
   });
   it("wait for the controller, are taken with its word, or expire after two minutes", () => {
     const { config, status } = demo();
@@ -526,7 +550,7 @@ describe("requests", () => {
     expect(dosingError("busy")).toMatch(/still waiting/);
     expect(dosingError("busy", true)).toMatch(/Save once/);
     expect(dosingError("revision")).toMatch(/changed elsewhere/);
-    expect(dosingError("Bloom is not a pump")).toBe("Bloom is not a pump");
+    expect(dosingError("Part B is not a pump")).toBe("Part B is not a pump");
     expect(
       [
         "finished",
@@ -548,52 +572,52 @@ describe("the dosing setup", () => {
   it("accepts the demo's setup, and says what the integration would refuse", () => {
     expect(setupErrors(draft())).toEqual([]);
     const bad = draft();
-    bad.pumps[1].name = "balance";
+    bad.pumps[1].name = "silica";
     bad.pumps[2].start_entity = "switch.not_a_button";
     bad.pumps[3].max_ml = 9000;
     bad.batch.full_entity = null;
     bad.batch.premix_min = 45;
-    bad.batch.mix_valves = ["switch.demo_doser_core_power"];
-    bad.batch.recipe.push({ pump: "balance", ml: 5, ml_entity: null });
+    bad.batch.mix_valves = ["switch.demo_doser_part_a_power"];
+    bad.batch.recipe.push({ pump: "silica", ml: 5, ml_entity: null });
     expect(setupErrors(bad)).toEqual([
-      "Two pumps are called balance.",
-      "Core: map its start.",
-      "Cleanse: the largest dose must be between 1 and 5000 mL.",
+      "Two pumps are called silica.",
+      "Part A: map its start.",
+      "Line cleaner: the largest dose must be between 1 and 5000 mL.",
       "A fill valve needs the float that says the tank is full.",
       "Mixing before dosing must be between 0 and 30 minutes.",
-      "switch.demo_doser_core_power is a dosing pump's power switch; it cannot also be batch hardware.",
-      "Balance is in the recipe twice.",
+      "switch.demo_doser_part_a_power is a dosing pump's power switch; it cannot also be batch hardware.",
+      "Silica is in the recipe twice.",
     ]);
   });
   it("links each pump to at most one of the room's stock tanks, and one tank to one pump", () => {
-    const tanks = ["balance", "bloom", "core", "cleanse"];
+    const tanks = ["silica", "part_b", "part_a", "cleaner"];
     expect(setupErrors(draft(), tanks)).toEqual([]);
     const next = draft();
-    next.pumps[2].stock_tank = "bloom";
+    next.pumps[2].stock_tank = "part_b";
     next.pumps[3].stock_tank = "gone";
     expect(setupErrors(next, tanks)).toEqual([
-      "Bloom and Core are linked to the same stock tank.",
-      "Cleanse: its stock tank is not one of this room's.",
+      "Part B and Part A are linked to the same stock tank.",
+      "Line cleaner: its stock tank is not one of this room's.",
     ]);
     // The room's tanks unknown (stock_get not read): only the pairs are checked.
-    expect(setupErrors(next)).toEqual(["Bloom and Core are linked to the same stock tank."]);
+    expect(setupErrors(next)).toEqual(["Part B and Part A are linked to the same stock tank."]);
     next.pumps[2].stock_tank = null;
     next.pumps[3].stock_tank = null;
     expect(setupErrors(next, tanks)).toEqual([]);
     expect(setupPayload(next).pumps.map((pump) => pump.stock_tank)).toEqual([
-      "balance",
-      "bloom",
+      "silica",
+      "part_b",
       null,
       null,
     ]);
   });
   it("gives a new pump an id from its name, and the recipe follows it", () => {
     const next = draft();
-    next.pumps.push({ ...next.pumps[0], key: "new-1", id: null, name: "Bloom!" });
+    next.pumps.push({ ...next.pumps[0], key: "new-1", id: null, name: "Part B!" });
     next.batch.recipe.push({ pump: "new-1", ml: 40, ml_entity: null });
     const payload = setupPayload(next);
-    expect(payload.pumps.at(-1)!.id).toBe("bloom_2");
-    expect(payload.batch.recipe.at(-1)).toEqual({ pump: "bloom_2", ml: 40, ml_entity: null });
+    expect(payload.pumps.at(-1)!.id).toBe("part_b_2");
+    expect(payload.batch.recipe.at(-1)).toEqual({ pump: "part_b_2", ml: 40, ml_entity: null });
     expect(newPumpId("  ", new Set())).toBe("pump");
     expect(
       newPumpId("A very long nutrient name indeed", new Set(["a_very_long_nutrient_nam"])),
@@ -606,14 +630,14 @@ describe("the dosing setup", () => {
     next.batch.postmix_min = 8;
     next.batch.recipe[1].ml = 1700;
     next.pumps[3].stock_tank = null;
-    const tanks = [{ id: "cleanse", name: "Cleanse 5 L" }];
+    const tanks = [{ id: "cleaner", name: "Line cleaner 5 L" }];
     expect(setupChanges(config, setupPayload(next), tanks)).toEqual([
-      { label: "Balance · Largest dose (mL)", before: "2000", after: "1500" },
-      { label: "Cleanse · Stock tank", before: "Cleanse 5 L", after: "none" },
+      { label: "Silica · Largest dose (mL)", before: "2000", after: "1500" },
+      { label: "Line cleaner · Stock tank", before: "Line cleaner 5 L", after: "none" },
       {
         label: "Recipe",
-        before: "Balance 300 mL, Bloom 1800 mL, Core 1080 mL, Cleanse 200 mL",
-        after: "Balance 300 mL, Bloom 1700 mL, Core 1080 mL, Cleanse 200 mL",
+        before: "Silica 300 mL, Part B 1800 mL, Part A 1080 mL, Line cleaner 200 mL",
+        after: "Silica 300 mL, Part B 1700 mL, Part A 1080 mL, Line cleaner 200 mL",
       },
       { label: "Mix after dosing (min)", before: "5", after: "8" },
     ]);
@@ -665,9 +689,9 @@ describe("the demo's dosing services and controller", () => {
   });
   it("doses: the request waits, the controller takes it, the pump runs its mL and finishes", () => {
     const demo = start();
-    const sent = demo.request({ action: "dose", pump: "balance", ml: 25 });
+    const sent = demo.request({ action: "dose", pump: "silica", ml: 25 });
     expect(sent.error).toBeNull();
-    expect(sent.request).toMatchObject({ action: "dose", pump: "balance", ml: 25, by: "Demo" });
+    expect(sent.request).toMatchObject({ action: "dose", pump: "silica", ml: 25, by: "Demo" });
     expect(sent.request!.id).toMatch(/^[0-9a-f]{32}$/);
     expect(demo.config().request!.id).toBe(sent.request!.id);
     // A second one is refused while the first waits.
@@ -678,53 +702,53 @@ describe("the demo's dosing services and controller", () => {
       handled: sent.request!.id,
       handled_result: "dosing",
     });
-    expect(demo.status().pumps.balance).toMatchObject({ state: "dosing", target_ml: 25 });
-    expect(demo.states["binary_sensor.demo_doser_balance_dosing"].state).toBe("on");
-    expect(demo.states["number.demo_doser_balance_volume"].state).toBe("25");
+    expect(demo.status().pumps.silica).toMatchObject({ state: "dosing", target_ml: 25 });
+    expect(demo.states["binary_sensor.demo_doser_silica_dosing"].state).toBe("on");
+    expect(demo.states["number.demo_doser_silica_volume"].state).toBe("25");
     vi.advanceTimersByTime(3_000);
     expect(demo.status().state).toBe("idle");
-    expect(demo.status().pumps.balance.last).toMatchObject({ ml: 25, result: "finished" });
+    expect(demo.status().pumps.silica.last).toMatchObject({ ml: 25, result: "finished" });
     expect(demo.status().history[0]).toMatchObject({
       kind: "dose",
-      doses: { balance: 25 },
+      doses: { silica: 25 },
       result: "finished",
     });
     // The firmware's batch recipe is put back in its volume number.
-    expect(demo.states["number.demo_doser_balance_volume"].state).toBe("300");
-    expect(demo.states["binary_sensor.demo_doser_balance_dosing"].state).toBe("off");
-    // What it dosed is drawn from Balance's stock tank, under the request's key, and the stock
+    expect(demo.states["number.demo_doser_silica_volume"].state).toBe("300");
+    expect(demo.states["binary_sensor.demo_doser_silica_dosing"].state).toBe("off");
+    // What it dosed is drawn from Silica's stock tank, under the request's key, and the stock
     // sensor says so.
-    expect(demo.level("balance")).toBe(6.875);
+    expect(demo.level("silica")).toBe(6.875);
     expect(demo.stock().history[0]).toMatchObject({
       source: "dose",
       key: sent.request!.id,
-      draw_ml: { balance: 25 },
+      draw_ml: { silica: 25 },
     });
     expect(Date.parse(demo.status().updated_at!)).toBeGreaterThan(NOW);
   });
   it("draws a dose stopped part way at the time it ran, and nothing from an unlinked pump", () => {
     const demo = start();
-    demo.request({ action: "dose", pump: "bloom", ml: 1800 });
+    demo.request({ action: "dose", pump: "part_b", ml: 1800 });
     vi.advanceTimersByTime(3_000);
-    expect(demo.status().pumps.bloom.state).toBe("dosing");
+    expect(demo.status().pumps.part_b.state).toBe("dosing");
     demo.request({ action: "stop" });
     vi.advanceTimersByTime(1_000);
-    const last = demo.status().pumps.bloom.last!;
+    const last = demo.status().pumps.part_b.last!;
     expect(last.result).toBe("stopped");
     expect(last.ml).toBeGreaterThan(0);
     expect(last.ml).toBeLessThan(1800);
-    expect(demo.stock().history[0]).toMatchObject({ source: "dose", draw_ml: { bloom: last.ml } });
-    expect(demo.level("bloom")).toBeCloseTo(5.4 - last.ml / 1000, 4);
-    // Cleanse unlinked: its dose draws nothing.
+    expect(demo.stock().history[0]).toMatchObject({ source: "dose", draw_ml: { part_b: last.ml } });
+    expect(demo.level("part_b")).toBeCloseTo(5.4 - last.ml / 1000, 4);
+    // Line cleaner unlinked: its dose draws nothing.
     const next = setupDraft(demo.get().config);
     next.pumps[3].stock_tank = null;
     expect(demo.save({ expected_revision: 4, ...setupPayload(next) }).error).toBeNull();
     const before = demo.stock().history.length;
-    demo.request({ action: "dose", pump: "cleanse", ml: 10 });
+    demo.request({ action: "dose", pump: "cleaner", ml: 10 });
     vi.advanceTimersByTime(5_000);
-    expect(demo.status().pumps.cleanse.last).toMatchObject({ ml: 10, result: "finished" });
+    expect(demo.status().pumps.cleaner.last).toMatchObject({ ml: 10, result: "finished" });
     expect(demo.stock().history).toHaveLength(before);
-    expect(demo.level("cleanse")).toBe(3.9);
+    expect(demo.level("cleaner")).toBe(3.9);
   });
   it("refuses a batch whose amount entity reads nothing, before anything moves", () => {
     const demo = start();
@@ -740,21 +764,21 @@ describe("the demo's dosing services and controller", () => {
     vi.advanceTimersByTime(1_000);
     expect(demo.status()).toMatchObject({
       state: "idle",
-      handled_result: "refused: the recipe amount for Bloom can't be read",
+      handled_result: "refused: the recipe amount for Part B can't be read",
     });
     expect(demo.states["switch.demo_tank_fill_valve"].state).toBe("off");
   });
   it("refuses what the integration refuses", () => {
-    const demo = start("f1_");
+    const demo = start("room_b_");
     expect(demo.request({ action: "dose", pump: "nope", ml: 5 }).error).toMatch(/no pump nope/);
-    expect(demo.request({ action: "dose", pump: "grow", ml: 2500 }).error).toMatch(
+    expect(demo.request({ action: "dose", pump: "veg_base", ml: 2500 }).error).toMatch(
       /at most 2000 mL/,
     );
     expect(demo.request({ action: "rinse" }).error).toMatch(/dose, batch or stop/);
     // The controller refuses a pump that is not calibrated.
-    demo.request({ action: "dose", pump: "fade", ml: 10 });
+    demo.request({ action: "dose", pump: "finisher", ml: 10 });
     vi.advanceTimersByTime(1_000);
-    expect(demo.status().handled_result).toBe("refused: Fade is not calibrated");
+    expect(demo.status().handled_result).toBe("refused: Finisher is not calibrated");
     expect(demo.status().state).toBe("idle");
   });
   it("makes a batch: fills, mixes, doses the recipe in order and mixes again", () => {
@@ -786,11 +810,11 @@ describe("the demo's dosing services and controller", () => {
     expect(status.history[0]).toMatchObject({
       kind: "batch",
       result: "finished",
-      doses: { balance: 300, bloom: 1800, core: 1080, cleanse: 200 },
+      doses: { silica: 300, part_b: 1800, part_a: 1080, cleaner: 200 },
     });
     expect(demo.states["switch.demo_mix_pump"].state).toBe("off");
     expect(demo.states["switch.demo_recirc_valve"].state).toBe("off");
-    // Each dose drawn from its pump's tank as it finished, one key per dose; Bloom now low.
+    // Each dose drawn from its pump's tank as it finished, one key per dose; Part B now low.
     const request = demo.config().request!.id;
     expect(
       demo
@@ -798,12 +822,14 @@ describe("the demo's dosing services and controller", () => {
         .history.slice(0, 4)
         .map((entry) => [entry.source, entry.key, entry.draw_ml]),
     ).toEqual([
-      ["batch", `${request}:cleanse`, { cleanse: 200 }],
-      ["batch", `${request}:core`, { core: 1080 }],
-      ["batch", `${request}:bloom`, { bloom: 1800 }],
-      ["batch", `${request}:balance`, { balance: 300 }],
+      ["batch", `${request}:cleaner`, { cleaner: 200 }],
+      ["batch", `${request}:part_a`, { part_a: 1080 }],
+      ["batch", `${request}:part_b`, { part_b: 1800 }],
+      ["batch", `${request}:silica`, { silica: 300 }],
     ]);
-    expect(["balance", "bloom", "core", "cleanse"].map(demo.level)).toEqual([6.6, 3.6, 11.82, 3.7]);
+    expect(["silica", "part_b", "part_a", "cleaner"].map(demo.level)).toEqual([
+      6.6, 3.6, 11.82, 3.7,
+    ]);
     expect(demo.states["sensor.crop_steering_stock_low"].state).toBe("1");
   });
   it("stops a batch where it is, and says in which step", () => {
@@ -845,11 +871,11 @@ describe("the demo's dosing services and controller", () => {
     const linked = setupDraft(demo.get().config);
     linked.pumps[0].stock_tank = "gone";
     expect(demo.save({ expected_revision: 5, ...setupPayload(linked) }).error).toBe(
-      "Balance: its stock tank is not one of this room's.",
+      "Silica: its stock tank is not one of this room's.",
     );
-    linked.pumps[0].stock_tank = "bloom";
+    linked.pumps[0].stock_tank = "part_b";
     expect(demo.save({ expected_revision: 5, ...setupPayload(linked) }).error).toBe(
-      "Balance and Bloom are linked to the same stock tank.",
+      "Silica and Part B are linked to the same stock tank.",
     );
   });
   it("rewrites the stock sensor when a saved setup links a pump to another tank", async () => {
@@ -870,10 +896,10 @@ describe("the demo's dosing services and controller", () => {
     });
     const tanks = states[stockSensorId("")].attributes.tanks as { id: string; pump: string }[];
     expect(tanks.map((tank) => [tank.id, tank.pump])).toEqual([
-      ["balance", "balance"],
-      ["bloom", null],
-      ["core", "core"],
-      ["cleanse", "cleanse"],
+      ["silica", "silica"],
+      ["part_b", null],
+      ["part_a", "part_a"],
+      ["cleaner", "cleaner"],
     ]);
   });
 });

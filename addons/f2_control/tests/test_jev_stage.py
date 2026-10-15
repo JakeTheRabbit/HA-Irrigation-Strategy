@@ -66,17 +66,17 @@ def test_the_probe_judge_knows_a_temperature_artefact():
 
 def test_the_flower_start_option_names_rooms_or_all_of_them():
     assert jev_bridge.flower_option("input_datetime.flip") == {"*": "input_datetime.flip"}
-    assert jev_bridge.flower_option("default=input_datetime.f2_flip_date, f1=2026-07-12") == {
-        "default": "input_datetime.f2_flip_date", "f1": "2026-07-12"}
+    assert jev_bridge.flower_option("default=input_datetime.flip_date, room_b=2026-07-12") == {
+        "default": "input_datetime.flip_date", "room_b": "2026-07-12"}
     assert jev_bridge.flower_option("") == {}
 
 
 def test_the_flower_day_comes_from_the_rooms_entity_or_date():
     now = K.NOW  # 27 Sep 2026
-    c = SimpleNamespace(jev=SimpleNamespace(flower_start={"default": "input_datetime.f2_flip_date", "f1": "2026-07-12"}),
-                        _jev_read=lambda e: {"input_datetime.f2_flip_date": "2026-08-22"}.get(e))
+    c = SimpleNamespace(jev=SimpleNamespace(flower_start={"default": "input_datetime.flip_date", "room_b": "2026-07-12"}),
+                        _jev_read=lambda e: {"input_datetime.flip_date": "2026-08-22"}.get(e))
     assert jev_bridge.flower_day(c, SimpleNamespace(slug="default"), now) == 37
-    assert jev_bridge.flower_day(c, SimpleNamespace(slug="f1"), now) == 78
+    assert jev_bridge.flower_day(c, SimpleNamespace(slug="room_b"), now) == 78
     assert jev_bridge.flower_day(c, SimpleNamespace(slug="veg"), now) is None
     c.jev.flower_start = {"default": "input_datetime.missing"}
     assert jev_bridge.flower_day(c, SimpleNamespace(slug="default"), now) is None
@@ -113,12 +113,12 @@ def test_the_stage_judge_advises_and_never_acts_on_water():
     # code finds the steering mismatch itself (generative steering in flower bulk), whatever Jev says
     d = j.decide(on_arc, ctx)
     assert d.kind == "alert" and d.value["code"] == "CS-705"
-    assert "on generative steering, but the stage calls for vegetative" in d.value["message"]
-    assert "flower day 37" in d.value["message"] and "Nothing was changed" in d.value["message"]
+    assert "uses generative steering, but the stage needs vegetative" in d.value["message"]
+    assert "flower day 37" in d.value["message"] and "changed nothing" in d.value["message"]
     matched = _stage_ctx(steering="vegetative")
     assert j.decide(on_arc, matched) is None  # steering right, Jev content: nothing to say
     firm = {"arc": council.combine(K.both("arc", K.choice_answer("ec_above_band", {"ec_above_band": 0.8})), "arc")}
-    assert "Jev: The settled pore EC sits above" in j.decide(firm, matched).value["message"]
+    assert "AI assistant: The settled pore EC sits above" in j.decide(firm, matched).value["message"]
     split = {"arc": council.combine(K.both("arc", K.choice_answer("ec_above_band", {"ec_above_band": 0.9}),
                                            K.choice_answer("on_arc", {"on_arc": 0.9})), "arc")}
     assert j.decide(split, matched) is None

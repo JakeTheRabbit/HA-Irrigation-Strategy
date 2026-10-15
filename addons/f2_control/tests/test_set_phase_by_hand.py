@@ -1,6 +1,6 @@
 """A zone moved to a phase by hand, from its Set Phase select.
 
-25 Sep 2026: after F2 was switched off and on again, its three zones went from P2 back to a P1 ramp an
+25 Sep 2026: after a production room was switched off and on again, its three zones went from P2 back to a P1 ramp an
 hour before lights-off, and there was no way to put them back. Now the operator picks a phase on
 select.crop_steering_zone_N_set_phase; the controller moves the zone once, sets the select back to
 Keep, and its own rules carry on from that phase.

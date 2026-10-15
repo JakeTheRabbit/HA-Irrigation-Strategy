@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   attachOutcomes,
+  brainWords,
   jevAnswer,
   jevChange,
   jevChanges,
@@ -8,6 +9,7 @@ import {
   jevCost,
   jevResult,
   outcomeText,
+  parseBrainAnswers,
   parseJevEntry,
   parseJevLog,
   parseJevRoom,
@@ -439,5 +441,104 @@ describe("the setpoints Jev manages on a zone", () => {
     expect(zone(undefined)).toBeNull();
     expect(zone("managed")).toBeNull();
     expect(parseJevSetpoints(undefined)).toBeNull();
+  });
+});
+
+describe("which brain runs, and whether it is on", () => {
+  const room = (state: string, attributes: Record<string, unknown> = {}) =>
+    parseJevRoom(entity("sensor.crop_steering_jev", state, attributes))!;
+  it("never reads rules, or a brain that fell back, as on", () => {
+    for (const reason of [
+      "rules",
+      "rules_no_key",
+      "model_invalid",
+      "sdk_missing",
+      "brain_off",
+      "start_failed",
+    ]) {
+      const r = room("rules", {
+        provider: "rules",
+        state: reason,
+        state_words: `Words for ${reason}.`,
+      });
+      expect(r.on).toBe(false);
+      expect(brainWords(r)).toEqual({
+        tile: "Rules",
+        detail: `Words for ${reason}.`,
+        subtitle: `Rules are running: Words for ${reason}.`,
+      });
+    }
+    const spent = room("on", {
+      provider: "claude_haiku",
+      state: "budget_spent",
+      state_words: "Spent US$1.00.",
+    });
+    expect(spent.on).toBe(false);
+    expect(brainWords(spent).tile).toBe("Rules");
+  });
+  it("reads a working brain as on, and a sensor from before as it always did", () => {
+    expect(
+      room("on", { provider: "claude_haiku", state: "acting", cost_usd_today: 0.21 }),
+    ).toMatchObject({
+      on: true,
+      costUsd: 0.21,
+    });
+    expect(brainWords(room("on", { state: "dry_run" })).tile).toBe("Advising only");
+    expect(brainWords(room("on", { state: "legacy", deprecated_route: true })).tile).toBe(
+      "On, retired route",
+    );
+    expect(room("on").on).toBe(true);
+    expect(brainWords(room("on")).tile).toBe("On");
+    expect(brainWords(room("error")).tile).toBe("Not answering");
+    expect(brainWords(null).tile).toBe("Not on this room");
+  });
+  it("treats a zone sensor on rules as no sensor", () => {
+    expect(
+      parseJevZone(entity("sensor.crop_steering_zone_1_jev", "rules", { provider: "rules" })),
+    ).toBeNull();
+  });
+  it("costs the Claude brain at what it spent", () => {
+    expect(jevCost(null, 0.4)).toBe("≈ $0.40");
+    expect(jevCost(3_000_000, 0.004)).toBe("under $0.01");
+  });
+});
+
+describe("parseBrainAnswers", () => {
+  it("reads the answers newest first, how many are asking, and drops a malformed one", () => {
+    const read = parseBrainAnswers(
+      entity("sensor.crop_steering_brain_answers", "asking", {
+        answers: [
+          {
+            id: "a",
+            question: "Why no water?",
+            zone: 1,
+            answer: "Still drying back.",
+            answered_at: "2026-10-15T08:00:00+00:00",
+            cannot_answer: false,
+          },
+          {
+            id: "b",
+            question: "Why the pump?",
+            answer: "The record does not say.",
+            cannot_answer: true,
+          },
+          { question: "no id" },
+          null,
+        ],
+        pending: ["c"],
+        asked_today: 3,
+        daily_limit: 20,
+      }),
+    );
+    expect(read?.answers.map((a) => [a.id, a.cannotAnswer, a.zone])).toEqual([
+      ["b", true, null],
+      ["a", false, 1],
+    ]);
+    expect(read?.answers[1].answeredAt).toBe(Date.parse("2026-10-15T08:00:00Z"));
+    expect([read?.pending, read?.askedToday, read?.limit]).toEqual([1, 3, 20]);
+  });
+
+  it("is null for a controller from before Ask why", () => {
+    expect(parseBrainAnswers(undefined)).toBeNull();
   });
 });

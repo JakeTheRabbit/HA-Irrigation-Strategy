@@ -17,6 +17,9 @@ should be, from how the probe actually behaved:
     is rewritten, and the reason is published.
   * The P1 target and field capacity are not written from here: the controller sets them from the zone's
     own highest readings (controller._follow_fc, 6 Oct 2026).
+  * The rescue level is the operator's emergency floor and never one of these setpoints. The maintenance
+    trigger stays the engine's ladder above it, and a dryback that would end under it is planned only as
+    deep as it lets the zone go.
 
 `learn` is a plain JSON-safe dict so it persists in the controller's state file.
 """
@@ -24,6 +27,7 @@ import copy
 
 import curve_tracker as ct
 import setpoint_supervisor as ss
+from crop_steering_engine.defaults import SUBSTRATE_PROFILES
 
 SETTLE_MIN = 20.0  # minutes before a shot's retained gain is read, unless the next shot arrives first
 PLATEAU_SHOTS = 2  # "a couple of shots"
@@ -39,10 +43,15 @@ MIN_RATE_DAYS = 2  # such days needed per light state before the dryback rate is
 GAIN_HEADROOM_PTS = 2.0  # only ramp shots fired at least this far under the ceiling teach the gain
 QUIET_MIN = 30.0  # minutes since a shot before a dryback reading is clean (drainage has finished)
 DEFAULT_BAND_PTS = 1.5  # P2 band under the peak until the gain is known
-MANAGED = ("p1_target_vwc", "field_capacity", "p2_vwc_threshold", "p3_emergency_vwc_threshold")
-JEV_MANAGED = ("p2_shot_size",)  # additionally, while the judge is configured: see jev_verdict
-JEV_SHOT_RANGE = (1.0, 4.0)  # % of substrate: the P2 shot size Jev may steer within
-JEV_PEAK_ADJ_RANGE = (-2.0, 2.0)  # points Jev may hold the working peak above or below the learned one
+LADDER_PTS = 3.0  # the engine's ladder: the maintenance trigger sits at least this far over the rescue level
+# A dryback's hold sits at least this far over the rescue level: the trigger after the planned stop is
+# 2 points under the hold (setpoint_supervisor.desired) and LADDER_PTS over the rescue.
+RESCUE_ROOM_PTS = 2.0 + LADDER_PTS
+# What the learner writes. Never the rescue level (p3_emergency_vwc_threshold): that is the operator's
+# emergency floor.
+MANAGED = ("p1_target_vwc", "field_capacity", "p2_vwc_threshold")
+# points a saved working-peak adjustment may hold it off the learned one (the generic profile's)
+JEV_PEAK_ADJ_RANGE = SUBSTRATE_PROFILES["generic"]["learner"]["peak_adj_range"]
 
 _NUMBERS = ("peak", "gain", "day_rate", "night_rate")
 
@@ -178,11 +187,12 @@ def frozen_reason(learn):
     if learn["outcome"] != "suspect":
         return None
     if learn["veto"]:
-        return f"today's plateau was not believed ({learn['veto']}): check delivery and the probe"
+        return f"the plateau of today was not accepted ({learn['veto']}): check the water delivery and the probe"
     if learn["peak"] is not None and learn["stalled_at"] is not None and learn["stalled_at"] < learn["peak"] - SUSPECT_DROP_PTS:
-        return (f"ramp stalled at {learn['stalled_at']:.1f}%, {learn['peak'] - learn['stalled_at']:.1f} points under "
-                f"the peak this zone has held ({learn['peak']:.1f}%): check delivery and the probe")
-    return "ramp shots are not lifting VWC: water is not reaching this probe (check the dripper, line and probe)"
+        return (f"the ramp stopped at {learn['stalled_at']:.1f}%, {learn['peak'] - learn['stalled_at']:.1f} points "
+                f"below the peak of this zone ({learn['peak']:.1f}%): check the water delivery and the probe")
+    return ("the ramp shots do not increase the VWC: water does not reach this probe (check the dripper, the line "
+            "and the probe)")
 
 
 def p1_target(learn, vwc, phase):
@@ -210,30 +220,54 @@ def model(learn):
     return ct.ZoneModel(knee=learn["peak"], gain=learn["gain"], day_rate=learn["day_rate"], night_rate=learn["night_rate"])
 
 
+def rescue_allows(peak, rescue):
+    """The deepest dryback (a relative %, as the P3 dryback target reads) a zone with this `peak` can be
+    planned to reach above its rescue level: one whose hold sits RESCUE_ROOM_PTS over it. 0 when the
+    rescue sits that close under the peak."""
+    if not peak or peak <= 0:
+        return 0.0
+    return max(0.0, (1.0 - (rescue + RESCUE_ROOM_PTS) / peak) * 100.0)
+
+
+def day_plan(learn, current, plan_ctx):
+    """Today's plan for this zone (curve_tracker.plan_day), or None until the model is complete. Its
+    note says when the P3 dryback target is out of reach and what the zone gets instead."""
+    m = model(learn)
+    if not (m and plan_ctx):
+        return None
+    # A dryback target that would end under the rescue level is planned only as deep as the rescue lets
+    # the zone go: the rescue would stop it there anyway, and maintenance shots stop no earlier than that needs.
+    dryback = min(plan_ctx["dryback_pct"], rescue_allows(m.knee, current["p3_emergency_vwc_threshold"]))
+    recipe = ct.Recipe(0.0, dryback, plan_ctx["p0_wait_min"], plan_ctx["p1_shot_pct"],
+                       plan_ctx["p1_gap_min"], current["p2_shot_size"],
+                       generative=bool(plan_ctx.get("generative", False)))
+    return recipe, ct.plan_day(m, recipe, plan_ctx["lights_on_h"], plan_ctx["lights_off_h"], plan_ctx["start_vwc"])
+
+
 def wanted(learn, current, vwc, phase, plan_ctx, others=()):
     """suffix -> value this zone should hold now. {} until something has been learned.
 
     `others`: setpoints another writer owns (Jev's Setpoints judge: the P2 shot size and re-water threshold). They
-    are never wanted here, so each lever has one writer, and the rescue floor's ladder guard reads their value.
+    are never wanted here, so each lever has one writer.
 
     The P1 target and field capacity it returns are not written: the controller sets those from the zone's own
     highest readings (controller._follow_fc).
 
     plan_ctx (optional, needs a complete model) adds the through-the-day schedule of the P2 threshold:
     {lights_on_h, lights_off_h, minutes_since_lights_on, shots_today, dryback_pct, p0_wait_min,
-     p1_shot_pct, p1_gap_min, start_vwc}
+     p1_shot_pct, p1_gap_min, start_vwc, generative}; `generative` (the zone's steering mode, False
+    when missing) sets how early maintenance shots may stop for the dryback.
     """
     target = p1_target(learn, vwc, phase)
     if target is None:
         return {}
     want = {"p1_target_vwc": target, "field_capacity": max(40.0, round(target + 2.0, 1))}
     m = model(learn)
+    planned = day_plan(learn, current, plan_ctx)
     if "p2_vwc_threshold" in others:
         pass  # another writer's
-    elif m and plan_ctx:
-        recipe = ct.Recipe(0.0, plan_ctx["dryback_pct"], plan_ctx["p0_wait_min"], plan_ctx["p1_shot_pct"],
-                           plan_ctx["p1_gap_min"], current["p2_shot_size"])
-        plan = ct.plan_day(m, recipe, plan_ctx["lights_on_h"], plan_ctx["lights_off_h"], plan_ctx["start_vwc"])
+    elif planned:
+        recipe, plan = planned
         d = ss.desired(m, recipe, plan, ss.Steer(current["p2_shot_size"]),
                        {"minutes_since_lights_on": plan_ctx["minutes_since_lights_on"],
                         "shots_today": plan_ctx["shots_today"], "feed_ec": 0.0}, ec_seen_max=0.0)
@@ -241,87 +275,37 @@ def wanted(learn, current, vwc, phase, plan_ctx, others=()):
     else:
         band = learn["gain"] * current["p2_shot_size"] if learn["gain"] else DEFAULT_BAND_PTS
         want["p2_vwc_threshold"] = round(working_peak(learn) - band, 1)
-    thr = want.get("p2_vwc_threshold", current["p2_vwc_threshold"])
-    if current["p3_emergency_vwc_threshold"] + 3.0 > thr:  # only touched when it would invert the ladder
-        want["p3_emergency_vwc_threshold"] = round(thr - 3.0, 1)
+    if "p2_vwc_threshold" in want:  # the rescue level is never moved: the trigger keeps the ladder over it
+        want["p2_vwc_threshold"] = max(want["p2_vwc_threshold"],
+                                       round(current["p3_emergency_vwc_threshold"] + LADDER_PTS, 1))
     return want
 
 
-def status(learn, enabled):
-    reason = frozen_reason(learn)
+def stalled(current, want):
+    """Why none of `want` can be written, or None. setpoint_supervisor.writes drops a batch that would leave
+    the engine's ladder out of order, and with the rescue level fixed that holds every write until the
+    operator moves a number, so the zone says why instead of "tracking"."""
+    out = ss.proposed(current, want)
+    if not out or ss.in_order(dict(current, **{s: v for s, v, _w in out})):
+        return None
+    rescue, target = current["p3_emergency_vwc_threshold"], current["p1_target_vwc"]
+    if rescue + LADDER_PTS >= target:
+        return (f"the {rescue:g}% rescue level leaves no room under the {target:g}% P1 target for the re-water "
+                f"threshold, which sits at least {LADDER_PTS:g} points over the rescue level: lower the rescue level "
+                "or raise the P1 target")
+    return ("the targets it wants would leave the rescue level, re-water threshold, P1 target and field "
+            "capacity out of order: check this zone's targets")
+
+
+def status(learn, enabled, stall=None, dryback_note=None, p2_stop=None):
+    """`stall`: why the learner's writes are held (stalled), or None. `dryback_note`: today's plan saying the
+    P3 dryback target is out of reach (day_plan). `p2_stop`: when today's plan stops maintenance shots for the
+    dryback, "HH:MM" (the dashboard marks it)."""
+    reason = frozen_reason(learn) or stall
     state = "off" if not enabled else "frozen" if reason else "tracking" if model(learn) else "learning"
     return state, {
         "learned_peak": learn["peak"], "gain": learn["gain"], "day_rate": learn["day_rate"],
         "night_rate": learn["night_rate"], "p1_outcome": learn["outcome"], "hold_days": learn["hold_days"],
         "frozen_reason": reason, "last_change": learn["last_change"],
+        "dryback_note": dryback_note or None, "p2_stop": p2_stop or None,
     }
-
-
-def evidence(learn, phase, vwc, target, ec, ec_target, feed_ec, p2_shot, shots_today):
-    """The situation for the judge (Jev), every comparison already made and put into words."""
-    ramp = learn["ramp"]
-    top = max([r["settled"] for r in ramp] + [vwc])
-    reach = "reached the peak target" if top >= target - 0.3 else f"{target - top:.1f} points short of the peak target"
-    normal = 0.5 * learn["gain"] if learn["gain"] else None
-    responses = []
-    for r in ramp[-4:]:
-        ok = r["rise"] >= (normal * r["pct"] if normal else 1.0)
-        responses.append(f"+{r['rise']:.1f} {'normal' if ok else 'weak'}")
-    e = {"phase": phase, "peak_target": f"{target:.1f}% VWC", "highest_vwc_today": f"{top:.1f}% ({reach})",
-         "vwc_now": f"{vwc:.1f}%", "shots_today": shots_today, "p2_shot_size_now": f"{p2_shot:.1f}%",
-         "last_shot_responses": responses}
-    held = max(learn["peak"] or 0.0, learn["prev_peak"] or 0.0)
-    if held:
-        e["highest_vwc_this_zone_has_held"] = f"{held:.1f}%"
-    if ec is not None and ec_target:
-        lo, hi = ec_target * 0.85, ec_target * 1.15
-        where = "BELOW" if ec < lo else "ABOVE" if ec > hi else "INSIDE"
-        e["pore_ec"] = f"{ec:.1f} mS/cm, {where} the stage range {lo:.1f} to {hi:.1f}"
-        if feed_ec is not None:
-            side, effect = ("lower", "lowers") if feed_ec < ec else ("higher", "raises")
-            e["feed_ec"] = f"{feed_ec:.1f} mS/cm ({side} than pore EC, so runoff {effect} pore EC)"
-    return e
-
-
-def jev_due(learn, hour_stamp):
-    """Once per clock hour. Pore EC and the ceiling answer over hours, not loops."""
-    return learn["jev"]["asked"] != hour_stamp
-
-
-def jev_verdict(learn, hour_stamp, verdict, p2_shot, clock):
-    """Record the judge's hourly P2 answer and return the setpoints to write: {"p2_shot_size": %} or {}.
-
-    It can only nudge: one step per lever per grow-day, inside fixed bounds. A guard that trips, or no
-    answer at all, changes nothing. `verdict` is jev_policy.verdicts(...) or None."""
-    jev = learn["jev"]
-    if jev["day"] != learn["day"]:
-        jev.update(day=learn["day"], nudged=[], changed=None)
-    jev["asked"] = hour_stamp
-    if verdict is None:
-        jev["last"] = f"{clock} no answer from Cloudflare: nothing changed"
-        return {}
-    if verdict.get("freeze"):
-        jev["last"] = f"{clock} hands off ({verdict['freeze']})"
-        return {}
-    out, said = {}, []
-    delta = verdict.get("p2_shot_delta") or 0.0
-    if delta and "ec" not in jev["nudged"]:
-        lo, hi = JEV_SHOT_RANGE
-        shot = round(max(lo, min(hi, p2_shot + delta)), 1)
-        if shot != round(p2_shot, 1):
-            out["p2_shot_size"] = shot
-            jev["nudged"].append("ec")
-            said.append(f"p2_shot_size {p2_shot:g} -> {shot:g}")
-    delta = verdict.get("peak_delta") or 0.0
-    if delta and "peak" not in jev["nudged"] and learn["peak"] is not None:
-        lo, hi = JEV_PEAK_ADJ_RANGE
-        adj = round(max(lo, min(hi, learn["peak_adj"] + delta)), 1)
-        if adj != learn["peak_adj"]:
-            learn["peak_adj"] = adj
-            jev["nudged"].append("peak")
-            said.append(f"working peak {adj:+g} on the learned {learn['peak']:g}")
-    if said:  # the latest hourly answer is usually "no change": keep what it DID change today in view
-        jev["changed"] = f"{clock} " + "; ".join(said)
-    why = "; ".join(verdict.get("why") or [])
-    jev["last"] = f"{clock} " + ("; ".join(said) if said else "no change") + (f" ({why})" if why else "")
-    return out

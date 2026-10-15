@@ -24,6 +24,7 @@ from . import ha_stubs
 ha_stubs.install()
 
 from custom_components.crop_steering import (  # noqa: E402
+    calibration,
     dosing_api,
     notify_api,
     run_api,
@@ -43,6 +44,7 @@ READ_ONLY = {
     "strategy_preview",
     "runs_get",
     "stock_get",
+    "calibration_get",
     "dosing_get",
     "notify_get",
     "whats_new_get",
@@ -50,7 +52,7 @@ READ_ONLY = {
 # Changes nothing but whether the dashboard's What's new window shows again: whoever opens the
 # dashboard first after an update may dismiss it, administrator or not.
 NOTICES = {"whats_new_seen": {"version": "2.0.0"}}
-SETUP = {"setup_read", "setup_create", "setup_save", "setup_remove"}
+SETUP = {"setup_read", "setup_create", "setup_save", "setup_remove", "setup_commission"}
 # Every other service changes something. What each is called with:
 CHANGES = {
     "set_manual_override": {"zone": 1},
@@ -73,6 +75,12 @@ CHANGES = {
     # What a dose drew from the stock tanks: the controller app calls it, as Home Assistant's
     # administrator Supervisor user; a signed-in non-administrator may not move a level.
     "stock_draw": {"room_id": ROOM, "key": "k", "draws": {}, "source": "dose"},
+    "calibration_record": {
+        "room_id": ROOM,
+        "expected_revision": 0,
+        "probe": "feed_ph",
+        "points": [],
+    },
     # A dose or a batch is what makes the controller app run a pump: never for a
     # non-administrator. A stop only switches things off (STOP, below).
     "dosing_save": {"room_id": ROOM, "expected_revision": 0, "pumps": [], "batch": {}},
@@ -145,9 +153,17 @@ def rig(monkeypatch):
         draw=AsyncMock(return_value={"tanks": []}),
     )
     monkeypatch.setattr(stock_api, "StockStore", lambda hass, entry: tanks)
+    probes = SimpleNamespace(
+        room_id=ROOM,
+        async_init=AsyncMock(),
+        response=MagicMock(return_value={"records": []}),
+        record=AsyncMock(return_value={"records": []}),
+    )
+    monkeypatch.setattr(calibration, "CalibrationStore", lambda hass, entry: probes)
     dosing = SimpleNamespace(
         room_id=ROOM,
         async_init=AsyncMock(),
+        start=MagicMock(return_value=None),
         response=MagicMock(return_value={"config": {}}),
         save=AsyncMock(return_value={"config": {}}),
         request=AsyncMock(return_value={"request": None, "error": None}),
@@ -174,6 +190,7 @@ def rig(monkeypatch):
         "create_setup": AsyncMock(return_value={}),
         "save_setup": AsyncMock(return_value={}),
         "remove_setup": AsyncMock(return_value={}),
+        "commission_setup": AsyncMock(return_value={}),
     }
     for name, fake in setup.items():
         monkeypatch.setattr(setup_api, name, fake)
@@ -197,6 +214,7 @@ def rig(monkeypatch):
     asyncio.run(strategy_api.async_setup_strategy_services(hass))
     asyncio.run(run_api.async_setup_runs(hass, ha_stubs.FakeEntry()))
     asyncio.run(stock_api.async_setup_stock(hass, ha_stubs.FakeEntry()))
+    asyncio.run(calibration.async_setup_calibration(hass, ha_stubs.FakeEntry()))
     asyncio.run(dosing_api.async_setup_dosing(hass, ha_stubs.FakeEntry()))
     asyncio.run(setup_api.async_setup_setup_services(hass))
     asyncio.run(whats_new.async_setup_whats_new(hass, ha_stubs.FakeEntry(), False))
@@ -214,6 +232,7 @@ def rig(monkeypatch):
             runs.mutate,
             tanks.mutate,
             tanks.draw,
+            probes.record,
             dosing.save,
             dosing.request,
             notifier.save,
@@ -222,6 +241,7 @@ def rig(monkeypatch):
             setup["create_setup"],
             setup["save_setup"],
             setup["remove_setup"],
+            setup["commission_setup"],
         )
         return (
             len(hass.bus.events),

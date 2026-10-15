@@ -11,8 +11,17 @@ from test_dosing import DEVICES, PUMP, _call, _devices
 from test_setup_entry import _install
 
 DOMAIN = "crop_steering"
-STATUS = "sensor.crop_steering_dosing"
+STATUS = "sensor.crop_steering_tent_dosing"
 DOSING = PUMP["dosing_entity"]
+
+
+def _run(runner):
+    """What the controller's main loop does for dosing (Controller._sleep_for): the requests read now,
+    then a wake whenever the dose it took is due, until it has ended."""
+    runner.poll()
+    while runner._steps is not None:
+        runner._sleep(runner._due - runner._mono())
+        runner.step()
 
 
 async def test_the_controller_doses_what_the_integration_was_asked_for(
@@ -66,7 +75,7 @@ async def test_the_controller_doses_what_the_integration_was_asked_for(
     monkeypatch.setattr(controller, "ha_call", call)
     runner._sleep = sleep
     assert runner.recover()
-    runner.poll()
+    _run(runner)
 
     sent = list(fake.calls)
     assert ("number", "set_value", {"entity_id": PUMP["volume_entity"], "value": 22}) in sent

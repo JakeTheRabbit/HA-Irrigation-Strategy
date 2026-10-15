@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Search } from "lucide-react";
 import { Heading } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { WhatsNewButton } from "@/components/whats-new";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,13 +14,14 @@ import {
   findErrorCodes,
   severityLabel,
 } from "@/lib/error-codes";
+import { startTour } from "@/lib/tour";
 import type { Controller } from "@/lib/types";
 
 /** The words the dashboard uses, as a grower reads them. */
 const glossary = [
   [
     "VWC (moisture)",
-    "Volumetric water content: the share of the substrate’s volume that is water, in %. Every moisture target, the peak, the re-water point and the rescue level, is a VWC.",
+    "Volumetric water content: the share of the substrate’s volume that is water, in %. Every moisture target, the peak, the re-water point and the rescue floor, is a VWC.",
   ],
   [
     "Pore EC",
@@ -33,7 +36,7 @@ const glossary = [
     "From lights-on to the first shot: the plants drink before the day’s watering starts. It ends at the latest first shot, or sooner if moisture falls to the re-water point.",
   ],
   [
-    "P1 · Ramp-up",
+    "P1 · Ramp",
     "The first shots of the day, spaced out, up to the peak target or the most P1 shots.",
   ],
   [
@@ -42,7 +45,7 @@ const glossary = [
   ],
   [
     "P3 · Overnight dryback",
-    "From the day’s last shot to lights-on: no routine watering, only a rescue shot if moisture reads below the rescue level.",
+    "From the day’s last shot to lights-on: no routine watering, only a rescue shot if moisture reads below the rescue floor.",
   ],
   [
     "Steering",
@@ -50,7 +53,7 @@ const glossary = [
   ],
   [
     "Runoff",
-    "The water that drains out of the slab, as a share of the water fed: it carries salt out. Athena gives 8–16% steering vegetative and 1–7% generative.",
+    "The water that drains out of the slab, as a share of the water fed: it carries salt out. More runoff steers vegetative and less generative; Plan › Schedule lists each stage’s range.",
   ],
 ];
 
@@ -59,7 +62,20 @@ const glossary = [
 export function Help({ controller }: { controller: Controller }) {
   return (
     <>
-      <Heading title="Help" action={<WhatsNewButton controller={controller} />} />
+      <Heading
+        title="Help"
+        action={
+          <div className="help-actions">
+            <span className="label-with-tip">
+              <Button variant="outline" onClick={startTour}>
+                Show the tour again
+              </Button>
+              <UiTip copyKey="take the tour again" />
+            </span>
+            <WhatsNewButton controller={controller} />
+          </div>
+        }
+      />
       <ErrorCodes />
       <section className="panel" aria-labelledby="glossary-title">
         <div className="panel-heading">
@@ -104,7 +120,7 @@ function ErrorCodes() {
     <section ref={section} className="panel error-codes" aria-labelledby="error-codes-title">
       <div className="panel-heading">
         <div>
-          <h2 id="error-codes-title">Error codes</h2>
+          <h2 id="error-codes-title">Alert codes</h2>
           <p>
             Every Crop Steering alert and Repairs card ends with a code such as CS-101 (the
             controller's regular status summary has none). Look it up here for what it means, what
@@ -116,8 +132,8 @@ function ErrorCodes() {
         <div className="search-field">
           <Search size={17} />
           <Input
-            aria-label="Search error codes"
-            placeholder="A code or words, e.g. 101 or probe"
+            aria-label="Search alert codes"
+            placeholder="A code or a word"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -158,11 +174,11 @@ function ErrorCodes() {
                       <dd>{entry.meaning}</dd>
                     </div>
                     <div>
-                      <dt>Watering meanwhile</dt>
+                      <dt>Effect on water</dt>
                       <dd>{entry.watering}</dd>
                     </div>
                     <div>
-                      <dt>Likely causes</dt>
+                      <dt>Probable causes</dt>
                       <dd>
                         <ul>
                           {entry.causes.map((cause) => (
@@ -172,7 +188,7 @@ function ErrorCodes() {
                       </dd>
                     </div>
                     <div>
-                      <dt>Suggested fixes</dt>
+                      <dt>What to do</dt>
                       <dd>
                         <ul>
                           {entry.fixes.map((fix) => (

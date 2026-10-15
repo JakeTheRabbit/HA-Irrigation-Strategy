@@ -23,7 +23,9 @@ from datetime import datetime, timedelta
 
 from . import council
 from . import journal as jn
-from .envelope import admit
+from .envelope import admit, cools_down
+
+ACTING_KINDS = ("advance", "distrust", "ec_mode", "setpoint")  # what dry run journals instead of returning
 
 
 @dataclass
@@ -52,12 +54,15 @@ def _label(d):
 
 class Brain:
     def __init__(self, asker, ledger, judges, allowed=None, log=print, reask_max=2, unsure_below=0.7,
-                 strict_after=3, strict_prob=0.8):
+                 strict_after=3, strict_prob=0.8, enrich=None, dry_run=False):
+        """`enrich(ctx, judge, evidence)` adds what the Claude route needs to every ask (jev.enrich; None on the
+        legacy routes). `dry_run`: an admitted directive that would act is journalled "would act", never returned
+        or recorded; alerts still pass."""
         self.asker, self.ledger, self.log = asker, ledger, log
+        self.enrich, self.dry_run = enrich, dry_run
         self.judges = [j for j in judges if allowed is None or j.name in allowed]
         self.state: dict[tuple, JudgeState] = {}
         self.errors: dict[str, str] = {}
-        self.triage = None
         self.journal = None  # jev.journal.Journal: every decision, for the dashboard's live log
         self.reask_max, self.unsure_below = reask_max, unsure_below
         self.strict_after, self.strict_prob = strict_after, strict_prob
@@ -108,6 +113,8 @@ class Brain:
                 ev["your_track_record"] = record
             if reask:
                 ev["second_look"] = judge.more_evidence(ctx, st.verdicts)
+            if self.enrich is not None:
+                ev = self.enrich(ctx, judge, ev)
             if self.asker.submit(key, ev, council.expand(judge.questions)):
                 st.last_asked = ctx.now
                 st.reasks, st.reask_due = (st.reasks + 1 if reask else 0), False
@@ -158,6 +165,15 @@ class Brain:
         if not ok:
             if new:
                 self._note(ctx, judge, st, d, "refused", why)
+                if d.kind == "setpoint" and cools_down(why):  # the notch budget's cool-down starts here
+                    self.ledger.record(judge.name, ctx.room, ctx.zone, _label(d), "refused", evidence={"why": why},
+                                       at=ctx.now)
+            return None
+        if self.dry_run and d.kind in ACTING_KINDS:
+            st.last = self._shown(st, d, f"would act (advising only): {why}")
+            if st.acted_seq != ans.seq:
+                st.acted_seq, st.reask_due = ans.seq, False
+                self._note(ctx, judge, st, d, "would act", why)
             return None
         if st.acted_seq != ans.seq:
             st.acted_seq = ans.seq
@@ -210,7 +226,7 @@ class Brain:
             result = judge.outcome(entry, ctx) if judge else ("judge no longer runs", False)
             if result is not None:
                 was = self.ledger.strict(entry["judge"], ctx.room, ctx.zone, after=self.strict_after)
-                self.ledger.resolve(entry["id"], result[0], result[1])
+                self.ledger.resolve(entry["id"], result[0], result[1], at=ctx.now)
                 if not was and self.ledger.strict(entry["judge"], ctx.room, ctx.zone, after=self.strict_after):
                     self.events.append(("strict", ctx.room, ctx.zone, entry["judge"]))
                 if self.journal is not None:

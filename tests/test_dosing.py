@@ -5,7 +5,7 @@ switch that is both a pump's power and batch hardware. Plus the request checks a
 still counts as waiting for the controller."""
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -29,7 +29,7 @@ BATCH = {
     "mix_valves": ["switch.mix_return"],
     "mix_power_sensor": "sensor.tank_mixer_power",
     "mix_min_w": 200,
-    "close_entities": ["switch.f1_feed"],
+    "close_entities": ["switch.room_b_feed"],
     "hold_entity": "input_boolean.tank_dosing",
     "filled_at_entity": "input_datetime.tank_filled_at",
     "recipe": [{"pump": "balance", "ml": 300, "ml_entity": "number.recipe_balance"}],
@@ -41,7 +41,7 @@ KNOWN = {
     "switch.tank_mixer",
     "switch.mix_return",
     "sensor.tank_mixer_power",
-    "switch.f1_feed",
+    "switch.room_b_feed",
     "input_boolean.tank_dosing",
     "input_datetime.tank_filled_at",
     "number.recipe_balance",
@@ -158,7 +158,7 @@ def test_every_batch_entity_is_in_its_allowed_domain(field, entity):
 def test_lists_of_switches_and_the_recipe_entity_are_checked_too():
     for changes in (
         {"mix_valves": ["input_boolean.mix_return"]},
-        {"close_entities": ["number.f1_feed"]},
+        {"close_entities": ["number.room_b_feed"]},
         {"recipe": [{"pump": "balance", "ml": 300, "ml_entity": "switch.x"}]},
     ):
         with pytest.raises(dosing.DosingError, match="must be a"):
@@ -171,7 +171,7 @@ def test_every_entity_must_exist_in_home_assistant():
     with pytest.raises(dosing.DosingError, match="does not exist"):
         clean(exists=(KNOWN - {"button.doser_balance_start"}).__contains__)
     with pytest.raises(dosing.DosingError, match="does not exist"):
-        clean(exists=(KNOWN - {"switch.f1_feed"}).__contains__)
+        clean(exists=(KNOWN - {"switch.room_b_feed"}).__contains__)
     # A stored setup read back before its devices return is not thrown away.
     assert clean(exists=None)[0][0]["id"] == "balance"
 
@@ -330,6 +330,20 @@ def test_a_dose_request_names_a_pump_and_an_amount_it_can_dose():
         dosing.check_request(config, "flush")
 
 
+def test_only_a_batch_can_be_run_anyway():
+    """A test refill run anyway is a batch's alone: a dose or a stop carrying it is refused, and the
+    word is true or false, never a string that reads as one."""
+    config = {"pumps": clean()[0]}
+    assert dosing.check_request(config, "batch", run_anyway=True) == (None, None)
+    assert dosing.check_request(config, "batch", run_anyway=False) == (None, None)
+    for action, pump, ml in (("dose", "balance", 25), ("stop", None, None)):
+        with pytest.raises(dosing.DosingError, match="only a batch"):
+            dosing.check_request(config, action, pump, ml, run_anyway=True)
+    for bad in ("true", 1, None):
+        with pytest.raises(dosing.DosingError, match="true or false"):
+            dosing.check_request(config, "batch", run_anyway=bad)
+
+
 def test_a_request_waits_until_it_is_handled_or_too_old_to_act_on():
     request = {"id": "abc", "at": (NOW - timedelta(seconds=30)).isoformat()}
     assert dosing.pending(request, None, NOW)
@@ -340,3 +354,129 @@ def test_a_request_waits_until_it_is_handled_or_too_old_to_act_on():
     assert not dosing.pending(None, None, NOW)
     assert not dosing.pending({"id": "abc", "at": "yesterday"}, None, NOW)
     assert not dosing.pending({"id": "abc", "at": "2026-09-28T12:00:00"}, None, NOW)
+
+
+# ------------------------------------------------------------------ the feed schedule
+def feed(**changes):
+    """Vege, Bloom and Fade, each dosing the one pump; Week 1 from Monday 5 October 2026: Vege, then
+    Bloom, Bloom, Fade."""
+    recipes = [
+        {"id": rid, "name": rid.title(), "doses": [{"pump": "balance", "ml": ml}]}
+        for rid, ml in (("vege", 200), ("bloom", 300), ("fade", 100))
+    ]
+    raw = {
+        "recipes": recipes,
+        "schedule": {
+            "start": "2026-10-05",
+            "weeks": ["vege", "bloom", "bloom", "fade"],
+        },
+        **changes,
+    }
+    return dosing.clean_feed(raw, [deepcopy(PUMP)], KNOWN.__contains__)
+
+
+def test_each_week_of_the_schedule_doses_its_recipe_and_the_last_one_carries_on():
+    doc = feed()
+    assert doc["recipes"][1] == {
+        "id": "bloom",
+        "name": "Bloom",
+        "doses": [{"pump": "balance", "ml": 300, "ml_entity": None}],
+        "ec": None,
+    }
+    days = {
+        date(2026, 10, 4): None,  # before it starts
+        date(2026, 10, 5): (1, "vege"),
+        date(2026, 10, 11): (1, "vege"),
+        date(2026, 10, 12): (2, "bloom"),  # the midnight that starts week 2
+        date(2026, 10, 26): (4, "fade"),
+        date(2027, 1, 1): (13, "fade"),  # after the last week, its recipe carries on
+    }
+    for day, expected in days.items():
+        assert dosing.schedule_week(doc, day) == expected
+    assert dosing.in_use(doc, date(2026, 10, 12))["name"] == "Bloom"
+    # Before it starts, and with no schedule, nothing is picked: the batch's own recipe.
+    assert dosing.in_use(doc, date(2026, 10, 4)) is None
+    assert dosing.feed_now(doc, date(2026, 10, 4))["source"] == "batch"
+    assert dosing.in_use(dosing.empty_feed(), date(2026, 10, 12)) is None
+
+
+def test_a_recipe_picked_by_hand_holds_until_the_next_week_starts():
+    doc = feed()
+    wednesday = date(2026, 10, 7)
+    dosing.pick(doc, "fade", wednesday)
+    assert doc["held_until"] == "2026-10-12"
+    assert dosing.feed_now(doc, wednesday) == {
+        "recipe": "Fade",
+        "recipe_id": "fade",
+        "ec": None,
+        "week": 1,
+        "weeks": 4,
+        "start": "2026-10-05",
+        "held_until": "2026-10-12",
+        "source": "held",
+    }
+    monday = dosing.feed_now(doc, date(2026, 10, 12))
+    assert (monday["recipe"], monday["source"], monday["held_until"]) == (
+        "Bloom",
+        "schedule",
+        None,
+    )
+    # This week's own recipe ends a hold; without a schedule, a pick is simply the one in use.
+    assert dosing.pick(doc, "vege", wednesday)["held_until"] is None
+    none = feed(schedule=None)
+    dosing.pick(none, "fade", wednesday)
+    assert none["held_until"] is None
+    assert dosing.feed_now(none, wednesday)["source"] == "hand"
+
+
+def test_a_feed_recipe_may_declare_the_feed_ec_it_mixes_to():
+    """Optional, 0.1 to 10 mS/cm; the controller waters on it only without a feed EC probe."""
+    doc = feed(
+        recipes=[
+            {"id": "vege", "name": "Vege", "ec": 2.4},
+            {"id": "bloom", "name": "Bloom", "ec": ""},
+        ],
+        schedule={"start": "2026-10-05", "weeks": ["vege", "bloom"]},
+    )
+    assert [recipe["ec"] for recipe in doc["recipes"]] == [2.4, None]
+    assert dosing.feed_now(doc, date(2026, 10, 5))["ec"] == 2.4
+    assert dosing.feed_now(doc, date(2026, 10, 12))["ec"] is None
+    assert dosing.feed_now(dosing.empty_feed(), date(2026, 10, 5))["ec"] is None
+    for ec in (0, 10.5, "strong", True):
+        with pytest.raises(dosing.DosingError, match="feed recipe A: its feed EC"):
+            feed(recipes=[{"name": "A", "ec": ec}], schedule=None)
+
+
+def test_a_feed_schedule_that_cannot_be_dosed_is_refused():
+    assert feed(stage="gone")["stage"] is None  # a pick of no recipe there is no pick
+    for changes, match in (
+        ({"schedule": {"start": "2026-10-05", "weeks": ["vege", "flower"]}}, "week 2"),
+        ({"schedule": {"start": "5 October", "weeks": ["vege"]}}, "must be a date"),
+        ({"schedule": {"start": None, "weeks": ["vege"] * 53}}, "at most 52 weeks"),
+        ({"recipes": [{"name": "A"}, {"name": "a"}]}, "two feed recipes are called"),
+        (
+            {"recipes": [{"name": "A", "doses": [{"pump": "bloom", "ml": 5}]}]},
+            "feed recipe A: the recipe doses pump bloom",
+        ),
+        (
+            {"recipes": [{"name": "A", "doses": [{"pump": "balance", "ml": 2001}]}]},
+            "feed recipe A:",
+        ),
+    ):
+        with pytest.raises(dosing.DosingError, match=match):
+            feed(**changes)
+    # A recipe sent without an id gets one from its name, never another's.
+    made = feed(
+        recipes=[{"id": "late", "name": "Late"}, {"name": "Late Flower"}], schedule=None
+    )
+    assert [recipe["id"] for recipe in made["recipes"]] == ["late", "late_flower"]
+    assert dosing.clean_feed(None, []) == dosing.empty_feed()
+
+
+def test_a_recipe_may_be_named_and_a_setup_from_before_names_has_none():
+    # BATCH has no name, as every setup saved before names.
+    assert clean()[1]["name"] == ""
+    assert clean(batch=batch(name="  Week 3  "))[1]["name"] == "Week 3"
+    assert clean(batch=batch(name="x" * 40))[1]["name"] == "x" * 40
+    with pytest.raises(dosing.DosingError, match="at most 40 characters"):
+        clean(batch=batch(name="x" * 41))

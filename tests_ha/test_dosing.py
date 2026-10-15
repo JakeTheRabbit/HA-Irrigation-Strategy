@@ -13,8 +13,8 @@ from test_setup_entry import _install
 from test_upgrade_in_place import _upgrade
 
 DOMAIN = "crop_steering"
-ROOM = "room:"
-SENSOR = "sensor.crop_steering_dosing_config"
+ROOM = "room:tent_"
+SENSOR = "sensor.crop_steering_tent_dosing_config"
 REFUSED = "requires an authenticated Home Assistant administrator"
 PUMP = {
     "id": "balance",
@@ -123,13 +123,13 @@ async def test_the_services_and_the_sensor_the_controller_reads(hass, hass_admin
     assert busy == {"request": None, "error": "busy"}
     # The controller app publishes the request as handled: the next one is taken.
     hass.states.async_set(
-        "sensor.crop_steering_dosing", "dosing", {"handled": answer["request"]["id"]}
+        "sensor.crop_steering_tent_dosing", "dosing", {"handled": answer["request"]["id"]}
     )
     stop = await _call(hass, hass_admin_user, "dosing_request", action="stop")
     assert stop["error"] is None and stop["request"]["action"] == "stop"
     # Out of range: refused with a reason, nothing stored.
     hass.states.async_set(
-        "sensor.crop_steering_dosing", "idle", {"handled": stop["request"]["id"]}
+        "sensor.crop_steering_tent_dosing", "idle", {"handled": stop["request"]["id"]}
     )
     too_much = await _call(
         hass, hass_admin_user, "dosing_request", action="dose", pump="balance", ml=2500
@@ -171,6 +171,32 @@ async def test_an_ordinary_user_can_read_and_stop_dosing_but_never_save_or_dose(
     assert hass.states.get(SENSOR).attributes["request"] == stop["request"]
 
 
+async def test_a_test_refill_run_anyway_reaches_the_sensor_the_controller_reads(
+    hass, hass_admin_user
+):
+    """Through Home Assistant's own schema and auth: an administrator's batch run anyway is published
+    with run_anyway on the request the controller reads; an ordinary user is refused one, and a
+    value that is not true or false is refused by the schema."""
+    await _install(hass)
+    _devices(hass)
+    await _call(
+        hass, hass_admin_user, "dosing_save", expected_revision=0, pumps=[PUMP], batch={}
+    )
+    staff = await _staff(hass)
+    with pytest.raises(HomeAssistantError, match=REFUSED):
+        await _call(hass, staff, "dosing_request", action="batch", run_anyway=True)
+    with pytest.raises(Exception, match="run_anyway"):
+        await _call(
+            hass, hass_admin_user, "dosing_request", action="batch", run_anyway="maybe"
+        )
+    answer = await _call(
+        hass, hass_admin_user, "dosing_request", action="batch", run_anyway=True
+    )
+    assert answer["error"] is None and answer["request"]["run_anyway"] is True
+    await hass.async_block_till_done()
+    assert hass.states.get(SENSOR).attributes["request"] == answer["request"]
+
+
 async def test_the_setup_is_never_saved_under_a_dose_or_batch_the_controller_reports(
     hass, hass_admin_user
 ):
@@ -180,12 +206,12 @@ async def test_the_setup_is_never_saved_under_a_dose_or_batch_the_controller_rep
         hass, hass_admin_user, "dosing_save", expected_revision=0, pumps=[PUMP], batch={}
     )
     for state in ("dosing", "batch"):
-        hass.states.async_set("sensor.crop_steering_dosing", state, {"handled": None})
+        hass.states.async_set("sensor.crop_steering_tent_dosing", state, {"handled": None})
         busy = await _call(
             hass, hass_admin_user, "dosing_save", expected_revision=1, pumps=[], batch={}
         )
         assert busy["error"] == "busy" and busy["config"]["revision"] == 1
-    hass.states.async_set("sensor.crop_steering_dosing", "idle", {"handled": None})
+    hass.states.async_set("sensor.crop_steering_tent_dosing", "idle", {"handled": None})
     saved = await _call(
         hass, hass_admin_user, "dosing_save", expected_revision=1, pumps=[], batch={}
     )
@@ -216,9 +242,44 @@ async def test_a_saved_setup_and_its_request_survive_a_reload(hass, hass_admin_u
 async def test_an_install_from_before_dosing_loads_with_an_empty_setup(hass):
     """UPGRADE IN PLACE: a 2.17 room has no dosing store and no dosing_config entity."""
     await _upgrade(hass, "entry_2_17_wizard.json")
-    state = hass.states.get(SENSOR)
+    state = hass.states.get("sensor.crop_steering_dosing_config")  # a room from before slugs
     assert state is not None and state.state == "0"
     assert (state.attributes["pumps"], state.attributes["request"]) == ([], None)
-    doc = await _call(hass, None, "dosing_get")  # an automation: it reads, and may not edit
+    doc = await _call(hass, None, "dosing_get", room_id="room:")  # an automation: it reads, and may not edit
     assert doc["error"] is None and doc["config"]["pumps"] == []
     assert doc["can_edit"] is False
+
+
+async def test_a_recipe_in_parts_reaches_the_controller_in_whole_ml(
+    hass, hass_admin_user
+):
+    """docs/DOSING.md, Configuration: a dose in parts of the batch's 1 part, and a fixed amount, are both
+    published in whole mL rounded half up; the parts survive a reload."""
+    entry = await _install(hass)
+    _devices(hass)
+    bloom = {k: v.replace("balance", "bloom") for k, v in PUMP.items() if k != "max_ml"}
+    bloom["max_ml"] = 2000
+    for key, state in (("volume_entity", "25"), ("start_entity", "unknown"),
+                       ("dosing_entity", "off"), ("power_entity", "off"), ("flow_entity", "10")):
+        hass.states.async_set(bloom[key], state)
+    recipe = [{"pump": "bloom", "parts": 1.5}, {"pump": "balance", "ml": 12.5}]
+    doc = await _call(
+        hass,
+        hass_admin_user,
+        "dosing_save",
+        expected_revision=0,
+        pumps=[PUMP, bloom],
+        batch={"part_ml": 12.5, "recipe": recipe},
+    )
+    assert doc["error"] is None
+    published = [
+        {"pump": "bloom", "ml": 19, "ml_entity": None, "parts": 1.5},
+        {"pump": "balance", "ml": 13, "ml_entity": None},
+    ]
+    await hass.async_block_till_done()
+    batch = hass.states.get(SENSOR).attributes["batch"]
+    assert (batch["part_ml"], batch["recipe"]) == (12.5, published)
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    batch = hass.states.get(SENSOR).attributes["batch"]
+    assert (batch["part_ml"], batch["recipe"]) == (12.5, published)

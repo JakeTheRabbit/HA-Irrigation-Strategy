@@ -34,6 +34,25 @@ def test_p0_waits_for_the_first_of_its_time_the_trigger_and_its_dryback():
     assert decide(S(phase="P0", vwc=58, peak_vwc=62, phase_minutes=45), p)[0] == "P1"
 
 
+def test_p0_says_which_dryback_from_which_peak_and_ends_on_its_additional_dryback():
+    """P0's dryback is measured from the highest reading since lights-on. With an additional dryback set,
+    P0 ends that far below it; unset, it waits for the P3 dryback target, as before."""
+    p = P(p0_max_wait_min=60, dryback_target=30, p0_additional_dryback=3)
+
+    def at(vwc):
+        return S(phase="P0", vwc=vwc, peak_vwc=60.5, dryback_pct=(60.5 - vwc) / 60.5 * 100, phase_minutes=40)
+
+    item = by_rule(waiting_for(at(59.0), p), "p0_dryback")  # 2.5% below
+    assert (item["value"], item["dryback"], item["peak"]) == (round(60.5 * 0.97, 2), 3, 60.5)
+    for vwc in (59.0, 58.7, 58.6, 55.0):
+        s = at(vwc)
+        assert (decide(s, p)[0] == "P1") == holds(by_rule(waiting_for(s, p), "p0_dryback")), vwc
+    unset = P(p0_max_wait_min=60, dryback_target=30)
+    item = by_rule(waiting_for(at(59.0), unset), "p0_dryback")
+    assert (item["value"], item["dryback"], item["peak"]) == (round(60.5 * 0.7, 2), 30, 60.5)
+    assert decide(at(58.6), unset)[0] == "P0"
+
+
 def test_p1_ramp_shot_needs_the_moisture_and_the_spacing_and_hands_over_at_the_ceiling():
     p = P(p1_target=65, field_capacity=70, p1_time_between_min=15, p1_min_shots=3, p1_max_shots=6)
     s = S(phase="P1", vwc=62, shot_count=1, minutes_since_shot=5, ec=4, ec_smooth=4)
@@ -69,6 +88,21 @@ def test_p2_tops_up_exactly_below_its_trigger():
         topup = by_rule(waiting_for(s, p), "p2_topup")
         assert (topup["op"], topup["value"]) == ("<", 45)
         assert decide(s, p)[2] == holds(topup), vwc  # fires exactly when the test holds
+
+
+def test_p2_top_up_waits_out_the_time_between_p2_shots_as_decide_does():
+    """A zone still under the trigger right after a shot waits for it to soak down to the probe."""
+    p = P(p1_target=85, field_capacity=80, p2_threshold=70, p2_time_between_min=5)
+    for minutes in (0, 1, 4.9, 5, 12):
+        s = S(phase="P2", vwc=67, ec=6, ec_smooth=6, minutes_since_shot=minutes)
+        topup = by_rule(waiting_for(s, p), "p2_topup")
+        assert (topup["value"], topup["now"], topup["in_min"]) == (70, 67, round(max(0.0, 5 - minutes), 1))
+        assert (decide(s, p)[4].kind == "p2_topup") == (holds(topup) and topup["in_min"] == 0), minutes
+    # 0 is off: a shot whenever moisture reads below the trigger, and no wait to show, as before.
+    off = P(p1_target=85, field_capacity=80, p2_threshold=70)
+    soon = S(phase="P2", vwc=67, ec=6, ec_smooth=6, minutes_since_shot=1)
+    assert decide(soon, off)[4].kind == "p2_topup"
+    assert "in_min" not in by_rule(waiting_for(soon, off), "p2_topup")
 
 
 def test_p2_lists_the_dilution_limit_only_with_a_known_ec():

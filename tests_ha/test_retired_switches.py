@@ -10,8 +10,8 @@ from test_setup_entry import _install
 from test_upgrade_in_place import _upgrade
 
 RETIRED = {
-    "switch.crop_steering_system_enabled": "system_enabled",
-    "switch.crop_steering_auto_irrigation_enabled": "auto_irrigation_enabled",
+    "switch.crop_steering_tent_system_enabled": "system_enabled",
+    "switch.crop_steering_tent_auto_irrigation_enabled": "auto_irrigation_enabled",
 }
 
 

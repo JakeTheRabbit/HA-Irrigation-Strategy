@@ -3,14 +3,24 @@ import { ArrowRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Empty, Heading, Status, time, type Page } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { JevTrouble, jevUsage } from "@/components/jev-status";
 import { Pill, Sparkline } from "@/components/mini-visuals";
+import { ProbeCalibration } from "@/components/probe-calibration";
 import { ageText, readHeartbeat } from "@/lib/controller-health";
 import { recentReadings } from "@/lib/dryback";
-import { readJev } from "@/lib/jev";
+import { brainWords, readJev } from "@/lib/jev";
 import { descriptor, numeric } from "@/lib/model";
 import type { SetupDocument, SetupRoom } from "@/lib/operator-types";
-import { PROBE_TONE, zoneProbes, type Probe } from "@/lib/probes";
+import {
+  PROBE_TONE,
+  READING_REASON,
+  probeChoicePayload,
+  probeChoices,
+  zoneProbes,
+  type Probe,
+  type ProbeChoice,
+} from "@/lib/probes";
 import type { Controller, EntityState } from "@/lib/types";
 import { useRecentHistory } from "@/lib/use-recent-moisture";
 import { errorText } from "@/lib/utils";
@@ -46,7 +56,9 @@ export function Probes({
   );
   const status = states[`sensor.crop_steering_${room.room.prefix}app_status`]?.state;
   const jev = readJev(states, room.room.prefix).room;
-  const trouble = probes.filter((probe) => probe.health !== "ok").length;
+  const trouble = probes.filter(
+    (probe) => probe.health !== "ok" && probe.health !== "not-counted",
+  ).length;
   const hardware = [
     ["Pump", asId(config.pump)],
     ["Main-line valve", asId(config.mainline)],
@@ -55,8 +67,8 @@ export function Probes({
   ].filter(([, id]) => id) as [string, string][];
   return (
     <>
-      <Heading title="Probes" />
-      <section className="panel probes-status" aria-label="Controller and Jev">
+      <Heading title="Probes" action={<UiTip copyKey="probes" />} />
+      <section className="panel probes-status" aria-label="Controller and AI assistant">
         <div>
           <span className="eyebrow">Probes</span>
           <strong>
@@ -75,7 +87,9 @@ export function Probes({
                 ? "Not reporting"
                 : heartbeat.health === "missing"
                   ? "No heartbeat"
-                  : "Heartbeat unreadable"}
+                  : heartbeat.health === "stopped"
+                    ? "Stopped"
+                    : "Heartbeat unreadable"}
           </strong>
           <span className="muted small">
             {heartbeat.at === null
@@ -85,12 +99,10 @@ export function Probes({
           </span>
         </div>
         <div>
-          <span className="eyebrow">Jev</span>
-          <strong>
-            {jev ? (jev.state === "error" ? "Not answering" : "On") : "Not on this room"}
-          </strong>
+          <span className="eyebrow">AI assistant</span>
+          <strong>{brainWords(jev).tile}</strong>
           <span className="muted small">
-            {jev ? jevUsage(jev, true) || "No calls today" : "The controller runs without it"}
+            {jev?.on ? jevUsage(jev, true) || "No calls today" : brainWords(jev).detail}
           </span>
         </div>
       </section>
@@ -110,7 +122,7 @@ export function Probes({
       <section className="panel" aria-labelledby="probes-title">
         <div className="panel-heading">
           <div>
-            <h2 id="probes-title">Each zone’s probes</h2>
+            <h2 id="probes-title">Probes of each zone</h2>
             <p>
               What each probe reads, when it last reported, and whether the zone’s reading uses it
             </p>
@@ -121,7 +133,7 @@ export function Probes({
         </div>
         {!room.zones.length ? (
           <Empty
-            title="No zones discovered"
+            title="No zones found"
             detail="Probes appear once the room’s zones are mapped in Setup."
           />
         ) : (
@@ -157,7 +169,7 @@ export function Probes({
                             : "unknown"}
                       </Pill>
                       {zone.enabled === false && (
-                        <Status enabled={false} label="Scheduling paused" />
+                        <Status enabled={false} label="Zone paused" />
                       )}
                     </th>
                   </tr>
@@ -177,11 +189,12 @@ export function Probes({
           </div>
         )}
       </section>
+      <ProbePicker controller={controller} probes={probes} />
       {hardware.length > 0 && (
         <section className="panel" aria-labelledby="probes-room-title">
           <div className="panel-heading">
             <div>
-              <h2 id="probes-room-title">The room’s pump, main line and feed water</h2>
+              <h2 id="probes-room-title">Pump, main line and feed</h2>
               <p>As Home Assistant reports them. “Off” does not prove a valve closed or no flow.</p>
             </div>
           </div>
@@ -208,6 +221,7 @@ export function Probes({
           </ul>
         </section>
       )}
+      <ProbeCalibration controller={controller} />
       <RoomMap controller={controller} navigate={navigate} />
       <ControllerInternals controller={controller} />
       <p className="footnote">
@@ -231,6 +245,11 @@ function ProbeRow({
     <tr data-probe={probe.id} data-health={probe.health}>
       <td>
         <strong>{probe.name}</strong>
+        {probe.primary && (
+          <Pill tone="phase" data-probe-primary>
+            Primary
+          </Pill>
+        )}
         <code className="cell-subtext">{probe.id}</code>
       </td>
       <td className="numeric">
@@ -261,8 +280,145 @@ function ProbeRow({
         <Pill dot tone={PROBE_TONE[probe.health]} data-probe-health={probe.health}>
           {probe.text}
         </Pill>
+        {probe.reason && (
+          <span className="cell-subtext" data-probe-reason={probe.reason}>
+            Reading: {READING_REASON[probe.reason] ?? probe.reason.replaceAll("_", " ")}
+            {probe.quality ? ` (${probe.quality})` : ""}
+          </span>
+        )}
       </td>
     </tr>
+  );
+}
+
+/** Which of each zone's probes count towards its reading, and which one is primary: the controller
+ * says when the primary goes offline, and the zone reads on from the others. Saved with the room's
+ * setup, alone, so it needs nothing switched off. Only where the integration names the probes. */
+function ProbePicker({ controller, probes }: { controller: Controller; probes: Probe[] }) {
+  const { room } = controller;
+  const saved = probeChoices(probes);
+  const [draft, setDraft] = useState<Record<string, ProbeChoice> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const choices = draft ?? saved;
+  const groups = room.zones.flatMap((zone) =>
+    (["vwc", "ec"] as const)
+      .filter((kind) => choices[`${zone.id}:${kind}`])
+      .map((kind) => ({
+        zone,
+        kind,
+        key: `${zone.id}:${kind}`,
+        listed: probes.filter((probe) => probe.zone === zone.id && probe.kind === kind),
+      })),
+  );
+  if (!groups.length) return null;
+  const change = (key: string, next: ProbeChoice) => {
+    setDraft({ ...choices, [key]: next });
+    setMessage("");
+  };
+  async function save() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const setup = await controller.operator<SetupDocument>("setup_read");
+      const target = setup.rooms.find((item) => item.prefix === room.room.prefix && item.active);
+      if (!target) throw new Error("This room's setup could not be found.");
+      await controller.operator("setup_save", probeChoicePayload(target, choices));
+      await controller.refresh();
+      setDraft(null);
+      setMessage("Saved. Each zone's reading uses the probes that count.");
+    } catch (error) {
+      setMessage(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel" aria-labelledby="probe-picker-title">
+      <div className="panel-heading">
+        <div>
+          <h2 id="probe-picker-title">Probes that count</h2>
+          <p>
+            Each zone’s reading is made from the probes that count. If its primary goes offline you
+            are told once, and the zone reads on from the others.
+          </p>
+        </div>
+      </div>
+      <div className="probe-picker">
+        {groups.map(({ zone, kind, key, listed }) => {
+          const choice = choices[key];
+          const counted = listed.filter((probe) => !choice.unused.includes(probe.id));
+          const what = `${zone.name} ${kind === "vwc" ? "moisture" : "pore EC"}`;
+          return (
+            <fieldset key={key} data-probe-choice={key}>
+              <legend>{what}</legend>
+              {listed.map((probe) => {
+                const counts = !choice.unused.includes(probe.id);
+                return (
+                  <div className="probe-choice" key={probe.id}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={counts}
+                        disabled={busy || (counts && counted.length === 1)}
+                        onChange={(event) =>
+                          change(key, {
+                            unused: event.target.checked
+                              ? choice.unused.filter((id) => id !== probe.id)
+                              : [...choice.unused, probe.id],
+                            primary:
+                              !event.target.checked && choice.primary === probe.id
+                                ? ""
+                                : choice.primary,
+                          })
+                        }
+                      />
+                      {probe.name}
+                    </label>
+                    <label className="muted small">
+                      <input
+                        type="radio"
+                        name={`primary-${key}`}
+                        checked={choice.primary === probe.id}
+                        disabled={busy || !counts}
+                        aria-label={`${probe.name} is the primary ${what} probe`}
+                        onChange={() => change(key, { ...choice, primary: probe.id })}
+                      />
+                      Primary
+                    </label>
+                  </div>
+                );
+              })}
+              <label className="muted small">
+                <input
+                  type="radio"
+                  name={`primary-${key}`}
+                  checked={!choice.primary}
+                  disabled={busy}
+                  onChange={() => change(key, { ...choice, primary: "" })}
+                />
+                No primary
+              </label>
+            </fieldset>
+          );
+        })}
+      </div>
+      <div className="probe-picker-actions">
+        <Button size="sm" disabled={busy || !draft} onClick={save}>
+          {busy ? "Saving…" : "Save"}
+        </Button>
+        {draft && (
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => setDraft(null)}>
+            Cancel
+          </Button>
+        )}
+        {message && (
+          <span className="muted small" role="status">
+            {message}
+          </span>
+        )}
+      </div>
+    </section>
   );
 }
 
@@ -329,7 +485,7 @@ function RoomMap({
       open={open}
       onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
     >
-      <summary>Room map: how the pump, valves and probes connect</summary>
+      <summary>Room map</summary>
       {open && (
         <section className="panel">
           <div className="panel-heading">
@@ -440,7 +596,7 @@ function ControllerInternals({ controller }: { controller: Controller }) {
       onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
     >
       <summary>
-        Controller internals: every sensor of this room ({reporting} of {sensors.length} reporting)
+        All sensors of this room ({reporting} of {sensors.length} reporting)
       </summary>
       {open && (
         <>
@@ -449,13 +605,13 @@ function ControllerInternals({ controller }: { controller: Controller }) {
               <Search size={17} />
               <Input
                 aria-label="Search sensors"
-                placeholder="Search name or entity ID…"
+                placeholder="Name or entity ID"
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
               />
             </div>
             <select
-              aria-label="Filter sensor availability"
+              aria-label="Sensor status filter"
               value={status}
               onChange={(e) => setStatus(e.target.value)}
             >
@@ -468,7 +624,7 @@ function ControllerInternals({ controller }: { controller: Controller }) {
           <section className="panel">
             {!visible.length ? (
               <Empty
-                title="No matching sensors"
+                title="No sensors found"
                 detail={
                   sensors.length
                     ? "Clear your filters to see all sensor entities."

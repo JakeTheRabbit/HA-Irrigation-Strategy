@@ -31,7 +31,8 @@
   justify-content: space-between;
   gap: 0.5rem;
 }
-.comparison-page label {
+.comparison-page label,
+.comparison-field {
   display: grid;
   gap: 0.4rem;
   font-size: 0.8rem;
@@ -66,7 +67,15 @@
 .comparison-reference p + p {
   margin-top: 0.3rem;
 }
-/* The full-resolution chart and the data quality, one tap down. */
+/* By grow week or both runs overlaid: two buttons, at their own width. */
+.comparison-view {
+  justify-self: start;
+}
+/* Each view shrinks to the page, as its content did when it sat in the grid on its own. */
+.comparison-pane {
+  min-width: 0;
+}
+/* The data quality, one tap down; the overlay view's body shares its spacing. */
 .comparison-more > summary {
   cursor: pointer;
   padding: 0.35rem 0;

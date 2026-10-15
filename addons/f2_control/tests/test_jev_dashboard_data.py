@@ -69,7 +69,8 @@ def test_each_zone_publishes_jevs_setpoint_range(tmp_path):
     brain.setpoints.zone("default", 1)["home"].update({"p2_shot_size": 5.0, "p2_vwc_threshold": 30.5})
     brain.setpoints.zone("default", 1)["last"] = {"at": "2026-09-28T22:31:00", "words": "P2 shot 5% -> 4.5%",
                                                   "reverted": False}
-    c = SimpleNamespace(jev=brain, _jev_read=lambda e: None, _on=lambda e, d=False: True)
+    c = SimpleNamespace(jev=brain, _jev_read=lambda e: None, _on=lambda e, d=False: True,
+                        _no_touch_until=lambda room, now: None)
     p = K.params(p2_shot_size=4.5, p2_threshold=30.5, p3_emergency_floor=20.7, p1_target=36.5, field_capacity=40.0)
     room = SimpleNamespace(slug="default", prefix="", zones={1: {}}, state={1: {"ec_offset": 0.0}},
                            strategy_required=False, _jev_params={1: p})

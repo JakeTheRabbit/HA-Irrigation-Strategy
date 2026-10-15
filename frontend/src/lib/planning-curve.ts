@@ -1,3 +1,4 @@
+import { addDays, dateInZone, viewerTimeZone, wallTime } from "./comparison";
 export type PlanningPhaseId = "P0" | "P1" | "P2" | "P3";
 export interface PlanningPoint {
   hour: number;
@@ -92,7 +93,7 @@ export function buildPlanningCurve(
   if (p2 === null) missing.push("Maintenance shot when below");
   if (morningDryback === null) missing.push("P3 dryback target/reference");
   if (p1 !== null && p2 !== null && p2 > p1)
-    warnings.push("The maintenance trigger is above the peak VWC target.");
+    warnings.push("The re-water point is above the peak VWC target.");
   const wait = value("p0_maximum_wait_time", 0, 1440);
   const interval = value("p1_time_between_shots", 0, 1440);
   const maxShots = value("p1_maximum_shots", 0, 200);
@@ -120,8 +121,8 @@ export function buildPlanningCurve(
   const p0End = Math.min(rawP0End, p3Start);
   const p1End = Math.min(rawP1End, p3Start);
   const phases: PlanningPhase[] = [
-    { id: "P0", label: "Additional dryback", start: 0, end: p0End, color: "#8f9aa6" },
-    { id: "P1", label: "Ramp-up", start: p0End, end: p1End, color: "#03a9f4" },
+    { id: "P0", label: "Extra dryback", start: 0, end: p0End, color: "#8f9aa6" },
+    { id: "P1", label: "Ramp", start: p0End, end: p1End, color: "#03a9f4" },
     { id: "P2", label: "Maintenance", start: p1End, end: p3Start, color: "#42b995" },
     { id: "P3", label: "Overnight dryback", start: p3Start, end: 24, color: "#e5a43b" },
   ];
@@ -134,7 +135,7 @@ export function buildPlanningCurve(
       : [];
   if (p1Windows.length)
     notes.push(
-      "P1 ticks show eligible irrigation windows at the supplied spacing, starting from the illustrated P1 boundary. Sensor feedback may end ramp-up sooner; they are not scheduled or recorded shots.",
+      "The P1 ticks show the possible shot times at the given interval, from the start of P1 on the chart. The probe readings can end the ramp sooner. The ticks are not scheduled or recorded shots.",
     );
   // Draw a periodic reference cycle. Reusing field capacity at lights-on would
   // invent overnight rehydration; the next cycle starts at the same endpoint.
@@ -148,7 +149,7 @@ export function buildPlanningCurve(
   const emergencyReferenceActive = floor !== null && overnightEnd !== null && overnightEnd <= floor;
   if (emergencyReferenceActive)
     warnings.push(
-      "The overnight reference reaches or crosses the rescue level. A rescue shot would be relevant at that reading; the chart does not predict or schedule one.",
+      "The overnight reference reaches or crosses the rescue floor. A rescue shot would be relevant at that reading; the chart does not predict or schedule one.",
     );
   // The ramp is a staircase, one riser per eligible shot. Each shot takes the share of the climb
   // that its configured size is of the ramp's total water; retained water is not predicted.
@@ -194,7 +195,7 @@ export function buildPlanningCurve(
     vwc.push({ hour: 24, value: overnightEnd, phase: "P3" });
   }
   notes.push(
-    "Overnight VWC is a straight planning connection from the last daytime reference to the relative dryback endpoint, then the same value at next lights-on. P0's latest-first-shot window is shown at that endpoint. Neither timing nor measured moisture is forecast. The rescue level is separate, not a desired overnight target.",
+    "Overnight VWC is a straight planning connection from the last daytime reference to the relative dryback endpoint, then the same value at next lights-on. P0's latest-first-shot window is shown at that endpoint. Neither timing nor measured moisture is forecast. The rescue floor is separate, not a desired overnight target.",
   );
   const ec: PlanningPoint[] = [];
   const ecTargets = phases
@@ -259,7 +260,7 @@ export function buildPlanningCurve(
     );
   if (p2 !== null && shot !== null && p2 + shot > 100)
     warnings.push(
-      "The maintenance trigger plus a maintenance shot exceeds 100% VWC; the illustrated band is clipped at 100%.",
+      "The re-water point plus a maintenance shot exceeds 100% VWC; the illustrated band is clipped at 100%.",
     );
   return {
     phases,
@@ -324,26 +325,29 @@ export interface FoldedRecording {
   earlier: number;
 }
 /** Fold recorded readings onto the lights-on axis so they sit under the targets being edited.
- * A grow-day runs from lights-on to the next lights-on, in the browser's time zone. */
+ * A grow-day runs from lights-on to the next lights-on, on the clock of `timeZone` (Home
+ * Assistant's, as the controller keeps it; the browser's where that is unknown). */
 export function foldRecorded(
   readings: readonly RecordedReading[],
   lightsOn: number,
   now: number,
+  timeZone = viewerTimeZone(),
 ): FoldedRecording {
   const folded: FoldedRecording = { today: [], previous: [], earlier: 0 };
   if (!Number.isFinite(lightsOn) || lightsOn < 0 || lightsOn >= 24 || !Number.isFinite(now))
     return folded;
+  const starts = new Map<string, number>();
+  const at = (date: string) => {
+    let start = starts.get(date);
+    if (start === undefined) {
+      start = wallTime(date, Math.round(lightsOn * 60), timeZone);
+      starts.set(date, start);
+    }
+    return start;
+  };
   const dayStart = (time: number) => {
-    const date = new Date(time);
-    const at = (offset: number) =>
-      new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate() + offset,
-        0,
-        Math.round(lightsOn * 60),
-      ).getTime();
-    return at(0) > time ? at(-1) : at(0);
+    const date = dateInZone(time, timeZone);
+    return at(date) > time ? at(addDays(date, -1)) : at(date);
   };
   const current = dayStart(now);
   const days = new Map<number, RecordedPoint[]>();

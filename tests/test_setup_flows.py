@@ -72,9 +72,17 @@ def test_native_creation_retains_supported_flow_and_validates_off(flow_module):
     data["room_name"] = "First room"
     result = asyncio.run(flow.async_step_user({"setup_payload": data}))
     assert result["type"] == "create_entry"
-    assert flow.unique == "default" and result["data"]["room_prefix"] == ""
+    # The first room has a slug like every other: un-prefixed ids are for upgraded installs only.
+    assert flow.unique == "room_first_room"
+    assert (result["data"]["room_slug"], result["data"]["room_prefix"]) == (
+        "first_room",
+        "first_room_",
+    )
     assert result["data"]["setup_revision"] == 1
-    assert result["data"]["enable_flag"] == "switch.crop_steering_engine_enabled"
+    assert (
+        result["data"]["enable_flag"]
+        == "switch.crop_steering_first_room_engine_enabled"
+    )
     assert result["data"]["zones"]["2"]["vwc_sensors"] == ["sensor.vwc"]
     states["switch.p"].state = "on"
     result = asyncio.run(flow.async_step_user({"setup_payload": data}))
@@ -92,6 +100,17 @@ def test_new_named_default_is_rejected_to_protect_controller_state(flow_module):
     assert result["type"] == "abort" and result["reason"] == "reserved_room_name"
 
 
+def test_a_first_room_named_default_is_rejected_on_every_path(flow_module):
+    hass, _, _ = rig()
+    hass.config_entries.entries = []
+    data = payload()
+    data["room_name"] = "Default"
+    flow = flow_module.ConfigFlow()
+    flow.hass = hass
+    result = asyncio.run(flow.async_step_user({"setup_payload": data}))
+    assert result["type"] == "abort" and result["reason"] == "reserved_room_name"
+
+
 def test_native_zone_builder_retains_archived_ids_and_unknown_values(flow_module):
     old = {
         "1": {"active": False, "zone_switch": "switch.v1", "special": 123},
@@ -102,40 +121,6 @@ def test_native_zone_builder_retains_archived_ids_and_unknown_values(flow_module
     )
     assert result["1"]["active"] is False and result["2"]["active"] is False
     assert result["1"]["special"] == 123 and result["2"]["max_daily_volume"] == 37
-
-
-def test_native_env_reload_cannot_bypass_off_gate(flow_module, monkeypatch):
-    hass, entry, states = rig()
-    entry.data["config_method"] = "env"
-    hass.config = type("Config", (), {"config_dir": "/unused"})()
-
-    async def executor(fn, *args):
-        return fn(*args)
-
-    hass.async_add_executor_job = executor
-    monkeypatch.setattr(
-        flow_module,
-        "load_env_config",
-        lambda _: {
-            "num_zones": 1,
-            "zones": {"1": {"zone_switch": "switch.v1"}},
-            "hardware": {"pump_switch": "switch.p", "main_line_switch": "switch.m"},
-            "parameters": {},
-            "features": {},
-        },
-    )
-    flow = flow_module.OptionsFlowHandler(entry)
-    flow.hass = hass
-    states["switch.p"].state = "on"
-    result = asyncio.run(flow.async_step_reload_env())
-    assert result["type"] == "abort"
-    assert not hass.config_entries.updates
-    states["switch.p"].state = "off"
-    result = asyncio.run(flow.async_step_reload_env())
-    assert result["type"] == "create_entry"
-    assert entry.data["zones"]["1"]["special"] == 123
-    assert entry.data["zones"]["2"]["active"] is False
-    assert entry.data["num_zones"] == 2
 
 
 def test_native_hardware_schema_retains_explicit_tank_telemetry(

@@ -15,6 +15,7 @@ import type {
 import { parseAutoSetpoints } from "./auto-setpoints";
 import { readWaiting } from "./waiting-for";
 import { PHASE_GROUPS, settingWords } from "./setting-words";
+import { growerWords } from "./words";
 import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
 
 const ROOT = "crop_steering_";
@@ -29,6 +30,7 @@ export const ZONE_PARAMETERS = new Set([
   "vegetative_dryback_target",
   "generative_dryback_target",
   "p0_maximum_wait_time",
+  "p0_additional_dryback",
   "p3_emergency_vwc_threshold",
   "p3_emergency_shot_size",
   "max_daily_volume",
@@ -40,6 +42,7 @@ export const ZONE_PARAMETERS = new Set([
   "drippers_per_plant",
   "dripper_flow_rate",
   "min_floor_drown_ceiling",
+  "min_daily_ml_per_plant",
 ]);
 export const ROOM_PARAMETERS = new Set([
   "dripper_flow_rate",
@@ -51,6 +54,7 @@ export const ROOM_PARAMETERS = new Set([
   "irrigation_ph_max",
   "max_shot_duration",
   "maximum_shot_duration",
+  "sump_power_threshold_w",
 ]);
 export const emptyRoom: Room = {
   id: "",
@@ -128,6 +132,18 @@ export function descriptor(states: States, room: Room): EntityState | undefined 
     (e) =>
       /^sensor\.crop_steering_.*engine_config$/.test(e.entity_id) &&
       e.attributes.prefix === room.prefix,
+  );
+}
+/** The slug a new room's entity ids get from its name, made as the integration makes it: every
+ * new room has one, so its ids read crop_steering_<slug>_... Only a room from an older install
+ * keeps un-prefixed ids, and "default" is reserved for it. */
+export function roomSlug(name: string): string {
+  return (
+    name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "") || "room"
   );
 }
 export function discoverRooms(states: States): Room[] {
@@ -292,13 +308,13 @@ function group(key: string) {
   if (/^p0_/.test(key)) return PHASE_GROUPS[0];
   if (/^p1_/.test(key)) return PHASE_GROUPS[1];
   if (/^p2_/.test(key)) return PHASE_GROUPS[2];
-  // The dryback targets are where Athena puts them: what the substrate dries by overnight.
+  // The dryback targets are P3's: what the substrate dries back by overnight.
   if (/^p3_|dryback/.test(key)) return PHASE_GROUPS[3];
   if (/^ec_target/.test(key)) return "EC targets";
   if (key === "field_capacity") return "Substrate";
   if (/substrate|plant_count|dripper/.test(key)) return "Hardware sizing";
   if (/light.*hour/.test(key)) return "Schedule";
-  if (/max_|maximum_shot_duration|maximum_ec|watchdog|irrigation_(ec|ph)|drown/.test(key))
+  if (/max_|maximum_shot_duration|maximum_ec|watchdog|irrigation_(ec|ph)|drown|sump|min_daily/.test(key))
     return "Safety";
   return "General";
 }
@@ -352,6 +368,7 @@ export function eventsForRoom(states: States, room: Room): LogEvent[] {
       )
       .map((e) => ({
         ...e,
+        message: growerWords(e.message),
         type: ["water", "phase", "warning", "info"].includes(e.type) ? e.type : "info",
       }));
   if (typeof log.attributes.feed !== "string") return [];
@@ -373,7 +390,7 @@ export function eventsForRoom(states: States, room: Room): LogEvent[] {
       {
         id: `${log.entity_id}:${i}:${line}`,
         timestamp: match[1],
-        message,
+        message: growerWords(message),
         type: /block|fault|hold|unavailable/i.test(message)
           ? "warning"
           : /P[0-3].*(?:→|->)/.test(message)
@@ -488,6 +505,7 @@ export function buildRoom(states: States, room: Room): RoomView {
   const roomActive = !room.id || roomIsActive(states, room);
   const autoSwitch = room.id ? resolve(states, room, "switch", "auto_setpoints") : undefined;
   const waterSelect = room.id ? resolve(states, room, "select", "water_today_view") : undefined;
+  const predictSwitch = room.id ? resolve(states, room, "switch", "notify_predictions") : undefined;
   const zones: Zone[] = activeIds.map((id) => {
     const z = `zone_${id}_`;
     const phase = resolve(states, room, "sensor", `${z}phase`);
@@ -711,7 +729,7 @@ export function buildRoom(states: States, room: Room): RoomView {
       title: strategyValid ? "Grow plan controls this room" : "Grow plan snapshot unavailable",
       detail: strategyValid
         ? "Displayed VWC and EC references come from the active plan. Manual setpoints are retained for use after the plan is disarmed."
-        : "The controller requires a valid plan snapshot. Targets are unavailable until plan status is restored; do not treat legacy number values as active targets.",
+        : "The controller needs a valid plan snapshot. The targets are unavailable until the plan status is available again. Do not use the old number values as active targets.",
     });
   const shot = config && beat.health === "stale" ? shotRunning(states, room, now) : null;
   if (shot)
@@ -720,6 +738,13 @@ export function buildRoom(states: States, room: Room): RoomView {
       severity: "info",
       title: "Watering",
       detail: `Zone ${shot}'s valve is open: a shot is running, and the controller reports again when it ends (last report ${ageText(now - beat.at!)} ago). Zone phases and statuses are its last report, not live.`,
+    });
+  else if (config && beat.health === "stopped")
+    alerts.push({
+      id: `${room.id}-controller`,
+      severity: "warning",
+      title: "Controller stopped",
+      detail: `${stoppedText(beat, now)} After an update or a restart it starts again by itself, which can take a few minutes; if it doesn't, start the controller app and check its log. Zone phases and statuses are its last report, not live.`,
     });
   else if (config && !live)
     alerts.push({
@@ -741,8 +766,8 @@ export function buildRoom(states: States, room: Room): RoomView {
       title: "Watering switch unavailable",
       detail:
         typeof flag === "string" && flag
-          ? `This room's engine switch, ${flag}, is missing or unavailable in Home Assistant, so the controller treats watering as off.`
-          : "The controller has not said which switch lets it water this room. Check the controller app and its log.",
+          ? `The kill switch of this room, ${flag}, is missing or unavailable in Home Assistant, so the controller operates as if it is off.`
+          : "The controller did not report the switch that lets it water this room. Examine the controller app and its log.",
     });
   // The integration's stock sensor lists every stock tank; the low ones get one notice.
   const stockTanks = resolve(states, room, "sensor", "stock_low")?.attributes.tanks;
@@ -804,11 +829,32 @@ export function buildRoom(states: States, room: Room): RoomView {
       entityId: waterSelect?.entity_id ?? null,
       view: waterSelect?.state === "Per plant" ? "plant" : "zone",
     },
+    notifyPredictions: {
+      entityId: predictSwitch?.entity_id ?? null,
+      enabled: boolean(predictSwitch),
+    },
   };
 }
 
+const stoppedText = (beat: { at: number | null }, now: number) =>
+  beat.at === null
+    ? "The controller app has stopped."
+    : `The controller app stopped ${ageText(now - beat.at)} ago.`;
+
 /** One line per room from what the controller publishes: watering, holding and why, not watering
  * and what to do, or how old the data is once the controller has stopped reporting. */
+/** The band under the header while the room's controller is not reporting: what that means for
+ * the numbers on every page. Null while it reports, while a shot holds its loop, and for a room
+ * that is off. */
+export function staleBanner(states: States, room: Room, now = Date.now()): string | null {
+  const status = roomStatus(states, room, now);
+  if (status.tone === "stale")
+    return `The controller has not reported for ${ageText(now - status.reportedAt!)}. Moisture and phases below are its last report, not live. Watering is held by the controller's own safety rules.`;
+  const beat = readHeartbeat(resolve(states, room, "sensor", "ai_heartbeat"), now);
+  return status.tone === "stopped" && beat.health !== "fresh"
+    ? `${status.detail} Moisture and phases below are its last report, not live.`
+    : null;
+}
 export function roomStatus(states: States, room: Room, now = Date.now()): RoomStatus {
   const beat = readHeartbeat(resolve(states, room, "sensor", "ai_heartbeat"), now);
   const say = (
@@ -836,7 +882,13 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
       `Hardware fault: ${fault}. Switch watering off, fix the stuck hardware and check it is off, then switch watering back on.`,
     );
   if (!roomIsActive(states, room))
-    return say("off", "Room off", "Nothing growing: no irrigation, no alerts.");
+    return say("off", "Room off", "No plants in the room: no shots, no alerts.");
+  if (beat.health === "stopped")
+    return say(
+      "stopped",
+      "Not watering",
+      `${stoppedText(beat, now)} After an update or a restart it starts again by itself, which can take a few minutes. If it doesn't, start the controller app and check its log.`,
+    );
   if (beat.health === "missing" || beat.health === "unreadable")
     return say(
       "stopped",
@@ -863,7 +915,7 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
       "Not watering",
       pending.startsWith("Setup changed")
         ? `${pending}. Switch watering off, wait up to 5 minutes for the controller to adopt the setup, then switch it back on.`
-        : `${pending}. Correct the room in Rooms & setup.`,
+        : `${pending}. Correct the room in Rooms and setup.`,
     );
   // System Enabled and Auto Irrigation Enabled are retired: while one reads off, the controller
   // keeps the engine switch off (CS-208), and an older controller holds every shot itself. Named
@@ -891,14 +943,14 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
     return say(
       "stopped",
       "Not watering",
-      "Watering is switched off for this room (its engine switch), so the controller opens no valve. It still reads the probes and follows the phases. A new room starts with watering off, so nothing is watered before its hardware has been checked.",
+      "The kill switch (Watering) of this room is off, so the controller opens no valve. It continues to read the probes and to follow the phases. A new room starts with the kill switch at off, so no water flows before you examine its hardware.",
       { label: "Switch it on in Settings", route: "settings" },
     );
   if (engine !== "on")
     return say(
       "stopped",
       "Not watering",
-      `This room's engine switch${flagId ? `, ${flagId},` : ""} is missing or unavailable in Home Assistant. The controller treats that as off, so nothing is watered until it reads on.`,
+      `The kill switch of this room${flagId ? `, ${flagId},` : ""} is missing or unavailable in Home Assistant. The controller operates as if it is off, and gives no shots until it reads on.`,
     );
   const plan = note("strategy_error");
   if (plan)
@@ -996,6 +1048,7 @@ export function validateChange(room: RoomView, states: States, change: Change): 
     room.engine.entityId,
     room.roomActiveEntity,
     room.autoSetpoints.entityId,
+    room.notifyPredictions.entityId,
     ...room.zones.flatMap((z) => [
       z.enabledEntity,
       `switch.${ROOT}${room.room.prefix}zone_${z.id}_manual_override`,

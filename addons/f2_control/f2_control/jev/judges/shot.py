@@ -1,10 +1,11 @@
 """Every phase: did the water land?
 
-A shot the controller fired is not a shot the plants got. On 24 Sep 2026 F2 zone 2 did not land from 14:36
-to 16:42: four shots of about 270 s, moisture falling 30.5 -> 26.4 while zones 1 and 3 landed normally.
-The watchdog meant to catch it could never fire (it was gated on health sensors that no longer existed).
-A person reads a shot the way this judge does: water went in; did the probe go up and stay up, did pore
-EC move toward the feed, and what did the sibling zones watered at the same time do?
+A shot the controller fired is not a shot the plants got. Observed on a production room (24 Sep 2026): a
+zone did not land from 14:36 to 16:42: four shots of about 270 s, moisture falling 30.5 -> 26.4 while
+zones 1 and 3 landed normally. The watchdog meant to catch it could never fire (it was gated on health
+sensors that no longer existed). A person reads a shot the way this judge does: water went in; did the
+probe go up and stay up, did pore EC move toward the feed, and what did the sibling zones watered at the
+same time do?
 
 Each shot is audited once, about 20 minutes after it ends (the newest one, when shots come faster than
 the cadence). The judge never adds water: its only directive is the CS-701 alert, raised when two shots
@@ -13,7 +14,7 @@ in a row did not reach the zone. Watering carries on as normal either way.
 from dataclasses import dataclass, field
 from datetime import timedelta
 
-from ..context import response
+from ..context import LANDED_SHARE, expected_rise, landed_share, response
 from ..doctrine import doctrine
 from .base import Judge, choice, common, with_doctrine
 
@@ -73,6 +74,15 @@ def _retained(r, typical):
     return out
 
 
+def _landed(r, substrate_l):
+    expected, share = expected_rise(r.shot, substrate_l), landed_share(r, substrate_l)
+    if share is None:
+        return "no reading to judge it by" if expected is not None else "the zone's substrate volume is unknown"
+    verdict = "landed" if share >= LANDED_SHARE else "did not land"
+    return (f"the spike was {share * 100:.0f}% of the {expected:+.1f} points {r.shot.litres:.1f} L should give "
+            f"{substrate_l:.1f} L of substrate: {verdict} by code's check ({LANDED_SHARE * 100:.0f}% or more lands)")
+
+
 def _ec_move(r, feed):
     if r.ec_move is None:
         return "no reading to judge it by"
@@ -130,6 +140,7 @@ class ShotJudge(Judge):
             "before_the_shot": f"VWC {_pct(sh.pre_vwc)}, pore EC {_ec(sh.pre_ec)}",
             "spike_first_10_min": ("no reading to judge it by" if r.peak_rise is None
                                    else f"{r.peak_rise:+.1f} points at the highest"),
+            "code_landed_check": _landed(r, ctx.substrate_l),
             "retained_rise_at_20_min": _retained(r, typical),
             "pore_ec_move_at_20_min": _ec_move(r, ctx.feed_ec),
             "typical_retained_rise": "unknown" if typical is None else f"{typical:.2f} points per shot today",
@@ -160,10 +171,10 @@ class ShotJudge(Judge):
             z.misses = []  # a landing, or no firm answer: the run is broken
         if len(z.misses) == 2:
             a, b = z.misses
-            alert = {"code": CODE, "title": "water isn't reaching this zone",
-                     "message": (f"The last two shots on {ctx.title} at {a.start:%H:%M} and {b.start:%H:%M} put in "
-                                 f"{a.litres:.1f} L and {b.litres:.1f} L and moisture did not rise; check the "
-                                 f"zone's valve, drippers and line; watering carries on as normal.")}
+            alert = {"code": CODE, "title": "water does not reach this zone",
+                     "message": (f"The last two shots on {ctx.title} at {a.start:%H:%M} and {b.start:%H:%M} gave "
+                                 f"{a.litres:.1f} L and {b.litres:.1f} L, and the VWC did not increase. Check the "
+                                 "valve, the drippers and the line of the zone. The shots continue as usual.")}
             z.directive = self.directive(ctx, "alert", alert,
                                          f"two shots in a row did not reach the zone (p={v.prob:.2f})")
         return z.directive

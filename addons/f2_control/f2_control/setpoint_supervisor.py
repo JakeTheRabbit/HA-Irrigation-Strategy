@@ -18,15 +18,18 @@ target fit what the ramp is showing. Any judge failure leaves the arithmetic in 
 from dataclasses import dataclass
 
 import curve_tracker as ct
+from crop_steering_engine.defaults import SUBSTRATE_PROFILES
 
-ADDITIONAL_DRYBACK_PCT = 3.0  # Athena: 1-5% further dryback after lights-on before the first shot
-P2_SHOT_RANGE = (1.0, 4.0)  # the EC lever: bigger shots force runoff and lower pore EC, smaller shots stack it
-PEAK_ADJ_RANGE = (-2.0, 2.0)  # how far judgement may move the peak off the learned knee
+# From the room's substrate profile (learner); these are the generic profile's.
+_LEARNER = SUBSTRATE_PROFILES["generic"]["learner"]
+ADDITIONAL_DRYBACK_PCT = _LEARNER["additional_dryback_pct"]  # Athena: 1-5% further dryback after lights-on
+P2_SHOT_RANGE = _LEARNER["p2_shot_range"]  # the EC lever: bigger shots force runoff and lower pore EC, smaller stack it
+PEAK_ADJ_RANGE = _LEARNER["peak_adj_range"]  # how far judgement may move the peak off the learned knee
 MAX_STEP = {"p1_target_vwc": 6.0, "field_capacity": 20.0, "p2_vwc_threshold": 10.0,
             "p3_emergency_vwc_threshold": 10.0, "dryback_target": 15.0}
 BOUNDS = {  # the engine's own _PARAM_BOUNDS, by setpoint suffix
-    "p1_target_vwc": (20, 85), "p2_vwc_threshold": (10, 70), "field_capacity": (40, 90), "dryback_target": (2, 60),
-    "p0_maximum_wait_time": (5, 240), "p3_emergency_vwc_threshold": (10, 60), "p2_shot_size": (0.5, 20),
+    "p1_target_vwc": (20, 100), "p2_vwc_threshold": (10, 100), "field_capacity": (40, 100), "dryback_target": (2, 60),
+    "p0_maximum_wait_time": (5, 240), "p3_emergency_vwc_threshold": (10, 65), "p2_shot_size": (0.5, 20),
     "p1_initial_shot_size": (0.5, 15), "p1_shot_size_increment": (0, 5), "p1_maximum_shots": (1, 40),
     "p1_time_between_shots": (1, 120), "ec_target_p1": (0.5, 9), "ec_target_p2": (0.5, 9),
 }
@@ -48,7 +51,11 @@ def attainable_ec_target(ec_range, feed_ec, ec_seen_max):
 def desired(model, recipe, plan, steer, ctx, ec_seen_max):
     """The setpoints this zone should hold RIGHT NOW: attainable, and scheduled by where the day is."""
     peak = plan.peak + steer.peak_adj
-    low = round(plan.floor - 2.0, 1)  # a threshold the zone sits above: no P0 bypass, no top-ups
+    # A threshold the zone sits above, after the planned stop, overnight and through P0: no top-ups, no
+    # P0 bypass. Under where the dryback TARGET ends, not the plan's own floor: when the plan expects a
+    # shallower night, the night can still dry to the target, and a threshold above that skipped P0 at
+    # lights-on ("P0 bypass VWC 61<=rewater 63").
+    low = round(peak * (1.0 - recipe.dryback_pct / 100.0) - 2.0, 1)
     band_lo = round(peak - model.gain * steer.p2_shot, 1)
     mins_on = ctx.get("minutes_since_lights_on")
     before_first_shot = ctx["shots_today"] == 0
@@ -60,7 +67,7 @@ def desired(model, recipe, plan, steer, ctx, ec_seen_max):
         "p1_target_vwc": round(peak, 1),
         "field_capacity": max(40.0, round(peak + 2.0, 1)),
         "p2_vwc_threshold": band_lo if watering else low,
-        "p3_emergency_vwc_threshold": max(10.0, round(plan.floor - 5.0, 1)),
+        "p3_emergency_vwc_threshold": max(10.0, round(low - 3.0, 1)),  # the engine's ladder under it
         "dryback_target": ADDITIONAL_DRYBACK_PCT if (before_first_shot and not drying) else overnight,
         "p0_maximum_wait_time": float(recipe.p1_delay_min),
         "p1_initial_shot_size": recipe.p1_shot_pct,
@@ -73,8 +80,36 @@ def desired(model, recipe, plan, steer, ctx, ec_seen_max):
     }
 
 
+def in_order(ladder):
+    """The engine's VWC ladder: rescue + 3 <= re-water threshold < P1 target <= field capacity."""
+    return (ladder["p3_emergency_vwc_threshold"] + 3 <= ladder["p2_vwc_threshold"]
+            < ladder["p1_target_vwc"] <= ladder["field_capacity"])
+
+
+LADDER = ("p3_emergency_vwc_threshold", "p2_vwc_threshold", "p1_target_vwc", "field_capacity")
+
+
 def writes(current, want):
-    """current + desired -> [(suffix, value, why)], clamped to the engine's bounds, big moves taken in steps."""
+    """current + desired -> [(suffix, value, why)], clamped to the engine's bounds, big moves taken in steps.
+    The ladder is judged as one set, then written so it stays in order after every write: Home Assistant
+    refuses a level that breaks it, so the levels going down go from the bottom up, those going up top down."""
+    out = proposed(current, want)
+    if not in_order(dict(current, **{s: v for s, v, _w in out})):
+        return []  # never an inverted ladder
+
+    def step(write):
+        suffix, value, _why = write
+        if suffix not in LADDER:
+            return (0, 0)
+        cur = current.get(suffix)
+        rung = LADDER.index(suffix)
+        return (1, rung) if cur is not None and value < cur else (2, -rung)
+
+    return sorted(out, key=step)
+
+
+def proposed(current, want):
+    """writes() before the ladder check."""
     out = []
     for suffix, target in want.items():
         cur = current.get(suffix)
@@ -87,10 +122,7 @@ def writes(current, want):
         target = round(target, 1)
         if cur is None or abs(target - cur) >= 0.05:
             out.append((suffix, target, f"{suffix} {cur} -> {target}"))
-    merged = dict(current, **{s: v for s, v, _w in out})
-    ok = (merged["p3_emergency_vwc_threshold"] + 3 <= merged["p2_vwc_threshold"]
-          < merged["p1_target_vwc"] <= merged["field_capacity"])
-    return out if ok else []  # never hand the engine an inverted VWC ladder
+    return out
 
 
 def evidence(model, recipe, plan, steer, ctx, ec_trend_24h=None, light_note=None):

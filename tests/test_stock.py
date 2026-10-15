@@ -191,6 +191,29 @@ def test_the_dose_entity_wins_while_it_reads_a_number():
     assert stock.dose_ml({"dose_ml": 200, "dose_entity": None}, "1800") == 200
 
 
+def test_a_linked_tank_takes_its_pumps_dose_in_the_recipe_in_use():
+    pumps = [
+        {"id": "bloom_pump", "stock_tank": "bloom"},
+        {"id": "core_pump", "stock_tank": "core"},
+        {"id": "cal_pump", "stock_tank": "cal"},
+        {"id": "ph_pump", "stock_tank": None},
+    ]
+    recipe = [
+        {"pump": "bloom_pump", "ml": 900, "ml_entity": None},
+        {"pump": "core_pump", "ml": 500, "ml_entity": "number.core_dose"},
+        {"pump": "ph_pump", "ml": 20, "ml_entity": None},
+    ]
+    states = {"number.core_dose": "650"}
+    assert stock.recipe_doses(pumps, recipe, states.get) == {
+        "bloom": 900,
+        "core": 650,
+        "cal": 0,  # the recipe passes its pump by
+    }
+    # The mL entity reads nothing usable: the fixed amount.
+    assert stock.recipe_doses(pumps, recipe, {}.get)["core"] == 500
+    assert stock.recipe_doses(pumps, [], {}.get) == {"bloom": 0, "core": 0, "cal": 0}
+
+
 def test_refilled_and_set_level():
     data = stock.empty()
     data["tanks"] = tanks({"name": "Bloom", "capacity_l": 50, "level_l": 4})

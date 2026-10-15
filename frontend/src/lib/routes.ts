@@ -5,6 +5,7 @@
 export type Page =
   | "today"
   | "zone"
+  | "today/ai"
   | "plan/targets"
   | "plan/schedule"
   | "history/timeline"
@@ -12,11 +13,12 @@ export type Page =
   | "history/compare"
   | "equipment/probes"
   | "equipment/stock"
-  | "equipment/tank"
+  | "equipment/feed"
   | "equipment/dosing"
   | "equipment/setup"
   | "settings"
   | "settings/notifications"
+  | "settings/ai"
   | "help";
 
 export interface Route {
@@ -28,6 +30,7 @@ export interface Route {
 export const PAGES: readonly Page[] = [
   "today",
   "zone",
+  "today/ai",
   "plan/targets",
   "plan/schedule",
   "history/timeline",
@@ -35,19 +38,21 @@ export const PAGES: readonly Page[] = [
   "history/compare",
   "equipment/probes",
   "equipment/stock",
-  "equipment/tank",
+  "equipment/feed",
   "equipment/dosing",
   "equipment/setup",
   "settings",
   "settings/notifications",
+  "settings/ai",
   "help",
 ];
 
 export type Section = "today" | "plan" | "history" | "equipment" | "settings";
 
-/** The menu entry a page belongs to: a zone is reached from Today, Help sits with Settings. */
+/** The menu entry a page belongs to: a zone and the AI assistant are reached from Today, Help sits with
+ * Settings. */
 export function sectionOf(page: Page): Section {
-  if (page === "today" || page === "zone") return "today";
+  if (page === "today" || page === "zone" || page === "today/ai") return "today";
   if (page === "settings" || page === "help") return "settings";
   return page.split("/")[0] as Section;
 }
@@ -64,6 +69,7 @@ export const LEGACY_PAGES: Readonly<Record<string, Page>> = {
   sensors: "equipment/probes",
   stock: "equipment/stock",
   setup: "equipment/setup",
+  "equipment/tank": "equipment/feed",
   settings: "settings",
   help: "help",
 };

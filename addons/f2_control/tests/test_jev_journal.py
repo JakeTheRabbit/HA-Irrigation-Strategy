@@ -69,7 +69,7 @@ def test_the_journal_survives_a_restart_and_keeps_only_the_newest(tmp_path):
     path = str(tmp_path / "j.jsonl")
     j = Journal(path)
     for i in range(MAX_KEPT + 25):
-        j.add({"t": f"2026-09-28T10:{i % 60:02d}:00", "room": "default" if i % 2 else "f1", "zone": 1,
+        j.add({"t": f"2026-09-28T10:{i % 60:02d}:00", "room": "default" if i % 2 else "room_b", "zone": 1,
                "judge": "salt", "title": "Pore EC", "verdict": str(i), "result": "no action"})
     again = Journal(path)
     assert len(again.entries) == MAX_KEPT and again.entries[-1]["verdict"] == str(MAX_KEPT + 24)
@@ -92,7 +92,7 @@ def _published(tmp_path, entries=0, reason="x"):
                            "title": "Pore EC", "kind": "decision", "verdict": "below band vegetative",
                            "p": 0.72, "agreed": True, "action": "hold the EC steer", "result": "acted",
                            "reason": reason})
-    c = SimpleNamespace(jev=brain, _jev_read=lambda e: "2026-08-22")
+    c = SimpleNamespace(jev=brain, _jev_read=lambda e: "2026-08-22", _no_touch_until=lambda room, now: None)
     room = SimpleNamespace(slug="default", prefix="", zones={1: {}, 2: {}, 3: {}})
     out = {}
     jev_bridge.publish(c, room, K.NOW, lambda eid, state, attrs: out.__setitem__(eid, (state, attrs)))
@@ -116,15 +116,3 @@ def test_the_room_sensor_carries_todays_stage_for_the_chart(tmp_path):
     stage = _published(tmp_path)["sensor.crop_steering_jev"][1]["stage"]
     assert stage["day"] == 37 and stage["name"] == "flower bulk" and stage["steering"] == "vegetative"
     assert stage["pore_ec"] == [3.5, 6.0] and stage["runoff_pct"] == [8, 16]
-
-
-def test_alert_triage_is_logged_only_when_its_call_changes(tmp_path):
-    brain = _brain(tmp_path, K.choice_answer("keep_ramping", {"keep_ramping": 0.9}))
-    c = SimpleNamespace(jev=brain)
-    room = SimpleNamespace(slug="default")
-    for push, why in ((True, "first time: pushed as always"), (True, "first time: pushed as always"),
-                      (False, "Jev: remind (p=0.81), card only")):
-        jev_bridge.triaged(c, room, 1, "jev_stage_default_z1", "CS-705", "off the stage's arc", push, why)
-    held, first = brain.journal.recent("default")
-    assert first["action"] == "CS-705: push to the phone" and held["action"] == "CS-705: card only"
-    assert held["title"] == "Alert triage" and held["verdict"] == "Jev: remind (p=0.81), card only"

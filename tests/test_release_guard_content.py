@@ -85,7 +85,7 @@ def test_a_dependency_added_beside_the_version_in_the_manifest_is_caught():
         ("hassio_api: false", "hassio_api: true"),  # a permission
         ("host_network: false", "host_network: true"),
         ("  num_zones: 3", "  num_zones: 4"),  # a shipped option default
-        ("boot: manual", "boot: auto"),
+        ("boot: auto", "boot: manual"),
     ],
 )
 def test_a_permission_or_an_option_changed_beside_the_version_in_the_addon_config_is_caught(

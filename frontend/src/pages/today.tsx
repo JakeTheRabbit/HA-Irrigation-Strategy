@@ -3,6 +3,7 @@ import { ArrowRight, Check, ChevronDown, ChevronRight, TriangleAlert, X } from "
 import { Button } from "@/components/ui/button";
 import { Empty, number, time as clock, type Page } from "@/components/dashboard";
 import { RoomOffBanner } from "@/components/room-controls";
+import { BrainCard } from "@/components/brain";
 import {
   roomReference,
   zoneAttention,
@@ -21,7 +22,7 @@ import {
   readJev,
   type JevEntry,
 } from "@/lib/jev";
-import { numeric, readable, roomStatus } from "@/lib/model";
+import { numeric, readable, roomStatus, staleBanner } from "@/lib/model";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { tankTelemetry } from "@/lib/tank-telemetry";
 import { eventTimes } from "@/lib/timeline";
@@ -35,7 +36,7 @@ import "./today.css";
 const H = 3_600_000;
 const PHASE_NAMES: Record<string, string> = {
   P0: "Morning dryback",
-  P1: "Ramp-up",
+  P1: "Ramp",
   P2: "Maintenance",
   P3: "Overnight dryback",
 };
@@ -53,15 +54,18 @@ function readingIssue(metric: Metric, states: States): string | null {
   if (!readable(entity) || numeric(entity) === null) return "not reporting";
   return "not reporting lately";
 }
-/** The probes a zone's combined reading leaves out (the integration's fused sensor attributes). */
+/** The probes a zone's combined reading leaves out (the integration's fused sensor attributes), but
+ * not those the zone's setup chose not to count. */
 function excludedProbes(entity: EntityState | undefined, kind: "vwc" | "ec") {
   const excluded = entity?.attributes.excluded;
   return excluded && typeof excluded === "object" && !Array.isArray(excluded)
-    ? Object.entries(excluded as Record<string, unknown>).map(([probe, reason]) => ({
-        probe,
-        reason: typeof reason === "string" && reason ? reason : "left out",
-        kind,
-      }))
+    ? Object.entries(excluded as Record<string, unknown>)
+        .filter(([, reason]) => reason !== "not counted")
+        .map(([probe, reason]) => ({
+          probe,
+          reason: typeof reason === "string" && reason ? reason : "left out",
+          kind,
+        }))
     : [];
 }
 /** A shot in P3 is a rescue: the controller waters overnight only below the rescue floor. */
@@ -139,6 +143,7 @@ export function Today({
     numeric(states[`number.crop_steering_${prefix}lights_on_hour`]),
     numeric(states[`number.crop_steering_${prefix}lights_off_hour`]),
     now,
+    controller.timeZone,
   );
   // Today's readings from lights-on, and at least the last three hours (a morning keeps the night).
   const from = Math.min(day?.start ?? now - 12 * H, now - 3 * H);
@@ -218,7 +223,7 @@ export function Today({
         <h1 className="today-empty-title">Today</h1>
         <section className="panel">
           <Empty
-            title="No zones discovered"
+            title="No zones found"
             detail="Connect Home Assistant in Settings. Zones are discovered from the controller entities available to your account."
             action={<Button onClick={() => navigate("settings")}>Open connection settings</Button>}
           />
@@ -243,14 +248,17 @@ export function Today({
           />
         ))}
       </section>
-      {jev.log && (
-        <JevToday
-          controller={controller}
-          entries={jev.log.entries}
-          day={day}
-          openHistory={() => navigate("history/timeline")}
-        />
-      )}
+      <div className="today-pair">
+        <BrainCard controller={controller} navigate={navigate} />
+        {jev.log && (
+          <JevToday
+            controller={controller}
+            entries={jev.log.entries}
+            day={day}
+            openHistory={() => navigate("history/timeline")}
+          />
+        )}
+      </div>
     </div>
   );
 }
@@ -272,6 +280,7 @@ function TodayStatus({
   const listId = useId();
   const { room, states } = controller;
   const status = roomStatus(states, room.room, now);
+  const banner = staleBanner(states, room.room, now) !== null;
   const stage = readJev(states, room.room.prefix).room?.stage ?? null;
   const steering = stage
     ? steeringOf(null, stage.steering)
@@ -319,7 +328,7 @@ function TodayStatus({
         {day && (
           <span
             className="today-fact"
-            title={`Lights on ${clock(day.start)}–${clock(day.lightsOff)}: the grow-day runs from one lights-on to the next.`}
+            title={`Lights on ${clock(day.start)} to ${clock(day.lightsOff)}. The grow-day starts at one lights-on and ends at the next lights-on.`}
           >
             {now < day.lightsOff
               ? `Lights on until ${clock(day.lightsOff)}`
@@ -366,7 +375,8 @@ function TodayStatus({
         {notices.length === 0 && <span className="today-fact muted">No alerts</span>}
       </p>
       {!room.roomActive && <RoomOffBanner controller={controller} />}
-      {room.roomActive && (status.tone === "stopped" || status.tone === "stale") && (
+      {/* A controller that is not reporting has the band under the header instead. */}
+      {room.roomActive && status.tone === "stopped" && !banner && (
         <p className="today-stopped" role="status">
           <TriangleAlert size={16} aria-hidden="true" />
           <span>
@@ -483,9 +493,9 @@ function MoistureBar({
     hi = Math.min(100, Math.max(...known) + 4);
   const at = (level: number) => `${((level - lo) / (hi - lo)) * 100}%`;
   const marks = [
-    { key: "rescue", level: rescue, label: "rescue" },
-    { key: "rewater", level: rewater, label: "re-water" },
-    { key: "peak", level: peak, label: "peak" },
+    { key: "rescue", level: rescue, label: "Rescue floor" },
+    { key: "rewater", level: rewater, label: "Re-water" },
+    { key: "peak", level: peak, label: "Peak" },
   ].filter((mark): mark is { key: string; level: number; label: string } => mark.level !== null);
   const words = marks.map((mark) => `${mark.label} ${number(mark.level)}%`).join(", ");
   return (
@@ -493,7 +503,7 @@ function MoistureBar({
       <div
         className="moisture-track"
         role="img"
-        aria-label={`Moisture ${number(value)}%: ${words}`}
+        aria-label={`VWC ${number(value)}%: ${words}`}
       >
         {rewater !== null && peak !== null && peak > rewater && (
           <span
@@ -736,12 +746,12 @@ function JevToday({
   );
   const check =
     day && managed
-      ? ` · Jev’s next setpoint check tonight ${clock(day.lightsOff)}–${clock(day.lightsOff + 3 * H)}`
+      ? ` · Next setpoint check of the AI assistant tonight ${clock(day.lightsOff)}–${clock(day.lightsOff + 3 * H)}`
       : "";
   return (
     <section className="panel today-jev" aria-labelledby="today-jev-title" data-jev-today>
       <div className="panel-heading">
-        <h2 id="today-jev-title">What Jev changed today</h2>
+        <h2 id="today-jev-title">AI assistant changes today</h2>
         <Button variant="ghost" size="sm" onClick={openHistory}>
           History <ArrowRight size={15} aria-hidden="true" />
         </Button>

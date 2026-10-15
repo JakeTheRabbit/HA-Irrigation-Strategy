@@ -10,8 +10,13 @@ from types import SimpleNamespace
 import pytest
 
 from custom_components.crop_steering import units
-from custom_components.crop_steering.calculations import fuse_probes
-from custom_components.crop_steering.const import PROBE_RANGE, PROBE_STALE_SECONDS
+from custom_components.crop_steering.calculations import ec_type_key, fuse_probes
+from custom_components.crop_steering.const import (
+    DOMAIN,
+    PROBE_FAR,
+    PROBE_RANGE,
+    PROBE_STALE_SECONDS,
+)
 
 NOW = datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc)
 SOURCE = (
@@ -34,6 +39,8 @@ def sensor(states, prefix=""):
         "_average_sensor_values",
         "_probe_readings",
         "_fuse_zone",
+        "_probe_method_entity",
+        "_ec_types",
         "_get_zone_vwc",
         "_get_zone_ec",
     }
@@ -51,8 +58,17 @@ def sensor(states, prefix=""):
         "_LOGGER": logging.getLogger(__name__),
         "to_native": units.to_native,
         "fuse_probes": fuse_probes,
+        "ec_type_key": ec_type_key,
+        "DOMAIN": DOMAIN,
+        "PROBE_FAR": PROBE_FAR,
         "PROBE_RANGE": PROBE_RANGE,
         "PROBE_STALE_SECONDS": PROBE_STALE_SECONDS,
+        "SHOT_SIZE_KEYS": next(
+            ast.literal_eval(node.value)
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and getattr(node.targets[0], "id", None) == "SHOT_SIZE_KEYS"
+        ),
         "dt_util": SimpleNamespace(
             parse_datetime=datetime.fromisoformat,
             as_local=lambda value: value.replace(tzinfo=timezone.utc),
@@ -66,6 +82,7 @@ def sensor(states, prefix=""):
     instance._zone_number = 1
     instance._zones_config = {}
     instance._probe_offsets = {}
+    instance._offsets_at = None
     instance._fusion = None
     instance.entity_description = SimpleNamespace(key="zone_1_weekly_water_usage")
     return instance
@@ -302,12 +319,21 @@ def test_a_zones_reading_names_the_probes_it_was_made_from():
         "sensor.c": _reported(90, "%", 1),
     }
     entity = _zone(states, vwc_sensors=["sensor.a", "sensor.b", "sensor.c"])
-    assert entity._get_zone_vwc(1) == 42.0
+    assert entity._get_zone_vwc(1) == 41.0
     assert entity.extra_state_attributes == {
         "probes": 3,
-        "used": ["sensor.a", "sensor.b", "sensor.c"],
-        "excluded": {},
-        "spread": 50.0,
+        "used": ["sensor.a", "sensor.b"],
+        "excluded": {"sensor.c": "far from the others"},
+        "spread": 2.0,
+        "method": "Median",
+        "steered_by": "Median",
+        "quality": {
+            "sensor.a": {"quality": "good", "reason": "fresh"},
+            "sensor.b": {"quality": "good", "reason": "fresh"},
+            "sensor.c": {"quality": "bad", "reason": "excluded_outlier"},
+        },
+        "offsets_learned": None,
+        "primary": None,
     }
 
 
@@ -319,6 +345,33 @@ def test_a_probe_that_stops_reporting_is_set_aside_without_stepping_the_zone():
     states["sensor.b"] = _reported(46, "%", 30)  # last heard from half an hour ago
     assert entity._get_zone_vwc(1) == 42.0
     assert entity.extra_state_attributes["excluded"] == {"sensor.b": "not reporting"}
+
+
+def test_a_probe_set_aside_for_its_unit_is_named_with_that_unit():
+    """What the controller names in CS-503: the probe and its unit, not only that the zone is blind."""
+    states = {"sensor.a": _reported(1250, "mV", 1)}
+    entity = _zone(states, vwc_sensors=["sensor.a"])
+    assert entity._get_zone_vwc(1) is None
+    assert entity.extra_state_attributes["excluded"] == {
+        "sensor.a": "set aside for its unit"
+    }
+    assert entity.extra_state_attributes["unit_set_aside"] == {"sensor.a": "mV"}
+    assert entity.extra_state_attributes["quality"] == {
+        "sensor.a": {"quality": "bad", "reason": "unknown_unit"}
+    }
+    states["sensor.a"] = _reported(45, "%", 0)  # its unit corrected: it counts again
+    assert entity._get_zone_vwc(1) == 45.0
+    assert "unit_set_aside" not in entity.extra_state_attributes
+
+
+def test_a_unitless_probe_out_of_range_is_excluded_as_out_of_range_as_before():
+    entity = _zone(
+        {"sensor.a": _reported(450, "", 1), "sensor.b": _reported(44, "%", 1)},
+        vwc_sensors=["sensor.a", "sensor.b"],
+    )
+    assert entity._get_zone_vwc(1) == 44.0
+    assert entity.extra_state_attributes["excluded"] == {"sensor.a": "out of range"}
+    assert "unit_set_aside" not in entity.extra_state_attributes
 
 
 def test_the_legacy_front_and_back_pair_is_still_a_zones_probes():

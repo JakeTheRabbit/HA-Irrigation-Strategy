@@ -10,47 +10,54 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
     CONF_NUM_ZONES,
+    DRAINAGE_TYPES,
+    EC_TYPES,
     PHASES,
+    PROBE_METHODS,
     STEERING_MODES,
     GROWTH_STAGES,
+    NO_TOUCH_OPTIONS,
     RECIPE_STAGES,
     RECIPE_PARAMS,
     SOFTWARE_VERSION,
     SET_PHASE_OPTIONS,
+    SUBSTRATES,
     WATER_TODAY_VIEWS,
 )
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .recipe import get_manager
+from .calculations import ec_type_key
 
 _LOGGER = logging.getLogger(__name__)
 
 SELECT_DESCRIPTIONS = [
     SelectEntityDescription(
         key="growth_stage",
-        name="Growth Stage",
+        name="Growth stage",
         icon="mdi:timeline",
         options=GROWTH_STAGES,  # Use constant from const.py
     ),
     SelectEntityDescription(
         key="steering_mode",
-        name="Steering Mode",
+        name="Steering mode",
         icon="mdi:steering",
         options=STEERING_MODES,  # Use constant from const.py
     ),
     SelectEntityDescription(
         key="irrigation_phase",
-        name="Irrigation Phase",
+        name="Irrigation phase",
         icon="mdi:water-circle",
         options=PHASES,  # Use constant from const.py (P0-P3 only)
     ),
     # Named-stage recipe: picking a stage applies its setpoints to the zones.
     SelectEntityDescription(
         key="recipe_stage",
-        name="Recipe Stage",
+        name="Recipe stage",
         icon="mdi:format-list-bulleted-type",
         options=RECIPE_STAGES,
     ),
@@ -58,9 +65,35 @@ SELECT_DESCRIPTIONS = [
     # the controller's vitals notification follows it. Zone total until someone chooses.
     SelectEntityDescription(
         key="water_today_view",
-        name="Water Today Shown As",
+        name="Water today shown as",
         icon="mdi:water-outline",
         options=WATER_TODAY_VIEWS,
+    ),
+    # How the room's runoff leaves it. A free-draining room is not watched for a table backing up
+    # (CS-310); Unknown and flood tables are. Setup asks; a room from before reads Unknown.
+    SelectEntityDescription(
+        key="drainage",
+        name="Drainage",
+        icon="mdi:pipe",
+        options=DRAINAGE_TYPES,
+        translation_key="drainage",
+    ),
+    # What the room grows in. The engine_config descriptor publishes it for the controller;
+    # generic until someone chooses.
+    SelectEntityDescription(
+        key="substrate",
+        name="Substrate",
+        icon="mdi:sprout",
+        options=SUBSTRATES,
+    ),
+    # The room's no-touch window: while it runs the AI assistant asks nothing and changes nothing
+    # in the room, and the rules carry on. `since` says when it was chosen; the controller sets it
+    # back to Off once the hour, the day or the night is over. Off until someone chooses.
+    SelectEntityDescription(
+        key="ai_no_touch",
+        name="Pause AI changes",
+        icon="mdi:hand-back-left-off",
+        options=NO_TOUCH_OPTIONS,
     ),
 ]
 
@@ -82,6 +115,7 @@ async def async_setup_entry(
     num_zones = config_data.get(CONF_NUM_ZONES, 1)
 
     # Add zone-specific select entities
+    ec_types = set()
     for zone_num in range(1, num_zones + 1):
         # Zone Steering Mode (per-row Vegetative/Generative; the engine falls back to global).
         # Retained from the lean branch: the master app's _zone_is_vegetative() reads this
@@ -91,7 +125,7 @@ async def async_setup_entry(
                 entry,
                 SelectEntityDescription(
                     key=f"zone_{zone_num}_steering_mode",
-                    name=f"Crop Steering Zone {zone_num} Steering Mode",
+                    name=f"Crop Steering Zone {zone_num} Steering mode",
                     options=["Vegetative", "Generative"],
                     icon="mdi:steering",
                 ),
@@ -106,13 +140,60 @@ async def async_setup_entry(
                 entry,
                 SelectEntityDescription(
                     key=f"zone_{zone_num}_set_phase",
-                    name=f"Zone {zone_num} Set Phase",
+                    name=f"Zone {zone_num} set phase",
                     options=SET_PHASE_OPTIONS,
                     icon="mdi:state-machine",
                 ),
                 zone_num=zone_num,
             )
         )
+
+        # How the zone's probes become its moisture reading, and apart its EC reading: Median
+        # unless chosen otherwise (Lowest and Highest need three probes that agree). The zone's
+        # VWC and EC sensors apply it; the controller steers on those.
+        for metric, label, icon in (
+            ("vwc", "Moisture", "mdi:water-percent"),
+            ("ec", "EC", "mdi:lightning-bolt"),
+        ):
+            selects.append(
+                CropSteeringSelect(
+                    entry,
+                    SelectEntityDescription(
+                        key=f"zone_{zone_num}_{metric}_method",
+                        name=f"Zone {zone_num} {label} from probes",
+                        options=PROBE_METHODS,
+                        icon=icon,
+                    ),
+                    zone_num=zone_num,
+                )
+            )
+
+        # What each of the zone's EC probes measures, pore or bulk EC: unknown until someone
+        # says, which fuses as before. The zone's EC sensor never combines a pore with a bulk
+        # reading (calculations.fuse_probes).
+        zone_config = config_data.get("zones", {})
+        zone_config = zone_config.get(zone_num) or zone_config.get(str(zone_num)) or {}
+        probes = list(zone_config.get("ec_sensors", [])) or [
+            zone_config.get("ec_front"),
+            zone_config.get("ec_back"),
+        ]
+        for probe in probes:
+            key = probe and ec_type_key(probe)
+            if not key or key in ec_types:
+                continue
+            ec_types.add(key)
+            selects.append(
+                CropSteeringSelect(
+                    entry,
+                    SelectEntityDescription(
+                        key=key,
+                        name=f"EC type {probe}",
+                        options=EC_TYPES,
+                        icon="mdi:lightning-bolt-outline",
+                    ),
+                    zone_num=zone_num,
+                )
+            )
 
     async_add_entities(selects)
 
@@ -138,10 +219,16 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         # (number.p1_target_vwc). Existing installs keep the id the registry already holds.
         self.entity_id = f"select.{self._attr_object_id}"
         self._attr_options = description.options
+        self._since = None  # ai_no_touch: when the current option was chosen
 
         # Set default values based on entity type
         if description.key == "growth_stage":
             self._attr_current_option = "Vegetative"
+        elif (
+            description.key == "drainage"
+            and entry.data.get("drainage") in DRAINAGE_TYPES
+        ):
+            self._attr_current_option = entry.data["drainage"]  # setup's answer
         else:
             self._attr_current_option = (
                 description.options[0] if description.options else None
@@ -155,6 +242,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         if last_state is not None and restored_state_is_ours(self._entry, last_state):
             if last_state.state in self.options:
                 self._attr_current_option = last_state.state
+                self._since = last_state.attributes.get("since")
         # The recipe stage's source of truth is the server-side recipe Store, not
         # the restored entity state — reflect the loaded recipe's active stage.
         if self.entity_description.key == "recipe_stage":
@@ -173,7 +261,6 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
                 manufacturer="Home Assistant Community",
                 model="Zone Controller",
                 sw_version=SOFTWARE_VERSION,
-                via_device=(DOMAIN, self._entry.entry_id),
             )
         else:
             # Main device
@@ -189,6 +276,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         """Change the selected option."""
         if option in self.options:
             self._attr_current_option = option
+            self._since = dt_util.utcnow().isoformat()
             self.async_write_ha_state()
             # Announce a manual phase pick on the event bus for automations. The controller
             # keeps each zone's phase itself and does not read this select.
@@ -211,6 +299,8 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
     def extra_state_attributes(self):
         """Expose the full recipe table on the recipe_stage select so the
         dashboard can read it (and edit via the save_recipe service)."""
+        if self.entity_description.key == "ai_no_touch":
+            return {"since": self._since}
         if self.entity_description.key != "recipe_stage":
             return None
         mgr = get_manager(self.hass, self._entry)

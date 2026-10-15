@@ -13,8 +13,8 @@ import random
 
 from crop_steering_engine import ZoneParams, ZoneSnapshot, decide
 
-LITRES_PER_PCT = 6.75 * 42 / 100.0  # one 1% shot across the zone (42 plants x 6.75 L)
-SHOT_MIN_PER_PCT = 1.0  # a 1% shot holds the valve open about a minute (0.0467 L/s); the controller is busy meanwhile
+SUBSTRATE_L = 5.0  # litres of substrate per plant when none is given: the controller's own `substrate_l` default
+SHOT_MIN_PER_PCT = 1.0  # a 1% shot holds the valve open about a minute; the controller is busy meanwhile
 UPTAKE_EC = 1.0  # mS/cm equivalent the plant removes with the water it drinks
 
 
@@ -34,12 +34,15 @@ def params_from(sp):
 
 
 def run(model, setpoints, start_vwc, start_ec, feed_ec, days=1, lights_on_h=10, lights_off_h=22,
-        supervisor=None, every_min=15, demand=None, noise=0.0, seed=7, latency_min=2, drain_tau_min=15.0):
+        supervisor=None, every_min=15, demand=None, noise=0.0, seed=7, latency_min=2, drain_tau_min=15.0,
+        substrate_l=SUBSTRATE_L, plant_count=0):
     """-> (trace, changes). trace rows are dicts; changes = [(clock_h, suffix, old, new, why)].
 
     supervisor(ctx) -> [(suffix, new_value, why)], called every `every_min` minutes with the live context.
+    substrate_l is litres per plant; the zone total follows controller._substrate_l(): x plant_count when set.
     """
     rnd = random.Random(seed)
+    litres_per_pct = (substrate_l * plant_count if plant_count > 0 else substrate_l) / 100.0
     sp = dict(setpoints)
     day_min = int(((lights_off_h - lights_on_h) % 24) * 60)
     water, salt = start_vwc, start_vwc * start_ec
@@ -93,7 +96,7 @@ def run(model, setpoints, start_vwc, start_ec, feed_ec, days=1, lights_on_h=10, 
             if phase == "P1":  # the peak before this shot's water, and the shots after the target
                 p1_before, p1_extra = peak, p1_extra + (1 if p1_reached else 0)
             pending[m + latency_min] = pending.get(m + latency_min, 0.0) + model.gain * size
-            watch, since, shots, daily_l = (m + 8, seen), 0.0, shots + 1, daily_l + size * LITRES_PER_PCT
+            watch, since, shots, daily_l = (m + 8, seen), 0.0, shots + 1, daily_l + size * litres_per_pct
             busy_until = m + max(latency_min, int(round(size * SHOT_MIN_PER_PCT))) + 1
         else:
             since += 1.0

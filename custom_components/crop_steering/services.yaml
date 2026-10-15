@@ -1,16 +1,21 @@
 apply_recipe:
   name: Apply recipe stage
   description: >-
-    Write a named-stage recipe's setpoints into the per-zone number entities the
-    engine reads (VWC targets, dryback, EC targets, EC ceiling, P2 shot size).
-    Operator-initiated; values are clamped by each number's min/max and the kill
-    switch still gates actuation. Omit the stage to re-apply the active one.
-    Needs a Home Assistant administrator when a signed-in user calls it, directly
-    or through a script they start; automations are unaffected.
+    Writes the setpoints of one recipe stage into the VWC, dryback, EC and shot size numbers. The
+    integration applies the stage in every room and every zone. Changes live setpoints that the
+    controller reads. The integration keeps each value inside the limits of its number. When the
+    stage puts the moisture setpoints of a zone in the wrong order, the integration writes nothing.
+    The kill switch still controls the shots. When a signed-in user calls it, that user must be a
+    Home Assistant administrator. An automation can call it without this check. Use it when the room
+    moves to a different growth stage. Leave the stage empty to apply the active stage again.
+    CAUTION: Examine the values of the stage before you apply it. The new setpoints change the water
+    that each zone gets in every room.
   fields:
     stage:
-      name: Stage
-      description: Recipe stage to apply. Defaults to the active stage.
+      name: Recipe stage
+      description: >-
+        The recipe stage to apply: Veg, Transition, Bulk, Ripen or Custom. A different stage writes a
+        different set of setpoints. Default: the active stage. Example: Bulk.
       required: false
       selector:
         select:
@@ -24,14 +29,19 @@ apply_recipe:
 save_recipe:
   name: Save recipe table
   description: >-
-    Replace the stored recipe table (stage -> setpoints) for every room. Used by
-    the dashboard recipe editor; does not change any live setpoint until a stage
-    is applied. Needs a Home Assistant administrator when a signed-in user calls
-    it, directly or through a script they start; automations are unaffected.
+    Replaces the stored recipe table of every room. The table gives the setpoints for each recipe
+    stage. Changes stored data only. No live setpoint changes until you apply a stage. When a
+    signed-in user calls it, that user must be a Home Assistant administrator. An automation can
+    call it without this check. The recipe editor of the dashboard calls it. Send the full table,
+    because the call replaces the stored table. The integration stores the table without a check of
+    its values, so examine the values before you apply a stage.
   fields:
     recipe:
-      name: Recipe
-      description: The full recipe object (version, active_stage, stages).
+      name: Recipe table
+      description: >-
+        The full recipe object: `version`, `active_stage` and `stages`. The stored table becomes this
+        object. A stage that you leave out of the object is not kept. Example: `{"version": 1,
+        "active_stage": "Veg", "stages": {"Veg": {"p2_shot_size": 5.0}}}`.
       required: true
       selector:
         object:
@@ -39,15 +49,21 @@ save_recipe:
 set_manual_override:
   name: Set manual override
   description: >-
-    Pause automatic irrigation for one zone until the timeout expires, including
-    across Home Assistant restarts. The default is 60 minutes. Disable clears the
-    hold immediately; turning the switch on directly creates an indefinite hold.
-    Needs a Home Assistant administrator when a signed-in user calls it, directly
-    or through a script they start; automations are unaffected.
+    Stops the automatic shots of one zone until the timeout ends. The hold stays in place through a
+    restart of Home Assistant. On: the controller gives the zone no shot, rescue shots included, and
+    stops a shot in progress. Off: the hold ends immediately. When a signed-in user calls it, that
+    user must be a Home Assistant administrator. An automation can call it without this check. Use
+    it for work on one zone, for example a dripper repair. Give the zone, the timeout and, with
+    several rooms, the room. Set enable to off to end the hold early. The integration refuses the
+    call when the override switch of the zone has a changed entity ID. CAUTION: Do not hold a zone
+    for longer than the work needs. The zone gets no water, not even a rescue shot, and the
+    substrate can dry out.
   fields:
     zone:
       name: Zone
-      description: Zone number.
+      description: >-
+        The number of the zone to hold. A different number holds a different zone. Range: 1 to 24.
+        Example: 3.
       required: true
       selector:
         number:
@@ -56,7 +72,10 @@ set_manual_override:
           mode: box
     timeout_minutes:
       name: Timeout
-      description: Auto-clear after this many minutes; defaults to 60 (max 24 h).
+      description: >-
+        The time after which the hold ends automatically, in minutes. Increase: the zone stays without
+        shots for longer. Decrease: the zone can get shots again sooner. Default: 60 min. Range: 1 to
+        1440 min (24 h). Example: 30.
       default: 60
       required: false
       selector:
@@ -66,47 +85,95 @@ set_manual_override:
           unit_of_measurement: min
           mode: box
     enable:
-      name: Enable
-      description: True to enable the override, false to clear it.
+      name: Override on
+      description: >-
+        On starts the hold. Off ends the hold. On: the zone gets no shots until the timeout ends. Off:
+        the hold ends immediately. Default: on. Set it to off to end a hold before its timeout.
       required: false
       selector:
         boolean:
     room:
       name: Room
-      description: Room slug for multi-room installs. Omit for the default room.
+      description: >-
+        The slug of the room. Leave it empty when there is only one room, or for the room without a
+        prefix in an older install. A different slug holds the zone in a different room. With several
+        rooms and no slug, the integration refuses the call. Default: empty. Example: f1.
       required: false
       selector:
         text:
 
 setup_read:
   name: Read room setup
-  description: Return setup capabilities, room configuration and searchable devices. Requires an administrator and a service response.
+  description: >-
+    Returns the setup of each room, the setup limits and the entities that the setup can use.
+    Changes nothing. Only a signed-in Home Assistant administrator can call it. An automation cannot
+    call it. The call must ask for a response. The setup page of the dashboard calls it. Use it to
+    read the zones, the hardware entities and the setup revision of each room.
 
 setup_create:
   name: Add room
-  description: Create a room through the Home Assistant config flow, after validating mapping and verified OFF hardware. Does not enable irrigation.
+  description: >-
+    Makes a new room through the Home Assistant config flow. The integration first examines the
+    hardware entities, and the mapped hardware must read off. Adds a room to Home Assistant. It does
+    not start shots. Only a signed-in Home Assistant administrator can call it. An automation cannot
+    call it. Use the setup page of the dashboard for this. Give the room name and the zones. After
+    the call, complete the setup wizard before you set the kill switch to on. CAUTION: Make sure
+    that each valve and pump entity is correct before you save. A wrong map can water the wrong zone
+    or no zone.
   fields:
     room_name:
+      name: Room name
+      description: >-
+        The name of the room. The name shows on the dashboard and in Home Assistant. Use 1 to 80
+        characters. Example: Flower room 1.
       required: true
       selector:
         text:
     zones:
+      name: Zones
+      description: >-
+        The list of zones. Each zone has its ID, its valve, its probes and its size values: plants,
+        substrate volume, drippers and dripper flow. Each item in the list makes or changes one zone.
+        Give 1 to 24 zones. Each zone needs a unique ID, and a new zone takes the next ID in sequence.
       required: true
       selector:
         object:
     hardware:
+      name: Room hardware
+      description: >-
+        The entities of the room: the pump, the main-line valve, the lights, the feed EC and feed pH
+        sensors and the tank entities. The controller uses each entity that you map here for this room.
+        Optional. A pump, a main-line valve or a zone valve must be a switch, an input_boolean or a
+        valve entity.
       selector:
         object:
 
 setup_save:
   name: Save room setup
-  description: Update one room without changing its IDs. All affected engines and mapped hardware must read OFF. Set active true to restore an archived room.
+  description: >-
+    Changes the setup of one room and keeps its IDs. Set active to on to restore an archived room.
+    Changes the hardware map of the room and starts a new setup revision. The kill switch of each
+    affected room and all mapped hardware must read off. A change of only the probe choice can occur
+    while the room waters. Only a signed-in Home Assistant administrator can call it. An automation
+    cannot call it. Use the setup page of the dashboard for this. Set the kill switch to off before
+    you save. Disarm an armed grow plan before you change the zones. CAUTION: Make sure that each
+    valve and pump entity is correct before you save. A wrong map can water the wrong zone or no
+    zone.
   fields:
     entry_id:
+      name: Room entry ID
+      description: >-
+        The config entry ID of the room. A different ID changes a different room. Get the ID from
+        `setup_read`.
       required: true
       selector:
         text:
     expected_revision:
+      name: Expected revision
+      description: >-
+        The setup revision that `setup_read` returned. When the stored revision is different, the
+        integration refuses the save and changes nothing. Read the revision with `setup_read`
+        immediately before the save. Range: 0 to 2147483647.
       required: true
       selector:
         number:
@@ -114,29 +181,122 @@ setup_save:
           max: 2147483647
           mode: box
     room_name:
+      name: Room name
+      description: >-
+        The name of the room. The name shows on the dashboard and in Home Assistant. Use 1 to 80
+        characters. Example: Flower room 1.
       required: true
       selector:
         text:
     active:
+      name: Room active
+      description: >-
+        On keeps the room or restores an archived room. Off archives the room. On: the room becomes
+        active. Off: the room becomes archived, and the controller gives it no shots. Set it to on to
+        restore an archived room.
       selector:
         boolean:
     zones:
+      name: Zones
+      description: >-
+        The list of zones. Each zone has its ID, its valve, its probes and its size values: plants,
+        substrate volume, drippers and dripper flow. Each item in the list makes or changes one zone.
+        Give 1 to 24 zones. Each zone needs a unique ID, and a new zone takes the next ID in sequence.
       required: true
       selector:
         object:
     hardware:
+      name: Room hardware
+      description: >-
+        The entities of the room: the pump, the main-line valve, the lights, the feed EC and feed pH
+        sensors and the tank entities. The controller uses each entity that you map here for this room.
+        Optional. A pump, a main-line valve or a zone valve must be a switch, an input_boolean or a
+        valve entity.
       selector:
         object:
 
-setup_remove:
-  name: Archive room
-  description: Archive the explicitly selected room after verified OFF checks. Preserves entry IDs, mappings and controller counters for restoration.
+setup_commission:
+  name: Save setup wizard progress
+  description: >-
+    Records the progress of the setup wizard. It records each zone where a person saw water from a
+    test shot, the size check and the end of setup. Changes the wizard record only. It does not
+    change the setup revision and it does not start hardware. The integration refuses the end of
+    setup until every safety check passes. Only a signed-in Home Assistant administrator can call
+    it. An automation cannot call it. The setup wizard calls it. Mark the room done only after a
+    person saw water from a test shot in each zone. The integration refuses the call for a room that
+    has completed the wizard.
   fields:
     entry_id:
+      name: Room entry ID
+      description: >-
+        The config entry ID of the room. A different ID records the progress of a different room. Get
+        the ID from `setup_read`.
       required: true
       selector:
         text:
     expected_revision:
+      name: Expected revision
+      description: >-
+        The setup revision that `setup_read` returned. When the stored revision is different, the
+        integration refuses the call and changes nothing. Read the revision with `setup_read`
+        immediately before the call. Range: 0 to 2147483647.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 2147483647
+          mode: box
+    water_seen:
+      name: Water seen
+      description: >-
+        A map from each zone number to the test shot that a person saw water from. Each item marks one
+        zone as tested. New items add to the stored items. Give each zone number as a text key, and a
+        text value that names the test shot.
+      selector:
+        object:
+    sizing_confirmed:
+      name: Size values confirmed
+      description: >-
+        On records that a person confirmed the size values of the room. On: the wizard records the size
+        values as confirmed. Off: the wizard shows a warning that nobody confirmed the size values. Set
+        it to on after you compare the plant count, the substrate volume and the dripper flow with the
+        room.
+      selector:
+        boolean:
+    done:
+      name: Setup done
+      description: >-
+        On marks the setup of the room as complete. On: the integration examines every safety check and
+        refuses the call when a check fails. Off: the room stays in the wizard. Default: off. Set it to
+        on as the last step of the wizard.
+      selector:
+        boolean:
+
+setup_remove:
+  name: Archive room
+  description: >-
+    Archives one room. The room keeps its entry ID and its hardware map, so you can restore it
+    later. The room becomes inactive, and the controller gives it no shots. The kill switch and all
+    mapped hardware must read off. The integration refuses the call while a grow plan of the room is
+    armed or active. Only a signed-in Home Assistant administrator can call it. An automation cannot
+    call it. Set the kill switch to off first. Disarm the grow plan of the room. To restore the
+    room, use `setup_save` with active set to on. CAUTION: Make sure that you select the correct
+    room. An archived room gets no water.
+  fields:
+    entry_id:
+      name: Room entry ID
+      description: >-
+        The config entry ID of the room to archive. A different ID archives a different room. Get the ID
+        from `setup_read`.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The setup revision that `setup_read` returned. When the stored revision is different, the
+        integration refuses the call and changes nothing. Read the revision with `setup_read`
+        immediately before the call. Range: 0 to 2147483647.
       required: true
       selector:
         number:
@@ -144,69 +304,131 @@ setup_remove:
           max: 2147483647
           mode: box
     confirm_name:
+      name: Confirm room name
+      description: >-
+        The exact name of the room to archive. When the name is not an exact match, the integration
+        refuses the call. Type the name as it shows on the dashboard. Example: Flower room 1.
       required: true
       selector:
         text:
 
 strategy_get:
-  name: Read grow strategy
-  description: Return the room's durable draft, active snapshot, and readable parameter bounds.
+  name: Read grow plan
+  description: >-
+    Returns the grow plan of the room: the saved draft, the active snapshot, the status and the
+    limits of each setting. Changes nothing. It has no administrator check. Use it to read the
+    revision before `strategy_save` or `strategy_activate`.
   fields:
     room_id:
       name: Room ID
-      description: "Canonical room identity: room: for the default or room:f1_ for a named room."
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID reads a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
 
 strategy_save:
-  name: Save grow strategy draft
-  description: Validate and save grower-defined endpoints and daily or weekly zone assignments. Does not activate watering. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  name: Save grow plan draft
+  description: >-
+    Examines and saves the grow plan draft: the endpoint profiles and the daily or weekly schedule
+    of each zone. Changes the stored draft only. It does not change live setpoints and it does not
+    start shots. The integration refuses the save while a plan is armed or active. When a signed-in
+    user calls it, that user must be a Home Assistant administrator. An automation can call it
+    without this check. Read the revision with `strategy_get` first. Disarm an armed plan before you
+    replace it. After the save, use `strategy_preview` to examine the shot volumes.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID saves the draft of a different room. The integration refuses an
+        unknown ID. Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
     expected_revision:
-      description: Revision returned by strategy_get; rejects stale edits.
+      name: Expected revision
+      description: >-
+        The revision that `strategy_get` returned. When the stored revision is different, the
+        integration refuses the save and changes nothing. Read the revision with `strategy_get`
+        immediately before the save. Minimum: 0.
       required: true
       selector:
         number:
           min: 0
           mode: box
     plan:
-      description: Version 1 plan with profiles and per-zone schedules.
+      name: Grow plan
+      description: >-
+        A version 1 plan with profiles and a schedule for each zone. After the checks, the stored draft
+        becomes this plan. The dashboard makes this object. See `docs/GROW_PLANS.md` for the format.
       required: true
       selector:
         object:
 
 strategy_preview:
-  name: Preview grow strategy
-  description: Interpolate explicit endpoints and calculate hydraulic shot volumes and durations without writes.
+  name: Preview grow plan
+  description: >-
+    Calculates the settings of each zone for one grow-day from the plan endpoints. It also
+    calculates the shot volume and duration from the hydraulic data. Changes nothing. It has no
+    administrator check. Use it before you arm a plan. Examine each zone for errors in the hydraulic
+    data.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID previews a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
     plan:
+      name: Plan to preview
+      description: >-
+        A plan to calculate instead of the saved draft. Empty: the preview uses the saved draft.
+        Optional. Use the same format as in `strategy_save`.
       required: false
       selector:
         object:
     date:
-      description: Optional local grow-day date, YYYY-MM-DD.
+      name: Grow-day date
+      description: >-
+        The local date of the grow-day to calculate. A different date gives the settings of a different
+        day of the plan. Optional. Format: YYYY-MM-DD. Default: today. Example: 2026-10-20.
       required: false
       selector:
         text:
 
 strategy_activate:
-  name: Arm grow strategy
-  description: Arm a saved draft for the next local lights-on boundary. Requires a compatible controller and readable configuration; never enables hardware. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  name: Arm grow plan
+  description: >-
+    Arms the saved draft. The plan starts at the next local lights-on. At lights-on, the plan
+    settings replace the setpoints that the controller uses. The call does not set any hardware to
+    on. The integration refuses the call when the controller is not compatible or the hydraulic data
+    has errors. When a signed-in user calls it, that user must be a Home Assistant administrator. An
+    automation can call it without this check. Save the draft and preview it first. Read the
+    revision with `strategy_get`. After lights-on, examine the status of the plan on the dashboard.
+    CAUTION: Examine the preview of each zone before you arm the plan. The plan changes the
+    setpoints that control the water of each zone.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID arms the plan of a different room. The integration refuses an unknown
+        ID. Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
     expected_revision:
+      name: Expected revision
+      description: >-
+        The revision of the saved draft, from `strategy_get`. When the stored revision is different, the
+        integration refuses the call and arms nothing. Read the revision with `strategy_get` immediately
+        before the call. Minimum: 0.
       required: true
       selector:
         number:
@@ -214,125 +436,415 @@ strategy_activate:
           mode: box
 
 strategy_disarm:
-  name: Disarm grow strategy
-  description: Cancel an unstarted plan or return an active plan to legacy setpoints at the next lights-on boundary. Use the engine control to stop irrigation eligibility. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  name: Disarm grow plan
+  description: >-
+    Cancels an armed plan that has not started. An active plan stops at the next lights-on. After
+    the disarm, the room returns to the values of its own setting entities. It does not stop shots.
+    To stop shots, set the kill switch to off. When a signed-in user calls it, that user must be a
+    Home Assistant administrator. An automation can call it without this check. Use it before you
+    save a new draft or change the zones of the room. Examine the plan status after the next
+    lights-on.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID disarms the plan of a different room. The integration refuses an
+        unknown ID. Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
 
 runs_get:
   name: Read run records
-  description: Read this room's recorded run metadata. Does not enable irrigation.
+  description: >-
+    Returns the run records of the room: the name, the dates and the reference data of each run.
+    Changes nothing. It has no administrator check. Use it to read the revision before you save,
+    archive or import records.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID reads a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
-runs_save:
-  name: Save run record
-  description: Register a run with current reference metadata, or edit its dates and name while preserving the original reference. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+setpoint_log_get:
+  name: Read setpoint change log
+  description: >-
+    Returns the change log of the room settings: the setting, the old and new value, the time and
+    who made the change. Changes nothing. It has no administrator check. Use it to find who changed
+    a setpoint. The writer can be a person, Home Assistant, the learner, the AI assistant or a
+    safety reset. The log keeps the last 2000 changes.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID reads a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
+      required: true
+      selector:
+        text:
+overlay_get:
+  name: Read AI changes
+  description: >-
+    Returns the settings that the AI assistant changed in this room for one grow-day. Each change
+    returns to your value at the lights-on that ends that grow-day. Changes nothing. It has no
+    administrator check. Use it to see which AI changes are open and when each one ends.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID reads a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
+      required: true
+      selector:
+        text:
+overlay_keep:
+  name: Keep an AI change
+  description: >-
+    Keeps the value that the AI assistant set on one setting as your own value. The setting keeps
+    the AI value after lights-on, and the open AI change ends. When a signed-in user calls it, that
+    user must be a Home Assistant administrator. An automation can call it without this check. Use
+    it when the AI value is correct for the room. The integration refuses the call when the setting
+    has no open AI change.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID acts on a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
+      required: true
+      selector:
+        text:
+    entity_id:
+      name: Setting entity
+      description: >-
+        The entity ID of the number that the AI assistant changed. A different entity ID acts on the AI
+        change of a different setting. Example: `number.crop_steering_zone_1_p2_shot_size`.
+      required: true
+      selector:
+        entity:
+          domain: number
+overlay_undo:
+  name: Undo an AI change
+  description: >-
+    Puts your own value back now on one setting that the AI assistant changed. The setting returns
+    to your value immediately, and the open AI change ends. When a signed-in user calls it, that
+    user must be a Home Assistant administrator. An automation can call it without this check. Use
+    it when the AI value is not correct for the room. The integration refuses the call when the
+    setting has no open AI change.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID acts on a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
+      required: true
+      selector:
+        text:
+    entity_id:
+      name: Setting entity
+      description: >-
+        The entity ID of the number that the AI assistant changed. A different entity ID acts on the AI
+        change of a different setting. Example: `number.crop_steering_zone_1_p2_shot_size`.
+      required: true
+      selector:
+        entity:
+          domain: number
+runs_save:
+  name: Save run record
+  description: >-
+    Records a new run with the current reference data, or changes the name and dates of a run. The
+    original reference data of a run stays. Changes stored run records only. It does not change
+    setpoints or hardware. When a signed-in user calls it, that user must be a Home Assistant
+    administrator. An automation can call it without this check. Read the revision with `runs_get`
+    first. A run spans 1 to 366 calendar days.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID saves the record of a different room. The integration refuses an
+        unknown ID. Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
     expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that `runs_get` returned before this change. When the stored revision is different,
+        the integration refuses the call and changes nothing. Read the revision with `runs_get`
+        immediately before the call. Minimum: 0.
       required: true
       selector:
         number:
           min: 0
           mode: box
     record:
+      name: Run record
+      description: >-
+        The run: its name, its start date and its end date. After the checks, the stored run becomes
+        this record. Use dates in the format YYYY-MM-DD. A name has 1 to 80 characters.
       required: true
       selector:
         object:
 runs_archive:
-  name: Archive or restore run record
-  description: Change run visibility without deleting historical reference metadata. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  name: Archive or restore run
+  description: >-
+    Hides or shows one run record. The reference data of the run stays. Changes the visibility of
+    the record only. When a signed-in user calls it, that user must be a Home Assistant
+    administrator. An automation can call it without this check. Set archived to on to hide a run.
+    Set archived to off to restore it.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID changes the record of a different room. The integration refuses an
+        unknown ID. Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
     expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that `runs_get` returned before this change. When the stored revision is different,
+        the integration refuses the call and changes nothing. Read the revision with `runs_get`
+        immediately before the call. Minimum: 0.
       required: true
       selector:
         number:
           min: 0
           mode: box
     id:
+      name: Run ID
+      description: >-
+        The ID of the run record. A different ID changes a different run. Get the ID from `runs_get`.
       required: true
       selector:
         text:
     archived:
+      name: Archived
+      description: >-
+        On hides the run. Off shows the run again. On: the run becomes archived. Off: the run becomes
+        visible again. Example: on, to hide a finished run.
       required: true
       selector:
         boolean:
 runs_import:
   name: Import run records
-  description: Import at most 100 validated metadata records for the same room. Recorder history is not included. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  description: >-
+    Imports up to 100 run records for the same room. The import does not include the recorder
+    history. Adds stored run records. It does not change setpoints or hardware. When a signed-in
+    user calls it, that user must be a Home Assistant administrator. An automation can call it
+    without this check. Read the revision with `runs_get` first. Make sure that each record is for
+    this room.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID imports into a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
     expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that `runs_get` returned before this change. When the stored revision is different,
+        the integration refuses the call and changes nothing. Read the revision with `runs_get`
+        immediately before the call. Minimum: 0.
       required: true
       selector:
         number:
           min: 0
           mode: box
     runs:
+      name: Run records
+      description: >-
+        A list of up to 100 run records. Each valid record adds one run to the room. Maximum: 100
+        records in one call.
       required: true
       selector:
         object:
-stock_get:
-  name: Read stock tanks
-  description: Read this room's stock tanks, their levels, what one batch takes from each, and the batches recorded. Does not change anything.
+calibration_get:
+  name: Read calibration history
+  description: >-
+    Returns the two-point calibration checks of the feed pH and feed EC sensors of the room, newest
+    first. It also gives the sensor entity that each check is for now. Changes nothing. It has no
+    administrator check. Use it to see when you last calibrated each sensor and the result.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID reads a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
+      required: true
+      selector:
+        text:
+calibration_record:
+  name: Record a calibration check
+  description: >-
+    Records what the feed pH or feed EC sensor read in two reference solutions. The answer gives the
+    slope, the offset and the result: "pass", "drifting" or "fail". Adds one record to the
+    calibration history. It changes no reading and no hardware. When a signed-in user calls it, that
+    user must be a Home Assistant administrator. An automation can call it without this check. Put
+    the sensor in two reference solutions, one after the other. Record the reference value and the
+    reading for each. A pass needs a slope from 95% to 105% and an offset of 0.1 or less.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID records the check of a different room. The integration refuses an
+        unknown ID. Example: `room:f1_` for a named room, or `room:` for the default room.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that `calibration_get` returned before this change. When the stored revision is
+        different, the integration refuses the call and changes nothing. Read the revision with
+        `calibration_get` immediately before the call. Minimum: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    probe:
+      name: Sensor to check
+      description: >-
+        The feed sensor that you checked: `feed_ph` or `feed_ec`. A different value records the check
+        against the other sensor. Example: `feed_ph`.
+      required: true
+      selector:
+        select:
+          options:
+            - feed_ph
+            - feed_ec
+    points:
+      name: Calibration points
+      description: >-
+        Exactly two points. Each point has the reference value of the solution and the reading of the
+        sensor. The two points set the slope, the offset and the result. The two pH references must be
+        1.0 or more apart. The two EC references must be 0.5 mS/cm or more apart. Example:
+        `[{"reference": 7.0, "reading": 7.05}, {"reference": 4.0, "reading": 4.1}]`.
+      required: true
+      example: '[{"reference": 7.0, "reading": 7.05}, {"reference": 4.0, "reading": 4.1}]'
+      selector:
+        object:
+    note:
+      name: Note
+      description: >-
+        A short note about the check. The note shows in the history. It has no other effect. Optional.
+        Maximum: 200 characters. Example: New pH 4 solution.
+      required: false
+      selector:
+        text:
+stock_get:
+  name: Read stock tanks
+  description: >-
+    Returns the stock tanks of the room: the levels, the quantity that one batch takes from each
+    tank, and the recorded batches. Changes nothing. It has no administrator check. Use it to read
+    the revision before you change the tanks.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID reads a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
 stock_save:
   name: Save stock tanks
-  description: Replace this room's list of stock tanks (name, capacity, level, dose per batch, dose entity, low mark). A tank left out is removed. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  description: >-
+    Replaces the list of stock tanks of the room. Each tank has a name, a capacity, a level, a dose
+    for each batch, a dose entity and a low mark. Changes stored data only. The integration removes
+    a tank that you leave out of the list. When a signed-in user calls it, that user must be a Home
+    Assistant administrator. An automation can call it without this check. Read the revision with
+    `stock_get` first. Send every tank, because the call replaces the full list.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID saves the tanks of a different room. The integration refuses an
+        unknown ID. Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
     expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that `stock_get` returned before this change. When the stored revision is
+        different, the integration refuses the call and changes nothing. Read the revision with
+        `stock_get` immediately before the call. Minimum: 0.
       required: true
       selector:
         number:
           min: 0
           mode: box
     tanks:
+      name: Stock tanks
+      description: >-
+        The full list of stock tanks, up to 12. The stored list becomes this list. Capacity: 0.1 to
+        10000 L. Level and low mark: 0 to 10000 L. Dose for each batch: 0 to 100000 mL. Default low
+        mark: 20% of the capacity.
       required: true
       selector:
         object:
 stock_refill:
   name: Refill a stock tank
-  description: Record that a stock tank was refilled to capacity, or set the level read off its side. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  description: >-
+    Records that a stock tank is full again, or sets the level that you read on the tank. Changes
+    the stored level of one tank. When a signed-in user calls it, that user must be a Home Assistant
+    administrator. An automation can call it without this check. Leave the level empty when you
+    filled the tank to its capacity. Give the level when you read a different level on the tank.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID changes the tank of a different room. The integration refuses an
+        unknown ID. Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
     expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that `stock_get` returned before this change. When the stored revision is
+        different, the integration refuses the call and changes nothing. Read the revision with
+        `stock_get` immediately before the call. Minimum: 0.
       required: true
       selector:
         number:
           min: 0
           mode: box
     id:
+      name: Tank ID
+      description: >-
+        The ID of the stock tank. A different ID changes a different tank. Get the ID from `stock_get`.
       required: true
       selector:
         text:
     level_l:
+      name: Tank level
+      description: >-
+        The level that you read on the tank, in litres. Empty: the level becomes the capacity of the
+        tank. A value: the level becomes that value. Optional. Range: 0 to 10000 L. Example: 18.5.
       required: false
       selector:
         number:
@@ -343,37 +855,78 @@ stock_refill:
           mode: box
 stock_record_batch:
   name: Record a batch
-  description: Take one batch's dose from every stock tank now. For rooms without a mapped tank last-fill entity; with one, batches are counted from it and recording one here as well counts it twice. A tank linked to a dosing pump is skipped, because that pump's doses draw it; the answer lists the tanks skipped. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  description: >-
+    Takes the dose of one batch from each stock tank now. Lowers the stored level of each stock
+    tank. The integration does not change a tank that a dosing pump supplies, and the answer lists
+    those tanks. When a signed-in user calls it, that user must be a Home Assistant administrator.
+    An automation can call it without this check. Use it only when the room has no mapped tank
+    last-fill entity. With that entity, the integration counts each batch itself, and this call
+    counts the batch two times.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID records the batch of a different room. The integration refuses an
+        unknown ID. Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
     expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that `stock_get` returned before this change. When the stored revision is
+        different, the integration refuses the call and changes nothing. Read the revision with
+        `stock_get` immediately before the call. Minimum: 0.
       required: true
       selector:
         number:
           min: 0
           mode: box
 stock_draw:
-  name: Draw what was dosed
-  description: Take from stock tanks what a dose or a batch actually dosed. The controller app calls it after every dose; each key is counted once, so sending one again changes nothing. A tank linked to a dosing pump is left as it is, because what that pump runs draws it, whoever starts it. Tanks this room does not have are skipped. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations and the controller app are unaffected.
+  name: Draw dosed quantity
+  description: >-
+    Takes from the stock tanks the quantity that a dose or a batch used. The controller calls it
+    after each dose. Lowers the stored level of each named tank. Each key counts one time only, so a
+    repeat changes nothing. The integration does not change a tank that a dosing pump supplies, or a
+    tank that the room does not have. When a signed-in user calls it, that user must be a Home
+    Assistant administrator. An automation or the controller can call it without this check. The
+    controller calls it, so you do not need to call it. Do not send a draw again with a new key for
+    a dose that the controller reported.
   fields:
     room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID draws from a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
       required: true
       selector:
         text:
     key:
+      name: Draw key
+      description: >-
+        A unique key for this draw. A key that the integration already counted changes nothing. Example:
+        `:balance:2026-09-28T12:00:00+00:00`.
       required: true
       example: ":balance:2026-09-28T12:00:00+00:00"
       selector:
         text:
     draws:
+      name: Quantities drawn
+      description: >-
+        A map from each stock tank ID to the quantity drawn, in mL. Each tank level decreases by its
+        quantity. A level does not go below empty. Each quantity must be 0 mL or more. Example:
+        `{"balance": 25}`.
       required: true
       example: '{"balance": 25}'
       selector:
         object:
     source:
+      name: Draw source
+      description: >-
+        What used the stock: `dose` or `batch`. The value shows in the stock history. It has no other
+        effect. Example: `dose`.
       required: true
       selector:
         select:
@@ -381,6 +934,10 @@ stock_draw:
             - "dose"
             - "batch"
     note:
+      name: Note
+      description: >-
+        A short note for the stock history. The note has no effect on the levels. Optional. The
+        integration keeps the first 200 characters.
       required: false
       selector:
         text:
@@ -411,6 +968,14 @@ dosing_save:
       required: true
       selector:
         object:
+    feed:
+      required: false
+      selector:
+        object:
+    profile:
+      required: false
+      selector:
+        object:
 dosing_request:
   fields:
     room_id:
@@ -438,6 +1003,10 @@ dosing_request:
           step: 0.1
           unit_of_measurement: mL
           mode: box
+    run_anyway:
+      required: false
+      selector:
+        boolean:
 # Names and descriptions of the notification services are in strings.json (translations/en.json).
 notify_get:
 notify_save:
@@ -461,6 +1030,19 @@ notify_save:
           step: 0.5
           unit_of_measurement: h
           mode: box
+    digest_hours:
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 24
+          step: 1
+          unit_of_measurement: h
+          mode: box
+    mutes:
+      required: false
+      selector:
+        object:
 notify_test:
   fields:
     service:
@@ -513,15 +1095,105 @@ notify:
       default: false
       selector:
         boolean:
+    overlays:
+      required: false
+      example: '["number.crop_steering_zone_1_p2_shot_size"]'
+      selector:
+        object:
+test_shot:
+  name: Test zone shot
+  description: >-
+    Asks the controller for a 10 s test shot in one zone. It does the same as the Test Shot button
+    of the zone. Opens the zone valve and runs the pump for 10 s. The shot passes every check of a
+    normal shot, except a hold from a grow plan. When a signed-in user calls it, that user must be a
+    Home Assistant administrator. An automation can call it without this check. Watch the drippers
+    of the zone during the test. The controller does not act on a request that it sees more than 10
+    min late. After the test, record the result in the setup wizard. WARNING: Tell each person near
+    the pump and the zone before the test. The pump starts and the zone valve opens. CAUTION: Make
+    sure that the drippers of the zone are in their pots or in a catch container. A test shot can
+    spill water.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID tests a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
+      required: true
+      selector:
+        text:
+    zone:
+      name: Zone
+      description: >-
+        The number of the zone to test. A different number tests a different zone. Range: 1 to 99. The
+        integration refuses a zone that the room does not have.
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 99
+          mode: box
 whats_new_get:
   name: Read what's new
-  description: The release highlights shipped with this integration, the installed version and the last release the dashboard's What's new window showed. Changes nothing.
+  description: >-
+    Returns the release highlights of the integration, the installed version and the last release
+    that the "What's new" window showed. Changes nothing. It has no administrator check. The
+    dashboard calls it.
 whats_new_seen:
   name: Mark what's new as shown
-  description: Record that the dashboard's What's new window has shown the highlights up to this version, for the whole installation, so it does not show them again. Changes nothing else.
+  description: >-
+    Records that the "What's new" window showed the highlights up to this version. The record is for
+    the full installation. The window does not show these highlights again to any user. It changes
+    nothing else. It has no administrator check. The dashboard calls it.
   fields:
     version:
+      name: Version
+      description: >-
+        The last version that the window showed. A higher version stops the window for more releases.
+        Format: X.Y.Z. Example: 2.25.0.
       required: true
       example: "2.25.0"
       selector:
         text:
+brain_ask:
+  name: Ask the AI assistant why
+  description: >-
+    Asks the AI assistant of the room why the controller or the AI assistant did something. The
+    controller gives the answer on the answers sensor of the room. Stores the question and spends
+    from the AI budget of the room. A room can ask 20 questions each calendar day. Only the Claude
+    Haiku model of the AI assistant answers questions. When a signed-in user calls it, that user
+    must be a Home Assistant administrator. An automation can call it without this check. Ask about
+    one decision, and give the zone when the question is about one zone. The controller does not ask
+    a question that waited for more than 1 h.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID asks a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
+      required: true
+      example: "room:"
+      selector:
+        text:
+    question:
+      name: Question
+      description: >-
+        The question to ask, in plain words. The AI assistant answers this text. Maximum: 300
+        characters. Example: Why did zone 1 not water after lights-on?
+      required: true
+      example: "Why did zone 1 not water after lights-on?"
+      selector:
+        text:
+          multiline: true
+    zone:
+      name: Zone
+      description: >-
+        The zone that the question is about. The integration stores the question with this zone number.
+        Optional. Range: 1 to 24. Example: 1.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 24
+          mode: box

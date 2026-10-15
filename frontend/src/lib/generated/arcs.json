@@ -1,0 +1,187 @@
+{
+  "default_arc": "slab_default",
+  "arcs": {
+    "slab_default": {
+      "title": "Slab guide / vendor arc: generative setting, vegetative bulk, generative finish",
+      "stages": [
+        {
+          "stage": "established veg",
+          "flower_days": null,
+          "steering": "vegetative",
+          "peak": "at or above field capacity",
+          "dryback_points": [
+            10,
+            15
+          ],
+          "dryback_relative_vendor": [
+            30,
+            40
+          ],
+          "pore_ec": [
+            3.0,
+            5.0
+          ],
+          "runoff_pct": [
+            8,
+            16
+          ],
+          "move_on_when": "roots established and uptake repeats day to day"
+        },
+        {
+          "stage": "flower setting (stretch)",
+          "flower_days": [
+            1,
+            21
+          ],
+          "steering": "generative",
+          "peak": "at or below field capacity",
+          "dryback_points": [
+            15,
+            25
+          ],
+          "dryback_relative_vendor": [
+            40,
+            50
+          ],
+          "pore_ec": [
+            5.0,
+            10.0
+          ],
+          "pore_ec_vendor": [
+            4.0,
+            10.0
+          ],
+          "runoff_pct": [
+            1,
+            7
+          ],
+          "notes": "start near the low end and deepen over three weeks; never cross the established minimum moisture",
+          "move_on_when": "vertical stretch has clearly slowed or stopped"
+        },
+        {
+          "stage": "flower bulk",
+          "flower_days": [
+            22,
+            42
+          ],
+          "steering": "vegetative",
+          "peak": "at or above field capacity",
+          "dryback_points": [
+            10,
+            15
+          ],
+          "dryback_relative_vendor": [
+            30,
+            40
+          ],
+          "pore_ec": [
+            3.5,
+            6.0
+          ],
+          "runoff_pct": [
+            8,
+            16
+          ],
+          "move_on_when": "flower expansion slows and ripening signs dominate"
+        },
+        {
+          "stage": "finish",
+          "flower_days": "last 10-14 days",
+          "steering": "ripening",
+          "peak": "at or below field capacity",
+          "dryback_points": [
+            20,
+            25
+          ],
+          "dryback_relative_vendor": [
+            40,
+            50
+          ],
+          "pore_ec": [
+            3.0,
+            4.0
+          ],
+          "runoff_pct": [
+            1,
+            7
+          ],
+          "notes": "deeper only on cultivar data; runoff higher only to correct excess EC",
+          "move_on_when": "maturity by trichomes, a person's call"
+        }
+      ]
+    },
+    "rockwool_default": {
+      "title": "Rockwool / one-law arc: deepest dryback and highest EC mid-flower (a preview: some rows are words, not numbers, so code cannot use it yet)",
+      "stages": [
+        {
+          "stage": "veg",
+          "flower_days": null,
+          "steering": "vegetative",
+          "dryback_points": [
+            5,
+            15
+          ],
+          "pore_ec": "about 3.0",
+          "runoff_pct": [
+            10,
+            20
+          ]
+        },
+        {
+          "stage": "flower weeks 1-3",
+          "flower_days": [
+            1,
+            21
+          ],
+          "steering": "building",
+          "peak": "high",
+          "dryback_points": [
+            10,
+            18
+          ],
+          "pore_ec": "stepping up",
+          "runoff_pct": [
+            10,
+            15
+          ]
+        },
+        {
+          "stage": "flower weeks 4-6",
+          "flower_days": [
+            22,
+            42
+          ],
+          "steering": "generative",
+          "peak": "mid",
+          "dryback_points": [
+            20,
+            30
+          ],
+          "pore_ec": [
+            4.5,
+            6.0
+          ],
+          "runoff_pct": [
+            15,
+            20
+          ]
+        },
+        {
+          "stage": "flower weeks 7-8",
+          "flower_days": [
+            43,
+            56
+          ],
+          "steering": "easing",
+          "peak": "mid, steady",
+          "dryback_points": [
+            18,
+            25
+          ],
+          "pore_ec": "easing or as planned",
+          "runoff_pct": "maintained"
+        }
+      ]
+    }
+  }
+}

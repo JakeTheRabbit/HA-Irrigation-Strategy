@@ -10,16 +10,21 @@ import { LoaderCircle, Settings2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, number, time as clock } from "@/components/dashboard";
 import { inPairs } from "@/components/day-timeline";
+import { UiTip } from "@/components/info-tip";
 import { appendLive, duration, joinRows, type Level, type TimelineRows } from "@/lib/day-timeline";
 import { numeric } from "@/lib/model";
 import { rangeTicks, tickLabel } from "@/lib/tank-history";
 import {
+  DEFAULT_LEVEL_HOURS,
   LEVEL_RANGES,
   levelAt,
+  levelLines,
   recordWindows,
+  shotGap,
   shotMarks,
   tankEntities,
   tankRecord,
+  type LevelLine,
   type Run,
   type TankIds,
   type TankRecord,
@@ -52,6 +57,7 @@ function useTankRecord(
     numeric(states[`number.crop_steering_${room.room.prefix}lights_off_hour`]),
     hours,
     now,
+    controller.timeZone,
   );
   const key = enabled
     ? [room.room.id, hours, windows[0].start, windows.at(-1)!.start, ...request.entityIds, "|"]
@@ -111,7 +117,8 @@ function useTankRecord(
 }
 
 /** The tank's level over a range beside what moved it: each zone's shots on the line, the pump's
- * runs and the tank filling above it, each recorded fill across it. */
+ * runs and the tank filling above it, each recorded fill across it, and the minimum and refill
+ * reminder levels. */
 export function TankLevel({
   controller,
   onConfigure,
@@ -125,7 +132,7 @@ export function TankLevel({
     const timer = window.setInterval(() => tick((value) => value + 1), 60_000);
     return () => window.clearInterval(timer);
   }, []);
-  const [hours, setHours] = useState<number>(LEVEL_RANGES[0].hours);
+  const [hours, setHours] = useState<number>(DEFAULT_LEVEL_HOURS);
   const now = Date.now();
   const read = tankEntities(controller.room, controller.states);
   const { level } = tankTelemetry(controller.states, controller.room.room);
@@ -143,7 +150,7 @@ export function TankLevel({
       data-tank-level-chart
     >
       <div className="panel-heading">
-        <h2 id="tank-level-title">Tank level and watering</h2>
+        <h2 id="tank-level-title">Tank level and shots</h2>
         <div className="tank-history-range" role="group" aria-label="Tank level range">
           {LEVEL_RANGES.map((option) => (
             <button
@@ -160,30 +167,37 @@ export function TankLevel({
       <div className="timeline-body">
         {!level.entityId ? (
           <Empty
-            title="No tank level is mapped"
-            detail="Map the tank’s level sensor, a percentage, in Rooms & setup to chart it here with the shots, pump runs and fills."
+            title="No tank level sensor"
+            tip={<UiTip copyKey="no tank level is mapped" />}
+            detail="Map the level sensor of the tank, in %, in Rooms and setup. The chart then shows it with the shots, pump runs and fills."
             action={mapSensors}
           />
         ) : !read.ids.level ? (
           <Empty
-            title="The tank level sensor is missing"
+            title="Tank level sensor missing"
+            tip={<UiTip copyKey="the tank level sensor is missing" />}
             detail={`Home Assistant has no ${level.entityId}.`}
             action={mapSensors}
           />
         ) : !charted ? (
           <Empty
-            title="The tank level is not charted"
+            title="Tank level not on chart"
+            tip={<UiTip copyKey="the tank level is not charted" />}
             detail={`${level.entityId} reports in “${level.unit}”, not %.`}
             action={mapSensors}
           />
         ) : record.error ? (
           <Empty
-            title="The tank’s history could not load"
+            title="Tank history did not load"
+            tip={<UiTip copyKey="the tank’s history could not load" />}
             detail={record.error}
             action={
-              <Button variant="outline" onClick={record.retry}>
-                Retry
-              </Button>
+              <span className="label-with-tip">
+                <Button variant="outline" onClick={record.retry}>
+                  Retry
+                </Button>
+                <UiTip copyKey="retry" />
+              </span>
             }
           />
         ) : !record.rows || record.at === null ? (
@@ -234,6 +248,7 @@ function LevelRecord({
 }) {
   const start = now - hours * HOUR;
   const record = tankRecord(rows, ids, start, now);
+  const lines = levelLines(controller.states, controller.room.room.prefix, ids.level);
   const range = LEVEL_RANGES.find((option) => option.hours === hours)?.label ?? `${hours} h`;
   const zones = controller.room.zones;
   const flows = new Map(
@@ -292,6 +307,7 @@ function LevelRecord({
       <LevelChart
         record={record}
         ids={ids}
+        lines={lines}
         start={start}
         end={now}
         hours={hours}
@@ -300,34 +316,40 @@ function LevelRecord({
       />
       <div className="grow-foot">
         <ul className="grow-legend" aria-label="Chart key">
-          <li title="What the mapped level sensor reported, held until its next reading">
+          <li title="Tank level. The values of the mapped level sensor. Each value stays on the chart until the next reading.">
             <i className="key-level" aria-hidden="true" />
             Tank level
           </li>
           {ids.valves.length > 0 && (
-            <li title="A zone valve opening, on the level line where it opened">
+            <li title="Shot. A zone valve opened. The mark is on the level line at the time that the valve opened.">
               <i className="key-shot" aria-hidden="true" />
               Shot
             </li>
           )}
           {ids.pump && (
-            <li title="The pump switch’s own report, not measured flow">
+            <li title="Pump on. The pump switch reports that it is on. The chart does not show measured flow.">
               <i className="key-pump" aria-hidden="true" />
               Pump on
             </li>
           )}
           {ids.filling && (
-            <li title="The tank filling status mapped for this room">
+            <li title="Tank fill. The mapped fill status of the tank for this room.">
               <i className="key-filling" aria-hidden="true" />
               Filling
             </li>
           )}
           {ids.fill && (
-            <li title="A newer time on the last-fill record">
+            <li title="Recorded fill. The last-fill record of the tank shows a newer time.">
               <i className="key-fill" aria-hidden="true" />
               Recorded fill
             </li>
           )}
+          {lines.map((line) => (
+            <li key={line.key} title={line.title}>
+              <i className={`key-${line.key}`} aria-hidden="true" />
+              {line.label}
+            </li>
+          ))}
         </ul>
         <details className="timeline-events">
           <summary>{counts.join(" · ")}</summary>
@@ -390,6 +412,7 @@ const diamond = (cx: number, cy: number) =>
 function LevelChart({
   record,
   ids,
+  lines,
   start,
   end,
   hours,
@@ -398,6 +421,7 @@ function LevelChart({
 }: {
   record: TankRecord;
   ids: TankIds;
+  lines: LevelLine[];
   start: number;
   end: number;
   hours: number;
@@ -467,8 +491,10 @@ function LevelChart({
         `V${f(bottom)}Z`,
     )
     .join("");
-  // Shots too close to tell apart share a mark, on the line where the first one opened.
-  const marks = shotMarks(record.shots, record.level, (8 / plotW) * (end - start)).map((mark) => ({
+  // Shots too close to tell apart share a mark, on the line where the first one opened; across a
+  // week, every shot in the hour.
+  const gap = shotGap(hours, (8 / plotW) * (end - start));
+  const marks = shotMarks(record.shots, record.level, gap).map((mark) => ({
     ...mark,
     cx: x(mark.time),
     cy: mark.level === null ? bottom - 6 : y(mark.level),
@@ -497,6 +523,15 @@ function LevelChart({
       y1: bottom,
       rank: 1,
       text: () => texts.fill(time),
+    })),
+    ...lines.map((line) => ({
+      x0: L,
+      x1: L + plotW,
+      y0: y(line.value) - 4,
+      y1: y(line.value) + 4,
+      rank: 3,
+      text: () => `${line.label}
+${line.title}`,
     })),
     ...strips.flatMap((strip, row) =>
       strip.runs.map((run) => ({
@@ -592,6 +627,25 @@ function LevelChart({
             </g>
           ))}
           <path d={area} className="level-area" />
+          {lines.map((line) => (
+            <g key={line.key} data-level-line={line.key} data-value={line.value}>
+              <line
+                x1={L}
+                x2={L + plotW}
+                y1={y(line.value)}
+                y2={y(line.value)}
+                className={`level-mark level-mark-${line.key}`}
+              />
+              <text
+                x={L + plotW - 4}
+                y={y(line.value) - 4}
+                className="axis-label level-mark-label"
+                textAnchor="end"
+              >
+                {line.label}
+              </text>
+            </g>
+          ))}
           {record.fills.map((time) => (
             <g key={time} data-fill={new Date(time).toISOString()}>
               <line

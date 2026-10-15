@@ -43,6 +43,25 @@ describe("saying what a zone waits for", () => {
     );
     expect(waitingText(p0, format)).toBe("P1 by 08:06, or sooner at VWC ≤ 70% (now 84.1%)");
   });
+  it("P0: which dryback, from which peak, when the dryback's level comes first", () => {
+    const p0 = waiting(
+      { rule: "p0_timeout", to: "P1", in_min: 30 },
+      { rule: "p0_bypass", to: "P1", metric: "vwc", op: "<=", value: 45, now: 59 },
+      {
+        rule: "p0_dryback",
+        to: "P1",
+        metric: "vwc",
+        op: "<=",
+        value: 58.69,
+        now: 59,
+        dryback: 3,
+        peak: 60.5,
+      },
+    );
+    expect(waitingText(p0, format)).toBe(
+      "P1 by 08:06, or sooner at VWC ≤ 58.69% (now 59%, 3% below the 60.5% high since lights-on)",
+    );
+  });
   it("P1: the next ramp shot and what hands over to P2", () => {
     const p1 = waiting(
       { rule: "p1_ramp", shot: true, metric: "vwc", op: "<", value: 85, now: 84.2, in_min: 0 },
@@ -71,7 +90,7 @@ describe("saying what a zone waits for", () => {
       /^ramp shot when VWC < 85% \(now 86%\) · P2 at VWC ≥ 85% after 1 more shot, /,
     );
   });
-  it("P2: the maintenance trigger, the dilution limit, and lights-off", () => {
+  it("P2: the re-water point, the dilution limit, and lights-off", () => {
     const p2 = waiting(
       { rule: "p2_topup", shot: true, metric: "vwc", op: "<", value: 70, now: 84.1 },
       { rule: "p2_dilute", shot: true, metric: "ec", op: ">", value: 3.84, now: 0.5 },
@@ -83,12 +102,29 @@ describe("saying what a zone waits for", () => {
     expect(waitingText(p2, { ...format, shotEstimate: AT + 90 * 60_000 })).toMatch(
       /^shot when VWC < 70% \(now 84\.1%, ≈ 09:06 at this dry-down\)/,
     );
+    // Under the trigger, the shot waits out the time between P2 shots.
+    const spaced = waiting(
+      { rule: "p2_topup", shot: true, metric: "vwc", op: "<", value: 70, now: 67, in_min: 4 },
+      { rule: "lights_off", to: "P3", in_min: 600 },
+    );
+    expect(waitingText(spaced, format)).toBe("shot at 07:40 (VWC 67% under 70%) · P3 by 17:36");
+    // Above it, the wait is not what it waits for.
+    const above = waiting({
+      rule: "p2_topup",
+      shot: true,
+      metric: "vwc",
+      op: "<",
+      value: 70,
+      now: 72,
+      in_min: 4,
+    });
+    expect(waitingText(above, format)).toBe("shot when VWC < 70% (now 72%)");
     // A held plan stops the routine shots: lights-off is all that is left.
     expect(waitingText(waiting({ rule: "lights_off", to: "P3", in_min: 600 }), format)).toBe(
       "P3 by 17:36",
     );
   });
-  it("P3: the rescue level and lights-on", () => {
+  it("P3: the rescue floor and lights-on", () => {
     const p3 = waiting(
       { rule: "p3_emergency", shot: true, metric: "vwc", op: "<", value: 60, now: 84.1 },
       { rule: "lights_on", to: "P0", in_min: 660 },

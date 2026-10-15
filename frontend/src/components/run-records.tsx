@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Download, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { UiTip } from "@/components/info-tip";
 import { Pill } from "@/components/mini-visuals";
 import { dateInZone } from "@/lib/comparison";
 import type { RunRecord, RunsDocument } from "@/lib/comparison-types";
@@ -171,6 +172,7 @@ export function RunRecords({
         >
           Import metadata
         </Button>
+        <UiTip copyKey="import run metadata" />
         <input
           ref={fileRef}
           hidden
@@ -196,35 +198,47 @@ export function RunRecords({
             void save();
           }}
         >
-          <label>
-            Run name
+          <div className="run-records-field">
+            <span className="label-with-tip">
+              <label htmlFor="run-record-name">Run name</label>
+              <UiTip copyKey="run name" />
+            </span>
             <Input
+              id="run-record-name"
               aria-label="Run name"
               required
               maxLength={80}
               value={form.name}
               onChange={(event) => setForm({ ...form, name: event.target.value })}
             />
-          </label>
-          <label>
-            Start date
+          </div>
+          <div className="run-records-field">
+            <span className="label-with-tip">
+              <label htmlFor="run-record-start">Start date</label>
+              <UiTip copyKey="start date" />
+            </span>
             <Input
+              id="run-record-start"
               aria-label="Run start date"
               type="date"
               required
               value={form.start_date}
               onChange={(event) => setForm({ ...form, start_date: event.target.value })}
             />
-          </label>
-          <label>
-            End date · blank while ongoing
+          </div>
+          <div className="run-records-field">
+            <span className="label-with-tip">
+              <label htmlFor="run-record-end">End date · empty if open</label>
+              <UiTip copyKey="end date · blank while ongoing" />
+            </span>
             <Input
+              id="run-record-end"
               aria-label="Run end date"
               type="date"
               value={form.end_date}
               onChange={(event) => setForm({ ...form, end_date: event.target.value })}
             />
-          </label>
+          </div>
           <p className="small run-records-wide">
             {form.id
               ? "Changing the name or dates preserves the original reference, sensors, plants and lights schedule."
@@ -277,7 +291,7 @@ export function RunRecords({
                 {run.reference_source}.
               </p>
               <details>
-                <summary>Registered zones and sensors</summary>
+                <summary>Registered zones and probes</summary>
                 {run.zones.map((zone) => (
                   <p className="small" key={zone.zone_id}>
                     {zone.name} · plants at registration: {zone.plant_count ?? "unknown"} · VWC{" "}

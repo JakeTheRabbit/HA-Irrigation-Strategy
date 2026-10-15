@@ -11,6 +11,16 @@ entities scale with your zone count, `N` = 1…zones).
   per-zone value for that zone and falls back to the global otherwise.
 - The engine reads these by `entity_id`. Renaming a friendly-name in HA or on a
   dashboard does not affect it.
+- **Defaults** are the entity-default column of one table,
+  `crop-steering-engine/src/crop_steering_engine/defaults.py`: what a new entity starts at and
+  what setup offers a new room. A restored or operator-set value always wins over it. The
+  table's other column is what the controller uses when neither the zone's nor the room's
+  setting can be read (around a Home Assistant restart, or a setting an older integration
+  lacks); for some settings it differs from the entity default, and it is kept at the values
+  installed controllers already use.
+- **Sizing** (substrate litres, plant count, drippers per plant, dripper flow) starts at generic
+  values, not any one room's. Setup shows them pre-filled for you to check, and the room's
+  setup reports each one still at its generic value (`sizing_generic`) until it is changed.
 
 ---
 
@@ -19,32 +29,37 @@ entities scale with your zone count, `N` = 1…zones).
 ### P0: morning dryback
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `p0_dryback_drop_percent` | 2-40 | 15 | % | How far VWC must drop from the overnight peak before P0 ends and P1 begins. |
-| `p0_maximum_wait_time` | 30-600 | 120 | min | Hard ceiling: forces P0 → P1 if the dryback target is never reached. |
+| `p0_dryback_drop_percent` | 2-40 | 15 | % | An old setting that stays for older rooms and recipes. The controller does not read this setting. The P0 dryback comes from the P0 extra dryback of each zone (`zone_N_p0_additional_dryback`, section 2). |
+| `p0_maximum_wait_time` | 30-600 | 120 | min | The longest time that the morning dryback (P0) lasts after lights-on. At this time, the zone goes to P1, also when the dryback is not complete. |
 
-### P1: ramp-up
+### P1: ramp
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `p1_initial_shot_size` | 0.1-20 | 2 | % | Size of the first ramp shot (% of substrate volume). |
-| `p1_shot_size_increment` | 0.05-10 | 0.5 | % | How much each successive shot grows. |
-| `p1_minimum_shots` | 1-20 | 3 | - | Minimum shots before P1 may exit. |
-| `p1_maximum_shots` | 1-30 | 6 | - | After this many shots P1 exits to P2 even if the target wasn't hit. |
-| `p1_target_vwc` | 5-95 | 60 | % | VWC that ends the ramp and moves the zone to P2. |
-| `p1_time_between_shots` | 1-60 | 5 | min | Spacing between ramp shots. |
+| `p1_initial_shot_size` | 0.1-20 | 2 | % | The size of the first ramp shot, as a percentage of the substrate volume. Each later ramp shot adds the ramp shot increase to the shot before it. |
+| `p1_shot_size_increment` | 0.05-10 | 0.5 | % | The size that each ramp shot adds to the shot before it, as a percentage of the substrate volume. The third ramp shot is the first ramp shot plus two times this value. |
+| `p1_minimum_shots` | 1-20 | 3 | - | The number of ramp shots that P1 must give before it can end because the substrate is full. P1 can still end at the maximum ramp shots, at the maximum extra shots, or with the daily water limit spent. |
+| `p1_maximum_shots` | 1-30 | 6 | - | The highest number of shots in P1. At this number, the zone goes to P2 at any VWC. |
+| `p1_rise_pts` | 0.1-5 | 0.5 | % | After P1 reaches its peak target, it gives extra shots. P1 gives another extra shot only while each one raises the settled VWC (the median of the last 10 minutes) by at least this value. When the controller knows the gain of the zone, the necessary rise is the larger of this value and 0.3 times the expected rise. |
+| `p1_maximum_extra_shots` | 1-10 | 3 | - | The highest number of extra shots that P1 gives after VWC reaches the peak target. At this number, the zone goes to P2. Extra shots count toward the daily water limit, and P1 gives no extra shot while the zone does not drain (CS-310). |
+| `p1_target_vwc` | 20-100 | 65 | % | Peak target: the VWC at which the ramp (P1) stops the ramp shots. The ramp stops at this value or at field capacity, whichever is lower. Then P1 gives extra shots until a shot no longer raises VWC enough. |
+| `p1_time_between_shots` | 1-60 | 15 | min | The minimum time between ramp shots. A ramp shot or an extra P1 shot starts only when this time has passed since the last shot. |
 
 ### P2: maintenance
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `p2_vwc_threshold` | 5-85 | 55 | % | Shoot a maintenance top-up when VWC falls below this. |
-| `p2_shot_size` | 0.5-30 | 5 | % | Size of a P2 maintenance shot. |
-| `p2_ec_high_threshold` | 0.5-3.0 | 1.2 | ×target | EC ratio above which the threshold is raised (water more to flush salts). |
-| `p2_ec_low_threshold` | 0.2-2.0 | 0.8 | ×target | EC ratio below which the threshold is lowered. |
+| `p2_vwc_threshold` | 10-100 | 60 | % | Re-water point: the VWC that starts a maintenance shot in P2. Each time the controller checks in P2, it gives a shot when VWC is below this value. In P0, VWC at or below this value ends the morning dryback. |
+| `p2_shot_size` | 0.5-30 | 5 | % | The size of each maintenance shot, as a percentage of the substrate volume. Watchdog shots and daily minimum shots use this size. EC flushes and dilution shots use 1.5 times this size or more. |
+| `p2_time_between_shots` | 0-60 | 0 | min | The minimum time from the last shot before a maintenance shot can start. It gives the water time to reach the probe before the controller reads VWC again. EC corrections use the EC correction interval. `0` stops this wait. |
+| `ec_min_interval` | 1-120 | 10 | min | The minimum time from the last shot before an EC correction (a flush or a dilution shot) or a daily minimum shot can start. With a settled pore EC reading, the wait is at least the EC settle time of the substrate type (45 min for generic). |
+| `p2_ec_high_threshold` | 0.5-3.0 | 1.2 | ×target | A ratio of pore EC to the EC target. The integration uses it only for the `p2_vwc_threshold_adjusted` sensor. The controller does not read this setting. To move the re-water point with pore EC, use `ec_stacking_enabled`. |
+| `p2_ec_low_threshold` | 0.2-2.0 | 0.8 | ×target | A ratio of pore EC to the EC target. The integration uses it only for the `p2_vwc_threshold_adjusted` sensor. The controller does not read this setting. To move the re-water point with pore EC, use `ec_stacking_enabled`. |
 
 ### P3: pre-lights-off / overnight
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `p3_emergency_vwc_threshold` | 20-65 | 40 | % | Overnight emergency floor: a rescue shot fires below this. |
-| `p3_emergency_shot_size` | 0.1-15 | 2 | % | Size of an emergency rescue shot. |
+| `p3_emergency_vwc_threshold` | 10-65 | 40 | % | Rescue floor: the overnight safety level of VWC. In P3, the controller gives a rescue shot each time VWC is below this level. Rescue shots can go past the daily water limit. |
+| `p3_emergency_shot_size` | 0.1-15 | 2 | % | The size of each rescue shot, as a percentage of the substrate volume. Rescue shots can go past the daily water limit. With the P3 dryback hold on, hold shots also use this size. |
+| `p3_time_between_shots` | 0-60 | 10 | min | The minimum time from the last shot before a rescue shot can start. It gives the water time to reach the probe before the controller reads VWC again. The time counts from the last shot of any type. `0` stops this wait. |
 
 ### EC targets: vegetative & generative (per phase)
 | Entity | Range | Default | Unit |
@@ -52,52 +67,60 @@ entities scale with your zone count, `N` = 1…zones).
 | `ec_target_veg_p0` / `_p1` / `_p2` / `_p3` | 0.5-15 | 3.0 / 3.0 / 3.2 / 3.0 | mS/cm |
 | `ec_target_gen_p0` / `_p1` / `_p2` / `_p3` | 0.5-20 | 4.0 / 5.0 / 6.0 / 4.5 | mS/cm |
 
-The active EC target = the row for the current phase **and** the zone's steering mode.
-`sensor.crop_steering_ec_ratio` = current EC ÷ this target.
+The active EC target is the row for the current phase **and** the steering mode of the zone.
+`sensor.crop_steering_ec_ratio` is the current EC divided by this target.
+The controller does not read `ec_target_veg_p3` or `ec_target_gen_p3`. The integration shows them
+only in the EC ratio sensor during P3.
 
 ### EC & safety limits
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `irrigation_ec_min` | 0-20 | 2.3 | mS/cm | Source-water EC gate (low bound). Irrigation blocked below it. `0` disables. |
-| `irrigation_ec_max` | 0-20 | 3.5 | mS/cm | Source-water EC gate (high bound). |
-| `irrigation_ph_min` | 3.0-9.0 | 5.8 | pH | Source-water pH gate (low bound). |
-| `irrigation_ph_max` | 3.0-9.0 | 6.2 | pH | Source-water pH gate (high bound). |
-| `maximum_ec` | 1-20 | 9.0 | mS/cm | Hard substrate-EC cutoff: no shot above it (salt-burn guard). |
-| `max_shot_duration` | 5-3600 | 900 | s | Longest a single shot may run. The controller refuses to water a room whose cap is missing or below 5 s (CS-203). |
-| `watchdog_hours` | 0-12 | 3 | h | Lights-on backstop: a zone below its P2 trigger that has had no water for this long gets a watchdog shot, or an urgent alert (CS-207) when watering is blocked. `0` turns it off. |
+| `irrigation_ec_min` | 0-20 | 0 | mS/cm | The lowest feed EC at which the controller starts shots. While the feed EC is below this value, all shots in the room wait. It operates only when the controller app has a feed EC sensor. `0` removes the lower limit. |
+| `irrigation_ec_max` | 0-20 | 0 | mS/cm | The highest feed EC at which the controller starts shots. While the feed EC is above this value, all shots in the room wait. It operates only when the controller app has a feed EC sensor. `0` removes the upper limit. |
+| `irrigation_ph_min` | 3.0-9.0 | 5.5 | pH | The lowest feed pH at which the controller starts shots. While the feed pH is below this value, all shots in the room wait. It operates only when the controller app has a feed pH sensor. A room configured before 5.5 to 6.5 became the default keeps its own band. |
+| `irrigation_ph_max` | 3.0-9.0 | 6.5 | pH | The highest feed pH at which the controller starts shots. While the feed pH is above this value, all shots in the room wait. It operates only when the controller app has a feed pH sensor. |
+| `maximum_ec` | 1-20 | 9.0 | mS/cm | The highest pore EC that the controller accepts in a zone. At or above this level, the controller gives a flush in any phase when the feed EC is lower than the pore EC. When the feed EC is not lower, or the zone does not drain, the zone gets no shot of any type. The high-EC flush needs VWC more than 2 points below field capacity. Nearer to field capacity, the zone loses only that flush, and the other shot rules continue. |
+| `max_shot_duration` | 5 to the room's limit | 900 | s | The longest time that a valve in this room stays open for one shot. The controller cuts a longer planned shot to this time (CS-306). The limit of the setting is the time that the slowest zone needs to give one full substrate volume, and at least 900 s. If the controller cannot read this value, or it is below 5 s, it starts no shot (CS-203). |
+| `sump_power_threshold_w` | 1-10000 | 20 | W | The power above which the sump pump counts as on. The power sensor is the `sump_power_sensor` option of the controller app. If the sump pump draws no power above this value for `sump_silent_hours`, the controller sends a CS-311 alert. |
+| `pump_prime_time` | 0-20 | 2 | s | The time that the pump runs before the main-line valve opens. With no main-line valve, the zone valve opens after this time. The controller uses it only when the room has a pump. |
+| `main_line_lead_time` | 0-10 | 1 | s | The time that the main-line valve is open before the zone valve opens. The controller uses it only when the room has a main-line valve. |
+| `watchdog_hours` | 0-12 | 3 | h | The longest time that a zone can go without a shot while the lights are on. When this time is past and VWC is below the re-water point, the controller gives a watchdog shot. When a hold stops the shot, it sends an urgent alert (CS-207). The watchdog does not operate in P0. `0` stops the watchdog. |
 
 ### Substrate & schedule
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `substrate_volume` | 1-200 | 6 | L | Substrate volume per plant: converts shot % → mL → valve seconds. |
-| `dripper_flow_rate` | 0.1-50 | 4 | L/hr | Per-dripper flow: the other half of the % → seconds conversion. |
-| `drippers_per_plant` | 1-6 | 1 | - | Drippers feeding each plant. |
-| `field_capacity` | 5-100 | 60 | % | VWC at/above which irrigation is blocked (over-water guard / P1 clamp). |
-| `vegetative_dryback_target` | 5-80 | 50 | % | Overnight dryback target in vegetative mode. |
-| `generative_dryback_target` | 5-70 | 40 | % | Overnight dryback target in generative mode. |
-| `lights_on_hour` | 0-23 | 10 | hour | Photoperiod start: P3→P0 + daily-counter reset fire here. |
-| `lights_off_hour` | 0-23 | 22 | hour | Photoperiod end: zones move to P3. |
+| `substrate_volume` | 1-200 | 10 | L | The litres of substrate for each plant, for example the volume of one block or pot. All shot sizes are a percentage of this volume. The water of a shot is the shot size, times this volume, times the plant count. |
+| `dripper_flow_rate` | 0.1-50 | 1.2 | L/hr | The litres per hour that one dripper gives. The controller uses it to calculate how long each shot runs. A value of 0, or a value that the controller cannot read, stops the shots of that zone (CS-204). |
+| `drippers_per_plant` | 1-6 | 2 | - | The number of drippers on each plant. With the dripper flow and the plant count, it gives the zone flow. The shot time is the water of the shot divided by the zone flow. |
+| `field_capacity` | 40-100 | 70 | % | The VWC at which the substrate is full and drains freely. The ramp stops at this level or at the peak target, whichever is lower. EC flushes that can go past the daily water limit need VWC more than 2 points below it. |
+| `vegetative_dryback_target` | 5-80 | 35 | % | The dryback for a zone in vegetative steering mode, as a percentage of the peak. At a peak of 60% and a target of 10%, the dryback ends at 54% VWC. The controller uses it in P0 when the P0 extra dryback is 0, and to start P3 early. |
+| `generative_dryback_target` | 5-70 | 45 | % | The dryback for a zone in generative steering mode, as a percentage of the peak. At a peak of 60% and a target of 10%, the dryback ends at 54% VWC. The controller uses it in P0 when the P0 extra dryback is 0, and to start P3 early. |
+| `lights_on_hour` | 0-23 | 12 | hour | The hour, from 0 to 23, when the lights come on. The grow-day starts at this hour. The zones move from P3 to P0, and the daily water and shot counters of each zone reset. |
+| `lights_off_hour` | 0-23 | 0 | hour | The hour, from 0 to 23, when the lights go off. At lights-off, the controller moves each zone to P3, the overnight dryback. |
 
 ---
 
 ## 2. Numbers: per-zone overrides (`number.crop_steering_zone_N_*`)
 
 Every zone gets its own copy of the setpoints below. The engine uses the zone's value
-for that zone. (3 zones × 23 = 69 entities on a 3-zone system.)
+for that zone. (3 zones × 27 = 81 entities on a 3-zone system.)
 
 **Per-zone copies of the global setpoints:** `p0_dryback_drop_percent`,
 `p0_maximum_wait_time`, `p1_initial_shot_size`, `p1_shot_size_increment`,
-`p1_minimum_shots`, `p1_maximum_shots`, `p1_target_vwc`, `p1_time_between_shots`,
-`p2_vwc_threshold`, `p2_shot_size`, `p3_emergency_vwc_threshold`,
-`p3_emergency_shot_size`, `vegetative_dryback_target`, `generative_dryback_target`,
+`p1_minimum_shots`, `p1_maximum_shots`, `p1_rise_pts`, `p1_maximum_extra_shots`, `p1_target_vwc`,
+`p1_time_between_shots`,
+`p2_vwc_threshold`, `p2_shot_size`, `p2_time_between_shots`, `ec_min_interval`, `p3_emergency_vwc_threshold`,
+`p3_emergency_shot_size`, `p3_time_between_shots`, `vegetative_dryback_target`, `generative_dryback_target`,
 `ec_target_veg_p0` to `_p2`, `ec_target_gen_p0` to `_p2`, `field_capacity`,
 `maximum_ec` and `watchdog_hours`. Ranges match the globals above.
 
 **Per-zone only (no global equivalent):**
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `zone_N_plant_count` | 1-50 | - | - | Plants in the zone: scales total water volume. |
-| `zone_N_max_daily_volume` | 0-200 | 200 | L | Daily water budget for the zone. Top-ups and EC-correction shots stop at it, and a shot that would cross it gets only what is left; rescues (watchdog, P3 emergency, high-EC flushes) and the P1 ramp are exempt. |
+| `zone_N_plant_count` | 1-50 | 4 | - | The number of plants in this zone. The water of a shot is the shot size, times the substrate for each plant, times this number. |
+| `zone_N_p0_additional_dryback` | 0-40 | 3 on a room set up from this release, 0 on a room updated in place | % | P0 extra dryback: the dryback after lights-on before the first shot, as a percentage of the highest VWC since lights-on. At 3% and a highest VWC of 60%, P0 ends at 58.2% VWC. At `0`, P0 uses the dryback target of the steering mode. P0 also ends at the maximum wait time, or when VWC falls to the re-water point. |
+| `zone_N_max_daily_volume` | 0 to the zone's limit | 20 | L | The most water that a zone gets in one grow-day, in litres. Maintenance shots, extra ramp shots, dilution shots and P0 EC flushes stop at this limit, and the last shot gets only what is left. Ramp shots, rescue shots, watchdog shots and high-EC flushes can go past it. The limit of the setting is 4 times the substrate of the zone (plants x litres for each plant), and at least 20 L. A value already above it stays, and Repairs lists it (CS-611). |
+| `zone_N_min_daily_ml_per_plant` | 0-10000 | 0 (off) | mL | The least water that each plant gets in one grow-day, in millilitres. The controller gives it at any probe reading, from lights-on (never in P0), and spreads it so that it is complete 3 h before lights-off. The shots stop when VWC is 5 points above field capacity, and never go past the daily water limit. A new entity takes the value of the old `input_number` helper of the same name. |
 | `zone_N_substrate_volume` / `zone_N_drippers_per_plant` / `zone_N_dripper_flow_rate` | as the globals | from setup | - | Created only when setup sizes the zone itself; otherwise the room-wide value applies. |
 
 ---
@@ -107,17 +130,20 @@ for that zone. (3 zones × 23 = 69 entities on a 3-zone system.)
 ### Global (`switch.crop_steering_*`)
 | Entity | What it does |
 |---|---|
-| `room_active` | Room on/off (default on). Off = nothing is growing: no irrigation of any kind for this room, including emergency shots and the no-probe fallback schedule, no alerts, repair issues cleared. Per room: `switch.crop_steering_<prefix>room_active`. |
-| `auto_setpoints` | Auto Setpoints (default off). On = the controller may rewrite this room's per-zone VWC targets from what it has learned, (the P1 target is the zone's highest reading of the grow-day before; field capacity the higher of today's and the day before's highest readings, and when it moves the re-water threshold and rescue floor move by the same points), never while a dated plan owns the room. With Jev's Setpoints judge running, the judge moves each zone's P2 shot size and re-water threshold and the learner keeps the P1 target and field capacity: one writer per number ([JEV.md](JEV.md#who-writes-which-setpoint)). Off = it still learns and reports, and writes nothing. Per room: `switch.crop_steering_<prefix>auto_setpoints`. |
-| `system_enabled` / `auto_irrigation_enabled` | **Retired**, hidden, named "(retired)". `engine_enabled` is the one switch that stops watering. They stay for controllers from 2.24.0 or before, which hold every shot while one reads off and treat a missing one as off. A newer controller switches the room's kill switch off while one of them reads off, and says so (CS-208). |
-| `ec_stacking_enabled` | When on, the system builds EC when below target instead of diluting (push EC up intentionally). |
-| `engine_enabled` | The room's kill switch ("Watering" in the dashboard's Settings), created off. Off = the controller waters nothing in this room, and a shot already running stops within a few seconds. Created for named rooms and new default rooms; an older default room keeps the helper its setup names. |
+| `room_active` | Room on/off (default on). Tells the controller that plants grow in the room. Off: the controller gives no shot of any type in the room, rescue shots included, and sends no alerts for the room. A shot that runs stops within a few seconds. Per room: `switch.crop_steering_<prefix>room_active`. |
+| `auto_setpoints` | Auto setpoints (default off). Lets the controller change the VWC setpoints of each zone from what it learns about the zone. On: field capacity follows the highest VWC of this grow-day or the grow-day before. The peak target follows the highest VWC of the grow-day before. Each moves 1 point or less each grow-day. When field capacity moves, the re-water point moves by the same number of points. The controller never changes the rescue floor, and writes nothing while an armed grow plan controls the room. While the Setpoints judge of the AI assistant runs, it owns the P2 shot size and the re-water point. The learner owns the rest ([JEV.md](JEV.md#who-writes-which-setpoint)). Off: the controller learns and reports, but writes no setpoint. Per room: `switch.crop_steering_<prefix>auto_setpoints`. |
+| `notify_predictions` | Predictions in notifications (default on, also on an upgraded room). Adds the next step of each zone to the vitals report of the controller. The dashboard shows the same step as `Next:`. Off: the vitals report gives only the readings. A controller that cannot find this switch includes the predictions. Per room: `switch.crop_steering_<prefix>notify_predictions`. |
+| `system_enabled` / `auto_irrigation_enabled` | **Retired**, hidden, named "(retired)". The kill switch (`engine_enabled`) is the one switch that stops the water of the room. While one of these switches is off, a current controller sets the kill switch of the room to off and raises alert CS-208. A controller of version 2.24.0 or older holds every shot while one of them is off or missing. |
+| `max_run_latch` | Max-run latch: on in a room configured since it was added, off in an older room. Stops a zone when its last 3 shots in a row all ran to the maximum shot length of the room. On: the zone gets no more shots, rescue shots included, until you fix its Repairs card (CS-312). The fix adds one to the `resets` attribute of this switch, which the controller watches. Off: the Repairs card reports the zone, and the zone continues to get water. Per room: `switch.crop_steering_<prefix>max_run_latch`. |
+| `ec_stacking_enabled` | EC stacking (default off). Lets the controller move the re-water point of each zone in maintenance (P2) to steer the pore EC to the P2 EC target. On: every 30 min in P2, the re-water point moves by 1 point or less. It goes down when pore EC is below 90% of the target, and up when pore EC is above 110%. The total move is 20% of the re-water point or less, and it returns to 0 at lights-on. |
+| `engine_enabled` | The kill switch of the room ("Watering" in the Settings of the dashboard). The integration creates it as off. Off: the controller starts no shot in the room, rescue shots and test shots included, and a shot that runs stops within a few seconds. The kill switch does not disconnect the electrical power. The integration creates it for named rooms and new default rooms. An older default room uses the helper that its setup names. |
 
 ### Per-zone (`switch.crop_steering_zone_N_*`)
 | Entity | What it does |
 |---|---|
-| `zone_N_enabled` | The zone's own switch ("zone scheduling" on the dashboard). Off = the controller waters nothing in this zone, not even a rescue shot, and a shot already running in it stops within a few seconds. |
-| `zone_N_manual_override` | Absolute lockout: **nothing** opens that valve (auto, emergency, manual). For maintenance. |
+| `zone_N_enabled` | The on/off switch of one zone ("zone scheduling" on the dashboard). Off: the controller gives the zone no shot, not even a rescue shot or a test shot. A shot that runs in the zone stops within a few seconds. If the controller cannot read the switch, it holds the zone. |
+| `zone_N_manual_override` | A maintenance lockout for one zone. On: the controller gives the zone no shot of any type, rescue shots and test shots included, and stops a shot that runs. Set with this switch, the override stays on until you set it to off. Set with the `crop_steering.set_manual_override` service, it goes off after its timeout. The override does not isolate the electrical power. |
+| `zone_N_p3_dryback_hold` | P3 dryback hold (default off). Holds the overnight dryback (P3) of the zone at its dryback target. On: in P3, each time VWC falls below the peak of the grow-day less the dryback target, the zone gets a shot. The shot has the rescue shot size, and the shots are at least `p3_time_between_shots` apart. The hold is steering, so a held grow plan and the daily water limit stop it. The rescue shot still runs below the hold. |
 
 ---
 
@@ -126,17 +152,27 @@ for that zone. (3 zones × 23 = 69 entities on a 3-zone system.)
 ### Global (`select.crop_steering_*`)
 | Entity | Options | What it does |
 |---|---|---|
-| `steering_mode` | Vegetative · Generative | System-wide veg/gen bias (picks which EC + dryback targets apply). |
-| `growth_stage` | Vegetative · Generative · Transition | Current growth stage: shifts EC targets + dryback aggressiveness. |
-| `irrigation_phase` | P0 · P1 · P2 · P3 | A manual phase indicator, read by `current_phase` and `ec_ratio`. The controller keeps each zone's phase itself and does not read it. |
-| `recipe_stage` | Veg · Transition · Bulk · Ripen · Custom | Picking a stage applies its setpoints to the zones. |
-| `water_today_view` | Zone total · Per plant | How Water today reads for the room: each zone's total, or its water and daily limit divided by its plant count. The dashboard shows it that way for everyone (Settings → Appearance), and the controller's vitals notification follows it. Zone total by default. |
+| `steering_mode` | Vegetative · Generative | The steering mode of the room: Vegetative or Generative. Each zone has its own steering mode (`zone_N_steering_mode`). The controller reads the select of each zone, and the growth stage when it cannot read it. The integration uses this room select for the EC ratio sensor and for a zone with no select of its own. |
+| `growth_stage` | Vegetative · Generative · Transition | The growth stage of the room. The controller reads it only when it cannot read the steering mode of a zone. Vegetative then uses the vegetative targets, and Generative or Transition the generative targets. When the steering mode of each zone reads correctly, a change here does not change the shots. |
+| `irrigation_phase` | P0 · P1 · P2 · P3 | A manual phase marker for the room. The controller does not read it, and a change does not move a zone. The `current_phase` sensor shows it when the controller publishes no phase, and the `ec_ratio` sensor uses it to find its EC target. To move a zone, use `zone_N_set_phase`. |
+| `recipe_stage` | Veg · Transition · Bulk · Ripen · Custom | Selects a stage of the room recipe. When you select a stage, the integration writes the setpoints of that stage into the numbers of the room and of each zone. Each value stays inside the limits of its number. If the VWC setpoints of the stage put the levels of a zone out of order, the integration writes nothing and shows an error. |
+| `drainage` | unknown · flood_table · free_drain | Tells how the runoff leaves the room. The setup asks for it on its first page. `free_drain`: the controller does not watch the room for a table that does not drain (CS-310), and removes a CS-310 card that the room has. `flood_table`: the controller watches each zone for VWC that rises with no water. It holds the EC flushes and the extra ramp shots of a backed-up zone (CS-310). `unknown`: the controller watches the room as for a flood table. A room configured before this select reads `unknown`. |
+| `water_today_view` | Zone total · Per plant | Selects how the dashboard and the vitals report show the water today of each zone. Zone total (default): the litres of each zone. Per plant: the water and the daily limit of each zone divided by its plant count. The dashboard shows the choice to all users (Settings → Appearance). It changes only the display, not the shots. |
+| `substrate` | generic · rockwool · coco | Tells the controller what the room grows in. The controller reads it from the room descriptor (`engine_config`) and uses a change without a disarm. `generic` (default, also on an upgraded room): the controller runs as before. `rockwool` and `coco` set the starting VWC setpoints and dryback targets of a setting that has no value yet. With `coco`, the controller waits 60 min after a shot before it uses a pore EC reading. A value that the room already has does not change. |
+| `ai_no_touch` | Off · 1 h · Until lights-on · 24 h | Pause AI changes: starts a no-touch period for the room, for example while a person takes samples. During the period, the AI assistant asks nothing and changes nothing in the room, and the shots continue by the rules of the controller. The `no_touch_until` value of the brain panel tells when the period ends, and the `since` attribute when it started. At the end, the controller sets the select back to Off. Off by default, also on an upgraded room. |
 
 ### Per-zone (`select.crop_steering_zone_N_*`)
 | Entity | Options | What it does |
 |---|---|---|
-| `zone_N_set_phase` | Keep · P0 · P1 · P2 · P3 | Moves the zone to a phase by hand. The controller applies a pick once, within a minute, and sets it back to Keep; its own rules carry on from that phase. Today's water and shot counts stay; P1 ramps from its first shot, and P0 measures its dry-back from the moisture at the move. |
-| `zone_N_steering_mode` | Vegetative · Generative | Per-zone veg/gen bias. |
+| `zone_N_set_phase` | Keep · P0 · P1 · P2 · P3 | Moves the zone to a phase by hand. The controller applies the choice one time, within a minute, and then sets the select back to Keep. The water and the shot count of the grow-day stay. P1 starts the ramp again from its first shot, and P0 measures the dryback from the VWC at the move. After the move, the rules continue: lights-off moves the zone to P3, and lights-on moves it to P0. |
+| `zone_N_steering_mode` | Vegetative · Generative | The steering mode of the zone: Vegetative or Generative. Vegetative: the zone uses the vegetative dryback target and EC targets. Generative: the zone uses the generative dryback target and EC targets. |
+| `zone_N_vwc_method`, `zone_N_ec_method` | Median · Average · Lowest · Highest | How the zone's probes become its moisture reading, and apart its EC reading. Median by default. A probe far from the others is left out first; Lowest and Highest need three probes that agree, and with fewer the zone steers on the median and the controller raises CS-502. |
+| `ec_type_<probe>` (one per mapped EC probe, named after the probe's entity id) | unknown · pore · bulk | Tells what the EC probe measures. Pore EC is the EC of the water in the pores of the substrate. Bulk EC is the EC of the substrate and the water together, and reads lower. `unknown` (default): the probe combines with the other probes as before. A zone never combines pore EC and bulk EC readings. It steers on its pore probes, and on its bulk probes only while no pore probe reports. The controller then raises alert CS-504. |
+
+### Per-zone buttons (`button.crop_steering_zone_N_*`)
+| Entity | What it does |
+|---|---|
+| `zone_N_test_shot` | Asks the controller for a 10 s test shot in the zone, to check the water delivery. The controller acts at its next pass, within a minute, on a press less than 10 min old. The test shot goes through each check of a normal shot, but a held grow plan does not stop it. The `crop_steering.test_shot` service presses it by room ID. |
 
 ---
 
@@ -145,52 +181,62 @@ for that zone. (3 zones × 23 = 69 entities on a 3-zone system.)
 ### System (`sensor.crop_steering_*`)
 | Entity | Unit | What it reports |
 |---|---|---|
-| `activity_log` | - | Rolling human-readable feed (last ~40 watered/blocked/phase events); full feed in the `feed` attribute. |
-| `app_current_phase` | - | Published by the controller: each zone's phase (e.g. `Z1:P3, Z2:P3, Z3:P3`). |
-| `current_phase` | - | The same, as the integration shows it: `app_current_phase`, else the `irrigation_phase` select. |
-| `current_decision` | - | What the controller decided this cycle. |
-| `app_status` | - | The controller's state for the room (`active` / `safe_idle` / …). |
-| `system_safety_status` | - | `safe` / fault. |
-| `ai_heartbeat` | - | Self-correction loop status (`healthy` / anomaly). Attribute `controller_version`: the controller app that is actually running (shown in the dashboard sidebar beside the descriptor's `integration_version`). |
-| `engine_config` | - | The room's descriptor: what the controller reads to find and drive the room (valves, pump, main line, kill switch, zones, `setup_revision`). Attribute `integration_version`: the integration Home Assistant actually loaded. Attribute `entry_id`: WHICH room this is. A room that is deleted and set up again keeps its entity ids and starts its revision again at 1, so this is how a running controller tells it from the room it already adopted; it then adopts the new setup through the usual gate (kill switch and hardware OFF). Neither attribute enters the setup fingerprint. |
-| `configured_avg_vwc` / `configured_avg_ec` | % / mS/cm | Means across every mapped zone probe. |
-| `ec_ratio` | - | Current EC ÷ target EC. |
-| `p1_shot_duration_seconds` / `p2_shot_duration_seconds` / `p3_shot_duration_seconds` | s | Computed valve seconds for each shot type. |
-| `p2_vwc_threshold_adjusted` | % | P2 threshold after EC-ratio adjustment. |
-| `stock_low` | - | How many of the room's stock tanks are at or below their low mark (0 when none). Attribute `tanks`: each tank's `id`, `pump` (the id of the dosing pump linked to it, or null), `name`, `level_l`, `capacity_l`, `percent`, `low_l`, `dose_ml` (what one batch takes now), `batches_left` and `low`. Attribute `last_batch`: the newest batch counted. The tanks are kept by the integration (Crop Steering → Stock tanks, or the `stock_*` services); a room with a tank last-fill entity mapped loses one batch's dose from every tank at each newer fill time, except a tank linked to a dosing pump: that one loses what the pump actually runs, whoever starts it ([DOSING.md](DOSING.md), Stock tanks). Automate a phone alert on it going above 0. |
-| `dosing_config` | - | The room's batch-tank dosing setup, which the controller app reads every 2 s ([DOSING.md](DOSING.md)). State: the setup's revision (unknown while the stored setup can't be read). Attributes `pumps`, `batch` and `request`, the one request left for the controller. Kept by the integration (Equipment › Dosing, or the `dosing_*` services), which never switches, presses or sets anything itself. |
-| `notify_config` | - | Who gets which alerts on the phones ([NOTIFICATIONS.md](NOTIFICATIONS.md)): one for the whole site however many rooms, so never prefixed. State: the setup's revision (`unavailable`, with an `error` attribute, while the stored setup can't be read). Attributes `recipients` (how many phones are set up: with none, the controller app pushes every alert to its own `notify_service` option as it always did) and `idle_hours` (after how many hours without a shot a room with its lights on is reported, CS-209). Kept by the integration (Settings & help › Notifications, or the `notify_*` services), which writes it with the first room that loads and removes it with the last: it is not a registry entity. |
-| `dosing` | - | Published by the controller: what the room's dosing is doing ([DOSING.md](DOSING.md), Status). State `idle` / `dosing` / `batch`, or `unavailable` while the room's dosing setup can't be read. Attributes `pumps` (each pump's state, flow, the dose running and its last dose), `batch` (the step, each step's state, the result), `handled` / `handled_result` (the last request taken and what came of it), `history` (the last 20 doses and batches) and `updated_at` (its last publish, at least once a minute). Not published for a room whose integration has no `dosing_config`. |
+| `activity_log` | - | Shows the newest event of the controller: a shot, a hold or a phase change. The `feed` attribute gives the recent events. |
+| `app_current_phase` | - | Shows the phase of each zone, as the controller keeps it. Example: `Z1:P3, Z2:P3, Z3:P3`. |
+| `current_phase` | - | Shows the phase of the room as the integration sees it. It copies `app_current_phase` from the controller, or the `irrigation_phase` select when the controller publishes nothing. |
+| `current_decision` | - | Shows what the controller decided in its last pass for the room: the first shot, else the first hold. The `fired` and `blocked` attributes give all zones. |
+| `app_status` | - | Shows the state of the controller for the room: `safe_idle` (no shot runs), `irrigating` (a shot runs), `error` (a hardware fault or a fail-closed hold stops the room) or `room_off`. |
+| `system_safety_status` | - | Shows the worst safety label of the zones of the room: `safe`, `warning` or `unsafe`. The attributes give the number of zones in each group. |
+| `ai_heartbeat` | - | Shows that the controller runs. The controller writes `healthy` at each pass, and `stopped` when the app stops, updates or restarts (attribute `stopped_at`). Attribute `controller_version`: the version of the controller app that runs. The dashboard sidebar shows it next to the `integration_version` of the descriptor. |
+| `engine_config` | - | The descriptor of the room. The controller reads it to find and drive the valves, the pump, the main line, the kill switch and the zones (`setup_revision`). Attribute `integration_version`: the integration that Home Assistant loaded. Attribute `entry_id`: tells one room from a room that a person deleted and configured again, which starts its revision again at 1. Neither attribute enters the setup fingerprint. |
+| `configured_avg_vwc` / `configured_avg_ec` | % / mS/cm | Show the mean VWC and the mean EC of all the probes that the room maps, in all zones. The controller does not steer on them. |
+| `ec_ratio` | - | Shows the mean EC of all zone probes divided by the EC target of the room. The integration makes it for display, and the controller does not read it. The target comes from the `irrigation_phase` select and the steering mode of the room. |
+| `p1_shot_duration_seconds` / `p2_shot_duration_seconds` / `p3_shot_duration_seconds` | s | Show how many seconds the first ramp shot, a maintenance shot and a rescue shot run. The integration calculates them from the substrate volume, the shot size, the drippers per plant and the dripper flow. The values are in whole seconds, at least 5 s and not more than the maximum shot length of the room. Each shows the longest zone, and the `zones` attribute gives each zone. |
+| `p2_vwc_threshold_adjusted` | % | Shows the re-water point of the room with a fixed change of 5 points for the EC ratio (`p2_ec_high_threshold`, `p2_ec_low_threshold`). The integration makes it for display, and the controller does not read it. The controller uses its own EC steer, which `ec_stacking_enabled` controls. |
+| `stock_low` | - | Shows how many stock tanks of the room are at or below their low mark (0 when no tank is low). Attribute `tanks`: each tank's `id`, `pump` (the ID of the dosing pump linked to it, or null), `name`, `level_l`, `capacity_l`, `percent`, `low_l`, `dose_ml` (what one batch takes now), `batches_left` and `low`. Attribute `last_batch`: the newest batch that the integration counted. The integration keeps the tanks (Crop Steering → Stock tanks, or the `stock_*` services; [DOSING.md](DOSING.md), Stock tanks). Make an automation that sends a phone alert when the value goes above 0. |
+| `dosing_config` | - | The batch-tank dosing setup of the room, which the controller reads ([DOSING.md](DOSING.md)). The state is the revision of the setup, or `unknown` while the integration cannot read the stored setup. Attributes `pumps`, `batch` and `request` (the one request that waits for the controller). The integration keeps it (Equipment › Dosing, or the `dosing_*` services), and never starts a pump itself. |
+| `brain_questions` | - | Keeps the last five questions of the room to the AI assistant, from Ask why or the `brain_ask` service. The state is the number of questions kept. Attribute `questions`: each one's `id`, `question` (300 characters or less), `zone` (or null for the room), `at` and `by`. The integration only keeps the questions, and the controller asks the AI assistant. |
+| `brain_answers` | - | Shows the answers of the AI assistant to `brain_questions`, the last five. An answer never changes a setting. State: `asking` while a question waits, `answered`, or `none`. Attribute `answers`: each one's `id` (the ID of the question), `question`, `zone`, `asked_at`, `answered_at`, `answer`, `grounded_in` and `cannot_answer`; also `pending`, `asked_today` and `daily_limit` (20 for each room each day). Only the `claude_haiku` AI assistant answers. With a different `brain_provider`, each answer gives the reason. |
+| `notify_config` | - | Shows who gets which alerts on the phones, for the whole site ([NOTIFICATIONS.md](NOTIFICATIONS.md)), so it has no room prefix. State: the revision of the setup (`unavailable`, with an `error` attribute, while the integration cannot read the stored setup). Attribute `recipients`: the number of phones. With no phones, the controller sends each alert to its own `notify_service` option. Attribute `idle_hours`: the hours with the lights on and no shot before alert CS-209. The integration keeps it (Settings & help › Notifications, or the `notify_*` services). It is not a registry entity. |
+| `dosing` | - | Shows what the dosing of the room does: `idle`, `dosing` or `batch`, or `unavailable` while the controller cannot read the dosing setup ([DOSING.md](DOSING.md), Status). The controller publishes it when it changes, and at least one time each minute (`updated_at`). Attributes `pumps`, `batch`, `handled` / `handled_result` (the last request and its result) and `history` (the recent doses and batches). Not published for a room whose integration has no `dosing_config`. |
+| `tank_level` | % | Shows the level of the tank that the room waters from, in percent ([USER_GUIDE.md](USER_GUIDE.md), Tank level for the controller). The controller calculates it from the tank distance sensor and the full and empty distances of the room. It is `unknown` with no sensor mapped, with no reading, or with a stuck sensor. Attributes `stuck`, `litres_per_pct` (learned, null until the level has fallen 5% one time with shots counted), `low` (the low float), `below_minimum`, `over_full` and `minimum_pct` (8) ([USER_GUIDE.md](USER_GUIDE.md), Reservoir minimum). Not published for a room with no tank level mapped. |
 
 The controller also publishes `sensor.f2_control_vitals`: the time of its last vitals report, with the report in the `vitals` attribute.
 
 ### Per-zone (`sensor.crop_steering_zone_N_*`)
 | Entity | Unit | What it reports |
 |---|---|---|
-| `vwc_zone_N` | % | Fused substrate moisture (`zone_N_vwc` on older installs): the median of the zone's probes (the mean of two), carried across a probe dropping out without a step. Attributes: `probes` (how many are mapped), `used`, `excluded` (each set-aside probe with `no reading`, `out of range` or `not reporting`), `spread` (highest minus lowest probe used). |
-| `ec_zone_N` | mS/cm | Fused pore-water EC (`zone_N_ec` on older installs), combined the same way, with the same attributes. |
-| `zone_N_phase` | - | The zone's current phase (P0-P3). |
-| `zone_N_auto_setpoints` | - | Published by the controller: `off` / `learning` / `tracking` / `frozen`. Attributes: `learned_peak`, `gain`, `day_rate`, `night_rate`, `p1_outcome` (`pending` / `reached` / `short` / `plateau` / `suspect`), `hold_days`, `frozen_reason`, `last_change`, `jev` (`disabled` / `ok` / `unavailable`), `jev_last` (the judge's latest hourly P2 answer), `jev_changed_today`, `working_peak_adjust`, `managed` (every number entity an automatic writer may rewrite on this zone: the learner's, plus the Setpoints judge's P2 shot size and re-water threshold while it runs, or the P2 shot size while the old hourly P2 check is configured), `managed_by` (each of those entities and the writer that owns it). |
-| `zone_N_status` / `_status_app` | - | The controller's label for the zone, published on `zone_N_status_app` with a `reason` attribute and shown by `zone_N_status`, its only writer: `Drying back` / `Ramping` / `Optimal` / `Overnight dryback` (P0-P3, holding), `Flushing` / `Refilling` / `Topping up` / `Emergency` (watering), `Blocked: <why>`, `Blocked — EC/cap`, `Probe dead — copying`, `Room off`. `Controller not reporting` when the controller has not reported for 10 minutes. |
-| `zone_N_waiting_for_app` | - | Published by the controller each minute: what would move the zone next, by the engine's own rules and numbers (`crop_steering_engine.waiting_for`), shown as the zone's "Next:" on the dashboard. State: the phase the list is for (`none`, with an empty list, while the zone has no usable probe or the room is off). Attribute `conditions`, one item per rule: `rule` (`p0_timeout` / `p0_bypass` / `p0_dryback`, `p1_ramp` / `p1_done` / `p1_max_shots`, `p2_topup` / `p2_dilute` / `lights_off`, `p3_emergency` / `lights_on`), `shot` (it fires a shot), `to` (the phase it moves to), then a reading test (`metric` `vwc` or `ec`, `op`, `value`, `now`) or a wait (`in_min`, minutes after `at`); `p1_done` adds `shots_left`, `ec_max`, `ec_now`. Attribute `at`: when it was worked out. It lists the engine's routine rules, not a forecast: a held plan leaves out the shots it stops; the EC flushes, the watchdog, the daily minimum and P2's early move to P3 in the last three hours before lights-off are not listed; a gate or switch that holds watering is in `zone_N_status`. |
-| `zone_N_safety_status` | - | `safe` / fault. |
-| `zone_N_daily_water_usage` / `_daily_water_app` | L | Water today (resets at lights-on). |
-| `zone_N_weekly_water_usage` / `_weekly_water_app` | L | Rolling 7-day water. |
-| `zone_N_irrigation_count_today` / `_irrigation_count_app` | - | Shot count today. |
-| `zone_N_last_irrigation` / `_last_irrigation_app` | - | Last shot timestamp. |
-| `zone_N_vmax_detected` | % | Advisory: the highest moisture the zone reached in its P1 wet-up, with a `confidence` attribute. Nothing tunes from it. |
-| `prediction_zone_N_next_irrigation_hours` | h | Hours to the next P2 shot, published only when it can be worked out. |
+| `vwc_zone_N` | % | Shows the VWC of the zone, made from its probes by the method of the zone (`zone_N_vwc` on older installs). The controller steers the zone on this reading. When a probe stops, the reading does not step. Attributes: `probes` (the number mapped), `used`, `excluded` (each probe left out, with `no reading`, `out of range` or `not reporting`) and `spread` (the highest probe less the lowest probe used). |
+| `ec_zone_N` | mS/cm | Shows the pore EC of the zone (`zone_N_ec` on older installs). The integration makes it from the probes in the same way as the zone VWC, with the same attributes. A zone with pore EC and bulk EC probes never combines the two. |
+| `zone_N_phase` | - | Shows the phase of the zone, P0 to P3, as the controller keeps it. The `reason` attribute gives the reason of the last decision. |
+| `zone_N_auto_setpoints` | - | Shows what the Auto setpoints learner does for the zone: `off`, `learning`, `tracking` or `frozen` (with `frozen_reason`). Attributes: `learned_peak`, `gain`, `day_rate`, `night_rate`, `p1_outcome` (`pending` / `reached` / `short` / `plateau` / `suspect`), `hold_days`, `frozen_reason`, `last_change`, `working_peak_adjust`, `managed` (each number that an automatic writer can change on this zone) and `managed_by` (the writer of each). The attributes `jev` (always `disabled`), `jev_last` and `jev_changed_today` (always empty) stay for one release. |
+| `zone_N_status` / `_status_app` | - | Show the label that the controller gives the zone, with the reason in the `reason` attribute. The controller publishes `zone_N_status_app`, and `zone_N_status` copies it. `Drying back`, `Ramping`, `Optimal` and `Overnight dryback` show a zone that waits in P0, P1, P2 or P3. `Flushing`, `Refilling`, `Topping up` and `Emergency` show a shot. `Blocked: <why>` and `Blocked — EC/cap` show what holds the zone. `Probe dead — copying` shows a zone with no usable probe. `Room off` shows that the room is off. `Controller not reporting` shows no report from the controller for 10 min. |
+| `zone_N_waiting_for_app` | - | Published by the controller each minute: what would move the zone next, by the engine's own rules and numbers (`crop_steering_engine.waiting_for`), shown as the zone's "Next:" on the dashboard. State: the phase the list is for (`none`, with an empty list, while the zone has no usable probe or the room is off). Attribute `conditions`, one item per rule: `rule` (`p0_timeout` / `p0_bypass` / `p0_dryback`, `p1_ramp` / `p1_done` / `p1_max_shots`, `p2_topup` / `p2_dilute` / `lights_off`, `p3_emergency` / `p3_hold` / `lights_on`), `shot` (it fires a shot), `to` (the phase it moves to), then a reading test (`metric` `vwc` or `ec`, `op`, `value`, `now`) or a wait (`in_min`, minutes after `at`); `p1_done` adds `shots_left`, `ec_max`, `ec_now`; `p0_dryback` adds `dryback` (the % it waits for) and `peak` (the highest reading since lights-on it is measured from); `p2_topup` carries `in_min` too while a P2 time between shots is set; `p3_hold` (only while the zone's P3 Dryback Hold is on) adds `dryback`. Attribute `at`: when it was worked out. It lists the engine's routine rules, not a forecast: a held plan leaves out the shots it stops; the EC flushes, the watchdog, the daily minimum and P2's early move to P3 in the last three hours before lights-off are not listed; a gate or switch that holds watering is in `zone_N_status`. |
+| `zone_N_safety_status` | - | Shows the safety label of the zone from its VWC and its pore EC: `safe`, `approaching_saturation`, `over_saturated`, `approaching_ec_limit`, `ec_limit_exceeded` or `ec_unknown`. |
+| `zone_N_daily_water_usage` / `_daily_water_app` | L | Show the litres that the zone got in this grow-day. The value returns to 0 at lights-on, not at midnight. |
+| `zone_N_weekly_water_usage` / `_weekly_water_app` | L | Show the litres that the zone got in the last seven grow-days. The `coverage` and `history_complete` attributes show if the history is complete. |
+| `zone_N_irrigation_count_today` / `_irrigation_count_app` | - | Show the number of shots that the zone got in this grow-day. The count returns to 0 at lights-on. |
+| `zone_N_last_irrigation` / `_last_irrigation_app` | - | Show the time of the last shot of the zone. |
+| `zone_N_vmax_detected` | % | Shows the highest VWC that the zone reached in its ramp (P1), with a `confidence` attribute. It is advice only, and no setting changes from it. |
+| `prediction_zone_N_next_irrigation_hours` | h | Shows the hours until the next maintenance shot of the zone, from the VWC, the re-water point and the dryback rate. The controller publishes it only in P2, when it knows the dryback rate. |
 
 > Note: a few `…_app` sensors are engine-published mirrors of the integration sensors;
 > prefer the engine `…_app` value when the two differ.
 
 ---
 
-## 6. Hardware (your own switches/sensors: mapped in Rooms & setup, not created here)
+## 6. Hardware (your own switches/sensors: mapped in Rooms and setup, not created here)
 
 The pump, mainline solenoid, per-zone valve switches, and the raw VWC/EC + source-water
 sensors are **your** existing HA entities. Map them in the Crop Steering sidebar under
-**Rooms & setup**: the controller drives what the room's setup maps, and with nothing mapped
+**Rooms and setup**: the controller drives what the room's setup maps, and with nothing mapped
 it holds every zone and says so. (The controller also reads a `hardware` map from its options
 file, for tests and hand-built development setups only: the app's Configuration tab doesn't
 offer it, and Supervisor rejects it as an unknown option.)
+
+The pump, main line and each zone valve can be a `switch` or an `input_boolean` (switched with
+`turn_on` / `turn_off`, read back `on` / `off`) or a `valve` (`valve.open_valve` /
+`valve.close_valve`, read back `open` / `closed`). Every open, close and read-back goes through one
+table in the controller (`ACTUATORS`), so a valve that does not read `closed` after a shot latches
+the same hardware hold (CS-301) a switch that does not read `off` does. Setup refuses any other
+domain; one mapped by hand holds its zone with CS-313 and is never sent a command.

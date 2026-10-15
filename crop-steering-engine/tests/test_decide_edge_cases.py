@@ -40,6 +40,7 @@ from crop_steering_engine import (
     system_safety_status,
     zone_status_label,
 )
+from crop_steering_engine.core import SAFETY_HOLD_MIN
 
 
 def P(**kw):
@@ -285,8 +286,8 @@ def test_f5b_p2_dilute_tier_gate():
 def test_f6_p1_at_its_ceiling_fires_its_extra_shot_never_an_ec_flush():
     base = dict(p1_target=60, field_capacity=70, ec_target_p1=5, max_ec=12)
     # (a) non-dilutive feed, (b) saltier feed than the slab, (c) slab full with dilutive feed,
-    # (c') a table that is not draining, (d) dilutive feed + slab room: the same extra shot, staying P1
-    for vwc, feed_ec, backed_up in ((66, 9, False), (66, 10, False), (69, 3, False), (69, 3, True), (66, 3, False)):
+    # (d) dilutive feed + slab room: the same extra shot, staying P1. (c') a table that is not draining gets none.
+    for vwc, feed_ec, backed_up in ((66, 9, False), (66, 10, False), (69, 3, False), (66, 3, False)):
         r = decide(
             S(phase="P1", vwc=vwc, ec=8, ec_smooth=8, feed_ec=feed_ec, minutes_since_shot=20, backed_up=backed_up),
             P(**base),
@@ -294,6 +295,8 @@ def test_f6_p1_at_its_ceiling_fires_its_extra_shot_never_an_ec_flush():
         assert r[0] == "P1" and r[2] is True and r[4].kind == "p1_extra"
         assert "flush" not in r[4] and "runoff" not in r[4]
         assert r[3] == 4.0  # sized like the ramp: the first 2.0 shot, 2x for pore EC 8 against a target of 5
+    held = decide(S(phase="P1", vwc=69, ec=8, ec_smooth=8, feed_ec=3, minutes_since_shot=20, backed_up=True), P(**base))
+    assert held[0] == "P1" and held[2] is False and held[4].kind == "hold_backed_up"
     # (e) the VWC-ramp shot (vwc < ceiling) still fires unconditionally even with non-dilutive feed
     r = decide(
         S(phase="P1", vwc=50, ec=8, ec_smooth=8, feed_ec=10, minutes_since_shot=20),
@@ -676,6 +679,53 @@ def test_zone_safety_status():
     assert (
         zone_safety_status(None, 9.5, 70, 9) == "ec_limit_exceeded"
     )  # vwc dead, ec over
+
+
+def _shown(readings):
+    """The labels a zone shows, one reading a minute, each fed the label before it and its age."""
+    shown, prev, since = [], None, 0
+    for minute, (vwc, ec) in enumerate(readings):
+        label = zone_safety_status(vwc, ec, 70, 9, prev, None if prev is None else minute - since)
+        if label != prev:
+            prev, since = label, minute
+        shown.append(label)
+    return shown
+
+
+def _changes(shown):
+    return sum(1 for a, b in zip(shown, shown[1:]) if a != b)
+
+
+def test_a_reading_jittering_on_a_threshold_gives_one_change_not_many():
+    for jitter in (
+        [(70.1, 3), (69.9, 3)] * 15,  # field capacity
+        [(65.05, 3), (64.95, 3)] * 15,  # 5 points under it
+        [(50, 9.05), (50, 8.95)] * 15,  # the EC limit
+        [(50, 8.05), (50, 7.95)] * 15,  # 1 mS/cm under it
+    ):
+        jitter = [(50, 3)] + jitter  # from a safe zone
+        shown = _shown(jitter)
+        assert _changes(shown) == 1, shown
+        assert [zone_safety_status(v, e, 70, 9) for v, e in jitter] != shown  # it used to flap
+
+
+def test_the_thresholds_do_not_move():
+    assert _shown([(65, 3), (70, 3)]) == ["approaching_saturation", "over_saturated"]
+    assert _shown([(50, 3), (50, 8)]) == ["safe", "approaching_ec_limit"]
+    assert _shown([(50, 3), (64.99, 3)]) == ["safe", "safe"]
+    assert _shown([(50, 3), (50, 9)]) == ["safe", "ec_limit_exceeded"]
+    assert zone_safety_status(70, 3, 70, 9, "safe", 0) == "over_saturated"  # worse is shown at once
+
+
+def test_a_label_clears_past_its_band_once_held_long_enough():
+    after = _shown([(70, 3)] + [(69.5, 3)] * 8 + [(68.9, 3)] * 8)
+    assert after[:9] == ["over_saturated"] * 9  # inside the band: held
+    assert after[9:] == ["approaching_saturation"] * 8  # 1 point back past it: clears
+    quick = _shown([(70, 3), (60, 3), (60, 3), (60, 3), (60, 3), (60, 3), (60, 3)])
+    assert quick == ["over_saturated"] * 5 + ["safe"] * 2  # well clear, but only after the hold
+    assert zone_safety_status(60, 3, 70, 9, "over_saturated", SAFETY_HOLD_MIN) == "safe"
+    assert zone_safety_status(None, None, 70, 9, "over_saturated", 1) == "over_saturated"
+    assert zone_safety_status(None, None, 70, 9, "over_saturated", SAFETY_HOLD_MIN) == "ec_unknown"
 
 
 def test_system_safety_status():

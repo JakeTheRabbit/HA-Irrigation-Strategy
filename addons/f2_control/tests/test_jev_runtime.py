@@ -90,12 +90,15 @@ def test_p1_hands_over_only_near_the_ceiling_with_the_minimum_shots():
 
 
 def test_p3_early_only_in_the_last_three_hours_and_above_the_floor():
-    early = K.ctx("P2", s=K.snap(hours_to_lights_off=5.0, vwc=34.0))
-    close = K.ctx("P2", s=K.snap(hours_to_lights_off=2.0, vwc=27.0), p=K.params(p3_emergency_floor=25.0))
-    ok = K.ctx("P2", s=K.snap(hours_to_lights_off=2.0, vwc=34.0))
+    early = K.ctx("P2", s=K.snap(hours_to_lights_off=5.0, vwc=34.0), steering="generative")
+    close = K.ctx("P2", s=K.snap(hours_to_lights_off=2.0, vwc=27.0), p=K.params(p3_emergency_floor=25.0),
+                  steering="generative")
+    ok = K.ctx("P2", s=K.snap(hours_to_lights_off=2.0, vwc=34.0), steering="generative")
+    unset = K.ctx("P2", s=K.snap(hours_to_lights_off=2.0, vwc=34.0))
     assert not admit(_d("advance", "P3", early), early)[0]
     assert not admit(_d("advance", "P3", close), close)[0]
     assert admit(_d("advance", "P3", ok), ok)[0]
+    assert not admit(_d("advance", "P3", unset), unset)[0]  # no steering mode set: advice only
 
 
 def test_p0_waits_for_half_the_dryback_or_a_quarter_of_the_wait():
@@ -247,9 +250,9 @@ def test_any_one_jev_file_in_the_state_folder_starts_jev_on_cloudflare_alone(tmp
 def test_an_old_options_file_keeps_its_budget_and_takes_the_new_defaults():
     import jev_bridge
 
-    f2_3_8_0 = {"typesafe_api_key": "apikey_x", "jev_enabled": True, "jev_judges": "all",
+    options_3_8_0 = {"typesafe_api_key": "apikey_x", "jev_enabled": True, "jev_judges": "all",
                 "jev_daily_calls": 2000, "jev_flower_start": "", "jev_flower_days": 56}
-    brain = jev_bridge.build(f2_3_8_0, ("", "", ""), "/tmp/state.json", lambda *a: None)
+    brain = jev_bridge.build(options_3_8_0, ("", "", ""), "/tmp/state.json", lambda *a: None)
     assert brain.routes == ["TypeSafe"] and brain.asker.daily_budget == 2000
     assert (brain.reask_max, brain.unsure_below, brain.strict_after, brain.strict_prob) == (2, 0.7, 3, 0.8)
     assert (brain.asker.warn_pct, brain.asker.transport.tries) == (80, 3)

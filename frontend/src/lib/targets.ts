@@ -32,7 +32,7 @@ export const TARGET_GROUPS: readonly TargetGroup[] = [
   },
   {
     phase: "P1",
-    title: "P1 · Ramp-up",
+    title: "P1 · Ramp",
     rows: [
       { key: "p1_target_vwc", label: "Peak target", unit: "%" },
       { key: "p1_initial_shot_size", label: "First shot", unit: "%" },
@@ -56,7 +56,7 @@ export const TARGET_GROUPS: readonly TargetGroup[] = [
     title: "P3 · Overnight dryback",
     rows: [
       { key: "dryback_target", label: "Dryback target", unit: "% of peak" },
-      { key: "p3_emergency_vwc_threshold", label: "Rescue level", unit: "%" },
+      { key: "p3_emergency_vwc_threshold", label: "Rescue floor", unit: "%" },
       { key: "p3_emergency_shot_size", label: "Rescue shot", unit: "%" },
     ],
   },
@@ -72,5 +72,35 @@ export const SETUP_GROUPS: readonly string[] = ["Substrate", "Hardware sizing", 
 export function jevChip(setpoints: JevSetpoints | null, key: string, unit: string): string | null {
   if (!setpoints?.managed) return null;
   const range = setpoints.range[key as JevSetpointKey];
-  return range ? `Jev · ${rangeText(range)}${unit ? ` ${unit}` : ""}` : null;
+  return range ? `AI assistant · ${rangeText(range)}${unit ? ` ${unit}` : ""}` : null;
+}
+
+/** What a steering mode does, in one sentence under the select: the overnight dryback it asks for
+ * (the mode's own target, as the zone has it) and what it does to the plant. */
+export function steeringConsequence(
+  mode: "Vegetative" | "Generative",
+  dryback: number | undefined,
+): string {
+  const down =
+    dryback === undefined ? "" : ` (${rangeText([dryback, dryback])} % down from the peak)`;
+  return mode === "Generative"
+    ? `Generative: drier nights${down} and pore EC allowed to build. It pushes flowering; watch the leaf tips for burn as pore EC climbs.`
+    : `Vegetative: wetter nights${down} and pore EC kept lower. It pushes leaf and stem growth; use it early or to recover stressed plants.`;
+}
+
+/** Where an armed grow plan puts a zone's steering today, from the plan's own snapshot: its grow
+ * day and its bias (0 = vegetative, 100 = generative). Null when the plan has no active day for it. */
+export function planSteering(snapshot: unknown, zoneId: number): string | null {
+  const zones = (snapshot as { zones?: unknown } | null)?.zones;
+  const entry = Array.isArray(zones)
+    ? (zones.find(
+        (item) =>
+          !!item && typeof item === "object" && (item as { zone_id?: unknown }).zone_id === zoneId,
+      ) as { status?: unknown; day?: unknown; bias?: unknown } | undefined)
+    : undefined;
+  if (entry?.status !== "active" || typeof entry.day !== "number" || entry.day < 1) return null;
+  if (typeof entry.bias !== "number" || !Number.isFinite(entry.bias)) return null;
+  const bias = Math.round(entry.bias);
+  const lean = bias > 50 ? "Generative" : bias < 50 ? "Vegetative" : "Balanced";
+  return `week ${Math.floor((entry.day - 1) / 7) + 1}: ${lean}, ${bias} of 100`;
 }

@@ -277,5 +277,26 @@ class TestEdgeCases:
         assert result == 723.2
 
 
+class TestShotAsTheControllerRunsIt:
+    """Each plant's shot goes through its own drippers, within the room's shot limits."""
+
+    def test_drippers_per_plant_share_the_shot(self):
+        # 2% of 11.4 L through two 3.8 L/hr drippers: 108 s, not the 216 one would take.
+        result = ShotCalculator.calculate_shot_duration(
+            dripper_flow=3.8, substrate_vol=11.4, shot_size=2.0, drippers_per_plant=2
+        )
+        assert result == 108.0
+
+    def test_whole_seconds_within_the_minimum_and_the_room_limit(self):
+        assert ShotCalculator.capped_shot_seconds(108.9, 900) == 108
+        assert ShotCalculator.capped_shot_seconds(540.0, 60) == 60
+        assert ShotCalculator.capped_shot_seconds(2.0, 900) == 5
+
+    def test_a_limit_that_is_not_one_is_not_applied(self):
+        assert ShotCalculator.capped_shot_seconds(540.0, None) == 540
+        assert ShotCalculator.capped_shot_seconds(540.0, 3) == 540
+        assert ShotCalculator.capped_shot_seconds(540.0, float("nan")) == 540
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

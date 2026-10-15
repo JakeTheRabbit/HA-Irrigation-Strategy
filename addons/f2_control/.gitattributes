@@ -1,0 +1,2 @@
+# The doctrine build compares the controller's copy byte for byte, so it keeps LF line endings on every checkout.
+f2_control/doctrine/** text eol=lf

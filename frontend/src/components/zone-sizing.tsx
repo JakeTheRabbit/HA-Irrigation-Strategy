@@ -2,13 +2,14 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UiTip } from "@/components/info-tip";
 import { findSession } from "@/lib/client";
 import { catchTest } from "@/lib/catch-test";
 import {
   SUBSTRATE_PRESETS,
   SUBSTRATE_PRESET_GROUPS,
-  matchPreset,
   presetLabel,
+  shownPreset,
 } from "@/lib/substrate-presets";
 import {
   SIZING_BOUNDS,
@@ -71,7 +72,7 @@ export function useSizingUnits(): SizingUnits {
 
 export function SizingUnitPickers({ units, disabled }: { units: SizingUnits; disabled: boolean }) {
   return (
-    <div className="workspace-form-grid sizing-units" role="group" aria-label="Sizing units">
+    <div className="workspace-form-grid sizing-units" role="group" aria-label="Size units">
       {(
         [
           ["volume", "Pot volume unit"],
@@ -171,16 +172,21 @@ export function SubstratePresetPicker({
   disabled: boolean;
   onPick: (litres: number) => void;
 }) {
+  const [picked, setPicked] = useState<string | null>(null);
   return (
     <div>
-      <Label htmlFor={id}>Substrate preset</Label>
+      <span className="label-with-tip">
+        <Label htmlFor={id}>Substrate preset</Label>
+        <UiTip copyKey="substrate preset" />
+      </span>
       <select
         id={id}
         disabled={disabled}
-        value={matchPreset(litres)?.id ?? "custom"}
+        value={shownPreset(picked, litres)}
         aria-describedby={id + "-note"}
         onChange={(event) => {
           const preset = SUBSTRATE_PRESETS.find((item) => item.id === event.target.value);
+          setPicked(preset?.id ?? null);
           if (preset) onPick(preset.litres);
           else document.getElementById(volumeFieldId)?.focus();
         }}
@@ -224,7 +230,8 @@ export function CatchTestCalculator({
     !!result && result.flow === null && (result.field === field || result.field === "both");
   return (
     <details id={id} className="catch-test">
-      <summary>Work out dripper flow from a catch test</summary>
+      <summary>Calculate dripper flow</summary>
+      <UiTip copyKey="work out dripper flow from a catch test" />
       <p className="small muted">
         Run one dripper into a measuring cup, time it, then enter what that one dripper delivered.
         This calculator only does the arithmetic: it never opens a valve or runs a pump, so start
@@ -232,7 +239,10 @@ export function CatchTestCalculator({
       </p>
       <div className="workspace-form-grid">
         <div>
-          <Label htmlFor={id + "-seconds"}>Run time · seconds</Label>
+          <span className="label-with-tip">
+            <Label htmlFor={id + "-seconds"}>Run time · s</Label>
+            <UiTip copyKey="run time · seconds" />
+          </span>
           <Input
             id={id + "-seconds"}
             type="number"
@@ -247,7 +257,10 @@ export function CatchTestCalculator({
           />
         </div>
         <div>
-          <Label htmlFor={id + "-ml"}>Water caught from one dripper · mL</Label>
+          <span className="label-with-tip">
+            <Label htmlFor={id + "-ml"}>Water from one dripper · mL</Label>
+            <UiTip copyKey="water caught from one dripper · ml" />
+          </span>
           <Input
             id={id + "-ml"}
             type="number"

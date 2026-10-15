@@ -1,24 +1,26 @@
-"""Crop-steering doctrine for Jev: the owner's GrowLabs wiki and Athena's handbook, restated as rules a judge can quote.
+"""Crop-steering doctrine for Jev: the GrowLabs wiki and Athena's handbook, restated as rules a judge can quote.
 
 Jev answers typed questions about the facts it is given, but it knows no crop-steering doctrine and does no
 arithmetic, so every judge writes the doctrine into its question. This module keeps that doctrine in one
-place: Ben Isdale's GrowLabs wiki pages, then Athena's Grow Guide Handbook (SOURCES), each point restated as one
+place: the GrowLabs wiki pages, then Athena's Grow Guide Handbook (SOURCES), each point restated as one
 plain sentence tagged with where it comes from. A judge appends doctrine("ramp", "probe") to a question's
 instructions.
 
-True water content vs probe readings: the wiki's moisture numbers (a ~92 % full mark, a 55-92 % working band,
-a 25-30 % recovery floor, drybacks of 5-30 points) are TRUE water content. A probe can read far from that: the
-F2 probes read about 33-41 % at saturation. So no rule sets an absolute moisture band against a raw reading.
-The rules judge a zone against its own saturation, its own peak and its own trends, and they say "true water
-content" wherever they keep a wiki number.
+True water content vs probe readings: the wiki's moisture numbers (a ~92 % full mark, a 55-92 % working band, a
+25-30 % recovery floor, drybacks of 5-30 points) are TRUE water content. A probe can read far from that: probes
+observed on a production room read about 33-41 % at saturation. So no rule sets an absolute moisture band against a
+raw reading. The rules judge a zone against its own saturation, its own peak and its own trends, and they say "true
+water content" wherever they keep a wiki number.
 
 Stage arc: the rockwool and one-steering-law pages put the deepest drybacks and the highest EC in flower
 weeks 4-6. The slab-irrigation page (Athena and CCI) makes flower days 22-42 a vegetative bulk. On 26 Sep 2026
-the owner chose the slab page's arc, so STAGE_ARC and the "stage" rules follow it. ALT_STAGE_ARC keeps the
-other arc for reference only.
+the slab page's arc was chosen, so the "stage" rules follow it, and STAGE_ARC is that arc as the doctrine
+pack's slab_default table (stage_rows). ALT_STAGE_ARC keeps the other arc for reference only.
 
 Within each topic the rules are listed most important first, so doctrine(..., limit=n) keeps the core.
 """
+import os
+import re
 from dataclasses import dataclass
 
 TEROS = "https://www.growlabs.nz/wiki/root-zone-teros12.html"
@@ -282,9 +284,9 @@ RULES = {
 }
 
 
-# Athena's Grow Guide Handbook (metric), Precision Irrigation Strategy, pages 33-41: sent by the owner on 28 Sep
-# 2026 as more doctrine for Jev. Its rules follow the owner's in each topic (the owner's pages lead, so
-# doctrine(..., limit=n) keeps them first), and where they differ the owner's stage arc wins (the last dryback rule).
+# Athena's Grow Guide Handbook (metric), Precision Irrigation Strategy, pages 33-41: added on 28 Sep
+# 2026 as more doctrine for Jev. Its rules follow the wiki's in each topic (the wiki's pages lead, so
+# doctrine(..., limit=n) keeps them first), and where they differ the chosen stage arc wins (the last dryback rule).
 ATHENA = "Athena Grow Guide Handbook (metric), Precision Irrigation Strategy, pp. 33-41"
 SOURCES.append(ATHENA)
 
@@ -366,39 +368,7 @@ def doctrine(*topics, limit=None):
     return "Doctrine: " + " ".join(texts) if texts else ""
 
 
-# The owner's chosen stage arc (slab guide, chosen 26 Sep 2026). Day 1 is the first day of 12/12. Dryback is in
-# points of TRUE water content; root-zone EC is in mS/cm and compares only with EC read the same way; runoff is
-# a share of the water fed. The veg row has no flower days: code picks it by room, not by day.
-STAGE_ARC = [
-    {"stage": "established veg", "days": None, "steering": "vegetative",
-     "peak": "at or above measured field capacity",
-     "dryback": "10-15 points of true water content", "dryback_points": (10, 15),
-     "pore_ec": "root-zone EC 3-5", "pore_ec_range": (3.0, 5.0),
-     "runoff": "8-16 % of the water fed", "runoff_pct": (8, 16),
-     "move_on_when": "roots established, uptake repeats day to day, plant ready to flip", "source": SLAB},
-    {"stage": "flower setting", "days": (1, 21), "steering": "generative",
-     "peak": "at or below field capacity",
-     "dryback": ("start near 15 points of true water content and move toward 20-25 over the three weeks; never "
-                 "cross the established minimum moisture"), "dryback_points": (15, 25),
-     "pore_ec": "root-zone EC 5-10", "pore_ec_range": (5.0, 10.0),
-     "runoff": "1-7 % of the water fed", "runoff_pct": (1, 7),
-     "move_on_when": "vertical stretch has clearly slowed or stopped", "source": SLAB},
-    {"stage": "flower bulk", "days": (22, 42), "steering": "vegetative",
-     "peak": "at or above field capacity",
-     "dryback": "10-15 points of true water content", "dryback_points": (10, 15),
-     "pore_ec": "root-zone EC 3.5-6", "pore_ec_range": (3.5, 6.0),
-     "runoff": "8-16 % of the water fed", "runoff_pct": (8, 16),
-     "move_on_when": "flower expansion slows and ripening signals dominate", "source": SLAB},
-    {"stage": "finish", "days": (43, 56), "steering": "ripening",
-     "peak": "at or below field capacity",
-     "dryback": ("a generative 20-25 points of true water content to start, deeper only on cultivar data, never "
-                 "below the established minimum moisture"), "dryback_points": (20, 25),
-     "pore_ec": "lower: root-zone EC 3-4", "pore_ec_range": (3.0, 4.0),
-     "runoff": "1-7 % of the water fed unless correcting excess EC", "runoff_pct": (1, 7),
-     "move_on_when": "cultivar-specific maturity (trichomes on mid-cola calyxes)", "source": SLAB},
-]
-
-# The arc the rockwool and one-law pages give instead. Recorded, not followed: the owner chose STAGE_ARC.
+# The arc the rockwool and one-law pages give instead. Recorded, not followed: STAGE_ARC was chosen.
 ALT_STAGE_ARC = [
     {"stage": "flower weeks 1-3", "days": (1, 21), "peak": "high (wet, bulking)",
      "dryback": "10-18 points of true water content", "pore_ec": "stepping up", "runoff": "10-15 % of the water fed",
@@ -416,16 +386,102 @@ NOMINAL_FLOWER_DAYS = 56  # the slab guide's nominal days: setting 1-21, bulk 22
 FINISH_DAYS = 14  # "normally the final 10-14 days": the finish starts this many days before the end
 
 
-def stage_intent(flower_day, flower_days=NOMINAL_FLOWER_DAYS):
-    """A copy of the STAGE_ARC row for a day of flower (day 1 = the first day of 12/12), or None when the day is
-    unknown or outside flower. The finish is the last FINISH_DAYS of `flower_days`: a longer cultivar stays in
-    the bulk until then, because the guide moves on when ripening signals dominate, not on a date."""
-    if flower_day is None or not 1 <= flower_day <= flower_days:
+def stage_intent(flower_day, flower_days=NOMINAL_FLOWER_DAYS, rows=None):
+    """A copy of the arc's row for a day of flower (day 1 = the first day of 12/12), or None when the day is unknown,
+    outside flower or no arc is in force (`rows` empty). The last row is the last FINISH_DAYS of `flower_days`: a
+    longer cultivar stays in the row before it until then, because the guide moves on when ripening signals
+    dominate, not on a date. `rows` are stage_rows(): the default arc is STAGE_ARC itself."""
+    flower = [r for r in (STAGE_ARC if rows is None else rows) if r.get("days")]
+    if flower_day is None or not flower or not 1 <= flower_day <= flower_days:
         return None
-    _veg, setting, bulk, finish = STAGE_ARC
-    start = max(flower_days - FINISH_DAYS + 1, bulk["days"][0])
-    if flower_day <= setting["days"][1]:
-        return dict(setting)
-    if flower_day < start:
-        return {**bulk, "days": (bulk["days"][0], start - 1)}
-    return {**finish, "days": (start, flower_days)}
+    *middle, last = flower
+    start = max(flower_days - FINISH_DAYS + 1, middle[-1]["days"][0] if middle else 1)
+    if flower_day >= start:
+        return {**last, "days": (start, flower_days)}
+    for row in middle[:-1]:
+        if flower_day <= row["days"][1]:
+            return dict(row)
+    return {**middle[-1], "days": (middle[-1]["days"][0], start - 1)}
+
+
+DEFAULT_ARC = "slab_default"
+STEERING = ("vegetative", "generative", "ripening")  # what the judges and the envelope compare with
+PACK_ARCS = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "doctrine", "arcs")
+
+
+class ArcInvalid(ValueError):
+    """A stage arc this release cannot use as it stands: the reason says what is missing."""
+
+
+def _pair(text, what):
+    found = re.fullmatch(r"\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*", str(text))
+    if not found:
+        raise ArcInvalid(f"{what} is {text!r}, not a number range")
+    lo, hi = float(found.group(1)), float(found.group(2))
+    if lo > hi:
+        raise ArcInvalid(f"{what} runs from {lo:g} down to {hi:g}")
+    return (int(lo) if lo.is_integer() else lo, int(hi) if hi.is_integer() else hi)
+
+
+def _read_arc(arc, pack):
+    """The rows of the pack's arc `arc` in the judges' shape, or ArcInvalid with the reason: every range a number
+    pair, a steering the judges know, a move-on sign in every row, one veg row and flower rows from day 1 with no
+    gap (the last may be "the last N days")."""
+    try:
+        with open(os.path.join(pack, f"{arc}.md"), encoding="utf-8") as fh:
+            text = fh.read().splitlines()
+    except OSError:
+        raise ArcInvalid(f"there is no stage arc {arc!r} in this release") from None
+    lines = [ln.strip() for ln in text if ln.strip().startswith("|")]
+    head = [c.strip() for c in lines[0].strip("|").split("|")] if lines else []
+    cite = next((ln[4:].strip() for ln in text if ln.startswith("### Stage arc")), arc)
+    rows = []
+    for line in lines[2:]:
+        cell = dict(zip(head, (c.strip() for c in line.strip("|").split("|"))))
+        name = cell.get("stage") or "a row"
+        if cell.get("steering") not in STEERING:
+            raise ArcInvalid(f"{name} steers {cell.get('steering')!r}, not one of {', '.join(STEERING)}")
+        if not cell.get("move_on_when"):
+            raise ArcInvalid(f"{name} has no sign that the stage moves on")
+        dry, ec, runoff = (_pair(cell.get(k), f"{name}'s {w}") for k, w in
+                           (("dryback_points", "dryback"), ("pore_ec", "pore EC"), ("runoff_pct", "runoff")))
+        days = cell.get("flower_days") or ""
+        rows.append({
+            "stage": name, "days": None if not days else (None if days.startswith("last") else _pair(days, name)),
+            "last": days.startswith("last"), "steering": cell["steering"], "peak": cell.get("peak") or "",
+            "dryback": f"{dry[0]:g}-{dry[1]:g} points of true water content"
+                       + (f" ({cell['notes']})" if cell.get("notes") else ""), "dryback_points": dry,
+            "pore_ec": f"root-zone EC {ec[0]:g}-{ec[1]:g}", "pore_ec_range": ec,
+            "runoff": f"{runoff[0]:g}-{runoff[1]:g} % of the water fed", "runoff_pct": runoff,
+            "move_on_when": cell["move_on_when"], "source": cite})
+    if len(rows) < 2 or rows[0]["days"] is not None or rows[0]["last"]:
+        raise ArcInvalid("it needs one veg row first and at least one flower row")
+    flower, day = rows[1:], 1
+    for i, row in enumerate(flower):
+        if row["last"] and i == len(flower) - 1:
+            row["days"] = (day, day + FINISH_DAYS - 1)
+        elif row["days"] is None or row["days"][0] != day:
+            raise ArcInvalid(f"{row['stage']} does not start on flower day {day}")
+        day = row["days"][1] + 1
+    for row in rows:
+        row.pop("last")
+    return rows
+
+
+# The stage arc in force by default, read from the controller's copy of the doctrine pack (the one source the
+# prompt and the dashboard read too). Day 1 is the first day of 12/12. Dryback is in points of TRUE water content;
+# root-zone EC is in mS/cm and compares only with EC read the same way; runoff is a share of the water fed. The veg
+# row has no flower days: code picks it by room, not by day. Empty when the copy is missing or unusable, so the
+# judges run with no arc in force (stage_rows says why) instead of the controller failing to start.
+try:
+    STAGE_ARC = _read_arc(DEFAULT_ARC, PACK_ARCS)
+except ArcInvalid:
+    STAGE_ARC = []
+
+
+def stage_rows(arc=DEFAULT_ARC, pack=PACK_ARCS):
+    """The rows of stage arc `arc`, read from the doctrine pack's table (the controller's copy) and checked, or
+    ArcInvalid with the reason. The default arc from the shipped pack is STAGE_ARC itself."""
+    if arc == DEFAULT_ARC and pack == PACK_ARCS and STAGE_ARC:
+        return STAGE_ARC
+    return _read_arc(arc, pack)

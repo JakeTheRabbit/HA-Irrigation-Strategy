@@ -1,9 +1,9 @@
-"""Once a grow-day: is this zone steered the way the owner's stage arc says for today's day of flower?
+"""Once a grow-day: is this zone steered the way the stage arc says for today's day of flower?
 
 The base engine has no idea what week of flower it is: the operator's steering mode and setpoints are all
 it knows, and nothing notices when they belong to another stage, or when the overnight dryback and the
-pore EC drift out of the stage's bands. This judge reads the zone against the owner's stage arc (the slab
-guide he chose on 26 Sep 2026, jev.doctrine.STAGE_ARC) and says what is off, as advice (CS-705). It never
+pore EC drift out of the stage's bands. This judge reads the zone against the stage arc (the slab
+guide chosen on 26 Sep 2026, jev.doctrine.STAGE_ARC) and says what is off, as advice (CS-705). It never
 changes a setting: moving to a new stage is the grower's call.
 """
 from datetime import timedelta
@@ -21,7 +21,7 @@ ARC = {
     "insufficient_evidence": "The facts do not support any of the other answers.",
 }
 
-MISMATCH = "Switch the zone's steering mode to the stage's, or confirm the stage is wrong."
+MISMATCH = "Set the steering mode of the zone to the steering mode of the stage, or make sure that the stage is correct."
 
 ADVICE = {
     "dryback_too_shallow": "Stop the day's watering a little earlier, or lower the overnight target, one change a day.",
@@ -104,15 +104,15 @@ class StageJudge(Judge):
             return None
         found = []
         if mismatch:
-            found.append(f"The zone is on {ctx.steering} steering, but the stage calls for {st['steering']}. {MISMATCH}")
+            found.append(f"The zone uses {ctx.steering} steering, but the stage needs {st['steering']}. {MISMATCH}")
         if judged:
-            found.append(f"Jev: {ARC[v.label]} Suggested: {ADVICE[v.label]}")
+            found.append(f"AI assistant: {ARC[v.label]} Suggestion: {ADVICE[v.label]}")
         why = ", ".join(x for x in ("steering mismatch" if mismatch else "",
                                     f"{v.label} (p={v.prob:.2f})" if judged else "") if x)
         return self.directive(ctx, "alert", {
             "code": "CS-705",
-            "title": "this zone is off the stage's arc",
-            "message": (f"{ctx.title} on flower day {ctx.flower_day} ({st['stage']}): {' '.join(found)} The owner's "
-                        f"doctrine for this stage steers {st['steering']}, with a dryback of {st['dryback']} and "
-                        f"{st['pore_ec']}. Nothing was changed."),
+            "title": "this zone is outside the stage arc",
+            "message": (f"{ctx.title} on flower day {ctx.flower_day} ({st['stage']}): {' '.join(found)} For this "
+                        f"stage, the doctrine of the owner steers {st['steering']}, with a dryback of {st['dryback']} "
+                        f"and {st['pore_ec']}. The AI assistant changed nothing."),
         }, why)

@@ -81,6 +81,27 @@ jobs:
           fi
           exit $bad
 
+      - name: Doctrine pack current, true of the code and lint-clean
+        # doctrine/README.md, checks 1-6 (check 6, the controller's copy, whenever that directory exists).
+        # The private word list comes from the DOCTRINE_DENYLIST secret and runs on every push and
+        # on every pull request from this repository, where a missing secret fails the build. A pull
+        # request from a fork, or one Dependabot opened, gets no Actions secrets: it runs the public
+        # patterns only, the skip goes into the job summary, and the merge push runs the private list.
+        env:
+          DENYLIST: ${{ secrets.DOCTRINE_DENYLIST }}
+          NO_SECRETS: ${{ github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository || github.event.pull_request.user.login == 'dependabot[bot]') }}
+        run: |
+          set -- --check \
+            --core crop-steering-engine/src/crop_steering_engine/core.py \
+            --jev addons/f2_control/f2_control/jev/doctrine.py
+          if [ "$NO_SECRETS" = "true" ]; then
+            python doctrine/tools/build_doctrine.py "$@" \
+              --private-skip "pull request with no secrets (fork or Dependabot); the merge push runs it"
+          else
+            printf '%s' "$DENYLIST" > "$RUNNER_TEMP/doctrine-denylist.json"
+            python doctrine/tools/build_doctrine.py "$@" --private-denylist "$RUNNER_TEMP/doctrine-denylist.json"
+          fi
+
       - name: Pytest (integration + health + services + state + version)
         run: |
           PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v
@@ -127,6 +148,131 @@ jobs:
           push: false
           build-args: |
             BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
+
+  container-smoke:
+    # One image, both install modes: the same amd64 image runs tests_container as a standalone
+    # container and as the Supervisor runs the app, against a fake Home Assistant. Runs on every
+    # Validate run with no path or `if` filter, so a required check never waits on a job that did
+    # not run. Nothing is pushed.
+    name: Controller container smoke (both modes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pytest
+        run: python -m pip install pytest==8.2.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the controller image
+        # As the add-on build job, plus load: the image must be in the local daemon to be run.
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: addons/f2_control
+          push: false
+          load: true
+          build-args: |
+            BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
+
+      - name: Container smoke, both modes, on that image
+        # tests_container skips without an image; inspecting it first keeps a skip from passing.
+        env:
+          CONTROLLER_IMAGE: ${{ steps.build.outputs.imageid }}
+        run: |
+          docker image inspect "$CONTROLLER_IMAGE" > /dev/null
+          python -m pytest tests_container -q -rs
+
+  addon-image-per-arch:
+    # The image's Python packages come from pinned, hashed files: requirements.txt, and the
+    # Anthropic SDK's requirements-brain.txt, which the Dockerfile skips on armv7 by name. This
+    # builds the add-on the way the Supervisor does on every arch build.yaml lists (QEMU for the
+    # ARM ones) and proves each image imports what it should and holds exactly the pinned code.
+    name: Add-on image ${{ matrix.arch }} (imports and pinned packages)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+          - arch: aarch64
+            platform: linux/arm64
+          - arch: armv7
+            platform: linux/arm/v7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Base image from build.yaml
+        id: base
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: echo "from=$(awk -v key="${ARCH}:" '$1 == key {print $2}' addons/f2_control/build.yaml)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the add-on image for ${{ matrix.arch }}
+        uses: docker/build-push-action@v6
+        with:
+          context: addons/f2_control
+          platforms: ${{ matrix.platform }}
+          load: true
+          push: false
+          tags: f2-control:${{ matrix.arch }}
+          build-args: |
+            BUILD_FROM=${{ steps.base.outputs.from }}
+            BUILD_ARCH=${{ matrix.arch }}
+      - name: Imports, and pip freeze equals the pinned files
+        env:
+          ARCH: ${{ matrix.arch }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          in_image() { docker run --rm --platform "$PLATFORM" --entrypoint "$1" "f2-control:$ARCH" "${@:2}"; }
+          files=addons/f2_control/requirements.txt
+          if [ "$ARCH" = armv7 ]; then
+            in_image python3 -c "import requests"
+            in_image python3 -c "
+          try:
+              import anthropic
+          except ModuleNotFoundError:
+              print('anthropic is not installed, as intended on armv7')
+          else:
+              raise SystemExit('anthropic is installed on armv7')"
+          else
+            in_image python3 -c "import requests, anthropic"
+            files="$files addons/f2_control/requirements-brain.txt"
+          fi
+          in_image pip3 freeze > freeze.txt
+          python3 - freeze.txt $files <<'EOF'
+          import re, sys
+
+          def pins(text):
+              text = re.sub(r"\\\n", " ", text)
+              specs = (line.split("#", 1)[0].split() for line in text.splitlines())
+              found = set()
+              for spec in specs:
+                  if spec:
+                      name, _, version = spec[0].partition("==")
+                      found.add(f'{re.sub(r"[-_.]+", "-", name.lower())}=={version}')
+              return found
+
+          frozen = pins(open(sys.argv[1]).read())
+          pinned = set().union(*(pins(open(name).read()) for name in sys.argv[2:]))
+          print("in the image, not pinned:", sorted(frozen - pinned) or "none")
+          print("pinned, not in the image:", sorted(pinned - frozen) or "none")
+          sys.exit(frozen != pinned)
+          EOF
 
   dependency-review:
     name: Dependency Review (PR only)
@@ -247,6 +393,7 @@ jobs:
           node frontend/scripts/verify-steering-visuals.mjs
           node frontend/scripts/verify-recipe-library.mjs
           node frontend/scripts/verify-tank-status.mjs
+          node frontend/scripts/verify-calibration.mjs
           node frontend/scripts/verify-ha-shell.mjs
       - uses: actions/upload-artifact@v4
         if: always()

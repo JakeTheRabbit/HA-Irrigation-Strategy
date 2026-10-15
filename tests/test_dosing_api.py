@@ -51,6 +51,7 @@ def dispatcher(monkeypatch):
 def clock(monkeypatch):
     now = {"at": NOW}
     monkeypatch.setattr(dosing_api, "_now", lambda: now["at"])
+    monkeypatch.setattr(dosing_api, "_today", lambda: now["at"].date())
     return now
 
 
@@ -69,7 +70,7 @@ def save(store, **data):
     return asyncio.run(store.save(data))
 
 
-def ask(store, action="dose", by="Ben", **data):
+def ask(store, action="dose", by="Alex", **data):
     if action == "dose":
         data = {"pump": "balance", "ml": 25, **data}
     return asyncio.run(store.request({"action": action, **data}, by))
@@ -162,7 +163,7 @@ def test_a_request_is_stored_for_the_controller_and_the_revision_does_not_move(
         "pump": "balance",
         "ml": 12.5,
         "at": NOW.isoformat(),
-        "by": "Ben",
+        "by": "Alex",
     }
     assert store.data["request"] == request and store.data["revision"] == 1
     assert store._store.value["request"] == request  # stored, not only in memory
@@ -174,6 +175,27 @@ def test_a_request_is_stored_for_the_controller_and_the_revision_does_not_move(
         None,
         None,
     )
+
+
+def test_a_test_refill_run_anyway_says_so_and_an_ordinary_request_keeps_its_shape():
+    """A batch run anyway is stored with run_anyway, which the controller reads with the request; a
+    request without it is stored as before, with no such key. Refused on a dose or a stop, and
+    nothing is stored."""
+    hass, store = rig()
+    save(store)
+    plain = ask(store, "batch")["request"]
+    assert "run_anyway" not in plain
+    handled(hass, plain["id"])
+    anyway = ask(store, "batch", run_anyway=True)
+    assert anyway["error"] is None and anyway["request"]["run_anyway"] is True
+    assert store._store.value["request"]["run_anyway"] is True
+    # ...and published on the sensor the controller reads.
+    assert store.sensor()[1]["request"]["run_anyway"] is True
+    handled(hass, anyway["request"]["id"])
+    for action in ("dose", "stop"):
+        refused = ask(store, action, run_anyway=True)
+        assert refused["request"] is None and "only a batch" in refused["error"]
+    assert store.data["request"] == anyway["request"]
 
 
 def handled_by(store):
@@ -244,12 +266,24 @@ def test_the_sensor_the_controller_reads():
     _, store = rig()
     assert store.sensor() == (
         0,
-        {"pumps": [], "batch": dosing.empty_batch(), "request": None},
+        {
+            "pumps": [],
+            "batch": dosing.empty_batch(),
+            "profile": dosing.empty_profile(),
+            "request": None,
+            "feed": dosing.feed_now(dosing.empty_feed(), NOW.date()),
+        },
     )
     save(store)
     ask(store)
     state, attributes = store.sensor()
-    assert state == 1 and set(attributes) == {"pumps", "batch", "request"}
+    assert state == 1 and set(attributes) == {
+        "pumps",
+        "batch",
+        "profile",
+        "request",
+        "feed",
+    }
     assert attributes["pumps"][0]["power_entity"] == PUMP["power_entity"]
     assert attributes["batch"]["recipe"][0]["ml_entity"] == "number.recipe_balance"
     assert attributes["request"] == store.data["request"]
@@ -260,14 +294,14 @@ def test_the_sensor_the_controller_reads():
 
 
 def test_the_status_it_reads_belongs_to_its_own_room():
-    hass, store = rig(prefix="f1_")
-    assert store.status_entity == "sensor.crop_steering_f1_dosing"
+    hass, store = rig(prefix="room_b_")
+    assert store.status_entity == "sensor.crop_steering_room_b_dosing"
     save(store)
     request = ask(store)["request"]
     handled(hass, request["id"])  # another room's controller status: not this room's
     assert ask(store)["error"] == "busy"
     hass.states.set(
-        "sensor.crop_steering_f1_dosing", "idle", {"handled": request["id"]}
+        "sensor.crop_steering_room_b_dosing", "idle", {"handled": request["id"]}
     )
     assert ask(store)["error"] is None
 
@@ -321,11 +355,22 @@ def services(monkeypatch):
     hass = ha_stubs.FakeHass(states={e: "off" for e in KNOWN})
     hass.services = Services()
     users = {
-        "admin": SimpleNamespace(is_admin=True, name="Ben"),
+        "admin": SimpleNamespace(is_admin=True, name="Alex"),
         "staff": SimpleNamespace(is_admin=False, name="Staff phone"),
     }
     hass.auth = SimpleNamespace(async_get_user=AsyncMock(side_effect=users.get))
     entry = ha_stubs.FakeEntry(entry_id="entry")
+    entry.unloads = []
+    entry.async_on_unload = entry.unloads.append
+    event = types.ModuleType("homeassistant.helpers.event")
+    event.midnight = []
+
+    def track(hass, action, **at):
+        event.midnight.append((action, at))
+        return lambda: event.midnight.remove((action, at))
+
+    event.async_track_time_change = track
+    monkeypatch.setitem(sys.modules, "homeassistant.helpers.event", event)
     monkeypatch.setattr(dosing_api, "DosingStore", _memory_store)
     asyncio.run(dosing_api.async_setup_dosing(hass, entry))
 
@@ -337,7 +382,7 @@ def services(monkeypatch):
         )
         return asyncio.run(hass.services.registered[(DOMAIN, name)](request))
 
-    return SimpleNamespace(hass=hass, call=call, entry=entry)
+    return SimpleNamespace(hass=hass, call=call, entry=entry, event=event)
 
 
 _REAL_STORE = dosing_api.DosingStore
@@ -373,7 +418,7 @@ def test_the_services_find_the_room_and_record_who_asked(services):
         services.call("dosing_request", action="dose", pump="balance", ml=5)["request"][
             "by"
         ]
-        == "Ben"
+        == "Alex"
     )
     handled(services.hass, services.call("dosing_get")["config"]["request"]["id"])
     automation = services.call("dosing_request", user=None, action="stop")
@@ -381,15 +426,114 @@ def test_the_services_find_the_room_and_record_who_asked(services):
     # A stop only switches things off: any signed-in user may ask for one, and is named.
     staff = services.call("dosing_request", user="staff", action="stop")
     assert (staff["error"], staff["request"]["by"]) == (None, "Staff phone")
-    for action, data in (("dose", {"pump": "balance", "ml": 5}), ("batch", {})):
+    for action, data in (
+        ("dose", {"pump": "balance", "ml": 5}),
+        ("batch", {}),
+        # A test refill run anyway is an administrator's alone.
+        ("batch", {"run_anyway": True}),
+    ):
         with pytest.raises(HomeAssistantError, match="administrator"):
             services.call("dosing_request", user="staff", action=action, **data)
+    # A stop is open to anyone, but run anyway is not: it is refused, and nothing is stored.
+    refused = services.call(
+        "dosing_request", user="staff", action="stop", run_anyway=True
+    )
+    assert refused["request"] is None and "only a batch" in refused["error"]
     with pytest.raises(HomeAssistantError, match="signed-in Home Assistant user"):
         services.call("dosing_request", user="deleted", action="stop")
     assert services.call("dosing_get")["config"]["request"] == staff["request"]
     with pytest.raises(HomeAssistantError, match="unknown or ambiguous"):
-        services.call("dosing_get", room_id="room:f1_")
+        services.call("dosing_get", room_id="room:room_b_")
     with pytest.raises(HomeAssistantError, match="canonical room_id"):
-        services.call("dosing_get", room_id="f1")
+        services.call("dosing_get", room_id="room_b")
     asyncio.run(dosing_api.async_unload_dosing(services.hass, services.entry))
     assert services.hass.services.registered == {}
+    # The midnight rewrite goes with the room: Home Assistant runs its unsubscribe on unload.
+    for unsubscribe in services.entry.unloads:
+        unsubscribe()
+    assert services.event.midnight == []
+
+
+FEED = {
+    "recipes": [
+        {"id": "vege", "name": "Vege", "doses": [{"pump": "balance", "ml": 200}]},
+        {"id": "bloom", "name": "Bloom", "doses": [{"pump": "balance", "ml": 300}]},
+    ],
+    # Week 1 from Monday 21 September 2026: NOW (Monday 28 September) is week 2, Bloom.
+    "schedule": {"start": "2026-09-21", "weeks": ["vege", "bloom"]},
+}
+
+
+def test_the_sensor_doses_the_week_s_recipe_and_moves_on_at_midnight(
+    services, dispatcher, clock
+):
+    saved = services.call(
+        "dosing_save",
+        expected_revision=0,
+        pumps=[copy.deepcopy(PUMP)],
+        batch=copy.deepcopy(BATCH),
+        feed=copy.deepcopy(FEED),
+    )
+    assert saved["error"] is None
+    assert saved["feed_now"]["recipe"] == "Bloom"
+    store = dosing_api.resolve_dosing(services.hass, "room:")
+    _, attributes = store.sensor()
+    assert attributes["batch"]["recipe"] == [
+        {"pump": "balance", "ml": 300, "ml_entity": None}
+    ]
+    assert (attributes["feed"]["week"], attributes["feed"]["source"]) == (2, "schedule")
+    # The batch's own recipe is kept as saved, for when no feed recipe is in use.
+    assert store.data["batch"]["recipe"][0]["ml_entity"] == "number.recipe_balance"
+    # Home Assistant's midnight: the sensor is written again, and reads the new day.
+    [(midnight, at)] = services.event.midnight
+    assert at == {"hour": 0, "minute": 0, "second": 0}
+    dispatcher.sent.clear()
+    midnight(None)
+    assert dispatcher.sent == [f"{dosing_api.SIGNAL}_entry"]
+    clock["at"] = NOW - timedelta(days=7)
+    assert store.sensor()[1]["batch"]["recipe"][0]["ml"] == 200
+
+
+def test_a_pick_holds_and_a_save_without_the_feed_keeps_it(clock):
+    _, store = rig()
+    assert save(store, feed=copy.deepcopy(FEED))["error"] is None
+    picked = save(
+        store, feed={**copy.deepcopy(FEED), "stage": "vege", "held_until": None}
+    )
+    assert picked["config"]["feed"]["held_until"] == "2026-10-05"  # week 3 starts
+    assert picked["feed_now"]["source"] == "held"
+    # The caller never says how long a pick holds; the same pick saved again keeps its hold.
+    again = save(
+        store, feed={**copy.deepcopy(FEED), "stage": "vege", "held_until": "2027-01-01"}
+    )
+    assert again["config"]["feed"]["held_until"] == "2026-10-05"
+    # A dashboard from before the feed schedule saves pumps and batch only: the feed stays.
+    kept = save(store)
+    assert kept["error"] is None and kept["config"]["feed"] == again["config"]["feed"]
+    # ... and is checked against the pumps saved: none may be taken from under a recipe.
+    refused = save(store, pumps=[], batch={})
+    assert "feed recipe Vege" in refused["error"]
+    assert store.data["revision"] == kept["config"]["revision"]
+
+
+def test_a_store_saved_before_the_feed_schedule_loads_with_none():
+    _, store = rig()
+    save(store)
+    stored = copy.deepcopy(store._store.value)
+    del stored["feed"]
+    _, again = rig(value=stored)
+    assert again.error is None and again.data["feed"] == dosing.empty_feed()
+    _, attributes = again.sensor()
+    assert attributes["batch"] == stored["batch"]  # its own recipe, unchanged
+    assert attributes["feed"]["source"] == "batch"
+
+
+def test_a_recipe_name_is_kept_by_a_save_from_a_page_that_does_not_know_it():
+    _, store = rig()
+    named = {**copy.deepcopy(BATCH), "name": "Week 3"}
+    assert save(store, batch=named)["error"] is None
+    assert store.data["batch"]["name"] == "Week 3"
+    assert save(store)["error"] is None  # BATCH has no name key: an older page
+    assert store.data["batch"]["name"] == "Week 3"
+    assert save(store, batch={**copy.deepcopy(BATCH), "name": ""})["error"] is None
+    assert store.data["batch"]["name"] == ""

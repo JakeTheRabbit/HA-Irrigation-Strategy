@@ -124,7 +124,7 @@ export async function loadHistoryWindow(
     series.daily = mergeDaily(series.daily);
     if (!series.daily.length)
       result.warnings.push(
-        `No retained readings for ${series.entityId}. Recorder may be disabled, the sensor excluded, or retention expired.`,
+        `No retained readings for ${series.entityId}. Possible causes: the recorder is off, the sensor is excluded, or the retention time is over.`,
       );
     else
       result.warnings.push(

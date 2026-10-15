@@ -1,23 +1,26 @@
-name: Crop Steering Controller (Jev)
+name: Crop Steering Controller
 version: "3.11.1"
 slug: f2_control
 description: >-
-  Autonomous crop steering for Home Assistant. Runs the daily P0-P1-P2-P3 dryback
-  cycle per zone from your live VWC/EC probes (fusing multiple sensors per zone),
-  sequences the pump and valves with valve-close read-back, and is gated by a hard
-  kill switch. Configure once in the Crop Steering UI; the operator dashboards are
-  served right in the sidebar.
-url: https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev
+  The controller of Crop Steering for Home Assistant. For each zone, it runs the
+  four phases of the grow-day (P0, P1, P2 and P3) from the VWC and EC readings that
+  the Crop Steering integration publishes. It operates the pump and the valves and
+  reads back each valve after it closes. When the kill switch is off, the controller
+  gives no shots. Configure the room in the Crop Steering dashboard, which opens in
+  the Home Assistant sidebar.
+url: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy
 arch:
   - amd64
   - aarch64
   - armv7
 init: false
-boot: manual
+boot: auto
 startup: application
 # Seconds the Supervisor waits after SIGTERM before it kills the app (10 by default): the shot in
 # flight is closed first, then dosing switches off what it has running (docs/DOSING.md).
 timeout: 30
+# The oldest Home Assistant the integration and this app support: the same number as hacs.json.
+homeassistant: "2024.10.0"
 homeassistant_api: true
 hassio_api: false
 host_network: false
@@ -25,6 +28,10 @@ ingress: true
 ingress_port: 8420
 panel_icon: mdi:sprout
 panel_title: Crop Steering
+# Set by the Supervisor on every start: this process runs as the Home Assistant app. A standalone
+# container sets F2_RUNTIME=container instead. The controller (runtime_env) and run.sh read it.
+environment:
+  F2_RUNTIME: addon
 options:
   num_zones: 3
   lights_on_hour: 10
@@ -42,15 +49,15 @@ options:
   flow_lps: 0.02
   loop_seconds: 60
   rediscover_seconds: 300
-  cf_account_id: ""
-  cf_api_token: ""
-  cf_gateway_id: ""
-  typesafe_api_key: ""
-  jev_enabled: true
+  brain_provider: auto
+  stage_arc: slab_default
+  anthropic_api_key: ""
+  anthropic_model: claude-haiku-5-5
+  anthropic_daily_budget_usd: 1.0
+  brain_dry_run: false
   jev_judges: all
   jev_daily_calls: 5000
   jev_budget_warn_pct: 80
-  jev_retries: 3
   jev_reask_max: 2
   jev_unsure_below: 0.7
   jev_strict_after: 3
@@ -75,6 +82,14 @@ schema:
   flow_lps: float
   loop_seconds: float
   rediscover_seconds: float
+  brain_provider: list(auto|rules|claude_haiku|jev_legacy)?
+  stage_arc: list(slab_default)?
+  anthropic_api_key: password?
+  anthropic_model: str?
+  anthropic_daily_budget_usd: float(0,1000)?
+  brain_dry_run: bool?
+  # Deprecated Jev route keys: in the schema only, so a new install's form leaves them out and a
+  # saved value is kept (YAML mode sets one). The controller reads each with its old default.
   cf_account_id: str?
   cf_api_token: password?
   cf_gateway_id: str?

@@ -1,0 +1,204 @@
+"""The Claude brain's prompt (haiku-brain-design section 7): two cached system blocks, the evidence block and one lane
+of questions, shaped as one Messages API request.
+
+Block A is the same on every install: the doctrine pack's role and hard rules, the preamble beside this file (how
+this controller asks), then the rest of the pack, from the controller's generated copy of doctrine/compiled/ (the
+app's build context cannot reach the repository root). Block B is the install's own: the stage arc table, rendered
+from the rows stage_rows() built at start (the same rows the judges and the dashboard use), then the substrate
+table(s), sorted. Neither block holds a clock, a name or an option value, so one cache entry serves every judge,
+zone and room; both are NFC and LF only, and their sha256 is logged at start, never their text.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import unicodedata
+
+from .doctrine import FINISH_DAYS
+from .enrich import neutral
+from .scrub import scrub, scrub_all
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+PACK = os.path.join(os.path.dirname(HERE), "doctrine")
+TOOLS = os.path.join(HERE, "brain_tools.json")
+PREAMBLE = os.path.join(HERE, "preamble.md")
+EFFORT = "low"  # fixed install-wide: an effort or thinking change would rewrite the cached prefix
+MAX_TOKENS = 2048
+REPORT_MAX_TOKENS = 4096
+OPERATOR = ("zone", "title", "message", "question")  # text a grower typed: sent as data, never as instructions
+SUBHEADS = ("7.1 What the engine does, and the brain's guard (generated from the code, verified against it)",
+            "7.2 The decisions you are asked", "7.3 Symptom to lever, and engine parameter to setting",
+            "7.4 Doctrine rules by topic")
+# The JEV doctrine topics a judge's phrasing was built with, as the pack's headings name them.
+TOPICS = {"ramp": "P1 ramp", "dryback": "Dryback", "maintenance": "P2 maintenance", "ec": "Pore EC",
+          "probe": "Probes and hardware evidence", "stage": "Growth stage", "ripening": "Ripening",
+          "closed_loop": "Closed-loop discipline", "slab": "Substrate"}
+SUBSTRATES = ("generic", "rockwool", "coco")
+
+
+def nfc(text):
+    return unicodedata.normalize("NFC", text.replace("\r\n", "\n"))
+
+
+def _read(path):
+    with open(path, encoding="utf-8") as fh:
+        return nfc(fh.read())
+
+
+def _json(value):
+    return json.dumps(value, sort_keys=True, separators=(", ", ": "), ensure_ascii=False, default=str)
+
+
+def _words(value):
+    return value if isinstance(value, str) else _json(value)
+
+
+def load_tools():
+    """The four tools, exactly as brain_tools.json holds them."""
+    with open(TOOLS, encoding="utf-8") as fh:
+        return json.load(fh)["tools"]
+
+
+def block_a(pack=PACK):
+    with open(os.path.join(pack, "manifest.json"), encoding="utf-8") as fh:
+        files = json.load(fh)["block_a"]
+    first, *rest = (_read(os.path.join(pack, f)) for f in files)
+    parts = [first, _read(PREAMBLE)] + [f"### {head}\n{text}" for head, text in zip(SUBHEADS, rest)]
+    return "\n".join(parts)
+
+
+def _range(pair):
+    lo, hi = pair
+    return f"{lo:g}-{hi:g}"
+
+
+def arc_citation(arc, pack=PACK):
+    """The arc's heading line from the pack's preview (its name and sources), or ""."""
+    try:
+        text = _read(os.path.join(pack, "arcs", f"{arc}.md"))
+    except OSError:
+        return ""
+    return next((line[4:] for line in text.splitlines() if line.startswith(f"### Stage arc `{arc}`")), "")
+
+
+def arc_table(rows, arc, pack=PACK):
+    """The arc as a table, from the rows the judges use (doctrine.stage_rows)."""
+    lines = [arc_citation(arc, pack) or f"Stage arc `{arc}`", "",
+             "| stage | flower days | steering | peak | overnight dryback (points of true water content) | "
+             "pore EC (mS/cm) | runoff (% of water fed) | moves on when |", "|---|---|---|---|---|---|---|---|"]
+    for i, row in enumerate(rows):
+        days = row.get("days")
+        days = "" if not days else (f"the last {FINISH_DAYS} days" if i == len(rows) - 1 else _range(days))
+        lines.append(f"| {row['stage']} | {days} | {row['steering']} | {row['peak']} | "
+                     f"{_range(row['dryback_points'])} | {_range(row['pore_ec_range'])} | {_range(row['runoff_pct'])} | "
+                     f"{row['move_on_when']} |")
+    return "\n".join(lines) + "\n"
+
+
+def block_b(rows=(), arc=None, substrates=("generic",), pack=PACK):
+    parts = ["## 8. This install's stage arc and substrate tables\n",
+             "Each room's evidence names its substrate and the arc in force. Use the table for that substrate; when "
+             "the room says `generic`, use only relative figures (the zone's own peak, its own drybacks, its own EC "
+             "history) and no absolute moisture band.\n",
+             "Stage-arc moisture figures are points of true water content; a probe can read far from true water "
+             "content until it is calibrated. The evidence's `stage` section already converts today's dryback band "
+             "into the engine's relative dryback for this zone's own peak. Use that converted figure, not the "
+             "table's raw points.\n"]
+    if rows:
+        parts.append(arc_table(rows, arc, pack))
+    for sub in sorted({s for s in substrates if s in SUBSTRATES} or {"generic"}):
+        parts.append(_read(os.path.join(pack, "substrates", f"{sub}.md")))
+    return nfc("\n".join(parts))
+
+
+def _sha(text):
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()[:8]
+
+
+class Prompt:
+    """Everything call_anthropic() sends, built once at start."""
+
+    def __init__(self, rows=(), arc=None, substrates=("generic",), pack=PACK):
+        self.tools, self.rows, self.arc, self.pack = load_tools(), rows, arc, pack
+        self.a, self.substrates = block_a(pack), None
+        self.use(substrates)
+
+    def use(self, substrates):
+        """Block B for the rooms' substrates: rebuilt (one cache rewrite) only when the set of them changes."""
+        subs = tuple(sorted({s for s in substrates if s in SUBSTRATES} or {"generic"}))
+        if subs == self.substrates:
+            return
+        self.substrates, self.b = subs, block_b(self.rows, self.arc, subs, self.pack)
+        self.system = [{"type": "text", "text": self.a, "cache_control": {"type": "ephemeral", "ttl": "1h"}},
+                       {"type": "text", "text": self.b, "cache_control": {"type": "ephemeral", "ttl": "1h"}}]
+
+    def describe(self):
+        """The start-log line: hashes and a size estimate, never the text."""
+        size = len(self.a) + len(self.b) + len(json.dumps(self.tools))
+        return f"brain: prompt A={_sha(self.a)} B={_sha(self.b)}, about {size / 4000:.1f}k tokens"
+
+    def evidence(self, state):
+        """(snapshot id, the <snapshot> block) for one ask, from the judge's evidence and its "_brain" key. Every
+        string is scrubbed of entity ids; JSON parts are sorted, so one moment gives the same bytes."""
+        state = dict(state)
+        meta = state.pop("_brain")
+        track, second = state.pop("your_track_record", None), state.pop("second_look", None)
+        operator = {k: state.pop(k) for k in OPERATOR if k in state}
+        lines = []
+        if operator:
+            said = "; ".join(f'{k} "{scrub(str(v))}"' for k, v in sorted(operator.items()))
+            lines.append(f"<operator_text>{said}</operator_text>")
+        lines += ["", "facts:"] + [f"- {k}: {_words(v)}" for k, v in sorted(scrub_all(state).items())]
+        for key in ("numbers", "zone_config"):
+            lines += ["", f"{key}: {_json(scrub_all(meta.get(key) or {}))}"]
+        for key in ("stage", "interlocks", "data_quality"):
+            if meta.get(key) is not None:
+                lines += ["", f"{key}: {_words(scrub_all(meta[key]))}"]
+        siblings = meta.get("siblings") or {}
+        lines += ["", "siblings:"] + ([f"- zone {z}: {_words(scrub_all(v))}" for z, v in sorted(siblings.items())]
+                                      or ["- none"])
+        if track:
+            lines += ["", f"your_track_record: {_words(scrub_all(track))}"]
+        if second:
+            lines += ["", f"second_look: {_words(scrub_all(second))}"]
+        body = nfc("\n".join(lines))
+        asked = meta.get("asked")
+        snap_id = (f"{meta.get('room')}:z{meta.get('zone')}:{meta.get('judge')}:{asked}:"
+                   f"{hashlib.sha1(body.encode('utf-8')).hexdigest()[:4]}")
+        return snap_id, f'<snapshot id="{snap_id}" judge="{meta.get("judge")}" asked_local="{asked}">\n{body}\n</snapshot>'
+
+    @staticmethod
+    def questions(snap_id, lane_index, lane):
+        """One lane's <questions> block: each phrasing without the doctrine text the legacy routes append (the
+        doctrine is in the system prompt; the lane names its topics), with its allowed keys and their meanings."""
+        out = [f'<questions lane="{lane_index}" snapshot_id="{snap_id}">']
+        for qid, v in sorted(lane.items()):
+            phrasing = neutral(scrub(v.get("base_instructions", v["instructions"])))
+            topics = [TOPICS[t] for t in v.get("doctrine_topics", ()) if t in TOPICS]
+            if topics:
+                phrasing += f" Apply the doctrine topics: {', '.join(topics)}."
+            kind = "yes_no" if v.get("type") == "noul" else v.get("type", "choice")
+            out += [f'<question id="{qid}" kind="{kind}">', f"<phrasing>{phrasing}</phrasing>"]
+            crit = v.get("criteria") or {}
+            if kind == "yes_no":
+                out += [f"<yes>{neutral(scrub(str(crit.get('true', ''))))}</yes>",
+                        f"<no>{neutral(scrub(str(crit.get('false', ''))))}</no>"]
+            elif kind != "report" and isinstance(crit, dict) and crit:  # a why task has no keys to choose from
+                out += ["<allowed>"] + [f"- {k}: {neutral(scrub(str(m)))}" for k, m in crit.items()] + ["</allowed>"]
+            out.append("</question>")
+        out += ["</questions>", "Answer each question above with one tool call."]
+        return nfc("\n".join(out))
+
+    def request(self, model, evidence, questions, max_tokens):
+        """The Messages API request for one lane: no sampling parameters, no prefill, no forced tool choice."""
+        return {"model": model, "max_tokens": max_tokens, "thinking": {"type": "adaptive"},
+                "output_config": {"effort": EFFORT}, "tool_choice": {"type": "auto"}, "tools": self.tools,
+                "system": self.system,
+                "messages": [{"role": "user", "content": [
+                    {"type": "text", "text": evidence, "cache_control": {"type": "ephemeral"}},
+                    {"type": "text", "text": questions}]}]}
+
+    @staticmethod
+    def max_tokens(lane):
+        return REPORT_MAX_TOKENS if any(v.get("type") == "report" for v in lane.values()) else MAX_TOKENS

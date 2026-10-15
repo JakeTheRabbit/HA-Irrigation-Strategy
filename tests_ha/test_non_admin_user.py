@@ -18,9 +18,9 @@ from pytest_homeassistant_custom_component.common import MockUser
 from test_setup_entry import _install
 
 DOMAIN = "crop_steering"
-ROOM = "room:"
-OVERRIDE = "switch.crop_steering_zone_1_manual_override"
-PLAN = "sensor.crop_steering_strategy_plan"
+ROOM = "room:tent_"
+OVERRIDE = "switch.crop_steering_tent_zone_1_manual_override"
+PLAN = "sensor.crop_steering_tent_strategy_plan"
 REFUSED = "requires an authenticated Home Assistant administrator"
 # Every service that changes something, with data its schema accepts: what refuses it must be the
 # administrator check, not validation.
@@ -35,11 +35,19 @@ CHANGES = {
     "stock_refill": {"room_id": ROOM, "expected_revision": 0, "id": "bloom"},
     "stock_record_batch": {"room_id": ROOM, "expected_revision": 0},
     "stock_draw": {"room_id": ROOM, "key": "k", "draws": {}, "source": "dose"},
+    "calibration_record": {
+        "room_id": ROOM,
+        "expected_revision": 0,
+        "probe": "feed_ph",
+        "points": [],
+    },
     "dosing_save": {"room_id": ROOM, "expected_revision": 0, "pumps": [], "batch": {}},
     # A stop is the one dosing request anyone may make (test_an_ordinary_user_may_stop_dosing).
     "dosing_request": {"room_id": ROOM, "action": "dose", "pump": "balance", "ml": 5},
     # A push to the phones: the controller app's, as Home Assistant's administrator Supervisor user.
     "notify": {"key": "k", "title": "t", "message": "m"},
+    # An ask spends the room's AI budget.
+    "brain_ask": {"room_id": ROOM, "question": "why?"},
     "save_recipe": {"recipe": {}},
     "apply_recipe": {},
     "set_manual_override": {"zone": 1},
@@ -47,12 +55,19 @@ CHANGES = {
     "setup_create": {},
     "setup_save": {},
     "setup_remove": {},
+    "setup_commission": {},
+    "test_shot": {"room_id": ROOM, "zone": 1},
+    "overlay_keep": {"room_id": ROOM, "entity_id": "number.crop_steering_zone_1_p2_shot_size"},
+    "overlay_undo": {"room_id": ROOM, "entity_id": "number.crop_steering_zone_1_p2_shot_size"},
 }
 READS = {
     "strategy_get": {"room_id": ROOM},
     "strategy_preview": {"room_id": ROOM},
     "runs_get": {"room_id": ROOM},
+    "setpoint_log_get": {"room_id": ROOM},
+    "overlay_get": {"room_id": ROOM},
     "stock_get": {"room_id": ROOM},
+    "calibration_get": {"room_id": ROOM},
     "dosing_get": {"room_id": ROOM},
     "notify_get": {},
     "whats_new_get": {},
@@ -130,7 +145,7 @@ async def test_an_ordinary_user_may_stop_dosing(hass):
     assert answer["error"] is None
     assert (answer["request"]["action"], answer["request"]["by"]) == ("stop", "Staff phone")
     await hass.async_block_till_done()
-    stored = hass.states.get("sensor.crop_steering_dosing_config").attributes["request"]
+    stored = hass.states.get("sensor.crop_steering_tent_dosing_config").attributes["request"]
     assert stored == answer["request"]
 
 

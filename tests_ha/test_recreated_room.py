@@ -27,14 +27,14 @@ from conftest import fixture
 from test_setup_entry import _install
 
 DOMAIN = "crop_steering"
-KILL = "switch.crop_steering_engine_enabled"
-ROOM = "switch.crop_steering_room_active"
+KILL = "switch.crop_steering_tent_engine_enabled"
+ROOM = "switch.crop_steering_tent_room_active"
 LIGHTS_ON, LIGHTS_OFF = (
-    "number.crop_steering_lights_on_hour",
-    "number.crop_steering_lights_off_hour",
+    "number.crop_steering_tent_lights_on_hour",
+    "number.crop_steering_tent_lights_off_hour",
 )
-P1 = "number.crop_steering_p1_target_vwc"
-MODE = "select.crop_steering_steering_mode"
+P1 = "number.crop_steering_tent_p1_target_vwc"
+MODE = "select.crop_steering_tent_steering_mode"
 
 # What the DELETED room left behind, as Home Assistant still holds it.
 LEFT_BEHIND = {
@@ -43,7 +43,7 @@ LEFT_BEHIND = {
     LIGHTS_ON: "12.0",
     LIGHTS_OFF: "0.0",
     P1: "58.0",
-    "switch.crop_steering_zone_1_enabled": "off",
+    "switch.crop_steering_tent_zone_1_enabled": "off",
 }
 
 
@@ -81,7 +81,7 @@ async def test_a_room_set_up_again_takes_the_wizards_answers_not_the_deleted_roo
     assert (
         _read(hass, ROOM) == "on"
     )  # a room is growing until the operator says otherwise
-    assert _read(hass, "switch.crop_steering_zone_1_enabled") == "on"
+    assert _read(hass, "switch.crop_steering_tent_zone_1_enabled") == "on"
 
 
 async def test_a_select_does_not_inherit_the_deleted_rooms_choice_either(hass):
@@ -110,7 +110,7 @@ async def test_the_real_sequence_delete_and_set_up_again_in_one_home_assistant(h
         "switch", "turn_off", {"entity_id": ROOM}, blocking=True
     )
     await hass.services.async_call(
-        "number", "set_value", {"entity_id": P1, "value": 58}, blocking=True
+        "number", "set_value", {"entity_id": P1, "value": 62}, blocking=True
     )
     assert _read(hass, KILL) == "on"
 
@@ -134,6 +134,13 @@ async def test_the_real_sequence_delete_and_set_up_again_in_one_home_assistant(h
 
 
 # ------------------------------------------------------------------ the same room, restarted
+# A room installed before every new room got a slug keeps its un-prefixed ids.
+OLD_KILL, OLD_ROOM, OLD_LIGHTS_ON, OLD_LIGHTS_OFF, OLD_P1 = (
+    entity_id.replace("crop_steering_tent_", "crop_steering_")
+    for entity_id in (KILL, ROOM, LIGHTS_ON, LIGHTS_OFF, P1)
+)
+
+
 async def _restart(hass, *, created_at, written, states):
     """Home Assistant starting with an EXISTING room: its entry, and the states it saved."""
     seed = fixture("entry_2_18_one_switch_tent.json")
@@ -162,7 +169,7 @@ async def _restart(hass, *, created_at, written, states):
     assert entry.state is ConfigEntryState.LOADED
 
 
-OPERATORS = {KILL: "on", ROOM: "off", LIGHTS_ON: "8.0", LIGHTS_OFF: "20.0", P1: "58.0"}
+OPERATORS = {OLD_KILL: "on", OLD_ROOM: "off", OLD_LIGHTS_ON: "8.0", OLD_LIGHTS_OFF: "20.0", OLD_P1: "58.0"}
 
 
 @pytest.mark.parametrize(
@@ -185,13 +192,13 @@ async def test_an_existing_room_restores_everything_exactly_as_before(
         written=now - timedelta(hours=written_hours_ago),
         states=OPERATORS,
     )
-    assert _read(hass, KILL) == "on"
-    assert _read(hass, ROOM) == "off"
-    assert (float(_read(hass, LIGHTS_ON)), float(_read(hass, LIGHTS_OFF))) == (
+    assert _read(hass, OLD_KILL) == "on"
+    assert _read(hass, OLD_ROOM) == "off"
+    assert (float(_read(hass, OLD_LIGHTS_ON)), float(_read(hass, OLD_LIGHTS_OFF))) == (
         8.0,
         20.0,
     )
-    assert float(_read(hass, P1)) == 58.0
+    assert float(_read(hass, OLD_P1)) == 58.0
 
 
 async def test_a_room_older_than_home_assistants_own_record_of_when_it_was_made_restores(
@@ -205,4 +212,4 @@ async def test_a_room_older_than_home_assistants_own_record_of_when_it_was_made_
         written=now - timedelta(hours=1),
         states=OPERATORS,
     )
-    assert _read(hass, KILL) == "on" and float(_read(hass, P1)) == 58.0
+    assert _read(hass, OLD_KILL) == "on" and float(_read(hass, OLD_P1)) == 58.0

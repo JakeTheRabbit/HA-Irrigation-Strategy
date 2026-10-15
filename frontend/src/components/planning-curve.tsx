@@ -3,6 +3,7 @@ import { SlidersHorizontal } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UiTip } from "@/components/info-tip";
 import {
   buildPlanningCurve,
   dryRates,
@@ -32,8 +33,14 @@ export interface PlanningCurveProps {
   showEditors?: boolean;
   selectedPhase?: PlanningPhaseId;
   description?: string;
-  /** Recorded probe readings for this zone, drawn under the targets on the same axes. */
-  recorded?: { vwc: readonly RecordedReading[]; ec: readonly RecordedReading[]; now: number };
+  /** Recorded probe readings for this zone, drawn under the targets on the same axes, cut into
+   * grow-days on the clock of `timeZone` (Home Assistant's; the browser's when omitted). */
+  recorded?: {
+    vwc: readonly RecordedReading[];
+    ec: readonly RecordedReading[];
+    now: number;
+    timeZone?: string;
+  };
   /** Learned VWC points retained per 1% shot, when the zone's supervisor knows it. */
   retention?: number | null;
 }
@@ -100,8 +107,10 @@ export function PlanningCurve({
     height = 220,
     plotWidth = width - left - right;
   const x = (hour: number) => left + (Math.min(24, Math.max(0, hour)) / 24) * plotWidth;
-  const vwcRecorded = foldRecorded(recorded?.vwc ?? [], lightsOn, recorded?.now ?? NaN);
-  const ecRecorded = foldRecorded(recorded?.ec ?? [], lightsOn, recorded?.now ?? NaN);
+  const fold = (readings: readonly RecordedReading[] = []) =>
+    foldRecorded(readings, lightsOn, recorded?.now ?? NaN, recorded?.timeZone);
+  const vwcRecorded = fold(recorded?.vwc);
+  const ecRecorded = fold(recorded?.ec);
   const hasRecorded = vwcRecorded.today.length + vwcRecorded.previous.length > 0;
   // The day drawn the way the engine runs it, timed by this zone's own measured dry-down.
   const rates = dryRates([vwcRecorded.today, ...vwcRecorded.previous], plan.photoperiod);
@@ -252,7 +261,10 @@ export function PlanningCurve({
     <section className="panel planning-curve" aria-labelledby={`${id}-title`}>
       <div className="panel-heading">
         <div>
-          <h2 id={`${id}-title`}>Daily VWC & EC plan</h2>
+          <div className="label-with-tip">
+            <h2 id={`${id}-title`}>Daily VWC and EC plan</h2>
+            <UiTip copyKey="daily vwc & ec plan" />
+          </div>
           <p>
             {description ??
               (onChange
@@ -366,7 +378,7 @@ export function PlanningCurve({
           width="100%"
           height="322"
           role="group"
-          aria-label="Twenty-four-hour phase and setpoint planning curve"
+          aria-label="24-hour phase and setpoint chart"
         >
           <title>
             {hasRecorded
@@ -485,7 +497,7 @@ export function PlanningCurve({
                   stroke="var(--muted-foreground)"
                   strokeDasharray="4 5"
                 >
-                  <title>{`Saved rescue level: ${saved.emergencyFloor}% VWC`}</title>
+                  <title>{`Saved rescue floor: ${saved.emergencyFloor}% VWC`}</title>
                 </line>
               )}
             </g>
@@ -550,7 +562,7 @@ export function PlanningCurve({
                     fill="#42b995"
                     fontSize="12"
                   >
-                    Maintenance trigger {trim(parameters.p2_vwc_threshold)}%
+                    Re-water point {trim(parameters.p2_vwc_threshold)}%
                   </text>
                   {advice && x(p2.end) - x(p2.start) > 190 && (
                     <text
@@ -826,7 +838,7 @@ export function PlanningCurve({
             P2 fires a {trim(parameters.p2_shot_size)}% shot each time VWC falls below{" "}
             {trim(parameters.p2_vwc_threshold)}%: {shotCount("P2") || "none"} projected. P3 dries
             down overnight to {trim(projection.lightsOnVwc)}%
-            {shotCount("P3") ? `, with ${shotCount("P3")} rescue shot(s) at the rescue level` : ""}.
+            {shotCount("P3") ? `, with ${shotCount("P3")} rescue shot(s) at the rescue floor` : ""}.
             Hover any riser for its time and size.
           </p>
           <p>
@@ -849,14 +861,14 @@ export function PlanningCurve({
                   ? "P2 maintenance starts late."
                   : "No P2 sawtooth with these targets."}
               </strong>{" "}
-              The engine fires a maintenance shot only once VWC reads below the maintenance trigger.
+              The controller gives a maintenance shot only when VWC falls below the re-water point.
               From {trim(advice.pointsToThreshold + parameters.p2_vwc_threshold)}% at the start of
               P2 that is {trim(advice.pointsToThreshold)} points, about{" "}
               {trim(advice.hoursToThreshold)} hours at {projection.rates.day} points/h
               {advice.shots
                 ? `, so the first shot is not until ${planningClock(lightsOn, advice.firstShotHour ?? 0)}.`
                 : ", longer than P2 lasts."}{" "}
-              For a sawtooth from the start of P2, drag the maintenance trigger up to about{" "}
+              For a sawtooth from the start of P2, drag the re-water point up to about{" "}
               {trim(advice.suggestedThreshold)}%, just under the peak VWC target. Shots then repeat
               about every {trim(advice.repeatHours)} hours at this dry-down; a smaller P2 shot gives
               a finer sawtooth.
@@ -879,7 +891,7 @@ export function PlanningCurve({
         )
       )}
       <p className="muted small" style={{ padding: "0 16px 12px", margin: 0 }}>
-        The rescue level stays separate from the dry-down; routine watering stops at the P3
+        The rescue floor stays separate from the dry-down; routine watering stops at the P3
         boundary.
         {Number.isFinite(parameters.p3_emergency_shot_size)
           ? ` Its ${parameters.p3_emergency_shot_size}% rescue shot is conditional on controller safety checks.`

@@ -20,6 +20,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { Empty } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { whileVisible } from "@/lib/live";
 import { historySpan, latestOnly } from "@/lib/sensor-context";
 import {
@@ -265,38 +266,46 @@ export function TankHistory({
           </SheetDescription>
         </SheetHeader>
         <div className="tank-history-body" data-tank-history>
-          <div className="tank-history-range" role="group" aria-label="History range">
-            {TANK_RANGES.map((option) => (
-              <button
-                type="button"
-                key={option.hours}
-                aria-pressed={hours === option.hours}
-                onClick={() => setHours(option.hours)}
-              >
-                {option.label}
-              </button>
-            ))}
+          <div className="label-with-tip">
+            <div className="tank-history-range" role="group" aria-label="History range">
+              {TANK_RANGES.map((option) => (
+                <button
+                  type="button"
+                  key={option.hours}
+                  aria-pressed={hours === option.hours}
+                  onClick={() => setHours(option.hours)}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+            <UiTip copyKey="history range" />
           </div>
           {!ids.length ? (
             <Empty
-              title="Tank EC and pH are not mapped"
-              detail="Map the tank’s EC and pH sensors in Rooms & setup to chart them here."
+              title="No feed EC or pH"
+              tip={<UiTip copyKey="tank ec and ph are not mapped" />}
+              detail="Map the tank’s EC and pH sensors in Rooms and setup to chart them here."
               action={mapSensors}
             />
           ) : data.series === null ? (
             data.error ? (
               <Empty
-                title="History could not load"
+                title="History did not load"
+                tip={<UiTip copyKey="history could not load" />}
                 detail={data.error}
                 action={
-                  <Button variant="outline" onClick={data.retry}>
-                    Retry history
-                  </Button>
+                  <span className="label-with-tip">
+                    <Button variant="outline" onClick={data.retry}>
+                      Retry history
+                    </Button>
+                    <UiTip copyKey="retry history" />
+                  </span>
                 }
               />
             ) : !connected ? (
               <Empty
-                title="Not connected to Home Assistant"
+                title="No Home Assistant connection"
                 detail="Recorded history loads while Home Assistant is connected. Nothing was loaded for this range before the connection dropped."
               />
             ) : (
@@ -401,7 +410,7 @@ function TankChart({
     <>
       {!drawn.length ? (
         <Empty
-          title="No recorded readings in this range"
+          title="No readings in this range"
           detail={`Home Assistant has no stored tank EC or pH readings for the last ${range}. Nothing is drawn in their place.`}
         />
       ) : (

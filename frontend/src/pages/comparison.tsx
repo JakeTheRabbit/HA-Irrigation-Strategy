@@ -3,6 +3,7 @@ import { ArrowRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Heading, type Page } from "@/components/dashboard";
+import { InfoTip, UiTip } from "@/components/info-tip";
 import type { Controller } from "@/lib/types";
 import type { HistoryWindow, RunsDocument, RunZone } from "@/lib/comparison-types";
 import { addDays, boundedRange, comparisonRange, dateInZone } from "@/lib/comparison";
@@ -30,8 +31,8 @@ function liveZone(controller: Controller, id: number): RunZone | null {
 }
 
 /** History › Compare runs: is this crop tracking the last good one, and where did it differ, week
- * by week? The full-resolution chart and the record's quality are one tap down; the run records
- * themselves are kept in Settings. */
+ * by week? A toggle swaps that for both runs overlaid on one full-resolution chart; the record's
+ * quality is one tap down and the run records themselves are kept in Settings. */
 export function Comparison({
   controller,
   navigate,
@@ -56,7 +57,8 @@ export function Comparison({
   const [loaded, setLoaded] = useState<Loaded | null>(null),
     [historyError, setHistoryError] = useState<string | null>(null),
     [loading, setLoading] = useState(false);
-  const [weekNotes, setWeekNotes] = useState<string[]>([]);
+  const [weekNotes, setWeekNotes] = useState<string[]>([]),
+    [overlay, setOverlay] = useState(false);
   const roomRef = useRef(controller.roomId);
   roomRef.current = controller.roomId;
   const doc = document?.room_id === controller.roomId ? document : null;
@@ -277,9 +279,13 @@ export function Comparison({
         }
       />
       <section className="panel comparison-controls">
-        <label>
-          This run
+        <div className="comparison-field">
+          <span className="label-with-tip">
+            <label htmlFor="comparison-current-run">This run</label>
+            <UiTip copyKey="this run" />
+          </span>
           <select
+            id="comparison-current-run"
             aria-label="Current run"
             value={currentId}
             onChange={(event) => {
@@ -296,11 +302,22 @@ export function Comparison({
               </option>
             ))}
           </select>
-        </label>
-        <label>
-          Compare with
+        </div>
+        <div className="comparison-field">
+          <span className="label-with-tip">
+            <label htmlFor="comparison-past-run">Compare with</label>
+            <InfoTip
+              label="Compare with"
+              copy={{
+                tooltip: "A past run that the page shows next to this run.",
+                impact: "The charts and the tables show the two runs side by side. It changes no setting.",
+                guidance: "Select a run first. Select No comparison run to show one run only.",
+              }}
+            />
+          </span>
           <select
-            aria-label="Previous run"
+            id="comparison-past-run"
+            aria-label="Past run"
             value={previousId}
             disabled={!currentRun}
             onChange={(event) => setPreviousId(event.target.value)}
@@ -315,10 +332,14 @@ export function Comparison({
                 </option>
               ))}
           </select>
-        </label>
-        <label>
-          Zone
+        </div>
+        <div className="comparison-field">
+          <span className="label-with-tip">
+            <label htmlFor="comparison-zone">Zone</label>
+            <UiTip copyKey="zone" />
+          </span>
           <select
+            id="comparison-zone"
             aria-label="Comparison zone"
             value={effectiveZone}
             onChange={(event) => setZoneId(Number(event.target.value))}
@@ -332,7 +353,7 @@ export function Comparison({
               </option>
             ))}
           </select>
-        </label>
+        </div>
         <div className="comparison-records-link">
           <label className="comparison-check">
             <input
@@ -351,9 +372,12 @@ export function Comparison({
             />{" "}
             Include archived run records
           </label>
-          <Button variant="ghost" size="sm" onClick={openRecords}>
-            Run records <ArrowRight size={15} aria-hidden="true" />
-          </Button>
+          <span className="label-with-tip">
+            <Button variant="ghost" size="sm" onClick={openRecords}>
+              Run records <ArrowRight size={15} aria-hidden="true" />
+            </Button>
+            <UiTip copyKey="run records" />
+          </span>
         </div>
       </section>
       {metadataLoading && <p role="status">Loading run records…</p>}
@@ -369,31 +393,57 @@ export function Comparison({
         <div className="comparison-notice">
           <p>
             No runs are recorded for this room yet. Record this crop and a past one, each with its
-            real start date, to compare them week by week. The chart below works on dates without a
+            real start date, to compare them week by week. The Overlay view works on dates without a
             run; Recorder history already purged cannot be recovered by adding one.
           </p>
-          <Button variant="outline" onClick={openRecords}>
-            Record a run
-          </Button>
+          <span className="label-with-tip">
+            <Button variant="outline" onClick={openRecords}>
+              Record a run
+            </Button>
+            <UiTip copyKey="record a run" />
+          </span>
         </div>
       )}
-      <RunWeeks
-        controller={controller}
-        current={currentRun}
-        previous={previousRun}
-        zoneId={effectiveZone}
-        zoneName={zoneName}
-        refresh={refresh}
-        onNotes={setWeekNotes}
-      />
-      <details className="comparison-more" data-section="chart">
-        <summary>Full-resolution chart, with a target reference</summary>
+      <div className="history-toggle comparison-view" role="group" aria-label="Comparison view">
+        {(
+          [
+            ["By grow week", false],
+            ["Overlay", true],
+          ] as const
+        ).map(([label, value]) => (
+          <button
+            type="button"
+            key={label}
+            aria-pressed={overlay === value}
+            onClick={() => setOverlay(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {/* Both views stay mounted, so switching is instant and the weekly notes stay filled. */}
+      <div className="comparison-pane" hidden={overlay}>
+        <RunWeeks
+          controller={controller}
+          current={currentRun}
+          previous={previousRun}
+          zoneId={effectiveZone}
+          zoneName={zoneName}
+          refresh={refresh}
+          onNotes={setWeekNotes}
+        />
+      </div>
+      <div className="comparison-pane" hidden={!overlay} data-section="chart">
         <div className="comparison-more-body">
           <section className="panel comparison-range">
-            <label>
-              History range
+            <div className="comparison-field">
+              <span className="label-with-tip">
+                <label htmlFor="comparison-history-range">History range</label>
+                <UiTip copyKey="history range" />
+              </span>
               <select
-                aria-label="Comparison history range"
+                id="comparison-history-range"
+                aria-label="History range"
                 value={period}
                 onChange={(event) => setPeriod(event.target.value)}
               >
@@ -405,32 +455,44 @@ export function Comparison({
                 </option>
                 <option value="custom">Custom dates</option>
               </select>
-            </label>
+            </div>
             {period === "custom" && (
               <>
-                <label>
-                  From date
+                <div className="comparison-field">
+                  <span className="label-with-tip">
+                    <label htmlFor="comparison-start-date">Start date</label>
+                    <UiTip copyKey="from date" />
+                  </span>
                   <Input
-                    aria-label="Comparison from date"
+                    id="comparison-start-date"
+                    aria-label="Comparison start date"
                     type="date"
                     value={customStart}
                     onChange={(event) => setCustomStart(event.target.value)}
                   />
-                </label>
-                <label>
-                  Through date
+                </div>
+                <div className="comparison-field">
+                  <span className="label-with-tip">
+                    <label htmlFor="comparison-end-date">End date</label>
+                    <UiTip copyKey="through date" />
+                  </span>
                   <Input
-                    aria-label="Comparison through date"
+                    id="comparison-end-date"
+                    aria-label="Comparison end date"
                     type="date"
                     value={customEnd}
                     onChange={(event) => setCustomEnd(event.target.value)}
                   />
-                </label>
+                </div>
               </>
             )}
-            <label>
-              Target reference
+            <div className="comparison-field">
+              <span className="label-with-tip">
+                <label htmlFor="comparison-target-reference">Target reference</label>
+                <UiTip copyKey="target reference" />
+              </span>
               <select
+                id="comparison-target-reference"
                 aria-label="Target reference"
                 value={reference}
                 onChange={(event) => setReference(event.target.value)}
@@ -441,7 +503,7 @@ export function Comparison({
                 </option>
                 <option value="phase">Current phase reference</option>
               </select>
-            </label>
+            </div>
             <p className="small comparison-wide">
               Calendar: {timeZone}
               {!doc && !currentRun ? " (browser time zone until run metadata loads)" : ""}. Windows
@@ -493,13 +555,13 @@ export function Comparison({
             </>
           )}
         </div>
-      </details>
+      </div>
       <details className="comparison-more" data-section="quality">
-        <summary>Data quality: daily ranges and history coverage</summary>
+        <summary>Data quality and history coverage</summary>
         <div className="comparison-more-body">
           {!!weekNotes.length && (
-            <section className="comparison-notice" aria-label="Where the weekly figures come from">
-              <h2>Where the weekly figures come from</h2>
+            <section className="comparison-notice" aria-label="Source of the weekly figures">
+              <h2>Source of the weekly figures</h2>
               {weekNotes.map((note) => (
                 <p key={note}>{note}</p>
               ))}

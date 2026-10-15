@@ -3,8 +3,7 @@
  * Irrigation plan, the Schedule, the planning curve and the sensor charts. One table, so a
  * setting never has two names.
  *
- * Names follow the Athena Handbook (Metric, V20) where it has a term for the thing. Every help
- * line says what the engine does (crop-steering-engine `decide()` and the controller's reads of
+ * Names use the words growers commonly use for the thing. Every help line says what the engine does (crop-steering-engine `decide()` and the controller's reads of
  * these numbers), not what the setting was meant for: change a line only together with that code.
  */
 
@@ -29,7 +28,7 @@ export interface SettingDetail {
   affects?: string;
   stacking?: string;
   auto?: string;
-  athena?: string;
+  practice?: string;
 }
 export const DETAIL_HEADINGS: ReadonlyArray<readonly [keyof SettingDetail, string]> = [
   ["what", "What it is"],
@@ -37,13 +36,13 @@ export const DETAIL_HEADINGS: ReadonlyArray<readonly [keyof SettingDetail, strin
   ["affects", "What it affects"],
   ["stacking", "With EC stacking on"],
   ["auto", "With Auto setpoints on"],
-  ["athena", "Athena Handbook"],
+  ["practice", "In practice"],
 ];
 
 /** The phase groups, in order; the Irrigation plan files the EC targets under them too. */
 export const PHASE_GROUPS = [
-  "P0 · Additional dryback",
-  "P1 · Ramp-up",
+  "P0 · Extra dryback",
+  "P1 · Ramp",
   "P2 · Maintenance",
   "P3 · Overnight dryback",
 ] as const;
@@ -67,7 +66,13 @@ const WORDS: Record<string, SettingWords> = {
     label: "Latest first shot",
     short: "Latest first shot",
     tag: "time",
-    help: "The ramp starts this long after lights-on at the latest; sooner if moisture falls to the maintenance trigger.",
+    help: "The ramp starts this long after lights-on at the latest; sooner if moisture falls to the re-water point.",
+  },
+  p0_additional_dryback: {
+    label: "Extra dryback",
+    short: "Extra dryback",
+    tag: "dries",
+    help: "The ramp starts once moisture is this far below the highest reading since lights-on. 0 is off: P0 waits for the P3 dryback target.",
   },
   p1_target_vwc: {
     label: "Peak VWC target",
@@ -88,7 +93,7 @@ const WORDS: Record<string, SettingWords> = {
   p1_time_between_shots: {
     label: "Time between P1 shots",
     short: "Time between P1 shots",
-    help: "Lets each ramp shot soak in before the next. Athena: 15 to 30 minutes.",
+    help: "Lets each ramp shot soak in before the next: commonly 15 to 30 minutes.",
   },
   p1_maximum_shots: {
     label: "Most P1 shots",
@@ -97,7 +102,7 @@ const WORDS: Record<string, SettingWords> = {
   },
   p2_vwc_threshold: {
     label: "Maintenance shot when below",
-    short: "Maintenance trigger",
+    short: "Re-water point",
     tag: "waters",
     help: "Through the day, a maintenance shot fires whenever moisture reads below this. The peak VWC target down to here is the daytime dryback.",
   },
@@ -108,7 +113,7 @@ const WORDS: Record<string, SettingWords> = {
   },
   p3_emergency_vwc_threshold: {
     label: "Rescue shot when below",
-    short: "Rescue level",
+    short: "Rescue floor",
     tag: "rescues",
     help: "In P3, a rescue shot fires whenever moisture reads below this. Keep it above the wilting point.",
   },
@@ -121,72 +126,82 @@ const WORDS: Record<string, SettingWords> = {
     label: "Full saturation (most it holds)",
     short: "Full saturation",
     tag: "ceiling",
-    help: "The wettest this substrate gets; the peak VWC target is capped here. It is not Athena’s field capacity, which is lower.",
+    help: "The wettest this substrate gets; the peak VWC target is capped here. Field capacity, the most it holds before it drains, is lower.",
   },
   max_daily_volume: {
     label: "Daily water limit",
     short: "Daily water limit",
-    help: "The most water a zone gets in one grow-day. Routine shots stop at it; ramp, rescue and watchdog shots and high-EC flushes can go past it.",
+    help: "The most water that a zone gets in one grow-day, in litres. Maintenance shots, extra ramp shots, dilution shots and P0 EC flushes stop at this limit. Ramp shots, rescue shots, watchdog shots and high-EC flushes can go past it.",
   },
   maximum_ec: {
-    label: "Maximum substrate EC",
+    label: "Maximum pore EC",
     short: "Maximum EC",
-    help: "At this substrate EC a flush fires in any phase (in P2, from 1 mS/cm below it), when the feed is weaker than the substrate (with no feed EC sensor, the feed counts as 3.0 mS/cm). If the feed isn't weaker, or moisture is within 2 points of full saturation, the zone gets no shots at all, rescue and watchdog included, until its EC falls below this.",
+    help: "The highest pore EC that the controller accepts in a zone. At or above this level, the controller gives a flush in any phase when the feed EC is lower than the pore EC. When the feed EC is not lower, or the zone does not drain, the zone gets no shot of any type.",
   },
   watchdog_hours: {
     label: "Watchdog interval",
     short: "Watchdog interval",
-    help: "After P0, with lights on, a zone below its maintenance trigger that has had no shot for this long gets one, even past the daily limit. 0 turns it off.",
+    help: "The longest time that a zone can go without a shot while the lights are on. When this time is past and VWC is below the re-water point, the controller gives a watchdog shot. The watchdog does not operate in P0.",
   },
   min_floor_drown_ceiling: {
     label: "Daily minimum stops at",
     short: "Daily minimum stops at",
     help: "Shots that make up a zone’s daily minimum water only fire while moisture reads below this.",
   },
+  min_daily_ml_per_plant: {
+    label: "Daily minimum water per plant",
+    short: "Daily minimum",
+    help: "The least water that each plant gets in one grow-day, in millilitres. The controller gives it at any probe reading. It spreads the water through the day, so that it is complete 3 h before lights-off.",
+  },
   irrigation_ec_min: {
     label: "Feed EC, lowest",
     short: "Feed EC, lowest",
-    help: "Shots wait while the feed (tank) EC reads below this; 0 means no lower limit. It needs a feed EC sensor set in the controller app.",
+    help: "The lowest feed EC at which the controller starts shots. While the feed EC is below this value, all shots in the room wait. It operates only when the controller app has a feed EC sensor.",
   },
   irrigation_ec_max: {
     label: "Feed EC, highest",
     short: "Feed EC, highest",
-    help: "Shots wait while the feed (tank) EC reads above this; 0 means no upper limit. It needs a feed EC sensor set in the controller app.",
+    help: "The highest feed EC at which the controller starts shots. While the feed EC is above this value, all shots in the room wait. It operates only when the controller app has a feed EC sensor.",
   },
   irrigation_ph_min: {
     label: "Feed pH, lowest",
     short: "Feed pH, lowest",
-    help: "Shots wait while the feed (tank) pH reads below this; 0 means no lower limit. It needs a feed pH sensor set in the controller app.",
+    help: "The lowest feed pH at which the controller starts shots. While the feed pH is below this value, all shots in the room wait. It operates only when the controller app has a feed pH sensor.",
   },
   irrigation_ph_max: {
     label: "Feed pH, highest",
     short: "Feed pH, highest",
-    help: "Shots wait while the feed (tank) pH reads above this; 0 means no upper limit. It needs a feed pH sensor set in the controller app.",
+    help: "The highest feed pH at which the controller starts shots. While the feed pH is above this value, all shots in the room wait. It operates only when the controller app has a feed pH sensor.",
+  },
+  sump_power_threshold_w: {
+    label: "Sump pump run power",
+    short: "Sump pump runs above",
+    help: "The power above which the sump pump counts as on. If the sump pump draws no power above this value for the hours set in the controller app, the controller sends a CS-311 alert.",
   },
   max_shot_duration: {
     label: "Longest shot",
     short: "Longest shot",
-    help: "The longest any valve in this room stays open for one shot. A longer planned shot is cut short and delivers less.",
+    help: "The longest time that a valve in this room stays open for one shot. The controller cuts a longer planned shot to this time, and that shot gives less water than planned.",
   },
   substrate_volume: {
     label: "Substrate per plant",
     short: "Substrate per plant",
-    help: "Litres of substrate in each plant’s pot or block. Shot sizes are a percentage of it.",
+    help: "The litres of substrate for each plant, for example the volume of one block or pot. All shot sizes are a percentage of this volume. The water of a shot is the shot size, times this volume, times the plant count.",
   },
   plant_count: {
     label: "Plants",
     short: "Plants",
-    help: "Plants in this zone. A shot’s water is its size times the substrate per plant, times this.",
+    help: "The number of plants in this zone. The water of a shot is the shot size, times the substrate per plant, times this number.",
   },
   drippers_per_plant: {
     label: "Drippers per plant",
     short: "Drippers per plant",
-    help: "With the dripper flow, this sets how long a shot runs: its water divided by the zone’s total dripper flow.",
+    help: "The number of drippers on each plant. With the dripper flow and the plant count, it gives the zone flow. The shot time is the water of the shot divided by the zone flow.",
   },
   dripper_flow_rate: {
     label: "Dripper flow",
     short: "Dripper flow",
-    help: "Litres per hour from each dripper.",
+    help: "The litres per hour that one dripper gives. The controller uses it to calculate how long each shot runs.",
   },
   lights_on_hour: {
     label: "Lights on",
@@ -225,34 +240,39 @@ const DRYBACK_WORDS: SettingWords = {
   help: "How far to dry back overnight, relative to the day’s peak: a 30% dryback from a 60% peak ends at 42%.",
 };
 
-// The "?" text. Quotes are the handbook's own words, with its printed page; the rest is what the
-// engine does, from decide() and the controller's parameter reads.
+// The "?" text: what the engine does, from decide() and the controller's parameter reads, and
+// under "In practice" the common grower guidance, in this dashboard's own words.
 const AUTO = "The controller adjusts this zone’s value itself. Auto setpoints is off by default.";
 const EC_STAGES =
-  "Substrate EC targets by growth stage: veg 3 to 5, flower stretch 4 to 10, bulk 3.5 to 6, finish 3 to 4 (p. 40).";
+  "Substrate EC is steered by growth stage: Plan › Schedule lists each stage’s pore EC band.";
 const DETAILS: Record<string, SettingDetail> = {
   p0_maximum_wait_time: {
-    what: "How long after lights-on the first shot can wait: Athena’s “transpiration before irrigation”.",
-    when: "P0 ends and the ramp starts at the first of: this long after lights-on; moisture at or below the maintenance trigger; moisture down by the P3 dryback target from its highest reading since lights-on. The ramp’s first shot then fires straight away, unless moisture is still at the peak VWC target.",
-    athena:
-      "Additional dryback is “the decrease in VWC% that occurs during P3, after the lights turn on and before the first irrigation event of the day” (p. 33): 1 to 5%, first shot 30 minutes to 2 hours after lights-on (p. 39). The P1 page says 1 to 2 hours (p. 36).",
+    what: "How long after lights-on the first shot can wait: the plants start drinking before the day’s watering does.",
+    when: "P0 ends and the ramp starts at the first of: this long after lights-on; moisture at or below the re-water point; moisture down by the additional dryback (or, while that is 0, the P3 dryback target) from its highest reading since lights-on. The ramp’s first shot then fires straight away, unless moisture is still at the peak VWC target.",
+    practice:
+      "The first shot commonly comes 30 minutes to 2 hours after lights-on. The extra fall before it, the additional dryback, is commonly 1 to 5% and is planned, not a missed shot.",
+  },
+  p0_additional_dryback: {
+    what: "How far moisture dries below its highest reading since lights-on before the first shot of the day, as a percentage of that reading: 3% of a 60% reading is 1.8 points.",
+    when: "In P0. The ramp starts once moisture is down by this much, or earlier at the latest first shot or the re-water point. 0 turns it off, and P0 then waits for the P3 dryback target instead.",
+    practice: "Commonly 1 to 5% after lights-on, before the first shot.",
   },
   p1_target_vwc: {
-    what: "The moisture the morning ramp brings the substrate up to: the top of the day’s range. Athena calls it the Peak VWC% Target.",
+    what: "The moisture the morning ramp brings the substrate up to: the top of the day’s range.",
     when: "In P1, a ramp shot fires while moisture is below it (or below full saturation, if that is lower) and the time between P1 shots has passed. P1 hands over to P2 once moisture has reached it, the P1 minimum shots have fired (3 by default, set in Home Assistant) and substrate EC is no more than 15% above the P1 target; or after the most P1 shots.",
     affects:
-      "Where the day peaks, which the P3 dryback target is measured from, and how much runoff the ramp makes. The maintenance trigger is always kept at least 1 point below it.",
+      "Where the day peaks, which the P3 dryback target is measured from, and how much runoff the ramp makes. The re-water point is always kept at least 1 point below it.",
     auto: AUTO,
-    athena:
-      "“The goal for maximum VWC% established by the last P1 event and maintained throughout the P2 phase” (p. 33). Set between field capacity and full saturation it forces runoff (vegetative); at or below field capacity it restricts runoff (generative) (p. 40).",
+    practice:
+      "Set between field capacity and full saturation, the ramp makes runoff, which steers vegetative; at or below field capacity it holds runoff back, which steers generative.",
   },
   p1_initial_shot_size: {
     what: `The size of the ramp’s first shot, ${OF_SUBSTRATE}.`,
     when: "The first shot of P1. Each later ramp shot adds “Each P1 shot adds” to the one before, until the most P1 shots.",
     affects:
       "Ramp shots are sized by substrate EC against the P1 target: up to twice this while EC is well above it, as little as half while it is well below.",
-    athena:
-      "2 to 6% shots, 15 to 30 minutes apart, saturate slowly and avoid channelling (p. 36). A 1% shot of a 4 L pot is 40 mL (p. 40).",
+    practice:
+      "Small shots of a few percent, 15 to 30 minutes apart, wet the substrate evenly and avoid channelling. A 1% shot of a 4 L pot is 40 mL.",
   },
   p1_shot_size_increment: {
     what: `How much bigger each ramp shot is than the one before, ${OF_SUBSTRATE}.`,
@@ -261,23 +281,23 @@ const DETAILS: Record<string, SettingDetail> = {
   p1_time_between_shots: {
     what: "The wait between ramp shots.",
     when: "A ramp shot fires only once this long has passed since the last shot, so each one can soak in.",
-    athena:
-      "“2%-6% shots, spaced 15-30 minutes apart allows the substrate to gradually build up to target VWC%” (p. 36).",
+    practice:
+      "15 to 30 minutes between ramp shots lets the substrate build up to the peak gradually.",
   },
   p1_maximum_shots: {
     what: "The most shots the ramp fires.",
-    when: "After this many ramp shots P1 hands over to P2, wherever moisture is. P2 then waters whenever moisture reads below the maintenance trigger.",
+    when: "After this many ramp shots P1 hands over to P2, wherever moisture is. P2 then waters whenever moisture reads below the re-water point.",
   },
   p2_vwc_threshold: {
     what: "The level that triggers a daytime maintenance shot. The peak VWC target minus this is how far the substrate dries back during the day.",
     when: "Each time the controller checks in P2 (every minute by default), from the end of the ramp until P3: whenever moisture reads below it, a maintenance shot fires. It is a level, not a crossing: moisture does not need to have been above it first, and reading exactly the value does not fire. There is no minimum wait between maintenance shots; the daily water limit still applies.",
     affects:
-      "How often maintenance shots fire, runoff and substrate EC. In P0, reaching it ends the wait and starts the ramp. After P0, with lights on, the watchdog waters a zone below it that has had no shot for the watchdog interval. It is always kept at least 1 point below the peak VWC target and 3 points above the rescue level, whatever is entered.",
+      "How often maintenance shots fire, runoff and substrate EC. In P0, reaching it ends the wait and starts the ramp. After P0, with lights on, the watchdog waters a zone below it that has had no shot for the watchdog interval. It is always kept at least 1 point below the peak VWC target and 3 points above the rescue floor, whatever is entered.",
     stacking:
-      "Moved 1 point down while substrate EC is under 90% of the P2 target (a bigger dryback, less runoff) and 1 point up while it is over 110%, checked every 30 minutes. The PID option can move it up to 20%.",
-    auto: AUTO,
-    athena:
-      "Athena names the maintenance shots, not this level. P2 “is used to maintain a desired VWC% throughout the lights on period” (p. 37), and “as plants grow and the rate of dryback increases it is now necessary to add P2 events to keep the substrate from drying back too much” (p. 38). Here, that means raising this level.",
+      "Moved 1 point down while substrate EC is under 90% of the P2 target (a bigger dryback, less runoff) and 1 point up while it is over 110%, checked every 30 minutes.",
+    auto: "The controller adjusts this zone’s value itself: by day, one maintenance shot under the peak VWC target; from the time its plan stops maintenance shots for the dryback (3 hours before lights-off at the earliest on a vegetative zone, the middle of the day on a generative one), under where the P3 dryback target ends, through the night and P0. Auto setpoints is off by default.",
+    practice:
+      "As plants grow they dry back faster, and more maintenance shots keep the daytime dryback in hand. Here, that means raising this level.",
   },
   p2_shot_size: {
     what: `The size of each maintenance shot, ${OF_SUBSTRATE}.`,
@@ -285,17 +305,16 @@ const DETAILS: Record<string, SettingDetail> = {
     affects:
       "Maintenance shots are sized by substrate EC against the P2 target, from half to twice this. Bigger shots make more runoff and lower substrate EC.",
     auto: "With the optional judge set up, the controller nudges it at most one step a day, within 1 to 4%. Auto setpoints is off by default.",
-    athena:
-      "“Decrease Substrate EC: Increase shot size”; “Increase Substrate EC: Decrease shot size” (p. 38).",
+    practice: "Bigger shots bring substrate EC down; smaller shots let it rise.",
   },
   p3_emergency_vwc_threshold: {
-    what: "The overnight safety level. It is not an Athena setting.",
+    what: "The overnight safety level.",
     when: "Each time the controller checks in P3, a rescue shot fires if moisture reads below it. The daily water limit does not hold rescue shots.",
     affects:
-      "It can cut the P3 dryback short: if the P3 dryback target ends below this level, a rescue shot fires before the substrate gets there. The maintenance trigger is always kept at least 3 points above it.",
+      "It can cut the P3 dryback short: if the P3 dryback target ends below this level, a rescue shot fires before the substrate gets there. The re-water point is always kept at least 3 points above it.",
     auto: AUTO,
-    athena:
-      "“Caution: make sure to monitor the drybacks in larger plants to avoid drying back past wilting point” (p. 41). Set this above the wilting point.",
+    practice:
+      "Large plants dry back fast overnight: watch that the dryback never reaches the wilting point, and set this above it.",
   },
   p3_emergency_shot_size: {
     what: `The size of each rescue shot, ${OF_SUBSTRATE}.`,
@@ -305,15 +324,15 @@ const DETAILS: Record<string, SettingDetail> = {
     what: "The wettest the substrate can be: the ceiling for the peak VWC target.",
     when: "The ramp stops at the lower of this and the peak VWC target. EC flushes and dilution shots only run while moisture is more than 2 points below it. The zone’s safety status reports approaching saturation within 5 points of it, and over-saturated at or above it.",
     auto: AUTO,
-    athena:
-      "Full saturation: “a substrate can no longer hold anymore water and peak VWC% can no longer increase” (p. 33), and a target above it “is a target that is impossible to reach” (p. 40). That is how this setting behaves. Field capacity, “maximum VWC% of a substrate prior to runoff” (p. 33), is lower: enter that here and a vegetative peak target above it (p. 40) is capped and never reached.",
+    practice:
+      "At full saturation the substrate holds no more water and the peak can rise no further, so a target above it is never reached. That is how this setting behaves. Field capacity, the most the substrate holds before it drains, is lower: enter that here and a vegetative peak target above it is capped and never reached.",
   },
 };
 const EC_DETAILS: Record<string, SettingDetail> = {
   "0": {
     what: "The substrate (pore water) EC reference for P0.",
     when: "In P0, a 10% flush fires when substrate EC is more than 2.5 times this, the feed is weaker than the substrate and moisture is more than 2 points below full saturation.",
-    athena: EC_STAGES,
+    practice: EC_STAGES,
   },
   "1": {
     what: "The substrate (pore water) EC the ramp checks before it hands over.",
@@ -321,21 +340,21 @@ const EC_DETAILS: Record<string, SettingDetail> = {
     affects:
       "Ramp shots are sized 1.2×, 1.5× or 2× while EC is above this (by up to 20%, up to 50%, or more), and 0.7× or 0.5× while it is under 80% or 50% of it.",
     auto: "After a ramp levels off, the controller may raise this (never above the P2 target) so a finished ramp can hand over. Auto setpoints is off by default.",
-    athena: EC_STAGES,
+    practice: EC_STAGES,
   },
   "2": {
     what: "The substrate (pore water) EC the day is steered toward.",
     when: "Maintenance shots are sized against it, from half to twice the maintenance shot size. More than 20% above it, a dilution shot of 1.5 times the maintenance shot runs, if the feed is weaker than the substrate and there is room below full saturation.",
-    stacking: "The maintenance trigger moves to steer substrate EC toward it.",
-    athena: EC_STAGES,
+    stacking: "The re-water point moves to steer substrate EC toward it.",
+    practice: EC_STAGES,
   },
 };
 const DRYBACK_DETAIL: SettingDetail = {
   what: "How far the substrate should dry back overnight, as a percentage of the day’s peak: a relative change. A 30% dryback from a 65% peak ends at 45.5%. The zone’s steering mode picks the vegetative or generative one.",
   when: "Overnight nothing waters toward it: the substrate simply dries. It acts in two places. In the last 3 hours before lights-off, maintenance shots stop early if drying this far by lights-on needs the rest of the night (and no more than 12 hours). After lights-on, P0 also ends once moisture drops this much below its highest reading since lights-on; with P3-sized values that rarely comes first.",
   affects: "When P2 ends, and so substrate EC: a bigger dryback raises it.",
-  athena:
-    "P3 dryback targets: vegetative 30 to 40% (less stress), generative 40 to 50% (more stress), “based on a relative change” (p. 39). By growth stage, the veg stage dries back 50% the first time, then 25% (p. 40). “The grower can control the amount of dryback by adding or subtracting P2 shots at the end of the day” (p. 37): stopping maintenance shots early is how the controller does that.",
+  practice:
+    "Vegetative steering dries back less and generative more, each measured relative to the day’s peak. Fewer maintenance shots at the end of the day deepen the overnight dryback: stopping them early is how the controller does that.",
 };
 
 const MODE: Record<string, string> = {

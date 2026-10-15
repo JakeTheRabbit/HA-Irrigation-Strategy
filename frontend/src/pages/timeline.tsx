@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bot,
   Check,
@@ -14,10 +14,12 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { AskWhy } from "@/components/ask-why";
 import { Empty, Heading, time as clock } from "@/components/dashboard";
 import { JevTrouble, jevUsage } from "@/components/jev-status";
 import { Pill } from "@/components/mini-visuals";
 import { jevAnswer, jevResult, outcomeText, readJev } from "@/lib/jev";
+import { changeEvents, type SetpointLogDocument } from "@/lib/setpoint-log";
 import {
   byHand,
   filterTimeline,
@@ -39,7 +41,7 @@ const KINDS: Record<TimelineKind, { label: string; icon: LucideIcon }> = {
   phase: { label: "Phase", icon: Repeat },
   setpoint: { label: "Setpoint", icon: SlidersHorizontal },
   alert: { label: "Alert", icon: TriangleAlert },
-  jev: { label: "Jev", icon: Bot },
+  jev: { label: "AI assistant", icon: Bot },
   note: { label: "Note", icon: Info },
 };
 const TYPES: { type: TimelineType; label: string }[] = [
@@ -48,17 +50,34 @@ const TYPES: { type: TimelineType; label: string }[] = [
   { type: "phase", label: "Phase" },
   { type: "setpoint", label: "Setpoints" },
   { type: "alert", label: "Alerts" },
-  { type: "jev", label: "Jev" },
+  { type: "jev", label: "AI assistant" },
 ];
 
 /** History › Timeline: what watered, when and why; phase changes; setpoint changes, the grower's and
  * Jev's; alerts; and Jev's decisions with how they turned out. One list, newest first. */
 export function Timeline({ controller, zone }: { controller: Controller; zone?: number }) {
   const [filter, setFilter] = useState<TimelineFilter>({ ...NO_FILTER, zone: zone ?? "all" });
+  const [changes, setChanges] = useState<SetpointLogDocument | null>(null);
   const { room, states } = controller;
+  // Who changed which setting: the integration's change log. An older integration has none.
+  useEffect(() => {
+    let cancelled = false;
+    setChanges(null);
+    if (!controller.roomId) return;
+    controller
+      .operator<SetpointLogDocument>("setpoint_log_get")
+      .then((doc) => {
+        if (!cancelled) setChanges(doc);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [controller.roomId, controller.operator]);
   const jev = readJev(states, room.room.prefix);
   const now = Date.now();
-  const items = mergeTimeline(room.events, jev.log?.entries ?? [], now);
+  const logged = changes?.room_id === controller.roomId ? changeEvents(changes) : [];
+  const items = mergeTimeline([...room.events, ...logged], jev.log?.entries ?? [], now);
   const shown = filterTimeline(items, filter);
   const quiet = items.filter((item) => item.jev && !jevActed(item.jev)).length;
   const names = new Map(room.zones.map((item) => [item.id, item.name]));
@@ -96,7 +115,7 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
           <Search size={17} />
           <Input
             aria-label="Search the timeline"
-            placeholder="Search the timeline…"
+            placeholder="Search the timeline"
             value={filter.query}
             onChange={(event) => set({ query: event.target.value })}
           />
@@ -136,7 +155,7 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
               checked={filter.allJev}
               onChange={(event) => set({ allJev: event.target.checked })}
             />
-            All Jev decisions
+            All AI assistant decisions
             {quiet > 0 && <span className="muted">({quiet} that changed nothing)</span>}
           </label>
         )}
@@ -146,10 +165,15 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
       </div>
       {jev.room && (
         <div className="timeline-jev-usage">
-          <p className="muted small">Jev: {jevUsage(jev.room)}</p>
+          <p className="muted small">
+            {jev.room.on
+              ? `AI assistant: ${jevUsage(jev.room)}`
+              : `AI assistant off: the controller uses its rules. ${jev.room.stateWords}`}
+          </p>
           <JevTrouble jev={jev.room} />
         </div>
       )}
+      <AskWhy controller={controller} zone={zone} />
       <section className="panel timeline-panel" aria-label="Timeline records">
         {!shown.length ? (
           <Empty
@@ -157,7 +181,7 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
             detail={
               items.length
                 ? "Change the search or the filters to see more."
-                : "The controller has published no activity records and Jev no decisions. This does not confirm that no irrigation occurred."
+                : "The controller published no activity records, and the AI assistant published no decisions. This does not show that no shot occurred."
             }
             action={
               items.length ? (
@@ -181,9 +205,9 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
         )}
       </section>
       <p className="footnote">
-        The controller’s own activity records and Jev’s journal, as the controller publishes them.
-        Home Assistant’s logbook may hold more. Jev answers; code decides what it may do and refuses
-        what it may not.
+        The activity records of the controller and the journal of the AI assistant, as the
+        controller publishes them. The logbook of Home Assistant can hold more. The AI assistant
+        answers. The controller code decides what it can do and refuses what it cannot do.
       </p>
     </>
   );
@@ -230,7 +254,7 @@ function Row({ item, names }: { item: TimelineItem; names: Map<number, string> }
           </>
         ) : entry ? (
           <>
-            {item.kind !== "jev" && <span className="timeline-jev-tag">Jev</span>}{" "}
+            {item.kind !== "jev" && <span className="timeline-jev-tag">AI assistant</span>}{" "}
             <strong>{entry.title}</strong>{" "}
             {entry.kind === "outcome"
               ? `after “${entry.verdict || "an earlier call"}”`
@@ -253,7 +277,7 @@ function Row({ item, names }: { item: TimelineItem; names: Map<number, string> }
         <span className="timeline-result">
           {hand ? (
             <Pill tone="neutral" data-jev-result="by hand">
-              Noted by Jev
+              Noted by the AI assistant
             </Pill>
           ) : (
             <Pill tone={jevResult(entry).tone} data-jev-result={entry.result}>

@@ -14,6 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UiTip } from "@/components/info-tip";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +50,7 @@ import {
   parseBalance,
   parsePlanImport,
   planErrors,
+  planState,
   rangeBlock,
   replaceRange,
 } from "@/lib/grow-plan";
@@ -416,6 +418,7 @@ export function GrowPlanner({
               <Upload size={16} />
               Import
             </Button>
+            <UiTip copyKey="import grow plan" />
           </div>
         }
       />
@@ -468,13 +471,29 @@ export function GrowPlanner({
             <div>
               <span className="eyebrow">Plan status</span>
               <strong className="plan-state">
-                {document.status}
+                {planState(document).label}
                 {dirty ? " · unsaved changes" : ""}
               </strong>
+              <p className="plan-state-why">{planState(document).sentence}</p>
               <p className="muted small">
                 Revision {document.revision} ·{" "}
                 {controller.demo ? "Isolated sample plan" : "Stored in Home Assistant"}
               </p>
+              <span className="label-with-tip">
+                <Label htmlFor="plan-name">Plan name (optional)</Label>
+                <UiTip copyKey="plan name (optional)" />
+              </span>
+              <Input
+                id="plan-name"
+                maxLength={100}
+                disabled={disabled}
+                value={plan.name ?? ""}
+                placeholder="AI assistant plan line"
+                onChange={(e) => {
+                  const { name: _old, ...unnamed } = plan;
+                  setPlan(e.target.value.trim() ? { ...unnamed, name: e.target.value } : unnamed);
+                }}
+              />
             </div>
             <div className="workspace-actions">
               <Button
@@ -542,6 +561,7 @@ export function GrowPlanner({
               <Button variant="outline" disabled={disabled} onClick={updateZonesFromSetup}>
                 Update zones from setup
               </Button>
+              <UiTip copyKey="update zones from setup" />
               {!editable && (
                 <p>Disarm and wait for draft status before updating zone assignments.</p>
               )}
@@ -576,7 +596,7 @@ export function GrowPlanner({
             open={advanced}
             onToggle={(event) => setAdvanced((event.currentTarget as HTMLDetailsElement).open)}
           >
-            <summary>Advanced: steering balance by week, endpoint profiles and recipes</summary>
+            <summary>Advanced plan settings</summary>
             <div className="workspace-tabs" role="tablist" aria-label="Grow planner view">
               <button
                 role="tab"
@@ -631,7 +651,7 @@ export function GrowPlanner({
                 <section className="panel workspace-card">
                   <div className="workspace-section-heading">
                     <div>
-                      <h2>Whole-grow overview</h2>
+                      <h2>Grow overview</h2>
                       <p className="muted">
                         Each row is a zone. Type a balance (0–100% generative) into a week or day;
                         Enter applies, Esc cancels, arrows move.
@@ -776,7 +796,10 @@ export function GrowPlanner({
                       </p>
                     </div>
                     <div className="workspace-actions">
-                      <Label htmlFor="preview-grow-day">Preview day</Label>
+                      <span className="label-with-tip">
+                        <Label htmlFor="preview-grow-day">Preview day</Label>
+                        <UiTip copyKey="preview day" />
+                      </span>
                       <Input
                         id="preview-grow-day"
                         type="number"
@@ -793,7 +816,10 @@ export function GrowPlanner({
                   </div>
                   <div className="workspace-form-grid">
                     <div>
-                      <Label htmlFor="zone-start-date">Zone grow start date</Label>
+                      <span className="label-with-tip">
+                        <Label htmlFor="zone-start-date">Zone start date</Label>
+                        <UiTip copyKey="zone grow start date" />
+                      </span>
                       <Input
                         id="zone-start-date"
                         type="date"
@@ -810,7 +836,10 @@ export function GrowPlanner({
                       />
                     </div>
                     <div>
-                      <Label htmlFor="block-profile">Endpoint profile</Label>
+                      <span className="label-with-tip">
+                        <Label htmlFor="block-profile">Endpoint profile</Label>
+                        <UiTip copyKey="endpoint profile" />
+                      </span>
                       <select
                         id="block-profile"
                         value={profile?.id || ""}
@@ -827,7 +856,10 @@ export function GrowPlanner({
                   </div>
                   <div className="steering-control">
                     <div className="workspace-section-heading">
-                      <Label htmlFor="steering-balance">Steering balance</Label>
+                      <span className="label-with-tip">
+                        <Label htmlFor="steering-balance">Steering balance</Label>
+                        <UiTip copyKey="steering balance" />
+                      </span>
                       <strong>{currentBlock?.bias ?? 50}% generative</strong>
                     </div>
                     <input
@@ -913,7 +945,10 @@ export function GrowPlanner({
               <section className="panel workspace-card">
                 <div className="workspace-section-heading">
                   <div>
-                    <h2>Vegetative and generative endpoints</h2>
+                    <div className="label-with-tip">
+                      <h2>Vegetative and generative endpoints</h2>
+                      <UiTip copyKey="vegetative and generative endpoints" />
+                    </div>
                     <p className="muted">
                       The slider blends between these values. Set appropriate targets for your
                       substrate, cultivar and grow stage.
@@ -955,7 +990,10 @@ export function GrowPlanner({
                 </div>
                 <div className="workspace-form-grid">
                   <div>
-                    <Label htmlFor="profile-zone">Zone limits</Label>
+                    <span className="label-with-tip">
+                      <Label htmlFor="profile-zone">Zone limits</Label>
+                      <UiTip copyKey="zone limits" />
+                    </span>
                     <select
                       id="profile-zone"
                       value={zoneId}
@@ -970,7 +1008,10 @@ export function GrowPlanner({
                     </select>
                   </div>
                   <div>
-                    <Label htmlFor="profile-name">Profile name</Label>
+                    <span className="label-with-tip">
+                      <Label htmlFor="profile-name">Profile name</Label>
+                      <UiTip copyKey="profile name" />
+                    </span>
                     <Input
                       id="profile-name"
                       value={profile?.name || ""}

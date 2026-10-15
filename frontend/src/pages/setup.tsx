@@ -21,7 +21,9 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Heading, Empty } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { ControllerSettings } from "@/components/controller-settings";
+import { SetupWizard } from "@/components/setup-wizard";
 import { Pill } from "@/components/mini-visuals";
 import {
   CatchTestCalculator,
@@ -31,6 +33,7 @@ import {
   useSizingUnits,
 } from "@/components/zone-sizing";
 import type { Controller } from "@/lib/types";
+import { roomSlug } from "@/lib/model";
 import { SIZING_UNITS, reviewValue, sizingError } from "@/lib/units";
 import {
   PLUMBING_HINTS,
@@ -43,7 +46,14 @@ import {
   type PlumbingLayout,
 } from "@/lib/plumbing";
 import { errorText } from "@/lib/utils";
-import type { SetupCandidate, SetupDocument, SetupRoom, SetupZone } from "@/lib/operator-types";
+import { needsWizard } from "@/lib/commissioning";
+import type {
+  Commissioning,
+  SetupCandidate,
+  SetupDocument,
+  SetupRoom,
+  SetupZone,
+} from "@/lib/operator-types";
 
 export function MappingPicker({
   label,
@@ -127,7 +137,7 @@ export function MappingPicker({
           </DialogHeader>
           <Input
             autoFocus
-            placeholder="Search name or entity ID…"
+            placeholder="Name or entity ID"
             aria-label={"Search " + label + " entities"}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
@@ -182,7 +192,9 @@ export function MappingPicker({
     </div>
   );
 }
-function newZone(id: number): SetupZone {
+/** A new zone, its sizing from the integration's one defaults table (`defaults`; these values
+ * where an older integration does not send it). */
+function newZone(id: number, defaults: SetupDocument["sizing_defaults"] = {}): SetupZone {
   return {
     id,
     name: "Zone " + id,
@@ -194,6 +206,7 @@ function newZone(id: number): SetupZone {
     substrate_volume: 5,
     drippers_per_plant: 1,
     dripper_flow_rate: 2,
+    ...defaults,
   };
 }
 const hardwareFields = [
@@ -274,7 +287,7 @@ export function Setup({
       active: true,
       num_zones: 1,
       active_zone_ids: [1],
-      zones: [newZone(1)],
+      zones: [newZone(1, data?.sizing_defaults)],
       hardware: {},
       plumbing: "",
       safety: { ready: true, blockers: [] },
@@ -285,6 +298,16 @@ export function Setup({
     setNotice("");
     setError("");
   }
+  // The wizard's checks change nothing in the room's setup: patch both copies, so they never make
+  // the room look edited.
+  function wizardStatus(commissioning: Commissioning) {
+    setOriginal((room) => room && { ...room, commissioning });
+    setDraft((room) => room && { ...room, commissioning });
+    if (commissioning.commissioned)
+      setNotice(
+        "The setup of this room is complete. Set the Watering switch to on. The dashboard shows a review first.",
+      );
+  }
   function editZone(id: number, patch: Partial<SetupZone>) {
     if (draft)
       setDraft({ ...draft, zones: draft.zones.map((z) => (z.id === id ? { ...z, ...patch } : z)) });
@@ -293,7 +316,8 @@ export function Setup({
     return (data?.candidates || [])
       .filter((c) =>
         kind === "switch"
-          ? c.domain === "switch"
+          ? // a zone valve, main line or pump: what the controller can open and close
+            ["switch", "input_boolean", "valve"].includes(c.domain)
           : kind === "timestamp"
             ? ["sensor", "input_datetime"].includes(c.domain)
             : kind === "binary"
@@ -335,6 +359,8 @@ export function Setup({
       errors.push(...plumbingErrors(plumbing, draft.hardware));
     }
     if (!draft.room_name.trim()) errors.push("Name the room.");
+    else if (isNew && roomSlug(draft.room_name) === "default")
+      errors.push("Default is reserved for the original room. Choose another room name.");
     if (!draft.zones.length) errors.push("Add a zone.");
     if (activeZones.some((z) => !z.name.trim() || !z.valve))
       errors.push("Every active zone needs a name and valve.");
@@ -387,7 +413,7 @@ export function Setup({
       setNotice(
         review === "remove"
           ? "Room archived. Its identifiers and stored configuration are retained."
-          : "Configuration saved in Home Assistant. Controller discovery and acknowledgement may follow on its next refresh; keep watering off until verified.",
+          : "The configuration is saved in Home Assistant. The controller can find and accept it at its next refresh. Keep the kill switch at off until you verify it.",
       );
     } catch (e) {
       setError(errorText(e));
@@ -395,18 +421,24 @@ export function Setup({
       setBusy(false);
     }
   }
-  const engineConfig = Object.values(controller.states).find(
-    (e) => e.entity_id.endsWith("engine_config") && e.attributes.prefix === draft?.prefix,
-  );
-  const heartbeat = Object.values(controller.states).find(
-    (e) => e.entity_id === "sensor.crop_steering_" + draft?.prefix + "ai_heartbeat",
-  );
+  // A new room has no prefix until it is created (it then gets its own slug), so it never
+  // borrows the descriptor or heartbeat of an older install's un-prefixed room.
+  const engineConfig = isNew
+    ? undefined
+    : Object.values(controller.states).find(
+        (e) => e.entity_id.endsWith("engine_config") && e.attributes.prefix === draft?.prefix,
+      );
+  const heartbeat = isNew
+    ? undefined
+    : Object.values(controller.states).find(
+        (e) => e.entity_id === "sensor.crop_steering_" + draft?.prefix + "ai_heartbeat",
+      );
   const confirmedRevision = Number(heartbeat?.attributes.setup_revision);
   const mappingConfirmed =
     !isNew && draft && Number.isFinite(confirmedRevision) && confirmedRevision >= draft.revision;
   const Installation = () => (
     <section className="panel workspace-card">
-      <h2>Install once, then map your devices</h2>
+      <h2>Install, then map devices</h2>
       <p className="muted">
         Home Assistant requires confirmation for custom integrations and controller apps. These
         shortcuts take you directly to the correct steps.
@@ -450,30 +482,44 @@ export function Setup({
         <li>
           <span className="step-number">3</span>
           <div>
-            <h3>Install the controller app</h3>
+            <h3>
+              Install the controller app <UiTip copyKey="install the controller app" />
+            </h3>
             <p>
               For Home Assistant OS/Supervised, add the repository and install Crop Steering. Keep
               watering off in every room while mapping hardware.
             </p>
             <Button asChild variant="outline">
               <a
-                href="https://my.home-assistant.io/redirect/supervisor_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FJakeTheRabbit%2FHA-Irrigation-Strategy"
+                href="https://my.home-assistant.io/redirect/supervisor_add_addon_repository/?repository_url=https%3A%2F%2Fgithub.com%2FJakeTheRabbit%2FHA-Irrigation-Strategy"
                 target="_blank"
                 rel="noreferrer"
               >
                 Add controller repository <ExternalLink size={15} />
               </a>
             </Button>
+            <p>
+              Home Assistant Container or Core: run the controller container instead.{" "}
+              <a
+                href="https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md#home-assistant-container-or-core"
+                target="_blank"
+                rel="noreferrer"
+              >
+                How to run it <ExternalLink size={13} />
+              </a>
+            </p>
           </div>
         </li>
         <li>
           <span className="step-number">4</span>
           <div>
-            <h3>Map, verify and start</h3>
+            <h3>
+              Map, verify and start <UiTip copyKey="map, verify and start" />
+            </h3>
             <p>
-              Use Rooms & setup to select valves and probes, enter pot/dripper measurements, confirm
-              the controller acknowledges the mapping, then review your grow plan. Switch watering
-              on deliberately in Settings.
+              Use Rooms and setup to select valves and probes, enter pot/dripper measurements,
+              confirm the controller acknowledges the mapping, then review your grow plan. Switch
+              watering on deliberately in Settings.
             </p>
             <Button
               variant="outline"
@@ -498,7 +544,7 @@ export function Setup({
   return (
     <>
       <Heading
-        title="Rooms & setup"
+        title="Rooms and setup"
         action={
           <Button
             disabled={!data?.capabilities.create || dirty || busy || !connected}
@@ -549,7 +595,10 @@ export function Setup({
         <>
           <section className="panel workspace-card workspace-section-heading">
             <div className="setup-room-select">
-              <Label htmlFor="setup-room">Room configuration</Label>
+              <span className="label-with-tip">
+                <Label htmlFor="setup-room">Room</Label>
+                <UiTip copyKey="room configuration" />
+              </span>
               <select
                 id="setup-room"
                 disabled={busy || dirty}
@@ -592,9 +641,14 @@ export function Setup({
           </section>
           {!draft ? (
             <Empty
-              title="Create your first room"
+              title="Make your first room"
               detail="Add a room and map devices that already exist in Home Assistant."
-              action={<Button onClick={addRoom}>Add room</Button>}
+              action={
+                <span className="label-with-tip">
+                  <Button onClick={addRoom}>Add room</Button>
+                  <UiTip copyKey="add room" />
+                </span>
+              }
             />
           ) : (
             <>
@@ -611,10 +665,13 @@ export function Setup({
                   </Button>
                 </div>
               )}
+              {!isNew && original && needsWizard(original) && (
+                <SetupWizard controller={controller} room={original} onStatus={wizardStatus} />
+              )}
               <section className="panel workspace-card">
                 <div className="workspace-section-heading">
                   <div>
-                    <h2>Room identity & readiness</h2>
+                    <h2>Room name and status</h2>
                     <p className="muted">
                       Room labels can change. Existing controller identifiers stay stable.
                     </p>
@@ -629,7 +686,10 @@ export function Setup({
                 </div>
                 <div className="workspace-form-grid">
                   <div>
-                    <Label htmlFor="room-name">Room name</Label>
+                    <span className="label-with-tip">
+                      <Label htmlFor="room-name">Room name</Label>
+                      <UiTip copyKey="room name" />
+                    </span>
                     <Input
                       id="room-name"
                       value={draft.room_name}
@@ -642,7 +702,7 @@ export function Setup({
                     <span className="mapping-label">Configuration</span>
                     <p>
                       {isNew
-                        ? "New namespace generated on creation"
+                        ? "Entity ids will start crop_steering_" + roomSlug(draft.room_name) + "_"
                         : "Revision " + draft.revision + " · " + (draft.prefix || "Default room")}
                     </p>
                     <Pill dot tone={engineConfig ? "on" : "warn"}>
@@ -679,7 +739,10 @@ export function Setup({
                 </div>
                 {asksPlumbing && (
                   <div className="setup-plumbing">
-                    <Label htmlFor="room-plumbing">How is this room plumbed?</Label>
+                    <span className="label-with-tip">
+                      <Label htmlFor="room-plumbing">Room plumbing</Label>
+                      <UiTip copyKey="how is this room plumbed?" />
+                    </span>
                     <select
                       id="room-plumbing"
                       disabled={busy}
@@ -753,7 +816,7 @@ export function Setup({
               <section className="panel workspace-card">
                 <div className="workspace-section-heading">
                   <div>
-                    <h2>Zones & sensor mapping</h2>
+                    <h2>Zones and probe mapping</h2>
                     <p className="muted">
                       Each zone has its own valve, probes and delivery sizing. Archived IDs are
                       never renumbered.
@@ -767,7 +830,10 @@ export function Setup({
                     }
                     onClick={() => {
                       const id = Math.max(0, ...draft.zones.map((z) => z.id)) + 1;
-                      setDraft({ ...draft, zones: [...draft.zones, newZone(id)] });
+                      setDraft({
+                        ...draft,
+                        zones: [...draft.zones, newZone(id, data?.sizing_defaults)],
+                      });
                     }}
                   >
                     <Plus size={16} />
@@ -925,7 +991,9 @@ export function Setup({
               {!isNew && draft.active && (
                 <section className="panel workspace-card workspace-section-heading">
                   <div>
-                    <h2>Remove this room</h2>
+                    <h2>
+                      Remove this room <UiTip copyKey="remove this room" />
+                    </h2>
                     <p className="muted">
                       Archive the room while retaining its identifiers and configuration. Watering
                       and the hardware must be off.
@@ -972,7 +1040,10 @@ export function Setup({
           </DialogHeader>
           {review === "remove" ? (
             <div>
-              <Label htmlFor="confirm-room-name">Type the room name to confirm</Label>
+              <span className="label-with-tip">
+                <Label htmlFor="confirm-room-name">Type the room name</Label>
+                <UiTip copyKey="type the room name to confirm" />
+              </span>
               <Input
                 id="confirm-room-name"
                 value={confirmName}

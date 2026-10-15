@@ -4,8 +4,6 @@ from __future__ import annotations
 
 import json
 import logging
-import os
-import yaml
 from pathlib import Path
 from typing import Any
 
@@ -19,11 +17,15 @@ from .const import (
     SOFTWARE_VERSION,
     DOMAIN,
     CONF_NUM_ZONES,
+    CONF_P0_ADDITIONAL_DRYBACK,
+    NEW_ROOM_P0_ADDITIONAL_DRYBACK,
     MIN_ZONES,
     MAX_ZONES,
     DEFAULT_NUM_ZONES,
+    DRAINAGE_TYPES,
+    MOISTURE_RANGES,
 )
-from .env_parser import load_env_config
+from .generated.defaults import ENTITY_DEFAULTS, SIZING_DEFAULTS
 from .plumbing import PLUMBING_LAYOUTS, infer as infer_plumbing
 from .room import slugify_room
 
@@ -35,6 +37,13 @@ _LOGGER = logging.getLogger(__name__)
 # --------------------------------------------------------------------------
 def _sw_sel():
     return selector.EntitySelector(selector.EntitySelectorConfig(domain="switch"))
+
+
+def _actuator_sel():
+    # A zone valve, main line or pump: any kind of device the controller can open and close.
+    return selector.EntitySelector(
+        selector.EntitySelectorConfig(domain=["switch", "input_boolean", "valve"])
+    )
 
 
 def _sensor_multi():
@@ -64,6 +73,17 @@ def _plumbing_sel():
     )
 
 
+def _drainage_sel():
+    # How the room's runoff leaves it: a free-draining room is not watched for a table backing up.
+    return selector.SelectSelector(
+        selector.SelectSelectorConfig(
+            options=DRAINAGE_TYPES,
+            translation_key="drainage",
+            mode=selector.SelectSelectorMode.LIST,
+        )
+    )
+
+
 def _as_list(v):
     if not v:
         return []
@@ -72,7 +92,7 @@ def _as_list(v):
 
 def _zone_schema(num_zones: int, zones: dict | None = None) -> dict:
     """Build the {marker: selector} map for per-zone entity mapping, prefilled from
-    an existing `zones` dict (env_parser/config-entry shape)."""
+    an existing `zones` dict (the config entry's shape)."""
     zones = zones or {}
     out: dict = {}
     for z in range(1, int(num_zones) + 1):
@@ -84,7 +104,7 @@ def _zone_schema(num_zones: int, zones: dict | None = None) -> dict:
         ec = zc.get("ec_sensors") or (
             _as_list(zc.get("ec_front")) + _as_list(zc.get("ec_back"))
         )
-        pc = zc.get("plant_count", 4)
+        pc = zc.get("plant_count", SIZING_DEFAULTS["plant_count"])
         out[vol.Optional(f"zone_{z}_name", default=zc.get("name", f"Zone {z}"))] = str
         out[vol.Optional(f"zone_{z}_active", default=zc.get("active", True))] = bool
         out[
@@ -93,7 +113,7 @@ def _zone_schema(num_zones: int, zones: dict | None = None) -> dict:
                 if sw
                 else vol.Required(f"zone_{z}_switch")
             )
-        ] = _sw_sel()
+        ] = _actuator_sel()
         out[vol.Optional(f"zone_{z}_vwc", default=vwc)] = _sensor_multi()
         out[vol.Optional(f"zone_{z}_ec", default=ec)] = _sensor_multi()
         out[vol.Optional(f"zone_{z}_plant_count", default=pc)] = vol.All(
@@ -138,8 +158,8 @@ def _hardware_schema(
             else vol.Required("plumbing")
         )
     ] = _plumbing_sel()
-    _ent("pump_switch", _sw_sel())
-    _ent("main_line_switch", _sw_sel())
+    _ent("pump_switch", _actuator_sel())
+    _ent("main_line_switch", _actuator_sel())
     _ent("waste_switch", _sw_sel())
     # Per-room source-water probes (optional). Map this room's reservoir EC/pH probes to
     # enable its source-water gate; leave empty to disable that gate for the room. (The
@@ -154,20 +174,44 @@ def _hardware_schema(
         vol.All(vol.Coerce(int), vol.Range(min=0, max=23))
     )
     out[
-        vol.Optional("substrate_volume", default=params.get("substrate_volume", 6.0))
+        vol.Optional(
+            "substrate_volume",
+            default=params.get("substrate_volume", SIZING_DEFAULTS["substrate_volume"]),
+        )
     ] = vol.All(vol.Coerce(float), vol.Range(min=0.1, max=200.0))
     out[
-        vol.Optional("dripper_flow_rate", default=params.get("dripper_flow_rate", 2.0))
+        vol.Optional(
+            "dripper_flow_rate",
+            default=params.get(
+                "dripper_flow_rate", SIZING_DEFAULTS["dripper_flow_rate"]
+            ),
+        )
     ] = vol.All(vol.Coerce(float), vol.Range(min=0.1, max=50.0))
     out[
-        vol.Optional("drippers_per_plant", default=params.get("drippers_per_plant", 1))
+        vol.Optional(
+            "drippers_per_plant",
+            default=params.get(
+                "drippers_per_plant", SIZING_DEFAULTS["drippers_per_plant"]
+            ),
+        )
     ] = vol.All(vol.Coerce(int), vol.Range(min=1, max=20))
-    out[vol.Optional("field_capacity", default=params.get("field_capacity", 70.0))] = (
-        vol.All(vol.Coerce(float), vol.Range(min=30.0, max=95.0))
+    out[
+        vol.Optional(
+            "field_capacity",
+            default=params.get("field_capacity", ENTITY_DEFAULTS["field_capacity"]),
+        )
+    ] = vol.All(
+        vol.Coerce(float),
+        vol.Range(
+            min=MOISTURE_RANGES["field_capacity"][0],
+            max=MOISTURE_RANGES["field_capacity"][1],
+        ),
     )
-    out[vol.Optional("max_ec", default=params.get("max_ec", 9.0))] = vol.All(
-        vol.Coerce(float), vol.Range(min=1.0, max=15.0)
-    )
+    out[
+        vol.Optional(
+            "max_ec", default=params.get("max_ec", ENTITY_DEFAULTS["maximum_ec"])
+        )
+    ] = vol.All(vol.Coerce(float), vol.Range(min=1.0, max=15.0))
     _ent("temperature_sensor", _sensor_one())
     _ent("humidity_sensor", _sensor_one())
     _ent("vpd_sensor", _sensor_one())
@@ -196,7 +240,7 @@ def _hardware_schema(
 
 
 def _build_zones(num_zones: int, data: dict, existing: dict | None = None) -> dict:
-    """Build the config-entry `zones` dict (env_parser shape) from submitted form data."""
+    """Build the config entry's `zones` dict from submitted form data."""
     zones: dict = {str(k): {**v, "active": False} for k, v in (existing or {}).items()}
     for z in range(1, int(num_zones) + 1):
         vwc = _as_list(data.get(f"zone_{z}_vwc"))
@@ -217,9 +261,11 @@ def _build_zones(num_zones: int, data: dict, existing: dict | None = None) -> di
             "vwc_back": vwc[1] if len(vwc) > 1 else "",
             "ec_front": ec[0] if ec else "",
             "ec_back": ec[1] if len(ec) > 1 else "",
-            "plant_count": int(data.get(f"zone_{z}_plant_count", 4)),
+            "plant_count": int(
+                data.get(f"zone_{z}_plant_count", SIZING_DEFAULTS["plant_count"])
+            ),
             "max_daily_volume": ((existing or {}).get(str(z)) or {}).get(
-                "max_daily_volume", 20.0
+                "max_daily_volume", ENTITY_DEFAULTS["max_daily_volume"]
             ),
         }
     return zones
@@ -248,11 +294,17 @@ def _build_hardware(data: dict) -> dict:
 
 def _build_parameters(data: dict) -> dict:
     return {
-        "substrate_volume": data.get("substrate_volume", 6.0),
-        "dripper_flow_rate": data.get("dripper_flow_rate", 2.0),
-        "drippers_per_plant": data.get("drippers_per_plant", 1),
-        "field_capacity": data.get("field_capacity", 70.0),
-        "max_ec": data.get("max_ec", 9.0),
+        "substrate_volume": data.get(
+            "substrate_volume", SIZING_DEFAULTS["substrate_volume"]
+        ),
+        "dripper_flow_rate": data.get(
+            "dripper_flow_rate", SIZING_DEFAULTS["dripper_flow_rate"]
+        ),
+        "drippers_per_plant": data.get(
+            "drippers_per_plant", SIZING_DEFAULTS["drippers_per_plant"]
+        ),
+        "field_capacity": data.get("field_capacity", ENTITY_DEFAULTS["field_capacity"]),
+        "max_ec": data.get("max_ec", ENTITY_DEFAULTS["maximum_ec"]),
         "lights_on_hour": data.get("lights_on_hour", 12),
         "lights_off_hour": data.get("lights_off_hour", 0),
     }
@@ -260,13 +312,8 @@ def _build_parameters(data: dict) -> dict:
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required("name", default="Crop Steering System"): str,
-        vol.Required("config_method", default="manual"): vol.In(
-            {
-                "manual": "Search and select devices (Recommended)",
-                "env": "Load from crop_steering.env file (advanced)",
-            }
-        ),
+        vol.Required("name", default="Grow room"): str,
+        vol.Required("drainage", default="unknown"): _drainage_sel(),
     }
 )
 
@@ -287,7 +334,7 @@ def _retry_form(flow, step_id, schema, user_input, info, error):
         data_schema=prefill(schema, user_input) if prefill else schema,
         errors={"base": "setup_invalid"},
         description_placeholders={
-            "info": f"{info}\n\n**Not saved yet.** {error}",
+            "info": f"{info}\n\n**The setup is not saved.** {error}",
             "error": str(error),
         },
     )
@@ -318,9 +365,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Initial step. The first config is the default (un-prefixed) room — existing
-        single-room installs are unchanged. Any further config adds another fully-isolated
-        room (own zones/sensors/pump/setpoints), namespaced as crop_steering_<slug>_*.
+        """Initial step. Every new room, the first one included, is namespaced as
+        crop_steering_<slug>_* from its name, with its own zones, sensors, pump and setpoints.
+        Only a room created before that, or imported from a .env file, has un-prefixed ids.
         """
         # Never set a room up on code that is waiting for a restart: whatever it creates is
         # created by the OLD code, and entity ids are for life.
@@ -335,21 +382,25 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             try:
                 data = prepare_setup(self.hass, user_input["setup_payload"])
-                named = bool(self._async_current_entries())
-                slug = slugify_room(data["room_name"]) if named else "default"
-                if named and slug == "default":
+                slug = slugify_room(data["room_name"])
+                if slug == "default":
                     return self.async_abort(reason="reserved_room_name")
-                await self.async_set_unique_id(f"room_{slug}" if named else "default")
+                await self.async_set_unique_id(f"room_{slug}")
                 self._abort_if_unique_id_configured()
                 data.update(
                     room_slug=slug,
-                    room_prefix=f"{slug}_" if named else "",
+                    room_prefix=f"{slug}_",
                     config_method="manual",
                     setup_revision=1,
+                    commissioning={
+                        "done": False
+                    },  # the setup wizard checks it before switch-on
                 )
+                data[CONF_P0_ADDITIONAL_DRYBACK] = NEW_ROOM_P0_ADDITIONAL_DRYBACK
                 data["enable_flag"] = (
                     f"switch.crop_steering_{data['room_prefix']}engine_enabled"
                 )
+                data["max_run_latch"] = True  # its max-run latch switch starts ON
                 blockers = safety_blockers(self.hass, proposed=data)
                 if blockers:
                     raise ValueError("; ".join(blockers))
@@ -368,22 +419,21 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 step_id="user",
                 data_schema=STEP_USER_DATA_SCHEMA,
                 description_placeholders={
-                    "info": "Choose how to configure the Crop Steering System. "
-                    "Select devices with searchable pickers (recommended). "
-                    "Advanced users can import an existing .env file.",
                     "version": running,
                     "restart_notice": "",
                 },
             )
 
-        await self.async_set_unique_id("default")
-        self._abort_if_unique_id_configured()
         self._data.update(user_input)
-        self._data["room_prefix"] = ""
         self._data["room_name"] = user_input.get("name", "Crop Steering")
 
-        if user_input["config_method"] == "env":
-            return await self.async_step_load_env()
+        slug = slugify_room(self._data["room_name"])
+        if slug == "default":
+            return self.async_abort(reason="reserved_room_name")
+        await self.async_set_unique_id(f"room_{slug}")
+        self._abort_if_unique_id_configured()
+        self._data["room_slug"] = slug
+        self._data["room_prefix"] = f"{slug}_"
         return await self.async_step_manual_zones()
 
     async def async_step_room(
@@ -393,10 +443,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             return self.async_show_form(
                 step_id="room",
-                data_schema=vol.Schema({vol.Required("room_name"): str}),
+                data_schema=vol.Schema(
+                    {
+                        vol.Required("room_name"): str,
+                        vol.Required("drainage", default="unknown"): _drainage_sel(),
+                    }
+                ),
                 description_placeholders={
-                    "info": "Name this room (e.g. Veg, Flower B). It gets its own zones, "
-                    "sensors, pump and setpoints — completely isolated from your other rooms.",
+                    "info": "Each room has its own zones, probes, pump and setpoints. It does "
+                    "not share them with other rooms. Example names: Veg, Flower B.",
                     "version": SOFTWARE_VERSION,
                 },
             )
@@ -409,90 +464,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._data["room_name"] = user_input["room_name"]
         self._data["room_slug"] = slug
         self._data["room_prefix"] = f"{slug}_"
+        self._data["drainage"] = user_input.get("drainage", "unknown")
         return await self.async_step_manual_zones()
-
-    async def async_step_load_env(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Load configuration from crop_steering.env file."""
-        env_path = os.path.join(self.hass.config.config_dir, "crop_steering.env")
-
-        if not await self.hass.async_add_executor_job(os.path.exists, env_path):
-            return self.async_abort(
-                reason="env_not_found",
-                description_placeholders={
-                    "path": env_path,
-                    "message": f"File not found: {env_path}\n\n"
-                    "Please create crop_steering.env in your Home Assistant config directory, "
-                    "or choose Manual configuration.",
-                },
-            )
-
-        try:
-            # Load and parse .env file off the event loop (file I/O must not block it)
-            env_config = await self.hass.async_add_executor_job(
-                load_env_config, self.hass.config.config_dir
-            )
-
-            if env_config["num_zones"] == 0:
-                return self.async_abort(
-                    reason="no_zones_configured",
-                    description_placeholders={
-                        "message": "No zones detected in crop_steering.env file. "
-                        "Please add at least one ZONE_N_SWITCH entry."
-                    },
-                )
-
-            # Validate entity IDs (skip if user chose to ignore missing)
-            ignore_missing = (
-                user_input.get("ignore_missing", False) if user_input else False
-            )
-            missing_entities = await self._validate_env_entities(env_config)
-            if missing_entities and not ignore_missing:
-                return self.async_show_form(
-                    step_id="load_env",
-                    data_schema=vol.Schema(
-                        {vol.Required("ignore_missing", default=False): bool}
-                    ),
-                    errors={"base": "missing_entities"},
-                    description_placeholders={
-                        "missing": "\n".join(missing_entities[:10]),
-                        "count": str(len(missing_entities)),
-                    },
-                )
-
-            # Create entry with .env configuration
-            _LOGGER.info(
-                f"Creating entry from .env: {env_config['num_zones']} zones, "
-                f"zones: {list(env_config['zones'].keys())}"
-            )
-
-            return self.async_create_entry(
-                title=f"Crop Steering ({env_config['num_zones']} zones from .env)",
-                data={
-                    "name": self._data.get("name", "Crop Steering System"),
-                    "config_method": "env",
-                    "room_name": self._data.get("room_name", "Crop Steering"),
-                    "room_prefix": "",
-                    "room_slug": "default",
-                    "num_zones": env_config["num_zones"],
-                    "zones": env_config["zones"],
-                    "hardware": env_config["hardware"],
-                    "parameters": env_config["parameters"],
-                    "features": env_config["features"],
-                    "env_file_path": env_path,
-                },
-            )
-
-        except Exception as e:
-            _LOGGER.error(f"Error loading .env file: {e}", exc_info=True)
-            return self.async_abort(
-                reason="env_parse_error",
-                description_placeholders={
-                    "error": str(e),
-                    "message": "Failed to parse crop_steering.env file. Please check the format.",
-                },
-            )
 
     async def async_step_manual_zones(
         self, user_input: dict[str, Any] | None = None
@@ -511,8 +484,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     }
                 ),
                 description_placeholders={
-                    "info": f"Configure {MIN_ZONES}-{MAX_ZONES} irrigation zones. "
-                    "Each zone can have independent sensors and controls."
+                    "info": f"A room can have {MIN_ZONES} to {MAX_ZONES} zones. "
+                    "Each zone has its own valve, probes and settings."
                 },
             )
 
@@ -521,120 +494,17 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return await self.async_step_zones()
 
-    async def async_step_load_yaml(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Load configuration from config.yaml."""
-        config_path = os.path.join(self.hass.config.config_dir, "config.yaml")
-
-        def _read_yaml():
-            # Existence check + read + parse together, off the event loop.
-            if not os.path.exists(config_path):
-                return None
-            with open(config_path, "r") as f:
-                return yaml.safe_load(f)
-
-        try:
-            config = await self.hass.async_add_executor_job(_read_yaml)
-        except yaml.YAMLError:
-            return self.async_abort(reason="yaml_error")
-
-        if config is None:
-            return self.async_abort(reason="yaml_not_found")
-
-        # Basic validation
-        if not isinstance(config, dict) or "zones" not in config:
-            return self.async_abort(reason="yaml_invalid_format")
-
-        # Extract and validate entities
-        entities_to_validate = []
-        if hardware := config.get("irrigation_hardware"):
-            entities_to_validate.extend(
-                [
-                    v
-                    for k, v in hardware.items()
-                    if v and isinstance(v, str) and "." in v
-                ]
-            )
-        if env_sensors := config.get("environmental_sensors"):
-            entities_to_validate.extend(
-                [
-                    v
-                    for k, v in env_sensors.items()
-                    if v and isinstance(v, str) and "." in v
-                ]
-            )
-
-        zones_config = {}
-        for zone in config.get("zones", []):
-            zone_id = zone.get("zone_id")
-            if not zone_id:
-                continue
-
-            zones_config[zone_id] = {
-                "zone_number": zone_id,
-                "zone_switch": zone.get("switch"),
-            }
-            entities_to_validate.append(zone.get("switch"))
-
-            if sensors := zone.get("sensors"):
-                zones_config[zone_id].update(
-                    {
-                        "vwc_front": sensors.get("vwc_front"),
-                        "vwc_back": sensors.get("vwc_back"),
-                        "ec_front": sensors.get("ec_front"),
-                        "ec_back": sensors.get("ec_back"),
-                    }
-                )
-                entities_to_validate.extend(
-                    [
-                        v
-                        for k, v in sensors.items()
-                        if v and isinstance(v, str) and "." in v
-                    ]
-                )
-
-        missing_entities = [
-            entity
-            for entity in entities_to_validate
-            if entity and not self.hass.states.get(entity)
-        ]
-
-        if missing_entities:
-            return self.async_abort(
-                reason="missing_entities",
-                description_placeholders={"missing": "\n".join(missing_entities[:5])},
-            )
-
-        # Build data for config entry
-        hardware_config = {
-            **config.get("irrigation_hardware", {}),
-            **config.get("environmental_sensors", {}),
-        }
-
-        data = {
-            "installation_mode": "yaml",
-            "name": self._data.get("name", "Crop Steering System"),
-            CONF_NUM_ZONES: len(zones_config),
-            "zones": zones_config,
-            "hardware": hardware_config,
-            "config_yaml": config,  # Store the full yaml config
-        }
-
-        return self.async_create_entry(
-            title=data["name"],
-            data=data,
-        )
-
     async def async_step_zones(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Map each zone's valve and sensors via entity pickers."""
         num = int(self._data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES))
         info = (
-            f"Pick the valve and probe(s) for each of your {num} zones. "
-            "You can choose MORE THAN ONE moisture/EC sensor per zone — the engine "
-            "averages valid readings. Outliers are not automatically rejected."
+            f"Select the valve and the probes of each of the {num} zones. A zone can have "
+            "more than one VWC probe and more than one EC probe. The integration combines "
+            "the probes of a zone into one reading, by default with the median. It does not "
+            "use a reading that is out of range. With three or more probes, it also does not "
+            "use a probe that is far from the others."
         )
         if user_input is None:
             return self.async_show_form(
@@ -664,10 +534,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Map shared hardware (pump/mainline/lights) and substrate properties."""
         info = (
-            "Shared plumbing, lights and the substrate facts used to size shots. Start by saying how "
-            "the room is plumbed: a room with one switch per zone, such as a tent on a single smart "
-            "plug, is zone valves only and needs nothing more than the valves you have already "
-            "picked. If water only flows while a pump runs, say so and choose the pump."
+            "The shared plumbing, the lights and the substrate data for the shot size. A room "
+            "with one switch for each zone, for example a tent on one power plug, uses zone "
+            "valves only. It needs only the valves that you selected in the last step. If water "
+            "flows only while a pump runs, select a plumbing type with a pump and select the pump."
         )
         if user_input is None:
             return self.async_show_form(
@@ -682,6 +552,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "room_name": self._data.get("room_name", "Crop Steering"),
             "room_prefix": self._data.get("room_prefix", ""),
             "room_slug": self._data.get("room_slug", "default"),
+            "drainage": self._data.get("drainage", "unknown"),
             CONF_NUM_ZONES: int(self._data.get(CONF_NUM_ZONES, DEFAULT_NUM_ZONES)),
             "zones": self._data.get("zones", {}),
             "hardware": _build_hardware(user_input),
@@ -691,6 +562,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data["enable_flag"] = (
             f"switch.crop_steering_{data['room_prefix']}engine_enabled"
         )
+        data["max_run_latch"] = True  # its max-run latch switch starts ON
         if user_input.get("plumbing"):
             data["plumbing"] = user_input["plumbing"]
         try:
@@ -700,31 +572,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "hardware", vol.Schema(_hardware_schema()), user_input, info, err
             )
         data["setup_revision"] = 1
+        data[CONF_P0_ADDITIONAL_DRYBACK] = NEW_ROOM_P0_ADDITIONAL_DRYBACK
+        data["commissioning"] = {
+            "done": False
+        }  # the setup wizard checks it before switch-on
         return self.async_create_entry(title=data["name"], data=data)
-
-    async def _validate_env_entities(self, env_config: dict) -> list[str]:
-        """Validate entity IDs from .env configuration."""
-        missing = []
-
-        # Check hardware entities
-        for key, entity_id in env_config.get("hardware", {}).items():
-            if entity_id and not self.hass.states.get(entity_id):
-                missing.append(f"{key}: {entity_id}")
-
-        # Check zone entities
-        for zone_num, zone_config in env_config.get("zones", {}).items():
-            for key, entity_id in zone_config.items():
-                if key in [
-                    "zone_switch",
-                    "vwc_front",
-                    "vwc_back",
-                    "ec_front",
-                    "ec_back",
-                ]:
-                    if entity_id and not self.hass.states.get(entity_id):
-                        missing.append(f"Zone {zone_num} {key}: {entity_id}")
-
-        return missing
 
     @staticmethod
     @callback
@@ -751,9 +603,9 @@ async def _versions(hass) -> tuple[str, str | None]:
     replaces the files and Home Assistant goes on running the old ones until it restarts.
     `waiting` is the version on disk when it differs, else None.
 
-    2026-09-21: 2.19.2 was on disk, code from before 2.18.0 was running, and nothing said so.
-    Setup was run twice on it, Home Assistant named every entity, and the controller could not
-    find one of them.
+    Observed on a production room (21 Sep 2026): 2.19.2 was on disk, code from before 2.18.0 was
+    running, and nothing said so. Setup was run twice on it, Home Assistant named every entity, and
+    the controller could not find one of them.
     """
     installed = await hass.async_add_executor_job(_installed_version)
     return SOFTWARE_VERSION, (
@@ -765,8 +617,8 @@ def _restart_notice(running: str, waiting: str | None) -> str:
     if not waiting:
         return ""
     return (
-        f"⚠️ Home Assistant is still running {running}, but {waiting} is installed. Restart "
-        "Home Assistant to run it: an update downloaded by HACS does nothing until then."
+        f"⚠️ Home Assistant runs {running}, but {waiting} is installed. Restart Home "
+        f"Assistant to run {waiting}. An update from HACS has no effect until the restart."
     )
 
 
@@ -797,7 +649,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         return self.async_show_menu(
             step_id="init",
             menu_options=[
-                "reload_env",
                 "edit_parameters",
                 "edit_zones",
             ],
@@ -808,73 +659,6 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                 "restart_notice": _restart_notice(running, waiting),
             },
         )
-
-    async def async_step_reload_env(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Reload configuration from .env file."""
-        if self._entry.data.get("config_method") != "env":
-            return self.async_abort(
-                reason="not_env_config",
-                description_placeholders={
-                    "message": "This integration was not configured from .env file. "
-                    "Use 'Edit Parameters' or 'Edit Zones' instead."
-                },
-            )
-
-        try:
-            # Reload .env file off the event loop (file I/O must not block it)
-            env_config = await self.hass.async_add_executor_job(
-                load_env_config, self.hass.config.config_dir
-            )
-
-            from .setup_api import (
-                effective,
-                configuration_payload,
-                prepare_setup,
-                safety_blockers,
-                _update,
-            )
-
-            prior = effective(self._entry)
-            zones = {
-                str(k): {**v, "active": False}
-                for k, v in prior.get("zones", {}).items()
-            }
-            for key, zone in env_config["zones"].items():
-                zones[str(key)] = {**zones.get(str(key), {}), **zone, "active": True}
-            proposed = {
-                **prior,
-                "num_zones": max(
-                    int(prior.get("num_zones", 1)), env_config["num_zones"]
-                ),
-                "zones": zones,
-                "hardware": {**prior.get("hardware", {}), **env_config["hardware"]},
-                "parameters": {
-                    **prior.get("parameters", {}),
-                    **env_config["parameters"],
-                },
-                "features": {**prior.get("features", {}), **env_config["features"]},
-            }
-            proposed = prepare_setup(
-                self.hass,
-                configuration_payload(proposed),
-                proposed,
-                self._entry.entry_id,
-            )
-            blockers = safety_blockers(self.hass, self._entry, proposed)
-            if blockers:
-                raise ValueError("; ".join(blockers))
-            _update(self.hass, self._entry, proposed)
-
-            return self.async_create_entry(
-                title="",
-                data={"reloaded": True, "zones_detected": env_config["num_zones"]},
-            )
-
-        except Exception as e:
-            _LOGGER.error(f"Error reloading .env: {e}")
-            return self.async_abort(reason="reload_failed")
 
     def _number_id(self, key: str) -> str:
         from .setup_api import effective
@@ -894,24 +678,33 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
         return live
 
     async def _set_live_numbers(self, values: dict) -> None:
-        for key, value in values.items():
-            if self.hass.states.get(self._number_id(key)) is None:
-                continue
-            await self.hass.services.async_call(
-                "number",
-                "set_value",
-                {"entity_id": self._number_id(key), "value": value},
-                blocking=True,
-            )
+        from .number import async_set_numbers
+
+        _written, failed = await async_set_numbers(
+            self.hass,
+            [
+                (self._number_id(key), value)
+                for key, value in values.items()
+                if self.hass.states.get(self._number_id(key)) is not None
+            ],
+        )
+        if failed:
+            raise failed[0][1]
 
     async def async_step_edit_parameters(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
         """Edit irrigation parameters via UI."""
+        from .ladder import refusal
+        from .number import read_ladder
         from .setup_api import effective, safety_blockers, _update
 
         if user_input is not None:
             blockers = safety_blockers(self.hass, self._entry)
+            ladder = read_ladder(self.hass, self._entry)
+            why = refusal(ladder, {k: v for k, v in user_input.items() if k in ladder})
+            if why:  # the peak and re-water level are one move, judged together
+                blockers = [*blockers, why]
             if blockers:
                 return self.async_abort(
                     reason="setup_invalid",
@@ -951,19 +744,19 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {
                     vol.Optional(
-                        key, default=current_params.get(key, fallback)
+                        key, default=current_params.get(key, ENTITY_DEFAULTS[key])
                     ): vol.All(vol.Coerce(float), _number_range(key))
-                    for key, fallback in (
-                        ("substrate_volume", 10.0),
-                        ("dripper_flow_rate", 2.0),
-                        ("p1_target_vwc", 65.0),
-                        ("p2_vwc_threshold", 60.0),
+                    for key in (
+                        "substrate_volume",
+                        "dripper_flow_rate",
+                        "p1_target_vwc",
+                        "p2_vwc_threshold",
                     )
                 }
             ),
             description_placeholders={
-                "info": "Edit irrigation parameters. Changes take effect immediately. "
-                "You can also edit these via number entities in Home Assistant."
+                "info": "Change the most used settings. A change has an effect immediately. "
+                "You can also change these settings with their number entities in Home Assistant."
             },
         )
 
@@ -985,8 +778,10 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
                     }
                 ),
                 description_placeholders={
-                    "info": "Set how many zones you have. Increase it to ADD a zone, decrease to "
-                    "remove the highest ones. You'll map entities on the next screen."
+                    "info": "Set the number of zones. To add a zone, increase the number. To "
+                    "stop the zones with the highest numbers, decrease the number. The integration "
+                    "keeps their configuration and sets them to inactive. Map the entities in the "
+                    "next step."
                 },
             )
         self._edit_num = int(user_input["num_zones"])
@@ -1021,8 +816,9 @@ class OptionsFlowHandler(config_entries.OptionsFlow):
             }
         )
         info = (
-            "Add, remove or swap the sensors and switches for each zone. "
-            "Pick multiple moisture/EC probes per zone if you have them — they get fused."
+            "Add, remove or replace the switches and the probes of each zone. A zone can have "
+            "more than one VWC probe and more than one EC probe. The integration combines them "
+            "into one reading."
         )
         if user_input is None:
             return self.async_show_form(

@@ -1,6 +1,6 @@
 """A room switched off and on again, in a real Home Assistant, with the real controller.
 
-25 Sep 2026, F2: to clear a hardware hold the operator switched the room off and on again at 20:53.
+Observed on a production room (25 Sep 2026): to clear a hardware hold the operator switched the room off and on again at 20:53.
 All three zones were in P2, an hour before lights-off, and the controller took the switch-on for a new
 crop: it started their day again from P0, then a P1 ramp, with today's counters at 0. The room switch
 here is the integration's own entity; only the controller's REST reads stand in for HTTP.
@@ -8,10 +8,11 @@ here is the integration's own entity; only the controller's REST reads stand in 
 
 from datetime import datetime, timedelta
 
+from conftest import room_of
 from test_recreated_room_controller import _see
 from test_setup_entry import _install
 
-ROOM = "switch.crop_steering_room_active"
+ROOM = "switch.crop_steering_tent_room_active"
 
 
 class _Clock(datetime):
@@ -39,7 +40,7 @@ async def test_a_room_switched_off_and_on_again_carries_on_where_it_was(
 
     monkeypatch.setattr(controller, "datetime", _Clock)
     _Clock.current = _Clock(2026, 9, 25, 20, 50)  # the lights are on (the new room's 12:00 to 00:00)
-    room = c.rooms[0]
+    room = room_of(c)
     zone = next(iter(room.zones))
     room.state[zone].update(
         phase="P2", shots=4, daily_vol=12.0, last_daily_reset=_Clock.current.date()

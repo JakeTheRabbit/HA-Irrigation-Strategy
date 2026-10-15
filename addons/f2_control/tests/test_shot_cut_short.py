@@ -1,9 +1,9 @@
 """A shot that something else cuts short: a hold comes on, or the zone's valve is switched off.
 
-23 Sep 2026, 11:25:22 NZST: the controller fired a Z1 P1 ramp shot (2.8 %, ~170 s): pump, main line,
+Observed on a production room (23 Sep 2026), 11:25:22 local time: the controller fired a Z1 P1 ramp shot (2.8 %, ~170 s): pump, main line,
 then the valve at 11:25:25. At 11:25:29 the batch tank ran empty. the room's dosing automation turned on
 input_boolean.nutrient_dosing_active (one of the controller's holds) and switched the pump off, and
-his dose guard closed the valve and the main line. The controller did not notice. It waited out the
+its dose guard closed the valve and the main line. The controller did not notice. It waited out the
 170 s, ran its close sequence and counted about 7.9 L for about 0.2 L delivered. Had the next dosing
 step started the pump to mix inside that window, the end-of-shot close would have stopped it mid-dose.
 
@@ -24,7 +24,7 @@ HOLD = "input_boolean.nutrient_dosing_active"
 KILL = "input_boolean.kill"
 PUMP, MAIN, VALVE = "switch.p", "switch.m", "switch.v1"
 FLOW = 7.9 / 170  # L/s: on the day, the full 170 s were counted as about 7.9 L
-CUT = "Zone 1: shot stopped early, something else closed the feed (CS-307)"
+CUT = "Zone 1: shot stopped early by an external change (CS-307)"
 
 
 class Clock:
@@ -61,7 +61,7 @@ def rig(monkeypatch, tmp_path):
         "hold_entities": [HOLD],
     }
     monkeypatch.setattr(controller, "load_options", lambda: options)
-    for name in ("ha_get", "ha_call", "ha_get_all", "ha_set"):
+    for name in ("ha_get", "ha_get_status", "ha_call", "ha_get_all", "ha_set"):
         monkeypatch.setattr(controller, name, getattr(fake, name))
     with monkeypatch.context() as setup:
         setup.setattr(controller.Controller, "_read_state_file", lambda self: {})
@@ -150,7 +150,7 @@ def test_23_sep_the_tank_ran_empty_4_s_into_a_170_s_shot(rig, monkeypatch, mixin
     assert room.shot_inflight is None and "_shot_inflight" not in saved(c)["default"]
     alerts = notifications(fake)
     assert [n["title"] for n in alerts] == [CUT]
-    assert HOLD in alerts[0]["message"] and "after 4 of 170 seconds" in alerts[0]["message"]
+    assert HOLD in alerts[0]["message"] and "after 4 s of 170 s" in alerts[0]["message"]
 
 
 # ---------------------------------------------------------------------------
@@ -175,7 +175,7 @@ def test_a_valve_switched_off_by_something_else_counts_only_the_time_it_was_open
     assert room.hardware_fault is None and room.shot_inflight is None
     alerts = notifications(fake)
     assert [n["title"] for n in alerts] == [CUT]
-    assert VALVE in alerts[0]["message"] and f"after {counted:.0f} of 120 seconds" in alerts[0]["message"]
+    assert VALVE in alerts[0]["message"] and f"after {counted:.0f} s of 120 s" in alerts[0]["message"]
 
 
 # ---------------------------------------------------------------------------
@@ -196,8 +196,8 @@ def test_a_hold_that_comes_on_mid_shot_closes_valve_and_main_line_and_leaves_the
     assert st["daily_vol"] == pytest.approx(FLOW * 12) and st["shots"] == 1
     alerts = notifications(fake)
     assert [n["title"] for n in alerts] == [CUT]
-    assert HOLD in alerts[0]["message"] and "after 12 of 170 seconds" in alerts[0]["message"]
-    assert f"Left {PUMP} on" in alerts[0]["message"]
+    assert HOLD in alerts[0]["message"] and "after 12 s of 170 s" in alerts[0]["message"]
+    assert f"left {PUMP} on" in alerts[0]["message"]
 
 
 def test_one_alert_per_zone_per_half_hour_however_often_it_happens(rig, monkeypatch):
@@ -254,3 +254,18 @@ def test_the_kill_switch_still_wins_and_closes_as_before(rig, monkeypatch, valve
     assert st["daily_vol"] == pytest.approx(FLOW * 22) and st["shots"] == 1  # to the check that saw it
     assert [n["title"] for n in notifications(fake)] == ["Zone 1: shot stopped early (CS-305)"]
     assert room.hardware_fault is None and room.shot_inflight is None
+
+
+def test_a_hold_that_goes_unavailable_mid_shot_ends_nothing(rig, monkeypatch):
+    """An unreadable hold stops the next shot starting (_blocked), but a shot in flight ends only on a
+    definite ON: unavailable says nothing about the feed path."""
+    c, fake, clock = rig
+    after_the_valve_opens(monkeypatch, fake, clock,
+                          (10.5, lambda at: fake.set_state(HOLD, "unavailable", last_updated=at(10.5))))
+    c._execute_shot(c.rooms[0], 1, 60, 5, flow_lps=FLOW)
+
+    st = c.rooms[0].state[1]
+    assert switched(fake) == [("turn_on", PUMP), ("turn_on", MAIN), ("turn_on", VALVE),
+                              ("turn_off", VALVE), ("turn_off", MAIN), ("turn_off", PUMP)]
+    assert st["daily_vol"] == pytest.approx(FLOW * 60) and notifications(fake) == []
+    assert c._blocked(c.rooms[0], 1) == f"external hold {HOLD} unreadable (reads neither on nor off)"

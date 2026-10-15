@@ -16,7 +16,7 @@ import fake_ha
 from crop_steering_engine import Reason
 
 # What happens once a probe is dead; how long it must be out first is test_blind_grace.py.
-pytestmark = pytest.mark.usefixtures("no_blind_grace")
+pytestmark = pytest.mark.usefixtures("no_blind_grace", "settings_built_in")
 
 PLAN = "sensor.crop_steering_strategy_plan"
 HOLD = "Lights-on boundary was missed; schedule held until the next boundary"
@@ -55,7 +55,7 @@ def rig(monkeypatch, tmp_path):
         "enable_flag": "input_boolean.kill",
     }
     monkeypatch.setattr(controller, "load_options", lambda: options)
-    for name in ("ha_get", "ha_call", "ha_get_all", "ha_set"):
+    for name in ("ha_get", "ha_get_status", "ha_call", "ha_get_all", "ha_set"):
         monkeypatch.setattr(controller, name, getattr(fake, name))
     with monkeypatch.context() as setup:
         setup.setattr(controller.Controller, "_read_state_file", lambda self: {})

@@ -703,6 +703,8 @@
 }
 .dosing-setup-line-actions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
 }
 .dosing-setup-add {
   max-width: 280px;

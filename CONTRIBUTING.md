@@ -10,7 +10,7 @@ A change is one thing a reviewer can hold in their head: one feature, one fix, o
 
 This is not tidiness. Large mixed changes are how problems get in:
 
-- **They cannot be reviewed.** Nobody reads four thousand changed lines. They skim, and approve what they did not read. 2.18.0 arrived as five commits in forty-five minutes touching the setup wizard, the controller's shot sequence, twenty dashboard source files and a new cloud feature; four defects went through with it ([docs/audits/2026-09-21-first-run-review.md](docs/audits/2026-09-21-first-run-review.md)).
+- **They cannot be reviewed.** Nobody reads four thousand changed lines. They skim, and approve what they did not read. 2.18.0 arrived as five commits in forty-five minutes touching the setup wizard, the controller's shot sequence, twenty dashboard source files and a new cloud feature; four defects went through with it ([docs/dev/audits/2026-09-21-first-run-review.md](docs/dev/audits/2026-09-21-first-run-review.md)).
 - **They cannot be tested alone.** When a staging room misbehaves after an update carrying six changes, the first day goes on finding out which one did it.
 - **They cannot be taken back alone.** Reverting one bad feature out of a mixed commit means rewriting it by hand, in a hurry, on the code that drives the pump.
 - **Things hide in them.** A mistake, a debugging leftover, or something deliberately malicious is far easier to slip past a reviewer inside a big change than in a small one. This matters more here than in most projects: boxes build the controller straight from this repository.
@@ -38,12 +38,18 @@ The pull request template asks for all of this.
 
 ## Generated files
 
-Two kinds of file in this repository are produced from other files. They change **only** in the same pull request as their source, and the checks prove they match:
+Some files in this repository are produced from other files. They change **only** in the same pull request as their source, and the checks prove they match:
 
 | Generated | From | Check |
 | --- | --- | --- |
 | `www/`, `custom_components/crop_steering/www/` and `addons/f2_control/www/` (the dashboard, one ~1 MB minified file) | `frontend/src` via `npm run build --prefix frontend` | CI rebuilds it and fails if the committed file differs by one byte |
 | `addons/f2_control/f2_control/crop_steering_engine/` | `crop-steering-engine/src/crop_steering_engine/` | CI diffs the two copies |
+| `custom_components/crop_steering/generated/defaults.py` (the one defaults table and the device-unit table, for the integration, which cannot import the engine) | `crop-steering-engine/src/crop_steering_engine/defaults.py`, copied with `cp` | `tests/test_generated_copies.py` byte-compares it, and the vendored engine's copy, with the source |
+| `doctrine/` outputs: the numbered `*.md` files, `engine-rules.generated.json` and `compiled/` | `doctrine/doctrine.rules.json` plus the code it describes, via `python doctrine/tools/build_doctrine.py` | CI runs `build_doctrine.py --check`, which fails if any output is stale |
+| `frontend/src/lib/generated/arcs.json` (the dashboard's stage arcs) | `doctrine/doctrine.rules.json`, via `python doctrine/tools/build_doctrine.py` | the same `build_doctrine.py --check` fails if it differs by one byte |
+| `addons/f2_control/LICENSE` (the licence inside the controller image) | `LICENSE`, copied as it is | `addons/f2_control/tests/test_container_packaging.py` fails if the two differ by one byte |
+
+The doctrine also depends on code. A change to a value it prints (from the engine's `core.py`, or the default dryback targets and P0 wait in the defaults table, `crop-steering-engine/src/crop_steering_engine/defaults.py`) regenerates the doctrine in the same commit; a change that makes one of its checked sentences false in the engine, the controller, the brain code or `number.py` rewords that rule in the same commit, or the build fails. Any other edit to those files needs nothing ([doctrine/README.md](doctrine/README.md)).
 
 Nobody can review a minified bundle by eye, so nobody is asked to: review `frontend/src`, and let the check prove the bundle is that source and nothing else. **A pull request that changes a generated file without its source, or fails that check, is not merged**, whatever the explanation.
 
@@ -67,7 +73,7 @@ Conventional commits (`feat:` `fix:` `docs:` `test:` `ci:` `chore:` `release:`),
 - Every `Validate` job is green on the exact commit being merged, with the branch up to date with `testing`.
 - A reviewer who does not understand a change asks, and the answer goes into the code or the pull request, not into a chat that disappears.
 
-Promotion is a separate decision after staging and its recorded audit: run **Promote** from `main`, first with its default read-only dry run, then with the exact candidate authorized for promotion ([docs/RELEASING.md](docs/RELEASING.md)). It checks the candidate before moving production. An assistant can prepare evidence and run the nonmutating preflight; successful CI alone is not permission to promote. Keep `testing` frozen at the candidate throughout that process.
+Promotion is a separate decision after staging and its recorded audit: run **Promote** from `main`, first with its default read-only dry run, then with the exact candidate authorized for promotion ([docs/RELEASING.md](docs/RELEASING.md)). It checks the candidate before moving production. An assistant can prepare evidence and run the nonmutating preflight; successful CI alone is not permission to promote. Keep `testing` frozen at the candidate throughout that process, until it is promoted, abandoned, or soaked and superseded: a candidate whose soak passed but which the owner holds back is marked "soaked, superseded", is never promoted later, and leaves staging auto-update off and staging rooms unrebuilt until the next release pull request merges ([docs/RELEASING.md](docs/RELEASING.md), step 6).
 
 ## Bringing in upstream's changes (forks)
 

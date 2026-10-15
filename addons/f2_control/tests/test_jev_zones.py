@@ -1,6 +1,6 @@
 """The zones judge compares a zone's water per plant with the room's median zone, this zone included.
 
-27 Sep 2026, the first live day on F2: zone 1 had 2477 mL a plant, zones 2 and 3 1052 and 974. Each zone
+27 Sep 2026, the first live day on a production room: zone 1 had 2477 mL a plant, zones 2 and 3 1052 and 974. Each zone
 was compared with the upper of its two siblings, so zones 2 and 3 were flagged (42 % and 39 %) against
 zone 1's 2477 and told of a valve or dripper fault they did not have.
 """
@@ -8,7 +8,7 @@ import jev_kit as K
 from jev import council
 from jev.judges.zones import ZonesJudge
 
-LIVE = {1: 2.477, 2: 1.052, 3: 0.974}  # litres a plant, F2 at 19:28 on 27 Sep 2026
+LIVE = {1: 2.477, 2: 1.052, 3: 0.974}  # litres a plant, a production room at 19:28 on 27 Sep 2026
 
 
 def _ctx(zone, lpp=LIVE, plants=42):
@@ -39,4 +39,4 @@ def test_the_alert_says_what_the_zone_was_compared_with():
     verdicts = {"why_different": council.combine(K.both("why_different", answer), "why_different")}
     d = ZonesJudge().decide(verdicts, _ctx(1))
     assert d.value["code"] == "CS-702"
-    assert "2477 mL a plant today, 235% of the room's median zone (1052 mL)" in d.value["message"]
+    assert "got 2477 mL for each plant, 235% of the room's median zone (1052 mL)" in d.value["message"]

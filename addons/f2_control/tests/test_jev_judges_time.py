@@ -68,10 +68,10 @@ def _dusk_history(night_rate=0.4, day_rate=0.8, rescue=False):
     return K.history(points=pts, shots=shots)
 
 
-def _dusk_ctx(hours_to_off=2.0, vwc=34.0, h=None, phase="P2"):
+def _dusk_ctx(hours_to_off=2.0, vwc=34.0, h=None, phase="P2", steering="generative"):
     s = K.snap(phase=phase, vwc=vwc, peak_vwc=38.0, minutes_since_shot=90.0, hours_to_lights_off=hours_to_off,
                hours_to_lights_on=hours_to_off + 6.0, shot_count=9, daily_vol=60.0)
-    return K.ctx(phase, s=s, h=h or _dusk_history(), hours_to_on=hours_to_off + 6.0)
+    return K.ctx(phase, s=s, h=h or _dusk_history(), hours_to_on=hours_to_off + 6.0, steering=steering)
 
 
 # night: lights off 3 h ago (P3 for 180 min), 3 h to lights-on; tonight falling `rate` points an hour to 26.5,
@@ -154,6 +154,15 @@ def test_dawn_too_early_in_p0_is_refused_by_the_envelope():
     assert status["directive"] == "advance P1" and status["why"].startswith("refused: dryback 2.0% under half")
 
 
+def test_dawn_on_a_flat_probe_is_refused_in_code_whatever_the_answer():
+    brain, t = _brain(DawnJudge(), K.both("dawn_call", K.choice_answer("start_ramp_now", {"start_ramp_now": 0.95})))
+    assert brain.tick(_dawn_ctx(dryback=12.0, minutes=40.0, flat=True)) == []
+    assert len(t.calls) == 1  # asked, answered firmly, and still refused
+    status = brain.zone_status("default", 1)["dawn"]
+    assert status["directive"] == "advance P1"
+    assert status["why"] == "refused: the probe reading has not moved for 40 min: the P0 timer decides"
+
+
 # ------------------------------------------------------------------ dusk
 def test_dusk_is_asked_only_in_p2_in_the_last_three_hours():
     j = DuskJudge()
@@ -224,6 +233,16 @@ def test_dusk_through_the_brain_brings_p3_forward_and_checks_it_two_hours_later(
     assert ledger.track("dusk", "default", 1).startswith("your last 1 call(s) of this kind worked 1 time(s)")
 
 
+def test_dusk_acts_only_on_a_zone_steered_generative_and_otherwise_advises():
+    for steering, words in ((None, "with no mode set"), ("ripening", "ripening")):
+        brain, t = _brain(DuskJudge(), K.both("dusk_call", K.choice_answer("enter_p3_now", {"enter_p3_now": 0.9})))
+        assert brain.tick(_dusk_ctx(steering=steering)) == []
+        assert len(t.calls) == 1  # still asked: its answer is shown as advice
+        status = brain.zone_status("default", 1)["dusk"]
+        assert status["directive"] == "advance P3"
+        assert status["why"] == f"refused: the zone is steered {words}, not generative: an early stop is advice only"
+
+
 def test_dusk_near_the_emergency_floor_is_refused_by_the_envelope():
     brain, _t = _brain(DuskJudge(), K.both("dusk_call", K.choice_answer("enter_p3_now", {"enter_p3_now": 0.9})))
     assert brain.tick(_dusk_ctx(vwc=27.0)) == []
@@ -291,9 +310,9 @@ def test_night_alerts_only_on_a_firm_probe_fault():
     j, c = NightJudge(), _night_ctx()
     d = j.decide(_verdicts("night_drop", K.choice_answer("probe_fault", {"probe_fault": 0.8, "real_drying": 0.2})), c)
     assert d.kind == "alert" and d.value["code"] == "CS-703"
-    assert d.value["title"] == "overnight low reading looks like a probe fault"
+    assert d.value["title"] == "low overnight reading: probable probe fault"
     msg = d.value["message"]
-    assert "Zone 1" in msg and "26.5%" in msg and "25.0%" in msg and "rescue shot still fires as normal" in msg
+    assert "Zone 1" in msg and "26.5%" in msg and "25.0%" in msg and "rescue shot still starts as usual" in msg
     split = _verdicts("night_drop", K.choice_answer("probe_fault", {"probe_fault": 0.8}),
                       K.choice_answer("real_drying", {"real_drying": 0.7, "probe_fault": 0.3}))
     below_bar = _verdicts("night_drop", K.choice_answer("probe_fault", {"probe_fault": 0.65, "real_drying": 0.35}))

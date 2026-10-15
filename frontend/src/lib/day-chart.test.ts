@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  athenaDryback,
   axisRange,
   bandStatus,
   CHART_LAYERS,
@@ -13,6 +12,7 @@ import {
   placeBadges,
   placeMarkers,
   rangeText,
+  referenceDryback,
   runoffBand,
   smoothPath,
   steeringOf,
@@ -33,14 +33,14 @@ describe("today's stage", () => {
     expect(steeringOf(null, null)).toBeNull();
     expect(steeringOf("Balanced", "something new")).toBeNull();
   });
-  it("finds Athena's relative overnight dryback for the stage the controller names", () => {
-    expect(athenaDryback("flower setting")).toEqual([40, 50]);
-    expect(athenaDryback("Flower stretch")).toEqual([40, 50]);
-    expect(athenaDryback("flower bulk")).toEqual([30, 40]);
-    expect(athenaDryback("finish")).toEqual([40, 50]);
-    expect(athenaDryback("established veg")).toEqual([25, 25]);
-    expect(athenaDryback(null)).toBeNull();
-    expect(athenaDryback("clone")).toBeNull();
+  it("turns the stage's reference dryback in points into a share of the zone's own peak", () => {
+    const [low, high] = referenceDryback([10, 15], 60)!;
+    expect(low).toBeCloseTo(16.67, 2);
+    expect(high).toBe(25);
+    expect(referenceDryback([15, 25], 50)).toEqual([30, 50]);
+    expect(referenceDryback(null, 60)).toBeNull();
+    expect(referenceDryback([10, 15], null)).toBeNull();
+    expect(referenceDryback([10, 15], 0)).toBeNull();
   });
   it("says a range the short way", () => {
     expect(rangeText([3.5, 6])).toBe("3.5–6");
@@ -178,7 +178,7 @@ describe("overnight dryback", () => {
     { time: 33.9 * H, value: 49.6 },
     { time: 35 * H, value: 44 }, // after lights-on: the next day
   ];
-  it("is relative to the evening peak, as Athena's targets are", () => {
+  it("is relative to the evening peak, as the P3 dryback target is", () => {
     const dryback = overnightDryback(night, off, end, 36 * H)!;
     expect(dryback.peak).toBe(64);
     expect(dryback.low).toBe(49.6);

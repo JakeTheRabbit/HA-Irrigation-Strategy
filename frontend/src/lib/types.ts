@@ -109,6 +109,9 @@ export interface RoomView {
   /** How Water today reads in this room, from its select (entityId null: an integration without it,
    * the zone total). */
   waterView: { entityId: string | null; view: "zone" | "plant" };
+  /** Whether the controller's vitals notification says what each zone does next, from the room's
+   * switch (entityId null: an integration without it, and the controller then includes them). */
+  notifyPredictions: { entityId: string | null; enabled: boolean | null };
 }
 /** One line per room: is it watering, and if not, why not and what to do. */
 export interface RoomStatus {
@@ -141,6 +144,9 @@ export interface Controller {
    * (a standalone tab), and Home Assistant refuses what they may not do. */
   admin: boolean | null;
   connection: "connecting" | "live" | "demo" | "offline";
+  /** Home Assistant's time zone: the grow-day runs from lights-on on its clock, whatever the
+   * viewer's own. The browser's zone in the demo and until Home Assistant has answered. */
+  timeZone: string;
   error: string | null;
   lastUpdated: number | null;
   roomId: string;

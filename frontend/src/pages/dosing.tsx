@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, Heading, number, type Page } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import { Pill } from "@/components/mini-visuals";
 import { PeristalticPump } from "@/components/peristaltic-pump";
 import { StockBottle } from "@/components/stock-bottle";
@@ -194,6 +195,7 @@ function RequestDialog({
           <Button variant="outline" disabled={busy} onClick={onClose}>
             Back
           </Button>
+          <UiTip copyKey="back" />
           <Button
             variant={shown?.stop ? "destructive" : "default"}
             disabled={busy || !["live", "demo"].includes(controller.connection)}
@@ -537,7 +539,7 @@ export function Dosing({
       title: `Dose ${view.pump.name}?`,
       rows: [
         { label: "Pump", value: `${view.pump.name} (${hardwareLabel(view.pump)})` },
-        { label: "Amount", value: `${mL(ml)} mL, into the tank as it is` },
+        { label: "Quantity", value: `${mL(ml)} mL, into the tank as it is` },
         {
           label: "Expected time",
           value: expected
@@ -545,13 +547,13 @@ export function Dosing({
             : "unknown: the flow reads nothing",
         },
         {
-          label: "It stops",
+          label: "How it stops",
           value: expected
             ? `by itself: the pump times the dose. Still running after ${seconds(doseDeadline(expected))}, its power is switched off.`
             : "by itself: the pump times the dose.",
         },
       ],
-      note: "Watering carries on while a single dose runs.",
+      note: "The shots continue while a single dose runs.",
       confirm: `Start ${view.pump.name}`,
       data: { action: "dose", pump: view.pump.id, ml },
     });
@@ -701,7 +703,7 @@ export function Dosing({
       />
       {loadError && !config && (
         <Empty
-          title="Dosing is not available"
+          title="Dosing not available"
           detail={`${loadError} Dosing needs the Crop Steering integration and controller app with batch-tank dosing.`}
         />
       )}
@@ -836,7 +838,10 @@ export function Dosing({
                   }}
                 >
                   <div className="dosing-field">
-                    <Label htmlFor={`${formId}-ml`}>Amount (mL)</Label>
+                    <span className="label-with-tip">
+                      <Label htmlFor={`${formId}-ml`}>Quantity (mL)</Label>
+                      <UiTip copyKey="amount (ml)" />
+                    </span>
                     <Input
                       id={`${formId}-ml`}
                       type="number"
@@ -981,9 +986,12 @@ export function Dosing({
                     <CircleStop size={16} /> Stop the batch
                   </Button>
                 ) : (
-                  <Button disabled={!!batchBlock || !canAct} onClick={reviewBatch}>
-                    Make a batch
-                  </Button>
+                  <>
+                    <Button disabled={!!batchBlock || !canAct} onClick={reviewBatch}>
+                      Make a batch
+                    </Button>
+                    <UiTip copyKey="make a batch" />
+                  </>
                 )}
               </div>
             </div>

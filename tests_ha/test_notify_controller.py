@@ -153,3 +153,133 @@ async def test_jevs_own_alerts_reach_the_phone_that_ticks_jev(
         )
         assert answer == {"sent_to": [STAFF_PHONE], "error": None}
         assert received[STAFF_PHONE][-1]["message"].startswith(words)
+
+
+async def test_the_channel_judges_alert_reaches_the_phone_that_ticks_hardware(
+    hass, hass_admin_user, controller_for, monkeypatch
+):
+    """CS-710 (water may be bypassing the substrate or the probe) is in the hardware kind, beside CS-701: the
+    tablet that ticks Hardware lockouts gets it, the staff phone that ticks only stock tanks does not."""
+    await _install(hass)
+    staff = await _staff(hass)
+    received, _doc = await _set_up(hass, hass_admin_user, staff)
+    c, fake, _clock = controller_for({"notify_service": "notify/mobile_app_old_phone"})
+    import controller
+
+    def answered(domain, service, data, timeout=12):
+        fake.calls.append((domain, service, dict(data)))
+        return 200, {"sent_to": [TABLET], "error": None}
+
+    monkeypatch.setattr(controller, "ha_service_response", answered)
+    c._jev_alert(
+        c.rooms[0],
+        1,
+        "channel",
+        {
+            "code": "CS-710",
+            "title": "water may be bypassing the substrate or the probe",
+            "message": "Do a catch test.",
+        },
+    )
+    [asked] = _asked(fake)
+    assert (asked["code"], asked["key"]) == ("CS-710", "jev_channel_default_z1")
+    assert not asked.get("urgent")
+    answer = await hass.services.async_call(
+        DOMAIN, "notify", asked, blocking=True, return_response=True
+    )
+    assert answer == {"sent_to": [TABLET], "error": None}
+    assert received[TABLET][-1]["message"].startswith("Do a catch test.")
+    assert not received.get(STAFF_PHONE)
+
+
+async def test_the_ai_assistants_cards_reach_the_phone_that_ticks_jev(
+    hass, hass_admin_user, controller_for, monkeypatch
+):
+    """CS-708 (its budget spent), CS-709 (its key refused) and CS-712 (a retired route, raised by
+    the rules panel with no brain built) are in the jev kind: the phone that ticks Jev gets them."""
+    await _install(hass)
+    staff = await _staff(hass)
+    received, doc = await _set_up(hass, hass_admin_user, staff)
+    phone, tablet = doc["config"]["recipients"]
+    await _call(
+        hass,
+        hass_admin_user,
+        "notify_save",
+        expected_revision=1,
+        recipients=[{**phone, "kinds": ["jev"]}, tablet],
+    )
+    await hass.async_block_till_done()
+    c, fake, _clock = controller_for({"notify_service": "notify/mobile_app_old_phone"})
+    import controller
+    import jev_bridge
+
+    def answered(domain, service, data, timeout=12):
+        fake.calls.append((domain, service, dict(data)))
+        return 200, {"sent_to": [STAFF_PHONE], "error": None}
+
+    monkeypatch.setattr(controller, "ha_service_response", answered)
+    room = c.rooms[0]
+    for code, label in (("CS-708", "spent"), ("CS-709", "brain")):
+        assert c._jev_alert(room, None, label, {"code": code, "title": "t", "message": f"{code} words."})
+    c.brain_status = jev_bridge.BrainStatus(
+        "rules", "rules", "Rules.", notice="cloudflare_route_retired"
+    )
+    jev_bridge.publish_rules(c, room, controller.datetime.now(), controller.ha_set)
+    asked = _asked(fake)
+    assert [(a["code"], a["key"]) for a in asked] == [
+        ("CS-708", "jev_spent_default"),
+        ("CS-709", "jev_brain_default"),
+        ("CS-712", "jev_route_default"),
+    ]
+    for one in asked:
+        answer = await hass.services.async_call(
+            DOMAIN, "notify", one, blocking=True, return_response=True
+        )
+        assert answer == {"sent_to": [STAFF_PHONE], "error": None}
+    assert received[STAFF_PHONE][-1]["message"].startswith("The controller does not use your Cloudflare settings")
+
+
+async def test_the_feed_proposal_reaches_the_phone_that_ticks_jev(
+    hass, hass_admin_user, controller_for, monkeypatch
+):
+    """CS-711 (the AI assistant proposes a feed change) is in the jev kind: the phone that ticks
+    Jev gets it, the tablet that ticks only emergencies and hardware does not."""
+    await _install(hass)
+    staff = await _staff(hass)
+    received, doc = await _set_up(hass, hass_admin_user, staff)
+    phone, tablet = doc["config"]["recipients"]
+    await _call(
+        hass,
+        hass_admin_user,
+        "notify_save",
+        expected_revision=1,
+        recipients=[{**phone, "kinds": ["jev"]}, tablet],
+    )
+    await hass.async_block_till_done()
+    c, fake, _clock = controller_for({"notify_service": "notify/mobile_app_old_phone"})
+    import controller
+
+    def answered(domain, service, data, timeout=12):
+        fake.calls.append((domain, service, dict(data)))
+        return 200, {"sent_to": [STAFF_PHONE], "error": None}
+
+    monkeypatch.setattr(controller, "ha_service_response", answered)
+    assert c._jev_alert(
+        c.rooms[0],
+        None,
+        "feed",
+        {
+            "code": "CS-711",
+            "title": "the AI assistant proposes a feed change",
+            "message": "A small step down in this room's feed EC.",
+        },
+    )
+    [asked] = _asked(fake)
+    assert (asked["code"], asked["key"]) == ("CS-711", "jev_feed_default")
+    assert not asked.get("urgent")
+    answer = await hass.services.async_call(
+        DOMAIN, "notify", asked, blocking=True, return_response=True
+    )
+    assert answer == {"sent_to": [STAFF_PHONE], "error": None}
+    assert received[STAFF_PHONE][-1]["message"].startswith("A small step down")
+    assert not received.get(TABLET)

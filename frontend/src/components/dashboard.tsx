@@ -23,6 +23,7 @@ import { errorText } from "@/lib/utils";
 import { coreWaterValue, waterParameters } from "@/lib/water-delivery";
 import type { Page } from "@/lib/routes";
 import { plantAmount } from "@/lib/water-view";
+import { Notice, UiTip } from "@/components/info-tip";
 import { Pill, type PillTone } from "./mini-visuals";
 
 export type { Page };
@@ -63,15 +64,21 @@ export function Empty({
   title,
   detail,
   action,
+  tip,
 }: {
   title: string;
   detail: string;
   action?: ReactNode;
+  /** An "About" button beside the title. */
+  tip?: ReactNode;
 }) {
   return (
     <div className="empty-state">
       <Info size={24} />
-      <h3>{title}</h3>
+      <h3>
+        {title}
+        {tip && <> {tip}</>}
+      </h3>
       <p>{detail}</p>
       {action}
     </div>
@@ -192,20 +199,23 @@ export function HistoryChart({
           <p>Water content and root-zone conductivity, as Home Assistant recorded them</p>
         </div>
         {ranges ? (
-          <div className="history-toggle" role="group" aria-label="History range">
-            {ranges.map((range) => (
-              <button
-                type="button"
-                key={range.hours}
-                aria-pressed={hours === range.hours}
-                onClick={() => setHours(range.hours)}
-              >
-                {range.label}
-              </button>
-            ))}
-          </div>
+          <span className="label-with-tip">
+            <div className="history-toggle" role="group" aria-label="History range">
+              {ranges.map((range) => (
+                <button
+                  type="button"
+                  key={range.hours}
+                  aria-pressed={hours === range.hours}
+                  onClick={() => setHours(range.hours)}
+                >
+                  {range.label}
+                </button>
+              ))}
+            </div>
+            <UiTip copyKey="history range" />
+          </span>
         ) : (
-          <>
+          <span className="label-with-tip">
             <label className="sr-only" htmlFor="history-range">
               History range
             </label>
@@ -220,12 +230,13 @@ export function HistoryChart({
                 </option>
               ))}
             </select>
-          </>
+            <UiTip copyKey="history range" />
+          </span>
         )}
       </div>
       {zones.length > 1 && (
         <div className="history-controls">
-          <div className="history-zone-options" aria-label="Zones shown in history">
+          <div className="history-zone-options" aria-label="Zones on the chart">
             {zones.map((zone, index) => (
               <button
                 key={zone.id}
@@ -265,7 +276,8 @@ export function HistoryChart({
         </div>
       ) : error ? (
         <Empty
-          title="History could not load"
+          title="History did not load"
+          tip={<UiTip copyKey="history could not load" />}
           detail={error}
           action={
             <Button variant="outline" onClick={() => setRetry((value) => value + 1)}>
@@ -275,7 +287,8 @@ export function HistoryChart({
         />
       ) : !visibleZones.length ? (
         <Empty
-          title="Choose a zone to compare"
+          title="Select a zone to compare"
+          tip={<UiTip copyKey="choose a zone to compare" />}
           detail="Select one or more zones above to show their recorded moisture and EC."
           action={
             <Button variant="outline" onClick={() => setHiddenZones([])}>
@@ -285,7 +298,7 @@ export function HistoryChart({
         />
       ) : !recordedLines.length ? (
         <Empty
-          title="No recorded moisture or EC history"
+          title="No recorded VWC or EC"
           detail="History appears when Home Assistant records the selected sensors. Missing measurements are not replaced with sample values."
         />
       ) : (
@@ -293,7 +306,7 @@ export function HistoryChart({
           <div
             className="chart-wrap combined-chart"
             role="img"
-            aria-label={`Recorded VWC on the left percent axis and EC on the right mS/cm axis for ${visibleZones.map((zone) => zone.name).join(", ")} over ${hours} hours`}
+            aria-label={`VWC and EC history chart. Recorded VWC on the left axis in %, and EC on the right axis in mS/cm, for ${visibleZones.map((zone) => zone.name).join(", ")} over ${hours} hours.`}
           >
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart
@@ -416,6 +429,9 @@ export function ReviewDialog({
   onApplied,
   title = "Review changes",
   note,
+  warning,
+  caution,
+  run,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -424,6 +440,13 @@ export function ReviewDialog({
   onApplied?: (applied: string[]) => void;
   title?: string;
   note?: string;
+  /** A "WARNING: ..." line (a risk to a person), shown before the values, styled as in an About tip. */
+  warning?: string | null;
+  /** A "CAUTION: ..." line (a risk to the plants or the equipment), shown after any warning. */
+  caution?: string | null;
+  /** Applies the reviewed change some other way than writing its values (an AI overlay's Keep or
+   * Undo); it throws when Home Assistant refuses. */
+  run?: () => Promise<void>;
 }) {
   const [busy, setBusy] = useState(false);
   const [errors, setErrors] = useState<string[]>([]);
@@ -434,6 +457,12 @@ export function ReviewDialog({
     setBusy(true);
     setErrors([]);
     try {
+      if (run) {
+        await run();
+        onApplied?.(items.map((item) => item.change.entityId));
+        onOpenChange(false);
+        return;
+      }
       const result = await controller.write(items.map((item) => item.change));
       onApplied?.(result.applied);
       if (result.failed.length)
@@ -465,6 +494,8 @@ export function ReviewDialog({
             only. Confirm each value before applying.
           </DialogDescription>
         </DialogHeader>
+        {warning && <Notice kind="warning" text={warning} />}
+        {caution && <Notice kind="caution" text={caution} />}
         <div className="review-list">
           {items.map((item) => (
             <div className="review-row" key={item.change.entityId}>

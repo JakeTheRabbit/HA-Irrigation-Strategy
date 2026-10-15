@@ -38,10 +38,12 @@ import {
   type Page,
   type Route,
 } from "@/lib/routes";
-import { AppHeader } from "@/components/app-header";
+import { AppHeader, StaleBanner } from "@/components/app-header";
+import { UiTip } from "@/components/info-tip";
 import { PageTabs, pageLabel, SECTION_LABELS } from "@/components/page-tabs";
 import { WaterViewProvider } from "@/lib/water-view";
 import { WhatsNewOnUpdate } from "@/components/whats-new";
+import { Tour } from "@/components/tour";
 import { ZonePage } from "@/pages/zone";
 import { Today } from "@/pages/today";
 import { Strategy, type Drafts } from "@/pages/strategy";
@@ -54,10 +56,10 @@ import { GrowPlanner } from "@/pages/grow-planner";
 import { Setup } from "@/pages/setup";
 import { Comparison } from "@/pages/comparison";
 import { StockTanks } from "@/pages/stock";
+import { Reservoir } from "@/pages/reservoir";
 import { Dosing } from "@/pages/dosing";
 import { WaterUsePage } from "@/pages/water-use";
-import { TankStatus } from "@/components/tank-status";
-import { TankLevel } from "@/components/tank-level";
+import { AiSettings, BrainPage } from "@/components/brain";
 
 const navigation = [
   { page: "today", label: SECTION_LABELS.today, icon: House },
@@ -191,7 +193,10 @@ export default function App() {
         </span>
       </a>
       <div className="room-selector">
-        <label htmlFor={variant + "-room"}>Room</label>
+        <span className="label-with-tip">
+          <label htmlFor={variant + "-room"}>Room</label>
+          <UiTip copyKey="room" />
+        </span>
         <select
           id={variant + "-room"}
           value={controller.roomId}
@@ -247,8 +252,8 @@ export default function App() {
         {!controller.demo && (
           <dl
             className="sidebar-versions"
-            aria-label="Running versions"
-            title="Reported by the running integration and controller, not by this page"
+            aria-label="Current versions"
+            title="Reported versions. The integration and the controller report these versions. The dashboard does not calculate them."
           >
             <div>
               <dt>Integration</dt>
@@ -293,9 +298,11 @@ export default function App() {
           openNavigation={() => setMobile(true)}
           selectRoom={selectRoom}
           openLog={() => navigate("history/timeline")}
+          openBrain={() => navigate("today/ai")}
           refresh={() => void refresh()}
           refreshing={refreshing}
         />
+        <StaleBanner controller={controller} openProbes={() => navigate("equipment/probes")} />
         <main id="main-content" tabIndex={-1}>
           <div className="main-inner">
             {(controller.connection === "offline" || controller.error || refreshError) && (
@@ -338,6 +345,9 @@ export default function App() {
                 navigate={navigate}
               />
             )}
+            {page === "today/ai" && (
+              <BrainPage key={pageKey} controller={controller} navigate={navigate} />
+            )}
             {page === "plan/targets" && (
               <Strategy
                 key={pageKey}
@@ -368,19 +378,8 @@ export default function App() {
             {page === "equipment/stock" && (
               <StockTanks key={pageKey} controller={controller} navigate={navigate} />
             )}
-            {page === "equipment/tank" && (
-              <>
-                <TankStatus
-                  key={pageKey}
-                  controller={controller}
-                  onConfigure={() => navigate("equipment/setup")}
-                />
-                <TankLevel
-                  key={`${pageKey}:level`}
-                  controller={controller}
-                  onConfigure={() => navigate("equipment/setup")}
-                />
-              </>
+            {page === "equipment/feed" && (
+              <Reservoir key={pageKey} controller={controller} navigate={navigate} />
             )}
             {page === "equipment/dosing" && (
               <Dosing
@@ -409,11 +408,13 @@ export default function App() {
                 onDirtyChange={setWorkspaceDirty}
               />
             )}
+            {page === "settings/ai" && <AiSettings key={pageKey} controller={controller} />}
             {page === "help" && <Help controller={controller} />}
           </div>
         </main>
       </div>
       <WhatsNewOnUpdate controller={controller} />
+      <Tour navigate={navigate} />
       <Dialog
         open={Boolean(pending)}
         onOpenChange={(open) => {

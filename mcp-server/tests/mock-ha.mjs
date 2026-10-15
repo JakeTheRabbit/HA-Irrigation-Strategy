@@ -58,7 +58,7 @@ const plumbingProblem = (layout, hardware) =>
     .filter(([key, index]) => Boolean(hardware[key]) !== LAYOUTS[layout][index])
     .map(([, , label]) => `The plumbing for this room disagrees about its ${label}`)
     .join(". ");
-// The default room has never declared its plumbing ("": every install from before 2.19.0); Veg
+// The default room has never declared its plumbing ("": every install from before 2.19.0); Room B
 // has, as a pump then zone valves, which is what its mapped switches are.
 function room(prefix, name) {
   const hardware = {
@@ -93,7 +93,7 @@ function room(prefix, name) {
   };
 }
 export async function mockHa(t) {
-  const rooms = [room("", "Default"), room("veg_", "Veg")];
+  const rooms = [room("", "Default"), room("room_b_", "Room B")];
   const candidates = rooms.flatMap((r) => [
     {
       entity_id: "switch." + r.prefix + "pump",

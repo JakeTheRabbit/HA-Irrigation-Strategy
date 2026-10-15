@@ -8,10 +8,10 @@ import {
 } from "react";
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { UiTip } from "@/components/info-tip";
 import { dailyLimit, Empty, number, time as clock } from "@/components/dashboard";
 import { ageText, ageTone, readHeartbeat } from "@/lib/controller-health";
 import {
-  athenaDryback,
   bandStatus,
   CHART_LAYERS,
   dayScales,
@@ -22,6 +22,7 @@ import {
   placeBadges,
   placeMarkers,
   rangeText,
+  referenceDryback,
   runoffBand,
   smoothPath,
   steeringOf,
@@ -44,6 +45,7 @@ import {
   earlierTraces,
   growDay,
   joinRows,
+  maintenanceStop,
   nextShot,
   NOT_REPORTING,
   phaseAt,
@@ -51,6 +53,7 @@ import {
   readings,
   setpointChanges,
   setpointSteps,
+  stoppedSegments,
   timelineEntities,
   typicalDay,
   unprojected,
@@ -90,10 +93,12 @@ import "./day-timeline.css";
 /** Each phase as the zone views name it, and as its chart column says it where there is room. */
 const PHASES: Record<string, { name: string; short: string; what: string }> = {
   P0: { name: "Morning dryback", short: "Dryback", what: "VWC falls after lights-on" },
-  P1: { name: "Ramp-up", short: "Ramp", what: "the first shots after lights-on" },
+  P1: { name: "Ramp", short: "Ramp", what: "the first shots after lights-on" },
   P2: { name: "Maintenance", short: "Maintenance", what: "shots through the lights-on hours" },
   P3: { name: "Overnight dryback", short: "Night", what: "dries back until lights-on" },
 };
+// The maintenance band after Auto setpoints' planned stop (stoppedSegments): a floor, not a trigger.
+const STOPPED = "Maintenance stopped";
 const HELD: Record<Block["kind"], string> = {
   cap: "daily budget spent",
   block: "blocked",
@@ -169,6 +174,8 @@ interface Lane {
   status: string | null;
   setupNote: string | null;
   rescue: number | null;
+  /** When Auto setpoints' plan stopped the maintenance shots for the dryback today, else null. */
+  p2Stop: number | null;
 }
 /** Earlier grow-days as loaded: per zone, each day's trace, yesterday first (null where there is
  * nothing to draw), and the room's setup revision as each day began. */
@@ -207,7 +214,7 @@ function useEarlierDays(
   day: GrowDay | null,
   ready: boolean,
 ) {
-  const { room, states } = controller;
+  const { room, states, timeZone } = controller;
   const ids = earlierEntities(room, states, zoneId);
   const hours = {
     on: numeric(states[`number.crop_steering_${room.room.prefix}lights_on_hour`]),
@@ -231,7 +238,7 @@ function useEarlierDays(
       retry: number | undefined;
     let pending = earlierLoads.get(key);
     if (!pending) {
-      const windows = earlierDays(day, 7, () => hours);
+      const windows = earlierDays(day, 7, () => hours, timeZone);
       pending = inPairs(
         windows.map((window) => () => load({ ...ids, start: window.start, end: window.end })),
       ).then(joinRows);
@@ -245,7 +252,7 @@ function useEarlierDays(
         if (current)
           setEarlier({
             key,
-            ...earlierTraces(rows, room, day, hours, ids.attributeIds[0]),
+            ...earlierTraces(rows, room, day, hours, ids.attributeIds[0], timeZone),
             error: "",
           });
       },
@@ -264,7 +271,7 @@ function useEarlierDays(
   return earlier?.key === key ? earlier : null;
 }
 
-/** One zone's grow-day in the language of Athena's irrigation phase reference chart: today in
+/** One zone's grow-day as a phase reference chart: today in
  * numbers, then what the zone did today (its phases, shots and pore EC), where it is now against
  * today's stage, and what comes next. Today is downloaded once when the page opens and live updates
  * extend it; the earlier days (yesterday, the typical day, last night's dryback) are downloaded once. */
@@ -287,6 +294,7 @@ export function ZoneDay({ controller, zone }: { controller: Controller; zone: Zo
     numeric(states[`number.crop_steering_${prefix}lights_on_hour`]),
     numeric(states[`number.crop_steering_${prefix}lights_off_hour`]),
     now,
+    controller.timeZone,
   );
   const entities = timelineEntities(room, states, zone.id);
   const key = day
@@ -338,19 +346,20 @@ export function ZoneDay({ controller, zone }: { controller: Controller; zone: Zo
   const age = Number.isFinite(newest) ? now - newest : null;
   const lane =
     rows && day ? buildLane(controller, zone, entities, day, rows, now, earlier, compare) : null;
-  const stage = readJev(states, prefix).room?.stage ?? null;
-  const athena = athenaDryback(stage?.name);
   return (
     <div className="day-timeline zone-day" data-day-timeline data-zone={zone.id}>
-      <ZoneNumbers controller={controller} zone={zone} lane={lane} day={day} athena={athena} />
+      <ZoneNumbers controller={controller} zone={zone} lane={lane} day={day} />
       <section className="panel zone-day-chart" aria-labelledby={`zone-day-${zone.id}`}>
         <div className="panel-heading">
           <h2 id={`zone-day-${zone.id}`}>Today</h2>
           {rows && (
             <div className="timeline-heading-side">
-              <label htmlFor="day-timeline-compare" className="timeline-compare">
-                Compare with
-              </label>
+              <span className="label-with-tip">
+                <label htmlFor="day-timeline-compare" className="timeline-compare">
+                  Compare with
+                </label>
+                <UiTip copyKey="compare with" />
+              </span>
               <select
                 id="day-timeline-compare"
                 value={compare}
@@ -375,11 +384,13 @@ export function ZoneDay({ controller, zone }: { controller: Controller; zone: Zo
         ) : !day ? (
           <Empty
             title="No lights schedule"
+            tip={<UiTip copyKey="no lights schedule" />}
             detail="Set this room’s lights-on and lights-off hours to draw its grow day."
           />
         ) : error ? (
           <Empty
-            title="The grow day could not load"
+            title="Grow-day did not load"
+            tip={<UiTip copyKey="the grow day could not load" />}
             detail={error}
             action={
               <Button variant="outline" onClick={() => setRetry((value) => value + 1)}>
@@ -630,29 +641,28 @@ function buildLane(
     setupNote: !moved
       ? null
       : compare === "yesterday"
-        ? "Rooms & setup saved since yesterday: its probe may have differed"
-        : `${moved} of ${compared.length} days before the last Rooms & setup save`,
+        ? "Rooms and setup saved since yesterday: its probe can be different"
+        : `${moved} of ${compared.length} days before the last Rooms and setup save`,
     rescue: read("p3_emergency_vwc_threshold"),
+    p2Stop: zone.auto?.state === "tracking" ? maintenanceStop(zone.auto.p2Stop, day) : null,
   };
 }
 
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** Today in numbers: moisture, pore EC against the stage's band, water today and each plant's
- * share, shots and the last one, the overnight dryback against Athena's target, and what comes
+ * share, shots and the last one, the overnight dryback against the stage's reference, and what comes
  * next. Readings are live; the lane adds what only today's record knows. */
 function ZoneNumbers({
   controller,
   zone,
   lane,
   day,
-  athena,
 }: {
   controller: Controller;
   zone: Zone;
   lane: Lane | null;
   day: GrowDay | null;
-  athena: [number, number] | null;
 }) {
   const stage = readJev(controller.states, controller.room.room.prefix).room?.stage ?? null;
   const band = lane?.ecBand?.band ?? stage?.poreEc ?? null;
@@ -666,6 +676,7 @@ function ZoneNumbers({
   const lastShot = zone.lastIrrigation.timestamp ?? null;
   const next = lane && day ? nextWords(lane, day) : null;
   const dryback = lane?.dryback;
+  const reference = referenceDryback(stage?.drybackPoints, dryback?.value.peak);
   // How fast it dries since the last shot settled, from today's readings.
   const rate = lane
     ? drybackTrend(
@@ -690,7 +701,7 @@ function ZoneNumbers({
           {rate !== null && (
             <dd
               className="zone-sub"
-              title={`VWC points lost per hour since the last shot settled, over up to the last ${DRYBACK_WINDOW_H} hours`}
+              title={`Dryback rate. The VWC points that the zone lost each hour since the last shot settled. The calculation uses up to the last ${DRYBACK_WINDOW_H} hours.`}
             >
               {Math.abs(rate) < 0.05
                 ? "steady"
@@ -737,7 +748,7 @@ function ZoneNumbers({
           {share !== null && (
             <dd
               className="zone-sub"
-              title="Routine shots stop at the zone's daily water limit; ramp, rescue and watchdog shots and high-EC flushes can go past it"
+              title="Daily water limit. Routine shots, for example maintenance shots, stop at the daily water limit of the zone. Ramp shots, rescue shots, watchdog shots and high-EC flushes can go past it."
             >
               {number(share, 0)}% of the {number(limit)} L limit
             </dd>
@@ -751,7 +762,7 @@ function ZoneNumbers({
         <div
           title={
             dryback
-              ? `From the evening peak of ${number(dryback.value.peak)}% (the highest reading in the 2 h before lights-off) to the low of ${number(dryback.value.low)}%: ${number(dryback.value.drop)} points. Athena’s dryback targets are this share of the peak.`
+              ? `From the evening peak of ${number(dryback.value.peak)}% (the highest reading in the 2 h before lights-off) to the low of ${number(dryback.value.low)}%: ${number(dryback.value.drop)} points, as a share of the peak.`
               : "Needs readings on both sides of lights-off."
           }
         >
@@ -760,12 +771,12 @@ function ZoneNumbers({
             {dryback ? number(dryback.value.percent) : "—"}
             {dryback && <span className="unit">% of peak</span>}
           </dd>
-          {athena && (
+          {reference && stage?.drybackPoints && (
             <dd
               className="zone-sub"
-              title="Athena’s relative dryback target for this stage; the zone’s own P3 target is under Targets"
+              title={`Reference dryback. The reference dryback for ${stage.name}: ${rangeText(stage.drybackPoints, 0)} points of VWC, as a part of the peak of this zone. The P3 target of the zone is on the Targets page.`}
             >
-              Athena {rangeText(athena, 0)}%
+              Reference {rangeText(reference, 0)}%
             </dd>
           )}
         </div>
@@ -879,15 +890,18 @@ function DayChart({
           hidden={hidden}
           onToggle={toggle}
         />
-        <label className="grow-readout-choice">
-          Readings
-          <select value={readout} onChange={(event) => place(event.target.value as Readout)}>
-            <option value="below">Under the chart</option>
-            <option value="over">On the chart</option>
-          </select>
-        </label>
+        <span className="label-with-tip">
+          <label className="grow-readout-choice">
+            Readings
+            <select value={readout} onChange={(event) => place(event.target.value as Readout)}>
+              <option value="below">Under the chart</option>
+              <option value="over">On the chart</option>
+            </select>
+          </label>
+          <UiTip copyKey="readings" />
+        </span>
         <details className="timeline-events">
-          <summary>Today’s events ({events.length})</summary>
+          <summary>Today's events ({events.length})</summary>
           {events.length ? (
             <ol>
               {events.map((event, index) => (
@@ -970,7 +984,7 @@ function Legend({
       )}
       {entry(
         "band",
-        "From the maintenance trigger (P2 re-waters under it) up to the peak target, over the ramp and maintenance hours.",
+        "From the re-water point up to the peak target, in the ramp and maintenance hours. Below the re-water point, P2 gives a maintenance shot.",
         <>
           <i className="key-band" aria-hidden="true" />
           Maintenance band
@@ -990,7 +1004,7 @@ function Legend({
           "Filled: code acted on it. Outline: advice, no action, or refused.",
           <>
             <i className="key-jev" aria-hidden="true" />
-            Jev decision
+            AI assistant decision
           </>,
         )}
       {compare &&
@@ -1096,9 +1110,13 @@ function Chart({
   // The references: field capacity all day, the maintenance band over the ramp and maintenance
   // hours, and the rescue floor overnight.
   const fc = steps("field_capacity", day);
-  const band = lane.columns
-    .filter((column) => column.phase === "P1" || column.phase === "P2")
-    .flatMap((column) => bandSegments(steps, column));
+  const band = stoppedSegments(
+    lane.columns
+      .filter((column) => column.phase === "P1" || column.phase === "P2")
+      .flatMap((column) => bandSegments(steps, column)),
+    lane.p2Stop,
+  );
+  const stoppedAt = band.find((segment) => segment.stopped);
   const rescue = lane.columns
     .filter((column) => column.phase === "P3" && column.end - column.start >= 30 * 60_000)
     .flatMap((column) =>
@@ -1375,7 +1393,7 @@ function Chart({
                 width={x(segment.end) - x(segment.start)}
                 y={y(segment.high)}
                 height={Math.max(1, y(segment.low) - y(segment.high))}
-                className="maintenance-band"
+                className={segment.stopped ? "maintenance-band stopped" : "maintenance-band"}
               />
             ))}
           </g>
@@ -1445,6 +1463,11 @@ function Chart({
           textAnchor="end"
         >
           FC {number(fcNow)}%{onAxis(fcNow) ? "" : fcNow > vwcAxis.max ? " ↑" : " ↓"}
+        </text>
+      )}
+      {show("band") && stoppedAt && onAxis(stoppedAt.low) && (
+        <text x={x(stoppedAt.start) + 4} y={y(stoppedAt.low) - 4} className="ref-label">
+          {STOPPED}
         </text>
       )}
       {show("rescue") && rescueNow && vwcAxis && (
@@ -1578,7 +1601,7 @@ function linePath(points: Reading[], x: (time: number) => number, y: (value: num
     })
     .join("");
 }
-/** The maintenance band over one ramp or maintenance column: from the maintenance trigger up to the
+/** The maintenance band over one ramp or maintenance column: from the re-water point up to the
  * peak target, stepping where either setpoint changed. */
 function bandSegments(steps: Steps, column: Column) {
   const high = steps("p1_target_vwc", column),
@@ -1626,7 +1649,7 @@ function readingText(
   before: Reading[],
   typical: TypicalPoint[],
   fc: Level[],
-  band: { start: number; end: number; high: number; low: number }[],
+  band: { start: number; end: number; high: number; low: number; stopped: boolean }[],
   rescue: Level[],
   compare: Compare,
   show: (layer: ChartLayer) => boolean,
@@ -1672,7 +1695,9 @@ function readingText(
   const maintenance = show("band") ? inside(band) : undefined;
   if (maintenance)
     lines.push(
-      `Maintenance band ${number(maintenance.low)}–${number(maintenance.high)}%: re-waters under ${number(maintenance.low)}%`,
+      maintenance.stopped
+        ? `${STOPPED} for the dryback: a top-up only below ${number(maintenance.low)}%`
+        : `Maintenance band ${number(maintenance.low)}–${number(maintenance.high)}%: re-waters under ${number(maintenance.low)}%`,
     );
   const floor = show("rescue") ? inside(rescue) : undefined;
   if (floor) lines.push(`Rescue shot only under ${number(floor.value)}%`);
@@ -1776,7 +1801,7 @@ function jevText(entry: JevEntry, lane: Lane): string {
         ? " (the two phrasings disagreed)"
         : "";
   return [
-    `${clock(entry.time)} · ${lane.zone.name} · Jev: ${entry.title}`,
+    `${clock(entry.time)} · ${lane.zone.name} · AI assistant: ${entry.title}`,
     `${jevAnswer(entry)}${agreed}`,
     ...(entry.action ? [`Asked to ${entry.action}`] : []),
     entry.reason ? `${result}: ${entry.reason}` : result,

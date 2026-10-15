@@ -147,6 +147,36 @@ def test_save_then_load_roundtrip(tmp_path):
     assert st[1]["last_daily_reset"] == date(2026, 6, 27)
 
 
+def test_pid_era_state_loads_and_drops_the_pid_terms(tmp_path):
+    """The EC PID is gone: a state file it wrote still loads, keeps the EC offset, and the
+    next save carries no ec_integral / ec_prev_err."""
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps(
+            {
+                "default": {
+                    "1": {
+                        "phase": "P2",
+                        "ec_offset": -1.5,
+                        "ec_integral": 0.4,
+                        "ec_prev_err": 0.2,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    c = _make([1], p)
+    c._load_state()
+    st = c.rooms[0].state[1]
+    assert st["phase"] == "P2" and st["ec_offset"] == -1.5
+    assert "ec_integral" not in st and "ec_prev_err" not in st
+    c._save_state()
+    saved = json.loads(p.read_text(encoding="utf-8"))["default"]["1"]
+    assert saved["ec_offset"] == -1.5
+    assert "ec_integral" not in saved and "ec_prev_err" not in saved
+
+
 # ----------------------------------------------------------------------- multi-room (Stage 2)
 
 
@@ -199,7 +229,7 @@ def test_nested_file_loads_per_room(tmp_path):
 # --------------------------------------------------------------------------- options compat
 # An old /data/options.json predates the feed_ec_sensor / feed_ph_sensor keys and may carry
 # the old facility-specific substrate_l / flow_lps numbers. Loading it must still work, must
-# NOT resurrect any F2-specific default entity id, and an unset feed sensor must DISABLE that
+# NOT resurrect any site-specific default entity id, and an unset feed sensor must DISABLE that
 # half of the source-water gate (generic, zero-config-safe) rather than poll a dead entity.
 
 
@@ -215,7 +245,7 @@ def _init(opts, monkeypatch):
 def test_old_options_without_feed_keys_disables_gate(monkeypatch):
     # an "old" file: no feed_* keys at all
     c, room = _init({"num_zones": 2, "substrate_l": 6, "flow_lps": 0.067}, monkeypatch)
-    assert room.feed_ec_sensor == ""  # no F2 atlas/aquaponics fallback
+    assert room.feed_ec_sensor == ""  # no fallback to one site's feed probe
     assert room.feed_ph_sensor == ""
     assert (
         c._read_feed_ec(room) is None
@@ -231,7 +261,7 @@ def test_blank_or_whitespace_feed_sensor_is_disabled(monkeypatch):
 
 
 def test_feed_sensors_honored_when_explicitly_set(monkeypatch):
-    # F2 (and any operator) keeps its behavior by setting these explicitly
+    # any operator keeps its behavior by setting these explicitly
     opts = {
         "feed_ec_sensor": "sensor.tank_probe_1_ec",
         "feed_ph_sensor": "sensor.my_ph",
@@ -241,12 +271,12 @@ def test_feed_sensors_honored_when_explicitly_set(monkeypatch):
     assert room.feed_ph_sensor == "sensor.my_ph"
 
 
-def test_substrate_flow_defaults_are_generic_not_f2(monkeypatch):
-    # empty options -> code fallbacks; must be generic placeholders, not F2's real numbers
+def test_substrate_flow_defaults_are_generic_not_one_sites(monkeypatch):
+    # empty options -> code fallbacks; must be generic placeholders, not one site's real numbers
     c, room = _init({}, monkeypatch)
     assert room.feed_ec_sensor == "" and room.feed_ph_sensor == ""
     assert c.substrate_l == 5.0
-    assert c.flow_lps == 0.02  # NOT F2's real 0.04
+    assert c.flow_lps == 0.02  # NOT one site's real 0.04
 
 
 def test_default_room_is_unprefixed(monkeypatch):
@@ -351,7 +381,8 @@ def test_a_learned_zone_saved_by_3_10_0_loads_without_the_retired_limit_keys(tmp
 
 def test_an_old_zone_loads_with_the_day_befores_peak_and_the_p1_rule_empty(tmp_path):
     """Before 3.11.0 a zone kept no peak_prev (the grow-day before's highest reading, the next
-    P1 target) and no P1 rule state: it loads with them empty, its own peak as it was.
+    P1 target) and no P1 rule state, and before the settled P1 rise no settled reading or
+    expected rise: it loads with them empty, its own peak as it was.
     """
     p = tmp_path / "state.json"
     p.write_text(
@@ -367,11 +398,15 @@ def test_an_old_zone_loads_with_the_day_befores_peak_and_the_p1_rule_empty(tmp_p
         st["p1_reached"],
         st["p1_peak_before"],
         st["p1_extra"],
+        st["p1_settled_before"],
+        st["p1_expected_rise"],
     ) == (
         None,
         False,
         None,
         0,
+        None,
+        None,
     )
 
 
@@ -413,3 +448,180 @@ def test_the_history_survives_a_restart_and_junk_in_it_is_dropped(tmp_path):
     st = c2.rooms[0].state[1]
     assert st["plateau_hist"] == [plateau] and st["night_hist"] == []
     assert st["night"] == night
+
+
+def test_a_3_11_1_state_file_loads_and_is_written_back_as_it_was(tmp_path):
+    """What controller 3.11.1 saved for a learned two-zone room mid-grow
+    (tests_ha/fixtures/state_3_11_1_learn_jev.json, recorded from that release): the learner with the
+    working peak Jev held above the learned one (learn.peak_adj, learn.jev), the day before's peak, the
+    P1 rule's state and both histories load, and saving writes back every value 3.11.1 wrote except
+    the removed EC PID's two terms.
+    """
+    fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
+    seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": seed}), encoding="utf-8")
+    c = _make([1, 2], p)
+    c._load_state()
+    for zone in (1, 2):
+        st, old = c.rooms[0].state[zone], seed[str(zone)]
+        assert st["learn"]["peak_adj"] == old["learn"]["peak_adj"] == 1.0
+        assert st["learn"]["jev"] == old["learn"]["jev"]
+        assert st["peak_prev"] == old["peak_prev"]
+        assert st["plateau_hist"] == old["plateau_hist"]
+    c._save_state()
+    saved = json.loads(p.read_text(encoding="utf-8"))["default"]
+    pid = ("ec_integral", "ec_prev_err")
+    for zone in ("1", "2"):
+        kept = {k: v for k, v in seed[zone].items() if k not in pid}
+        assert {k: saved[zone][k] for k in kept} == kept
+        assert not any(k in saved[zone] for k in pid)
+
+
+def test_a_3_11_1_data_folder_gets_an_instance_id_once_and_keeps_it(tmp_path):
+    """No instance_id beside a 3.11.1 state.json: one uuid4 is made there, and a restart reads it back.
+    It is the duplicate-controller guard's identity; nothing else in the folder is touched.
+    """
+    (tmp_path / "state.json").write_text('{"1": {"phase": "P2"}}', encoding="utf-8")
+    path = tmp_path / "instance_id"
+    made = C._instance_id(str(path))
+    assert str(C.uuid.UUID(made)) == made and C.uuid.UUID(made).version == 4
+    assert path.read_text(encoding="utf-8").strip() == made
+    assert C._instance_id(str(path)) == made
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["instance_id", "state.json"]
+
+
+def test_a_corrupt_instance_id_is_replaced_and_an_unwritable_one_never_stops_the_start(
+    tmp_path,
+):
+    path = tmp_path / "instance_id"
+    path.write_text("not a uuid", encoding="utf-8")
+    made = C._instance_id(str(path))
+    assert path.read_text(encoding="utf-8").strip() == made != "not a uuid"
+    elsewhere = tmp_path / "missing-folder" / "instance_id"
+    assert C.uuid.UUID(C._instance_id(str(elsewhere))) and not elsewhere.exists()
+
+
+def test_an_old_zone_loads_unlatched_and_a_latch_survives_a_restart(tmp_path):
+    """Before the max-run latch a zone kept no run of cut shots: it loads with none, and is not
+    latched. A latched zone stays latched across a restart; a malformed latch is dropped.
+    """
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"default": {"1": {"phase": "P2", "peak": 60.0, "shots": 4}}}),
+        encoding="utf-8",
+    )
+    c = _make([1], p)
+    c._load_state()
+    st = c.rooms[0].state[1]
+    assert (st["shots"], st["capped_in_a_row"], st["max_run_latch"]) == (4, 0, None)
+
+    st["capped_in_a_row"] = 3
+    st["max_run_latch"] = {"since": "2026-10-15T10:00:00", "resets": 2}
+    assert c._save_state()
+    again = _make([1], p)
+    again._load_state()
+    st = again.rooms[0].state[1]
+    assert st["capped_in_a_row"] == 3
+    assert st["max_run_latch"] == {"since": "2026-10-15T10:00:00", "resets": 2}
+
+    for junk in ({"since": "x"}, {"resets": "2"}, "latched", 5):
+        p.write_text(
+            json.dumps(
+                {"default": {"1": {"max_run_latch": junk, "capped_in_a_row": -1}}}
+            ),
+            encoding="utf-8",
+        )
+        c = _make([1], p)
+        c._load_state()
+        st = c.rooms[0].state[1]
+        assert (st["capped_in_a_row"], st["max_run_latch"]) == (0, None), junk
+
+
+def test_vmax_series_absent_from_a_3_11_1_file_loads_empty(tmp_path):
+    """A 3.11.1 state file has no Vmax wet-up series: it loads as an empty one, with no advisory yet."""
+    fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
+    seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
+    assert "vmax_wetup" not in seed["1"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": seed}), encoding="utf-8")
+    c = _make([1, 2], p)
+    c._load_state()
+    assert c.rooms[0].state[1]["vmax_wetup"] == []
+    assert c.rooms[0]._vmax == {}
+
+
+def test_vmax_series_round_trips_and_its_advisory_survives_a_restart(tmp_path):
+    p = tmp_path / "state.json"
+    c = _make([1], p)
+    c._load_state()
+    c.rooms[0].state[1]["vmax_wetup"] = [50.0, 55.0, 60.0, 62.0, 62.3, 62.4]
+    c._save_state()
+    c2 = _make([1], p)
+    c2._load_state()
+    assert c2.rooms[0].state[1]["vmax_wetup"] == [50.0, 55.0, 60.0, 62.0, 62.3, 62.4]
+    assert c2.rooms[0]._vmax[1] == C.detect_vmax([50.0, 55.0, 60.0, 62.0, 62.3, 62.4])
+    assert c2.rooms[0]._vmax[1][0] is not None
+
+
+def test_vmax_series_stays_bounded_and_drops_bad_readings(tmp_path):
+    p = tmp_path / "state.json"
+    series = [40.0 + i * 0.1 for i in range(C.VMAX_SERIES_MAX + 25)]
+    saved = {"vmax_wetup": [None, "x", True, float("nan"), 140.0] + series}
+    p.write_text(json.dumps({"default": {"1": saved}}), encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()
+    assert c.rooms[0].state[1]["vmax_wetup"] == series[25:]
+
+
+# ---- plan adherence's record (_adherence): additive, field by field ----
+def test_a_file_without_plan_adherence_loads_fresh_and_saves_no_record(tmp_path):
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": {"1": {"phase": "P2"}}}), encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()
+    assert c.rooms[0]._adherence == C.plan_adherence.fresh()
+    c._save_state()
+    assert "_adherence" not in json.loads(p.read_text(encoding="utf-8"))["default"]
+
+
+def test_a_plan_adherence_record_that_is_not_one_loads_fresh(tmp_path):
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": {"_adherence": ["junk"]}}), encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()
+    assert c.rooms[0]._adherence == C.plan_adherence.fresh()
+
+
+def test_each_wrong_field_of_the_record_starts_fresh_and_a_later_field_is_kept(
+    tmp_path,
+):
+    p = tmp_path / "state.json"
+    today = datetime.now().date().isoformat()
+    saved = {
+        "v": 1,
+        "draft_seen": "yesterday",
+        "baseline": {"revision": 3, "values": "x"},
+        "alerted": {"plan_saved_not_armed_default_r3": today, "bad": 7},
+        "phase_log": {
+            "1": [{"at": "x", "from": "P3", "to": "P0", "how": "lights-on"}, 5]
+        },
+        "bridge": 5,
+        "bridge_day": 12,
+        "cooldown_until": None,
+        "from_a_later_release": {"kept": True},
+    }
+    p.write_text(json.dumps({"default": {"_adherence": saved}}), encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()
+    adh = c.rooms[0]._adherence
+    assert (
+        adh["draft_seen"] is None and adh["baseline"] is None and adh["bridge"] is None
+    )
+    assert adh["bridge_day"] is None
+    assert adh["alerted"] == {"plan_saved_not_armed_default_r3": today}
+    assert adh["phase_log"] == {"1": [saved["phase_log"]["1"][0]]}
+    c._save_state()
+    written = json.loads(p.read_text(encoding="utf-8"))["default"]["_adherence"]
+    assert written["from_a_later_release"] == {"kept": True}
+    assert written["alerted"] == {"plan_saved_not_armed_default_r3": today}

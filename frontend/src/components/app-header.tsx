@@ -1,22 +1,25 @@
 import { useEffect, useState } from "react";
-import { House, Menu, RefreshCw } from "lucide-react";
+import { ArrowRight, House, Menu, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActivityPanel } from "@/components/activity-panel";
+import { UiTip } from "@/components/info-tip";
+import { BrainChip } from "@/components/brain";
 import { SafetySwitches } from "@/components/room-controls";
-import { ageText, ageTone } from "@/lib/controller-health";
-import { roomStatus } from "@/lib/model";
+import { ageText, ageTone, updatedText } from "@/lib/controller-health";
+import { roomStatus, staleBanner } from "@/lib/model";
 import type { Controller } from "@/lib/types";
 import "./app-header.css";
 
 /** The frame's top bar on every page: each room as a status dot and a short state (the selected one
- * pressed; another one opens it), how old the selected room's controller data is, the recent
- * records and refresh, and the room's two safety switches. */
+ * pressed; another one opens it), how old the selected room's controller data is, the AI assistant's
+ * state, the recent records and refresh, and the room's two safety switches. */
 export function AppHeader({
   controller,
   haMenu,
   openNavigation,
   selectRoom,
   openLog,
+  openBrain,
   refresh,
   refreshing,
 }: {
@@ -26,6 +29,8 @@ export function AppHeader({
   openNavigation: () => void;
   selectRoom: (id: string) => void;
   openLog: () => void;
+  /** Opens the AI assistant page. */
+  openBrain: () => void;
   refresh: () => void;
   refreshing: boolean;
 }) {
@@ -97,7 +102,7 @@ export function AppHeader({
         {controller.demo && (
           <span
             className="demo-pill"
-            title="Sample readings: try any setting safely. Changes stay in this tab, and no live equipment is connected."
+            title="Sample readings. The dashboard shows sample readings. Your changes stay in this browser tab. The dashboard connects to no live equipment."
           >
             Demo<span className="wide-only"> data</span>
           </span>
@@ -105,22 +110,17 @@ export function AppHeader({
         <span
           className="data-age"
           data-age={connection === "offline" ? "red" : ageTone(age)}
-          title="How old the selected room's latest controller report is"
+          title="Age of the latest report. The time since the controller of the selected room sent its latest report."
         >
-          {connection === "offline" ? (
-            "Offline"
-          ) : connection === "connecting" ? (
-            "Connecting…"
-          ) : age === null ? (
-            "No controller data"
-          ) : (
-            <>
-              <span className="wide-only">Data </span>
-              {ageText(age)}
-              <span className="wide-only"> old</span>
-            </>
-          )}
+          {connection === "offline"
+            ? "Offline"
+            : connection === "connecting"
+              ? "Connecting…"
+              : age === null
+                ? "No controller data"
+                : updatedText(age)}
         </span>
+        <BrainChip controller={controller} open={openBrain} />
         <ActivityPanel controller={controller} openLog={openLog} />
         <Button
           variant="ghost"
@@ -134,5 +134,28 @@ export function AppHeader({
         <SafetySwitches controller={controller} />
       </div>
     </header>
+  );
+}
+
+/** One full-width band under the header while the selected room's controller is not reporting:
+ * the numbers on the page are its last report. It links to the probes, which say what reports. */
+export function StaleBanner({
+  controller,
+  openProbes,
+}: {
+  controller: Controller;
+  openProbes: () => void;
+}) {
+  const words = staleBanner(controller.states, controller.room.room);
+  if (words === null) return null;
+  return (
+    <div className="stale-banner" role="status">
+      <TriangleAlert size={16} aria-hidden="true" />
+      <p>{words}</p>
+      <button type="button" className="stale-banner-link" onClick={openProbes}>
+        Probes <ArrowRight size={14} aria-hidden="true" />
+      </button>
+      <UiTip copyKey="probes" />
+    </div>
   );
 }

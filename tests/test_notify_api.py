@@ -154,6 +154,14 @@ def home_assistant(monkeypatch):
 
     translation.async_get_translations = async_get_translations
     monkeypatch.setitem(sys.modules, "homeassistant.helpers.translation", translation)
+    event = types.ModuleType("homeassistant.helpers.event")
+
+    def async_track_time_interval(hass, action, interval):
+        hass.intervals = getattr(hass, "intervals", []) + [(action, interval)]
+        return lambda: hass.intervals.remove((action, interval))
+
+    event.async_track_time_interval = async_track_time_interval
+    monkeypatch.setitem(sys.modules, "homeassistant.helpers.event", event)
 
 
 def rig(stored=None, **hass_options):
@@ -197,7 +205,13 @@ def test_a_site_with_no_store_answers_with_an_empty_setup_and_its_phones():
     hass, notifier = rig()
     answer = asyncio.run(notifier.response(ADMIN))
     assert answer["schema_version"] == 1 and answer["error"] is None
-    assert answer["config"] == {"revision": 0, "idle_hours": 3, "recipients": []}
+    assert answer["config"] == {
+        "revision": 0,
+        "idle_hours": 3,
+        "recipients": [],
+        "digest_hours": 4,
+        "mutes": {},
+    }
     assert answer["kinds"] == notify_catalog.serial()
     assert answer["phones"] == [
         {
@@ -220,6 +234,9 @@ def test_a_site_with_no_store_answers_with_an_empty_setup_and_its_phones():
             "friendly_name": "Crop Steering notifications",
             "recipients": 0,
             "idle_hours": 3,
+            "kinds": list(notify_catalog.KIND_IDS),
+            # And that it puts Keep and Undo on a push about the AI's settings.
+            "overlay_actions": True,
         },
     )
 
@@ -230,7 +247,7 @@ def test_saving_moves_the_revision_and_a_stale_or_invalid_save_changes_nothing()
         notifier,
         recipients=[
             {"service": PHONE_A, "kinds": ["stock", "emergency"]},
-            row(GROUP, name=" Everyone ", kinds=["phases"], rooms=["f1_", ""]),
+            row(GROUP, name=" Everyone ", kinds=["phases"], rooms=["room_b_", ""]),
         ],
         idle_hours=4,
     )
@@ -244,10 +261,11 @@ def test_saving_moves_the_revision_and_a_stale_or_invalid_save_changes_nothing()
         "kinds": ["emergency", "stock"],
         "rooms": [],
         "urgent_high_priority": True,
+        "digest": False,
     }
     assert (group["name"], group["rooms"], group["user_id"]) == (
         "Everyone",
-        ["", "f1_"],
+        ["", "room_b_"],
         None,
     )
     assert answer["config"]["idle_hours"] == 4
@@ -263,7 +281,7 @@ def test_saving_moves_the_revision_and_a_stale_or_invalid_save_changes_nothing()
         ([row("mobile_app_phone_a")], "notify.<name>"),
         ([row(PHONE_A), row(PHONE_A)], f"{PHONE_A} is listed twice"),
         ([row("notify.mobile_app_nowhere")], "not a notify service"),
-        ([row(PHONE_A, rooms=["F1"])], "room prefixes"),
+        ([row(PHONE_A, rooms=["Room B"])], "room prefixes"),
         ([row(PHONE_A, urgent_high_priority="yes")], "true or false"),
         ([row(PHONE_A)] * 21, "at most 20"),
     ):
@@ -322,7 +340,7 @@ def _two_owners():
     return rig(
         saved(
             row(PHONE_A, user_id=STAFF.id, kinds=["stock"]),
-            row(PHONE_B, user_id=OTHER.id, kinds=["emergency"], rooms=["f1_"]),
+            row(PHONE_B, user_id=OTHER.id, kinds=["emergency"], rooms=["room_b_"]),
         )
     )
 
@@ -400,7 +418,7 @@ def _routed():
     return rig(
         saved(
             row(PHONE_A, kinds=["stock", "watering"]),
-            row(PHONE_B, kinds=["emergency", "hardware"], rooms=["f1_"]),
+            row(PHONE_B, kinds=["emergency", "hardware"], rooms=["room_b_"]),
             row(
                 GROUP,
                 kinds=["phases", "emergency"],
@@ -423,10 +441,10 @@ def test_a_push_goes_to_each_phone_that_ticks_its_kind_and_covers_its_room_once(
     }
     hass.services.sent.clear()
     # CS-301 is an emergency AND a hardware lockout: the phone ticking both gets it once.
-    answer = send(notifier, code="CS-301", room="f1_", urgent=True)
+    answer = send(notifier, code="CS-301", room="room_b_", urgent=True)
     assert answer == {"sent_to": [PHONE_B], "error": None} and _sent(hass) == [PHONE_B]
     hass.services.sent.clear()
-    # The default room's emergency: not the phone that covers only f1_.
+    # The default room's emergency: not the phone that covers only room_b_.
     assert send(notifier, code="CS-301", room="", urgent=True)["sent_to"] == [GROUP]
     hass.services.sent.clear()
     # About no room in particular: everyone who ticks its kind.
@@ -434,7 +452,7 @@ def test_a_push_goes_to_each_phone_that_ticks_its_kind_and_covers_its_room_once(
     assert send(notifier, code="CS-801", urgent=True)["sent_to"] == [PHONE_B, GROUP]
     hass.services.sent.clear()
     assert send(notifier, event="phase", room="")["sent_to"] == [GROUP]
-    assert send(notifier, event="phase", room="f1_")["sent_to"] == []
+    assert send(notifier, event="phase", room="room_b_")["sent_to"] == []
     # Nobody ticks it: nobody gets it, and that is not a failure.
     assert send(notifier, code="CS-705", room="") == {"sent_to": [], "error": None}
     # A newer controller's code: an emergency when it says so, else setup.
@@ -449,7 +467,7 @@ def test_an_emergency_no_row_covers_still_reaches_every_phone_that_takes_emergen
     hass, notifier = rig(
         saved(
             row(PHONE_A, kinds=["stock"]),
-            row(PHONE_B, kinds=["emergency"], rooms=["f1_"]),
+            row(PHONE_B, kinds=["emergency"], rooms=["room_b_"]),
         )
     )
     assert send(notifier, code="CS-301", room="", urgent=True) == {
@@ -459,7 +477,7 @@ def test_an_emergency_no_row_covers_still_reaches_every_phone_that_takes_emergen
     assert send(notifier, code="CS-801", urgent=True)["sent_to"] == [PHONE_B]
     assert send(notifier, code="CS-705", room="") == {"sent_to": [], "error": None}
     hass, notifier = rig(saved(row(PHONE_A, kinds=["stock", "dosing"])))
-    assert send(notifier, code="CS-301", room="f1_", urgent=True) == {
+    assert send(notifier, code="CS-301", room="room_b_", urgent=True) == {
         "sent_to": [],
         "error": "no phone takes emergencies",
     }
@@ -468,7 +486,7 @@ def test_an_emergency_no_row_covers_still_reaches_every_phone_that_takes_emergen
 
 def test_every_push_carries_its_key_as_the_tag_and_emergencies_go_high_priority():
     hass, notifier = _routed()
-    send(notifier, key="blind_f1_z2", code="CS-301", room="f1_", urgent=True)
+    send(notifier, key="blind_room_b_z2", code="CS-301", room="room_b_", urgent=True)
     send(notifier, key="stock_low", code="CS-608", room="")
     send(notifier, key="x", code="CS-801", urgent=True)
     payloads = {service: payload for service, payload in hass.services.sent}
@@ -484,7 +502,7 @@ def test_every_push_carries_its_key_as_the_tag_and_emergencies_go_high_priority(
             "push": {"interruption-level": "time-sensitive"},
         },
     }
-    assert hass.services.sent[0][1]["data"]["tag"] == "blind_f1_z2"
+    assert hass.services.sent[0][1]["data"]["tag"] == "blind_room_b_z2"
     # Not urgent: the tag and the link.
     assert payloads[PHONE_A] == {
         "title": "T",
@@ -494,6 +512,24 @@ def test_every_push_carries_its_key_as_the_tag_and_emergencies_go_high_priority(
     # `data` goes to mobile_app services only; this one asked for no high priority anyway.
     assert payloads[GROUP] == {"title": "T", "message": "M"}
     assert notify_api.push_data(GROUP, "k", True) is None
+
+
+def test_a_push_about_the_ais_settings_carries_keep_and_undo_on_a_phone():
+    ids = [
+        "number.crop_steering_zone_1_p2_shot_size",
+        "number.crop_steering_zone_2_p2_shot_size",
+    ]
+    data = notify_api.push_data(PHONE_A, "jev_setpoint_default", False, ids)
+    assert data == {
+        "tag": "jev_setpoint_default",
+        **LINK,
+        "actions": [
+            {"action": "CROP_STEERING_KEEP:" + ",".join(ids), "title": "Keep"},
+            {"action": "CROP_STEERING_UNDO:" + ",".join(ids), "title": "Undo"},
+        ],
+    }
+    assert "actions" not in notify_api.push_data(PHONE_A, "k", False, [])
+    assert notify_api.push_data(GROUP, "k", False, ids) is None
 
 
 def test_a_phone_that_fails_never_stops_the_others(monkeypatch):
@@ -506,7 +542,7 @@ def test_a_phone_that_fails_never_stops_the_others(monkeypatch):
     }
     assert _sent(hass) == [GROUP]
     # Every phone it went to failed: nothing was sent, and the answer says why.
-    answer = send(notifier, code="CS-301", room="f1_")
+    answer = send(notifier, code="CS-301", room="room_b_")
     assert answer["sent_to"] == [] and PHONE_B in answer["error"]
     # A phone that does not answer in time is a failure too, and does not hold the others up.
     monkeypatch.setattr(notify_api, "SEND_TIMEOUT_S", 0.05)
@@ -674,44 +710,44 @@ def _raise(hass, issue_id, action="create", domain=DOMAIN):
 def test_a_repairs_card_goes_to_the_phones_that_tick_its_kind_when_it_is_raised(issues):
     rooms = [
         {"room_slug": "default", "room_prefix": "", "room_name": "Crop Steering"},
-        {"room_slug": "f1", "room_prefix": "f1_", "room_name": "Flower 1"},
+        {"room_slug": "room_b", "room_prefix": "room_b_", "room_name": "Room B"},
     ]
     hass, notifier = rig(
         saved(
-            row(PHONE_A, kinds=["stock"], rooms=["f1_"]),
+            row(PHONE_A, kinds=["stock"], rooms=["room_b_"]),
             row(PHONE_B, kinds=["emergency"]),
         ),
         rooms=rooms,
     )
     notifier.listen()
-    issues["stock_low_f1"] = SimpleNamespace(
+    issues["stock_low_room_b"] = SimpleNamespace(
         translation_placeholders={"count": "1", "tanks": "- Bloom: 2 L of 20 L"}
     )
-    _raise(hass, "stock_low_f1")
+    _raise(hass, "stock_low_room_b")
     service, payload = hass.services.sent[-1]
     assert service == PHONE_A
-    assert payload["title"] == "Flower 1: 1 stock tank(s) running low (CS-608)"
+    assert payload["title"] == "Room B: 1 stock tank(s) low (CS-608)"
     assert (
         "- Bloom: 2 L of 20 L" in payload["message"]
         and "Code CS-608." in payload["message"]
     )
-    assert payload["data"] == {"tag": "stock_low_f1", **LINK}
+    assert payload["data"] == {"tag": "stock_low_room_b", **LINK}
     # Still raised: an update (new placeholders, or raised again after a restart) is not a new card.
-    _raise(hass, "stock_low_f1", "update")
-    _raise(hass, "stock_low_f1", "remove")
+    _raise(hass, "stock_low_room_b", "update")
+    _raise(hass, "stock_low_room_b", "remove")
     _raise(hass, "something_else", domain="another_integration")
     assert len(hass.services.sent) == 1
-    # The default room's low stock: not for the phone that covers only f1_.
+    # The default room's low stock: not for the phone that covers only room_b_.
     issues["stock_low"] = SimpleNamespace(
         translation_placeholders={"count": "2", "tanks": ""}
     )
     _raise(hass, "stock_low")
     assert len(hass.services.sent) == 1
     # A critical card is an emergency, sent as one.
-    _raise(hass, "kill_switch_missing_f1")
+    _raise(hass, "kill_switch_missing_room_b")
     service, payload = hass.services.sent[-1]
     assert service == PHONE_B and payload["data"]["priority"] == "high"
-    assert payload["title"] == "Flower 1: kill switch helper missing (CS-601)"
+    assert payload["title"] == "Room B: Kill switch missing (CS-601)"
     notifier.stop()
     assert hass.bus.listeners == []
 

@@ -32,7 +32,7 @@ def test_a_named_zone_is_named_and_its_number_is_still_there():
     states[DESCRIPTOR][1]["zone_names"] = {"1": "GT1", "2": "GT4"}
     _c, alerts, _fake = _dead_probe_alerts(states)
     title = alerts["f2_blind_default_z2"]["title"]
-    assert title == "GT4 (Z2): moisture sensor not reporting (CS-102)"
+    assert title == "GT4 (Z2): moisture probe does not report (CS-102)"
     assert alerts["f2_blind_default_z1"]["title"].startswith("GT1 (Z1): ")
 
 
@@ -66,4 +66,4 @@ def test_an_install_without_names_gets_the_zone_number():
         else:
             states[DESCRIPTOR][1]["zone_names"] = names
         _c, alerts, _fake = _dead_probe_alerts(states)
-        assert alerts["f2_blind_default_z2"]["title"] == "Zone 2: moisture sensor not reporting (CS-102)", names
+        assert alerts["f2_blind_default_z2"]["title"] == "Zone 2: moisture probe does not report (CS-102)", names

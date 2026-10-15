@@ -111,7 +111,7 @@ def test_continuous_snapshot_controls_dryback_and_all_ec_phases_in_both_modes(
 def test_wrong_room_stale_incomplete_snapshot_never_falls_back():
     now = datetime.now(timezone.utc)
     for attrs in (
-        snapshot(now, "f1_"),
+        snapshot(now, "room_b_"),
         snapshot(now - timedelta(minutes=5)),
         {**snapshot(now), "zones": []},
     ):

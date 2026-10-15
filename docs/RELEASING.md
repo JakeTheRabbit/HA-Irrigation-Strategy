@@ -6,7 +6,7 @@ This controller opens valves and runs pumps on unattended crops. A bug that reac
 
 An explicitly owner-approved, bounded rehearsal exception is recorded as `approved-rehearsal` in step 5. It changes the accepted promotion scope for that candidate; it does not turn an isolated software rehearsal into a hardware soak or permission to operate unverified plumbing. Without that explicit decision, the normal staging requirements below apply.
 
-CI is necessary and nowhere near sufficient. On one day in September 2026 this repository published four releases in under ten hours. 2.17.1 shipped nineteen minutes after 2.17.0 because "the room on/off control did nothing on a fresh 2.17.0 install", which its changelog records as "Found on the first live install". 2.18.0 was published one minute after its pull request merged. Every one of those builds was green. Four defects that survived all of them, including one that stopped the integration loading at all on Home Assistant older than 2026.5, are written up in [audits/2026-09-21-first-run-review.md](audits/2026-09-21-first-run-review.md). Production was the test environment. This process moves that job to a staging room.
+CI is necessary and nowhere near sufficient. On one day in September 2026 this repository published four releases in under ten hours. 2.17.1 shipped nineteen minutes after 2.17.0 because "the room on/off control did nothing on a fresh 2.17.0 install", which its changelog records as "Found on the first live install". 2.18.0 was published one minute after its pull request merged. Every one of those builds was green. Four defects that survived all of them, including one that stopped the integration loading at all on Home Assistant older than 2026.5, are written up in [dev/audits/2026-09-21-first-run-review.md](dev/audits/2026-09-21-first-run-review.md). Production was the test environment. This process moves that job to a staging room.
 
 How a change gets *in* (one change, one branch, one pull request) is in [CONTRIBUTING.md](../CONTRIBUTING.md). This document is how it gets *out*.
 
@@ -62,7 +62,7 @@ Every pull request states its class. The class sets the minimum soak. When in do
 
 ### 2. Automated checks, green on the exact commit
 
-`bash tests/run_ci.sh` locally, and on GitHub every job of `Validate`: ruff, black, yamllint, vendored engine identical, the stub suite, the controller suite, the engine suite, **the real-Home-Assistant tier (`tests_ha/`)**, hassfest, HACS validation, the add-on image build, the dashboard build (**and proof that the committed dashboard file is exactly what `frontend/src` builds**), the browser checks, MCP.
+`bash tests/run_ci.sh` locally, and on GitHub every job of `Validate`: ruff, black, yamllint, vendored engine identical, the stub suite, the controller suite, the engine suite, **the real-Home-Assistant tier (`tests_ha/`)**, hassfest, HACS validation, the add-on image build, the add-on image per arch (amd64, aarch64, armv7: imports and pinned packages), **the controller container smoke in both modes (`tests_container/`)**, the dashboard build (**and proof that the committed dashboard file is exactly what `frontend/src` builds**), the browser checks, MCP.
 
 A C2 or C3 change is not reviewable without:
 
@@ -86,7 +86,9 @@ Give it real notes: in place of `--notes`, pass `--notes-file <(python scripts/r
 
 Staging rooms now see it: HACS offers the pre-release, Supervisor offers the new controller version from `#testing`. Production rooms see nothing, because `main` has not moved.
 
-**`testing` is now frozen.** From the moment the release pull request merges until the candidate is promoted or abandoned, nothing else merges into `testing`. The reason is mechanical, not tidy-minded: HACS installs the integration from the *tag*, but Supervisor builds the controller from the *tip of the branch at the moment the box updates*. A feature merged behind a candidate carries no version change, so no box is offered it, but a staging room that installs or rebuilds after that merge builds the newer code **under the candidate's version number**, and what soaks is no longer what was tagged. A backup restore can import a saved image instead; it does not always rebuild the branch tip (see *Rolling back*). Pull requests can still be opened, reviewed and checked during a soak; they wait to merge. One staging room can only soak one candidate at a time anyway, so the freeze costs review latency and nothing else. Make it mechanical: switch on **Lock branch** for `testing` when you cut the candidate, and off when it is promoted or abandoned. The one thing that merges into a frozen `testing` is the fix for a failed candidate (step 6).
+Publishing the pre-release also starts **Controller container** (`container.yml`): it builds the standalone container image once for amd64 and arm64, runs both modes' container smoke on that exact image, pushes it as `ghcr.io/<owner>/crop-steering-controller:<version>` and `:testing`, and names its digest in the pre-release notes. A version is never pushed twice with different bytes; the workflow refuses. The Home Assistant app does not use this image: boxes still build it from the branch. To try the workflow without pushing, dispatch it with `channel = candidate` and `dry_run = true`. The first time it publishes, the owner sets the GHCR package's visibility to public and links it to this repository.
+
+**`testing` is now frozen.** From the moment the release pull request merges until the candidate is promoted, abandoned, or soaked and superseded (step 6), nothing else merges into `testing`. The reason is mechanical, not tidy-minded: HACS installs the integration from the *tag*, but Supervisor builds the controller from the *tip of the branch at the moment the box updates*. A feature merged behind a candidate carries no version change, so no box is offered it, but a staging room that installs or rebuilds after that merge builds the newer code **under the candidate's version number**, and what soaks is no longer what was tagged. A backup restore can import a saved image instead; it does not always rebuild the branch tip (see *Rolling back*). Pull requests can still be opened, reviewed and checked during a soak; they wait to merge. One staging room can only soak one candidate at a time anyway, so the freeze costs review latency and nothing else. Make it mechanical: switch on **Lock branch** for `testing` when you cut the candidate, and off when it is promoted, abandoned or superseded. The one thing that merges into a frozen `testing` is the fix for a failed candidate (step 6).
 
 ### 4. Soak on a staging room, on real plumbing
 
@@ -96,7 +98,7 @@ A staging room is a real room you can afford to get wrong: real switch, real pum
 
 - [ ] Take a Supervisor backup of the controller add-on (it holds `/data`) and a Home Assistant backup.
 - [ ] Snapshot every `number.`, `select.` and `switch.crop_steering_*` state before updating.
-- [ ] Update both halves **in place from the previous release**. Never a fresh install standing in for an upgrade.
+- [ ] Update both halves **in place from the previous release** (for a candidate meant for promotion, see *Production path* below). Never a fresh install standing in for an upgrade.
 - [ ] Confirm the installed versions and a current controller heartbeat. A copied file or a clean restart proves nothing.
 - [ ] **Prove the box is running the tagged code**, not a later tip of the branch. On the box (host console, or the *Advanced SSH & Web Terminal* add-on with protection mode off): `docker exec $(docker ps -qf name=f2_control) sha256sum /app/controller.py`. On your machine: `git show v2.19.0:addons/f2_control/f2_control/controller.py | sha256sum`. They must match. Write both into the audit file. If they differ, the soak has not started.
 - [ ] Diff the snapshot: **nothing the operator set has moved**, no entity has changed id, no repair issue has appeared.
@@ -124,6 +126,16 @@ A staging room is a real room you can afford to get wrong: real switch, real pum
 **Rollback rehearsal (C3, and any release that changes the state file)**
 
 - [ ] Restore the backup taken above and confirm the room resumes with its counters and phase intact. Rehearse this on staging; do not discover how rollback behaves on a production room.
+
+**Production path (a candidate meant for promotion)**
+
+When the candidates before it were superseded (step 6) rather than promoted, "the previous release" is not what production runs. For a candidate that will be promoted it means **the release `main` runs**, and its soak adds:
+
+- [ ] A room on the release `main` runs, updated in place to the candidate, both halves, with the whole *Upgrade, engine off* list, the hash of `main`'s release proven before the update.
+- [ ] The rollback rehearsal on that room: restore its backups of `main`'s release, prove that release's hash again, and confirm the room resumes with its counters and phase intact.
+- [ ] While rooms installed from the separate Jev repository remain, a Jev 3.11.1 room moved to the candidate by the move guide the candidate carries (`docs/MOVING_FROM_JEV.md`), every step, with its snapshot diff and catch test.
+
+The update from the superseded candidate before it is soaked as well, but it is not evidence for production.
 
 ### 5. Promote
 
@@ -164,7 +176,7 @@ After the dry run passes and the owner authorizes promotion, dispatch **Promote*
 
 If `main` advances but the release flip fails, the workflow fails visibly with that partial result. **Do not rewind `main`.** Fix the reported issue and dispatch again from the new `main`; preflight accepts an already-promoted identical SHA and completes only the release flip. If GitHub completed the flip but its response was lost, the retry verifies the already-stable state and makes no changes. Keep `testing` frozen until it succeeds. Branch/ref protection is still required: no workflow can stop a separate writer changing refs after its final check.
 
-The workflow uses `GITHUB_TOKEN`; its ref/release writes do not start another push/release workflow. It relies on the completed candidate `Validate` run and its own pre/post-write checks. Release packaging must already have completed when the pre-release was created.
+The workflow uses `GITHUB_TOKEN`; its ref/release writes do not start another push/release workflow, so after the flip it dispatches **Pages** and **Controller container** with `channel = stable`, which re-tags `:latest` and `:<major.minor>` to the digest the candidate already published (nothing is rebuilt) and refuses unless the release is no longer a pre-release and `main` is at its tag. Promote runs from `main`, so that dispatch starts with the promotion after the one that first carries it; until then, the owner dispatches the stable re-tag by hand (`gh workflow run container.yml --ref main -f tag=vX.Y.Z -f channel=stable`). It relies on the completed candidate `Validate` run and its own pre/post-write checks. Release packaging must already have completed when the pre-release was created.
 
 **First installation of this workflow:** GitHub cannot dispatch it until it exists on the default branch. For that one bootstrap only, the owner reviews the workflow/script, runs the local read-only preflight against the final tagged candidate and its uploaded evidence, then explicitly authorizes a normal fast-forward of `main` to that same SHA and the matching release flip. Do not copy the workflow alone into `main`, create a merge commit on `main`, force an update, or bypass an unsuccessful preflight. All later promotions use **Promote**. This bootstrap changes no runtime requirement or evidence claim.
 
@@ -173,6 +185,14 @@ GitHub's pull request merge button cannot fast-forward: every option it offers c
 ### 6. If the candidate fails
 
 It stays a pre-release forever (put "abandoned" in its title) and `main` never sees it. Fix on a branch, through a pull request into the still-frozen `testing`, take the next version number, cut a new candidate, and **start the soak clock again**. A candidate that needed a fix has not soaked.
+
+**A candidate that soaked clean but is held.** The owner may choose not to promote a candidate whose full soak passed, for instance to let later fixes soak before production takes the jump. Upload its `release-audit-v<version>.md` first, then put "soaked, superseded" in its pre-release title and switch **Lock branch** off so the next change can merge. Three rules hold:
+
+- **It is never promoted later.** `main` moves only to a later candidate that contains it and soaked itself, including the production path in step 4.
+- **Staging stays still until the next candidate.** From the unlock until the next `release/x.y.z` pull request merges, staging auto-update stays off and no staging room installs or rebuilds the controller: the reason for the freeze in step 3 still applies, and a rebuild would run newer code under the superseded number.
+- **A failed soak is still "abandoned"**, never "superseded".
+
+Promote is never given a superseded tag, so nothing in it changes: the candidate that is promoted still has `testing` at its tag.
 
 ## Hotfixes
 
@@ -199,7 +219,7 @@ Because the repository address is the add-on's identity, pointing an existing ro
 
 1. Kill switch OFF. Wait for any shot to finish. Stop the old controller and switch off its *Start on boot*.
 2. Back up the old add-on and copy `state.json` out of its `/data`.
-3. Add the new repository address, install the controller from it, **do not start it yet**.
+3. Add the new repository address, install the controller from it, **do not start it yet**, and switch off its *Start on boot* until you start it in step 4: it is on by default, and a host restart before then would start both controllers.
 4. Put `state.json` into the new add-on's `/data`, copy the add-on options across, then start it.
 5. Confirm it logs `resumed after restart` with the right setup revision, and that the daily counters are the ones you copied.
 6. Only then uninstall the old controller. Two controllers on one room is two things opening the same valve.
@@ -220,7 +240,7 @@ Open it as a pull request into `testing` like any other change. You cannot split
 
 People skip checklists at 11 pm. Repository settings do not.
 
-- **Protect `testing`:** require a pull request, require an approval from someone other than the author, require every `Validate` job (they must include *Real Home Assistant*, *Build f2-control add-on image* and *Dashboard build and browser workflows*, not only lint), require the branch to be up to date before merging, block force-pushes and deletion.
+- **Protect `testing`:** require a pull request, require an approval from someone other than the author, require every `Validate` job (they must include *Real Home Assistant*, *Build f2-control add-on image*, *Controller container smoke (both modes)* and *Dashboard build and browser workflows*, not only lint), require the branch to be up to date before merging, block force-pushes and deletion.
 - **Protect `main`:** block force-pushes and deletion. It takes no pull requests at all: the only thing that ever arrives is a fast-forward, pushed by whoever is allowed to promote. On an organisation's repository, restrict pushes to those people. On a personal repository classic branch protection cannot do that (the *Restrict who can push* option exists only for organisations): anyone with write access can push, so keep write access to yourself, or use a ruleset with *Restrict updates* and yourself as the only bypass. (Not checked against GitHub's current settings pages; confirm when you set it up.)
 - **Freeze `testing` during a soak** with *Lock branch* (step 3).
 - **Production boxes:** plain repository address, add-on auto-update OFF, HACS beta versions OFF.

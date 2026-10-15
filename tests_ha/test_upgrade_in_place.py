@@ -12,6 +12,7 @@ straight on. To cover another kind of old install, add a snapshot rather than ha
 import json
 import os
 import re
+from datetime import datetime
 from pathlib import Path
 
 import pytest
@@ -27,11 +28,13 @@ from pytest_homeassistant_custom_component.common import (
 
 DOMAIN = "crop_steering"
 KILL = "switch.crop_steering_engine_enabled"
+PID_TERMS = ("ec_integral", "ec_prev_err")  # the removed EC PID's state: dropped on load
 DESCRIPTOR = "sensor.crop_steering_engine_config"
 
 
-async def _upgrade(hass, name, *, registry_ids=None):
-    """Start the new code on top of a seeded old install."""
+async def _upgrade(hass, name, *, registry_ids=None, restored=None):
+    """Start the new code on top of a seeded old install. `restored`: more saved number states,
+    entity id -> value, beside the fixture's operator-tuned ones."""
     seed = fixture(name)
     for entity_id, (state, attributes) in seed["states"].items():
         hass.states.async_set(entity_id, state, attributes)
@@ -64,7 +67,7 @@ async def _upgrade(hass, name, *, registry_ids=None):
         hass,
         [
             State(eid, *(saved if isinstance(saved, list) else [saved]))
-            for eid, saved in seed["operator_tuned_numbers"].items()
+            for eid, saved in {**seed["operator_tuned_numbers"], **(restored or {})}.items()
         ],
     )
     assert await hass.config_entries.async_setup(entry.entry_id)
@@ -232,8 +235,9 @@ async def test_a_3_8_0_state_file_loads_with_its_history_empty_and_nothing_moves
 ):
     """3.8.0 kept no plateau or night history (tests_ha/fixtures/state_3_8_0_mid_grow.json).
     The new controller loads that file exactly as it was, starts the history empty, and writing
-    it back changes nothing else but four new zone keys (the day before's peak and the P1 rule's
-    state), all saved empty."""
+    it back changes nothing else but ten new zone keys (the day before's peak, the P1 rule's state,
+    the max-run latch's run of cut shots and latch and the Vmax advisory's wet-up series, all saved
+    empty, and the follower's record, its peak the grow-day's own)."""
     await _upgrade(hass, "entry_2_17_wizard.json")
     seed = fixture("state_3_8_0_mid_grow.json")["state"]
     hass.states.async_set(KILL, "on")
@@ -259,18 +263,24 @@ async def test_a_3_8_0_state_file_loads_with_its_history_empty_and_nothing_moves
         kept = (written.pop("plateau_hist"), written.pop("night_hist"), written.pop("night"))
         assert kept == ([], [], None)
         learn = dict(written.pop("learn"))
-        new = (written.pop("peak_prev"), written.pop("p1_reached"), written.pop("p1_peak_before"), written.pop("p1_extra"))
-        assert new == (None, False, None, 0)  # the day before's peak and the P1 rule's state, saved empty
-        old = dict(seed["default"][zone])
+        new = (written.pop("peak_prev"), written.pop("p1_reached"), written.pop("p1_peak_before"), written.pop("p1_extra"),
+               written.pop("p1_settled_before"), written.pop("p1_expected_rise"))
+        assert new == (None, False, None, 0, None, None)  # the day before's peak and the P1 rule's state, saved empty
+        assert (written.pop("capped_in_a_row"), written.pop("max_run_latch")) == (0, None)
+        assert written.pop("vmax_wetup") == []
+        old = {k: v for k, v in seed["default"][zone].items() if k not in PID_TERMS}
+        assert written.pop("fc_follow") == {"peak": old["peak"], "day": None, "used": {}}
         assert learn == old.pop("learn")
         assert written == old
 
 
+@pytest.mark.parametrize("options_file", [False, True], ids=["as-a-dict", "read-from-options-json"])
 async def test_3_8_0_app_options_keep_their_jev_budget_and_take_the_new_defaults(
-    hass, controller_for, monkeypatch
+    hass, controller_for, monkeypatch, options_file
 ):
-    """F2's 3.8.0 options (tests_ha/fixtures/options_3_8_0_f2.json) start Jev on the TypeSafe
-    route with the owner's 2000 calls, and every new setting at its default."""
+    """A 3.8.0 app's options (tests_ha/fixtures/options_3_8_0_jev_typesafe.json) start Jev on the TypeSafe
+    route with the owner's 2000 calls, and every new setting at its default: handed over as a dict,
+    and written to options.json and read by the controller's own load_options, as the app does."""
     import functools
 
     import jev_bridge
@@ -279,8 +289,9 @@ async def test_3_8_0_app_options_keep_their_jev_budget_and_take_the_new_defaults
     # No asker worker thread: Home Assistant's test harness fails a test that leaves one running.
     monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False))
     await _upgrade(hass, "entry_2_17_wizard.json")
-    options = fixture("options_3_8_0_f2.json")["options"]
-    c, _fake, _clock = controller_for(options)
+    options = fixture("options_3_8_0_jev_typesafe.json")["options"]
+    c, _fake, _clock = controller_for(options, options_file=options_file)
+    assert c._options == options
     assert c.jev is not None and c.jev.routes == ["TypeSafe"]
     assert c.jev.asker.daily_budget == 2000  # the owner's value stays until the owner changes it
     settings = (c.jev.reask_max, c.jev.unsure_below, c.jev.strict_after, c.jev.strict_prob)
@@ -368,9 +379,10 @@ async def test_the_controller_carries_a_2_25_1_room_straight_on_with_its_options
     assert saved["_setup"] == old["_setup"]
     for zone in ("1", "2"):
         written, was = saved[zone], old[zone]
-        assert {k: written[k] for k in was if k != "learn"} == {
-            k: v for k, v in was.items() if k != "learn"
+        assert {k: written[k] for k in was if k not in ("learn", *PID_TERMS)} == {
+            k: v for k, v in was.items() if k not in ("learn", *PID_TERMS)
         }
+        assert not set(PID_TERMS) & set(written)
         assert {k: written["learn"][k] for k in was["learn"]} == was["learn"]
 
     # ...and it still drives the room the way 2.25.1 did: pump, main line, valve.
@@ -407,7 +419,7 @@ async def test_a_2_25_1_room_with_its_engine_switch_off_stays_dry_after_the_upgr
     room = c.rooms[0]
 
     assert room.enable_flag == KILL
-    assert c._blocked(room, 1) == "f2-control disabled (kill switch off)"
+    assert c._blocked(room, 1) == "Crop Steering Controller disabled (kill switch off)"
 
 
 # ------------------------------------------------------------------ Jev starts only where it has run
@@ -451,6 +463,7 @@ async def test_a_2_25_1_room_with_cloudflare_set_for_the_setpoint_check_gets_no_
     )
     assert app["options"].get("jev_enabled") is (True if "merged" in options else None)
     assert c.jev is None and built == []  # no brain, and no route to ask anything through
+    assert (c.brain_status.provider, c.brain_status.notice) == ("rules", "cloudflare_route_retired")
     assert c._cf[:2] == ("fixture-account", "fixture-token")
     assert [p.name for p in data.iterdir() if p.name.startswith("jev_")] == []
     said = capsys.readouterr().out
@@ -475,6 +488,7 @@ async def test_a_jev_line_app_keeps_its_brain_with_no_option_changed(
     await _upgrade(hass, "entry_2_17_wizard.json")
     c, app, built, stub, data = _seeded_app(controller_for, monkeypatch, options)
     assert c.jev is not None and c.jev.routes == [route]
+    assert (c.brain_status.provider, c.brain_status.state) == ("jev_legacy", "legacy")
     assert [r.name for r in built[0]] == [route] and c.jev.asker.transport is stub
     token = app["options"]["typesafe_api_key"] or app["options"]["cf_api_token"]
     assert built[0][0].token == token  # its own credentials, as saved
@@ -495,19 +509,227 @@ async def test_a_3_0_0_app_on_cloudflare_whose_brain_never_acted_runs_without_je
         controller_for, monkeypatch, "options_3_0_0_jev_cf_quiet.json"
     )
     assert c.jev is None and built == []
+    assert (c.brain_status.provider, c.brain_status.notice) == ("rules", "cloudflare_route_retired")  # OD-11
+
+
+# ------------------------------------------------------------------ a Jev 3.11.1 install
+JEV_3_11_1 = "entry_3_11_1_pumped_room.json"
+
+
+async def test_a_3_11_1_room_keeps_every_entity_id_its_moved_ladder_and_its_dosing_setup(
+    hass, hass_storage
+):
+    """The last Jev release (tests_ha/fixtures/entry_3_11_1_pumped_room.json, recorded from 3.11.1's own
+    wizard and controller): every entity it registered keeps its id and has a state, except those this
+    code retires on purpose; each zone's ladder stays where 3.11.1's Auto setpoints moved it; the entry
+    is loaded as it is; and the dosing setup it saved is the one the controller app is shown."""
+    from custom_components.crop_steering import _RETIRED
+
+    seed = fixture(JEV_3_11_1)
+    dosing = fixture("dosing_3_11_1.json")["dosing"]
+    store = f"{DOMAIN}.dosing.{seed['entry_id']}"
+    hass_storage[store] = {"version": 1, "minor_version": 1, "key": store, "data": dosing}
+    entry, _seed = await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
+    assert (entry.version, entry.minor_version) == (seed["version"], seed["minor_version"])
+    assert entry.data == seed["data"] and entry.options == seed["options"]
+
+    registry = er.async_get(hass)
+    kept = [
+        entity_id
+        for entity_id, key in seed["registry"].items()
+        if re.sub(r"^zone_\d+_", "zone_", key) not in _RETIRED.get(entity_id.split(".")[0], ())
+    ]
+    assert len(kept) > 100
+    assert [e for e in kept if registry.async_get(e) is None] == []
+    assert [e for e in kept if hass.states.get(e) is None] == []
+
+    for entity_id, saved in seed["operator_tuned_numbers"].items():
+        tuned = saved[0] if isinstance(saved, list) else saved
+        state = hass.states.get(entity_id).state
+        if entity_id.startswith("number."):
+            assert float(state) == float(tuned), entity_id
+        else:
+            assert state == tuned, entity_id
+    for entity_id, value in seed["moved_by_the_controller"].items():
+        assert float(hass.states.get(entity_id).state) == value, entity_id
+    assert float(hass.states.get("number.crop_steering_lights_on_hour").state) == 6
+    assert float(hass.states.get("number.crop_steering_lights_off_hour").state) == 18
+
+    descriptor = hass.states.get(DESCRIPTOR).attributes
+    assert (descriptor["pump"], descriptor["mainline"], descriptor["plumbing"]) == (
+        "switch.irrigation_pump",
+        "switch.irrigation_main_line",
+        "pump_mainline_valves",
+    )
+    assert descriptor["setup_revision"] == 1
+
+    shown = hass.states.get("sensor.crop_steering_dosing_config")
+    assert int(shown.state) == dosing["revision"]
+    assert shown.attributes["pumps"] == dosing["pumps"]
+    # Shown with the refill reminder off: the setup was saved before it (docs/DOSING.md).
+    assert shown.attributes["batch"] == {
+        **dosing["batch"],
+        "name": "",
+        "level_entity": None,
+        "remind_pct": 0,
+    }
+
+
+def _jev_3_11_1_app(controller_for, monkeypatch, options):
+    """The real controller on the 3.11.1 room's app: its options file, and the /data/state.json and
+    /data/jev_usage.json 3.11.1 left, on the day that usage file was written. Jev's routes are stubbed:
+    `built` records every route list the brain was given."""
+    import functools
+
+    import jev_bridge
+    import jev_kit
+    from jev.client import Asker
+
+    usage = fixture("jev_usage_3_11_1.json")["usage"]
+    data = Path(os.environ["F2_STATE_PATH"]).parent
+    (data / "jev_usage.json").write_text(json.dumps(usage), encoding="utf-8")
+    noon = datetime.fromisoformat(usage["day"]).replace(hour=12).timestamp()
+    built, stub = [], jev_kit.FakeTransport({})
+    monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: built.append(found) or stub)
+    monkeypatch.setattr(
+        jev_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: noon)
+    )
+    state = fixture("state_3_11_1_learn_jev.json")["state"]
+    c, fake, _clock = controller_for(fixture(options)["options"], saved_state=state)
+    return c, fake, built, usage, state
+
+
+async def test_the_controller_carries_a_3_11_1_room_straight_on_with_its_learner_and_jev(
+    hass, controller_for, monkeypatch
+):
+    """Both layers updated on an armed 3.11.1 box on Cloudflare. The new controller resumes the adopted
+    setup with no disarm cycle, its brain starts on the same route with the same credentials and the
+    day's call count, every learned value (the working peak Jev held above the learned one included)
+    and the day before's peak load as they were, and writing the state back keeps every value 3.11.1
+    wrote."""
+    seed = fixture(JEV_3_11_1)
+    await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
+    hass.states.async_set(KILL, "on")  # armed and growing: nobody is going to disarm it
+    c, fake, built, usage, state = _jev_3_11_1_app(
+        controller_for, monkeypatch, "options_3_11_1_jev_cf.json"
+    )
+    room, old = c.rooms[0], state["default"]
+
+    assert room._setup_pending is None, room._setup_pending
+    assert room.setup_revision == 1
+    assert "Setup" not in (c._blocked(room, 1) or "")
+    assert c.jev is not None and c.jev.routes == ["Cloudflare"]
+    assert built[0][0].token == "fixture-token"
+    assert c.jev.asker.stats["calls"] == usage["calls"]  # the day's count survives the update
+    assert "setpoints" not in {j.name for j in c.jev.judges}  # the judges the operator chose
+    c._refresh_lights(room)
+    assert (room.lights_on_hour, room.lights_off_hour) == (6.0, 18.0)
+    for zone in (1, 2):
+        st, was = room.state[zone], old[str(zone)]
+        assert (st["phase"], st["peak"], st["peak_prev"], st["shots"], st["daily_vol"]) == (
+            was["phase"],
+            was["peak"],
+            was["peak_prev"],
+            was["shots"],
+            was["daily_vol"],
+        )
+        assert st["learn"] == was["learn"]
+        assert st["learn"]["peak_adj"] == 1.0 and st["learn"]["jev"]["nudged"] == ["peak"]
+
+    assert c._save_state()
+    saved = json.loads(Path(os.environ["F2_STATE_PATH"]).read_text(encoding="utf-8"))["default"]
+    assert saved["_setup"] == old["_setup"]
+    for zone in ("1", "2"):
+        written, was = saved[zone], old[zone]
+        assert {k: written[k] for k in was if k not in ("learn", *PID_TERMS)} == {
+            k: v for k, v in was.items() if k not in ("learn", *PID_TERMS)
+        }
+        assert not set(PID_TERMS) & set(written)
+        assert {k: written["learn"][k] for k in was["learn"]} == was["learn"]
+
+    # ...and it still drives the room the way 3.11.1 did: pump, main line, valve.
+    for switch in (
+        "switch.crop_steering_system_enabled",
+        "switch.crop_steering_auto_irrigation_enabled",
+        "switch.crop_steering_zone_1_enabled",
+    ):
+        fake.set_state(switch, "on")
+    fake.calls.clear()
+    c._execute_shot(room, 1, 10, 5, flow_lps=0.05)
+    assert switch_calls(fake) == [
+        ("turn_on", "switch.irrigation_pump"),
+        ("turn_on", "switch.irrigation_main_line"),
+        ("turn_on", "switch.zone_1_valve"),
+        ("turn_off", "switch.zone_1_valve"),
+        ("turn_off", "switch.irrigation_main_line"),
+        ("turn_off", "switch.irrigation_pump"),
+    ]
+
+
+async def test_a_3_11_1_app_on_typesafe_keeps_its_brain_and_the_room_its_state(
+    hass, controller_for, monkeypatch
+):
+    seed = fixture(JEV_3_11_1)
+    await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
+    hass.states.async_set(KILL, "on")
+    c, _fake, built, _usage, state = _jev_3_11_1_app(
+        controller_for, monkeypatch, "options_3_11_1_jev_typesafe.json"
+    )
+    assert c.jev is not None and c.jev.routes == ["TypeSafe"]
+    assert built[0][0].token == "fixture-typesafe-key"
+    assert c.rooms[0]._setup_pending is None
+    assert c.rooms[0].state[1]["learn"] == state["default"]["1"]["learn"]
+
+
+async def test_a_3_11_1_room_shows_the_same_safety_status_under_the_same_ids(
+    hass, controller_for, monkeypatch
+):
+    """The safety status now holds its label through a small band: on the first reading after the
+    update a 3.11.1 room shows exactly what 3.11.1 showed (the label at the thresholds), under the
+    same entity ids, and a reading that has not moved does not move it."""
+    from crop_steering_engine import zone_safety_status
+
+    seed = fixture(JEV_3_11_1)
+    await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
+    c, fake, _built, _usage, _state = _jev_3_11_1_app(
+        controller_for, monkeypatch, "options_3_11_1_jev_cf.json"
+    )
+    room = c.rooms[0]
+    now = datetime(2026, 1, 1, 12, 0)
+    for minute in (0, 1):
+        pub = c._loop_room(room, now.replace(minute=minute))
+        c._publish_status(room, pub, now.replace(minute=minute))
+        for zone in (1, 2):
+            d = pub[zone]
+            shown = fake.sets[f"sensor.crop_steering_zone_{zone}_safety_status"][0]
+            assert shown == zone_safety_status(
+                d["vwc"], d["ec"], d["p"].field_capacity, d["p"].max_ec
+            )
+            assert shown == "approaching_saturation"  # 3.11.1's label for these readings
+        assert fake.sets["sensor.crop_steering_system_safety_status"][0] == "warning"
 
 
 # ------------------------------------------------------------------ an env-file era install
 async def test_an_env_era_install_with_only_front_and_back_probes_still_loads_and_fuses(
     hass,
 ):
+    """Nothing reads crop_steering.env any more: setup no longer imports one and Configure no
+    longer reloads one. A room set up from one runs on what its entry stored, left as found."""
     seed = fixture("entry_env_era.json")
     entry, _ = await _upgrade(
         hass, "entry_env_era.json", registry_ids=_known_numbers(seed)
     )
+    assert not Path(hass.config.config_dir, "crop_steering.env").exists()
     assert float(hass.states.get("sensor.crop_steering_vwc_zone_1").state) == 60.0
     assert float(hass.states.get("number.crop_steering_substrate_volume").state) == 8
+    assert entry.data == seed["data"]  # config_method "env" and all
     assert entry.options == seed["options"]  # old bookkeeping keys are left exactly as found
+    hardware = seed["data"]["hardware"]
+    descriptor = hass.states.get(DESCRIPTOR).attributes
+    assert (descriptor["pump"], descriptor["mainline"]) == (
+        hardware["pump_switch"],
+        hardware["main_line_switch"],
+    )
 
 
 async def test_a_probe_with_no_unit_on_an_old_install_reads_exactly_as_it_always_did(hass):

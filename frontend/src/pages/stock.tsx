@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Empty, Heading, number, type Page } from "@/components/dashboard";
+import { UiTip } from "@/components/info-tip";
 import {
   dosingConfigId,
   dosingStatusId,
@@ -214,7 +215,10 @@ function TankCard({
             if (valid && (await onLevel(value))) setSetting(false);
           }}
         >
-          <Label htmlFor={inputId}>Level read off the tank (L)</Label>
+          <span className="label-with-tip">
+            <Label htmlFor={inputId}>Tank level (L)</Label>
+            <UiTip copyKey="level read off the tank (l)" />
+          </span>
           <div>
             <Input
               id={inputId}
@@ -230,6 +234,7 @@ function TankCard({
             <Button type="submit" size="sm" disabled={!valid || busy}>
               Save level
             </Button>
+            <UiTip copyKey="save level" />
             <Button type="button" size="sm" variant="ghost" onClick={() => setSetting(false)}>
               Cancel
             </Button>
@@ -240,6 +245,7 @@ function TankCard({
           <Button size="sm" disabled={busy} onClick={onRefill}>
             Refilled
           </Button>
+          <UiTip copyKey="refilled" />
           <Button
             size="sm"
             variant="outline"
@@ -326,7 +332,10 @@ function Editor({
             <fieldset key={draft.id ?? `new-${index}`} className="stock-editor-row">
               <legend className="sr-only">{draft.name || `Tank ${index + 1}`}</legend>
               <div className="stock-editor-name">
-                <Label htmlFor={`${listId}-${index}-name`}>Name</Label>
+                <span className="label-with-tip">
+                  <Label htmlFor={`${listId}-${index}-name`}>Name</Label>
+                  <UiTip copyKey="name" />
+                </span>
                 <Input
                   id={`${listId}-${index}-name`}
                   value={draft.name}
@@ -339,7 +348,10 @@ function Editor({
               {numeric(index, "dose_ml", "Per batch", "mL")}
               {numeric(index, "low_l", "Low mark", "L")}
               <div className="stock-editor-entity">
-                <Label htmlFor={`${listId}-${index}-entity`}>Dose entity (optional)</Label>
+                <span className="label-with-tip">
+                  <Label htmlFor={`${listId}-${index}-entity`}>Dose entity (optional)</Label>
+                  <UiTip copyKey="dose entity (optional)" />
+                </span>
                 <Input
                   id={`${listId}-${index}-entity`}
                   list={`${listId}-entities`}
@@ -470,6 +482,7 @@ export function StockTanks({
               <Button variant="outline" disabled={busy || !doc.tanks.length} onClick={recordBatch}>
                 Record a batch
               </Button>
+              <UiTip copyKey="record a batch" />
               <Button onClick={edit} disabled={busy || !!doc.error}>
                 <Pencil size={16} /> Edit stock tanks
               </Button>
@@ -509,7 +522,7 @@ export function StockTanks({
                 className="inline-link"
                 onClick={() => navigate("equipment/setup")}
               >
-                map one in Rooms & setup
+                map one in Rooms and setup
               </Button>
               .
             </>
@@ -522,7 +535,7 @@ export function StockTanks({
       {!doc && !error && <p className="muted">Loading stock tanks…</p>}
       {doc && !doc.tanks.length && !doc.error && (
         <Empty
-          title="No stock tanks yet"
+          title="No stock tanks"
           detail="Add each concentrate you dose into the batch tank: its capacity, how much one batch takes, and when to warn you."
           action={
             <Button onClick={edit}>

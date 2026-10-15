@@ -1,7 +1,7 @@
 """Room On/Off. An OFF room (nothing growing) must neither irrigate nor alert, must keep a heartbeat
 so the integration does not call the engine offline, and must start a fresh run when switched back on.
 
-The pain this fixes, as seen live on 2026-09-20: F1 was empty with unplugged probes, yet the engine
+The pain this fixes, as seen live on 2026-09-20: a production room was empty with unplugged probes, yet the engine
 ran its 90-minute blind schedule (31.5 L per zone per day) and re-raised "probe dead" every 30 minutes.
 """
 from datetime import datetime, timedelta
@@ -45,7 +45,7 @@ def _room(room_state, extra=None):
     states = {"sensor.crop_steering_engine_config": ("ok", _desc(enable_flag="input_boolean.kill")), **FLAGS}
     if room_state is not None:
         states[ROOM_ACTIVE] = (room_state, {})
-    states.update(extra or {})  # no VWC sensor at all -> the zone is blind, exactly like empty F1
+    states.update(extra or {})  # no VWC sensor at all -> the zone is blind, exactly like that empty room
     return _build({"num_zones": 1, "enable_flag": "input_boolean.kill", "notify_service": "notify/phone"}, states=states)
 
 
@@ -97,7 +97,7 @@ def test_a_missing_switch_means_on_so_older_integrations_keep_watering():
 
 def test_an_off_room_stays_off_while_home_assistant_restarts():
     """Seen live 2026-09-20 23:54: during a core restart the switch read unavailable, unavailable meant ON,
-    and empty F1 began a 'fresh run' and raised probe-dead alerts at midnight."""
+    and the empty room began a 'fresh run' and raised probe-dead alerts at midnight."""
     c, fake = _room("off")
     c.loop_once(_Clock.now())
     for unreadable in ("unavailable", "unknown"):
@@ -167,7 +167,7 @@ def _mid_p2_room():
 
 
 def test_switching_a_room_off_and_on_again_within_a_day_carries_on_where_it_was():
-    """25 Sep 2026: the operator switched F2 off and on again at 20:53 to clear a fault, and all three
+    """25 Sep 2026: the operator switched a production room off and on again at 20:53 to clear a fault, and all three
     zones, in P2 an hour before lights-off, went back to P0 and a P1 ramp with today's counters at 0."""
     c, fake = _mid_p2_room()
     _Clock.current += timedelta(minutes=3)

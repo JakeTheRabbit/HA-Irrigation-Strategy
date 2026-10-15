@@ -147,7 +147,7 @@ describe("the merged timeline", () => {
   it("keeps an outcome whose decision is not on the list as a row", () => {
     const row = merged.find((item) => item.jev === stray)!;
     expect(row.outcomes).toEqual([]);
-    expect(timelineText(row)).toBe("Jev · Pore EC: after “hold the EC steer”");
+    expect(timelineText(row)).toBe("AI assistant · Pore EC: after “hold the EC steer”");
     expect(timelineResult(row)).toBe("Didn’t work");
   });
   it("sorts each row into water, phase, setpoints, alerts, Jev or a note", () => {
@@ -202,14 +202,12 @@ describe("the merged timeline", () => {
     expect(zones({ query: "stage's arc" })).toEqual(["jev:4:2026-09-27T15:01:00:alerts"]);
   });
   it("exports as CSV with the local time, the row in words and Jev's result", () => {
-    const csv = timelineCsv(merged, "Flower 2").split("\r\n");
+    const csv = timelineCsv(merged, "Room A").split("\r\n");
     expect(csv[0]).toBe('"Timestamp","Room","Zone","Type","Message","Result"');
     expect(csv).toContain(
-      '"2026-09-27 22:48:00","Flower 2","3","setpoint","Jev · Setpoints: smaller shots, 70% → P2 shot 4.5% → 4%","Acted; worked"',
+      '"2026-09-27 22:48:00","Room A","3","setpoint","AI assistant · Setpoints: smaller shots, 70% → P2 shot 4.5% → 4%","Acted; worked"',
     );
-    expect(csv).toContain(
-      '"2026-09-27 12:00:00","Flower 2","Room","alert","Pump fault: holding",""',
-    );
+    expect(csv).toContain('"2026-09-27 12:00:00","Room A","Room","alert","Pump fault: holding",""');
     expect(
       timelineCsv(
         mergeTimeline([event("f", "2026-09-27T10:00:00", "=HYPERLINK()", "info")], [], now),
@@ -232,8 +230,8 @@ describe("a setpoint the grower changed", () => {
     const [row] = mergeTimeline([], [entry], now);
     expect(byHand(entry)).toBe(true);
     expect(row.kind).toBe("setpoint");
-    expect(timelineText(row)).toBe("By hand · Setpoints: p2 vwc threshold 62 → 61");
-    expect(timelineResult(row)).toBe("Noted by Jev");
+    expect(timelineText(row)).toBe("By hand · Setpoints: re-water point 62 → 61");
+    expect(timelineResult(row)).toBe("Noted by the AI assistant");
     expect(byHand(jev({ judge: "setpoints", verdict: "smaller shots", result: "acted" }))).toBe(
       false,
     );
@@ -281,7 +279,7 @@ describe("the Timeline page", () => {
       noon,
     ).length;
     expect(rows).toBeGreaterThan(merged);
-    for (const text of ["All Jev decisions", "Refused", "Advice", "calls today", "input tokens"])
+    for (const text of ["All AI assistant decisions", "Refused", "Advice", "calls today", "input tokens"])
       expect(html).toContain(text);
     expect(html).toMatch(/class="timeline-outcome" data-worked="(true|false)"/);
     // Days are headed: the demo's journal reaches back to yesterday.
@@ -291,10 +289,10 @@ describe("the Timeline page", () => {
   it("shows a room without Jev its controller records, without Jev's controls", () => {
     const states = createDemo(noon);
     const html = renderToStaticMarkup(
-      createElement(Timeline, { controller: controller(states, "f1_") }),
+      createElement(Timeline, { controller: controller(states, "room_b_") }),
     );
     expect(html).toContain('class="timeline-row"');
-    expect(html).not.toContain("All Jev decisions");
+    expect(html).not.toContain("All AI assistant decisions");
     expect(html).not.toContain('data-source="jev"');
   });
   it("opens on one zone when asked", () => {

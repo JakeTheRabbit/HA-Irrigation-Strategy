@@ -71,9 +71,11 @@ async function levelChart(page) {
   await level.locator(".tank-level-svg").waitFor();
   return level;
 }
-/** Hovers the newest mark on the level line and returns the tooltip's text. */
+/** Hovers the newest mark on the level line, scrolled into view, and returns the tooltip's text. */
 async function hoverShot(page, level) {
-  const dot = await level.locator('[data-layer="shots"] circle').last().boundingBox();
+  const mark = level.locator('[data-layer="shots"] circle').last();
+  await mark.scrollIntoViewIfNeeded();
+  const dot = await mark.boundingBox();
   await page.mouse.move(dot.x + dot.width / 2, dot.y + dot.height / 2);
   await level.locator(".grow-tip").waitFor();
   return level.locator(".grow-tip").innerText();
@@ -84,10 +86,18 @@ try {
   await page.goto(`${origin}/dashboard.html?demo=1#/today`);
   await page.locator('[data-last-irrigation="1"]').waitFor();
   assert.ok(await page.locator('[data-last-irrigation="1"]:visible').getAttribute("datetime"));
-  // The tank: Equipment › Tank & pump.
+  // The tank: Equipment › Tank & feed. The old Tank & pump address still opens it.
   await page.goto(`${origin}/dashboard.html?demo=1#/equipment/tank`);
+  await page.waitForFunction(() => location.hash === "#/equipment/feed");
   const tank = page.locator("[data-tank-status]");
   await tank.waitFor();
+  assert.equal(
+    await page
+      .getByRole("navigation", { name: "Equipment views" })
+      .locator('[aria-current="page"]')
+      .innerText(),
+    "Tank and feed",
+  );
   // The demo tank was filled to 100 % two hours ago and is being drawn down since.
   const cardLevel = Number(await tank.locator("[data-tank-level]").getAttribute("data-tank-level"));
   assert.ok(cardLevel > 25 && cardLevel < 100, `tank card level ${cardLevel}`);
@@ -130,6 +140,25 @@ try {
   await tank.screenshot({ path: file("tank-status.png") });
   await tank.screenshot({ path: img("tank-status.png") });
 
+  // The reservoir minimum, in words, between the card and the level chart: watering allowed, its
+  // marks, the litres left above the minimum, and the batch on the tank with a way to Dosing.
+  const guard = page.locator("[data-reservoir-guard]");
+  assert.equal(await guard.getAttribute("data-reservoir-guard"), "ok");
+  const guardText = await guard.innerText();
+  assert.match(guardText, /Watering allowed/);
+  assert.match(guardText, /8 % · starts again at 12 %/);
+  assert.match(guardText, /About [\d.,]+ L/);
+  assert.match(guardText, /2\.4 L/);
+  assert.match(guardText, /Last batch: |Batch running: |No batch made yet/);
+  assert.doesNotMatch(guardText, /crop_steering|below_minimum|litres_per_pct|vwc/i);
+  const order = await page.evaluate(() =>
+    ["[data-tank-status]", "[data-reservoir-guard]", "[data-tank-level-chart]"].map(
+      (selector) => document.querySelector(selector).getBoundingClientRect().top,
+    ),
+  );
+  assert.ok(order[0] < order[1] && order[1] < order[2], "card, minimum, then the level chart");
+  await guard.screenshot({ path: file("reservoir-guard.png") });
+
   // Under the card, the tank's level over time with what moved it: the demo's recorded history.
   const level = await levelChart(page);
   const summary = () => level.locator(".tank-level-svg").getAttribute("aria-label");
@@ -150,6 +179,10 @@ try {
     (await level.locator('[data-run="filling"]').count()) >= 1,
     "the filling before a fill",
   );
+  // The controller's minimum across the level, in the key; this room sets no refill reminder.
+  assert.equal(await level.locator('[data-level-line="minimum"]').getAttribute("data-value"), "8");
+  assert.equal(await level.locator('[data-level-line="remind"]').count(), 0, "no reminder here");
+  assert.match(await level.locator(".grow-legend").innerText(), /Minimum 8 %/);
   // The newest recorded fill is the demo's last fill, two hours ago.
   assert.equal(
     await level.locator("[data-fill]").last().getAttribute("data-fill"),
@@ -168,7 +201,18 @@ try {
   );
   await page.mouse.move(0, 0);
   await level.locator(".grow-tip").waitFor({ state: "hidden" });
-  // Every range: one or two refills a day, each to 100 %, as F2's tank is filled.
+  // Half a day: the newest fill, two hours ago, and the shots since it.
+  await level.getByRole("button", { name: "12 h", exact: true }).click();
+  await page.waitForFunction(() =>
+    document
+      .querySelector("[data-tank-level-chart] .tank-level-svg")
+      ?.getAttribute("aria-label")
+      ?.startsWith("Tank level over the last 12 h:"),
+  );
+  assert.ok((await level.locator("[data-fill]").count()) >= 1, "a fill in the last 12 h");
+  assert.ok((await level.locator('[data-layer="shots"] circle').count()) > 0, "shots in 12 h");
+  assert.equal(await level.locator('[data-level-line="minimum"]').count(), 1);
+  // Every range: one or two refills a day, each to 100 %, as a real batch tank is filled.
   for (const [range, days] of [
     ["3 days", 3],
     ["7 days", 7],
@@ -191,7 +235,7 @@ try {
     /^\d+ shots · pump on /,
   );
   await noSmallText(level, "the tank level chart");
-  // The Tank & pump tab, card and chart: the README's screenshot.
+  // The Tank & feed tab, card and chart: the README's screenshot.
   await level.screenshot({ path: file("tank-level.png") });
   await page.screenshot({ path: img("tank-level.png") });
   await level.getByRole("button", { name: "24 h", exact: true }).click();
@@ -207,7 +251,11 @@ try {
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
       `no horizontal overflow at ${width}`,
     );
-    for (const panel of ["[data-tank-status]", "[data-tank-level-chart]"]) {
+    for (const panel of [
+      "[data-tank-status]",
+      "[data-reservoir-guard]",
+      "[data-tank-level-chart]",
+    ]) {
       const audit = await new AxeBuilder({ page }).include(panel).analyze();
       assert.deepEqual(
         audit.violations.map((v) => ({ id: v.id, impact: v.impact })),
@@ -216,8 +264,9 @@ try {
       );
     }
   }
-  // At phone width the level chart keeps its shots and its tooltip.
+  // At phone width the level chart keeps its shots, its minimum and its tooltip.
   assert.match(await hoverShot(page, await levelChart(page)), /· Zone \d\n/);
+  assert.equal(await page.locator('[data-level-line="minimum"]').count(), 1);
   await page.mouse.move(0, 0);
   await page.screenshot({ path: file("tank-status-mobile.png"), fullPage: true });
 
@@ -238,13 +287,13 @@ try {
   );
   assert.equal(await sheet.locator("[data-tank-summary]").count(), 2, "latest, lowest, highest");
   await sheet.screenshot({ path: img("tank-history.png") });
-  // Flower 2 checks its feed water on these probes: its gate is drawn and named as such.
+  // Room A checks its feed water on these probes: its gate is drawn and named as such.
   assert.ok((await chart.locator(".recharts-reference-line").count()) >= 2, "gate lines drawn");
   assert.match(
     await sheet.locator('[data-tank-gate="ec"]').innerText(),
     /2\.3–3\.5 mS\/cm\. Irrigation is held while this probe reads outside the gate/,
   );
-  // A room saved in Rooms & setup gates on the probes mapped there: no word of app options.
+  // A room saved in Rooms and setup gates on the probes mapped there: no word of app options.
   assert.equal(await sheet.locator("[data-tank-gate-option]").count(), 0);
   for (const range of ["7 days", "30 days"]) {
     await sheet.getByRole("button", { name: range, exact: true }).click();
@@ -306,7 +355,7 @@ try {
     colorScheme: "light",
   });
   const light = await open(lightContext);
-  await light.goto(`${origin}/dashboard.html?demo=1#/equipment/tank`);
+  await light.goto(`${origin}/dashboard.html?demo=1#/equipment/feed`);
   // The level chart and a shot's tooltip, in the light theme.
   const lightLevel = await levelChart(light);
   await noSmallText(lightLevel, "the tank level chart");
@@ -343,23 +392,35 @@ try {
   );
   await lightContext.close();
 
-  await page.goto(`${origin}/dashboard.html?demo=1&room=room%3Af1_#/equipment/tank`);
+  await page.goto(`${origin}/dashboard.html?demo=1&room=room%3Aroom_b_#/equipment/feed`);
   await page.waitForFunction(
     () => document.querySelector("[data-pump-state]")?.getAttribute("data-pump-state") === "off",
   );
-  // Flower 1's card and level chart are its own tank's: another level, where its chart ends.
-  const f1Level = Number(await page.locator("[data-tank-level]").getAttribute("data-tank-level"));
-  assert.notEqual(f1Level, cardLevel, "Flower 1 reads its own tank");
-  const f1Day = (
+  // Room B maps no tank level for the minimum: it says it is off and how to arm it.
+  assert.equal(
+    await page.locator("[data-reservoir-guard]").getAttribute("data-reservoir-guard"),
+    "unmapped",
+  );
+  assert.match(
+    await page.locator("[data-reservoir-guard]").innerText(),
+    /Map the tank level[\s\S]*Off: no tank level mapped/,
+  );
+  // Room B's card and level chart are its own tank's: another level, where its chart ends.
+  const roomBLevel = Number(await page.locator("[data-tank-level]").getAttribute("data-tank-level"));
+  assert.notEqual(roomBLevel, cardLevel, "Room B reads its own tank");
+  const roomBDay = (
     await (await levelChart(page)).locator(".tank-level-svg").getAttribute("aria-label")
   ).match(
     /^Tank level over the last 24 h: latest ([\d.]+)%, .*, highest 100%\..* recorded fills?\.$/,
   );
-  assert.equal(Number(f1Day?.[1]), f1Level, "Flower 1's chart ends where its card reads");
-  // Flower 1 maps no feed-water probe: no gate is drawn, and the panel says its limits hold nothing.
+  assert.equal(Number(roomBDay?.[1]), roomBLevel, "Room B's chart ends where its card reads");
+  // Room B: no minimum, its level not read by the controller; the refill reminder at 20 %.
+  assert.equal(await page.locator('[data-level-line="minimum"]').count(), 0, "no minimum in Room B");
+  assert.equal(await page.locator('[data-level-line="remind"]').getAttribute("data-value"), "20");
+  // Room B maps no feed-water probe: no gate is drawn, and the panel says its limits hold nothing.
   await page.setViewportSize({ width: 1440, height: 1000 });
   sheet = await openHistory(page);
-  assert.equal(await sheet.locator(".recharts-reference-line").count(), 0, "no gate in Flower 1");
+  assert.equal(await sheet.locator(".recharts-reference-line").count(), 0, "no gate in Room B");
   assert.match(
     await sheet.locator('[data-tank-gate="ec"]').innerText(),
     /Off: no feed-water EC probe is mapped, so 2\.3–3\.5 mS\/cm is not applied\./,
@@ -383,6 +444,8 @@ try {
     "level chart: level, shots, pump runs, filling and recorded fills over 24 h, 3 days and 7 days",
     "level chart tooltip names the zone, length and litres; accessible light, dark and at 390 px",
     "room isolation, and no gate where no feed-water probe is mapped",
+    "Tank & feed: the old tank address redirects, the reservoir minimum and the batch in words",
+    "the reservoir minimum is off, and says how to arm it, where no tank level is mapped",
   ];
   await writeFile(
     new URL("tank-status-verification.json", out),

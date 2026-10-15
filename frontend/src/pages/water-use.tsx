@@ -18,7 +18,7 @@ export function WaterUsePage({ controller }: { controller: Controller }) {
       ) : (
         <section className="panel">
           <Empty
-            title="No zones discovered"
+            title="No zones found"
             detail="Water use appears once the room’s zones are configured and report their water."
           />
         </section>

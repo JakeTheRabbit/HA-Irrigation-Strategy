@@ -17,7 +17,7 @@ pump name or recipe is assumed.
 | Layer | Owns | Never does |
 |---|---|---|
 | Integration | Each room's dosing configuration and its one pending request, in a revisioned store; the services to read, save and request; `sensor.crop_steering_<prefix>dosing_config` for the controller | Switch, press or set any hardware |
-| Controller app | Every action: doses, batches, stops, the irrigation hold during a batch and while dosing hardware does not read off, recovery after a restart, alerts CS-801 to CS-807; `sensor.crop_steering_<prefix>dosing` with live status | Act on a dose or batch asked for more than 120 s before, or on a room whose configuration it cannot read; switch a dosing pump's power on |
+| Controller app | Every action: doses, batches, stops, the irrigation hold during a batch and while dosing hardware does not read off, recovery after a restart, the mix check after a batch, alerts CS-801 to CS-808; `sensor.crop_steering_<prefix>dosing` with live status | Act on a dose or batch asked for more than 120 s before, or on a room whose configuration it cannot read; switch a dosing pump's power on |
 | Dashboard | Equipment › Dosing: pumps, a dose form, the batch, the recipe, history, and the dosing setup | Write any hardware entity; everything goes through `dosing_request` |
 
 ## Configuration (integration store `crop_steering.dosing.<entry_id>`)
@@ -29,12 +29,13 @@ pump name or recipe is assumed.
     {
       "id": "balance",                 // [a-z0-9_]{1,24}, unique in the room
       "name": "Balance",               // 1..40 chars
-      "volume_entity": "number.x",     // number.* | input_number.*   the firmware's dose volume (mL)
+      "volume_entity": "number.x",     // number.* | input_number.*   the firmware's dose volume (mL or L)
       "start_entity": "button.x",      // button.* | input_button.* | script.*   starts the on-device dose
       "dosing_entity": "sensor.x",     // binary_sensor.* (on = dosing) | sensor.* (state starts with dosing_prefix)
       "dosing_prefix": "Dosing",       // sensor type only; default "Dosing"
       "power_entity": "switch.x",      // switch.*   turning it off stops the motor (the stop and the overrun cut)
       "flow_entity": "number.x",       // number.* | input_number.* | sensor.*   calibrated flow, mL/s
+                                       // (or mL/min, L/h: Units and hardware, below)
       "max_ml": 2000,                  // 1..5000; a request above it is refused
       "restore_volume": true,          // put the volume number back after a single dose (firmware that
                                        // keeps its batch recipe in that number); default true
@@ -49,7 +50,7 @@ pump name or recipe is assumed.
     "fill_timeout_min": 20,            // 1..60
     "mix_pump": "switch.x",            // switch.* | null
     "mix_valves": ["switch.x"],        // 0..4 switch.*, opened before the mix pump starts
-    "mix_power_sensor": "sensor.x",    // sensor.* (W) | null
+    "mix_power_sensor": "sensor.x",    // sensor.* (W, kW or mW) | null
     "mix_min_w": 200,                  // 0 = no power check; else the mix pump must draw this within 20 s
                                        // (needs mix_power_sensor)
     "premix_min": 2,                   // 0..30
@@ -57,10 +58,31 @@ pump name or recipe is assumed.
     "close_entities": ["switch.x"],    // 0..16 switch.*, switched off before filling (another room's feed path)
     "hold_entity": "input_boolean.x",  // input_boolean.* | null   on for the whole batch, for other automations
     "filled_at_entity": "input_datetime.x", // input_datetime.* | null   stamped with the end time of a finished batch
-    "recipe": [                        // dose order = list order; each pump at most once
-      {"pump": "balance", "ml": 300, "ml_entity": null} // ml_entity (number.*|input_number.*|sensor.*) is read
+    "part_ml": 12.5,                   // 0.1..5000, only when set: "1 part (mL)", the mL one part is per batch
+    "name": "Week 3",                  // the recipe's name, 0..40 characters; "" (a setup from before names) = none.
+                                       // A save that leaves the key out keeps the stored name
+    "level_entity": "sensor.x",        // sensor.* | number.* | input_number.* | null   the tank's level, in %
+    "remind_pct": 20,                  // 0..100; 0 = no refill reminder (Refill reminder, below); needs level_entity
+    "recipe": [                        // dose order = list order (the operator's); each pump at most once
+      {"pump": "balance", "ml": 300, "ml_entity": null}, // ml_entity (number.*|input_number.*|sensor.*) is read
                                                         // at batch start and wins over ml; 0 skips the pump
+      {"pump": "bloom", "ml": 19, "ml_entity": null, "parts": 1.5} // parts (0..100), only when set:
+                                                        // ml = parts x part_ml, in whole mL
     ]
+  },
+  "feed": {                            // Feed schedule, below; an empty one changes nothing
+    "recipes": [                       // 0..12 named feed recipes
+      {"id": "vege", "name": "Vege",   // id [a-z0-9_]{1,24}, unique (made from the name when left out)
+       "doses": [{"pump": "balance", "ml": 250, "ml_entity": null}], // as the batch's recipe
+       "ec": 2.4}                      // optional: the feed EC it mixes to, 0.1-10 mS/cm, or null
+    ],
+    "schedule": {"start": "2026-10-05", "weeks": ["vege", "bloom", "bloom"]}, // 0..52 weeks
+    "stage": null,                     // the recipe picked by hand, or null
+    "held_until": null                 // set by the store: a pick over the schedule holds until then
+  },
+  "profile": {                         // the room's hardware profile (Hardware profile, below)
+    "hold_wait_s": 600, "fill_open_s": 10, "full_blind_s": 15, "mix_power_s": 20,
+    "min_flow_ml_s": 0.05, "max_dose_s": 1200
   },
   "request": null,                     // see Requests
   "updated_at": "2026-09-28T12:00:00+13:00"
@@ -69,21 +91,71 @@ pump name or recipe is assumed.
 
 Validation (`dosing.py`, pure): every entity exists and is in its allowed domain; pump ids unique;
 recipe pumps exist; a pump appears in the recipe at most once; `full_entity` set whenever
-`fill_valve` is; `mix_power_sensor` set whenever `mix_min_w` is above 0 (else the power could not be
-checked); no entity is both a dosing pump's `power_entity` and batch hardware; a `mix_pump`,
+`fill_valve` is; the recipe's `name` at most 40 characters; `mix_power_sensor` set whenever `mix_min_w` is above 0 (else the power could not be
+checked); `level_entity` set whenever `remind_pct` is above 0; no entity is both a dosing pump's `power_entity` and batch hardware; a `mix_pump`,
 `mix_valves` or `close_entities` switch may be a room's irrigation pump or main line (the batch
 holds that room's watering); a pump's `stock_tank` is one of the room's stock tanks, and a stock
-tank is linked to at most one pump. A room with no pumps is valid and does nothing. "Exists" is checked
+tank is linked to at most one pump; a dose in `parts` needs `part_ml`, and its mL is at most the
+pump's `max_ml`. Every recipe amount is whole mL, rounded half up (12.5 -> 13, 0.4 -> 0, which skips
+the pump): a fixed `ml`, and `parts` x `part_ml`, when they are saved, and an `ml_entity`'s reading by
+the controller when the batch starts. A setup saved without `part_ml` or `parts` has neither key, and
+reads back unchanged. A room with no pumps is valid and does nothing. "Exists" is checked
 when a setup is saved; a stored setup read back at start-up is kept although a device has not come
-back yet.
+back yet. A save that does not send `level_entity` or `remind_pct` keeps the stored ones, so a page
+that does not know them never switches the reminder off. Each feed recipe follows the recipe's rules, names are unique, and every week of the
+schedule names one of the recipes.
+
+### Feed schedule
+
+A room can keep named feed recipes and give each week of the grow one of them, from the day its
+first week starts. Week 1 is the 7 days from `start`, counted in Home Assistant's days and time zone;
+after the last week, the last week's recipe carries on. At Home Assistant's midnight that starts a
+week, the integration writes the dosing config again and the next batch doses the new week's recipe,
+with nobody touching it. A batch already running keeps the doses it started with.
+
+The recipe in use today: the schedule's this week; a recipe picked by hand (`stage`) while the
+schedule runs holds until the schedule's next week starts (picking this week's own recipe ends a
+hold); without a schedule running, the recipe picked by hand; with none picked, the batch's own
+`recipe`, as before. A store saved before the feed schedule loads with an empty one and doses its
+batch recipe unchanged.
+
+A feed recipe may declare the feed EC it mixes to (`ec`). The dosing config carries the EC of the
+recipe in use today as `feed.ec`, and watering compares pore EC with, in order: a mapped feed EC
+probe's reading, that declared EC, else 3.0 mS/cm. A declared value can't catch a mis-mixed tank, so a
+probe always wins and the source-water gate runs on the probe alone; a recipe's EC never holds water.
+
+`dosing_save` takes `feed` as optional: left out (a dashboard from before it), the stored one is
+kept and checked against the pumps being saved. `held_until` is set by the store when `stage`
+changes, never taken from the caller.
+
+### Hardware profile
+
+The times and limits the controller works to are the room's own, so a slower fill valve, a mix pump
+that takes longer to draw its power or a slow pump that needs longer doses can be set for that room
+alone. Each key is optional; one left out takes its default, and the defaults are the values every
+room used before the profile existed, so a setup stored without one (any install before it) runs
+exactly as before.
+
+| Key | Default | Range | What it sets |
+|---|---|---|---|
+| `hold_wait_s` | 600 | 60..3600 | how long a batch waits at Hold for a shot in flight |
+| `fill_open_s` | 10 | 2..120 | how long the fill valve has to read on |
+| `full_blind_s` | 15 | 5..300 | how long `full_entity` may read nothing while the tank fills |
+| `mix_power_s` | 20 | 5..300 | how long the mix pump has to draw `mix_min_w` |
+| `min_flow_ml_s` | 0.05 | 0.01..100 | the lowest flow that counts as a calibration |
+| `max_dose_s` | 1200 | 60..3600 | the longest expected dose; no dose runs past it + 60 s |
+
+The numbers below (10 s, 15 s, 20 s, 0.05 mL/s, 20 and 21 minutes, 10 min) are these defaults. The
+controller reads the profile from `dosing_config`; a value it cannot use (missing, not a positive
+number) takes the default.
 
 ## Services
 
 | Service | Who | Data | Response |
 |---|---|---|---|
-| `crop_steering.dosing_get` | any user | `room_id` | `{schema_version: 1, room_id, config, candidates[], can_edit, error}` |
-| `crop_steering.dosing_save` | admin | `room_id, expected_revision, pumps, batch` | the same as `dosing_get`, or `error` |
-| `crop_steering.dosing_request` | admin; a `stop`: any signed-in user | `room_id, action ("dose" \| "batch" \| "stop"), pump?, ml?` | `{request, error}` |
+| `crop_steering.dosing_get` | any user | `room_id` | `{schema_version: 1, room_id, config, feed_now, candidates[], can_edit, error}` |
+| `crop_steering.dosing_save` | admin | `room_id, expected_revision, pumps, batch, feed?, profile?` (left out: the stored ones are kept) | the same as `dosing_get`, or `error` |
+| `crop_steering.dosing_request` | admin; a `stop`: any signed-in user | `room_id, action ("dose" \| "batch" \| "stop"), pump?, ml?, run_anyway?` | `{request, error}` |
 
 - `room_id` is `"room:<prefix>"`, as for the stock services.
 - Who: as for every service that changes something, "admin" means a signed-in administrator, and a
@@ -105,6 +177,13 @@ back yet.
   `batch` returns `error: "busy"` while one is pending, and a `dose` is refused when the pump is
   unknown or `ml` is not in 0 < ml ≤ `max_ml` (`error` then says which). A request does not move
   the revision.
+- A test refill run anyway: a `batch` with `run_anyway: true` (an administrator's call, as every
+  batch is) is stored with `run_anyway: true`; without it the key is left out, as before. Only a
+  batch may carry it: on a `dose` or a `stop` it is refused ("only a batch (a test refill) can be
+  run anyway"). It is the person's word that they checked the fill, never a way past a safety
+  check: the controller refuses a batch run anyway for every reason it refuses any other (a hold
+  entity on or unreadable, a latched hardware fault, a full sensor that can't be read), and the
+  overfill guard still keeps the fill valve shut.
 - `dosing_save` returns `error: "busy"` too (the same word) while a request is pending or while
   `sensor.crop_steering_<prefix>dosing` reads `dosing` or `batch` (a dose or a batch runs from the
   setup it started with, which must not change under it),
@@ -113,12 +192,19 @@ back yet.
   pump saved without an `id` gets one made from its name.
 
 `sensor.crop_steering_<prefix>dosing_config`: state = the revision; attributes `pumps`, `batch`,
-`request`. This is what the controller reads (every 2 s).
+`profile`, `request` and `feed`. This is what the controller reads (every 2 s). Its `batch.recipe` is the recipe
+in use today (Feed schedule, above), and `feed` (also `feed_now` in `dosing_get`) says which:
+`{recipe, recipe_id, week, weeks, start, held_until, source}`, `source` one of `schedule`, `held`,
+`hand` or `batch` (the batch's own recipe; `recipe` is then null).
 
 ## Requests and the controller
 
-The controller runs one dosing thread for all rooms. Every 2 s it reads each room's
-`dosing_config`. A request is taken once (its `id` is remembered, in `dosing_state.json` so a
+Dosing runs on the controller's main loop, for all rooms, with no thread of its own: between two
+passes the loop wakes whenever dosing is due. Every 2 s it reads each room's `dosing_config`, and a
+dose or batch runs on to its next wait (a read of the pump, the fill, the mix, a pause) each time the
+loop wakes for it. While a shot runs, a dose or batch already running goes on with its steps the same
+way (a batch's open fill valve is still watched for its full sensor); with none running, dosing waits
+for the shot to end. A request is taken once (its `id` is remembered, in `dosing_state.json` so a
 restart does not take it again, and published as `handled`). A room whose `dosing_config` can't be
 read has no request taken.
 
@@ -136,7 +222,7 @@ read has no request taken.
 - `dose`: one pump, `ml` mL, into the tank as it is.
 - `batch`: the batch sequence. Refused while `hold_entity` is already on (something else is
   dosing) or can't be read, or while the room has a latched hardware fault.
-- The thread does one thing at a time: while a dose or a batch runs, in any room, a `dose` or a
+- Dosing does one thing at a time: while a dose or a batch runs, in any room, a `dose` or a
   `batch` is refused (a `stop` is always acted on), and so is one for a room held by dosing hardware
   that does not read off ("refused: <entity> does not read off yet"). A request refused meanwhile
   keeps its own `handled_result`: the end of the running dose or batch never takes its place.
@@ -150,6 +236,25 @@ drawn from its stock tank"); for a batch "making a batch", then "finished", "fin
 could not be stamped" or "stopped: <step>: <reason>"; a refusal "refused: <reason>" (for example
 "refused: Bloom is not calibrated (flow 0)" or "refused: a batch is running"); an old request "too
 old to act on"; a stop "stopped", or "stopped; <entity> does not read off".
+
+### Units and hardware
+
+Every number the controller reads from a dosing device goes through the one device-unit table
+(`UNITS` in `crop-steering-engine/src/crop_steering_engine/defaults.py`), which irrigation's probes
+use too: a pump's `volume_entity` and a recipe's `ml_entity` in mL (mL or L), a pump's `flow_entity`
+in mL/s (mL/s, mL/min or L/h) and the `mix_power_sensor` in W (W, kW or mW). A volume number is
+written in its own unit (0.1 for 100 mL in L) and read back in it. A unit the table does not know,
+or none, is read as mL, mL/s or W, as it always was, and said once in the log; it is never set aside,
+because a dose is refused all the same for an uncalibrated flow, more than `max_ml`, more than 20
+minutes and a volume that does not read back.
+
+The fill valve, the mix pump, the mix valves, the hold, the valves, main lines and pumps a batch
+closes, and each pump's `power_entity` are switched and read back through the controller's actuator
+table, the one irrigation uses: a `switch` or `input_boolean` is sent `turn_on` / `turn_off` and
+reads `on` / `off`; a `valve` is sent `open_valve` / `close_valve` and reads `open` / `closed`. Any
+other on/off domain is switched `turn_on` / `turn_off` and read back `on` / `off`, as before. Below,
+"on" and "off" mean the domain's own words. The configuration above still offers `switch.*` for
+these.
 
 ### One dose (`ml` into a pump)
 
@@ -213,7 +318,7 @@ take more than 20 minutes. The watchdog is set from these doses.
 | Fill | skipped when `full_entity` already reads full or there is no `fill_valve`; else open it, read it back on within 10 s, and wait for full; always close it and read back | the fill valve does not read on (**CS-804**, "the fill valve did not open"); `full_entity` reads nothing usable as the fill begins or for 15 s while it fills (**CS-804**, "the full sensor stopped reporting"); not full within `fill_timeout_min` (**CS-804**) |
 | Mix | skipped without a `mix_pump`; open `mix_valves` and read them back, start `mix_pump` and read it back on; with `mix_min_w` and a `mix_power_sensor`, wait up to 20 s for the power | a mix valve does not open (CS-806); the pump does not read on or does not draw its power (**CS-805**) |
 | Premix | `premix_min` minutes | |
-| Dose | each recipe pump in order, as "One dose", with the amounts read before Hold; 0 skips | a dose ends any other way than finished (CS-801/802) |
+| Dose | each recipe pump in order, as "One dose", with the amounts read before Hold, in whole mL; 0 skips | a dose ends any other way than finished (CS-801/802) |
 | Postmix | `postmix_min` minutes | |
 | Finish | stop `mix_pump`, close `mix_valves`, read back; stamp `filled_at_entity` (`input_datetime.set_datetime` with the end time as a timestamp); `hold_entity` off, read back | a switch does not read off (CS-806) |
 
@@ -232,6 +337,32 @@ take more than 20 minutes. The watchdog is set from these doses.
 - Stamping `filled_at_entity` is what the stock tanks no pump is linked to count batches by, so such
   a stock tank whose per-batch dose points at the same recipe number is drawn down by exactly what
   was dosed. A tank linked to a pump is drawn by the pump's runs (Stock tanks, below).
+
+### The mix check
+
+Five minutes after a batch finishes (its mix stopped and its hold released), the controller reads the
+tank with the room's feed EC and pH probes (the add-on's `feed_ec_sensor` and `feed_ph_sensor`, or the
+room's own) and compares each reading with the room's irrigation band:
+`number.crop_steering_<prefix>irrigation_ec_min` / `_max` and `irrigation_ph_min` / `_max`, a bound of 0
+or less being no bound. Only a probe that is mapped and has a band is checked; a room with neither has
+no check, and its batches run exactly as before. The probes are read through the device-unit table
+(Units and hardware): EC in mS/cm, µS/cm or dS/m converts exactly, an unknown unit counts only while
+plausible, and one with no exact conversion (ppm, ppt) is not read. pH is read as the source-water
+gate reads it.
+
+- Every reading inside its band: the batch is marked good (`mix.verdict` "good").
+- A reading outside its band ("off target"), or a probe that reads nothing usable ("not read"):
+  **CS-808** names each reading and its band, the batch is not marked good, and a `batch` asked for
+  with no user (`by` null: an automation) is refused, "refused: the last batch's mix check failed
+  (...); make the next batch by hand", until a batch made by hand passes the check. A dose, a stop
+  and a batch made by hand are never refused for it.
+- While the check is still due, an automation's batch is refused too ("the last batch's mix is not
+  checked yet").
+
+The mix check never holds watering, whatever it finds. The source-water gate still holds a zone on its
+own, as it always did, while the feed probe reads off its band or stays dead past its grace. The
+verdict is kept in `dosing_state.json` (`mix`), so a restart while the tank settles still checks it,
+and a batch that finishes replaces it. A file from before the check has none and loads unchanged.
 
 ### Holding: dosing hardware that does not read off
 
@@ -265,17 +396,29 @@ power, the fill valve, the mix pump, the mix valves; never `hold_entity`, which 
 else's) switched off and held the same way, as soon as its setup can be read. Every write of the file
 is atomic, and the file and its directory are synced.
 
-The dosing thread is watched: the controller's main loop checks it every loop, and one that has died
-is started again (whatever it had recorded is held and switched off as after a restart) with CS-806;
-one that has not gone round for 10 minutes raises CS-806 (once every 30 minutes).
+A dose or batch that stops with an error it does not settle itself is recovered as after a restart
+(whatever it had recorded is held and switched off; nothing is resumed), with CS-806.
 
-When the app is stopped (SIGTERM: an update, a restart), the shot in flight is closed first; then no
-dosing switch-on starts any more (one already on its way to Home Assistant lands first, 5 s at most),
-the dosing thread gets 3 s to switch its own dose's or batch's hardware off, and everything recorded
-is switched off again, each off with a 2 s timeout and without waiting to read it back. The record
-stays, and a batch's `hold_entity` stays on, for the next start. The app's `timeout: 30`
-(`addons/f2_control/config.yaml`) has the Supervisor wait 30 s after SIGTERM, rather than its
-default 10, before it kills the container.
+When the app is stopped (SIGTERM: an update, a restart), no dose, batch or dosing switch-on starts
+any more; then the shot in flight is closed; then everything a dose or batch recorded is switched
+off, each off with a 2 s timeout and without waiting to read it back. The signal is handled on the
+main loop, so when it lands while a dosing switch-on is on its way to Home Assistant, the way out
+waits for that call to land (4 s at most) before it starts, and its offs come after it. The record stays, and a batch's `hold_entity`
+stays on, for the next start. The app's `timeout: 30` (`addons/f2_control/config.yaml`) has the
+Supervisor wait 30 s after SIGTERM, rather than its default 10, before it kills the container.
+
+All of that runs inside a 25 s budget (or `F2_STOP_BUDGET_S` seconds, when that environment variable
+is set), so a slow Home Assistant can never make the Supervisor kill the app half way. While a dose
+or batch has anything recorded, dosing keeps the last 5 s of it (a fifth of a shorter budget). Each
+room with a shot recorded gets an equal share of the rest, the shot running now first. Inside a
+room's share a read waits only as long as leaves time for the offs it may prove, each counted as long
+as Home Assistant's slowest answer so far in the stop, and a read that could not come back in what
+is left is not made: a slow Home Assistant costs reads, never the offs they prove, and no call is cut
+shorter than Home Assistant is answering. A read that is not made or not answered never counts as
+off: while a hold or another valve on the shot's line cannot be read, the main line and pump are left
+on. The valve of the shot running now is switched off even when there was no time to prove it is the
+shot's. Whatever does not fit is not sent and stays recorded, as an off that is not confirmed always
+has, and the state file is always saved.
 
 ### Status: `sensor.crop_steering_<prefix>dosing`
 
@@ -285,17 +428,38 @@ State: `idle` | `dosing` | `batch` | `unavailable` (the room's configuration can
 {
   "pumps": {"balance": {"state": "idle" | "dosing" | "unavailable", "flow_ml_s": 11.06,
                         "target_ml": 25, "started_at": "…", "expected_s": 2.3,
-                        "last": {"ml": 25, "at": "…", "result": "finished" | "ended early" | "ran past its time" | "not confirmed" | "stopped"}}},
+                        "last": {"ml": 25, "given": 25, "at": "…", "result": "finished" | "ended early" | "ran past its time" | "not confirmed" | "stopped"}}},
   "batch": {"step": "idle" | "hold" | "close" | "fill" | "mix" | "premix" | "dose" | "postmix" | "finish",
-            "pump": "bloom" | null, "started_at": "…", "step_started_at": "…",
+            "pump": "bloom" | null, "name": "Week 3", "started_at": "…", "step_started_at": "…",
             "steps": [{"step": "fill", "state": "done" | "running" | "skipped" | "failed", "at": "…", "note": "…"}],
             "result": null | "finished" | "stopped: <reason>", "ended_at": null | "…"},
   "handled": "<request id>", "handled_result": "…",
   "history": [{"kind": "dose" | "batch" | "draw", "at": "…", "ended_at": "…", "result": "…",
-               "doses": {"balance": 300, "bloom": 1800}, "by": "…"}],  // newest first, 20 kept
+               "name": "Week 3",                                  // a batch's recipe name
+               "doses": {"balance": 300, "bloom": 1800},           // what was asked
+               "dosed": [{"pump": "balance", "name": "Balance", "ml": 300, "given": 300,
+                          "result": "finished", "at": "…"}],      // each dose, in order (below)
+               "by": "…",
+               "mix": "good" | "off target" | "not read"}],  // newest first, 20 kept; mix once checked
+  "last_batch": {"kind": "batch", "name": "Week 3", …} | null,     // the newest batch, kept past the 20
+  "mix": null | {"batch": "<its started_at>", "due": "…", "verdict": null | "good" | "off target" | "not read",
+                 "checked_at": "…", "why": "…", "ec": 2.1, "ph": 5.9},  // the last batch's mix check
   "updated_at": "…"                    // the controller's last publish
 }
 ```
+
+### Exact dose record
+
+Every dose, alone or in a batch, is recorded in the order it went in with what was asked (`ml`) and
+what it gave (`given`, in mL): finished, the amount asked for; ended early, ran past its time or
+stopped, the seconds from the press to the moment it ended, or its stop or cut was sent, x the
+pump's calibrated flow, never more than asked (a pump that ran past its time may have given more);
+not confirmed, not known (`null`). The stock tanks are drawn down by the same `given`. A batch is
+recorded with its recipe's `name`, and the newest batch is kept apart as `last_batch`, so single
+doses never push it out of the history. A batch's record in `dosing_state.json` carries each dose
+given so far, so one cut by a restart keeps them, with the dose in flight `given: null`. A
+`dosing_state.json` or a history from before this record loads as it is: no `dosed`, no `given`,
+`last_batch` null until the next batch. `doses` (what was asked) is kept as it was.
 
 `updated_at` is the time of the controller's last publish, refreshed at least every 60 s even
 when nothing changes, so the page can tell a stale controller. It is published on every change as
@@ -305,11 +469,22 @@ draws not yet taken, alerts not yet created and volume numbers still to put back
 runs, so they never hold up its watch. When one read of the setup fails while a dose or batch runs
 in the room, the status keeps the setup it started with (`dosing` or `batch`, not `unavailable`).
 Nothing is published for a room whose integration has no `dosing_config` (one from before dosing).
-`dosing_state.json` keeps `handled`, each pump's `last`, the `history` (with a `draw` entry for a
+`dosing_state.json` keeps `handled`, each pump's `last`, the `last_batch`, when the refill reminder was last said (`reminded_at`), the `history` (with a `draw` entry for a
 stock draw that was dropped, below), the draws and alerts not yet delivered and the volume numbers
 still to put back across a restart.
 
-## Alerts (controller, group CS-8xx "Dosing")
+### Refill reminder
+
+Nothing refills a batch tank by itself. With `remind_pct` above 0, the controller reads the room's
+`level_entity` once a minute while no dose or batch runs in the room. Three reads in a row at or
+under `remind_pct` (one bad echo is not a low tank) raise **CS-906**, "batch tank down to N%, refill
+it". It comes again each day the level stays there (the time it was said is kept in
+`dosing_state.json`, so a restart does not say it sooner), and the notification is dismissed once
+the level reads 5 points above `remind_pct`; the next low tank is then told at once. A level that
+reads nothing changes nothing. Setting `remind_pct` to 0 takes a reminder that is up down. Watering
+is never held by it.
+
+## Alerts (controller, group CS-8xx "Dosing", and CS-906)
 
 | Code | Title | Watering |
 |---|---|---|
@@ -320,6 +495,8 @@ still to put back across a restart.
 | CS-805 | The mixing pump did not start | held rooms water again |
 | CS-806 | Dosing was stopped, or needs a check | held rooms water again once the hardware reads off; a dose's pump that does not read off holds its room |
 | CS-807 | A dose was not taken off its stock tank | carries on |
+| CS-808 | A batch's mix is off its band, or could not be checked | carries on; an automation's next batch is refused |
+| CS-906 | Batch tank low, refill it (Refill reminder, above) | carries on |
 
 Each event (a dose, a batch, a restart) raises its own notification, so a second one within half an
 hour is never swallowed by the first, and an alert about hardware that does not read off is updated
@@ -378,6 +555,12 @@ that draws a linked tank:
   at all is not logged (a fill entity stamped many times a day would push the pumps' draws out of
   the history). A batch recorded by hand (`crop_steering.stock_record_batch`) skips them the same
   way; its answer lists the linked tanks it skipped (`skipped`).
+- **Batches left.** What one batch takes from a linked tank (`stock_get`'s `doses`, the stock
+  sensor's `dose_ml` and `batches_left`, the low-stock card) is its pump's dose in the recipe in use:
+  the feed schedule's this week, a recipe picked by hand, else the batch's own (its `ml_entity`
+  reading when usable, else its `ml`); 0 when that recipe passes the pump by. It follows a dosing
+  setup saved and the schedule's week moving on at midnight. A tank no pump is linked to keeps its
+  own `dose_ml` / `dose_entity`.
 - `sensor.crop_steering_<prefix>stock_low` gives each entry of its `tanks` attribute an `id`, and a
   `pump`: the id of the pump linked to it, or null.
 

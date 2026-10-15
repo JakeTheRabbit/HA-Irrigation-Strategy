@@ -1,5 +1,6 @@
 import { parseControllerTime } from "./controller-health";
 import type { EntityState, States } from "./types";
+import { growerWords } from "./words";
 
 /** What the controller's Jev bridge publishes for a room (addons/f2_control/f2_control/jev_bridge.py):
  * `sensor.crop_steering_<prefix>jev_log` (every decision, newest first), `sensor.crop_steering_<prefix>jev`
@@ -102,8 +103,8 @@ export function parseJevEntry(raw: unknown, index = 0): JevEntry | null {
   const written = text(item.result);
   const legacy = written.match(/^(refused|waiting|no[ _]action)\s*[:—-]\s*(.+)$/i);
   const resultText = (legacy ? legacy[1] : written).replaceAll("_", " ").toLowerCase();
-  const reason = text(item.reason ?? item.note) || (legacy ? legacy[2].trim() : "");
-  const action = text(item.action);
+  const reason = growerWords(text(item.reason ?? item.note) || (legacy ? legacy[2].trim() : ""));
+  const action = growerWords(text(item.action));
   const outcome =
     text(item.kind).toLowerCase() === "outcome" ||
     RESULTS[resultText] === "worked" ||
@@ -112,7 +113,7 @@ export function parseJevEntry(raw: unknown, index = 0): JevEntry | null {
   // A judge's alert (CS-7xx) is advice to the grower; the alert-triage judge's own call is not.
   if (result === "acted" && !outcome && judge !== "alerts" && /^CS-\d+/i.test(action))
     result = "advice";
-  const title = text(item.title) || JEV_TITLES[judge] || (judge ? words(judge) : "Jev");
+  const title = text(item.title) || JEV_TITLES[judge] || (judge ? words(judge) : "AI assistant");
   return {
     key: `${index}:${text(item.t)}:${judge}`,
     time: entryTime(item.t ?? item.time),
@@ -122,7 +123,7 @@ export function parseJevEntry(raw: unknown, index = 0): JevEntry | null {
     judge,
     title: title.charAt(0).toUpperCase() + title.slice(1),
     kind: outcome ? "outcome" : "decision",
-    verdict: words(item.verdict),
+    verdict: growerWords(words(item.verdict)),
     p: probability(item.p),
     agreed: agreement(item.agreed),
     action,
@@ -210,8 +211,26 @@ export interface JevRoom {
   judges: string[];
   judgeErrors: Record<string, string>;
   stage: JevStage | null;
+  /** Which brain runs: claude_haiku, jev_legacy or rules ("" from a controller before the AI assistant). */
+  provider: string;
+  /** Why it is where it is (acting, dry_run, legacy, budget_spent, rules_no_key, ...): "" when not said. */
+  brainState: string;
+  stateWords: string;
+  notice: string;
+  deprecatedRoute: boolean;
+  /** US$ the Claude brain has spent since the last lights-on; null on the legacy route. */
+  costUsd: number | null;
+  /** The brain is judging the room now. Every other state means the engine is on its own rules. */
+  on: boolean;
 }
-/** The room's Jev sensor: today's calls, tokens and errors, and today's stage. Null without one. */
+
+/** The brain states in which it judges: anything else is rules (a published reason, a fallback). */
+const BRAIN_ON = ["acting", "dry_run", "legacy"];
+
+/** The room's brain sensor: today's calls, tokens and errors, today's stage, which brain runs and whether it is
+ * on. The entity state alone never says that: under rules it reads "rules", and a Claude brain that has fallen back
+ * keeps "on" with the reason in `state`. A sensor with no `state` attribute (an older controller) reads as before.
+ * Null without one. */
 export function parseJevRoom(entity: EntityState | undefined): JevRoom | null {
   if (!entity) return null;
   const a = entity.attributes ?? {};
@@ -236,7 +255,39 @@ export function parseJevRoom(entity: EntityState | undefined): JevRoom | null {
     judges: Array.isArray(a.judges) ? a.judges.map(text).filter(Boolean) : [],
     judgeErrors: errors,
     stage: parseJevStage(a.stage),
+    provider: text(a.provider),
+    brainState: text(a.state),
+    stateWords: text(a.state_words),
+    notice: text(a.notice),
+    deprecatedRoute: a.deprecated_route === true,
+    costUsd: count(a.cost_usd_today),
+    on:
+      !["rules", "error", "unknown", "unavailable"].includes(text(entity.state)) &&
+      (!text(a.state) || BRAIN_ON.includes(text(a.state))),
   };
+}
+
+/** What the pages say of the room's brain, in one place: the tile's word, its small text and the zone panel's
+ * subtitle. Never "On" or "Acting now" while the engine is on its own rules. */
+export function brainWords(room: JevRoom | null): {
+  tile: string;
+  detail: string;
+  subtitle: string | null;
+} {
+  if (!room)
+    return { tile: "Not on this room", detail: "The controller runs without it", subtitle: null };
+  if (room.state === "error") return { tile: "Not answering", detail: "", subtitle: null };
+  if (!room.on) {
+    const why = room.stateWords || "Rules are running.";
+    return { tile: "Rules", detail: why, subtitle: `Rules are running: ${why}` };
+  }
+  const tile =
+    room.brainState === "dry_run"
+      ? "Advising only"
+      : room.brainState === "legacy"
+        ? "On, retired route"
+        : "On";
+  return { tile, detail: "", subtitle: null };
 }
 
 export interface JevZoneJudge {
@@ -254,6 +305,7 @@ export function parseJevZone(
 ): { acting: string[]; judges: JevZoneJudge[] } | null {
   if (!entity) return null;
   const state = text(entity.state);
+  if (state === "rules" || text(entity.attributes?.provider) === "rules") return null;
   const acting =
     !state || ["watching", "unknown", "unavailable"].includes(state)
       ? []
@@ -278,11 +330,11 @@ export function parseJevZone(
             {
               judge,
               title: JEV_TITLES[judge] ?? words(judge),
-              answer: words(main?.answer),
+              answer: growerWords(words(main?.answer)),
               p: probability(main?.p),
               agreed: agreement(main?.agreed),
-              directive: words(item.directive),
-              why: text(item.why),
+              directive: growerWords(words(item.directive)),
+              why: growerWords(text(item.why)),
             },
           ];
         })
@@ -291,6 +343,7 @@ export function parseJevZone(
 }
 
 export const jevIds = (prefix: string) => ({
+  answers: `sensor.crop_steering_${prefix}brain_answers`,
   log: `sensor.crop_steering_${prefix}jev_log`,
   room: `sensor.crop_steering_${prefix}jev`,
   zone: (zone: number) => `sensor.crop_steering_${prefix}zone_${zone}_jev`,
@@ -301,11 +354,54 @@ export function readJev(states: States, prefix: string) {
   return { log: parseJevLog(states[ids.log]), room: parseJevRoom(states[ids.room]) };
 }
 
-/** Workers AI input at $0.042 per million tokens; output is free (docs/JEV.md). */
+/** One answer to a grower's "why" (sensor.crop_steering_<prefix>brain_answers, jev_bridge.why_task). */
+export interface BrainAnswer {
+  id: string;
+  question: string;
+  zone: number | null;
+  answeredAt: number | null;
+  answer: string;
+  cannotAnswer: boolean;
+}
+
+/** The room's answers to "why", newest first, and how many questions are still with the brain. Null without the
+ * sensor (a controller from before Ask why); an entry without an id or a question is left out. */
+export function parseBrainAnswers(entity: EntityState | undefined): {
+  answers: BrainAnswer[];
+  pending: number;
+  askedToday: number | null;
+  limit: number | null;
+} | null {
+  if (!entity) return null;
+  const a = entity.attributes ?? {};
+  const answers = (Array.isArray(a.answers) ? a.answers : [])
+    .filter(
+      (item): item is Record<string, unknown> =>
+        !!item && typeof item === "object" && !!text(item.id) && !!text(item.question),
+    )
+    .map((item) => ({
+      id: text(item.id),
+      question: text(item.question),
+      zone: finite(item.zone),
+      answeredAt: parseControllerTime(item.answered_at),
+      answer: text(item.answer),
+      cannotAnswer: item.cannot_answer === true,
+    }))
+    .reverse();
+  return {
+    answers,
+    pending: Array.isArray(a.pending) ? a.pending.length : 0,
+    askedToday: finite(a.asked_today),
+    limit: finite(a.daily_limit),
+  };
+}
+
+/** Workers AI input at $0.042 per million tokens; output is free (docs/JEV.md). The legacy route only: the Claude
+ * brain publishes what it spent (`cost_usd_today`), which wins. */
 export const JEV_USD_PER_MILLION = 0.042;
-export function jevCost(tokens: number | null): string | null {
-  if (tokens === null) return null;
-  const usd = (tokens * JEV_USD_PER_MILLION) / 1e6;
+export function jevCost(tokens: number | null, costUsd: number | null = null): string | null {
+  if (tokens === null && costUsd === null) return null;
+  const usd = costUsd ?? ((tokens ?? 0) * JEV_USD_PER_MILLION) / 1e6;
   return usd < 0.01 ? "under $0.01" : `≈ $${usd < 1 ? usd.toFixed(2) : usd.toFixed(1)}`;
 }
 
@@ -390,7 +486,7 @@ export function parseJevSetpoints(entity: EntityState | undefined): JevSetpoints
     home: numbers(item.home),
     range: ranges,
     current: numbers(item.current),
-    last: text(item.last) || null,
+    last: growerWords(text(item.last)) || null,
     pausedUntil: paused === null || paused === undefined ? null : entryTime(paused),
   };
 }

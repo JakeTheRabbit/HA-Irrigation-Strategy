@@ -50,7 +50,7 @@ def test_every_heartbeat_carries_it():
     c._heartbeat(c.rooms[0], controller.datetime.now(), None)
     attrs = fake.sets["sensor.crop_steering_ai_heartbeat"][1]  # what the controller published
     assert attrs["controller_version"] == _config_version()
-    assert attrs["engine"] == "f2-control"  # and nothing that was there has gone
+    assert attrs["engine"] == "Crop Steering Controller"  # and nothing that was there has gone
 
 
 def test_the_integrations_version_in_the_descriptor_does_not_touch_the_setup_fingerprint():

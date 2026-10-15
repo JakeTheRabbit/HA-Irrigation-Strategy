@@ -9,6 +9,7 @@ import {
   midnight,
   summarize,
   timeAtAge,
+  wallTime,
 } from "./comparison";
 import { loadHistoryWindow } from "./comparison-history";
 import { HaClient } from "./client";
@@ -33,6 +34,13 @@ describe("run comparison calendar and aggregation", () => {
     expect(midnight("2026-04-06", zone) - midnight("2026-04-05", zone)).toBe(25 * 3600000);
     for (const start of ["2026-09-27", "2026-04-05"])
       expect(ageAt(timeAtAge(0.5, start, zone), start, zone)).toBeCloseTo(0.5);
+  });
+  it("uses 23/25-hour New York dates, the northern hemisphere's clock changes", () => {
+    const ny = "America/New_York";
+    expect(midnight("2026-03-09", ny) - midnight("2026-03-08", ny)).toBe(23 * 3600000);
+    expect(midnight("2026-11-02", ny) - midnight("2026-11-01", ny)).toBe(25 * 3600000);
+    for (const start of ["2026-03-08", "2026-11-01"])
+      expect(ageAt(timeAtAge(0.5, start, ny), start, ny)).toBeCloseTo(0.5);
   });
   it("aligns previous progress by local grow age and truncates closed runs", () => {
     const current = record("2026-09-27"),
@@ -127,7 +135,7 @@ describe("bounded Recorder windows", () => {
     );
     expect(result.series[0].daily).toEqual([]);
     expect(result.series[0].points.every((p) => p.value === null)).toBe(true);
-    expect(result.warnings.join(" ")).toMatch(/retention expired/);
+    expect(result.warnings.join(" ")).toMatch(/retention time is over/);
   });
   it("drops end boundary, NaN and unavailable states from numeric summaries", async () => {
     const result = await loadHistoryWindow(
@@ -212,5 +220,27 @@ describe("daily long-term statistics", () => {
     ]);
     expect(dailyStatistics(rows, zone)["sensor.none"]).toEqual([]);
     expect(() => dailyStatistics(null, zone)).toThrow("invalid statistics");
+  });
+});
+
+describe("a wall-clock time in a named time zone", () => {
+  it("is the same instant whatever the browser's own zone", () => {
+    expect(wallTime("2026-09-23", 600, "Pacific/Auckland")).toBe(
+      Date.parse("2026-09-22T22:00:00Z"),
+    );
+    expect(wallTime("2026-09-23", 600, "America/New_York")).toBe(
+      Date.parse("2026-09-23T14:00:00Z"),
+    );
+    expect(wallTime("2026-09-23", 630, "UTC")).toBe(Date.parse("2026-09-23T10:30:00Z"));
+  });
+  it("reads a time a clock change skips or repeats as the browser's Date does", () => {
+    // 02:30 on 27 September 2026 does not exist in Auckland: it reads as 03:30 NZDT.
+    expect(wallTime("2026-09-27", 150, "Pacific/Auckland")).toBe(
+      Date.parse("2026-09-26T14:30:00Z"),
+    );
+    // 02:30 on 5 April 2026 happens twice: the first, NZDT, is taken.
+    expect(wallTime("2026-04-05", 150, "Pacific/Auckland")).toBe(
+      Date.parse("2026-04-04T13:30:00Z"),
+    );
   });
 });

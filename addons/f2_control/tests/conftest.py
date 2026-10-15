@@ -28,6 +28,19 @@ def _hermetic_state_file(tmp_path, monkeypatch):
     monkeypatch.setenv("F2_STATE_PATH", str(tmp_path / "constructor-state.json"))
 
 
+@pytest.fixture(autouse=True)
+def _runs_as_the_app(monkeypatch):
+    """The suite runs as the Home Assistant app, which is what the Supervisor gives it
+    (runtime_env.runtime() is "addon"); a machine's own environment never decides it. A test of a
+    standalone container hands runtime_env its own environment."""
+    monkeypatch.setenv("F2_RUNTIME", "addon")
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "test-supervisor-token")
+    monkeypatch.delenv("HA_URL", raising=False)
+    import controller
+
+    monkeypatch.setattr(controller, "_GATE", controller._AuthGate())  # decided now, as the app
+
+
 @pytest.fixture
 def no_blind_grace(monkeypatch):
     """For tests of what happens once a probe is dead: it counts as dead at once. How long a probe
@@ -37,9 +50,23 @@ def no_blind_grace(monkeypatch):
     monkeypatch.setattr(controller, "BLIND_GRACE_MIN", 0)
 
 
+@pytest.fixture
+def settings_built_in(monkeypatch):
+    """For tests whose fake Home Assistant leaves a room's settings out: they run on built-in values at once,
+    as they did before the settings wait. The wait, and the zone held on a never-read water-sizing setting
+    (controller.SETTINGS_WAIT_PASSES, controller.WATER_SIZING), are tested in test_settings_wait.py."""
+    import controller
+
+    monkeypatch.setattr(controller, "SETTINGS_WAIT_PASSES", 0)
+    monkeypatch.setattr(controller, "WATER_SIZING", ())
+
+
 @pytest.fixture(autouse=True)
 def _no_real_history(monkeypatch):
     """Never let a test ask a real Home Assistant for history: none is recorded unless a rig says so."""
     import controller
 
     monkeypatch.setattr(controller, "ha_history", lambda entity, since, timeout=12: None)
+    monkeypatch.setattr(controller, "ha_logbook", lambda entity, since, timeout=8: [])
+    # ...nor fire an event at one: a rig that records events patches its own (fake_ha.FakeHA).
+    monkeypatch.setattr(controller, "ha_fire", lambda event, data, timeout=4: True)

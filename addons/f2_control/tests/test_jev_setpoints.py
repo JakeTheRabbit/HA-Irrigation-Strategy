@@ -4,6 +4,7 @@ around the operator's value, the operator's edits always winning, and a rescue s
 26 Sep 2026: the old learner walked zone 1's P2 shot from 3 % to 1 % one step a day (30-second shots every 96
 seconds) and ratcheted zone 3's targets to 74.5 in four days. These tests pin what makes that impossible now.
 """
+import json
 import re
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -25,7 +26,7 @@ from jev.setpoint_memory import SetpointMemory
 NIGHT = datetime(2026, 9, 27, 23, 0)  # an hour after lights-off (lights 10:00-22:00)
 Z1 = K.params(p2_shot_size=5.0, p2_threshold=30.5, p3_emergency_floor=20.7, p1_target=36.5, field_capacity=40.0)
 
-# F2 zone 2 on 4 Oct 2026, before the operator's stopgap, and its learner block as controller 3.8.0 wrote it
+# Zone 2 of a production room on 4 Oct 2026, before the operator's stopgap, and its learner block as controller 3.8.0 wrote it
 # (tests_ha/fixtures/entry_3_8_learned_tent.json); kept here from the retired ratchet-guard tests.
 Z2 = dict(p1_target_vwc=29.5, field_capacity=50.0, p2_vwc_threshold=27.5, p3_emergency_vwc_threshold=20.0,
           p2_shot_size=6.0)
@@ -194,6 +195,7 @@ class _Controller:
 
     def _auto_write(self, room, zone, suffix, old, value, learn, now, by="auto"):
         self.writes.append((zone, suffix, old, value, by))
+        return True
 
     def _alert(self, key, code, title, message, room=None, zone=None):
         self.alerts.append((key, code, message))
@@ -231,7 +233,7 @@ def test_a_move_is_written_once_and_is_not_mistaken_for_an_edit(tmp_path):
     jev_bridge.apply_setpoint(c, room, 1, d, ctx, NIGHT)
     assert c.writes == [(1, SHOT, 5.0, 4.5, "Jev")]
     # The phones that tick Jev hear of it (docs/NOTIFICATIONS.md): a push, no card.
-    [(event, zone, (words, why))] = c.events
+    [(event, zone, (words, why, _entity))] = c.events
     assert (event, zone, words) == ("jev_setpoint", 1, "P2 shot 5% -> 4.5%")
     assert why.startswith("Smaller maintenance shots tomorrow") and "smaller_shots (p=" in why
     assert c.alerts == []
@@ -242,6 +244,32 @@ def test_a_move_is_written_once_and_is_not_mistaken_for_an_edit(tmp_path):
     assert sp["home"][SHOT] == 5.0 and sp["current"][SHOT] == 4.5 and "P2 shot 5% -> 4.5%" in sp["last_words"]
     tomorrow = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(days=1))
     assert not tomorrow["changed_today"]
+
+
+def test_a_move_written_names_its_number_on_the_push_for_keep_and_undo(tmp_path):
+    """The phone gets Keep and Undo for the number Jev wrote (an AI overlay in the integration); a move not
+    written (no per-zone number) names none."""
+    c, room = _Controller(tmp_path), _room()
+    c._auto_write = lambda *a, **k: True
+    ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
+    jev_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
+    [(event, zone, (words, _why, entity))] = c.events
+    assert (event, zone, entity) == ("jev_setpoint", 1, f"number.crop_steering_zone_1_{SHOT}")
+
+
+def test_a_move_that_went_back_to_the_operators_value_is_not_an_edit_by_hand(tmp_path):
+    """The AI's overlay ran out or was undone (the integration's overlays.py): the operator's value is back."""
+    c, room = _Controller(tmp_path), _room()
+    ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
+    jev_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
+    c.numbers[SHOT] = 4.5
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=5))  # the write landed
+    jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=10))
+    c.numbers[SHOT] = 5.0  # put back to the operator's own value
+    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(days=2))
+    assert sp["home"][SHOT] == 5.0 and sp["current"][SHOT] == 5.0
+    assert all(row["verdict"] != "set by hand" for row in c.jev.journal.recent("default"))
+    assert SHOT not in SetpointMemory(str(tmp_path / "sp.json")).zone("default", 1)["written"]
 
 
 def test_a_rescue_shot_after_a_change_puts_it_back_and_pauses_the_zone(tmp_path):
@@ -260,6 +288,68 @@ def test_a_rescue_shot_after_a_change_puts_it_back_and_pauses_the_zone(tmp_path)
     assert sp["frozen"] and "put back" in sp["last_words"]
     jev_bridge.guard_setpoints(c, room, 1, NIGHT + timedelta(hours=6))  # once only
     assert len(c.writes) == 2 and c.jev.journal.recent("default")[0]["verdict"] == "safety revert"
+
+
+def _moved(tmp_path):
+    c, room = _Controller(tmp_path), _room()
+    ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
+    jev_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
+    return c, room, c.jev.setpoints.zone("default", 1)
+
+
+def test_a_write_that_lands_is_read_back_and_never_sent_again(tmp_path):
+    c, room, rec = _moved(tmp_path)
+    c.numbers[SHOT] = 4.5
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=1))
+    assert rec["pending"] is None
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(hours=2))
+    assert c.writes == [(1, SHOT, 5.0, 4.5, "Jev")]
+
+
+def test_a_write_that_does_not_land_is_sent_again_backing_off_then_recorded_as_failed(tmp_path):
+    c, room, rec = _moved(tmp_path)  # Home Assistant keeps showing 5.0
+    for minutes, sent in ((4, 1), (5, 2), (14, 2), (15, 3), (35, 4), (74, 4)):
+        jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=minutes))
+        assert len(c.writes) == sent, minutes
+        sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=minutes))
+        assert sp["home"][SHOT] == 5.0  # the old value is never taken for an edit by hand while it is retried
+    assert set(c.writes) == {(1, SHOT, 5.0, 4.5, "Jev")}
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=75))
+    assert len(c.writes) == 4 and rec["pending"] is None and rec["written"][SHOT] == 5.0
+    top = c.jev.journal.recent("default")[0]
+    assert (top["verdict"], top["action"], top["result"]) == ("write failed", "p2 shot size 5 -> 4.5", "failed")
+    assert "still shows 5 after 4 tries" in top["reason"]
+    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=76))
+    assert sp["home"][SHOT] == 5.0 and sp["last_words"].endswith("(did not reach Home Assistant)")
+    assert c.jev.journal.recent("default")[0]["verdict"] == "write failed"  # and not "set by hand"
+    assert SetpointMemory(str(tmp_path / "sp.json")).zone("default", 1)["last"]["failed"]
+
+
+def test_switching_automatic_targets_off_stops_the_retries(tmp_path):
+    c, room, rec = _moved(tmp_path)
+    c.auto = "off"
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=5))
+    assert len(c.writes) == 1 and rec["pending"] is None
+    assert "switched off" in c.jev.journal.recent("default")[0]["reason"]
+
+
+def test_an_edit_by_hand_during_the_retries_ends_them(tmp_path):
+    c, room, rec = _moved(tmp_path)
+    c.numbers[SHOT] = 5.5
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=5))
+    assert len(c.writes) == 1 and rec["pending"] is None
+    assert jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=6))["home"][SHOT] == 5.5
+
+
+def test_a_pending_write_an_older_memory_left_still_loads_and_times_out(tmp_path):
+    old = {"default:1": {"home": {SHOT: 5.0}, "written": {SHOT: 4.5},
+                         "pending": {"suffix": SHOT, "from": 5.0, "at": NIGHT.isoformat()}}}
+    (tmp_path / "sp.json").write_text(json.dumps(old))
+    c, room = _Controller(tmp_path), _room()
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(hours=1))
+    assert c.writes == []
+    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(hours=1))
+    assert sp["home"][SHOT] == 5.0 and c.jev.setpoints.zone("default", 1)["pending"] is None
 
 
 def test_the_whole_loop_through_the_brain_logs_and_files_the_move(tmp_path):
@@ -293,7 +383,7 @@ def test_the_outcome_asks_whether_water_or_ec_moved_the_way_the_change_meant():
 JUDGE = {"cf_account_id": "acc", "cf_api_token": "tok"}
 Z2 = {f"number.crop_steering_zone_1_{s}": (str(v), {}) for s, v in Z2.items()}  # zone 2, as the rig's zone 1
 LIGHTS_ON = datetime(2026, 10, 4, 10, 0)
-LEARNER, JUDGED = ("p1_target_vwc", "field_capacity", "p3_emergency_vwc_threshold"), (SHOT, THRESHOLD)
+LEARNER, JUDGED = ("p1_target_vwc", "field_capacity"), (SHOT, THRESHOLD)  # the rescue floor is nobody's
 
 
 @pytest.fixture
@@ -338,19 +428,12 @@ def _sent(fake, suffix=None):
             and (suffix is None or d["entity_id"] == f"number.crop_steering_zone_1_{suffix}")]
 
 
-def _never_ask_the_hourly_judge(monkeypatch):
-    def boom(*a, **k):
-        raise AssertionError("the old per-hour judge must not be asked while the Setpoints judge runs")
-
-    monkeypatch.setattr(asr.controller.jev_policy, "call", boom)
-
-
-def test_the_learner_never_writes_the_judges_levers_even_to_keep_its_ladder(ramp_clock, monkeypatch):
-    _never_ask_the_hourly_judge(monkeypatch)
+def test_the_learner_never_writes_the_judges_levers_nor_the_rescue_level(ramp_clock):
     c, fake, room = _zone_2(numbers={**Z2, "number.crop_steering_zone_1_p3_emergency_vwc_threshold": ("26", {})})
     _day(c, fake, room, p2_passes=150)  # well over an hour of P2, where the old hourly judge moved the shot
     assert _sent(fake, THRESHOLD) == [] and _sent(fake, SHOT) == []  # its band wanted 57.3: not its lever
-    assert _sent(fake, "p3_emergency_vwc_threshold") == [24.5]  # the floor goes 3 under the JUDGE's 27.5
+    assert _sent(fake, "p3_emergency_vwc_threshold") == []  # the rescue level is the operator's, even 1.5 under
+    # the judge's 27.5
     assert fake.sets["sensor.crop_steering_zone_1_auto_setpoints"][1]["jev"] == "disabled"
 
 
@@ -374,7 +457,6 @@ def test_the_published_attributes_say_which_writer_owns_which_lever(ramp_clock):
     # the zone's own highest readings set these two, not the learner (6 Oct 2026)
     assert owners[number + "p1_target_vwc"] == "the zone's highest reading of the grow-day before"
     assert owners[number + "field_capacity"] == "the zone's highest reading of this grow-day or the one before"
-    assert owners[number + "p3_emergency_vwc_threshold"].startswith("Auto setpoints learner, only to keep it")
     # without the judge the learner owns the threshold too, and the shot size is nobody's
     c, fake, room = asr._rig()
     asr._flat_ramp(c, fake, room)

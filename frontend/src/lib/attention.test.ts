@@ -200,7 +200,7 @@ describe("rescue shots and Jev", () => {
   });
   it("flags Jev's setpoints paused after a revert, until the pause ends", () => {
     expect(run([zone(1, { jevPausedUntil: now + 2 * H })]).get(1)?.[0].text).toBe(
-      "Jev’s setpoint changes paused until 06:00 after a revert",
+      "AI assistant setpoint changes paused until 06:00 after a revert",
     );
     expect(run([zone(1, { jevPausedUntil: now - 1 })]).size).toBe(0);
   });

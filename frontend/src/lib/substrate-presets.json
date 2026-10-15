@@ -1,0 +1,55 @@
+{
+  "groups": [
+    { "id": "block", "label": "Rockwool blocks · volume from dimensions" },
+    { "id": "nutrifield", "label": "Nutrifield" },
+    { "id": "slab", "label": "Rockwool slabs and big blocks · stated litres per plant" },
+    { "id": "us-pot", "label": "Pots · nominal US gallons" },
+    { "id": "metric-pot", "label": "Pots · litres" }
+  ],
+  "presets": [
+    {
+      "id": "rockwool-4in",
+      "group": "block",
+      "name": "Rockwool 4 in cube",
+      "dimensionsCm": [10, 10, 6.5]
+    },
+    {
+      "id": "rockwool-delta-10",
+      "group": "block",
+      "name": "Rockwool Delta 10",
+      "dimensionsCm": [10, 10, 10]
+    },
+    {
+      "id": "rockwool-hugo",
+      "group": "block",
+      "name": "Rockwool Hugo",
+      "dimensionsCm": [15, 15, 14.2]
+    },
+    {
+      "id": "nutrifield-15x15x16",
+      "group": "nutrifield",
+      "name": "Nutrifield 0.9 gal",
+      "litres": 3.37,
+      "dimensionsCm": [15, 15, 16]
+    },
+    {
+      "id": "nutrifield-18x18x18",
+      "group": "nutrifield",
+      "name": "Nutrifield 1.5 gal",
+      "litres": 5.8,
+      "dimensionsCm": [18, 18, 18]
+    },
+    { "id": "rockwool-uni-slab", "group": "slab", "name": "Rockwool uni-slab", "litres": 5 },
+    { "id": "rockwool-mama", "group": "slab", "name": "Rockwool Mama block", "litres": 8 },
+    { "id": "rockwool-slab", "group": "slab", "name": "Rockwool slab", "litres": 10 },
+    { "id": "pot-1gal", "group": "us-pot", "name": "1 gal pot", "litres": 3.8 },
+    { "id": "pot-2gal", "group": "us-pot", "name": "2 gal pot", "litres": 7.6 },
+    { "id": "pot-3gal", "group": "us-pot", "name": "3 gal pot", "litres": 11.4 },
+    { "id": "pot-5gal", "group": "us-pot", "name": "5 gal pot", "litres": 18.9 },
+    { "id": "pot-7gal", "group": "us-pot", "name": "7 gal pot", "litres": 26.5 },
+    { "id": "pot-5l", "group": "metric-pot", "name": "5 L pot", "litres": 5 },
+    { "id": "pot-10l", "group": "metric-pot", "name": "10 L pot", "litres": 10 },
+    { "id": "pot-15l", "group": "metric-pot", "name": "15 L pot", "litres": 15 },
+    { "id": "pot-20l", "group": "metric-pot", "name": "20 L pot", "litres": 20 }
+  ]
+}

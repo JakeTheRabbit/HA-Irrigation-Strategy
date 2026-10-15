@@ -3,7 +3,8 @@
 - `home`: the operator's own value of each setting Jev may move, the centre of its band. It is the value first
   seen, and it follows the operator: any value Jev did not write becomes the new home.
 - `written`: the last value Jev wrote for each setting, so an operator's edit can be told from Jev's own.
-- `pending`: a write Home Assistant has not reflected yet, so for a few minutes the old value is not an edit.
+- `pending`: a write Home Assistant has not reflected yet {suffix, from, to, by, at, tries, next}: the old value is
+  not an edit while it is read back, sent again and, if it never lands, recorded as failed (jev_bridge.readback).
 - `last`: the last move {suffix, from, to, at, day, words, choice, reverted}.
 - `frozen_until`: when a zone paused after a safety revert may be moved again.
 """
