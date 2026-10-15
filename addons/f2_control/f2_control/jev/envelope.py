@@ -10,6 +10,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
+from crop_steering_engine import p0_dryback
+
 ORDER = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
 NEXT = {"P0": "P1", "P1": "P2", "P2": "P3"}
 
@@ -42,7 +44,7 @@ def admit(d: Directive, ctx, confirmed=0, evidence_ok=False):
         if not ctx.lights_on:
             return False, "lights off: the base engine owns the night"
         if target == "P1":
-            half = p.dryback_target / 2.0
+            half = p0_dryback(p) / 2.0
             quarter = p.p0_max_wait_min / 4.0
             if snap.dryback_pct < half and snap.phase_minutes < quarter:
                 return False, (f"dryback {snap.dryback_pct:.1f}% under half the target ({half:.1f}%) "
