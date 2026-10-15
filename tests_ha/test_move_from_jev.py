@@ -22,11 +22,13 @@ from datetime import datetime
 from pathlib import Path
 
 import pytest
+import yaml
 from conftest import fixture
 from test_upgrade_in_place import JEV_3_11_1, KILL, _upgrade
 
 DOC = Path(__file__).resolve().parents[1] / "docs" / "MOVING_FROM_JEV.md"
 APP_CODE = Path(__file__).resolve().parents[1] / "addons" / "f2_control" / "f2_control"
+APP_CONFIG = APP_CODE.parent / "config.yaml"
 RECORDED = Path(__file__).parent / "fixtures" / "data_3_11_1_files"
 OLD, NEW = "e031e6d4_f2_control", "6db5faba_f2_control"
 JEV_FILES = ("jev_usage.json", "jev_ledger.jsonl", "jev_journal.jsonl", "jev_setpoints.json")
@@ -76,7 +78,7 @@ def _move(root, new=NEW):
     )
 
 
-def _start(controller_for, monkeypatch, new, options):
+def _start(controller_for, monkeypatch, new, options, **kw):
     """The real controller started on the new app's data folder with the old app's options (doc step 3), on the
     day the usage file was written. The brain's routes are stubbed: `built` records every route list it was given."""
     import jev_bridge
@@ -91,7 +93,7 @@ def _start(controller_for, monkeypatch, new, options):
         jev_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: noon)
     )
     monkeypatch.setenv("F2_STATE_PATH", str(new / "state.json"))
-    c, fake, _clock = controller_for(fixture(options)["options"])
+    c, fake, _clock = controller_for(fixture(options)["options"] if isinstance(options, str) else options, **kw)
     return c, fake, built
 
 
@@ -242,3 +244,29 @@ def test_the_copy_list_names_every_file_the_controller_keeps_in_its_data_folder(
     assert set(_copied()) == named - {"options.json", "brain_tools.json", "manifest.json", "brain_notices.json"}
     assert {p.name for p in RECORDED.iterdir()} | {"state.json", "jev_usage.json"} == set(_copied())
     assert hashlib.sha256("\n".join(sorted(_copied())).encode()).hexdigest() == COPIED_SHA256
+
+
+@pytest.mark.parametrize(
+    "options, names, route",
+    [
+        ("options_3_11_1_jev_cf.json", EVERYTHING, "Cloudflare"),
+        ("options_3_11_1_jev_typesafe.json", ("state.json",), "TypeSafe"),
+    ],
+)
+async def test_the_route_keys_off_the_form_still_reach_the_old_brain(
+    hass, hass_storage, controller_for, monkeypatch, tmp_path, options, names, route
+):
+    """The new app's form leaves out the deprecated route keys, which step 3 sets in YAML mode. The Supervisor
+    keeps a saved key its schema still allows and lays this app's defaults under the rest; the controller reads
+    that file itself and reaches the old brain on its own route."""
+    await _room(hass, hass_storage)
+    _old, new = _old_app(tmp_path, names)
+    assert _move(tmp_path).returncode == 0
+    config = yaml.safe_load(APP_CONFIG.read_text(encoding="utf-8"))
+    saved = fixture(options)["options"]
+    assert set(saved) <= set(config["schema"])  # nothing is stripped
+    served = {**config["options"], **saved}
+    c, _fake, built = _start(controller_for, monkeypatch, new, served, options_file=True)
+    assert c.jev is not None and c.jev.routes == [route]
+    assert built[0][0].token == (saved["typesafe_api_key"] or saved["cf_api_token"])
+    assert (c.brain_status.provider, c.brain_status.state) == ("jev_legacy", "legacy")
