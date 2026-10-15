@@ -28,9 +28,8 @@ from jev.judges.zones import ZonesJudge
 from jev.journal import Journal
 from jev.ledger import Ledger
 from jev.setpoint_memory import SetpointMemory
-from jev.triage import Triage
 
-ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "alerts")
+ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints")
 PENDING_S = 300  # a write Home Assistant has not reflected yet is not an operator's edit for this long
 REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the old value back
 PAUSE_H = 48  # and the zone's setpoints are left alone this long
@@ -95,7 +94,6 @@ def build(options, cf, state_path, log):
     brain.setpoints = SetpointMemory(os.path.join(data, "jev_setpoints.json"))
     brain.usage_path = os.path.join(data, "jev_usage.json")
     restore_usage(asker, brain.usage_path)
-    brain.triage = Triage(asker) if "alerts" in allowed else None
     brain.flower_start = flower_option(options.get("jev_flower_start"))
     brain.flower_days = int(options.get("jev_flower_days") or 56)
     return brain
@@ -375,22 +373,6 @@ def headline(entry):
     what = entry.get("action") or entry.get("result") or ""
     zone = f"Z{entry['zone']} " if entry.get("zone") is not None else ""
     return f"{entry['t'][11:16]} {zone}{entry['title']}: {entry['verdict']} -> {what}"[:255]
-
-
-def triaged(c, room, zone, key, code, title, push, why):
-    """The Alerts judge's push-or-card call, in the journal whenever it changes for an alert."""
-    brain = getattr(c, "jev", None)
-    journal = getattr(brain, "journal", None)
-    if journal is None or room is None:
-        return
-    seen = brain.__dict__.setdefault("_triaged", {})
-    if seen.get(key) == (push, why):
-        return
-    seen[key] = (push, why)
-    journal.add({"t": datetime.now().isoformat(timespec="seconds"), "room": room.slug, "zone": zone,
-                 "judge": "alerts", "title": "Alert triage", "kind": "decision", "verdict": why, "p": None,
-                 "agreed": None, "action": f"{code}: {'push to the phone' if push else 'card only'}",
-                 "result": "acted", "reason": str(title)[:120]})
 
 
 USAGE_KEYS = ("day", "calls", "errors", "input_tokens", "last_error", "retries", "failovers", "reasks", "warned")

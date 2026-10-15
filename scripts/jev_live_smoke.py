@@ -33,7 +33,6 @@ from jev.judges.setpoints import SHOT, THRESHOLD, SetpointsJudge, band  # noqa: 
 from jev.judges.shot import ShotJudge  # noqa: E402
 from jev.judges.stage import StageJudge  # noqa: E402
 from jev.judges.zones import ZonesJudge  # noqa: E402
-from jev.triage import QUESTIONS as TRIAGE_Q  # noqa: E402
 
 
 def ramp_feed_front():
@@ -256,17 +255,7 @@ def main():
         acted = f"{d.kind} {d.value}" if d is not None else None
         print(f"{'ok  ' if ok else 'MISS'}  {title}: {v.label} p={v.prob:.2f} agreed={v.agreed} "
               f"-> {acted} [{'admitted' if admitted else 'refused: ' + why}]  (expected {expect})")
-    state = {"alert_code": "CS-702", "title": "this zone's water per plant is out of line with the others",
-             "message": "Zone 2 has had 430 mL a plant today, 48% of the room's median zone (900 mL). Watering carries on as normal.",
-             "local_time": "02:10", "raised_today": 3}
-    asker.submit("smoke:alerts", state, council.expand(TRIAGE_Q))
-    ans = asker.result("smoke:alerts")
-    v = council.combine(ans.answers, "urgency") if ans else None
-    ok = v is not None and v.label in ("remind", "quiet")
-    good += ok
-    print(f"{'ok  ' if ok else 'MISS'}  alerts: CS-702 advice at 02:10: {None if v is None else v.label} "
-          f"p={None if v is None else v.prob}")
-    total = len(SCENARIOS) + 1
+    total = len(SCENARIOS)
     print(f"\n{good}/{total} as a grower would expect; {asker.stats['calls']} calls, "
           f"{asker.stats['input_tokens']} input tokens, {asker.stats['errors']} errors")
     return 0 if good == total else 1

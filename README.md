@@ -56,7 +56,7 @@ Across a flower run the targets also change by **stage**. Jev follows this arc, 
 
 ## What Jev does
 
-[Jev](https://developers.cloudflare.com/ai/models/typesafe/jev/) is a decision model from TypeSafe. It does not chat: it picks answers from a fixed list and says how sure it is of each one. The controller asks it eleven kinds of question. Their names are the ones the dashboard uses.
+[Jev](https://developers.cloudflare.com/ai/models/typesafe/jev/) is a decision model from TypeSafe. It does not chat: it picks answers from a fixed list and says how sure it is of each one. The controller asks it ten kinds of question. Their names are the ones the dashboard uses.
 
 | On the dashboard | When it is asked | The question, in plain words | What the controller may do with the answer |
 | --- | --- | --- | --- |
@@ -70,7 +70,6 @@ Across a flower run the targets also change by **stage**. Jev follows this arc, 
 | **Zone comparison** | Hourly with the lights on | Why is this zone drinking far more or far less than the rest of the room? | Raise alert CS-702 with the likely cause. |
 | **Stage arc** | Once a day | Is this zone's dry-back and pore EC where today's stage wants them? | Raise advice CS-705. It never changes a setting. |
 | **Setpoints** | Once a night, only with Auto setpoints on | Should tomorrow's maintenance shots be a notch smaller or bigger, or start a notch later or sooner? | Move one setting by one small step, inside a range around your own value ([how](#letting-jev-move-setpoints)). |
-| **Alert triage** | When an alert is raised, and again after 6 hours | Is this worth a push to your phone, or just a card? | Decide whether its repeats push to your phone. Serious faults always push. |
 
 Three things make the answers safe to act on:
 

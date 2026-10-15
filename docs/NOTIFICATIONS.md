@@ -135,8 +135,8 @@ not the whole setup.
 
 ## The controller
 
-- `_alert` still creates the card first, exactly as now, and Jev's Alerts judge still decides whether a
-  repeat pushes at all (docs/JEV.md). When it pushes:
+- `_alert` still creates the card first, exactly as now, and the code's severity in docs/error-codes.json
+  decides whether a repeat pushes at all (below). When it pushes:
   - with at least one recipient saved (the integration publishes `sensor.crop_steering_notify_config`,
     state = the revision, attribute `recipients` = the count), it calls `crop_steering.notify` and sends
     nothing itself;
@@ -150,8 +150,13 @@ not the whole setup.
 
 In detail:
 
-- Jev's Alerts judge is asked whenever a phone could get the push: a recipient saved, or the
-  `notify_service` option set (as before). A repeat it holds goes to nobody.
+- A standing alert's card is updated every 30 minutes; its push decays by severity, the same with Jev on or
+  off. A critical code, or a warning that means a zone is not being watered (the controller's
+  `NOT_WATERING_CODES`: CS-206, CS-208, CS-209, CS-602), pushes every 30 minutes for as long as it lasts. Any
+  other warning pushes after 15 minutes, then 1, 2 and 4 hours, then every 8 hours, each with the card's
+  first update at or after it. An info code pushes once. The schedule starts again with each episode: the
+  alert cleared and raised again, raised under another code, or back after an hour without being raised.
+  It is held in memory only, so a restart pushes once more. A repeat it holds goes to nobody.
 - The controller's loop reads `sensor.crop_steering_notify_config` at most once a minute, so a change on the
   page reaches it within a minute; an alert goes on the last reading and never waits on the read. No sensor
   (an integration from before this) counts as no recipients.

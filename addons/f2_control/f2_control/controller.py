@@ -344,6 +344,15 @@ EVENTS_BUDGET_S = 10.0
 # their push is urgent, a high-priority one on a phone whose row asks for that.
 CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-301", "CS-308", "CS-310",
                             "CS-311", "CS-402", "CS-601", "CS-606", "CS-801"})
+# How often a standing alert pushes again, by its severity in docs/error-codes.json (tests/test_error_codes.py
+# keeps INFO_CODES equal to the info codes): a critical code, or a warning that means a zone is not being watered,
+# every 30 minutes for as long as it lasts; any other warning after 15 minutes, then 1, 2 and 4 hours, then every
+# 8 hours; an info code once. Each episode starts the schedule again: an alert cleared (or not raised for
+# ALERT_EPISODE_GAP_S) and raised again, or raised under another code. Held in memory only: a restart pushes once.
+NOT_WATERING_CODES = frozenset({"CS-206", "CS-208", "CS-209", "CS-602"})
+INFO_CODES = frozenset({"CS-205", "CS-305", "CS-403", "CS-501", "CS-702", "CS-705"})
+WARNING_REPUSH_MIN = (15, 60, 120, 240, 480)
+ALERT_EPISODE_GAP_S = 3600
 # CS-310: a zone's moisture rising by BACKUP_RISE_PTS within BACKUP_WINDOW_MIN while no water went in, its valve
 # closed for BACKUP_GRACE_MIN before (the wetting front of a shot keeps rising a while): water coming up from
 # below, a table that isn't draining. Backtested on F2's 22-30 Sep 2026 readings: the two real episodes (Zone 2
@@ -2364,6 +2373,27 @@ class Controller:
             return age >= 300
         return age >= 1800
 
+    def _push_due(self, key, code, now):
+        """Whether this raise of `key` also pushes to a phone (see NOT_WATERING_CODES): the first raise of an
+        episode always does; its repeats decay by the code's severity. A push only ever goes with a card, so a
+        step falls due at the card's next update after it. Call before the raise is recorded in _alerted."""
+        pushes = self.__dict__.setdefault("_pushes", {})  # key -> (pushes this episode, the last one's time, code)
+        last = self._alerted.get(key)
+        count, pushed, was = pushes.get(key, (0, None, None))
+        if last is None or was != code or (now - last).total_seconds() > ALERT_EPISODE_GAP_S:
+            count, pushed = 0, None  # a new episode
+        if pushed is None:
+            due = True
+        elif code in CRITICAL_CODES or code in NOT_WATERING_CODES:
+            due = (now - pushed).total_seconds() >= 1800
+        elif code in INFO_CODES:
+            due = False
+        else:
+            step = WARNING_REPUSH_MIN[min(count, len(WARNING_REPUSH_MIN)) - 1]
+            due = (now - pushed).total_seconds() >= step * 60
+        pushes[key] = (count + 1, now, code) if due else (count, pushed, code)
+        return due
+
     def _carry_retired_switches(self, room):
         """Switch the engine switch off for each RETIRED_SWITCHES entry that reads off, and return
         their names. Only ever OFF: an off one never switches watering back on. A retired switch
@@ -2403,6 +2433,7 @@ class Controller:
         condition re-checked every loop) or could not be created."""
         if quiet and not self._alert_due(key, code):
             return False
+        now = datetime.now()
         where = self._where(room, zone) if room is not None else ""
         title = f"{where}: {title} ({code})" if where else f"{title[:1].upper()}{title[1:]} ({code})"
         log("ALERT", title, "-", " ".join(message.split()))
@@ -2421,23 +2452,11 @@ class Controller:
             notification_id=f"f2_{key}",
         ):
             return False
-        self._alerted[key] = datetime.now()
+        push = self._push_due(key, code, now)
+        self._alerted[key] = now
         self._alert_codes[key] = code
-        dom, _, svc = self.notify_service.partition("/")
-        recipients = self._notify_config()[0]  # phones set up in the integration (docs/NOTIFICATIONS.md)
-        push = True
-        triage = getattr(getattr(self, "jev", None), "triage", None)
-        if (recipients or (dom and svc)) and triage is not None:
-            try:  # Jev's Alerts judge: whether this alert's repeats keep buzzing a phone (docs/JEV.md)
-                push, why = triage.push(key, code, title, message, datetime.now())
-                jev_bridge.triaged(self, room, zone, key, code, title, push, why)
-                if not push:
-                    log("ALERT push held:", key, why)
-            except Exception as e:
-                push = True
-                log("jev triage error", key, e)
         if push:
-            self._push(key, code, title, message, room, zone, recipients)
+            self._push(key, code, title, message, room, zone, self._notify_config()[0])
         return True
 
     def _push(self, key, code, title, message, room, zone, recipients):
