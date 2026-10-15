@@ -29,7 +29,7 @@ entities scale with your zone count, `N` = 1…zones).
 ### P0: morning dryback
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `p0_dryback_drop_percent` | 2-40 | 15 | % | How far VWC must drop from the overnight peak before P0 ends and P1 begins. |
+| `p0_dryback_drop_percent` | 2-40 | 15 | % | Kept for older rooms and recipes; the controller does not read it. P0's own dryback is the per-zone `zone_N_p0_additional_dryback` (section 2). |
 | `p0_maximum_wait_time` | 30-600 | 120 | min | Hard ceiling: forces P0 → P1 if the dryback target is never reached. |
 
 ### P1: ramp-up
@@ -114,6 +114,7 @@ for that zone. (3 zones × 26 = 78 entities on a 3-zone system.)
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
 | `zone_N_plant_count` | 1-50 | 4 | - | Plants in the zone: scales total water volume. |
+| `zone_N_p0_additional_dryback` | 0-40 | 3 on a room set up from this release, 0 on a room updated in place | % | P0 ends once moisture is this far below the highest reading since lights-on, the small extra dryback before the first shot. `0` is off: P0 waits for the dryback target, as before. Its other exits (the maximum wait, the maintenance trigger) are unchanged. |
 | `zone_N_max_daily_volume` | 0-200 | 20 | L | Daily water budget for the zone. Top-ups and EC-correction shots stop at it, and a shot that would cross it gets only what is left; rescues (watchdog, P3 emergency, high-EC flushes) and the P1 ramp are exempt. |
 | `zone_N_min_daily_ml_per_plant` | 0-10000 | 0 (off) | mL | Minimum daily water per plant. From lights-on (never in P0), paced to finish 3 h before lights-off, the zone is watered up to this times its plant count whatever the probe reads, so a probe that reads wet cannot starve the plants (and a correct probe is watered anyway). Stops once moisture is 5 points above the zone's field capacity, and never past the daily limit. A new entity takes the value of the old `input_number` helper of the same name. |
 | `zone_N_substrate_volume` / `zone_N_drippers_per_plant` / `zone_N_dripper_flow_rate` | as the globals | from setup | - | Created only when setup sizes the zone itself; otherwise the room-wide value applies. |

@@ -118,6 +118,7 @@ CONTROLLER_FALLBACKS_12C6D1A = {
     "p1_maximum_extra_shots": 3,
     "pump_prime_time": 2.0,
     "main_line_lead_time": 1.0,
+    "p0_additional_dryback": 0,  # added after it: off, as P0 always was
 }
 
 

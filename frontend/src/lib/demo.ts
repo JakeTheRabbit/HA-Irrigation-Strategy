@@ -189,6 +189,7 @@ export function createDemo(now = Date.now()): States {
         options: ["Keep", "P0", "P1", "P2", "P3"],
       });
       number(prefix, `${key}p0_maximum_wait_time`, 60, 5, 240, 1, "min");
+      number(prefix, `${key}p0_additional_dryback`, 3, 0, 40, 0.5, "%");
       number(prefix, `${key}generative_dryback_target`, 14, 2, 60, 0.5, "% of peak");
       number(prefix, `${key}p1_target_vwc`, 64 + index * 2, 20, 90, 0.5, "%");
       number(prefix, `${key}p2_vwc_threshold`, 61 + index * 2, 10, 90, 0.5, "%");

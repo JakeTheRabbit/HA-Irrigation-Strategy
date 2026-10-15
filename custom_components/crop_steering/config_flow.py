@@ -19,6 +19,8 @@ from .const import (
     SOFTWARE_VERSION,
     DOMAIN,
     CONF_NUM_ZONES,
+    CONF_P0_ADDITIONAL_DRYBACK,
+    NEW_ROOM_P0_ADDITIONAL_DRYBACK,
     MIN_ZONES,
     MAX_ZONES,
     DEFAULT_NUM_ZONES,
@@ -400,6 +402,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     config_method="manual",
                     setup_revision=1,
                 )
+                data[CONF_P0_ADDITIONAL_DRYBACK] = NEW_ROOM_P0_ADDITIONAL_DRYBACK
                 data["enable_flag"] = (
                     f"switch.crop_steering_{data['room_prefix']}engine_enabled"
                 )
@@ -552,6 +555,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     "parameters": env_config["parameters"],
                     "features": env_config["features"],
                     "env_file_path": env_path,
+                    CONF_P0_ADDITIONAL_DRYBACK: NEW_ROOM_P0_ADDITIONAL_DRYBACK,
                 },
             )
 
@@ -690,6 +694,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             "zones": zones_config,
             "hardware": hardware_config,
             "config_yaml": config,  # Store the full yaml config
+            CONF_P0_ADDITIONAL_DRYBACK: NEW_ROOM_P0_ADDITIONAL_DRYBACK,
         }
 
         return self.async_create_entry(
@@ -773,6 +778,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "hardware", vol.Schema(_hardware_schema()), user_input, info, err
             )
         data["setup_revision"] = 1
+        data[CONF_P0_ADDITIONAL_DRYBACK] = NEW_ROOM_P0_ADDITIONAL_DRYBACK
         return self.async_create_entry(title=data["name"], data=data)
 
     async def _validate_env_entities(self, env_config: dict) -> list[str]:

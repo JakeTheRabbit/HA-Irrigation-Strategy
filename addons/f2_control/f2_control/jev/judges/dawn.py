@@ -10,6 +10,8 @@ judge. It can only bring the ramp forward: the base engine's own three ways out 
 """
 from datetime import timedelta
 
+from crop_steering_engine import p0_dryback
+
 from ..context import flat_minutes, trend, words_trend
 from ..doctrine import doctrine
 from .base import Judge, choice, common, with_doctrine
@@ -67,9 +69,9 @@ class DawnJudge(Judge):
         e.update({
             "minutes_in_morning_dryback": (f"{s.phase_minutes:.0f} of at most {p.p0_max_wait_min:.0f}; the timer "
                                            "starts the ramp " + ("now" if left <= 0 else f"in {left:.0f} minutes")),
-            "dryback_so_far": (f"{s.dryback_pct:.1f}% of a {p.dryback_target:.1f}% target, measured from the "
+            "dryback_so_far": (f"{s.dryback_pct:.1f}% of a {p0_dryback(p):.1f}% target, measured from the "
                                f"highest reading since the dryback began ({s.peak_vwc:.1f}%): "
-                               f"{_share(s.dryback_pct, p.dryback_target)}"),
+                               f"{_share(s.dryback_pct, p0_dryback(p))}"),
             "dryback_from_start": self._from_start(ctx),
             "moisture_vs_rewater_threshold": (f"{s.vwc - p.p2_threshold:.1f} points above the re-water threshold "
                                               f"of {p.p2_threshold:.1f}% (at the threshold the ramp starts anyway)"
@@ -97,7 +99,7 @@ class DawnJudge(Judge):
         rel = pts / v0 * 100.0
         text = (f"moisture was {v0:.1f}% when the dryback began and is {s.vwc:.1f}% now: "
                 f"{'down' if pts >= 0 else 'up'} {abs(pts):.1f} points, a {max(rel, 0.0):.1f}% dryback "
-                f"({_share(rel, p.dryback_target)})")
+                f"({_share(rel, p0_dryback(p))})")
         if s.peak_vwc - v0 >= 0.5:
             text += (f"; the peak the dryback figure is measured from is {s.peak_vwc - v0:.1f} points above that, "
                      "free water, so that figure reads high")

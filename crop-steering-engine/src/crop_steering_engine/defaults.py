@@ -55,6 +55,9 @@ DEFAULTS = {
     "vegetative_dryback_target": (50.0, 20),
     "generative_dryback_target": (40.0, 20),
     "p0_maximum_wait_time": (120.0, 45),
+    # Per zone only: the integration starts a new room's zones at 3 and an updated room's at 0
+    # (off), so the entity column does not apply; the controller falls back to 0, off.
+    "p0_additional_dryback": (None, 0),
     "p0_dryback_drop_percent": (15.0, None),
     # P1
     "p1_target_vwc": (65.0, 60),

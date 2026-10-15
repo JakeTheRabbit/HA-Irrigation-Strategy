@@ -2113,6 +2113,11 @@ class Controller:
                 FALLBACK[f"{'vegetative' if veg else 'generative'}_dryback_target"],
             ),
             p0_max_wait_min=self._zone_num(room, zone, "p0_maximum_wait_time", FALLBACK["p0_maximum_wait_time"]),
+            # Per zone only. Optional: an integration older than the setting leaves it at 0 (off), so
+            # P0 waits for the dryback target as it always has, and nothing alerts.
+            p0_additional_dryback=self._zone_num(
+                room, zone, "p0_additional_dryback", FALLBACK["p0_additional_dryback"], optional=True
+            ),
             ec_target_p0=self._zone_num(room, zone, f"ec_target_{sfx}_p0", FALLBACK[f"ec_target_{sfx}_p0"]),
             ec_target_p1=self._zone_num(room, zone, f"ec_target_{sfx}_p1", FALLBACK[f"ec_target_{sfx}_p1"]),
             ec_target_p2=self._zone_num(room, zone, f"ec_target_{sfx}_p2", FALLBACK[f"ec_target_{sfx}_p2"]),
