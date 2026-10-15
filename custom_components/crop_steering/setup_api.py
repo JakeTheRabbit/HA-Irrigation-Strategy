@@ -9,12 +9,13 @@ import math
 
 from . import units
 from .admin import async_require_admin
-from .const import DOMAIN, MAX_ZONES
+from .const import DOMAIN, LEGACY_KILL_SWITCH, MAX_ZONES
 from .plumbing import (
     PLUMBING_LAYOUTS,
     infer as infer_plumbing,
     problems as plumbing_problems,
 )
+from .room import room_gate
 from .sizing import prefer_setup_value
 
 API_VERSION = 1
@@ -68,17 +69,8 @@ def hardware_entities(data):
 
 
 def engine_flag(hass, data):
-    prefix = data.get("room_prefix", "")
-    beat = hass.states.get(f"sensor.crop_steering_{prefix}ai_heartbeat")
-    return (
-        (beat.attributes.get("enable_flag") if beat else None)
-        or data.get("enable_flag")
-        or (
-            f"switch.crop_steering_{prefix}engine_enabled"
-            if prefix
-            else "input_boolean.f2_control_enabled"
-        )
-    )
+    """The kill switch of the room this setup is for (room.room_gate, judged on the setup itself)."""
+    return room_gate(hass, data.get("room_prefix", ""), data)
 
 
 def safety_blockers(hass, entry=None, proposed=None):
@@ -105,10 +97,8 @@ def safety_blockers(hass, entry=None, proposed=None):
         flag = engine_flag(hass, proposed)
         if hass.states.get(flag):
             controls.add(flag)
-        if not proposed.get("room_prefix") and hass.states.get(
-            "input_boolean.f2_control_enabled"
-        ):
-            controls.add("input_boolean.f2_control_enabled")
+        if not proposed.get("room_prefix") and hass.states.get(LEGACY_KILL_SWITCH):
+            controls.add(LEGACY_KILL_SWITCH)
     blockers = [
         blocker
         for eid in sorted(controls | entities)

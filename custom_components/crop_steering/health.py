@@ -14,15 +14,15 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers import issue_registry as ir
 
 from .const import DOMAIN, REPAIRS_DOCS_URL
-from .room import room_prefix
+from .room import resolve_gate, room_prefix
 
 _LOGGER = logging.getLogger(__name__)
 
-_DEFAULT_KILL_SWITCH = "input_boolean.f2_control_enabled"
 _STALE_MIN = 10
 _DEAD = ("unavailable", "unknown", "none", "")
 ISSUE_IDS = (
     "kill_switch_missing",
+    "engine_switch_not_gate",
     "engine_offline",
     "zone_no_sensor",
     "fused_sensor_unavailable",
@@ -74,37 +74,6 @@ def _base_key(issue_id: str) -> str:
         if issue_id == base or issue_id.startswith(base + "_"):
             return base
     return issue_id
-
-
-def _kill_switch(hass: HomeAssistant, prefix: str) -> str:
-    """Resolve the kill-switch entity id this room's engine actually uses.
-
-    Best source: the running engine itself — it publishes its configured ``enable_flag``
-    on the room's heartbeat sensor, which covers a custom add-on ``enable_flag`` option.
-    Fallbacks: the room's engine_config descriptor, then the per-room engine_enabled
-    switch (named rooms) or the documented default (default room).
-
-    Except while the engine is BEHIND: its heartbeat reports an older ``setup_revision`` than the
-    room publishes. It then holds every zone until it adopts the new setup, and adopting moves it
-    to the descriptor's flag, so the flag it names is the one being left behind. That is every
-    first install where the controller app was started before the integration was set up: the
-    app's shipped option names input_boolean.f2_control_enabled, a fresh install never creates
-    it, and this check used to send a new operator off to create a second kill switch that the
-    room would never use.
-    """
-    hb = hass.states.get(f"sensor.{DOMAIN}_{prefix}ai_heartbeat")
-    desc = hass.states.get(f"sensor.{DOMAIN}_{prefix}engine_config")
-    beat = (getattr(hb, "attributes", {}) or {}) if hb is not None else {}
-    room = (getattr(desc, "attributes", {}) or {}) if desc is not None else {}
-    have, want = beat.get("setup_revision"), room.get("setup_revision")
-    behind = type(have) is int and type(want) is int and want > have
-    if beat.get("enable_flag") and not (behind and room.get("enable_flag")):
-        return beat["enable_flag"]
-    if room.get("enable_flag"):
-        return room["enable_flag"]
-    if prefix:
-        return f"switch.{DOMAIN}_{prefix}engine_enabled"
-    return _DEFAULT_KILL_SWITCH
 
 
 def _strategy_hold(plan, heartbeat):
@@ -212,12 +181,20 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
         # Kill switch + engine heartbeat are per-room: the engine drives EVERY configured
         # room, each with its own kill switch and prefixed heartbeat. Resolve them per room
         # so a custom default kill switch and additional rooms are all monitored.
-        kill = _kill_switch(hass, prefix)
+        kill, reported = resolve_gate(hass, prefix)
         _issue(
             hass,
             hass.states.get(kill) is None,
             _iid("kill_switch_missing", slug),
             ir.IssueSeverity.ERROR,
+            {
+                "kill_switch": kill,
+                "source": (
+                    "the one its controller reports"
+                    if reported
+                    else "as the room's setup publishes it: the controller has not reported its own yet"
+                ),
+            },
         )
         hb = hass.states.get(f"sensor.{DOMAIN}_{prefix}ai_heartbeat")
         offline = hb is None
@@ -230,6 +207,20 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
             except Exception:  # pragma: no cover - defensive
                 offline = False
         _issue(hass, offline, _iid("engine_offline", slug), ir.IssueSeverity.WARNING)
+
+        # An operator who turns Engine Enabled OFF expects water to stop. Only the running
+        # controller knows its gate, so only a current heartbeat can say that switch is not it.
+        own = f"switch.{DOMAIN}_{prefix}engine_enabled"
+        _issue(
+            hass,
+            reported
+            and not offline
+            and kill != own
+            and hass.states.get(own) is not None,
+            _iid("engine_switch_not_gate", slug),
+            ir.IssueSeverity.WARNING,
+            {"kill_switch": kill, "engine_switch": own},
+        )
 
         # A zone with no VWC sensor mapped -> it can't be steered.
         no_sensor = []

@@ -86,9 +86,10 @@ KINDS = (
         "id": "setup",
         "name": "Setup and settings",
         "detail": "A setup change waiting, a setting missing, out of range or read from "
-        "somewhere new, and the grow strategy plan",
+        "somewhere new, the grow strategy plan, and an Engine Enabled switch that does not "
+        "stop water",
         "codes": _codes(
-            "CS-201 CS-401 CS-402 CS-403 CS-405 CS-601 CS-605 CS-606 CS-607"
+            "CS-201 CS-401 CS-402 CS-403 CS-405 CS-601 CS-605 CS-606 CS-607 CS-610"
         ),
         "events": (),
     },
@@ -108,6 +109,7 @@ REPAIRS = {
     "strategy_hold": "CS-606",
     "strategy_degraded": "CS-607",
     "stock_low": "CS-608",
+    "engine_switch_not_gate": "CS-610",
 }
 
 

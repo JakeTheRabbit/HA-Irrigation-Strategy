@@ -813,7 +813,11 @@
   "issues": {
     "kill_switch_missing": {
       "title": "Crop Steering: kill switch helper missing (CS-601)",
-      "description": "The engine is gated by the helper `input_boolean.f2_control_enabled`, but it doesn't exist, so the Crop Steering Controller app can't run. Create it: Settings → Devices & Services → Helpers → Create Helper → Toggle, named so the entity is input_boolean.f2_control_enabled. Leave it OFF until you're ready to irrigate.\n\nCode CS-601. What it means and what to do: Crop Steering → Help & tools → Error codes."
+      "description": "This room's kill switch is `{kill_switch}` ({source}), and it doesn't exist in Home Assistant, so nothing in this room is watered. If it is the helper of an installation from before the setup wizard, create it: Settings → Devices & Services → Helpers → Create Helper → Toggle, named so the entity is {kill_switch}. Leave it OFF until you're ready to irrigate. A room made by the setup wizard stops on its own Engine Enabled switch: don't create a helper for it.\n\nCode CS-601. What it means and what to do: Crop Steering → Help & tools → Error codes."
+    },
+    "engine_switch_not_gate": {
+      "title": "Crop Steering: Engine Enabled does not stop water in this room (CS-610)",
+      "description": "The controller reports that this room stops on `{kill_switch}`. The room also has an Engine Enabled switch, `{engine_switch}`, and switching that OFF does not stop water here. To stop watering, switch `{kill_switch}` OFF. To make Engine Enabled the room's kill switch, see \"Moving a room's kill switch\" in the install guide: on a room with no saved setup, set the controller app's enable_flag option; on a room whose setup has been saved, change the kill switch in its setup.\n\nCode CS-610. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
     "engine_offline": {
       "title": "Crop Steering: engine not running (CS-602)",
