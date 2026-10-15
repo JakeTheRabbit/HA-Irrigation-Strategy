@@ -35,9 +35,9 @@ def _held(seed):
     return held
 
 
-def _band_ids(zones=(1, 2)):
-    ids = {f"number.crop_steering_{key}": key for key in BANDS}
-    ids.update({f"number.crop_steering_zone_{z}_{key}": key for z in zones for key in BANDS})
+def _band_ids(zones=(1, 2), prefix=""):
+    ids = {f"number.crop_steering_{prefix}{key}": key for key in BANDS}
+    ids.update({f"number.crop_steering_{prefix}zone_{z}_{key}": key for z in zones for key in BANDS})
     return ids
 
 
@@ -69,6 +69,6 @@ async def test_a_coco_room_takes_the_coco_bands_for_new_values_only(hass):
 
 
 async def test_a_new_room_is_generic_and_starts_where_the_table_does(hass):
-    await _install(hass)
-    for entity_id, key in _band_ids(zones=(1,)).items():
+    await _install(hass)  # a new room has a slug: the wizard's "Tent" is tent_
+    for entity_id, key in _band_ids(zones=(1,), prefix="tent_").items():
         assert _value(hass, entity_id) == _start("generic", key), entity_id

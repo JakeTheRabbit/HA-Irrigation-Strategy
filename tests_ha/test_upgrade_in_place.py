@@ -235,9 +235,9 @@ async def test_a_3_8_0_state_file_loads_with_its_history_empty_and_nothing_moves
 ):
     """3.8.0 kept no plateau or night history (tests_ha/fixtures/state_3_8_0_mid_grow.json).
     The new controller loads that file exactly as it was, starts the history empty, and writing
-    it back changes nothing else but nine new zone keys (the day before's peak, the P1 rule's state
-    and the max-run latch's run of cut shots and latch, all saved empty, and the follower's record,
-    its peak the grow-day's own)."""
+    it back changes nothing else but ten new zone keys (the day before's peak, the P1 rule's state,
+    the max-run latch's run of cut shots and latch and the Vmax advisory's wet-up series, all saved
+    empty, and the follower's record, its peak the grow-day's own)."""
     await _upgrade(hass, "entry_2_17_wizard.json")
     seed = fixture("state_3_8_0_mid_grow.json")["state"]
     hass.states.async_set(KILL, "on")
@@ -267,6 +267,7 @@ async def test_a_3_8_0_state_file_loads_with_its_history_empty_and_nothing_moves
                written.pop("p1_settled_before"), written.pop("p1_expected_rise"))
         assert new == (None, False, None, 0, None, None)  # the day before's peak and the P1 rule's state, saved empty
         assert (written.pop("capped_in_a_row"), written.pop("max_run_latch")) == (0, None)
+        assert written.pop("vmax_wetup") == []
         old = {k: v for k, v in seed["default"][zone].items() if k not in PID_TERMS}
         assert written.pop("fc_follow") == {"peak": old["peak"], "day": None, "used": {}}
         assert learn == old.pop("learn")

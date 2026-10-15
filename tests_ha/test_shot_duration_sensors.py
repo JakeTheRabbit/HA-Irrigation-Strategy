@@ -6,6 +6,7 @@ REAL sensors, in a real Home Assistant, are held against the REAL controller's o
 the same states: its substrate litres, its flow, its shot size and its room limit.
 """
 
+from conftest import room_of
 from homeassistant.helpers.entity_component import async_update_entity
 from test_install_to_controller import KILL
 from test_mcp_setup_contract import _payload, _room, _service
@@ -19,7 +20,7 @@ SHOTS = {
 
 
 async def _sensor(hass, key):
-    entity_id = f"sensor.crop_steering_{key}"
+    entity_id = f"sensor.crop_steering_tent_{key}"  # the wizard's room is new, so it has a slug: tent_
     await async_update_entity(hass, entity_id)
     return hass.states.get(entity_id)
 
@@ -39,7 +40,7 @@ async def test_each_sensor_is_what_the_controller_runs_with_two_drippers_per_pla
         {"substrate_volume": 11.4, "dripper_flow_rate": 3.8, "drippers_per_plant": 2},
     )
     c, _fake, _clock = controller_for({"enable_flag": KILL})
-    room = c.rooms[0]
+    room = room_of(c)
     for key in SHOTS:
         state = await _sensor(hass, key)
         expected = _controller_seconds(c, room, 1, key)
@@ -58,10 +59,10 @@ async def test_a_zone_sized_in_rooms_and_hardware_is_timed_by_its_own_sizing(
     zone["dripper_flow_rate"] = 2
     await _service(hass, hass_admin_user, "setup_save", _payload(room, zones=[zone]))
     await hass.async_block_till_done()
-    assert hass.states.get("number.crop_steering_zone_1_substrate_volume").state == "5.8"
+    assert hass.states.get("number.crop_steering_tent_zone_1_substrate_volume").state == "5.8"
     c, _fake, _clock = controller_for({"enable_flag": KILL})
     state = await _sensor(hass, "p2_shot_duration_seconds")
-    expected = _controller_seconds(c, c.rooms[0], 1, "p2_shot_duration_seconds")
+    expected = _controller_seconds(c, room_of(c), 1, "p2_shot_duration_seconds")
     assert int(state.state) == expected
     # 5% of 5.8 L is 290 mL through one 2 L/hr dripper: 522 s; the room's 6 L would give 540.
     assert expected == 522
@@ -72,12 +73,12 @@ async def test_the_room_limit_caps_the_sensor_as_it_caps_the_shot(hass, controll
     await hass.services.async_call(
         "number",
         "set_value",
-        {"entity_id": "number.crop_steering_max_shot_duration", "value": 60},
+        {"entity_id": "number.crop_steering_tent_max_shot_duration", "value": 60},
         blocking=True,
     )
     c, _fake, _clock = controller_for({"enable_flag": KILL})
     state = await _sensor(hass, "p2_shot_duration_seconds")
     assert int(state.state) == _controller_seconds(
-        c, c.rooms[0], 1, "p2_shot_duration_seconds"
+        c, room_of(c), 1, "p2_shot_duration_seconds"
     )
     assert state.state == "60"

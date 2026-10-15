@@ -7,8 +7,12 @@ P3 time between shots apart.
 
 from datetime import timedelta
 
+import pytest
+
 import controller
 from test_p3_time_between_shots import Clock, probe, rig  # noqa: F401  (rig is a fixture)
+
+pytestmark = pytest.mark.usefixtures("settings_built_in")
 
 HOLD = "switch.crop_steering_zone_1_p3_dryback_hold"
 

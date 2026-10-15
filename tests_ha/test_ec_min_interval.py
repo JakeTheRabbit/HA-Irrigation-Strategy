@@ -12,7 +12,7 @@ import re
 from datetime import datetime, timedelta
 
 import pytest
-from conftest import fixture
+from conftest import fixture, room_of
 from crop_steering_engine import decide
 from test_setup_entry import _install
 from test_upgrade_in_place import JEV_3_11_1, UPSTREAM_2_25_1, _upgrade
@@ -21,11 +21,16 @@ ROOM = "number.crop_steering_ec_min_interval"
 ZONE = "number.crop_steering_zone_1_ec_min_interval"
 
 
-def _intervals(hass):
+def _new(entity_id):
+    """The same id on a new room, which has a slug: the wizard's "Tent" is tent_."""
+    return entity_id.replace("crop_steering_", "crop_steering_tent_", 1)
+
+
+def _intervals(hass, prefix=""):
     """Every EC-correction minimum interval number in the room: the room's own, then one per zone."""
-    zone = re.compile(r"number\.crop_steering_zone_\d+_ec_min_interval$")
+    zone = re.compile(rf"number\.crop_steering_{prefix}zone_\d+_ec_min_interval$")
     zones = sorted(s.entity_id for s in hass.states.async_all("number") if zone.match(s.entity_id))
-    return [ROOM, *zones]
+    return [ROOM.replace("crop_steering_", f"crop_steering_{prefix}", 1), *zones]
 
 
 async def _set(hass, entity_id, value):
@@ -36,8 +41,8 @@ async def _set(hass, entity_id, value):
 
 async def test_a_new_room_has_todays_ten_minutes(hass):
     await _install(hass)
-    assert _intervals(hass) == [ROOM, ZONE]
-    for entity_id in _intervals(hass):
+    assert _intervals(hass, "tent_") == [_new(ROOM), _new(ZONE)]
+    for entity_id in _intervals(hass, "tent_"):
         state = hass.states.get(entity_id)
         assert float(state.state) == 10
         assert (state.attributes["min"], state.attributes["max"]) == (1, 120)
@@ -62,10 +67,10 @@ async def test_a_room_updated_in_place_gets_it_at_ten_and_nothing_else_moves(has
 
 async def test_the_zones_own_value_reaches_decide(hass, controller_for):
     await _install(hass)
-    await _set(hass, ROOM, 20)
-    await _set(hass, ZONE, 25)  # the zone's own value wins over the room's
+    await _set(hass, _new(ROOM), 20)
+    await _set(hass, _new(ZONE), 25)  # the zone's own value wins over the room's
     c, _fake, _clock = controller_for({})
-    room = c.rooms[0]
+    room = room_of(c)
     c.loop_once(datetime.now())  # the first pass starts the grow-day
     now = datetime.now()
     room.state[1].update(phase="P2", last_shot=now - timedelta(minutes=1))

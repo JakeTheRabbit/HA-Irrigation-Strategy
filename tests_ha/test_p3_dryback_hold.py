@@ -11,25 +11,26 @@ import re
 from datetime import datetime
 
 import pytest
-from conftest import fixture, switch_calls
+from conftest import fixture, room_of, switch_calls
 from test_real_flow import VALVE
 from test_setup_entry import _install
 from test_upgrade_in_place import JEV_3_11_1, UPSTREAM_2_25_1, _upgrade
 
-KILL = "switch.crop_steering_engine_enabled"
+# The wizard's room is new, so it has a slug: "Tent" is tent_ (an upgraded room keeps no prefix).
+KILL = "switch.crop_steering_tent_engine_enabled"
 ARMED = (
     KILL,
-    "switch.crop_steering_system_enabled",
-    "switch.crop_steering_auto_irrigation_enabled",
-    "switch.crop_steering_zone_1_enabled",
+    "switch.crop_steering_tent_system_enabled",
+    "switch.crop_steering_tent_auto_irrigation_enabled",
+    "switch.crop_steering_tent_zone_1_enabled",
 )
-HOLD = "switch.crop_steering_zone_1_p3_dryback_hold"
-STATUS = "sensor.crop_steering_zone_1_status_app"
-WAITING = "sensor.crop_steering_zone_1_waiting_for_app"
+HOLD = "switch.crop_steering_tent_zone_1_p3_dryback_hold"
+STATUS = "sensor.crop_steering_tent_zone_1_status_app"
+WAITING = "sensor.crop_steering_tent_zone_1_waiting_for_app"
 
 
-def _holds(hass):
-    pattern = re.compile(r"switch\.crop_steering_zone_\d+_p3_dryback_hold$")
+def _holds(hass, prefix=""):
+    pattern = re.compile(rf"switch\.crop_steering_{prefix}zone_\d+_p3_dryback_hold$")
     return sorted(s.entity_id for s in hass.states.async_all("switch") if pattern.match(s.entity_id))
 
 
@@ -40,15 +41,15 @@ async def _set(hass, entity_id, value):
 
 
 async def _night(hass):
-    """Lights off around now, so the zone is in P3 whenever this runs."""
+    """Lights off around now, so the new room's zone is in P3 whenever this runs."""
     now = datetime.now()
-    await _set(hass, "number.crop_steering_lights_on_hour", (now.hour + 4) % 24)
-    await _set(hass, "number.crop_steering_lights_off_hour", (now.hour - 8) % 24)
+    await _set(hass, "number.crop_steering_tent_lights_on_hour", (now.hour + 4) % 24)
+    await _set(hass, "number.crop_steering_tent_lights_off_hour", (now.hour - 8) % 24)
 
 
 async def test_a_new_room_has_the_hold_off_on_every_zone(hass):
     await _install(hass)
-    assert _holds(hass) == [HOLD]
+    assert _holds(hass, "tent_") == [HOLD]
     assert hass.states.get(HOLD).state == "off"
 
 
@@ -74,12 +75,12 @@ async def _armed_night(hass, controller_for, hold):
     await _install(hass)
     await _night(hass)
     for mode in ("vegetative", "generative"):  # whichever mode the zone steers in
-        await _set(hass, f"number.crop_steering_zone_1_{mode}_dryback_target", 30)
+        await _set(hass, f"number.crop_steering_tent_zone_1_{mode}_dryback_target", 30)
     await hass.services.async_call(
         "switch", "turn_on" if hold else "turn_off", {"entity_id": HOLD}, blocking=True
     )
     c, fake, _clock = controller_for({"enable_flag": KILL})
-    room = c.rooms[0]
+    room = room_of(c)
     for switch in ARMED:
         fake.set_state(switch, "on")
     c.loop_once(datetime.now())  # the first pass starts the grow-day

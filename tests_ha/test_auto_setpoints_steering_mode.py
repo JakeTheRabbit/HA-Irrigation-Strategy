@@ -12,11 +12,13 @@ from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
+from conftest import room_of
 from test_setup_entry import _install
 
-ZONE = "number.crop_steering_zone_1_"
-MODE = "select.crop_steering_zone_1_steering_mode"
-STATUS = "sensor.crop_steering_zone_1_auto_setpoints"
+# The wizard's room is new, so it has a slug: "Tent" is tent_.
+ZONE = "number.crop_steering_tent_zone_1_"
+MODE = "select.crop_steering_tent_zone_1_steering_mode"
+STATUS = "sensor.crop_steering_tent_zone_1_auto_setpoints"
 
 
 @pytest.mark.parametrize(
@@ -34,25 +36,28 @@ async def test_the_zones_steering_mode_keeps_its_afternoon_and_the_sensor_says_w
     await hass.services.async_call(
         "switch",
         "turn_on",
-        {"entity_id": "switch.crop_steering_auto_setpoints"},
+        {"entity_id": "switch.crop_steering_tent_auto_setpoints"},
         blocking=True,
     )
     # The zone as Auto setpoints left it this morning, and a rescue level well under where 30% ends, so
     # only the zone's uptake limits the dryback.
-    for key, value in (
-        ("p1_target_vwc", 36),
-        ("field_capacity", 40),
-        ("p2_vwc_threshold", 34),
-        ("p3_emergency_vwc_threshold", 20),
-    ):
-        await hass.services.async_call(
-            "number",
-            "set_value",
-            {"entity_id": f"{ZONE}{key}", "value": value},
-            blocking=True,
-        )
+    from custom_components.crop_steering.number import async_set_numbers
+
+    _written, failed = await async_set_numbers(  # as one move: the ladder stays in order throughout
+        hass,
+        [
+            (f"{ZONE}{key}", value)
+            for key, value in (
+                ("p1_target_vwc", 36),
+                ("field_capacity", 40),
+                ("p2_vwc_threshold", 34),
+                ("p3_emergency_vwc_threshold", 20),
+            )
+        ],
+    )
+    assert failed == []
     c, fake, _clock = controller_for({})
-    room = c.rooms[0]
+    room = room_of(c)
     room.lights_on_hour, room.lights_off_hour = 10.0, 22.0
     room.state[1]["learn"] = dict(
         au.fresh(),

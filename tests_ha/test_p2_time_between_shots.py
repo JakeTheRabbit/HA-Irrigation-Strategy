@@ -12,7 +12,7 @@ import re
 from datetime import datetime, timedelta
 
 import pytest
-from conftest import fixture
+from conftest import fixture, room_of
 from crop_steering_engine import decide
 from test_setup_entry import _install
 from test_upgrade_in_place import JEV_3_11_1, UPSTREAM_2_25_1, _upgrade
@@ -22,11 +22,16 @@ ZONE = "number.crop_steering_zone_1_p2_time_between_shots"
 WAITING = "sensor.crop_steering_zone_1_waiting_for_app"
 
 
-def _gaps(hass):
+def _new(entity_id):
+    """The same id on a new room, which has a slug: the wizard's "Tent" is tent_."""
+    return entity_id.replace("crop_steering_", "crop_steering_tent_", 1)
+
+
+def _gaps(hass, prefix=""):
     """Every P2 Time Between Shots number in the room: the room's own, then one per zone."""
-    zone = re.compile(r"number\.crop_steering_zone_\d+_p2_time_between_shots$")
+    zone = re.compile(rf"number\.crop_steering_{prefix}zone_\d+_p2_time_between_shots$")
     zones = sorted(s.entity_id for s in hass.states.async_all("number") if zone.match(s.entity_id))
-    return [ROOM, *zones]
+    return [ROOM.replace("crop_steering_", f"crop_steering_{prefix}", 1), *zones]
 
 
 async def _set(hass, entity_id, value):
@@ -35,17 +40,17 @@ async def _set(hass, entity_id, value):
     )
 
 
-async def _daytime(hass):
+async def _daytime(hass, prefix=""):
     """Lights around now, so the zone is mid-photoperiod whenever this runs."""
     now = datetime.now()
-    await _set(hass, "number.crop_steering_lights_on_hour", (now.hour - 4) % 24)
-    await _set(hass, "number.crop_steering_lights_off_hour", (now.hour + 8) % 24)
+    await _set(hass, f"number.crop_steering_{prefix}lights_on_hour", (now.hour - 4) % 24)
+    await _set(hass, f"number.crop_steering_{prefix}lights_off_hour", (now.hour + 8) % 24)
 
 
 async def test_a_new_room_has_it_off(hass):
     await _install(hass)
-    assert _gaps(hass) == [ROOM, ZONE]
-    for entity_id in _gaps(hass):
+    assert _gaps(hass, "tent_") == [_new(ROOM), _new(ZONE)]
+    for entity_id in _gaps(hass, "tent_"):
         state = hass.states.get(entity_id)
         assert float(state.state) == 0
         assert (state.attributes["min"], state.attributes["max"]) == (0, 60)
@@ -70,11 +75,11 @@ async def test_a_room_updated_in_place_has_it_off_and_nothing_else_moves(hass, n
 
 async def test_the_controller_waits_the_zones_own_time_and_says_when(hass, controller_for):
     await _install(hass)
-    await _daytime(hass)
-    await _set(hass, ROOM, 5)
-    await _set(hass, ZONE, 8)  # the zone's own value wins over the room's
+    await _daytime(hass, "tent_")
+    await _set(hass, _new(ROOM), 5)
+    await _set(hass, _new(ZONE), 8)  # the zone's own value wins over the room's
     c, fake, _clock = controller_for({})
-    room = c.rooms[0]
+    room = room_of(c)
     c.loop_once(datetime.now())  # the first pass starts the grow-day
     now = datetime.now()
     room.state[1].update(phase="P2", last_shot=now - timedelta(minutes=1))
@@ -89,7 +94,7 @@ async def test_the_controller_waits_the_zones_own_time_and_says_when(hass, contr
     for entity_id, (state, attributes) in fake.sets.items():  # its REST writes, into HA
         hass.states.async_set(entity_id, state, attributes)
     await hass.async_block_till_done()
-    conditions = {c["rule"]: c for c in hass.states.get(WAITING).attributes["conditions"]}
+    conditions = {c["rule"]: c for c in hass.states.get(_new(WAITING)).attributes["conditions"]}
     assert 6.5 <= conditions["p2_topup"]["in_min"] <= 7.0
 
 

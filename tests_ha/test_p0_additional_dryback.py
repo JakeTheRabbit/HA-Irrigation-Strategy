@@ -13,7 +13,7 @@ from datetime import datetime
 
 import pytest
 import test_upgrade_in_place
-from conftest import fixture
+from conftest import fixture, room_of
 from crop_steering_engine import decide
 from test_setup_entry import _install
 from test_upgrade_in_place import JEV_3_11_1, UPSTREAM_2_25_1, _upgrade
@@ -22,9 +22,9 @@ ROOM = "number.crop_steering_p0_additional_dryback"
 OLD = "number.crop_steering_zone_1_p0_dryback_drop_percent"
 
 
-def _zones(hass):
+def _zones(hass, prefix=""):
     """Every zone's P0 additional dryback number, in zone order."""
-    zone = re.compile(r"number\.crop_steering_zone_\d+_p0_additional_dryback$")
+    zone = re.compile(rf"number\.crop_steering_{prefix}zone_\d+_p0_additional_dryback$")
     return sorted(s.entity_id for s in hass.states.async_all("number") if zone.match(s.entity_id))
 
 
@@ -54,9 +54,9 @@ def _p0_before(s, p):
 
 
 async def test_a_new_room_starts_every_zone_at_three_percent(hass):
-    await _install(hass)
-    zones = _zones(hass)
-    assert zones and hass.states.get(ROOM) is None
+    await _install(hass)  # a new room has a slug: the wizard's "Tent" is tent_
+    zones = _zones(hass, "tent_")
+    assert zones and hass.states.get(ROOM.replace("crop_steering_", "crop_steering_tent_")) is None
     for entity_id in zones:
         state = hass.states.get(entity_id)
         assert float(state.state) == 3
@@ -67,7 +67,7 @@ async def test_a_new_room_starts_every_zone_at_three_percent(hass):
 async def test_a_new_room_waits_for_the_extra_drop_before_the_first_shot(hass, controller_for):
     await _install(hass)
     c, _fake, _clock = controller_for({})
-    room = c.rooms[0]
+    room = room_of(c)
     c.loop_once(datetime.now())
     snap, p = c._snapshot(room, 1, datetime.now(), True, False)
     assert p.p0_additional_dryback == 3
