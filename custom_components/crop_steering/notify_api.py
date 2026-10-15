@@ -8,6 +8,10 @@ the revision, `recipients` how many rows) tells the controller whether anyone is
 it pushes to its own notify_service option as it always did. The integration's own Repairs cards go out the
 same way when one is raised.
 
+A row may take a digest instead (`digest`): what is not an emergency waits, and goes to that phone as one push
+every `digest_hours`, grouped by severity. A room can be muted until a time (`mutes`): nothing but an emergency
+is pushed for it meanwhile, and the sensor's `muted` attribute tells the controller so.
+
 Nothing here is needed for watering: a store that can't be read, a phone that fails, or no store at all only
 changes who gets a push.
 """
@@ -16,6 +20,7 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
+from datetime import datetime, timedelta, timezone
 import logging
 import re
 import time
@@ -34,6 +39,20 @@ SENSOR = f"sensor.{DOMAIN}_notify_config"
 IDLE_HOURS = 3
 IDLE_RANGE = (1, 12)
 MAX_RECIPIENTS = 20
+# A row that takes a digest gets what is not an emergency as one push every digest_hours (1 to 24), held in
+# memory meanwhile: a restart of Home Assistant drops what was waiting (its cards stay). Checked every minute.
+DIGEST_HOURS = 4
+DIGEST_RANGE = (1, 24)
+DIGEST_TAG = "crop_steering_digest"
+DIGEST_CHECK = timedelta(minutes=1)
+# The digest's headings, in its order: any code but an info one, an info code (docs/error-codes.json), an event.
+DIGEST_GROUPS = (
+    ("warning", "Warnings"),
+    ("info", "For your information"),
+    ("event", "Updates"),
+)
+# A room is muted until a time at most this far ahead.
+MUTE_MAX = timedelta(days=30)
 # One phone's push. The controller app waits 12 s for the whole call, and the phones are sent to at once.
 SEND_TIMEOUT_S = 8
 # What a push for an emergency adds, for a row that asks for high priority: Android's keys, then iOS's (each
@@ -60,7 +79,13 @@ class NotifyError(ValueError):
 
 
 def empty() -> dict:
-    return {"revision": 0, "idle_hours": IDLE_HOURS, "recipients": []}
+    return {
+        "revision": 0,
+        "idle_hours": IDLE_HOURS,
+        "recipients": [],
+        "digest_hours": DIGEST_HOURS,
+        "mutes": {},
+    }
 
 
 def _kinds(value, where) -> list[str]:
@@ -86,11 +111,13 @@ def _rooms(value, where) -> list[str]:
     return sorted(set(value))
 
 
-def _flag(value, where) -> bool:
-    if value is None:  # high priority for emergencies unless the row says otherwise
-        return True
+def _flag(value, where, name="urgent_high_priority", default=True) -> bool:
+    if (
+        value is None
+    ):  # high priority for emergencies unless the row says otherwise; no digest
+        return default
     if not isinstance(value, bool):
-        raise NotifyError(f"{where}: urgent_high_priority must be true or false")
+        raise NotifyError(f"{where}: {name} must be true or false")
     return value
 
 
@@ -117,6 +144,7 @@ def clean_recipient(raw, index=1, phones=None) -> dict:
         "kinds": _kinds(raw.get("kinds"), where),
         "rooms": _rooms(raw.get("rooms"), where),
         "urgent_high_priority": _flag(raw.get("urgent_high_priority"), where),
+        "digest": _flag(raw.get("digest"), where, "digest", False),
     }
 
 
@@ -141,9 +169,53 @@ def clean_idle(value):
     return int(value) if float(value).is_integer() else float(value)
 
 
+def clean_digest_hours(value) -> int:
+    """How often a digest goes out, in whole hours: 1 to 24."""
+    low, high = DIGEST_RANGE
+    if (
+        type(value) not in (int, float)
+        or not float(value).is_integer()
+        or not low <= value <= high
+    ):
+        raise NotifyError(
+            f"digest_hours must be a whole number of hours from {low} to {high}"
+        )
+    return int(value)
+
+
+def clean_mutes(value, now) -> dict:
+    """{room prefix: until}, each until an ISO time with its offset, stored in UTC; one already past is dropped
+    (that room is no longer muted), one more than MUTE_MAX ahead refused."""
+    if not isinstance(value, dict):
+        raise NotifyError("mutes must map a room prefix to the time its mute ends")
+    mutes = {}
+    for room, until in value.items():
+        if not (isinstance(room, str) and ROOM.fullmatch(room)):
+            raise NotifyError(
+                f'mutes: {room!r} is not a room prefix ("" for the default room, or "f1_")'
+            )
+        try:
+            end = datetime.fromisoformat(until)
+        except (TypeError, ValueError):
+            end = None
+        if end is None or end.tzinfo is None:
+            raise NotifyError(f"mutes: {room!r} needs an ISO time with its offset")
+        if end > now + MUTE_MAX:
+            raise NotifyError(
+                f"mutes: a room is muted for at most {MUTE_MAX.days} days"
+            )
+        if end > now:
+            mutes[room] = end.astimezone(timezone.utc).isoformat(timespec="seconds")
+    return dict(sorted(mutes.items()))
+
+
+def _now():
+    return datetime.now(timezone.utc)
+
+
 def own_edit(stored, submitted, user_id) -> list[dict]:
-    """A non-administrator's save, applied to the stored rows: the kinds, rooms and high-priority flag of the
-    rows whose user_id is theirs, and nothing else. They cannot add or remove a row, rename one or change
+    """A non-administrator's save, applied to the stored rows: the kinds, rooms, high-priority flag and digest of
+    the rows whose user_id is theirs, and nothing else (a row sent without `digest` keeps its own). They cannot add or remove a row, rename one or change
     whose it is, and another person's row must come back as it was."""
     if not isinstance(submitted, list) or not all(
         isinstance(r, dict) for r in submitted
@@ -167,6 +239,7 @@ def own_edit(stored, submitted, user_id) -> list[dict]:
             "kinds": _kinds(raw.get("kinds"), where),
             "rooms": _rooms(raw.get("rooms"), where),
             "urgent_high_priority": _flag(raw.get("urgent_high_priority"), where),
+            "digest": _flag(raw.get("digest"), where, "digest", row["digest"]),
         }
         if not (row["user_id"] and row["user_id"] == user_id):
             if any(wanted[key] != row[key] for key in wanted):
@@ -220,6 +293,9 @@ def _valid(value) -> dict:
         "recipients": clean_recipients(
             [_known_kinds(row) for row in value.get("recipients", [])]
         ),
+        # A store saved before the digest and the mutes has neither: no digest, every 4 hours, nothing muted.
+        "digest_hours": clean_digest_hours(value.get("digest_hours", DIGEST_HOURS)),
+        "mutes": clean_mutes(value.get("mutes", {}), _now()),
     }
 
 
@@ -244,6 +320,10 @@ class Notifier:
         self._unsubscribe = None
         self._cards = {}  # issue id -> when its card was last pushed, by _clock
         self._clock = time.monotonic
+        self._now = _now
+        # service -> {"since": by _clock, "items": {key: (group, title)}}: what waits for its digest
+        self._held = {}
+        self._untrack = None
         self.data = empty()
         self.error = None
 
@@ -281,6 +361,10 @@ class Notifier:
         attributes["idle_hours"] = self.data["idle_hours"]
         # The kinds a row can tick: the controller routes its vitals here only when "vitals" is one.
         attributes["kinds"] = list(notify_catalog.KIND_IDS)
+        if self.data[
+            "mutes"
+        ]:  # {room prefix: until}: nothing but emergencies is pushed for those rooms
+            attributes["muted"] = dict(self.data["mutes"])
         self.hass.states.async_set(SENSOR, str(self.data["revision"]), attributes)
 
     async def phones(self) -> list[dict]:
@@ -337,9 +421,17 @@ class Notifier:
             try:
                 if user is None or user.is_admin:
                     phones = {phone["service"]: phone for phone in await self.phones()}
-                    rows = clean_recipients(data.get("recipients"), phones)
+                    rows = clean_recipients(
+                        self._keep_digest(data.get("recipients")), phones
+                    )
                     self._exist(rows)
                     idle = clean_idle(data.get("idle_hours", self.data["idle_hours"]))
+                    hours = clean_digest_hours(
+                        data.get("digest_hours", self.data["digest_hours"])
+                    )
+                    mutes = clean_mutes(
+                        data.get("mutes", self.data["mutes"]), self._now()
+                    )
                 else:
                     rows = own_edit(
                         self.data["recipients"], data.get("recipients"), user.id
@@ -350,17 +442,51 @@ class Notifier:
                             "not allowed: only an administrator can change after how many "
                             "hours a room that has not watered is reported"
                         )
+                    hours, mutes = self.data["digest_hours"], self.data["mutes"]
+                    if data.get("digest_hours", hours) != hours:
+                        raise NotifyError(
+                            "not allowed: only an administrator can change how often a digest "
+                            "goes out"
+                        )
+                    if data.get("mutes", mutes) != mutes:
+                        raise NotifyError(
+                            "not allowed: only an administrator can mute a room"
+                        )
+                    mutes = clean_mutes(mutes, self._now())
             except NotifyError as error:
                 return await self.response(user, str(error))
             draft = {
                 "revision": self.data["revision"] + 1,
                 "idle_hours": idle,
                 "recipients": rows,
+                "digest_hours": hours,
+                "mutes": mutes,
             }
             await self._store.async_save(draft)
             self.data = draft
             self.publish()
             return await self.response(user)
+
+    def _keep_digest(self, recipients):
+        """A row sent without `digest` (by a page from before it) keeps the stored row's."""
+        if not isinstance(recipients, list):
+            return recipients
+        stored = {row["service"]: row["digest"] for row in self.data["recipients"]}
+        return [
+            (
+                {**raw, "digest": stored[raw["service"]]}
+                if isinstance(raw, dict)
+                and "digest" not in raw
+                and raw.get("service") in stored
+                else raw
+            )
+            for raw in recipients
+        ]
+
+    def muted(self, room) -> bool:
+        """Whether `room` (a prefix; None: no room in particular, never muted) is muted now."""
+        until = self.data["mutes"].get(room) if room is not None else None
+        return until is not None and datetime.fromisoformat(until) > self._now()
 
     def _exist(self, rows):
         """A phone added now must be a notify service Home Assistant has; one saved before may be away (an
@@ -419,8 +545,18 @@ class Notifier:
         if not self.data["recipients"]:
             return {"sent_to": [], "error": "no phone is set up for notifications"}
         urgent = bool(data.get("urgent"))
+        if not urgent and self.muted(data.get("room")):
+            return {
+                "sent_to": [],
+                "error": None,
+                "muted": True,
+            }  # to nobody, on purpose
         kinds = notify_catalog.kinds_for(data.get("code"), data.get("event"), urgent)
         rows = route(self.data["recipients"], kinds, data.get("room"))
+        held = [] if urgent else [row["service"] for row in rows if row["digest"]]
+        for service in held:
+            self._hold(service, data)
+        rows = [row for row in rows if row["service"] not in held]
         if urgent and not rows:
             # An emergency must reach someone: with no row covering its room, every phone that takes
             # emergencies for any room gets it; with none at all the controller pushes to its own option.
@@ -452,10 +588,45 @@ class Notifier:
                 data["key"],
                 "; ".join(failed),
             )
-        return {
+        answer = {
             "sent_to": [r["service"] for r, e in zip(rows, errors) if not e],
             "error": "; ".join(failed) or None,
         }
+        if held:
+            answer["held"] = held
+        return answer
+
+    # ------------------------------------------------------------------ the digest
+    def _hold(self, service, data):
+        """Keep a push for `service`'s next digest; a repeat of the same key replaces the one waiting."""
+        code = data.get("code")
+        if code:
+            group = "info" if code in notify_catalog.INFO else "warning"
+        else:
+            group = "event" if data.get("event") else "warning"
+        box = self._held.setdefault(service, {"since": self._clock(), "items": {}})
+        box["items"][data["key"]] = (group, data["title"])
+
+    async def flush(self, everything=False):
+        """Send each digest that is due, `digest_hours` after the first push it holds (or every one)."""
+        now, due = self._clock(), self.data["digest_hours"] * 3600
+        services = [
+            service
+            for service, box in self._held.items()
+            if everything or now - box["since"] >= due
+        ]
+        boxes = [self._held.pop(service) for service in services]
+        errors = await asyncio.gather(
+            *(
+                self._deliver(service, *digest_text(box["items"]), DIGEST_TAG, False)
+                for service, box in zip(services, boxes)
+            )
+        )
+        for service, error in zip(services, errors):
+            if error:
+                _LOGGER.warning(
+                    "Crop Steering digest to %s not delivered: %s", service, error
+                )
 
     async def _deliver(self, service, title, message, key, urgent) -> str | None:
         """Send one push -> None, or why it failed. A phone that fails never stops the others."""
@@ -489,11 +660,20 @@ class Notifier:
                 self.hass.async_create_task(self.push_issue(data.get("issue_id")))
 
         self._unsubscribe = self.hass.bus.async_listen(ISSUE_EVENT, changed)
+        from homeassistant.helpers.event import async_track_time_interval
+
+        async def tick(_now):
+            await self.flush()
+
+        self._untrack = async_track_time_interval(self.hass, tick, DIGEST_CHECK)
 
     def stop(self):
         if self._unsubscribe is not None:
             self._unsubscribe()
             self._unsubscribe = None
+        if self._untrack is not None:
+            self._untrack()
+            self._untrack = None
 
     async def push_issue(self, issue_id):
         """A Repairs card just raised, pushed like any alert with key = its issue id, to the phones whose row
@@ -585,6 +765,18 @@ class Notifier:
         return title.removeprefix("Crop Steering: "), message
 
 
+def digest_text(items) -> tuple[str, str]:
+    """A digest's (title, message): the titles it holds under a heading per severity, in DIGEST_GROUPS order."""
+    lines = []
+    for group, heading in DIGEST_GROUPS:
+        titles = [title for kind, title in items.values() if kind == group]
+        if titles:
+            lines += ([""] if lines else []) + [heading] + [f"• {t}" for t in titles]
+    count = len(items)
+    title = f"Crop Steering: {count} {'push' if count == 1 else 'pushes'} held"
+    return title, "\n".join(lines)
+
+
 async def async_setup_notify(hass, entry) -> None:
     """Once for the site, with the first room that sets up; each room after it only joins, and the store, the
     sensor and the services stay while any room is loaded (async_unload_notify)."""
@@ -628,6 +820,8 @@ async def async_setup_notify(hass, entry) -> None:
             vol.Required("expected_revision"): vol.All(int, vol.Range(min=0)),
             vol.Required("recipients"): list,
             vol.Optional("idle_hours"): vol.Coerce(float),
+            vol.Optional("digest_hours"): vol.Coerce(float),
+            vol.Optional("mutes"): dict,
         },
         "notify_test": {vol.Required("service"): str},
         "notify": {

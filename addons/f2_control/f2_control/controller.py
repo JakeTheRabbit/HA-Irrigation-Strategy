@@ -3339,6 +3339,9 @@ class Controller:
         push = self._push_due(key, code, now)
         self._alerted[key] = now
         self._alert_codes[key] = code
+        if push and self._muted(room, code):
+            log("ALERT push held:", key, "its room is muted in Crop Steering")
+            push = False
         if push:
             self._push(key, code, title, message, room, zone, self._notify_config()[0])
         return True
@@ -3388,7 +3391,8 @@ class Controller:
         return True
 
     def _notify_config(self, refresh=False):
-        """(recipients, idle_hours) from the integration's sensor.crop_steering_notify_config: read by each loop at
+        """(recipients, idle_hours) from the integration's sensor.crop_steering_notify_config, and the rooms muted
+        in it into _notify_mutes (_muted): read by each loop at
         most once a minute (`refresh`), and otherwise the last reading, so an alert never waits on the read. An
         integration without it (older than notifications) or unable to read its store: (0, 3.0), so every push
         goes to the notify_service option exactly as before and CS-209 counts 3 hours."""
@@ -3407,8 +3411,27 @@ class Controller:
         except (TypeError, ValueError):
             idle = IDLE_HOURS
         idle = min(IDLE_HOURS_RANGE[1], max(IDLE_HOURS_RANGE[0], idle)) if math.isfinite(idle) else IDLE_HOURS
+        mutes = {}  # room prefix -> until; an integration from before mutes has none
+        for prefix, until in (attrs.get("muted") if isinstance(attrs.get("muted"), dict) else {}).items():
+            try:
+                until = datetime.fromisoformat(until)
+            except (TypeError, ValueError):
+                continue
+            if until.tzinfo is not None:
+                mutes[prefix] = until
+        self._notify_mutes = mutes
         self._notify_cfg = (now, (recipients, idle))
         return recipients, idle
+
+    def _muted(self, room, code):
+        """Whether an alert's push stays with nobody because its room is muted until a later time (the
+        integration's sensor.crop_steering_notify_config `muted`, as last read): never a critical code, nor an
+        alert about no room in particular. Covers the notify_service fallback too."""
+        if room is None or code in CRITICAL_CODES:
+            return False
+        self._notify_config()  # the last reading, or the first
+        until = self._notify_mutes.get(room.prefix)
+        return until is not None and until > datetime.now(timezone.utc)
 
     def _notify_event(self, event, room, zone, *detail):
         """A phase change ("phase": was, to, why) or a setting Jev moved ("jev_setpoint": words, why): not an

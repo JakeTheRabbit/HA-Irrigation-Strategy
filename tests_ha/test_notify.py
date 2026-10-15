@@ -131,6 +131,7 @@ async def test_the_services_and_the_sensor_the_controller_reads(hass, hass_admin
         "kinds": ["emergency", "stock"],
         "rooms": [],
         "urgent_high_priority": True,
+        "digest": False,
     }
     await hass.async_block_till_done()
     state = hass.states.get(SENSOR)

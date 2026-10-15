@@ -503,6 +503,19 @@ notify_save:
           step: 0.5
           unit_of_measurement: h
           mode: box
+    digest_hours:
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 24
+          step: 1
+          unit_of_measurement: h
+          mode: box
+    mutes:
+      required: false
+      selector:
+        object:
 notify_test:
   fields:
     service:

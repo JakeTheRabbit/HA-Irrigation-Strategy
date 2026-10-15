@@ -116,7 +116,9 @@ its config entry, every entity id, the ladder its controller moved, and beside i
 working peak (`state_3_11_1_learn_jev.json`), the `/data/jev_usage.json` (`jev_usage_3_11_1.json`) and the
 dosing store (`dosing_3_11_1.json`). `data_3_11_1_files/` holds the rest of a 3.11.1 app's `/data`: the
 ledger, journal and setpoint memory its brain wrote and the `dosing_state.json` its dosing runner wrote,
-recorded by running 3.11.1's own controller, brain and dosing runner on its own test kit. The `options_<version>_*.json` files with a `data` folder
+recorded by running 3.11.1's own controller, brain and dosing runner on its own test kit. `notify_3_11_1.json` and `notify_3_11_1_staff.json` are site
+notification stores with two phones, in the shape 3.11.1 saves them, from before a vitals kind, a digest or a
+muted room. The `options_<version>_*.json` files with a `data` folder
 (`data_3_0_0_ledger/`, `data_3_2_0/`, `data_3_3_0_typesafe/`, `data_3_0_0_quiet/`,
 `data_3_11_1_usage/`) are apps from 2.25.1 and the Jev line as each left `/data/options.json` and
 `/data`, recorded by running that version's own controller: they prove the brain starts on Cloudflare
