@@ -77,6 +77,4 @@ async def test_the_controller_reads_the_tents_microsiemens_probe_as_millisiemens
 ):
     await _install(hass)  # the seeded probe reports 3100 uS/cm
     c, _fake, _clock = controller_for({"enable_flag": KILL})
-    assert c._read_sensor("sensor.crop_steering_ec_zone_1", lo=0, hi=20) == pytest.approx(
-        3.1
-    )
+    assert c._read_sensor("sensor.crop_steering_ec_zone_1", "ec") == pytest.approx(3.1)

@@ -174,7 +174,7 @@ An older integration publishes only each zone's combined reading, which then sta
 
 | Setup label             | Configuration key         | Select                                                                                                                |
 | ----------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------- |
-| Room pump               | `pump_switch`             | The room pump's actual HA switch. The controller descriptor publishes this as `pump`.                                 |
+| Room pump               | `pump_switch`             | The room pump's actual HA switch, `input_boolean` or valve. The controller descriptor publishes this as `pump`.       |
 | Tank fill level (%)     | `water_level_sensor`      | A percentage sensor, 0-100. A litres value is not a percentage.                                                       |
 | Tank EC (display)       | `tank_ec_sensor`          | A tank conductivity sensor in mS/cm or dS/m accepted by setup.                                                        |
 | Tank pH (display)       | `tank_ph_sensor`          | A pH sensor.                                                                                                          |
@@ -216,7 +216,7 @@ A room without pumps says what dosing does, with **Set up dosing**. Dosing, batc
 An HA administrator uses **Equipment › Setup**. Pair devices and expose their entities in HA first; this workspace maps existing entities.
 
 1. Choose an existing room or **Add room**. Give it a clear name. Names may change without changing its stable identity. Say how the room is plumbed (zone valves only, or a pump and valves); nothing is guessed from empty fields.
-2. Map **Room pump** and **Mainline valve** where the plumbing has them, then each active zone's valve. Search by friendly name or exact entity ID; inspect the displayed value/unit before selecting.
+2. Map **Room pump** and **Mainline valve** where the plumbing has them, then each active zone's valve. Search by friendly name or exact entity ID; inspect the displayed value/unit before selecting. Each can be a switch, an `input_boolean` helper or a valve (a device Home Assistant opens and closes); setup refuses anything else (a cover or a light, for example). A valve must read closed, like a switch reads off, before setup is saved.
 3. Select one or more VWC and EC probes per zone. **Clear mapping** removes the selected mapping; **Done** closes the picker. Multiple valid readings are combined by the integration, which leaves out a probe that is not reporting or out of range and says so (see [Probes](#probes)).
 4. Enter plant count, substrate litres **per plant** (or choose a pot or rockwool preset), drippers **per plant**, and flow in litres/hour **per dripper**. **Units** in Settings switch volume and flow to US gallons and GPH for typing; values are saved in litres. A zone's catch test works out the flow per dripper from a timed catch and fills only the draft.
 5. Map optional room equipment, tank displays and any feed-water safety probes as separate roles. Explicitly map shared equipment only where appropriate; never reuse a zone valve accidentally.

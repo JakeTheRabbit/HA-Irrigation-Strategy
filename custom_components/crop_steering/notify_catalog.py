@@ -28,19 +28,22 @@ KINDS = (
         "id": "hardware",
         "name": "Hardware lockouts",
         "detail": "A pump or valve that did not do what it was told, a hardware hold, a shot "
-        "cut, water that isn't reaching a zone, a table that isn't draining and a sump pump that stopped",
+        "cut, water that isn't reaching a zone, a table that isn't draining, a sump pump that stopped "
+        "and a pump or valve the controller can't switch",
         "codes": _codes(
             "CS-301 CS-302 CS-303 CS-304 CS-305 CS-306 CS-307 CS-308 CS-309 CS-310 CS-311 "
-            "CS-701"
+            "CS-313 CS-701"
         ),
         "events": (),
     },
     {
         "id": "sensors",
         "name": "Sensors and drift",
-        "detail": "A moisture or EC reading the controller can't use, a zone without a "
-        "sensor, and a probe Jev doubts or set aside",
-        "codes": _codes("CS-101 CS-102 CS-103 CS-104 CS-603 CS-604 CS-703 CS-704"),
+        "detail": "A moisture or EC reading the controller can't use, a probe set aside "
+        "for its unit, a zone without a sensor, and a probe Jev doubts or set aside",
+        "codes": _codes(
+            "CS-101 CS-102 CS-103 CS-104 CS-503 CS-603 CS-604 CS-703 CS-704"
+        ),
         "events": (),
     },
     {

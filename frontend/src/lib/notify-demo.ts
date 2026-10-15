@@ -32,15 +32,16 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "hardware",
     name: "Hardware lockouts",
     detail:
-      "A pump or valve that did not do what it was told, a hardware hold, a shot cut, water that isn't reaching a zone, a table that isn't draining and a sump pump that stopped.",
-    codes: [...codes(301, 311), "CS-701"],
+      "A pump or valve that did not do what it was told, a hardware hold, a shot cut, water that isn't reaching a zone, a table that isn't draining, a sump pump that stopped and a pump or valve the controller can't switch.",
+    codes: [...codes(301, 311), "CS-313", "CS-701"],
     events: [],
   },
   {
     id: "sensors",
     name: "Sensors and drift",
-    detail: "A probe the controller cannot use, a zone without one, and a probe Jev set aside.",
-    codes: [...codes(101, 104), "CS-603", "CS-604", "CS-703", "CS-704"],
+    detail:
+      "A probe the controller cannot use, a probe set aside for its unit, a zone without one, and a probe Jev set aside.",
+    codes: [...codes(101, 104), "CS-503", "CS-603", "CS-604", "CS-703", "CS-704"],
     events: [],
   },
   {

@@ -23,7 +23,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | CS-2xx | **Watering held**: Something is stopping shots in a room or a zone. |
 | CS-3xx | **Pumps and valves**: A switch did not do what it was told, or a shot was cut. |
 | CS-4xx | **Settings**: A setting is missing, out of range, or read from somewhere new. |
-| CS-5xx | **Checks across zones**: Advice from comparing a room's zones. |
+| CS-5xx | **Checks across zones**: Advice from comparing a room's zones, and a probe set aside for its unit. |
 | CS-6xx | **Repairs cards**: Raised by the integration, under Settings → Repairs. |
 | CS-7xx | **Jev**: Jev's judgements about a zone (advice, a probe it set aside), and how Jev itself is doing: its calls running low, a judge on the stricter gate (docs/JEV.md). |
 | CS-8xx | **Dosing**: Batch-tank dosing: a dose or a batch that did not end as it should (docs/DOSING.md). |
@@ -56,12 +56,14 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-309](#cs-309) | An interrupted shot's hardware may still be ON | Warning | Notification |
 | [CS-310](#cs-310) | Moisture rising with no water: the table is not draining | Critical | Notification |
 | [CS-311](#cs-311) | The sump pump has not run | Critical | Notification |
+| [CS-313](#cs-313) | A valve or pump the controller can't switch, not watering | Warning | Notification |
 | [CS-401](#cs-401) | Setting outside the engine's range | Warning | Notification |
 | [CS-402](#cs-402) | Settings missing, running on built-in values | Critical | Notification |
 | [CS-403](#cs-403) | Lights hours now come from the integration | Information | Notification |
 | [CS-404](#cs-404) | Automatic targets paused | Warning | Notification |
 | [CS-405](#cs-405) | Timezone mismatch, the day may be shifted | Warning | Notification |
 | [CS-501](#cs-501) | Much less water than the other zones | Information | Notification |
+| [CS-503](#cs-503) | Moisture probe set aside for its unit | Warning | Notification |
 | [CS-601](#cs-601) | Kill switch helper missing | Critical | Repairs card |
 | [CS-602](#cs-602) | Engine not running | Warning | Repairs card |
 | [CS-603](#cs-603) | Zone with no moisture sensor | Warning | Repairs card |
@@ -613,6 +615,27 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 - If the plug is offline, bring it back: until then the pump's runs can't be seen.
 - Set sump_silent_hours longer only if the pump really runs less often than that.
 
+<a id="cs-313"></a>
+
+### CS-313: A valve or pump the controller can't switch, not watering
+
+*Warning · Notification*
+
+**What it means.** A zone's valve, or its room's pump or main line, is mapped to a kind of device the controller has no way to open and close. It can drive a switch, an input_boolean and a valve (open and closed). Setup refuses anything else, so this one was mapped by hand, in the controller app's hardware option or by editing the room. The notification names it.
+
+**Watering meanwhile.** That zone is not watered, and the device is never sent a command. Earlier controllers sent it a switch command, which it ignored, so it was never opened or switched on then either. Other zones carry on.
+
+**Likely causes**
+
+- A cover, a light, a fan or another kind of device was mapped as a zone valve, the pump or the main line by hand.
+- The device's integration exposes it as a kind Crop Steering does not drive.
+
+**Suggested fixes**
+
+- In Crop Steering → Rooms & setup, map a switch, an input_boolean or a valve in its place.
+- If the hardware only exists as that kind of device, make a switch for it in Home Assistant (a template switch, for example) and map that.
+- The zone is watered again from the next loop once a device the controller can switch is mapped.
+
 ## Settings (CS-4xx)
 
 <a id="cs-401"></a>
@@ -738,6 +761,26 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Compare the plants, and check the probe's position.
 - Do a catch test on this zone and a neighbour.
+
+<a id="cs-503"></a>
+
+### CS-503: Moisture probe set aside for its unit
+
+*Warning · Notification*
+
+**What it means.** The zone's moisture probe reports in a unit that can't be taken as a moisture percentage, and its number is outside 0 to 100, so the probe is set aside and the zone has no moisture reading. Moisture is read in %, and m³/m³ is converted; a probe whose unit is unknown, or that has none, is still read as % while its number is between 0 and 100. The notification names the probe and its unit, and Home Assistant's log says once which probe was set aside.
+
+**Watering meanwhile.** The same as for CS-102: for its first 15 minutes out the zone waits, then it carries on without the probe while the engine is on: the same shots as a zone whose probe is working, or one shot every 90 minutes (the app's blind_fallback_min option) within the daily water limit if there is none. Phase changes that go by moisture wait for the probe. Nothing is held.
+
+**Likely causes**
+
+- The sensor mapped to the zone is another reading from the same device: a raw count, a voltage or a temperature.
+- The probe's own integration reports its moisture reading in an unusual unit.
+
+**Suggested fixes**
+
+- In Crop Steering → Rooms & setup, map the zone to the probe's moisture reading in % (or m³/m³).
+- If the sensor is the moisture reading, correct its unit in its own integration.
 
 ## Repairs cards (CS-6xx)
 

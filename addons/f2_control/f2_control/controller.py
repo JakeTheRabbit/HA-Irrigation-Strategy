@@ -56,6 +56,11 @@ from crop_steering_engine import (
     system_safety_status,
     zone_status_label,
 )
+# What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
+# controller column of the one defaults table, pinned to the values installed controllers use.
+from crop_steering_engine.defaults import CONTROLLER_FALLBACKS as FALLBACK
+# Every number read from a device goes through the one device-unit table (_device).
+from crop_steering_engine.defaults import UNITS, to_canonical
 
 # ---------------------------------------------------------------- HA REST (Supervisor proxy)
 BASE = os.environ.get("HA_URL", "http://supervisor/core/api")
@@ -252,6 +257,11 @@ _PROBE_ALERTS = {
         "Check the probe's calibration, and that the sensor mapped to this zone reports moisture "
         "in %.",
     ),
+    "CS-503": (
+        "moisture probe set aside for its unit",
+        "Map this zone to the probe's moisture reading in % (or m³/m³), or correct the sensor's "
+        "unit in its own integration. The probe counts again as soon as its reading can be used.",
+    ),
 }
 
 # What follows a shot cancelled before its water started (CS-302, CS-303, CS-304): _execute_shot's
@@ -316,29 +326,31 @@ class _Stop:
             self.slowest[0] = max(self.slowest[0], time.monotonic() - began)
 
 
-def _read(entity, deadline=None):
-    """ha_get, inside the stop's `deadline` (a _Stop) when there is one: a read that no longer fits is
-    not made and reads as unknown."""
+def _read(entity, deadline=None, get=None):
+    """ha_get (or `get`: hw_get for a zone valve, main line or pump), inside the stop's `deadline` (a
+    _Stop) when there is one: a read that no longer fits is not made and reads as unknown."""
+    get = get or ha_get
     if deadline is None:
-        return ha_get(entity)
+        return get(entity)
     timeout = deadline.timeout(8)
-    return HAState() if timeout is None else deadline.timed(ha_get, entity, timeout=timeout)
+    return HAState() if timeout is None else deadline.timed(get, entity, timeout=timeout)
 
 
 def _switch_off(entity, deadline=None, keep=0):
-    """A switch's turn_off, inside the stop's `deadline` when there is one, keeping time for `keep` offs
-    after it -> whether Home Assistant took it. One that no longer fits is not sent."""
+    """A zone valve, main line or pump's close (hw_call), inside the stop's `deadline` when there is one,
+    keeping time for `keep` offs after it -> whether Home Assistant took it. One that no longer fits is
+    not sent."""
     if deadline is None:
-        return ha_call("switch", "turn_off", entity_id=entity)
+        return hw_call(entity, False)
     timeout = deadline.off_timeout(12, keep)
-    return timeout is not None and deadline.timed(ha_call, "switch", "turn_off", entity_id=entity, timeout=timeout)
+    return timeout is not None and deadline.timed(hw_call, entity, False, timeout=timeout)
 
 
 def _history(entity, since, deadline=None):
     if deadline is None:
-        return ha_history(entity, since)
+        return hw_history(entity, since)
     timeout = deadline.timeout(12)
-    return None if timeout is None else deadline.timed(ha_history, entity, since, timeout=timeout)
+    return None if timeout is None else deadline.timed(hw_history, entity, since, timeout=timeout)
 
 
 def _pause(seconds, deadline=None):
@@ -359,6 +371,44 @@ RETIRED_SWITCHES = (
     ("system_enabled", "System Enabled"),
     ("auto_irrigation_enabled", "Auto Irrigation Enabled"),
 )
+
+# How each kind of on/off device a zone valve, main line or pump can be is opened, closed and read back:
+# domain -> (open service, close service, open state, closed state). Every open, close and read-back of
+# that hardware goes through it (hw_call, hw_get). A mapped entity of any other domain is never sent a
+# command: its zone is held with CS-313 (_undrivable).
+ACTUATORS = {
+    "switch": ("turn_on", "turn_off", "on", "off"),
+    "input_boolean": ("turn_on", "turn_off", "on", "off"),
+    "valve": ("open_valve", "close_valve", "open", "closed"),
+}
+
+
+def hw_call(entity, on, **timeout):
+    """Open (on=True) or close one zone valve, main line or pump -> whether Home Assistant took it.
+    One whose domain is not in ACTUATORS is not sent anything, and that is a failure."""
+    domain = entity.split(".", 1)[0]
+    row = ACTUATORS.get(domain)
+    return bool(row) and ha_call(domain, row[0] if on else row[1], entity_id=entity, **timeout)
+
+
+def hw_state(entity, state):
+    """A state of `entity` in on/off words: its domain's open state reads "on" and its closed state "off".
+    Anything else (unavailable, opening, a domain not in ACTUATORS) is returned as it is."""
+    row = ACTUATORS.get(entity.split(".", 1)[0])
+    return {row[2]: "on", row[3]: "off"}.get(state, state) if row else state
+
+
+def hw_get(entity, timeout=8):
+    """ha_get for a zone valve, main line or pump, its state in on/off words (hw_state)."""
+    read = ha_get(entity, timeout=timeout)
+    return HAState(hw_state(entity, read[0]), read[1], read[2], getattr(read, "last_changed", None))
+
+
+def hw_history(entity, since, **timeout):
+    """ha_history for a zone valve, main line or pump, each state in on/off words (hw_state)."""
+    rows = ha_history(entity, since, **timeout)
+    return rows and [(hw_state(entity, state), stamp) for state, stamp in rows]
+
 
 # What Controller._on reads as ON. A hold (hold_entities) in one of these states stops a shot starting
 # (_blocked) and ends one in flight (_wait_shot): the same test, so the two can never disagree.
@@ -434,7 +484,8 @@ FC_SHIFT_MIN = 1.0
 # CS-311: the sump pump a room drains to (option sump_power_sensor) drawing no power for SUMP_SILENT_H while the
 # room is on. F2's ran every 1 to 1.5 hours, day and night, 22-28 Sep 2026 (its longest gap 2.37 h) and then not
 # at all for 41.6 h: its tables backed up. Checked every SUMP_CHECK_MIN from Home Assistant's history, as a run
-# lasts about a minute and a loop could miss it; a run is more than SUMP_RUN_W.
+# lasts about a minute and a loop could miss it; a run is more than SUMP_RUN_W (compared in W, whatever unit the
+# plug reports: _device_history).
 SUMP_SILENT_H, SUMP_CHECK_MIN, SUMP_RUN_W = 3.0, 5.0, 20.0
 
 
@@ -627,6 +678,7 @@ class Controller:
                     domain, service, data, timeout),
                 state_path=os.path.join(os.path.dirname(self._state_path) or ".", "dosing_state.json"),
                 log=log,
+                actuators=ACTUATORS,
             )
         except Exception as e:
             log("dosing: off, it could not start:", e)
@@ -1272,7 +1324,7 @@ class Controller:
                         room.enable_flag
                     )  # absent legacy helper on a fresh setup
                 armed = sorted(flag for flag in flags if ha_get(flag)[0] != "off")
-                running = sorted(e for e in hardware if ha_get(e)[0] != "off")
+                running = sorted(e for e in hardware if hw_get(e)[0] != "off")
                 if running or (armed and not resuming):
                     if active:  # an archived room is meant to stay dry: no noise about it
                         self._alert(
@@ -1531,19 +1583,83 @@ class Controller:
             return default
         return str(v).lower() in ON_STATES
 
-    def _read_sensor(self, entity, lo=0.0, hi=200.0, max_age_min=20, to_ms_cm=False):
+    def _device(self, entity, quantity, keep_refused=False):
+        """One read of a mapped device (a moisture or EC probe, a feed probe, a power plug) through the device-unit
+        table (crop_steering_engine.defaults.UNITS) -> (value in the quantity's canonical unit or None, state,
+        unit, last_updated, how the unit was taken or None when there is no number, attributes). Every numeric
+        device read goes through here or _device_history, so none can skip the table (tests/test_device_units.py).
+        The unit of an entity that is unavailable now is the one it last reported this run."""
         v, attrs, lu = ha_get(entity)
+        seen = self.__dict__.setdefault("_device_units", {})
+        unit = (attrs or {}).get("unit_of_measurement")
         if v in (None, "unknown", "unavailable", ""):
-            return None
+            return None, v, seen.get(entity, unit), lu, None, attrs
+        seen[entity] = unit
         try:
             f = float(v)
-        except Exception:
+        except (TypeError, ValueError):
+            return None, v, unit, lu, None, attrs
+        if not math.isfinite(f):
+            return None, v, unit, lu, None, attrs
+        value, taken = self._canonical(entity, quantity, f, unit, keep_refused)
+        return value, v, unit, lu, taken, attrs
+
+    def _canonical(self, entity, quantity, number, unit, keep_refused=False, keep_unknown=False):
+        """`number` from `entity` in its quantity's canonical unit -> (value or None, how the unit was taken). A
+        unit that is not simply recognised is said once a run in the log, naming the sensor and the unit.
+        `keep_refused`: a refused unit is read as the canonical unit while plausible, as before the table (the
+        source-water gate holds on a dead feed probe, so setting one aside would stop a room that waters).
+        `keep_unknown`: a unit the table does not know, or none, is read as the canonical unit whatever the
+        number, as before the table (the dosing runner: its own checks bound every dose)."""
+        value, taken = to_canonical(quantity, number, unit)
+        lo, hi = UNITS[quantity]["plausible"]
+        if taken == "refused" and keep_refused and lo <= number <= hi:
+            value, taken = number, "kept"
+        if taken in ("unrecognised", "implausible") and keep_unknown:
+            value, taken = number, "as before"
+        said = self.__dict__.setdefault("_unit_notices", set())
+        if taken != "recognised" and (entity, unit, taken) not in said:
+            said.add((entity, unit, taken))
+            table = UNITS[quantity]
+            log(f"unit: {entity} reports {quantity} in {unit or 'no unit'!r}: " + {
+                "refused": f"no exact conversion to {table['canonical']}, so its readings are set aside",
+                "kept": f"no exact conversion to {table['canonical']}, but it is read as {table['canonical']} "
+                        f"while it stays within {lo:g}-{hi:g}, as it always was, so it keeps feeding its gate",
+                "unrecognised": f"not a unit the table knows, so it is read as {table['canonical']} "
+                                f"while it stays within {lo:g}-{hi:g}",
+                "implausible": f"not a unit the table knows, and {number:g} is outside {lo:g}-{hi:g} "
+                               f"{table['canonical']}, so the reading is set aside",
+                "as before": f"not a unit the table knows, so it is read as {table['canonical']}, as it always was",
+            }[taken])
+        return value, taken
+
+    def _device_history(self, entity, quantity, since):
+        """Every reading `entity` has had since `since`, through the device-unit table, as [(value, last_changed)],
+        or None when there is no evidence: Home Assistant can't say, or a reading had to be set aside for its
+        unit. History rows carry no unit (ha_history asks for none), so each is read in the unit the entity
+        reports now, or last reported this run while it is unavailable."""
+        rows = ha_history(entity, since)
+        if rows is None:
             return None
-        if to_ms_cm:  # an EC probe in uS/cm (micro sign, Greek mu or plain "u") is a thousandth of that in mS/cm
-            unit = str((attrs or {}).get("unit_of_measurement") or "").lower().replace(" ", "")
-            if unit in ("µs/cm", "μs/cm", "us/cm"):
-                f /= 1000.0
-        if not math.isfinite(f) or f < lo or f > hi:
+        unit = self._device(entity, quantity)[2]
+        out = []
+        for state, changed in rows:
+            try:
+                number = float(state)
+            except (TypeError, ValueError):
+                continue
+            value = self._canonical(entity, quantity, number, unit)[0]
+            if value is None:
+                return None
+            out.append((value, changed))
+        return out
+
+    def _read_sensor(self, entity, quantity, max_age_min=20, keep_refused=False):
+        """A device's live reading in its quantity's canonical unit, or None: no number, set aside for its unit,
+        outside the quantity's sane range, stale, or stamped in the future."""
+        lo, hi = UNITS[quantity]["plausible"]
+        f, _v, _unit, lu, _taken, _attrs = self._device(entity, quantity, keep_refused)
+        if f is None or f < lo or f > hi:
             return None
         try:
             if not lu:
@@ -1561,7 +1677,8 @@ class Controller:
     def _read_feed_ec(self, room):
         if not room.feed_ec_sensor:
             return None
-        feed = self._read_sensor(room.feed_ec_sensor, lo=0, hi=20, to_ms_cm=True)
+        # A feed probe in ppm or ppt is read as before (keep_refused): never a new dead-feed hold.
+        feed = self._read_sensor(room.feed_ec_sensor, "ec", keep_refused=True)
         if feed is not None:
             lo = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_min", 0)
             hi = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_max", 0)
@@ -1575,7 +1692,7 @@ class Controller:
     def _read_feed_ph(self, room):
         if not room.feed_ph_sensor:
             return None
-        ph = self._read_sensor(room.feed_ph_sensor, lo=0, hi=14)
+        ph = self._read_sensor(room.feed_ph_sensor, "ph")
         if ph is not None:
             lo = self._num(f"number.crop_steering_{room.prefix}irrigation_ph_min", 0)
             hi = self._num(f"number.crop_steering_{room.prefix}irrigation_ph_max", 0)
@@ -1675,10 +1792,10 @@ class Controller:
     def _params(self, room, zone, ec_known=True):
         veg = self._veg(room, zone)
         sfx = "veg" if veg else "gen"
-        base = self._zone_num(room, zone, "p2_vwc_threshold", 45)
-        p1t = self._zone_num(room, zone, "p1_target_vwc", 60)
-        fc = self._zone_num(room, zone, "field_capacity", 70)
-        efloor = self._zone_num(room, zone, "p3_emergency_vwc_threshold", 40)
+        base = self._zone_num(room, zone, "p2_vwc_threshold", FALLBACK["p2_vwc_threshold"])
+        p1t = self._zone_num(room, zone, "p1_target_vwc", FALLBACK["p1_target_vwc"])
+        fc = self._zone_num(room, zone, "field_capacity", FALLBACK["field_capacity"])
+        efloor = self._zone_num(room, zone, "p3_emergency_vwc_threshold", FALLBACK["p3_emergency_vwc_threshold"])
         # EC-steer offset is shell-owned (decide() no longer nudges). Bake it into the
         # P2 rewater threshold, clamped to the same safe band the engine used: never
         # below the emergency-floor band, never above the ramp ceiling.
@@ -1688,44 +1805,47 @@ class Controller:
         raw = ZoneParams(
             p1_target=p1t,
             p2_threshold=p2_thr,
-            p2_shot_size=self._zone_num(room, zone, "p2_shot_size", 5),
-            p1_initial=self._zone_num(room, zone, "p1_initial_shot_size", 2),
-            p1_incr=self._zone_num(room, zone, "p1_shot_size_increment", 0.5),
-            p1_max_shots=int(self._zone_num(room, zone, "p1_maximum_shots", 12)),
-            p1_min_shots=int(self._zone_num(room, zone, "p1_minimum_shots", 0)),
-            p1_time_between_min=self._zone_num(room, zone, "p1_time_between_shots", 15),
+            p2_shot_size=self._zone_num(room, zone, "p2_shot_size", FALLBACK["p2_shot_size"]),
+            p1_initial=self._zone_num(room, zone, "p1_initial_shot_size", FALLBACK["p1_initial_shot_size"]),
+            p1_incr=self._zone_num(room, zone, "p1_shot_size_increment", FALLBACK["p1_shot_size_increment"]),
+            p1_max_shots=int(self._zone_num(room, zone, "p1_maximum_shots", FALLBACK["p1_maximum_shots"])),
+            p1_min_shots=int(self._zone_num(room, zone, "p1_minimum_shots", FALLBACK["p1_minimum_shots"])),
+            p1_time_between_min=self._zone_num(room, zone, "p1_time_between_shots", FALLBACK["p1_time_between_shots"]),
             dryback_target=self._zone_num(
                 room,
                 zone,
                 f"{'vegetative' if veg else 'generative'}_dryback_target",
-                20,
+                FALLBACK[f"{'vegetative' if veg else 'generative'}_dryback_target"],
             ),
-            p0_max_wait_min=self._zone_num(room, zone, "p0_maximum_wait_time", 45),
-            ec_target_p0=self._zone_num(room, zone, f"ec_target_{sfx}_p0", 4),
-            ec_target_p1=self._zone_num(room, zone, f"ec_target_{sfx}_p1", 5),
-            ec_target_p2=self._zone_num(room, zone, f"ec_target_{sfx}_p2", 6),
+            p0_max_wait_min=self._zone_num(room, zone, "p0_maximum_wait_time", FALLBACK["p0_maximum_wait_time"]),
+            ec_target_p0=self._zone_num(room, zone, f"ec_target_{sfx}_p0", FALLBACK[f"ec_target_{sfx}_p0"]),
+            ec_target_p1=self._zone_num(room, zone, f"ec_target_{sfx}_p1", FALLBACK[f"ec_target_{sfx}_p1"]),
+            ec_target_p2=self._zone_num(room, zone, f"ec_target_{sfx}_p2", FALLBACK[f"ec_target_{sfx}_p2"]),
             p3_emergency_floor=efloor,
-            p3_emergency_shot=self._zone_num(room, zone, "p3_emergency_shot_size", 2),
+            p3_emergency_shot=self._zone_num(room, zone, "p3_emergency_shot_size", FALLBACK["p3_emergency_shot_size"]),
+            p3_time_between_min=self._zone_num(
+                room, zone, "p3_time_between_shots", FALLBACK["p3_time_between_shots"], optional=True
+            ),
             # Fallback used ONLY when a zone has no readable max_daily_volume entity — e.g. a zone the
             # engine detected from its VWC sensor but the integration never built a cap entity for
             # (num_zones < detected zones). Must fail LOW: the integration's own entity maxes at 200 L,
             # so the engine can never grant more daily water than the UI can express. Was 300 (above the
             # UI max) which let orphaned zones free-run to 300 L/day while wired zones honoured their cap.
-            max_daily_volume=self._zone_num(room, zone, "max_daily_volume", 150),
+            max_daily_volume=self._zone_num(room, zone, "max_daily_volume", FALLBACK["max_daily_volume"]),
             field_capacity=fc,
-            max_ec=self._zone_num(room, zone, "maximum_ec", 9),
+            max_ec=self._zone_num(room, zone, "maximum_ec", FALLBACK["maximum_ec"]),
             stacking_on=self._on(
                 f"switch.crop_steering_{room.prefix}ec_stacking_enabled", False
             ),
-            watchdog_hours=self._zone_num(room, zone, "watchdog_hours", 3),
+            watchdog_hours=self._zone_num(room, zone, "watchdog_hours", FALLBACK["watchdog_hours"]),
             min_daily_volume=self._num(
                 f"input_number.crop_steering_{room.prefix}zone_{zone}_min_daily_ml_per_plant",
                 0.0,
             )
-            * self._zone_num(room, zone, "plant_count", 0)
+            * self._zone_num(room, zone, "plant_count", FALLBACK["plant_count"])
             / 1000.0,  # mL/plant x plants -> zone-L floor (0 if either unset)
             drown_ceiling=self._zone_num(
-                room, zone, "min_floor_drown_ceiling", 90, optional=True
+                room, zone, "min_floor_drown_ceiling", FALLBACK["min_floor_drown_ceiling"], optional=True
             ),  # hard anti-drown VWC cap on the floor (engine-only knob — no integration entity)
         )
         p, warns = validate_params(raw)
@@ -1747,14 +1867,10 @@ class Controller:
     def _snapshot(self, room, zone, now, lights_on, lights_just_on):
         st = room.state[zone]
         vwc = self._read_sensor(
-            self._fused_id(room.prefix, "vwc", zone, room.zones[zone].get("vwc")),
-            lo=0,
-            hi=100,
+            self._fused_id(room.prefix, "vwc", zone, room.zones[zone].get("vwc")), "vwc"
         )
         ec = self._read_sensor(
-            self._fused_id(room.prefix, "ec", zone, room.zones[zone].get("ec")),
-            lo=0,
-            hi=20,
+            self._fused_id(room.prefix, "ec", zone, room.zones[zone].get("ec")), "ec"
         )
         if vwc is None:
             return None, self._params(room, zone)
@@ -1934,7 +2050,7 @@ class Controller:
         if writes:
             current = {
                 "p1_target_vwc": p.p1_target, "field_capacity": p.field_capacity,
-                "p2_vwc_threshold": self._zone_num(room, zone, "p2_vwc_threshold", 45, optional=True),
+                "p2_vwc_threshold": self._zone_num(room, zone, "p2_vwc_threshold", FALLBACK["p2_vwc_threshold"], optional=True),
                 "p3_emergency_vwc_threshold": p.p3_emergency_floor, "p2_shot_size": p.p2_shot_size,
             }
             h = now.hour + now.minute / 60.0
@@ -2306,6 +2422,21 @@ class Controller:
                 room=room,
             )
             return plumbing
+        undrivable = self._undrivable(room, zone)
+        if undrivable:
+            names = ", ".join(undrivable)
+            self._alert(
+                f"actuator_{room.slug}_z{zone}",
+                "CS-313",
+                "a valve or pump the controller can't switch, not watering",
+                "This zone's valve, or the room's pump or main line, is a kind of device the controller "
+                "has no way to open and close, so it is never sent a command and the zone is not "
+                "watered. Map a switch, an input_boolean or a valve in its place in Rooms & setup."
+                f"\n\nCan't be switched: {names}",
+                room=room,
+                zone=zone,
+            )
+            return f"{names} can't be switched (a zone valve, main line or pump must be a switch, input_boolean or valve)"
         if not self._on(room.enable_flag, False):
             return "f2-control disabled (kill switch off)"
         retired = getattr(room, "_retired_off", None)
@@ -2380,7 +2511,7 @@ class Controller:
         # closed, and latched a hold that stopped the room for 7 hours. Nothing is opened until the
         # whole feed path reads again, and nothing latches.
         offline = [e for e in (hw.get("pump"), hw.get("mainline"), hw["valves"].get(zone))
-                   if e and str(ha_get(e)[0]).lower() not in ("on", "off")]
+                   if e and str(hw_get(e)[0]).lower() not in ("on", "off")]
         if offline:
             return f"{', '.join(offline)} offline (reads neither on nor off)"
         return None
@@ -2648,7 +2779,7 @@ class Controller:
         BACKUP_CLEAR_MIN, then the card goes."""
         valve = room.hw["valves"].get(zone)
         last = room.__dict__.setdefault("_last_water", {})
-        if valve and ha_get(valve)[0] == "on":
+        if valve and hw_get(valve)[0] == "on":
             last[zone] = now
         shot = room.state[zone].get("last_shot")
         wet = max((t for t in (last.get(zone), shot if isinstance(shot, datetime) else None) if t), default=None)
@@ -2696,15 +2827,11 @@ class Controller:
         if not entity or (checked is not None and now - checked < timedelta(minutes=SUMP_CHECK_MIN)):
             return
         room._sump_checked = now
-        rows = ha_history(entity, datetime.now(timezone.utc) - timedelta(hours=self.sump_silent_h))
+        rows = self._device_history(
+            entity, "power", datetime.now(timezone.utc) - timedelta(hours=self.sump_silent_h))
         if rows is None:
             return
-        ran = False
-        for state, _changed in rows:
-            try:
-                ran = ran or float(state) > SUMP_RUN_W
-            except (TypeError, ValueError):
-                continue
+        ran = any(watts > SUMP_RUN_W for watts, _changed in rows)
         key = f"sump_{room.slug}"
         if ran:
             if key in self._alerted:
@@ -2884,20 +3011,35 @@ class Controller:
         """One entity's state for Jev's context (the room's flower start date)."""
         return ha_get(entity)[0]
 
-    def _unreadable(self, entity, lo=0.0, hi=100.0, max_age_min=20):
+    def _unreadable(self, entity, max_age_min=20):
         """Why `_read_sensor` found no usable moisture reading at `entity`, as (code, sentence).
         The same tests in the same order, on one more read of the entity."""
-        v, _attrs, lu = ha_get(entity)
+        lo, hi = UNITS["vwc"]["plausible"]
+        value, v, unit, lu, taken, attrs = self._device(entity, "vwc")
         if v is None:
             return "CS-102", "This zone's moisture sensor can't be found in Home Assistant, so the controller has no reading to steer by."
+        # The integration's zone reading names the probes it set aside for their unit (unit_set_aside).
+        aside = (attrs or {}).get("unit_set_aside")
+        if v in ("unknown", "unavailable", "") and isinstance(aside, dict) and aside:
+            probes = ", ".join(f"{probe} (in '{unit or 'no unit'}')" for probe, unit in aside.items())
+            return "CS-503", (
+                f"This zone's moisture probe {probes} reports in a unit the controller can't take as a moisture "
+                "percentage, so the probe is set aside and the zone has no reading to steer by."
+            )
         if v in ("unknown", "unavailable", ""):
             return "CS-102", f"This zone's moisture sensor reads '{v or 'empty'}', so the controller has no reading to steer by."
         try:
-            f = float(v)
+            float(v)
         except (TypeError, ValueError):
             return "CS-102", f"This zone's moisture sensor reads '{v}', which isn't a number, so the controller has no reading to steer by."
-        if not math.isfinite(f) or f < lo or f > hi:
+        if taken == "refused" or (taken == "implausible" and str(unit or "").strip()):
+            return "CS-503", (
+                f"This zone's moisture sensor reads {v} in '{unit}', which the controller can't take as a "
+                "moisture percentage, so it sets the probe aside."
+            )
+        if value is None or value < lo or value > hi:
             return "CS-103", f"This zone's moisture sensor reads {v}, which can't be a moisture reading ({lo:g}–{hi:g}%), so the controller ignores it."
+        f = value
         try:
             ts = datetime.fromisoformat(str(lu).replace("Z", "+00:00"))
             age_min = (datetime.now(timezone.utc) - ts).total_seconds() / 60.0
@@ -3031,6 +3173,14 @@ class Controller:
         }
 
     @staticmethod
+    def _undrivable(room, zone):
+        """This zone's valve and the room's main line and pump that have no row in ACTUATORS. Setup refuses
+        them; one mapped by hand holds its zone (CS-313) and is never sent a command."""
+        hw = room.hw
+        return [e for e in (hw.get("pump"), hw.get("mainline"), hw["valves"].get(zone))
+                if e and e.split(".", 1)[0] not in ACTUATORS]
+
+    @staticmethod
     def _fault_record(fault, fallback_entities=()):
         entities = fault.get("entities") if isinstance(fault, dict) else None
         return {
@@ -3118,7 +3268,7 @@ class Controller:
                 continue
             for affected_room in affected:
                 entities.update(self._hardware_entities(affected_room))
-            if not entities or not all(ha_get(e)[0] == "off" for e in entities):
+            if not entities or not all(hw_get(e)[0] == "off" for e in entities):
                 continue
             room.hardware_fault = None
             # an interrupted shot's record is settled too: every switch it could name reads OFF
@@ -3184,7 +3334,7 @@ class Controller:
         zone = rec["zone"]
         tag = f"[{room.slug}] Z{zone} interrupted shot (started {rec['started']})"
         order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
-        reads = {e: ha_get(e) for e in order}
+        reads = {e: hw_get(e) for e in order}
         if all(read[0] == "off" for read in reads.values()):
             self._clear_inflight(room, f"{tag}: its valve/main line/pump read OFF - record closed")
             return
@@ -3323,7 +3473,7 @@ class Controller:
             for valve in other.hw.get("valves", {}).values():
                 if not valve or valve == rec.get("valve"):
                     continue
-                v = _read(valve, deadline)[0]
+                v = _read(valve, deadline, hw_get)[0]
                 if v == "on":
                     return True
                 unread = unread or (deadline is not None and v is None)
@@ -3378,7 +3528,7 @@ class Controller:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     break
-                state = ha_get(entity, timeout=min(step, remaining))[0]
+                state = hw_get(entity, timeout=min(step, remaining))[0]
                 if entity != valve:
                     ended = str(state).lower() in ON_STATES
                 else:
@@ -3411,7 +3561,7 @@ class Controller:
         interruption was seen.
         """
         valve, mainline, pump = room.hw["valves"].get(zone), room.hw.get("mainline"), room.hw.get("pump")
-        reads = {e: ha_get(e) for e in (valve, mainline, pump) if e}
+        reads = {e: hw_get(e) for e in (valve, mainline, pump) if e}
         close = [e for e in (valve, mainline) if e and reads[e][0] != "off"]
         left = []
         if pump and reads[pump][0] != "off":
@@ -3460,7 +3610,7 @@ class Controller:
             while True:
                 if deadline is not None and deadline.timeout(8) is None:
                     return False  # no read-back fits in what is left of the stop
-                if all(_read(ent, deadline)[0] == want for ent in entities):
+                if all(_read(ent, deadline, hw_get)[0] == want for ent in entities):
                     return True
                 if time.monotonic() >= end:
                     return False
@@ -3477,7 +3627,7 @@ class Controller:
         # read back for 10 s more: 16 s in all, still inside the minute's loop for a genuinely
         # stuck-open valve.
         for ent in entities:
-            if _read(ent, deadline)[0] != "off":
+            if _read(ent, deadline, hw_get)[0] != "off":
                 _switch_off(ent, deadline)
         return settled(CONFIRM_RETRY_S, CONFIRM_POLL_S)
 
@@ -3490,6 +3640,10 @@ class Controller:
         plumbing = plumbing_hold(room.hw)
         if plumbing:  # never open a valve on a room whose declared pump is not there to run
             log(f"[{room.slug}] Z{zone} shot held: {plumbing}")
+            return
+        undrivable = self._undrivable(room, zone)
+        if undrivable:  # never sent a command (_blocked raises CS-313 for it)
+            log(f"[{room.slug}] Z{zone} shot held: {', '.join(undrivable)} can't be switched")
             return
         # A shot a plan hold never stops (PLAN_HOLD_EXEMPT) does not wait on the plan here either.
         strategy_hold = None if plan_exempt else self._strategy_preflight(room, zone, datetime.now())
@@ -3528,8 +3682,8 @@ class Controller:
             # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
             # Pump and mainline are optional (a one-switch tent has neither): each is sequenced when
             # mapped and skipped, with its lead time, when not. The valve is always required.
-            if pump and not ha_call("switch", "turn_on", entity_id=pump):
-                ha_call("switch", "turn_off", entity_id=pump)  # it may be on all the same: off before the alert
+            if pump and not hw_call(pump, True):
+                hw_call(pump, False)  # it may be on all the same: off before the alert
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "CS-302",
@@ -3543,9 +3697,9 @@ class Controller:
                 return
             if pump:
                 time.sleep(2)
-            if mainline and not ha_call("switch", "turn_on", entity_id=mainline):
+            if mainline and not hw_call(mainline, True):
                 if pump:
-                    ha_call("switch", "turn_off", entity_id=pump)
+                    hw_call(pump, False)
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "CS-303",
@@ -3561,10 +3715,10 @@ class Controller:
                 time.sleep(1)
             valve_started = time.monotonic()
             valve_opened = datetime.now(timezone.utc)  # on Home Assistant's clock too: see _close_cut_short
-            if not ha_call("switch", "turn_on", entity_id=valve):
+            if not hw_call(valve, True):
                 for upstream in (mainline, pump):
                     if upstream:
-                        ha_call("switch", "turn_off", entity_id=upstream)
+                        hw_call(upstream, False)
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "CS-304",
@@ -3596,7 +3750,7 @@ class Controller:
             # pump-relay-default-off / independent watchdog) can. So check EVERY turn_off + the
             # read-back and ALERT loudly on any non-close (the old code ignored turn_off failures
             # and a dead-HA read-back masked a stuck-open valve as "closed" — silent danger).
-            close_ok = ha_call("switch", "turn_off", entity_id=valve)
+            close_ok = hw_call(valve, False)
             # Delivery is estimated, not flow-metered. Include the acknowledgement
             # interval conservatively because the exact physical close time is unknown.
             elapsed = max(elapsed, time.monotonic() - valve_started)
@@ -3604,12 +3758,12 @@ class Controller:
             if upstream:
                 time.sleep(1)
             for ent in upstream:
-                close_ok = ha_call("switch", "turn_off", entity_id=ent) and close_ok
+                close_ok = hw_call(ent, False) and close_ok
             # Only a definitive OFF is safe, including pump/mainline read-back.
             closed = self._confirm_switches((valve, *upstream), "off")
             if not close_ok or not closed:
                 for ent in reversed(upstream):
-                    ha_call("switch", "turn_off", entity_id=ent)
+                    hw_call(ent, False)
                 self._latch_hardware_fault(
                     room, f"zone {zone} valve/pump/mainline close not confirmed"
                 )
@@ -3666,7 +3820,7 @@ class Controller:
                     close_ok = True
                     for ent in closing:
                         close_ok = (
-                            ha_call("switch", "turn_off", entity_id=ent) and close_ok
+                            hw_call(ent, False) and close_ok
                         )
                     # Read back as patiently as after a normal close: a plug that reports OFF 1.6 s
                     # late is not a stuck pump (the 15 Sep false hold, on this very path).
@@ -3710,7 +3864,7 @@ class Controller:
         rec = room.shot_inflight
         order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
         # Each read keeps time for its own switch's off and those of the switches read before it.
-        reads = {e: _read(e, stop and stop.keeping(i)) for i, e in enumerate(order, 1)}
+        reads = {e: _read(e, stop and stop.keeping(i), hw_get) for i, e in enumerate(order, 1)}
         if all(read[0] == "off" for read in reads.values()):
             room.shot_inflight = None
             return
@@ -3812,7 +3966,7 @@ class Controller:
         (the machine-gun: per-plant 6 L / zone flow -> ~36x too short, VWC never rises).
         """
         per_plant = self._zone_num(room, zone, "substrate_volume", self.substrate_l)
-        pc = self._zone_num(room, zone, "plant_count", 0)
+        pc = self._zone_num(room, zone, "plant_count", FALLBACK["plant_count"])
         return per_plant * pc if pc > 0 else per_plant
 
     def _zone_flow_lps(self, room, zone):
@@ -3832,8 +3986,8 @@ class Controller:
                     if not math.isfinite(value) or value <= 0:
                         return 0.0
                     break
-        pc = self._zone_num(room, zone, "plant_count", 0) or 1
-        dpp = self._zone_num(room, zone, "drippers_per_plant", 1)
+        pc = self._zone_num(room, zone, "plant_count", FALLBACK["plant_count"]) or 1
+        dpp = self._zone_num(room, zone, "drippers_per_plant", FALLBACK["drippers_per_plant"])
         fr = self._zone_num(
             room,
             zone,
@@ -4295,7 +4449,7 @@ class Controller:
             # The EC steer runs on ec_smooth, which only settled readings feed (see _settled_ec).
             if (snap.ec is not None and snap.ec_smooth is not None and p.stacking_on
                     and st["phase"] == "P2" and p.ec_target_p2 > 0):
-                base = self._zone_num(room, zone, "p2_vwc_threshold", 45)
+                base = self._zone_num(room, zone, "p2_vwc_threshold", FALLBACK["p2_vwc_threshold"])
                 les = st.get("last_ec_steer")
                 # Jev's Salt judge chooses how: steer (as always), hold the offset, or decay it toward 0.
                 ec_mode = getattr(jev_dirs.get("ec_mode"), "value", "steer")
@@ -4711,7 +4865,7 @@ class Controller:
                 fc = f"{st['peak']:.0f}" if st.get("peak") else "—"
                 water = f"{st['daily_vol']:.1f}L day"
                 if per_plant:  # each plant's share; a zone without a plant count stays in litres
-                    plants = self._zone_num(room, z, "plant_count", 0)
+                    plants = self._zone_num(room, z, "plant_count", FALLBACK["plant_count"])
                     if plants >= 1 and float(plants).is_integer():
                         ml = st["daily_vol"] * 1000 / plants
                         water = f"{ml:.0f} mL/plant day" if ml < 1000 else f"{ml / 1000:.1f} L/plant day"

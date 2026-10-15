@@ -164,6 +164,7 @@ class Rig:
             now=self.clock.now,
             history=self.history,
             respond=self.respond,
+            actuators=controller.ACTUATORS,
         )
 
     def set(self, entity, state):
