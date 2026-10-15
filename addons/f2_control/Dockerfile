@@ -22,7 +22,7 @@ RUN PIP_CONFIG_FILE=/dev/null pip3 install --no-cache-dir --require-hashes -r /t
 
 # The Anthropic SDK for the optional AI assistant, with its whole closure, exact and hashed
 # (requirements-brain.txt, compiled against requirements.txt so shared packages keep one pin).
-# Nothing imports it yet. armv7 skips it by name: some of its compiled dependencies publish no
+# jev/client.py imports it when it is there. armv7 skips it by name: some of its compiled dependencies publish no
 # 32-bit ARM wheel, so trying would make the image's contents depend on the build. An armv7 box
 # runs rules. The Supervisor passes BUILD_ARCH; a plain docker build leaves it unset and installs.
 ARG BUILD_ARCH
