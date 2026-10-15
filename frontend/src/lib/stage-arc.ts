@@ -1,9 +1,11 @@
 import { athenaDryback } from "./day-chart";
+import generated from "./generated/arcs.json";
 
-/** The grow by stage, as the controller's Jev steers it: the owner's stage arc (the slab guide,
- * chosen 26 Sep 2026; addons/f2_control/f2_control/jev/doctrine.py STAGE_ARC and stage_intent),
- * with Athena's relative overnight dryback for each stage beside it. Day 1 is the first day of
- * 12/12. Pure, so the arc and today's place in it are tested on their own. */
+/** The grow by stage, as the controller steers it: the doctrine pack's default stage arc, read from
+ * frontend/src/lib/generated/arcs.json (written by doctrine/tools/build_doctrine.py from the same rows
+ * the controller's jev/doctrine.py stage_rows reads), with Athena's relative overnight dryback for each
+ * stage beside it. Day 1 is the first day of 12/12. Pure, so the arc and today's place in it are tested
+ * on their own. */
 
 export type StageSteering = "vegetative" | "generative" | "ripening";
 export interface Stage {
@@ -24,70 +26,52 @@ export interface Stage {
   moveOn: string;
 }
 
+/** A row of the generated arc: flower days are a day pair, "last N days" for the finish, or null
+ * for the veg row. */
+interface ArcRow {
+  stage: string;
+  flower_days: [number, number] | string | null;
+  steering: StageSteering;
+  dryback_points: [number, number];
+  pore_ec: [number, number];
+  runoff_pct: [number, number];
+  move_on_when: string;
+}
+const pack = generated as unknown as { default_arc: string; arcs: Record<string, { stages: ArcRow[] }> };
+/** The default arc's rows, as the pack has them. */
+export const ARC_ROWS: readonly ArcRow[] = pack.arcs[pack.default_arc].stages;
+
 /** The slab guide's nominal flower, and its finish: "normally the final 10-14 days". */
 export const NOMINAL_FLOWER_DAYS = 56;
 export const FINISH_DAYS = 14;
 
-const SETTING_LAST = 21;
-const BULK_FIRST = 22;
-
-/** The arc for a flower of `days` days. A longer cultivar stays in the bulk until its last
- * FINISH_DAYS, as the controller does: the guide moves on when ripening signals dominate, not on a
- * date. */
-export function stageArc(days = NOMINAL_FLOWER_DAYS): Stage[] {
+/** The arc for a flower of `days` days. A longer cultivar stays in the stage before the finish until
+ * its last FINISH_DAYS, as the controller does: the guide moves on when ripening signals dominate,
+ * not on a date. */
+export function stageArc(days = NOMINAL_FLOWER_DAYS, rows: readonly ArcRow[] = ARC_ROWS): Stage[] {
   const length = Number.isInteger(days) && days >= 1 ? days : NOMINAL_FLOWER_DAYS;
-  const finish = Math.max(length - FINISH_DAYS + 1, BULK_FIRST);
-  const stage = (
-    name: string,
-    first: number,
-    last: number,
-    steering: StageSteering,
-    poreEc: [number, number],
-    drybackPoints: [number, number],
-    runoff: [number, number],
-    moveOn: string,
-  ): Stage => ({
-    name,
+  const flower = rows.filter((row) => row.flower_days !== null);
+  const middle = flower.slice(0, -1);
+  const pair = (row: ArcRow) => row.flower_days as [number, number];
+  const finish = Math.max(length - FINISH_DAYS + 1, middle.length ? pair(middle.at(-1)!)[0] : 1);
+  const stage = (row: ArcRow, first: number, last: number): Stage => ({
+    name: row.stage,
     first,
     last,
-    steering,
-    poreEc,
-    drybackPoints,
-    athena: athenaDryback(name)!,
-    runoff,
-    moveOn,
+    steering: row.steering,
+    poreEc: row.pore_ec,
+    drybackPoints: row.dryback_points,
+    athena: athenaDryback(row.stage)!,
+    runoff: row.runoff_pct,
+    moveOn: row.move_on_when,
   });
   return [
-    stage(
-      "flower setting",
-      1,
-      Math.min(SETTING_LAST, length),
-      "generative",
-      [5, 10],
-      [15, 25],
-      [1, 7],
-      "vertical stretch has clearly slowed or stopped",
+    ...middle.map((row, index) =>
+      index === middle.length - 1
+        ? stage(row, pair(row)[0], finish - 1)
+        : stage(row, pair(row)[0], Math.min(pair(row)[1], length)),
     ),
-    stage(
-      "flower bulk",
-      BULK_FIRST,
-      finish - 1,
-      "vegetative",
-      [3.5, 6],
-      [10, 15],
-      [8, 16],
-      "flower expansion slows and ripening signals dominate",
-    ),
-    stage(
-      "finish",
-      finish,
-      length,
-      "ripening",
-      [3, 4],
-      [20, 25],
-      [1, 7],
-      "cultivar-specific maturity (trichomes on mid-cola calyxes)",
-    ),
+    stage(flower.at(-1)!, finish, length),
   ].filter((item) => item.first <= item.last);
 }
 
