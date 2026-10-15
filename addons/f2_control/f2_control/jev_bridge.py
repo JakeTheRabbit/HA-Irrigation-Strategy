@@ -319,6 +319,28 @@ def zone_context(c, room, zone, snap, p, now, lights_on):
     )
 
 
+def room_health(c, room, now):
+    """The room's data health (gap SF-26), read once a pass: ("ok", None), else ("impaired", words) when an enabled
+    zone's moisture reading is stale or missing, or ("critical", words) when no enabled zone has a fresh one. On the
+    Claude route anything but ok asks nothing (stale data fails closed) and the brain panel says why."""
+    held = room.__dict__.get("_brain_health")
+    if held and held[0] == now:
+        return held[1]
+    zones = [z for z in room.zones if c._on(f"switch.crop_steering_{room.prefix}zone_{z}_enabled", True)]
+    stale = [z for z in zones
+             if c._read_sensor(c._fused_id(room.prefix, "vwc", z, room.zones[z].get("vwc")), lo=0, hi=100) is None]
+    if not stale:
+        out = ("ok", None)
+    else:
+        which = ("no zone has a" if len(stale) == len(zones) else
+                 ", ".join(c._zone_title(room, z) for z in stale) + (" has no" if len(stale) == 1 else " have no"))
+        out = ("critical" if len(stale) == len(zones) else "impaired",
+               f"Readings too old to judge: {which} fresh moisture reading. The AI stays out until the probes "
+               "report again; the rules keep watering.")
+    room._brain_health = (now, out)
+    return out
+
+
 def tick(c, room, zone, snap, p, now, lights_on):
     """Record this pass's reading, run the judges, raise their alerts, apply a setpoint move.
     -> {kind: Directive} for the controller's pass (advance, distrust, ec_mode)."""
@@ -329,6 +351,8 @@ def tick(c, room, zone, snap, p, now, lights_on):
     if haiku(c):
         if not c._on(room.enable_flag, False):
             return {}  # the kill switch is off: the engine decides alone, and nothing is asked (it costs money)
+        if room_health(c, room, now)[0] != "ok":
+            return {}  # stale or impaired readings: the engine decides alone, and nothing is asked (fail-closed)
         c.jev.prompt.use(getattr(r, "substrate", "generic") for r in getattr(c, "rooms", [room]))
     ctx = zone_context(c, room, zone, snap, p, now, lights_on)
     out = {}
@@ -847,6 +871,9 @@ def panel(c, room, now):
         words = f"Spent US${snap['cost_usd']:.2f} of US${meter.budget:.2f}. Rules until the next lights-on."
     else:
         words = _STATE_WORDS.get(state, status.words)
+    health, health_words = room_health(c, room, now) if haiku(c) else ("ok", None)
+    if health != "ok" and state in ("acting", "dry_run"):
+        state, words = "stale_data", health_words
     acting = can_act(c)
     if acting:
         brain._fallback_since = None
@@ -858,8 +885,10 @@ def panel(c, room, now):
            "deprecated_route": status.deprecated_route, "fallback_since": getattr(brain, "_fallback_since", None),
            "stage_arc": {"id": getattr(brain, "arc", DEFAULT_ARC), "in_force": bool(getattr(brain, "arc_rows", STAGE_ROWS)),
                          "words": getattr(brain, "arc_note", None)},
-           "judges_acting": [j for j in built if j in ACTING_JUDGES] if acting else [],
+           "judges_acting": [j for j in built if j in ACTING_JUDGES and health == "ok"] if acting else [],
            "judges_advising": [j for j in built if j not in ACTING_JUDGES] + (["alerts"] if brain.triage else [])}
+    if haiku(c):
+        out["room_health"] = health
     entries = brain.journal.recent(room.slug, 1) if getattr(brain, "journal", None) is not None else []
     if entries:
         e = entries[0]
