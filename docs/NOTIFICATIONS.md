@@ -64,9 +64,12 @@ docs/error-codes.json is in no kind at all.
       "user_id": "7f21…",                         // the Home Assistant user the phone belongs to, when known
       "kinds": ["stock", "dosing"],               // ids from the table above
       "rooms": [],                                // room prefixes ("" = the default room, "f1_"); empty = every room
-      "urgent_high_priority": true                // emergencies go out as high-priority / time-sensitive pushes
+      "urgent_high_priority": true,               // emergencies go out as high-priority / time-sensitive pushes
+      "digest": false                             // true: what is not an emergency waits for the digest
     }
-  ]
+  ],
+  "digest_hours": 4,                              // a digest phone gets one push this often (1 to 24)
+  "mutes": {"f1_": "2026-10-15T08:00:00+00:00"}   // room prefix -> when its mute ends (UTC)
 }
 ```
 
@@ -77,12 +80,16 @@ phone it is. Other notify services (a group, Supernotify) can be added as rows b
 A save checks every row: `service` is `notify.<name>`, each service once, at most 20 rows; a phone added
 now must be a notify service Home Assistant has, while one saved before may be away (an app not registered
 again since a restart never blocks a save); `kinds` are ids from the table; `rooms` are room prefixes;
-`urgent_high_priority` is true when left out; `idle_hours` is 1 to 12. A row an administrator saves
+`urgent_high_priority` is true when left out; `idle_hours` is 1 to 12; `digest_hours` is a whole number of
+hours from 1 to 24; `mutes` maps a room prefix to an ISO time with its offset, at most 30 days ahead, kept in
+UTC, and one already past is dropped. A row sent without `digest`, or a save without `digest_hours` or
+`mutes` (a page from before them), keeps what is stored. A store saved before them loads with no digest,
+`digest_hours` 4 and nothing muted. A row an administrator saves
 without a `name` or a `user_id` takes them from the phone's mobile_app registration.
 
 `sensor.crop_steering_notify_config` is written by the integration with the first room that loads and
 removed with the last (it is not a registry entity): state the revision, attributes `recipients` (how many
-rows) and `idle_hours`. While the store can't be read it is `unavailable`, with `error`, and the
+rows), `idle_hours`, and `muted` (the `mutes`, only while there are any). While the store can't be read it is `unavailable`, with `error`, and the
 controller pushes as with no recipients; Home Assistant's log says so at start-up. A kind a row names that
 this version does not know (saved by a newer one, before a rollback) is dropped when the store is read,
 not the whole setup.
@@ -92,9 +99,9 @@ not the whole setup.
 | Service | Who | Data | Response |
 |---|---|---|---|
 | `crop_steering.notify_get` | any signed-in user | none | `{schema_version: 1, config, kinds[{id, name, detail, codes[], events[]}], phones[{service, name, user_id, user_name}], can_edit_all, user_id}` |
-| `crop_steering.notify_save` | admin: any row; a non-admin: only rows whose `user_id` is their own (they cannot add or remove rows) | `expected_revision, recipients, idle_hours?` | as `notify_get`, or `error` ("revision", "not allowed: …", a readable message) |
+| `crop_steering.notify_save` | admin: any row; a non-admin: only rows whose `user_id` is their own (they cannot add or remove rows) | `expected_revision, recipients, idle_hours?, digest_hours?, mutes?` | as `notify_get`, or `error` ("revision", "not allowed: …", a readable message) |
 | `crop_steering.notify_test` | admin, or the phone's own user | `service` | `{sent: true}` or `error` |
-| `crop_steering.notify` | admin (the controller) | `key, code?, event?, room?, zone?, title, message, urgent?` | `{sent_to[], error}` |
+| `crop_steering.notify` | admin (the controller) | `key, code?, event?, room?, zone?, title, message, urgent?` | `{sent_to[], error}`, with `muted: true` or `held[]` (below) |
 
 - `notify` works out the push's kinds from `code` (the catalog) or `event`, then sends to every recipient
   that ticks one of them and whose `rooms` is empty or includes `room`, once per service. A push about no
@@ -107,6 +114,15 @@ not the whole setup.
   Every push carries `data.tag = key`, so a repeat replaces the earlier one on the phone instead of piling up,
   and the link that opens the Crop Steering panel when it is tapped (`url` for iOS, `clickAction` for
   Android, both `/crop-steering`).
+- **A muted room** (`mutes`, until its time) gets no push but an emergency: a push for it that is not
+  `urgent` answers `{sent_to: [], error: null, muted: true}` (to nobody, on purpose). A push about no room in
+  particular is never muted.
+- **A digest.** A row with `digest` gets what is not `urgent` as one push, `digest_hours` after the first one it
+  holds (checked every minute): title "Crop Steering: 3 pushes held", and the held pushes' titles under
+  "Warnings", "For your information" (the info codes of docs/error-codes.json, `notify_catalog.INFO`) and
+  "Updates" (events), with `data.tag = "crop_steering_digest"`. A repeat of the same key replaces the one
+  waiting. The answer lists those rows in `held`. An emergency never waits. What waits is held in memory: a
+  restart of Home Assistant drops it (the cards stay).
 - A failed send to one phone never stops the others; failures are listed in the response and logged. A
   phone that has not answered in 8 s counts as failed.
 - With no recipients saved, or a store that can't be read, `notify` sends nothing and says why in `error`
@@ -124,7 +140,7 @@ not the whole setup.
   neither save nor test. `notify_get` and `notify_save` answer `error` too (null when all is well).
 - A non-administrator's save is matched to the stored rows by `service`, in any order. For a row that is
   not theirs, its kinds, rooms and high-priority flag must come back unchanged; for their own, only those
-  three change. They may not change `idle_hours`, which is the site's.
+  three and `digest` change. They may not change `idle_hours`, `digest_hours` or `mutes`, which are the site's.
 - `notify_test` sends at normal priority, with `data.tag = "crop_steering_test"`, and says what the phone's
   row ticks.
 - The integration's own Repairs cards (CS-601 to CS-608) go out through `notify` when a card is created,
@@ -144,6 +160,9 @@ not the whole setup.
     pushes to its `notify_service` option as it always has, so an install that never opens the page
     behaves exactly as before, and a push is never lost. With that option empty too, the controller's log
     says the push went to no phone.
+- A room muted in the sensor's `muted` pushes nothing but a critical code until its time, through
+  `crop_steering.notify` or to the `notify_service` option alike (the card is still raised). An integration
+  from before mutes publishes none.
 - Phase changes and Jev's setting changes are sent through `crop_steering.notify` only (never the fallback:
   they are not alerts).
 - CS-209 is raised by the controller like any alert (key `idle_<room>`), with its code written out.

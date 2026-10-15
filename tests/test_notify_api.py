@@ -154,6 +154,14 @@ def home_assistant(monkeypatch):
 
     translation.async_get_translations = async_get_translations
     monkeypatch.setitem(sys.modules, "homeassistant.helpers.translation", translation)
+    event = types.ModuleType("homeassistant.helpers.event")
+
+    def async_track_time_interval(hass, action, interval):
+        hass.intervals = getattr(hass, "intervals", []) + [(action, interval)]
+        return lambda: hass.intervals.remove((action, interval))
+
+    event.async_track_time_interval = async_track_time_interval
+    monkeypatch.setitem(sys.modules, "homeassistant.helpers.event", event)
 
 
 def rig(stored=None, **hass_options):
@@ -197,7 +205,13 @@ def test_a_site_with_no_store_answers_with_an_empty_setup_and_its_phones():
     hass, notifier = rig()
     answer = asyncio.run(notifier.response(ADMIN))
     assert answer["schema_version"] == 1 and answer["error"] is None
-    assert answer["config"] == {"revision": 0, "idle_hours": 3, "recipients": []}
+    assert answer["config"] == {
+        "revision": 0,
+        "idle_hours": 3,
+        "recipients": [],
+        "digest_hours": 4,
+        "mutes": {},
+    }
     assert answer["kinds"] == notify_catalog.serial()
     assert answer["phones"] == [
         {
@@ -244,6 +258,7 @@ def test_saving_moves_the_revision_and_a_stale_or_invalid_save_changes_nothing()
         "kinds": ["emergency", "stock"],
         "rooms": [],
         "urgent_high_priority": True,
+        "digest": False,
     }
     assert (group["name"], group["rooms"], group["user_id"]) == (
         "Everyone",

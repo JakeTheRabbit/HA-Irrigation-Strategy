@@ -36,6 +36,11 @@ def test_the_emergencies_are_exactly_the_critical_codes():
     assert set(catalog.EMERGENCY) == critical == set(_kind("emergency"))
 
 
+def test_the_info_codes_are_exactly_the_info_codes():
+    info = {code for code, entry in CODES.items() if entry["severity"] == "info"}
+    assert set(catalog.INFO) == info
+
+
 def test_the_table_is_the_contracts():
     assert catalog.KIND_IDS == (
         "emergency",

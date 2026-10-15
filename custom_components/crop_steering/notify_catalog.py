@@ -96,6 +96,8 @@ KINDS = (
 KIND_IDS = tuple(kind["id"] for kind in KINDS)
 EVENTS = {event: kind["id"] for kind in KINDS for event in kind["events"]}
 EMERGENCY = KINDS[0]["codes"]
+# Every code whose severity is info in docs/error-codes.json: a digest lists them apart from the warnings.
+INFO = _codes("CS-205 CS-305 CS-403 CS-501 CS-702 CS-705")
 
 # The integration's own Repairs cards (health.py, stock_api.py) by translation key, with the code each one
 # carries in its title (strings.json). tests/test_notify_catalog.py keeps the two in step.

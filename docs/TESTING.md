@@ -86,7 +86,8 @@ its config entry, every entity id, the ladder its controller moved, and beside i
 `/data/options.json` on Cloudflare and on TypeSafe (`options_3_11_1_jev_cf.json`,
 `options_3_11_1_jev_typesafe.json`), the `/data/state.json` with the learner and the hourly P2 check's
 working peak (`state_3_11_1_learn_jev.json`), the `/data/jev_usage.json` (`jev_usage_3_11_1.json`) and the
-dosing store (`dosing_3_11_1.json`). The `options_<version>_*.json` files with a `data` folder
+dosing store (`dosing_3_11_1.json`). `notify_3_11_1.json` is the site's notification store with two phones,
+in the shape 3.11.1 saves it, from before a digest or a muted room. The `options_<version>_*.json` files with a `data` folder
 (`data_3_0_0_ledger/`, `data_3_2_0/`, `data_3_3_0_typesafe/`, `data_3_0_0_quiet/`,
 `data_3_11_1_usage/`) are apps from 2.25.1 and the Jev line as each left `/data/options.json` and
 `/data`, recorded by running that version's own controller: they prove the brain starts on Cloudflare

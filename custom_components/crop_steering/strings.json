@@ -915,7 +915,7 @@
     },
     "notify_save": {
       "name": "Save notifications",
-      "description": "Save who gets which alerts: each phone's kinds of alert, rooms and high priority for emergencies, and after how many hours a room that has watered nothing is reported. An administrator may change every row; anyone else signed in may change only the kinds, rooms and high priority of their own phones. Automations save as an administrator does.",
+      "description": "Save who gets which alerts: each phone's kinds of alert, rooms, high priority for emergencies and digest, after how many hours a room that has watered nothing is reported, how often a digest goes out, and which rooms are muted. An administrator may change every row; anyone else signed in may change only the kinds, rooms, high priority and digest of their own phones. Automations save as an administrator does.",
       "fields": {
         "expected_revision": {
           "name": "Expected revision",
@@ -923,11 +923,19 @@
         },
         "recipients": {
           "name": "Recipients",
-          "description": "Every phone's row: service, name, user_id, kinds, rooms and urgent_high_priority."
+          "description": "Every phone's row: service, name, user_id, kinds, rooms, urgent_high_priority and digest (what is not an emergency waits for one push every few hours)."
         },
         "idle_hours": {
           "name": "Hours without watering",
           "description": "Report a room that is on, with its lights on, that has watered nothing for this many hours (1 to 12)."
+        },
+        "digest_hours": {
+          "name": "Hours between digests",
+          "description": "How often a phone that takes a digest gets one push listing what waited (1 to 24)."
+        },
+        "mutes": {
+          "name": "Muted rooms",
+          "description": "Room prefix to the time its mute ends (ISO, with its offset, at most 30 days ahead): nothing but an emergency is pushed for a muted room. Replaces every mute; leave it out to keep them."
         }
       }
     },
