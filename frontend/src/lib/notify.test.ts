@@ -70,10 +70,7 @@ const doc = (change: Partial<NotifyDocument> = {}): NotifyDocument => ({
   error: null,
   ...change,
 });
-const BEN = "notify.mobile_app_s23ultra";
-const CALLUM = "notify.mobile_app_callum_phone";
-const STEWART = "notify.mobile_app_stews_iphone";
-const SEAN = "notify.mobile_app_sean_iphone";
+const [PHONE_A, PHONE_B, PHONE_C, PHONE_D] = DEMO_PHONES.map((phone) => phone.service);
 
 describe("reading what notify_get returns", () => {
   it("reads the setup, the kinds, the phones and who is asking", () => {
@@ -246,7 +243,7 @@ describe("who may change a row, and what it is called", () => {
     expect(canEditRow({ can_edit_all: false, user_id: null }, nobody)).toBe(false);
   });
   it("names a row by its owner and device, or by its service when the site has no such phone", () => {
-    expect(rowLabel(recipient(BEN, []), DEMO_PHONES)).toEqual({
+    expect(rowLabel(recipient(PHONE_A, []), DEMO_PHONES)).toEqual({
       title: "Ben",
       subtitle: "S23Ultra",
       name: "Ben (S23Ultra)",
@@ -292,17 +289,17 @@ describe("who may change a row, and what it is called", () => {
 
 describe("the draft", () => {
   it("is the same setup whatever order the ticks were made and the rows listed in", () => {
-    const a = toDraft(config([recipient(BEN, ["stock", "dosing"], { rooms: ["room_b_", ""] })]));
-    const b = toDraft(config([recipient(BEN, ["dosing", "stock"], { rooms: ["", "room_b_"] })]));
+    const a = toDraft(config([recipient(PHONE_A, ["stock", "dosing"], { rooms: ["room_b_", ""] })]));
+    const b = toDraft(config([recipient(PHONE_A, ["dosing", "stock"], { rooms: ["", "room_b_"] })]));
     expect(sameDraft(a, b)).toBe(true);
     expect(sameDraft(a, { ...a, idle_hours: 4 })).toBe(false);
-    expect(sameDraft(a, updateRow(a, BEN, { urgent_high_priority: false }))).toBe(false);
+    expect(sameDraft(a, updateRow(a, PHONE_A, { urgent_high_priority: false }))).toBe(false);
     // A row removed and added again as it was is no change.
-    const two = toDraft(config([recipient(BEN, ["emergency"]), recipient(STEWART, ["emergency"])]));
+    const two = toDraft(config([recipient(PHONE_A, ["emergency"]), recipient(PHONE_C, ["emergency"])]));
     expect(sameDraft(two, { ...two, recipients: [...two.recipients].reverse() })).toBe(true);
     expect(sameDraft(two, { ...two, recipients: [two.recipients[0]] })).toBe(false);
     // A copy: editing the draft leaves the saved setup as it was.
-    const saved = config([recipient(BEN, ["stock"])]);
+    const saved = config([recipient(PHONE_A, ["stock"])]);
     toDraft(saved).recipients[0].kinds.push("dosing");
     expect(saved.recipients[0].kinds).toEqual(["stock"]);
   });
@@ -319,8 +316,8 @@ describe("the draft", () => {
     expect(toggleRoom([""], "")).toEqual([]);
   });
   it("adds a phone with Emergencies ticked for every room, from the site's phones or by name", () => {
-    expect(newRecipient(SEAN, DEMO_PHONES)).toEqual({
-      service: SEAN,
+    expect(newRecipient(PHONE_D, DEMO_PHONES)).toEqual({
+      service: PHONE_D,
       name: "Sean iPhone",
       user_id: "demo-user-sean",
       kinds: ["emergency"],
@@ -347,19 +344,19 @@ describe("the draft", () => {
     const draft = (recipients: NotifyRecipient[]) => toDraft(config(recipients));
     expect(roomsWithoutEmergencies(toDraft(DEMO_NOTIFY), ROOMS)).toEqual([]);
     expect(
-      roomsWithoutEmergencies(draft([recipient(BEN, ["emergency"], { rooms: [""] })]), ROOMS),
+      roomsWithoutEmergencies(draft([recipient(PHONE_A, ["emergency"], { rooms: [""] })]), ROOMS),
     ).toEqual([ROOMS[1]]);
     expect(
       roomsWithoutEmergencies(
         draft([
-          recipient(BEN, ["stock"]),
-          recipient(CALLUM, ["emergency"], { rooms: ["room_b_"] }),
-          recipient(STEWART, ["emergency"], { rooms: [""] }),
+          recipient(PHONE_A, ["stock"]),
+          recipient(PHONE_B, ["emergency"], { rooms: ["room_b_"] }),
+          recipient(PHONE_C, ["emergency"], { rooms: [""] }),
         ]),
         ROOMS,
       ),
     ).toEqual([]);
-    expect(roomsWithoutEmergencies(draft([recipient(BEN, ["stock"])]), ROOMS)).toEqual(ROOMS);
+    expect(roomsWithoutEmergencies(draft([recipient(PHONE_A, ["stock"])]), ROOMS)).toEqual(ROOMS);
   });
   it("checks the threshold as the integration does", () => {
     const draft = toDraft(DEMO_NOTIFY);
@@ -375,7 +372,7 @@ describe("saving", () => {
   it("sends every row against the revision it was read at, the threshold only as an administrator", () => {
     const draft = toDraft(
       config([
-        recipient(CALLUM, ["dosing", "phases", "stock", "unknown"], {
+        recipient(PHONE_B, ["dosing", "phases", "stock", "unknown"], {
           user_id: "demo-user-callum",
           rooms: ["room_b_"],
         }),
@@ -387,7 +384,7 @@ describe("saving", () => {
       expected_revision: 3,
       recipients: [
         {
-          service: CALLUM,
+          service: PHONE_B,
           name: "callum_phone",
           user_id: "demo-user-callum",
           kinds: ["phases", "stock", "dosing", "unknown"],
@@ -409,27 +406,27 @@ describe("saving", () => {
   });
   it("carries a draft onto a setup saved elsewhere meanwhile, field by field", () => {
     const before = config([
-      recipient(BEN, ["emergency", "stock"]),
-      recipient(CALLUM, ["hardware"]),
-      recipient(STEWART, ["emergency"]),
+      recipient(PHONE_A, ["emergency", "stock"]),
+      recipient(PHONE_B, ["hardware"]),
+      recipient(PHONE_C, ["emergency"]),
       recipient("notify.gone", ["stock"]),
     ]);
     // This draft: Callum ticks phases, Stewart is removed, Sean is added, the threshold is 5.
     const draft: ReturnType<typeof toDraft> = {
       idle_hours: 5,
       recipients: [
-        recipient(BEN, ["emergency", "stock"]),
-        recipient(CALLUM, ["hardware", "phases"]),
+        recipient(PHONE_A, ["emergency", "stock"]),
+        recipient(PHONE_B, ["hardware", "phases"]),
         recipient("notify.gone", ["stock", "dosing"]),
-        recipient(SEAN, ["emergency"]),
+        recipient(PHONE_D, ["emergency"]),
       ],
     };
     // Elsewhere: Ben's rooms and high priority, Callum's rooms, a new family group; "gone" removed.
     const after = config(
       [
-        recipient(BEN, ["emergency", "stock"], { rooms: ["room_b_"], urgent_high_priority: false }),
-        recipient(CALLUM, ["hardware"], { rooms: [""] }),
-        recipient(STEWART, ["emergency"]),
+        recipient(PHONE_A, ["emergency", "stock"], { rooms: ["room_b_"], urgent_high_priority: false }),
+        recipient(PHONE_B, ["hardware"], { rooms: [""] }),
+        recipient(PHONE_C, ["emergency"]),
         recipient("notify.family", ["emergency"]),
       ],
       4,
@@ -438,19 +435,19 @@ describe("saving", () => {
     const rebased = rebaseDraft(before, draft, after);
     expect(rebased.idle_hours).toBe(5);
     expect(rebased.recipients).toEqual([
-      recipient(BEN, ["emergency", "stock"], { rooms: ["room_b_"], urgent_high_priority: false }),
-      recipient(CALLUM, ["hardware", "phases"], { rooms: [""] }),
+      recipient(PHONE_A, ["emergency", "stock"], { rooms: ["room_b_"], urgent_high_priority: false }),
+      recipient(PHONE_B, ["hardware", "phases"], { rooms: [""] }),
       recipient("notify.family", ["emergency"]),
       // Changed here, removed elsewhere: kept, so the review shows it as added.
       recipient("notify.gone", ["stock", "dosing"]),
-      recipient(SEAN, ["emergency"]),
+      recipient(PHONE_D, ["emergency"]),
     ]);
     // A row removed elsewhere that this draft did not touch goes with it.
     const untouched = rebaseDraft(before, toDraft(before), after);
     expect(untouched.recipients.map((row) => row.service)).toEqual([
-      BEN,
-      CALLUM,
-      STEWART,
+      PHONE_A,
+      PHONE_B,
+      PHONE_C,
       "notify.family",
     ]);
     expect(untouched.idle_hours).toBe(3);
@@ -462,7 +459,7 @@ describe("saving", () => {
     const tick = (on: boolean) => ({
       type: "edit" as const,
       edit: (draft: ReturnType<typeof toDraft>) =>
-        updateRow(draft, CALLUM, {
+        updateRow(draft, PHONE_B, {
           kinds: toggleKind(draft.recipients[1].kinds, "phases", on),
         }),
     });
@@ -476,7 +473,7 @@ describe("saving", () => {
         ...first.config,
         revision: 4,
         recipients: first.config.recipients.map((row) =>
-          row.service === STEWART ? { ...row, kinds: ["emergency", "stock"] } : row,
+          row.service === PHONE_C ? { ...row, kinds: ["emergency", "stock"] } : row,
         ),
       },
     });
@@ -497,13 +494,13 @@ describe("saving", () => {
   it("lists what a save changes, phone by phone", () => {
     const base = DEMO_NOTIFY;
     let draft = toDraft(base);
-    draft = updateRow(draft, CALLUM, {
+    draft = updateRow(draft, PHONE_B, {
       kinds: ["hardware", "stock", "phases"],
       rooms: ["room_b_"],
       urgent_high_priority: true,
     });
-    draft = { ...draft, recipients: draft.recipients.filter((row) => row.service !== STEWART) };
-    draft = { ...draft, recipients: [...draft.recipients, newRecipient(SEAN, DEMO_PHONES)] };
+    draft = { ...draft, recipients: draft.recipients.filter((row) => row.service !== PHONE_C) };
+    draft = { ...draft, recipients: [...draft.recipients, newRecipient(PHONE_D, DEMO_PHONES)] };
     draft = { ...draft, idle_hours: 6 };
     const changes = draftChanges(base, draft, {
       kinds: DEMO_KINDS,
@@ -514,7 +511,7 @@ describe("saving", () => {
     expect(changes.idle).toEqual({ before: 3, after: 6 });
     expect(changes.phones).toEqual([
       {
-        service: CALLUM,
+        service: PHONE_B,
         title: "Callum (Callum Phone)",
         change: "changed",
         lines: [
@@ -525,7 +522,7 @@ describe("saving", () => {
         ],
       },
       {
-        service: SEAN,
+        service: PHONE_D,
         title: "Sean (Sean iPhone)",
         change: "added",
         lines: [
@@ -535,7 +532,7 @@ describe("saving", () => {
         ],
       },
       {
-        service: STEWART,
+        service: PHONE_C,
         title: "Stewart (Stews iPhone)",
         change: "removed",
         lines: [{ label: "Removed", before: null, after: "no more pushes from Crop Steering" }],
@@ -549,7 +546,7 @@ describe("saving", () => {
       count: 0,
     });
     // The default room's prefix is "": all rooms to that room alone is a change too.
-    const defaultRoom = draftChanges(base, updateRow(toDraft(base), STEWART, { rooms: [""] }), {
+    const defaultRoom = draftChanges(base, updateRow(toDraft(base), PHONE_C, { rooms: [""] }), {
       kinds: DEMO_KINDS,
       phones: DEMO_PHONES,
       rooms: ROOMS,
@@ -601,9 +598,9 @@ describe("the demo's notification services", () => {
     ]);
     expect(read.config.idle_hours).toBe(3);
     expect(read.config.recipients.map((row) => [row.service, row.kinds])).toEqual([
-      [BEN, DEMO_KINDS.map((kind) => kind.id)],
-      [CALLUM, ["hardware", "stock", "dosing"]],
-      [STEWART, ["emergency"]],
+      [PHONE_A, DEMO_KINDS.map((kind) => kind.id)],
+      [PHONE_B, ["hardware", "stock", "dosing"]],
+      [PHONE_C, ["emergency"]],
     ]);
     // Emergencies are every critical code (docs/NOTIFICATIONS.md).
     expect(read.kinds[0].codes).toEqual([
@@ -632,7 +629,7 @@ describe("the demo's notification services", () => {
   });
   it("saves against the revision, and refuses one saved meanwhile", () => {
     const { get, save, sensor } = start();
-    const draft = updateRow(toDraft(get().config), CALLUM, {
+    const draft = updateRow(toDraft(get().config), PHONE_B, {
       kinds: ["hardware", "stock", "dosing", "phases"],
     });
     const saved = save(savePayload(get(), { ...draft, idle_hours: 4 }));
@@ -648,7 +645,7 @@ describe("the demo's notification services", () => {
       /notify service/,
     );
     expect(
-      save({ expected_revision: 4, recipients: [{ service: BEN, kinds: ["weather"] }] }).error,
+      save({ expected_revision: 4, recipients: [{ service: PHONE_A, kinds: ["weather"] }] }).error,
     ).toBe("weather is not a kind of alert.");
     expect(save({ expected_revision: 4, recipients: [], idle_hours: 13 }).error).toMatch(/1 to 12/);
     // Every phone removed: saved, and the controller falls back to its own notify service.
@@ -660,8 +657,8 @@ describe("the demo's notification services", () => {
     const read = get();
     expect(read).toMatchObject({ can_edit_all: false, user_id: "demo-user-callum" });
     const draft = toDraft(read.config);
-    const own = updateRow(draft, CALLUM, { kinds: ["hardware", "stock", "dosing", "phases"] });
-    const other = updateRow(draft, BEN, { kinds: ["emergency"] });
+    const own = updateRow(draft, PHONE_B, { kinds: ["hardware", "stock", "dosing", "phases"] });
+    const other = updateRow(draft, PHONE_A, { kinds: ["emergency"] });
     expect(save(savePayload(read, other)).error).toMatch(/^not allowed: /);
     expect(
       save(savePayload(read, { ...draft, recipients: draft.recipients.slice(0, 2) })).error,
@@ -670,8 +667,8 @@ describe("the demo's notification services", () => {
     const saved = save(savePayload(read, own));
     expect(saved.error).toBeNull();
     expect(saved.config.recipients[1].kinds).toContain("phases");
-    expect(test(CALLUM)).toEqual({ sent: true, error: null });
-    expect(test(BEN)).toMatchObject({ sent: false, error: expect.stringMatching(/^not allowed/) });
+    expect(test(PHONE_B)).toEqual({ sent: true, error: null });
+    expect(test(PHONE_A)).toMatchObject({ sent: false, error: expect.stringMatching(/^not allowed/) });
     expect(test("nonsense")).toMatchObject({ sent: false });
   });
   it("answers as Ben for a name that is no phone's owner", () => {
@@ -725,9 +722,9 @@ describe("the controller store", () => {
     expect(store.getSnapshot().roomId).toBe("room:");
     getStates.mockClear();
     await store.operator("notify_get");
-    await store.operator("notify_test", { service: BEN });
+    await store.operator("notify_test", { service: PHONE_A });
     expect(operator).toHaveBeenNthCalledWith(1, "notify_get", {});
-    expect(operator).toHaveBeenNthCalledWith(2, "notify_test", { service: BEN });
+    expect(operator).toHaveBeenNthCalledWith(2, "notify_test", { service: PHONE_A });
     // Reads and a test push refresh nothing; a save refreshes the states once, like any change.
     expect(getStates).not.toHaveBeenCalled();
     await store.operator("notify_save", { expected_revision: 3, recipients: [] });
