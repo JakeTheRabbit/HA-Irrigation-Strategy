@@ -293,7 +293,7 @@ def test_the_outcome_asks_whether_water_or_ec_moved_the_way_the_change_meant():
 JUDGE = {"cf_account_id": "acc", "cf_api_token": "tok"}
 Z2 = {f"number.crop_steering_zone_1_{s}": (str(v), {}) for s, v in Z2.items()}  # zone 2, as the rig's zone 1
 LIGHTS_ON = datetime(2026, 10, 4, 10, 0)
-LEARNER, JUDGED = ("p1_target_vwc", "field_capacity", "p3_emergency_vwc_threshold"), (SHOT, THRESHOLD)
+LEARNER, JUDGED = ("p1_target_vwc", "field_capacity"), (SHOT, THRESHOLD)  # the rescue floor is nobody's
 
 
 @pytest.fixture
@@ -375,7 +375,6 @@ def test_the_published_attributes_say_which_writer_owns_which_lever(ramp_clock):
     # the zone's own highest readings set these two, not the learner (6 Oct 2026)
     assert owners[number + "p1_target_vwc"] == "the zone's highest reading of the grow-day before"
     assert owners[number + "field_capacity"] == "the zone's highest reading of this grow-day or the one before"
-    assert owners[number + "p3_emergency_vwc_threshold"] == "moves with field capacity; the learner never moves it"
     # without the judge the learner owns the threshold too, and the shot size is nobody's
     c, fake, room = asr._rig()
     asr._flat_ramp(c, fake, room)
