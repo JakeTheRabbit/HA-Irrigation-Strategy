@@ -15,7 +15,7 @@ import plan_adherence
 
 from . import council
 from .doctrine import doctrine
-from .judges.base import choice, with_doctrine
+from .judges.base import choice, noul, with_doctrine
 
 FIRM = 0.6
 ASKS_PER_DAY = 4  # asks a room may make a photoperiod, second looks apart
@@ -44,7 +44,28 @@ QUESTIONS = with_doctrine({
     ],
 }, doctrine("closed_loop", limit=3))
 
+KEEP_YES = ("The reading that stopped the plan moving on is one this zone needs to be watered safely on today's "
+            "targets, so the zone should stay on yesterday's targets until it is back.")
+KEEP_NO = "The engine waters this zone safely without that reading, so today's targets can apply now."
+KEEP = with_doctrine({
+    "keep_yesterday": [
+        noul("The plan has not moved on to today because of the reading named under why_not_moved_on. Is that "
+             "reading a reason to keep yesterday's targets in force today?", KEEP_YES, KEEP_NO),
+        noul("Today's plan day changes the targets listed under change_today, but it has not been applied because "
+             "of the reading under why_not_moved_on. Should the zone stay on yesterday's targets until that reading "
+             "is back?", KEEP_YES, KEEP_NO),
+    ],
+}, doctrine("closed_loop", limit=3))
+KEEP_FIRM = 0.7  # both phrasings below 0.5 and their average p_yes at most 0.3
+BRIDGE_CLASSES = ("transition_missed", "armed_not_started")
+STRICT_WITHIN_MIN = 45.0  # on the stricter gate, a second firm "no" within this long of the first
+
 ALLOWED_KEYS = {cls: tuple(keys) for cls, keys in plan_adherence.PICK.items()}
+
+
+def catch_up_says_no(verdict):
+    """True on a firm "no": both phrasings answered and below 0.5, averaging a p_yes of 0.3 or less."""
+    return verdict is not None and verdict.label is False and verdict.firm(KEEP_FIRM)
 
 
 def pick(verdict, drift):
@@ -97,6 +118,8 @@ def evidence(view, drift, extra=None):
         out["engine_without_it"] = ("Without a moisture reading a zone is watered on its sibling's shots or a timer; "
                                     "without a root-zone EC reading it is watered by moisture alone, with EC sizing "
                                     "and salt checks paused.")
+    if drift.cls in BRIDGE_CLASSES and drift.extra.get("zones"):
+        out["change_today"] = drift.line
     if drift.cls == "steering_disagrees":
         out["steering_select"] = drift.line
     for key, value in (extra or {}).items():

@@ -42,6 +42,8 @@ the room is doing, using the integration's own preview of the plan, and says pla
 - a zone that did not start its day at lights-on, did not stop at lights-off, or stayed in its morning dryback past
   its maximum wait (each should never happen: please send the controller log), and a ramp that runs very long.
 
+Under the Claude Haiku brain the assistant may pick which suggestion the line shows. When today's plan day is held by a stale probe, it is also asked whether that probe matters for watering today: only on a firm *no*, and only once the envelope's rules all pass (lights on and away from lights-off, no shot running, fresh readings elsewhere, once a day), the controller applies today's plan values, the plan's own, until the plan applies the day itself or the next lights-on. The plan, its revision and every setting are left as they are, and a CS-713 card says so. Turn it off by leaving `plan` out of `jev_judges`, or try it with `brain_dry_run`.
+
 Nothing is checked in a room that is off, in the first 10 minutes after a start, or on plan data older than
 six hours. A plan with the same lights-on and lights-off hour has no lights-on edge, so the checks that wait for one
 are skipped.

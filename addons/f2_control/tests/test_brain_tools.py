@@ -12,7 +12,7 @@ FILE = pathlib.Path(prompt.TOOLS)
 def _questions():
     found = {f"{j.name}.{q}": vs for j in jev_bridge.judges() for q, vs in j.questions.items()}
     found.update({f"feed.{q}": vs for q, vs in feed.QUESTIONS.items()})
-    found.update({f"plan.{q}": vs for q, vs in plan_task.QUESTIONS.items()})
+    found.update({f"plan.{q}": vs for q, vs in {**plan_task.QUESTIONS, **plan_task.KEEP}.items()})
     return found
 
 

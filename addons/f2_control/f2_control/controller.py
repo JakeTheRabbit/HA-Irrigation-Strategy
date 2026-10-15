@@ -45,7 +45,7 @@ from jev import client as jev_client
 import setpoint_supervisor
 import tank_level
 import zone_history
-from strategy_runtime import parse_snapshot, parameter_override, strategy_block
+from strategy_runtime import merge_bridge, parse_snapshot, parameter_override, strategy_block
 
 from crop_steering_engine import (
     EC_SETTLE_MIN,
@@ -2965,6 +2965,10 @@ class Controller:
                 "setup_lifecycle_version": 1,
                 "strategy_required": getattr(room, "strategy_required", False),
                 "strategy_error": (getattr(room, "strategy_snapshot", None) or {}).get("error"),
+                # the plan day whose targets are in force, a plan-day catch-up's included (plan_task)
+                "plan_day_in_force": ((getattr(room, "strategy_snapshot", None) or {}).get("bridged")
+                                      or (getattr(room, "strategy_snapshot", None) or {}).get("grow_day")),
+                "plan_bridged": bool((getattr(room, "strategy_snapshot", None) or {}).get("bridged")),
                 "setup_revision": getattr(room, "setup_revision", 0),
                 "setup_active": getattr(room, "setup_active", True),
                 "setup_pending": getattr(room, "_setup_pending", None),
@@ -3952,6 +3956,8 @@ class Controller:
             return self._alert(key, "CS-711", title, message, room=room, zone=zone)
         elif code == "CS-712":
             return self._alert(key, "CS-712", title, message, room=room, zone=zone)
+        elif code == "CS-713":
+            return self._alert(key, "CS-713", title, message, room=room, zone=zone)
         log("jev alert refused: not in the error-code list", judge, code)
         return False
 
@@ -5640,6 +5646,8 @@ class Controller:
         rt = self._plan_fetch(room, now, state, attrs, expected, lights_on_at)
         source = getattr(room, "_lights_source", "integration")
         rt["lights_bad_since"] = None if source == "integration" else (rt.get("lights_bad_since") or now)
+        if attrs.get("degraded_kind") != rt.get("degraded_kind"):  # since when, as this controller first saw it
+            rt["degraded_kind"], rt["degraded_since"] = attrs.get("degraded_kind"), now
         zones = {}
         for z in room.zones:
             st, p = room.state[z], params.get(z)
@@ -5688,7 +5696,7 @@ class Controller:
                 notes = jev_bridge.plan_task(self, room, now, view, drifts)
             except Exception as e:
                 log("plan task error", room.slug, e)
-        room._plan_panel = plan_adherence.panel(view, drifts, notes)
+        room._plan_panel = plan_adherence.panel(view, drifts, notes, adh.get("bridge"))
         if json.dumps(adh, sort_keys=True, default=str) != before:
             self._save_state()
 
@@ -5748,6 +5756,67 @@ class Controller:
                 snapshot["required"] = True
                 snapshot["error"] = "Strategy state could not be persisted"
         room.strategy_snapshot = snapshot
+        if (getattr(room, "_adherence", None) or {}).get("bridge"):
+            room.strategy_snapshot = self._bridged(room, snapshot, state, room._strategy_raw[1], now)
+
+    def _bridged(self, room, snapshot, state, attrs, now):
+        """The snapshot with a plan-day catch-up merged in (strategy_runtime.merge_bridge), or without it once it is
+        over: the plan applied the day itself (its values should be the same: CS-713 if not), the plan, its zones or
+        its revision changed, its day is no longer held by a stale probe, or the next lights-on came. The first pass
+        that merges it reads every value back through the read path the engine uses; a mismatch drops it."""
+        adh = room._adherence
+        bridge = adh["bridge"]
+        day = self._grow_day_start(room, now).isoformat()
+        zones = {int(z): v for z, v in (bridge.get("zones") or {}).items()}
+        rows = snapshot.get("zones") or {}
+        why, caught = None, False
+        if bridge.get("day") != day:
+            why = "the next lights-on came"
+        elif (state != "active" or not snapshot.get("required") or snapshot.get("error")
+              or bridge.get("revision") != snapshot.get("revision")):
+            why = "the plan changed or is held"
+        elif not set(zones) <= set(snapshot.get("managed") or ()):
+            why = "the plan's zones changed"
+        elif all(str((rows.get(z) or {}).get("applied_day") or "") >= day for z in zones):
+            why, caught = "the plan applied the day itself", True
+            differ = [z for z in zones if (rows.get(z) or {}).get("parameters") != zones[z]]
+            if differ:
+                self._alert(f"plan_bridge_differs_{room.slug}", "CS-713",
+                            "the plan's own values differ from what the controller applied",
+                            f"The plan applied day {day} itself, and its values for zone(s) "
+                            f"{', '.join(map(str, differ))} differ from the ones the controller had applied while "
+                            "it waited. This should not happen: the controller keeps running on the plan's own "
+                            "values; please report it with the controller log.", room=room)
+        elif attrs.get("degraded_kind") != "probe_stale":
+            why = "the plan's day is no longer held by a stale probe"
+        if why is None:
+            merged = merge_bridge(snapshot, bridge, day)
+            if not bridge.get("checked"):
+                room.strategy_snapshot = merged
+                read = {(z, k): self._zone_num(room, z, k, None) for z, values in zones.items() for k in values}
+                wrong = [(z, k) for (z, k), got in read.items()
+                         if got is None or abs(got - float(zones[z][k])) > 1e-6]
+                if wrong:
+                    why = f"read back {wrong[0][1]} on zone {wrong[0][0]} wrong"
+                    adh["cooldown_until"] = (now + timedelta(days=7)).isoformat(timespec="minutes")
+                    self._alert(f"plan_bridge_{room.slug}", "CS-713", "today's plan targets could not be applied",
+                                "The controller applied today's plan targets while the plan waited, and could not "
+                                f"read them back ({why}). It went back to the plan's own targets in force and will "
+                                "not try again for 7 days. Please report it with the controller log.", room=room)
+                else:
+                    bridge["checked"] = True
+                    self._save_state()
+                    return merged
+            else:
+                return merged
+        log(f"[plan] {room.slug} catch-up of day {bridge.get('day')} ended: {why}")
+        adh["bridge"] = None
+        if caught:
+            adh["bridge_outcome"] = bridge.get("day")
+        room.strategy_snapshot = snapshot
+        room._strategy_batch_invalid = True
+        self._save_state()
+        return snapshot
 
     def _loop_room(self, room, now):
         """One room's full control pass: snapshot -> decide -> act -> build the publish dict.

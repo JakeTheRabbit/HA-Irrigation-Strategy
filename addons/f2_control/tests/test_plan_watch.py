@@ -65,6 +65,10 @@ def _services(calls):
 
 @pytest.fixture
 def room(monkeypatch):
+    return make_room(monkeypatch)
+
+
+def make_room(monkeypatch):
     c, fake = _room("on")
     c._start = _Clock.now() - timedelta(hours=2)
     st = c.rooms[0].state[1]

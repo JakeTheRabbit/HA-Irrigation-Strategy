@@ -67,7 +67,7 @@ PICK = {
 
 def fresh():
     return {"v": 1, "draft_seen": None, "baseline": None, "alerted": {}, "phase_log": {}, "bridge": None,
-            "bridge_day": None, "cooldown_until": None}
+            "bridge_day": None, "cooldown_until": None, "bridge_outcome": None}
 
 
 def load(raw):
@@ -83,7 +83,9 @@ def load(raw):
     if isinstance(raw.get("phase_log"), dict):
         out["phase_log"] = {str(z): [e for e in v if isinstance(e, dict)][-LOG_MAX:]
                             for z, v in raw["phase_log"].items() if isinstance(v, list)}
-    for key in ("bridge_day", "cooldown_until"):
+    if isinstance(out["bridge"], dict) and not isinstance(out["bridge"].get("zones"), dict):
+        out["bridge"] = None
+    for key in ("bridge_day", "cooldown_until", "bridge_outcome"):
         if isinstance(raw.get(key), str):
             out[key] = raw[key]
     if isinstance(out["baseline"], dict) and not isinstance(out["baseline"].get("values"), dict):
@@ -635,8 +637,13 @@ def panel(view, drifts, notes=None, bridged=None):
         shown.append({"class": d.cls, "zone": d.zone, "severity": d.sev, "line": d.line,
                       "suggestion": pick or (d.suggestions[0] if d.suggestions else ""), "why": why or "",
                       "since": d.since, "action": action or "advise"})
+    line = headline(view, drifts)
+    if bridged and view.status == "active":
+        line = (f"Plan: day {bridged.get('day')}'s targets applied by the controller at "
+                f"{str(bridged.get('since', ''))[11:16]} while the plan waits for: "
+                f"{view.attrs.get('degraded_reason') or 'a stale probe'}.")
     return {
-        "status": view.status, "headline": headline(view, drifts),
+        "status": view.status, "headline": line,
         "zones": [zone_plan(view, z) for z in sorted(view.in_force())] if view.status in ("active", "disarming")
         else [],
         "expected_day": view.expected_day.isoformat(),

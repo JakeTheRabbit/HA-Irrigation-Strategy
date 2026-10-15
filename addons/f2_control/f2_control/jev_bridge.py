@@ -20,6 +20,7 @@ from jev.context import Shot, ZoneContext, ZoneHistory, response, words_response
 from jev.doctrine import DEFAULT_ARC, ArcInvalid, stage_intent, stage_rows
 from jev.doctrine import STAGE_ARC as STAGE_ROWS
 from jev import feed as jev_feed
+from jev import journal as jn
 from jev.enrich import enrich
 from jev.judges.channel import ChannelJudge
 from jev.prompt import Prompt
@@ -36,6 +37,7 @@ from jev.judges.setpoints import band as setpoint_band
 from jev.judges.shot import ShotJudge
 from jev.judges.stage import StageJudge
 from jev.judges.zones import ZonesJudge
+from jev.envelope import Directive, admit
 from jev.journal import Journal
 from jev.ledger import Ledger
 from jev import council
@@ -1077,7 +1079,7 @@ def publish(c, room, now, ha_set):
     report_task(c, room, now, ha_set)
 
 
-def _plan_note(c, room, verdict, drift, action, reason, why):
+def _plan_note(c, room, verdict, drift, action, reason, why, result="advised"):
     journal = getattr(c.jev, "journal", None)
     if journal is not None:
         journal.add({"t": datetime.now().isoformat(timespec="seconds"), "room": room.slug, "zone": drift.zone,
@@ -1085,7 +1087,7 @@ def _plan_note(c, room, verdict, drift, action, reason, why):
                      "verdict": "no answer" if verdict is None else str(verdict.label).replace("_", " "),
                      "p": None if verdict is None else verdict.prob,
                      "agreed": None if verdict is None else verdict.agreed, "action": action[:80],
-                     "result": "advised", "reason": reason[:120], "why": why or ""})
+                     "result": result, "reason": reason[:120], "why": why or ""})
 
 
 def plan_task(c, room, now, view, drifts):
@@ -1109,6 +1111,11 @@ def plan_task(c, room, now, view, drifts):
         rec["reask_due"] = jev_plan.unsure(verdict) and not rec["reasked"]
         _plan_note(c, room, verdict, drift, suggestion, "a suggestion for a person: nothing is changed"
                    if index or why else "unsure: the drift's own suggestion stands", why)
+        keep = council.combine(ans.answers, "keep_yesterday")
+        if keep is not None:
+            _plan_keep(c, room, now, view, rec, drift, keep)
+    _plan_catch_up(c, room, now, view, rec)
+    _plan_outcomes(c, room, now)
     target = asked[0] if asked else None
     if (target is not None and c._on(room.enable_flag, False) and c._no_touch_until(room, now) is None
             and room_health(c, room, now)[0] == "ok" and task.due(rec, target, now, view.lights_on_at)):
@@ -1123,10 +1130,140 @@ def plan_task(c, room, now, view, drifts):
             state["your_track_record"] = record
         if rec["reask_due"] and rec["cls"] == target.cls:
             state["second_look"] = {"why_again": "your last answer was unsure, or your two readings of it disagreed"}
-        if task.ask(rec, state, jev_plan.QUESTIONS, now):
+        questions = dict(jev_plan.QUESTIONS)
+        if _bridge_candidate(c, room, view, target):
+            questions.update(jev_plan.KEEP)
+        if task.ask(rec, state, questions, now):
             rec["cls"], rec["drift"] = target.cls, target
     live = {d.cls for d in drifts}
     return {cls: note for cls, note in rec["notes"].items() if cls in live}
+
+
+def _bridge_candidate(c, room, view, drift):
+    """Whether the brain is asked keep_yesterday too: a missed plan day that changes targets, held by a stale probe,
+    once a photoperiod, outside a cool-down."""
+    adh = getattr(room, "_adherence", None) or {}
+    cool = adh.get("cooldown_until")
+    return (drift.cls in jev_plan.BRIDGE_CLASSES and bool(drift.extra.get("zones"))
+            and view.attrs.get("degraded_kind") == "probe_stale"
+            and adh.get("bridge_day") != view.expected_day.isoformat()
+            and not (cool and datetime.fromisoformat(cool) > view.now))
+
+
+def _plan_keep(c, room, now, view, rec, drift, keep):
+    """A keep_yesterday answer: a firm no (and on the stricter gate, a second within 45 min) makes the catch_up
+    directive from code's own values; anything else keeps the plan's day where it is."""
+    no = jev_plan.catch_up_says_no(keep)
+    strict = c.jev.ledger.strict("plan", room.slug, "room")
+    if no and strict:
+        last, rec["keep_no_at"] = rec.get("keep_no_at"), now
+        no = last is not None and now - last <= timedelta(minutes=jev_plan.STRICT_WITHIN_MIN)
+    why = (keep.notes or [""])[0]
+    if not no:
+        _plan_note(c, room, keep, drift, "keep yesterday's targets", "the plan's day waits for the reading", why)
+        return
+    rec["directive"] = Directive("plan", "catch_up", {
+        "day": view.expected_day.isoformat(), "revision": view.attrs.get("revision"),
+        "zones": {z: dict(v) for z, v in drift.extra["zones"].items()}},
+        f"keep_yesterday: no ({why})"[:200], now + timedelta(minutes=45))
+    rec["directive_verdict"] = keep
+
+
+def _plan_context(c, room, now, view):
+    snap = getattr(room, "strategy_snapshot", None) or {}
+    adh = getattr(room, "_adherence", None) or {}
+    rt = room.__dict__.get("_plan_rt") or {}
+    kind = view.attrs.get("degraded_kind")
+    hold = _plan_holds(c, room)
+    if getattr(room, "_setup_pending", None) or not c._room_active(room) or c._dosing_hold(room):
+        hold = "; ".join(x for x in (hold if hold != "none" else "", "setup, room or dosing hold") if x)
+    cool = adh.get("cooldown_until")
+    rows = view.in_force()
+    return jev_plan.PlanContext(
+        now=now, status=view.status, required=bool(snap.get("required")), error=snap.get("error"),
+        managed=tuple(sorted(snap.get("managed") or ())), room_zones=tuple(sorted(room.zones)),
+        revision=view.attrs.get("revision"), expected_day=view.expected_day.isoformat(),
+        in_force_days={z: r.get("applied_day") or view.attrs.get("grow_day") for z, r in rows.items()},
+        parameters={z: r.get("parameters") for z, r in rows.items()},
+        preview=(view.preview or {}).get("today") or {}, degraded_kind=kind, degraded_since=rt.get("degraded_since"),
+        lights_on=view.lights_on, lights_on_at=view.lights_on_at, lights_off_at=view.lights_off_at,
+        busy=bool(getattr(c, "_busy", False) or getattr(room, "shot_inflight", None)),
+        room_hold=None if hold == "none" else hold, health=room_health(c, room, now)[0],
+        no_touch=c._no_touch_until(room, now) is not None,
+        cooldown_until=datetime.fromisoformat(cool) if cool else None, bridge_day=adh.get("bridge_day"))
+
+
+def _plan_catch_up(c, room, now, view, rec):
+    """A catch_up directive the brain's firm no made, put through the envelope each pass until it acts or runs
+    out (45 min). Dry run journals "would act". Acting stores the bridge (the controller merges it into the plan's
+    snapshot on the next pass, controller._bridged), and raises the CS-713 card that says so."""
+    d = rec.get("directive")
+    if d is None:
+        return
+    drift = rec.get("drift")
+    ok, why = admit(d, _plan_context(c, room, now, view))
+    if not ok:
+        if why == "expired" or now > d.expires:
+            rec["directive"] = None
+            _plan_note(c, room, rec.get("directive_verdict"), drift, "catch up today's plan day", why, "",
+                       "refused")
+        elif not rec.get("refused_said"):
+            rec["refused_said"] = True
+            _plan_note(c, room, rec.get("directive_verdict"), drift, "catch up today's plan day", why, "",
+                       "refused")
+        rec["notes"][drift.cls] = (rec["notes"].get(drift.cls, (drift.suggestions[0], "", ""))[0],
+                                   f"refused: {why}", "advise")
+        return
+    rec["directive"] = None
+    words = (f"Day {d.value['day']}'s targets applied by the controller for "
+             + ", ".join(view.titles.get(int(z)) or f"zone {z}" for z in d.value["zones"]))
+    if getattr(c.jev, "dry_run", False):
+        rec["notes"][drift.cls] = (words + " (advising only: not applied).", d.why, "would act")
+        _plan_note(c, room, rec.get("directive_verdict"), drift, "catch up today's plan day", why, d.why,
+                   "would act")
+        return
+    adh = room.__dict__.setdefault("_adherence", {})
+    adh["bridge"] = {"day": d.value["day"], "revision": d.value["revision"],
+                     "zones": {str(z): v for z, v in d.value["zones"].items()},
+                     "since": now.isoformat(timespec="minutes"), "checked": False}
+    adh["bridge_day"] = d.value["day"]
+    room._strategy_batch_invalid = True  # this pass fires nothing more; the next one runs on the bridged targets
+    c._save_state()
+    c.jev.ledger.record("plan", room.slug, "room", "catch_up", "catch_up", evidence={"why": d.why},
+                        check_at=now + timedelta(hours=6), check={"day": d.value["day"],
+                                                                 "zones": sorted(d.value["zones"])}, at=now)
+    c.jev.log(f"[plan] {room.slug} bridged day {d.value['day']} for zones {sorted(d.value['zones'])}: {d.why}")
+    reason = view.attrs.get("degraded_reason") or "a stale probe"
+    c._jev_alert(room, None, "plan_bridge", {
+        "code": "CS-713", "title": "today's plan targets applied by the controller",
+        "message": (f"{words} at {now:%H:%M} while the plan waits for: {reason}. They stay until the plan applies "
+                    f"day {d.value['day']} itself or the next lights-on. Nothing in the plan was changed.")})
+    rec["notes"][drift.cls] = (words + f" at {now:%H:%M}.", d.why, "acted")
+    _plan_note(c, room, rec.get("directive_verdict"), drift, "catch up today's plan day", why, d.why, "acted")
+
+
+def _plan_outcomes(c, room, now):
+    """A catch-up's check, 6 h after it acted: good when the plan caught up, or the zones ran without a rescue
+    shot; a bad one rests the catch-up for 7 days (the cool-down)."""
+    for entry in c.jev.ledger.due(now):
+        if entry.get("judge") != "plan" or entry.get("room") != room.slug:
+            continue
+        at = datetime.fromisoformat(entry["at"])
+        zones = (entry.get("check") or {}).get("zones") or ()
+        rescues = [z for z in zones for s in _hist(room, int(z)).shots if s.start >= at and s.kind == "p3_emergency"]
+        adh = room.__dict__.setdefault("_adherence", {})
+        caught = adh.get("bridge_outcome") == (entry.get("check") or {}).get("day")
+        good = caught or not rescues
+        what = ("the plan applied the day itself" if caught else
+                "no rescue shot since" if good else f"a rescue shot on zone {rescues[0]}")
+        c.jev.ledger.resolve(entry["id"], what, good, at=now)
+        if not good:
+            adh["cooldown_until"] = (now + timedelta(days=7)).isoformat(timespec="minutes")
+            c._save_state()
+        journal = getattr(c.jev, "journal", None)
+        if journal is not None:
+            journal.add(jn.outcome(room.slug, None, "plan", now, "catch_up", what, good, of=entry.get("at"),
+                                   action="catch_up"))
 
 
 def _plan_holds(c, room):

@@ -132,6 +132,21 @@ def parse_snapshot(state, attributes, prefix, now, was_required=False):
     return result
 
 
+def merge_bridge(snapshot, bridge, day):
+    """A copy of `snapshot` with today's plan values for the zones a plan-day catch-up (`bridge`, the controller's
+    record of one the envelope admitted) holds, and `bridged` set to its day; or `snapshot` itself when the bridge is
+    not for `day`, for this revision, or the snapshot is not usable. Pure: neither input is changed."""
+    if (not bridge or not snapshot or not snapshot.get("required") or snapshot.get("error")
+            or bridge.get("day") != day or bridge.get("revision") != snapshot.get("revision")):
+        return snapshot
+    zones = dict(snapshot.get("zones") or {})
+    for zone, parameters in (bridge.get("zones") or {}).items():
+        record = zones.get(int(zone))
+        if record is not None and record.get("status") == "active" and isinstance(parameters, dict):
+            zones[int(zone)] = {**record, "parameters": dict(parameters), "applied_day": day}
+    return {**snapshot, "zones": zones, "bridged": day}
+
+
 def parameter_override(snapshot, zone, suffix):
     """Both native mode families read the same continuous canonical setpoint."""
     if not snapshot or snapshot.get("error"):

@@ -114,7 +114,8 @@
     ]
   },
   "yes_no_questions": [
-    "probe.tracking"
+    "probe.tracking",
+    "plan.keep_yesterday"
   ],
   "tools": [
     {
