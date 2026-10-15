@@ -214,5 +214,5 @@ def test_every_alert_the_controller_raises_passes_a_code():
         if isinstance(code, ast.Name):  # the moisture alert: one of _PROBE_ALERTS
             continue
         assert isinstance(code, ast.Constant) and re.fullmatch(r"CS-\d{3}", code.value), ast.unparse(call)[:80]
-    assert sorted(controller._PROBE_ALERTS) == ["CS-101", "CS-102", "CS-103"]
+    assert sorted(controller._PROBE_ALERTS) == ["CS-101", "CS-102", "CS-103", "CS-503"]
 
