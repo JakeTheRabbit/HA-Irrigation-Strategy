@@ -1,7 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDemo } from "./demo";
 import { buildRoom, discoverRooms } from "./model";
-import { ecType, fusionMethod, probeHealth, roomProbeIds, STUCK_MS, zoneProbes } from "./probes";
+import { OperatorDemo } from "./operator-demo";
+import type { SetupDocument } from "./operator-types";
+import {
+  ecType,
+  fusionMethod,
+  probeChoicePayload,
+  probeChoices,
+  probeHealth,
+  roomProbeIds,
+  STUCK_MS,
+  zoneProbes,
+} from "./probes";
 
 const now = new Date(2026, 8, 28, 16, 0).getTime();
 const H = 3_600_000;
@@ -136,5 +147,51 @@ describe("which EC a zone with pore and bulk EC probes steers on", () => {
   it("says nothing for a zone without both, or an older integration", () => {
     expect(ecType(fused({ used: ["sensor.a"] }))).toBeNull();
     expect(ecType(undefined)).toBeNull();
+  });
+});
+
+describe("which of a zone's probes count, and its primary", () => {
+  it("is a probe left out by choice, not a fault", () => {
+    expect(health({ excluded: "not counted", state: "unavailable" })).toEqual({
+      health: "not-counted",
+      text: "Does not count",
+    });
+  });
+  it("sends only the choice, and shows it once saved", async () => {
+    let states = createDemo(now);
+    const demo = new OperatorDemo(
+      () => states,
+      (next) => (states = next),
+    );
+    const zones = () =>
+      buildRoom(
+        states,
+        discoverRooms(states).find((item) => item.prefix === "")!,
+      ).zones;
+    const before = zones().flatMap((zone) => zoneProbes(zone, states, now));
+    const choices = probeChoices(before);
+    expect(choices["1:vwc"]).toEqual({ unused: [], primary: "" });
+    choices["1:vwc"] = { unused: ["sensor.demo_z1_back_vwc"], primary: "sensor.demo_z1_front_vwc" };
+    const setup = await demo.call<SetupDocument>("setup_read", {});
+    const room = setup.rooms.find((item) => item.prefix === "")!;
+    const payload = probeChoicePayload(room, choices);
+    expect(Object.keys(payload)).toEqual(["entry_id", "expected_revision", "zones"]);
+    expect(payload.zones[0]).toEqual({
+      id: 1,
+      active: true,
+      vwc_unused: ["sensor.demo_z1_back_vwc"],
+      vwc_primary: "sensor.demo_z1_front_vwc",
+      ec_unused: [],
+      ec_primary: "",
+    });
+    await demo.call("setup_save", payload);
+    const after = zoneProbes(zones()[0], states, now);
+    expect(after.map((probe) => [probe.name, probe.health, probe.primary])).toEqual([
+      ["Zone 1 front VWC", "ok", true],
+      ["Zone 1 back VWC", "not-counted", false],
+      ["Zone 1 front EC", "ok", false],
+      ["Zone 1 back EC", "ok", false],
+    ]);
+    expect(probeChoices(after)["1:vwc"]).toEqual(choices["1:vwc"]);
   });
 });

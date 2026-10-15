@@ -52,6 +52,11 @@ UNITS = {
     "ph": units.accepted("ph"),
     "tank_temperature": units.accepted("temperature"),
 }
+# Per zone and reading: the mapped probes that do not count, and the one that leads (calculations
+# fuse_probes). They map no hardware, so a change of only these needs nothing switched off.
+PROBE_CHOICE = {
+    f"{kind}_{what}" for kind in ("vwc", "ec") for what in ("unused", "primary")
+}
 
 
 def effective(entry):
@@ -348,9 +353,38 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
                     raise ValueError("Sensor lists require sensor entity IDs")
                 if enabled and active:
                     _entity(hass, sensor, {"sensor"}, kind)
+            remapped = set(sensors) != set(
+                prior.get(f"{kind}_sensors")
+                or [prior[k] for k in (f"{kind}_front", f"{kind}_back") if prior.get(k)]
+            )
             prior[f"{kind}_sensors"] = sensors
             prior[f"{kind}_front"] = sensors[0] if sensors else ""
             prior[f"{kind}_back"] = sensors[1] if len(sensors) > 1 else ""
+            # Other probes: which count and which leads is chosen again (all count, none leads).
+            unused = row.get(f"{kind}_unused", prior.get(f"{kind}_unused") or [])
+            primary = row.get(f"{kind}_primary", prior.get(f"{kind}_primary") or "")
+            if not isinstance(unused, list) or not isinstance(primary, str):
+                raise ValueError(
+                    f"Zone {z}: probes left out are a list, the primary one id"
+                )
+            if remapped:
+                unused, primary = [], ""
+            unused = [s for s in sensors if s in unused]
+            primary = primary if primary in sensors else ""
+            if sensors and len(unused) == len(sensors):
+                raise ValueError(
+                    f"Zone {z}: at least one of its {kind.upper()} probes must count"
+                )
+            if primary in unused:
+                raise ValueError(f"Zone {z}: the primary probe must be one that counts")
+            for key, value in (
+                (f"{kind}_unused", unused),
+                (f"{kind}_primary", primary),
+            ):
+                if value:
+                    prior[key] = value
+                else:
+                    prior.pop(key, None)
         for key, (low, high, integer) in SIZING.items():
             value = row.get(key, prior.get(key))
             if value is None:
@@ -514,6 +548,10 @@ def setup_room(hass, entry):
                     or [cfg[k] for k in (f"{kind}_front", f"{kind}_back") if cfg.get(k)]
                     for kind in ("vwc", "ec")
                 },
+                **{
+                    key: cfg.get(key) or ("" if key.endswith("_primary") else [])
+                    for key in sorted(PROBE_CHOICE)
+                },
                 **sizing,
                 # Sizing still at the generic value setup offers a new room, so not yet
                 # confirmed as this room's own: changing it to anything else clears it.
@@ -615,10 +653,30 @@ def _update(hass, entry, data):
     )
 
 
+def _choice_only(payload, old):
+    """A save that sends nothing but which probes count and which leads (PROBE_CHOICE), each zone
+    as active as it is stored: the Probes page's picker."""
+    zones = old.get("zones") or {}
+    rows = payload.get("zones")
+    return (
+        set(payload) <= {"entry_id", "expected_revision", "zones"}
+        and isinstance(rows, list)
+        and all(
+            isinstance(row, dict)
+            and set(row) <= {"id", "active"} | PROBE_CHOICE
+            and row.get("active", True)
+            == (zones.get(str(row.get("id"))) or {}).get("active", True)
+            for row in rows
+        )
+    )
+
+
 async def save_setup(hass, payload):
     entry = _selected(hass, payload)
-    data = prepare_setup(hass, payload, effective(entry), entry.entry_id)
-    blockers = safety_blockers(hass, entry, data)
+    old = effective(entry)
+    data = prepare_setup(hass, payload, old, entry.entry_id)
+    # Choosing which probes count and which leads, and nothing else, can be done while watering.
+    blockers = [] if _choice_only(payload, old) else safety_blockers(hass, entry, data)
     if blockers:
         raise ValueError("; ".join(blockers))
     _update(hass, entry, data)

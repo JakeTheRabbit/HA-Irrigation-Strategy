@@ -53,15 +53,18 @@ function readingIssue(metric: Metric, states: States): string | null {
   if (!readable(entity) || numeric(entity) === null) return "not reporting";
   return "not reporting lately";
 }
-/** The probes a zone's combined reading leaves out (the integration's fused sensor attributes). */
+/** The probes a zone's combined reading leaves out (the integration's fused sensor attributes), but
+ * not those the zone's setup chose not to count. */
 function excludedProbes(entity: EntityState | undefined, kind: "vwc" | "ec") {
   const excluded = entity?.attributes.excluded;
   return excluded && typeof excluded === "object" && !Array.isArray(excluded)
-    ? Object.entries(excluded as Record<string, unknown>).map(([probe, reason]) => ({
-        probe,
-        reason: typeof reason === "string" && reason ? reason : "left out",
-        kind,
-      }))
+    ? Object.entries(excluded as Record<string, unknown>)
+        .filter(([, reason]) => reason !== "not counted")
+        .map(([probe, reason]) => ({
+          probe,
+          reason: typeof reason === "string" && reason ? reason : "left out",
+          kind,
+        }))
     : [];
 }
 /** A shot in P3 is a rescue: the controller waters overnight only below the rescue floor. */

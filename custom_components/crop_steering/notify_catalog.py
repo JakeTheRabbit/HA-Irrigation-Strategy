@@ -41,10 +41,11 @@ KINDS = (
         "id": "sensors",
         "name": "Sensors and drift",
         "detail": "A moisture or EC reading the controller can't use, a probe set aside "
-        "for its unit, a zone without a sensor, a zone whose probes disagree, a zone "
-        "steering on bulk EC, and a probe Jev doubts or set aside",
+        "for its unit, a zone without a sensor, a zone whose probes disagree or whose primary "
+        "probe is offline, a zone steering on bulk EC, and a probe Jev doubts or set aside",
         "codes": _codes(
-            "CS-101 CS-102 CS-103 CS-104 CS-502 CS-503 CS-504 CS-603 CS-604 CS-703 CS-704"
+            "CS-101 CS-102 CS-103 CS-104 CS-502 CS-503 CS-504 CS-505 CS-603 CS-604 CS-703 "
+            "CS-704"
         ),
         "events": (),
     },

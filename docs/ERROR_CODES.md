@@ -67,6 +67,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-502](#cs-502) | Too few probes agree for Lowest or Highest | Warning | Notification |
 | [CS-503](#cs-503) | Moisture probe set aside for its unit | Warning | Notification |
 | [CS-504](#cs-504) | Steering on bulk EC: no pore EC probe reporting | Warning | Notification |
+| [CS-505](#cs-505) | A zone's primary probe is offline | Warning | Notification |
 | [CS-601](#cs-601) | Kill switch helper missing | Critical | Repairs card |
 | [CS-602](#cs-602) | Engine not running | Warning | Repairs card |
 | [CS-603](#cs-603) | Zone with no moisture sensor | Warning | Repairs card |
@@ -853,6 +854,26 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Check the pore EC probes the zone's reading leaves out, under the zone's Probes.
 - Correct what each probe measures in its EC Type setting (pore, bulk or unknown).
+
+<a id="cs-505"></a>
+
+### CS-505: A zone's primary probe is offline
+
+*Warning · Notification*
+
+**What it means.** The probe chosen as the zone's primary for moisture or EC gives no reading or has stopped reporting. The zone's reading is made from its other probes that count. You are told once; the alert goes when the primary reports again.
+
+**Watering meanwhile.** Carries on, steered by the zone's other probes.
+
+**Likely causes**
+
+- The probe's cable is loose or cut, or its device has lost power.
+- The probe's device is offline in Home Assistant.
+
+**Suggested fixes**
+
+- Check the probe's cable, power and its device in Home Assistant.
+- Choose another primary, or none, under the zone's Probes.
 
 ## Repairs cards (CS-6xx)
 

@@ -172,12 +172,64 @@
   margin: 0 22px 22px;
   overflow-wrap: anywhere;
 }
+.probe-picker {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+  padding: 0 20px;
+}
+.probe-picker fieldset {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  margin: 0;
+  padding: 10px 14px 12px;
+  border: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  border-radius: 8px;
+}
+.probe-picker legend {
+  padding: 0 4px;
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.probe-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  font-size: var(--text-sm);
+}
+.probe-picker label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.probe-picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 20px 18px;
+}
+.probes-table td:first-child .pill {
+  margin-left: 8px;
+  vertical-align: 1px;
+}
 @media (max-width: 1100px) {
   .insight-zone-map {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 720px) {
+  .probe-picker {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 0 14px;
+  }
+  .probe-picker-actions {
+    padding: 12px 14px 16px;
+  }
   .probes-status {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -656,6 +656,22 @@
       ]
     },
     {
+      "code": "CS-505",
+      "title": "A zone's primary probe is offline",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The probe chosen as the zone's primary for moisture or EC gives no reading or has stopped reporting. The zone's reading is made from its other probes that count. You are told once; the alert goes when the primary reports again.",
+      "watering": "Carries on, steered by the zone's other probes.",
+      "causes": [
+        "The probe's cable is loose or cut, or its device has lost power.",
+        "The probe's device is offline in Home Assistant."
+      ],
+      "fixes": [
+        "Check the probe's cable, power and its device in Home Assistant.",
+        "Choose another primary, or none, under the zone's Probes."
+      ]
+    },
+    {
       "code": "CS-601",
       "title": "Kill switch helper missing",
       "source": "repairs",

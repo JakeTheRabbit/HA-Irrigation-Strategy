@@ -322,6 +322,7 @@ def test_a_zones_reading_names_the_probes_it_was_made_from():
         "method": "Median",
         "steered_by": "Median",
         "offsets_learned": None,
+        "primary": None,
     }
 
 

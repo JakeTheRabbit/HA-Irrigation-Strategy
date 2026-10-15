@@ -1066,6 +1066,33 @@ try {
       await axeDark("probes", "#main-content");
     },
   );
+  await check("probes: the picker chooses which probes count and a primary at 390px", async () => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await go("equipment/probes");
+    const zone1 = page.locator('[data-probe-choice="1:vwc"]');
+    await expectVisible(zone1);
+    assert.equal(await page.locator(".probe-picker fieldset").count(), 6);
+    await noOverflow();
+    await zone1.getByRole("checkbox", { name: "Zone 1 back VWC" }).uncheck();
+    // The last probe that counts cannot be left out too, nor one left out be the primary.
+    assert.ok(await zone1.getByRole("checkbox", { name: "Zone 1 front VWC" }).isDisabled());
+    const primary = (name) =>
+      zone1.getByRole("radio", { name: `${name} is the primary Zone 1 moisture probe` });
+    assert.ok(await primary("Zone 1 back VWC").isDisabled());
+    await primary("Zone 1 front VWC").check();
+    await noOverflow();
+    await axe("probe picker on a phone", ".probe-picker");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expectVisible(page.getByRole("status").filter({ hasText: "Saved" }));
+    const row = (id) => page.locator(`.probes-table tr[data-probe="${id}"]`);
+    assert.equal(
+      await row("sensor.demo_z1_back_vwc").locator("[data-probe-health]").innerText(),
+      "Does not count",
+    );
+    await expectVisible(row("sensor.demo_z1_front_vwc").locator("[data-probe-primary]"));
+    assert.match(await page.locator(".probes-status").innerText(), /Probes\s+11 of 12 OK/);
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  });
   await check(
     "stock tanks: the next to run out, refill, set a level, record a batch and add a tank",
     async () => {

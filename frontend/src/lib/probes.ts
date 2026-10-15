@@ -1,4 +1,5 @@
 import type { PillTone } from "@/components/mini-visuals";
+import type { SetupRoom } from "./operator-types";
 import type { EntityState, States, Zone } from "./types";
 
 /** Equipment › Probes: each probe behind a zone's moisture and pore EC, and whether to believe it.
@@ -15,7 +16,8 @@ export const PROBE_RANGE = { vwc: [0, 100], ec: [0, 20] } as const;
 export const STUCK_MS = { vwc: 3 * 3_600_000, ec: 6 * 3_600_000 } as const;
 
 export type ProbeKind = "vwc" | "ec";
-export type ProbeHealth = "ok" | "stale" | "stuck" | "out-of-range" | "no-reading" | "left-out";
+export type ProbeHealth =
+  "ok" | "stale" | "stuck" | "out-of-range" | "no-reading" | "left-out" | "not-counted";
 /** Each health as its pill's colour: amber to look at, red for a reading that cannot be used. */
 export const PROBE_TONE: Record<ProbeHealth, PillTone> = {
   ok: "on",
@@ -24,6 +26,7 @@ export const PROBE_TONE: Record<ProbeHealth, PillTone> = {
   "out-of-range": "off",
   "no-reading": "off",
   "left-out": "warn",
+  "not-counted": "neutral",
 };
 export interface Probe {
   id: string;
@@ -37,6 +40,8 @@ export interface Probe {
   changed: number | null;
   /** The zone's reading uses it; null from an older integration, which does not say. */
   used: boolean | null;
+  /** The zone's setup names it primary: the controller says when it goes offline (CS-505). */
+  primary: boolean;
   health: ProbeHealth;
   /** The health in a few words. */
   text: string;
@@ -68,6 +73,7 @@ export function probeHealth(input: {
 }): { health: ProbeHealth; text: string } {
   const { kind, state, unit, reported, changed, excluded, stale, now } = input;
   const reason = excluded?.toLowerCase() ?? "";
+  if (reason === "not counted") return { health: "not-counted", text: "Does not count" };
   const out = excluded ? ", left out of the zone's reading" : "";
   if (reason === "no reading" || !readable(state) || !Number.isFinite(Number(state)))
     return { health: "no-reading", text: `No reading${out}` };
@@ -133,6 +139,7 @@ export function zoneProbes(zone: Zone, states: States, now: number): Probe[] {
         reported,
         changed,
         used: used === null ? null : used.includes(id),
+        primary: fused?.attributes.primary === id,
         ...probeHealth({
           kind,
           state: entity?.state,
@@ -184,4 +191,46 @@ export function roomProbeIds(zones: readonly Zone[], states: States): string[] {
         for (const id of Object.keys(excluded)) ids.add(id);
     }
   return [...ids].filter((id) => /^sensor\.[a-z0-9_]+$/.test(id)).sort();
+}
+
+/** What the zone's setup stores of its probes (setup_api.py PROBE_CHOICE): for each reading, the
+ * probes that do not count and the one that is primary. */
+export interface ProbeChoice {
+  unused: string[];
+  primary: string;
+}
+/** A zone's choice as the page shows it, keyed `zone:kind`: only where the integration names the
+ * zone's probes (an older one does not, and has nothing to choose). */
+export function probeChoices(probes: readonly Probe[]): Record<string, ProbeChoice> {
+  const choices: Record<string, ProbeChoice> = {};
+  for (const probe of probes) {
+    if (probe.used === null) continue;
+    const choice = (choices[`${probe.zone}:${probe.kind}`] ??= { unused: [], primary: "" });
+    if (probe.health === "not-counted") choice.unused.push(probe.id);
+    if (probe.primary) choice.primary = probe.id;
+  }
+  return choices;
+}
+/** The save the picker sends: each zone's id, whether it is active, and its choice, nothing else,
+ * so the integration takes it while the room waters. */
+export function probeChoicePayload(room: SetupRoom, choices: Record<string, ProbeChoice>) {
+  return {
+    entry_id: room.entry_id,
+    expected_revision: room.revision,
+    zones: room.zones.map((zone) => ({
+      id: zone.id,
+      active: zone.active,
+      ...Object.fromEntries(
+        (["vwc", "ec"] as const).flatMap((kind) => {
+          const choice = choices[`${zone.id}:${kind}`];
+          return choice
+            ? [
+                [`${kind}_unused`, choice.unused],
+                [`${kind}_primary`, choice.primary],
+              ]
+            : [];
+        }),
+      ),
+    })),
+  };
 }

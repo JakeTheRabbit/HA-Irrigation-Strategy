@@ -822,11 +822,23 @@ class CropSteeringSensor(SensorEntity):
 
     def _fuse_zone(self, sensor_ids: list[str], kind: str) -> float | None:
         """One zone's reading from its probes (calculations.fuse_probes), combined as the zone's
-        select says; Median without it."""
+        select says; Median without it. Probes the zone's setup leaves out (`<kind>_unused`) do not
+        count; the one it names primary (`<kind>_primary`) is published, for the controller to say
+        when it goes offline (CS-505)."""
         lo, hi = PROBE_RANGE[kind]
+        zone = (
+            self._zones_config.get(self._zone_number)
+            or self._zones_config.get(str(self._zone_number))
+            or {}
+        )
+        unused = set(zone.get(f"{kind}_unused") or ()) & set(sensor_ids)
+        if unused == set(sensor_ids):
+            unused = (
+                set()
+            )  # setup never leaves a zone none; an edited entry must not either
         method = self.hass.states.get(self._probe_method_entity(kind))
         value, self._fusion = fuse_probes(
-            self._probe_readings(sensor_ids, kind),
+            self._probe_readings([s for s in sensor_ids if s not in unused], kind),
             self._probe_offsets,
             lo,
             hi,
@@ -852,6 +864,11 @@ class CropSteeringSensor(SensorEntity):
                 {pid: "set aside for its unit" for pid in aside}
             )
             self._fusion["unit_set_aside"] = aside
+        self._fusion["excluded"].update(dict.fromkeys(sorted(unused), "not counted"))
+        primary = zone.get(f"{kind}_primary")
+        self._fusion["primary"] = (
+            primary if primary in sensor_ids and primary not in unused else None
+        )
         return value
 
     def _average_sensor_values(

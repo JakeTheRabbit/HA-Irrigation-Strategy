@@ -10,7 +10,14 @@ import { recentReadings } from "@/lib/dryback";
 import { readJev } from "@/lib/jev";
 import { descriptor, numeric } from "@/lib/model";
 import type { SetupDocument, SetupRoom } from "@/lib/operator-types";
-import { PROBE_TONE, zoneProbes, type Probe } from "@/lib/probes";
+import {
+  PROBE_TONE,
+  probeChoicePayload,
+  probeChoices,
+  zoneProbes,
+  type Probe,
+  type ProbeChoice,
+} from "@/lib/probes";
 import type { Controller, EntityState } from "@/lib/types";
 import { useRecentHistory } from "@/lib/use-recent-moisture";
 import { errorText } from "@/lib/utils";
@@ -46,7 +53,9 @@ export function Probes({
   );
   const status = states[`sensor.crop_steering_${room.room.prefix}app_status`]?.state;
   const jev = readJev(states, room.room.prefix).room;
-  const trouble = probes.filter((probe) => probe.health !== "ok").length;
+  const trouble = probes.filter(
+    (probe) => probe.health !== "ok" && probe.health !== "not-counted",
+  ).length;
   const hardware = [
     ["Pump", asId(config.pump)],
     ["Main-line valve", asId(config.mainline)],
@@ -179,6 +188,7 @@ export function Probes({
           </div>
         )}
       </section>
+      <ProbePicker controller={controller} probes={probes} />
       {hardware.length > 0 && (
         <section className="panel" aria-labelledby="probes-room-title">
           <div className="panel-heading">
@@ -233,6 +243,11 @@ function ProbeRow({
     <tr data-probe={probe.id} data-health={probe.health}>
       <td>
         <strong>{probe.name}</strong>
+        {probe.primary && (
+          <Pill tone="phase" data-probe-primary>
+            Primary
+          </Pill>
+        )}
         <code className="cell-subtext">{probe.id}</code>
       </td>
       <td className="numeric">
@@ -265,6 +280,137 @@ function ProbeRow({
         </Pill>
       </td>
     </tr>
+  );
+}
+
+/** Which of each zone's probes count towards its reading, and which one is primary: the controller
+ * says when the primary goes offline, and the zone reads on from the others. Saved with the room's
+ * setup, alone, so it needs nothing switched off. Only where the integration names the probes. */
+function ProbePicker({ controller, probes }: { controller: Controller; probes: Probe[] }) {
+  const { room } = controller;
+  const saved = probeChoices(probes);
+  const [draft, setDraft] = useState<Record<string, ProbeChoice> | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("");
+  const choices = draft ?? saved;
+  const groups = room.zones.flatMap((zone) =>
+    (["vwc", "ec"] as const)
+      .filter((kind) => choices[`${zone.id}:${kind}`])
+      .map((kind) => ({
+        zone,
+        kind,
+        key: `${zone.id}:${kind}`,
+        listed: probes.filter((probe) => probe.zone === zone.id && probe.kind === kind),
+      })),
+  );
+  if (!groups.length) return null;
+  const change = (key: string, next: ProbeChoice) => {
+    setDraft({ ...choices, [key]: next });
+    setMessage("");
+  };
+  async function save() {
+    setBusy(true);
+    setMessage("");
+    try {
+      const setup = await controller.operator<SetupDocument>("setup_read");
+      const target = setup.rooms.find((item) => item.prefix === room.room.prefix && item.active);
+      if (!target) throw new Error("This room's setup could not be found.");
+      await controller.operator("setup_save", probeChoicePayload(target, choices));
+      await controller.refresh();
+      setDraft(null);
+      setMessage("Saved. Each zone's reading uses the probes that count.");
+    } catch (error) {
+      setMessage(errorText(error));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel" aria-labelledby="probe-picker-title">
+      <div className="panel-heading">
+        <div>
+          <h2 id="probe-picker-title">Which probes count</h2>
+          <p>
+            Each zone’s reading is made from the probes that count. If its primary goes offline you
+            are told once, and the zone reads on from the others.
+          </p>
+        </div>
+      </div>
+      <div className="probe-picker">
+        {groups.map(({ zone, kind, key, listed }) => {
+          const choice = choices[key];
+          const counted = listed.filter((probe) => !choice.unused.includes(probe.id));
+          const what = `${zone.name} ${kind === "vwc" ? "moisture" : "pore EC"}`;
+          return (
+            <fieldset key={key} data-probe-choice={key}>
+              <legend>{what}</legend>
+              {listed.map((probe) => {
+                const counts = !choice.unused.includes(probe.id);
+                return (
+                  <div className="probe-choice" key={probe.id}>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={counts}
+                        disabled={busy || (counts && counted.length === 1)}
+                        onChange={(event) =>
+                          change(key, {
+                            unused: event.target.checked
+                              ? choice.unused.filter((id) => id !== probe.id)
+                              : [...choice.unused, probe.id],
+                            primary:
+                              !event.target.checked && choice.primary === probe.id
+                                ? ""
+                                : choice.primary,
+                          })
+                        }
+                      />
+                      {probe.name}
+                    </label>
+                    <label className="muted small">
+                      <input
+                        type="radio"
+                        name={`primary-${key}`}
+                        checked={choice.primary === probe.id}
+                        disabled={busy || !counts}
+                        aria-label={`${probe.name} is the primary ${what} probe`}
+                        onChange={() => change(key, { ...choice, primary: probe.id })}
+                      />
+                      Primary
+                    </label>
+                  </div>
+                );
+              })}
+              <label className="muted small">
+                <input
+                  type="radio"
+                  name={`primary-${key}`}
+                  checked={!choice.primary}
+                  disabled={busy}
+                  onChange={() => change(key, { ...choice, primary: "" })}
+                />
+                No primary
+              </label>
+            </fieldset>
+          );
+        })}
+      </div>
+      <div className="probe-picker-actions">
+        <Button size="sm" disabled={busy || !draft} onClick={save}>
+          {busy ? "Saving…" : "Save"}
+        </Button>
+        {draft && (
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => setDraft(null)}>
+            Cancel
+          </Button>
+        )}
+        {message && (
+          <span className="muted small" role="status">
+            {message}
+          </span>
+        )}
+      </div>
+    </section>
   );
 }
 

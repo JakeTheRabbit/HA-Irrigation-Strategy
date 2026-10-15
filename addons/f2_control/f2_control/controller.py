@@ -2183,6 +2183,8 @@ class Controller:
                         room=room,
                         zone=zone,
                     )
+                if attrs:
+                    self._watch_primary_probe(room, zone, metric, what, looking, attrs)
                 chosen, steered = attrs.get("method"), attrs.get("steered_by")
                 if not chosen or not steered or chosen == steered:
                     continue
@@ -2199,6 +2201,36 @@ class Controller:
                     room=room,
                     zone=zone,
                 )
+
+    def _watch_primary_probe(self, room, zone, metric, what, looking, attrs):
+        """CS-505: the probe the zone's setup names primary (published as `primary`) gives no reading
+        or has stopped reporting, so the zone's reading is made from its other probes. Said once
+        while it stays offline; the card goes when it reports again. No primary, no alert."""
+        key = f"probe_primary_{room.slug}_z{zone}_{metric}"
+        primary = attrs.get("primary")
+        why = (attrs.get("excluded") or {}).get(primary) if primary else None
+        if why not in ("no reading", "not reporting"):
+            if key in self._alerted:
+                ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
+                self._alerted.pop(key, None)
+                self._alert_codes.pop(key, None)
+            return
+        if key in self._alerted:
+            return
+        self._alert(
+            key,
+            "CS-505",
+            f"the primary {what} probe is offline",
+            f"The probe chosen as this zone's primary for {what} "
+            f"{'gives no reading' if why == 'no reading' else 'has stopped reporting'}. The zone's reading "
+            "carries on from its other probes, and watering with it. Check the probe's cable, "
+            "power and its device in Home Assistant, or choose another primary under the zone's "
+            f"Probes. You are told once; this goes when it reports again.\n\nSensor: {looking}\n"
+            f"Primary: {primary}",
+            room=room,
+            zone=zone,
+            quiet=False,
+        )
 
     def _snapshot(self, room, zone, now, lights_on, lights_just_on):
         st = room.state[zone]
