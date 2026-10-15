@@ -112,24 +112,25 @@ handed to the word-list matcher and planted in a rule, and the build must fail; 
 international form and a room-id token, both assembled at run time, must fail the public list; a missing private
 list must fail loud. No committed file holds a forbidden word, an encoding of one or a digest of one.
 
-### The CI step (sketch for the doctrine check pull request)
+### The CI step
 
-```yaml
-- name: Doctrine pack
-  env:
-    DENYLIST: ${{ secrets.DOCTRINE_DENYLIST }}
-    FORK: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository }}
-  run: |
-    if [ "$FORK" = "true" ]; then
-      python doctrine/tools/build_doctrine.py --check --private-skip "fork pull request: no secrets"
-    else
-      printf '%s' "$DENYLIST" > "$RUNNER_TEMP/denylist.json"
-      python doctrine/tools/build_doctrine.py --check --private-denylist "$RUNNER_TEMP/denylist.json"
-    fi
-```
+The *Validate* workflow (`.github/workflows/ci-validate.yml`, step "Doctrine pack current, true of the code and
+lint-clean") runs `build_doctrine.py --check --core ... --jev ...` on every push and pull request. It byte-checks
+the controller's copy of `compiled/` whenever that directory exists, runs the public list always, and runs the
+private list from the repository's Actions secret `DOCTRINE_DENYLIST`: a JSON list of `[regex, why]` pairs.
 
-An empty secret on a same-repository pull request or a push writes an empty file, which fails loud. The secret
-must exist before that step merges.
+- **Push, or a pull request from this repository** (release pull requests included): the secret is written to a
+  file and checked. A missing or empty secret fails the build ("private denylist secret missing").
+- **A pull request from a fork, or one Dependabot opened:** GitHub gives it no Actions secrets, so the step passes
+  `--private-skip` and the skip is written to the job summary. The merge push runs the private list, so nothing
+  such a pull request brought in reaches a release candidate unchecked.
+
+**Create the secret before this step reaches `testing`.** Without it every push to `testing` fails *Validate*,
+which blocks merges and **Promote**. `tests/test_doctrine_ci_step.py` runs the step's own shell with each of those
+environments.
+
+Only the doctrine outputs and the files listed under check 4 are linted. Running the private list over every
+shipped path is a later change.
 
 ## Files
 

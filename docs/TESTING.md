@@ -271,6 +271,11 @@ runs only when `DOCTRINE_PRIVATE_DENYLIST` names a file; otherwise the test skip
 so. On a throwaway copy of the pack it also proves that each lint layer fails the build on a planted
 value made up at run time. See [doctrine/README.md](../doctrine/README.md).
 
+On GitHub the *Validate* workflow also runs the build as a step of its own, with the private word list
+from the `DOCTRINE_DENYLIST` secret on every push and every pull request from this repository (a
+missing secret fails it), and the public patterns only on a fork or Dependabot pull request, which
+says so in the job summary. `tests/test_doctrine_ci_step.py` runs that step's shell for each case.
+
 ### 6. Controller safety regressions: `addons/f2_control/tests/test_safety_regressions.py`
 
 Deterministic fake clocks and HA responses reproduce request-latency overruns, blind fallback/copy budget bypass, failed hardware closure and error cleanup, persisted shared-hardware holds, explicit recovery, and temporarily absent room descriptors. Tests verify preserved state/counters across restart and rediscovery.
