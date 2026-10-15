@@ -37,6 +37,9 @@ DEFAULTS = {
     "plant_count": (4, 0),
     "max_shot_duration": (900, None),  # seconds
     "max_daily_volume": (20.0, 150),  # litres per zone per grow-day
+    # mL per plant per grow-day, 0 = off. The controller falls back to the old
+    # input_number helper of the same name, then to 0.
+    "min_daily_ml_per_plant": (0.0, None),
     # Substrate limits
     "field_capacity": (70.0, 70),
     "maximum_ec": (9.0, 9),
