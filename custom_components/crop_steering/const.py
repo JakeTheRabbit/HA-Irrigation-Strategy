@@ -7,6 +7,10 @@ REPAIRS_DOCS_URL = "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob
 
 # Configuration keys
 CONF_NUM_ZONES = "num_zones"
+# The P0 additional dryback (%) each zone of a room starts with. A room set up from this release on
+# stores it; a room set up before has none, so its zones start at 0 (off) and P0 is unchanged.
+CONF_P0_ADDITIONAL_DRYBACK = "p0_additional_dryback"
+NEW_ROOM_P0_ADDITIONAL_DRYBACK = 3.0
 
 # Zone configuration
 MIN_ZONES = 1
