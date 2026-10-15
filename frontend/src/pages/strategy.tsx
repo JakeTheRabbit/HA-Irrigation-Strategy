@@ -20,7 +20,13 @@ import { managedBy } from "@/lib/auto-setpoints";
 import { jevIds, parseJevSetpoints } from "@/lib/jev";
 import { setpointParam } from "@/lib/sensor-context";
 import { settingWords } from "@/lib/setting-words";
-import { jevChip, SETUP_GROUPS, TARGET_GROUPS } from "@/lib/targets";
+import {
+  jevChip,
+  planSteering,
+  SETUP_GROUPS,
+  steeringConsequence,
+  TARGET_GROUPS,
+} from "@/lib/targets";
 import "./setpoint-preview.css";
 import "./targets.css";
 
@@ -97,6 +103,22 @@ export function Strategy({
         ).test(field.entityId)
       : false,
   );
+  /** The other mode's value of a mode-dependent target, shown muted beside the one in use. */
+  const otherValue = (key: string) => {
+    const suffix =
+      key === "dryback_target"
+        ? `_${otherMode}_dryback_target`
+        : /^ec_target_p[012]$/.test(key)
+          ? `_ec_target_${otherMode?.slice(0, 3)}_${key.slice(-2)}`
+          : null;
+    const field = suffix ? otherFields.find((item) => item.entityId.endsWith(suffix)) : undefined;
+    const value = field ? (drafts[field.entityId]?.value ?? field.value) : null;
+    return value === null || value === "" ? null : `${number(Number(value))} ${field?.unit ?? ""}`;
+  };
+  const planSteers = zone
+    ? planSteering(states[`sensor.crop_steering_${prefix}strategy_plan`]?.attributes, zone.id)
+    : null;
+  const step = review ? 1 : saved && !Object.keys(drafts).length ? 2 : 0;
   const restFields = own.filter(
     (field) =>
       !tableIds.has(field.entityId) &&
@@ -191,7 +213,7 @@ export function Strategy({
     });
   }
   /** One setting as a row, with Jev's range and the probe's hints. */
-  const row = (setting: Setting, label: string, unit: string) => {
+  const row = (setting: Setting, label: string, unit: string, other?: string | null) => {
     const param = setpointParam(setting.entityId, prefix);
     return (
       <SettingRow
@@ -207,6 +229,7 @@ export function Strategy({
         auto={managedBy(supervisors, setting.entityId)}
         readOnly={planEngaged}
         disabled={!canEdit}
+        other={other}
         onEdit={edit}
       />
     );
@@ -240,6 +263,16 @@ export function Strategy({
             <a href="#/plan/schedule">Open schedule</a>
           </Button>
         </div>
+      )}
+      {!planEngaged && (
+        <ol className="workflow-steps" aria-label="Changing targets">
+          {["Edit draft", "Review changes", "Apply & verify"].map((label, index) => (
+            <li key={label} aria-current={step === index ? "step" : undefined}>
+              <i>{index + 1}</i>
+              {label}
+            </li>
+          ))}
+        </ol>
       )}
       <nav className="zone-switcher targets-zones" aria-label="Targets for">
         {room.zones.map((item) => {
@@ -310,14 +343,44 @@ export function Strategy({
                 {drafts[choice.entityId] && (
                   <span className="small muted">Currently {choice.value || "unavailable"}</span>
                 )}
+                {zone && /_steering_mode$/.test(choice.entityId) && preview.draft.mode && (
+                  <p className="targets-consequence">
+                    {steeringConsequence(
+                      preview.draft.mode,
+                      preview.draft.parameters.dryback_target,
+                    )}
+                  </p>
+                )}
               </div>
             ))}
+          {zone && planEngaged && (
+            <div className="targets-choice">
+              <p>
+                Steering comes from the grow plan{planSteers ? ` (${planSteers})` : ""}. Change it
+                in Schedule.
+              </p>
+            </div>
+          )}
           {zone && !planEngaged && (
             <table className="targets-table">
+              {otherMode && (
+                <thead>
+                  <tr>
+                    <th scope="col">Setting</th>
+                    <th scope="col">{preview.draft.mode} · in use</th>
+                    <th scope="col" className="targets-other">
+                      {otherMode === "generative" ? "Generative" : "Vegetative"}
+                    </th>
+                    <th scope="col">
+                      <span className="sr-only">Ranges</span>
+                    </th>
+                  </tr>
+                </thead>
+              )}
               {TARGET_GROUPS.map((group) => (
                 <tbody key={group.phase}>
                   <tr className="targets-phase">
-                    <th colSpan={3} scope="colgroup">
+                    <th colSpan={otherMode ? 4 : 3} scope="colgroup">
                       <span className="pill" data-phase={group.phase}>
                         {group.phase}
                       </span>{" "}
@@ -327,11 +390,16 @@ export function Strategy({
                   {group.rows.map((item) => {
                     const setting = preview.fields[item.key];
                     return setting ? (
-                      row(setting, item.label, setting.unit || item.unit)
+                      row(
+                        setting,
+                        item.label,
+                        setting.unit || item.unit,
+                        otherMode ? otherValue(item.key) : undefined,
+                      )
                     ) : (
                       <tr key={item.key} className="targets-missing">
                         <th scope="row">{item.label}</th>
-                        <td colSpan={2}>Not reported by this controller</td>
+                        <td colSpan={otherMode ? 3 : 2}>Not reported by this controller</td>
                       </tr>
                     );
                   })}
@@ -371,17 +439,6 @@ export function Strategy({
                 </tbody>
               ))}
             </table>
-          )}
-          {!planEngaged && otherMode && otherFields.length > 0 && (
-            <details className="targets-more">
-              <summary>
-                {otherMode === "generative" ? "Generative" : "Vegetative"} targets: the P3 dryback
-                and EC targets used while the zone is steered {otherMode}
-              </summary>
-              <table className="targets-table">
-                <tbody>{otherFields.map(plain)}</tbody>
-              </table>
-            </details>
           )}
           {!planEngaged && restFields.length > 0 && (
             <div className="targets-rest">

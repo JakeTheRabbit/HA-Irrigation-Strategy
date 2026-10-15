@@ -714,11 +714,44 @@ try {
       assert.deepEqual(chips, ["Jev · 59–62 %", "Jev · 3–5 %"]);
       // With Jev's Setpoints judge on the room, the Auto switch says what it lets Jev do.
       await expectVisible(page.getByText("Jev manages the P2 shot size and re-water point"));
-      // The other steering mode's own targets are one tap down; the hardware is in Setup.
-      await table.page().locator(".targets-more > summary").click();
-      await expectVisible(
-        page.locator('input[id="setting-number.crop_steering_zone_1_generative_dryback_target"]'),
+      // Edit, Review, Apply & verify: the stepper is on its first step while editing.
+      assert.match(
+        await page.locator('.workflow-steps [aria-current="step"]').innerText(),
+        /Edit draft$/,
       );
+      // The steering select says what the mode does, with the zone's own overnight dryback.
+      assert.match(
+        await page.locator(".targets-consequence").innerText(),
+        /^Vegetative: wetter nights \(\d+(\.\d+)? % down from the peak\) and pore EC kept lower\./,
+      );
+      // The other mode's numbers sit beside the ones in use, muted, instead of one tap down.
+      assert.deepEqual(await table.locator("thead th").allInnerTexts(), [
+        "Setting",
+        "Vegetative · in use",
+        "Generative",
+        "Ranges",
+      ]);
+      const other = await table
+        .locator('tr[data-setting$="dryback_target"] .targets-other')
+        .innerText();
+      assert.match(other, /^\d+(\.\d+)? % of peak$/, "the generative dryback is shown");
+      assert.equal(await page.locator("details.targets-more").count(), 0);
+      // Switching the draft mode moves the in-use column; the stepper and sentence follow.
+      const steering = page.locator(
+        'select[id="choice-select.crop_steering_zone_1_steering_mode"]',
+      );
+      await steering.selectOption("Generative");
+      assert.match(
+        await page.locator(".targets-consequence").innerText(),
+        /^Generative: drier nights/,
+      );
+      assert.equal(
+        Number(await table.locator('tr[data-setting$="dryback_target"] input').inputValue()),
+        Number(other.split(" ")[0]),
+      );
+      await steering.selectOption("Vegetative");
+      assert.equal(await page.locator(".draft-bar").count(), 0, "switching back leaves no draft");
+      // The hardware is in Setup.
       assert.equal(
         await page
           .locator('input[id="setting-number.crop_steering_zone_1_substrate_volume"]')
