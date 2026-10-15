@@ -7,8 +7,8 @@ import { catchTest } from "@/lib/catch-test";
 import {
   SUBSTRATE_PRESETS,
   SUBSTRATE_PRESET_GROUPS,
-  matchPreset,
   presetLabel,
+  shownPreset,
 } from "@/lib/substrate-presets";
 import {
   SIZING_BOUNDS,
@@ -171,16 +171,18 @@ export function SubstratePresetPicker({
   disabled: boolean;
   onPick: (litres: number) => void;
 }) {
+  const [picked, setPicked] = useState<string | null>(null);
   return (
     <div>
       <Label htmlFor={id}>Substrate preset</Label>
       <select
         id={id}
         disabled={disabled}
-        value={matchPreset(litres)?.id ?? "custom"}
+        value={shownPreset(picked, litres)}
         aria-describedby={id + "-note"}
         onChange={(event) => {
           const preset = SUBSTRATE_PRESETS.find((item) => item.id === event.target.value);
+          setPicked(preset?.id ?? null);
           if (preset) onPick(preset.litres);
           else document.getElementById(volumeFieldId)?.focus();
         }}
