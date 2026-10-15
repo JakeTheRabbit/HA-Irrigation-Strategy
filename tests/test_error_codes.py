@@ -56,6 +56,7 @@ RESERVED = {
     "CS-502": ("feat/probe-fusion-guarded", "a zone's probes disagree"),
     "CS-503": ("fix/probe-unit-table", "a probe set aside for its unit"),
     "CS-504": ("feat/ec-type-per-probe", "bulk and pore EC mixed in one zone"),
+    "CS-505": ("feat/probe-primary", "a zone's primary probe is offline"),
     "CS-609": ("feat/duplicate-controller-guard", "two controllers on one room"),
     "CS-708": ("feat/claude-haiku-brain", "the brain"),
     "CS-709": ("feat/claude-haiku-brain", "the brain"),
