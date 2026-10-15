@@ -12,6 +12,11 @@ level falls far enough, the litres drawn per 1 % of level are learned from it; o
 should have lowered the level by DRAWDOWN_PCT or more while it moved less than a quarter of that mean the sensor
 is stuck, and its level is not trusted until it moves again. A rise (a refill) starts the count again.
 
+The reservoir minimum and the overfill guard (docs/USER_GUIDE.md, "Reservoir minimum"), each with hysteresis so a
+level hovering at its mark does not flap: shots are held at or below LOW_HOLD_PCT until the level reads
+LOW_RELEASE_PCT or more, and a fill is forced off at or over OVER_HOLD_PCT until the level reads OVER_RELEASE_PCT
+or less. Both latches live in the same `_tank` block, so a restart between the marks keeps them.
+
 Pure: the state is a plain dict the controller keeps in /data/state.json (the room's `_tank` block).
 """
 
@@ -20,6 +25,8 @@ RISE_PCT = 2.0  # a rise at least this big is a refill: the count starts again
 DRAWDOWN_PCT = 5.0  # shots that should have lowered the level this much are enough to judge
 STUCK_SHARE = 0.25  # ...and a level that fell less than this share of it is stuck
 LEARN_WEIGHT = 0.3  # how much a new fall moves the learned litres per 1 %
+LOW_HOLD_PCT, LOW_RELEASE_PCT = 8.0, 12.0  # the reservoir minimum: held at or below 8 %, released at 12 %
+OVER_HOLD_PCT, OVER_RELEASE_PCT = 102.0, 98.0  # the overfill guard: fill off at or over 102 %, released at 98 %
 
 
 def mapping(attrs):
@@ -51,7 +58,7 @@ def percent(distance_mm, full_mm, empty_mm):
 
 
 def fresh():
-    return {"base_pct": None, "litres": 0.0, "litres_per_pct": None, "stuck": False}
+    return {"base_pct": None, "litres": 0.0, "litres_per_pct": None, "stuck": False, "low": False, "over": False}
 
 
 def load(saved):
@@ -68,7 +75,8 @@ def load(saved):
         state["litres"] = float(litres)
     if state["litres_per_pct"] is not None and state["litres_per_pct"] <= 0:
         state["litres_per_pct"] = None
-    state["stuck"] = saved.get("stuck") is True
+    for key in ("stuck", "low", "over"):
+        state[key] = saved.get(key) is True
     return state
 
 
@@ -100,3 +108,21 @@ def observe(state, level_pct):
         if expected >= DRAWDOWN_PCT and fall < expected * STUCK_SHARE:
             state["stuck"] = True
     return not state["stuck"]
+
+
+def below_minimum(held, level_pct):
+    """Whether the tank is at its minimum, from whether it was (`held`) and the level now: 8 % holds, 12 % frees."""
+    return level_pct < LOW_RELEASE_PCT if held else level_pct <= LOW_HOLD_PCT
+
+
+def over_full(held, level_pct):
+    """Whether the tank is over its full mark, from whether it was (`held`) and the level now: 102 % holds, 98 %
+    frees."""
+    return level_pct > OVER_RELEASE_PCT if held else level_pct >= OVER_HOLD_PCT
+
+
+def drop(state, litres):
+    """The % of level that drawing `litres` takes off the tank, at the litres per 1 % it has shown. None until
+    those are known."""
+    known = state["litres_per_pct"]
+    return litres / known if known else None

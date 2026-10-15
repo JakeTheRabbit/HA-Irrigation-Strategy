@@ -119,7 +119,8 @@ def test_a_refill_trusts_the_level_again():
     tank_level.drawn(state, 400.0)
     assert not tank_level.observe(state, 70.0)
     assert tank_level.observe(state, 95.0)  # the tank was refilled: the sensor moves
-    assert state == {"base_pct": 95.0, "litres": 0.0, "litres_per_pct": 40.0, "stuck": False}
+    assert state == {"base_pct": 95.0, "litres": 0.0, "litres_per_pct": 40.0, "stuck": False,
+                     "low": False, "over": False}
 
 
 def test_the_shots_feed_the_check_and_a_stuck_sensor_publishes_no_level(rig, capsys):  # noqa: F811
@@ -163,7 +164,8 @@ def test_the_learned_litres_per_pct_survive_a_restart(rig):  # noqa: F811
     with open(c._state_path) as fh:
         saved = json.load(fh)
     c._load_room_state(room, saved)
-    assert room.tank_drawdown == {"base_pct": 70.0, "litres": 0.0, "litres_per_pct": 40.0, "stuck": False}
+    assert room.tank_drawdown == {"base_pct": 70.0, "litres": 0.0, "litres_per_pct": 40.0, "stuck": False,
+                                  "low": False, "over": False}
 
 
 def test_the_descriptor_mapping_is_picked_up_without_an_adoption(rig):  # noqa: F811
