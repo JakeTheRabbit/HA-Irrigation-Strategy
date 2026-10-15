@@ -252,6 +252,16 @@ describe("room model", () => {
     const target = { entityId: "number.crop_steering_p1_target_vwc", value: 64.5 };
     expect(validateChange(planned, states, target)).toBeTruthy(); // targets stay the plan's
   });
+  it("reads the room's Include Predictions in Notifications switch, which may be switched here", () => {
+    const states = fixture();
+    const id = "switch.crop_steering_notify_predictions";
+    const room = () => buildRoom(states, discoverRooms(states)[0]);
+    expect(room().notifyPredictions).toEqual({ entityId: null, enabled: null }); // an older integration
+    states[id] = entity(id, "on");
+    expect(room().notifyPredictions).toEqual({ entityId: id, enabled: true });
+    expect(validateChange(room(), states, { entityId: id, value: false })).toBeNull();
+    expect(validateChange(room(), states, { entityId: id, value: "off" })).toBeTruthy();
+  });
   it("rejects a misconfigured engine flag that points directly at mapped hardware", () => {
     const states = fixture();
     states["sensor.crop_steering_engine_config"].attributes.pump =

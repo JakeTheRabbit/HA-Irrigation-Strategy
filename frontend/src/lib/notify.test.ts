@@ -280,6 +280,9 @@ describe("who may change a row, and what it is called", () => {
     expect(kindCoverage(DEMO_KINDS.find((kind) => kind.id === "jev")!).events).toEqual([
       "Jev moving a setting",
     ]);
+    expect(kindCoverage(DEMO_KINDS.find((kind) => kind.id === "vitals")!).events).toEqual([
+      "the controller's regular report on every zone",
+    ]);
     expect(
       kindCoverage({ id: "z", name: "Z", detail: "", codes: [], events: ["tank_refill"] }).events,
     ).toEqual(["tank refill"]);
@@ -583,6 +586,7 @@ describe("the demo's notification services", () => {
       "sensors",
       "watering",
       "phases",
+      "vitals",
       "stock",
       "dosing",
       "jev",

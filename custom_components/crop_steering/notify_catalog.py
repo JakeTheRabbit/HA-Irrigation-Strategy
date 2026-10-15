@@ -61,6 +61,14 @@ KINDS = (
         "events": ("phase",),
     },
     {
+        "id": "vitals",
+        "name": "Vitals",
+        "detail": "The controller's regular report on every zone: moisture, EC, water today and, while "
+        "the room's predictions switch is on, what each zone does next",
+        "codes": (),
+        "events": ("vitals",),
+    },
+    {
         "id": "stock",
         "name": "Stock tanks",
         "detail": "Stock tanks running low, and a dose that was not taken off its stock tank",

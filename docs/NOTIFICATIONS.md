@@ -28,6 +28,7 @@ either gets it once.
 | `sensors` | Sensors and drift | CS-101 to CS-104, CS-603, CS-604, CS-703, CS-704 |
 | `watering` | Watering stopped | CS-202 to CS-208, CS-602, and **CS-209** (new: no watering for a while) |
 | `phases` | Phase changes | A zone moving P0 → P1 → P2 → P3 (new event, no card) |
+| `vitals` | Vitals | The controller's regular report on every zone (event `vitals`, no new card). Not ticked on any row until someone ticks it, an upgraded row included |
 | `stock` | Stock tanks | CS-608, CS-807 |
 | `dosing` | Dosing | CS-801 to CS-806 |
 | `jev` | Jev | CS-501, CS-702, CS-705, CS-706, CS-707, CS-404, and Jev moving a setting (new event, no card) |
@@ -44,6 +45,10 @@ docs/error-codes.json is in no kind at all.
   zone, from and to (for example "F2 · Zone 2: P1 → P2, ramp target reached"). No card; a push only.
 - **Jev setting change** (`event: "jev_setpoint"`): when Jev moves a zone's P2 shot size or re-water point
   (docs/JEV.md). No card; a push only.
+- **Vitals** (`event: "vitals"`): the controller's report on every zone, every `notify_min` minutes, key
+  `vitals`, title "<name> vitals". Under each zone, while the room's `notify_predictions` switch is on (it
+  is until someone switches it off), a "Next:" line says what the zone does next, in the words of the
+  dashboard's Next: line. It is still the `f2_vitals` card and `sensor.f2_control_vitals`, as before.
 - **CS-209 No watering for a while** (a card and a push): a room that is active, with lights on, has watered
   nothing for `idle_hours` (default 3, set on the page, 1 to 12): no shot fired in any of its zones, whether
   because watering is switched off, a hold, or nothing called for water. Raised once per stretch and again
@@ -138,7 +143,7 @@ not the whole setup.
 - `_alert` still creates the card first, exactly as now, and Jev's Alerts judge still decides whether a
   repeat pushes at all (docs/JEV.md). When it pushes:
   - with at least one recipient saved (the integration publishes `sensor.crop_steering_notify_config`,
-    state = the revision, attribute `recipients` = the count), it calls `crop_steering.notify` and sends
+    state = the revision, attribute `recipients` = the count, `kinds` = the kinds a row can tick), it calls `crop_steering.notify` and sends
     nothing itself;
   - with no recipients saved, when that call fails, or when an emergency reached no phone through it, it
     pushes to its `notify_service` option as it always has, so an install that never opens the page
@@ -161,7 +166,11 @@ In detail:
   It counts as failed when Home Assistant can't be reached or does not answer in time, answers 4xx or 5xx,
   or answers that nothing was sent with an `error`; a push nobody ticked is not a failure, unless it is an
   emergency (a critical code): that one counts as failed whenever it reached no phone.
-- The vitals report (every `notify_min` minutes) is not an alert: it still goes to `notify_service` only.
+- The vitals report (every `notify_min` minutes) goes through `crop_steering.notify` as the `vitals` kind
+  once at least one recipient is saved and the integration lists `vitals` among the sensor's `kinds`; so,
+  with phones set up, it reaches only the phones that tick Vitals. With nobody set up, with an integration
+  that does not list the kind (older than this), or when that call fails, it goes to `notify_service` as it
+  always did.
 - Events are queued during a loop and sent after its shots, so a slow Home Assistant never holds one up: one
   push per room and kind (lights-off moves every zone at once), all of them within 10 s
   (`EVENTS_BUDGET_S`). An event that fails, or is left when the time is up, is dropped, never retried and

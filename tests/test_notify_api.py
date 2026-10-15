@@ -220,6 +220,7 @@ def test_a_site_with_no_store_answers_with_an_empty_setup_and_its_phones():
             "friendly_name": "Crop Steering notifications",
             "recipients": 0,
             "idle_hours": 3,
+            "kinds": list(notify_catalog.KIND_IDS),
         },
     )
 

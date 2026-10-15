@@ -59,6 +59,14 @@ export const DEMO_KINDS: NotifyKind[] = [
     events: ["phase"],
   },
   {
+    id: "vitals",
+    name: "Vitals",
+    detail:
+      "The controller's regular report on every zone: moisture, EC, water today and, while the room's predictions switch is on, what each zone does next.",
+    codes: [],
+    events: ["vitals"],
+  },
+  {
     id: "stock",
     name: "Stock tanks",
     detail: "A stock tank running low, and a dose not taken off its tank.",
