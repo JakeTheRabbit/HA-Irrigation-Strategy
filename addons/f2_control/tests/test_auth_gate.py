@@ -321,3 +321,13 @@ def test_a_non_admin_token_with_a_shot_recorded_closes_it_and_sends_nothing_more
     closed = max(t for t, m, p, _s in session.sent if p == f"/states/{VALVE}")
     assert [s for s in session.sent if s[0] > closed] == []  # nothing more over the hour
     assert "_shot_inflight" not in json.load(open(first._state_path))["default"]
+
+
+def test_the_log_shows_home_assistants_address_without_a_password():
+    """HA_URL may carry a user name and password; every log line names the address through SHOWN_BASE."""
+    with open(controller.__file__, encoding="utf-8") as fh:
+        source = fh.read()
+    assert "{BASE}" not in "".join(line for line in source.splitlines() if "_GATE.saw(" in line or "log(" in line)
+    assert '"| base:", BASE)' not in source
+    shown = runtime_env._shown("http://grower:hunter2@ha:8123/api")
+    assert "hunter2" not in shown and shown.endswith("@ha:8123/api")
