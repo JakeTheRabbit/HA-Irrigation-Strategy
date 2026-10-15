@@ -63,6 +63,15 @@ pump name or recipe is assumed.
                                                         // at batch start and wins over ml; 0 skips the pump
     ]
   },
+  "feed": {                            // Feed schedule, below; an empty one changes nothing
+    "recipes": [                       // 0..12 named feed recipes
+      {"id": "vege", "name": "Vege",   // id [a-z0-9_]{1,24}, unique (made from the name when left out)
+       "doses": [{"pump": "balance", "ml": 250, "ml_entity": null}]} // as the batch's recipe
+    ],
+    "schedule": {"start": "2026-10-05", "weeks": ["vege", "bloom", "bloom"]}, // 0..52 weeks
+    "stage": null,                     // the recipe picked by hand, or null
+    "held_until": null                 // set by the store: a pick over the schedule holds until then
+  },
   "request": null,                     // see Requests
   "updated_at": "2026-09-28T12:00:00+13:00"
 }
@@ -76,14 +85,33 @@ checked); no entity is both a dosing pump's `power_entity` and batch hardware; a
 holds that room's watering); a pump's `stock_tank` is one of the room's stock tanks, and a stock
 tank is linked to at most one pump. A room with no pumps is valid and does nothing. "Exists" is checked
 when a setup is saved; a stored setup read back at start-up is kept although a device has not come
-back yet.
+back yet. Each feed recipe follows the recipe's rules, names are unique, and every week of the
+schedule names one of the recipes.
+
+### Feed schedule
+
+A room can keep named feed recipes and give each week of the grow one of them, from the day its
+first week starts. Week 1 is the 7 days from `start`, counted in Home Assistant's days and time zone;
+after the last week, the last week's recipe carries on. At Home Assistant's midnight that starts a
+week, the integration writes the dosing config again and the next batch doses the new week's recipe,
+with nobody touching it. A batch already running keeps the doses it started with.
+
+The recipe in use today: the schedule's this week; a recipe picked by hand (`stage`) while the
+schedule runs holds until the schedule's next week starts (picking this week's own recipe ends a
+hold); without a schedule running, the recipe picked by hand; with none picked, the batch's own
+`recipe`, as before. A store saved before the feed schedule loads with an empty one and doses its
+batch recipe unchanged.
+
+`dosing_save` takes `feed` as optional: left out (a dashboard from before it), the stored one is
+kept and checked against the pumps being saved. `held_until` is set by the store when `stage`
+changes, never taken from the caller.
 
 ## Services
 
 | Service | Who | Data | Response |
 |---|---|---|---|
-| `crop_steering.dosing_get` | any user | `room_id` | `{schema_version: 1, room_id, config, candidates[], can_edit, error}` |
-| `crop_steering.dosing_save` | admin | `room_id, expected_revision, pumps, batch` | the same as `dosing_get`, or `error` |
+| `crop_steering.dosing_get` | any user | `room_id` | `{schema_version: 1, room_id, config, feed_now, candidates[], can_edit, error}` |
+| `crop_steering.dosing_save` | admin | `room_id, expected_revision, pumps, batch, feed?` | the same as `dosing_get`, or `error` |
 | `crop_steering.dosing_request` | admin; a `stop`: any signed-in user | `room_id, action ("dose" \| "batch" \| "stop"), pump?, ml?` | `{request, error}` |
 
 - `room_id` is `"room:<prefix>"`, as for the stock services.
@@ -114,7 +142,10 @@ back yet.
   pump saved without an `id` gets one made from its name.
 
 `sensor.crop_steering_<prefix>dosing_config`: state = the revision; attributes `pumps`, `batch`,
-`request`. This is what the controller reads (every 2 s).
+`request` and `feed`. This is what the controller reads (every 2 s). Its `batch.recipe` is the recipe
+in use today (Feed schedule, above), and `feed` (also `feed_now` in `dosing_get`) says which:
+`{recipe, recipe_id, week, weeks, start, held_until, source}`, `source` one of `schedule`, `held`,
+`hand` or `batch` (the batch's own recipe; `recipe` is then null).
 
 ## Requests and the controller
 
