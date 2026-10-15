@@ -19,6 +19,9 @@ from test_jev_controller import NOW as JEV_NOW
 from test_jev_controller import _p1_zone, jev_with  # noqa: F401 (jev_with: a pytest fixture)
 from test_zone_count import KILL, _room
 
+
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
 CONFIG = "sensor.crop_steering_notify_config"
 OPTION = "notify/mobile_app_old_phone"  # the notify_service option, as an install before this has it
 FOOTER = "\n\nCode {}. What it means and what to do: Crop Steering → Help & tools → Error codes."

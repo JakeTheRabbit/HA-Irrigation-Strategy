@@ -91,6 +91,9 @@ dosing store (`dosing_3_11_1.json`). The `options_<version>_*.json` files with a
 `data_3_11_1_usage/`) are apps from 2.25.1 and the Jev line as each left `/data/options.json` and
 `/data`, recorded by running that version's own controller: they prove the brain starts on Cloudflare
 credentials only where a Jev file shows it has run.
+`entities_moved_2_25_1.json` (F-605) is that 2.25.1 room with a few setting ids moved, as CS-605 describes:
+it names the snapshot it starts from and the ids it moves, and proves a controller-only update keeps the
+room watering and holds only the zone whose water-sizing setting it cannot read (`test_settings_wait.py`).
 
 **Only the web server is stood in for.** The manifest depends on `frontend` and `http` for the
 sidebar panel; `conftest.py` marks both as set up and gives `hass.http` a mock, and the panel

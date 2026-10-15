@@ -8,6 +8,9 @@ import controller
 import fake_ha
 
 
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
+
 class FixedDateTime(datetime):
     instant = datetime(2026, 9, 8, 12)
 

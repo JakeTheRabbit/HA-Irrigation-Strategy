@@ -10,6 +10,9 @@ import controller
 import fake_ha
 from crop_steering_engine import Reason
 
+
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
 FLOW = 42 * 1 * 4 / 3600  # 42 plants x 1 dripper x 4 L/h, in L/s
 
 

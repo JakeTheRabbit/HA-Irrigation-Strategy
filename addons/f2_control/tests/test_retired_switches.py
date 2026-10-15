@@ -9,6 +9,9 @@ import pytest
 
 from test_controller import _build, _desc
 
+
+pytestmark = pytest.mark.usefixtures("settings_built_in")
+
 KILL = "input_boolean.kill"
 SYSTEM = "switch.crop_steering_system_enabled"
 AUTO = "switch.crop_steering_auto_irrigation_enabled"
