@@ -13,6 +13,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
+from . import setpoint_log
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .sizing import SIZING_KEYS, configured_sizing, prefer_setup_value
 
@@ -772,9 +773,18 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             )
 
     async def async_set_native_value(self, value: float) -> None:
-        """Update the value."""
+        """Update the value, and append who moved it from what to the room's change log."""
+        old = self._attr_native_value
         self._attr_native_value = value
         self.async_write_ha_state()
+        log = setpoint_log.log_for(self.hass, self._entry.entry_id)
+        if log is not None:
+            field = self.entity_description.key
+            if self._zone_num is not None:
+                field = field.removeprefix(f"zone_{self._zone_num}_")
+            await log.record(
+                self.entity_id, field, self._zone_num, old, value, self._context
+            )
 
     @property
     def available(self) -> bool:

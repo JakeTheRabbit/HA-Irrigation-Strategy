@@ -230,6 +230,14 @@ runs_get:
       required: true
       selector:
         text:
+setpoint_log_get:
+  name: Read setpoint change log
+  description: Read which of this room's settings changed, from what to what, when and who changed it. Does not change anything.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
 runs_save:
   name: Save run record
   description: Register a run with current reference metadata, or edit its dates and name while preserving the original reference. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.

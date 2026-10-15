@@ -188,6 +188,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .run_api import async_setup_runs
 
     await async_setup_runs(hass, entry)
+    from .setpoint_log import async_setup_setpoint_log
+
+    await async_setup_setpoint_log(hass, entry)
     await async_setup_panel(hass)
     # What's new: the release highlights the dashboard shows once after an update.
     try:
@@ -310,6 +313,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .run_api import async_unload_runs
 
     await async_unload_runs(hass, entry)
+    from .setpoint_log import async_unload_setpoint_log
+
+    await async_unload_setpoint_log(hass, entry)
     from .stock_api import async_unload_stock
 
     await async_unload_stock(hass, entry)
