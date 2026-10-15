@@ -36,6 +36,7 @@ import jev_bridge
 import jev_policy
 import runtime_env
 import setpoint_supervisor
+import tank_level
 import zone_history
 from strategy_runtime import parse_snapshot, parameter_override, strategy_block
 
@@ -604,6 +605,9 @@ class Room:
         self._beat_at = None  # and when, by time.monotonic()
         self._statuses = {}  # z -> (label, reason) of its zones' last status
         self._status_at = {}  # z -> when, by time.monotonic()
+        # the tank level the descriptor maps (tank_level.mapping), and its drawdown check (durable)
+        self.tank = {}
+        self.tank_drawdown = tank_level.fresh()
 
 
 class Controller:
@@ -1074,6 +1078,7 @@ class Controller:
         room._strategy_persisted = True
         room._off_since = None
         block = per_room.get(room.slug)
+        room.tank_drawdown = tank_level.load(block.get("_tank") if isinstance(block, dict) else None)
         if isinstance(block, dict):
             room.strategy_required = bool(block.get("_strategy_required", False))
             try:
@@ -1256,6 +1261,7 @@ class Controller:
                 continue
             room.zone_names = self._zone_names(attrs)  # display only; a rename needs no adoption
             room.room_name = self._room_name(attrs)
+            room.tank = tank_level.mapping(attrs)  # read only, never actuated: needs no adoption
             saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_setup")
             another_room = self._is_another_room(room, attrs, saved)
             revision = attrs.get("setup_revision", 0)
@@ -1432,6 +1438,8 @@ class Controller:
                 block.pop("_shot_inflight", None)
             if hasattr(room, "_room_active_known"):
                 block["_room_active"] = room._room_active_known
+            if room.tank_drawdown["base_pct"] is not None:  # only once a level has been read
+                block["_tank"] = room.tank_drawdown
             if getattr(room, "_off_since", None):
                 block["_room_off_since"] = room._off_since.isoformat()
             else:
@@ -2839,6 +2847,54 @@ class Controller:
             room=room,
         )
 
+    def _tank_level(self, room):
+        """The room's tank level (tank_level.py) -> (percent or None, low or None). The percent is None when no
+        distance sensor is mapped, it has no reading, or the drawdown check says it is stuck. `low` is the
+        float's answer, None when no float is mapped or it is unavailable. Read once a loop (_watch_tank)."""
+        tank, pct, low = room.tank, None, None
+        if tank.get("distance"):
+            mm = self._device(tank["distance"], "distance")[0]
+            if mm is not None:
+                level = tank_level.percent(mm, tank["full_mm"], tank["empty_mm"])
+                drawdown = room.tank_drawdown
+                was = drawdown["stuck"]
+                if tank_level.observe(drawdown, level):
+                    pct = level
+                if drawdown["stuck"] != was:
+                    log(f"[{room.slug}] tank level: " + (
+                        f"{tank['distance']} still reads {level:.1f} % although the shots have drawn "
+                        f"{drawdown['litres']:.1f} L since it read {drawdown['base_pct']:.1f} %, about "
+                        f"{drawdown['litres'] / drawdown['litres_per_pct']:.1f} % at the "
+                        f"{drawdown['litres_per_pct']:.2f} L per 1 % it has shown: it looks stuck, so its level "
+                        "is not trusted until it moves" if drawdown["stuck"] else
+                        f"{tank['distance']} moves again ({level:.1f} %), so its level is trusted again"
+                    ))
+                    self._save_state()
+        if tank.get("float"):
+            on = self._on(tank["float"], None)
+            low = None if on is None else on == (tank["float_low_state"] == "on")
+        return pct, low
+
+    def _watch_tank(self, room):
+        """Read the room's tank level and publish it as sensor.crop_steering_<prefix>tank_level. A room with no
+        tank level mapped reads and publishes nothing."""
+        if not room.tank:
+            return
+        pct, low = room.tank_reading = self._tank_level(room)
+        drawdown = room.tank_drawdown
+        ha_set(
+            f"sensor.crop_steering_{room.prefix}tank_level",
+            pct if pct is not None else "unknown",
+            {
+                "unit_of_measurement": "%",
+                "friendly_name": "Tank level",
+                "stuck": drawdown["stuck"],
+                "litres_per_pct": drawdown["litres_per_pct"],
+                "low": low,
+                "engine": "f2-control",
+            },
+        )
+
     # ---------- CS-209: no watering for a while ----------
     def _watch_idle(self, room, now, lights_on, pub):
         """CS-209 (docs/NOTIFICATIONS.md): the room is on, its lights are on and a zone is in P1 or P2, and no zone
@@ -3107,6 +3163,8 @@ class Controller:
         st["last_shot"] = now
         st["last_shot_is_anchor"] = False  # water was delivered: this one is an irrigation
         st["daily_vol"] += delivered_l
+        if room.tank.get("distance"):  # what the tank gave, for the level's drawdown check
+            tank_level.drawn(room.tank_drawdown, delivered_l)
         self._save_state()
         if getattr(self, "jev", None) is not None:
             try:  # the shot, for Jev's Shot and Probe judges to read its answer later
@@ -4644,6 +4702,10 @@ class Controller:
             self._watch_sump(room, now)
         except Exception as e:
             log("sump watch error", room.slug, e)
+        try:  # the tank level is read and published; nothing here acts on it
+            self._watch_tank(room)
+        except Exception as e:
+            log("tank level error", room.slug, e)
         room._was_lights_on = lights_on
         return pub
 
