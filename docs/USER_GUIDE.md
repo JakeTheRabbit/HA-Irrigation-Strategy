@@ -198,9 +198,22 @@ The percentage sensor above only draws the tank. For the controller to read the 
 | `empty_mm` | The same when the tank is empty; further than `full_mm`. Required with a distance sensor. |
 | `float_low_state` | `on` (the default) or `off`: the float's state that means the tank is low. |
 
-The distance sensor's unit must be mm, cm, m, in or ft; it is converted to millimetres through the device-unit table, so the same tank reads the same level whatever unit its sensor reports. A sensor in any other unit, or none, is refused at mapping. The level is 0 % at `empty_mm` and 100 % at `full_mm`, and reads over 100 % above the full mark. The controller reads it once a loop and publishes it as `sensor.crop_steering_tank_level` ([ENTITIES.md](ENTITIES.md)); nothing acts on it yet. The batch tank's full float in the dosing setup is not a level and is not read here.
+The distance sensor's unit must be mm, cm, m, in or ft; it is converted to millimetres through the device-unit table, so the same tank reads the same level whatever unit its sensor reports. A sensor in any other unit, or none, is refused at mapping. The level is 0 % at `empty_mm` and 100 % at `full_mm`, and reads over 100 % above the full mark. The controller reads it once a loop and publishes it as `sensor.crop_steering_tank_level` ([ENTITIES.md](ENTITIES.md)); the reservoir minimum below acts on it. The batch tank's full float in the dosing setup is not a level and is not read here.
 
 The sensor is trusted unless it is unavailable, because many sensors send a reading only when it changes, so a quiet tank's sensor can go hours without one. What the controller checks instead is the drawdown: it counts the litres the shots draw against the level's fall. Each time the level falls 5 %, it learns the litres drawn per 1 % of level from it. Once it knows them, shots that should have lowered the level by 5 % or more while it moved less than a quarter of that mean the sensor is stuck: its level is published as unknown, the log says why, and it is trusted again when it falls 5 % or a refill raises it. Until the tank has fallen 5 % once with the shots counted, a stuck sensor cannot be told from a full one. Mapping a level does not put the sensor behind the safety gate.
+
+#### Reservoir minimum
+
+Once a tank level is mapped, the controller keeps the pump from running the tank dry and a fill from running it over. A room with no level mapped, as every room is after an update until its operator maps one, is never held by any of this; a batch tank's full float does not count.
+
+| What | When | What happens |
+| --- | --- | --- |
+| Minimum | The level reads 8 % or less, or the low float reads low | Every zone is held (CS-901) until the level reads 12 % or more and the float no longer reads low. The two marks stop a level hovering at 8 % from starting and stopping the room every minute. |
+| Level unknown | The distance sensor or the float reads nothing usable, or the drawdown check says the sensor is stuck | Every zone is held (CS-902) until it reads again. |
+| Plan-ahead refill | One more round of shots, each zone's last, would take the level to 8 % or less, at the litres per 1 % the tank has shown | CS-903 asks for a refill while watering carries on. A shot that would itself take the level to 8 % or less waits until the tank is refilled. Nothing is planned before the litres per 1 % are learned. |
+| Overfill guard | The level reads 102 % or more | A batch's fill valve is switched off, and none is opened, until the level reads 98 % or less (CS-904). Watering carries on. |
+
+The minimum and overfill marks are kept in `/data/state.json` with the drawdown check, so a restart with the level between two marks keeps the hold it had. The tank level sensor shows them as its `below_minimum`, `over_full` and `minimum_pct` attributes.
 
 ### Dosing
 

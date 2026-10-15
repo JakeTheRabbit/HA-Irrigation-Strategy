@@ -626,6 +626,8 @@ describe("the demo's notification services", () => {
       "CS-601",
       "CS-606",
       "CS-801",
+      "CS-901",
+      "CS-902",
     ]);
     // The integration's sensor, as the controller reads it.
     expect(sensor()).toMatchObject({ state: "3", attributes: { recipients: 3 } });

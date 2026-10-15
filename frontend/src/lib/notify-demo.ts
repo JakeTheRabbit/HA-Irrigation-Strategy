@@ -48,8 +48,8 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "watering",
     name: "Watering stopped",
     detail:
-      "Something stopping the shots in a room or a zone, and a room that has watered nothing for a while with the lights on.",
-    codes: [...codes(202, 208), "CS-602", "CS-609", "CS-209"],
+      "Something stopping the shots in a room or a zone, a room that has watered nothing for a while with the lights on, and the tank it waters from at its minimum, due a refill or over its full mark.",
+    codes: [...codes(202, 208), "CS-602", "CS-609", "CS-209", ...codes(901, 904)],
     events: [],
   },
   {

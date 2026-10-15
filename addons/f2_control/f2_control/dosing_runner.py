@@ -1028,6 +1028,8 @@ class DosingRunner:
         full = self._full(batch)
         if full:
             return self._skip(job, "fill", "the tank reads full already")
+        if self._over(job):
+            return self._skip(job, "fill", "the tank level reads over its full mark")
         self._begin(job, "fill")
         sensor = batch.get("full_entity")
         if full is None:
@@ -1048,7 +1050,7 @@ class DosingRunner:
         while True:
             state = self._full(batch)
             now = self._mono()
-            if state:
+            if state or self._over(job):
                 filled = True
                 break
             if state is None:
@@ -1079,6 +1081,16 @@ class DosingRunner:
         if stuck:
             raise _Ended(f"{valve} did not read off after filling")
         self._done(job)
+
+    def _over(self, job):
+        """The overfill guard (Controller._tank_over): the room's mapped tank level reads over its full mark, so the
+        fill valve is not opened, or is closed. False with no level mapped, or when it can't be asked."""
+        over = getattr(self.c, "_tank_over", None)
+        try:
+            return over is not None and over(job.room) is True
+        except Exception as e:
+            self._log("dosing: the overfill guard could not be read", job.room.slug, e)
+            return False
 
     def _fill_alert(self, job, title, what):
         self._alert(job.room.slug, "CS-804", title,

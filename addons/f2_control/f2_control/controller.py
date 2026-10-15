@@ -670,7 +670,7 @@ EVENTS_BUDGET_S = 10.0
 # The codes whose severity is critical in docs/error-codes.json (tests/test_error_codes.py keeps the two equal):
 # their push is urgent, a high-priority one on a phone whose row asks for that.
 CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-301", "CS-308", "CS-310",
-                            "CS-311", "CS-402", "CS-601", "CS-606", "CS-801"})
+                            "CS-311", "CS-402", "CS-601", "CS-606", "CS-801", "CS-901", "CS-902"})
 # How often a standing alert pushes again, by its severity in docs/error-codes.json (tests/test_error_codes.py
 # keeps INFO_CODES equal to the info codes): a critical code, or a warning that means a zone is not being watered,
 # every 30 minutes for as long as it lasts; any other warning after 15 minutes, then 1, 2 and 4 hours, then every
@@ -971,6 +971,7 @@ class Room:
         # the tank level the descriptor maps (tank_level.mapping), and its drawdown check (durable)
         self.tank = {}
         self.tank_drawdown = tank_level.fresh()
+        self.tank_round = {}  # z -> litres of its last shot asked for, for the plan-ahead refill (_tank_plan)
 
 
 def room_gate(room):
@@ -3140,6 +3141,9 @@ class Controller:
         settings = self._settings_hold(room, zone)
         if settings:
             return settings
+        tank = self._tank_hold(room)  # only with a tank level mapped: never on an upgraded room until then
+        if tank:
+            return tank
         # Source-water EC gate — only when a feed-EC sensor is configured. With no feed sensor
         # the gate is disabled (the dosing/fill holds above still apply) so the add-on is safe
         # out of the box on installs without a reservoir probe.
@@ -3610,8 +3614,9 @@ class Controller:
         return pct, low
 
     def _watch_tank(self, room):
-        """Read the room's tank level and publish it as sensor.crop_steering_<prefix>tank_level. A room with no
-        tank level mapped reads and publishes nothing."""
+        """Read the room's tank level and publish it as sensor.crop_steering_<prefix>tank_level, with the minimum
+        and overfill latches, and ask for a refill ahead of the minimum (_tank_plan). A room with no tank level
+        mapped reads and publishes nothing."""
         if not room.tank:
             return
         pct, low = room.tank_reading = self._tank_level(room)
@@ -3625,9 +3630,139 @@ class Controller:
                 "stuck": drawdown["stuck"],
                 "litres_per_pct": drawdown["litres_per_pct"],
                 "low": low,
+                "below_minimum": drawdown["low"],
+                "over_full": drawdown["over"],
+                "minimum_pct": tank_level.LOW_HOLD_PCT,
                 "engine": "f2-control",
             },
         )
+        self._tank_marks(room, pct)
+        self._tank_plan(room, pct)
+
+    # ---------- SF-08: the reservoir minimum, the plan-ahead refill and the overfill guard ----------
+    def _dismiss(self, key):
+        """Take card f2_{key} down, when this controller raised it."""
+        if key in self._alerted:
+            ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
+            self._alerted.pop(key, None)
+            self._alert_codes.pop(key, None)
+
+    def _tank_marks(self, room, pct):
+        """Move the minimum and overfill latches (tank_level.below_minimum, over_full) by a level read now; saved
+        when either moves. CS-904 goes up and comes down with the overfill latch."""
+        drawdown = room.tank_drawdown
+        if pct is None:
+            return
+        low = tank_level.below_minimum(drawdown["low"], pct)
+        over = tank_level.over_full(drawdown["over"], pct)
+        if over != drawdown["over"]:
+            key = f"tank_over_{room.slug}"
+            if over:
+                self._alert(
+                    key,
+                    "CS-904",
+                    "the tank is over its full mark, filling stopped",
+                    f"The tank reads {pct:.1f} %, at or over {tank_level.OVER_HOLD_PCT:g} % of the full distance "
+                    "it was mapped with, so a batch's fill valve is switched off, and none is opened, until it "
+                    f"reads {tank_level.OVER_RELEASE_PCT:g} % or less. Watering carries on. Check the fill valve "
+                    "closes, and the tank's full and empty distances in Rooms & setup."
+                    f"\n\nSensor: {room.tank['distance']}",
+                    room=room,
+                    quiet=False,
+                )
+            else:
+                self._dismiss(key)
+        if (low, over) != (drawdown["low"], drawdown["over"]):
+            drawdown.update(low=low, over=over)
+            self._save_state()
+
+    def _tank_hold(self, room):
+        """Why the reservoir minimum holds the room's shots (docs/USER_GUIDE.md, "Reservoir minimum"), else None.
+        Armed only by a tank level mapped in Rooms & setup (tank_level.mapping): a batch tank's full float is not a
+        level, so a room without one, as every room is until its operator maps one, is never held here. A level
+        that reads nothing, or that the drawdown check says is stuck, holds (CS-902): a pump run dry is what the
+        minimum is there for. At or below 8 % holds until 12 % (CS-901), and so does a low float."""
+        tank = room.tank
+        if not tank:
+            return None
+        pct, low = room.tank_reading = self._tank_level(room)
+        unread = [e for e, value in ((tank.get("distance"), pct), (tank.get("float"), low)) if e and value is None]
+        if unread:
+            names = ", ".join(unread)
+            self._alert(
+                f"tank_unknown_{room.slug}",
+                "CS-902",
+                "the tank level can't be read, not watering",
+                "The tank level this room waters from reads nothing usable, or its distance sensor looks stuck "
+                "(it has not fallen while the shots drew from the tank), so how much is left can't be known and "
+                "no shot starts: a pump that draws air runs dry. Watering starts again by itself once the level "
+                f"reads again. Check the sensor, its power and its placement.\n\nSensor: {names}",
+                room=room,
+            )
+            return f"tank level unknown ({names})"
+        self._dismiss(f"tank_unknown_{room.slug}")
+        self._tank_marks(room, pct)
+        if (pct is not None and room.tank_drawdown["low"]) or low:
+            level = f"reads {pct:.1f} %" if pct is not None and room.tank_drawdown["low"] else "float reads low"
+            self._alert(
+                f"tank_low_{room.slug}",
+                "CS-901",
+                "the tank is at its minimum, not watering",
+                f"The tank this room waters from {level}: at or below its {tank_level.LOW_HOLD_PCT:g} % minimum, or "
+                "its low float reads low. No shot starts: a pump that draws air runs dry and can lose its prime. "
+                f"Watering starts again by itself once the tank reads {tank_level.LOW_RELEASE_PCT:g} % or more and "
+                "its float, if it has one, no longer reads low. Refill the tank.",
+                room=room,
+            )
+            return f"tank at its minimum ({level})"
+        self._dismiss(f"tank_low_{room.slug}")
+        return None
+
+    def _tank_short(self, room, zone, litres):
+        """A shot of `litres` waits when it would take the tank to its minimum: the level now, less what the litres
+        take off it at the litres per 1 % the tank has shown (the drawdown check). Nothing waits before those are
+        learned, or with no distance sensor mapped. The litres are kept for the plan-ahead refill (_tank_plan)."""
+        if not room.tank.get("distance"):
+            return None
+        room.tank_round[zone] = litres
+        pct = (getattr(room, "tank_reading", None) or (None, None))[0]
+        drop = tank_level.drop(room.tank_drawdown, litres)
+        if pct is None or drop is None or pct - drop > tank_level.LOW_HOLD_PCT:
+            return None
+        return (f"this {litres:.1f} L shot would take the tank from {pct:.1f} % to {pct - drop:.1f} %, "
+                f"at or below its {tank_level.LOW_HOLD_PCT:g} % minimum")
+
+    def _tank_plan(self, room, pct):
+        """CS-903, the plan-ahead refill: one more round of shots, each zone's last, would take the tank to its
+        minimum. It only tells; a shot that would cross the minimum waits (_tank_short). Its card comes down once
+        a round leaves the tank at 12 % or more, after a refill."""
+        need = sum(room.tank_round.values())
+        drop = tank_level.drop(room.tank_drawdown, need) if need else None
+        if pct is None or drop is None:
+            return
+        key = f"tank_refill_{room.slug}"
+        if pct - drop <= tank_level.LOW_HOLD_PCT:
+            self._alert(
+                key,
+                "CS-903",
+                "refill the tank before the next round of shots",
+                f"The tank reads {pct:.1f} %. One more round of shots ({need:.1f} L, each zone's last) would take it "
+                f"to about {pct - drop:.1f} %, at or below its {tank_level.LOW_HOLD_PCT:g} % minimum, at the "
+                f"{room.tank_drawdown['litres_per_pct']:.2f} L per 1 % the tank has shown. A shot that would cross "
+                "the minimum waits until the tank is refilled. Refill the tank now.",
+                room=room,
+            )
+        elif pct - drop >= tank_level.LOW_RELEASE_PCT:
+            self._dismiss(key)
+
+    def _tank_over(self, room):
+        """The overfill guard a batch's fill reads (dosing_runner._fill): True while the tank reads at or over
+        102 %, until it reads 98 % or less. False with no distance sensor mapped, so a fill stops on its full
+        float as it always did; a level that reads nothing keeps the last answer."""
+        if not getattr(room, "tank", {}).get("distance"):
+            return False
+        self._tank_marks(room, self._tank_level(room)[0])
+        return room.tank_drawdown["over"]
 
     # ---------- CS-209: no watering for a while ----------
     def _watch_idle(self, room, now, lights_on, pub):
@@ -4505,6 +4640,10 @@ class Controller:
         # substrate or dripper configuration mid-shot must not rewrite its litres.
         nominal_l = (flow_lps * duration_s if flow_lps is not None
                      else size_pct / 100.0 * self._substrate_l(room, zone))
+        short = self._tank_short(room, zone, nominal_l)
+        if short:  # the plan-ahead half of the reservoir minimum: _tank_plan asks for the refill
+            log(f"[{room.slug}] Z{zone} shot held: {short}")
+            return
         with self._shot_lock:  # a batch holds rooms under this lock (see _shot_running)
             making = self._dosing_hold(room)
             if not making:
@@ -5736,7 +5875,7 @@ class Controller:
             self._watch_sump(room, now)
         except Exception as e:
             log("sump watch error", room.slug, e)
-        try:  # the tank level is read and published; nothing here acts on it
+        try:  # the tank level is read and published, and the plan-ahead refill asked for (CS-903)
             self._watch_tank(room)
         except Exception as e:
             log("tank level error", room.slug, e)

@@ -20,7 +20,7 @@ KINDS = (
         # Every code whose severity is critical in docs/error-codes.json.
         "codes": _codes(
             "CS-201 CS-202 CS-203 CS-204 CS-207 CS-301 CS-308 CS-310 CS-311 CS-402 "
-            "CS-601 CS-606 CS-801"
+            "CS-601 CS-606 CS-801 CS-901 CS-902"
         ),
         "events": (),
     },
@@ -53,9 +53,11 @@ KINDS = (
         "id": "watering",
         "name": "Watering stopped",
         "detail": "Something stopping shots in a room or a zone, the engine not running, a "
-        "second controller on the room, and a room that has watered nothing for a while",
+        "second controller on the room, a room that has watered nothing for a while, and the tank "
+        "it waters from at its minimum, due a refill or over its full mark",
         "codes": _codes(
-            "CS-202 CS-203 CS-204 CS-205 CS-206 CS-207 CS-208 CS-209 CS-602 CS-609"
+            "CS-202 CS-203 CS-204 CS-205 CS-206 CS-207 CS-208 CS-209 CS-602 CS-609 "
+            "CS-901 CS-902 CS-903 CS-904"
         ),
         "events": (),
     },

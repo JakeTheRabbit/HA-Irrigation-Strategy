@@ -27,6 +27,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | CS-6xx | **Repairs cards**: Raised by the integration, under Settings → Repairs. |
 | CS-7xx | **Jev**: Jev's judgements about a zone (advice, a probe it set aside), and how Jev itself is doing: its calls running low, a judge on the stricter gate (docs/JEV.md). |
 | CS-8xx | **Dosing**: Batch-tank dosing: a dose or a batch that did not end as it should (docs/DOSING.md). |
+| CS-9xx | **Reservoir**: The tank a room waters from: at its minimum, a level that can't be read, a refill due before the next round of shots, and a fill stopped over the full mark (docs/USER_GUIDE.md, "Reservoir minimum"). |
 
 ## All codes
 
@@ -94,6 +95,10 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-805](#cs-805) | The mixing pump did not start | Warning | Notification |
 | [CS-806](#cs-806) | Dosing was stopped, or needs a check | Warning | Notification |
 | [CS-807](#cs-807) | A dose was not taken off its stock tank | Warning | Notification |
+| [CS-901](#cs-901) | Tank at its minimum | Critical | Notification |
+| [CS-902](#cs-902) | Tank level can't be read | Critical | Notification |
+| [CS-903](#cs-903) | Refill the tank before the next round of shots | Warning | Notification |
+| [CS-904](#cs-904) | Tank over its full mark | Warning | Notification |
 
 ## Sensors (CS-1xx)
 
@@ -1430,3 +1435,84 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Set the tank's level in Stock tanks (Set level) to what is in it.
 - Check the pump's stock tank in the dosing setup.
+
+## Reservoir (CS-9xx)
+
+<a id="cs-901"></a>
+
+### CS-901: Tank at its minimum
+
+*Critical · Notification*
+
+**What it means.** The tank level mapped for this room reads 8 % or less, or its low float reads low. The minimum only works once a tank level (a distance sensor or a low float) is mapped in Crop Steering → Rooms & setup; a batch tank's full float is not a level and never sets it off.
+
+**Watering meanwhile.** Every zone in the room is held: no shot starts, so the pump never draws air. Watering starts again by itself once the tank reads 12 % or more and its float no longer reads low.
+
+**Likely causes**
+
+- The tank ran down: it was not refilled in time (CS-903 says ahead of time when it will be needed).
+- A fill did not happen, or stopped early.
+- The tank's full and empty distances are wrong, so the level reads lower than the tank is.
+
+**Suggested fixes**
+
+- Refill the tank.
+- Check the tank's full and empty distances, and the float's low state, in Crop Steering → Rooms & setup.
+
+<a id="cs-902"></a>
+
+### CS-902: Tank level can't be read
+
+*Critical · Notification*
+
+**What it means.** The tank level mapped for this room reads nothing usable (its distance sensor or its float is unavailable or unknown), or the distance sensor looks stuck: the shots drew enough to lower it and it did not move. How much water is left can't be known.
+
+**Watering meanwhile.** Every zone in the room is held until the level reads again, or a stuck sensor moves (a refill moves it): a pump run dry is what the minimum is there for.
+
+**Likely causes**
+
+- The sensor lost power or its connection to Home Assistant.
+- The distance sensor is stuck: something in its beam, condensation on it, or a reading frozen high.
+
+**Suggested fixes**
+
+- Check the sensor, its power and its placement, and that Home Assistant shows a reading.
+- If the room should water without a tank level, remove the level in Crop Steering → Rooms & setup.
+
+<a id="cs-903"></a>
+
+### CS-903: Refill the tank before the next round of shots
+
+*Warning · Notification*
+
+**What it means.** One more round of shots, each zone's last, would take the tank to its 8 % minimum or below, at the litres per 1 % the tank has shown while the shots drew from it. Said only once those are known, with a distance sensor mapped.
+
+**Watering meanwhile.** Carries on, except a shot that would take the tank to its minimum, which waits until the tank is refilled. The card comes down once the tank holds a round with room to spare.
+
+**Likely causes**
+
+- The tank is running down, as it does between refills.
+
+**Suggested fixes**
+
+- Refill the tank, or start a batch.
+
+<a id="cs-904"></a>
+
+### CS-904: Tank over its full mark
+
+*Warning · Notification*
+
+**What it means.** The tank level reads 102 % or more of the full distance it was mapped with.
+
+**Watering meanwhile.** Carries on. A batch's fill valve is switched off, and none is opened, until the level reads 98 % or less.
+
+**Likely causes**
+
+- The fill valve did not close, or leaks.
+- The tank's full distance is set too far down, so a full tank reads over 100 %.
+
+**Suggested fixes**
+
+- Check the fill valve closes.
+- Check the tank's full distance in Crop Steering → Rooms & setup.
