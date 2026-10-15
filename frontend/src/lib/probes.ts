@@ -148,6 +148,19 @@ export function zoneProbes(zone: Zone, states: States, now: number): Probe[] {
   });
 }
 
+/** How the zone's reading is made from its probes, in words (calculations.py fuse_probes publishes
+ * the zone's choice as `method` and what it steered by as `steered_by`): Lowest or Highest with
+ * fewer than three probes that agree steers on the median instead (CS-502). Null from an older
+ * integration, which does not say. */
+export function fusionMethod(fused: EntityState | undefined): string | null {
+  const method = fused?.attributes.method;
+  const steered = fused?.attributes.steered_by;
+  if (typeof method !== "string" || typeof steered !== "string") return null;
+  return method === steered
+    ? `${steered.toLowerCase()} of its probes`
+    : `${steered.toLowerCase()} of its probes: ${method} needs three that agree`;
+}
+
 /** Every probe the room's combined sensors name: what the page watches and draws. */
 export function roomProbeIds(zones: readonly Zone[], states: States): string[] {
   const ids = new Set<string>();
