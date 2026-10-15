@@ -114,6 +114,12 @@ def test_new_default_room_can_use_integration_engine_switch():
     assert d["enable_flag"] == "switch.crop_steering_engine_enabled"
 
 
+def test_the_descriptor_carries_the_substrate_only_when_given():
+    given = room.build_engine_config("veg_", "veg", 2, _ZONES, _HW, substrate="coco")
+    assert given["substrate"] == "coco"
+    assert "substrate" not in room.build_engine_config("veg_", "veg", 2, _ZONES, _HW)
+
+
 # ---------------------------------------------------------------- whose restored state is it?
 def _at(hours_ago, aware=True):
     from datetime import datetime, timedelta, timezone

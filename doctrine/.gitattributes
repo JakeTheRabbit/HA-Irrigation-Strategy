@@ -1,0 +1,2 @@
+# The build compares generated files byte for byte, so they keep LF line endings on every checkout.
+* text eol=lf
