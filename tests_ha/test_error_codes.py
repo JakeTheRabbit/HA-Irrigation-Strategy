@@ -29,7 +29,8 @@ async def _issue_strings(hass):
     strings = await async_get_translations(hass, "en", "issues", {DOMAIN})
     out = {}
     for key, value in strings.items():
-        issue, field = key.split(".")[3:5]
+        parts = key.split(".")
+        issue, field = parts[3], ".".join(parts[4:])
         out.setdefault(issue, {})[field] = value
     return out
 
@@ -42,7 +43,8 @@ async def test_every_card_home_assistant_can_show_carries_its_code(hass):
     for issue, text in cards.items():
         match = re.search(r"\((CS-\d{3})\)$", text["title"])
         assert match, (issue, text["title"])
-        assert f"Code {match.group(1)}." in text["description"], issue
+        body = text.get("description") or text["fix_flow.step.confirm.description"]
+        assert f"Code {match.group(1)}." in body, issue
         codes.add(match.group(1))
     assert codes == REPAIRS
 
