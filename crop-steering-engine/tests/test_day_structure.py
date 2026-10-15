@@ -44,7 +44,7 @@ def test_every_firing_rule_has_its_kind_and_the_documented_exemption(snap, param
 
 def test_the_exemptions_are_the_agreed_ones():
     exempt = {kind for kind, yes in CAP_EXEMPT.items() if yes}
-    assert exempt == {"flush_high_ec", "p1_ramp", "p1_extra", "p2_rescue", "p3_emergency", "watchdog"}
+    assert exempt == {"flush_high_ec", "p1_ramp", "p2_rescue", "p3_emergency", "watchdog"}
 
 
 @pytest.mark.parametrize(
@@ -64,14 +64,16 @@ def test_a_shot_that_does_not_fire_says_why_and_is_never_exempt(snap, params, ki
 # ---------------------------------------------------------------------------
 # The daily budget: routine and EC-correction shots stop at it, rescues and the ramp do not
 # ---------------------------------------------------------------------------
-def test_a_p1_extra_shot_runs_over_the_budget_like_the_ramp():
-    # At the ceiling the shot due is the extra one. Like the ramp it is bounded by p1_max_shots and its size, so a
-    # spent budget does not stop it (the capped P1 EC flush it replaced did stop there).
-    snap = dict(phase="P1", vwc=66, minutes_since_shot=20, shot_count=4, daily_vol=300)
-    first = decide(S(**snap), P())
-    again = decide(S(**snap, peak_vwc=66.5, p1_extra_shots=1, p1_peak_before_shot=66), P())  # it rose 0.5
+def test_a_p1_extra_shot_comes_out_of_the_budget():
+    # At the ceiling the shot due is the extra one. Unlike the ramp it counts against the daily budget: under it the
+    # shot goes, and a spent budget at the target ends P1 instead of holding the zone there with no water.
+    snap = dict(phase="P1", vwc=66, minutes_since_shot=20, shot_count=4)
+    first = decide(S(**snap, daily_vol=100), P())
+    again = decide(S(**snap, daily_vol=100, peak_vwc=66.5, p1_extra_shots=1, p1_peak_before_shot=66), P())  # rose 0.5
     for result in (first, again):
-        assert result[0] == "P1" and result[2] is True and kind_of(result) == "p1_extra" and result[4].cap_exempt
+        assert result[0] == "P1" and result[2] is True and kind_of(result) == "p1_extra" and not result[4].cap_exempt
+    spent = decide(S(**snap, daily_vol=300), P())
+    assert spent[0] == "P2" and spent[2] is False and "daily budget spent" in spent[4]
 
 
 @pytest.mark.parametrize(
@@ -115,11 +117,13 @@ def test_the_p1_ramp_runs_in_full_over_the_budget_and_ends_at_max_shots():
     assert done[0] == "P2" and "max shots" in done[4]
 
 
-def test_at_the_ceiling_neither_pore_ec_nor_a_spent_budget_ends_p1():
-    # P1 used to hand over at its ceiling on pore EC back in band, or on a spent budget with the EC still high.
-    # Neither counts now: in band, high, or high over budget, P1 ends only once the extra shot raised the peak < 0.5.
+def test_at_the_ceiling_pore_ec_does_not_end_p1_and_a_spent_budget_does():
+    # P1 used to hand over at its ceiling on pore EC back in band. That does not count: in band or high, P1 ends once
+    # the extra shot raised the peak < 0.5. A spent budget does end it, as the extra shots come out of the budget.
     base = dict(phase="P1", vwc=62, peak_vwc=62, feed_ec=3, minutes_since_shot=20, shot_count=6)
-    for ec, daily_vol in ((5, 100), (8, 100), (8, 300)):
+    spent = decide(S(**base, ec=8, daily_vol=300), P(max_ec=12))
+    assert spent[0] == "P2" and "daily budget spent" in spent[4]
+    for ec, daily_vol in ((5, 100), (8, 100)):
         assert decide(S(**base, ec=ec, daily_vol=daily_vol), P(max_ec=12))[0] == "P1"
         full = decide(S(**base, ec=ec, daily_vol=daily_vol, p1_extra_shots=1, p1_peak_before_shot=61.8), P(max_ec=12))
         assert full[0] == "P2" and "P1 full: the last shot raised the peak 0.2 (< 0.5)" in full[4]

@@ -285,8 +285,8 @@ def test_f5b_p2_dilute_tier_gate():
 def test_f6_p1_at_its_ceiling_fires_its_extra_shot_never_an_ec_flush():
     base = dict(p1_target=60, field_capacity=70, ec_target_p1=5, max_ec=12)
     # (a) non-dilutive feed, (b) saltier feed than the slab, (c) slab full with dilutive feed,
-    # (c') a table that is not draining, (d) dilutive feed + slab room: the same extra shot, staying P1
-    for vwc, feed_ec, backed_up in ((66, 9, False), (66, 10, False), (69, 3, False), (69, 3, True), (66, 3, False)):
+    # (d) dilutive feed + slab room: the same extra shot, staying P1. (c') a table that is not draining gets none.
+    for vwc, feed_ec, backed_up in ((66, 9, False), (66, 10, False), (69, 3, False), (66, 3, False)):
         r = decide(
             S(phase="P1", vwc=vwc, ec=8, ec_smooth=8, feed_ec=feed_ec, minutes_since_shot=20, backed_up=backed_up),
             P(**base),
@@ -294,6 +294,8 @@ def test_f6_p1_at_its_ceiling_fires_its_extra_shot_never_an_ec_flush():
         assert r[0] == "P1" and r[2] is True and r[4].kind == "p1_extra"
         assert "flush" not in r[4] and "runoff" not in r[4]
         assert r[3] == 4.0  # sized like the ramp: the first 2.0 shot, 2x for pore EC 8 against a target of 5
+    held = decide(S(phase="P1", vwc=69, ec=8, ec_smooth=8, feed_ec=3, minutes_since_shot=20, backed_up=True), P(**base))
+    assert held[0] == "P1" and held[2] is False and held[4].kind == "hold_backed_up"
     # (e) the VWC-ramp shot (vwc < ceiling) still fires unconditionally even with non-dilutive feed
     r = decide(
         S(phase="P1", vwc=50, ec=8, ec_smooth=8, feed_ec=10, minutes_since_shot=20),
