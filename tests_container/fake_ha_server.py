@@ -1,10 +1,18 @@
 """A stand-in for Home Assistant's REST API, enough to run the controller app's real image against.
 
 Serves /api/, /api/config, /api/states, /api/services and /api/history from an in-memory table seeded
-from the SEED environment variable (JSON: entity id -> state, or [state, attributes]). A switch or
-input_boolean service call changes the entity's state as Home Assistant would, and every service call
-is logged with the time it arrived. Once the entity named by SLOW_AFTER is switched on, every later
-answer waits DELAY seconds first: a slow Home Assistant, from the moment a shot's valve opens.
+from the SEED environment variable (JSON: entity id -> state, or [state, attributes]), under /api and,
+for the app's own address (http://supervisor/core/api), under /core/api. A switch or input_boolean
+service call changes the entity's state as Home Assistant would, and every request is logged as
+`REQ <method> <path> <status>` with the time it arrived. Once the entity named by SLOW_AFTER is switched
+on, every later answer waits DELAY seconds first: a slow Home Assistant, from the moment a shot's valve
+opens.
+
+Refusals, as a test asks for them: REFUSE (401 or 403) answers every request with it (only those carrying
+the token REFUSE_TOKEN, when that is set), for the first REFUSE_FOR_S seconds when that is set; every
+state written is logged as `STATE <entity> <json>`. ADMIN_ONLY_WRITES=1 answers 401 to a state write, as Home
+Assistant does for a token whose user is not an administrator. TIME_ZONE sets /api/config's time zone,
+CONFIG_STATUS its status, and NO_TIME_ZONE=1 leaves it out of the answer.
 """
 
 import json
@@ -17,6 +25,10 @@ from urllib.parse import parse_qs, urlparse
 
 DELAY = float(os.environ.get("DELAY", "2"))
 SLOW_AFTER = os.environ.get("SLOW_AFTER", "")
+REFUSE = int(os.environ.get("REFUSE") or 0)
+REFUSE_FOR_S = float(os.environ.get("REFUSE_FOR_S") or 0)
+ADMIN_ONLY_WRITES = os.environ.get("ADMIN_ONLY_WRITES") == "1"
+STARTED = time.monotonic()
 SLOW = threading.Event()
 LOCK = threading.Lock()
 STATES = {}
@@ -38,11 +50,24 @@ def put(entity, state, attributes=None):
     }
 
 
+def refusing(headers):
+    token = os.environ.get("REFUSE_TOKEN")
+    if token and headers.get("Authorization") != f"Bearer {token}":
+        return False
+    return REFUSE and (not REFUSE_FOR_S or time.monotonic() - STARTED < REFUSE_FOR_S)
+
+
 class Handler(BaseHTTPRequestHandler):
     def log_message(self, *_):
         pass
 
+    def _path(self):
+        url = urlparse(self.path)
+        path = url.path[len("/core"):] if url.path.startswith("/core/api") else url.path
+        return url, path
+
     def _send(self, code, body):
+        log("REQ", self.command, self._path()[1], code)
         if SLOW.is_set():
             time.sleep(DELAY)
         data = json.dumps(body).encode()
@@ -53,12 +78,14 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self):
-        url = urlparse(self.path)
-        path = url.path
+        url, path = self._path()
+        if refusing(self.headers):
+            return self._send(REFUSE, {"message": "refused"})
         if path in ("/api", "/api/"):
             return self._send(200, {"message": "API running."})
         if path == "/api/config":
-            return self._send(200, {"time_zone": os.environ.get("HA_TIME_ZONE", "UTC")})
+            body = {} if os.environ.get("NO_TIME_ZONE") == "1" else {"time_zone": os.environ.get("TIME_ZONE", "UTC")}
+            return self._send(int(os.environ.get("CONFIG_STATUS") or 200), body)
         # The answer is taken under the lock and sent after it, so one slow answer never holds up another.
         with LOCK:
             if path == "/api/states":
@@ -75,10 +102,15 @@ class Handler(BaseHTTPRequestHandler):
         return self._send(code, answer)
 
     def do_POST(self):
-        path = urlparse(self.path).path
+        _url, path = self._path()
         body = json.loads(self.rfile.read(int(self.headers.get("Content-Length") or 0)) or b"{}")
+        if refusing(self.headers):
+            return self._send(REFUSE, {"message": "refused"})
         if path.startswith("/api/states/"):
+            if ADMIN_ONLY_WRITES:
+                return self._send(401, {"message": "Unauthorized"})
             entity = path[len("/api/states/"):]
+            log("STATE", entity, json.dumps(body))
             with LOCK:
                 put(entity, body.get("state"), body.get("attributes") or {})
                 answer = STATES[entity]
