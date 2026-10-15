@@ -30,6 +30,29 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement=UnitOfTime.SECONDS,
         mode="box",
     ),
+    # How long the pump runs before the main line opens, and the main line before a zone's valve:
+    # fixed at 2 s and 1 s until these, for a pump that takes longer to reach pressure. The
+    # controller caps each at its maximum here.
+    NumberEntityDescription(
+        key="pump_prime_time",
+        name="Pump Prime Time",
+        icon="mdi:pump",
+        native_min_value=0,
+        native_max_value=20,
+        native_step=0.5,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        mode="box",
+    ),
+    NumberEntityDescription(
+        key="main_line_lead_time",
+        name="Main Line Lead Time",
+        icon="mdi:pipe-valve",
+        native_min_value=0,
+        native_max_value=10,
+        native_step=0.5,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        mode="box",
+    ),
     NumberEntityDescription(
         key="substrate_volume",
         name="Substrate Volume",

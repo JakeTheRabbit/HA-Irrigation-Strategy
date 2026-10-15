@@ -5,8 +5,9 @@ Before the table, the same settings had two sets of built-in values: the integra
 can be read, around a Home Assistant restart for example). They disagree for some settings, and both
 are what installed rooms run on today. The table keeps both columns, so this pins each column to the
 values the release before it shipped (Jev 3.11.1, commit 12c6d1a), plus the P3 Time Between Shots
-added since at 10 minutes in both, and the source-water pH band a new room
-starts with, 5.5-6.5 (a room that has a band keeps its own). Making the columns agree is a change of its own, with a bold line
+added since at 10 minutes in both, the source-water pH band a new room starts with, 5.5-6.5 (a
+room that has a band keeps its own), and the pump prime and main-line lead, at the 2 s and 1 s the
+controller always waited, in both. Making the columns agree is a change of its own, with a bold line
 in the changelog; it is never a side effect of editing the table.
 
 The controller half is checked where it is used: every _zone_num call reads its fallback from the
@@ -32,7 +33,8 @@ def table():
 
 # number.py DEFAULT_VALUES at 12c6d1a, and the per-zone plant count and daily cap defaults beside it,
 # plus P3 Time Between Shots (10 minutes), the sump pump's run threshold (the 20 W the controller
-# always compared with) and the minimum daily water per plant (0), all added after it.
+# always compared with) and the minimum daily water per plant (0), all added after it, and the pump
+# prime and main-line lead (2 s and 1 s, the waits 12c6d1a's controller had fixed).
 ENTITY_DEFAULTS_12C6D1A = {
     "max_shot_duration": 900,
     "substrate_volume": 10.0,
@@ -78,10 +80,13 @@ ENTITY_DEFAULTS_12C6D1A = {
     "p1_rise_pts": 0.5,
     "p1_maximum_extra_shots": 3.0,
     "min_daily_ml_per_plant": 0.0,  # added after it: off, as the missing helper read
+    "pump_prime_time": 2.0,
+    "main_line_lead_time": 1.0,
 }
 
-# The literal at each controller _zone_num call site at 12c6d1a, plus P3 Time Between Shots and the P1 rise
-# and extra-shot settings (the engine constants P1_RISE_PTS and P1_MAX_EXTRA_SHOTS).
+# The literal at each controller _zone_num call site at 12c6d1a, plus P3 Time Between Shots, the P1 rise
+# and extra-shot settings (the engine constants P1_RISE_PTS and P1_MAX_EXTRA_SHOTS), and the pump prime
+# and main-line lead it waited as fixed sleeps.
 CONTROLLER_FALLBACKS_12C6D1A = {
     "p2_vwc_threshold": 45,
     "p1_target_vwc": 60,
@@ -111,6 +116,8 @@ CONTROLLER_FALLBACKS_12C6D1A = {
     "p3_time_between_shots": 10.0,
     "p1_rise_pts": 0.5,
     "p1_maximum_extra_shots": 3,
+    "pump_prime_time": 2.0,
+    "main_line_lead_time": 1.0,
 }
 
 

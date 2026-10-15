@@ -78,6 +78,8 @@ The active EC target = the row for the current phase **and** the zone's steering
 | `maximum_ec` | 1-20 | 9.0 | mS/cm | Hard substrate-EC cutoff: no shot above it (salt-burn guard). |
 | `max_shot_duration` | 5-3600 | 900 | s | Longest a single shot may run. The controller refuses to water a room whose cap is missing or below 5 s (CS-203). |
 | `sump_power_threshold_w` | 1-10000 | 20 | W | The sump pump counts as running while its power plug (the controller app's `sump_power_sensor` option) reads above this, after the reading is put into watts. No run for `sump_silent_hours` raises CS-311. |
+| `pump_prime_time` | 0-20 | 2 | s | How long the pump runs before the main line (or, with no main line, the zone valve) opens. Raise it for a pump that takes longer to reach pressure. |
+| `main_line_lead_time` | 0-10 | 1 | s | How long the main-line valve is open before the zone valve opens. |
 | `watchdog_hours` | 0-12 | 3 | h | Lights-on backstop: a zone below its P2 trigger that has had no water for this long gets a watchdog shot, or an urgent alert (CS-207) when watering is blocked. `0` turns it off. |
 
 ### Substrate & schedule
