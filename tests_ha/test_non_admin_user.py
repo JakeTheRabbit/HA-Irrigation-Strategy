@@ -48,12 +48,15 @@ CHANGES = {
     "setup_save": {},
     "setup_remove": {},
     "test_shot": {"room_id": ROOM, "zone": 1},
+    "overlay_keep": {"room_id": ROOM, "entity_id": "number.crop_steering_zone_1_p2_shot_size"},
+    "overlay_undo": {"room_id": ROOM, "entity_id": "number.crop_steering_zone_1_p2_shot_size"},
 }
 READS = {
     "strategy_get": {"room_id": ROOM},
     "strategy_preview": {"room_id": ROOM},
     "runs_get": {"room_id": ROOM},
     "setpoint_log_get": {"room_id": ROOM},
+    "overlay_get": {"room_id": ROOM},
     "stock_get": {"room_id": ROOM},
     "dosing_get": {"room_id": ROOM},
     "notify_get": {},

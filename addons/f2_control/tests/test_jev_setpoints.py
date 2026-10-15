@@ -246,6 +246,20 @@ def test_a_move_is_written_once_and_is_not_mistaken_for_an_edit(tmp_path):
     assert not tomorrow["changed_today"]
 
 
+def test_a_move_that_went_back_to_the_operators_value_is_not_an_edit_by_hand(tmp_path):
+    """The AI's overlay ran out or was undone (the integration's overlays.py): the operator's value is back."""
+    c, room = _Controller(tmp_path), _room()
+    ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
+    jev_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
+    c.numbers[SHOT] = 4.5
+    jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=10))
+    c.numbers[SHOT] = 5.0  # put back to the operator's own value
+    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(days=2))
+    assert sp["home"][SHOT] == 5.0 and sp["current"][SHOT] == 5.0
+    assert all(row["verdict"] != "set by hand" for row in c.jev.journal.recent("default"))
+    assert SHOT not in SetpointMemory(str(tmp_path / "sp.json")).zone("default", 1)["written"]
+
+
 def test_a_rescue_shot_after_a_change_puts_it_back_and_pauses_the_zone(tmp_path):
     c, room = _Controller(tmp_path), _room()
     ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))

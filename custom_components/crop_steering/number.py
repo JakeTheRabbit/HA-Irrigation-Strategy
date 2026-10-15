@@ -14,7 +14,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.helpers.restore_state import async_get as restore_state_data
 
 from .bounds import check_held_values, daily_volume_bound, shot_duration_bound
-from . import setpoint_log
+from . import overlays, setpoint_log
 from .const import (
     DOMAIN,
     CONF_NUM_ZONES,
@@ -1024,7 +1024,8 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             )
 
     async def async_set_native_value(self, value: float) -> None:
-        """Update the value, and append who moved it from what to the room's change log. A moisture
+        """Update the value, append who moved it from what to the room's change log, and open or end an
+        AI overlay. A moisture
         level that breaks the ladder's order is refused (ladder.py); a recipe stage is judged as one set
         before any of it is written."""
         key = self.entity_description.key
@@ -1051,7 +1052,14 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         check_held_values(self.hass, self._entry, self._room.values())
         log = setpoint_log.log_for(self.hass, self._entry.entry_id)
         if log is not None:
-            await log.record(self.entity_id, key, self._zone_num, old, value, self._context)
+            who, expires = await log.record(
+                self.entity_id, key, self._zone_num, old, value, self._context
+            )
+            held = overlays.overlays_for(self.hass, self._entry.entry_id)
+            if held is not None:
+                await held.written(
+                    self.entity_id, key, self._zone_num, old, value, who, expires
+                )
 
     @property
     def available(self) -> bool:
