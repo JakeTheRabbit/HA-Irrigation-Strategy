@@ -75,9 +75,12 @@ ENTITY_DEFAULTS_12C6D1A = {
     "max_daily_volume": 20.0,
     "p3_time_between_shots": 10.0,
     "sump_power_threshold_w": 20.0,
+    "p1_rise_pts": 0.5,
+    "p1_maximum_extra_shots": 3.0,
 }
 
-# The literal at each controller _zone_num call site at 12c6d1a, plus P3 Time Between Shots.
+# The literal at each controller _zone_num call site at 12c6d1a, plus P3 Time Between Shots and the P1 rise
+# and extra-shot settings (the engine constants P1_RISE_PTS and P1_MAX_EXTRA_SHOTS).
 CONTROLLER_FALLBACKS_12C6D1A = {
     "p2_vwc_threshold": 45,
     "p1_target_vwc": 60,
@@ -106,6 +109,8 @@ CONTROLLER_FALLBACKS_12C6D1A = {
     "drippers_per_plant": 1,
     "min_floor_drown_ceiling": 90,
     "p3_time_between_shots": 10.0,
+    "p1_rise_pts": 0.5,
+    "p1_maximum_extra_shots": 3,
 }
 
 

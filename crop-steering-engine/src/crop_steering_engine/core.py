@@ -19,7 +19,15 @@ PHASES = ("P0", "P1", "P2", "P3")
 EC_SETTLE_MIN = 45.0
 # P1 ends when a shot at or over the P1 target no longer raises the zone's highest reading by this much (a rule
 # adopted on 6 Oct 2026): reach the target, give one more shot, and if the peak did not rise, the slab is full.
+# It is the fallback of the zone's p1_rise_pts setting (ZoneParams.p1_rise_pts).
 P1_RISE_PTS = 0.5
+# With the zone's learned gain known, a rise also has to reach this share of what the last shot should have lifted
+# (the auto setpoints' own plateau test), so a probe that moves a lot per shot is not kept in P1 by its noise.
+P1_RISE_GAIN_FRACTION = 0.3
+# Extra shots P1 may give once it has read its target: the fallback of p1_maximum_extra_shots.
+P1_MAX_EXTRA_SHOTS = 3
+# Minutes of readings a settled moisture reading is the median of (settled_reading).
+SETTLED_VWC_MIN = 10.0
 
 
 class Reason(str):
@@ -37,12 +45,12 @@ class Reason(str):
 # Which shots may take a zone over its daily budget. The budget is a BUDGET, not a wall: routine and
 # EC-correction shots stop at it, rescues do not. P1 ramp shots are exempt because the ramp runs in full
 # and in order, whatever it is set to: it is bounded by p1_maximum_shots and its shot size, not the budget.
-# Kinds that never fire: idle (nothing due), block_high_ec, hold_high_ec, block_daily_cap.
+# Kinds that never fire: idle (nothing due), block_high_ec, hold_high_ec, block_daily_cap, hold_backed_up.
 CAP_EXEMPT = {
     "flush_high_ec": True,  # anti-lockout: pore EC at max_ec
     "p0_ec_flush": False,
     "p1_ramp": True,
-    "p1_extra": True,  # a P1 shot at or over the target, to see whether the slab still takes water
+    "p1_extra": False,  # a P1 shot at or over the target, to see whether the slab still takes water: budgeted
     "p1_flush": False,  # no longer fired (3.11.0); kept so an old reason's kind still has an entry
     "p2_rescue": True,  # pore EC within 1 of max_ec
     "p2_dilute": False,
@@ -97,6 +105,8 @@ class ZoneParams:
     #                                  still reading under the rescue level got another rescue every pass (60 s)
     #                                  until the water arrived. The gap counts from the last shot, so the first
     #                                  rescue of a night still goes at once. 0 = off. None: as before (no gap).
+    p1_rise_pts: float = P1_RISE_PTS  # an extra P1 shot that raises the reading less than this ends P1
+    p1_max_extra_shots: int = P1_MAX_EXTRA_SHOTS  # extra P1 shots after the target is read; at this many P1 ends
 
 
 @dataclass
@@ -133,6 +143,35 @@ class ZoneSnapshot:
     p1_reached: bool = False  # this P1 has read at or over its ceiling (the caller latches it)
     p1_peak_before_shot: float | None = None  # the zone's peak_vwc right before its last P1 shot
     p1_extra_shots: int = 0  # P1 shots fired after the ceiling was reached
+    vwc_settled: float | None = None  # the zone's settled moisture now (settled_reading), and the same right before
+    p1_settled_before_shot: float | None = None  # its last P1 shot: when both are given the rise is measured on them,
+    #                                              not on the raw peak, so one noisy reading cannot earn a shot
+    p1_expected_rise: float | None = None  # what the last P1 shot should have lifted the reading by, from the zone's
+    #                                        learned gain; None = not learned, and the rise is judged on p1_rise_pts
+
+
+def settled_reading(readings):
+    """PURE. The median of a run of moisture readings (the last SETTLED_VWC_MIN minutes of them), or None if there
+    are none: one jumpy reading moves it far less than it moves the latest reading or the running highest."""
+    vals = sorted(v for v in readings if v is not None and math.isfinite(v))
+    if not vals:
+        return None
+    mid = len(vals) // 2
+    return vals[mid] if len(vals) % 2 else (vals[mid - 1] + vals[mid]) / 2.0
+
+
+def p1_rise(s: ZoneSnapshot, p: ZoneParams):
+    """PURE. (rise, needed): how much the last P1 shot raised the zone's reading, settled when the caller gives both
+    settled readings and the zone's peak otherwise (None before the first extra shot), and the rise it needed to keep
+    P1 going: p1_rise_pts, or more once the learned gain says the shot should have lifted the reading further."""
+    if s.vwc_settled is not None and s.p1_settled_before_shot is not None:
+        rise = s.vwc_settled - s.p1_settled_before_shot
+    else:
+        rise = None if s.p1_peak_before_shot is None else s.peak_vwc - s.p1_peak_before_shot
+    need = p.p1_rise_pts
+    if s.p1_expected_rise is not None and math.isfinite(s.p1_expected_rise) and s.p1_expected_rise > 0:
+        need = max(need, P1_RISE_GAIN_FRACTION * s.p1_expected_rise)
+    return rise, need
 
 
 def floor_share(s: ZoneSnapshot, p: ZoneParams) -> float:
@@ -225,14 +264,22 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
         # not. The maximum shots still end P1. There is deliberately NO time-based exit: a zone gate-blocked before or
         # during the ramp (feed pH/EC, dosing hold) waits in P1 and resumes; lights-off -> P3 (above) is the only
         # other way out. Pore EC no longer holds P1 open: P2's dilute shots correct it.
+        # The rise is measured on settled readings when the caller has them (p1_rise), the extra shots stop at
+        # p1_max_extra_shots, and they come out of the daily budget: a spent budget at the target ends P1.
         p1_ceiling = min(p.p1_target, p.field_capacity)
         reached = s.p1_reached or s.vwc >= p1_ceiling
-        rise = None if s.p1_peak_before_shot is None else s.peak_vwc - s.p1_peak_before_shot
+        rise, need = p1_rise(s, p)
+        waited = s.minutes_since_shot >= p.p1_time_between_min
         if s.shot_count >= p.p1_max_shots:
             phase, treason = "P2", f"P1 max shots {s.shot_count}/{p.p1_max_shots}"
+        elif reached and s.p1_extra_shots >= p.p1_max_extra_shots and waited:
+            phase, treason = "P2", f"P1 extra shots {s.p1_extra_shots}/{p.p1_max_extra_shots}"
+        elif reached and s.daily_vol >= p.max_daily_volume:
+            phase, treason = "P2", f"P1 at its target with the daily budget spent ({s.daily_vol:.0f}/{p.max_daily_volume:.0f}L)"
         elif (reached and s.shot_count >= p.p1_min_shots and s.p1_extra_shots >= 1
-              and s.minutes_since_shot >= p.p1_time_between_min and rise is not None and rise < P1_RISE_PTS):
-            phase, treason = "P2", f"P1 full: the last shot raised the peak {max(rise, 0.0):.1f} (< {P1_RISE_PTS:g})"
+              and waited and rise is not None and rise < need):
+            what = "settled reading" if s.vwc_settled is not None and s.p1_settled_before_shot is not None else "peak"
+            phase, treason = "P2", f"P1 full: the last shot raised the {what} {max(rise, 0.0):.1f} (< {round(need, 2):g})"
     elif phase == "P2":
         # predictive P3: only if starting dryback NOW would finish by lights-on.
         if s.uptime_min >= 10 and s.vwc >= p.p3_emergency_floor and s.hours_to_lights_off <= 3.0:
@@ -302,14 +349,17 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
             if s.minutes_since_shot >= p.p1_time_between_min:
                 raw = min(p.p1_initial + p.p1_incr * s.shot_count,
                           p.p1_initial + p.p1_incr * p.p1_max_shots)
+                rise, _need = p1_rise(s, p)
                 if not reached:
                     ir, kind = f"P1 ramp VWC {s.vwc:.0f}<{p1_ceiling:.0f}", "p1_ramp"
-                elif s.p1_extra_shots == 0 or s.p1_peak_before_shot is None:
+                elif s.backed_up:  # CS-310: the table is not draining, so no extra water goes into it
+                    ir, kind = "HOLD P1 extra shot: the table is not draining", "hold_backed_up"
+                elif s.p1_extra_shots == 0 or rise is None:
                     ir, kind = f"P1 extra shot at the target {p1_ceiling:.0f}", "p1_extra"
                 else:
-                    ir, kind = (f"P1 extra shot: the last one raised the peak "
-                                f"{s.peak_vwc - s.p1_peak_before_shot:.1f}"), "p1_extra"
-                fire, size = True, ec_adjust(raw, ec, p.ec_target_p1)
+                    ir, kind = f"P1 extra shot: the last one raised the peak {rise:.1f}", "p1_extra"
+                if kind != "hold_backed_up":
+                    fire, size = True, ec_adjust(raw, ec, p.ec_target_p1)
         elif phase == "P2":
             if ec_known and ec >= p.max_ec - 1.0 and flush_ok and ec_gap_ok:
                 fire, size, ir, kind = True, p.p2_shot_size * 1.5, f"P2 rescue flush EC {ec:.1f}", "p2_rescue"
@@ -406,10 +456,10 @@ def waiting_for(s: ZoneSnapshot, p: ZoneParams) -> list:
         if s.shot_count < p.p1_max_shots and not s.steering_held and not reached:
             add("p1_ramp", shot=True, metric="vwc", op="<", value=ceiling, now=s.vwc,
                 in_min=p.p1_time_between_min - s.minutes_since_shot)
-        # At the target: one more shot, then P2 once a shot no longer raises the peak by P1_RISE_PTS.
+        # At the target: one more shot, then P2 once a shot no longer raises the reading by the rise it needs.
         add("p1_done", to="P2", metric="vwc", op=">=", value=ceiling, now=s.vwc,
             shots_left=max(0, p.p1_min_shots - s.shot_count, 0 if s.p1_extra_shots else 1), ec_max=None, ec_now=None,
-            rise_min=P1_RISE_PTS)
+            rise_min=round(p1_rise(s, p)[1], 2))
         add("p1_max_shots", to="P2", shots_left=max(0, p.p1_max_shots - s.shot_count))
     elif s.phase == "P2":
         if not s.steering_held:
@@ -509,6 +559,7 @@ _PARAM_BOUNDS = {
     "p0_max_wait_min": (5.0, 240.0), "p3_emergency_shot": (0.5, 15.0),
     "max_daily_volume": (10.0, 2000.0), "min_daily_volume": (0.0, 500.0),
     "drown_ceiling": (50.0, 100.0), "min_floor_finish_h": (0.0, 12.0),
+    "p1_rise_pts": (0.1, 5.0), "p1_max_extra_shots": (1.0, 10.0),
 }
 
 
@@ -519,7 +570,7 @@ def validate_params(p):
         v = getattr(p, name)
         if v < lo or v > hi:
             nv = max(lo, min(hi, v))
-            if name == "p1_max_shots":
+            if name in ("p1_max_shots", "p1_max_extra_shots"):
                 nv = int(nv)
             fixes[name] = nv
             warns.append(f"{name}={v:g} out of [{lo:g},{hi:g}] -> clamped to {nv:g}")

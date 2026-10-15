@@ -39,6 +39,8 @@ entities scale with your zone count, `N` = 1…zones).
 | `p1_shot_size_increment` | 0.05-10 | 0.5 | % | How much each successive shot grows. |
 | `p1_minimum_shots` | 1-20 | 3 | - | Minimum shots before P1 may exit. |
 | `p1_maximum_shots` | 1-30 | 6 | - | After this many shots P1 exits to P2 even if the target wasn't hit. |
+| `p1_rise_pts` | 0.1-5 | 0.5 | % | Once P1 reads its target it gives one more shot, and another while each raises the settled moisture reading (the median of the last 10 minutes) by at least this much, or by 0.3 of what the zone's learned gain says the shot should give if that is more. |
+| `p1_maximum_extra_shots` | 1-10 | 3 | - | The most extra shots P1 gives after reading its target; at this many it moves to P2. Extra shots count toward the daily water limit, and none is given while the table is not draining (CS-310). |
 | `p1_target_vwc` | 5-95 | 65 | % | VWC that ends the ramp and moves the zone to P2. |
 | `p1_time_between_shots` | 1-60 | 15 | min | Spacing between ramp shots. |
 
@@ -95,11 +97,12 @@ The active EC target = the row for the current phase **and** the zone's steering
 ## 2. Numbers: per-zone overrides (`number.crop_steering_zone_N_*`)
 
 Every zone gets its own copy of the setpoints below. The engine uses the zone's value
-for that zone. (3 zones × 24 = 72 entities on a 3-zone system.)
+for that zone. (3 zones × 26 = 78 entities on a 3-zone system.)
 
 **Per-zone copies of the global setpoints:** `p0_dryback_drop_percent`,
 `p0_maximum_wait_time`, `p1_initial_shot_size`, `p1_shot_size_increment`,
-`p1_minimum_shots`, `p1_maximum_shots`, `p1_target_vwc`, `p1_time_between_shots`,
+`p1_minimum_shots`, `p1_maximum_shots`, `p1_rise_pts`, `p1_maximum_extra_shots`, `p1_target_vwc`,
+`p1_time_between_shots`,
 `p2_vwc_threshold`, `p2_shot_size`, `p3_emergency_vwc_threshold`,
 `p3_emergency_shot_size`, `p3_time_between_shots`, `vegetative_dryback_target`, `generative_dryback_target`,
 `ec_target_veg_p0` to `_p2`, `ec_target_gen_p0` to `_p2`, `field_capacity`,

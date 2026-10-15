@@ -58,7 +58,9 @@ from crop_steering_engine import (
     zone_safety_status,
     system_safety_status,
     zone_status_label,
+    settled_reading,
 )
+from crop_steering_engine.core import SETTLED_VWC_MIN
 # What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
 # controller column of the one defaults table, pinned to the values installed controllers use.
 from crop_steering_engine.defaults import CONTROLLER_FALLBACKS as FALLBACK
@@ -1198,6 +1200,8 @@ class Controller:
             "p1_extra": 0,  # ...and the P1 shots fired since the target was reached
             "capped_in_a_row": 0,  # CS-312: the shots in a row cut to the room's maximum shot length
             "max_run_latch": None,  # ...and, once latched, {"since", "resets"} (_count_capped)
+            "p1_settled_before": None,  # ...its settled reading right before its last P1 shot (core.settled_reading)
+            "p1_expected_rise": None,  # ...and what that shot should lift it by, from the learned gain
             **zone_history.fresh(),
         }
 
@@ -1281,6 +1285,13 @@ class Controller:
         latch = d.get("max_run_latch")
         if isinstance(latch, dict) and type(latch.get("resets")) is int and isinstance(latch.get("since"), str):
             s["max_run_latch"] = {"since": latch["since"], "resets": latch["resets"]}
+        for key in ("p1_settled_before", "p1_expected_rise"):  # absent before the settled P1 rise: None
+            try:
+                value = float(d.get(key))
+                if math.isfinite(value) and 0.0 < value <= 100.0:
+                    s[key] = value
+            except (TypeError, ValueError):
+                pass
         try:  # absent before 3.11.0: None, and the grow-day in progress stands in (_vwc_maxima)
             prev = float(d.get("peak_prev"))
             if math.isfinite(prev) and 0.0 < prev <= 100.0:
@@ -1643,6 +1654,8 @@ class Controller:
             "p1_extra": int(s.get("p1_extra") or 0),
             "capped_in_a_row": int(s.get("capped_in_a_row") or 0),
             "max_run_latch": s.get("max_run_latch"),
+            "p1_settled_before": s.get("p1_settled_before"),
+            "p1_expected_rise": s.get("p1_expected_rise"),
             "shots": s.get("shots"),
             "daily_vol": s.get("daily_vol"),
             "water_history": s.get("water_history"),
@@ -2061,6 +2074,10 @@ class Controller:
             p1_incr=self._zone_num(room, zone, "p1_shot_size_increment", FALLBACK["p1_shot_size_increment"]),
             p1_max_shots=int(self._zone_num(room, zone, "p1_maximum_shots", FALLBACK["p1_maximum_shots"])),
             p1_min_shots=int(self._zone_num(room, zone, "p1_minimum_shots", FALLBACK["p1_minimum_shots"])),
+            # new settings: an integration older than them has no such number, and the fallback is the rule as it was
+            p1_rise_pts=self._zone_num(room, zone, "p1_rise_pts", FALLBACK["p1_rise_pts"], optional=True),
+            p1_max_extra_shots=int(self._zone_num(
+                room, zone, "p1_maximum_extra_shots", FALLBACK["p1_maximum_extra_shots"], optional=True)),
             p1_time_between_min=self._zone_num(room, zone, "p1_time_between_shots", FALLBACK["p1_time_between_shots"]),
             dryback_target=self._zone_num(
                 room,
@@ -2182,11 +2199,26 @@ class Controller:
             p1_reached=bool(st.get("p1_reached")),
             p1_peak_before_shot=st.get("p1_peak_before"),
             p1_extra_shots=int(st.get("p1_extra") or 0),
+            # ...measured on settled readings, against what the learned gain says the shot should have given
+            vwc_settled=self._settled_vwc(st),
+            p1_settled_before_shot=st.get("p1_settled_before"),
+            p1_expected_rise=st.get("p1_expected_rise"),
             ec_settled=ec_settled,
             # a held plan holds the steering; decide() then fires only the rescues (PLAN_HOLD_EXEMPT)
             steering_held=bool(strategy_block(getattr(room, "strategy_snapshot", None), zone)),
         )
         return snap, self._params(room, zone, ec_known=ec is not None)
+
+    @staticmethod
+    def _settled_vwc(st):
+        """The zone's settled moisture reading (core.settled_reading): the median of its readings over the last
+        SETTLED_VWC_MIN minutes, since its last shot. None before the first reading."""
+        win = st.get("win") or []
+        if not win:
+            return None
+        start = win[-1][0] - timedelta(minutes=SETTLED_VWC_MIN)
+        last = st.get("last_shot")
+        return settled_reading([v for t, v in win if t > start and not (isinstance(last, datetime) and t <= last)])
 
     def _settled_ec(self, st, ec, now):
         """The pore EC the engine's EC rules act on (ZoneSnapshot.ec_settled).
@@ -3438,6 +3470,9 @@ class Controller:
             log("zone history error", room.slug, zone, e)
         if st.get("phase") == "P1":  # the P1 rule (core.decide): did this shot raise the peak?
             st["p1_peak_before"] = st.get("peak")
+            st["p1_settled_before"] = self._settled_vwc(st)
+            gain = st["learn"].get("gain")
+            st["p1_expected_rise"] = round(gain * size_pct, 2) if gain and size_pct > 0 else None
             if st.get("p1_reached"):
                 st["p1_extra"] = int(st.get("p1_extra") or 0) + 1
         st["shots"] += 1
@@ -3456,6 +3491,7 @@ class Controller:
         P1 handing over to P2 is the day's plateau. A history error never stops the phase change."""
         if new == "P1":  # the P1 rule (core.decide) starts again
             st["p1_reached"], st["p1_peak_before"], st["p1_extra"] = False, None, 0
+            st["p1_settled_before"], st["p1_expected_rise"] = None, None
         try:
             entry = zone_history.phase_changed(st, was, new, day=self._grow_day_start(room, now).isoformat(), how=how)
             if entry is not None:
