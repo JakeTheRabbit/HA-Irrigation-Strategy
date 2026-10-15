@@ -71,9 +71,10 @@ DEFAULTS = {
     "ec_target_gen_p1": (5.0, 5),
     "ec_target_gen_p2": (6.0, 6),
     "ec_target_gen_p3": (4.5, None),
-    # Source-water bands (0 = that band is off)
-    "irrigation_ph_min": (5.8, None),
-    "irrigation_ph_max": (6.2, None),
+    # Source-water bands (0 = that band is off). A new room's pH band; a room that
+    # already has these numbers keeps its own (restored), so an update never moves it.
+    "irrigation_ph_min": (5.5, None),
+    "irrigation_ph_max": (6.5, None),
     "irrigation_ec_min": (0.0, None),
     "irrigation_ec_max": (0.0, None),
     # Photoperiod

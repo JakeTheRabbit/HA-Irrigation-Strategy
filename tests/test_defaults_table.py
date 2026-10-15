@@ -5,7 +5,8 @@ Before the table, the same settings had two sets of built-in values: the integra
 can be read, around a Home Assistant restart for example). They disagree for some settings, and both
 are what installed rooms run on today. The table keeps both columns, so this pins each column to the
 values the release before it shipped (Jev 3.11.1, commit 12c6d1a), plus the P3 Time Between Shots
-added since at 10 minutes in both. Making the columns agree is a change of its own, with a bold line
+added since at 10 minutes in both, and the source-water pH band a new room
+starts with, 5.5-6.5 (a room that has a band keeps its own). Making the columns agree is a change of its own, with a bold line
 in the changelog; it is never a side effect of editing the table.
 
 The controller half is checked where it is used: every _zone_num call reads its fallback from the
@@ -63,8 +64,8 @@ ENTITY_DEFAULTS_12C6D1A = {
     "ec_target_gen_p1": 5.0,
     "ec_target_gen_p2": 6.0,
     "ec_target_gen_p3": 4.5,
-    "irrigation_ph_min": 5.8,
-    "irrigation_ph_max": 6.2,
+    "irrigation_ph_min": 5.5,
+    "irrigation_ph_max": 6.5,
     "irrigation_ec_min": 0.0,
     "irrigation_ec_max": 0.0,
     "lights_on_hour": 12,
