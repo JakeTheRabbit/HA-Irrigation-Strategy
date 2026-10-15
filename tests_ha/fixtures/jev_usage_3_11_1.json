@@ -1,0 +1,14 @@
+{
+ "_about": "The /data/jev_usage.json Jev 3.11.1 wrote beside state_3_11_1_learn_jev.json (the same run): the day's calls through its stubbed Cloudflare route. Its ledger and journal are left out.",
+ "usage": {
+  "day": "2026-10-14",
+  "calls": 202,
+  "errors": 0,
+  "input_tokens": 181800,
+  "last_error": null,
+  "retries": 0,
+  "failovers": 0,
+  "reasks": 128,
+  "warned": false
+ }
+}
