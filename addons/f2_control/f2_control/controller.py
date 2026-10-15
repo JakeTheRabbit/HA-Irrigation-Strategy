@@ -332,6 +332,11 @@ def _on_since_shot(history, started):
 # daily budget) still applies to them.
 PLAN_HOLD_EXEMPT = frozenset({"p3_emergency", "watchdog", "min_daily", "blind_fallback", "blind_copy_rescue"})
 
+# Minutes from the last shot before a P2 top-up may go, when the room has no P2 Time Between Shots number (an
+# integration older than it): the number's own default, off, so a controller-only update tops up as before.
+# tests/test_p2_time_between_shots_default.py keeps the two equal.
+P2_TIME_BETWEEN_SHOTS_MIN = 0.0
+
 # Who gets which phone push is the integration's, for the whole site (docs/NOTIFICATIONS.md): it publishes how
 # many phones are set up, and the watering-stopped threshold, here. Read at most once a minute.
 NOTIFY_CONFIG = "sensor.crop_steering_notify_config"
@@ -1628,6 +1633,9 @@ class Controller:
             ec_target_p2=self._zone_num(room, zone, f"ec_target_{sfx}_p2", 6),
             p3_emergency_floor=efloor,
             p3_emergency_shot=self._zone_num(room, zone, "p3_emergency_shot_size", 2),
+            p2_time_between_min=self._zone_num(
+                room, zone, "p2_time_between_shots", P2_TIME_BETWEEN_SHOTS_MIN, optional=True
+            ),
             # Fallback used ONLY when a zone has no readable max_daily_volume entity — e.g. a zone the
             # engine detected from its VWC sensor but the integration never built a cap entity for
             # (num_zones < detected zones). Must fail LOW: the integration's own entity maxes at 200 L,
