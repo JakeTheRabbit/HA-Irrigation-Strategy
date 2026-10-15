@@ -41,17 +41,65 @@
   background: var(--surface);
   color: var(--foreground);
 }
-.targets-more,
 .targets-rest {
   margin: 10px 0 0;
   border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
 }
-.targets-more > summary {
-  cursor: pointer;
-  padding: 10px 20px;
+.targets-consequence {
+  flex-basis: 100%;
+  margin: 0;
   color: var(--muted-foreground);
-  font-size: var(--text-sm);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.targets-table thead th {
+  padding-top: 2px;
+  padding-bottom: 2px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
   font-weight: 600;
+}
+.targets-other {
+  width: 1%;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+}
+/* Edit → Review → Apply & verify: where a change to the targets is. */
+.workflow-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 28px;
+  align-items: center;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.workflow-steps li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.workflow-steps i {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-style: normal;
+}
+.workflow-steps [aria-current] {
+  color: var(--primary-strong);
+  font-weight: 600;
+}
+.workflow-steps [aria-current] i {
+  border-color: var(--primary-strong);
+  background: var(--primary);
+  color: var(--primary-foreground);
 }
 .targets-rest h3 {
   padding: 12px 20px 4px;
@@ -85,7 +133,16 @@
   .targets-choice {
     margin: 0 14px 8px;
   }
-  .targets-more > summary,
+  .targets-table thead,
+  .targets-other[data-same] {
+    display: none;
+  }
+  .targets-other::before {
+    content: "Other mode: ";
+  }
+  .workflow-steps {
+    gap: 6px 14px;
+  }
   .targets-rest h3 {
     padding-left: 14px;
     padding-right: 14px;

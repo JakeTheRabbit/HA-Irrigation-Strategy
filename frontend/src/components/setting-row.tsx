@@ -34,6 +34,7 @@ export function SettingRow({
   auto,
   readOnly,
   disabled,
+  other,
   onEdit,
 }: {
   setting: Setting;
@@ -49,6 +50,8 @@ export function SettingRow({
   /** Shown, not edited: an armed grow plan owns it. */
   readOnly?: boolean;
   disabled: boolean;
+  /** The other steering mode's value, muted in its own column; undefined for a table without one. */
+  other?: string | null;
   onEdit: (setting: Setting, value: string) => void;
 }) {
   const error = draft ? validateSetpoint(setting, draft.value) : "";
@@ -103,6 +106,11 @@ export function SettingRow({
           )}
           <span className="targets-unit">{unit}</span>
         </td>
+        {other !== undefined && (
+          <td className="targets-other" data-same={other === null || undefined}>
+            {other ?? "same"}
+          </td>
+        )}
         <td className="targets-chip">
           {chip && <span className="jev-chip">{chip}</span>}
           {auto && <AutoBadge />}
@@ -110,7 +118,7 @@ export function SettingRow({
       </tr>
       {context && (
         <tr className="targets-note" id={`note-${setting.entityId}`}>
-          <td colSpan={3}>
+          <td colSpan={other === undefined ? 3 : 4}>
             {note && <p className={error ? "field-error" : undefined}>{note}</p>}
             {auto && draft && (
               <p className="setting-auto-hint">
