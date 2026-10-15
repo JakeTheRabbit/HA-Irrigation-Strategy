@@ -97,8 +97,19 @@ describe("the menu", () => {
     );
     expect(sectionOf("zone")).toBe("today");
     expect(sectionOf("help")).toBe("settings");
-    expect(sectionOf("equipment/tank")).toBe("equipment");
+    expect(sectionOf("equipment/feed")).toBe("equipment");
     expect(sectionOf("equipment/dosing")).toBe("equipment");
+  });
+  it("opens the tank and its feed under Equipment, the old tank address included", () => {
+    expect(parseRoute("#/equipment/feed")).toEqual({
+      route: { page: "equipment/feed" },
+      canonical: true,
+    });
+    expect(parseRoute("#/equipment/tank")).toEqual({
+      route: { page: "equipment/feed" },
+      canonical: false,
+    });
+    expect(canonicalHash("#/equipment/tank")).toBe("#/equipment/feed");
   });
   it("opens each room's batch-tank dosing under Equipment", () => {
     expect(parseRoute("#/equipment/dosing")).toEqual({
