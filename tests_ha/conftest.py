@@ -18,6 +18,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import custom_components
 import pytest
+from aiohttp.test_utils import TestServer
 from homeassistant.setup import async_setup_component
 
 # The test plugin ships its own `custom_components` package (its sample integrations) and imports it
@@ -47,17 +48,25 @@ def _custom_integrations(hass, enable_custom_integrations):
 
 
 @pytest.fixture
-async def real_api(hass, aiohttp_client, socket_enabled):
+async def real_api(hass, socket_enabled):
     """Home Assistant's real REST API, with its auth and ban middlewares, served on a loopback port:
     the address (ending in /api) for the controller's own `requests` code. The one thing stood in for
     is the HTTP component's own listener start, which would bind port 8123. A module that uses this
     overrides `_custom_integrations` (above, which puts a MagicMock in place of `http`) with one that
-    only enables the custom integrations."""
+    only enables the custom integrations.
+
+    Only a server is started, never an aiohttp client: nothing here sends through aiohttp, and a
+    client's session builds aiohttp's DNS resolver, which with aiodns installed creates a pycares
+    channel, and a recent pycares starts a process-long thread for it that the test plugin's
+    leaked-thread check fails on (the plugin with Home Assistant 2024.10 predates that thread)."""
     with patch("homeassistant.components.http.HomeAssistantHTTP.start", AsyncMock()):
         assert await async_setup_component(hass, "http", {})
         assert await async_setup_component(hass, "api", {})
-    client = await aiohttp_client(hass.http.app)
-    return str(client.make_url("/api"))
+    server = TestServer(hass.http.app)
+    server.app._router.freeze = lambda: None  # as the plugin's aiohttp_client: views added later still serve
+    await server.start_server()
+    yield str(server.make_url("/api"))
+    await server.close()
 
 
 # ------------------------------------------------------------------ seeded old installs
