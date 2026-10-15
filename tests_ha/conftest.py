@@ -14,10 +14,11 @@ import json
 import os
 import sys
 from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import custom_components
 import pytest
+from homeassistant.setup import async_setup_component
 
 # The test plugin ships its own `custom_components` package (its sample integrations) and imports it
 # first, so Home Assistant's loader would never look in this repository. Add ours to that package's
@@ -43,6 +44,20 @@ def _custom_integrations(hass, enable_custom_integrations):
     hass.config.components.update({"frontend", "http"})
     hass.http = MagicMock(async_register_static_paths=AsyncMock())
     yield
+
+
+@pytest.fixture
+async def real_api(hass, aiohttp_client, socket_enabled):
+    """Home Assistant's real REST API, with its auth and ban middlewares, served on a loopback port:
+    the address (ending in /api) for the controller's own `requests` code. The one thing stood in for
+    is the HTTP component's own listener start, which would bind port 8123. A module that uses this
+    overrides `_custom_integrations` (above, which puts a MagicMock in place of `http`) with one that
+    only enables the custom integrations."""
+    with patch("homeassistant.components.http.HomeAssistantHTTP.start", AsyncMock()):
+        assert await async_setup_component(hass, "http", {})
+        assert await async_setup_component(hass, "api", {})
+    client = await aiohttp_client(hass.http.app)
+    return str(client.make_url("/api"))
 
 
 # ------------------------------------------------------------------ seeded old installs
