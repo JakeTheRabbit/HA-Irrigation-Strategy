@@ -12,6 +12,9 @@ from .const import (
     SECONDS_PER_HOUR,
 )
 
+# The shortest shot the controller runs, in seconds (MIN_SHOT_S in the controller app).
+MIN_SHOT_S = 5
+
 
 def _combine(values, method):
     """Probe readings as one, by a PROBE_METHODS name; the median for any other."""
@@ -174,14 +177,34 @@ class ShotCalculator:
 
     @staticmethod
     def calculate_shot_duration(
-        dripper_flow: float, substrate_vol: float, shot_size: float
+        dripper_flow: float,
+        substrate_vol: float,
+        shot_size: float,
+        drippers_per_plant: float = 1,
     ) -> float:
-        """Calculate irrigation shot duration in seconds."""
+        """Seconds a shot of `shot_size`% of `substrate_vol` litres per plant takes through each
+        plant's `drippers_per_plant` drippers of `dripper_flow` L/hr. Plant count cancels: every
+        plant gets its own shot through its own drippers at once."""
         try:
-            if dripper_flow and dripper_flow > 0:
+            flow = dripper_flow * drippers_per_plant
+            if flow and flow > 0:
                 volume_to_add = substrate_vol * (shot_size * PERCENTAGE_TO_RATIO)
-                duration_hours = volume_to_add / dripper_flow
+                duration_hours = volume_to_add / flow
                 return round(duration_hours * SECONDS_PER_HOUR, 1)
             return 0.0
         except Exception:
             return 0.0
+
+    @staticmethod
+    def capped_shot_seconds(seconds: float, max_shot_seconds: float | None) -> int:
+        """What the controller runs a shot of `seconds` for: whole seconds, at least MIN_SHOT_S,
+        and no longer than the room's maximum shot length when that reads as one (5 s or more).
+        """
+        whole = int(seconds)
+        if (
+            max_shot_seconds is not None
+            and math.isfinite(max_shot_seconds)
+            and max_shot_seconds >= MIN_SHOT_S
+        ):
+            whole = min(int(max_shot_seconds), whole)
+        return max(MIN_SHOT_S, whole)
