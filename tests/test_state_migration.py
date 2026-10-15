@@ -315,3 +315,101 @@ def test_the_anchor_flag_round_trips_and_junk_is_tolerated(tmp_path):
     assert (
         third.rooms[0].state[1]["last_shot_is_anchor"] is False
     )  # invalid metadata cannot establish that an old timestamp was an anchor
+
+
+def test_a_learned_zone_saved_by_3_10_0_loads_without_the_retired_limit_keys(tmp_path):
+    """3.9.0 and 3.10.0 saved the 2-points-a-day limit's keys (day_ceiling, p1_entry,
+    stale_target) and the settled-reading keys (full_date, full_day, full_prev) in the learner
+    block. The limit is gone (6 Oct 2026): those keys are dropped on load, everything else the
+    learner had learned loads as it was."""
+    learned = {
+        "peak": 65.54,
+        "gain": 1.368,
+        "day": "2026-10-05",
+        "outcome": "reached",
+        "ramp": [{"pct": 2.0, "rise": 1.8, "settled": 47.9, "flat": False}],
+    }
+    retired = {
+        "day_ceiling": 50.0,
+        "p1_entry": 48.1,
+        "stale_target": False,
+        "full_date": "2026-10-05T10:00:00+13:00",
+        "full_day": 39.6,
+        "full_prev": None,
+    }
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"default": {"2": {"learn": {**learned, **retired}}}}),
+        encoding="utf-8",
+    )
+    c = _make([2], p)
+    c._load_state()
+    learn = c.rooms[0].state[2]["learn"]
+    assert {k: learn[k] for k in learned} == learned
+    assert not set(retired) & set(learn)
+
+
+def test_an_old_zone_loads_with_the_day_befores_peak_and_the_p1_rule_empty(tmp_path):
+    """Before 3.11.0 a zone kept no peak_prev (the grow-day before's highest reading, the next
+    P1 target) and no P1 rule state: it loads with them empty, its own peak as it was.
+    """
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"default": {"2": {"phase": "P3", "peak": 71.48, "shots": 7}}}),
+        encoding="utf-8",
+    )
+    c = _make([2], p)
+    c._load_state()
+    st = c.rooms[0].state[2]
+    assert (st["phase"], st["peak"], st["shots"]) == ("P3", 71.48, 7)
+    assert (
+        st["peak_prev"],
+        st["p1_reached"],
+        st["p1_peak_before"],
+        st["p1_extra"],
+    ) == (
+        None,
+        False,
+        None,
+        0,
+    )
+
+
+def test_an_old_file_without_history_loads_with_it_empty(tmp_path):
+    """3.8.0 kept no plateau or night history: its file loads as it was, history empty."""
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"default": {"1": {"phase": "P2", "peak": 36.1, "shots": 9}}}),
+        encoding="utf-8",
+    )
+    c = _make([1], p)
+    c._load_state()
+    st = c.rooms[0].state[1]
+    assert (st["phase"], st["peak"], st["shots"]) == ("P2", 36.1, 9)
+    assert (st["plateau_hist"], st["night_hist"], st["night"]) == ([], [], None)
+
+
+def test_the_history_survives_a_restart_and_junk_in_it_is_dropped(tmp_path):
+    p = tmp_path / "state.json"
+    c = _make([1], p)
+    c._load_state()
+    plateau = {"date": "2026-10-01", "value": 36.0, "how": "P1 recovered", "shots": 6}
+    night = {
+        "off_at": "2026-10-01T22:00:00",
+        "off_vwc": 32.78,
+        "plateau": 36.0,
+        "day": "2026-10-01",
+        "on_at": None,
+        "on_vwc": None,
+        "on_shots": 0,
+        "shots": 0,
+        "end_at": None,
+        "end_vwc": None,
+    }
+    c.rooms[0].state[1].update(plateau_hist=[plateau, "junk"], night=night)
+    c._save_state()
+    c2 = _make([1], p)
+    c2._load_state()
+    st = c2.rooms[0].state[1]
+    assert st["plateau_hist"] == [plateau] and st["night_hist"] == []
+    assert st["night"] == night

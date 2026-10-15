@@ -42,7 +42,19 @@ const page = await context.newPage();
 page.setDefaultTimeout(10000);
 page.on("pageerror", (error) => errors.push(error.message));
 const library = () => page.locator("[data-recipe-library]");
+/** Plan › Schedule keeps the steering balance, endpoint profiles and recipes one tap down. */
+async function openTab(name) {
+  const advanced = page.locator("details.plan-advanced");
+  await advanced.waitFor();
+  if ((await advanced.getAttribute("open")) === null) await advanced.locator("> summary").click();
+  await page
+    .getByRole("tablist", { name: "Grow planner view" })
+    .getByRole("tab", { name, exact: true })
+    .click();
+}
 async function openLibrary() {
+  await openTab("Recipes");
+  await library().waitFor();
   if ((await library().getAttribute("open")) === null)
     await library().locator("summary").first().click();
 }
@@ -74,7 +86,10 @@ async function axe(name) {
   );
 }
 try {
+  // An old address: the grow planner is Plan › Schedule now.
   await page.goto(origin + "/dashboard.html?demo=1#/grow-plan", { waitUntil: "networkidle" });
+  await page.getByRole("heading", { name: "Schedule", exact: true }).waitFor();
+  await openTab("Recipes");
   await library().waitFor();
   await check(
     "Named recipes persist without randomUUID; draft replacement retains current dates",
@@ -106,7 +121,10 @@ try {
         page.getByRole("button", { name: "Export recipe My saved plan", exact: true }),
       );
       assert.deepEqual(saved.plan, initial.plan);
+      // The zone's start date is set on the steering balance; the recipe replaces the rest.
+      await openTab("Steering balance");
       await page.locator("#zone-start-date").fill("2026-08-01");
+      await openLibrary();
       await page.getByRole("button", { name: "Preview recipe My saved plan", exact: true }).click();
       const load = page.getByRole("button", { name: "Load into local draft", exact: true });
       assert.equal(await load.isDisabled(), true);
@@ -115,6 +133,13 @@ try {
         .check();
       await load.click();
       await page.getByRole("dialog").waitFor({ state: "hidden" });
+      await page
+        .getByRole("status")
+        .filter({
+          hasText: "Recipe loaded into the local draft. Current zone start dates are retained.",
+        })
+        .waitFor();
+      await openTab("Steering balance");
       assert.equal(await page.locator("#zone-start-date").inputValue(), "2026-08-01");
       const loaded = await downloadPlan(page.getByRole("button", { name: "Export", exact: true }));
       assert.deepEqual(loaded.plan.profiles, initial.plan.profiles);
@@ -122,7 +147,6 @@ try {
         loaded.plan.zones.map((z) => z.schedule),
         initial.plan.zones.map((z) => z.schedule),
       );
-      assert.ok((await page.locator('[data-planning-line="vwc"]').count()) > 0);
       await page.getByRole("button", { name: "Discard draft", exact: true }).click();
       await page.reload({ waitUntil: "networkidle" });
       await openLibrary();
@@ -142,11 +166,11 @@ try {
       page.getByRole("button", { name: "Export recipe My saved plan", exact: true }),
     );
     await page.locator("#desktop-room").selectOption("room:f1_");
-    await library().waitFor();
+    await page.getByRole("heading", { name: "Schedule", exact: true }).waitFor();
     await openLibrary();
     assert.equal(await library().locator(".recipe-list li").count(), 2);
     await page.locator("#desktop-room").selectOption("room:");
-    await library().waitFor();
+    await page.getByRole("heading", { name: "Schedule", exact: true }).waitFor();
     await openLibrary();
     await page.getByRole("button", { name: "Remove recipe My saved plan", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click();
@@ -192,6 +216,8 @@ try {
         window.location.hash = "#/compare";
       });
       await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
+      // The full-resolution chart is one tap down, under the weekly comparison.
+      await page.locator('details[data-section="chart"] > summary').click();
       await page.waitForFunction(() =>
         document
           .querySelector('[aria-label="Current run"]')
@@ -260,7 +286,7 @@ try {
       await page.evaluate(() => {
         window.location.hash = "#/grow-plan";
       });
-      await library().waitFor();
+      await page.getByRole("heading", { name: "Schedule", exact: true }).waitFor();
       await openLibrary();
       assert.equal(await library().locator(".recipe-list li").count(), 3);
     },

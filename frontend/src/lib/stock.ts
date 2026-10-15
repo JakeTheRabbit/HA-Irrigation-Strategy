@@ -15,8 +15,13 @@ export interface StockTank {
 }
 export interface StockBatch {
   at: string;
-  source: "fill" | "manual";
+  /** fill: counted from the tank's last fill; manual: recorded by hand; pump: what a linked dosing
+   * pump ran, whoever started it, drawn by the integration under its `key`; dose and batch: a
+   * dose reported through stock_draw, which takes only tanks no pump is linked to (and every tank
+   * before the integration watched the pumps). */
+  source: "fill" | "manual" | "pump" | "dose" | "batch";
   draw_ml: Record<string, number>;
+  key?: string;
 }
 export interface StockDocument {
   schema_version: 1;
@@ -43,6 +48,26 @@ export const stockShare = (tank: Pick<StockTank, "level_l" | "capacity_l">) =>
 
 export const batchesLeft = (tank: Pick<StockTank, "level_l">, doseMl: number | undefined) =>
   doseMl && doseMl > 0 ? Math.floor(Math.round(tank.level_l * 1000 * 1e6) / 1e6 / doseMl) : null;
+
+/** The tank that runs out first at today's doses, and about how many batches it has left: the
+ * fewest batches, then the emptiest. Null when no tank's dose is known. */
+export function nextToRunOut(
+  tanks: readonly StockTank[],
+  doses: Readonly<Record<string, number>>,
+): { tank: StockTank; batches: number } | null {
+  let next: { tank: StockTank; batches: number } | null = null;
+  for (const tank of tanks) {
+    const batches = batchesLeft(tank, doses[tank.id] ?? tank.dose_ml);
+    if (batches === null) continue;
+    if (
+      !next ||
+      batches < next.batches ||
+      (batches === next.batches && stockShare(tank) < stockShare(next.tank))
+    )
+      next = { tank, batches };
+  }
+  return next;
+}
 
 /** Red at or under the low mark, amber within half as much again, normal above. */
 export function stockTone(tank: Pick<StockTank, "level_l" | "low_l">): Tone {

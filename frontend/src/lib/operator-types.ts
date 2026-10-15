@@ -16,6 +16,12 @@ export type OperatorAction =
   | "stock_save"
   | "stock_refill"
   | "stock_record_batch"
+  | "dosing_get"
+  | "dosing_save"
+  | "dosing_request"
+  | "notify_get"
+  | "notify_save"
+  | "notify_test"
   | "whats_new_get"
   | "whats_new_seen";
 

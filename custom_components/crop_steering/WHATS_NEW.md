@@ -19,6 +19,109 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.11.1 - 2026-10-06
+
+- The re-water point and the rescue floor now always stay in the right order under field capacity, even when they all move down together.
+- After an update, the targets wait for the next lights-on before they follow the highest reading.
+- Bug fixes and improvements.
+
+## 3.11.0 - 2026-10-06
+
+- Each morning a zone's P1 target is its highest reading of the day before, with no limit on how far it moves.
+- The morning ramp now goes to the target, gives one more shot, and stops only when a shot no longer raises the reading.
+- Field capacity, the re-water point and the rescue floor move together with the highest reading.
+- Bug fixes and improvements.
+
+## 3.10.0 - 2026-10-06
+
+- A zone whose pore EC runs high is now flushed whenever its table drains, even when its probe reads very wet.
+- Field capacity now follows what the probe reads, and goes up the same day the probe reads higher.
+- When it moves, the P1 target, the re-water point and the rescue floor move with it, so the dryback stays the same.
+- Bug fixes and improvements.
+
+## 3.9.0 - 2026-10-05
+
+- Each zone's P1 target and field capacity are kept up to date again, rising at most 2 points a day and only after a morning ramp reached them.
+- Jev answers more often: it retries, asks another way when the first fails, and takes a second look when it is unsure.
+- A stock tank linked to a dosing pump now goes down by what the pump pumps. After updating, read each tank's level and press Set level once.
+- Tank & pump has a chart of the tank level over a day, 3 days or a week, with every shot, pump run and fill. Tap the zone chart's key to hide a line.
+- Bug fixes and improvements.
+
+## 3.8.0 - 2026-09-30
+
+- A critical alert when a zone's moisture rises with no water going in: its table isn't draining.
+- A critical alert when the sump pump hasn't run for three hours, once its power sensor is set in the controller app.
+- A zone whose table isn't draining gets no daily minimum until it has drained.
+- Bug fixes and improvements.
+
+## 3.7.0 - 2026-09-30
+
+- A zone's minimum water per plant per day is now spread evenly through the day, instead of all at lights-on.
+- It waits out the morning dryback, catches up in the ramp, and is all in three hours before lights-off.
+- Bug fixes and improvements.
+
+## 3.6.0 - 2026-09-30
+
+- Choose who gets which alerts: a row of checkboxes for each phone, and the rooms it covers, on Settings & help › Notifications.
+- New pushes to tick: a room that has watered nothing for a few hours with its lights on, a zone changing phase, and Jev moving a setting.
+- Tapping a push opens Crop Steering, and an emergency always reaches a phone, even when nobody ticked it for that room.
+- Bug fixes and improvements.
+
+## 3.5.0 - 2026-09-28
+
+- Dose a nutrient pump or make a whole batch from the new Dosing page, one per room's tank.
+- Stock tanks now follow what was actually dosed, and each pump shows how much is left.
+- A batch holds watering, and Stop works at any step.
+- Bug fixes and improvements.
+
+## 3.4.2 - 2026-09-28
+
+- A pump plug that is slow to report it has switched off no longer stops the room's watering.
+- Bug fixes and improvements.
+
+## 3.4.1 - 2026-09-28
+
+- The README explains the Jev edition from scratch, with a screenshot of every page where Jev shows.
+- The demo shows the range Jev may move the re-water point in, as the controller sets it.
+- Bug fixes and improvements.
+
+## 3.4.0 - 2026-09-28
+
+- The dashboard is simpler: Today, Plan, History and Equipment, plus a page for each zone.
+- Today fits one screen and flags a zone only when it needs you, with the reason.
+- Every decision Jev makes now sits in one timeline, with a tick or cross when its result is known.
+- Bug fixes and improvements.
+
+## 3.3.0 - 2026-09-28
+
+- Today's grow day is redrawn in the style of Athena's charts: one clear chart per zone, its numbers above it, the stage's targets on top.
+- Jev's decisions now show live: what it answered, what it asked for, and what the controller did about it.
+- Jev also knows Athena's crop-steering guide now, alongside your own doctrine, which still leads.
+- Bug fixes and improvements.
+
+## 3.2.0 - 2026-09-28
+
+- With Auto setpoints on, Jev may nudge each zone's maintenance shot size or re-water point one small step a night.
+- It stays close to your own values, your edits always win, and a change that needs a rescue shot is undone.
+- Bug fixes and improvements.
+
+## 3.1.0 - 2026-09-28
+
+- Every decision Jev makes is now recorded with what the controller did about it, ready for a live log on the dashboard.
+- Bug fixes and improvements.
+
+## 3.0.1 - 2026-09-27
+
+- When one zone gets far more water than the others, only that zone is flagged now; its neighbours no longer hear of a fault they don't have.
+- Bug fixes and improvements.
+
+## 3.0.0 - 2026-09-27
+
+- Jev now judges what the controller decided by fixed rules: when the ramp starts and ends, when watering stops, why pore EC moved, and probe trust.
+- Your own crop-steering doctrine is part of every judgement, and each zone is checked against today's stage of flower.
+- Every judgement shows on its zone with how sure Jev was. Without a Jev key the controller runs exactly as before.
+- Bug fixes and improvements.
+
 ## 2.25.1 - 2026-09-27
 
 - A zone with more than one moisture probe reads the middle one, and no longer jumps when a probe drops out or stops reporting.

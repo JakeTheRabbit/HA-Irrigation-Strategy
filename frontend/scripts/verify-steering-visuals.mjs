@@ -48,6 +48,10 @@ async function fresh(route) {
   await page.goto(`${origin}/dashboard.html?demo=1#/${route}`, { waitUntil: "networkidle" });
   await page.reload({ waitUntil: "networkidle" });
 }
+/** Moves within the page, so the demo keeps what this check changed (a reload resets it). */
+async function open(route) {
+  await page.evaluate((hash) => (location.hash = hash), `#/${route}`);
+}
 async function check(name, fn) {
   try {
     await fn();
@@ -74,6 +78,12 @@ async function axe(name) {
   );
 }
 async function noOverflow() {
+  // A new window size reaches the layout a frame or two after it is set.
+  await page
+    .waitForFunction(() => document.documentElement.scrollWidth <= innerWidth + 1, null, {
+      timeout: 2_000,
+    })
+    .catch(() => {});
   assert.equal(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
     true,
@@ -86,18 +96,15 @@ try {
   await check(
     "P3 floor follows numeric edits; saved baseline and room values remain unchanged",
     async () => {
+      // An old address: the targets are Plan › Targets, every phase in one table.
       await fresh("strategy");
-      await page.getByRole("heading", { name: "Today’s targets", exact: true }).waitFor();
-      await page
-        .getByRole("navigation", { name: "Setpoint phase" })
-        .getByRole("button", { name: "P3", exact: true })
-        .click();
+      await page.getByRole("heading", { name: "Targets", exact: true }).waitFor();
       const floor = field("p3_emergency_vwc_threshold");
       // Each zone's axis scales to its own recorded data, so zones are compared by value and a
       // zone's draft line only against that same zone's saved line, never by pixels across zones.
       const zoneTab = (n) =>
         page
-          .locator(".strategy-zone-picker")
+          .getByRole("navigation", { name: "Targets for" })
           .getByRole("button", { name: new RegExp("Zone " + n) });
       const otherFloor = page.locator(
         '[id="setting-number.crop_steering_zone_2_p3_emergency_vwc_threshold"]',
@@ -154,7 +161,7 @@ try {
     const shot = await pinned.newPage();
     shot.on("pageerror", (e) => errors.push(e.message));
     await shot.clock.setFixedTime(new Date(2026, 8, 20, 9, 0, 0));
-    await shot.goto(`${origin}/dashboard.html?demo=1#/strategy`, { waitUntil: "networkidle" });
+    await shot.goto(`${origin}/dashboard.html?demo=1#/plan/targets`, { waitUntil: "networkidle" });
     const graph = shot.locator(".planning-curve");
     await graph.locator('[data-planning-line="recorded-vwc"]').waitFor();
     assert.ok(await graph.locator('[data-planning-line="recorded-vwc-previous"]').count());
@@ -175,6 +182,9 @@ try {
     await graph.screenshot({
       path: fileURLToPath(new URL("../../img/plan-graph.png", import.meta.url)),
     });
+    // What the probes recorded over days, against the targets: on the zone's page, on request.
+    await shot.evaluate(() => (location.hash = "#/zone/1"));
+    await shot.locator("details.zone-recorded > summary").click();
     const history = shot
       .locator("section")
       .filter({ has: shot.getByRole("heading", { name: "Recorded sensor behaviour" }) })
@@ -188,16 +198,15 @@ try {
   });
   await check("Room off stands the room down and says so", async () => {
     await fresh("settings");
-    await page.getByRole("button", { name: "Switch room off…" }).click();
+    await page.getByRole("button", { name: "Switch room off…", exact: true }).click();
     await page.getByRole("button", { name: /^Apply 1 change/ }).click();
-    await page.getByRole("button", { name: "Switch room on…" }).first().waitFor();
+    await page.getByRole("button", { name: "Switch room on…", exact: true }).waitFor();
     // Same document, so the demo keeps its in-memory state; a reload would switch the room back on.
-    await page.evaluate(() => {
-      location.hash = "#/overview";
-    });
+    await open("overview");
     const banner = page.locator(".room-off-banner");
     await banner.waitFor();
     assert.match(await banner.innerText(), /no irrigation, no alerts/i);
+    assert.match(await page.locator('.room-chip[data-room="room:"]').innerText(), /Room off/);
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: fileURLToPath(new URL("../../img/room-off.png", import.meta.url)),
@@ -205,11 +214,7 @@ try {
     });
   });
   await check("P1 controls reshape preview; invalid drafts cannot apply", async () => {
-    await fresh("strategy");
-    await page
-      .getByRole("navigation", { name: "Setpoint phase" })
-      .getByRole("button", { name: "P1", exact: true })
-      .click();
+    await fresh("plan/targets");
     const target = field("p1_target_vwc");
     // The VWC axis scales to what is plotted, so compare what each line plots, not its pixels.
     const before = await line("vwc").getAttribute("data-planning-values");
@@ -227,11 +232,13 @@ try {
   await check(
     "Field capacity suggestion names its source, fills only the local draft and is never applied by itself",
     async () => {
-      await fresh("strategy");
+      // Full saturation is the substrate's: Equipment › Setup.
+      await fresh("equipment/setup");
+      const section = page.locator(".controller-settings");
       const capacity = field("field_capacity");
-      const context = page.locator('[id="context-number.crop_steering_zone_1_field_capacity"]');
+      const note = page.locator('[id="note-number.crop_steering_zone_1_field_capacity"]');
       // Zone 1's supervisor is tracking, so the controller has a learned peak to offer.
-      const learned = context.locator(".setting-suggestion");
+      const learned = note.locator(".setting-suggestion");
       await learned.waitFor();
       assert.match(
         await learned.innerText(),
@@ -239,34 +246,34 @@ try {
       );
       assert.equal(await capacity.inputValue(), "70", "A suggestion must not change the field");
       assert.equal(
-        await page.getByRole("button", { name: "Discard draft", exact: true }).count(),
+        await section.getByRole("button", { name: "Discard draft", exact: true }).count(),
         0,
         "A suggestion must not create a draft",
       );
-      await context.getByRole("button", { name: "Use 60% in draft", exact: true }).click();
+      await note.getByRole("button", { name: "Use 60% in draft", exact: true }).click();
       assert.equal(await capacity.inputValue(), "60", "The draft holds the suggested value");
       // Draft only: the controller keeps its saved value until the change is reviewed and applied.
-      await page.getByText("Currently 70 %", { exact: true }).waitFor();
+      await note.getByText("Currently 70 %", { exact: true }).waitFor();
       assert.equal(
-        await context.getByRole("button", { name: "Use 60% in draft", exact: true }).isDisabled(),
+        await note.getByRole("button", { name: "Use 60% in draft", exact: true }).isDisabled(),
         true,
       );
-      await page.getByRole("button", { name: /^Review 1 change/ }).click();
+      await section.getByRole("button", { name: /^Review 1 change/ }).click();
       assert.match(
         await page.getByRole("dialog").locator(".review-row").innerText(),
         /Zone 1 · Full saturation \(most it holds\)[\s\S]*70 %[\s\S]*60 %/,
       );
       await page.getByRole("button", { name: "Back to editing", exact: true }).click();
       await page.getByRole("dialog").waitFor({ state: "hidden" });
-      await page.getByRole("button", { name: "Discard draft", exact: true }).click();
+      await section.getByRole("button", { name: "Discard draft", exact: true }).click();
       assert.equal(await capacity.inputValue(), "70");
       // Zone 2's supervisor is still learning: the suggestion falls back to recorded history.
       await page
-        .locator(".strategy-zone-picker")
+        .getByRole("navigation", { name: "Settings for" })
         .getByRole("button", { name: /Zone 2/ })
         .click();
       const typical = page.locator(
-        '[id="context-number.crop_steering_zone_2_field_capacity"] .setting-suggestion',
+        '[id="note-number.crop_steering_zone_2_field_capacity"] .setting-suggestion',
       );
       await typical.waitFor();
       assert.match(
@@ -279,7 +286,9 @@ try {
   await check(
     "Runtime estimates show all-plant zone litres and per-plant water separately",
     async () => {
-      await fresh("strategy");
+      // What a shot delivers is set up with the drippers: Equipment › Setup, Water & calibration.
+      await fresh("equipment/setup");
+      await page.locator("details.controller-settings-water > summary").click();
       const water = page.getByRole("region", { name: "Zone 1 water delivery" });
       // A labelled section is exposed as a region by the accessibility tree.
       await water.getByLabel("Try a valve-open runtime · seconds").fill("120");
@@ -290,7 +299,8 @@ try {
       assert.match(await water.locator(".wd-effective").innerText(), /2\.4(?:0)? L \/ zone/);
       assert.match(await water.innerText(), /Total substrate capacity/);
       assert.match(await water.innerText(), /216/);
-      await fresh("zones");
+      // Water per plant today, zone by zone: History › Water use.
+      await fresh("history/water");
       const summary = page.locator(".wd-daily");
       const row = summary.getByRole("row").filter({ hasText: "Zone 1" });
       assert.match(await row.innerText(), /5\.3(?:0)? L/);
@@ -300,23 +310,24 @@ try {
   await check(
     "Register, compare and archive runs with bounded dates and room isolation",
     async () => {
-      await fresh("compare");
-      await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
-      await page.getByRole("img", { name: /Recorded VWC and EC/ }).waitFor();
+      // Run records are kept in Settings; History › Compare runs lines them up.
+      await fresh("settings");
+      const records = page.locator("#run-records");
+      await records.waitFor();
       const dateAgo = (days) => new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
       async function register(name, start, end = "") {
-        await page.getByRole("button", { name: "Add run", exact: true }).click();
+        await records.getByRole("button", { name: "Add run", exact: true }).click();
         await page.getByLabel("Run name", { exact: true }).fill(name);
         await page.getByLabel("Run start date", { exact: true }).fill(start);
         await page.getByLabel("Run end date", { exact: true }).fill(end);
         await page.getByRole("button", { name: "Save run record", exact: true }).click();
         await page.locator(".comparison-run-list article").filter({ hasText: name }).waitFor();
       }
-      await page.getByRole("button", { name: "Add run", exact: true }).click();
+      await records.getByRole("button", { name: "Add run", exact: true }).click();
       await page.getByLabel("Run name", { exact: true }).fill("Unsaved run draft");
       await page
         .locator(".desktop-sidebar")
-        .getByRole("button", { name: "Overview", exact: true })
+        .getByRole("button", { name: "Today", exact: true })
         .click();
       await page.getByRole("heading", { name: "Discard unsaved workspace changes?" }).waitFor();
       await page.getByRole("button", { name: "Keep editing", exact: true }).click();
@@ -327,6 +338,24 @@ try {
       await page.getByRole("button", { name: "Cancel", exact: true }).click();
       await register("Previous room run", dateAgo(80), dateAgo(50));
       await register("Current room run", dateAgo(16));
+      const downloaded = page.waitForEvent("download");
+      await records.getByRole("button", { name: "Export metadata", exact: true }).click();
+      const metadata = JSON.parse(await readFile(await (await downloaded).path(), "utf8"));
+      assert.equal(metadata.room_id, "room:");
+      assert.equal(metadata.runs.length, 5); // Three sample records plus this workflow's two.
+      assert.ok(metadata.runs.every((run) => run.zones.length === 3 && run.captured_at));
+      // Compared on History, in the same visit.
+      await page
+        .locator(".desktop-sidebar")
+        .getByRole("button", { name: "History", exact: true })
+        .click();
+      await page
+        .getByRole("navigation", { name: "History views" })
+        .getByRole("button", { name: "Compare runs", exact: true })
+        .click();
+      await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
+      await page.locator('details[data-section="chart"] > summary').click();
+      await page.getByRole("img", { name: /Recorded VWC and EC/ }).waitFor();
       await page
         .getByLabel("Previous run", { exact: true })
         .selectOption({ label: "Previous room run" });
@@ -347,11 +376,11 @@ try {
         .getByText("Loading selected-zone Recorder history…", { exact: true })
         .waitFor({ state: "hidden" });
       assert.ok(
-        (await page.locator('[data-comparison-series=\"target-floor\"]').count()) > 0,
+        (await page.locator('[data-comparison-series="target-floor"]').count()) > 0,
         "Daily P3 reference is rendered",
       );
       assert.ok(
-        (await page.locator('[data-comparison-series=\"target-vwc\"]').count()) > 0,
+        (await page.locator('[data-comparison-series="target-vwc"]').count()) > 0,
         "Full daily VWC reference is rendered",
       );
       await noOverflow();
@@ -364,18 +393,15 @@ try {
         path: fileURLToPath(new URL("../../img/run-comparison.png", import.meta.url)),
         fullPage: true,
       });
-      const downloaded = page.waitForEvent("download");
-      await page.getByRole("button", { name: "Export metadata", exact: true }).click();
-      const metadata = JSON.parse(await readFile(await (await downloaded).path(), "utf8"));
-      assert.equal(metadata.room_id, "room:");
-      assert.equal(metadata.runs.length, 5); // Three sample records plus this workflow's two.
-      assert.ok(metadata.runs.every((run) => run.zones.length === 3 && run.captured_at));
+      // Archived and restored in Settings; each room keeps its own records.
+      await page.getByRole("button", { name: "Run records", exact: true }).click();
+      await records.waitFor();
       const past = page
         .locator(".comparison-run-list article")
         .filter({ hasText: "Previous room run" });
       await past.getByRole("button", { name: "Archive", exact: true }).click();
       await past.waitFor({ state: "hidden" });
-      await page.getByLabel("Include archived run records").check();
+      await records.getByLabel("Include archived run records").check();
       await page
         .locator(".comparison-run-list article")
         .filter({ hasText: "Previous room run" })
@@ -399,6 +425,8 @@ try {
           .count(),
         0,
       );
+      await open("history/compare");
+      await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
       await page.setViewportSize({ width: 390, height: 844 });
       await noOverflow();
       await axe("mobile run comparison");
@@ -406,13 +434,9 @@ try {
       await page.setViewportSize({ width: 1600, height: 1100 });
     },
   );
-  await check("Mobile phase editing stays usable without page overflow", async () => {
+  await check("Mobile target editing stays usable without page overflow", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
-    await fresh("strategy");
-    await page
-      .getByRole("navigation", { name: "Setpoint phase" })
-      .getByRole("button", { name: "P3", exact: true })
-      .click();
+    await fresh("plan/targets");
     await field("p3_emergency_vwc_threshold").fill("40");
     await noOverflow();
     await axe("mobile setpoints");

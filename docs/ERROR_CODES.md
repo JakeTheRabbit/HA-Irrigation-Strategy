@@ -12,7 +12,7 @@ Most notifications are raised again, at most every 30 minutes, for as long as th
 and after 5 minutes when their code changes. A few are said once: CS-301 once per fault
 (dismissing it does not clear the hold), CS-403 once each time the controller app starts and
 CS-405 at start-up. Most stay in Home Assistant until you dismiss them, even after their cause
-has gone; the controller withdraws CS-201, CS-308 and CS-309 itself, and switching a room's
+has gone; the controller withdraws CS-201, CS-209, CS-308 and CS-309 itself, and switching a room's
 *Room Active* off clears its notifications.
 A room whose *Room Active* switch is off (nothing growing) raises no watering notifications; a
 setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still reported.
@@ -25,6 +25,8 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | CS-4xx | **Settings**: A setting is missing, out of range, or read from somewhere new. |
 | CS-5xx | **Checks across zones**: Advice from comparing a room's zones. |
 | CS-6xx | **Repairs cards**: Raised by the integration, under Settings → Repairs. |
+| CS-7xx | **Jev**: Jev's judgements about a zone (advice, a probe it set aside), and how Jev itself is doing: its calls running low, a judge on the stricter gate (docs/JEV.md). |
+| CS-8xx | **Dosing**: Batch-tank dosing: a dose or a batch that did not end as it should (docs/DOSING.md). |
 
 ## All codes
 
@@ -42,6 +44,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-206](#cs-206) | Root-zone EC too high, not watering | Warning | Notification |
 | [CS-207](#cs-207) | URGENT, drying out and not being watered | Critical | Notification |
 | [CS-208](#cs-208) | A retired switch is off, so watering was switched off | Warning | Notification |
+| [CS-209](#cs-209) | No watering for a while | Warning | Notification |
 | [CS-301](#cs-301) | CRITICAL hardware fault, watering stopped | Critical | Notification |
 | [CS-302](#cs-302) | Shot cancelled, the pump didn't switch on | Warning | Notification |
 | [CS-303](#cs-303) | Shot cancelled, the main-line valve didn't switch on | Warning | Notification |
@@ -51,6 +54,8 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-307](#cs-307) | Shot stopped early, something else closed the feed | Warning | Notification |
 | [CS-308](#cs-308) | CRITICAL, an interrupted shot's hardware is still ON | Critical | Notification |
 | [CS-309](#cs-309) | An interrupted shot's hardware may still be ON | Warning | Notification |
+| [CS-310](#cs-310) | Moisture rising with no water: the table is not draining | Critical | Notification |
+| [CS-311](#cs-311) | The sump pump has not run | Critical | Notification |
 | [CS-401](#cs-401) | Setting outside the engine's range | Warning | Notification |
 | [CS-402](#cs-402) | Settings missing, running on built-in values | Critical | Notification |
 | [CS-403](#cs-403) | Lights hours now come from the integration | Information | Notification |
@@ -65,6 +70,20 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-606](#cs-606) | Grow strategy plan is holding irrigation | Critical | Repairs card |
 | [CS-607](#cs-607) | Grow strategy plan has not moved on to today | Warning | Repairs card |
 | [CS-608](#cs-608) | Stock tanks running low | Warning | Repairs card |
+| [CS-701](#cs-701) | Water isn't reaching this zone | Warning | Notification |
+| [CS-702](#cs-702) | This zone's water per plant is out of line with the others | Information | Notification |
+| [CS-703](#cs-703) | Overnight low reading looks like a probe fault | Warning | Notification |
+| [CS-704](#cs-704) | Jev set this zone's probe aside | Warning | Notification |
+| [CS-705](#cs-705) | The zone is off the stage's arc | Information | Notification |
+| [CS-706](#cs-706) | Jev has used most of today's calls | Warning | Notification |
+| [CS-707](#cs-707) | Jev is on the stricter gate for this zone | Warning | Notification |
+| [CS-801](#cs-801) | A dosing pump ran past its time and was switched off | Critical | Notification |
+| [CS-802](#cs-802) | A dose could not be confirmed, or ended early | Warning | Notification |
+| [CS-803](#cs-803) | A dose or batch was interrupted by a restart | Warning | Notification |
+| [CS-804](#cs-804) | The batch tank could not be filled | Warning | Notification |
+| [CS-805](#cs-805) | The mixing pump did not start | Warning | Notification |
+| [CS-806](#cs-806) | Dosing was stopped, or needs a check | Warning | Notification |
+| [CS-807](#cs-807) | A dose was not taken off its stock tank | Warning | Notification |
 
 ## Sensors (CS-1xx)
 
@@ -329,6 +348,28 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 - Switch the named switch back on in Home Assistant (it is hidden: Settings → Entities, with hidden entities shown), then switch watering on in Crop Steering → Settings → Watering.
 - Change an automation that switches System Enabled or Auto Irrigation Enabled off to switch the room's Watering switch (its engine switch) off instead.
 
+<a id="cs-209"></a>
+
+### CS-209: No watering for a while
+
+*Warning · Notification*
+
+**What it means.** A room that is on, with its lights on and at least one zone in P1 or P2, has had no shot in any of its zones for the number of hours set under Settings & help → Notifications (3 unless changed, 1 to 12). A zone in P0, the morning dry-back, or in P3 does not count: no water is expected then. The notification says why when the controller can tell: watering switched off, a hold with its reason, or no zone calling for water.
+
+**Watering meanwhile.** Nothing changes: this only tells you. It is said again each time the same number of hours passes, and clears itself at the next shot in the room, or once the lights go off or no zone is in P1 or P2.
+
+**Likely causes**
+
+- Watering was switched off in the room (its engine switch) and not switched back on.
+- A hold stops every shot: a batch being made, a hardware hold after a pump or valve fault (CS-301), a zone switched off or under manual override, the source-water gate, a pump or valve that reads neither on nor off. The notification names it.
+- Nothing called for water: every zone in P1 or P2 read wetter than the point where it is watered, for example a probe out of its cube or stuck high, or a re-water point set too low for the plants.
+
+**Suggested fixes**
+
+- Read the reason in the notification. Clear the hold it names, or switch watering back on in Crop Steering → Settings → Watering.
+- If nothing called for water, compare each zone's moisture reading with its re-water point on the zone's page, and check the probes are in their cubes.
+- Change after how many hours this is said, or who gets it, under Crop Steering → Settings & help → Notifications.
+
 ## Pumps and valves (CS-3xx)
 
 <a id="cs-301"></a>
@@ -523,6 +564,54 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 - Bring its device back online.
 - If the switch is excluded from Home Assistant's recorder, include it: its history is how the controller tells a restart from a person.
 - Don't wait for the notification to go away: once the switch and its history read again, the controller closes what it can prove this shot opened and leaves anything else ON.
+
+<a id="cs-310"></a>
+
+### CS-310: Moisture rising with no water: the table is not draining
+
+*Critical · Notification*
+
+**What it means.** A zone's moisture reading rose by 3 points or more within an hour while no water went in: its valve was not open, by the controller or by hand, during the rise or in the 45 minutes before it. Water is reaching the slabs from below: the table or its drain is blocked, or the sump is not pumping, and the slabs are sitting in runoff. The notification says how far the reading rose, over how long, and when the zone last had water.
+
+**Watering meanwhile.** The zone's daily minimum and its EC flushes are held while this lasts, so the controller never pours water into a flooded table; a zone reading this wet gets no routine shots anyway. It is said again every 30 minutes while the reading keeps rising, and clears itself once the reading has stopped rising for an hour.
+
+**Likely causes**
+
+- A table's drain or drain line is blocked: substrate, roots or debris in the outlet.
+- The sump pump is not pumping (failed, without power, its float stuck), so the sump fills and backs up into the tables.
+- A shared gutter or drain is backed up and runoff from other tables flows into this one.
+- Less likely: the probe was moved into a wetter spot, or water was put on by hand without the zone's valve (a hose).
+
+**Suggested fixes**
+
+- Go to the room now: look for standing water on the table, and check its drain outlets, the sump and the sump pump.
+- Clear the blockage and make sure the sump pumps out. The reading starts falling once the table drains.
+- Don't water the zone by hand until the table has drained.
+- If nothing is backed up, check the probe hasn't been moved or knocked into a wetter spot.
+
+<a id="cs-311"></a>
+
+### CS-311: The sump pump has not run
+
+*Critical · Notification*
+
+**What it means.** The power reading of the sump pump the room's tables drain to (the controller app's sump_power_sensor option) has shown no run for the hours set in sump_silent_hours (3 unless changed) while the room is on. A sump pump that normally runs every hour or two has stopped: runoff has nowhere to go, the sump fills and backs up into the tables, and the slabs end up sitting in it. The notification names the sensor.
+
+**Watering meanwhile.** Nothing changes: this only tells you. It is said again every 30 minutes while the pump stays still, and clears itself at its next run. Once a zone's moisture starts rising with no water, CS-310 follows and holds that zone's daily minimum and EC flushes.
+
+**Likely causes**
+
+- The sump pump has failed, or its float is stuck.
+- The pump has no power: its plug is switched off or tripped.
+- Nothing reaches the sump: the tables' drains or the line to the sump are blocked.
+- The power plug is offline, so no run can be seen (its reading is unavailable).
+
+**Suggested fixes**
+
+- Check the sump now: its water level, the pump, its float and its power.
+- Clear what stops the water reaching or leaving the sump, and watch the pump run.
+- If the plug is offline, bring it back: until then the pump's runs can't be seen.
+- Set sump_silent_hours longer only if the pump really runs less often than that.
 
 ## Settings (CS-4xx)
 
@@ -767,7 +856,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 **Suggested fixes**
 
-- Open Irrigation plan → Schedule in the Crop Steering sidebar and read the reason.
+- Open Plan › Schedule in the Crop Steering sidebar and read the reason.
 - If it stays in error, fix the cause, then disarm the plan and arm it again.
 
 <a id="cs-607"></a>
@@ -810,3 +899,311 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Refill the tank, then press Refilled on Crop Steering → Stock tanks.
 - Or set the level you read off the tank. The card clears itself once every tank is above its low mark.
+
+## Jev (CS-7xx)
+
+<a id="cs-701"></a>
+
+### CS-701: Water isn't reaching this zone
+
+*Warning · Notification*
+
+**What it means.** Jev's Shot judge found, for two shots in a row, no sign that the water reached this zone: moisture did not rise, while the controller counted the litres.
+
+**Watering meanwhile.** Carries on as normal. The litres counted may not be what arrived.
+
+**Likely causes**
+
+- A closed hand valve, a kinked or blocked line, or blocked drippers.
+- A tank or dosing hold that closed the feed path during the shot.
+- The zone's valve does not open although it reads on.
+
+**Suggested fixes**
+
+- Check the zone's valve, line and drippers during the next shot.
+- Do a catch test on one dripper.
+
+<a id="cs-702"></a>
+
+### CS-702: This zone's water per plant is out of line with the others
+
+*Information · Notification*
+
+**What it means.** The zone's water per plant today is under 70 % or over 140 % of the room's other zones, and Jev's Zones judge names the likely reason in the message.
+
+**Watering meanwhile.** Carries on as normal. This is advice only.
+
+**Likely causes**
+
+- Plants that drink less or more.
+- The probe sits in a wetter or drier spot than the roots.
+- A valve, dripper or line problem.
+- Shots that do not land.
+
+**Suggested fixes**
+
+- Compare the zone's settings and plants with its siblings'.
+- Check the probe's position, and do a catch test on this zone and a neighbour.
+
+<a id="cs-703"></a>
+
+### CS-703: Overnight low reading looks like a probe fault
+
+*Warning · Notification*
+
+**What it means.** The zone's moisture is falling toward the P3 emergency floor overnight, and Jev's Night judge reads it as a probe fault rather than drying.
+
+**Watering meanwhile.** Carries on: the P3 rescue shot still fires as normal.
+
+**Likely causes**
+
+- A probe that stepped or stopped moving.
+- A probe knocked out of place.
+
+**Suggested fixes**
+
+- Check the probe in the morning, before the ramp starts.
+
+<a id="cs-704"></a>
+
+### CS-704: Jev set this zone's probe aside
+
+*Warning · Notification*
+
+**What it means.** Jev judged twice in a row, and the controller's own check confirmed, that the zone's moisture probe is not tracking the substrate (stuck, channeling, out of the block, on the wrong zone or drifting).
+
+**Watering meanwhile.** Carries on without the probe, as for a dead probe: the zone copies a healthy sibling's shots, or waters on its timer, within its daily limit. The probe counts again as soon as Jev judges it tracks.
+
+**Likely causes**
+
+- A probe pulled part-way out of the block, or sitting in a channel.
+- A probe mapped to the wrong zone.
+- A probe that has stopped measuring but still reports.
+
+**Suggested fixes**
+
+- Check the probe's placement and wiring, and which zone it is mapped to in Rooms & setup.
+
+<a id="cs-705"></a>
+
+### CS-705: The zone is off the stage's arc
+
+*Information · Notification*
+
+**What it means.** Jev's daily Stage judge compared the zone with the owner's stage arc for today's day of flower (steering, dryback, pore EC) and found it off, naming what and what the doctrine says.
+
+**Watering meanwhile.** Carries on as normal. This is advice only: nothing is changed.
+
+**Likely causes**
+
+- The zone's steering mode or settings are for another stage.
+- The overnight dryback or the pore EC has drifted outside the stage's band.
+- The stage's move-on signs have appeared.
+
+**Suggested fixes**
+
+- Compare the zone's settings with the stage (docs/JEV.md, the owner's stage arc), and change them if the stage has moved on.
+- Check jev_flower_start points at the right flip date.
+
+<a id="cs-706"></a>
+
+### CS-706: Jev has used most of today's calls
+
+*Warning · Notification*
+
+**What it means.** Jev has been asked the warning share (80 % by default) of its daily call budget, across every room. Once the budget is spent, Jev is not asked again until midnight.
+
+**Watering meanwhile.** Carries on as normal. Once the budget is spent, the engine's own rules decide every zone until midnight.
+
+**Likely causes**
+
+- More zones or judges than the budget was set for.
+- Many second looks: Jev was often unsure today.
+- The budget option is still at an older, lower value.
+
+**Suggested fixes**
+
+- Raise jev_daily_calls in the app's options, then restart the app.
+- Check reasks_today and errors_today on the Jev sensor: many of either show what used the calls.
+
+<a id="cs-707"></a>
+
+### CS-707: Jev is on the stricter gate for this zone
+
+*Warning · Notification*
+
+**What it means.** Several of one Jev judge's calls in a row for this zone (three by default) did not work out when they were checked. Until two in a row do, that judge acts only when both phrasings agree at 0.8 or more (the default) and a second look gives the same answer.
+
+**Watering meanwhile.** Carries on. Jev keeps judging the zone; whenever it is not sure enough, the engine's own rules act, as they do without Jev.
+
+**Likely causes**
+
+- A probe or sensor misleading the judge.
+- Conditions the judge has not met before, such as a new stage or a changed room.
+- A setting that works against the judge's calls.
+
+**Suggested fixes**
+
+- Read the zone's Jev log on the dashboard: the calls and how each was checked.
+- Check the zone's probe and settings.
+
+## Dosing (CS-8xx)
+
+<a id="cs-801"></a>
+
+### CS-801: A dosing pump ran past its time and was switched off
+
+*Critical · Notification*
+
+**What it means.** A dose was still running at its deadline: 1.25 times the time its volume takes at the pump's calibrated flow, plus 20 seconds, and never more than 21 minutes. The controller switched the pump's power off, read it back (sending the off again once if it did not read off) and ended the dose as "ran past its time". The tank may hold more nutrient than was asked for. When the power still does not read off, the off is sent again every 2 seconds, the room's watering is held until it reads off, and this notification comes again every 30 minutes.
+
+**Watering meanwhile.** A single dose holds no watering, so watering carries on, unless the pump's power does not read off: then the room is held until it does. In a batch, the batch stops too (CS-806), and the rooms it held water again once its hardware reads off.
+
+**Likely causes**
+
+- The pump's firmware did not stop its motor at the volume it was given.
+- The pump's flow calibration (mL/s) is well above what it really pumps, so the dose was expected sooner.
+- The pump's dosing sensor stayed on dosing although the motor had stopped.
+
+**Suggested fixes**
+
+- Check the batch tank's EC before it is used: it may hold more than was asked for.
+- Check the pump's firmware and dosing sensor, and recalibrate its flow.
+- If the power switch feeds the pump's board, switch it back on once it is fixed: the controller never switches a dosing pump on.
+- If its power does not read off, switch the pump off on the device or at its socket: the room waters again once it reads off.
+
+<a id="cs-802"></a>
+
+### CS-802: A dose could not be confirmed, or ended early
+
+*Warning · Notification*
+
+**What it means.** The controller set the pump's volume and pressed its start, but could not confirm the dose: the pump's dosing sensor never read dosing within the dose's expected time plus 15 seconds (a dose too short to be caught between two reads counts only when Home Assistant's recorder shows it dosing), or it read unavailable or unknown during the dose (a pump that restarts mid-dose drops its dose). Whether the pump dosed, and how much, is not known, and nothing is taken off its stock tank. Or the dose ended in less than half its expected time ("ended early"): what ran, the seconds it ran times its flow, is taken off its stock tank.
+
+**Watering meanwhile.** A single dose holds no watering, so watering carries on. In a batch, the batch stops too (CS-806), and the rooms it held water again once its hardware reads off.
+
+**Likely causes**
+
+- The pump is offline, or its start button or script did nothing.
+- The dosing sensor shows dosing in a way the setup does not recognise: a text sensor whose dosing state does not start with the dosing prefix, for instance.
+- The pump's firmware refused the volume it was given.
+- The pump restarted or dropped off the network during the dose.
+- The pump's firmware ended the dose early, or its flow calibration is well below what it pumps.
+
+**Suggested fixes**
+
+- Check the pump is online and what its dosing sensor shows during a dose, and set the dosing prefix to match.
+- Check the batch tank's EC before dosing again: the dose may or may not have gone in.
+
+<a id="cs-803"></a>
+
+### CS-803: A dose or batch was interrupted by a restart
+
+*Warning · Notification*
+
+**What it means.** The controller app stopped (an update, a restart, a crash or a power cut) while a dose or a batch was running, or its record of what was running (dosing_state.json) could not be read at start. At its next start it holds the watering of the rooms the dose or batch held, and switches off every dosing pump's power, the fill valve, the mix pump and the mix valves of that room (with a record it could not read: of every room with dosing set up), again every 2 seconds until every one reads off; a switch that reads unavailable or unknown is not off. Only then is the batch's hold turned off and the rooms released. The notification names what does not read off and comes again every 30 minutes until it does. The controller never resumes a dose or a batch; the volume number a dose changed is put back.
+
+**Watering meanwhile.** The rooms the dose or batch held stay held until its dosing hardware reads off; then watering carries on.
+
+**Likely causes**
+
+- The controller app was updated, restarted or stopped during a dose or a batch.
+- Home Assistant or the host restarted.
+- dosing_state.json could not be read at start (it is kept as dosing_state.json.bad).
+
+**Suggested fixes**
+
+- Check the batch tank: what was dosed before the stop is in it, and the dosing history lists it. Dose the rest by hand or make a fresh batch.
+- Update or restart the controller app between batches.
+- If a switch stays unavailable, bring its device back or switch it off at its socket: the rooms water again once it reads off.
+
+<a id="cs-804"></a>
+
+### CS-804: The batch tank could not be filled
+
+*Warning · Notification*
+
+**What it means.** A batch could not fill the tank: the fill valve did not read on within 10 seconds of being opened, the tank's full sensor read nothing usable (as the fill began, or for 15 seconds while it filled), or it did not read full within the fill timeout. The controller closed the fill valve and read it back, and the batch stops (CS-806). A batch is refused before anything moves while the full sensor can't be read.
+
+**Watering meanwhile.** The rooms the batch held water again; the fill valve was closed.
+
+**Likely causes**
+
+- The water supply is off or slow, or the fill valve did not open.
+- The full sensor is stuck or offline, or reports a state other than the one set as full.
+- The fill timeout is shorter than a fill takes.
+- The fill valve is offline or its relay did not switch.
+- The full sensor went offline.
+
+**Suggested fixes**
+
+- Check the water supply, the fill valve, and what the full sensor reads when the tank is full.
+- Raise the fill timeout in the dosing setup if a fill takes longer.
+
+<a id="cs-805"></a>
+
+### CS-805: The mixing pump did not start
+
+*Warning · Notification*
+
+**What it means.** A batch opened the mix valves and switched the mix pump on, but the pump did not read on, or its power sensor did not read the minimum power within 20 seconds. The batch stops (CS-806).
+
+**Watering meanwhile.** The rooms the batch held water again, once its hardware reads off.
+
+**Likely causes**
+
+- The mix pump did not start, or its plug did not switch.
+- The power sensor is offline or slow to report.
+- The minimum power is set above what the pump draws.
+
+**Suggested fixes**
+
+- Check the mix pump, its plug, and what the power sensor reads while it runs.
+- Set the minimum power below what the pump draws, or to 0 to skip the check.
+
+<a id="cs-806"></a>
+
+### CS-806: Dosing was stopped, or needs a check
+
+*Warning · Notification*
+
+**What it means.** A batch ended before it finished: someone stopped it, a step failed (CS-801, CS-802, CS-804 and CS-805 come first and say which), its hold did not read on, a shot in a room it holds was still running after 10 minutes, a switch did not read off, or it ran past its watchdog (the wait for a shot, the fill timeout, premix, postmix and every dose's deadline, plus 10 minutes). The notification names the step, the reason and what was dosed. Every dosing pump's power, the fill valve, the mix pump and the mix valves were switched off; the hold is released only once they read off, and the tank's fill time is not stamped. The same code says when a single dose was stopped but its pump's power does not read off, a dose was stopped by an error in the controller, the volume number of a pump could not be put back after a dose, a finished batch could not stamp its fill time or release its hold, dosing in a room keeps failing, or the dosing thread stopped and was started again or stopped answering. Whatever does not read off holds its rooms, and the notification comes again every 30 minutes, until it does.
+
+**Watering meanwhile.** The rooms a stopped batch held water again once its hardware and its hold read off; until then they stay held. A dose whose pump does not read off holds its room the same way. Otherwise watering carries on.
+
+**Likely causes**
+
+- Someone stopped the batch.
+- A fill, mix or dose that failed.
+- A switch of the batch, or of a room it holds, that did not read off.
+- A pump's volume number that did not take the value it was put back to.
+- The filled-at or hold entity did not take its command.
+- An error in the controller (its log names it).
+
+**Suggested fixes**
+
+- Check the batch tank before making another batch: the notification lists what was dosed before it stopped.
+- Fix the cause it names, then make the batch again.
+- When it says a volume number could not be put back, set it back by hand before the next batch.
+- When it names an error in the controller, check the controller app's log.
+
+<a id="cs-807"></a>
+
+### CS-807: A dose was not taken off its stock tank
+
+*Warning · Notification*
+
+**What it means.** A dose drew from the stock tank linked to its pump, but Home Assistant did not take the draw: the tank is not one of the room's stock tanks any more, Home Assistant refused it (an HTTP 4xx answer), or it had not taken it 24 hours after the dose. The draw was dropped and is kept in the room's dosing history; the tank's level is now higher than what is in it.
+
+**Watering meanwhile.** Carries on as normal: only the stock level is wrong.
+
+**Likely causes**
+
+- The stock tank was removed after the pump was linked to it.
+- Crop Steering's stock service refused the call, or was missing at that moment (an old integration, or a reload).
+- Home Assistant could not be reached for a day.
+
+**Suggested fixes**
+
+- Set the tank's level in Stock tanks (Set level) to what is in it.
+- Check the pump's stock tank in the dosing setup.

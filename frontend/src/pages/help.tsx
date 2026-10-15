@@ -1,14 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  ArrowUpRight,
-  BookOpen,
-  CalendarRange,
-  ChevronRight,
-  Gauge,
-  Map,
-  Radio,
-  Search,
-} from "lucide-react";
+import { ChevronRight, Search } from "lucide-react";
 import { Heading } from "@/components/dashboard";
 import { WhatsNewButton } from "@/components/whats-new";
 import { Badge } from "@/components/ui/badge";
@@ -22,181 +13,70 @@ import {
   severityLabel,
 } from "@/lib/error-codes";
 import type { Controller } from "@/lib/types";
+
+/** The words the dashboard uses, as a grower reads them. */
 const glossary = [
   [
-    "Water per zone and per plant",
-    "Zone water is the total delivered estimate for all plants. Average per plant divides that total by plant count. Substrate litres describe the combined pot capacity; they are not water delivered. Runtime estimates multiply dripper flow by run time and respect the controller duration limit.",
+    "VWC (moisture)",
+    "Volumetric water content: the share of the substrate’s volume that is water, in %. Every moisture target, the peak, the re-water point and the rescue level, is a VWC.",
   ],
   [
-    "Run comparisons",
-    "Choose a day, week, month or run-to-date to compare recorded VWC and EC. Previous runs align by grow age. Saved target references show when they were captured; backdating a run does not recreate old targets or readings removed by Recorder retention.",
-  ],
-  [
-    "VWC",
-    "Volumetric water content: the percentage of substrate volume occupied by water. Compare recorded readings with active targets; a nominal shot does not guarantee the same retained-water increase.",
-  ],
-  [
-    "Root-zone EC",
-    "Electrical conductivity of the substrate measurement, in mS/cm after normalization. Pore EC and bulk EC are different measurement bases; use targets appropriate to the mapped sensor. Feed-water EC is a separate reservoir measurement.",
+    "Pore EC",
+    "The conductivity of the water in the substrate’s pores, in mS/cm: how much salt the roots sit in. It is read in the slab; the feed’s EC is a separate reading. Each stage has its pore EC range.",
   ],
   [
     "Dryback",
-    "The controller uses relative loss from peak: (peak VWC − current VWC) ÷ peak VWC × 100. A 60% peak and 10% dryback target means 54% VWC, not 50%.",
+    "How far moisture falls from the day’s peak, as a share of the peak: from a 65% peak, a 20% dryback ends at 52%. A bigger dryback steers generative, a smaller one vegetative.",
   ],
   [
-    "P0 · Additional dryback",
-    "After lights-on, the controller waits for dryback, a fall to the maintenance trigger, or the latest first shot. Existing low-VWC and emergency safeguards can take precedence.",
+    "P0 · Morning dryback",
+    "From lights-on to the first shot: the plants drink before the day’s watering starts. It ends at the latest first shot, or sooner if moisture falls to the re-water point.",
   ],
   [
     "P1 · Ramp-up",
-    "Progressive shots bring substrate moisture to the peak VWC target, subject to the most P1 shots, timing and safety limits.",
+    "The first shots of the day, spaced out, up to the peak target or the most P1 shots.",
   ],
   [
     "P2 · Maintenance",
-    "A maintenance shot fires whenever VWC reads below the maintenance trigger. EC feedback may adjust the trigger; the planning curve shows the base setpoints, not a measured prediction.",
+    "Through the day, a shot fires whenever moisture reads below the re-water point. Shot size and the re-water point steer runoff and pore EC.",
   ],
   [
     "P3 · Overnight dryback",
-    "Routine irrigation stops. A rescue shot fires if VWC reads below the rescue level. There is no independent scheduled P3 EC target.",
+    "From the day’s last shot to lights-on: no routine watering, only a rescue shot if moisture reads below the rescue level.",
   ],
   [
-    "Steering balance",
-    "0% uses the vegetative endpoint; 100% uses the generative endpoint; intermediate values blend their explicit parameters. Pot size and dripper flow convert shot fractions to delivery volume and time.",
+    "Steering",
+    "Vegetative keeps the slab wetter, with smaller drybacks, more runoff and a lower pore EC, for growth; generative dries it further, with less runoff and a higher pore EC, for flowers.",
   ],
   [
-    "Planning versus history",
-    "The planning curve is a schematic drawn from targets. Recorded history comes from Home Assistant Recorder. Neither an event acknowledgement nor a modeled curve proves physical delivery.",
+    "Runoff",
+    "The water that drains out of the slab, as a share of the water fed: it carries salt out. Athena gives 8–16% steering vegetative and 1–7% generative.",
   ],
 ];
+
+/** Settings › Help: what an alert code means and what to do, and the words the dashboard uses. The
+ * user guide (docs/USER_GUIDE.md) has the rest. */
 export function Help({ controller }: { controller: Controller }) {
   return (
     <>
-      <Heading title="Help & tools" action={<WhatsNewButton controller={controller} />} />
-      <div className="help-intro">
-        <BookOpen size={28} />
-        <div>
-          <h2>Map. Plan. Review. Verify.</h2>
-          <p>
-            Configure each room and zone, check sensor validity, set explicit endpoint profiles,
-            then review the daily or weekly grow plan. Live targets and manual fallback values are
-            kept distinct.
-          </p>
-          <h3 id="daily-routine">Daily routine</h3>
-          <ol className="daily-routine">
-            <li>
-              <a href="#/overview">Check the room’s readings and alerts on the Overview</a>
-            </li>
-            <li>
-              <a href="#/zones">Inspect any zone that needs attention</a>
-            </li>
-            <li>
-              <a href="#/strategy">Review irrigation changes before applying them</a>
-            </li>
-          </ol>
-        </div>
-      </div>
-      <div className="help-columns">
-        <section className="panel">
-          <div className="panel-heading">
-            <div>
-              <h2>Terms & phases</h2>
-              <p>What the controls mean in practice</p>
-            </div>
-          </div>
-          <dl className="glossary">
-            {glossary.map(([term, definition]) => (
-              <div key={term}>
-                <dt>{term}</dt>
-                <dd>{definition}</dd>
-              </div>
-            ))}
-          </dl>
-        </section>
-        <div>
-          <section className="panel">
-            <div className="panel-heading">
-              <div>
-                <h2>Advanced workflows</h2>
-                <p>Everything uses the same room context and layout.</p>
-              </div>
-            </div>
-            <div className="specialist-links">
-              {[
-                {
-                  route: "grow-plan",
-                  title: "Irrigation plan · Schedule",
-                  detail: "Schedule changes to zone targets by day or week.",
-                  icon: CalendarRange,
-                },
-                {
-                  route: "strategy",
-                  title: "Irrigation plan · Today",
-                  detail: "See current targets and edit them when a schedule is not active.",
-                  icon: Gauge,
-                },
-                {
-                  route: "compare",
-                  title: "Compare runs & targets",
-                  detail:
-                    "Compare recorded days, weeks and complete runs against reference targets.",
-                  icon: CalendarRange,
-                },
-                {
-                  route: "insights",
-                  title: "Insights & calibration",
-                  detail: "Inspect delivery sizing, data quality and device mapping.",
-                  icon: Radio,
-                },
-                {
-                  route: "setup",
-                  title: "Rooms, zones & installation",
-                  detail: "Map sensors and hardware; add, archive or restore zones.",
-                  icon: Map,
-                },
-              ].map((tool) => (
-                <a href={"#/" + tool.route} key={tool.route}>
-                  <tool.icon size={20} />
-                  <span>
-                    <strong>{tool.title}</strong>
-                    <small>{tool.detail}</small>
-                  </span>
-                  <ArrowUpRight size={17} />
-                </a>
-              ))}
-            </div>
-          </section>
-          <div className="help-note">
-            <div>
-              <h3>When changes take effect</h3>
-              <p>
-                Manual setpoint writes use fresh bounds and state readback. Grow plans are saved as
-                drafts, explicitly armed, then activated at a local lights-on boundary. Disarming an
-                active plan retains its targets until the next boundary.
-              </p>
-              <p>
-                Mapping changes require disarmed engines and hardware OFF. Saving configuration
-                confirms Home Assistant storage; wait for controller revision acknowledgement before
-                enabling operation.
-              </p>
-            </div>
-          </div>
-          <div className="help-note">
-            <div>
-              <h3>What is not claimed</h3>
-              <p>
-                This controller does not regulate room climate or predict yield/potency. Historical
-                manual-shot and phase-event services have no verified execution consumer in the
-                shipped polling engine and are not exposed as operating buttons.
-              </p>
-              <p>
-                Missing/stale readings remain unavailable. Your current room is{" "}
-                {controller.room.room.name}.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Heading title="Help" action={<WhatsNewButton controller={controller} />} />
       <ErrorCodes />
+      <section className="panel" aria-labelledby="glossary-title">
+        <div className="panel-heading">
+          <div>
+            <h2 id="glossary-title">Terms and phases</h2>
+            <p>What the dashboard’s words mean for the crop</p>
+          </div>
+        </div>
+        <dl className="glossary">
+          {glossary.map(([term, definition]) => (
+            <div key={term}>
+              <dt>{term}</dt>
+              <dd>{definition}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
     </>
   );
 }

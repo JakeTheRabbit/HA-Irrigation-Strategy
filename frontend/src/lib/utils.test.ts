@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { errorText } from "./utils";
+import { dayWord, errorText } from "./utils";
 
 describe("errorText", () => {
   it("uses the message of real errors", () => {
@@ -39,5 +39,20 @@ describe("errorText", () => {
   it("stringifies every other value", () => {
     expect(errorText(404)).toBe("404");
     expect(errorText(false)).toBe("false");
+  });
+});
+
+describe("dayWord", () => {
+  const now = new Date(2026, 8, 28, 2, 10).getTime();
+  it("says nothing for today and Yesterday for the day before, by the calendar", () => {
+    expect(dayWord(new Date(2026, 8, 28, 0, 5).getTime(), now)).toBe("");
+    expect(dayWord(new Date(2026, 8, 27, 22, 48).getTime(), now)).toBe("Yesterday");
+    expect(dayWord(new Date(2026, 8, 27, 0, 0).getTime(), now)).toBe("Yesterday");
+  });
+  it("names an older day by its date", () => {
+    const at = new Date(2026, 8, 25, 14, 0).getTime();
+    expect(dayWord(at, now)).toBe(
+      new Date(at).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }),
+    );
   });
 });

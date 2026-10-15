@@ -32,7 +32,7 @@ def render(catalog):
         "and after 5 minutes when their code changes. A few are said once: CS-301 once per fault",
         "(dismissing it does not clear the hold), CS-403 once each time the controller app starts and",
         "CS-405 at start-up. Most stay in Home Assistant until you dismiss them, even after their cause",
-        "has gone; the controller withdraws CS-201, CS-308 and CS-309 itself, and switching a room's",
+        "has gone; the controller withdraws CS-201, CS-209, CS-308 and CS-309 itself, and switching a room's",
         "*Room Active* off clears its notifications.",
         "A room whose *Room Active* switch is off (nothing growing) raises no watering notifications; a",
         "setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still reported.",

@@ -1,0 +1,522 @@
+/* Today: one line for the room, a card per zone, and what Jev changed. Quiet unless something
+   needs a person: a flagged card gets a coloured edge and its reason in words. */
+.today {
+  display: grid;
+  gap: 16px;
+}
+.today-empty-title {
+  margin: 8px 0 16px;
+}
+.today-head {
+  display: grid;
+  gap: 8px;
+}
+.today-title {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+.today-title h1 {
+  font-size: 22px;
+}
+.today-state {
+  padding: 1px 10px;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 22px;
+}
+.today-state[data-tone="holding"] {
+  background: color-mix(in srgb, var(--success) 14%, var(--surface));
+  color: color-mix(in srgb, var(--success) 55%, var(--foreground));
+}
+.today-state[data-tone="watering"] {
+  background: color-mix(in srgb, var(--primary) 14%, var(--surface));
+  color: var(--primary-strong);
+}
+.today-state[data-tone="stopped"],
+.today-state[data-tone="stale"] {
+  background: color-mix(in srgb, var(--destructive) 12%, var(--surface));
+  color: var(--destructive);
+}
+.today-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  row-gap: 6px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.today-line > * + * {
+  margin-left: 12px;
+  padding-left: 12px;
+  border-left: 1px solid var(--border);
+}
+.today-fact strong {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.today-fact[data-watering] {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--foreground);
+  font-weight: 600;
+}
+.today-fact[data-watering] i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.today-fact[data-watering="true"] i {
+  background: var(--success);
+}
+.today-fact[data-watering="false"] {
+  color: var(--destructive);
+}
+.today-fact[data-watering="false"] i {
+  background: var(--destructive);
+}
+.today-steering {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.today-steering[data-steering="vegetative"] {
+  color: color-mix(in srgb, var(--success) 70%, var(--foreground));
+}
+.today-steering[data-steering="generative"] {
+  color: color-mix(in srgb, #7c4dbc 75%, var(--foreground));
+}
+.today-alerts {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--warning);
+  font-weight: 600;
+}
+.today-alerts[data-severity="critical"] {
+  color: var(--destructive);
+}
+.today-alerts[data-severity="info"] {
+  color: var(--muted-foreground);
+  font-weight: 500;
+}
+.today-alerts[aria-expanded="true"] .today-alerts-chevron {
+  transform: rotate(180deg);
+}
+.today-alerts:hover {
+  text-decoration: underline;
+}
+.today-alert-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.today-alert-list[hidden] {
+  display: none;
+}
+.today-notice,
+.today-stopped,
+.today-tank {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  margin: 0;
+  padding: 9px 13px;
+  border: 1px solid color-mix(in srgb, var(--warning) 28%, transparent);
+  border-radius: 7px;
+  background: var(--warning-bg);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.today-notice strong,
+.today-stopped strong {
+  font-weight: 650;
+}
+.today-alert-list [data-severity="info"] .today-notice {
+  border-color: var(--border);
+  background: var(--muted);
+}
+.today-critical,
+.today-stopped {
+  border-color: color-mix(in srgb, var(--destructive) 40%, transparent);
+  background: color-mix(in srgb, var(--destructive) 8%, var(--surface));
+}
+.today-stopped > svg,
+.today-critical > svg {
+  color: var(--destructive);
+}
+.today-stopped > svg,
+.today-tank > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.today-tank > svg {
+  color: var(--warning);
+}
+.today-tank > span {
+  flex: 1;
+}
+.inline-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary-strong);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.inline-action:hover {
+  text-decoration: underline;
+}
+
+/* A card per zone: three across on a laptop, one under another on a phone. */
+.today-zones {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
+  gap: 16px;
+}
+.today-zone {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-width: 0;
+  padding: 15px 18px 14px;
+  border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: var(--ha-native-shadow, 0 1px 2px rgb(0 0 0 / 4%));
+  transition: border-color 0.15s;
+}
+.today-zone:hover {
+  border-color: color-mix(in srgb, var(--foreground) 30%, var(--border));
+}
+.today-zone[data-attention="warning"] {
+  border-color: color-mix(in srgb, var(--warning) 50%, var(--border));
+  box-shadow: inset 4px 0 0 var(--warning);
+}
+.today-zone[data-attention="critical"] {
+  border-color: color-mix(in srgb, var(--destructive) 55%, var(--border));
+  box-shadow: inset 4px 0 0 var(--destructive);
+}
+.today-zone-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+.today-zone-head h2 {
+  font-size: var(--text-lg);
+}
+/* The whole card opens the zone: its name is the link, stretched over the card. */
+.today-zone-link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.today-zone-link:focus-visible {
+  outline: none;
+}
+.today-zone-go {
+  display: inline-block;
+  margin-left: 2px;
+  color: var(--muted-foreground);
+  vertical-align: -3px;
+  transition: transform 0.15s;
+}
+.today-zone:hover .today-zone-go {
+  color: var(--foreground);
+  transform: translateX(2px);
+}
+.today-zone-link:focus-visible::after {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.today-flag {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  line-height: 1.45;
+}
+.today-flag > svg {
+  flex: none;
+  margin-top: 2px;
+}
+.today-flag[data-level="critical"] {
+  background: color-mix(in srgb, var(--destructive) 10%, var(--surface));
+  color: var(--destructive);
+}
+.today-flag-more {
+  font-weight: 500;
+}
+.today-moisture {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+}
+.today-vwc {
+  margin: 0;
+  line-height: 1;
+  white-space: nowrap;
+}
+.today-vwc strong {
+  font-size: 34px;
+  font-weight: 600;
+  letter-spacing: -0.8px;
+  font-variant-numeric: tabular-nums;
+}
+.today-vwc .unit {
+  font-size: 16px;
+  margin-left: 2px;
+}
+.today-spark {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  overflow: visible;
+}
+.today-spark path {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 1.8;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+}
+.today-spark path.today-spark-now {
+  stroke-width: 7;
+}
+.today-spark-empty {
+  display: block;
+}
+.moisture-bar {
+  display: grid;
+  gap: 5px;
+}
+.moisture-track {
+  position: relative;
+  height: 8px;
+  margin: 4px 0 2px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 9%, var(--surface));
+}
+/* The maintenance band: from the re-water point up to the peak target. */
+.moisture-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary) 30%, var(--surface));
+}
+.moisture-mark {
+  position: absolute;
+  top: -4px;
+  bottom: -4px;
+  width: 2px;
+  margin-left: -1px;
+  border-radius: 1px;
+  background: var(--muted-foreground);
+}
+.moisture-mark[data-mark="rescue"],
+.moisture-legend [data-mark="rescue"]::before {
+  background: var(--destructive);
+}
+.moisture-mark[data-mark="rewater"],
+.moisture-legend [data-mark="rewater"]::before {
+  background: var(--warning);
+}
+.moisture-mark[data-mark="peak"],
+.moisture-legend [data-mark="peak"]::before {
+  background: var(--primary-strong);
+}
+.moisture-now {
+  position: absolute;
+  top: 50%;
+  width: 13px;
+  height: 13px;
+  margin: -6.5px 0 0 -6.5px;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--foreground);
+}
+.moisture-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 14px;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 1.4;
+}
+.moisture-legend span::before {
+  content: "";
+  display: inline-block;
+  width: 2px;
+  height: 10px;
+  margin-right: 5px;
+  border-radius: 1px;
+  vertical-align: -1px;
+}
+.today-zone-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 5px 14px;
+  margin: 2px 0 0;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  font-size: var(--text-sm);
+  line-height: 1.45;
+}
+.today-zone-facts > div {
+  display: contents;
+}
+.today-zone-facts dt {
+  color: var(--muted-foreground);
+}
+.today-zone-facts dd {
+  margin: 0;
+  min-width: 0;
+  font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
+}
+.today-next[data-stopped] dd {
+  color: var(--destructive);
+  font-weight: 550;
+}
+.today-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 0 8px;
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+/* What Jev changed today. */
+.today-jev {
+  margin-bottom: 0;
+}
+.today-jev .panel-heading {
+  padding: 12px 18px 6px;
+}
+.today-jev-list {
+  margin: 0;
+  padding: 0 18px 8px;
+  list-style: none;
+}
+.today-jev-list li {
+  display: grid;
+  grid-template-columns: 76px 80px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 10px;
+  padding: 9px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  font-size: var(--text-sm);
+}
+.today-jev-list time,
+.today-jev-zone {
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.today-jev-what strong {
+  font-weight: 600;
+}
+.today-jev-outcome {
+  display: inline-grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--success) 16%, var(--surface));
+  color: color-mix(in srgb, var(--success) 60%, var(--foreground));
+  align-self: center;
+}
+.today-jev-outcome[data-worked="false"] {
+  background: color-mix(in srgb, var(--destructive) 14%, var(--surface));
+  color: var(--destructive);
+}
+.today-jev-none {
+  padding: 4px 18px 16px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+@media (max-width: 720px) {
+  .today {
+    gap: 14px;
+  }
+  .today-title h1 {
+    font-size: 20px;
+  }
+  /* Wrapped facts: space, not dividers, so no line starts with one. */
+  .today-line {
+    gap: 4px 14px;
+  }
+  .today-line > * + * {
+    margin-left: 0;
+    padding-left: 0;
+    border-left: 0;
+  }
+  .today-zones {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+  .today-zone {
+    padding: 13px 14px 12px;
+  }
+  .today-vwc strong {
+    font-size: 30px;
+  }
+  .today-jev .panel-heading {
+    padding: 12px 14px 4px;
+  }
+  .today-jev-list {
+    padding: 0 14px 6px;
+  }
+  .today-jev-list li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "time zone outcome"
+      "what what outcome";
+    gap: 2px 10px;
+  }
+  .today-jev-list time {
+    grid-area: time;
+  }
+  .today-jev-zone {
+    grid-area: zone;
+  }
+  .today-jev-what {
+    grid-area: what;
+  }
+  .today-jev-outcome {
+    grid-area: outcome;
+  }
+  .today-jev-none {
+    padding: 4px 14px 14px;
+  }
+}

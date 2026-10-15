@@ -1,0 +1,220 @@
+/* Equipment › Probes: the controller and Jev at a glance, each zone's probes, the room's pump and
+   feed water; one tap down, the room map and the controller's own sensors. */
+.probes-status {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  margin-bottom: 16px;
+  padding: 0;
+}
+.probes-status > div {
+  display: grid;
+  gap: 2px;
+  padding: 14px 20px;
+}
+.probes-status > div + div {
+  border-left: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.probes-status strong {
+  font-size: 17px;
+  font-weight: 650;
+}
+.probes-status + .jev-trouble {
+  margin-bottom: 16px;
+}
+.probes-table td {
+  padding-top: 9px;
+  padding-bottom: 9px;
+  vertical-align: middle;
+}
+.probes-table tbody tr.probes-zone th {
+  padding-top: 14px;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 650;
+}
+.probes-zone .pill {
+  margin-left: 10px;
+  vertical-align: 1px;
+}
+.probes-table tr[data-health]:not([data-health="ok"]) td:first-child strong {
+  color: color-mix(in srgb, var(--warning) 70%, var(--foreground));
+}
+.probes-hardware {
+  margin: 0;
+  padding: 0 20px 14px;
+  list-style: none;
+}
+.probes-hardware li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto 90px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  font-size: var(--text-sm);
+}
+.probes-hardware li > span:first-child {
+  display: grid;
+  min-width: 0;
+}
+.probes-hardware code {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.probes-more {
+  margin: 12px 0;
+}
+.probes-more > summary {
+  cursor: pointer;
+  padding: 6px 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.probes-more[open] > summary {
+  margin-bottom: 10px;
+}
+.insight-room-map {
+  padding: 22px;
+}
+.insight-shared-map {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  padding-bottom: 24px;
+}
+.insight-shared-map > .insight-mapping {
+  flex: 1;
+  max-width: 360px;
+}
+.insight-shared-map > svg {
+  color: var(--muted-foreground);
+  flex-shrink: 0;
+}
+.insight-mapping {
+  background: var(--muted);
+  border: 1px solid var(--border);
+  padding: 12px 14px;
+  border-radius: 7px;
+  min-width: 0;
+}
+.insight-mapping > span {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.insight-mapping > strong {
+  display: block;
+  font-weight: 500;
+  font-size: 12px;
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.insight-mapping > code {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  margin-top: 6px;
+  overflow-wrap: anywhere;
+}
+.insight-mapping > small {
+  display: block;
+  font-size: var(--text-xs);
+  margin-top: 6px;
+  color: var(--muted-foreground);
+}
+.insight-zone-map {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 15px;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
+}
+.insight-zone-map > section {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 15px;
+  min-width: 0;
+}
+.insight-zone-map > section.selected {
+  border-color: var(--primary);
+}
+.insight-map-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.insight-probe-links {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 16px;
+}
+.insight-probe-links > strong {
+  font-size: var(--text-xs);
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+.insight-feed-map {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 22px;
+}
+.insight-mapping-note {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  margin: 0 22px 22px;
+  overflow-wrap: anywhere;
+}
+@media (max-width: 1100px) {
+  .insight-zone-map {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 720px) {
+  .probes-status {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .probes-status > div + div {
+    border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+    border-left: 0;
+  }
+  .probes-hardware {
+    padding: 0 14px 12px;
+  }
+  .probes-hardware li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .probes-hardware li > span:last-child {
+    display: none;
+  }
+  .insight-room-map {
+    padding: 17px;
+  }
+  .insight-zone-map {
+    grid-template-columns: 1fr;
+    padding-top: 18px;
+  }
+  .insight-shared-map {
+    flex-direction: column;
+    gap: 9px;
+    padding-bottom: 18px;
+  }
+  .insight-shared-map > .insight-mapping {
+    width: 100%;
+    max-width: none;
+  }
+  .insight-shared-map > svg {
+    transform: rotate(90deg);
+  }
+  .insight-feed-map {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}

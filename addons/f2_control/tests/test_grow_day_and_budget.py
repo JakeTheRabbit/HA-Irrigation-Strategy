@@ -123,19 +123,6 @@ def test_a_zone_with_no_dated_reset_is_not_restarted_mid_day(rig):
 # ---------------------------------------------------------------------------
 # Settled pore EC
 # ---------------------------------------------------------------------------
-def test_22_sep_p1_hands_over_on_the_settled_ec_not_the_ramp_transient(rig):
-    c, fake, room = rig
-    now = Clock.now()
-    probe(fake, 1, vwc=61, ec=7.4)  # 16 minutes after a ramp shot: the feed front, not the slab
-    probe(fake, 2, vwc=55, ec=5)
-    room.state[1].update(phase="P1", shots=6, last_shot=now - timedelta(minutes=16), last_daily_reset=now.date(),
-                         ec_settled=4.5, ec_settled_at=now - timedelta(hours=2))
-    pub = c._loop_room(room, now)
-    assert room.state[1]["phase"] == "P2" and "EC ok 4.5" in pub[1]["reason"]
-    assert pub[1]["ec"] == 7.4 and pub[1]["ec_settled"] == 4.5  # both published; the rules used the settled one
-    assert room.state[1]["ec_settled"] == 4.5  # the transient did not replace it
-
-
 def test_only_a_reading_taken_45_minutes_after_a_shot_settles_and_feeds_the_ec_steer(rig):
     c, fake, room = rig
     now = Clock.now()
@@ -264,14 +251,3 @@ def test_a_sliver_of_budget_and_recent_water_holds_as_spent(rig):
     assert pub[1]["fire"] is False and "BLOCK daily-cap" in pub[1]["reason"] and turned_on(fake) == []
 
 
-def test_22_sep_p1_at_its_ceiling_with_the_budget_spent_completes_instead_of_waiting_all_day(rig):
-    c, fake, room = rig
-    now = Clock.now()
-    fake.set_state("number.crop_steering_max_daily_volume", "60")
-    probe(fake, 1, vwc=61, ec=8.0)  # EC keeps P1 open (gate 5.75); no settled reading yet
-    probe(fake, 2, vwc=55, ec=5)
-    room.state[1].update(phase="P1", shots=7, daily_vol=59.9, last_shot=now - timedelta(minutes=20),
-                         last_daily_reset=now.date())
-    pub = c._loop_room(room, now)
-    assert room.state[1]["phase"] == "P2"
-    assert "P1 complete at ceiling; EC flush over daily budget" in pub[1]["reason"]

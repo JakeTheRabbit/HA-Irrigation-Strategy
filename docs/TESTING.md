@@ -75,7 +75,16 @@ devices, and the values its operator had tuned (with the attributes that version
 them). To cover another kind of old install, add a snapshot there rather than hand-building one
 in a test. `entry_2_17_wizard.json` is a pumped two-zone room from the 2.17 wizard;
 `entry_env_era.json` is from the env-file era (legacy front/back probe pairs, no setup revision,
-a probe with no unit, bookkeeping keys in `entry.options`).
+a probe with no unit, bookkeeping keys in `entry.options`). `entry_3_8_learned_tent.json` is the
+2.18 tent as a 3.8.0 box holds it, with the state file controller 3.8.0 wrote for a zone its Auto
+Setpoints learner had learned (F2 zone 2 on 4 Oct 2026). `entry_2_25_1_pumped_room.json` is a
+pumped two-zone room as upstream 2.25.1 left it, recorded from that release's own wizard and
+controller: its config entry, every entity id it registered, its app `/data/options.json` and the
+`/data/state.json` its controller wrote. The `options_<version>_*.json` files with a `data` folder
+(`data_3_0_0_ledger/`, `data_3_2_0/`, `data_3_3_0_typesafe/`, `data_3_0_0_quiet/`,
+`data_3_11_1_usage/`) are apps from 2.25.1 and the Jev line as each left `/data/options.json` and
+`/data`, recorded by running that version's own controller: they prove the brain starts on Cloudflare
+credentials only where a Jev file shows it has run.
 
 **Only the web server is stood in for.** The manifest depends on `frontend` and `http` for the
 sidebar panel; `conftest.py` marks both as set up and gives `hass.http` a mock, and the panel

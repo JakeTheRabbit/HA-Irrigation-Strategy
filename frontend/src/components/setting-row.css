@@ -1,0 +1,232 @@
+/* A table of controller settings: name and "?", input and unit, Jev's range or Auto, and a
+   note under a row being edited. Plan › Targets and Equipment › Setup. */
+.targets-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.targets-table th,
+.targets-table td {
+  padding: 3px 8px;
+  text-align: left;
+  vertical-align: middle;
+}
+.targets-table th:first-child,
+.targets-table td:first-child {
+  padding-left: 20px;
+}
+.targets-table th:last-child,
+.targets-table td:last-child {
+  padding-right: 20px;
+}
+.targets-table tbody tr:not(.targets-phase):not(.targets-note) th {
+  font-weight: 500;
+}
+.targets-table tbody tr:not(.targets-phase):not(.targets-note) th label {
+  cursor: pointer;
+}
+.targets-table .setting-help-trigger {
+  margin-left: 4px;
+  vertical-align: -2px;
+}
+.targets-phase th {
+  padding-top: 14px;
+  padding-bottom: 4px;
+  font-weight: 650;
+}
+.targets-table tbody:first-child .targets-phase th {
+  padding-top: 4px;
+}
+.targets-input {
+  width: 1%;
+  white-space: nowrap;
+}
+.targets-input input {
+  width: 92px;
+  height: 32px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.targets-input strong {
+  display: inline-block;
+  min-width: 60px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.targets-unit {
+  display: inline-block;
+  min-width: 48px;
+  margin-left: 6px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.targets-chip {
+  width: 1%;
+  white-space: nowrap;
+}
+.targets-chip .auto-badge {
+  margin-left: 4px;
+}
+.targets-table tr.is-draft th {
+  color: var(--primary-strong);
+}
+.targets-note td {
+  padding-top: 0;
+  padding-bottom: 8px;
+}
+.targets-note p {
+  margin: 2px 0 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 1.5;
+}
+.targets-note .field-error {
+  color: var(--destructive);
+}
+.targets-note .setting-auto-hint {
+  color: var(--primary-strong);
+}
+.targets-note .setting-advisory {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 4px;
+  padding: 6px 9px;
+  border-radius: 6px;
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.targets-missing td {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+@media (max-width: 720px) {
+  .targets-table th:first-child,
+  .targets-table td:first-child {
+    padding-left: 14px;
+  }
+  .targets-table th:last-child,
+  .targets-table td:last-child {
+    padding-right: 14px;
+  }
+  .targets-input input {
+    width: 76px;
+  }
+  .targets-unit {
+    min-width: 64px;
+  }
+}
+.controller-settings-zones {
+  display: inline-flex;
+  margin: 4px 0 8px;
+}
+.controller-settings-group {
+  margin-top: 14px;
+}
+.controller-settings-group h3 {
+  font-size: var(--text-sm);
+}
+.controller-settings-group > p {
+  margin: 2px 0 6px;
+}
+.controller-settings-safety > summary {
+  cursor: pointer;
+  padding: 6px 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.controller-settings .targets-table th:first-child,
+.controller-settings .targets-table td:first-child {
+  padding-left: 0;
+}
+.controller-settings .targets-table th:last-child,
+.controller-settings .targets-table td:last-child {
+  padding-right: 0;
+}
+.controller-settings .targets-table {
+  max-width: 680px;
+}
+.controller-settings .setpoint-water {
+  margin-top: 16px;
+}
+/* A phone: the name on its own line with the input beside it, Jev's range under them. */
+@media (max-width: 720px) {
+  .targets-table tbody tr:not(.targets-phase):not(.targets-note):not(.targets-missing) {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
+    column-gap: 8px;
+    padding: 3px 14px;
+  }
+  .targets-table tbody tr:not(.targets-phase):not(.targets-note):not(.targets-missing) > * {
+    width: auto;
+    padding: 0;
+  }
+  .targets-table
+    tbody
+    tr:not(.targets-phase):not(.targets-note):not(.targets-missing)
+    > .targets-chip {
+    grid-column: 1 / -1;
+  }
+  .targets-table
+    tbody
+    tr:not(.targets-phase):not(.targets-note):not(.targets-missing)
+    > .targets-chip:empty {
+    display: none;
+  }
+}
+/* Setup › Water & calibration: a catch test, tried in the calculation only. */
+.calibration {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.calibration h3 {
+  font-size: var(--text-sm);
+}
+.calibration-fields {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.2fr);
+  align-items: end;
+  gap: 12px;
+}
+.calibration-fields > div:not(.calibration-result) {
+  display: grid;
+  gap: 6px;
+}
+.calibration-result {
+  display: grid;
+  gap: 2px;
+}
+.calibration-result > span,
+.calibration-result > small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.calibration-result strong {
+  font-size: 18px;
+}
+.calibration-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+@media (max-width: 720px) {
+  .calibration-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.controller-settings-water > summary {
+  cursor: pointer;
+  padding: 6px 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.controller-settings-water[open] > summary {
+  margin-bottom: 10px;
+}

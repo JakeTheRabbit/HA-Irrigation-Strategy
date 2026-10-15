@@ -1,0 +1,14 @@
+/* Plan › Schedule: the balance grid, endpoint profiles and recipes, one tap down. */
+.plan-advanced {
+  margin-top: 16px;
+}
+.plan-advanced > summary {
+  cursor: pointer;
+  padding: 6px 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.plan-advanced[open] > summary {
+  margin-bottom: 12px;
+}

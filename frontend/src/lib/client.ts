@@ -10,6 +10,8 @@ export interface HassSession {
   callService: (domain: string, service: string, data: Record<string, unknown>) => Promise<unknown>;
   /** Home Assistant's own websocket (`hass.connection`); see live.ts. */
   connection?: unknown;
+  /** The signed-in user (`hass.user`). */
+  user?: { is_admin?: unknown };
 }
 export function findSession(base?: string): HassSession | undefined {
   if (typeof window === "undefined") return;
@@ -179,6 +181,12 @@ export class HaClient {
       "stock_save",
       "stock_refill",
       "stock_record_batch",
+      "dosing_get",
+      "dosing_save",
+      "dosing_request",
+      "notify_get",
+      "notify_save",
+      "notify_test",
       "whats_new_get",
       "whats_new_seen",
     ];

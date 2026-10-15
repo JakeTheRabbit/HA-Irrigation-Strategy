@@ -343,7 +343,7 @@ stock_refill:
           mode: box
 stock_record_batch:
   name: Record a batch
-  description: Take one batch's dose from every stock tank now. For rooms without a mapped tank last-fill entity; with one, batches are counted from it and recording one here as well counts it twice. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
+  description: Take one batch's dose from every stock tank now. For rooms without a mapped tank last-fill entity; with one, batches are counted from it and recording one here as well counts it twice. A tank linked to a dosing pump is skipped, because that pump's doses draw it; the answer lists the tanks skipped. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.
   fields:
     room_id:
       required: true
@@ -355,6 +355,164 @@ stock_record_batch:
         number:
           min: 0
           mode: box
+stock_draw:
+  name: Draw what was dosed
+  description: Take from stock tanks what a dose or a batch actually dosed. The controller app calls it after every dose; each key is counted once, so sending one again changes nothing. A tank linked to a dosing pump is left as it is, because what that pump runs draws it, whoever starts it. Tanks this room does not have are skipped. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations and the controller app are unaffected.
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    key:
+      required: true
+      example: ":balance:2026-09-28T12:00:00+00:00"
+      selector:
+        text:
+    draws:
+      required: true
+      example: '{"balance": 25}'
+      selector:
+        object:
+    source:
+      required: true
+      selector:
+        select:
+          options:
+            - "dose"
+            - "batch"
+    note:
+      required: false
+      selector:
+        text:
+# Names and descriptions of the dosing services are in strings.json (translations/en.json).
+dosing_get:
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+dosing_save:
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    pumps:
+      required: true
+      selector:
+        object:
+    batch:
+      required: true
+      selector:
+        object:
+dosing_request:
+  fields:
+    room_id:
+      required: true
+      selector:
+        text:
+    action:
+      required: true
+      selector:
+        select:
+          options:
+            - "dose"
+            - "batch"
+            - "stop"
+    pump:
+      required: false
+      selector:
+        text:
+    ml:
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 5000
+          step: 0.1
+          unit_of_measurement: mL
+          mode: box
+# Names and descriptions of the notification services are in strings.json (translations/en.json).
+notify_get:
+notify_save:
+  fields:
+    expected_revision:
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    recipients:
+      required: true
+      selector:
+        object:
+    idle_hours:
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 12
+          step: 0.5
+          unit_of_measurement: h
+          mode: box
+notify_test:
+  fields:
+    service:
+      required: true
+      example: "notify.mobile_app_my_phone"
+      selector:
+        text:
+notify:
+  fields:
+    key:
+      required: true
+      example: "stock_low"
+      selector:
+        text:
+    code:
+      required: false
+      example: "CS-608"
+      selector:
+        text:
+    event:
+      required: false
+      selector:
+        select:
+          options:
+            - "phase"
+            - "jev_setpoint"
+    room:
+      required: false
+      example: "f1_"
+      selector:
+        text:
+    zone:
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 64
+          mode: box
+    title:
+      required: true
+      selector:
+        text:
+    message:
+      required: true
+      selector:
+        text:
+          multiline: true
+    urgent:
+      required: false
+      default: false
+      selector:
+        boolean:
 whats_new_get:
   name: Read what's new
   description: The release highlights shipped with this integration, the installed version and the last release the dashboard's What's new window showed. Changes nothing.

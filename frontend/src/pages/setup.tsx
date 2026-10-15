@@ -21,6 +21,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Heading, Empty } from "@/components/dashboard";
+import { ControllerSettings } from "@/components/controller-settings";
 import { Pill } from "@/components/mini-visuals";
 import {
   CatchTestCalculator,
@@ -44,13 +45,15 @@ import {
 import { errorText } from "@/lib/utils";
 import type { SetupCandidate, SetupDocument, SetupRoom, SetupZone } from "@/lib/operator-types";
 
-function MappingPicker({
+export function MappingPicker({
   label,
   values,
   candidates,
   multiple = false,
   onChange,
   disabled = false,
+  hint,
+  choose,
 }: {
   label: string;
   values: string[];
@@ -58,6 +61,10 @@ function MappingPicker({
   multiple?: boolean;
   onChange: (values: string[]) => void;
   disabled?: boolean;
+  /** What to choose, in the picker; the probes' wording by default. */
+  hint?: string;
+  /** The button's words while nothing is mapped. */
+  choose?: string;
 }) {
   const [open, setOpen] = useState(false),
     [search, setSearch] = useState("");
@@ -101,7 +108,7 @@ function MappingPicker({
             ? selected
                 .map((id) => candidates.find((c) => c.entity_id === id)?.name || id)
                 .join(", ")
-            : "Choose " + (multiple ? "sensors" : "entity")}
+            : (choose ?? "Choose " + (multiple ? "sensors" : "entity"))}
         </span>
         <Search size={16} />
       </Button>
@@ -111,9 +118,10 @@ function MappingPicker({
           <DialogHeader>
             <DialogTitle>Map {label}</DialogTitle>
             <DialogDescription>
-              {multiple
-                ? "Choose one or more probes. The integration combines their readings."
-                : "Choose the entity already configured in Home Assistant."}{" "}
+              {hint ??
+                (multiple
+                  ? "Choose one or more probes. The integration combines their readings."
+                  : "Choose the entity already configured in Home Assistant.")}{" "}
               Availability and units are shown before selection.
             </DialogDescription>
           </DialogHeader>
@@ -219,12 +227,13 @@ export function Setup({
     [confirmName, setConfirmName] = useState("");
   const [tab, setTab] = useState<"rooms" | "install">("rooms");
   const units = useSizingUnits();
+  const [settingsDirty, setSettingsDirty] = useState(false);
   const dirty = !!draft && (isNew || JSON.stringify(draft) !== JSON.stringify(original));
   const connected = ["live", "demo"].includes(controller.connection);
   useLayoutEffect(() => {
-    onDirtyChange(dirty);
+    onDirtyChange(dirty || settingsDirty);
     return () => onDirtyChange(false);
-  }, [dirty, onDirtyChange]);
+  }, [dirty, settingsDirty, onDirtyChange]);
   function selectRoom(room: SetupRoom | undefined) {
     setIsNew(false);
     setOriginal(room ? structuredClone(room) : null);
@@ -938,6 +947,9 @@ export function Setup({
             </>
           )}
         </>
+      )}
+      {tab === "rooms" && controller.roomId && (
+        <ControllerSettings controller={controller} onDirtyChange={setSettingsDirty} />
       )}
       <Dialog
         open={!!review}

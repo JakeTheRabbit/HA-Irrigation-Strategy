@@ -145,6 +145,16 @@ def test_the_minimum_daily_floor_fires_while_the_plan_is_held(rig):
     assert "switch.v1" in opened(fake)
 
 
+def test_the_floor_is_paced_from_this_photoperiods_lights_on(rig):
+    """The min-daily floor is spread over the day (core.floor_share): the controller gives it the clock."""
+    c, fake, room = rig
+    probe(fake, 1, 50)
+    snap, _p = c._snapshot(room, 1, datetime(2026, 9, 23, 13, 30), True, False)
+    assert snap.hours_since_lights_on == pytest.approx(13.5 - room.lights_on_hour)
+    early, _p = c._snapshot(room, 1, datetime(2026, 9, 23, int(room.lights_on_hour), 0), True, True)
+    assert early.hours_since_lights_on == 0.0
+
+
 def test_without_a_held_plan_the_same_zone_is_simply_topped_up(rig):
     c, fake, room = rig
     now = Clock.now()

@@ -7,41 +7,6 @@ export type Tone = "normal" | "high" | "over" | "muted";
 const share = (value: number | null, max: number) =>
   value === null || !(max > 0) ? 0 : Math.max(0, Math.min(100, (value / max) * 100));
 
-export interface MiniBar {
-  id: string;
-  label: string;
-  value: number | null;
-  title: string;
-  tone?: Tone;
-  /** The zone the rest of the card is about: its label is emphasised. */
-  selected?: boolean;
-}
-
-/** One small vertical bar per zone, labelled with the zone's number. */
-export function MiniBars({ bars, max, label }: { bars: MiniBar[]; max: number; label: string }) {
-  return (
-    <div className="mini-bars" role="img" aria-label={label}>
-      {bars.map((bar) => (
-        <span
-          className="mini-bar"
-          key={bar.id}
-          title={bar.title}
-          data-selected={bar.selected || undefined}
-        >
-          <span className="mini-bar-track">
-            <span
-              className="mini-bar-fill"
-              data-tone={bar.tone ?? "normal"}
-              style={{ height: `${share(bar.value, max)}%` }}
-            />
-          </span>
-          <span className="mini-bar-label">{bar.label}</span>
-        </span>
-      ))}
-    </div>
-  );
-}
-
 /** A slim horizontal bar filled to `value` of `max`, with an optional marker line at `mark`.
  * With `from` it is a range: filled from `from` to `value`. */
 export function Meter({

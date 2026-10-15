@@ -1,0 +1,12 @@
+/* Settings: every zone's scheduling, under the room's watering switch. */
+.settings-zones {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.settings-zones h3 {
+  font-size: var(--text-sm);
+}

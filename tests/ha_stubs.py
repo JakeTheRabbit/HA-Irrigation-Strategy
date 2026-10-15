@@ -118,6 +118,14 @@ def install() -> None:
         ir.async_delete_issue = _delete
     helpers.issue_registry = ir
 
+    dispatcher = _mod("homeassistant.helpers.dispatcher")
+    if not hasattr(dispatcher, "async_dispatcher_send"):
+        dispatcher.async_dispatcher_send = lambda hass, signal, *args: None
+        dispatcher.async_dispatcher_connect = lambda hass, signal, target: (
+            lambda: None
+        )
+    helpers.dispatcher = dispatcher
+
     util = _mod("homeassistant.util")
     if not hasattr(util, "__path__"):
         util.__path__ = []
@@ -132,10 +140,11 @@ def install() -> None:
 
 # ------------------------------- fakes for driving handlers -------------------------------
 class FakeState:
-    def __init__(self, state, attributes=None, last_updated=None):
+    def __init__(self, state, attributes=None, last_updated=None, last_changed=None):
         self.state = state
         self.attributes = attributes or {}
         self.last_updated = last_updated
+        self.last_changed = last_changed
 
 
 class FakeStates:
@@ -148,8 +157,21 @@ class FakeStates:
             return None
         return v if isinstance(v, FakeState) else FakeState(v)
 
-    def set(self, entity_id, state, attributes=None, last_updated=None):
-        self._m[entity_id] = FakeState(state, attributes, last_updated)
+    def set(
+        self, entity_id, state, attributes=None, last_updated=None, last_changed=None
+    ):
+        self._m[entity_id] = FakeState(state, attributes, last_updated, last_changed)
+
+    def async_all(self, domain_filter=None):
+        """Every state, or those of the given domain(s), each carrying its entity_id."""
+        domains = (domain_filter,) if isinstance(domain_filter, str) else domain_filter
+        found = []
+        for entity_id in self._m:
+            if domains is None or entity_id.split(".", 1)[0] in domains:
+                state = self.get(entity_id)
+                state.entity_id = entity_id
+                found.append(state)
+        return found
 
 
 class FakeServices:

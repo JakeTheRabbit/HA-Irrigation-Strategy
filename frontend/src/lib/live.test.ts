@@ -12,6 +12,7 @@ import {
 import { historySpan, mergeSeries } from "./sensor-context";
 import { ControllerStore } from "./use-controller";
 import { createDemo } from "./demo";
+import { readJev } from "./jev";
 import type { EntityState, States } from "./types";
 
 afterEach(() => {
@@ -147,9 +148,64 @@ describe("watched entities", () => {
       "sensor.crop_steering_zone_2_status",
       "sensor.crop_steering_f1_ai_heartbeat",
       "sensor.crop_steering_f1_zone_1_last_irrigation_app",
+      // Jev's sensors: a log first posted after the page opened still updates live.
+      "sensor.crop_steering_jev",
+      "sensor.crop_steering_jev_log",
+      "sensor.crop_steering_zone_2_jev",
+      "sensor.crop_steering_f1_jev_log",
+      "sensor.crop_steering_f1_zone_1_jev",
     ])
       expect(ids).toContain(id);
     expect(ids).not.toContain("sensor.crop_steering_f1_zone_2_phase");
+    expect(ids).not.toContain("sensor.crop_steering_f1_zone_2_jev");
+  });
+  it("includes each probe a zone's combined reading names, used or left out", () => {
+    const ids = watchedEntities({
+      ...home(),
+      ...states(
+        entity("sensor.crop_steering_vwc_zone_1", "58", {
+          used: ["sensor.z1_front_vwc"],
+          excluded: { "sensor.z1_back_vwc": "not reporting", "sensor.gone": "no reading" },
+        }),
+        entity("sensor.z1_front_vwc", "58.8"),
+        entity("sensor.z1_back_vwc", "57.2"),
+      ),
+    });
+    expect(ids).toContain("sensor.z1_front_vwc");
+    expect(ids).toContain("sensor.z1_back_vwc");
+    // A probe Home Assistant does not have would make it reject the whole subscription.
+    expect(ids).not.toContain("sensor.gone");
+  });
+  it("includes each room's dosing sensors and the hardware its dosing setup names", () => {
+    const ids = watchedEntities({
+      ...home(),
+      ...states(
+        entity("sensor.crop_steering_dosing_config", "3", {
+          pumps: [
+            {
+              id: "bloom",
+              flow_entity: "number.bloom_flow",
+              dosing_entity: "binary_sensor.bloom_dosing",
+            },
+          ],
+          batch: { mix_valves: ["switch.recirc"], fill_valve: "switch.not_in_ha" },
+        }),
+        entity("number.bloom_flow", "10.5"),
+        entity("binary_sensor.bloom_dosing", "off"),
+        entity("switch.recirc", "off"),
+      ),
+    });
+    for (const id of [
+      "sensor.crop_steering_dosing_config",
+      "number.bloom_flow",
+      "binary_sensor.bloom_dosing",
+      "switch.recirc",
+      // The controller's dosing report, before it has posted one.
+      "sensor.crop_steering_dosing",
+      "sensor.crop_steering_f1_dosing",
+    ])
+      expect(ids).toContain(id);
+    expect(ids).not.toContain("switch.not_in_ha");
   });
   it("is empty without crop-steering entities, so nothing subscribes to all of Home Assistant", () => {
     expect(watchedEntities(states(entity("light.kitchen", "on")))).toEqual([]);
@@ -308,6 +364,41 @@ describe("inside Home Assistant", () => {
     await vi.advanceTimersByTimeAsync(250);
     expect(store.getSnapshot().states[VWC].state).toBe("61.5");
   });
+  it("shows a Jev log first posted after the page opened, and each decision after it", async () => {
+    // Flower 1's controller has not posted its log yet (an older controller, or Jev just switched on).
+    const LOG = "sensor.crop_steering_f1_jev_log";
+    const { home, store } = await started();
+    const [, message] = home.connection.subscribeMessage.mock.calls[0] as unknown as [
+      unknown,
+      { entity_ids: string[] },
+    ];
+    expect(message.entity_ids).toContain(LOG);
+    expect(readJev(store.getSnapshot().states, "f1_").log).toBeNull();
+    const entry = (t: string, verdict: string) => ({
+      t,
+      zone: 1,
+      judge: "dawn",
+      title: "Morning start",
+      kind: "decision",
+      verdict,
+      p: 0.8,
+      agreed: true,
+      action: "",
+      result: "no action",
+      reason: "",
+    });
+    const first = entry("2026-09-28T08:05:00", "keep drying");
+    home.push({ a: { [LOG]: { s: "08:05 Z1 Morning start", a: { entries: [first] }, lc: 1 } } });
+    await vi.advanceTimersByTimeAsync(250);
+    expect(readJev(store.getSnapshot().states, "f1_").log!.entries).toHaveLength(1);
+    const second = entry("2026-09-28T08:35:00", "start ramp now");
+    home.push({ c: { [LOG]: { "+": { s: "08:35 Z1", a: { entries: [second, first] }, lu: 2 } } } });
+    await vi.advanceTimersByTimeAsync(250);
+    expect(
+      readJev(store.getSnapshot().states, "f1_").log!.entries.map((item) => item.verdict),
+    ).toEqual(["start ramp now", "keep drying"]);
+    store.stop();
+  });
   it("writes by reading back only the written entity", async () => {
     const { home, store } = await started();
     home.calls.length = 0;
@@ -460,6 +551,76 @@ describe("inside Home Assistant", () => {
     ).rejects.toThrow("limited to the selected room");
     store.stop();
   });
+  const EC = "sensor.crop_steering_ec_zone_1";
+  it("reads a run's daily lows and highs from long-term statistics over the websocket", async () => {
+    const { home, store } = await started();
+    const day = Date.UTC(2026, 7, 24);
+    home.connection.sendMessagePromise.mockImplementation(async () => ({
+      [VWC]: [
+        { start: day, end: day + 86_400_000, min: 55.2, max: 66.1 },
+        { start: day + 86_400_000, end: day + 2 * 86_400_000, min: 54.8, max: 65.9 },
+      ],
+      [EC]: [
+        { start: new Date(day).toISOString(), min: 3.9, max: 4.6 },
+        { start: day, min: null },
+      ],
+    }));
+    home.calls.length = 0;
+    const request = {
+      entityIds: [VWC, EC],
+      start: new Date(day).toISOString(),
+      end: new Date(day + 2 * 86_400_000).toISOString(),
+      timeZone: "UTC",
+    };
+    const ranges = await store.getSnapshot().dailyRanges(request);
+    expect(ranges.source).toBe("statistics");
+    expect(ranges.series).toEqual([
+      {
+        entityId: VWC,
+        daily: [
+          { date: "2026-08-24", records: 1, min: 55.2, max: 66.1 },
+          { date: "2026-08-25", records: 1, min: 54.8, max: 65.9 },
+        ],
+      },
+      { entityId: EC, daily: [{ date: "2026-08-24", records: 1, min: 3.9, max: 4.6 }] },
+    ]);
+    expect(home.connection.sendMessagePromise).toHaveBeenCalledWith({
+      type: "recorder/statistics_during_period",
+      start_time: request.start,
+      end_time: request.end,
+      statistic_ids: [VWC, EC],
+      period: "day",
+      types: ["min", "max"],
+    });
+    expect(home.calls).toEqual([]);
+    store.stop();
+  });
+  it("reads a sensor without statistics, and every sensor standalone, from recorded history", async () => {
+    const { home, store } = await started();
+    const end = Date.now(),
+      start = end - 3 * 86_400_000;
+    home.connection.sendMessagePromise.mockImplementation(async () => ({
+      [VWC]: [{ start, min: 55, max: 66 }],
+    }));
+    home.calls.length = 0;
+    const request = {
+      entityIds: [VWC, EC],
+      start: new Date(start).toISOString(),
+      end: new Date(end).toISOString(),
+      timeZone: "UTC",
+    };
+    const mixed = await store.getSnapshot().dailyRanges(request);
+    expect(mixed.source).toBe("statistics");
+    expect(mixed.series.map((item) => item.entityId)).toEqual([VWC, EC]);
+    expect(mixed.warnings.join(" ")).toContain(`No long-term statistics for ${EC}`);
+    expect(home.calls.some((call) => call.startsWith("GET history/period/"))).toBe(true);
+    delete (home.connection as { sendMessagePromise?: unknown }).sendMessagePromise;
+    expect((await store.getSnapshot().dailyRanges(request)).source).toBe("history");
+    await expect(
+      store.getSnapshot().dailyRanges({ ...request, entityIds: ["sensor.somewhere_else"] }),
+    ).rejects.toThrow();
+    store.stop();
+  });
   it("keeps a grow day to the selected room and one day", async () => {
     const { store } = await started();
     const start = Date.now() - 3_600_000,
@@ -472,6 +633,30 @@ describe("inside Home Assistant", () => {
     await expect(
       timeline({ entityIds: [VALVE], attributeIds: [], start: end - 30 * 3_600_000, end }),
     ).rejects.toThrow("at most one grow-day");
+    store.stop();
+  });
+  it("reads the tank and pump the selected room maps, and no other room's", async () => {
+    const { home, store } = await started();
+    const start = Date.now() - 3_600_000,
+      end = Date.now();
+    const timeline = store.getSnapshot().timeline;
+    const tank = {
+      entityIds: ["binary_sensor.demo_tank_filling", "sensor.demo_tank_level", "switch.demo_pump"],
+      attributeIds: ["sensor.demo_tank_last_fill"],
+      start,
+      end,
+    };
+    await expect(timeline(tank)).resolves.toEqual({});
+    // The last-fill record comes with its attributes: a date-and-time helper's timestamp.
+    expect(home.connection.sendMessagePromise).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity_ids: ["sensor.demo_tank_last_fill"],
+        no_attributes: false,
+      }),
+    );
+    await expect(
+      timeline({ entityIds: ["sensor.demo_f1_tank_level"], attributeIds: [], start, end }),
+    ).rejects.toThrow("History is limited to entities in the selected room.");
     store.stop();
   });
 });

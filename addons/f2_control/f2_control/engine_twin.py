@@ -45,6 +45,7 @@ def run(model, setpoints, start_vwc, start_ec, feed_ec, days=1, lights_on_h=10, 
     water, salt = start_vwc, start_vwc * start_ec
     phase, peak, shots, since, phase_min, daily_l = "P3", start_vwc, 0, 999.0, 0.0, 0.0
     pending, recent, responses, watch, runoff_today, busy_until = {}, [], [], None, 0.0, -1
+    p1_reached, p1_before, p1_extra = False, None, 0  # the P1 rule's bookkeeping, as the controller keeps it
     trace, changes = [], []
     for m in range(days * 24 * 60):
         dm = m % 1440
@@ -67,6 +68,8 @@ def run(model, setpoints, start_vwc, start_ec, feed_ec, days=1, lights_on_h=10, 
         if watch and m == watch[0]:
             responses, watch = (responses + [round(seen - watch[1], 2)])[-4:], None
         peak = max(peak, seen)
+        if phase == "P1" and seen >= min(sp["p1_target_vwc"], sp["field_capacity"]):
+            p1_reached = True
         snap = ZoneSnapshot(
             vwc=seen, ec=ec, phase=phase, peak_vwc=peak,
             dryback_pct=max(0.0, (peak - seen) / peak * 100.0) if peak > 0 else 0.0,
@@ -75,6 +78,7 @@ def run(model, setpoints, start_vwc, start_ec, feed_ec, days=1, lights_on_h=10, 
             ec_smooth=ec, lights_on=lights, lights_just_on=dm == 0,
             hours_to_lights_on=(1440 - dm) / 60.0 if lights else (1440 - dm) / 60.0,
             hours_to_lights_off=max(0.0, (day_min - dm) / 60.0), uptime_min=m + 60.0, feed_ec=feed_ec,
+            p1_reached=p1_reached, p1_peak_before_shot=p1_before, p1_extra_shots=p1_extra,
         )
         new_phase, _thr, fire, size, reason = decide(snap, params_from(sp))
         if m < busy_until:  # the real controller runs a shot synchronously: no second decision until it ends
@@ -83,9 +87,11 @@ def run(model, setpoints, start_vwc, start_ec, feed_ec, days=1, lights_on_h=10, 
             if new_phase == "P0":
                 daily_l, shots, peak, runoff_today = 0.0, 0, seen, 0.0
             if new_phase == "P1":
-                shots = 0
+                shots, p1_reached, p1_before, p1_extra = 0, False, None, 0
             phase, phase_min = new_phase, 0.0
         if fire and size > 0:
+            if phase == "P1":  # the peak before this shot's water, and the shots after the target
+                p1_before, p1_extra = peak, p1_extra + (1 if p1_reached else 0)
             pending[m + latency_min] = pending.get(m + latency_min, 0.0) + model.gain * size
             watch, since, shots, daily_l = (m + 8, seen), 0.0, shots + 1, daily_l + size * LITRES_PER_PCT
             busy_until = m + max(latency_min, int(round(size * SHOT_MIN_PER_PCT))) + 1

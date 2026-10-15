@@ -1,3 +1,67 @@
+# 3.11.1
+
+Pair with integration 3.11.1. **C3.** The ladder fix (#42). The four setpoints that follow the zone's highest readings stay inside each number's own min and max as well as the engine's bounds, are written top-down when field capacity rises and bottom-up when it falls, and a refused write stops the rest, so the ladder never inverts (6 Oct: F2 zone 2's floor of 17.9 was refused under 20 after its threshold had moved). Nothing moves until a lights-on has kept a day before (`peak_prev`): the day in progress is no stand-in. No state-file change.
+
+# 3.11.0
+
+Pair with integration 3.11.0. **C3.** The owner's P1 rules (#40). The P1 target is the zone's highest reading of the grow-day before (zone key `peak_prev`, kept at lights-on), with no 2-points-a-day limit; field capacity is the higher of today's and the day before's highest readings, and the re-water threshold and rescue floor move with it. P1 ends when a shot at the target no longer raises the zone's highest reading by 0.5 (the engine's `p1_extra` shots), or at the maximum shots; pore EC no longer holds P1 open. A zone on the blind path keeps its peak at lights-on too; until the first lights-on after the update, the grow-day in progress stands in for the day before only once its P1 is over. The learner writes neither the P1 target nor field capacity. New zone keys `peak_prev`, `p1_reached`, `p1_peak_before`, `p1_extra`; a 3.10.0 state file loads with them empty, and 3.10.0 ignores them after a rollback.
+
+# 3.10.0
+
+Pair with integration 3.10.0. **C3.** EC flushes (#37): the capped corrections (P0 flush, P1 flush, P2 dilute) need dilutive feed and a table that drains (`ZoneSnapshot.backed_up`, set from the CS-310 hold), not a moisture reading under field capacity - 2; the cap-exempt anti-lockout and P2 rescue keep that test, and a dilutive zone that reads full falls through to the capped rules instead of being blocked from all water. Field capacity follows the sensor (#38): the zone's highest reading 20 minutes or more after a shot, today or yesterday, never under the P1 target + 2, tracked every loop from the probe (learner keys `full_date`, `full_day`, `full_prev`) and written for blind zones too; when the probe moves it by a point or more, the P1 target, P2 re-water threshold and rescue floor move by the same points. A 3.9.0 state file loads with the new keys empty; 3.9.0 ignores them after a rollback.
+
+# 3.9.0
+
+Pair with integration 3.9.0. **C3.** One writer per setpoint under Jev's Setpoints judge (#34): the Auto setpoints learner writes the P1 target, field capacity and rescue floor, the judge the P2 shot size and re-water threshold; a learned P1 target rises at most 2 points a day and only after that day's ramp reached it, and a stale target goes to 2 points over the reading P1 began at, capped at the learned peak plus 1 (learner keys `day_ceiling`, `p1_entry`, `stale_target`). Each zone's plateau and nights are kept in the state file and logged every morning (#31); `decide()` is unchanged. Jev's availability (#32): TypeSafe then Cloudflare with retries, stale questions dropped, second looks, the stricter gate, CS-706 and CS-707; new options `jev_budget_warn_pct`, `jev_retries`, `jev_reask_max`, `jev_unsure_below`, `jev_strict_after` and `jev_strict_prob`, and `jev_daily_calls` defaults to 5000. A 3.8.0 state file loads with the new keys empty; 3.8.0 ignores them after a rollback.
+
+# 3.8.0
+
+Pair with integration 3.8.0. **C3.** Tables backing up (#26): CS-310 (critical) when a zone's moisture rises by 3 points within an hour while its valve (the controller's or a person's) stayed shut for that time and the 45 minutes before; the zone's daily minimum is held until the reading has not risen for an hour. CS-311 (critical) when the sump pump named in the new option `sump_power_sensor` (one sensor or `room=sensor` pairs) shows no run in Home Assistant's history for `sump_silent_hours` (default 3) while the room is on. New options only; no change to the state file.
+
+# 3.7.0
+
+Pair with integration 3.7.0. **C3.** The minimum-daily floor (`input_number.crop_steering_<prefix>zone_N_min_daily_ml_per_plant` x plant count) is paced (#24): never in P0, then due only while the zone is behind a straight line to the whole minimum 3 hours before lights-off, so a zone behind at the end of P0 catches up in P1 and the rest is spaced through P2; past that point it fires until met. It still waters whatever the probe reads (only the drown ceiling and the 10-minute spacing hold it). The snapshot now carries `hours_since_lights_on`. No change to options or the state file.
+
+# 3.6.0
+
+Pair with integration 3.6.0. **C3.** Who gets which phone push (#22): once any phone is set up on Settings & help › Notifications, each alert's push goes through the integration's `crop_steering.notify` to the phones whose row ticks its kind; with none, or when that call fails, it goes to `notify_service` exactly as before, and so does an emergency that reached no phone. Phase changes and Jev's moves are sent after the loop's shots, one push per room, within 10 s; a pump whose turn_on errored (CS-302) and a mix pump that did not start (CS-805) are switched off before their alert. New: pushes for a zone changing phase and for Jev moving a setting (through the routing only), and CS-209 when a room with its lights on has watered nothing for the set hours. No change to options or the state file.
+
+# 3.5.0
+
+Pair with integration 3.5.0. **C3.** Batch-tank dosing: the controller runs single doses and batches requested from the new Equipment › Dosing page, holds watering during a batch, draws each dose from its linked stock tank, and recovers after a restart (#19). New file `/data/dosing_state.json`; new app option `timeout: 30` (Supervisor stop timeout); no change to existing options or the state file. Not run on hardware.
+
+# 3.4.2
+
+Pair with integration 3.4.2. **C3.** A switch that has not reported OFF 6 s after a close is sent OFF again and read back for 10 s more before a hardware hold (#18). No change to add-on options or the state file. Not run on hardware.
+
+# 3.4.1
+
+Pair with integration 3.4.1. **C1.** The app's documentation page describes Jev and its options, and the install guide's buttons add this repository (#16); the dashboard demo shows Jev's re-water range as the controller bands it (#15). No change to the controller, its options or the state file. Not run on hardware.
+
+# 3.4.0
+
+Pair with integration 3.4.0. **C3.** Jev's Pore EC judge is asked only while EC stacking is on; journal outcomes name their decision (`of`) in words; the day's Jev usage survives restarts (`/data/jev_usage.json`); each zone's Jev sensor publishes its `setpoints` range (#12). The dashboard is rebuilt to five pages (#13). No change to add-on options or the state file. Not run on hardware.
+
+# 3.3.0
+
+Pair with integration 3.3.0. **C3.** Jev's doctrine gains Athena's Grow Guide Handbook as a second cited source (24 rules after the owner's, 123 in all; #7). The dashboard's grow day and live Jev log (#10) ship with the integration and this app's page. No change to add-on options or the state file. Not run on hardware.
+
+# 3.2.0
+
+Pair with integration 3.2.0. **C3.** The Setpoints judge: one notch a night on a zone's own P2 shot size or re-water threshold, inside a range around the operator's value, while the room's Auto setpoints switch is on; a rescue shot after a change puts it back and pauses the zone 48 h; the base Auto Setpoints learner never writes while it runs (#6). New file `/data/jev_setpoints.json`; no change to add-on options or the state file. Not run on hardware.
+
+# 3.1.0
+
+Pair with integration 3.1.0. **C3.** Jev's decisions are journalled (`/data/jev_journal.jsonl`) and published as `sensor.crop_steering_<prefix>jev_log` for the dashboard's live log; the room's Jev sensor gains `stage` (#5). No change to add-on options or the state file. Not run on hardware.
+
+# 3.0.1
+
+Pair with integration 3.0.1. **C3.** Jev's zones judge compares each zone's water per plant with the room's median zone, itself included, instead of its thirstiest sibling, so only the odd zone out gets the CS-702 alert (#3). Advice only: no water decision changes. No change to add-on options or the state file. Not run on hardware.
+
+# 3.0.0
+
+The Jev edition. Pair with integration 3.0.0. **C3.** Jev judges the engine's decisions inside a code envelope (docs/JEV.md); with no Jev key it runs exactly as 2.25.1. New options: `typesafe_api_key`, `jev_enabled`, `jev_judges`, `jev_daily_calls`, `jev_flower_start`, `jev_flower_days`. No state-file change. Not run on hardware.
+
 # 2.25.1
 
 Pair with integration 2.25.1. **No controller change:** the version moves with the pair (the integration's zone sensors now combine a zone's probes, #130). No change to add-on options or the state file.

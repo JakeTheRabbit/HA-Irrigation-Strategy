@@ -25,13 +25,17 @@ import os
 import re
 import signal
 import sys
+import threading
 import time
 from datetime import date, datetime, timedelta, timezone
 
 import requests
 import auto_setpoints
+import dosing_runner
+import jev_bridge
 import jev_policy
 import setpoint_supervisor
+import zone_history
 from strategy_runtime import parse_snapshot, parameter_override, strategy_block
 
 from crop_steering_engine import (
@@ -56,7 +60,20 @@ from crop_steering_engine import (
 BASE = os.environ.get("HA_URL", "http://supervisor/core/api")
 TOKEN = os.environ.get("SUPERVISOR_TOKEN") or os.environ.get("HA_TOKEN", "")
 HDR = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
-_S = requests.Session()
+_S = requests.Session()  # the main loop's
+_LOCAL = threading.local()
+
+
+def _session():
+    """The calling thread's own requests.Session: the main loop's is _S, and any other thread (the
+    dosing thread, dosing_runner.py) gets one of its own. A Session is not safe to share between
+    threads, and the dosing thread reads every second while a shot's reads run on the main loop."""
+    if threading.current_thread() is threading.main_thread():
+        return _S
+    session = getattr(_LOCAL, "session", None)
+    if session is None:
+        session = _LOCAL.session = requests.Session()
+    return session
 
 
 def log(*a):
@@ -76,7 +93,7 @@ class HAState(tuple):
 def ha_get(entity, timeout=8):
     """Return (state_str, attributes, last_updated_iso) or (None, {}, None); see HAState."""
     try:
-        r = _S.get(f"{BASE}/states/{entity}", headers=HDR, timeout=timeout)
+        r = _session().get(f"{BASE}/states/{entity}", headers=HDR, timeout=timeout)
         if r.status_code != 200:
             return HAState()
         d = r.json()
@@ -98,7 +115,7 @@ def ha_get_all():
     """Return the full /api/states list (or [] on failure). Used once at startup for
     multi-room discovery — find every sensor.crop_steering_*engine_config descriptor."""
     try:
-        r = _S.get(f"{BASE}/states", headers=HDR, timeout=12)
+        r = _session().get(f"{BASE}/states", headers=HDR, timeout=12)
         if r.status_code != 200:
             return []
         return r.json() or []
@@ -111,7 +128,7 @@ def ha_history(entity, since, timeout=12):
     [(state, last_changed_iso), ...]; the first is the state it was already in at `since`.
     None when Home Assistant can't say: unreachable, an error, or nothing recorded for it."""
     try:
-        r = _S.get(
+        r = _session().get(
             f"{BASE}/history/period/{since.isoformat()}",
             headers=HDR,
             params={
@@ -130,10 +147,10 @@ def ha_history(entity, since, timeout=12):
         return None
 
 
-def ha_call(domain, service, **data):
+def ha_call(domain, service, *, timeout=12, **data):
     try:
-        r = _S.post(
-            f"{BASE}/services/{domain}/{service}", headers=HDR, json=data, timeout=12
+        r = _session().post(
+            f"{BASE}/services/{domain}/{service}", headers=HDR, json=data, timeout=timeout
         )
         if r.status_code >= 300:
             log("call_service FAILED", domain, service, "HTTP", r.status_code)
@@ -144,9 +161,31 @@ def ha_call(domain, service, **data):
         return False
 
 
+def ha_service_response(domain, service, data, timeout=12):
+    """Call a service asking for its answer (?return_response, for a service that answers when asked:
+    crop_steering.stock_draw) -> (HTTP status, the service's answer), or (None, None) when Home
+    Assistant can't be reached. The status tells a refusal (4xx: sending it again changes nothing)
+    from a failure worth trying again."""
+    try:
+        r = _session().post(
+            f"{BASE}/services/{domain}/{service}", headers=HDR, json=data,
+            params={"return_response": ""}, timeout=timeout,
+        )
+    except Exception as e:
+        log("call_service failed", domain, service, e)
+        return None, None
+    if r.status_code >= 300:
+        log("call_service FAILED", domain, service, "HTTP", r.status_code)
+    try:
+        body = r.json()
+    except ValueError:
+        body = None
+    return r.status_code, body.get("service_response") if isinstance(body, dict) else None
+
+
 def ha_set(entity, state, attributes=None, timeout=8):
     try:
-        _S.post(
+        _session().post(
             f"{BASE}/states/{entity}",
             headers=HDR,
             json={"state": state, "attributes": attributes or {}},
@@ -226,6 +265,7 @@ _CANCELLED_SHOT_CLEANUP = (
 
 # Switch read-back after a close: see Controller._confirm_switches.
 CONFIRM_FIRST_READ_S, CONFIRM_POLL_S, CONFIRM_TIMEOUT_S = 1.0, 0.5, 6.0
+CONFIRM_RETRY_S = 10.0  # a second read-back, after OFF is sent again to what still reads on
 
 # The shortest shot the controller runs, in seconds (a shot sized shorter is lengthened to this).
 MIN_SHOT_S = 5
@@ -291,6 +331,46 @@ def _on_since_shot(history, started):
 # its copy of a sibling's rescue. Every other gate (kill switch, faults, zone switches, source water, the
 # daily budget) still applies to them.
 PLAN_HOLD_EXEMPT = frozenset({"p3_emergency", "watchdog", "min_daily", "blind_fallback", "blind_copy_rescue"})
+
+# Who gets which phone push is the integration's, for the whole site (docs/NOTIFICATIONS.md): it publishes how
+# many phones are set up, and the watering-stopped threshold, here. Read at most once a minute.
+NOTIFY_CONFIG = "sensor.crop_steering_notify_config"
+NOTIFY_CONFIG_S = 60.0
+# How long crop_steering.notify may take to push to the phones: what a push to notify_service always could.
+NOTIFY_TIMEOUT_S = 12
+# The most one loop spends sending its phase changes and Jev's moves: they are only news, and the loop is not.
+EVENTS_BUDGET_S = 10.0
+# The codes whose severity is critical in docs/error-codes.json (tests/test_error_codes.py keeps the two equal):
+# their push is urgent, a high-priority one on a phone whose row asks for that.
+CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-301", "CS-308", "CS-310",
+                            "CS-311", "CS-402", "CS-601", "CS-606", "CS-801"})
+# CS-310: a zone's moisture rising by BACKUP_RISE_PTS within BACKUP_WINDOW_MIN while no water went in, its valve
+# closed for BACKUP_GRACE_MIN before (the wetting front of a shot keeps rising a while): water coming up from
+# below, a table that isn't draining. Backtested on F2's 22-30 Sep 2026 readings: the two real episodes (Zone 2
+# filling from a stopped sump, 28 Sep 21:19 and 29 Sep 12:09) and nothing else. Cleared after BACKUP_CLEAR_MIN
+# without a rise.
+BACKUP_RISE_PTS, BACKUP_WINDOW_MIN, BACKUP_GRACE_MIN, BACKUP_CLEAR_MIN = 3.0, 60.0, 45.0, 60.0
+# Field capacity follows the zone's highest readings (_follow_fc). When it moves by this many points or more, the P2
+# re-water threshold and the rescue (P3 emergency) floor move with it; a smaller move is field capacity only.
+FC_SHIFT_MIN = 1.0
+# CS-311: the sump pump a room drains to (option sump_power_sensor) drawing no power for SUMP_SILENT_H while the
+# room is on. F2's ran every 1 to 1.5 hours, day and night, 22-28 Sep 2026 (its longest gap 2.37 h) and then not
+# at all for 41.6 h: its tables backed up. Checked every SUMP_CHECK_MIN from Home Assistant's history, as a run
+# lasts about a minute and a loop could miss it; a run is more than SUMP_RUN_W.
+SUMP_SILENT_H, SUMP_CHECK_MIN, SUMP_RUN_W = 3.0, 5.0, 20.0
+
+
+def room_option(value):
+    """An option naming one entity for every room ("*"), or `room=entity` pairs, comma separated."""
+    out = {}
+    for part in str(value or "").split(","):
+        name, sep, entity = part.strip().partition("=")
+        if part.strip():
+            out[name.strip() if sep else "*"] = (entity if sep else name).strip()
+    return out
+# CS-209: hours with the lights on, a zone in P1 or P2 and no shot in the room: the integration's idle_hours,
+# kept inside 1 to 12, else 3.
+IDLE_HOURS, IDLE_HOURS_RANGE = 3.0, (1.0, 12.0)
 
 # A room's choice of how Water today reads, select.crop_steering_<prefix>water_today_view. The integration
 # offers ["Zone total", PER_PLANT] (WATER_TODAY_VIEWS in its const.py); the vitals follow it.
@@ -411,6 +491,11 @@ class Room:
 
 
 class Controller:
+    # Batch-tank dosing (dosing_runner.py, docs/DOSING.md): None until __init__ builds it. A shot starts,
+    # and a batch holds a room, under _shot_lock, so a shot is either seen running or never starts.
+    dosing = None
+    _shot_lock = threading.Lock()
+
     def __init__(self):
         o = load_options()
         # ---- shared (cross-room) config ----
@@ -425,8 +510,18 @@ class Controller:
         self.hold_entities = [e for e in (o.get("hold_entities") or []) if e]
         self.feed_grace_min = float(o.get("feed_grace_min", 30))
         self.blind_fallback_min = float(o.get("blind_fallback_min", 90))
+        # Optional (CS-311): the power sensor of the sump pump a room's tables drain to, one for every room or
+        # `room=sensor` pairs, and how long it may stand still while the room is on. Unset = not watched.
+        self.sump_sensors = room_option(o.get("sump_power_sensor"))
+        self.sump_silent_h = float(o.get("sump_silent_hours") or SUMP_SILENT_H)
         # Optional: Jev (TypeSafe, via Cloudflare AI) as a guard on auto setpoints. Unset = arithmetic only.
         self._cf = tuple((o.get(k) or "").strip() for k in ("cf_account_id", "cf_api_token", "cf_gateway_id"))
+        # The Jev edition: Jev judges the engine's decisions inside a code envelope (docs/JEV.md). None = off.
+        try:
+            self.jev = jev_bridge.build(o, self._cf, os.environ.get("F2_STATE_PATH") or "/data/state.json", log)
+        except Exception as e:  # Jev can never stop the controller starting
+            log("jev: off, it could not start:", e)
+            self.jev = None
         self.loop_seconds = float(o.get("loop_seconds", 60))
         self.flow_lps = float(
             o.get("flow_lps", 0.02)
@@ -440,6 +535,24 @@ class Controller:
         # override exists so a test/dev rig can redirect the file BEFORE this constructor's
         # own _load_state()/adoption pass reads and writes it.
         self._state_path = os.environ.get("F2_STATE_PATH") or "/data/state.json"
+        # Dosing runs on its own thread, started by run(). Like Jev, it can never stop the controller
+        # starting, and it only ever acts on an explicit request for a room with dosing set up.
+        try:
+            self.dosing = dosing_runner.DosingRunner(
+                self,
+                get=lambda entity, **timeout: ha_get(entity, **timeout),
+                call=lambda domain, service, **data: ha_call(domain, service, **data),
+                publish=lambda entity, state, attributes: ha_set(entity, state, attributes),
+                alert=self._dosing_alert,
+                history=lambda entity, since: ha_history(entity, since),
+                respond=lambda domain, service, data, timeout: ha_service_response(
+                    domain, service, data, timeout),
+                state_path=os.path.join(os.path.dirname(self._state_path) or ".", "dosing_state.json"),
+                log=log,
+            )
+        except Exception as e:
+            log("dosing: off, it could not start:", e)
+            self.dosing = None
         self._busy = False
         self._shot_room = None  # the room whose shot is in flight (see _execute_shot / _safe_off)
         self._alerted = {}
@@ -726,6 +839,11 @@ class Controller:
             "water_history": None,
             "water_history_legacy_excluded_l": 0.0,
             "learn": auto_setpoints.fresh(),
+            "peak_prev": None,  # the highest VWC of the grow-day before, kept at lights-on (_vwc_maxima)
+            "p1_reached": False,  # the P1 rule (core.decide): this P1 has read at or over its target
+            "p1_peak_before": None,  # ...the zone's peak right before its last P1 shot
+            "p1_extra": 0,  # ...and the P1 shots fired since the target was reached
+            **zone_history.fresh(),
         }
 
     def _apply_saved_zone(self, fresh, d):
@@ -792,6 +910,23 @@ class Controller:
                 s["water_history_legacy_excluded_l"] = excluded
         except (TypeError, ValueError):
             pass
+        if isinstance(d.get("p1_reached"), bool):  # the P1 rule's state, absent before 3.11.0
+            s["p1_reached"] = d["p1_reached"]
+        try:
+            before = float(d.get("p1_peak_before"))
+            if math.isfinite(before) and 0.0 < before <= 100.0:
+                s["p1_peak_before"] = before
+        except (TypeError, ValueError):
+            pass
+        if isinstance(d.get("p1_extra"), int) and not isinstance(d.get("p1_extra"), bool) and 0 <= d["p1_extra"] <= 100:
+            s["p1_extra"] = d["p1_extra"]
+        try:  # absent before 3.11.0: None, and the grow-day in progress stands in (_vwc_maxima)
+            prev = float(d.get("peak_prev"))
+            if math.isfinite(prev) and 0.0 < prev <= 100.0:
+                s["peak_prev"] = prev
+        except (TypeError, ValueError):
+            pass
+        s.update(zone_history.restore(d))
         return s
 
     def _read_state_file(self):
@@ -1130,6 +1265,10 @@ class Controller:
         return {
             "phase": s.get("phase"),
             "peak": s.get("peak"),
+            "peak_prev": s.get("peak_prev"),
+            "p1_reached": bool(s.get("p1_reached")),
+            "p1_peak_before": s.get("p1_peak_before"),
+            "p1_extra": int(s.get("p1_extra") or 0),
             "shots": s.get("shots"),
             "daily_vol": s.get("daily_vol"),
             "water_history": s.get("water_history"),
@@ -1146,6 +1285,9 @@ class Controller:
             "last_phase_change": lpc.isoformat() if isinstance(lpc, datetime) else None,
             "last_ec_steer": les.isoformat() if isinstance(les, datetime) else None,
             "last_daily_reset": ldr.isoformat() if isinstance(ldr, date) else None,
+            "plateau_hist": s.get("plateau_hist") or [],
+            "night_hist": s.get("night_hist") or [],
+            "night": s.get("night"),
         }
 
     def _save_state(self):
@@ -1586,9 +1728,15 @@ class Controller:
             lights_just_on=lights_just_on,
             hours_to_lights_on=self._hours_to(now, room.lights_on_hour),
             hours_to_lights_off=self._hours_to(now, room.lights_off_hour),
+            # the min-daily floor's clock: it is paced from lights-on (core.floor_share)
+            hours_since_lights_on=(24.0 - self._hours_to(now, room.lights_on_hour)) % 24.0,
             uptime_min=(now - self._start).total_seconds() / 60.0,
             feed_ec=(feed_ec if feed_ec is not None else 3.0),
             new_grow_day=new_grow_day,
+            # the P1 rule (core.decide): reached the target, the peak before the last shot, shots since reaching it
+            p1_reached=bool(st.get("p1_reached")),
+            p1_peak_before_shot=st.get("p1_peak_before"),
+            p1_extra_shots=int(st.get("p1_extra") or 0),
             ec_settled=ec_settled,
             # a held plan holds the steering; decide() then fires only the rescues (PLAN_HOLD_EXEMPT)
             steering_held=bool(strategy_block(getattr(room, "strategy_snapshot", None), zone)),
@@ -1640,7 +1788,8 @@ class Controller:
     # ---------- auto setpoints (the engine still fires every shot) ----------
     def _auto_tick(self, room, zone, snap, p, lights_on, now):
         """Learn this zone from its own shots every loop. Rewrite its targets only when the room's
-        opt-in switch is on, only on its own per-zone numbers, and never while a grow plan owns the room."""
+        opt-in switch is on, only on its own per-zone numbers, never while a grow plan owns the room,
+        and never one that Jev's Setpoints judge owns."""
         st = room.state[zone]
         if not isinstance(st.get("learn"), dict):
             st["learn"] = auto_setpoints.fresh()
@@ -1657,6 +1806,14 @@ class Controller:
         planned = bool(getattr(room, "strategy_required", False))
         jev_state = room.__dict__.setdefault("_jev_state", {})
         jev = jev_state.get(zone, "ok") if (self._cf[0] and self._cf[1]) else "disabled"
+        # Each lever has one writer. With Jev's Setpoints judge running, the P2 shot size and re-water threshold
+        # are its own (jev_bridge) and this learner writes the rest, never consulting the old per-hour judge
+        # (26 Sep 2026: that judge walked zone 1's shot to 1 %). Writing nothing at all under the judge left
+        # nobody on the P1 target: zone 2 sat at 29.5 under a probe reading 44 % and never ramped (4 Oct 2026).
+        judged = jev_bridge.judge_levers(self)
+        if judged:
+            jev = "disabled"
+        writes = enabled and not planned
         was = learn["outcome"]
         outcome = auto_setpoints.ramp_outcome(learn, st["phase"])
         if outcome != was:
@@ -1683,7 +1840,7 @@ class Controller:
         # size (pore EC) and the working peak, one bounded step per lever per grow-day. It cannot fire,
         # size or delay a shot, and a call that fails or takes too long changes nothing.
         stamp = now.strftime("%Y-%m-%dT%H")
-        if (enabled and not planned and jev != "disabled" and lights_on and st["phase"] == "P2"
+        if (writes and jev != "disabled" and lights_on and st["phase"] == "P2"
                 and auto_setpoints.jev_due(learn, stamp)):
             verdict = jev_policy.verdicts(jev_policy.call(
                 self._cf[0], self._cf[1],
@@ -1696,7 +1853,7 @@ class Controller:
                 self._auto_write(room, zone, suffix, p.p2_shot_size, value, learn, now, by="Jev")
             log(f"[{room.slug}] Z{zone} Jev P2: {learn['jev']['last']}")
             self._save_state()
-        if enabled and not planned:
+        if writes:
             current = {
                 "p1_target_vwc": p.p1_target, "field_capacity": p.field_capacity,
                 "p2_vwc_threshold": self._zone_num(room, zone, "p2_vwc_threshold", 45, optional=True),
@@ -1710,40 +1867,134 @@ class Controller:
                 p1_shot_pct=p.p1_initial, p1_gap_min=p.p1_time_between_min,
                 start_vwc=learn["ramp_start"] if learn["ramp_start"] is not None else snap.vwc,
             )
-            want = auto_setpoints.wanted(learn, current, snap.vwc, st["phase"], ctx)
-            for suffix, value, _why in setpoint_supervisor.writes(current, want):
-                self._auto_write(room, zone, suffix, current[suffix], value, learn, now)
-            if st["phase"] == "P1" and learn["outcome"] == "plateau":
-                gate = auto_setpoints.p1_ec_gate(ec_rules, p.ec_target_p1, p.ec_target_p2)
-                if gate is not None:  # let the hand-over through; see p1_ec_gate
-                    mode = "veg" if self._veg(room, zone) else "gen"
-                    self._auto_write(room, zone, f"ec_target_{mode}_p1", p.ec_target_p1, gate, learn, now)
+            if self._follow_fc(room, zone, p, now):
+                pass  # the setpoints moved with the zone's highest readings; the learner acts on the next pass
+            else:
+                want = auto_setpoints.wanted(learn, current, snap.vwc, st["phase"], ctx, others=judged)
+                for suffix in ("p1_target_vwc", "field_capacity"):  # the zone's highest readings set these
+                    want.pop(suffix, None)
+                for suffix, value, _why in setpoint_supervisor.writes(current, want):
+                    self._auto_write(room, zone, suffix, current[suffix], value, learn, now)
         state, attrs = auto_setpoints.status(learn, enabled)
         if enabled and planned:
             state, attrs["frozen_reason"] = "frozen", "an armed grow plan owns this room's targets"
-        suffixes = auto_setpoints.MANAGED + (auto_setpoints.JEV_MANAGED if jev != "disabled" else ())
+        who = dict.fromkeys(auto_setpoints.MANAGED, "Auto setpoints learner")
+        who["p1_target_vwc"] = "the zone's highest reading of the grow-day before"
+        who["field_capacity"] = "the zone's highest reading of this grow-day or the one before"
+        who["p3_emergency_vwc_threshold"] += (", only to keep it 3 points under the re-water threshold; "
+                                              "moves with field capacity")
+        who.update(dict.fromkeys(judged, "Jev's Setpoints judge, one notch a night"))
+        if jev != "disabled":  # the old per-hour judge, which only ever runs without the Setpoints judge
+            who.update(dict.fromkeys(auto_setpoints.JEV_MANAGED, "Jev's hourly P2 check"))
+        number = f"number.crop_steering_{room.prefix}zone_{zone}_"
         attrs.update(
             jev=jev, jev_last=learn["jev"]["last"], jev_changed_today=learn["jev"]["changed"],
             working_peak_adjust=learn["peak_adj"],
             updated=now.isoformat(), engine="f2-control", friendly_name=f"Zone {zone} auto setpoints",
-            managed=[f"number.crop_steering_{room.prefix}zone_{zone}_{s}" for s in suffixes],
+            managed=[number + s for s in who], managed_by={number + s: w for s, w in who.items()},
         )
         ha_set(f"sensor.crop_steering_{room.prefix}zone_{zone}_auto_setpoints", state, attrs)
 
+    def _vwc_maxima(self, st):
+        """-> (field capacity, P1 target) from the zone's highest readings, or (None, None) until a lights-on has
+        kept a day before.
+
+        `peak` is the highest VWC since this grow-day's lights-on (the engine's own daily peak); `peak_prev` is the
+        grow-day before's, kept at lights-on. Field capacity is the higher of the two; the P1 target is the day
+        before's. Until the first lights-on after the update keeps one, nothing is written: the grow-day in progress
+        is no stand-in for it (6 Oct 2026, updated after lights-on: F2 zone 2's ramp stopped at its shot limit at
+        51.4, and field capacity followed it down from 67.5)."""
+        prev = st.get("peak_prev")
+        if prev is None or prev <= 0.0:
+            return None, None
+        return max(st.get("peak") or 0.0, prev), prev
+
+    def _follow_fc(self, room, zone, p, now):
+        """The zone's setpoints follow its own highest readings -> True when anything was written.
+
+        The owner, 6 Oct 2026: "the P1 target should be the VWC MAX the previous days actual field capacity, the
+        highest value that the VWC got to during the day is the next days p1 target", "the FC needs to increase as
+        the sensor does", "the p2 dryback and shit needs to move as well to be in line with the new FC", "the rescue
+        floor should increase too", "the system needs to do this shit automatically". So:
+          - field capacity = the highest reading of this grow-day or the one before (_vwc_maxima);
+          - the P1 target = the highest reading of the grow-day before, with no limit on how far it moves;
+          - when field capacity moves by FC_SHIFT_MIN or more, the P2 re-water threshold and the rescue (P3
+            emergency) floor move by the same points, so the dryback under full keeps its size. Jev's Setpoints judge
+            takes a moved threshold as the new centre of its range (jev_bridge).
+        Nothing is written that would leave the ladder inverted (rescue + 3 <= threshold < P1 target <= field
+        capacity): then field capacity alone moves if that is valid, else nothing. Within the engine's bounds and each
+        number's own min and max, which Home Assistant enforces (6 Oct 2026: a rescue floor of 17.9 was refused under
+        the entity's 20, after the threshold had already moved, and zone 2's ladder was left inverted). The ladder is
+        written from the top when it moves up and from the bottom when it moves down, so it holds after every write,
+        and a refused write stops the rest. Runs for every zone, its probe trusted or not, under the room's Auto
+        setpoints switch, never while a grow plan owns it."""
+        if not self._on(f"switch.crop_steering_{room.prefix}auto_setpoints", False):
+            return False
+        if getattr(room, "strategy_required", False):
+            return False
+        st = room.state[zone]
+        seen, yday = self._vwc_maxima(st)
+        if seen is None:
+            return False
+
+        def bounded(suffix, value):
+            lo, hi = setpoint_supervisor.BOUNDS[suffix]
+            attrs = ha_get(f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}")[1] or {}
+            try:
+                lo = max(lo, float(attrs["min"]))
+            except (KeyError, TypeError, ValueError):
+                pass
+            try:
+                hi = min(hi, float(attrs["max"]))
+            except (KeyError, TypeError, ValueError):
+                pass
+            return round(max(lo, min(hi, value)), 1)
+
+        fc = bounded("field_capacity", seen)
+        target = bounded("p1_target_vwc", min(yday, fc))
+        thr = self._zone_num(room, zone, "p2_vwc_threshold", None, optional=True)
+        if thr is None:
+            return False
+        delta = round(fc - p.field_capacity, 1)
+        new_thr, rescue = thr, p.p3_emergency_floor
+        if abs(delta) >= FC_SHIFT_MIN:
+            new_thr = bounded("p2_vwc_threshold", thr + delta)
+            rescue = bounded("p3_emergency_vwc_threshold", p.p3_emergency_floor + delta)
+        if rescue + 3.0 <= new_thr < target <= fc:
+            writes = [("field_capacity", p.field_capacity, fc), ("p1_target_vwc", p.p1_target, target),
+                      ("p2_vwc_threshold", thr, new_thr), ("p3_emergency_vwc_threshold", p.p3_emergency_floor, rescue)]
+            if delta < 0:
+                writes.reverse()
+        elif p.p3_emergency_floor + 3.0 <= thr < p.p1_target <= fc:
+            writes = [("field_capacity", p.field_capacity, fc)]
+        else:
+            return False
+        learn = st["learn"] if isinstance(st.get("learn"), dict) else {}
+        wrote = False
+        for suffix, old, value in writes:
+            if abs(value - old) >= 0.05:
+                if not self._auto_write(room, zone, suffix, old, value, learn, now, by="auto (highest reading)"):
+                    return wrote  # refused: what is still to move waits for the next loop, the ladder holds
+                wrote = True
+        return wrote
+
     def _auto_write(self, room, zone, suffix, old, value, learn, now, by="auto"):
+        """Write one per-zone number -> False when it was not written (no such number, or Home Assistant refused)."""
         entity = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
         if ha_get(entity)[0] in (None, "unknown", "unavailable", ""):
-            return  # no per-zone number on this install: room-level values are the operator's, never ours
+            return False  # no per-zone number on this install: room-level values are the operator's, never ours
         written = room.__dict__.setdefault("_auto_written", {})
         last = written.get((zone, suffix))
         if last and last[0] == value and (now - last[1]).total_seconds() < 300:
-            return  # HA has not reflected the last write yet: do not spam it
+            return True  # HA has not reflected the last write yet: do not spam it
+        if not ha_call("number", "set_value", entity_id=entity, value=value):
+            return False
         written[(zone, suffix)] = (value, now)
-        ha_call("number", "set_value", entity_id=entity, value=value)
         learn["last_change"] = f"{now.strftime('%H:%M')} {suffix} {old:g} -> {value:g}"
         tag = "" if room.prefix == "" else f"{room.slug} "
         self._activity.insert(0, f"{now.strftime('%H:%M')} {tag}Z{zone} {by} {suffix} {old:g} -> {value:g}"[:120])
         log(f"[{room.slug}] Z{zone} {by} {suffix} {old:g} -> {value:g}")
+        return True
 
     # ---------- room status (On / Off) ----------
     def _room_active(self, room):
@@ -1762,7 +2013,10 @@ class Controller:
     def _room_switched_off(self, room):
         """Stand the room down: its standing alerts are about a room that is now deliberately idle."""
         log(f"[{room.slug}] room switched OFF - irrigation and alerts stand down")
-        for key in [k for k in self._alerted if f"_{room.slug}_" in k or k.endswith(f"_{room.slug}")]:
+        # A snapshot: the dosing thread may raise an alert meanwhile (dosing_runner.py). A dosing alert
+        # is about one event in the batch tank, which a room going idle does not undo: it stays.
+        for key in [k for k in list(self._alerted) if not k.startswith("dosing_")
+                    and (f"_{room.slug}_" in k or k.endswith(f"_{room.slug}"))]:
             ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
             del self._alerted[key]
 
@@ -1944,6 +2198,9 @@ class Controller:
             return "Room archived in integration setup"
         if not self._room_active(room):
             return "Room off (nothing growing)"
+        making = self._dosing_hold(room)  # every shot, the rescues a plan hold lets through included
+        if making:
+            return making
         planned_hold = strategy_block(getattr(room, "strategy_snapshot", None), zone)
         if planned_hold:
             if getattr(reason, "kind", None) not in PLAN_HOLD_EXEMPT:
@@ -2138,12 +2395,14 @@ class Controller:
             )
         return off
 
-    def _alert(self, key, code, title, message, room=None, zone=None):
+    def _alert(self, key, code, title, message, room=None, zone=None, quiet=True):
         """Raise notification `f2_{key}` with its error code (docs/error-codes.json; the dashboard's
         Help & tools lists the same catalog). The key, and so the notification id, never changes
-        with the wording: an update replaces an old notification instead of adding a second one."""
-        if not self._alert_due(key, code):
-            return
+        with the wording: an update replaces an old notification instead of adding a second one.
+        True once Home Assistant has it; False while it is inside its quiet period (`quiet`: for a
+        condition re-checked every loop) or could not be created."""
+        if quiet and not self._alert_due(key, code):
+            return False
         where = self._where(room, zone) if room is not None else ""
         title = f"{where}: {title} ({code})" if where else f"{title[:1].upper()}{title[1:]} ({code})"
         log("ALERT", title, "-", " ".join(message.split()))
@@ -2161,12 +2420,391 @@ class Controller:
             message=message,
             notification_id=f"f2_{key}",
         ):
-            return
+            return False
         self._alerted[key] = datetime.now()
         self._alert_codes[key] = code
         dom, _, svc = self.notify_service.partition("/")
+        recipients = self._notify_config()[0]  # phones set up in the integration (docs/NOTIFICATIONS.md)
+        push = True
+        triage = getattr(getattr(self, "jev", None), "triage", None)
+        if (recipients or (dom and svc)) and triage is not None:
+            try:  # Jev's Alerts judge: whether this alert's repeats keep buzzing a phone (docs/JEV.md)
+                push, why = triage.push(key, code, title, message, datetime.now())
+                jev_bridge.triaged(self, room, zone, key, code, title, push, why)
+                if not push:
+                    log("ALERT push held:", key, why)
+            except Exception as e:
+                push = True
+                log("jev triage error", key, e)
+        if push:
+            self._push(key, code, title, message, room, zone, recipients)
+        return True
+
+    def _push(self, key, code, title, message, room, zone, recipients):
+        """An alert's phone push (docs/NOTIFICATIONS.md). With phones set up in the integration it goes through
+        crop_steering.notify to the ones whose row ticks its kind of alert, and nothing is pushed here. With none,
+        or when that call fails, it goes to the notify_service option exactly as it always did: never both, and
+        never lost to the router."""
+        if recipients:
+            try:
+                if self._route(key, code, None, room, zone, title, message, code in CRITICAL_CODES):
+                    return
+            except Exception as e:  # whatever goes wrong, the push goes the old way
+                log("notify: crop_steering.notify failed", key, e)
+        dom, _, svc = self.notify_service.partition("/")
         if dom and svc:
             ha_call(dom, svc, title=title, message=message)
+        else:
+            log("notify: the push for", key, "went to no phone: none takes it in Crop Steering, and the "
+                "notify_service option is empty")
+
+    def _route(self, key, code, event, room, zone, title, message, urgent=False, timeout=NOTIFY_TIMEOUT_S):
+        """Hand one push to crop_steering.notify, asking for its answer -> True when the integration took it: sent
+        to the phones that ask for it, or to none because none does. False when it could not be asked, refused it
+        (HTTP 4xx or 5xx, no answer in `timeout`), sent it nowhere and said why (nobody set up after all, or every
+        phone it tried failed), or when an emergency (`urgent`) reached no phone at all."""
+        data = {"key": key, "title": title, "message": message}
+        for name, value in (("code", code), ("event", event), ("zone", zone)):
+            if value is not None:
+                data[name] = value
+        if room is not None:
+            data["room"] = room.prefix
+        if urgent:
+            data["urgent"] = True
+        status, answer = ha_service_response("crop_steering", "notify", data, timeout)
+        if status is None or not 200 <= status < 300:
+            log("notify: crop_steering.notify did not take", key, "HTTP", status)
+            return False
+        sent = answer.get("sent_to") if isinstance(answer, dict) else None
+        if isinstance(answer, dict) and answer.get("error") and not sent:
+            log("notify: crop_steering.notify sent", key, "to nobody:", answer["error"])
+            return False
+        if urgent and not sent:  # an emergency must reach a phone: the notify_service option is tried next
+            log("notify: emergency", key, "reached no phone through crop_steering.notify")
+            return False
+        return True
+
+    def _notify_config(self, refresh=False):
+        """(recipients, idle_hours) from the integration's sensor.crop_steering_notify_config: read by each loop at
+        most once a minute (`refresh`), and otherwise the last reading, so an alert never waits on the read. An
+        integration without it (older than notifications) or unable to read its store: (0, 3.0), so every push
+        goes to the notify_service option exactly as before and CS-209 counts 3 hours."""
+        now = time.monotonic()
+        cached = getattr(self, "_notify_cfg", None)
+        if cached is not None and (not refresh or 0 <= now - cached[0] < NOTIFY_CONFIG_S):
+            return cached[1]
+        attrs = ha_get(NOTIFY_CONFIG)[1]
+        attrs = attrs if isinstance(attrs, dict) else {}
+        try:
+            recipients = max(0, int(attrs.get("recipients") or 0))
+        except (TypeError, ValueError):
+            recipients = 0
+        try:
+            idle = float(attrs.get("idle_hours"))
+        except (TypeError, ValueError):
+            idle = IDLE_HOURS
+        idle = min(IDLE_HOURS_RANGE[1], max(IDLE_HOURS_RANGE[0], idle)) if math.isfinite(idle) else IDLE_HOURS
+        self._notify_cfg = (now, (recipients, idle))
+        return recipients, idle
+
+    def _notify_event(self, event, room, zone, *detail):
+        """A phase change ("phase": was, to, why) or a setting Jev moved ("jev_setpoint": words, why): not an
+        alert, so no card, and pushed only through crop_steering.notify, never to the notify_service option
+        (docs/NOTIFICATIONS.md). Queued, and sent once the loop's shots are done (_send_events), so a slow Home
+        Assistant never holds one up."""
+        self.__dict__.setdefault("_events", []).append((event, room, zone, detail))
+
+    def _send_events(self):
+        """The events queued this loop, to the phones that ask for them, when any phone is set up at all: one push
+        per room and kind (lights-off moves every zone at once), within EVENTS_BUDGET_S for the lot. One that
+        fails, or is left when the time is up, is logged and dropped: an event is never worth a retry, nor a push
+        to notify_service."""
+        events = self.__dict__.pop("_events", None) or []
+        if not events or not self._notify_config()[0]:
+            return
+        grouped = {}
+        for event, room, zone, detail in events:
+            grouped.setdefault((event, room.slug), (event, room, []))[2].append((zone, detail))
+        deadline = time.monotonic() + EVENTS_BUDGET_S
+        for event, room, items in grouped.values():
+            left = deadline - time.monotonic()
+            if left <= 0:
+                log("notify: no time left this loop, not sent:", event, room.slug, len(items))
+                continue
+            try:
+                zone = items[0][0] if len(items) == 1 else None
+                title, message = self._event_text(event, room, items)
+                key = f"{event}_{room.slug}" + (f"_z{zone}" if zone is not None else "")
+                self._route(key, None, event, room, zone, title, message, timeout=min(NOTIFY_TIMEOUT_S, left))
+            except Exception as e:
+                log("notify: event not sent", event, room.slug, e)
+
+    def _event_text(self, event, room, items):
+        """A room's events of one kind this loop as one push -> (title, message): one zone's in its own words, or
+        a line for each ("Zone 1: P2 → P3, lights-off -> P3")."""
+        moves = []
+        for zone, detail in items:
+            if event == "phase":
+                was, to, why = detail
+                moves.append((zone, f"{was} → {to}", why))
+            else:
+                words, why = detail
+                moves.append((zone, f"Jev changed {words}", why))
+        if len(moves) == 1:
+            zone, head, why = moves[0]
+            return f"{self._where(room, zone)}: {head}", why or head
+        what = "phase changes" if event == "phase" else "settings Jev changed"
+        name = self._where(room)
+        title = f"{name}: {what}" if name else what[:1].upper() + what[1:]
+        return title, "\n".join(
+            f"{self._zone_title(room, zone)}: {head}" + (f", {why}" if why else "") for zone, head, why in moves
+        )
+
+    # ---------- CS-310: moisture rising with no water ----------
+    def _watch_backup(self, room, zone, snap, now):
+        """CS-310 (docs/error-codes.json) -> whether the zone is held as backed up. Its moisture rose by
+        BACKUP_RISE_PTS within BACKUP_WINDOW_MIN while its valve, opened by the controller or by hand, stayed shut
+        for that time and the BACKUP_GRACE_MIN before it: water coming up from below, a table that isn't draining.
+        The readings compared start only BACKUP_GRACE_MIN after the zone's last water and after the controller
+        started (a valve opened before a restart is not known). Held until the reading has not risen for
+        BACKUP_CLEAR_MIN, then the card goes."""
+        valve = room.hw["valves"].get(zone)
+        last = room.__dict__.setdefault("_last_water", {})
+        if valve and ha_get(valve)[0] == "on":
+            last[zone] = now
+        shot = room.state[zone].get("last_shot")
+        wet = max((t for t in (last.get(zone), shot if isinstance(shot, datetime) else None) if t), default=None)
+        start = max(now - timedelta(minutes=BACKUP_WINDOW_MIN), self._start + timedelta(minutes=BACKUP_GRACE_MIN))
+        if wet is not None:
+            start = max(start, wet + timedelta(minutes=BACKUP_GRACE_MIN))
+        track = room.__dict__.setdefault("_vwc_track", {}).setdefault(zone, [])
+        track.append((now, snap.vwc))
+        track[:] = [(t, v) for t, v in track if t >= start]
+        recent = sorted(v for t, v in track if t > now - timedelta(minutes=5))
+        low = min((v for _, v in track), default=None)
+        rising = (len(track) >= 3 and (now - track[0][0]).total_seconds() >= 20 * 60
+                  and recent[len(recent) // 2] - low >= BACKUP_RISE_PTS)
+        held = room.__dict__.setdefault("_backed_up", {})
+        key = f"backup_{room.slug}_z{zone}"
+        if rising:
+            held[zone] = now
+            since = f"since {wet:%H:%M}" if wet else "since before the controller started"
+            self._alert(
+                key,
+                "CS-310",
+                "moisture rising with no water: the table is not draining",
+                f"Moisture went from {low:.1f} to {recent[len(recent) // 2]:.1f} % in the last "
+                f"{(now - track[0][0]).total_seconds() / 60:.0f} minutes, but this zone has had no water {since}. "
+                "Water is coming up from below: the table, its drain or the sump is backed up and the slabs are "
+                "sitting in runoff. Check the table, its drains and the sump pump now. The zone's daily minimum is "
+                "held until the reading stops rising.",
+                room=room,
+                zone=zone,
+            )
+        elif zone in held and now - held[zone] >= timedelta(minutes=BACKUP_CLEAR_MIN):
+            del held[zone]
+            ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
+            self._alerted.pop(key, None)
+            self._alert_codes.pop(key, None)
+        return zone in held
+
+    def _watch_sump(self, room, now):
+        """CS-311 (docs/error-codes.json): the sump pump this room's tables drain to (option sump_power_sensor) has
+        drawn no power for sump_silent_h while the room is on. Read from Home Assistant's history every
+        SUMP_CHECK_MIN (a run lasts about a minute); no evidence either way says nothing. The card goes at its next
+        run."""
+        entity = self.sump_sensors.get(room.slug) or self.sump_sensors.get("*")
+        checked = getattr(room, "_sump_checked", None)
+        if not entity or (checked is not None and now - checked < timedelta(minutes=SUMP_CHECK_MIN)):
+            return
+        room._sump_checked = now
+        rows = ha_history(entity, datetime.now(timezone.utc) - timedelta(hours=self.sump_silent_h))
+        if rows is None:
+            return
+        ran = False
+        for state, _changed in rows:
+            try:
+                ran = ran or float(state) > SUMP_RUN_W
+            except (TypeError, ValueError):
+                continue
+        key = f"sump_{room.slug}"
+        if ran:
+            if key in self._alerted:
+                ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
+                self._alerted.pop(key, None)
+                self._alert_codes.pop(key, None)
+            return
+        self._alert(
+            key,
+            "CS-311",
+            "the sump pump has not run",
+            f"The sump pump this room drains to has drawn no power for {self.sump_silent_h:g} hours, though it "
+            "normally runs every hour or two while the room is watered. Runoff has nowhere to go: the sump fills and "
+            "backs up into the tables, and the slabs end up sitting in it (CS-310 follows once a zone's moisture "
+            "rises with no water). Check the sump pump now: its power, its float and that it pumps out, or its "
+            f"plug if the reading is unavailable.\n\nSensor: {entity}",
+            room=room,
+        )
+
+    # ---------- CS-209: no watering for a while ----------
+    def _watch_idle(self, room, now, lights_on, pub):
+        """CS-209 (docs/NOTIFICATIONS.md): the room is on, its lights are on and a zone is in P1 or P2, and no zone
+        has had a shot for idle_hours. The clock starts when that holds and again at every shot in the room; the
+        card comes at idle_hours and again each idle_hours after while it lasts, and goes at the next shot, or
+        once lights-off or P0 and P3 end it. A room that is off never reaches here (_loop_room)."""
+        if not (lights_on and any(room.state[z].get("phase") in ("P1", "P2") for z in room.zones)):
+            self._idle_reset(room, now)
+            return
+        began = getattr(room, "_idle_began", None)
+        if began is None:
+            began = room._idle_began = self._idle_start(room, now)
+        shots = [room.state[z].get("last_shot") for z in room.zones if not room.state[z].get("last_shot_is_anchor")]
+        start = max([began, *(shot for shot in shots if isinstance(shot, datetime))])
+        if start != getattr(room, "_idle_from", None):  # the clock started, or a shot restarted it
+            room._idle_from, room._idle_raised = start, 0
+            self._idle_dismiss(room)
+        hours = self._notify_config()[1]
+        idle = (now - start).total_seconds() / 3600.0
+        due = int(idle // hours)
+        if due > getattr(room, "_idle_raised", 0) and self._alert(
+            f"idle_{room.slug}",
+            "CS-209",
+            "no watering for a while",
+            f"Nothing in this room has been watered for {idle:.1f} hours while its lights were on and a zone "
+            f"was in P1 or P2. {self._idle_why(room, pub)} This is said again every "
+            f"{'hour' if hours == 1 else f'{hours:g} hours'} while it lasts, and clears itself at the next shot.",
+            room=room,
+            quiet=False,
+        ):
+            room._idle_raised, room._idle_card = due, True
+
+    def _idle_start(self, room, now):
+        """When the room's CS-209 clock began, as far as can be told: after the last loop that saw it not running
+        (lights off, no zone in P1 or P2, the room off), after today's lights-on and after the first zone now in P1
+        or P2 moved there. After a restart that is what the saved state says, so a restart does not reset it; a
+        zone now in P2 ramped in P1 before that, so it is never earlier than the truth."""
+        lights_on = datetime.combine(self._grow_day_start(room, now), datetime.min.time())
+        moved = [room.state[z].get("last_phase_change") for z in room.zones
+                 if room.state[z].get("phase") in ("P1", "P2")]
+        moved = [when for when in moved if isinstance(when, datetime)]
+        times = [lights_on + timedelta(hours=room.lights_on_hour), getattr(room, "_idle_off", None),
+                 min(moved) if moved else None]
+        return min(now, max(t for t in times if t is not None))
+
+    def _idle_reset(self, room, now):
+        """CS-209's clock is not running: it may start only after now, and its card goes."""
+        room._idle_began, room._idle_from, room._idle_off = None, None, now
+        self._idle_dismiss(room)
+
+    def _idle_dismiss(self, room):
+        """Take CS-209's card down when one may be up: after this controller raised it, and once after a start,
+        whatever the last run left."""
+        if getattr(room, "_idle_card", None) is False:
+            return
+        key = f"idle_{room.slug}"
+        if ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}"):
+            room._idle_card = False
+        self._alerted.pop(key, None)
+        self._alert_codes.pop(key, None)
+
+    def _idle_why(self, room, pub):
+        """Why nothing has been watered, as far as this pass can tell: watering switched off, a hold (_blocked), or
+        nothing called for water."""
+        if not self._on(room.enable_flag, False):
+            return f"Watering is switched off in this room: its engine switch ({room.enable_flag}) is off."
+        holds = []
+        for zone in sorted(room.zones):
+            if room.state[zone].get("phase") in ("P1", "P2"):
+                hold = (pub.get(zone) or {}).get("block") or self._blocked(room, zone)
+                if hold:
+                    holds.append(f"{self._zone_title(room, zone)}: {hold}")
+        if holds:
+            return f"Watering is held. {'; '.join(holds)}."
+        return ("Nothing called for water: no zone in P1 or P2 dried to the point where the engine waters it. If "
+                "the plants are drinking, check the probes and each zone's re-water point.")
+
+    def _dosing_alert(self, room, code, title, message, event=None, quiet=False):
+        """An alert the dosing runner raised (docs/DOSING.md) -> True once Home Assistant has it (the
+        runner keeps it until then). Only these codes exist, each written out here so the error-code
+        list sees it; `room` is None for a room no longer set up, or for dosing as a whole. Each
+        event (a dose, a batch, a restart) has its own notification: a second one within 30 minutes
+        is never swallowed by the first. The runner paces an event's repeats itself (and a repeat
+        replaces its card), so `_alert`'s quiet period is only for a condition re-checked every loop."""
+        key = f"dosing_{getattr(room, 'slug', 'gone')}_{code[3:]}" + (f"_{event}" if event else "")
+        if code == "CS-801":
+            return self._alert(key, "CS-801", title, message, room=room, quiet=quiet)
+        if code == "CS-802":
+            return self._alert(key, "CS-802", title, message, room=room, quiet=quiet)
+        if code == "CS-803":
+            return self._alert(key, "CS-803", title, message, room=room, quiet=quiet)
+        if code == "CS-804":
+            return self._alert(key, "CS-804", title, message, room=room, quiet=quiet)
+        if code == "CS-805":
+            return self._alert(key, "CS-805", title, message, room=room, quiet=quiet)
+        if code == "CS-806":
+            return self._alert(key, "CS-806", title, message, room=room, quiet=quiet)
+        if code == "CS-807":
+            return self._alert(key, "CS-807", title, message, room=room, quiet=quiet)
+        log("dosing alert refused: not in the error-code list", code)
+        return True  # never deliverable: not kept
+
+    def _dosing_hold(self, room):
+        """Why dosing holds this room's watering ("making a batch", or "dosing hardware still on: ..."
+        while something a dose or batch left does not read off), else None."""
+        return self.dosing.holds(room) if self.dosing is not None else None
+
+    def _watch_dosing(self):
+        """The dosing thread is never gone unnoticed (dosing_runner.health): dead, it is started again,
+        its records recovered as after a restart, and CS-806 says so; stalled, CS-806 says that."""
+        dosing = self.dosing
+        if dosing is None:
+            return
+        try:
+            health = dosing.health()
+            if health == "dead":
+                log("dosing: the dosing thread has stopped: starting it again")
+                dosing.restart()
+            elif health == "stalled":
+                self._dosing_alert(
+                    None, "CS-806", "dosing has stopped answering",
+                    "The controller's dosing thread has not gone round for more than 10 minutes, so "
+                    "dosing requests are not being taken. Anything it holds stays held. Restart the "
+                    "controller app if it does not recover; check the tank if a dose or batch was "
+                    "running.", "stalled", quiet=True)  # checked every loop: once per 30 min
+        except Exception as e:
+            log("dosing: could not check the dosing thread:", e)
+
+    def _shot_running(self, slugs):
+        """Whether a shot is in flight in one of these rooms, read under the lock a shot starts under,
+        so a batch that has just held them never misses one starting."""
+        with self._shot_lock:
+            room = getattr(self, "_shot_room", None) if getattr(self, "_busy", False) else None
+        return room is not None and room.slug in slugs
+
+    def _jev_alert(self, room, zone, judge, alert):
+        """An alert one of Jev's judges, or Jev's runtime, raised (docs/JEV.md). Only these codes exist: a judge can
+        never raise anything the error-code list does not explain. `zone` None is a room-wide alert."""
+        key = f"jev_{judge}_{room.slug}" + ("" if zone is None else f"_z{zone}")
+        code, title, message = alert.get("code"), alert.get("title", ""), alert.get("message", "")
+        if code == "CS-701":
+            self._alert(key, "CS-701", title, message, room=room, zone=zone)
+        elif code == "CS-702":
+            self._alert(key, "CS-702", title, message, room=room, zone=zone)
+        elif code == "CS-703":
+            self._alert(key, "CS-703", title, message, room=room, zone=zone)
+        elif code == "CS-705":
+            self._alert(key, "CS-705", title, message, room=room, zone=zone)
+        elif code == "CS-706":
+            self._alert(key, "CS-706", title, message, room=room, zone=zone)
+        elif code == "CS-707":
+            self._alert(key, "CS-707", title, message, room=room, zone=zone)
+        else:
+            log("jev alert refused: not in the error-code list", judge, code)
+
+    @staticmethod
+    def _jev_read(entity):
+        """One entity's state for Jev's context (the room's flower start date)."""
+        return ha_get(entity)[0]
 
     def _unreadable(self, entity, lo=0.0, hi=100.0, max_age_min=20):
         """Why `_read_sensor` found no usable moisture reading at `entity`, as (code, sentence).
@@ -2264,11 +2902,42 @@ class Controller:
         if not isinstance(st.get("learn"), dict):
             st["learn"] = auto_setpoints.fresh()
         auto_setpoints.shot(st["learn"], st.get("phase"), size_pct, st.get("last_vwc"), now.timestamp())
+        first = st.get("phase") == "P1" and st["shots"] == 0
+        try:  # the day's first shot closes the night: the VWC it started from is what the zone landed on
+            record = zone_history.shot(st, vwc_before=st.get("last_vwc"), now=now, day=day, first=first)
+            if record is not None:
+                words = zone_history.night_words(record)
+                tag = "" if room.prefix == "" else f"{room.slug} "
+                self._activity.insert(0, f"{now.strftime('%H:%M')} {tag}Z{zone} {words}"[:120])
+                log(f"[{room.slug}] Z{zone} {words}")
+        except Exception as e:  # a record is never worth a delivered shot the counters miss
+            log("zone history error", room.slug, zone, e)
+        if st.get("phase") == "P1":  # the P1 rule (core.decide): did this shot raise the peak?
+            st["p1_peak_before"] = st.get("peak")
+            if st.get("p1_reached"):
+                st["p1_extra"] = int(st.get("p1_extra") or 0) + 1
         st["shots"] += 1
         st["last_shot"] = now
         st["last_shot_is_anchor"] = False  # water was delivered: this one is an irrigation
         st["daily_vol"] += delivered_l
         self._save_state()
+        if getattr(self, "jev", None) is not None:
+            try:  # the shot, for Jev's Shot and Probe judges to read its answer later
+                jev_bridge.shot_counted(room, zone, delivered_l)
+            except Exception as e:
+                log("jev shot record error", room.slug, zone, e)
+
+    def _record_phase(self, room, zone, st, was, new, now, how):
+        """Keep the zone's history on a phase change by anyone (the engine, a Jev judge, the operator's Set Phase):
+        P1 handing over to P2 is the day's plateau. A history error never stops the phase change."""
+        if new == "P1":  # the P1 rule (core.decide) starts again
+            st["p1_reached"], st["p1_peak_before"], st["p1_extra"] = False, None, 0
+        try:
+            entry = zone_history.phase_changed(st, was, new, day=self._grow_day_start(room, now).isoformat(), how=how)
+            if entry is not None:
+                log(f"[{room.slug}] Z{zone} plateau {entry['value']:.2f} after {entry['shots']} shots: {entry['how']}")
+        except Exception as e:
+            log("zone history error", room.slug, zone, e)
 
     # ---------- hardware (sync; this process does one thing) ----------
     @staticmethod
@@ -2669,22 +3338,35 @@ class Controller:
         """True only when every switch reads back `want`.
 
         Zigbee/MQTT plugs accept a command at once but report the new state later
-        (a pump's OFF report: usually under 1 s, 1.6 s seen on a live install). A read-back
-        that gives up too early latches a false hardware hold; one that waits too long
-        stalls every room (this loop is synchronous) before a real stuck-open is caught.
+        (a pump's OFF report: usually under 1 s; 1.6 s on 15 Sep and about 10 s on 28 Sep 2026 on a
+        live install). A read-back that gives up too early latches a false hardware hold; one that
+        waits too long stalls every room (this loop is synchronous) before a real stuck-open is caught.
         """
+
+        def settled(window, first):
+            deadline = time.monotonic() + window
+            time.sleep(first)
+            while True:
+                if all(ha_get(ent)[0] == want for ent in entities):
+                    return True
+                if time.monotonic() >= deadline:
+                    return False
+                time.sleep(CONFIRM_POLL_S)
+
         # First read at 1 s, exactly as before, so a plug that reports promptly costs nothing extra.
-        # A late report is then re-read every 0.5 s up to 6 s in all: nearly four times the worst lag
-        # seen, and still short enough that a genuinely stuck-open valve latches the hold within the
-        # same minute's loop. The pump has already been commanded OFF by the time this runs.
-        deadline = time.monotonic() + CONFIRM_TIMEOUT_S
-        time.sleep(CONFIRM_FIRST_READ_S)
-        while True:
-            if all(ha_get(ent)[0] == want for ent in entities):
-                return True
-            if time.monotonic() >= deadline:
-                return False
-            time.sleep(CONFIRM_POLL_S)
+        # A late report is then re-read every 0.5 s up to 6 s. The pump has already been commanded
+        # OFF by the time this runs.
+        if settled(CONFIRM_TIMEOUT_S, CONFIRM_FIRST_READ_S):
+            return True
+        if want != "off":
+            return False
+        # Whatever still does not read OFF is sent OFF again (a plug may have missed the first) and
+        # read back for 10 s more: 16 s in all, still inside the minute's loop for a genuinely
+        # stuck-open valve.
+        for ent in entities:
+            if ha_get(ent)[0] != "off":
+                ha_call("switch", "turn_off", entity_id=ent)
+        return settled(CONFIRM_RETRY_S, CONFIRM_POLL_S)
 
     def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None, plan_exempt=False):
         if self._hardware_fault_block(room):
@@ -2705,8 +3387,14 @@ class Controller:
         # substrate or dripper configuration mid-shot must not rewrite its litres.
         nominal_l = (flow_lps * duration_s if flow_lps is not None
                      else size_pct / 100.0 * self._substrate_l(room, zone))
-        self._busy = True
-        self._shot_room = room  # the room whose shot is in flight right now (see _safe_off)
+        with self._shot_lock:  # a batch holds rooms under this lock (see _shot_running)
+            making = self._dosing_hold(room)
+            if not making:
+                self._busy = True
+                self._shot_room = room  # the room whose shot is in flight right now (see _safe_off)
+        if making:
+            log(f"[{room.slug}] Z{zone} shot held: {making}")
+            return
         hw = room.hw
         valve = hw["valves"].get(zone)
         pump, mainline = hw.get("pump"), hw.get("mainline")
@@ -2728,6 +3416,7 @@ class Controller:
             # Pump and mainline are optional (a one-switch tent has neither): each is sequenced when
             # mapped and skipped, with its lead time, when not. The valve is always required.
             if pump and not ha_call("switch", "turn_on", entity_id=pump):
+                ha_call("switch", "turn_off", entity_id=pump)  # it may be on all the same: off before the alert
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "CS-302",
@@ -2914,10 +3603,38 @@ class Controller:
     def _safe_exit(self, *_):
         log("SIGTERM — closing what is in flight, saving state, exiting")
         try:
+            # The shot in flight first: it is water running now, and dosing's way out waits on its thread.
             self._safe_off()
+            self._exit_dosing()
             self._save_state()
         finally:
             sys.exit(0)
+
+    def _exit_dosing(self):
+        """Stopping: no dosing switch-on starts from here, the dosing thread switches its own job off,
+        and what a dose or batch has recorded is switched off again, each off with a short timeout
+        (dosing_runner.exit). Its record stays in dosing_state.json, so the next start reads it back
+        OFF and raises CS-803."""
+        try:
+            if self.dosing is not None:
+                self.dosing.exit()
+        except Exception as e:
+            log("dosing: could not switch off on the way out:", e)
+
+    def _start_dosing(self):
+        """Before the first loop: settle what a dose or batch left running before this start
+        (docs/DOSING.md, After a restart), then start dosing's own thread, which tries the recovery
+        again until Home Assistant takes it. Neither can stop the controller starting."""
+        if self.dosing is None:
+            return
+        try:
+            self.dosing.recover()
+        except Exception as e:
+            log("dosing: start-up recovery failed; the dosing thread tries again:", e)
+        try:
+            self.dosing.start()
+        except Exception as e:
+            log("dosing: off, it could not start:", e)
 
     @staticmethod
     def _step_ec_offset(cur, ec_smooth, ec_target_p2, base):
@@ -3153,6 +3870,8 @@ class Controller:
     def loop_once(self, now):
         if self._busy:
             return
+        self._notify_config(refresh=True)  # who gets pushes, read here so an alert never waits on it
+        self._watch_dosing()
         self._recover_hardware_faults()
         self._reconcile_inflight()
         self._defaulted_this_loop = set()
@@ -3172,6 +3891,7 @@ class Controller:
             all_pub[room.slug] = pub
         self._check_defaulted_setpoints()
         self._maybe_notify(all_pub, now)
+        self._send_events()
 
     def _blind_time_transition(self, room, zone, now, lights_on, lights_just_on):
         """Time-only phase forces for a BLIND zone (dead/missing probe), so it can never
@@ -3184,21 +3904,26 @@ class Controller:
         gds = self._grow_day_start(room, now)
         new_grow_day = self._new_grow_day(room, st, now, lights_on)
         new_phase = None
+        why = None
         if not lights_on and st["phase"] != "P3":
-            new_phase = "P3"
+            new_phase, why = "P3", "lights-off (no moisture reading)"
         elif st["phase"] == "P3" and (lights_just_on or new_grow_day):
-            new_phase = "P0"
+            new_phase, why = "P0", "lights-on (no moisture reading)"
         elif st["phase"] in ("P1", "P2") and new_grow_day:
-            new_phase = "P0"
+            new_phase, why = "P0", "a new grow-day (no moisture reading)"
         if new_phase and new_phase != st["phase"]:
             if new_phase == "P0":
-                st["daily_vol"], st["shots"] = 0.0, 0
+                if (st.get("peak") or 0.0) > 0.0:  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
+                    st["peak_prev"] = st["peak"]
+                st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, 0.0  # _snapshot takes the peak from the next reading
                 st["ec_offset"], st["last_ec_steer"] = 0.0, None
                 st["ec_integral"], st["ec_prev_err"] = 0.0, 0.0
                 st["last_daily_reset"] = gds
+            was = st["phase"]
             st["phase"] = new_phase
             st["last_phase_change"] = now
             self._save_state()
+            self._notify_event("phase", room, zone, was, new_phase, why)
 
     def _apply_phase_request(self, room, zone, st, now):
         """Move a zone to the phase the operator picked on its Set Phase select, once. The select is
@@ -3217,6 +3942,7 @@ class Controller:
         was = st["phase"]
         if wanted == was:
             return
+        self._record_phase(room, zone, st, was, wanted, now, "set by hand")
         if wanted == "P0":
             st["peak"] = 0.0
         if wanted == "P1":
@@ -3226,6 +3952,7 @@ class Controller:
         self._activity.insert(0, f"{now.strftime('%H:%M')} {tag}Z{zone} phase {was} -> {wanted}, set by hand"[:120])
         log(f"[{room.slug}] Z{zone} phase {was} -> {wanted}: set by hand")
         self._save_state()
+        self._notify_event("phase", room, zone, was, wanted, "set by hand")
 
     def _strategy_preflight(self, room, zone, now):
         if getattr(room, "_strategy_batch_invalid", False):
@@ -3287,6 +4014,7 @@ class Controller:
         """One room's full control pass: snapshot -> decide -> act -> build the publish dict.
         Reads/writes only this room's prefixed entities + its own state."""
         if getattr(room, "setup_active", True) is False:
+            self._idle_reset(room, now)
             return {}
         active, was = self._room_active(room), getattr(room, "_was_room_active", None)
         room._was_room_active = active
@@ -3296,6 +4024,7 @@ class Controller:
                 self._save_state()
             if was is not False:
                 self._room_switched_off(room)
+            self._idle_reset(room, now)  # CS-209 runs only while the room is on
             self._publish_room_off(room, now)
             return {}  # no snapshot, no decision, no blind schedule, no alerts, no vitals line
         if was is False:
@@ -3309,6 +4038,7 @@ class Controller:
             room._was_lights_on if room._was_lights_on is not None else lights_on
         )
         lights_just_on = lights_on and was_off
+        lights_just_off = room._was_lights_on is True and not lights_on
         snaps, decisions, healthy, blind, params = {}, {}, [], [], {}
         for zone in room.zones:
             st = room.state[zone]
@@ -3322,12 +4052,44 @@ class Controller:
                 st["ec_integral"], st["ec_prev_err"] = 0.0, 0.0
             snap, p = self._snapshot(room, zone, now, lights_on, lights_just_on)
             params[zone] = p
+            if lights_just_off or lights_just_on:  # the night's two readings (zone_history), kept across a restart
+                try:
+                    vwc = snap.vwc if snap is not None else None
+                    if lights_just_off:
+                        zone_history.lights_off(st, vwc, now, self._grow_day_start(room, now).isoformat())
+                    else:
+                        zone_history.lights_on(st, vwc, now)
+                    self._save_state()
+                except Exception as e:  # a record never stops the room being decided and watered
+                    log("zone history error", room.slug, zone, e)
+            jev_dirs = {}
+            distrusted = room.__dict__.setdefault("_jev_distrusted", {})
+            distrusted.pop(zone, None)
+            if snap is not None and getattr(self, "jev", None) is not None:
+                try:  # Jev's judges (docs/JEV.md): whatever goes wrong here, the base engine decides
+                    jev_dirs = jev_bridge.tick(self, room, zone, snap, p, now, lights_on)
+                    if "distrust" in jev_dirs:
+                        distrusted[zone] = jev_dirs["distrust"].why  # the zone takes the dead-probe path
+                        snap = None
+                    elif "advance" in jev_dirs:
+                        snap = jev_bridge.advance(self, room, zone, snap, jev_dirs["advance"], now)
+                except Exception as e:
+                    log("jev error", room.slug, zone, e)
+                    jev_dirs = {}
             if snap is None:
                 room._blind_since.setdefault(zone, now)
                 blind.append((zone, p))
                 continue
             room._blind_since.pop(zone, None)
             snaps[zone] = snap
+            if st["phase"] == "P1" and snap.vwc >= min(p.p1_target, p.field_capacity):
+                st["p1_reached"] = True  # the P1 rule (core.decide): the target has been read this P1
+            try:  # CS-310: never pour the daily minimum, or an EC flush, into a table that isn't draining
+                if self._watch_backup(room, zone, snap, now):
+                    p = params[zone] = dataclasses.replace(p, min_daily_volume=0.0)
+                    snap = snaps[zone] = dataclasses.replace(snap, backed_up=True)
+            except Exception as e:
+                log("backup watch error", room.slug, zone, e)
             if snap.ec is None:
                 self._alert(
                     f"ec_unknown_{room.slug}_z{zone}",
@@ -3351,7 +4113,12 @@ class Controller:
                 new_phase, new_thr, fire, size, reason = decide(snap, p)
             shown = snap  # what waiting_for reads: the snapshot, in the phase the zone is now in
             if new_phase != st["phase"]:
+                # decide()'s reason leads with why the phase moved ("lights-off -> P3 | ..."): the push says it.
+                self._notify_event("phase", room, zone, st["phase"], new_phase, str(reason).split(" | ")[0])
+                self._record_phase(room, zone, st, st["phase"], new_phase, now, str(reason).split(" | ")[0])
                 if new_phase == "P0":
+                    if (st.get("peak") or 0.0) > 0.0:  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
+                        st["peak_prev"] = st["peak"]
                     st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, snap.vwc
                     st["ec_offset"], st["last_ec_steer"] = 0.0, None
                     st["ec_integral"], st["ec_prev_err"] = (
@@ -3362,6 +4129,8 @@ class Controller:
                     room._vmax_wetup[zone] = []  # fresh wet-up curve for today's ramp
                 if new_phase == "P1":
                     st["shots"] = 0
+                    # entering P1 already at the target: the shot decide() fires on this tick is the extra shot
+                    st["p1_reached"] = snap.vwc >= min(p.p1_target, p.field_capacity)
                 st["phase"] = new_phase
                 st["last_phase_change"] = now
                 self._save_state()
@@ -3377,7 +4146,15 @@ class Controller:
                     and st["phase"] == "P2" and p.ec_target_p2 > 0):
                 base = self._zone_num(room, zone, "p2_vwc_threshold", 45)
                 les = st.get("last_ec_steer")
-                if les is None or (now - les).total_seconds() >= 1800:
+                # Jev's Salt judge chooses how: steer (as always), hold the offset, or decay it toward 0.
+                ec_mode = getattr(jev_dirs.get("ec_mode"), "value", "steer")
+                if ec_mode != "steer" and (les is None or (now - les).total_seconds() >= 1800):
+                    if ec_mode == "decay":
+                        st["ec_offset"] = round(float(st.get("ec_offset", 0.0)) * 0.5, 2)
+                        st["ec_integral"] = float(st.get("ec_integral", 0.0)) * 0.5
+                    st["last_ec_steer"] = now
+                    self._save_state()
+                elif les is None or (now - les).total_seconds() >= 1800:
                     if self._on("input_boolean.crop_steering_ec_pid_enabled", False):
                         gains = (
                             self._num("input_number.crop_steering_ec_pid_kp", 0.4),
@@ -3423,6 +4200,10 @@ class Controller:
         for zone, p in blind:
             st = room.state[zone]
             self._publish_waiting_for(room, zone, None, p, now)  # no probe: nothing to compare
+            try:  # field capacity follows the sensor even while the zone waters without it
+                self._follow_fc(room, zone, p, now)
+            except Exception as e:
+                log("field capacity error", room.slug, zone, e)
             # A dead probe must NOT freeze the daily cycle: still honour the time-based
             # phase forces (lights-off -> P3, P3 -> P0 at the new photoperiod). Only the
             # VWC-driven transitions are paused while blind.
@@ -3460,6 +4241,21 @@ class Controller:
             # reminder so a dead probe can't sit unnoticed (the silent-freeze lesson). Why it
             # is unusable is read every tick, so a changed cause replaces the card's diagnosis.
             looking = self._fused_id(room.prefix, "vwc", zone, room.zones[zone].get("vwc"))
+            set_aside = room.__dict__.get("_jev_distrusted", {}).get(zone)
+            if set_aside:
+                self._alert(
+                    f"blind_{room.slug}_z{zone}",
+                    "CS-704",
+                    "Jev set this zone's probe aside",
+                    f"Jev judged, twice in a row and confirmed by the controller's own check, that this "
+                    f"zone's moisture probe is not tracking the substrate ({set_aside}). {plan} It counts "
+                    "again as soon as Jev judges it tracks. Check the probe's placement and wiring."
+                    f"\n\nSensor: {looking}",
+                    room=room,
+                    zone=zone,
+                )
+                room._blind_zones.add(zone)
+                continue
             code, what = self._unreadable(looking)
             self._alert(
                 f"blind_{room.slug}_z{zone}",
@@ -3495,6 +4291,8 @@ class Controller:
             # would have stopped (ZoneSnapshot.steering_held), so the hold is said here instead.
             block = (self._blocked(room, zone, reason) if fire
                      else strategy_block(getattr(room, "strategy_snapshot", None), zone))
+            if fire and not block and getattr(self, "jev", None) is not None:
+                jev_bridge.shot_started(room, zone, snaps.get(zone), getattr(reason, "kind", None))
             acted = self._act_zone(
                 room,
                 zone,
@@ -3544,6 +4342,20 @@ class Controller:
                 room=room,
                 zone=z,
             )
+        if getattr(self, "jev", None) is not None:
+            try:
+                jev_bridge.siblings(self, room, snaps, params, now)
+                jev_bridge.publish(self, room, now, ha_set)
+            except Exception as e:
+                log("jev publish error", room.slug, e)
+        try:  # CS-209 only ever tells: it can never stop the room being watered
+            self._watch_idle(room, now, lights_on, pub)
+        except Exception as e:
+            log("idle watch error", room.slug, e)
+        try:  # CS-311 only ever tells, too
+            self._watch_sump(room, now)
+        except Exception as e:
+            log("sump watch error", room.slug, e)
         room._was_lights_on = lights_on
         return pub
 
@@ -3791,7 +4603,7 @@ class Controller:
             f"(UTC{off_h:+.1f}h) TZ={os.environ.get('TZ', 'unset')}"
         )
         try:
-            r = _S.get(f"{BASE}/config", headers=HDR, timeout=8)
+            r = _session().get(f"{BASE}/config", headers=HDR, timeout=8)
             ha_tz = (r.json() or {}).get("time_zone") if r.status_code == 200 else None
         except Exception:
             ha_tz = None
@@ -3828,6 +4640,7 @@ class Controller:
         )
         log("token present:", bool(TOKEN), "| base:", BASE)
         self._log_timezone()
+        self._start_dosing()
         while True:
             try:
                 self.loop_once(datetime.now())

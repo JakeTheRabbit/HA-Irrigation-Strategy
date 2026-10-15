@@ -57,3 +57,11 @@ export interface HistoryRequest {
   timeZone: string;
   signal?: AbortSignal;
 }
+/** Each sensor's low and high per local date, and where they came from: Home Assistant's long-term
+ * statistics (kept indefinitely), its recorded history (only as long as the recorder keeps it) or
+ * the demo. */
+export interface DailyRanges {
+  source: "statistics" | "history" | "demo";
+  series: { entityId: string; daily: DailyReading[] }[];
+  warnings: string[];
+}

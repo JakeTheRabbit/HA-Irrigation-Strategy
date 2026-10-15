@@ -3,6 +3,14 @@ import { twMerge } from "tailwind-merge";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
+/** The local calendar day of `at` as seen from `now`: "" for today, "Yesterday", else "Fri 26 Sep". */
+export function dayWord(at: number, now: number): string {
+  const midnight = (ms: number) => new Date(ms).setHours(0, 0, 0, 0);
+  const days = Math.round((midnight(now) - midnight(at)) / 86_400_000);
+  if (days === 0) return "";
+  if (days === 1) return "Yesterday";
+  return new Date(at).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+}
 /** Readable text for anything a catch block can receive. Home Assistant rejects
  * service calls with plain objects, which String() renders as "[object Object]". */
 export function errorText(e: unknown): string {

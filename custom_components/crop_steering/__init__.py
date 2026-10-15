@@ -134,6 +134,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # Before the platforms register this room's entities: a room with none was set up just now.
     fresh = _is_new_room(hass, entry)
 
+    # Who gets which alerts: one store for the whole site, set up with the first room (docs/NOTIFICATIONS.md).
+    # Before the stock tanks, so the low-stock card they may raise goes to the phones that ask for it.
+    try:
+        from .notify_api import async_setup_notify
+
+        await async_setup_notify(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the notify store
+        _LOGGER.warning("Notifications unavailable: %s", err)
+
     # Load this room's named-stage recipe (server-side Store) before the platforms
     # come up, so the recipe select + sensor can read it on setup.
     try:
@@ -152,6 +161,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await async_setup_stock(hass, entry)
     except Exception as err:  # pragma: no cover - never block setup on the stock store
         _LOGGER.warning("Stock tanks unavailable: %s", err)
+
+    # Batch-tank dosing: each room's setup and its one request, stored; the dosing_config sensor
+    # publishes them for the controller app, which does every action (docs/DOSING.md).
+    try:
+        from .dosing_api import async_setup_dosing
+
+        await async_setup_dosing(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the dosing store
+        _LOGGER.warning("Dosing unavailable: %s", err)
 
     _remove_retired_entities(hass, entry)
     _hide_retired_switches(hass, entry)
@@ -295,6 +313,12 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .stock_api import async_unload_stock
 
     await async_unload_stock(hass, entry)
+    from .dosing_api import async_unload_dosing
+
+    await async_unload_dosing(hass, entry)
+    from .notify_api import async_unload_notify
+
+    await async_unload_notify(hass, entry)
     from .whats_new import async_unload_whats_new
 
     await async_unload_whats_new(hass, entry)

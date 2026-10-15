@@ -1,5 +1,5 @@
-name: Crop Steering Controller
-version: "2.25.1"
+name: Crop Steering Controller (Jev)
+version: "3.11.1"
 slug: f2_control
 description: >-
   Autonomous crop steering for Home Assistant. Runs the daily P0-P1-P2-P3 dryback
@@ -7,7 +7,7 @@ description: >-
   sequences the pump and valves with valve-close read-back, and is gated by a hard
   kill switch. Configure once in the Crop Steering UI; the operator dashboards are
   served right in the sidebar.
-url: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy
+url: https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev
 arch:
   - amd64
   - aarch64
@@ -15,6 +15,9 @@ arch:
 init: false
 boot: manual
 startup: application
+# Seconds the Supervisor waits after SIGTERM before it kills the app (10 by default): the shot in
+# flight is closed first, then dosing switches off what it has running (docs/DOSING.md).
+timeout: 30
 homeassistant_api: true
 hassio_api: false
 host_network: false
@@ -32,6 +35,8 @@ options:
   instance_name: Crop Steering
   feed_ec_sensor: ""
   feed_ph_sensor: ""
+  sump_power_sensor: ""
+  sump_silent_hours: 3
   hold_entities: []
   substrate_l: 5
   flow_lps: 0.02
@@ -40,6 +45,18 @@ options:
   cf_account_id: ""
   cf_api_token: ""
   cf_gateway_id: ""
+  typesafe_api_key: ""
+  jev_enabled: true
+  jev_judges: all
+  jev_daily_calls: 5000
+  jev_budget_warn_pct: 80
+  jev_retries: 3
+  jev_reask_max: 2
+  jev_unsure_below: 0.7
+  jev_strict_after: 3
+  jev_strict_prob: 0.8
+  jev_flower_start: ""
+  jev_flower_days: 56
 schema:
   num_zones: int
   lights_on_hour: float
@@ -50,6 +67,8 @@ schema:
   instance_name: str?
   feed_ec_sensor: str?
   feed_ph_sensor: str?
+  sump_power_sensor: str?
+  sump_silent_hours: float?
   hold_entities:
     - str
   substrate_l: float
@@ -59,3 +78,15 @@ schema:
   cf_account_id: str?
   cf_api_token: password?
   cf_gateway_id: str?
+  typesafe_api_key: password?
+  jev_enabled: bool?
+  jev_judges: str?
+  jev_daily_calls: int?
+  jev_budget_warn_pct: int?
+  jev_retries: int?
+  jev_reask_max: int?
+  jev_unsure_below: float?
+  jev_strict_after: int?
+  jev_strict_prob: float?
+  jev_flower_start: str?
+  jev_flower_days: int?

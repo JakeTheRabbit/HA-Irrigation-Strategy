@@ -1,0 +1,99 @@
+/* Plan › Targets: a zone's targets as one compact table by phase, the day they make beside it. */
+.targets-zones {
+  display: inline-flex;
+  margin-bottom: 16px;
+}
+.targets-zones .nav-draft-count {
+  margin-left: 6px;
+}
+.targets-grid {
+  grid-template-columns: minmax(420px, 1.05fr) minmax(420px, 1fr);
+}
+.targets-panel {
+  margin-bottom: 0;
+  padding-bottom: 6px;
+}
+.targets-panel .panel-heading {
+  padding-bottom: 8px;
+}
+.targets-panel .auto-chip {
+  margin-top: 8px;
+}
+.targets-choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0 20px 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--muted);
+  font-size: var(--text-sm);
+}
+.targets-choice label {
+  font-weight: 600;
+}
+.targets-choice select {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--foreground);
+}
+.targets-more,
+.targets-rest {
+  margin: 10px 0 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.targets-more > summary {
+  cursor: pointer;
+  padding: 10px 20px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.targets-rest h3 {
+  padding: 12px 20px 4px;
+  font-size: var(--text-sm);
+}
+.targets-setup-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 10px 20px 8px;
+  padding-top: 10px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+@media (max-width: 1150px) {
+  .targets-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  /* The table first; the day it makes under it. */
+  .targets-grid .setpoint-preview {
+    grid-row: auto;
+  }
+}
+@media (max-width: 720px) {
+  .targets-zones {
+    display: flex;
+    flex-wrap: wrap;
+  }
+  .targets-choice {
+    margin: 0 14px 8px;
+  }
+  .targets-more > summary,
+  .targets-rest h3 {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+  .targets-setup-link {
+    margin: 10px 14px 8px;
+  }
+}
+.targets-unavailable {
+  margin: 0 20px 10px;
+}

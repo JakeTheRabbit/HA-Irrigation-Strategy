@@ -37,7 +37,7 @@ const LOOKBACK_DAYS = 120;
 
 /** A zone's water-today counters: the one the dashboard shows first, then the controller's sensor
  * and the integration's mirror of it, which can hold grow-days the first one lacks. */
-function counterIds(controller: Controller, zone: Zone): string[] {
+export function counterIds(controller: Controller, zone: Zone): string[] {
   const root = `sensor.crop_steering_${controller.room.room.prefix}zone_${zone.id}_daily_water_`;
   return [...new Set([zone.water.entityId, root + "app", root + "usage"])].filter(
     (id): id is string => !!id && !!controller.states[id],
@@ -88,7 +88,16 @@ function startText(start: GrowStart, today: string) {
         : `on or before ${day}, when the records begin`;
 }
 
-export function WaterUsePanel({ controller, zones }: { controller: Controller; zones: Zone[] }) {
+export function WaterUsePanel({
+  controller,
+  zones,
+  title = "Water use",
+}: {
+  controller: Controller;
+  zones: Zone[];
+  /** The panel's heading: on a page that is itself called Water use, the table's own name. */
+  title?: string;
+}) {
   const room = controller.room;
   const lightsOn = room.settings.find((field) => field.entityId.endsWith("_lights_on_hour"))?.value;
   const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
@@ -164,7 +173,7 @@ export function WaterUsePanel({ controller, zones }: { controller: Controller; z
     <section className="panel wu-panel" aria-labelledby="water-use-title">
       <div className="panel-heading">
         <div>
-          <h2 id="water-use-title">Water use</h2>
+          <h2 id="water-use-title">{title}</h2>
           <p>
             Litres per zone, all plants
             {lightsOn !== undefined && lightsOn !== null

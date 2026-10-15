@@ -15,6 +15,8 @@ should be, from how the probe actually behaved:
   * A "plateau" is only believed if the ramp really climbed and did not stall far under a peak the
     zone has held before. Anything else is a delivery or probe problem: nothing is learned, nothing
     is rewritten, and the reason is published.
+  * The P1 target and field capacity are not written from here: the controller sets them from the zone's
+    own highest readings (controller._follow_fc, 6 Oct 2026).
 
 `learn` is a plain JSON-safe dict so it persists in the controller's state file.
 """
@@ -208,8 +210,14 @@ def model(learn):
     return ct.ZoneModel(knee=learn["peak"], gain=learn["gain"], day_rate=learn["day_rate"], night_rate=learn["night_rate"])
 
 
-def wanted(learn, current, vwc, phase, plan_ctx):
+def wanted(learn, current, vwc, phase, plan_ctx, others=()):
     """suffix -> value this zone should hold now. {} until something has been learned.
+
+    `others`: setpoints another writer owns (Jev's Setpoints judge: the P2 shot size and re-water threshold). They
+    are never wanted here, so each lever has one writer, and the rescue floor's ladder guard reads their value.
+
+    The P1 target and field capacity it returns are not written: the controller sets those from the zone's own
+    highest readings (controller._follow_fc).
 
     plan_ctx (optional, needs a complete model) adds the through-the-day schedule of the P2 threshold:
     {lights_on_h, lights_off_h, minutes_since_lights_on, shots_today, dryback_pct, p0_wait_min,
@@ -220,7 +228,9 @@ def wanted(learn, current, vwc, phase, plan_ctx):
         return {}
     want = {"p1_target_vwc": target, "field_capacity": max(40.0, round(target + 2.0, 1))}
     m = model(learn)
-    if m and plan_ctx:
+    if "p2_vwc_threshold" in others:
+        pass  # another writer's
+    elif m and plan_ctx:
         recipe = ct.Recipe(0.0, plan_ctx["dryback_pct"], plan_ctx["p0_wait_min"], plan_ctx["p1_shot_pct"],
                            plan_ctx["p1_gap_min"], current["p2_shot_size"])
         plan = ct.plan_day(m, recipe, plan_ctx["lights_on_h"], plan_ctx["lights_off_h"], plan_ctx["start_vwc"])
@@ -273,19 +283,6 @@ def evidence(learn, phase, vwc, target, ec, ec_target, feed_ec, p2_shot, shots_t
     return e
 
 
-def p1_ec_gate(ec, ec_target_p1, ec_target_p2):
-    """The engine only leaves P1 on "target reached" once pore EC <= 1.15 x the P1 EC target; above that
-    it keeps flushing at the ceiling until max shots. After a PLATEAU that flush is pure runoff, so a P1
-    EC target stricter than the zone's own P2 target must not hold the hand-over. Returns the smallest P1
-    EC target that lets it through, or None: never above the P2 target, because pore EC over THAT is
-    genuinely high and the engine's flush is exactly what is wanted."""
-    if ec is None or not ec_target_p1 or not ec_target_p2:
-        return None
-    need = round(ec / 1.15 + 0.05, 1)
-    return need if ec_target_p1 < need <= ec_target_p2 else None
-
-
-# ------------------------------------------------------------------ the judge in P2
 def jev_due(learn, hour_stamp):
     """Once per clock hour. Pore EC and the ceiling answer over hours, not loops."""
     return learn["jev"]["asked"] != hour_stamp

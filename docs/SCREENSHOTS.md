@@ -16,6 +16,10 @@ Captured on 25 September 2026 from the compiled application with isolated demo d
 
 ![The tank's EC and pH over 24 hours, 7 days or 30 days, with the feed-water limits](../img/tank-history.png)
 
+## Tank level and watering
+
+![The tank's level over 7 days with each zone's shots, the pump's runs, the tank filling and each recorded fill](../img/tank-level.png)
+
 ## Water use per zone
 
 ![Today, this week, this grow and an estimate for the whole grow, with litres per grow week](../img/water-use.png)

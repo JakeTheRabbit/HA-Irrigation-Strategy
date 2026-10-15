@@ -1,0 +1,34 @@
+/* A stock tank as a bottle: the liquid in its pump's colour (--pump-hue, set on its card or tile),
+   amber at or under the low mark, red at or under half of it. */
+.stock-bottle {
+  display: block;
+  overflow: visible;
+}
+.sb-cap {
+  fill: color-mix(in srgb, var(--muted-foreground) 55%, var(--surface));
+}
+.sb-shell {
+  fill: color-mix(in srgb, var(--foreground) 4%, var(--surface));
+}
+.sb-liquid {
+  fill: color-mix(in srgb, var(--pump-hue, var(--primary)) 62%, var(--surface));
+}
+.stock-bottle[data-state="low"] .sb-liquid {
+  fill: color-mix(in srgb, var(--warning) 70%, var(--surface));
+}
+.stock-bottle[data-state="very-low"] .sb-liquid {
+  fill: color-mix(in srgb, var(--destructive) 70%, var(--surface));
+}
+.sb-outline {
+  fill: none;
+  stroke: color-mix(in srgb, var(--muted-foreground) 80%, var(--surface));
+  stroke-width: 1.3;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+.sb-low {
+  stroke: var(--foreground);
+  stroke-width: 1.2;
+  stroke-dasharray: 3 2;
+  vector-effect: non-scaling-stroke;
+}

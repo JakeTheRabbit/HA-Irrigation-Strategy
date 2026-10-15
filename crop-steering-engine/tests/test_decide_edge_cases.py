@@ -115,8 +115,13 @@ def test_phase_transitions_extended():
     assert (
         ph(S(phase="P0", vwc=58, dryback_pct=5, phase_minutes=10), P()) == "P0"
     )  # still drying
-    # Design #2: P1->P2 "recovered" also requires pore EC back in band (ec <= ec_target_p1*1.15).
-    assert ph(S(phase="P1", vwc=61, ec=5, ec_smooth=5), P()) == "P2"
+    # P1->P2: at the ceiling one more shot goes in, and P1 ends once a shot no longer raises the peak by 0.5.
+    # Pore EC no longer gates the hand-over.
+    at_ceiling = decide(S(phase="P1", vwc=61, ec=5, ec_smooth=5), P())
+    assert at_ceiling[0] == "P1" and at_ceiling[4].kind == "p1_extra"
+    extra = dict(phase="P1", vwc=61, shot_count=5, p1_extra_shots=1, p1_peak_before_shot=61)
+    assert ph(S(**extra, peak_vwc=61.2), P()) == "P2"
+    assert ph(S(**extra, peak_vwc=61.5), P()) == "P1"  # it rose 0.5: another extra shot
     assert ph(S(phase="P1", vwc=50, shot_count=12), P()) == "P2"  # max-shots escape
     assert ph(S(phase="P1", vwc=50, shot_count=1, phase_minutes=121), P()) == "P1"  # no clock exit: ramp runs in full
 
@@ -196,15 +201,16 @@ def test_anti_lockout_flush_any_phase():
         )
         is True
     )
-    # BLOCK when the flush can't help: feed not dilutive, or slab saturated.
+    # BLOCK when the flush can't help: feed not dilutive, or a table that is not draining.
     assert (
         fire(S(phase="P2", vwc=50, ec=10, feed_ec=10), P(max_ec=9, field_capacity=70))
         is False
     )
-    assert (
-        fire(S(phase="P2", vwc=69, ec=10, feed_ec=3), P(max_ec=9, field_capacity=70))
-        is False
-    )
+    blocked = decide(S(phase="P2", vwc=50, ec=10, feed_ec=3, backed_up=True), P(max_ec=9, field_capacity=70))
+    assert blocked[2] is False and "table not draining" in blocked[4]
+    # A slab reading full gets no cap-exempt anti-lockout flush, but the capped dilute still flushes it.
+    full = decide(S(phase="P2", vwc=69, ec=10, feed_ec=3), P(max_ec=9, field_capacity=70))
+    assert full[2] is True and full[4].kind == "p2_dilute" and full[4].cap_exempt is False
 
 
 def test_p2_rescue_flush_not_blocked():
@@ -273,34 +279,21 @@ def test_f5b_p2_dilute_tier_gate():
 
 
 # ---------------------------------------------------------------------------
-# FINDING #6 — P1 EC-driven flush/runoff gated like the anti-lockout/P2-rescue tiers
+# FINDING #6 (retired): P1 no longer flushes on pore EC, so there is no P1 flush to gate. At its ceiling P1
+# fires its extra shot whatever the feed, the pore EC or the drainage; those gate only the EC corrections.
 # ---------------------------------------------------------------------------
-def test_f6_p1_ceiling_ec_flush_gate():
+def test_f6_p1_at_its_ceiling_fires_its_extra_shot_never_an_ec_flush():
     base = dict(p1_target=60, field_capacity=70, ec_target_p1=5, max_ec=12)
-    # (a) non-dilutive feed, slab has room -> must NOT flush
-    n = decide(
-        S(phase="P1", vwc=66, ec=8, ec_smooth=8, feed_ec=9, minutes_since_shot=20),
-        P(**base),
-    )
-    assert n[2] is False and "flush" not in n[4] and "runoff" not in n[4]
-    # (b) saltier feed than the slab -> must NOT flush
-    s = decide(
-        S(phase="P1", vwc=66, ec=8, ec_smooth=8, feed_ec=10, minutes_since_shot=20),
-        P(**base),
-    )
-    assert s[2] is False
-    # (c) slab full (vwc >= fc-2) even with dilutive feed -> must NOT flush
-    full = decide(
-        S(phase="P1", vwc=69, ec=8, ec_smooth=8, feed_ec=3, minutes_since_shot=20),
-        P(**base),
-    )
-    assert full[2] is False
-    # (d) dilutive feed + slab room -> flush fires and stays P1
-    y = decide(
-        S(phase="P1", vwc=66, ec=8, ec_smooth=8, feed_ec=3, minutes_since_shot=20),
-        P(**base),
-    )
-    assert y[0] == "P1" and y[2] is True and ("flush" in y[4] or "runoff" in y[4])
+    # (a) non-dilutive feed, (b) saltier feed than the slab, (c) slab full with dilutive feed,
+    # (c') a table that is not draining, (d) dilutive feed + slab room: the same extra shot, staying P1
+    for vwc, feed_ec, backed_up in ((66, 9, False), (66, 10, False), (69, 3, False), (69, 3, True), (66, 3, False)):
+        r = decide(
+            S(phase="P1", vwc=vwc, ec=8, ec_smooth=8, feed_ec=feed_ec, minutes_since_shot=20, backed_up=backed_up),
+            P(**base),
+        )
+        assert r[0] == "P1" and r[2] is True and r[4].kind == "p1_extra"
+        assert "flush" not in r[4] and "runoff" not in r[4]
+        assert r[3] == 4.0  # sized like the ramp: the first 2.0 shot, 2x for pore EC 8 against a target of 5
     # (e) the VWC-ramp shot (vwc < ceiling) still fires unconditionally even with non-dilutive feed
     r = decide(
         S(phase="P1", vwc=50, ec=8, ec_smooth=8, feed_ec=10, minutes_since_shot=20),
@@ -399,29 +392,30 @@ def test_d2_p1_ramps_to_field_capacity():
         S(phase="P1", vwc=68, ec=5, ec_smooth=5, minutes_since_shot=20),
         P(p1_target=80, field_capacity=70, ec_target_p1=5),
     )
-    assert a[0] == "P1" and a[2] is True
-    # (a cont.) at vwc>=FC with EC ok -> transitions to P2 (does not chase unachievable target=80)
-    assert (
-        ph(
-            S(phase="P1", vwc=70, ec=5, ec_smooth=5, minutes_since_shot=20),
-            P(p1_target=80, field_capacity=70, ec_target_p1=5),
-        )
-        == "P2"
+    assert a[0] == "P1" and a[2] is True and a[4].kind == "p1_ramp"
+    # (a cont.) at vwc>=FC the ceiling is reached (it does not chase the unachievable target=80): the next shot
+    # is the extra one that shows whether the slab still takes water
+    at_fc = decide(
+        S(phase="P1", vwc=70, ec=5, ec_smooth=5, minutes_since_shot=20),
+        P(p1_target=80, field_capacity=70, ec_target_p1=5),
     )
-    # (b) P1 AT ceiling with HIGH ec, dilutive feed + slab room -> flush, stays P1
+    assert at_fc[0] == "P1" and at_fc[2] is True and at_fc[4].kind == "p1_extra"
+    # (b) P1 AT ceiling with HIGH ec, dilutive feed + slab room -> still the extra shot, never an EC flush
     b = decide(
         S(phase="P1", vwc=66, ec=8, ec_smooth=8, minutes_since_shot=20, feed_ec=3),
         P(p1_target=60, field_capacity=70, ec_target_p1=5, max_ec=12),
     )
-    assert b[0] == "P1" and b[2] is True and ("flush" in b[4] or "runoff" in b[4])
-    # (c) P1 at ceiling with acceptable ec -> transitions to P2
-    assert (
-        ph(
-            S(phase="P1", vwc=71, ec=5, ec_smooth=5, minutes_since_shot=20),
-            P(p1_target=80, field_capacity=70, ec_target_p1=5),
+    assert b[0] == "P1" and b[2] is True and b[4].kind == "p1_extra" and "flush" not in b[4]
+    # (c) over the FC ceiling, once the extra shot raised the peak by less than 0.5 -> P2, acceptable ec or high
+    for ec in (5, 8):
+        assert (
+            ph(
+                S(phase="P1", vwc=71, peak_vwc=71.2, ec=ec, ec_smooth=ec, minutes_since_shot=20,
+                  p1_extra_shots=1, p1_peak_before_shot=71),
+                P(p1_target=80, field_capacity=70, ec_target_p1=5),
+            )
+            == "P2"
         )
-        == "P2"
-    )
 
 
 # ---------------------------------------------------------------------------
@@ -549,8 +543,11 @@ def test_per_zone_independence():
     b = decide(
         S(phase="P1", vwc=64, ec=5, minutes_since_shot=20),
         P(p1_target=62, ec_target_p1=5),
-    )  # already past target 62
-    assert a[2] is True and b[0] == "P2"
+    )  # already past target 62: its extra shot
+    assert a[2] is True and a[4].kind == "p1_ramp" and b[2] is True and b[4].kind == "p1_extra"
+    # once a shot no longer raised the peak, only the zone past its own target moves on
+    flat = S(phase="P1", vwc=64, peak_vwc=64.2, ec=5, minutes_since_shot=20, p1_extra_shots=1, p1_peak_before_shot=64)
+    assert ph(flat, P(p1_target=78, ec_target_p1=5)) == "P1" and ph(flat, P(p1_target=62, ec_target_p1=5)) == "P2"
 
 
 # ---------------------------------------------------------------------------
@@ -721,8 +718,9 @@ def test_zone_status_label():
 
 def test_p1_runs_its_full_configured_cycle_never_cut_short_by_a_clock():
     """Fundamental principle: phases happen in order and P1 is the ramp AS CONFIGURED. It ends only when
-    the ramp is complete (target reached with the minimum shots in, or the maximum shots delivered) -
-    never because minutes elapsed, whether the zone sat gate-blocked before OR during the ramp."""
+    the ramp is complete (target reached with the minimum shots in and one more shot that no longer raised
+    the peak, or the maximum shots delivered) - never because minutes elapsed, whether the zone sat
+    gate-blocked before OR during the ramp."""
     # no clock exit at any shot count while the ramp is still below target
     for shots in (0, 1, 3, 11):
         assert ph(S(phase="P1", vwc=30, shot_count=shots, phase_minutes=9999), P()) == "P1"
@@ -730,11 +728,16 @@ def test_p1_runs_its_full_configured_cycle_never_cut_short_by_a_clock():
     assert fire(S(phase="P1", vwc=30, shot_count=1, phase_minutes=9999), P()) is True
     # complete = configured max shots delivered
     assert ph(S(phase="P1", vwc=30, shot_count=12), P()) == "P2"
-    # complete = target reached + EC back in band, but only once the configured MINIMUM shots are in
-    assert ph(S(phase="P1", vwc=61, ec=5, shot_count=1), P(p1_min_shots=3)) == "P1"
-    assert ph(S(phase="P1", vwc=61, ec=5, shot_count=3), P(p1_min_shots=3)) == "P2"
-    assert ph(S(phase="P1", vwc=61, ec=None, shot_count=2), P(p1_min_shots=3)) == "P1"
-    assert ph(S(phase="P1", vwc=61, ec=None, shot_count=3), P(p1_min_shots=3)) == "P2"
+    # complete = target reached + an extra shot that raised the peak by less than 0.5, but only once the
+    # configured MINIMUM shots are in; pore EC, known or not, plays no part
+    full = dict(phase="P1", vwc=61, peak_vwc=61.2, p1_extra_shots=1, p1_peak_before_shot=61)
+    for ec in (5, None):
+        assert ph(S(**full, ec=ec, shot_count=2), P(p1_min_shots=3)) == "P1"
+        assert ph(S(**full, ec=ec, shot_count=3), P(p1_min_shots=3)) == "P2"
+    # that shot is judged only once the P1 spacing has passed, so its peak has had time to show
+    assert ph(S(**full, shot_count=3, minutes_since_shot=10), P(p1_min_shots=3)) == "P1"
+    # no clock exit at the ceiling either: without its extra shot P1 waits for it, however long that takes
+    assert ph(S(phase="P1", vwc=61, shot_count=3, phase_minutes=9999), P(p1_min_shots=3)) == "P1"
     # lights-off still outranks everything: no zone strands in P1 overnight
     assert ph(S(phase="P1", vwc=30, shot_count=0, phase_minutes=9999, lights_on=False), P()) == "P3"
 

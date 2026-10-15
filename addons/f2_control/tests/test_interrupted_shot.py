@@ -325,8 +325,10 @@ def test_a_switch_that_will_not_close_latches_the_hold_and_is_retried_every_loop
     assert "Zone 1: CRITICAL, an interrupted shot's hardware is still ON (CS-308)" in [
         n["title"] for n in notifications(fake)
     ]
+    first = offs(fake).count("switch.v1")
+    assert first == 2  # the close, and once more inside its read-back
     c._reconcile_inflight()
-    assert offs(fake).count("switch.v1") == 2  # tried again on the next loop
+    assert offs(fake).count("switch.v1") == 2 * first  # tried again on the next loop
 
 
 def test_a_switch_that_cannot_be_read_is_left_alone_and_said_so_with_its_code(rig):

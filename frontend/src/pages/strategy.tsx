@@ -1,36 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check, SlidersHorizontal, TriangleAlert } from "lucide-react";
+import { ArrowRight, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Empty, Heading, ReviewDialog, number, type ReviewItem } from "@/components/dashboard";
-import type { Controller, Setting } from "@/lib/types";
+import {
+  Empty,
+  Heading,
+  ReviewDialog,
+  number,
+  type Page,
+  type ReviewItem,
+} from "@/components/dashboard";
+import type { Choice, Controller, Setting } from "@/lib/types";
 import { PlanningCurve } from "@/components/planning-curve";
-import { WaterDelivery } from "@/components/water-delivery";
 import { buildSetpointPreview, validateSetpoint } from "@/lib/setpoint-preview";
-import { smoothRecorded, type PlanningPhaseId } from "@/lib/planning-curve";
-import {
-  FieldSuggestionLine,
-  SensorContextCard,
-  useSensorContext,
-} from "@/components/sensor-context";
-import { AutoBadge, AutoSetpointsControl, AutoZoneChip } from "@/components/room-controls";
-import { SettingHelp } from "@/components/setting-help";
+import { smoothRecorded } from "@/lib/planning-curve";
+import { useSensorContext } from "@/components/sensor-context";
+import { AutoSetpointsControl, AutoZoneChip } from "@/components/room-controls";
+import { SettingRow } from "@/components/setting-row";
 import { managedBy } from "@/lib/auto-setpoints";
-import {
-  fieldHint,
-  referenceLines,
-  setpointMetric,
-  setpointParam,
-  suggestedDraft,
-} from "@/lib/sensor-context";
-import { GROUP_HELP, PHASE_GROUPS, TAG_TEXT, settingWords } from "@/lib/setting-words";
+import { jevIds, parseJevSetpoints } from "@/lib/jev";
+import { setpointParam } from "@/lib/sensor-context";
+import { settingWords } from "@/lib/setting-words";
+import { jevChip, SETUP_GROUPS, TARGET_GROUPS } from "@/lib/targets";
 import "./setpoint-preview.css";
-
-function fieldGroup(setting: Setting) {
-  const ecPhase = setting.entityId.match(/_ec_target_(?:veg|gen)_p([012])$/);
-  return ecPhase ? PHASE_GROUPS[Number(ecPhase[1])] : setting.group;
-}
+import "./targets.css";
 
 export type Drafts = Record<
   string,
@@ -41,82 +33,82 @@ export type Drafts = Record<
     zone: string;
   }
 >;
+
+/** Plan › Targets: a zone's targets as one compact table by phase, each with Jev's range where Jev
+ * manages it, and the day they make beside it while you edit. Nothing is written until reviewed. */
 export function Strategy({
   controller,
   drafts,
   setDrafts,
   selectedZone,
+  navigate,
 }: {
   controller: Controller;
   drafts: Drafts;
   setDrafts: React.Dispatch<React.SetStateAction<Drafts>>;
   selectedZone?: number;
+  navigate: (page: Page) => void;
 }) {
+  const { room, states } = controller;
   const [zoneId, setZoneId] = useState<string>(
-    selectedZone === undefined
-      ? String(controller.room.zones[0]?.id ?? "room")
-      : String(selectedZone),
+    selectedZone === undefined ? String(room.zones[0]?.id ?? "room") : String(selectedZone),
   );
   const [review, setReview] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [phase, setPhase] = useState("All");
-  const [showInactive, setShowInactive] = useState(false);
   const [expanded, setExpanded] = useState(false);
-  const [roomPreviewZone, setRoomPreviewZone] = useState(controller.room.zones[0]?.id);
+  const [roomPreviewZone, setRoomPreviewZone] = useState(room.zones[0]?.id);
   useEffect(() => {
     if (selectedZone !== undefined) setZoneId(String(selectedZone));
   }, [selectedZone]);
-  const planEngaged = controller.room.strategy.engaged;
-  const allSettings = controller.room.settings;
-  const zone = controller.room.zones.find((z) => String(z.id) === zoneId);
-  const fields =
-    zoneId === "room"
-      ? allSettings.filter((field) => field.zoneId === undefined)
-      : zone?.fields || [];
-  const choices = (controller.room.choices || []).filter((choice) =>
+  const planEngaged = room.strategy.engaged;
+  const connected = ["live", "demo"].includes(controller.connection);
+  const canEdit = !planEngaged && connected;
+  const allSettings = room.settings;
+  const zone = room.zones.find((z) => String(z.id) === zoneId);
+  const previewZoneId =
+    zone?.id ?? room.zones.find((z) => z.id === roomPreviewZone)?.id ?? room.zones[0]?.id;
+  const preview = buildSetpointPreview(room, states, previewZoneId ?? 0, drafts);
+  const prefix = room.room.prefix;
+  const setpoints = zone ? parseJevSetpoints(states[jevIds(prefix).zone(zone.id)]) : null;
+  const jevManaged = room.zones.some(
+    (item) => parseJevSetpoints(states[jevIds(prefix).zone(item.id)]) !== null,
+  );
+  const choices = (room.choices || []).filter((choice) =>
     zoneId === "room" ? choice.zoneId === undefined : String(choice.zoneId) === zoneId,
   );
-  const previewZoneId =
-    zone?.id ??
-    controller.room.zones.find((z) => z.id === roomPreviewZone)?.id ??
-    controller.room.zones[0]?.id;
-  const preview = buildSetpointPreview(
-    controller.room,
-    controller.states,
-    previewZoneId ?? 0,
-    drafts,
+  // The table's settings, as the steering mode resolves them; the other mode's own targets; and
+  // what is neither a target nor Setup's (hardware, substrate, safety).
+  const tableIds = new Set(
+    zone
+      ? TARGET_GROUPS.flatMap((group) => group.rows.map((row) => preview.fields[row.key]?.entityId))
+      : [],
   );
-  const activeMode =
+  const own = zone ? zone.fields : allSettings.filter((field) => field.zoneId === undefined);
+  const otherMode =
     preview.draft.mode === "Vegetative"
-      ? "veg"
+      ? "generative"
       : preview.draft.mode === "Generative"
-        ? "gen"
+        ? "vegetative"
         : null;
-  const visibleFields = fields.filter((setting) => {
-    if (showInactive || !activeMode) return true;
-    const mode = setting.entityId.match(
-      /_(vegetative|generative)_dryback_target$|_ec_target_(veg|gen)_p[012]$/,
-    );
-    return !mode || (mode[1]?.slice(0, 3) ?? mode[2]) === activeMode;
-  });
-  const groups = [...new Set(visibleFields.map(fieldGroup))];
-  const shownGroups = groups.filter(
-    (group) =>
-      phase === "All" || (phase === "Other" ? !/^P[0-3]/.test(group) : group.startsWith(phase)),
+  const otherFields = own.filter((field) =>
+    otherMode
+      ? new RegExp(
+          `_(${otherMode}_dryback_target|ec_target_${otherMode.slice(0, 3)}_p[012])$`,
+        ).test(field.entityId)
+      : false,
   );
-  const invalid = validateSetpoint;
-  const canEdit = !planEngaged && ["live", "demo"].includes(controller.connection);
-  // Recorded probe behaviour for the zone being previewed. The chart lines and the hints
-  // under each input read the same draft state as the form, so they move as you type.
-  const sensorZone = controller.room.zones.find((z) => z.id === previewZoneId);
-  // Seeing the probe never depends on being allowed to edit: a schedule-owned day still plots.
-  const sensor = useSensorContext(
-    controller,
-    sensorZone,
-    ["live", "demo"].includes(controller.connection),
+  const restFields = own.filter(
+    (field) =>
+      !tableIds.has(field.entityId) &&
+      !otherFields.includes(field) &&
+      !SETUP_GROUPS.includes(field.group) &&
+      !/_(vegetative|generative)_dryback_target$|_ec_target_(veg|gen)_p[012]$/.test(field.entityId),
   );
+  // Recorded probe behaviour for the zone being previewed: the dark lines on the day, and the
+  // hints under a field being edited.
+  const sensorZone = room.zones.find((z) => z.id === previewZoneId);
+  const sensor = useSensorContext(controller, sensorZone, connected);
   // The plan graph redraws on every drag step, so the recorder dump is thinned once per load.
-  // Medians, not extremes: drawn raw, pore EC is a wall of sensor flicker.
   const recorded = useMemo(
     () => ({
       vwc: smoothRecorded(sensor.vwc.points, 10),
@@ -125,19 +117,13 @@ export function Strategy({
     }),
     [sensor.vwc.points, sensor.ec.points, sensor.now],
   );
-  const sensorLines = referenceLines({
-    draft: preview.draft.parameters,
-    saved: preview.saved.parameters,
-    typicalDailyPeak: sensor.vwc.stats?.typicalDailyPeak ?? null,
-    learnedPeak: sensorZone?.auto?.learnedPeak ?? null,
-  });
-  const supervisors = controller.room.zones.map((z) => z.auto);
+  const supervisors = room.zones.map((z) => z.auto);
   const errors = Object.entries(drafts)
     .map(([id, draft]) => {
       const setting = allSettings.find((s) => s.entityId === id);
-      const choice = controller.room.choices.find((c) => c.entityId === id);
+      const choice = room.choices.find((c) => c.entityId === id);
       return setting
-        ? invalid(setting, draft.value)
+        ? validateSetpoint(setting, draft.value)
         : choice
           ? choice.options.includes(draft.value)
             ? ""
@@ -147,7 +133,7 @@ export function Strategy({
     .filter(Boolean);
   const items: ReviewItem[] = Object.entries(drafts).flatMap<ReviewItem>(([id, draft]) => {
     const setting = allSettings.find((s) => s.entityId === id);
-    const choice = controller.room.choices.find((c) => c.entityId === id);
+    const choice = room.choices.find((c) => c.entityId === id);
     if (choice && choice.options.includes(draft.value))
       return [
         {
@@ -157,7 +143,7 @@ export function Strategy({
           after: draft.value,
         },
       ];
-    return !setting || invalid(setting, draft.value)
+    return !setting || validateSetpoint(setting, draft.value)
       ? []
       : [
           {
@@ -168,6 +154,10 @@ export function Strategy({
           },
         ];
   });
+  const zoneLabel = (id: number | undefined) =>
+    id === undefined
+      ? "Room settings"
+      : (room.zones.find((item) => item.id === id)?.name ?? `Zone ${id}`);
   function edit(setting: Setting, value: string) {
     setSaved(false);
     setDrafts((current) => {
@@ -179,30 +169,62 @@ export function Strategy({
           value,
           original: current[setting.entityId]?.original ?? setting.value,
           label: setting.label,
-          zone:
-            setting.zoneId === undefined
-              ? "Room settings"
-              : (controller.room.zones.find((item) => item.id === setting.zoneId)?.name ??
-                `Zone ${setting.zoneId}`),
+          zone: zoneLabel(setting.zoneId),
         };
       return next;
     });
   }
+  function choose(choice: Choice, value: string) {
+    setSaved(false);
+    setDrafts((current) => {
+      const next = { ...current };
+      if (value === (current[choice.entityId]?.original ?? choice.value))
+        delete next[choice.entityId];
+      else
+        next[choice.entityId] = {
+          value,
+          original: current[choice.entityId]?.original ?? choice.value,
+          label: choice.label,
+          zone: zone?.name || "Room settings",
+        };
+      return next;
+    });
+  }
+  /** One setting as a row, with Jev's range and the probe's hints. */
+  const row = (setting: Setting, label: string, unit: string) => {
+    const param = setpointParam(setting.entityId, prefix);
+    return (
+      <SettingRow
+        key={setting.entityId}
+        setting={setting}
+        label={label}
+        unit={unit}
+        draft={drafts[setting.entityId]}
+        prefix={prefix}
+        sensor={sensor}
+        learnedPeak={sensorZone?.auto?.learnedPeak}
+        chip={param ? jevChip(setpoints, param, unit) : null}
+        auto={managedBy(supervisors, setting.entityId)}
+        readOnly={planEngaged}
+        disabled={!canEdit}
+        onEdit={edit}
+      />
+    );
+  };
+  const plain = (setting: Setting) => {
+    const param = setpointParam(setting.entityId, prefix);
+    const words = param ? settingWords(param) : undefined;
+    return row(setting, words?.label ?? setting.label, setting.unit);
+  };
   return (
     <>
       <Heading
-        title="Today’s targets"
-        description="Current zone targets and their daily curve. When a schedule is active, it owns these targets; use Schedule to change upcoming days."
+        title="Targets"
         action={
           <div className="heading-actions">
-            <AutoSetpointsControl controller={controller} />
+            <AutoSetpointsControl controller={controller} jevManaged={jevManaged} />
             <Button
-              disabled={
-                !items.length ||
-                Boolean(errors.length) ||
-                planEngaged ||
-                !["live", "demo"].includes(controller.connection)
-              }
+              disabled={!items.length || Boolean(errors.length) || !canEdit}
               onClick={() => setReview(true)}
             >
               Review {Object.keys(drafts).length || ""}{" "}
@@ -213,528 +235,260 @@ export function Strategy({
       />
       {planEngaged && (
         <div className="workspace-message">
-          The active schedule owns today’s targets. Edit its dated targets in Schedule.{" "}
+          The armed grow plan sets these targets. Change them in its schedule.{" "}
           <Button asChild variant="outline">
-            <a href="#/grow-plan">Open schedule</a>
+            <a href="#/plan/schedule">Open schedule</a>
           </Button>
         </div>
       )}
-      {!planEngaged && (
-        <div className="workflow-steps">
-          <span className="active">
-            <i>1</i>Edit draft
-          </span>
-          <span>
-            <i>2</i>Review changes
-          </span>
-          <span>
-            <i>3</i>Apply & verify
-          </span>
+      <nav className="zone-switcher targets-zones" aria-label="Targets for">
+        {room.zones.map((item) => {
+          const count = Object.values(drafts).filter((d) => d.zone === item.name).length;
+          return (
+            <button
+              type="button"
+              key={item.id}
+              aria-current={zoneId === String(item.id) ? "page" : undefined}
+              onClick={() => setZoneId(String(item.id))}
+            >
+              {item.name}
+              {count > 0 && <i className="nav-draft-count">{count}</i>}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          aria-current={zoneId === "room" ? "page" : undefined}
+          onClick={() => setZoneId("room")}
+        >
+          Room
+        </button>
+      </nav>
+      {saved && (
+        <div className="success-banner" role="status">
+          <Check size={18} />
+          Changes applied and verified by controller readback.
         </div>
       )}
-      <div className="strategy-layout setpoint-workspace">
-        <aside className="strategy-zone-picker">
-          <span className="eyebrow">Configure</span>
-          {controller.room.zones.map((z) => (
-            <button
-              key={z.id}
-              className={zoneId === String(z.id) ? "selected" : ""}
-              onClick={() => {
-                setZoneId(String(z.id));
-                setPhase("All");
-              }}
-            >
-              <span>{z.name}</span>
-              <span className="small">
-                {Object.values(drafts).filter((d) => d.zone === z.name).length || z.phase}
-              </span>
-            </button>
-          ))}
-          <button
-            className={zoneId === "room" ? "selected" : ""}
-            onClick={() => {
-              setZoneId("room");
-              setPhase("All");
-            }}
-          >
-            <span>Room settings</span>
-            <SlidersHorizontal size={16} />
-          </button>
-          <p>Each setting uses the limits and units reported by your controller.</p>
-        </aside>
-        <div className="strategy-content">
-          <div className="section-title">
+      <div className="setpoint-editor-grid targets-grid">
+        <section className="panel targets-panel" aria-labelledby="targets-title">
+          <div className="panel-heading">
             <div>
-              <h2>{zone?.name || "Room settings"}</h2>
+              <h2 id="targets-title">{zone?.name || "Room settings"}</h2>
               <p>
                 {zone
-                  ? "Phase targets, timing and limits for this zone."
-                  : "Shared controller settings for this room. A zone’s own value, where it has one, takes precedence."}
+                  ? preview.draft.mode
+                    ? `${preview.draft.mode} steering: its dryback and EC targets below.`
+                    : "Steering mode unavailable."
+                  : "The room’s day: a zone’s own value, where it has one, takes precedence."}
               </p>
-              {(zone ? [zone] : controller.room.zones).map(
-                (item) =>
-                  item.auto && (
-                    <AutoZoneChip
-                      key={item.id}
-                      status={item.auto}
-                      name={zone ? undefined : item.name}
-                    />
-                  ),
-              )}
+              {zone?.auto && <AutoZoneChip status={zone.auto} />}
             </div>
           </div>
-          {saved && (
-            <div className="success-banner" role="status">
-              <Check size={18} />
-              Changes applied and verified by controller readback.
+          {!planEngaged &&
+            choices.map((choice) => (
+              <div className="targets-choice" key={choice.entityId}>
+                <label htmlFor={`choice-${choice.entityId}`}>
+                  {choice.label}
+                  {drafts[choice.entityId] && <span className="draft-dot" />}
+                </label>
+                <select
+                  id={`choice-${choice.entityId}`}
+                  value={drafts[choice.entityId]?.value ?? choice.value ?? ""}
+                  disabled={!canEdit}
+                  onChange={(event) => choose(choice, event.target.value)}
+                >
+                  <option value="" disabled>
+                    Select a mode
+                  </option>
+                  {choice.options.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </select>
+                {drafts[choice.entityId] && (
+                  <span className="small muted">Currently {choice.value || "unavailable"}</span>
+                )}
+              </div>
+            ))}
+          {zone && !planEngaged && (
+            <table className="targets-table">
+              {TARGET_GROUPS.map((group) => (
+                <tbody key={group.phase}>
+                  <tr className="targets-phase">
+                    <th colSpan={3} scope="colgroup">
+                      <span className="pill" data-phase={group.phase}>
+                        {group.phase}
+                      </span>{" "}
+                      {group.title.split(" · ")[1]}
+                    </th>
+                  </tr>
+                  {group.rows.map((item) => {
+                    const setting = preview.fields[item.key];
+                    return setting ? (
+                      row(setting, item.label, setting.unit || item.unit)
+                    ) : (
+                      <tr key={item.key} className="targets-missing">
+                        <th scope="row">{item.label}</th>
+                        <td colSpan={2}>Not reported by this controller</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              ))}
+            </table>
+          )}
+          {zone && planEngaged && preview.source === "unavailable-plan" && (
+            <p className="workspace-message targets-unavailable">
+              Scheduled targets are unavailable. Reconnect to verify the active schedule.
+            </p>
+          )}
+          {zone && planEngaged && (
+            <table className="targets-table">
+              {TARGET_GROUPS.map((group) => (
+                <tbody key={group.phase}>
+                  <tr className="targets-phase">
+                    <th colSpan={3} scope="colgroup">
+                      <span className="pill" data-phase={group.phase}>
+                        {group.phase}
+                      </span>{" "}
+                      {group.title.split(" · ")[1]}
+                    </th>
+                  </tr>
+                  {group.rows.map((item) => (
+                    <tr key={item.key}>
+                      <th scope="row">{item.label}</th>
+                      <td className="targets-input">
+                        <strong>
+                          {number(preview.draft.parameters[item.key] ?? null, item.digits ?? 1)}
+                        </strong>
+                        <span className="targets-unit">{item.unit}</span>
+                      </td>
+                      <td />
+                    </tr>
+                  ))}
+                </tbody>
+              ))}
+            </table>
+          )}
+          {!planEngaged && otherMode && otherFields.length > 0 && (
+            <details className="targets-more">
+              <summary>
+                {otherMode === "generative" ? "Generative" : "Vegetative"} targets: the P3 dryback
+                and EC targets used while the zone is steered {otherMode}
+              </summary>
+              <table className="targets-table">
+                <tbody>{otherFields.map(plain)}</tbody>
+              </table>
+            </details>
+          )}
+          {!planEngaged && restFields.length > 0 && (
+            <div className="targets-rest">
+              {zone && <h3>Other settings</h3>}
+              <table className="targets-table">
+                <tbody>{restFields.map(plain)}</tbody>
+              </table>
             </div>
           )}
-          <div className="setpoint-editor-grid">
-            <div className="setpoint-controls">
-              {planEngaged ? (
-                <section className="panel settings-group">
-                  <div className="settings-group-heading">
-                    <h3>Active scheduled targets</h3>
-                  </div>
-                  <div className="setting-fields">
-                    {Object.entries(preview.draft.parameters).map(([key, value]) => {
-                      const field =
-                        allSettings.find(
-                          (item) =>
-                            item.zoneId === previewZoneId && item.entityId.endsWith(`_${key}`),
-                        ) ??
-                        allSettings.find(
-                          (item) => item.zoneId === undefined && item.entityId.endsWith(`_${key}`),
-                        );
-                      const ecPhase = key.match(/^ec_target_p([012])$/);
-                      const label =
-                        settingWords(key)?.label ?? field?.label ?? key.replaceAll("_", " ");
-                      const unit =
-                        key === "dryback_target"
-                          ? "% of peak"
-                          : ecPhase
-                            ? "mS/cm"
-                            : (field?.unit ?? "");
-                      return (
-                        <div className="setting-field" key={key}>
-                          <span>{label}</span>
-                          <strong>
-                            {number(value)} {unit}
-                          </strong>
-                        </div>
-                      );
-                    })}
-                    {preview.source === "unavailable-plan" && (
-                      <p>
-                        Scheduled targets are unavailable. Reconnect to verify the active schedule.
-                      </p>
-                    )}
-                  </div>
-                </section>
-              ) : (
-                <>
-                  <nav className="setpoint-phase-picker" aria-label="Setpoint phase">
-                    {["All", "P0", "P1", "P2", "P3", "Other"]
-                      .filter(
-                        (item) =>
-                          item === "All" ||
-                          (item === "Other"
-                            ? groups.some((group) => !/^P[0-3]/.test(group))
-                            : groups.some((group) => group.startsWith(item))),
-                      )
-                      .map((item) => (
-                        <button
-                          type="button"
-                          key={item}
-                          aria-pressed={phase === item}
-                          onClick={() => setPhase(item)}
-                        >
-                          {item === "Other"
-                            ? "Room & limits"
-                            : item === "All"
-                              ? "All settings"
-                              : item}
-                        </button>
-                      ))}
-                  </nav>
-                  {choices.length > 0 && (
-                    <section className="panel settings-group">
-                      <div className="settings-group-heading">
-                        <span className="phase-marker">
-                          <SlidersHorizontal size={16} />
-                        </span>
-                        <div>
-                          <h3>Steering mode</h3>
-                          <p>
-                            {zone
-                              ? "The selected mode picks which EC and P3 dryback targets below the controller uses."
-                              : "The current engine uses each zone's mode, with legacy growth stage as fallback."}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="setting-fields">
-                        {choices.map((choice) => (
-                          <div className="setting-field" key={choice.entityId}>
-                            <div>
-                              <Label htmlFor={`choice-${choice.entityId}`}>
-                                {choice.label}
-                                {drafts[choice.entityId] && <span className="draft-dot" />}
-                              </Label>
-                              <p>
-                                Uses modes reported by Home Assistant. Review the change before
-                                applying.
-                              </p>
-                            </div>
-                            <div>
-                              <select
-                                id={`choice-${choice.entityId}`}
-                                value={drafts[choice.entityId]?.value ?? choice.value ?? ""}
-                                disabled={
-                                  planEngaged || !["live", "demo"].includes(controller.connection)
-                                }
-                                onChange={(event) => {
-                                  const value = event.target.value;
-                                  setSaved(false);
-                                  setDrafts((current) => {
-                                    const next = { ...current };
-                                    if (
-                                      value === (current[choice.entityId]?.original ?? choice.value)
-                                    )
-                                      delete next[choice.entityId];
-                                    else
-                                      next[choice.entityId] = {
-                                        value,
-                                        original:
-                                          current[choice.entityId]?.original ?? choice.value,
-                                        label: choice.label,
-                                        zone: zone?.name || "Room settings",
-                                      };
-                                    return next;
-                                  });
-                                }}
-                              >
-                                <option value="" disabled>
-                                  Select a mode
-                                </option>
-                                {choice.options.map((option) => (
-                                  <option key={option} value={option}>
-                                    {option}
-                                  </option>
-                                ))}
-                              </select>
-                              {drafts[choice.entityId] && (
-                                <p className="small muted">
-                                  Currently {choice.value || "unavailable"}
-                                </p>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </section>
-                  )}
-                  {zone && activeMode && (
-                    <label className="setpoint-mode-visibility">
-                      <input
-                        type="checkbox"
-                        checked={showInactive}
-                        onChange={(event) => setShowInactive(event.target.checked)}
-                      />
-                      Show targets for both steering modes
-                    </label>
-                  )}
-                  {!fields.length && !choices.length ? (
-                    <section className="panel">
-                      <Empty
-                        title="No editable settings available"
-                        detail="This controller has not exposed editable number entities for this selection. Sensor readings cannot be edited."
-                      />
-                    </section>
-                  ) : (
-                    shownGroups.map((group) => (
-                      <section className="panel settings-group" key={group}>
-                        <div className="settings-group-heading">
-                          <span className="phase-marker">{group.match(/^P[0-3]/)?.[0] || "•"}</span>
-                          <div>
-                            <h3>{group}</h3>
-                            <p>
-                              {GROUP_HELP[group] ?? "Configuration reported by the controller."}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="setting-fields">
-                          {visibleFields
-                            .filter((field) => fieldGroup(field) === group)
-                            .map((setting) => {
-                              const draft = drafts[setting.entityId];
-                              const error = draft ? invalid(setting, draft.value) : "";
-                              const stale = draft && draft.original !== setting.value;
-                              const param = setpointParam(
-                                setting.entityId,
-                                controller.room.room.prefix,
-                              );
-                              const metric = param ? setpointMetric(param) : null;
-                              const typed = !draft
-                                ? setting.value
-                                : draft.value.trim() && Number.isFinite(Number(draft.value))
-                                  ? Number(draft.value)
-                                  : null;
-                              const hint =
-                                param && metric
-                                  ? fieldHint(
-                                      param,
-                                      typed,
-                                      sensor[metric].stats,
-                                      sensor.hours,
-                                      sensorZone?.auto?.learnedPeak,
-                                    )
-                                  : null;
-                              const suggested = hint?.suggestion
-                                ? suggestedDraft(hint.suggestion.value, setting)
-                                : null;
-                              const auto = managedBy(supervisors, setting.entityId);
-                              const words = param ? settingWords(param) : undefined;
-                              const tag = words?.tag;
-                              return (
-                                <div
-                                  className={`setting-field ${draft ? "is-draft" : ""}`}
-                                  key={setting.entityId}
-                                >
-                                  <div>
-                                    <div className="setting-name">
-                                      {tag && (
-                                        <span className="setting-tag" data-tag={tag}>
-                                          {TAG_TEXT[tag]}
-                                        </span>
-                                      )}
-                                      <Label htmlFor={`setting-${setting.entityId}`}>
-                                        {setting.label}
-                                        {draft && (
-                                          <span className="draft-dot" title="Unsaved draft" />
-                                        )}
-                                        {auto && <AutoBadge />}
-                                      </Label>
-                                      {param && words?.detail && (
-                                        <SettingHelp
-                                          label={setting.label}
-                                          param={param}
-                                          detail={words.detail}
-                                        />
-                                      )}
-                                    </div>
-                                    <p>
-                                      {setting.description ||
-                                        `Allowed range: ${setting.min}–${setting.max}${setting.unit ? ` ${setting.unit}` : ""}.`}
-                                    </p>
-                                    <span className="setting-limit">
-                                      {setting.min}–{setting.max} {setting.unit} · step{" "}
-                                      {setting.step}
-                                      {param && (
-                                        <>
-                                          {" "}
-                                          · <code>{param}</code>
-                                        </>
-                                      )}
-                                    </span>
-                                  </div>
-                                  <div className="setting-input">
-                                    <div>
-                                      <Input
-                                        id={`setting-${setting.entityId}`}
-                                        type="number"
-                                        min={setting.min}
-                                        max={setting.max}
-                                        step={setting.step}
-                                        value={draft?.value ?? setting.value ?? ""}
-                                        placeholder={
-                                          setting.value === null ? "Unavailable" : undefined
-                                        }
-                                        aria-invalid={Boolean(error)}
-                                        aria-describedby={
-                                          `hint-${setting.entityId}` +
-                                          (hint || auto ? ` context-${setting.entityId}` : "")
-                                        }
-                                        disabled={
-                                          planEngaged ||
-                                          !["live", "demo"].includes(controller.connection)
-                                        }
-                                        onChange={(e) => edit(setting, e.target.value)}
-                                      />
-                                      <span>{setting.unit}</span>
-                                    </div>
-                                    <p
-                                      id={`hint-${setting.entityId}`}
-                                      className={error ? "field-error" : "small muted"}
-                                    >
-                                      {error ||
-                                        (stale
-                                          ? `Controller now reports ${number(setting.value)}. Review before applying.`
-                                          : draft
-                                            ? `Currently ${number(setting.value)} ${setting.unit}`
-                                            : "")}
-                                    </p>
-                                  </div>
-                                  {(hint || auto) && (
-                                    <div
-                                      className="setting-context"
-                                      id={`context-${setting.entityId}`}
-                                    >
-                                      {auto && (
-                                        <p className="setting-auto-hint">
-                                          Managed automatically – manual edits will be overwritten.
-                                        </p>
-                                      )}
-                                      {hint?.text && (
-                                        <p className="setting-sensor-hint">
-                                          {setting.zoneId === undefined
-                                            ? `${sensor.zoneName} probe · `
-                                            : ""}
-                                          {hint.text}
-                                        </p>
-                                      )}
-                                      {hint?.suggestion && (
-                                        <FieldSuggestionLine
-                                          suggestion={hint.suggestion}
-                                          zoneName={
-                                            setting.zoneId === undefined
-                                              ? sensor.zoneName
-                                              : undefined
-                                          }
-                                          draftValue={suggested}
-                                          unit={setting.unit}
-                                          action="in draft"
-                                          disabled={!canEdit || typed === suggested}
-                                          onUse={(value) => edit(setting, String(value))}
-                                        />
-                                      )}
-                                      {hint?.warning && (
-                                        <p className="setting-advisory">
-                                          <TriangleAlert size={13} aria-hidden="true" />
-                                          <span>
-                                            {hint.warning[0].toUpperCase() + hint.warning.slice(1)}.
-                                            Advisory only; you can still save this value.
-                                          </span>
-                                        </p>
-                                      )}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                        </div>
-                      </section>
-                    ))
-                  )}
-                </>
-              )}
+          {!zone && !restFields.length && !choices.length && (
+            <Empty
+              title="No room targets"
+              detail="This room’s shared settings are its hardware and safety limits, in Equipment › Setup."
+            />
+          )}
+          <p className="targets-setup-link">
+            Substrate, plants, drippers, flow and safety limits are set up in Equipment.{" "}
+            <Button variant="ghost" size="sm" onClick={() => navigate("equipment/setup")}>
+              Equipment › Setup <ArrowRight size={15} aria-hidden="true" />
+            </Button>
+          </p>
+        </section>
+        <aside
+          className={`setpoint-preview ${expanded ? "is-expanded" : ""}`}
+          aria-label="Setpoint planning preview"
+        >
+          <div className="setpoint-preview-context">
+            <div>
+              <strong>
+                {room.room.name} ·{" "}
+                {room.zones.find((z) => z.id === previewZoneId)?.name ?? "No zone"}
+              </strong>
+              <span>
+                {preview.readOnly
+                  ? "Armed grow plan · read only"
+                  : `${preview.draft.mode ?? "Mode unavailable"} · local draft`}
+              </span>
             </div>
-            <aside
-              className={`setpoint-preview ${expanded ? "is-expanded" : ""}`}
-              aria-label="Setpoint planning preview"
+            <Button
+              variant="outline"
+              size="sm"
+              className="setpoint-expand"
+              onClick={() => setExpanded(!expanded)}
+              aria-expanded={expanded}
             >
-              <div className="setpoint-preview-context">
-                <div>
-                  <strong>
-                    {controller.room.room.name} ·{" "}
-                    {controller.room.zones.find((z) => z.id === previewZoneId)?.name ?? "No zone"}
-                  </strong>
-                  <span>
-                    {preview.readOnly
-                      ? "Active schedule · read only"
-                      : `${preview.draft.mode ?? "Mode unavailable"} · local draft`}
-                  </span>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="setpoint-expand"
-                  onClick={() => setExpanded(!expanded)}
-                  aria-expanded={expanded}
-                >
-                  {expanded ? "Compact preview" : "Expand preview"}
-                </Button>
-              </div>
-              {zoneId === "room" && (
-                <div className="setpoint-preview-zone">
-                  <Label htmlFor="setpoint-preview-zone">Preview room changes in</Label>
-                  <select
-                    id="setpoint-preview-zone"
-                    value={previewZoneId ?? ""}
-                    onChange={(event) => setRoomPreviewZone(Number(event.target.value))}
-                  >
-                    {controller.room.zones.map((item) => (
-                      <option key={item.id} value={item.id}>
-                        {item.name}
-                      </option>
-                    ))}
-                  </select>
-                  <p>Zone-specific values take precedence over room defaults.</p>
-                </div>
-              )}
-              <PlanningCurve
-                recorded={recorded}
-                retention={sensorZone?.auto?.gain}
-                parameters={preview.draft.parameters}
-                lightsOn={preview.draft.lightsOn}
-                lightsOff={preview.draft.lightsOff}
-                baseline={preview.readOnly ? undefined : preview.saved}
-                bounds={preview.bounds}
-                showEditors={false}
-                selectedPhase={/^P[0-3]$/.test(phase) ? (phase as PlanningPhaseId) : undefined}
-                description={
-                  preview.readOnly
-                    ? "Today’s active scheduled targets. Open Schedule to edit the dated plan."
-                    : "Drag a target or adjust the controls beside this graph. Nothing is written until you review and apply."
-                }
-                onChange={
-                  canEdit
-                    ? (key, value) => {
-                        const setting = preview.fields[key];
-                        if (setting) edit(setting, String(value));
-                      }
-                    : undefined
-                }
-              />
-              <p className="setpoint-preview-note">
-                Blue and pink are your targets for the whole day; the dark lines are what this
-                zone’s probe actually recorded, today and on earlier days. Nothing is forecast. The
-                P3 boundary is shown at lights-off; the engine may stop earlier based on measured
-                dryback. P2 can also adjust for EC and safety limits.
-              </p>
-              <SensorContextCard
-                context={sensor}
-                lines={sensorLines}
-                disabledNote={
-                  planEngaged
-                    ? "The active schedule owns today’s targets, so nothing can be typed here. Recorded sensor behaviour is shown while manual targets are editable."
-                    : undefined
-                }
-              />
-              {preview.notes.map((note) => (
-                <p className="setpoint-preview-note" key={note}>
-                  {note}
-                </p>
-              ))}
-              {preview.issues.length > 0 && (
-                <div className="workspace-message" role="status">
-                  {preview.issues.map((issue) => (
-                    <p key={issue}>{issue}</p>
-                  ))}
-                </div>
-              )}
-              {previewZoneId !== undefined && (
-                <div className="setpoint-water">
-                  <WaterDelivery
-                    controller={controller}
-                    zoneId={previewZoneId}
-                    parameters={preview.draft.parameters}
-                    fieldOverrides={preview.fieldOverrides}
-                  />
-                </div>
-              )}
-            </aside>
+              {expanded ? "Compact preview" : "Expand preview"}
+            </Button>
           </div>
-        </div>
+          {zoneId === "room" && (
+            <div className="setpoint-preview-zone">
+              <label htmlFor="setpoint-preview-zone">Preview room changes in</label>
+              <select
+                id="setpoint-preview-zone"
+                value={previewZoneId ?? ""}
+                onChange={(event) => setRoomPreviewZone(Number(event.target.value))}
+              >
+                {room.zones.map((item) => (
+                  <option key={item.id} value={item.id}>
+                    {item.name}
+                  </option>
+                ))}
+              </select>
+              <p>Zone-specific values take precedence over room defaults.</p>
+            </div>
+          )}
+          <PlanningCurve
+            recorded={recorded}
+            retention={sensorZone?.auto?.gain}
+            parameters={preview.draft.parameters}
+            lightsOn={preview.draft.lightsOn}
+            lightsOff={preview.draft.lightsOff}
+            baseline={preview.readOnly ? undefined : preview.saved}
+            bounds={preview.bounds}
+            showEditors={false}
+            description={
+              preview.readOnly
+                ? "Today’s targets from the armed grow plan. Open Schedule to change the plan."
+                : "Drag a target, or type it in the table. Nothing is written until you review and apply."
+            }
+            onChange={
+              canEdit
+                ? (key, value) => {
+                    const setting = preview.fields[key];
+                    if (setting) edit(setting, String(value));
+                  }
+                : undefined
+            }
+          />
+          <p className="setpoint-preview-note">
+            Blue and pink are your targets for the whole day; the dark lines are what this zone’s
+            probe recorded, today and on earlier days. Nothing is forecast. The P3 boundary is shown
+            at lights-off; the engine may stop earlier on measured dryback. P2 can also adjust for
+            EC and safety limits.
+          </p>
+          {preview.notes.map((item) => (
+            <p className="setpoint-preview-note" key={item}>
+              {item}
+            </p>
+          ))}
+          {preview.issues.length > 0 && (
+            <div className="workspace-message" role="status">
+              {preview.issues.map((issue) => (
+                <p key={issue}>{issue}</p>
+              ))}
+            </div>
+          )}
+        </aside>
       </div>
       {Object.keys(drafts).length > 0 && (
         <div className="draft-bar" role="status">
@@ -759,12 +513,7 @@ export function Strategy({
             Discard draft
           </Button>
           <Button
-            disabled={
-              Boolean(errors.length) ||
-              !items.length ||
-              planEngaged ||
-              !["live", "demo"].includes(controller.connection)
-            }
+            disabled={Boolean(errors.length) || !items.length || !canEdit}
             onClick={() => setReview(true)}
           >
             Review changes <ArrowRight size={16} />

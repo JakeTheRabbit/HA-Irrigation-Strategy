@@ -83,29 +83,6 @@ def _writes(fake):
     return {d["entity_id"]: d["value"] for dom, svc, d in fake.calls if (dom, svc) == ("number", "set_value")}
 
 
-def test_plateau_fails_p1_over_by_dropping_the_target_to_what_the_zone_achieved():
-    c, fake, room = _rig()
-    vwc, now = _flat_ramp(c, fake, room)  # 30 -> 33.8, then two flat shots
-    assert _writes(fake)["number.crop_steering_zone_1_p1_target_vwc"] == 34.0  # big moves go 6 points a pass...
-    _tick(c, fake, room, vwc, now + timedelta(minutes=1))
-    w = _writes(fake)
-    assert w["number.crop_steering_zone_1_p1_target_vwc"] == round(vwc - 0.1, 1)  # ...and land a minute later:
-    # a target the zone has already met, so the engine's own "P1 recovered" rule hands over to P2
-    assert room.state[1]["learn"]["peak"] == 33.8
-    assert any("auto" in line and "p1_target_vwc" in line for line in c._activity)
-
-
-def test_once_in_p2_the_achieved_peak_is_the_target_going_forward_and_the_band_follows_it():
-    c, fake, room = _rig()
-    vwc, now = _flat_ramp(c, fake, room)
-    room.state[1]["phase"] = "P2"
-    for k in (6, 7):
-        _tick(c, fake, room, vwc - 0.3, now + timedelta(minutes=k), rate=0.7)
-    w = _writes(fake)
-    assert w["number.crop_steering_zone_1_p1_target_vwc"] == 33.8
-    assert w["number.crop_steering_zone_1_p2_vwc_threshold"] == round(33.8 - room.state[1]["learn"]["gain"] * 3.0, 1)
-
-
 def test_switch_off_learns_and_reports_but_never_writes():
     c, fake, room = _rig(auto="off")
     _flat_ramp(c, fake, room)
@@ -147,7 +124,9 @@ def test_learned_state_is_saved_with_the_zone_and_restored():
 
 
 # ------------------------------------------------------------------ Jev as a guard on the learning
-JEV = {"cf_account_id": "acc", "cf_api_token": "tok"}
+# The base engine's own per-hour judge: it runs only while the Jev edition's brain is off, because with the
+# brain on the Setpoints judge owns the zone's setpoints (test_jev_setpoints.py).
+JEV = {"cf_account_id": "acc", "cf_api_token": "tok", "jev_enabled": False}
 
 
 def _answers(fail=0.04, trust=0.92):
@@ -161,15 +140,6 @@ def test_jev_can_veto_a_plateau_it_reads_as_a_delivery_failure(monkeypatch):
     _flat_ramp(c, fake, room)
     assert _writes(fake) == {} and room.state[1]["learn"]["outcome"] == "suspect"
     assert room.state[1]["learn"]["peak"] is None  # the false ceiling was not kept
-
-
-def test_jev_agreeing_or_being_unreachable_leaves_the_arithmetic_in_charge(monkeypatch):
-    for answer, label in ((_answers(), "ok"), (None, "unavailable")):
-        monkeypatch.setattr(controller.jev_policy, "call", lambda *a, **k: answer)
-        c, fake, room = _rig(options=JEV)
-        _flat_ramp(c, fake, room)
-        assert "number.crop_steering_zone_1_p1_target_vwc" in _writes(fake)
-        assert fake.sets["sensor.crop_steering_zone_1_auto_setpoints"][1]["jev"] == label
 
 
 def test_without_cloudflare_credentials_jev_is_simply_disabled(monkeypatch):

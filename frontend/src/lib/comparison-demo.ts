@@ -51,7 +51,9 @@ export async function demoHistoryWindow(request: HistoryRequest) {
             : String(
                 (ec ? 3.2 : 55) +
                   seed * (ec ? 0.025 : 0.25) +
-                  (ec ? 0.7 : 7) * Math.sin(hour / 3.8 + seed),
+                  (ec ? 0.7 : 7) * Math.sin(hour / 3.8 + seed) +
+                  // A slow drift over the weeks, so two runs differ by grow week.
+                  (ec ? 0.35 : 3) * Math.sin(Math.floor(hour / 24) / 6.5 + seed),
               ),
         });
       }
@@ -115,7 +117,8 @@ export class RunDemo {
     const current = this.capture(
       room,
       `Demo • current run — ${room.name.slice(0, 35)}`,
-      addDays(today, -35),
+      // The demo grow plan's start (operator-demo), where the demo water record's grow begins.
+      addDays(today, -14),
       null,
     );
     const previous = this.capture(

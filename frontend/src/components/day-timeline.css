@@ -1,22 +1,29 @@
-/* Phases are told apart by label and by hues kept clear of red, amber and green, which mean state
-   (blocked, held, fresh). Every text is at least 12 px. */
+/* The grow day in Athena's chart language: a light band on top, phase columns with P0-P3 badges,
+   field capacity in red with the steering's runoff zone (green vegetative, purple generative), VWC in
+   blue with its shots as dots, pore EC in the steering's colour. Every text is at least 12 px. */
 .day-timeline {
-  --tl-p0: #6b7580;
-  --tl-p1: #2f6fb5;
-  --tl-p2: #6450b0;
-  --tl-p3: #34405a;
-  --tl-on-phase: #ffffff;
-  --tl-night: color-mix(in srgb, #34405a 8%, transparent);
-  --tl-lights-on: color-mix(in srgb, var(--foreground) 7%, var(--surface));
-  --tl-lights-off: #34405a;
+  --gd-veg: #16a34a;
+  --gd-gen: #9146b4;
+  --gd-veg-text: #11743a;
+  --gd-gen-text: #7a3799;
+  --gd-day: #f5d443;
+  --gd-night: #34405a;
+  --gd-ink: #1f2430;
+  --gd-on-ink: #ffffff;
+  --gd-red: #c62828;
+  --gd-band: color-mix(in srgb, var(--primary) 12%, transparent);
 }
 .dark .day-timeline {
-  --tl-p0: #7b8591;
-  --tl-p1: #3a7cc4;
-  --tl-p2: #7462c4;
-  --tl-p3: #4c5a7a;
-  --tl-night: color-mix(in srgb, #000000 32%, transparent);
-  --tl-lights-off: #0e1424;
+  --gd-veg: #4ade80;
+  --gd-gen: #c58af0;
+  --gd-veg-text: #6ee7a0;
+  --gd-gen-text: #d6a8f5;
+  --gd-day: #d9b52f;
+  --gd-night: #2b3754;
+  --gd-ink: #e6e6e6;
+  --gd-on-ink: #161616;
+  --gd-red: #f07b72;
+  --gd-band: color-mix(in srgb, var(--primary) 16%, transparent);
 }
 .day-timeline .timeline-heading-side {
   display: flex;
@@ -30,7 +37,7 @@
   color: var(--muted-foreground);
 }
 .day-timeline .timeline-heading-side select {
-  height: 24px;
+  height: 26px;
   padding: 0 28px 0 8px;
   font-size: 12px;
 }
@@ -48,99 +55,186 @@
   font-weight: 600;
 }
 .day-timeline .timeline-body {
-  padding: 4px 20px 18px;
+  padding: 0 20px 12px;
 }
-.day-timeline .timeline-body svg {
+
+.day-timeline .grow-chart {
+  position: relative;
+  margin-top: 4px;
+}
+.day-timeline .grow-svg {
   display: block;
   overflow: visible;
   font-family: inherit;
   touch-action: manipulation;
+  user-select: none;
 }
-.day-timeline .timeline-zone {
-  margin-top: 10px;
-}
-.day-timeline .timeline-zone-line {
-  font-size: 13px;
+.day-timeline .grow-tip {
+  position: absolute;
+  z-index: 2;
+  max-width: min(280px, 90%);
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 14%);
+  font-size: 12px;
   line-height: 1.45;
-  margin-bottom: 4px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.day-timeline .grow-tip[hidden] {
+  display: none;
+}
+/* The reading under the chart: one wrapped line, the same height whether or not it reads. */
+.day-timeline .grow-readout {
+  min-height: calc(2 * 1.45em + 12px);
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.day-timeline .grow-readout strong {
+  font-weight: 600;
+}
+.day-timeline .grow-readout[data-empty] {
   color: var(--muted-foreground);
 }
-/* One row per zone on a laptop or wider, whatever the time of day adds (overnight, a hold): the
-   Overview must stay within two screens. The whole line is the row's tooltip; a phone wraps. */
-@media (min-width: 1024px) {
-  .day-timeline .timeline-zone-line {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
+/* Where the reading is taken: a bar up the plot, a dot on each line it crosses. */
+.day-timeline .grow-cursor {
+  pointer-events: none;
 }
-.day-timeline .timeline-zone-line strong {
-  color: var(--foreground);
-  font-weight: 600;
-}
-.day-timeline .timeline-tick,
-.day-timeline .timeline-gutter,
-.day-timeline .lights-label,
-.day-timeline .estimate-label {
-  font-size: 12px;
-  fill: var(--muted-foreground);
-}
-.day-timeline .lights-on {
-  fill: var(--tl-lights-on);
-}
-.day-timeline .lights-off {
-  fill: var(--tl-lights-off);
-}
-.day-timeline .lights-label.off {
-  fill: #ffffff;
-}
-.day-timeline .night {
-  fill: var(--tl-night);
-}
-.day-timeline .phase-P0 {
-  fill: var(--tl-p0);
-  background: var(--tl-p0);
-  --tl-phase: var(--tl-p0);
-}
-.day-timeline .phase-P1 {
-  fill: var(--tl-p1);
-  background: var(--tl-p1);
-  --tl-phase: var(--tl-p1);
-}
-.day-timeline .phase-P2 {
-  fill: var(--tl-p2);
-  background: var(--tl-p2);
-  --tl-phase: var(--tl-p2);
-}
-.day-timeline .phase-P3 {
-  fill: var(--tl-p3);
-  background: var(--tl-p3);
-  --tl-phase: var(--tl-p3);
-}
-.day-timeline .phase.projected {
-  fill-opacity: 0.16;
-  stroke: var(--tl-phase);
+.day-timeline .cursor-bar {
+  stroke: var(--foreground);
+  stroke-opacity: 0.55;
   stroke-width: 1;
-  stroke-dasharray: 4 3;
 }
-.day-timeline .phase.projected.open {
-  fill: var(--muted-foreground);
-  fill-opacity: 0.08;
+.day-timeline .cursor-dot {
+  fill: var(--surface);
+  stroke: var(--primary);
+  stroke-width: 1.8;
+}
+.day-timeline .cursor-dot[data-series="ec"] {
   stroke: var(--muted-foreground);
 }
-.day-timeline .phase-label {
-  font-size: 12px;
-  font-weight: 600;
-  fill: var(--tl-on-phase);
-  text-anchor: middle;
+.day-timeline .cursor-dot[data-series="ec"][data-steering="vegetative"] {
+  stroke: var(--gd-veg);
 }
-.day-timeline .phase-label.projected {
+.day-timeline .cursor-dot[data-series="ec"][data-steering="generative"] {
+  stroke: var(--gd-gen);
+}
+.day-timeline .cursor-dot[data-series="yesterday"] {
+  stroke: var(--muted-foreground);
+}
+
+/* The chart's marks. */
+.day-timeline .light-day {
+  stop-color: var(--gd-day);
+}
+.day-timeline .light-night {
+  stop-color: var(--gd-night);
+}
+.day-timeline .grid {
+  stroke: color-mix(in srgb, var(--border) 85%, transparent);
+  stroke-width: 1;
+}
+.day-timeline .axis-label,
+.day-timeline .axis-title,
+.day-timeline .ref-label,
+.day-timeline .badge-word {
+  font-size: 12px;
   fill: var(--muted-foreground);
+}
+.day-timeline .axis-title {
+  font-weight: 600;
+}
+.day-timeline .ref-label {
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  font-weight: 600;
+}
+.day-timeline .ref-label.fc,
+.day-timeline .ref-label.rescue {
+  fill: var(--gd-red);
+}
+.day-timeline .runoff-zone {
+  fill: var(--gd-veg);
+  fill-opacity: 0.16;
+}
+.day-timeline [data-steering="generative"] .runoff-zone {
+  fill: var(--gd-gen);
+}
+.day-timeline .maintenance-band {
+  fill: var(--gd-band);
+}
+.day-timeline .typical-band {
+  fill: var(--muted-foreground);
+  fill-opacity: 0.2;
+}
+.day-timeline .phase-divider {
+  stroke: var(--muted-foreground);
+  stroke-opacity: 0.55;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.day-timeline .fc-line {
+  fill: none;
+  stroke: var(--gd-red);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+.day-timeline .rescue-line {
+  fill: none;
+  stroke: var(--gd-red);
+  stroke-width: 1.3;
+  stroke-dasharray: 1.5 3;
+  stroke-linecap: round;
+}
+.day-timeline .yesterday-line {
+  fill: none;
+  stroke: var(--muted-foreground);
+  stroke-opacity: 0.75;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.day-timeline .ec-line {
+  fill: none;
+  stroke: var(--muted-foreground);
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+.day-timeline .ec-line[data-steering="vegetative"],
+.day-timeline .ec-axis[data-steering="vegetative"] .ec-band {
+  stroke: var(--gd-veg);
+}
+.day-timeline .ec-line[data-steering="generative"],
+.day-timeline .ec-axis[data-steering="generative"] .ec-band {
+  stroke: var(--gd-gen);
+}
+.day-timeline .ec-band {
+  fill: var(--muted-foreground);
+  fill-opacity: 0.3;
+  stroke-width: 0;
+}
+.day-timeline .ec-axis[data-steering="vegetative"] .ec-band {
+  fill: var(--gd-veg);
+  fill-opacity: 0.55;
+}
+.day-timeline .ec-axis[data-steering="generative"] .ec-band {
+  fill: var(--gd-gen);
+  fill-opacity: 0.55;
 }
 .day-timeline .vwc-line {
   fill: none;
   stroke: var(--primary);
-  stroke-width: 1.8;
+  stroke-width: 2;
   stroke-linejoin: round;
 }
 .day-timeline .projection {
@@ -149,203 +243,202 @@
   stroke-width: 1.6;
   stroke-dasharray: 5 4;
   stroke-linejoin: round;
+  opacity: 0.85;
 }
-.day-timeline .yesterday-line {
-  fill: none;
-  stroke: var(--muted-foreground);
-  stroke-opacity: 0.55;
-  stroke-width: 1.3;
-  stroke-linejoin: round;
-}
-.day-timeline .yesterday-edge {
-  stroke: var(--muted-foreground);
-  stroke-dasharray: 2 2;
-}
-.day-timeline .yesterday-shot {
-  fill: var(--muted-foreground);
-  fill-opacity: 0.5;
-}
-.day-timeline .typical-band {
-  fill: var(--muted-foreground);
-  fill-opacity: 0.25;
-}
-.day-timeline .typical-line {
-  fill: none;
-  stroke: var(--muted-foreground);
-  stroke-opacity: 0.7;
-}
-.day-timeline .target-step {
-  fill: none;
-  stroke: var(--warning);
-  stroke-width: 1.5;
-  stroke-dasharray: 6 3;
-}
-.day-timeline .target-label {
-  font-size: 12px;
-  fill: var(--warning);
-  paint-order: stroke;
+.day-timeline .shot-dot {
+  fill: var(--gd-ink);
   stroke: var(--surface);
-  stroke-width: 3px;
-  stroke-linejoin: round;
-}
-.day-timeline .expected-shot {
-  stroke: var(--foreground);
-  stroke-width: 1.5;
-  stroke-dasharray: 3 2;
-}
-.day-timeline .expected-shot.emergency {
-  stroke: var(--destructive);
-}
-.day-timeline .estimate {
-  stroke: var(--foreground);
-  stroke-width: 1.4;
-  stroke-dasharray: 5 4;
-}
-.day-timeline .estimate-point {
-  fill: var(--surface);
-  stroke: var(--foreground);
-  stroke-width: 1.4;
-}
-.day-timeline .estimate-label {
-  fill: var(--foreground);
-}
-.day-timeline .shot {
-  fill: var(--foreground);
-}
-.day-timeline .cap {
-  fill: url(#day-timeline-hatch);
-  stroke: var(--destructive);
   stroke-width: 1;
 }
-.day-timeline .hatch-ground {
-  fill: color-mix(in srgb, var(--destructive) 14%, var(--surface));
-}
-.day-timeline .hatch-line {
-  stroke: var(--destructive);
-  stroke-width: 2;
-}
-.day-timeline .hold {
-  fill: color-mix(in srgb, var(--warning) 14%, transparent);
-  stroke: var(--warning);
-  stroke-width: 1.2;
-  stroke-dasharray: 3 2;
-}
-.day-timeline .setpoint-mark {
+.day-timeline .held-ring {
   fill: var(--surface);
-  stroke: var(--foreground);
-  stroke-width: 1.4;
+  stroke: var(--gd-ink);
+  stroke-width: 1.6;
+}
+.day-timeline .expected-shot {
+  fill: var(--surface);
+  stroke: var(--muted-foreground);
+  stroke-width: 1.3;
+  stroke-dasharray: 2 1.5;
+}
+.day-timeline .expected-shot.emergency {
+  stroke: var(--gd-red);
+}
+.day-timeline .jev-mark {
+  fill: var(--surface);
+  stroke: var(--gd-ink);
+  stroke-width: 1.5;
+}
+.day-timeline .jev-mark[data-acted] {
+  fill: var(--gd-ink);
 }
 .day-timeline .now-line {
   stroke: var(--foreground);
   stroke-width: 1;
-  stroke-dasharray: 1 2;
+  stroke-dasharray: 1 2.5;
+  opacity: 0.8;
 }
-.day-timeline .timeline-detail {
-  min-height: 2.9em;
-  margin-top: 12px;
-  padding: 7px 10px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  font-size: 13px;
-  line-height: 1.4;
-  overflow-wrap: anywhere;
+.day-timeline .now-mark {
+  fill: var(--foreground);
 }
-.day-timeline .timeline-legend {
+.day-timeline .phase-badge circle {
+  fill: var(--gd-ink);
+}
+.day-timeline .phase-badge .badge-text {
+  font-size: 12px;
+  font-weight: 700;
+  fill: var(--gd-on-ink);
+}
+.day-timeline .phase-badge[data-future] circle {
+  fill: var(--surface);
+  stroke: var(--gd-ink);
+  stroke-width: 1.3;
+  stroke-dasharray: 2.5 2;
+}
+.day-timeline .phase-badge[data-future] .badge-text {
+  fill: var(--gd-ink);
+}
+
+/* One small key for every zone's chart, and today's events at the end of its line. */
+.day-timeline .grow-foot {
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px 18px;
+  margin-top: 10px;
+}
+.day-timeline .grow-legend {
+  display: flex;
+  flex: 1 1 420px;
+  flex-wrap: wrap;
   gap: 6px 16px;
-  margin: 12px 0 0;
+  margin: 0;
   padding: 0;
   list-style: none;
   font-size: 12px;
   color: var(--muted-foreground);
 }
-.day-timeline .timeline-legend li {
+.day-timeline .grow-legend li {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.day-timeline .timeline-legend i {
-  display: inline-block;
-  width: 14px;
-  height: 10px;
-  border-radius: 2px;
-}
-.day-timeline .timeline-toggle {
+/* Each key entry switches its layer: off reads faded and struck through. */
+.day-timeline .grow-legend button {
   display: flex;
   align-items: center;
   gap: 6px;
-  min-height: 20px;
-  padding: 0 8px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  background: var(--surface);
+  min-height: 24px;
+  margin: 0;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
   color: inherit;
-  font-size: 12px;
+  font: inherit;
+  cursor: pointer;
 }
-.day-timeline .timeline-toggle[aria-pressed="false"] {
+.day-timeline .grow-legend button:hover {
+  color: var(--foreground);
+}
+.day-timeline .grow-legend button:focus-visible {
+  outline: 2px solid var(--ring, var(--primary));
+  outline-offset: 2px;
+}
+.day-timeline .grow-legend button[aria-pressed="false"] {
+  opacity: 0.45;
   text-decoration: line-through;
 }
-.day-timeline .timeline-toggle[aria-pressed="false"] i {
-  opacity: 0.3;
+.day-timeline .grow-readout-choice {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
 }
-.day-timeline .key-today,
-.day-timeline .key-projected,
-.day-timeline .key-yesterday,
-.day-timeline .key-target {
-  height: 0 !important;
-  border-top: 2px solid var(--primary);
-  border-radius: 0 !important;
+.day-timeline .grow-readout-choice select {
+  height: 26px;
+  padding: 0 28px 0 8px;
+  font-size: 12px;
 }
-.day-timeline .key-projected {
-  border-top-style: dashed;
+.day-timeline .grow-legend i {
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 0;
 }
-.day-timeline .key-yesterday {
-  border-top-color: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
-}
-.day-timeline .key-target {
-  border-top: 2px dashed var(--warning);
-}
-.day-timeline .key-typical {
-  background: color-mix(in srgb, var(--muted-foreground) 22%, transparent);
-  border-top: 1px solid var(--muted-foreground);
-  border-bottom: 1px solid transparent;
-}
-.day-timeline .key-expected {
-  width: 0 !important;
-  height: 12px !important;
-  border-left: 1.5px dashed var(--foreground);
-  border-radius: 0 !important;
-}
-.day-timeline .key-shot {
-  background: var(--foreground);
-  width: 4px !important;
-}
-.day-timeline .key-cap {
-  background: repeating-linear-gradient(
-    45deg,
-    color-mix(in srgb, var(--destructive) 14%, var(--surface)) 0 3px,
-    var(--destructive) 3px 5px
+/* Solid, then dashed: today, then what is expected. */
+.day-timeline .key-vwc {
+  width: 24px !important;
+  height: 2px !important;
+  background: linear-gradient(
+    90deg,
+    var(--primary) 0 11px,
+    transparent 11px 14px,
+    var(--primary) 14px 18px,
+    transparent 18px 20px,
+    var(--primary) 20px 24px
   );
 }
-.day-timeline .key-hold {
-  border: 1.2px dashed var(--warning);
-  background: color-mix(in srgb, var(--warning) 14%, transparent);
+.day-timeline .key-ec {
+  border-top: 2px solid var(--gd-veg);
 }
-.day-timeline .key-change {
+.day-timeline .key-ec[data-steering="generative"] {
+  border-top-color: var(--gd-gen);
+}
+.day-timeline .key-shot,
+.day-timeline .key-held {
   width: 9px !important;
   height: 9px !important;
-  border: 1.4px solid var(--foreground);
-  border-radius: 0 !important;
+  border-radius: 50%;
+  background: var(--gd-ink);
+}
+.day-timeline .key-held {
+  margin-left: 4px;
+  background: var(--surface);
+  border: 1.6px solid var(--gd-ink);
+}
+.day-timeline .key-fc {
+  border-top: 2px dashed var(--gd-red);
+}
+.day-timeline .key-runoff {
+  height: 10px !important;
+  width: 12px !important;
+  margin-left: -4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--gd-veg) 30%, transparent);
+}
+.day-timeline .key-runoff[data-steering="generative"] {
+  background: color-mix(in srgb, var(--gd-gen) 30%, transparent);
+}
+.day-timeline .key-band {
+  height: 10px !important;
+  border-radius: 2px;
+  background: var(--gd-band);
+  border-top: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+}
+.day-timeline .key-rescue {
+  border-top: 2px dotted var(--gd-red);
+}
+.day-timeline .key-jev {
+  width: 9px !important;
+  height: 9px !important;
+  background: var(--gd-ink);
   transform: rotate(45deg);
 }
-.day-timeline .key-night {
-  background: var(--tl-night);
-  border: 1px solid var(--border);
+.day-timeline .key-compare {
+  border-top: 2px solid color-mix(in srgb, var(--muted-foreground) 60%, transparent);
 }
+
 .day-timeline .timeline-events {
-  margin-top: 12px;
+  flex: none;
+  margin-left: auto;
   font-size: 13px;
+}
+.day-timeline .timeline-events[open] {
+  flex-basis: 100%;
 }
 .day-timeline .timeline-events summary {
   cursor: pointer;
@@ -365,7 +458,7 @@
 }
 @media (max-width: 720px) {
   .day-timeline .timeline-body {
-    padding: 4px 14px 16px;
+    padding: 0 12px 14px;
   }
   .day-timeline .panel-heading {
     flex-direction: column;

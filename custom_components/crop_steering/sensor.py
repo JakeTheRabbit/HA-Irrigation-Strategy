@@ -232,6 +232,7 @@ async def async_setup_entry(
         CropSteeringEngineConfigSensor(entry, num_zones, zones_config, hardware_config)
     )
     sensors.append(CropSteeringStockSensor(entry))
+    sensors.append(CropSteeringDosingConfigSensor(entry))
 
     async_add_entities(sensors)
 
@@ -332,9 +333,14 @@ class CropSteeringStockSensor(SensorEntity):
         if manager is None:
             return {}
         doses = manager.doses()
+        linked = (
+            manager.linked()
+        )  # tank id -> the dosing pump that draws it (docs/DOSING.md)
         return {
             "tanks": [
                 {
+                    "id": tank["id"],
+                    "pump": linked.get(tank["id"]),
                     "name": tank["name"],
                     "level_l": tank["level_l"],
                     "capacity_l": tank["capacity_l"],
@@ -353,7 +359,67 @@ class CropSteeringStockSensor(SensorEntity):
     async def async_added_to_hass(self) -> None:
         from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
+        from .dosing_api import SIGNAL as DOSING_SIGNAL
         from .stock_api import SIGNAL
+
+        # The tanks change, or which pump is linked to one (a dosing setup saved).
+        for signal in (SIGNAL, DOSING_SIGNAL):
+            self.async_on_remove(
+                async_dispatcher_connect(
+                    self.hass,
+                    f"{signal}_{self._entry.entry_id}",
+                    self.async_write_ha_state,
+                )
+            )
+
+
+class CropSteeringDosingConfigSensor(SensorEntity):
+    """The room's batch-tank dosing setup and its one request, for the controller app, which reads
+    this every 2 s (docs/DOSING.md). State: the setup's revision; attributes: pumps, batch and
+    request. The setup lives in the integration's store (dosing_api.py); this is rewritten
+    whenever it changes."""
+
+    _attr_should_poll = False
+    _attr_icon = "mdi:beaker-outline"
+
+    def __init__(self, entry):
+        self._entry = entry
+        self._prefix = room_prefix(entry)
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_dosing_config"
+        self._attr_name = "Dosing config"
+        self._attr_object_id = f"{DOMAIN}_{self._prefix}dosing_config"
+        # Home Assistant ignores _attr_object_id; the controller finds the setup by THIS id.
+        self.entity_id = f"sensor.{self._attr_object_id}"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name="Crop Steering System",
+            manufacturer="Home Assistant Community",
+            model="Professional Irrigation Controller",
+            sw_version=SOFTWARE_VERSION,
+        )
+
+    def _manager(self):
+        return (
+            self.hass.data.get(DOMAIN, {}).get("_dosing", {}).get(self._entry.entry_id)
+        )
+
+    @property
+    def native_value(self) -> Any:
+        manager = self._manager()
+        return manager.sensor()[0] if manager is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        manager = self._manager()
+        return manager.sensor()[1] if manager is not None else {}
+
+    async def async_added_to_hass(self) -> None:
+        from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
+        from .dosing_api import SIGNAL
 
         self.async_on_remove(
             async_dispatcher_connect(

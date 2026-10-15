@@ -51,7 +51,7 @@ export function ActivityPanel({
               openLog();
             }}
           >
-            Open the activity log <ArrowRight size={16} />
+            Open the timeline <ArrowRight size={16} />
           </Button>
         </SheetFooter>
       </SheetContent>

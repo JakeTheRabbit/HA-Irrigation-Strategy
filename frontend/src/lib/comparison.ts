@@ -167,3 +167,33 @@ export function mergeDaily(rows: DailyReading[], monthly = false): DailyReading[
   }
   return [...groups.values()].sort((a, b) => a.date.localeCompare(b.date));
 }
+/** Daily long-term statistics rows (`recorder/statistics_during_period`, period "day", types min
+ * and max) as daily ranges. A day is named by the local date of its middle in `timeZone`, so a
+ * server whose midnight is a few hours off still names the same day. A sensor Home Assistant keeps
+ * no statistics for has no rows. */
+export function dailyStatistics(result: unknown, timeZone: string): Record<string, DailyReading[]> {
+  if (!result || typeof result !== "object")
+    throw new Error("Home Assistant returned invalid statistics.");
+  const instant = (value: unknown) =>
+    typeof value === "number" ? value : typeof value === "string" ? Date.parse(value) : NaN;
+  return Object.fromEntries(
+    Object.entries(result as Record<string, unknown>).map(([id, rows]) => [
+      id,
+      mergeDaily(
+        (Array.isArray(rows) ? rows : []).flatMap(
+          (row: { start?: unknown; min?: unknown; max?: unknown } | null) => {
+            const start = instant(row?.start);
+            const { min, max } = row ?? {};
+            return Number.isFinite(start) &&
+              typeof min === "number" &&
+              typeof max === "number" &&
+              Number.isFinite(min) &&
+              Number.isFinite(max)
+              ? [{ date: dateInZone(start + DAY / 2, timeZone), records: 1, min, max }]
+              : [];
+          },
+        ),
+      ),
+    ]),
+  );
+}

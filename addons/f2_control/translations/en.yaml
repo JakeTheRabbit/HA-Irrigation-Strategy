@@ -28,9 +28,11 @@ configuration:
   notify_service:
     name: Notification service
     description: >-
-      Where to send vitals and alerts. Use the path form notify/<your_service>,
-      for example notify/mobile_app_my_phone. Find yours in
-      Developer Tools > Actions by typing "notify".
+      Where to send vitals, and alerts whenever no phone is set up under Crop Steering >
+      Settings & help > Notifications (there, each phone chooses what it gets) or an
+      alert can't be passed on there. Use the path form notify/<your_service>, for
+      example notify/mobile_app_my_phone. Find yours in Developer Tools > Actions by
+      typing "notify".
   notify_min:
     name: Minutes between routine notifications
     description: >-
@@ -91,12 +93,13 @@ configuration:
       How often the controller looks for new rooms and for setup changes saved
       in the Crop Steering page. Default 300 (five minutes).
   cf_account_id:
-    name: Cloudflare account ID (optional, Auto Setpoints judge)
+    name: Cloudflare account ID (Jev)
     description: >-
-      Only used by Auto Setpoints. When a P1 ramp stops rising, the controller asks the
-      Jev model (typesafe/jev on Cloudflare Workers AI) whether the probe reading can be
-      trusted before it lowers a zone's targets. LEAVE BLANK to run Auto Setpoints
-      without the judge - the learner still works, it just trusts its own checks.
+      A second route to Jev (typesafe/jev on Cloudflare Workers AI), which judges the
+      engine's decisions in every phase inside the controller's safety envelope
+      (docs/JEV.md). With this and the token below but no TypeSafe key, Jev starts only
+      on an install that has already run it; a new install needs the TypeSafe key
+      below. LEAVE BLANK to run the plain engine.
   cf_api_token:
     name: Cloudflare API token (optional)
     description: >-
@@ -108,3 +111,77 @@ configuration:
     description: >-
       Route the Jev calls through an AI Gateway (for logs and rate limits), e.g. default.
       Leave blank to call Workers AI directly.
+  typesafe_api_key:
+    name: TypeSafe API key (Jev, direct)
+    description: >-
+      A TypeSafe API key (apikey_...). When set, Jev is asked straight from TypeSafe and the
+      Cloudflare fields above are not needed. Stored as a password.
+  jev_enabled:
+    name: Jev judges decisions
+    description: >-
+      Off runs the plain engine even with Cloudflare set. On (default) lets the judges
+      below act, each only inside the controller's safety envelope.
+  jev_judges:
+    name: Jev judges that may act
+    description: >-
+      all (default), or a comma-separated list of dawn, ramp, salt, dusk, probe, shot,
+      night, zones, stage, setpoints and alerts. A judge not listed is never asked.
+      Setpoints also needs the room's Auto setpoints switch on.
+  jev_daily_calls:
+    name: Jev calls a day
+    description: >-
+      The most calls Jev gets in a day across every room (default 5000). Once spent,
+      the engine decides alone until midnight.
+  jev_budget_warn_pct:
+    name: Warn at this share of Jev's calls (%)
+    description: >-
+      When the day's calls reach this share of the budget above (default 80), the app
+      raises CS-706, once that day.
+  jev_retries:
+    name: Tries per Jev route
+    description: >-
+      How many times each route to Jev is tried while it is busy, failing or slow
+      (default 3), inside 60 seconds. A refused key moves straight on to the next route.
+  jev_reask_max:
+    name: Second looks when Jev is unsure
+    description: >-
+      When an answer that did not act is under the sureness below, or its two phrasings
+      disagree, Jev is asked again with more evidence, up to this many times (default 2).
+      Then the engine decides.
+  jev_unsure_below:
+    name: Jev is unsure below
+    description: >-
+      An answer with a probability under this (default 0.7) is unsure, and is asked again.
+  jev_strict_after:
+    name: Bad calls before the stricter gate
+    description: >-
+      After this many of a judge's calls in a row did not work out for a zone (default 3),
+      that judge acts there only when it is very sure and a second look agrees, until two
+      calls in a row work. The app raises CS-707.
+  jev_strict_prob:
+    name: Sureness on the stricter gate
+    description: >-
+      How sure an answer must be to act on the stricter gate (default 0.8).
+  jev_flower_start:
+    name: Flower start (Jev's stage arc)
+    description: >-
+      Where each room's first day of 12/12 is, so the judges know the stage: an
+      input_datetime or a date for every room, or room=value pairs, e.g.
+      default=input_datetime.f2_flip_date, f1=input_datetime.f1_flip_date. Blank: the
+      judges work without a stage.
+  sump_power_sensor:
+    name: Sump pump power sensor (optional)
+    description: >-
+      The power reading (W) of the sump pump the room's tables drain to, e.g. sensor.f2_sump_pump_power;
+      for more than one room, room=sensor pairs, e.g. default=sensor.f2_sump_pump_power. When set, a
+      pump that shows no run for the hours below while the room is on raises CS-311 (critical): the
+      tables are about to back up. Blank: not watched.
+  sump_silent_hours:
+    name: Sump pump may stand still for (hours)
+    description: >-
+      How long the sump pump may show no run before CS-311 (default 3). Set it longer than the
+      longest normal gap between its runs.
+  jev_flower_days:
+    name: Days of flower
+    description: >-
+      The cultivar's flowering length (default 56). The finish is its last 14 days.

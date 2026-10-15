@@ -15,12 +15,17 @@ def test_missing_ec_does_not_scale_water_or_infer_flush(ec):
     assert not decide(S(phase="P2", ec=ec, vwc=55), P())[2]
 
 
-def test_missing_ec_p1_exit_requires_watered_ceiling_or_existing_timeout_limit():
-    assert decide(S(phase="P1", ec=None, vwc=60, shot_count=0), P())[0] == "P1"
-    result = decide(S(phase="P1", ec=None, vwc=60, shot_count=1), P())
-    assert result[0] == "P2" and "flush unverified" in result[4]
-    assert decide(S(phase="P1", ec=None, vwc=45, shot_count=12), P())[0] == "P2"
-    assert decide(S(phase="P1", ec=None, vwc=45, shot_count=1, phase_minutes=120), P())[0] == "P1"
+@pytest.mark.parametrize("ec", [None, float("nan"), 5])
+def test_missing_ec_changes_nothing_in_the_p1_exit(ec):
+    # Pore EC plays no part in when P1 ends, so a missing reading exits exactly as a known one (5): at the
+    # ceiling P1 waits for its extra shot, ends once that shot no longer raised the peak, or at max shots.
+    at_ceiling = decide(S(phase="P1", ec=ec, vwc=60, shot_count=1), P())
+    assert at_ceiling[0] == "P1" and at_ceiling[4].kind == "p1_extra"
+    full = dict(phase="P1", ec=ec, vwc=60, peak_vwc=60.2, shot_count=2, p1_extra_shots=1, p1_peak_before_shot=60)
+    result = decide(S(**full), P())
+    assert result[0] == "P2" and "P1 full" in result[4]
+    assert decide(S(phase="P1", ec=ec, vwc=45, shot_count=12), P())[0] == "P2"
+    assert decide(S(phase="P1", ec=ec, vwc=45, shot_count=1, phase_minutes=120), P())[0] == "P1"
 
 
 def test_missing_ec_preserves_budget_dry_rescue_and_safety_warning():

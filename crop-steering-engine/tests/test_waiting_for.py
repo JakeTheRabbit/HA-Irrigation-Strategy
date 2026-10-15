@@ -42,10 +42,19 @@ def test_p1_ramp_shot_needs_the_moisture_and_the_spacing_and_hands_over_at_the_c
     ramp = by_rule(items, "p1_ramp")
     assert (ramp["op"], ramp["value"], ramp["in_min"], ramp["shot"]) == ("<", 65, 10.0, True)
     done = by_rule(items, "p1_done")
-    assert (done["value"], done["shots_left"], done["ec_max"], done["ec_now"]) == (65, 2, 5.75, 4)
+    # no EC limit on the hand-over any more: what it waits on is a shot that no longer raises the peak
+    assert (done["value"], done["shots_left"], done["ec_max"], done["ec_now"], done["rise_min"]) == (65, 2, None, None, 0.5)
     assert by_rule(items, "p1_max_shots")["shots_left"] == 5
     assert not decide(s, p)[2]  # the spacing has not passed
     assert decide(S(phase="P1", vwc=62, shot_count=1, minutes_since_shot=15, ec=4, ec_smooth=4), p)[2]
+    # at the ceiling the ramp item goes: the shot decide() fires is the extra one, still counted as to come
+    top = S(phase="P1", vwc=65, shot_count=3, minutes_since_shot=15, ec=4, ec_smooth=4)
+    assert rules(waiting_for(top, p)) == ["p1_done", "p1_max_shots"]
+    assert by_rule(waiting_for(top, p), "p1_done")["shots_left"] == 1
+    assert decide(top, p)[4].kind == "p1_extra"
+    # the caller latches "reached": a reading back under the ceiling brings no ramp shot back
+    dipped = S(phase="P1", vwc=63, shot_count=4, minutes_since_shot=15, ec=4, ec_smooth=4, p1_reached=True)
+    assert "p1_ramp" not in rules(waiting_for(dipped, p)) and decide(dipped, p)[4].kind == "p1_extra"
 
 
 def test_the_ramp_ceiling_is_the_lower_of_the_peak_target_and_full_saturation():
@@ -101,11 +110,14 @@ def test_a_held_plan_leaves_out_the_routine_shots_it_stops():
     assert decide(rescue, P(p3_emergency_floor=40))[2]  # the rescue still fires
 
 
-def test_with_no_ec_reading_p1_hands_over_only_after_a_shot():
+def test_with_or_without_an_ec_reading_p1_hands_over_only_after_its_extra_shot():
+    # The ceiling alone is not enough: one more shot goes in, and P1 ends once it raised the peak under rise_min.
     p = P(p1_target=60, field_capacity=70, p1_min_shots=0)
-    s = S(phase="P1", vwc=65, shot_count=0, ec=None, ec_smooth=None)
-    assert by_rule(waiting_for(s, p), "p1_done")["shots_left"] == 1
-    assert decide(s, p)[0] == "P1"
-    after = S(phase="P1", vwc=65, shot_count=1, ec=None, ec_smooth=None)
-    assert by_rule(waiting_for(after, p), "p1_done")["shots_left"] == 0
-    assert decide(after, p)[0] == "P2"
+    for ec in (None, 4):
+        s = S(phase="P1", vwc=65, peak_vwc=65, shot_count=0, ec=ec, ec_smooth=ec)
+        assert by_rule(waiting_for(s, p), "p1_done")["shots_left"] == 1
+        assert decide(s, p)[0] == "P1"
+        after = dict(phase="P1", vwc=65, shot_count=1, ec=ec, ec_smooth=ec, p1_extra_shots=1, p1_peak_before_shot=65)
+        assert by_rule(waiting_for(S(**after, peak_vwc=65.4), p), "p1_done")["shots_left"] == 0
+        assert decide(S(**after, peak_vwc=65.4), p)[0] == "P2"
+        assert decide(S(**after, peak_vwc=65.5), p)[0] == "P1"  # it rose rise_min: another extra shot

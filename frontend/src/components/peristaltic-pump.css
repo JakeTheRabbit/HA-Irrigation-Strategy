@@ -1,0 +1,149 @@
+/* A peristaltic dosing pump in cream and brushed metal, a little dimmer on the dark theme. The
+   liquid in its tube is the pump's own colour (--pump-hue, set on its card). */
+.peristaltic {
+  --pp-cream-light: #fcf8ef;
+  --pp-cream-dark: #e2d6bd;
+  --pp-recess: #ece2cd;
+  --pp-edge: #b3a88f;
+  --pp-plate: #dcd7cc;
+  --pp-plate-edge: #bdb5a6;
+  --pp-metal: #cbc4b5;
+  --pp-metal-edge: #8b8474;
+  --pp-hub: #7b7465;
+  --pp-tube: #cdbf9f;
+  --pp-mark: #5a5347;
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.dark .peristaltic {
+  --pp-cream-light: #e6dfcf;
+  --pp-cream-dark: #b3a78e;
+  --pp-recess: #cbbfa6;
+  --pp-edge: #8a8069;
+  --pp-plate: #3b3833;
+  --pp-plate-edge: #57524a;
+  --pp-metal: #a8a090;
+  --pp-metal-edge: #6c665b;
+  --pp-hub: #5e584d;
+  --pp-tube: #a99c80;
+}
+.pp-cream-light {
+  stop-color: var(--pp-cream-light);
+}
+.pp-cream-dark {
+  stop-color: var(--pp-cream-dark);
+}
+.pp-glow-in {
+  stop-color: var(--success);
+  stop-opacity: 0.38;
+}
+.pp-glow-out {
+  stop-color: var(--success);
+  stop-opacity: 0;
+}
+.pp-glow {
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.pp-plate {
+  fill: var(--pp-plate);
+  stroke: var(--pp-plate-edge);
+  stroke-width: 1.5;
+}
+.pp-screw {
+  fill: var(--pp-metal);
+  stroke: var(--pp-metal-edge);
+  stroke-width: 0.8;
+}
+.pp-head {
+  stroke: var(--pp-edge);
+  stroke-width: 2;
+}
+.pp-recess {
+  fill: var(--pp-recess);
+  stroke: color-mix(in srgb, var(--pp-edge) 55%, transparent);
+  stroke-width: 1;
+}
+.pp-tube,
+.pp-liquid {
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.pp-tube {
+  stroke: var(--pp-tube);
+  stroke-width: 9;
+}
+.pp-liquid {
+  stroke: color-mix(in srgb, var(--pump-hue, var(--primary)) 55%, var(--pp-cream-light));
+  stroke-width: 4.5;
+}
+.pp-arm {
+  fill: var(--pp-metal);
+  stroke: var(--pp-metal);
+  stroke-width: 7;
+  stroke-linejoin: round;
+}
+.pp-roller {
+  fill: var(--pp-metal);
+  stroke: var(--pp-metal-edge);
+  stroke-width: 1.2;
+}
+.pp-axle,
+.pp-hub {
+  fill: var(--pp-hub);
+}
+.pp-shine {
+  fill: none;
+  stroke: #ffffff;
+  stroke-opacity: 0.55;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+.pp-unknown {
+  fill: var(--pp-mark);
+  font:
+    700 30px Roboto,
+    sans-serif;
+}
+/* The rotor turns and the liquid runs while the pump doses, with a glow round the head. */
+.pp-rotor {
+  transform-origin: 60px 54px;
+}
+.peristaltic[data-state="dosing"] .pp-rotor {
+  animation: pp-turn 1.1s linear infinite;
+}
+.peristaltic[data-state="dosing"] .pp-liquid {
+  stroke: var(--pump-hue, var(--primary));
+  stroke-dasharray: 5 6;
+  animation: pp-flow 0.7s linear infinite;
+}
+.peristaltic[data-state="dosing"] .pp-glow {
+  opacity: 1;
+}
+@keyframes pp-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes pp-flow {
+  to {
+    stroke-dashoffset: -11;
+  }
+}
+/* A pump the page cannot read is greyed out, its question mark left clear. */
+.peristaltic[data-state="unavailable"] > :not(.pp-unknown) {
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+@media (prefers-reduced-motion: reduce) {
+  .peristaltic .pp-rotor,
+  .peristaltic .pp-liquid {
+    animation: none !important;
+  }
+  .peristaltic[data-state="dosing"] .pp-liquid {
+    stroke-dasharray: none;
+  }
+}

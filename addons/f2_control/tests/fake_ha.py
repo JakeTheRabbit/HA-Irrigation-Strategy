@@ -50,6 +50,11 @@ class FakeHA:
             )
         return True
 
+    def ha_service_response(self, domain, service, data, timeout=12):
+        """A service call asking for its answer: recorded as a call, answered with nothing."""
+        self.calls.append((domain, service, dict(data)))
+        return 200, None
+
     def ha_history(self, entity, since, timeout=12):
         """What the recorder holds from `since`: a test's own list, else the state the entity is in now."""
         if entity in self.history:
@@ -80,6 +85,7 @@ def install(controller, fake: FakeHA, options: dict):
         controller.ha_get_all,
         controller.ha_set,
         controller.ha_history,
+        controller.ha_service_response,
     )
     controller.load_options = lambda: dict(options)
     controller.ha_get = fake.ha_get
@@ -87,4 +93,5 @@ def install(controller, fake: FakeHA, options: dict):
     controller.ha_get_all = fake.ha_get_all
     controller.ha_set = fake.ha_set
     controller.ha_history = fake.ha_history
+    controller.ha_service_response = fake.ha_service_response
     return orig

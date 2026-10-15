@@ -1,38 +1,3 @@
-.mini-bars {
-  display: inline-flex;
-  align-items: flex-end;
-  gap: 6px;
-  flex: none;
-}
-.mini-bar {
-  display: grid;
-  justify-items: center;
-  gap: 3px;
-}
-.mini-bar-track {
-  display: flex;
-  align-items: flex-end;
-  width: 10px;
-  height: 34px;
-  border-radius: 3px;
-  background: color-mix(in srgb, var(--foreground) 9%, var(--surface));
-  overflow: hidden;
-}
-.mini-bar-fill {
-  width: 100%;
-  min-height: 2px;
-  border-radius: 3px 3px 0 0;
-  background: var(--primary);
-}
-.mini-bar-label {
-  font-size: var(--text-xs);
-  line-height: 1;
-  color: var(--muted-foreground);
-}
-.mini-bar[data-selected] .mini-bar-label {
-  color: var(--foreground);
-  font-weight: 700;
-}
 .meter {
   position: relative;
   display: block;
@@ -60,15 +25,12 @@
   border-radius: 1px;
   background: var(--foreground);
 }
-.mini-bar-fill[data-tone="high"],
 .meter-fill[data-tone="high"] {
   background: var(--warning);
 }
-.mini-bar-fill[data-tone="over"],
 .meter-fill[data-tone="over"] {
   background: var(--destructive);
 }
-.mini-bar-fill[data-tone="muted"],
 .meter-fill[data-tone="muted"] {
   background: var(--muted-foreground);
 }

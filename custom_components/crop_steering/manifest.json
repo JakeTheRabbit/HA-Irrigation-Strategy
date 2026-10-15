@@ -9,10 +9,10 @@
     "frontend",
     "http"
   ],
-  "documentation": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy",
+  "documentation": "https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev",
   "integration_type": "hub",
   "iot_class": "calculated",
-  "issue_tracker": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues",
+  "issue_tracker": "https://github.com/JakeTheRabbit/HA-Crop-Steering-Jev/issues",
   "requirements": [],
-  "version": "2.25.1"
+  "version": "3.11.1"
 }

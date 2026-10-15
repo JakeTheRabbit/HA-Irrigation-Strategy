@@ -375,7 +375,7 @@
           "humidity_sensor": "Recorded for the dashboard. The controller does not use it.",
           "vpd_sensor": "Recorded for the dashboard. The controller does not use it.",
           "water_level_sensor": "Reservoir/tank level sensor. Optional; triggers low-water alerts.",
-          "notification_service": "Recorded only. Alerts are sent by the controller add-on, using its own notify_service option.",
+          "notification_service": "Recorded only. Which phone gets which alerts is set under Crop Steering → Settings & help → Notifications; with no phone set up there, the controller app sends them with its own notify_service option.",
           "tank_temperature_sensor": "Read-only tank-water temperature in °C, °F or K. This is separate from room/canopy temperature.",
           "tank_ec_sensor": "Read-only tank EC in mS/cm or dS/m. This mapping does not enable or change the source-water EC gate.",
           "tank_ph_sensor": "Read-only tank pH. This mapping does not enable or change the source-water pH gate.",
@@ -725,7 +725,7 @@
           "humidity_sensor": "Recorded for the dashboard. The controller does not use it.",
           "vpd_sensor": "Recorded for the dashboard. The controller does not use it.",
           "water_level_sensor": "Reservoir/tank level sensor. Optional; triggers low-water alerts.",
-          "notification_service": "Recorded only. Alerts are sent by the controller add-on, using its own notify_service option.",
+          "notification_service": "Recorded only. Which phone gets which alerts is set under Crop Steering → Settings & help → Notifications; with no phone set up there, the controller app sends them with its own notify_service option.",
           "tank_temperature_sensor": "Read-only tank-water temperature in °C, °F or K. This is separate from room/canopy temperature.",
           "tank_ec_sensor": "Read-only tank EC in mS/cm or dS/m. This mapping does not enable or change the source-water EC gate.",
           "tank_ph_sensor": "Read-only tank pH. This mapping does not enable or change the source-water pH gate.",
@@ -851,6 +851,132 @@
         "pump_valves": "A pump, then zone valves: the pump has to run whenever a zone waters",
         "mainline_valves": "A main-line valve, then zone valves: mains or gravity pressure, no pump to switch",
         "pump_mainline_valves": "A pump, a main-line valve, then zone valves"
+      }
+    }
+  },
+  "services": {
+    "dosing_get": {
+      "name": "Read dosing",
+      "description": "Read this room's dosing pumps, batch hardware and recipe, the request waiting for the controller app, and every entity the setup can use. Does not change anything.",
+      "fields": {
+        "room_id": {
+          "name": "Room ID",
+          "description": "Canonical room identity: room: for the default room or room:f1_ for a named room."
+        }
+      }
+    },
+    "dosing_save": {
+      "name": "Save dosing setup",
+      "description": "Replace this room's dosing pumps, batch hardware and recipe. Refused while a request is waiting for the controller app or it reports a dose or a batch running, and when the expected revision is stale. Switches nothing. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations are unaffected.",
+      "fields": {
+        "room_id": {
+          "name": "Room ID",
+          "description": "Canonical room identity: room: for the default room or room:f1_ for a named room."
+        },
+        "expected_revision": {
+          "name": "Expected revision",
+          "description": "The revision Read dosing returned; a stale one is refused."
+        },
+        "pumps": {
+          "name": "Pumps",
+          "description": "Up to 8 dosing pumps, in the order the dosing page shows them."
+        },
+        "batch": {
+          "name": "Batch",
+          "description": "The batch tank's fill, mixing and hold hardware, and the recipe."
+        }
+      }
+    },
+    "dosing_request": {
+      "name": "Request a dose or batch",
+      "description": "Ask the controller app to dose one pump into the batch tank, make a batch, or stop. A stop replaces any request still waiting; a dose or a batch is refused while another is waiting. The controller acts within seconds, and never on a dose or a batch asked for more than two minutes before. A dose or a batch needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; a stop is open to every signed-in user; automations are unaffected.",
+      "fields": {
+        "room_id": {
+          "name": "Room ID",
+          "description": "Canonical room identity: room: for the default room or room:f1_ for a named room."
+        },
+        "action": {
+          "name": "Action",
+          "description": "dose, batch or stop."
+        },
+        "pump": {
+          "name": "Pump",
+          "description": "The pump's id, for a dose."
+        },
+        "ml": {
+          "name": "Millilitres",
+          "description": "How much to dose: more than 0, up to the pump's maximum."
+        }
+      }
+    },
+    "notify_get": {
+      "name": "Read notifications",
+      "description": "Read who gets which alerts on the phones: each phone's row, what each kind of alert covers, the site's phones and whose they are, and whether the caller may change every row. Does not change anything."
+    },
+    "notify_save": {
+      "name": "Save notifications",
+      "description": "Save who gets which alerts: each phone's kinds of alert, rooms and high priority for emergencies, and after how many hours a room that has watered nothing is reported. An administrator may change every row; anyone else signed in may change only the kinds, rooms and high priority of their own phones. Automations save as an administrator does.",
+      "fields": {
+        "expected_revision": {
+          "name": "Expected revision",
+          "description": "The revision the setup was read at: a save against an older one is refused."
+        },
+        "recipients": {
+          "name": "Recipients",
+          "description": "Every phone's row: service, name, user_id, kinds, rooms and urgent_high_priority."
+        },
+        "idle_hours": {
+          "name": "Hours without watering",
+          "description": "Report a room that is on, with its lights on, that has watered nothing for this many hours (1 to 12)."
+        }
+      }
+    },
+    "notify_test": {
+      "name": "Send a test notification",
+      "description": "Send one test push to a phone. An administrator may test any phone; anyone else signed in may test only their own.",
+      "fields": {
+        "service": {
+          "name": "Service",
+          "description": "The phone's notify service, for example notify.mobile_app_my_phone."
+        }
+      }
+    },
+    "notify": {
+      "name": "Send a notification",
+      "description": "Send one push to every phone whose row ticks its kind of alert and covers its room. The controller app calls it for its alerts, phase changes and the settings Jev moves. Needs a Home Assistant administrator when a signed-in user calls it, directly or through a script they start; automations and the controller app are unaffected.",
+      "fields": {
+        "key": {
+          "name": "Key",
+          "description": "What the push is about: a later push with the same key replaces it on the phone."
+        },
+        "code": {
+          "name": "Code",
+          "description": "The alert's error code, such as CS-608: which kinds of alert it belongs to."
+        },
+        "event": {
+          "name": "Event",
+          "description": "phase or jev_setpoint, for a push that is not an alert."
+        },
+        "room": {
+          "name": "Room",
+          "description": "The room's prefix: empty for the default room, f1_ for a named room. Left out, the push is about no room in particular."
+        },
+        "zone": {
+          "name": "Zone",
+          "description": "The zone the push is about."
+        },
+        "title": {
+          "name": "Title",
+          "description": "The push's title."
+        },
+        "message": {
+          "name": "Message",
+          "description": "The push's text."
+        },
+        "urgent": {
+          "name": "Urgent",
+          "description": "A critical alert: a phone whose row asks for it gets it as a high-priority push."
+        }
       }
     }
   }

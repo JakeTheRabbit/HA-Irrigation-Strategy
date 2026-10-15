@@ -14,6 +14,8 @@
 | tests | Integration and repository contract tests |
 | docs | Install, operation, architecture and release process |
 | docs/TESTING.md / docs/ENTITIES.md | Development checks and entity reference |
+| docs/DOSING.md | The batch-tank dosing contract between the integration, the controller app and the dashboard: configuration, services, requests, the batch sequence, restart recovery and status |
+| docs/NOTIFICATIONS.md | The contract for who gets which alerts on the phones: the kinds of alert, the site's one store, the services, the routing, and the controller's fallback to its own notify service |
 | docs/error-codes.json | The one list of error codes (CS-101 …); docs/ERROR_CODES.md is written from it by scripts/render_error_codes.py, and the dashboard's Help & tools page imports it |
 | img | Screenshots used by the README and docs |
 | repository.yaml | HA app repository discovery metadata; the controller app is installed from this repository only |

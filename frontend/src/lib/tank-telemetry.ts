@@ -8,6 +8,27 @@ export interface TankReading {
   issue: string | null;
 }
 
+/** When a last-fill entity's state says the tank was filled (epoch ms): a date-and-time helper's
+ * timestamp attribute, or a timestamp sensor's dated, time-zone-aware state. Null otherwise. */
+export function fillTime(
+  entityId: string,
+  state: string,
+  attributes?: Record<string, unknown>,
+): number | null {
+  const raw = state || "";
+  const time =
+    entityId.startsWith("input_datetime.") &&
+    attributes?.has_date === true &&
+    attributes?.has_time === true &&
+    typeof attributes.timestamp === "number" &&
+    !["unknown", "unavailable", ""].includes(raw)
+      ? attributes.timestamp * 1000
+      : /^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$/i.test(raw)
+        ? Date.parse(raw)
+        : NaN;
+  return time > 0 && Number.isFinite(new Date(time).getTime()) ? time : null;
+}
+
 export function tankTelemetry(states: States, room: Room, now = Date.now()) {
   const config = descriptor(states, room)?.attributes || {};
   const mapped = (key: string) =>
@@ -39,21 +60,10 @@ export function tankTelemetry(states: States, room: Room, now = Date.now()) {
   };
   const fillId = mapped("tank_last_fill_sensor");
   const fillEntity = fillId ? states[fillId] : undefined;
-  const raw = fillEntity?.state || "";
-  const attrs = fillEntity?.attributes;
-  const time =
-    fillId?.startsWith("input_datetime.") &&
-    attrs?.has_date === true &&
-    attrs?.has_time === true &&
-    typeof attrs.timestamp === "number" &&
-    !["unknown", "unavailable", ""].includes(raw)
-      ? attrs.timestamp * 1000
-      : /^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$/i.test(raw)
-        ? Date.parse(raw)
-        : NaN;
+  const time = fillId ? fillTime(fillId, fillEntity?.state ?? "", fillEntity?.attributes) : null;
   const fillIssue = !fillId
     ? "Not mapped"
-    : !Number.isFinite(time) || time <= 0 || Number.isNaN(new Date(time).getTime())
+    : time === null
       ? "Unavailable"
       : time > now
         ? "Future timestamp"
@@ -67,7 +77,7 @@ export function tankTelemetry(states: States, room: Room, now = Date.now()) {
     fill: binary("tank_fill_entity"),
     lastFill: {
       entityId: fillId,
-      timestamp: fillIssue ? null : new Date(time).toISOString(),
+      timestamp: fillIssue || time === null ? null : new Date(time).toISOString(),
       issue: fillIssue,
     },
   };

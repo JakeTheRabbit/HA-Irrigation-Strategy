@@ -101,21 +101,30 @@ const numberOf = (state: string): number | null => {
   return text && Number.isFinite(Number(text)) ? Number(text) : null;
 };
 
-/** What a room's day timeline reads, where it exists: each zone's phase, valve and VWC probe, the
- * room's setpoints, and the controller's decision with its attributes. */
-export function timelineEntities(room: RoomView, states: States) {
+/** What a room's day timeline reads, where it exists: each zone's phase, valve, VWC and pore EC
+ * probes, the room's setpoints, and the controller's decision with its attributes. With `zoneId`,
+ * only that zone's (and the room's own setpoints). */
+export function timelineEntities(room: RoomView, states: States, zoneId?: number) {
   const root = `sensor.crop_steering_${room.room.prefix}`;
   const exists = (id: string | null): id is string => !!id && !!states[id];
-  const zones = room.zones.map((zone) => ({
-    id: zone.id,
-    phase: `${root}zone_${zone.id}_phase`,
-    valve: zone.valveEntity,
-    vwc: zone.vwc.entityId,
-  }));
+  const zones = room.zones
+    .filter((zone) => zoneId === undefined || zone.id === zoneId)
+    .map((zone) => ({
+      id: zone.id,
+      phase: `${root}zone_${zone.id}_phase`,
+      valve: zone.valveEntity,
+      vwc: zone.vwc.entityId,
+      ec: zone.ec.entityId,
+    }));
   const decision = `${root}current_decision`;
   const ids = [
-    ...zones.flatMap((zone) => [zone.phase, zone.valve, zone.vwc]),
-    ...room.settings.map((setting) => setting.entityId),
+    ...zones.flatMap((zone) => [zone.phase, zone.valve, zone.vwc, zone.ec]),
+    ...room.settings
+      .filter(
+        (setting) =>
+          zoneId === undefined || setting.zoneId === undefined || setting.zoneId === zoneId,
+      )
+      .map((setting) => setting.entityId),
   ];
   return {
     zones,
@@ -324,11 +333,13 @@ export function valueAt(rows: TimelineRow[] = [], time: number): number | null {
 /** What the earlier grow-days are read from: each zone's VWC probe and valve, the lights hours
  * (a changed schedule moves a day's lights-on), the room switch (a room that was off has nothing to
  * compare) and, with its attributes, the room descriptor (its setup revision). */
-export function earlierEntities(room: RoomView, states: States) {
+export function earlierEntities(room: RoomView, states: States, zoneId?: number) {
   const root = `crop_steering_${room.room.prefix}`;
   const exists = (id: string | null | undefined): id is string => !!id && !!states[id];
   const ids = [
-    ...room.zones.flatMap((zone) => [zone.vwc.entityId, zone.valveEntity]),
+    ...room.zones
+      .filter((zone) => zoneId === undefined || zone.id === zoneId)
+      .flatMap((zone) => [zone.vwc.entityId, zone.valveEntity]),
     `number.${root}lights_on_hour`,
     `number.${root}lights_off_hour`,
     `switch.${root}room_active`,
@@ -379,9 +390,12 @@ export interface DayTrace {
   /** The zone's VWC in ten-minute medians, by hours since that day's own lights-on. */
   points: RecordedPoint[];
   shots: Shot[];
+  /** The room was switched off at some point that day: its line is still drawn, but it is kept
+   * out of the typical day and the zone's dry-down rates. */
+  roomOff?: boolean;
 }
-/** One earlier grow-day of a zone, to compare today with. Null when there is nothing to compare:
- * under two readings, or the room was switched off during it. */
+/** One earlier grow-day of a zone, to compare today with. Null when there is nothing to draw:
+ * under two readings. A room switched off during it still draws its line, marked `roomOff`. */
 export function dayTrace(
   rows: TimelineRows,
   ids: { vwc: string | null; valve: string | null; active: string | null },
@@ -398,9 +412,9 @@ export function dayTrace(
   const points = smoothRecorded(readings(ids.vwc ? rows[ids.vwc] : [], day.start, day.end)).map(
     (point) => ({ ...point, hour: (point.time - day.start) / 3_600_000 }),
   );
-  if (off || points.length < 2) return null;
+  if (points.length < 2) return null;
   const shots = ids.valve ? valveShots(rows[ids.valve], [], zoneId, day.start, day.end) : [];
-  return { day, points, shots };
+  return off ? { day, points, shots, roomOff: true } : { day, points, shots };
 }
 
 /** The room's setup revision in force at `time`, from its descriptor's recorded attributes. A
@@ -417,7 +431,7 @@ export function revisionAt(rows: TimelineRow[] = [], time: number): number | nul
 
 /** The week before `day` as the room lived it, from the rows of `earlierEntities`: each grow-day
  * cut at the lights-on recorded in force then (`hours` where none was recorded), every zone's
- * trace of each day (null where there is nothing to compare), and the setup revision as each day
+ * trace of each day (null where there is nothing to draw), and the setup revision as each day
  * began. */
 export function earlierTraces(
   rows: TimelineRows,
@@ -579,7 +593,11 @@ export function compareDays(
 }
 
 export type TargetKey =
-  "dryback_target" | "p1_target_vwc" | "p2_vwc_threshold" | "p3_emergency_vwc_threshold";
+  | "dryback_target"
+  | "p1_target_vwc"
+  | "p2_vwc_threshold"
+  | "p3_emergency_vwc_threshold"
+  | "field_capacity";
 const PHASE_TARGET: Record<string, TargetKey> = {
   P0: "dryback_target",
   P1: "p1_target_vwc",

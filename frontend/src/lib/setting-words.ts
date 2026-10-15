@@ -8,16 +8,8 @@
  * these numbers), not what the setting was meant for: change a line only together with that code.
  */
 
-/** Which way a level acts, shown as a small tag before its name. */
+/** Which way a level acts. */
 export type SettingTag = "fills" | "waters" | "dries" | "rescues" | "ceiling" | "time";
-export const TAG_TEXT: Record<SettingTag, string> = {
-  fills: "fills up to",
-  waters: "waters below",
-  dries: "dries by",
-  rescues: "rescues below",
-  ceiling: "ceiling",
-  time: "time limit",
-};
 
 export interface SettingWords {
   label: string;

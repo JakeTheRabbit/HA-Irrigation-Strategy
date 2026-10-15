@@ -1,0 +1,62 @@
+/* The tank's level and what moved it, in the zone Today chart's language: its key, tooltip,
+   gridlines, shot dots and events list come from day-timeline.css. The level wears the tank card's
+   water colour; filling and recorded fills the chart's green. */
+.tank-level .panel-heading {
+  flex-wrap: wrap;
+}
+.tank-level .level-track {
+  fill: var(--muted);
+}
+.tank-level .level-run {
+  fill: var(--primary);
+}
+.tank-level .level-run[data-run="filling"] {
+  fill: var(--gd-veg);
+}
+.tank-level .level-area {
+  fill: var(--primary);
+  fill-opacity: 0.14;
+}
+.tank-level .level-line {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.tank-level .level-fill-line {
+  stroke: var(--gd-veg);
+  stroke-width: 1.4;
+  stroke-dasharray: 4 3;
+}
+.tank-level .level-fill-mark {
+  fill: var(--gd-veg);
+  stroke: var(--surface);
+  stroke-width: 1;
+}
+.tank-level .key-level {
+  border-top: 2px solid var(--primary);
+}
+.tank-level .key-pump,
+.tank-level .key-filling {
+  height: 8px !important;
+  border-radius: 2px;
+  background: var(--primary);
+}
+.tank-level .key-filling {
+  background: var(--gd-veg);
+}
+.tank-level .key-fill {
+  width: 0 !important;
+  height: 12px !important;
+  border-left: 2px dashed var(--gd-veg);
+}
+.tank-level .tank-level-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--muted-foreground);
+}
+.tank-level .tank-history-note,
+.tank-level .tank-history-caption {
+  margin-top: 8px;
+}

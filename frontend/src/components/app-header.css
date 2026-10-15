@@ -1,0 +1,199 @@
+/* The top bar (its box: styles.css): rooms on the left, then the data's age, the recent records,
+   refresh and the safety switches. */
+.room-chips {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+}
+.room-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  max-width: 280px;
+  height: 32px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.room-chip[aria-pressed="true"] {
+  border-color: color-mix(in srgb, var(--foreground) 35%, var(--border));
+  background: var(--muted);
+  color: var(--foreground);
+  cursor: default;
+}
+.room-chip:not([aria-pressed="true"]):hover {
+  background: var(--muted);
+}
+.room-chip-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.room-chip[data-tone="holding"] .room-chip-dot {
+  background: var(--success);
+}
+.room-chip[data-tone="watering"] .room-chip-dot {
+  background: var(--primary);
+}
+.room-chip[data-tone="stopped"] .room-chip-dot,
+.room-chip[data-tone="stale"] .room-chip-dot {
+  background: var(--destructive);
+}
+.room-chip-words {
+  display: inline-flex;
+  gap: 6px;
+  min-width: 0;
+}
+.room-chip-name {
+  font-weight: 600;
+}
+.room-chip-state {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.room-chip-state::before {
+  content: "·";
+  margin-right: 6px;
+  color: var(--muted-foreground);
+}
+.room-chip[data-tone="stopped"] .room-chip-state,
+.room-chip[data-tone="stale"] .room-chip-state {
+  color: var(--destructive);
+  font-weight: 600;
+}
+.demo-pill {
+  padding: 1px 9px;
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--surface));
+  border-radius: 999px;
+  background: var(--warning-bg);
+  color: var(--warning);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.data-age {
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.data-age[data-age="amber"] {
+  color: var(--warning);
+  font-weight: 600;
+}
+.data-age[data-age="red"] {
+  color: var(--destructive);
+  font-weight: 600;
+}
+/* The two safety switches: what each is now, a click away from its confirmation. */
+.safety-switches {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 10px;
+  border-left: 1px solid var(--border);
+}
+.safety-switch {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 550;
+  white-space: nowrap;
+}
+.safety-switch:not(:disabled):hover {
+  background: var(--muted);
+}
+.safety-switch:disabled {
+  color: var(--muted-foreground);
+}
+.safety-switch > svg {
+  color: var(--muted-foreground);
+}
+.safety-switch-dot {
+  width: 7px;
+  height: 7px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.safety-switch[data-state="on"] .safety-switch-dot {
+  background: var(--success);
+}
+.safety-switch[data-safety="watering"][data-state="off"] {
+  border-color: color-mix(in srgb, var(--destructive) 45%, var(--border));
+  color: var(--destructive);
+}
+.safety-switch[data-safety="watering"][data-state="off"] .safety-switch-dot {
+  background: var(--destructive);
+}
+@media (max-width: 1200px) {
+  .room-chip {
+    max-width: 220px;
+  }
+}
+/* A phone: the selected room in words, the others as dots; the switches as icons with their dot. */
+@media (max-width: 720px) {
+  .room-chips {
+    gap: 4px;
+  }
+  .room-chip {
+    height: 30px;
+    padding: 0 9px;
+    font-size: var(--text-xs);
+  }
+  .room-chip:not([aria-pressed="true"]) {
+    padding: 0 8px;
+  }
+  .room-chip:not([aria-pressed="true"]) .room-chip-words {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  /* Recent records and refresh stay a menu away (History; the page keeps itself current), and the
+     menu's footer says the demo is one. */
+  .topbar .connection-info > [aria-label="Recent activity"],
+  .topbar .connection-info > [aria-label="Refresh controller data"],
+  .topbar .wide-only,
+  .demo-pill {
+    display: none;
+  }
+  .data-age {
+    font-size: var(--text-xs);
+  }
+  .safety-switches {
+    gap: 4px;
+    padding-left: 6px;
+  }
+  .safety-switch {
+    height: 30px;
+    padding: 0 7px;
+    gap: 4px;
+  }
+  .safety-switch-text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+}

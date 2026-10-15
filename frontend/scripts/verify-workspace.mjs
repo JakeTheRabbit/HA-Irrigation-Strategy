@@ -64,18 +64,34 @@ async function fresh(route) {
   target.hash = "/" + route;
   await page.goto(target.toString(), { waitUntil: "networkidle" });
 }
-async function navigate(label) {
-  await page.locator(".desktop-sidebar").getByRole("button", { name: label, exact: true }).click();
-}
-async function navigateSchedule(target = page) {
+async function navigate(label, target = page) {
   await target
     .locator(".desktop-sidebar")
-    .getByRole("button", { name: "Irrigation plan", exact: true })
+    .getByRole("button", { name: label, exact: true })
     .click();
+}
+/** A view under a menu entry: the entry, then its tab. */
+async function navigateTo(section, view, target = page) {
+  await navigate(section, target);
   await target
-    .getByRole("navigation", { name: "Irrigation plan views" })
-    .getByRole("button", { name: "Schedule", exact: true })
+    .getByRole("navigation", { name: `${section} views` })
+    .getByRole("button", { name: view, exact: true })
     .click();
+}
+/** Plan › Schedule keeps the steering balance, endpoint profiles and recipes one tap down. */
+async function openPlanner(tab = "Steering balance", target = page) {
+  const advanced = target.locator("details.plan-advanced");
+  await visible(advanced);
+  if ((await advanced.getAttribute("open")) === null) await advanced.locator("> summary").click();
+  await target
+    .getByRole("tablist", { name: "Grow planner view" })
+    .getByRole("tab", { name: tab, exact: true })
+    .click();
+  if (tab === "Steering balance") await visible(target.locator("#steering-balance"));
+}
+async function navigateSchedule(target = page) {
+  await navigateTo("Plan", "Schedule", target);
+  await openPlanner("Steering balance", target);
 }
 async function exported() {
   const download = page.waitForEvent("download");
@@ -138,7 +154,7 @@ async function check(name, run) {
   }
 }
 async function pause() {
-  await navigate("Settings");
+  await navigate("Settings & help");
   const pause = page.getByRole("button", { name: "Switch watering off…", exact: true });
   if (await pause.count()) {
     await pause.click();
@@ -259,25 +275,27 @@ async function liveSetup(run) {
 const savedZone = (calls) => calls.findLast((call) => call.action === "setup_save").data.zones[0];
 try {
   await check(
-    "Planning slider changes both plotted VWC and EC; exact day and week edits preserve neighboring days and other zones",
+    "Planning slider changes both the VWC and the EC setpoints; exact day and week edits preserve neighboring days and other zones",
     async () => {
+      // An old address: the grow planner is Plan › Schedule, its balance under Advanced.
       await fresh("grow-plan");
-      await visible(page.locator("#steering-balance"));
+      await openPlanner();
       await page.getByRole("button", { name: "Days", exact: true }).click();
       await page.locator("#preview-grow-day").fill("16");
+      // The balance blends the two endpoints: the setpoints at it, beside the grid.
+      const at = (text) =>
+        page
+          .locator(".plan-cell-table tbody tr")
+          .filter({ hasText: text })
+          .locator(".plan-cell-at")
+          .allInnerTexts();
       const initial = await exported(),
-        oldVwc = await page.locator('[data-planning-line="vwc"]').getAttribute("d"),
-        oldEc = await page
-          .locator('[data-planning-line="ec"]')
-          .evaluateAll((es) => es.map((e) => e.getAttribute("d")));
+        oldVwc = await at("VWC"),
+        oldEc = await at("EC");
+      assert.ok(oldVwc.length && oldEc.length, "VWC and EC setpoints move with the balance");
       await setBalance(90);
-      assert.notEqual(await page.locator('[data-planning-line="vwc"]').getAttribute("d"), oldVwc);
-      assert.notDeepEqual(
-        await page
-          .locator('[data-planning-line="ec"]')
-          .evaluateAll((es) => es.map((e) => e.getAttribute("d"))),
-        oldEc,
-      );
+      assert.notDeepEqual(await at("VWC"), oldVwc);
+      assert.notDeepEqual(await at("EC"), oldEc);
       let plan = await exported();
       assert.equal(block(plan, 1, 16).bias, 90);
       assert.equal(block(plan, 1, 15).bias, block(initial, 1, 15).bias);
@@ -295,8 +313,8 @@ try {
   await check(
     "Typing a balance into a grid cell updates that cell and the slider; preview, Esc, rejection, arrows and Mixed weeks",
     async () => {
-      await fresh("grow-plan");
-      await visible(page.locator("#steering-balance"));
+      await fresh("plan/schedule");
+      await openPlanner();
       const initial = await exported();
       const cell = (zone, unit) =>
         page.getByRole("textbox", {
@@ -390,32 +408,32 @@ try {
   await check(
     "Planner draft guards navigation, hash changes, browser back and selected room; keep editing preserves draft",
     async () => {
-      await fresh("grow-plan");
-      await visible(page.locator("#steering-balance"));
+      await fresh("plan/schedule");
+      await openPlanner();
       await setBalance(83);
       await page
-        .getByRole("navigation", { name: "Irrigation plan views" })
-        .getByRole("button", { name: "Today", exact: true })
+        .getByRole("navigation", { name: "Plan views" })
+        .getByRole("button", { name: "Targets", exact: true })
         .click();
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
-      assert.equal(new URL(page.url()).hash, "#/grow-plan");
+      assert.equal(new URL(page.url()).hash, "#/plan/schedule");
       assert.equal(await page.locator("#steering-balance").inputValue(), "83");
-      await navigate("Overview");
+      await navigate("Today");
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(await page.locator("#steering-balance").inputValue(), "83");
       await page.evaluate(() => (location.hash = "/zones"));
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
-      assert.equal(new URL(page.url()).hash, "#/grow-plan");
+      assert.equal(new URL(page.url()).hash, "#/plan/schedule");
       await page.locator("#desktop-room").selectOption({ label: "Flower 1" });
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(await page.locator("#desktop-room").inputValue(), "room:");
-      await navigate("Overview");
+      await navigate("Today");
       await page.getByRole("button", { name: "Discard and continue" }).click();
-      await visible(page.getByRole("heading", { level: 1, name: / overview$/ }));
+      await visible(page.getByRole("heading", { level: 1, name: / today$/ }));
       await navigateSchedule();
       assert.notEqual(await page.locator("#steering-balance").inputValue(), "83");
       await setBalance(81);
@@ -425,53 +443,49 @@ try {
       assert.equal(await page.locator("#steering-balance").inputValue(), "81");
     },
   );
-  await check(
-    "Endpoint profile edits, duplicate, local curve handle and save/arm/disarm lifecycle",
-    async () => {
-      await fresh("grow-plan");
-      await visible(page.locator("#steering-balance"));
-      await page.getByRole("tab", { name: "Endpoint profiles" }).click();
-      await page.getByRole("button", { name: "Duplicate profile" }).click();
-      await page.locator("#profile-name").fill("Verification profile");
-      await page.locator("#vegetative-p1_target_vwc").fill("66");
-      await page.locator("#generative-p1_target_vwc").fill("62");
-      await page.getByRole("tab", { name: "Schedule & curve" }).click();
-      const handle = page.getByRole("slider", { name: "Maintenance shot when below", exact: true });
-      const before = Number(await handle.getAttribute("aria-valuenow"));
-      await handle.focus();
-      await handle.press("ArrowUp");
-      assert.ok(Number(await handle.getAttribute("aria-valuenow")) > before);
-      const plan = await exported(),
-        profile = plan.profiles.find((p) => p.name === "Verification profile");
-      assert.equal(profile.vegetative.p2_vwc_threshold, profile.generative.p2_vwc_threshold);
-      assert.equal(profile.vegetative.p1_target_vwc, 66);
-      await page.getByRole("button", { name: "Review & save", exact: true }).click();
-      await visible(page.getByRole("heading", { name: "Review grow plan", exact: true }));
-      assert.match(await page.getByRole("dialog").innerText(), /Flower 2 only/);
-      await page.getByRole("button", { name: "Save draft", exact: true }).click();
-      await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
-      assert.equal(
-        await page.getByRole("button", { name: "Arm plan", exact: true }).isEnabled(),
-        true,
-      );
-      await page.getByRole("button", { name: "Arm plan", exact: true }).click();
-      await page.getByRole("button", { name: "Arm for next lights-on", exact: true }).click();
-      await visible(page.getByRole("button", { name: "Disarm plan", exact: true }));
-      assert.equal(await page.locator("#steering-balance").isDisabled(), true);
-      const gridCell = page.getByRole("textbox", {
-        name: "Zone 1, week 2, steering balance percent generative",
-      });
-      assert.equal(await gridCell.isEditable(), false, "An armed plan's grid is read only");
-      await page.getByRole("button", { name: "Disarm plan", exact: true }).click();
-      await page.getByRole("button", { name: "Confirm disarm", exact: true }).click();
-      await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
-      assert.equal(await page.locator("#steering-balance").isEnabled(), true);
-      assert.equal(await gridCell.isEditable(), true);
-    },
-  );
+  await check("Endpoint profile edits, duplicate and save/arm/disarm lifecycle", async () => {
+    await fresh("plan/schedule");
+    await openPlanner("Endpoint profiles");
+    await page.getByRole("button", { name: "Duplicate profile" }).click();
+    await page.locator("#profile-name").fill("Verification profile");
+    await page.locator("#vegetative-p1_target_vwc").fill("66");
+    await page.locator("#generative-p1_target_vwc").fill("62");
+    // The same value at both endpoints: a target the balance does not move.
+    await page.locator("#vegetative-p2_vwc_threshold").fill("57");
+    await page.locator("#generative-p2_vwc_threshold").fill("57");
+    const plan = await exported(),
+      profile = plan.profiles.find((p) => p.name === "Verification profile");
+    assert.equal(profile.vegetative.p2_vwc_threshold, profile.generative.p2_vwc_threshold);
+    assert.equal(profile.vegetative.p1_target_vwc, 66);
+    assert.equal(profile.generative.p1_target_vwc, 62);
+    await openPlanner("Steering balance");
+    await page.getByRole("button", { name: "Review & save", exact: true }).click();
+    await visible(page.getByRole("heading", { name: "Review grow plan", exact: true }));
+    assert.match(await page.getByRole("dialog").innerText(), /Flower 2 only/);
+    await page.getByRole("button", { name: "Save draft", exact: true }).click();
+    await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
+    assert.equal(
+      await page.getByRole("button", { name: "Arm plan", exact: true }).isEnabled(),
+      true,
+    );
+    await page.getByRole("button", { name: "Arm plan", exact: true }).click();
+    await page.getByRole("button", { name: "Arm for next lights-on", exact: true }).click();
+    await visible(page.getByRole("button", { name: "Disarm plan", exact: true }));
+    assert.equal(await page.locator("#steering-balance").isDisabled(), true);
+    const gridCell = page.getByRole("textbox", {
+      name: "Zone 1, week 2, steering balance percent generative",
+    });
+    assert.equal(await gridCell.isEditable(), false, "An armed plan's grid is read only");
+    await page.getByRole("button", { name: "Disarm plan", exact: true }).click();
+    await page.getByRole("button", { name: "Confirm disarm", exact: true }).click();
+    await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
+    assert.equal(await page.locator("#steering-balance").isEnabled(), true);
+    assert.equal(await gridCell.isEditable(), true);
+  });
   await check(
     "Setup room-change discard resets selected configuration and stale draft",
     async () => {
+      // An old address: Rooms & setup is Equipment › Setup.
       await fresh("setup");
       await visible(page.locator("#room-name"));
       await page.locator("#room-name").fill("Must be discarded");
@@ -485,10 +499,10 @@ try {
   await check(
     "Setup maps a new zone, saves sizing, archives/restores the stable zone ID, and retains other room mappings",
     async () => {
-      await fresh("grow-plan");
-      await visible(page.locator("#steering-balance"));
+      await fresh("plan/schedule");
+      await openPlanner();
       await pause();
-      await navigate("Rooms & setup");
+      await navigateTo("Equipment", "Setup");
       await visible(page.locator("#room-name"));
       await page.getByRole("button", { name: "Add zone", exact: true }).click();
       await page.getByRole("button", { name: "Map Zone 4 valve", exact: true }).click();
@@ -532,7 +546,6 @@ try {
       );
       assert.equal(await page.locator("#zone-1-plant_count").inputValue(), "36");
       await navigateSchedule();
-      await visible(page.locator("#steering-balance"));
       await page.getByRole("button", { name: "Update zones from setup", exact: true }).click();
       assert.equal(
         await page.locator(".calendar-label").filter({ hasText: "Zone 4" }).count(),
@@ -810,8 +823,8 @@ try {
   await check(
     "Grow plan and setup are accessible and fit 390px with keyboard reachable mappings",
     async () => {
-      await fresh("grow-plan");
-      await visible(page.locator("#steering-balance"));
+      await fresh("plan/schedule");
+      await openPlanner();
       await axe("grow-plan-desktop");
       await page.setViewportSize({ width: 390, height: 844 });
       await noOverflow();
@@ -819,7 +832,7 @@ try {
       await page.locator("#steering-balance").press("ArrowRight");
       await page.screenshot({ path: out + "workspace-grow-mobile.png", fullPage: true });
       await axe("grow-plan-mobile");
-      await fresh("setup");
+      await fresh("equipment/setup");
       await visible(page.locator("#room-name"));
       await noOverflow();
       await axe("setup-mobile");
@@ -1059,7 +1072,7 @@ try {
       lp.on("pageerror", (e) => pageErrors.push(e.message));
       try {
         await lp.goto(origin + "/dashboard.html?room=f1#/grow-plan");
-        await visible(lp.locator("#steering-balance"));
+        await openPlanner("Steering balance", lp);
         await lp.locator("#steering-balance").fill("80");
         await lp.getByRole("button", { name: "Review & save", exact: true }).click();
         failSave = true;
@@ -1120,7 +1133,7 @@ try {
         document.status = "error";
         document.error = "Fixture invalid snapshot";
         await lp.reload();
-        await visible(lp.locator("#steering-balance"));
+        await openPlanner("Steering balance", lp);
         assert.equal(await lp.locator("#steering-balance").isDisabled(), true);
         assert.equal(await lp.getByRole("button", { name: "Arm plan", exact: true }).count(), 0);
         assert.equal(
@@ -1141,41 +1154,40 @@ try {
             },
           ],
         });
-        await lp
-          .locator(".desktop-sidebar")
-          .getByRole("button", { name: "Overview", exact: true })
-          .click();
+        await navigate("Today", lp);
         await lp.getByRole("button", { name: "Refresh controller data" }).click();
-        await visible(lp.getByText("Grow plan controls this room", { exact: true }));
-        const targetCell = lp
-          .locator(".zone-table-desktop tbody tr")
-          .first()
-          .locator("td")
-          .filter({ hasText: "Plan · threshold" });
-        assert.match(await targetCell.innerText(), /77/);
+        // Today's line has a note for it; opened, it says the grow plan controls the room.
+        await lp.locator(".today-alerts").click();
+        await visible(
+          lp
+            .locator(".today-alert-list")
+            .getByText("Grow plan controls this room.", { exact: true }),
+        );
+        // The zone's page shows the plan's targets, not the numbers kept for after it.
+        await lp.evaluate(() => (location.hash = "#/zone/1"));
+        const targets = lp.locator(".zone-targets");
+        await visible(targets.getByText("Set by the armed grow plan", { exact: true }));
+        const rewater = targets.locator("tr").filter({ hasText: "Re-water point" });
+        assert.match(await rewater.innerText(), /77/);
         const mutations = () =>
           apiCalls.filter(
             (call) => !["setup_read", "strategy_get", "strategy_preview"].includes(call.action),
           );
         const writesBeforeToday = structuredClone(mutations());
-        await lp
-          .locator(".desktop-sidebar")
-          .getByRole("button", { name: "Irrigation plan", exact: true })
-          .click();
-        await visible(lp.getByRole("heading", { name: "Today’s targets", exact: true }));
-        await visible(lp.getByText("Active schedule · read only", { exact: true }));
+        await navigate("Plan", lp);
+        await visible(lp.getByRole("heading", { name: "Targets", exact: true }));
+        await visible(lp.getByText("Armed grow plan · read only", { exact: true }));
         await visible(lp.getByRole("link", { name: "Open schedule", exact: true }));
-        const activeTargets = lp.locator(".settings-group").filter({
-          has: lp.getByRole("heading", { name: "Active scheduled targets", exact: true }),
-        });
-        const scheduledVwc = activeTargets
-          .locator(".setting-field")
-          .filter({ hasText: /maintenance shot when below/i });
-        const scheduledEc = activeTargets
-          .locator(".setting-field")
-          .filter({ hasText: /substrate ec target, p2/i });
-        assert.equal((await scheduledVwc.locator("strong").innerText()).trim(), "77");
-        assert.equal((await scheduledEc.locator("strong").innerText()).trim(), "4.2 mS/cm");
+        const activeTargets = lp.locator(".targets-panel");
+        const scheduled = (phase, label) =>
+          activeTargets
+            .locator("tbody")
+            .filter({ has: lp.locator(`.pill[data-phase="${phase}"]`) })
+            .locator("tr")
+            .filter({ hasText: label })
+            .locator("strong");
+        assert.equal((await scheduled("P2", "Re-water point").innerText()).trim(), "77");
+        assert.match((await scheduled("P2", "EC target").innerText()).trim(), /^4\.20?$/);
         assert.equal(await lp.locator('input[id^="setting-"], select[id^="choice-"]').count(), 0);
         assert.equal(
           await lp.getByRole("button", { name: "Review changes", exact: true }).isDisabled(),
@@ -1196,25 +1208,27 @@ try {
             { exact: true },
           ),
         );
-        assert.equal(await activeTargets.locator(".setting-field").count(), 0);
+        assert.ok(
+          (await activeTargets.locator(".targets-table strong").allInnerTexts()).every(
+            (text) => !/\d/.test(text),
+          ),
+          "An expired schedule shows no target values",
+        );
         assert.equal(await lp.locator('input[id^="setting-"], select[id^="choice-"]').count(), 0);
         assert.deepEqual(
           mutations(),
           writesBeforeToday,
           "An expired schedule must not enable fallback writes",
         );
-        await lp
-          .locator(".desktop-sidebar")
-          .getByRole("button", { name: "Overview", exact: true })
-          .click();
+        // Today says so first, as a critical line; the zone's page shows no stale numbers.
+        await navigate("Today", lp);
         await lp.getByRole("button", { name: "Refresh controller data" }).click();
-        await visible(lp.getByText("Grow plan snapshot unavailable", { exact: true }));
-        assert.doesNotMatch(await targetCell.innerText(), /77|54/);
+        await visible(lp.locator(".today-critical").getByText("Grow plan snapshot unavailable."));
+        await lp.evaluate(() => (location.hash = "#/zone/1"));
+        await visible(rewater);
+        assert.doesNotMatch(await rewater.innerText(), /77|54/);
         await lp.screenshot({ path: out + "workspace-stale-plan.png", fullPage: true });
-        await lp
-          .locator(".desktop-sidebar")
-          .getByRole("button", { name: "Rooms & setup", exact: true })
-          .click();
+        await navigateTo("Equipment", "Setup", lp);
         await visible(lp.locator("#room-name"));
         await lp.locator("#room-name").fill("Flower 1 verified");
         await lp.getByRole("button", { name: "Review configuration", exact: true }).click();
@@ -1256,7 +1270,7 @@ try {
         await tp.goto(origin + "/workspace-theme-parent.html");
         const frame = tp.frames().find((f) => f !== tp.mainFrame());
         assert.ok(frame);
-        await visible(frame.getByRole("heading", { level: 1, name: / overview$/ }));
+        await visible(frame.getByRole("heading", { level: 1, name: / today$/ }));
         await frame.waitForFunction(
           () =>
             document.documentElement.dataset.themeSource === "home-assistant" &&
@@ -1288,30 +1302,21 @@ try {
           path: fileURLToPath(new URL("../../img/operator-dashboard.png", import.meta.url)),
         });
         await navigateSchedule(frame);
-        await visible(frame.locator("#steering-balance"));
-        assert.equal(await frame.locator('[data-planning-cadence="p1"]').count(), 1);
-        const panel = frame
-          .locator(".workspace-card")
-          .filter({ has: frame.locator(".planning-curve") });
+        // The flower by stage leads the schedule; the balance grid is under Advanced.
+        const panel = frame.locator(".grow-stages");
         await tp.evaluate(() => (document.querySelector("iframe").style.height = "3000px"));
         await panel.screenshot({
           path: fileURLToPath(new URL("../../img/grow-plan.png", import.meta.url)),
         });
         await tp.evaluate(() => (document.querySelector("iframe").style.height = "100vh"));
         await tp.screenshot({ path: out + "workspace-ha-native-dark.png", fullPage: true });
-        await frame
-          .locator(".desktop-sidebar")
-          .getByRole("button", { name: "Rooms & setup", exact: true })
-          .click();
+        await navigateTo("Equipment", "Setup", frame);
         await visible(frame.locator("#setup-room"));
         await tp.screenshot({
           path: fileURLToPath(new URL("../../img/rooms-setup.png", import.meta.url)),
         });
-        await frame
-          .locator(".desktop-sidebar")
-          .getByRole("button", { name: "Overview", exact: true })
-          .click();
-        await visible(frame.getByRole("heading", { level: 1, name: / overview$/ }));
+        await navigate("Today", frame);
+        await visible(frame.getByRole("heading", { level: 1, name: / today$/ }));
         await tp.setViewportSize({ width: 390, height: 844 });
         await tp.screenshot({
           path: fileURLToPath(new URL("../../img/mobile-overview.png", import.meta.url)),
@@ -1331,10 +1336,7 @@ try {
               .getPropertyValue("--ha-native-canvas")
               .trim() === "#fafafa",
         );
-        await frame
-          .locator(".desktop-sidebar")
-          .getByRole("button", { name: "Settings", exact: true })
-          .click();
+        await navigate("Settings & help", frame);
         await frame.getByRole("button", { name: "Light", exact: true }).click();
         await frame.waitForFunction(
           () => document.documentElement.dataset.themeSource === "override",

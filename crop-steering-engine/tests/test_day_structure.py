@@ -27,7 +27,7 @@ def test_the_reason_is_still_the_same_text_and_now_says_which_rule_fired():
         (dict(phase="P2", vwc=55, ec=10, feed_ec=3), {}, "flush_high_ec"),
         (dict(phase="P0", vwc=50, ec=6, feed_ec=3, dryback_pct=5), dict(ec_target_p0=2, max_ec=12), "p0_ec_flush"),
         (dict(phase="P1", vwc=50, minutes_since_shot=20), {}, "p1_ramp"),
-        (dict(phase="P1", vwc=66, ec=8, feed_ec=3, minutes_since_shot=20), dict(max_ec=12), "p1_flush"),
+        (dict(phase="P1", vwc=66, minutes_since_shot=20), {}, "p1_extra"),
         (dict(phase="P2", vwc=40, ec=8.5, feed_ec=3), {}, "p2_rescue"),
         (dict(phase="P2", vwc=55, ec=7.5, feed_ec=3, minutes_since_shot=30), {}, "p2_dilute"),
         (dict(phase="P2", vwc=40), {}, "p2_topup"),
@@ -44,7 +44,7 @@ def test_every_firing_rule_has_its_kind_and_the_documented_exemption(snap, param
 
 def test_the_exemptions_are_the_agreed_ones():
     exempt = {kind for kind, yes in CAP_EXEMPT.items() if yes}
-    assert exempt == {"flush_high_ec", "p1_ramp", "p2_rescue", "p3_emergency", "watchdog"}
+    assert exempt == {"flush_high_ec", "p1_ramp", "p1_extra", "p2_rescue", "p3_emergency", "watchdog"}
 
 
 @pytest.mark.parametrize(
@@ -64,14 +64,14 @@ def test_a_shot_that_does_not_fire_says_why_and_is_never_exempt(snap, params, ki
 # ---------------------------------------------------------------------------
 # The daily budget: routine and EC-correction shots stop at it, rescues and the ramp do not
 # ---------------------------------------------------------------------------
-def test_a_p1_flush_is_not_a_rescue_and_stops_at_the_budget():
-    # Two ramp shots short of the configured minimum, so P1 cannot complete yet: the EC flush at the
-    # ceiling is what would fire, and it no longer counts as an emergency because its text says "flush".
-    result = decide(
-        S(phase="P1", vwc=66, ec=8, feed_ec=3, minutes_since_shot=20, shot_count=2, daily_vol=300),
-        P(max_ec=12, p1_min_shots=4),
-    )
-    assert result[0] == "P1" and result[2] is False and kind_of(result) == "block_daily_cap"
+def test_a_p1_extra_shot_runs_over_the_budget_like_the_ramp():
+    # At the ceiling the shot due is the extra one. Like the ramp it is bounded by p1_max_shots and its size, so a
+    # spent budget does not stop it (the capped P1 EC flush it replaced did stop there).
+    snap = dict(phase="P1", vwc=66, minutes_since_shot=20, shot_count=4, daily_vol=300)
+    first = decide(S(**snap), P())
+    again = decide(S(**snap, peak_vwc=66.5, p1_extra_shots=1, p1_peak_before_shot=66), P())  # it rose 0.5
+    for result in (first, again):
+        assert result[0] == "P1" and result[2] is True and kind_of(result) == "p1_extra" and result[4].cap_exempt
 
 
 @pytest.mark.parametrize(
@@ -115,12 +115,14 @@ def test_the_p1_ramp_runs_in_full_over_the_budget_and_ends_at_max_shots():
     assert done[0] == "P2" and "max shots" in done[4]
 
 
-def test_p1_at_the_ceiling_held_open_only_by_ec_completes_once_the_budget_is_spent():
-    base = dict(phase="P1", vwc=62, ec=8, feed_ec=3, minutes_since_shot=20, shot_count=6)
-    under = decide(S(**base, daily_vol=100), P(max_ec=12))
-    assert under[0] == "P1" and under[2] and kind_of(under) == "p1_flush"
-    over = decide(S(**base, daily_vol=300), P(max_ec=12))
-    assert over[0] == "P2" and "P1 complete at ceiling; EC flush over daily budget" in over[4]
+def test_at_the_ceiling_neither_pore_ec_nor_a_spent_budget_ends_p1():
+    # P1 used to hand over at its ceiling on pore EC back in band, or on a spent budget with the EC still high.
+    # Neither counts now: in band, high, or high over budget, P1 ends only once the extra shot raised the peak < 0.5.
+    base = dict(phase="P1", vwc=62, peak_vwc=62, feed_ec=3, minutes_since_shot=20, shot_count=6)
+    for ec, daily_vol in ((5, 100), (8, 100), (8, 300)):
+        assert decide(S(**base, ec=ec, daily_vol=daily_vol), P(max_ec=12))[0] == "P1"
+        full = decide(S(**base, ec=ec, daily_vol=daily_vol, p1_extra_shots=1, p1_peak_before_shot=61.8), P(max_ec=12))
+        assert full[0] == "P2" and "P1 full: the last shot raised the peak 0.2 (< 0.5)" in full[4]
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +147,8 @@ def test_the_p0_ec_flush_is_gated_like_every_other_flush():
     base = dict(phase="P0", vwc=50, ec=6, feed_ec=3, dryback_pct=5)
     assert decide(S(**base), p)[2] is True
     assert decide(S(**{**base, "feed_ec": 8}), p)[2] is False  # feed saltier than the slab
-    assert decide(S(**{**base, "vwc": 69}), p)[2] is False  # slab already full
+    assert decide(S(**{**base, "vwc": 69}), p)[2] is True  # a full slab is where a flush works
+    assert decide(S(**{**base, "backed_up": True}), p)[2] is False  # the table is not draining
     assert decide(S(**{**base, "minutes_since_shot": 3}), p)[2] is False  # a flush just went in
 
 
@@ -166,12 +169,16 @@ def test_the_new_grow_day_reset_needs_the_lights_on_and_a_new_day():
 # ---------------------------------------------------------------------------
 # Settled pore EC
 # ---------------------------------------------------------------------------
-def test_22_sep_p1_at_the_ceiling_hands_over_on_the_settled_ec_not_the_ramp_transient():
+def test_22_sep_the_ramp_transient_no_longer_holds_p1_at_the_ceiling():
+    # 22 Sep: a raw 7.4 just after a ramp shot (the feed front; settled 4.5) kept P1 flushing into runoff. Pore EC,
+    # raw or settled, no longer decides when P1 ends; the settled reading still sizes the extra shot.
     snap = dict(phase="P1", vwc=61, ec=7.4, feed_ec=3, minutes_since_shot=16, shot_count=6)
     raw_only = decide(S(**snap), P(max_ec=12))
-    assert raw_only[0] == "P1"  # the transient kept the ramp flushing into runoff
     settled = decide(S(**snap, ec_settled=4.5), P(max_ec=12))
-    assert settled[0] == "P2" and "EC ok 4.5" in settled[4]
+    assert raw_only[0] == settled[0] == "P1" and raw_only[4].kind == settled[4].kind == "p1_extra"
+    assert (raw_only[3], settled[3]) == (7.5, 5.0)  # 1.5x on the transient, unscaled on the settled value
+    full = dict(snap, peak_vwc=61.2, p1_extra_shots=1, p1_peak_before_shot=61)
+    assert decide(S(**full), P(max_ec=12))[0] == decide(S(**full, ec_settled=4.5), P(max_ec=12))[0] == "P2"
 
 
 def test_every_ec_rule_reads_the_settled_value_when_there_is_one():
@@ -196,15 +203,16 @@ def test_a_correction_judged_on_a_held_settled_value_waits_for_the_next_settled_
     rescue = dict(phase="P2", vwc=40, ec=5, ec_settled=8.5, feed_ec=3)
     assert decide(S(**rescue, minutes_since_shot=20), P())[4].kind == "p2_topup"
     assert decide(S(**rescue, minutes_since_shot=50), P())[4].kind == "p2_rescue"
-    # and the P1 flush at the ceiling waits too, while the ramp itself does not
-    flush = dict(phase="P1", vwc=62, ec=5, ec_settled=8, feed_ec=3, shot_count=3)
-    assert decide(S(**flush, minutes_since_shot=20), P(max_ec=12))[2] is False
-    assert decide(S(**flush, minutes_since_shot=50), P(max_ec=12))[4].kind == "p1_flush"
-    assert decide(S(**{**flush, "vwc": 50}, minutes_since_shot=20), P(max_ec=12))[4].kind == "p1_ramp"
+    # P1's shots are not EC corrections: at the ceiling the extra shot keeps the P1 spacing, as the ramp does
+    p1 = dict(phase="P1", vwc=62, ec=5, ec_settled=8, feed_ec=3, shot_count=3)
+    assert decide(S(**p1, minutes_since_shot=20), P(max_ec=12))[4].kind == "p1_extra"
+    assert decide(S(**{**p1, "vwc": 50}, minutes_since_shot=20), P(max_ec=12))[4].kind == "p1_ramp"
 
 
 def test_without_a_settled_value_the_raw_reading_behaves_exactly_as_before():
     assert decide(S(phase="P2", vwc=55, ec=10, feed_ec=3, minutes_since_shot=12), P())[4].kind == "flush_high_ec"
     held = decide(S(phase="P2", vwc=55, ec=10, feed_ec=3, minutes_since_shot=3), P())
     assert "flush draining (3/10min)" in held[4]
-    assert decide(S(phase="P1", vwc=62, ec=8, feed_ec=3, minutes_since_shot=16), P(max_ec=12))[4].kind == "p1_flush"
+    # P1 at its ceiling fires its extra shot (no flush any more), sized on the raw reading: EC 8 against 5, 2x
+    extra = decide(S(phase="P1", vwc=62, ec=8, feed_ec=3, minutes_since_shot=16), P(max_ec=12))
+    assert extra[4].kind == "p1_extra" and extra[3] == 4.0

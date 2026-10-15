@@ -28,6 +28,9 @@ describe("room tank telemetry", () => {
   });
   it("reads isolated mappings, including pump and recorded fill", () => {
     const states = createDemo(now);
+    // Two rooms' tanks at two levels: each room reads its own.
+    states["sensor.demo_tank_level"].state = "42";
+    states["sensor.demo_f1_tank_level"].state = "72";
     const tank = tankTelemetry(states, room, now);
     expect(tank.level.value).toBe(42);
     expect(tank.pump.on).toBe(true);

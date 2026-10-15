@@ -1,0 +1,30 @@
+{
+ "_about": "F2's controller app options as 3.8.0 saved them in /data/options.json (2 Oct 2026), the TypeSafe key replaced. 3.8.0 had no second route, retries, re-asks or stricter gate, and a 2000-call budget.",
+ "options": {
+  "num_zones": 3,
+  "lights_on_hour": 10,
+  "lights_off_hour": 22,
+  "enable_flag": "input_boolean.f2_control_enabled",
+  "notify_service": "script/crop_steering_push",
+  "notify_min": 30,
+  "instance_name": "Crop Steering",
+  "feed_ec_sensor": "",
+  "feed_ph_sensor": "",
+  "sump_power_sensor": "default=sensor.f2_sump_pump_power",
+  "sump_silent_hours": 3,
+  "hold_entities": [],
+  "substrate_l": 5,
+  "flow_lps": 0.02,
+  "loop_seconds": 60,
+  "rediscover_seconds": 300,
+  "cf_account_id": "",
+  "cf_api_token": "",
+  "cf_gateway_id": "",
+  "typesafe_api_key": "apikey_seeded",
+  "jev_enabled": true,
+  "jev_judges": "all",
+  "jev_daily_calls": 2000,
+  "jev_flower_start": "",
+  "jev_flower_days": 56
+ }
+}

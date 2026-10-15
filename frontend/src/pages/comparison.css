@@ -19,10 +19,17 @@
   line-height: 1.55;
 }
 .comparison-controls,
-.comparison-form {
+.comparison-range {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1rem;
+}
+.comparison-records-link {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.5rem;
 }
 .comparison-page label {
   display: grid;
@@ -56,10 +63,105 @@
   display: grid;
   gap: 0.4rem;
 }
-.comparison-reference {
+.comparison-reference p + p {
+  margin-top: 0.3rem;
+}
+/* The full-resolution chart and the data quality, one tap down. */
+.comparison-more > summary {
+  cursor: pointer;
+  padding: 0.35rem 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+.comparison-more[open] > summary {
+  margin-bottom: 0.6rem;
+}
+.comparison-more-body {
   display: grid;
-  grid-template-columns: minmax(180px, 1fr) 3fr;
-  gap: 1.2rem;
+  gap: 1rem;
+}
+/* By grow week: this run's figure, the compared run's in grey under it. */
+.run-weeks .panel-heading {
+  padding: 0 0 0.8rem;
+  flex-wrap: wrap;
+}
+.rw-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+.rw-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.rw-key i {
+  width: 0.9rem;
+  height: 0.55rem;
+  border-radius: 2px;
+}
+.rw-key-this {
+  background: var(--foreground);
+}
+.rw-key-other {
+  background: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+}
+.rw-differences {
+  margin-bottom: 1rem;
+  padding: 0.8rem 1rem;
+  border-radius: 0.6rem;
+  background: var(--muted);
+}
+.rw-differences h3 {
+  margin-bottom: 0.3rem;
+  font-size: var(--text-sm);
+}
+.rw-differences ul {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  padding-left: 1.1rem;
+  font-size: var(--text-sm);
+}
+.rw-differences p {
+  font-size: var(--text-sm);
+}
+.rw-table th[scope="row"] {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  white-space: nowrap;
+}
+.rw-table th[scope="row"] .pill {
+  margin-left: 0.5rem;
+  vertical-align: 1px;
+}
+.rw-table th[scope="row"] small {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.rw-table td {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.rw-this,
+.rw-other {
+  display: block;
+}
+.rw-this {
+  font-weight: 600;
+}
+.rw-other {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.rw-table tr[data-current] {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
 }
 .comparison-chart svg {
   width: 100%;
@@ -73,8 +175,7 @@
   stroke: var(--border);
   stroke-width: 0.8;
 }
-.comparison-legend,
-.comparison-actions {
+.comparison-legend {
   display: flex;
   flex-wrap: wrap;
   gap: 0.7rem;
@@ -114,54 +215,21 @@
   width: 120px;
   margin-bottom: 0;
 }
-.comparison-run-list h3 .pill {
-  margin-left: 8px;
-  vertical-align: 1px;
-}
-.comparison-record-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 1rem;
-}
-.comparison-form {
-  margin: 1rem 0;
-  grid-template-columns: 2fr 1fr 1fr;
-}
-.comparison-run-list article {
-  display: flex;
-  justify-content: space-between;
-  align-items: start;
-  gap: 1rem;
-  padding: 1rem 0;
-  border-top: 1px solid var(--border);
-  margin-top: 1rem;
-}
-.comparison-run-list details {
-  overflow-wrap: anywhere;
-  margin-top: 0.5rem;
-}
+
 @media (max-width: 850px) {
   .comparison-controls {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
-  .comparison-reference {
-    grid-template-columns: 1fr;
-  }
-  .comparison-form {
-    grid-template-columns: 1fr;
-  }
-  .comparison-run-list article {
-    flex-direction: column;
+  .comparison-range {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 @media (max-width: 520px) {
-  .comparison-controls {
+  .comparison-controls,
+  .comparison-range {
     grid-template-columns: 1fr;
   }
-  .comparison-record-heading {
-    flex-direction: column;
-  }
+
   .comparison-chart svg {
     min-height: 180px;
   }

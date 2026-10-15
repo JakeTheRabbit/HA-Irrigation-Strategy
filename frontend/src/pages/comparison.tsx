@@ -1,17 +1,16 @@
-import { useLayoutEffect, useEffect, useRef, useState } from "react";
-import { Download, RefreshCw, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { ArrowRight, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Heading } from "@/components/dashboard";
-import { Pill } from "@/components/mini-visuals";
+import { Heading, type Page } from "@/components/dashboard";
 import type { Controller } from "@/lib/types";
-import type { HistoryWindow, RunRecord, RunsDocument, RunZone } from "@/lib/comparison-types";
+import type { HistoryWindow, RunsDocument, RunZone } from "@/lib/comparison-types";
 import { addDays, boundedRange, comparisonRange, dateInZone } from "@/lib/comparison";
 import { ComparisonChart, ComparisonSummary, format, type Loaded } from "./comparison-views";
+import { RunWeeks } from "./comparison-weeks";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { buildComparisonTarget } from "@/lib/comparison-target";
 import "./comparison.css";
-type Form = { id?: string; name: string; start_date: string; end_date: string };
 const errorText = (error: unknown) =>
   error instanceof Error ? error.message : "Comparison request failed.";
 const sensorIds = (zone: RunZone) =>
@@ -29,12 +28,16 @@ function liveZone(controller: Controller, id: number): RunZone | null {
       }
     : null;
 }
+
+/** History › Compare runs: is this crop tracking the last good one, and where did it differ, week
+ * by week? The full-resolution chart and the record's quality are one tap down; the run records
+ * themselves are kept in Settings. */
 export function Comparison({
   controller,
-  onDirtyChange,
+  navigate,
 }: {
   controller: Controller;
-  onDirtyChange?: (dirty: boolean) => void;
+  navigate: (page: Page) => void;
 }) {
   const [document, setDocument] = useState<RunsDocument | null>(null),
     [metadataError, setMetadataError] = useState<string | null>(null),
@@ -50,15 +53,12 @@ export function Comparison({
     [refresh, setRefresh] = useState(0),
     [monthly, setMonthly] = useState(false),
     [reference, setReference] = useState("current");
-  const [form, setForm] = useState<Form | null>(null),
-    [saving, setSaving] = useState(false),
-    [formError, setFormError] = useState<string | null>(null);
   const [loaded, setLoaded] = useState<Loaded | null>(null),
     [historyError, setHistoryError] = useState<string | null>(null),
     [loading, setLoading] = useState(false);
+  const [weekNotes, setWeekNotes] = useState<string[]>([]);
   const roomRef = useRef(controller.roomId);
   roomRef.current = controller.roomId;
-  const fileRef = useRef<HTMLInputElement>(null);
   const doc = document?.room_id === controller.roomId ? document : null;
   const currentRun = doc?.runs.find((run) => run.id === currentId) || null,
     previousRun = doc?.runs.find((run) => run.id === previousId) || null;
@@ -75,19 +75,12 @@ export function Comparison({
     : zoneChoices[0]?.zone_id || 0;
   const currentZone = controller.room.zones.find((zone) => zone.id === effectiveZone);
   const runChoices = doc?.runs.filter((run) => archived || !run.archived) || [];
-  useLayoutEffect(() => {
-    onDirtyChange?.(Boolean(form));
-    return () => onDirtyChange?.(false);
-  }, [form, onDirtyChange]);
   useEffect(() => {
     setDocument(null);
     setCurrentId("");
     setPreviousId("");
-    setForm(null);
     setLoaded(null);
-    setFormError(null);
     setZoneId(0);
-    setSaving(false);
     setReference("current");
   }, [controller.roomId]);
   useEffect(() => {
@@ -98,20 +91,17 @@ export function Comparison({
     controller
       .operator<RunsDocument>("runs_get")
       .then((value) => {
-        if (!cancelled) {
-          setDocument(value);
-          setMetadataError(value.error);
-          if (controller.demo && metadataReload === 0) {
-            const current = value.runs.find(
-              (run) => !run.archived && !run.end_date && run.name.startsWith("Demo • current run"),
-            );
-            const previous = value.runs.find(
-              (run) => !run.archived && run.name.startsWith("Demo • previous run"),
-            );
-            setCurrentId((selected) => selected || current?.id || "");
-            setPreviousId((selected) => selected || previous?.id || "");
-          }
-        }
+        if (cancelled) return;
+        setDocument(value);
+        setMetadataError(value.error);
+        // The run in progress, and the latest one before it: what a grower compares first.
+        const open = value.runs.filter((run) => !run.archived);
+        const current = open.find((run) => !run.end_date) ?? open[0];
+        const previous = open
+          .filter((run) => run.id !== current?.id && run.end_date)
+          .sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
+        setCurrentId((selected) => selected || current?.id || "");
+        setPreviousId((selected) => selected || previous?.id || "");
       })
       .catch((error) => {
         if (!cancelled) setMetadataError(errorText(error));
@@ -223,90 +213,6 @@ export function Comparison({
     timeZone,
     refresh,
   ]);
-  async function save() {
-    if (!form || !doc) return;
-    const room = controller.roomId;
-    setSaving(true);
-    setFormError(null);
-    try {
-      const next = await controller.operator<RunsDocument>("runs_save", {
-        record: form,
-        expected_revision: doc.revision,
-      });
-      if (roomRef.current === room) {
-        setDocument(next);
-        if (!form.id)
-          setCurrentId(
-            next.runs.find((run) => !doc.runs.some((old) => old.id === run.id))?.id || "",
-          );
-        setForm(null);
-      }
-    } catch (error) {
-      if (roomRef.current === room) setFormError(errorText(error));
-    } finally {
-      if (roomRef.current === room) setSaving(false);
-    }
-  }
-  async function archiveRun(run: RunRecord) {
-    if (!doc) return;
-    const room = controller.roomId;
-    setSaving(true);
-    setFormError(null);
-    try {
-      const next = await controller.operator<RunsDocument>("runs_archive", {
-        id: run.id,
-        archived: !run.archived,
-        expected_revision: doc.revision,
-      });
-      if (roomRef.current !== room) return;
-      setDocument(next);
-      if (!run.archived) {
-        if (currentId === run.id) {
-          setCurrentId("");
-          setReference("current");
-        }
-        if (previousId === run.id) setPreviousId("");
-      }
-    } catch (error) {
-      if (roomRef.current === room) setFormError(errorText(error));
-    } finally {
-      if (roomRef.current === room) setSaving(false);
-    }
-  }
-  function exportRuns() {
-    if (!doc) return;
-    const url = URL.createObjectURL(
-      new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }),
-    );
-    const link = window.document.createElement("a");
-    link.href = url;
-    link.download = "crop-steering-run-metadata.json";
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-  }
-  async function importRuns(file?: File) {
-    if (!file || !doc) return;
-    const room = controller.roomId;
-    setFormError(null);
-    setSaving(true);
-    try {
-      if (file.size > 2_000_000) throw new Error("Metadata import is limited to 2 MB.");
-      const value = JSON.parse(await file.text());
-      if (roomRef.current !== room) throw new Error("Room changed; import cancelled.");
-      if (value.schema_version !== 1 || value.room_id !== room || !Array.isArray(value.runs))
-        throw new Error("Import a version 1 export for this exact room.");
-      const next = await controller.operator<RunsDocument>("runs_import", {
-        runs: value.runs,
-        expected_revision: doc.revision,
-      });
-      if (roomRef.current === room) setDocument(next);
-    } catch (error) {
-      if (roomRef.current === room) setFormError(errorText(error));
-    } finally {
-      if (roomRef.current === room) setSaving(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
   const savedZone = currentRun?.zones.find((zone) => zone.zone_id === effectiveZone);
   const preview = currentZone
     ? buildSetpointPreview(controller.room, controller.states, effectiveZone, {})
@@ -350,6 +256,12 @@ export function Comparison({
     ...(dailyTarget?.warnings || []),
     ...(reference === "current" ? preview?.issues || [] : []),
   ];
+  const openRecords = () => {
+    navigate("settings");
+    setTimeout(() => window.document.getElementById("run-records")?.scrollIntoView(), 0);
+  };
+  const zoneName =
+    zoneChoices.find((zone) => zone.zone_id === effectiveZone)?.name ?? `Zone ${effectiveZone}`;
   return (
     <div className="comparison-page">
       <Heading
@@ -366,7 +278,7 @@ export function Comparison({
       />
       <section className="panel comparison-controls">
         <label>
-          Current run
+          This run
           <select
             aria-label="Current run"
             value={currentId}
@@ -386,7 +298,7 @@ export function Comparison({
           </select>
         </label>
         <label>
-          Previous run
+          Compare with
           <select
             aria-label="Previous run"
             value={previousId}
@@ -421,67 +333,28 @@ export function Comparison({
             ))}
           </select>
         </label>
-        <label>
-          History range
-          <select
-            aria-label="Comparison history range"
-            value={period}
-            onChange={(event) => setPeriod(event.target.value)}
-          >
-            <option value="day">Day</option>
-            <option value="week">Week · 7 days</option>
-            <option value="month">Calendar month</option>
-            <option value="run" disabled={!currentRun}>
-              Run to date
-            </option>
-            <option value="custom">Custom dates</option>
-          </select>
-        </label>
-        {period === "custom" && (
-          <>
-            <label>
-              From date
-              <Input
-                aria-label="Comparison from date"
-                type="date"
-                value={customStart}
-                onChange={(event) => setCustomStart(event.target.value)}
-              />
-            </label>
-            <label>
-              Through date
-              <Input
-                aria-label="Comparison through date"
-                type="date"
-                value={customEnd}
-                onChange={(event) => setCustomEnd(event.target.value)}
-              />
-            </label>
-          </>
-        )}
-        <label className="comparison-check">
-          <input
-            type="checkbox"
-            checked={archived}
-            onChange={(event) => {
-              setArchived(event.target.checked);
-              if (!event.target.checked) {
-                if (currentRun?.archived) {
-                  setCurrentId("");
-                  setPreviousId("");
+        <div className="comparison-records-link">
+          <label className="comparison-check">
+            <input
+              type="checkbox"
+              checked={archived}
+              onChange={(event) => {
+                setArchived(event.target.checked);
+                if (!event.target.checked) {
+                  if (currentRun?.archived) {
+                    setCurrentId("");
+                    setPreviousId("");
+                  }
+                  if (previousRun?.archived) setPreviousId("");
                 }
-                if (previousRun?.archived) setPreviousId("");
-              }
-            }}
-          />{" "}
-          Include archived run records
-        </label>
-        <p className="small comparison-wide">
-          Calendar: {timeZone}
-          {!doc && !currentRun ? " (browser time zone until run metadata loads)" : ""}. Windows end
-          at the request time; the previous run stops at the same grow age. Run records never enable
-          or arm irrigation.
-        </p>
+              }}
+            />{" "}
+            Include archived run records
+          </label>
+          <Button variant="ghost" size="sm" onClick={openRecords}>
+            Run records <ArrowRight size={15} aria-hidden="true" />
+          </Button>
+        </div>
       </section>
       {metadataLoading && <p role="status">Loading run records…</p>}
       {metadataError && (
@@ -494,20 +367,67 @@ export function Comparison({
       )}
       {doc && !doc.runs.length && (
         <div className="comparison-notice">
-          No runs have been registered for this room. Add a run with its actual start date to
-          compare grow ages. Date-range history works without a run; past Recorder retention cannot
-          be recovered by adding one.
+          <p>
+            No runs are recorded for this room yet. Record this crop and a past one, each with its
+            real start date, to compare them week by week. The chart below works on dates without a
+            run; Recorder history already purged cannot be recovered by adding one.
+          </p>
+          <Button variant="outline" onClick={openRecords}>
+            Record a run
+          </Button>
         </div>
       )}
-      {loading && <p role="status">Loading selected-zone Recorder history…</p>}
-      {historyError && (
-        <p className="comparison-notice" role="alert">
-          {historyError}
-        </p>
-      )}
-      {loaded && (
-        <>
-          <section className="panel comparison-reference">
+      <RunWeeks
+        controller={controller}
+        current={currentRun}
+        previous={previousRun}
+        zoneId={effectiveZone}
+        zoneName={zoneName}
+        refresh={refresh}
+        onNotes={setWeekNotes}
+      />
+      <details className="comparison-more" data-section="chart">
+        <summary>Full-resolution chart, with a target reference</summary>
+        <div className="comparison-more-body">
+          <section className="panel comparison-range">
+            <label>
+              History range
+              <select
+                aria-label="Comparison history range"
+                value={period}
+                onChange={(event) => setPeriod(event.target.value)}
+              >
+                <option value="day">Day</option>
+                <option value="week">Week · 7 days</option>
+                <option value="month">Calendar month</option>
+                <option value="run" disabled={!currentRun}>
+                  Run to date
+                </option>
+                <option value="custom">Custom dates</option>
+              </select>
+            </label>
+            {period === "custom" && (
+              <>
+                <label>
+                  From date
+                  <Input
+                    aria-label="Comparison from date"
+                    type="date"
+                    value={customStart}
+                    onChange={(event) => setCustomStart(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Through date
+                  <Input
+                    aria-label="Comparison through date"
+                    type="date"
+                    value={customEnd}
+                    onChange={(event) => setCustomEnd(event.target.value)}
+                  />
+                </label>
+              </>
+            )}
             <label>
               Target reference
               <select
@@ -522,224 +442,96 @@ export function Comparison({
                 <option value="phase">Current phase reference</option>
               </select>
             </label>
-            <div>
-              <h2>{targetLabel}</h2>
-              <p>
-                {reference === "phase"
-                  ? `VWC ${format(targets.vwc)}% · EC ${format(targets.ec)} mS/cm`
-                  : `P0–P3 VWC / EC illustration · lights ${format(lights.on)} → ${format(lights.off)} h`}
-              </p>
-              <p className="small">
-                {reference === "saved" && currentRun
-                  ? `${savedZone?.reference_source || currentRun.reference_source}. Captured ${new Date(currentRun.captured_at).toLocaleString(undefined, { timeZone: currentRun.time_zone })} (${currentRun.time_zone}). Saved lights on/off: ${format(currentRun.lights.on)} / ${format(currentRun.lights.off)} h.`
-                  : `Current configuration observed ${controller.lastUpdated ? new Date(controller.lastUpdated).toLocaleString() : "at this page snapshot"}; source: ${preview?.source || "selected live zone unavailable"}.`}
-              </p>
-              <p className="small">
-                This is a reference illustration, not the historical targets used during these
-                readings. Registering past dates captures today's reference; editing dates keeps the
-                original capture.
-              </p>
-            </div>
-          </section>
-          <ComparisonChart
-            loaded={loaded}
-            targets={reference === "phase" ? targets : { vwc: null, ec: null }}
-            dailyTarget={dailyTarget}
-            label={targetLabel}
-          />
-          <p className="small">
-            History requested through{" "}
-            {new Date(loaded.end).toLocaleString(undefined, { timeZone: loaded.timeZone })} (
-            {loaded.timeZone}); loaded {new Date(loaded.loadedAt).toLocaleTimeString()}. Use Refresh
-            history to advance this window. Raw retained state changes are summarized before chart
-            downsampling.
-          </p>
-          <label className="comparison-check">
-            <input
-              type="checkbox"
-              checked={monthly}
-              onChange={(event) => setMonthly(event.target.checked)}
-            />{" "}
-            Group recorded ranges by month
-          </label>
-          <ComparisonSummary loaded={loaded} monthly={monthly} />
-        </>
-      )}
-      {!!warnings.length && (
-        <section className="comparison-notice" aria-label="History coverage">
-          <h2>History coverage</h2>
-          {[...new Set(warnings)].map((warning) => (
-            <p key={warning}>{warning}</p>
-          ))}
-          <p>
-            Available samples do not establish complete coverage. Recorder exclusion, outages and
-            retention limits can leave partial history.
-          </p>
-        </section>
-      )}
-      <section className="panel comparison-records">
-        <div className="comparison-record-heading">
-          <div>
-            <h2>Run records</h2>
-            <p className="small">
-              Store up to 100 runs per room, with 1–366 inclusive calendar days per completed run.
-              Metadata export contains no Recorder readings.
-            </p>
-          </div>
-          <Button
-            onClick={() => {
-              setForm({ name: "", start_date: dateInZone(Date.now(), timeZone), end_date: "" });
-              setFormError(null);
-            }}
-            disabled={!doc || !!doc.error || saving || !!form}
-          >
-            <Plus size={15} /> Add run
-          </Button>
-        </div>
-        <div className="comparison-actions">
-          <Button variant="outline" onClick={exportRuns} disabled={!doc}>
-            <Download size={15} /> Export metadata
-          </Button>
-          <Button
-            variant="outline"
-            onClick={() => fileRef.current?.click()}
-            disabled={!doc || !!doc.error || saving || !!form}
-          >
-            Import metadata
-          </Button>
-          <input
-            ref={fileRef}
-            hidden
-            type="file"
-            accept="application/json,.json"
-            aria-label="Import run metadata"
-            onChange={(event) => void importRuns(event.target.files?.[0])}
-          />
-        </div>
-        {form && (
-          <form
-            className="comparison-form"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void save();
-            }}
-          >
-            <label>
-              Run name
-              <Input
-                aria-label="Run name"
-                required
-                maxLength={80}
-                value={form.name}
-                onChange={(event) => setForm({ ...form, name: event.target.value })}
-              />
-            </label>
-            <label>
-              Start date
-              <Input
-                aria-label="Run start date"
-                type="date"
-                required
-                value={form.start_date}
-                onChange={(event) => setForm({ ...form, start_date: event.target.value })}
-              />
-            </label>
-            <label>
-              End date · blank while ongoing
-              <Input
-                aria-label="Run end date"
-                type="date"
-                value={form.end_date}
-                onChange={(event) => setForm({ ...form, end_date: event.target.value })}
-              />
-            </label>
             <p className="small comparison-wide">
-              {form.id
-                ? "Changing the name or dates preserves the original reference, sensors, plants and lights schedule."
-                : "Registration captures this room's configured sensors, plant counts, targets and lights schedule now. Past dates do not imply a historical configuration snapshot."}
+              Calendar: {timeZone}
+              {!doc && !currentRun ? " (browser time zone until run metadata loads)" : ""}. Windows
+              end at the request time; the previous run stops at the same grow age. Run records
+              never enable or arm irrigation.
             </p>
-            <div className="comparison-actions comparison-wide">
-              <Button type="submit" disabled={saving}>
-                {saving ? "Saving…" : "Save run record"}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={saving}
-                onClick={() => setForm(null)}
-              >
-                Cancel
-              </Button>
-            </div>
-          </form>
-        )}
-        {formError && (
-          <p role="alert" className="comparison-notice">
-            {formError}
-          </p>
-        )}
-        <div className="comparison-run-list">
-          {runChoices.map((run) => (
-            <article key={run.id}>
-              <div>
-                <h3>
-                  {run.name}
-                  {run.archived ? (
-                    <Pill tone="neutral">Archived</Pill>
-                  ) : run.end_date ? (
-                    <Pill tone="neutral">Ended</Pill>
-                  ) : (
-                    <Pill dot tone="on">
-                      Ongoing
-                    </Pill>
-                  )}
-                </h3>
-                <p>
-                  {run.start_date} → {run.end_date || "ongoing"} · {run.time_zone}
-                </p>
-                <p className="small">
-                  Reference captured{" "}
-                  {new Date(run.captured_at).toLocaleString(undefined, { timeZone: run.time_zone })}
-                  . {run.reference_source}.
-                </p>
-                <details>
-                  <summary>Registered zones and sensors</summary>
-                  {run.zones.map((zone) => (
-                    <p className="small" key={zone.zone_id}>
-                      {zone.name} · plants at registration: {zone.plant_count ?? "unknown"} · VWC{" "}
-                      {zone.vwc_sensor || "unavailable"} · EC {zone.ec_sensor || "unavailable"}
-                    </p>
-                  ))}
-                </details>
-              </div>
-              <div className="comparison-actions">
-                <Button
-                  variant="outline"
-                  disabled={saving || !!form || !!doc?.error}
-                  onClick={() => {
-                    setForm({
-                      id: run.id,
-                      name: run.name,
-                      start_date: run.start_date,
-                      end_date: run.end_date || "",
-                    });
-                    setFormError(null);
-                  }}
-                >
-                  Edit dates/name
-                </Button>
-                <Button
-                  variant="outline"
-                  disabled={saving || !!form || !!doc?.error}
-                  onClick={() => void archiveRun(run)}
-                >
-                  {run.archived ? "Restore" : "Archive"}
-                </Button>
-              </div>
-            </article>
-          ))}
+          </section>
+          {loading && <p role="status">Loading selected-zone Recorder history…</p>}
+          {historyError && (
+            <p className="comparison-notice" role="alert">
+              {historyError}
+            </p>
+          )}
+          {loaded && (
+            <>
+              <section className="panel comparison-reference">
+                <div>
+                  <h2>{targetLabel}</h2>
+                  <p>
+                    {reference === "phase"
+                      ? `VWC ${format(targets.vwc)}% · EC ${format(targets.ec)} mS/cm`
+                      : `P0–P3 VWC / EC illustration · lights ${format(lights.on)} → ${format(lights.off)} h`}
+                  </p>
+                  <p className="small">
+                    {reference === "saved" && currentRun
+                      ? `${savedZone?.reference_source || currentRun.reference_source}. Captured ${new Date(currentRun.captured_at).toLocaleString(undefined, { timeZone: currentRun.time_zone })} (${currentRun.time_zone}). Saved lights on/off: ${format(currentRun.lights.on)} / ${format(currentRun.lights.off)} h.`
+                      : `Current configuration observed ${controller.lastUpdated ? new Date(controller.lastUpdated).toLocaleString() : "at this page snapshot"}; source: ${preview?.source || "selected live zone unavailable"}.`}
+                  </p>
+                  <p className="small">
+                    This is a reference illustration, not the historical targets used during these
+                    readings. Registering past dates captures today's reference; editing dates keeps
+                    the original capture.
+                  </p>
+                </div>
+              </section>
+              <ComparisonChart
+                loaded={loaded}
+                targets={reference === "phase" ? targets : { vwc: null, ec: null }}
+                dailyTarget={dailyTarget}
+                label={targetLabel}
+              />
+              <p className="small">
+                History requested through{" "}
+                {new Date(loaded.end).toLocaleString(undefined, { timeZone: loaded.timeZone })} (
+                {loaded.timeZone}); loaded {new Date(loaded.loadedAt).toLocaleTimeString()}. Use
+                Refresh history to advance this window. Raw retained state changes are summarized
+                before chart downsampling.
+              </p>
+            </>
+          )}
         </div>
-      </section>
+      </details>
+      <details className="comparison-more" data-section="quality">
+        <summary>Data quality: daily ranges and history coverage</summary>
+        <div className="comparison-more-body">
+          {!!weekNotes.length && (
+            <section className="comparison-notice" aria-label="Where the weekly figures come from">
+              <h2>Where the weekly figures come from</h2>
+              {weekNotes.map((note) => (
+                <p key={note}>{note}</p>
+              ))}
+            </section>
+          )}
+          {loaded && (
+            <>
+              <label className="comparison-check">
+                <input
+                  type="checkbox"
+                  checked={monthly}
+                  onChange={(event) => setMonthly(event.target.checked)}
+                />{" "}
+                Group recorded ranges by month
+              </label>
+              <ComparisonSummary loaded={loaded} monthly={monthly} />
+            </>
+          )}
+          {!!warnings.length && (
+            <section className="comparison-notice" aria-label="History coverage">
+              <h2>History coverage</h2>
+              {[...new Set(warnings)].map((warning) => (
+                <p key={warning}>{warning}</p>
+              ))}
+              <p>
+                Available samples do not establish complete coverage. Recorder exclusion, outages
+                and retention limits can leave partial history.
+              </p>
+            </section>
+          )}
+        </div>
+      </details>
     </div>
   );
 }

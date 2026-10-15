@@ -1,0 +1,10 @@
+/* Jev not answering, a judge failing, or the day's last error: said once, in amber. */
+.jev-trouble {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--warning-bg);
+  color: color-mix(in srgb, var(--warning) 75%, var(--foreground));
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}

@@ -19,10 +19,6 @@ export const WaterViewContext = createContext<{
   setView: (view: WaterView) => Promise<void>;
 }>({ view: "zone", available: false, setView: async () => {} });
 export const useWaterView = () => useContext(WaterViewContext);
-/** What a Water today column or tile is called: the cells then say mL or L, not "per plant". */
-export const waterTodayLabel = (view: WaterView) =>
-  view === "plant" ? "Water today per plant" : "Water today";
-
 /** The selected room's choice, for the whole dashboard; changing it writes the room's select. */
 export function WaterViewProvider({
   controller,

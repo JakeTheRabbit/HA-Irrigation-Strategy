@@ -170,7 +170,7 @@ def _slow_switch_report(monkeypatch, fake, clock, entity, service, lag_s):
     def call(domain, svc, **data):
         if data.get("entity_id") == entity and svc == service:
             fake.calls.append((domain, svc, data))
-            due["at"] = clock.seconds + lag_s
+            due.setdefault("at", clock.seconds + lag_s)  # the first command's report; a repeat changes nothing
             return True
         return real_call(domain, svc, **data)
 
@@ -193,6 +193,37 @@ def test_slow_pump_off_report_does_not_latch_false_fault(rig, monkeypatch):
     assert c._blocked(c.rooms[0], 2) is None
 
 
+def test_a_pump_off_report_ten_seconds_late_does_not_latch(rig, monkeypatch):
+    # Live 2026-09-28 11:18: veg_main_pump reported OFF about 10 s after its turn_off, past the 6 s
+    # read-back, and F2 stayed held until someone cleared it. What still reads on is sent OFF again
+    # and read back once more before any hold.
+    c, fake, clock = rig
+    _slow_switch_report(monkeypatch, fake, clock, "switch.p", "turn_off", 10)
+    c._execute_shot(c.rooms[0], 1, 6, 6)
+    assert c.rooms[0].hardware_fault is None
+    assert c._blocked(c.rooms[0], 2) is None
+    offs = [a for d, s, a in fake.calls if s == "turn_off" and a.get("entity_id") == "switch.p"]
+    assert len(offs) == 2  # the close, and once more to the plug that still read on
+
+
+def test_a_plug_that_missed_the_first_off_obeys_the_second(rig, monkeypatch):
+    c, fake, _clock = rig
+    real_call = controller.ha_call
+    missed = []
+
+    def call(domain, svc, **data):
+        if data.get("entity_id") == "switch.p" and svc == "turn_off" and not missed:
+            missed.append(True)
+            fake.calls.append((domain, svc, data))
+            return True  # accepted and never acted on
+        return real_call(domain, svc, **data)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    c._execute_shot(c.rooms[0], 1, 6, 6)
+    assert fake.states["switch.p"][0] == "off"
+    assert c.rooms[0].hardware_fault is None
+
+
 def test_a_pump_that_never_reports_off_still_latches_and_within_seconds(rig, monkeypatch):
     # Patience for a slow report must not become blindness to a stuck one.
     c, fake, clock = rig
@@ -201,7 +232,8 @@ def test_a_pump_that_never_reports_off_still_latches_and_within_seconds(rig, mon
     c._execute_shot(c.rooms[0], 1, 6, 6)
     assert c.rooms[0].hardware_fault is not None
     assert "hardware" in c._blocked(c.rooms[0], 2).lower()
-    assert clock.seconds - before < 6 + 6 + 10  # the shot, one bounded read-back, and sequencing
+    # The shot, both bounded read-backs, and sequencing: still well inside the minute's loop.
+    assert clock.seconds - before < 6 + controller.CONFIRM_TIMEOUT_S + controller.CONFIRM_RETRY_S + 10
 
 
 def test_fault_survives_restart_and_requires_off_then_verified_recovery(rig, monkeypatch):
@@ -307,6 +339,24 @@ def test_error_cleanup_also_latches_when_hardware_does_not_close(rig, monkeypatc
         monkeypatch.setattr(c, "_wait_shot", fail_wait)
     c._execute_shot(c.rooms[0], 1, 6, 6)
     assert c._blocked(c.rooms[0], 2) is not None
+
+
+def test_a_pump_whose_switch_on_errored_is_switched_off_before_its_alert(rig, monkeypatch):
+    """CS-302: Home Assistant answered the pump's turn_on with an error, but the pump may be on all the same. It
+    is switched off before the alert, whose phone push can take a while, not only in the cleanup after it."""
+    c, fake, _clock = rig
+    steps = []
+
+    def call(domain, service, **data):
+        steps.append((service, data.get("entity_id") or data.get("notification_id")))
+        if (service, data.get("entity_id")) == ("turn_on", "switch.p"):
+            return False
+        return fake.ha_call(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    c._execute_shot(c.rooms[0], 1, 6, 6)
+    card = steps.index(("create", "f2_hw_default_z1"))
+    assert ("turn_off", "switch.p") in steps[steps.index(("turn_on", "switch.p")):card]
 
 
 def test_absent_room_fault_survives_save_and_blocks_shared_hardware_until_rediscovery(rig):

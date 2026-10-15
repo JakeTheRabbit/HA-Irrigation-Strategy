@@ -1,11 +1,18 @@
-import type { HistoryRequest, HistoryWindow, RunsDocument } from "./comparison-types";
+import type { DailyRanges, HistoryRequest, HistoryWindow, RunsDocument } from "./comparison-types";
 import { demoHistoryWindow } from "./comparison-demo";
 import type { TimelineRequest } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
 import { OperatorDemo } from "./operator-demo";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Change, Controller, EntityState, States, WriteResult } from "./types";
-import { applyChanges, asStates, findSession, HaClient, haSessionToken } from "./client";
+import {
+  applyChanges,
+  asStates,
+  findSession,
+  HaClient,
+  haSessionToken,
+  type HassSession,
+} from "./client";
 import {
   buildRoom,
   descriptor,
@@ -17,6 +24,7 @@ import {
 import {
   createDemo,
   demoBeat,
+  demoClock,
   demoDay,
   demoHistory,
   demoReact,
@@ -26,6 +34,7 @@ import {
 import {
   applyEntityUpdate,
   liveConnection,
+  liveDailyStatistics,
   liveHistory,
   liveStatistics,
   watchedEntities,
@@ -33,10 +42,16 @@ import {
   type EntityUpdate,
   type LiveConnection,
 } from "./live";
+import { roomProbeIds } from "./probes";
+import { TANK_KEYS } from "./tank-level";
 import { historySamples, type WaterRecord, type WaterRecordRequest } from "./water-use";
 
 type Listener = () => void;
 const SESSION_KEY = "crop-steering-connection-tab";
+/** Whether Home Assistant's signed-in user is an administrator; null when this page cannot tell
+ * (a standalone tab with a token). */
+const adminOf = (session?: HassSession) =>
+  typeof session?.user?.is_admin === "boolean" ? session.user.is_admin : null;
 export class ControllerStore {
   private listeners = new Set<Listener>();
   private client: HaClient | null = null;
@@ -58,6 +73,7 @@ export class ControllerStore {
   private error: string | null = null;
   private updated: number | null = null;
   private writing = false;
+  private admin: boolean | null = null;
   readonly demo: boolean;
   private snapshot!: Controller;
   private operatorDemo?: OperatorDemo;
@@ -65,8 +81,11 @@ export class ControllerStore {
   private historyAborters = new Set<AbortController>();
   constructor(demo = typeof window !== "undefined" && isDemoLocation(window.location)) {
     this.demo = demo;
-    this.states = demo ? createDemo() : {};
+    this.admin = demo ? true : null;
+    this.states = demo ? demoClock(createDemo()) : {};
     this.connection = demo ? "demo" : "connecting";
+    const search =
+      typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
     if (demo)
       this.operatorDemo = new OperatorDemo(
         () => this.states,
@@ -80,14 +99,12 @@ export class ControllerStore {
         },
         // ?whats-new=2.22.0: the demo as an installation updated from 2.22.0, ?whats-new=unknown
         // from one running before What's new existed. Otherwise it has nothing new to show.
-        typeof window !== "undefined"
-          ? new URLSearchParams(window.location.search).get("whats-new")
-          : null,
+        search?.get("whats-new") ?? null,
+        // ?notify-user=callum: Settings & help › Notifications as that phone's owner, who is not an
+        // administrator.
+        search?.get("notify-user") ?? null,
       );
-    const requested =
-      typeof window !== "undefined"
-        ? new URLSearchParams(window.location.search).get("room")
-        : null;
+    const requested = search?.get("room") ?? null;
     const rooms = discoverRooms(this.states);
     this.roomId =
       resolveRequestedRoom(rooms, requested)?.id || (requested === null ? rooms[0]?.id : "") || "";
@@ -108,6 +125,7 @@ export class ControllerStore {
     const room = rooms.find((r) => r.id === this.roomId) || emptyRoom;
     this.snapshot = {
       demo: this.demo,
+      admin: this.admin,
       connection: this.connection,
       error: this.error,
       lastUpdated: this.updated,
@@ -122,6 +140,7 @@ export class ControllerStore {
       write: this.write,
       history: this.history,
       historyWindow: this.historyWindow,
+      dailyRanges: this.dailyRanges,
       timeline: this.timeline,
       waterRecord: this.waterRecord,
       operator: this.operator,
@@ -139,6 +158,7 @@ export class ControllerStore {
       const base =
         saved.base || (typeof window !== "undefined" ? window.location.origin : "http://localhost");
       const session = saved.token ? undefined : findSession(base);
+      this.admin = adminOf(session);
       const inheritedToken =
         typeof window !== "undefined" && base === window.location.origin ? haSessionToken() : "";
       try {
@@ -171,7 +191,7 @@ export class ControllerStore {
   refresh = async () => {
     if (this.demo) {
       this.updated = Date.now();
-      this.states = demoBeat(this.states, this.updated);
+      this.states = demoClock(demoBeat(this.states, this.updated), this.updated);
       this.publish();
       return;
     }
@@ -322,6 +342,7 @@ export class ControllerStore {
     if (this.demo) return;
     const session = token.trim() ? undefined : findSession(base);
     const client = new HaClient(base, token.trim(), session);
+    this.admin = adminOf(session);
     this.historyAborters.forEach((abort) => abort.abort());
     this.historyAborters.clear();
     this.generation++;
@@ -443,15 +464,28 @@ export class ControllerStore {
   operator = async <T>(action: OperatorAction, data: Record<string, unknown> = {}): Promise<T> => {
     const generation = this.generation;
     const roomId = this.roomId;
+    // Notifications are the whole site's, never a room's.
     const scoped =
-      action.startsWith("strategy_") || action.startsWith("runs_") || action.startsWith("stock_");
+      action.startsWith("strategy_") ||
+      action.startsWith("runs_") ||
+      action.startsWith("stock_") ||
+      action.startsWith("dosing_");
     const payload = scoped ? { ...data, room_id: roomId } : data;
     if (scoped && !roomId) throw new Error("Select an available room.");
-    // What's new's record changes nothing a refresh would show, and must neither wait on nor hold
-    // up a change being applied.
+    // What's new's record and a test push change nothing a refresh would show, and must neither
+    // wait on nor hold up a change being applied.
     const mutation =
       !action.startsWith("whats_new_") &&
-      !["strategy_get", "strategy_preview", "setup_read", "runs_get", "stock_get"].includes(action);
+      ![
+        "strategy_get",
+        "strategy_preview",
+        "setup_read",
+        "runs_get",
+        "stock_get",
+        "dosing_get",
+        "notify_get",
+        "notify_test",
+      ].includes(action);
     if (mutation && this.writing) throw new Error("Another change is still being applied.");
     if (mutation) this.writing = true;
     try {
@@ -480,22 +514,34 @@ export class ControllerStore {
       if (mutation) this.writing = false;
     }
   };
-  historyWindow = async (request: HistoryRequest): Promise<HistoryWindow> => {
+  /** Throws unless every id is a sensor of the selected room or one of its registered runs. A
+   * promise only when it has to read the room's run records first. */
+  private checkRunSensors(entityIds: string[]): Promise<void> | void {
     const generation = this.generation,
       roomId = this.roomId;
     if (!roomId) throw new Error("Select an available room.");
     const allowed = new Set(this.snapshot.room.entities.map((entity) => entity.entity_id));
-    let registered = this.runDocuments.get(roomId);
-    if (request.entityIds.some((id) => !allowed.has(id)) && registered?.generation !== generation) {
-      await this.operator<RunsDocument>("runs_get");
-      registered = this.runDocuments.get(roomId);
-    }
-    if (registered?.generation === generation)
-      for (const run of registered.document.runs)
-        for (const zone of run.zones)
-          for (const id of [zone.vwc_sensor, zone.ec_sensor]) if (id) allowed.add(id);
-    if (request.entityIds.some((id) => !allowed.has(id)))
-      throw new Error("History is limited to this room's current or registered run sensors.");
+    const check = () => {
+      const registered = this.runDocuments.get(roomId);
+      if (registered?.generation === generation)
+        for (const run of registered.document.runs)
+          for (const zone of run.zones)
+            for (const id of [zone.vwc_sensor, zone.ec_sensor]) if (id) allowed.add(id);
+      if (entityIds.some((id) => !allowed.has(id)))
+        throw new Error("History is limited to this room's current or registered run sensors.");
+    };
+    if (
+      entityIds.some((id) => !allowed.has(id)) &&
+      this.runDocuments.get(roomId)?.generation !== generation
+    )
+      return this.operator<RunsDocument>("runs_get").then(check);
+    check();
+  }
+  historyWindow = async (request: HistoryRequest): Promise<HistoryWindow> => {
+    const generation = this.generation,
+      roomId = this.roomId;
+    const reading = this.checkRunSensors(request.entityIds);
+    if (reading) await reading;
     const abort = new AbortController();
     const cancel = () => abort.abort();
     request.signal?.addEventListener("abort", cancel, { once: true });
@@ -516,13 +562,57 @@ export class ControllerStore {
       request.signal?.removeEventListener("abort", cancel);
     }
   };
+  /** Each sensor's low and high per local date over a run (Compare runs, by grow week): Home
+   * Assistant's daily long-term statistics over its websocket inside Home Assistant, kept
+   * indefinitely; standalone, and for a sensor without statistics, its recorded history. */
+  dailyRanges = async (request: HistoryRequest): Promise<DailyRanges> => {
+    const generation = this.generation,
+      roomId = this.roomId;
+    await this.checkRunSensors(request.entityIds);
+    if (this.demo) {
+      const window = await demoHistoryWindow(request);
+      return {
+        source: "demo",
+        series: window.series.map(({ entityId, daily }) => ({ entityId, daily })),
+        warnings: window.warnings,
+      };
+    }
+    if (!this.client || this.connection !== "live")
+      throw new Error("Connect to Home Assistant to load recorded history.");
+    const series: DailyRanges["series"] = [];
+    const warnings: string[] = [];
+    if (this.live?.sendMessagePromise) {
+      const statistics = await liveDailyStatistics(this.live, request);
+      for (const entityId of request.entityIds)
+        if (statistics[entityId]?.length) series.push({ entityId, daily: statistics[entityId] });
+    }
+    const missing = request.entityIds.filter((id) => !series.some((item) => item.entityId === id));
+    if (missing.length) {
+      const window = await this.historyWindow({ ...request, entityIds: missing });
+      series.push(...window.series.map(({ entityId, daily }) => ({ entityId, daily })));
+      warnings.push(...window.warnings);
+      if (this.live?.sendMessagePromise)
+        warnings.push(
+          `No long-term statistics for ${missing.join(", ")}: its days come from recorded history, which reaches back only as far as the recorder keeps it.`,
+        );
+    }
+    if (generation !== this.generation || roomId !== this.roomId)
+      throw new Error("Room or range changed; history request cancelled.");
+    return {
+      source: missing.length === request.entityIds.length ? "history" : "statistics",
+      series,
+      warnings,
+    };
+  };
   history = async (entityIds: string[], hours: number, signal?: AbortSignal) => {
     if (!Number.isFinite(hours) || hours <= 0 || hours > 720)
       throw new Error("History range must be between 0 and 720 hours.");
-    // The room's own entities, and the tank probes its descriptor maps for display.
+    // The room's own entities, the probes its zones' readings combine, and the tank probes its
+    // descriptor maps for display.
     const mapped = descriptor(this.states, this.snapshot.room.room)?.attributes;
     const allowed = new Set([
       ...this.snapshot.room.entities.map((e) => e.entity_id),
+      ...roomProbeIds(this.snapshot.room.zones, this.states),
       ...[mapped?.tank_ec_sensor, mapped?.tank_ph_sensor].filter(
         (id): id is string => typeof id === "string" && !!id,
       ),
@@ -553,9 +643,15 @@ export class ControllerStore {
    * over REST standalone. Live updates extend it from there (day-timeline.ts appendLive). */
   timeline = async (request: TimelineRequest) => {
     const room = this.snapshot.room;
+    const mapped = descriptor(this.states, room.room)?.attributes;
     const allowed = new Set([
       ...room.entities.map((entity) => entity.entity_id),
       ...room.zones.flatMap((zone) => (zone.valveEntity ? [zone.valveEntity] : [])),
+      // The tank and pump its descriptor maps, charted on Equipment › Tank & pump.
+      ...Object.values(TANK_KEYS).flatMap((key) => {
+        const id = mapped?.[key];
+        return typeof id === "string" && id ? [id] : [];
+      }),
     ]);
     const ids = [...request.entityIds, ...request.attributeIds];
     if (!ids.length || ids.some((id) => !allowed.has(id)))

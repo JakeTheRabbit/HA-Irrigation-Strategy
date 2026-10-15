@@ -149,13 +149,15 @@ def test_with_the_supervisor_the_same_engine_traces_the_chart():
     ramp = [s for _h, s, ph in shots if ph in ("P0", "P1")]
     assert shots[0][0] >= 10.5  # a real P0: transpiration before irrigation
     assert 3 <= len(ramp) <= 7 and max(ramp) <= 3.6  # an even ramp, no escalation
-    assert max(r["vwc"] for r in rows) <= Z1.knee + 2.0  # a little P1 runoff, as Athena intends, not a 40% chase
+    # a little P1 runoff, as Athena intends, not a 40% chase (P1 gives one extra shot at its target, 6 Oct 2026)
+    assert max(r["vwc"] for r in rows) <= Z1.knee + 2.5
     stop = sup.plan.p2_stop_h
     p2 = [r["vwc"] for r in rows if sup.plan.p1_end_h + 1.0 <= r["h"] % 24 <= stop and r["h"] % 24 > 10]
     assert min(p2) >= sup.plan.band[0] - 0.8  # the engine's own top-ups hold the band
     assert shots[-1][0] <= stop + 0.3  # and stop on time, so the dryback starts when planned
     peak, end = max(r["vwc"] for r in rows), rows[-1]["vwc"]
-    assert abs((peak - end) / peak * 100 - 15.0) < 3.5
+    # the night's dryback against the planned 15 %, measured from the day's peak, which now holds P1's extra shot
+    assert abs((peak - end) / peak * 100 - 15.0) < 5.0
     base = sum(s for _h, s, _p in _day(et.run(Z1, LIVE_Z1, 31.5, 5.2, 3.0, days=2, demand=DEMAND)[0], 1)[1])
     assert sum(s for _h, s, _p in shots) < base * 0.75  # and far less water goes to runoff
     assert any(s == "p1_target_vwc" and old == 40.0 and new == 36.0 for _h, s, old, new, _w in changes)

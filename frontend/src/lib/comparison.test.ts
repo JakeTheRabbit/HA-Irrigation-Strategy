@@ -4,6 +4,7 @@ import {
   ageAt,
   boundedRange,
   comparisonRange,
+  dailyStatistics,
   downsample,
   midnight,
   summarize,
@@ -188,5 +189,28 @@ describe("bounded Recorder windows", () => {
     await expect(loadHistoryWindow(read, { ...request(), entityIds: [] })).rejects.toThrow(
       /explicitly/,
     );
+  });
+});
+describe("daily long-term statistics", () => {
+  it("names each day by its middle, so a server a few hours off names the same day", () => {
+    // Auckland's midnight on 24 August is noon UTC the day before.
+    const rows = {
+      [id]: [
+        { start: Date.UTC(2026, 7, 23, 12), end: Date.UTC(2026, 7, 24, 12), min: 55, max: 66 },
+        { start: "2026-08-24T12:00:00Z", min: 54, max: 65 },
+        { start: Date.UTC(2026, 7, 25, 12), min: "56", max: 64 },
+      ],
+      "sensor.none": null,
+    };
+    expect(dailyStatistics(rows, zone)[id]).toEqual([
+      { date: "2026-08-24", records: 1, min: 55, max: 66 },
+      { date: "2026-08-25", records: 1, min: 54, max: 65 },
+    ]);
+    expect(dailyStatistics(rows, "UTC")[id].map((row) => row.date)).toEqual([
+      "2026-08-24",
+      "2026-08-25",
+    ]);
+    expect(dailyStatistics(rows, zone)["sensor.none"]).toEqual([]);
+    expect(() => dailyStatistics(null, zone)).toThrow("invalid statistics");
   });
 });

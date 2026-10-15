@@ -75,6 +75,22 @@ def test_every_notification_code_is_explained_and_every_explained_code_is_raised
     assert raised == listed
 
 
+def test_the_controller_sends_exactly_the_critical_codes_as_urgent():
+    """docs/NOTIFICATIONS.md: a critical code's push is urgent, high priority on a phone that asks for it."""
+    tree = ast.parse(CONTROLLER.read_text(encoding="utf-8"))
+    [urgent] = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(getattr(t, "id", "") == "CRITICAL_CODES" for t in node.targets)
+    ]
+    assert ast.unparse(urgent.func) == "frozenset"
+    critical = {
+        code for code, entry in CODES.items() if entry["severity"] == "critical"
+    }
+    assert set(ast.literal_eval(urgent.args[0])) == critical
+
+
 def test_every_repairs_card_carries_its_code_in_both_languages_files():
     strings = _repairs_codes(INTEGRATION / "strings.json")
     assert _repairs_codes(INTEGRATION / "translations" / "en.json") == strings

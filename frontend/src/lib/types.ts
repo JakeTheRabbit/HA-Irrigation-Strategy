@@ -1,4 +1,4 @@
-import type { HistoryRequest, HistoryWindow } from "./comparison-types";
+import type { DailyRanges, HistoryRequest, HistoryWindow } from "./comparison-types";
 import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
 import type { AutoSetpointStatus } from "./auto-setpoints";
@@ -137,6 +137,9 @@ export interface Series {
 }
 export interface Controller {
   demo: boolean;
+  /** Whether the signed-in Home Assistant user is an administrator: null when this page cannot tell
+   * (a standalone tab), and Home Assistant refuses what they may not do. */
+  admin: boolean | null;
   connection: "connecting" | "live" | "demo" | "offline";
   error: string | null;
   lastUpdated: number | null;
@@ -150,6 +153,9 @@ export interface Controller {
   disconnect: () => void;
   write: (changes: Change[]) => Promise<WriteResult>;
   historyWindow: (request: HistoryRequest) => Promise<HistoryWindow>;
+  /** Each sensor's low and high per local date over a run: long-term statistics where Home
+   * Assistant keeps them, else recorded history (Compare runs, by grow week). */
+  dailyRanges: (request: HistoryRequest) => Promise<DailyRanges>;
   /** `signal` stops a long read between its day-sized requests. */
   history: (entityIds: string[], hours: number, signal?: AbortSignal) => Promise<Series[]>;
   /** One grow-day of recorder history for the selected room's day timeline. */

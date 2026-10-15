@@ -1,0 +1,83 @@
+/* Settings › Run records: the room's runs, a form to add or change one, export and import. */
+.run-records {
+  display: grid;
+  gap: 12px;
+}
+.run-records .small {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  line-height: 1.55;
+}
+.run-records h3 {
+  font-weight: 650;
+}
+.run-records label {
+  display: grid;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+.run-records .run-records-check {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.run-records-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.run-records-notice {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--muted);
+  font-size: var(--text-sm);
+}
+.comparison-record-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+}
+.comparison-form {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1fr;
+  gap: 14px;
+  margin: 4px 0;
+}
+.comparison-form .run-records-wide {
+  grid-column: 1/-1;
+}
+.comparison-run-list h3 .pill {
+  margin-left: 8px;
+  vertical-align: 1px;
+}
+.comparison-run-list article {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 16px;
+  padding: 14px 0;
+  border-top: 1px solid var(--border);
+}
+.comparison-run-list details {
+  overflow-wrap: anywhere;
+  margin-top: 8px;
+}
+@media (max-width: 850px) {
+  .comparison-form {
+    grid-template-columns: 1fr;
+  }
+  .comparison-run-list article {
+    flex-direction: column;
+  }
+}
+@media (max-width: 520px) {
+  .comparison-record-heading {
+    flex-direction: column;
+  }
+}

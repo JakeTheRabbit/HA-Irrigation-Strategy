@@ -1,21 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import {
-  Activity,
-  CalendarRange,
-  ChartNoAxesCombined,
-  Wrench,
   ArrowUpRight,
-  ChevronRight,
-  CircleHelp,
+  CalendarRange,
   Droplets,
-  FlaskConical,
+  History,
   House,
-  Layers,
-  Menu,
-  Radio,
-  RefreshCw,
   Settings2,
-  X,
+  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -38,114 +29,104 @@ import { useHaTheme } from "@/lib/ha-theme";
 import { useHaShell } from "@/lib/ha-shell";
 import { errorText } from "@/lib/utils";
 import { roomIsActive, runningVersions } from "@/lib/model";
-import { RoomOffBanner } from "@/components/room-controls";
-import { ActivityPanel } from "@/components/activity-panel";
-import { StatusLines } from "@/components/status-line";
+import {
+  canonicalHash,
+  parseRoute,
+  routeHash,
+  sameRoute,
+  sectionOf,
+  type Page,
+  type Route,
+} from "@/lib/routes";
+import { AppHeader } from "@/components/app-header";
+import { PageTabs, pageLabel, SECTION_LABELS } from "@/components/page-tabs";
 import { WaterViewProvider } from "@/lib/water-view";
 import { WhatsNewOnUpdate } from "@/components/whats-new";
-import { time, type Page } from "@/components/dashboard";
-import { Overview } from "@/pages/overview";
-import { Zones } from "@/pages/zones";
+import { ZonePage } from "@/pages/zone";
+import { Today } from "@/pages/today";
 import { Strategy, type Drafts } from "@/pages/strategy";
-import { ActivityPage } from "@/pages/activity";
-import { Sensors } from "@/pages/sensors";
+import { Timeline } from "@/pages/timeline";
+import { Probes } from "@/pages/probes";
 import { Settings } from "@/pages/settings";
+import { Notifications } from "@/pages/notifications";
 import { Help } from "@/pages/help";
 import { GrowPlanner } from "@/pages/grow-planner";
 import { Setup } from "@/pages/setup";
-import { Insights } from "@/pages/insights";
 import { Comparison } from "@/pages/comparison";
 import { StockTanks } from "@/pages/stock";
+import { Dosing } from "@/pages/dosing";
+import { WaterUsePage } from "@/pages/water-use";
+import { TankStatus } from "@/components/tank-status";
+import { TankLevel } from "@/components/tank-level";
 
 const navigation = [
-  { id: "overview", label: "Overview", icon: House },
-  { id: "zones", label: "Zones", icon: Layers },
-  { id: "strategy", label: "Irrigation plan", icon: CalendarRange },
-  { id: "compare", label: "Compare runs", icon: ChartNoAxesCombined },
-  { id: "insights", label: "Insights", icon: ChartNoAxesCombined },
-  { id: "activity", label: "Activity", icon: Activity },
-  { id: "sensors", label: "Sensors", icon: Radio },
-  { id: "stock", label: "Stock tanks", icon: FlaskConical },
-  { id: "setup", label: "Rooms & setup", icon: Wrench },
-  { id: "settings", label: "Settings", icon: Settings2 },
-  { id: "help", label: "Help & tools", icon: CircleHelp },
-] as const;
-function readPage(): Page {
-  const hash = window.location.hash.replace(/^#\/?/, "").split("?")[0];
-  if (hash === "grow-plan" || navigation.some((n) => n.id === hash)) return hash as Page;
-  const view = new URLSearchParams(window.location.search).get("view") || "";
-  return (
-    (
-      {
-        dashboard: "overview",
-        overview: "overview",
-        zones: "zones",
-        tune: "strategy",
-        strategy: "strategy",
-        logs: "activity",
-        log: "activity",
-        activity: "activity",
-        sensors: "sensors",
-        settings: "settings",
-        help: "help",
-        timeline: "grow-plan",
-        climate: "sensors",
-        control: "settings",
-        substrate: "insights",
-        analyze: "insights",
-        floor: "setup",
-        floorplan: "setup",
-        recipes: "grow-plan",
-      } as Record<string, Page>
-    )[view] || "overview"
-  );
+  { page: "today", label: SECTION_LABELS.today, icon: House },
+  { page: "plan/targets", label: SECTION_LABELS.plan, icon: CalendarRange },
+  { page: "history/timeline", label: SECTION_LABELS.history, icon: History },
+  { page: "equipment/probes", label: SECTION_LABELS.equipment, icon: Wrench },
+  { page: "settings", label: SECTION_LABELS.settings, icon: Settings2 },
+] as const satisfies readonly { page: Page; label: string; icon: unknown }[];
+
+/** The page this address opens; an old or short form of it is rewritten in place (no new history
+ * entry), keeping a Help link's `?code=`. */
+function readRoute(): Route {
+  const next = canonicalHash(window.location.hash, window.location.search);
+  if (next !== null) window.history.replaceState(null, "", next);
+  return parseRoute(window.location.hash, window.location.search).route;
 }
+
 export default function App() {
   const controller = useController();
-  const [page, setPage] = useState<Page>(readPage);
+  const [route, setRoute] = useState<Route>(readRoute);
   const [mobile, setMobile] = useState(false);
   const [drafts, setDrafts] = useState<Drafts>({});
-  const [zoneId, setZoneId] = useState<number | undefined>();
+  /** The zone Plan › Targets starts on, or the one History › Timeline shows. */
+  const [focusZone, setFocusZone] = useState<number | undefined>();
   const [workspaceDirty, setWorkspaceDirty] = useState(false);
   const [pending, setPending] = useState<(() => void) | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const theme = useHaTheme();
   const haShell = useHaShell();
-  const pageRef = useRef(page);
+  const routeRef = useRef(route);
   const dirtyRef = useRef(false);
   dirtyRef.current = Object.keys(drafts).length > 0 || workspaceDirty;
-  pageRef.current = page;
+  routeRef.current = route;
+  const page = route.page;
   function confirmNavigation(action: () => void) {
     if (dirtyRef.current) setPending(() => action);
     else action();
   }
-  function navigate(next: Page, nextZone?: number) {
-    if (next === page && nextZone === undefined) {
+  /** Opens a page. `zone` opens that zone's page, picks the zone Plan › Targets starts on, or the
+   * zone History › Timeline shows. */
+  function navigate(next: Page, zone?: number) {
+    const target: Route = next === "zone" ? { page: "zone", zone: zone ?? null } : { page: next };
+    const focused = next === "plan/targets" || next === "history/timeline";
+    if (sameRoute(target, route) && (!focused || zone === undefined)) {
       setMobile(false);
       return;
     }
     confirmNavigation(() => {
-      setPage(next);
-      setZoneId(nextZone);
-      window.history.pushState(null, "", `#/${next}`);
+      setRoute(target);
+      setFocusZone(focused ? zone : undefined);
+      window.history.pushState(null, "", routeHash(target));
       setMobile(false);
       window.scrollTo({ top: 0 });
     });
   }
   useEffect(() => {
     const hashChange = () => {
-      const next = readPage();
-      if (next === pageRef.current) return;
+      const next = readRoute();
+      if (sameRoute(next, routeRef.current)) return;
       if (dirtyRef.current) {
-        window.history.replaceState(null, "", `#/${pageRef.current}`);
+        window.history.replaceState(null, "", routeHash(routeRef.current));
         setPending(() => () => {
-          setPage(next);
-          window.history.pushState(null, "", `#/${next}`);
+          setRoute(next);
+          window.history.pushState(null, "", routeHash(next));
         });
       } else {
-        setPage(next);
-        setZoneId(undefined);
+        setRoute(next);
+        setFocusZone(undefined);
       }
     };
     window.addEventListener("hashchange", hashChange);
@@ -163,9 +144,14 @@ export default function App() {
       window.removeEventListener("beforeunload", beforeUnload);
     };
   }, []);
+  const zoneName =
+    page === "zone"
+      ? (controller.room.zones.find((zone) => zone.id === route.zone) ?? controller.room.zones[0])
+          ?.name
+      : undefined;
   useEffect(() => {
-    document.title = `${navigation.find((n) => n.id === (page === "grow-plan" ? "strategy" : page))?.label} · ${controller.room.room.name} · Crop Steering`;
-  }, [page, controller.room.room.name]);
+    document.title = `${zoneName ?? pageLabel(page)} · ${controller.room.room.name} · Crop Steering`;
+  }, [page, zoneName, controller.room.room.name]);
   async function refresh() {
     setRefreshing(true);
     setRefreshError("");
@@ -177,15 +163,24 @@ export default function App() {
       setRefreshing(false);
     }
   }
+  function selectRoom(id: string) {
+    confirmNavigation(() => {
+      setDrafts({});
+      setFocusZone(undefined);
+      controller.changeRoom(id);
+      setMobile(false);
+    });
+  }
   const versions = runningVersions(controller.states, controller.room.room);
+  const section = sectionOf(page);
   const sidebar = (variant: string) => (
     <>
       <a
-        href="#/overview"
+        href="#/today"
         className="brand"
         onClick={(event) => {
           event.preventDefault();
-          navigate("overview");
+          navigate("today");
         }}
       >
         <span className="brand-mark">
@@ -201,15 +196,7 @@ export default function App() {
           id={variant + "-room"}
           value={controller.roomId}
           disabled={!controller.rooms.length}
-          onChange={(event) => {
-            const id = event.target.value;
-            confirmNavigation(() => {
-              setDrafts({});
-              setZoneId(undefined);
-              controller.changeRoom(id);
-              setMobile(false);
-            });
-          }}
+          onChange={(event) => selectRoom(event.target.value)}
         >
           {!controller.roomId && (
             <option value="" disabled>
@@ -223,24 +210,18 @@ export default function App() {
             </option>
           ))}
         </select>
-        <span>
-          <span className={`connection-dot ${controller.connection}`} />
-          {controller.demo ? "Isolated demo data" : "Home Assistant controller"}
-        </span>
       </div>
       <nav aria-label="Main navigation">
-        {navigation.map((item, index) => (
+        {navigation.map((item) => (
           <button
-            key={item.id}
-            className={`${(page === "grow-plan" ? "strategy" : page) === item.id ? "active" : ""} ${item.id === "settings" ? "nav-separated" : ""}`}
-            aria-current={
-              (page === "grow-plan" ? "strategy" : page) === item.id ? "page" : undefined
-            }
-            onClick={() => navigate(item.id)}
+            key={item.page}
+            className={`${section === sectionOf(item.page) ? "active" : ""} ${item.page === "settings" ? "nav-separated" : ""}`}
+            aria-current={section === sectionOf(item.page) ? "page" : undefined}
+            onClick={() => navigate(item.page)}
           >
             <item.icon size={19} />
             <span>{item.label}</span>
-            {item.id === "strategy" && Object.keys(drafts).length > 0 && (
+            {item.page === "plan/targets" && Object.keys(drafts).length > 0 && (
               <i className="nav-draft-count">{Object.keys(drafts).length}</i>
             )}
           </button>
@@ -258,7 +239,11 @@ export default function App() {
             <House size={17} /> Home Assistant
           </Button>
         )}
-        <span className="small">Configuration changes require review.</span>
+        <span className="small">
+          {controller.demo
+            ? "Demo data: changes stay in this tab."
+            : "Every change is reviewed before it is written."}
+        </span>
         {!controller.demo && (
           <dl
             className="sidebar-versions"
@@ -278,6 +263,7 @@ export default function App() {
       </div>
     </>
   );
+  const pageKey = controller.roomId;
   const shell = (
     <div className="app-shell">
       <a
@@ -301,69 +287,17 @@ export default function App() {
         </SheetContent>
       </Sheet>
       <div className="app-main">
-        <header className="topbar">
-          {haShell.available && (
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Open Home Assistant menu"
-              title="Home Assistant menu"
-              onClick={haShell.toggle}
-            >
-              <House size={20} />
-            </Button>
-          )}
-          <div className="breadcrumbs">
-            <Button
-              className="mobile-menu"
-              variant="ghost"
-              size="icon"
-              aria-label="Open navigation"
-              onClick={() => setMobile(true)}
-            >
-              <Menu size={21} />
-            </Button>
-            <span>{controller.room.room.name}</span>
-            <ChevronRight size={14} />
-            <strong>
-              {navigation.find((n) => n.id === (page === "grow-plan" ? "strategy" : page))?.label}
-            </strong>
-          </div>
-          <div className="connection-info">
-            <span className={`connection-label ${controller.connection}`}>
-              <span className={`connection-dot ${controller.connection}`} />
-              {controller.connection === "live"
-                ? "Connected"
-                : controller.connection === "demo"
-                  ? "Demo mode"
-                  : controller.connection === "connecting"
-                    ? "Connecting…"
-                    : "Offline"}
-            </span>
-            <span className="last-updated">Updated {time(controller.lastUpdated)}</span>
-            <ActivityPanel controller={controller} openLog={() => navigate("activity")} />
-            <Button
-              variant="ghost"
-              size="icon"
-              aria-label="Refresh controller data"
-              disabled={refreshing || controller.connection === "connecting"}
-              onClick={refresh}
-            >
-              <RefreshCw size={17} className={refreshing ? "spin" : ""} />
-            </Button>
-          </div>
-        </header>
+        <AppHeader
+          controller={controller}
+          haMenu={haShell.available ? haShell.toggle : null}
+          openNavigation={() => setMobile(true)}
+          selectRoom={selectRoom}
+          openLog={() => navigate("history/timeline")}
+          refresh={() => void refresh()}
+          refreshing={refreshing}
+        />
         <main id="main-content" tabIndex={-1}>
           <div className="main-inner">
-            {controller.demo && (
-              <div className="demo-banner">
-                <span>
-                  <strong>Demo data</strong> · Explore sample readings and try settings safely.
-                  Changes stay in memory.
-                </span>
-                <span>No live equipment connected</span>
-              </div>
-            )}
             {(controller.connection === "offline" || controller.error || refreshError) && (
               <div className="connection-banner" role="alert">
                 <div>
@@ -388,74 +322,76 @@ export default function App() {
                 )}
               </div>
             )}
-            <StatusLines controller={controller} />
-            <RoomOffBanner controller={controller} />
-            {page === "overview" && (
-              <Overview key={controller.roomId} controller={controller} navigate={navigate} />
+            <PageTabs
+              page={page}
+              navigate={(next) => navigate(next)}
+              badges={{ "plan/targets": Object.keys(drafts).length }}
+            />
+            {page === "today" && (
+              <Today key={pageKey} controller={controller} navigate={navigate} />
             )}
-            {page === "zones" && (
-              <Zones key={controller.roomId} controller={controller} navigate={navigate} />
+            {page === "zone" && (
+              <ZonePage
+                key={pageKey}
+                controller={controller}
+                zoneId={route.zone ?? null}
+                navigate={navigate}
+              />
             )}
-            {(page === "strategy" || page === "grow-plan") && (
-              <div className="toolbar" role="navigation" aria-label="Irrigation plan views">
-                <Button
-                  variant={page === "strategy" ? "default" : "outline"}
-                  aria-current={page === "strategy" ? "page" : undefined}
-                  onClick={() => navigate("strategy")}
-                >
-                  Today
-                </Button>
-                <Button
-                  variant={page === "grow-plan" ? "default" : "outline"}
-                  aria-current={page === "grow-plan" ? "page" : undefined}
-                  onClick={() => navigate("grow-plan")}
-                >
-                  Schedule
-                </Button>
-                <span className="muted small">
-                  One set of targets: edit today or schedule changes by date.
-                </span>
-              </div>
-            )}
-            {page === "strategy" && (
+            {page === "plan/targets" && (
               <Strategy
-                key={controller.roomId}
+                key={pageKey}
                 controller={controller}
                 drafts={drafts}
                 setDrafts={setDrafts}
-                selectedZone={zoneId}
+                selectedZone={focusZone}
+                navigate={navigate}
               />
             )}
-            {page === "grow-plan" && (
+            {page === "plan/schedule" && (
               <GrowPlanner
-                key={controller.roomId}
+                key={pageKey}
                 controller={controller}
                 onDirtyChange={setWorkspaceDirty}
               />
             )}
-            {page === "compare" && (
-              <Comparison
-                key={controller.roomId}
+            {page === "history/timeline" && (
+              <Timeline key={`${pageKey}:${focusZone}`} controller={controller} zone={focusZone} />
+            )}
+            {page === "history/water" && <WaterUsePage key={pageKey} controller={controller} />}
+            {page === "history/compare" && (
+              <Comparison key={pageKey} controller={controller} navigate={navigate} />
+            )}
+            {page === "equipment/probes" && (
+              <Probes key={pageKey} controller={controller} navigate={navigate} />
+            )}
+            {page === "equipment/stock" && (
+              <StockTanks key={pageKey} controller={controller} navigate={navigate} />
+            )}
+            {page === "equipment/tank" && (
+              <>
+                <TankStatus
+                  key={pageKey}
+                  controller={controller}
+                  onConfigure={() => navigate("equipment/setup")}
+                />
+                <TankLevel
+                  key={`${pageKey}:level`}
+                  controller={controller}
+                  onConfigure={() => navigate("equipment/setup")}
+                />
+              </>
+            )}
+            {page === "equipment/dosing" && (
+              <Dosing
+                key={pageKey}
                 controller={controller}
+                navigate={navigate}
                 onDirtyChange={setWorkspaceDirty}
               />
             )}
-            {page === "insights" && (
-              <Insights key={controller.roomId} controller={controller} navigate={navigate} />
-            )}
-            {page === "setup" && (
-              <Setup
-                key={controller.roomId}
-                controller={controller}
-                onDirtyChange={setWorkspaceDirty}
-              />
-            )}
-            {page === "activity" && (
-              <ActivityPage key={controller.roomId} controller={controller} />
-            )}
-            {page === "sensors" && <Sensors key={controller.roomId} controller={controller} />}
-            {page === "stock" && (
-              <StockTanks key={controller.roomId} controller={controller} navigate={navigate} />
+            {page === "equipment/setup" && (
+              <Setup key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
             )}
             {page === "settings" && (
               <Settings
@@ -463,15 +399,19 @@ export default function App() {
                 theme={theme.preference}
                 setTheme={theme.setPreference}
                 themeSource={theme.source}
+                onDirtyChange={setWorkspaceDirty}
+              />
+            )}
+            {page === "settings/notifications" && (
+              <Notifications
+                key={pageKey}
+                controller={controller}
+                onDirtyChange={setWorkspaceDirty}
               />
             )}
             {page === "help" && <Help controller={controller} />}
           </div>
         </main>
-        <footer className="page-footer">
-          <span>Crop Steering</span>
-          <span>{controller.room.room.name} · Controller-reported data</span>
-        </footer>
       </div>
       <WhatsNewOnUpdate controller={controller} />
       <Dialog
