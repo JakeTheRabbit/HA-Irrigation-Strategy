@@ -83,10 +83,26 @@ def in_order(ladder):
             < ladder["p1_target_vwc"] <= ladder["field_capacity"])
 
 
+LADDER = ("p3_emergency_vwc_threshold", "p2_vwc_threshold", "p1_target_vwc", "field_capacity")
+
+
 def writes(current, want):
-    """current + desired -> [(suffix, value, why)], clamped to the engine's bounds, big moves taken in steps."""
+    """current + desired -> [(suffix, value, why)], clamped to the engine's bounds, big moves taken in steps.
+    The ladder is judged as one set, then written so it stays in order after every write: Home Assistant
+    refuses a level that breaks it, so the levels going down go from the bottom up, those going up top down."""
     out = proposed(current, want)
-    return out if in_order(dict(current, **{s: v for s, v, _w in out})) else []  # never an inverted ladder
+    if not in_order(dict(current, **{s: v for s, v, _w in out})):
+        return []  # never an inverted ladder
+
+    def step(write):
+        suffix, value, _why = write
+        if suffix not in LADDER:
+            return (0, 0)
+        cur = current.get(suffix)
+        rung = LADDER.index(suffix)
+        return (1, rung) if cur is not None and value < cur else (2, -rung)
+
+    return sorted(out, key=step)
 
 
 def proposed(current, want):
