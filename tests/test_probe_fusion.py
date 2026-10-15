@@ -33,6 +33,7 @@ def test_one_probe_reads_exactly_what_it_reads():
         "spread": 0.0,
         "method": "Median",
         "steered_by": "Median",
+        "quality": {"sensor.a": {"quality": "good", "reason": "fresh"}},
     }
 
 
@@ -131,6 +132,7 @@ def test_no_usable_probe_is_no_reading():
             "spread": None,
             "method": "Median",
             "steered_by": "Median",
+            "quality": {},
         },
     )
 
@@ -277,3 +279,35 @@ def test_offsets_are_forgotten_when_the_zones_probes_change():
     # shift the zone by what it once read against a probe that is gone.
     value, _detail = guarded([THREE[0], THREE[1], ("sensor.d", None, None)], offsets)
     assert value == 49.0 and offsets == {}
+
+
+def test_each_probe_says_the_quality_of_its_reading_and_why():
+    """Beside the freshness and range checks, each probe's quality and the reason for it."""
+    reasons = {
+        "fresh": [("sensor.a", 40.0, FRESH)],
+        "stale": [("sensor.a", 40.0, FRESH), ("sensor.b", 42.0, STALE)],
+        "out_of_range": [("sensor.a", 40.0, FRESH), ("sensor.b", 140.0, FRESH)],
+        "excluded_outlier": [
+            ("sensor.a", 40.0, FRESH),
+            ("sensor.c", 42.0, FRESH),
+            ("sensor.b", 90.0, FRESH),
+        ],
+    }
+    for reason, readings in reasons.items():
+        _value, detail = fuse_probes(
+            readings, {}, LO, HI, PROBE_STALE_SECONDS, far=PROBE_FAR["vwc"]
+        )
+        probe = readings[-1][0]
+        assert detail["quality"][probe] == {
+            "quality": "good" if reason == "fresh" else "bad",
+            "reason": reason,
+        }, reason
+        assert detail["quality"]["sensor.a"] == {"quality": "good", "reason": "fresh"}
+
+
+def test_a_probe_with_no_reading_is_stale_and_a_stale_one_steering_is_suspect():
+    detail = fuse([("sensor.a", None, None), ("sensor.b", 41.0, STALE)], {})[1]
+    assert detail["quality"] == {
+        "sensor.a": {"quality": "bad", "reason": "stale"},
+        "sensor.b": {"quality": "suspect", "reason": "stale"},
+    }

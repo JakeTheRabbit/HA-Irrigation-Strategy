@@ -40,6 +40,10 @@ def fuse_probes(readings, offsets, lo, hi, stale_s, method="Median", far=None):
     - The rest become one reading by `method` (PROBE_METHODS; the median, the mean for two). Lowest
       and Highest let one probe steer the zone, so with fewer than PROBE_EXTREME_MIN probes left
       the zone steers on the median instead, and detail["steered_by"] says so.
+    - detail["quality"] gives each probe a quality ("good" when the reading uses it fresh,
+      "suspect" when it uses it stale because no probe is fresh, "bad" when it is left out) and a
+      reason: "fresh", "stale" (no reading, or none for stale_s), "out_of_range" or
+      "excluded_outlier" (far from the others). The sensor adds "unknown_unit".
     - With every probe used, each probe's offset is learned against that reading. With a probe
       missing, each remaining probe is first shifted by its offset, so losing a probe does not step
       the reading the controller measures dryback and thresholds from.
@@ -90,7 +94,22 @@ def fuse_probes(readings, offsets, lo, hi, stale_s, method="Median", far=None):
         "spread": round(max(pool.values()) - min(pool.values()), 2) if pool else None,
         "method": method,
         "steered_by": steered_by,
+        "quality": {},
     }
+    for pid, v, age in readings:
+        if pid in far_off:
+            reason = "excluded_outlier"
+        elif v is not None and math.isfinite(v) and pid not in usable:
+            reason = "out_of_range"
+        elif pid not in usable or (age is not None and age > stale_s):
+            reason = "stale"
+        else:
+            reason = "fresh"
+        used = "good" if reason == "fresh" else "suspect"
+        detail["quality"][pid] = {
+            "quality": used if pid in pool else "bad",
+            "reason": reason,
+        }
     if not pool:
         return None, detail
     if len(pool) == len(readings):
