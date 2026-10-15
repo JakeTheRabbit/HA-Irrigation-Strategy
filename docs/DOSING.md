@@ -73,7 +73,8 @@ pump name or recipe is assumed.
   "feed": {                            // Feed schedule, below; an empty one changes nothing
     "recipes": [                       // 0..12 named feed recipes
       {"id": "vege", "name": "Vege",   // id [a-z0-9_]{1,24}, unique (made from the name when left out)
-       "doses": [{"pump": "balance", "ml": 250, "ml_entity": null}]} // as the batch's recipe
+       "doses": [{"pump": "balance", "ml": 250, "ml_entity": null}], // as the batch's recipe
+       "ec": 2.4}                      // optional: the feed EC it mixes to, 0.1-10 mS/cm, or null
     ],
     "schedule": {"start": "2026-10-05", "weeks": ["vege", "bloom", "bloom"]}, // 0..52 weeks
     "stage": null,                     // the recipe picked by hand, or null
@@ -113,6 +114,11 @@ schedule runs holds until the schedule's next week starts (picking this week's o
 hold); without a schedule running, the recipe picked by hand; with none picked, the batch's own
 `recipe`, as before. A store saved before the feed schedule loads with an empty one and doses its
 batch recipe unchanged.
+
+A feed recipe may declare the feed EC it mixes to (`ec`). The dosing config carries the EC of the
+recipe in use today as `feed.ec`, and watering compares pore EC with, in order: a mapped feed EC
+probe's reading, that declared EC, else 3.0 mS/cm. A declared value can't catch a mis-mixed tank, so a
+probe always wins and the source-water gate runs on the probe alone; a recipe's EC never holds water.
 
 `dosing_save` takes `feed` as optional: left out (a dashboard from before it), the stored one is
 kept and checked against the pumps being saved. `held_until` is set by the store when `stage`

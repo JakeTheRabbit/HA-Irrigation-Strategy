@@ -2177,6 +2177,18 @@ class Controller:
                 )
         return feed
 
+    def _recipe_feed_ec(self, room):
+        """The feed EC (mS/cm) the feed recipe in use today declares, as the integration publishes it on
+        sensor.crop_steering_<prefix>dosing_config (`feed.ec`), or None: no dosing setup, no feed recipe
+        in use, none declared, or not a number in 0.1-10. Declared, never measured: it stands in only
+        where no feed EC probe reads, and the source-water gate never runs on it."""
+        feed = ha_get(f"sensor.crop_steering_{room.prefix}dosing_config")[1].get("feed")
+        try:
+            ec = float(feed.get("ec"))
+        except (AttributeError, TypeError, ValueError):
+            return None
+        return ec if 0.1 <= ec <= 10 else None
+
     def _read_feed_ph(self, room):
         if not room.feed_ph_sensor:
             return None
@@ -2493,6 +2505,8 @@ class Controller:
             feed_ec = room._feed_last_good_value
         else:
             feed_ec = None
+        if feed_ec is None:  # measured first, then the feed recipe's declared EC, then 3.0
+            feed_ec = self._recipe_feed_ec(room)
         new_grow_day = self._new_grow_day(room, st, now, lights_on)
         snap = ZoneSnapshot(
             vwc=vwc,
