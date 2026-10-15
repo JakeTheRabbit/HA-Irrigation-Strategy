@@ -756,7 +756,7 @@ try {
       await page.locator("#zone-1-substrate_volume").fill("6.5");
       assert.equal(await preset.inputValue(), "custom", "Typing a volume is a custom entry");
       await page.locator("#zone-1-substrate_volume").fill("20");
-      assert.equal(await preset.inputValue(), "pot-20l", "A typed preset volume is recognised");
+      assert.equal(await preset.inputValue(), "custom", "A typed volume is never named as a preset, even when it matches one");
       await liveSetup(async (lp, calls) => {
         await lp.locator("#zone-1-substrate-preset").selectOption("pot-5gal");
         assert.equal(await lp.locator("#zone-1-substrate_volume").inputValue(), "18.9");
