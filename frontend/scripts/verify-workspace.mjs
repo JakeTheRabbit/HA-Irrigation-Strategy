@@ -1389,7 +1389,7 @@ try {
         );
         // A controller silent past its 10 min heartbeat: one band under the header, in words, on
         // a phone too, linking to the probes; the labelled header keeps both switches in words.
-        states["sensor.crop_steering_f1_ai_heartbeat"].last_updated = new Date(
+        states["sensor.crop_steering_room_b_ai_heartbeat"].last_updated = new Date(
           Date.now() - 14 * 60_000,
         ).toISOString();
         await navigate("Today", lp);
