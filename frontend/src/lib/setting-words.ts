@@ -162,6 +162,11 @@ const WORDS: Record<string, SettingWords> = {
     short: "Feed pH, highest",
     help: "Shots wait while the feed (tank) pH reads above this; 0 means no upper limit. It needs a feed pH sensor set in the controller app.",
   },
+  sump_power_threshold_w: {
+    label: "Sump pump runs above",
+    short: "Sump pump runs above",
+    help: "The sump pump counts as running while its power reads above this. A sump pump that shows no run for the hours set in the controller app raises an urgent alert.",
+  },
   max_shot_duration: {
     label: "Longest shot",
     short: "Longest shot",

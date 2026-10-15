@@ -362,7 +362,7 @@ CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "C
 # closed for BACKUP_GRACE_MIN before (the wetting front of a shot keeps rising a while): water coming up from below,
 # a table that isn't draining. Backtested on a production room's 22-30 Sep 2026 readings: the two real episodes (one
 # zone filling from a stopped sump, 28 Sep 21:19 and 29 Sep 12:09) and nothing else. Cleared after BACKUP_CLEAR_MIN
-# without a rise.
+# without a rise. Not watched in a room whose Drainage select says free_drain: nothing there can back up.
 BACKUP_RISE_PTS, BACKUP_WINDOW_MIN, BACKUP_GRACE_MIN, BACKUP_CLEAR_MIN = 3.0, 60.0, 45.0, 60.0
 # Field capacity follows the zone's highest readings (_follow_fc). When it moves by this many points or more, the P2
 # re-water threshold and the rescue (P3 emergency) floor move with it; a smaller move is field capacity only.
@@ -370,8 +370,9 @@ FC_SHIFT_MIN = 1.0
 # CS-311: the sump pump a room drains to (option sump_power_sensor) drawing no power for SUMP_SILENT_H while the
 # room is on. Observed on a production room: its sump ran every 1 to 1.5 hours, day and night, 22-28 Sep 2026 (its
 # longest gap 2.37 h) and then not at all for 41.6 h: its tables backed up. Checked every SUMP_CHECK_MIN from Home
-# Assistant's history, as a run lasts about a minute and a loop could miss it; a run is more than SUMP_RUN_W
-# (compared in W, whatever unit the plug reports: _device_history).
+# Assistant's history, as a run lasts about a minute and a loop could miss it; a run is more than the room's Sump
+# Pump Run Threshold, or SUMP_RUN_W where the integration has no such setting (compared in W, whatever unit the
+# plug reports: _device_history).
 SUMP_SILENT_H, SUMP_CHECK_MIN, SUMP_RUN_W = 3.0, 5.0, 20.0
 # The default room's kill switch on an installation from before the setup wizard: a helper the operator
 # made by hand, and this app's shipped `enable_flag` option (config.yaml). A room made by the wizard stops
@@ -2658,7 +2659,8 @@ class Controller:
         for that time and the BACKUP_GRACE_MIN before it: water coming up from below, a table that isn't draining.
         The readings compared start only BACKUP_GRACE_MIN after the zone's last water and after the controller
         started (a valve opened before a restart is not known). Held until the reading has not risen for
-        BACKUP_CLEAR_MIN, then the card goes."""
+        BACKUP_CLEAR_MIN, then the card goes. A room that drains freely is not watched, and a card it had goes."""
+        free = ha_get(f"select.crop_steering_{room.prefix}drainage")[0] == "free_drain"
         valve = room.hw["valves"].get(zone)
         last = room.__dict__.setdefault("_last_water", {})
         if valve and ha_get(valve)[0] == "on":
@@ -2673,7 +2675,7 @@ class Controller:
         track[:] = [(t, v) for t, v in track if t >= start]
         recent = sorted(v for t, v in track if t > now - timedelta(minutes=5))
         low = min((v for _, v in track), default=None)
-        rising = (len(track) >= 3 and (now - track[0][0]).total_seconds() >= 20 * 60
+        rising = (not free and len(track) >= 3 and (now - track[0][0]).total_seconds() >= 20 * 60
                   and recent[len(recent) // 2] - low >= BACKUP_RISE_PTS)
         held = room.__dict__.setdefault("_backed_up", {})
         key = f"backup_{room.slug}_z{zone}"
@@ -2692,7 +2694,7 @@ class Controller:
                 room=room,
                 zone=zone,
             )
-        elif zone in held and now - held[zone] >= timedelta(minutes=BACKUP_CLEAR_MIN):
+        elif zone in held and (free or now - held[zone] >= timedelta(minutes=BACKUP_CLEAR_MIN)):
             del held[zone]
             ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
             self._alerted.pop(key, None)
@@ -2701,9 +2703,9 @@ class Controller:
 
     def _watch_sump(self, room, now):
         """CS-311 (docs/error-codes.json): the sump pump this room's tables drain to (option sump_power_sensor) has
-        drawn no power for sump_silent_h while the room is on. Read from Home Assistant's history every
-        SUMP_CHECK_MIN (a run lasts about a minute); no evidence either way says nothing. The card goes at its next
-        run."""
+        drawn no power for sump_silent_h while the room is on: no reading above the room's Sump Pump Run Threshold
+        (SUMP_RUN_W when it has none, or it can't be read). Read from Home Assistant's history every SUMP_CHECK_MIN
+        (a run lasts about a minute); no evidence either way says nothing. The card goes at its next run."""
         entity = self.sump_sensors.get(room.slug) or self.sump_sensors.get("*")
         checked = getattr(room, "_sump_checked", None)
         if not entity or (checked is not None and now - checked < timedelta(minutes=SUMP_CHECK_MIN)):
@@ -2713,7 +2715,8 @@ class Controller:
             entity, "power", datetime.now(timezone.utc) - timedelta(hours=self.sump_silent_h))
         if rows is None:
             return
-        ran = any(watts > SUMP_RUN_W for watts, _changed in rows)
+        run_w = self._num(f"number.crop_steering_{room.prefix}sump_power_threshold_w", SUMP_RUN_W)
+        ran = any(watts > run_w for watts, _changed in rows)
         key = f"sump_{room.slug}"
         if ran:
             if key in self._alerted:

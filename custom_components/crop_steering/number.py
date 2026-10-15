@@ -413,6 +413,18 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement="hour",
         mode="box",
     ),
+    # CS-311: the sump pump counts as running while its plug reads above this. The controller puts
+    # the plug's reading into watts first, whatever unit it reports.
+    NumberEntityDescription(
+        key="sump_power_threshold_w",
+        name="Sump Pump Run Threshold",
+        icon="mdi:pump",
+        native_min_value=1,
+        native_max_value=10000,
+        native_step=1,
+        native_unit_of_measurement="W",
+        mode="box",
+    ),
 ]
 
 # Default values (shared by global + per-zone entities): the entity-default column of the one

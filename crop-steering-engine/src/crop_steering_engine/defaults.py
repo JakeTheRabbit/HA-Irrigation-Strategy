@@ -83,6 +83,9 @@ DEFAULTS = {
     # Photoperiod
     "lights_on_hour": (12, None),
     "lights_off_hour": (0, None),
+    # The sump pump's power above which it counts as running (W), for CS-311. The
+    # controller falls back to its own SUMP_RUN_W, the same 20 W it always compared with.
+    "sump_power_threshold_w": (20.0, None),
     # Controller-only: the highest VWC the minimum-daily floor may water a zone up to
     "min_floor_drown_ceiling": (None, 90),
 }
