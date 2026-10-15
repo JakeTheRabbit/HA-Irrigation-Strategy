@@ -37,6 +37,9 @@ SET_PHASE_OPTIONS = ["Keep", *PHASES]
 # How Water today reads, in the dashboard and the controller's vitals notification: each zone's
 # total, or what each of its plants got. The controller matches "Per plant" by these words.
 WATER_TODAY_VIEWS = ["Zone total", "Per plant"]
+# A room's no-touch window: Off, or how long the AI assistant asks nothing and changes nothing there
+# (an operator sampling or visiting). The controller matches these words and sets Off when it ends.
+NO_TOUCH_OPTIONS = ["Off", "1 h", "Until lights-on", "24 h"]
 STEERING_MODES = ["Vegetative", "Generative"]
 # What the room grows in, published in its descriptor for the controller. "generic" (the default,
 # and what every upgraded room reads) changes nothing; the ids match the doctrine pack's substrates.

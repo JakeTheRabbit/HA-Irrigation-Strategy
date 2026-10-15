@@ -10,6 +10,7 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.util import dt as dt_util
 
 from .const import (
     DOMAIN,
@@ -17,6 +18,7 @@ from .const import (
     PHASES,
     STEERING_MODES,
     GROWTH_STAGES,
+    NO_TOUCH_OPTIONS,
     RECIPE_STAGES,
     RECIPE_PARAMS,
     SOFTWARE_VERSION,
@@ -70,6 +72,15 @@ SELECT_DESCRIPTIONS = [
         name="Substrate",
         icon="mdi:sprout",
         options=SUBSTRATES,
+    ),
+    # The room's no-touch window: while it runs the AI assistant asks nothing and changes nothing
+    # in the room, and the rules carry on. `since` says when it was chosen; the controller sets it
+    # back to Off once the hour, the day or the night is over. Off until someone chooses.
+    SelectEntityDescription(
+        key="ai_no_touch",
+        name="Pause AI Changes",
+        icon="mdi:hand-back-left-off",
+        options=NO_TOUCH_OPTIONS,
     ),
 ]
 
@@ -147,6 +158,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         # (number.p1_target_vwc). Existing installs keep the id the registry already holds.
         self.entity_id = f"select.{self._attr_object_id}"
         self._attr_options = description.options
+        self._since = None  # ai_no_touch: when the current option was chosen
 
         # Set default values based on entity type
         if description.key == "growth_stage":
@@ -164,6 +176,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         if last_state is not None and restored_state_is_ours(self._entry, last_state):
             if last_state.state in self.options:
                 self._attr_current_option = last_state.state
+                self._since = last_state.attributes.get("since")
         # The recipe stage's source of truth is the server-side recipe Store, not
         # the restored entity state — reflect the loaded recipe's active stage.
         if self.entity_description.key == "recipe_stage":
@@ -198,6 +211,7 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
         """Change the selected option."""
         if option in self.options:
             self._attr_current_option = option
+            self._since = dt_util.utcnow().isoformat()
             self.async_write_ha_state()
             # Announce a manual phase pick on the event bus for automations. The controller
             # keeps each zone's phase itself and does not read this select.
@@ -220,6 +234,8 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
     def extra_state_attributes(self):
         """Expose the full recipe table on the recipe_stage select so the
         dashboard can read it (and edit via the save_recipe service)."""
+        if self.entity_description.key == "ai_no_touch":
+            return {"since": self._since}
         if self.entity_description.key != "recipe_stage":
             return None
         mgr = get_manager(self.hass, self._entry)
