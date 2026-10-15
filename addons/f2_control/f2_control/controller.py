@@ -330,7 +330,7 @@ def ha_fire(event, data, timeout=4):
         return False
     try:
         r = _session().post(f"{BASE}/events/{event}", headers=HDR, json=data, timeout=timeout)
-        _GATE.saw("other", r.status_code, f"POST {BASE}/events/{event}")
+        _GATE.saw("other", r.status_code, f"POST {SHOWN_BASE}/events/{event}")
         return r.status_code < 300
     except Exception:
         return False
