@@ -11,7 +11,8 @@ each week of the grow one of them (Week 1 Vege, Weeks 2-6 Bloom, Weeks 7-8 Fade)
 first week starts, counted in Home Assistant's days, so the recipe moves on by itself at the midnight
 that starts a week; after the last week, that week's recipe carries on. A recipe picked by hand while
 the schedule runs holds until the schedule's next week starts. Without a schedule running, the
-recipe picked by hand is the one in use, and with none picked the batch's own recipe is.
+recipe picked by hand is the one in use, and with none picked the batch's own recipe is. A feed
+recipe may declare the feed EC it mixes to; the controller waters on it only without a feed EC probe.
 """
 
 from __future__ import annotations
@@ -404,7 +405,12 @@ def clean_feed(raw, pumps: list[dict], exists=None) -> dict:
             doses = _recipe(item.get("doses"), by_id, exists)
         except DosingError as error:
             raise DosingError(f"feed recipe {name}: {error}") from None
-        out.append({"id": recipe_id, "name": name, "doses": doses})
+        # The feed EC the recipe mixes to, mS/cm, optional: watering compares pore EC with it
+        # when no feed EC probe is mapped.
+        ec = item.get("ec")
+        if ec not in (None, ""):
+            ec = _number(ec, 0.1, 10, f"feed recipe {name}: its feed EC (mS/cm)")
+        out.append({"id": recipe_id, "name": name, "doses": doses, "ec": ec or None})
     ids = {recipe["id"] for recipe in out}
     schedule = raw.get("schedule") or {}
     if not isinstance(schedule, dict):
@@ -478,7 +484,8 @@ def pick(feed: dict, recipe_id, today: date) -> dict:
 
 
 def feed_now(feed: dict, today: date) -> dict:
-    """What the room doses today and why: the recipe's name and id (None = the batch's own recipe),
+    """What the room doses today and why: the recipe's name, id and declared feed EC in mS/cm (None =
+    the batch's own recipe, or no EC declared; the controller waters on a measured feed EC first),
     the schedule's week and its length, and `source`: "schedule", "held" (picked by hand over the
     schedule), "hand" (picked, no schedule running) or "batch" (the batch's own recipe).
     """
@@ -495,6 +502,7 @@ def feed_now(feed: dict, today: date) -> dict:
     return {
         "recipe": recipe["name"] if recipe else None,
         "recipe_id": recipe["id"] if recipe else None,
+        "ec": recipe.get("ec") if recipe else None,
         "week": now[0] if now else None,
         "weeks": len(schedule.get("weeks") or []),
         "start": schedule.get("start"),

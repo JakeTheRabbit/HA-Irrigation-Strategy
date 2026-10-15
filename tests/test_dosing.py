@@ -367,6 +367,7 @@ def test_each_week_of_the_schedule_doses_its_recipe_and_the_last_one_carries_on(
         "id": "bloom",
         "name": "Bloom",
         "doses": [{"pump": "balance", "ml": 300, "ml_entity": None}],
+        "ec": None,
     }
     days = {
         date(2026, 10, 4): None,  # before it starts
@@ -393,6 +394,7 @@ def test_a_recipe_picked_by_hand_holds_until_the_next_week_starts():
     assert dosing.feed_now(doc, wednesday) == {
         "recipe": "Fade",
         "recipe_id": "fade",
+        "ec": None,
         "week": 1,
         "weeks": 4,
         "start": "2026-10-05",
@@ -411,6 +413,24 @@ def test_a_recipe_picked_by_hand_holds_until_the_next_week_starts():
     dosing.pick(none, "fade", wednesday)
     assert none["held_until"] is None
     assert dosing.feed_now(none, wednesday)["source"] == "hand"
+
+
+def test_a_feed_recipe_may_declare_the_feed_ec_it_mixes_to():
+    """Optional, 0.1 to 10 mS/cm; the controller waters on it only without a feed EC probe."""
+    doc = feed(
+        recipes=[
+            {"id": "vege", "name": "Vege", "ec": 2.4},
+            {"id": "bloom", "name": "Bloom", "ec": ""},
+        ],
+        schedule={"start": "2026-10-05", "weeks": ["vege", "bloom"]},
+    )
+    assert [recipe["ec"] for recipe in doc["recipes"]] == [2.4, None]
+    assert dosing.feed_now(doc, date(2026, 10, 5))["ec"] == 2.4
+    assert dosing.feed_now(doc, date(2026, 10, 12))["ec"] is None
+    assert dosing.feed_now(dosing.empty_feed(), date(2026, 10, 5))["ec"] is None
+    for ec in (0, 10.5, "strong", True):
+        with pytest.raises(dosing.DosingError, match="feed recipe A: its feed EC"):
+            feed(recipes=[{"name": "A", "ec": ec}], schedule=None)
 
 
 def test_a_feed_schedule_that_cannot_be_dosed_is_refused():
