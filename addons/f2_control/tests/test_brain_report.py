@@ -7,9 +7,11 @@ from datetime import datetime
 
 import brain_kit as B
 import jev_bridge
+import pytest
 from jev.client import HA_STATE_MAX, MAX_TEXT, validate_answer
 from jev.prompt import REPORT_MAX_TOKENS, Prompt
 from test_brain_wiring import claude  # noqa: F401 - the fixture
+from test_jev_controller import KILL
 
 LANE = jev_bridge.REPORT_QUESTION
 SNAP = "default:zroom:report:2026-09-28T01:30:abcd"
@@ -103,3 +105,13 @@ def test_the_report_is_off_when_it_is_not_among_the_judges(claude):  # noqa: F81
     c._clock.t = NIGHT.timestamp()
     c.loop_once(NIGHT)
     assert not _asked(c) and "report" not in fake.sets["sensor.crop_steering_jev"][1]["judges_advising"]
+
+
+@pytest.mark.parametrize("entity", [KILL, "sensor.crop_steering_vwc_zone_1"])
+def test_no_report_with_the_kill_switch_off_or_stale_readings(claude, entity):  # noqa: F811
+    c, fake = claude(reporting)
+    fake.set_state(entity, "off" if entity == KILL else "unavailable")
+    c._clock.t = NIGHT.timestamp()
+    c.loop_once(NIGHT)
+    c.loop_once(NIGHT)
+    assert not _asked(c) and "sensor.crop_steering_brain_report" not in fake.sets

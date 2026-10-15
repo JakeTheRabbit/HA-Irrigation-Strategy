@@ -1127,7 +1127,8 @@ def feed_task(c, room, now):
     day = c._grow_day_start(room, now).isoformat()
     since_on = (24.0 - c._hours_to(now, room.lights_on_hour)) % 24.0
     if (task.due(room.slug, day) and c._lights_on(room, now) and since_on >= jev_feed.AFTER_H
-            and c._on(room.enable_flag, False) and c._no_touch_until(room, now) is None):
+            and c._on(room.enable_flag, False) and c._no_touch_until(room, now) is None
+            and room_health(c, room, now)[0] == "ok"):  # stale readings ask nothing (SF-26)
         task.ask(room.slug, day, feed_facts(c, room, now), now)
 
 
@@ -1197,7 +1198,8 @@ def report_task(c, room, now, ha_set):
     day = c._grow_day_start(room, now).isoformat()
     since_off = (now.hour + now.minute / 60.0 - room.lights_off_hour) % 24.0
     if (rec.get("grow_day") != day and not c._lights_on(room, now) and since_off >= REPORT_AFTER_H
-            and not brain.asker.pending(key) and c._no_touch_until(room, now) is None):
+            and not brain.asker.pending(key) and c._on(room.enable_flag, False)
+            and c._no_touch_until(room, now) is None and room_health(c, room, now)[0] == "ok"):
         asked_at = brain.asker.clock()
         if brain.asker.submit(key, report_evidence(c, room, now, day), REPORT_QUESTION):
             rec.update(grow_day=day, asked_at=asked_at)

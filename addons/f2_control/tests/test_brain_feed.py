@@ -85,3 +85,13 @@ def test_only_a_firm_change_is_a_proposal():
     assert feed.proposal(v("feed_ec_up_small", 0.8, agreed=False)) is None
     assert feed.proposal(v("keep_feed", 0.9)) is None and feed.proposal(None) is None
     assert set(feed.WORDS) < set(feed.PROPOSAL) and "insufficient_evidence" in feed.PROPOSAL
+
+
+def test_stale_readings_ask_no_feed_question(claude):  # noqa: F811
+    c, fake = claude(B.judging({"proposal": "feed_ec_down_small"}), feed_ec_sensor=FEED)
+    fake.set_state(FEED, "2.4", {"unit_of_measurement": "mS/cm"})
+    fake.set_state("sensor.crop_steering_vwc_zone_1", "unavailable")  # room health is not ok: nothing is asked
+    for _ in range(2):
+        _zone(c)
+        c.loop_once(NOW)
+    assert not _feed_asks(c) and not _created(fake, "CS-711")
