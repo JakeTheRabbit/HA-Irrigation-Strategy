@@ -37,7 +37,7 @@ from jev.ledger import Ledger
 from jev.setpoint_memory import SetpointMemory
 from jev.triage import Triage
 
-ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "alerts")
+ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "alerts", "report")
 PENDING_S = 300  # a write Home Assistant has not reflected yet is not an operator's edit for this long
 REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the old value back
 PAUSE_H = 48  # and the zone's setpoints are left alone this long
@@ -45,6 +45,10 @@ PAUSE_H = 48  # and the zone's setpoints are left alone this long
 JEV_FILES = ("jev_usage.json", "jev_ledger.jsonl", "jev_journal.jsonl", "jev_setpoints.json")
 PROVIDERS = ("auto", "rules", "claude_haiku", "jev_legacy")
 NOTICES = "brain_notices.json"  # {"cs712": "<release>"}: the retired-route card is shown once a release
+REPORTS = "brain_report.json"  # {room: {"grow_day", "asked_at", "report"}}: the daily report, across a restart
+REPORT_AFTER_H = 3.0  # hours after lights-off: the setpoints judge has had its night window
+REPORT_QUESTION = {"report": {"type": "report", "instructions": "Write the report for the grow-day that just ended "
+                                                                "with write_report."}}
 # The judges whose answers can act (the rest advise); empty on the panel while the brain cannot act.
 ACTING_JUDGES = ("dawn", "ramp", "salt", "dusk", "probe", "setpoints")
 FRIENDLY = "AI assistant"
@@ -216,6 +220,8 @@ def build(options, cf, state_path, log, status=None):
         brain.triage = Triage(asker, may_quiet=False, meta=alert_meta)
     else:
         brain.triage = Triage(asker)
+    brain.report = haiku and "report" in allowed  # write_report is a Claude tool: no legacy route can answer it
+    brain.report_path = os.path.join(data, REPORTS)
     brain.flower_start = flower_option(options.get("jev_flower_start"))
     brain.flower_days = int(options.get("jev_flower_days") or 56)
     return brain
@@ -859,7 +865,8 @@ def panel(c, room, now):
            "stage_arc": {"id": getattr(brain, "arc", DEFAULT_ARC), "in_force": bool(getattr(brain, "arc_rows", STAGE_ROWS)),
                          "words": getattr(brain, "arc_note", None)},
            "judges_acting": [j for j in built if j in ACTING_JUDGES] if acting else [],
-           "judges_advising": [j for j in built if j not in ACTING_JUDGES] + (["alerts"] if brain.triage else [])}
+           "judges_advising": [j for j in built if j not in ACTING_JUDGES] + (["alerts"] if brain.triage else [])
+           + (["report"] if getattr(brain, "report", False) else [])}
     entries = brain.journal.recent(room.slug, 1) if getattr(brain, "journal", None) is not None else []
     if entries:
         e = entries[0]
@@ -915,6 +922,86 @@ def publish(c, room, now, ha_set):
         entries = journal.recent(room.slug)
         ha_set(f"sensor.crop_steering_{room.prefix}jev_log", headline(entries[0] if entries else None),
                {"entries": entries, "friendly_name": "Jev decisions", "engine": "f2-control"})
+    report_task(c, room, now, ha_set)
+
+
+def _reports(brain):
+    """Each room's report record, read from /data once; a missing or damaged file is no report yet."""
+    if "_reports" not in brain.__dict__:
+        try:
+            with open(brain.report_path, encoding="utf-8") as fh:
+                saved = json.load(fh)
+            brain._reports = {k: v for k, v in saved.items() if isinstance(v, dict)}
+        except (OSError, ValueError, AttributeError, TypeError):
+            brain._reports = {}
+    return brain._reports
+
+
+def _save_reports(brain):
+    try:
+        tmp = brain.report_path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as fh:
+            json.dump(brain._reports, fh)
+        os.replace(tmp, brain.report_path)
+    except OSError:
+        pass  # the report is still published; a restart may ask for it again
+
+
+def report_evidence(c, room, now, day):
+    """The grow-day that just ended, as the report task's evidence: each zone's counters (they reset at the next
+    lights-on), its siblings' words and the room's decisions since lights-on began the grow-day."""
+    zones = []
+    for zone in room.zones:
+        st = room.state[zone]
+        plants = c._zone_num(room, zone, "plant_count", 0)
+        z = {"zone": zone, "phase_now": st.get("phase"), "shots": st.get("shots"),
+             "water_l": round(st.get("daily_vol") or 0.0, 3), "peak_vwc": st.get("peak"),
+             "pore_ec_settled": st.get("ec_settled"), "vwc_at_lights_off": (st.get("night") or {}).get("off_vwc")}
+        if plants and plants >= 1:
+            z["water_per_plant_l"] = round((st.get("daily_vol") or 0.0) / plants, 3)
+        z.update({k: v for k, v in room.__dict__.get("_jev_sib", {}).get(zone, {}).items() if k.endswith("_words")})
+        zones.append(z)
+    start = (datetime.fromisoformat(day) + timedelta(hours=room.lights_on_hour)).isoformat(timespec="seconds")
+    journal = getattr(c.jev, "journal", None)
+    decisions = [{k: e.get(k) for k in ("t", "zone", "judge", "verdict", "action", "result")}
+                 for e in (journal.recent(room.slug, 100) if journal is not None else []) if str(e.get("t")) >= start]
+    return {"grow_day": day, "local_time": f"{now:%H:%M}", "zones": zones, "decisions": decisions[::-1][-40:],
+            "_brain": {"room": room.slug, "zone": "room", "judge": "report",
+                       "asked": now.isoformat(timespec="minutes"), "stage": stage_info(c, room, now)}}
+
+
+def report_task(c, room, now, ha_set):
+    """The room's daily grower report (haiku-brain-design section 5, ADVISES): asked once a grow-day, REPORT_AFTER_H
+    after lights-off so the setpoints judge has had its window, and only when the budget lets a new ask start
+    (Asker.submit). The answer is published on its own sensor and kept in /data, so a restart neither asks again nor
+    loses it; the last report stays up until the next one comes back."""
+    brain = c.jev
+    if not getattr(brain, "report", False):
+        return
+    reports = _reports(brain)
+    rec = reports.setdefault(room.slug, {})
+    key = f"report:{room.slug}"
+    ans = brain.asker.result(key)
+    got = (ans.answers or {}).get("report") if ans is not None else None
+    if got and rec.get("asked_at") is not None and ans.at >= rec["asked_at"] and (
+            (rec.get("report") or {}).get("grow_day") != rec.get("grow_day")):
+        rec["report"] = {**got, "grow_day": rec.get("grow_day"), "generated_at": now.isoformat(timespec="seconds"),
+                         "cost_usd": (ans.usage or {}).get("cost_usd")}
+        _save_reports(brain)
+    day = c._grow_day_start(room, now).isoformat()
+    since_off = (now.hour + now.minute / 60.0 - room.lights_off_hour) % 24.0
+    if (rec.get("grow_day") != day and not c._lights_on(room, now) and since_off >= REPORT_AFTER_H
+            and not brain.asker.pending(key)):
+        asked_at = brain.asker.clock()
+        if brain.asker.submit(key, report_evidence(c, room, now, day), REPORT_QUESTION):
+            rec.update(grow_day=day, asked_at=asked_at)
+            _save_reports(brain)
+    r = rec.get("report")
+    if r:
+        ha_set(f"sensor.crop_steering_{room.prefix}brain_report", r.get("headline") or "no report",
+               {"grow_day": r.get("grow_day"), "zones": r.get("zones"), "watch": r.get("watch"),
+                "generated_at": r.get("generated_at"), "cost_usd": r.get("cost_usd"), "friendly_name": "Daily report",
+                "engine": "f2-control"})
 
 
 def publish_rules(c, room, now, ha_set):

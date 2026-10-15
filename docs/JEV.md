@@ -156,6 +156,9 @@ each page with screenshots.
   the action in words) and each alert-triage call (push or card only).
 - `/data/jev_ledger.jsonl`: every directive that acted, what Jev saw, and later how it turned out.
 - `/data/jev_journal.jsonl`: every decision behind the live log (the last 400), kept across restarts.
+- `sensor.crop_steering_<prefix>brain_report` (Claude Haiku only): the daily report, asked once a grow-day three
+  hours after lights-off. Its state is the headline; `grow_day`, `zones` (one line each), `watch` (up to three
+  things to check), `generated_at` and `cost_usd`. Kept in `/data/brain_report.json` across a restart.
 - `/data/jev_usage.json`: today's calls, input tokens and errors, so the count survives a restart.
 
 ## Checked against the real Jev
