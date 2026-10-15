@@ -258,11 +258,18 @@ def normalize_plan(plan, zone_ids, catalog):
         normalized_zones.append(
             {"zone_id": zid, "start_date": start, "schedule": normalized_schedule}
         )
-    return {
+    out = {
         "schema_version": SCHEMA_VERSION,
         "profiles": normalized_profiles,
         "zones": normalized_zones,
     }
+    # The grower's own name for the plan, optional: a plan without one is stored as before.
+    name = plan.get("name")
+    if name is not None:
+        if not isinstance(name, str) or not 1 <= len(name.strip()) <= 100:
+            raise ValueError("Plan name must be 1..100 characters")
+        out["name"] = name.strip()
+    return out
 
 
 def preview_zone(plan, zone_id, grow_day, catalog=None):

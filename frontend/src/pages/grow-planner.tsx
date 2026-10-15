@@ -477,6 +477,18 @@ export function GrowPlanner({
                 Revision {document.revision} ·{" "}
                 {controller.demo ? "Isolated sample plan" : "Stored in Home Assistant"}
               </p>
+              <Label htmlFor="plan-name">Plan name (optional)</Label>
+              <Input
+                id="plan-name"
+                maxLength={100}
+                disabled={disabled}
+                value={plan.name ?? ""}
+                placeholder="Shown on the AI assistant's plan line"
+                onChange={(e) => {
+                  const { name: _old, ...unnamed } = plan;
+                  setPlan(e.target.value.trim() ? { ...unnamed, name: e.target.value } : unnamed);
+                }}
+              />
             </div>
             <div className="workspace-actions">
               <Button

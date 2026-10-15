@@ -61,6 +61,8 @@ export interface ZonePlan {
 }
 export interface GrowPlan {
   schema_version: 1;
+  /** The grower's own name for the plan (optional; a plan saved before it has none). */
+  name?: string;
   profiles: SteeringProfile[];
   zones: ZonePlan[];
 }
