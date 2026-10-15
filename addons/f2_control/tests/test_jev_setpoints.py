@@ -4,6 +4,7 @@ around the operator's value, the operator's edits always winning, and a rescue s
 26 Sep 2026: the old learner walked zone 1's P2 shot from 3 % to 1 % one step a day (30-second shots every 96
 seconds) and ratcheted zone 3's targets to 74.5 in four days. These tests pin what makes that impossible now.
 """
+import json
 import re
 from datetime import datetime, timedelta
 from types import SimpleNamespace
@@ -194,6 +195,7 @@ class _Controller:
 
     def _auto_write(self, room, zone, suffix, old, value, learn, now, by="auto"):
         self.writes.append((zone, suffix, old, value, by))
+        return True
 
     def _alert(self, key, code, title, message, room=None, zone=None):
         self.alerts.append((key, code, message))
@@ -260,6 +262,68 @@ def test_a_rescue_shot_after_a_change_puts_it_back_and_pauses_the_zone(tmp_path)
     assert sp["frozen"] and "put back" in sp["last_words"]
     jev_bridge.guard_setpoints(c, room, 1, NIGHT + timedelta(hours=6))  # once only
     assert len(c.writes) == 2 and c.jev.journal.recent("default")[0]["verdict"] == "safety revert"
+
+
+def _moved(tmp_path):
+    c, room = _Controller(tmp_path), _room()
+    ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
+    jev_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
+    return c, room, c.jev.setpoints.zone("default", 1)
+
+
+def test_a_write_that_lands_is_read_back_and_never_sent_again(tmp_path):
+    c, room, rec = _moved(tmp_path)
+    c.numbers[SHOT] = 4.5
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=1))
+    assert rec["pending"] is None
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(hours=2))
+    assert c.writes == [(1, SHOT, 5.0, 4.5, "Jev")]
+
+
+def test_a_write_that_does_not_land_is_sent_again_backing_off_then_recorded_as_failed(tmp_path):
+    c, room, rec = _moved(tmp_path)  # Home Assistant keeps showing 5.0
+    for minutes, sent in ((4, 1), (5, 2), (14, 2), (15, 3), (35, 4), (74, 4)):
+        jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=minutes))
+        assert len(c.writes) == sent, minutes
+        sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=minutes))
+        assert sp["home"][SHOT] == 5.0  # the old value is never taken for an edit by hand while it is retried
+    assert set(c.writes) == {(1, SHOT, 5.0, 4.5, "Jev")}
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=75))
+    assert len(c.writes) == 4 and rec["pending"] is None and rec["written"][SHOT] == 5.0
+    top = c.jev.journal.recent("default")[0]
+    assert (top["verdict"], top["action"], top["result"]) == ("write failed", "p2 shot size 5 -> 4.5", "failed")
+    assert "still shows 5 after 4 tries" in top["reason"]
+    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=76))
+    assert sp["home"][SHOT] == 5.0 and sp["last_words"].endswith("(did not reach Home Assistant)")
+    assert c.jev.journal.recent("default")[0]["verdict"] == "write failed"  # and not "set by hand"
+    assert SetpointMemory(str(tmp_path / "sp.json")).zone("default", 1)["last"]["failed"]
+
+
+def test_switching_automatic_targets_off_stops_the_retries(tmp_path):
+    c, room, rec = _moved(tmp_path)
+    c.auto = "off"
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=5))
+    assert len(c.writes) == 1 and rec["pending"] is None
+    assert "switched off" in c.jev.journal.recent("default")[0]["reason"]
+
+
+def test_an_edit_by_hand_during_the_retries_ends_them(tmp_path):
+    c, room, rec = _moved(tmp_path)
+    c.numbers[SHOT] = 5.5
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=5))
+    assert len(c.writes) == 1 and rec["pending"] is None
+    assert jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=6))["home"][SHOT] == 5.5
+
+
+def test_a_pending_write_an_older_memory_left_still_loads_and_times_out(tmp_path):
+    old = {"default:1": {"home": {SHOT: 5.0}, "written": {SHOT: 4.5},
+                         "pending": {"suffix": SHOT, "from": 5.0, "at": NIGHT.isoformat()}}}
+    (tmp_path / "sp.json").write_text(json.dumps(old))
+    c, room = _Controller(tmp_path), _room()
+    jev_bridge.readback(c, room, 1, NIGHT + timedelta(hours=1))
+    assert c.writes == []
+    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(hours=1))
+    assert sp["home"][SHOT] == 5.0 and c.jev.setpoints.zone("default", 1)["pending"] is None
 
 
 def test_the_whole_loop_through_the_brain_logs_and_files_the_move(tmp_path):
