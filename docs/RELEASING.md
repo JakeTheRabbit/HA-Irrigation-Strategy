@@ -199,7 +199,7 @@ Because the repository address is the add-on's identity, pointing an existing ro
 
 1. Kill switch OFF. Wait for any shot to finish. Stop the old controller and switch off its *Start on boot*.
 2. Back up the old add-on and copy `state.json` out of its `/data`.
-3. Add the new repository address, install the controller from it, **do not start it yet**.
+3. Add the new repository address, install the controller from it, **do not start it yet**, and switch off its *Start on boot* until you start it in step 4: it is on by default, and a host restart before then would start both controllers.
 4. Put `state.json` into the new add-on's `/data`, copy the add-on options across, then start it.
 5. Confirm it logs `resumed after restart` with the right setup revision, and that the daily counters are the ones you copied.
 6. Only then uninstall the old controller. Two controllers on one room is two things opening the same valve.
