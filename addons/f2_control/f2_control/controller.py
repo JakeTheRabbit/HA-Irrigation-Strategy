@@ -296,6 +296,44 @@ RETIRED_SWITCHES = (
     ("auto_irrigation_enabled", "Auto Irrigation Enabled"),
 )
 
+# How each kind of on/off device a zone valve, main line or pump can be is opened, closed and read back:
+# domain -> (open service, close service, open state, closed state). Every open, close and read-back of
+# that hardware goes through it (hw_call, hw_get). A mapped entity of any other domain is never sent a
+# command: its zone is held with CS-313 (_undrivable).
+ACTUATORS = {
+    "switch": ("turn_on", "turn_off", "on", "off"),
+    "input_boolean": ("turn_on", "turn_off", "on", "off"),
+    "valve": ("open_valve", "close_valve", "open", "closed"),
+}
+
+
+def hw_call(entity, on):
+    """Open (on=True) or close one zone valve, main line or pump -> whether Home Assistant took it.
+    One whose domain is not in ACTUATORS is not sent anything, and that is a failure."""
+    domain = entity.split(".", 1)[0]
+    row = ACTUATORS.get(domain)
+    return bool(row) and ha_call(domain, row[0] if on else row[1], entity_id=entity)
+
+
+def hw_state(entity, state):
+    """A state of `entity` in on/off words: its domain's open state reads "on" and its closed state "off".
+    Anything else (unavailable, opening, a domain not in ACTUATORS) is returned as it is."""
+    row = ACTUATORS.get(entity.split(".", 1)[0])
+    return {row[2]: "on", row[3]: "off"}.get(state, state) if row else state
+
+
+def hw_get(entity, timeout=8):
+    """ha_get for a zone valve, main line or pump, its state in on/off words (hw_state)."""
+    read = ha_get(entity, timeout=timeout)
+    return HAState(hw_state(entity, read[0]), read[1], read[2], getattr(read, "last_changed", None))
+
+
+def hw_history(entity, since):
+    """ha_history for a zone valve, main line or pump, each state in on/off words (hw_state)."""
+    rows = ha_history(entity, since)
+    return rows and [(hw_state(entity, state), stamp) for state, stamp in rows]
+
+
 # What Controller._on reads as ON. A hold (hold_entities) in one of these states stops a shot starting
 # (_blocked) and ends one in flight (_wait_shot): the same test, so the two can never disagree.
 ON_STATES = ("on", "true", "open", "1", "home")
@@ -1228,7 +1266,7 @@ class Controller:
                         room.enable_flag
                     )  # absent legacy helper on a fresh setup
                 armed = sorted(flag for flag in flags if ha_get(flag)[0] != "off")
-                running = sorted(e for e in hardware if ha_get(e)[0] != "off")
+                running = sorted(e for e in hardware if hw_get(e)[0] != "off")
                 if running or (armed and not resuming):
                     if active:  # an archived room is meant to stay dry: no noise about it
                         self._alert(
@@ -2320,6 +2358,21 @@ class Controller:
                 room=room,
             )
             return plumbing
+        undrivable = self._undrivable(room, zone)
+        if undrivable:
+            names = ", ".join(undrivable)
+            self._alert(
+                f"actuator_{room.slug}_z{zone}",
+                "CS-313",
+                "a valve or pump the controller can't switch, not watering",
+                "This zone's valve, or the room's pump or main line, is a kind of device the controller "
+                "has no way to open and close, so it is never sent a command and the zone is not "
+                "watered. Map a switch, an input_boolean or a valve in its place in Rooms & setup."
+                f"\n\nCan't be switched: {names}",
+                room=room,
+                zone=zone,
+            )
+            return f"{names} can't be switched (a zone valve, main line or pump must be a switch, input_boolean or valve)"
         if not self._on(room_gate(room), False):
             return f"{PRODUCT} disabled (kill switch off)"
         retired = getattr(room, "_retired_off", None)
@@ -2394,7 +2447,7 @@ class Controller:
         # closed, and latched a hold that stopped the room for 7 hours. Nothing is opened until the
         # whole feed path reads again, and nothing latches.
         offline = [e for e in (hw.get("pump"), hw.get("mainline"), hw["valves"].get(zone))
-                   if e and str(ha_get(e)[0]).lower() not in ("on", "off")]
+                   if e and str(hw_get(e)[0]).lower() not in ("on", "off")]
         if offline:
             return f"{', '.join(offline)} offline (reads neither on nor off)"
         return None
@@ -2663,7 +2716,7 @@ class Controller:
         free = ha_get(f"select.crop_steering_{room.prefix}drainage")[0] == "free_drain"
         valve = room.hw["valves"].get(zone)
         last = room.__dict__.setdefault("_last_water", {})
-        if valve and ha_get(valve)[0] == "on":
+        if valve and hw_get(valve)[0] == "on":
             last[zone] = now
         shot = room.state[zone].get("last_shot")
         wet = max((t for t in (last.get(zone), shot if isinstance(shot, datetime) else None) if t), default=None)
@@ -3058,6 +3111,14 @@ class Controller:
         }
 
     @staticmethod
+    def _undrivable(room, zone):
+        """This zone's valve and the room's main line and pump that have no row in ACTUATORS. Setup refuses
+        them; one mapped by hand holds its zone (CS-313) and is never sent a command."""
+        hw = room.hw
+        return [e for e in (hw.get("pump"), hw.get("mainline"), hw["valves"].get(zone))
+                if e and e.split(".", 1)[0] not in ACTUATORS]
+
+    @staticmethod
     def _fault_record(fault, fallback_entities=()):
         entities = fault.get("entities") if isinstance(fault, dict) else None
         return {
@@ -3145,7 +3206,7 @@ class Controller:
                 continue
             for affected_room in affected:
                 entities.update(self._hardware_entities(affected_room))
-            if not entities or not all(ha_get(e)[0] == "off" for e in entities):
+            if not entities or not all(hw_get(e)[0] == "off" for e in entities):
                 continue
             room.hardware_fault = None
             # an interrupted shot's record is settled too: every switch it could name reads OFF
@@ -3211,7 +3272,7 @@ class Controller:
         zone = rec["zone"]
         tag = f"[{room.slug}] Z{zone} interrupted shot (started {rec['started']})"
         order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
-        reads = {e: ha_get(e) for e in order}
+        reads = {e: hw_get(e) for e in order}
         if all(read[0] == "off" for read in reads.values()):
             self._clear_inflight(room, f"{tag}: its valve/main line/pump read OFF - record closed")
             return
@@ -3290,7 +3351,7 @@ class Controller:
             if not lo <= (changed - started).total_seconds() <= hi:
                 # A Home Assistant restart or the switch reconnecting also moves last_changed: ask the
                 # recorder whether anyone switched it since the shot opened it.
-                own = _on_since_shot(ha_history(ent, started + timedelta(seconds=lo)), started)
+                own = _on_since_shot(hw_history(ent, started + timedelta(seconds=lo)), started)
                 if own is None:
                     return close, [], order[i:], ""
                 if not own:
@@ -3308,11 +3369,11 @@ class Controller:
     def _switch_off_confirmed(self, entities):
         """Switch these off, the valve first and then back up the line as after a normal shot, and
         report whether every one reads back OFF."""
-        ok = ha_call("switch", "turn_off", entity_id=entities[0])
+        ok = hw_call(entities[0], False)
         if len(entities) > 1:
             time.sleep(1)
         for ent in entities[1:]:
-            ok = ha_call("switch", "turn_off", entity_id=ent) and ok
+            ok = hw_call(ent, False) and ok
         return ok and self._confirm_switches(entities, "off")
 
     def _line_in_use(self, room, rec):
@@ -3322,7 +3383,7 @@ class Controller:
             if other is not room and not line & {other.hw.get("mainline"), other.hw.get("pump")}:
                 continue
             for valve in other.hw.get("valves", {}).values():
-                if valve and valve != rec.get("valve") and ha_get(valve)[0] == "on":
+                if valve and valve != rec.get("valve") and hw_get(valve)[0] == "on":
                     return True
         return False
 
@@ -3375,7 +3436,7 @@ class Controller:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     break
-                state = ha_get(entity, timeout=min(step, remaining))[0]
+                state = hw_get(entity, timeout=min(step, remaining))[0]
                 if entity != valve:
                     ended = str(state).lower() in ON_STATES
                 else:
@@ -3408,7 +3469,7 @@ class Controller:
         interruption was seen.
         """
         valve, mainline, pump = room.hw["valves"].get(zone), room.hw.get("mainline"), room.hw.get("pump")
-        reads = {e: ha_get(e) for e in (valve, mainline, pump) if e}
+        reads = {e: hw_get(e) for e in (valve, mainline, pump) if e}
         close = [e for e in (valve, mainline) if e and reads[e][0] != "off"]
         left = []
         if pump and reads[pump][0] != "off":
@@ -3452,7 +3513,7 @@ class Controller:
             deadline = time.monotonic() + window
             time.sleep(first)
             while True:
-                if all(ha_get(ent)[0] == want for ent in entities):
+                if all(hw_get(ent)[0] == want for ent in entities):
                     return True
                 if time.monotonic() >= deadline:
                     return False
@@ -3469,8 +3530,8 @@ class Controller:
         # read back for 10 s more: 16 s in all, still inside the minute's loop for a genuinely
         # stuck-open valve.
         for ent in entities:
-            if ha_get(ent)[0] != "off":
-                ha_call("switch", "turn_off", entity_id=ent)
+            if hw_get(ent)[0] != "off":
+                hw_call(ent, False)
         return settled(CONFIRM_RETRY_S, CONFIRM_POLL_S)
 
     def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None, plan_exempt=False):
@@ -3482,6 +3543,10 @@ class Controller:
         plumbing = plumbing_hold(room.hw)
         if plumbing:  # never open a valve on a room whose declared pump is not there to run
             log(f"[{room.slug}] Z{zone} shot held: {plumbing}")
+            return
+        undrivable = self._undrivable(room, zone)
+        if undrivable:  # never sent a command (_blocked raises CS-313 for it)
+            log(f"[{room.slug}] Z{zone} shot held: {', '.join(undrivable)} can't be switched")
             return
         # A shot a plan hold never stops (PLAN_HOLD_EXEMPT) does not wait on the plan here either.
         strategy_hold = None if plan_exempt else self._strategy_preflight(room, zone, datetime.now())
@@ -3520,8 +3585,8 @@ class Controller:
             # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
             # Pump and mainline are optional (a one-switch tent has neither): each is sequenced when
             # mapped and skipped, with its lead time, when not. The valve is always required.
-            if pump and not ha_call("switch", "turn_on", entity_id=pump):
-                ha_call("switch", "turn_off", entity_id=pump)  # it may be on all the same: off before the alert
+            if pump and not hw_call(pump, True):
+                hw_call(pump, False)  # it may be on all the same: off before the alert
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "CS-302",
@@ -3535,9 +3600,9 @@ class Controller:
                 return
             if pump:
                 time.sleep(2)
-            if mainline and not ha_call("switch", "turn_on", entity_id=mainline):
+            if mainline and not hw_call(mainline, True):
                 if pump:
-                    ha_call("switch", "turn_off", entity_id=pump)
+                    hw_call(pump, False)
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "CS-303",
@@ -3553,10 +3618,10 @@ class Controller:
                 time.sleep(1)
             valve_started = time.monotonic()
             valve_opened = datetime.now(timezone.utc)  # on Home Assistant's clock too: see _close_cut_short
-            if not ha_call("switch", "turn_on", entity_id=valve):
+            if not hw_call(valve, True):
                 for upstream in (mainline, pump):
                     if upstream:
-                        ha_call("switch", "turn_off", entity_id=upstream)
+                        hw_call(upstream, False)
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "CS-304",
@@ -3588,7 +3653,7 @@ class Controller:
             # pump-relay-default-off / independent watchdog) can. So check EVERY turn_off + the
             # read-back and ALERT loudly on any non-close (the old code ignored turn_off failures
             # and a dead-HA read-back masked a stuck-open valve as "closed" — silent danger).
-            close_ok = ha_call("switch", "turn_off", entity_id=valve)
+            close_ok = hw_call(valve, False)
             # Delivery is estimated, not flow-metered. Include the acknowledgement
             # interval conservatively because the exact physical close time is unknown.
             elapsed = max(elapsed, time.monotonic() - valve_started)
@@ -3596,12 +3661,12 @@ class Controller:
             if upstream:
                 time.sleep(1)
             for ent in upstream:
-                close_ok = ha_call("switch", "turn_off", entity_id=ent) and close_ok
+                close_ok = hw_call(ent, False) and close_ok
             # Only a definitive OFF is safe, including pump/mainline read-back.
             closed = self._confirm_switches((valve, *upstream), "off")
             if not close_ok or not closed:
                 for ent in reversed(upstream):
-                    ha_call("switch", "turn_off", entity_id=ent)
+                    hw_call(ent, False)
                 self._latch_hardware_fault(
                     room, f"zone {zone} valve/pump/mainline close not confirmed"
                 )
@@ -3658,7 +3723,7 @@ class Controller:
                     close_ok = True
                     for ent in closing:
                         close_ok = (
-                            ha_call("switch", "turn_off", entity_id=ent) and close_ok
+                            hw_call(ent, False) and close_ok
                         )
                     # Read back as patiently as after a normal close: a plug that reports OFF 1.6 s
                     # late is not a stuck pump (the 15 Sep false hold, on this very path).
@@ -3688,7 +3753,7 @@ class Controller:
             if not rec:
                 continue
             order = [e for e in (rec.get("valve"), rec.get("mainline"), rec.get("pump")) if e]
-            reads = {e: ha_get(e) for e in order}
+            reads = {e: hw_get(e) for e in order}
             if all(read[0] == "off" for read in reads.values()):
                 room.shot_inflight = None
                 continue

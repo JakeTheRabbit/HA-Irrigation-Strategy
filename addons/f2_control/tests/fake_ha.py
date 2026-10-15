@@ -44,10 +44,12 @@ class FakeHA:
     def ha_call(self, domain, service, **data):
         self.calls.append((domain, service, data))
         # emulate a switch actually toggling, so valve read-back sees the new state
-        if domain == "switch" and "entity_id" in data:
+        if domain in ("switch", "input_boolean") and "entity_id" in data:
             self.set_state(
                 data["entity_id"], "on" if service == "turn_on" else "off"
             )
+        elif domain == "valve" and "entity_id" in data:
+            self.set_state(data["entity_id"], "open" if service == "open_valve" else "closed")
         return True
 
     def ha_service_response(self, domain, service, data, timeout=12):

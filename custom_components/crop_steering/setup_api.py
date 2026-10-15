@@ -20,9 +20,12 @@ from .room import room_gate
 from .sizing import prefer_setup_value
 
 API_VERSION = 1
+# What a zone valve, main line or pump can be: the kinds of device the controller can open and close
+# (its ACTUATORS table, addons/f2_control/f2_control/controller.py).
+ACTUATOR_DOMAINS = {"switch", "input_boolean", "valve"}
 HARDWARE_DOMAINS = {
-    "pump_switch": {"switch"},
-    "main_line_switch": {"switch"},
+    "pump_switch": ACTUATOR_DOMAINS,
+    "main_line_switch": ACTUATOR_DOMAINS,
     "waste_switch": {"switch"},
     "light_entity": {"light", "switch"},
     "feed_ec_sensor": {"sensor"},
@@ -148,17 +151,20 @@ def _off_blocker(hass, eid):
     for an entity that was on, unreachable, or did not exist at all: three different things to fix.
     """
     state = hass.states.get(eid)
-    if state is not None and state.state == "off":
+    # A valve reads open or closed; everything else here reads on or off.
+    on, off = ("open", "closed") if eid.startswith("valve.") else ("on", "off")
+    if state is not None and state.state == off:
         return None
     if state is None:
         detail = (
             "entity not found: check the id, or its device integration has not loaded"
         )
-    elif state.state == "on":
-        detail = "it is ON: turn it off, then submit again"
+    elif state.state == on:
+        action = "close it" if on == "open" else "turn it off"
+        detail = f"it is {on.upper()}: {action}, then submit again"
     else:
-        detail = f"it reads {state.state!r}: the device has to be reachable and OFF"
-    return f"{eid} must read OFF before changing setup ({detail})"
+        detail = f"it reads {state.state!r}: the device has to be reachable and {off.upper()}"
+    return f"{eid} must read {off.upper()} before changing setup ({detail})"
 
 
 def _entry(hass, entry_id):
@@ -179,6 +185,13 @@ def _name(value):
 
 
 def _entity(hass, eid, domains, kind=None):
+    if domains is ACTUATOR_DOMAINS and isinstance(eid, str) and "." in eid:
+        domain = eid.split(".")[0]
+        if domain not in domains:
+            raise ValueError(
+                f"{eid}: the controller can't open or close a {domain}. A zone valve, main line "
+                "or pump must be a switch, an input_boolean or a valve"
+            )
     if not isinstance(eid, str) or eid.split(".")[0] not in domains:
         raise ValueError(
             f"Invalid entity domain for {eid!r}; expected {', '.join(sorted(domains))}"
@@ -300,7 +313,7 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
         )
         valve = row.get("valve", prior.get("zone_switch", ""))
         if valve:
-            _entity(hass, valve, {"switch"})
+            _entity(hass, valve, ACTUATOR_DOMAINS)
         elif enabled:
             raise ValueError(f"Zone {z}: select a valve")
         if enabled and active and valve:
@@ -559,7 +572,7 @@ def read_setup(hass):
             }
             for s in hass.states.async_all()
             if s.entity_id.split(".")[0]
-            in {"sensor", "switch", "light", "binary_sensor", "input_datetime"}
+            in {"sensor", "light", "binary_sensor", "input_datetime", *ACTUATOR_DOMAINS}
         ],
     }
 

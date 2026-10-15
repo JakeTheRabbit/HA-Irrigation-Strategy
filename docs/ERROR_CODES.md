@@ -56,6 +56,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-309](#cs-309) | An interrupted shot's hardware may still be ON | Warning | Notification |
 | [CS-310](#cs-310) | Moisture rising with no water: the table is not draining | Critical | Notification |
 | [CS-311](#cs-311) | The sump pump has not run | Critical | Notification |
+| [CS-313](#cs-313) | A valve or pump the controller can't switch, not watering | Warning | Notification |
 | [CS-401](#cs-401) | Setting outside the engine's range | Warning | Notification |
 | [CS-402](#cs-402) | Settings missing, running on built-in values | Critical | Notification |
 | [CS-403](#cs-403) | Lights hours now come from the integration | Information | Notification |
@@ -614,6 +615,27 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 - Clear what stops the water reaching or leaving the sump, and watch the pump run.
 - If the plug is offline, bring it back: until then the pump's runs can't be seen.
 - Set sump_silent_hours longer only if the pump really runs less often than that.
+
+<a id="cs-313"></a>
+
+### CS-313: A valve or pump the controller can't switch, not watering
+
+*Warning · Notification*
+
+**What it means.** A zone's valve, or its room's pump or main line, is mapped to a kind of device the controller has no way to open and close. It can drive a switch, an input_boolean and a valve (open and closed). Setup refuses anything else, so this one was mapped by hand, in the controller app's hardware option or by editing the room. The notification names it.
+
+**Watering meanwhile.** That zone is not watered, and the device is never sent a command. Earlier controllers sent it a switch command, which it ignored, so it was never opened or switched on then either. Other zones carry on.
+
+**Likely causes**
+
+- A cover, a light, a fan or another kind of device was mapped as a zone valve, the pump or the main line by hand.
+- The device's integration exposes it as a kind Crop Steering does not drive.
+
+**Suggested fixes**
+
+- In Crop Steering → Rooms & setup, map a switch, an input_boolean or a valve in its place.
+- If the hardware only exists as that kind of device, make a switch for it in Home Assistant (a template switch, for example) and map that.
+- The zone is watered again from the next loop once a device the controller can switch is mapped.
 
 ## Settings (CS-4xx)
 

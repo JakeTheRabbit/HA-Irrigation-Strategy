@@ -1,0 +1,225 @@
+{
+  "_about": "The hardware service calls the 3.11.1 controller sent for one shot on zone 1 of the seeded 2.25.1 and 3.11.1 rooms (pump, main line and valve all switches), normal and with the zone valve stuck ON after its close, recorded by running tests_ha/test_actuator_domains.py's _two_shots against that controller. Each call is [domain, service, data].",
+  "entry_2_25_1_pumped_room.json": {
+    "shot": [
+      [
+        "switch",
+        "turn_on",
+        {
+          "entity_id": "switch.irrigation_pump"
+        }
+      ],
+      [
+        "switch",
+        "turn_on",
+        {
+          "entity_id": "switch.irrigation_main_line"
+        }
+      ],
+      [
+        "switch",
+        "turn_on",
+        {
+          "entity_id": "switch.zone_1_valve"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.zone_1_valve"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.irrigation_main_line"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.irrigation_pump"
+        }
+      ]
+    ],
+    "valve_stuck_open": [
+      [
+        "switch",
+        "turn_on",
+        {
+          "entity_id": "switch.irrigation_pump"
+        }
+      ],
+      [
+        "switch",
+        "turn_on",
+        {
+          "entity_id": "switch.irrigation_main_line"
+        }
+      ],
+      [
+        "switch",
+        "turn_on",
+        {
+          "entity_id": "switch.zone_1_valve"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.zone_1_valve"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.irrigation_main_line"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.irrigation_pump"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.zone_1_valve"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.irrigation_pump"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.irrigation_main_line"
+        }
+      ]
+    ]
+  },
+  "entry_3_11_1_pumped_room.json": {
+    "shot": [
+      [
+        "switch",
+        "turn_on",
+        {
+          "entity_id": "switch.irrigation_pump"
+        }
+      ],
+      [
+        "switch",
+        "turn_on",
+        {
+          "entity_id": "switch.irrigation_main_line"
+        }
+      ],
+      [
+        "switch",
+        "turn_on",
+        {
+          "entity_id": "switch.zone_1_valve"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.zone_1_valve"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.irrigation_main_line"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.irrigation_pump"
+        }
+      ]
+    ],
+    "valve_stuck_open": [
+      [
+        "switch",
+        "turn_on",
+        {
+          "entity_id": "switch.irrigation_pump"
+        }
+      ],
+      [
+        "switch",
+        "turn_on",
+        {
+          "entity_id": "switch.irrigation_main_line"
+        }
+      ],
+      [
+        "switch",
+        "turn_on",
+        {
+          "entity_id": "switch.zone_1_valve"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.zone_1_valve"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.irrigation_main_line"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.irrigation_pump"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.zone_1_valve"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.irrigation_pump"
+        }
+      ],
+      [
+        "switch",
+        "turn_off",
+        {
+          "entity_id": "switch.irrigation_main_line"
+        }
+      ]
+    ]
+  }
+}

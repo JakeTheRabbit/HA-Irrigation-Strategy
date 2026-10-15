@@ -39,6 +39,13 @@ def _sw_sel():
     return selector.EntitySelector(selector.EntitySelectorConfig(domain="switch"))
 
 
+def _actuator_sel():
+    # A zone valve, main line or pump: any kind of device the controller can open and close.
+    return selector.EntitySelector(
+        selector.EntitySelectorConfig(domain=["switch", "input_boolean", "valve"])
+    )
+
+
 def _sensor_multi():
     return selector.EntitySelector(
         selector.EntitySelectorConfig(domain="sensor", multiple=True)
@@ -106,7 +113,7 @@ def _zone_schema(num_zones: int, zones: dict | None = None) -> dict:
                 if sw
                 else vol.Required(f"zone_{z}_switch")
             )
-        ] = _sw_sel()
+        ] = _actuator_sel()
         out[vol.Optional(f"zone_{z}_vwc", default=vwc)] = _sensor_multi()
         out[vol.Optional(f"zone_{z}_ec", default=ec)] = _sensor_multi()
         out[vol.Optional(f"zone_{z}_plant_count", default=pc)] = vol.All(
@@ -151,8 +158,8 @@ def _hardware_schema(
             else vol.Required("plumbing")
         )
     ] = _plumbing_sel()
-    _ent("pump_switch", _sw_sel())
-    _ent("main_line_switch", _sw_sel())
+    _ent("pump_switch", _actuator_sel())
+    _ent("main_line_switch", _actuator_sel())
     _ent("waste_switch", _sw_sel())
     # Per-room source-water probes (optional). Map this room's reservoir EC/pH probes to
     # enable its source-water gate; leave empty to disable that gate for the room. (The
