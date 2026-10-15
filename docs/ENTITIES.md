@@ -137,6 +137,7 @@ for that zone. (3 zones × 23 = 69 entities on a 3-zone system.)
 |---|---|---|
 | `zone_N_set_phase` | Keep · P0 · P1 · P2 · P3 | Moves the zone to a phase by hand. The controller applies a pick once, within a minute, and sets it back to Keep; its own rules carry on from that phase. Today's water and shot counts stay; P1 ramps from its first shot, and P0 measures its dry-back from the moisture at the move. |
 | `zone_N_steering_mode` | Vegetative · Generative | Per-zone veg/gen bias. |
+| `zone_N_vwc_method`, `zone_N_ec_method` | Median · Average · Lowest · Highest | How the zone's probes become its moisture reading, and apart its EC reading. Median by default. A probe far from the others is left out first; Lowest and Highest need three probes that agree, and with fewer the zone steers on the median and the controller raises CS-502. |
 
 ---
 
