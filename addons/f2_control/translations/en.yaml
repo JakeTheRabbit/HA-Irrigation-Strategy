@@ -2,8 +2,10 @@ configuration:
   num_zones:
     name: Number of zones (fallback)
     description: >-
-      Normally AUTO-DETECTED from the integration's sensor.crop_steering_vwc_zone_N. This
-      value is only used if Home Assistant isn't reachable at startup. Add more probes per
+      The zones always come from the Crop Steering integration's room. This value is used
+      only for a room whose valves are hand-mapped in the options file (the `hardware` key,
+      which this form does not show). While Home Assistant cannot be reached at startup, no
+      zone is driven until it answers. Add more probes per
       zone in the Crop Steering UI - the engine reads each zone's FUSED
       sensor.crop_steering_vwc_zone_N / ec_zone_N (an average of every probe you map).
   lights_on_hour:

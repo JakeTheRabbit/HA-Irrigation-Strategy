@@ -108,19 +108,30 @@ def test_an_archived_zone_is_not_driven_even_before_its_sensors_exist(fused):
     assert sorted(c.rooms[0].zones) == [1, 3]
 
 
-def test_home_assistant_unreachable_at_start_uses_the_documented_fallback_then_corrects_itself(monkeypatch):
-    """The `num_zones` option still means what its description says: "only used if Home Assistant
-    isn't reachable at startup". What is new is that it is a stand-in: the moment Home Assistant
-    answers, the room's real zones replace it."""
+def test_home_assistant_unreachable_at_start_invents_no_zones_then_finds_the_real_ones(monkeypatch):
+    """With Home Assistant unreachable at start, `num_zones` (default 3) used to stand in for the
+    room until it answered: a one-zone tent briefly had zones 2 and 3. Nothing can be actuated
+    while Home Assistant is down, so the stand-in bought nothing. The room now has no zones until
+    Home Assistant answers, and then exactly its own."""
     states = _room(1)
     fake = fake_ha.FakeHA()
     fake_ha.install(controller, fake, dict(SHIPPED_OPTIONS))  # nothing answers yet
     c = controller.Controller()
-    assert sorted(c.rooms[0].zones) == [1, 2, 3] and c._default_provisional
+    assert c.rooms[0].zones == {} and c._default_provisional
+    c.loop_once(NOW)
+    assert not [call for call in fake.calls if call[0] == "switch"]  # nothing driven meanwhile
     for entity_id, (value, attrs) in states.items():
         fake.set_state(entity_id, value, attrs)  # Home Assistant finishes booting
     c.loop_once(NOW)
     assert sorted(c.rooms[0].zones) == [1] and not c._default_provisional
+
+
+def test_a_hand_mapped_install_without_num_zones_still_gets_three():
+    """An old or raw options file with a `hardware` map and no `num_zones` key: 3, never 0."""
+    options = {"enable_flag": "input_boolean.f2_control_enabled",
+               "hardware": {"pump": "switch.p", "mainline": "switch.m", "valves": {"1": "switch.v1"}}}
+    c, _fake = _build(options, states={"sun.sun": ("above_horizon", {})})
+    assert sorted(c.rooms[0].zones) == [1, 2, 3] and not c._default_provisional
 
 
 # =========================================================================== UPGRADE IN PLACE
@@ -144,7 +155,7 @@ def test_legacy_room_keeps_all_zones_when_ha_publishes_sensors_in_stages(descrip
     rooms cannot rely on setup adoption later to repair an incorrectly settled zone list."""
     c, fake = _restart_on(_saved([1, 2, 3]), {})
     room = c.rooms[0]
-    assert sorted(room.zones) == [1, 2, 3] and c._default_provisional
+    assert room.zones == {} and c._default_provisional  # Home Assistant not answering yet
     partial = _room(3, fused=False, revision=0)
     descriptor = partial.pop(DESCRIPTOR)
     for entity_id, (value, attrs) in partial.items():
