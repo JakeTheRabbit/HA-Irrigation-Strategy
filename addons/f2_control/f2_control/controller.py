@@ -285,6 +285,8 @@ def ha_logbook(entity, since, timeout=8):
     """Home Assistant's logbook entries for `entity` from `since` (an aware datetime) to now, oldest
     first, each with who made it (context_user_id, or the automation or script by name). [] when
     Home Assistant can't say."""
+    if not _GATE.allows("other"):
+        return []
     try:
         r = _session().get(
             f"{BASE}/logbook/{since.isoformat()}",
@@ -292,6 +294,7 @@ def ha_logbook(entity, since, timeout=8):
             params={"entity": entity, "end_time": datetime.now(timezone.utc).isoformat()},
             timeout=timeout,
         )
+        _GATE.saw("other", r.status_code, f"GET {BASE}/logbook")
         entries = r.json() if r.status_code == 200 else []
         return entries if isinstance(entries, list) else []
     except Exception:
