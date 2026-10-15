@@ -78,10 +78,10 @@ KINDS = (
         "id": "jev",
         "name": "Jev",
         "detail": "Jev's advice about a zone, its automatic targets paused, Jev moving a "
-        "setting, its calls running low, a zone on its stricter gate, and the AI assistant's "
-        "budget spent, its key refused or a retired route",
+        "setting, its calls running low, a zone on its stricter gate, the AI assistant's "
+        "budget spent, its key refused or a retired route, and its feed proposals",
         "codes": _codes(
-            "CS-404 CS-501 CS-702 CS-705 CS-706 CS-707 CS-708 CS-709 CS-712"
+            "CS-404 CS-501 CS-702 CS-705 CS-706 CS-707 CS-708 CS-709 CS-711 CS-712"
         ),
         "events": ("jev_setpoint",),
     },
