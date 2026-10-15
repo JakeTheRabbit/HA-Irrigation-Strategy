@@ -109,6 +109,9 @@ export interface RoomView {
   /** How Water today reads in this room, from its select (entityId null: an integration without it,
    * the zone total). */
   waterView: { entityId: string | null; view: "zone" | "plant" };
+  /** Whether the controller's vitals notification says what each zone does next, from the room's
+   * switch (entityId null: an integration without it, and the controller then includes them). */
+  notifyPredictions: { entityId: string | null; enabled: boolean | null };
 }
 /** One line per room: is it watering, and if not, why not and what to do. */
 export interface RoomStatus {

@@ -43,12 +43,17 @@ def test_the_table_is_the_contracts():
         "sensors",
         "watering",
         "phases",
+        "vitals",
         "stock",
         "dosing",
         "jev",
         "setup",
     )
-    assert catalog.EVENTS == {"phase": "phases", "jev_setpoint": "jev"}
+    assert catalog.EVENTS == {
+        "phase": "phases",
+        "vitals": "vitals",
+        "jev_setpoint": "jev",
+    }
     assert set(_kind("hardware")) == {f"CS-30{n}" for n in range(1, 10)} | {
         "CS-310",
         "CS-311",
@@ -75,6 +80,7 @@ def test_a_code_in_two_kinds_is_in_both():
 def test_events_and_codes_the_catalog_does_not_know():
     assert catalog.kinds_for(event="phase") == {"phases"}
     assert catalog.kinds_for(event="jev_setpoint") == {"jev"}
+    assert catalog.kinds_for(event="vitals") == {"vitals"}
     assert catalog.kinds_for(event="something new") == set()  # not an alert: nobody
     # A newer controller's code: an emergency when it says the code is critical, else setup.
     assert catalog.kinds_for("CS-299", urgent=True) == {"emergency"}

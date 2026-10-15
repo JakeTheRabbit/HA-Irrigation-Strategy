@@ -268,9 +268,10 @@ class Notifier:
             )
 
     def publish(self):
-        """sensor.crop_steering_notify_config, which the controller app reads: the revision, how many rows and
-        the watering-stopped threshold. Unavailable while the stored setup can't be read: the controller then
-        pushes to its own notify_service option, as it does with no rows."""
+        """sensor.crop_steering_notify_config, which the controller app reads: the revision, how many rows, the
+        watering-stopped threshold and the kinds a row can tick. Unavailable while the stored setup can't
+        be read: the controller then pushes to its own notify_service option, as it does with no
+        rows."""
         attributes = {"friendly_name": "Crop Steering notifications"}
         if self.error:
             attributes["error"] = self.error
@@ -278,6 +279,8 @@ class Notifier:
             return
         attributes["recipients"] = len(self.data["recipients"])
         attributes["idle_hours"] = self.data["idle_hours"]
+        # The kinds a row can tick: the controller routes its vitals here only when "vitals" is one.
+        attributes["kinds"] = list(notify_catalog.KIND_IDS)
         self.hass.states.async_set(SENSOR, str(self.data["revision"]), attributes)
 
     async def phones(self) -> list[dict]:

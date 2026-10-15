@@ -736,6 +736,93 @@ def _profile(room):
     """The room's substrate profile (defaults.SUBSTRATE_PROFILES): generic unless the room chose another."""
     return SUBSTRATE_PROFILES.get(getattr(room, "substrate", "generic"), SUBSTRATE_PROFILES["generic"])
 
+
+_SIGN = {"<": "<", "<=": "≤", ">": ">", ">=": "≥"}
+
+
+def _num(value):
+    """A threshold or a reading for people: at most two decimals, none that are zero."""
+    try:
+        return f"{float(value):.2f}".rstrip("0").rstrip(".")
+    except (TypeError, ValueError):
+        return "?"
+
+
+def next_text(conditions, at):
+    """What would move a zone next, in one line: the engine's own conditions (waiting_for, as published on
+    sensor.crop_steering_<prefix>zone_N_waiting_for_app) in the words of the dashboard's "Next:"
+    (frontend/src/lib/waiting-for.ts waitingText). `at` is when they were worked out, a local time: a wait
+    ends `in_min` after it. "" when there is nothing to say."""
+    items = [c for c in conditions or [] if isinstance(c, dict)]
+
+    def find(rule):
+        return next((c for c in items if c.get("rule") == rule), None)
+
+    def when(item):
+        minutes = (item or {}).get("in_min")
+        return (at + timedelta(minutes=minutes)).strftime("%H:%M") if minutes else None
+
+    def test(item, unit, label):
+        return f"{label} {_SIGN.get(item.get('op'), item.get('op'))} {_num(item.get('value'))}{unit}"
+
+    def reading(item, unit):
+        return "" if item.get("now") is None else f" (now {_num(item['now'])}{unit})"
+
+    def more(count, word):
+        return f"{count} more {word}{'' if count == 1 else 's'}"
+
+    timeout = find("p0_timeout")
+    if timeout:
+        # Whichever moisture level drying reaches first: the trigger, or the P3 dryback's level.
+        levels = [c for c in (find("p0_bypass"), find("p0_dryback")) if c and c.get("value") is not None]
+        first = max(levels, key=lambda c: c["value"], default=None)
+        by = when(timeout)
+        text = f"P1 by {by}" if by else "P1 now"
+        return text + (f", or sooner at {test(first, '%', 'VWC')}{reading(first, '%')}" if first else "")
+    done = find("p1_done")
+    if done:
+        parts = []
+        ramp = find("p1_ramp")
+        if ramp:
+            below = ramp.get("now") is not None and ramp["now"] < (ramp.get("value") or 0)
+            due = when(ramp)
+            parts.append(
+                f"ramp shot {'at ' + due if due else 'due'} (VWC {_num(ramp['now'])}% under {_num(ramp.get('value'))}%)"
+                if below
+                else f"ramp shot when {test(ramp, '%', 'VWC')}{reading(ramp, '%')}"
+            )
+        shots = f" after {more(done['shots_left'], 'shot')}" if done.get("shots_left") else ""
+        ec = ""
+        if done.get("ec_max") is not None:
+            ec = f" with pwEC ≤ {_num(done['ec_max'])}" + (
+                "" if done.get("ec_now") is None else f" (now {_num(done['ec_now'])})"
+            )
+        most = (find("p1_max_shots") or {}).get("shots_left")
+        parts.append(
+            f"P2 at {test(done, '%', 'VWC')}{shots}{ec}" + (f", or after {more(most, 'ramp shot')}" if most else "")
+        )
+        return " · ".join(parts)
+    topup, off = find("p2_topup"), find("lights_off")
+    if topup or off:
+        # A held plan leaves the routine shots out: then only lights-off is left.
+        dilute = find("p2_dilute")
+        parts = [
+            f"shot when {test(topup, '%', 'VWC')}{reading(topup, '%')}" if topup else None,
+            f"dilution if {test(dilute, '', 'pwEC')}{reading(dilute, '')}" if dilute else None,
+            # By, not at: in its last three hours P2 moves early when the night is too short to dry.
+            f"P3 by {when(off) or 'lights-off'}" if off else None,
+        ]
+        return " · ".join(part for part in parts if part)
+    rescue = find("p3_emergency")
+    if rescue:
+        on = find("lights_on")
+        parts = [
+            f"rescue shot if {test(rescue, '%', 'VWC')}{reading(rescue, '%')}",
+            f"P0 at {when(on) or 'lights-on'}" if on else None,
+        ]
+        return " · ".join(part for part in parts if part)
+    return ""
+
 # How a room is plumbed, as DECLARED in the integration's setup and published as the descriptor's
 # `plumbing`: layout -> (has a pump switch, has a main-line valve). The integration carries the same
 # table (custom_components/crop_steering/plumbing.py); tests/test_plumbing.py pins the two together.
@@ -2856,6 +2943,10 @@ class Controller:
         card and grow-day line. No snapshot (no probe, or the room is off): an empty list, so an old
         one never lingers. A wait's clock time is `at` plus its in_min."""
         conditions = waiting_for(snap, p) if snap is not None else []
+        # Kept for the vitals notification's "Next:" lines (_maybe_notify).
+        if getattr(room, "_waiting", None) is None:
+            room._waiting = {}
+        room._waiting[zone] = (conditions, now)
         ha_set(
             f"sensor.crop_steering_{room.prefix}zone_{zone}_waiting_for_app",
             snap.phase if snap is not None else "none",
@@ -5697,6 +5788,10 @@ class Controller:
                 feed = self._read_feed_ec(room)
                 head += f" | feed EC {feed if feed is not None else 'unreadable'}"
             lines = [head]
+            # "Include Predictions in Notifications": each zone's next step under its line. On until
+            # switched off; an integration without the switch counts as on.
+            predictions = self._on(f"switch.crop_steering_{room.prefix}notify_predictions", True)
+            waiting = getattr(room, "_waiting", None) or {}
             per_plant = ha_get(f"select.crop_steering_{room.prefix}water_today_view")[0] == PER_PLANT
             for z in sorted(pub):
                 d = pub[z]
@@ -5715,6 +5810,10 @@ class Controller:
                 lines.append(
                     f"  Z{z} {d['phase']}: VWC {vwc} EC {ec} (FC~{fc}) | {water} | last {ago}"
                 )
+                if predictions and z in waiting:
+                    upcoming = next_text(*waiting[z])
+                    if upcoming:
+                        lines.append(f"  Next: {upcoming}")
             blocks.append("\n".join(lines))
         if not blocks:
             return
@@ -5722,13 +5821,15 @@ class Controller:
         if self._n_defaulted:
             head += f"  ⚠️ {self._n_defaulted} setpoint(s) missing → engine defaults"
         msg = f"{head}\n" + "\n".join(blocks)
-        dom, _, svc = self.notify_service.partition("/")
-        if dom and svc:
-            ha_call(dom, svc, title=f"{self.instance_name} vitals", message=msg)
+        title = f"{self.instance_name} vitals"
+        if not self._route_vitals(title, msg):
+            dom, _, svc = self.notify_service.partition("/")
+            if dom and svc:
+                ha_call(dom, svc, title=title, message=msg)
         ha_call(
             "persistent_notification",
             "create",
-            title=f"{self.instance_name} vitals",
+            title=title,
             message=msg,
             notification_id="f2_vitals",
         )
@@ -5737,6 +5838,20 @@ class Controller:
             now.strftime("%H:%M"),
             {"vitals": msg, "live": any_live, "friendly_name": f"{self.instance_name} vitals"},
         )
+
+    def _route_vitals(self, title, message):
+        """The vitals push, to the phones that tick Vitals (docs/NOTIFICATIONS.md) -> True when the integration
+        took it. False, so it goes to the notify_service option as it always did, with nobody set up, with an
+        integration that has no vitals kind (older than it), or when the call fails."""
+        attrs = ha_get(NOTIFY_CONFIG)[1]
+        kinds = attrs.get("kinds") if isinstance(attrs, dict) else None
+        if not isinstance(kinds, list) or "vitals" not in kinds or not self._notify_config()[0]:
+            return False
+        try:
+            return self._route("vitals", None, "vitals", None, None, title, message)
+        except Exception as e:  # whatever goes wrong, the vitals go the old way
+            log("notify: vitals not handed to crop_steering.notify", e)
+            return False
 
     def _log_timezone(self):
         """All phase logic runs on container-local `datetime.now()`. If the Supervisor's TZ

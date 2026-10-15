@@ -505,6 +505,7 @@ export function buildRoom(states: States, room: Room): RoomView {
   const roomActive = !room.id || roomIsActive(states, room);
   const autoSwitch = room.id ? resolve(states, room, "switch", "auto_setpoints") : undefined;
   const waterSelect = room.id ? resolve(states, room, "select", "water_today_view") : undefined;
+  const predictSwitch = room.id ? resolve(states, room, "switch", "notify_predictions") : undefined;
   const zones: Zone[] = activeIds.map((id) => {
     const z = `zone_${id}_`;
     const phase = resolve(states, room, "sensor", `${z}phase`);
@@ -828,6 +829,10 @@ export function buildRoom(states: States, room: Room): RoomView {
       entityId: waterSelect?.entity_id ?? null,
       view: waterSelect?.state === "Per plant" ? "plant" : "zone",
     },
+    notifyPredictions: {
+      entityId: predictSwitch?.entity_id ?? null,
+      enabled: boolean(predictSwitch),
+    },
   };
 }
 
@@ -1031,6 +1036,7 @@ export function validateChange(room: RoomView, states: States, change: Change): 
     room.engine.entityId,
     room.roomActiveEntity,
     room.autoSetpoints.entityId,
+    room.notifyPredictions.entityId,
     ...room.zones.flatMap((z) => [
       z.enabledEntity,
       `switch.${ROOT}${room.room.prefix}zone_${z.id}_manual_override`,

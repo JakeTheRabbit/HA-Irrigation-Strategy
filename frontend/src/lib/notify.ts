@@ -229,6 +229,7 @@ export const phoneLabel = (phone: NotifyPhone) =>
 export const EVENT_WORDS: Readonly<Record<string, string>> = {
   phase: "a zone changing phase",
   jev_setpoint: "Jev moving a setting",
+  vitals: "the controller's regular report on every zone",
 };
 export const eventWords = (id: string) => EVENT_WORDS[id] ?? id.replaceAll("_", " ");
 export function kindCoverage(kind: NotifyKind): {
