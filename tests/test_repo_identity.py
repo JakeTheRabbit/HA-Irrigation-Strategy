@@ -37,6 +37,8 @@ REPOSITORY_NAMES = [
 ]
 # Release history keeps the names it was written with.
 HISTORY = {"CHANGELOG.md", "addons/f2_control/CHANGELOG.md"}
+# The move guide, and its test, name the repository an install moves from.
+MOVED_FROM = {"docs/MOVING_FROM_JEV.md", "tests_ha/test_move_from_jev.py"}
 BINARY = {
     ".png",
     ".jpg",
@@ -100,6 +102,8 @@ def test_hacs_the_readme_and_the_app_page_name_the_product_without_an_edition():
 def test_every_link_to_a_repository_on_this_account_names_this_one():
     elsewhere = []
     for path in _shipped_text_files():
+        if path.relative_to(ROOT).as_posix() in MOVED_FROM:
+            continue
         text = path.read_text(encoding="utf-8", errors="ignore")
         for pattern in REPOSITORY_NAMES:
             for match in pattern.finditer(text):

@@ -86,7 +86,7 @@
    "switch",
    "turn_off",
    {
-    "entity_id": "switch.f1_feed"
+    "entity_id": "switch.room_b_feed"
    }
   ],
   [
@@ -191,7 +191,7 @@
   "switch.balance_power",
   "input_boolean.tank_hold",
   "input_boolean.tank_hold",
-  "switch.f1_feed",
+  "switch.room_b_feed",
   "switch.tank_fill",
   "switch.tank_fill",
   "input_boolean.mix_valve",

@@ -57,6 +57,7 @@ RESERVED = {
     "CS-503": ("fix/probe-unit-table", "a probe set aside for its unit"),
     "CS-504": ("feat/ec-type-per-probe", "bulk and pore EC mixed in one zone"),
     "CS-609": ("feat/duplicate-controller-guard", "two controllers on one room"),
+    "CS-610": ("fix/one-kill-switch-rule", "a room switch that does not stop water"),
     "CS-708": ("feat/claude-haiku-brain", "the brain"),
     "CS-709": ("feat/claude-haiku-brain", "the brain"),
     "CS-710": ("feat/brain-channel", "the brain: water finding a channel"),
