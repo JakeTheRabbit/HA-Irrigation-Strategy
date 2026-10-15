@@ -78,6 +78,30 @@ describe("a zone's probes", () => {
     expect(probes[3].text).toBe("Silent 3 h, left out of the zone's reading");
     expect(probes[0].value).toBe(60.8);
   });
+  it("carries each probe's reading quality and reason, when the integration gives them", () => {
+    expect(zoneProbes(room.zones[2], states, now)[0]).toMatchObject({
+      quality: null,
+      reason: null,
+    });
+    const fusedId = room.zones[2].vwc.entityId!;
+    const fused = states[fusedId];
+    const first = (fused.attributes.used as string[])[0];
+    const graded = {
+      ...states,
+      [fusedId]: {
+        ...fused,
+        attributes: {
+          ...fused.attributes,
+          quality: { [first]: { quality: "suspect", reason: "stale" } },
+        },
+      },
+    };
+    expect(zoneProbes(room.zones[2], graded, now)[0]).toMatchObject({
+      id: first,
+      quality: "suspect",
+      reason: "stale",
+    });
+  });
   it("stands the combined sensor in for its probes on an older integration", () => {
     const f1 = buildRoom(
       states,

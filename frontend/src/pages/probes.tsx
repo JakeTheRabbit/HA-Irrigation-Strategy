@@ -10,7 +10,7 @@ import { recentReadings } from "@/lib/dryback";
 import { readJev } from "@/lib/jev";
 import { descriptor, numeric } from "@/lib/model";
 import type { SetupDocument, SetupRoom } from "@/lib/operator-types";
-import { PROBE_TONE, zoneProbes, type Probe } from "@/lib/probes";
+import { PROBE_TONE, READING_REASON, zoneProbes, type Probe } from "@/lib/probes";
 import type { Controller, EntityState } from "@/lib/types";
 import { useRecentHistory } from "@/lib/use-recent-moisture";
 import { errorText } from "@/lib/utils";
@@ -261,6 +261,12 @@ function ProbeRow({
         <Pill dot tone={PROBE_TONE[probe.health]} data-probe-health={probe.health}>
           {probe.text}
         </Pill>
+        {probe.reason && (
+          <span className="cell-subtext" data-probe-reason={probe.reason}>
+            Reading: {READING_REASON[probe.reason] ?? probe.reason.replaceAll("_", " ")}
+            {probe.quality ? ` (${probe.quality})` : ""}
+          </span>
+        )}
       </td>
     </tr>
   );
