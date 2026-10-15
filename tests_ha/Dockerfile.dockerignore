@@ -1,0 +1,4 @@
+# Build context for tests_ha/Dockerfile: the image needs the plugin pin and nothing else, so a
+# checkout with node_modules or a virtualenv does not get sent to Docker on every build.
+*
+!requirements-test-ha.txt

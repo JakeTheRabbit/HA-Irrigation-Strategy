@@ -61,6 +61,30 @@ separate virtualenv). When it is not, the run ends `PARTIAL: real Home Assistant
 exits non-zero, even if every other check passed; `bash tests/run_ci.sh --allow-skip` accepts that
 partial run and exits zero, but still says PARTIAL rather than ALL CHECKS PASSED. CI always runs it.
 
+### On Windows or macOS: in a container
+
+Home Assistant only runs on Linux (it imports `fcntl`), so on Windows the tier cannot run natively,
+and on macOS it needs the same Python 3.14.2+ setup as above. `tests_ha/Dockerfile` is a Linux box
+with the production leg's Python and `requirements-test-ha.txt` installed; it is test tooling only
+and nothing ships from it. With Docker, from the repository root:
+
+```bash
+# Once, and again whenever requirements-test-ha.txt changes (a few minutes; the build sends
+# only that file to Docker).
+docker build -f tests_ha/Dockerfile -t crop-steering-tests-ha .
+
+# The whole tier against your working tree (committed, staged and new files; nothing git ignores).
+git ls-files -co --exclude-standard -z | tar --null -T - -cf - | docker run --rm -i crop-steering-tests-ha
+
+# Arguments go to pytest, so one file or one test works too:
+git ls-files -co --exclude-standard -z | tar --null -T - -cf - | docker run --rm -i crop-steering-tests-ha tests_ha/test_real_flow.py -q
+```
+
+The same commands work in Git Bash, macOS Terminal and PowerShell 7 (Windows' own `tar` reads the
+list). The tree goes in as a `tar` stream rather than a bind mount: each run starts clean, sees
+exactly the files git would commit, and leaves nothing behind in the checkout. The image covers the
+production leg only; the oldest-supported leg below stays in CI.
+
 | File | Scenario |
 | --- | --- |
 | `test_real_flow.py` | **Fresh install.** The wizard through the real flow manager for a one-switch room; the registered id of every entity; an existing registry keeps its ids. |
