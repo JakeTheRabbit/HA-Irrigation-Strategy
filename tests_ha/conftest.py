@@ -65,6 +65,10 @@ for _path in (_ADDON / "f2_control", _ADDON / "tests"):
 def _hermetic_controller_state(tmp_path, monkeypatch):
     """The add-on Controller must never read or write this machine's real /data/state.json."""
     monkeypatch.setenv("F2_STATE_PATH", str(tmp_path / "state.json"))
+    # It runs as the Home Assistant app (runtime_env.runtime() is "addon"), as the Supervisor starts it.
+    monkeypatch.setenv("F2_RUNTIME", "addon")
+    monkeypatch.setenv("SUPERVISOR_TOKEN", "test-supervisor-token")
+    monkeypatch.delenv("HA_URL", raising=False)
 
 
 @pytest.fixture
