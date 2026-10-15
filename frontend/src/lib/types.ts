@@ -141,6 +141,9 @@ export interface Controller {
    * (a standalone tab), and Home Assistant refuses what they may not do. */
   admin: boolean | null;
   connection: "connecting" | "live" | "demo" | "offline";
+  /** Home Assistant's time zone: the grow-day runs from lights-on on its clock, whatever the
+   * viewer's own. The browser's zone in the demo and until Home Assistant has answered. */
+  timeZone: string;
   error: string | null;
   lastUpdated: number | null;
   roomId: string;

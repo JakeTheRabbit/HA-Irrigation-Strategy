@@ -114,8 +114,9 @@ export function Strategy({
       vwc: smoothRecorded(sensor.vwc.points, 10),
       ec: smoothRecorded(sensor.ec.points, 20),
       now: sensor.now,
+      timeZone: controller.timeZone,
     }),
-    [sensor.vwc.points, sensor.ec.points, sensor.now],
+    [sensor.vwc.points, sensor.ec.points, sensor.now, controller.timeZone],
   );
   const supervisors = room.zones.map((z) => z.auto);
   const errors = Object.entries(drafts)

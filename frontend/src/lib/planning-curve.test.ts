@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { PlanningCurve } from "../components/planning-curve";
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   buildPlanningCurve,
   dryRates,
@@ -334,6 +334,38 @@ describe("recorded readings on the plan graph", () => {
     expect(foldRecorded([{ time: at(20, 11), value: 40 }], Number.NaN, at(20, 12)).today).toEqual(
       [],
     );
+  });
+  describe("viewed from another time zone", () => {
+    // The viewer is in New York; Home Assistant and the room are in Auckland.
+    let zone: string | undefined;
+    beforeAll(() => {
+      zone = process.env.TZ;
+      process.env.TZ = "America/New_York";
+    });
+    afterAll(() => {
+      if (zone === undefined) delete process.env.TZ;
+      else process.env.TZ = zone;
+    });
+    const z = (iso: string) => Date.parse(iso);
+    const now = z("2026-09-23T02:00:00Z"); // 14:00 NZST on the 23rd, 22:00 EDT on the 22nd
+    const readings = [
+      { time: z("2026-09-22T12:00:00Z"), value: 34 }, // 00:00 NZST on the 23rd
+      { time: z("2026-09-22T21:30:00Z"), value: 30 }, // 09:30 NZST, before lights-on
+      { time: z("2026-09-22T22:30:00Z"), value: 32 }, // 10:30 NZST
+      { time: z("2026-09-23T01:00:00Z"), value: 36 }, // 13:00 NZST
+    ];
+    it("cuts grow-days at lights-on on Home Assistant's clock, not the viewer's", () => {
+      const folded = foldRecorded(readings, 10, now, "Pacific/Auckland");
+      expect(folded.today).toEqual([
+        { hour: 0.5, value: 32, time: readings[2].time },
+        { hour: 3, value: 36, time: readings[3].time },
+      ]);
+      expect(folded.previous.map((day) => day.map((point) => point.hour))).toEqual([[14, 23.5]]);
+      // On the viewer's own clock lights-on was 10:00 EDT, so three readings land in its today.
+      expect(foldRecorded(readings, 10, now).today.map((point) => point.hour)).toEqual([
+        7.5, 8.5, 11,
+      ]);
+    });
   });
   it("scales the VWC axis to what is plotted instead of a fixed 0-100", () => {
     // the span is always 20/40/60/80/100, so the four grid intervals are whole multiples of 5

@@ -32,8 +32,14 @@ export interface PlanningCurveProps {
   showEditors?: boolean;
   selectedPhase?: PlanningPhaseId;
   description?: string;
-  /** Recorded probe readings for this zone, drawn under the targets on the same axes. */
-  recorded?: { vwc: readonly RecordedReading[]; ec: readonly RecordedReading[]; now: number };
+  /** Recorded probe readings for this zone, drawn under the targets on the same axes, cut into
+   * grow-days on the clock of `timeZone` (Home Assistant's; the browser's when omitted). */
+  recorded?: {
+    vwc: readonly RecordedReading[];
+    ec: readonly RecordedReading[];
+    now: number;
+    timeZone?: string;
+  };
   /** Learned VWC points retained per 1% shot, when the zone's supervisor knows it. */
   retention?: number | null;
 }
@@ -100,8 +106,10 @@ export function PlanningCurve({
     height = 220,
     plotWidth = width - left - right;
   const x = (hour: number) => left + (Math.min(24, Math.max(0, hour)) / 24) * plotWidth;
-  const vwcRecorded = foldRecorded(recorded?.vwc ?? [], lightsOn, recorded?.now ?? NaN);
-  const ecRecorded = foldRecorded(recorded?.ec ?? [], lightsOn, recorded?.now ?? NaN);
+  const fold = (readings: readonly RecordedReading[] = []) =>
+    foldRecorded(readings, lightsOn, recorded?.now ?? NaN, recorded?.timeZone);
+  const vwcRecorded = fold(recorded?.vwc);
+  const ecRecorded = fold(recorded?.ec);
   const hasRecorded = vwcRecorded.today.length + vwcRecorded.previous.length > 0;
   // The day drawn the way the engine runs it, timed by this zone's own measured dry-down.
   const rates = dryRates([vwcRecorded.today, ...vwcRecorded.previous], plan.photoperiod);

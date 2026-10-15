@@ -78,13 +78,16 @@ export function recordWindows(
   lightsOff: number | null,
   hours: number,
   now: number,
+  timeZone?: string,
 ): Span[] {
-  const lit = growDay(lightsOn, lightsOff, now);
+  const lit = growDay(lightsOn, lightsOff, now, timeZone);
   const schedule = lit ? { on: lightsOn, off: lightsOff } : { on: 0, off: 12 };
-  const today = lit ?? growDay(0, 12, now)!;
+  const today = lit ?? growDay(0, 12, now, timeZone)!;
   const from = now - hours * HOUR;
   const count = Math.max(0, Math.ceil((today.start - from) / (24 * HOUR)) + 1);
-  const earlier = earlierDays(today, count, () => schedule).filter((day) => day.end > from);
+  const earlier = earlierDays(today, count, () => schedule, timeZone).filter(
+    (day) => day.end > from,
+  );
   return [...earlier.reverse(), today].map((day) => ({
     start: day.start,
     end: Math.min(day.end, now),

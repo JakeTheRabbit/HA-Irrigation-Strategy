@@ -52,6 +52,7 @@ function useTankRecord(
     numeric(states[`number.crop_steering_${room.room.prefix}lights_off_hour`]),
     hours,
     now,
+    controller.timeZone,
   );
   const key = enabled
     ? [room.room.id, hours, windows[0].start, windows.at(-1)!.start, ...request.entityIds, "|"]

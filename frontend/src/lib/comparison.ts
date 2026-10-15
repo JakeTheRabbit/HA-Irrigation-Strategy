@@ -53,6 +53,41 @@ export function midnight(value: string, zone: string): number {
   midnightCache.set(key, lo);
   return lo;
 }
+/** The browser's own time zone: the fallback where Home Assistant's is unknown. */
+export const viewerTimeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+const clocks = new Map<string, Intl.DateTimeFormat>();
+/** How far `zone`'s wall clock is ahead of UTC at `time`, in ms. */
+function zoneOffset(time: number, zone: string): number {
+  let clock = clocks.get(zone);
+  if (!clock) {
+    clock = new Intl.DateTimeFormat("en-CA", {
+      timeZone: zone,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    if (clocks.size > 20) clocks.clear();
+    clocks.set(zone, clock);
+  }
+  const part: Record<string, number> = {};
+  for (const { type, value } of clock.formatToParts(time)) part[type] = Number(value);
+  const wall = Date.UTC(part.year, part.month - 1, part.day, part.hour, part.minute);
+  return wall - Math.floor(time / 60_000) * 60_000;
+}
+/** The instant `zone`'s wall clock reads `minutes` past midnight on `value`, as the browser's
+ * `new Date(y, m, d, 0, minutes)` reads its own zone: a time a clock change repeats is its first
+ * occurrence, and one it skips is read on the clock before the change (02:30 becomes 03:30). */
+export function wallTime(value: string, minutes: number, zone: string): number {
+  const wall = Date.parse(value + "T00:00:00Z") + minutes * 60_000;
+  const before = wall - zoneOffset(wall - DAY, zone);
+  const after = wall - zoneOffset(wall + DAY, zone);
+  const reads = (time: number) => time + zoneOffset(time, zone) === wall;
+  const valid = [before, after].filter(reads);
+  return valid.length ? Math.min(...valid) : before;
+}
 export function ageAt(time: number, runStart: string, zone: string): number {
   const day = dateInZone(time, zone);
   const start = midnight(day, zone),

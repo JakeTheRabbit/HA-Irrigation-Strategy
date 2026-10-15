@@ -4,6 +4,7 @@ import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
 import type { Change, EntityState, RoomView, Series, States, WriteResult } from "./types";
 import { numeric, validateChange } from "./model";
+import { viewerTimeZone } from "./comparison";
 
 export interface HassSession {
   callApi: <T>(method: string, path: string, data?: unknown) => Promise<T>;
@@ -12,6 +13,8 @@ export interface HassSession {
   connection?: unknown;
   /** The signed-in user (`hass.user`). */
   user?: { is_admin?: unknown };
+  /** Home Assistant's settings (`hass.config`). */
+  config?: { time_zone?: unknown };
 }
 export function findSession(base?: string): HassSession | undefined {
   if (typeof window === "undefined") return;
@@ -26,6 +29,18 @@ export function findSession(base?: string): HassSession | undefined {
       /* Cross-origin parent; still inspect this window. */
     }
   }
+}
+/** Home Assistant's time zone (`time_zone` of its settings), the clock the controller keeps the
+ * grow-day on; the browser's own where it is not known yet or not a zone this browser knows. */
+export function haTimeZone(config?: { time_zone?: unknown }): string {
+  const zone = config?.time_zone;
+  try {
+    if (typeof zone === "string" && zone)
+      return new Intl.DateTimeFormat("en", { timeZone: zone }).resolvedOptions().timeZone;
+  } catch {
+    /* Unknown to this browser. */
+  }
+  return viewerTimeZone();
 }
 export function haSessionToken(): string {
   try {
@@ -201,6 +216,14 @@ export class HaClient {
         "This action needs the updated Crop Steering integration. Open Setup for installation instructions.",
       );
     return response.service_response;
+  }
+  /** Home Assistant's time zone: from the Home Assistant page this runs in, else `GET config`. */
+  async timeZone(): Promise<string> {
+    return haTimeZone(
+      this.session
+        ? this.session.config
+        : await this.request<{ time_zone?: unknown }>("GET", "config"),
+    );
   }
   async states(): Promise<States> {
     return asStates(await this.request("GET", "states"));

@@ -40,6 +40,7 @@ import {
   type TimelineRow,
 } from "./day-timeline";
 import { createDemo, demoDay } from "./demo";
+import { recordWindows } from "./tank-level";
 import { buildRoom, discoverRooms } from "./model";
 import type { EntityState } from "./types";
 
@@ -84,6 +85,46 @@ describe("grow day", () => {
       [-1, 10],
     ])
       expect(growDay(on, off, local(23, 12))).toBeNull();
+  });
+});
+
+describe("grow day on Home Assistant's clock, viewed from another time zone", () => {
+  // The viewer is in New York; Home Assistant and the room are in Auckland.
+  let zone: string | undefined;
+  beforeAll(() => {
+    zone = process.env.TZ;
+    process.env.TZ = "America/New_York";
+  });
+  afterAll(() => {
+    if (zone === undefined) delete process.env.TZ;
+    else process.env.TZ = zone;
+  });
+  const z = (iso: string) => Date.parse(iso);
+  const now = z("2026-09-23T02:00:00Z"); // 14:00 NZST on the 23rd, 22:00 EDT on the 22nd
+  it("starts at lights-on on Home Assistant's clock, not the viewer's", () => {
+    expect(growDay(10, 22, now, "Pacific/Auckland")).toEqual({
+      start: z("2026-09-22T22:00:00Z"), // 10:00 NZST on the 23rd
+      lightsOff: z("2026-09-23T10:00:00Z"), // 22:00 NZST
+      end: z("2026-09-23T22:00:00Z"), // 10:00 NZST on the 24th
+    });
+    // On the viewer's own clock the same instant is in another grow-day.
+    expect(growDay(10, 22, now)!.start).toBe(z("2026-09-22T14:00:00Z")); // 10:00 EDT on the 22nd
+  });
+  it("keeps the 23-hour grow-day of Home Assistant's clock change", () => {
+    const day = growDay(10, 22, z("2026-09-27T01:00:00Z"), "Pacific/Auckland")!; // 14:00 NZDT
+    expect(day.start).toBe(z("2026-09-26T21:00:00Z")); // 10:00 NZDT
+    const [yesterday] = earlierDays(day, 1, () => ({ on: 10, off: 22 }), "Pacific/Auckland");
+    expect(yesterday).toEqual({
+      start: z("2026-09-25T22:00:00Z"), // 10:00 NZST
+      lightsOff: z("2026-09-26T10:00:00Z"), // 22:00 NZST
+      end: z("2026-09-26T21:00:00Z"), // 10:00 NZDT
+    });
+  });
+  it("reads the tank's record in Home Assistant's grow-days", () => {
+    expect(recordWindows(10, 22, 12, now, "Pacific/Auckland")).toEqual([
+      { start: z("2026-09-21T22:00:00Z"), end: z("2026-09-22T22:00:00Z") },
+      { start: z("2026-09-22T22:00:00Z"), end: now },
+    ]);
   });
 });
 

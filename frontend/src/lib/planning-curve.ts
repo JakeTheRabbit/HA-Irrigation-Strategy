@@ -1,3 +1,4 @@
+import { addDays, dateInZone, viewerTimeZone, wallTime } from "./comparison";
 export type PlanningPhaseId = "P0" | "P1" | "P2" | "P3";
 export interface PlanningPoint {
   hour: number;
@@ -324,26 +325,29 @@ export interface FoldedRecording {
   earlier: number;
 }
 /** Fold recorded readings onto the lights-on axis so they sit under the targets being edited.
- * A grow-day runs from lights-on to the next lights-on, in the browser's time zone. */
+ * A grow-day runs from lights-on to the next lights-on, on the clock of `timeZone` (Home
+ * Assistant's, as the controller keeps it; the browser's where that is unknown). */
 export function foldRecorded(
   readings: readonly RecordedReading[],
   lightsOn: number,
   now: number,
+  timeZone = viewerTimeZone(),
 ): FoldedRecording {
   const folded: FoldedRecording = { today: [], previous: [], earlier: 0 };
   if (!Number.isFinite(lightsOn) || lightsOn < 0 || lightsOn >= 24 || !Number.isFinite(now))
     return folded;
+  const starts = new Map<string, number>();
+  const at = (date: string) => {
+    let start = starts.get(date);
+    if (start === undefined) {
+      start = wallTime(date, Math.round(lightsOn * 60), timeZone);
+      starts.set(date, start);
+    }
+    return start;
+  };
   const dayStart = (time: number) => {
-    const date = new Date(time);
-    const at = (offset: number) =>
-      new Date(
-        date.getFullYear(),
-        date.getMonth(),
-        date.getDate() + offset,
-        0,
-        Math.round(lightsOn * 60),
-      ).getTime();
-    return at(0) > time ? at(-1) : at(0);
+    const date = dateInZone(time, timeZone);
+    return at(date) > time ? at(addDays(date, -1)) : at(date);
   };
   const current = dayStart(now);
   const days = new Map<number, RecordedPoint[]>();

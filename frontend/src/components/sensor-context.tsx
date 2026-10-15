@@ -61,7 +61,6 @@ export interface SensorContextData {
   ec: MetricContext;
 }
 const REFRESH_MS = 60_000;
-const timeZone = () => Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
 
 /** Recorded VWC and pore EC for one zone. Fetches only while `enabled` (connected and
  * editable): the whole window on zone or window change, then each minute only the readings
@@ -136,13 +135,13 @@ export function useSensorContext(
   const metrics = useMemo(() => {
     const build = (entityId: string | null, live: number | null | undefined): MetricContext => {
       const series = held?.series.find((item) => item.entityId === entityId);
-      const options = { hours, now, timeZone: timeZone(), live };
+      const options = { hours, now, timeZone: controller.timeZone, live };
       return entityId && held
         ? { entityId, points: windowPoints(series, options), stats: sensorStats(series, options) }
         : { entityId, points: [], stats: null };
     };
     return { vwc: build(vwcId, liveVwc), ec: build(ecId, liveEc) };
-  }, [held, hours, now, vwcId, ecId, liveVwc, liveEc]);
+  }, [held, hours, now, vwcId, ecId, liveVwc, liveEc, controller.timeZone]);
   return {
     hours,
     setHours,

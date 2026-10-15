@@ -207,7 +207,7 @@ function useEarlierDays(
   day: GrowDay | null,
   ready: boolean,
 ) {
-  const { room, states } = controller;
+  const { room, states, timeZone } = controller;
   const ids = earlierEntities(room, states, zoneId);
   const hours = {
     on: numeric(states[`number.crop_steering_${room.room.prefix}lights_on_hour`]),
@@ -231,7 +231,7 @@ function useEarlierDays(
       retry: number | undefined;
     let pending = earlierLoads.get(key);
     if (!pending) {
-      const windows = earlierDays(day, 7, () => hours);
+      const windows = earlierDays(day, 7, () => hours, timeZone);
       pending = inPairs(
         windows.map((window) => () => load({ ...ids, start: window.start, end: window.end })),
       ).then(joinRows);
@@ -245,7 +245,7 @@ function useEarlierDays(
         if (current)
           setEarlier({
             key,
-            ...earlierTraces(rows, room, day, hours, ids.attributeIds[0]),
+            ...earlierTraces(rows, room, day, hours, ids.attributeIds[0], timeZone),
             error: "",
           });
       },
@@ -287,6 +287,7 @@ export function ZoneDay({ controller, zone }: { controller: Controller; zone: Zo
     numeric(states[`number.crop_steering_${prefix}lights_on_hour`]),
     numeric(states[`number.crop_steering_${prefix}lights_off_hour`]),
     now,
+    controller.timeZone,
   );
   const entities = timelineEntities(room, states, zone.id);
   const key = day
