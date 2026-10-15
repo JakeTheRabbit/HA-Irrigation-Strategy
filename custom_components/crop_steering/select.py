@@ -38,26 +38,26 @@ _LOGGER = logging.getLogger(__name__)
 SELECT_DESCRIPTIONS = [
     SelectEntityDescription(
         key="growth_stage",
-        name="Growth Stage",
+        name="Growth stage",
         icon="mdi:timeline",
         options=GROWTH_STAGES,  # Use constant from const.py
     ),
     SelectEntityDescription(
         key="steering_mode",
-        name="Steering Mode",
+        name="Steering mode",
         icon="mdi:steering",
         options=STEERING_MODES,  # Use constant from const.py
     ),
     SelectEntityDescription(
         key="irrigation_phase",
-        name="Irrigation Phase",
+        name="Irrigation phase",
         icon="mdi:water-circle",
         options=PHASES,  # Use constant from const.py (P0-P3 only)
     ),
     # Named-stage recipe: picking a stage applies its setpoints to the zones.
     SelectEntityDescription(
         key="recipe_stage",
-        name="Recipe Stage",
+        name="Recipe stage",
         icon="mdi:format-list-bulleted-type",
         options=RECIPE_STAGES,
     ),
@@ -65,7 +65,7 @@ SELECT_DESCRIPTIONS = [
     # the controller's vitals notification follows it. Zone total until someone chooses.
     SelectEntityDescription(
         key="water_today_view",
-        name="Water Today Shown As",
+        name="Water today shown as",
         icon="mdi:water-outline",
         options=WATER_TODAY_VIEWS,
     ),
@@ -91,7 +91,7 @@ SELECT_DESCRIPTIONS = [
     # back to Off once the hour, the day or the night is over. Off until someone chooses.
     SelectEntityDescription(
         key="ai_no_touch",
-        name="Pause AI Changes",
+        name="Pause AI changes",
         icon="mdi:hand-back-left-off",
         options=NO_TOUCH_OPTIONS,
     ),
@@ -125,7 +125,7 @@ async def async_setup_entry(
                 entry,
                 SelectEntityDescription(
                     key=f"zone_{zone_num}_steering_mode",
-                    name=f"Crop Steering Zone {zone_num} Steering Mode",
+                    name=f"Crop Steering Zone {zone_num} Steering mode",
                     options=["Vegetative", "Generative"],
                     icon="mdi:steering",
                 ),
@@ -140,7 +140,7 @@ async def async_setup_entry(
                 entry,
                 SelectEntityDescription(
                     key=f"zone_{zone_num}_set_phase",
-                    name=f"Zone {zone_num} Set Phase",
+                    name=f"Zone {zone_num} set phase",
                     options=SET_PHASE_OPTIONS,
                     icon="mdi:state-machine",
                 ),
@@ -160,7 +160,7 @@ async def async_setup_entry(
                     entry,
                     SelectEntityDescription(
                         key=f"zone_{zone_num}_{metric}_method",
-                        name=f"Zone {zone_num} {label} From Probes",
+                        name=f"Zone {zone_num} {label} from probes",
                         options=PROBE_METHODS,
                         icon=icon,
                     ),
@@ -187,7 +187,7 @@ async def async_setup_entry(
                     entry,
                     SelectEntityDescription(
                         key=key,
-                        name=f"EC Type {probe}",
+                        name=f"EC type {probe}",
                         options=EC_TYPES,
                         icon="mdi:lightning-bolt-outline",
                     ),

@@ -345,7 +345,7 @@ async def test_the_low_stock_card_reaches_the_phone_that_ticks_stock_once(
     await hass.async_block_till_done()
     assert ir.async_get(hass).async_get_issue(DOMAIN, "stock_low_tent") is not None
     push = received[STAFF_PHONE][-1]
-    assert push["title"] == "Tent: 1 stock tank(s) running low (CS-608)"
+    assert push["title"] == "Tent: 1 stock tank(s) low (CS-608)"
     assert "- Bloom: 1 L of 10 L" in push["message"]
     assert push["message"].endswith(
         "Code CS-608. What it means and what to do: Crop Steering → Help & tools → Error codes."

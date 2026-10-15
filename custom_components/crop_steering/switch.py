@@ -28,14 +28,14 @@ BASE_SWITCH_DESCRIPTIONS = [
     # after longer it starts a fresh run.
     SwitchEntityDescription(
         key="room_active",
-        name="Room Active (off = empty room: no irrigation, no alerts)",
+        name="Room active",
         icon="mdi:sprout",
     ),
     # Opt-in. ON lets the engine's setpoint supervisor rewrite this room's zone targets so they stay
     # attainable and follow the reference curve. The engine still fires every shot by its own rules.
     SwitchEntityDescription(
         key="auto_setpoints",
-        name="Auto Setpoints (supervisor rewrites zone targets)",
+        name="Auto setpoints",
         icon="mdi:auto-fix",
     ),
     # ON: a zone whose shots keep running into the room's longest allowed shot is stopped until
@@ -43,19 +43,19 @@ BASE_SWITCH_DESCRIPTIONS = [
     # a room the wizard sets up (it marks the entry), OFF for every room set up before the latch.
     SwitchEntityDescription(
         key="max_run_latch",
-        name="Max-Run Latch (stop a zone that keeps hitting its longest shot)",
+        name="Max-run latch",
         icon="mdi:timer-lock",
     ),
     SwitchEntityDescription(
         key="ec_stacking_enabled",
-        name="EC Stacking Enabled",
+        name="EC stacking",
         icon="mdi:chemistry-bottle",
     ),
     # ON: the controller's vitals notification says, under each zone, what it will do next (the
     # dashboard's "Next:"). On until switched off.
     SwitchEntityDescription(
         key="notify_predictions",
-        name="Include Predictions in Notifications",
+        name="Predictions in notifications",
         icon="mdi:crystal-ball",
     ),
     # Retired: the room's engine switch ("Watering" on the dashboard) is the one switch that stops
@@ -64,13 +64,13 @@ BASE_SWITCH_DESCRIPTIONS = [
     # a newer one switches the engine switch off while one of them is off (CS-208).
     SwitchEntityDescription(
         key="system_enabled",
-        name="System Enabled (retired)",
+        name="System enabled (retired)",
         icon="mdi:power",
         entity_registry_visible_default=False,
     ),
     SwitchEntityDescription(
         key="auto_irrigation_enabled",
-        name="Auto Irrigation Enabled (retired)",
+        name="Auto irrigation enabled (retired)",
         icon="mdi:auto-mode",
         entity_registry_visible_default=False,
     ),
@@ -85,7 +85,7 @@ def create_zone_switch_descriptions(num_zones: int) -> list[SwitchEntityDescript
         zone_switches.append(
             SwitchEntityDescription(
                 key=f"zone_{zone_num}_enabled",
-                name=f"Zone {zone_num} Enabled",
+                name=f"Zone {zone_num} enabled",
                 icon="mdi:water-pump",
             )
         )
@@ -94,7 +94,7 @@ def create_zone_switch_descriptions(num_zones: int) -> list[SwitchEntityDescript
         zone_switches.append(
             SwitchEntityDescription(
                 key=f"zone_{zone_num}_manual_override",
-                name=f"Zone {zone_num} Manual Override",
+                name=f"Zone {zone_num} manual override",
                 icon="mdi:hand-water",
             )
         )
@@ -104,7 +104,7 @@ def create_zone_switch_descriptions(num_zones: int) -> list[SwitchEntityDescript
         zone_switches.append(
             SwitchEntityDescription(
                 key=f"zone_{zone_num}_p3_dryback_hold",
-                name=f"Zone {zone_num} P3 Dryback Hold",
+                name=f"Zone {zone_num} P3 dryback hold",
                 icon="mdi:weather-night",
             )
         )
@@ -140,7 +140,7 @@ async def async_setup_entry(
                 entry,
                 SwitchEntityDescription(
                     key="engine_enabled",
-                    name="Engine Enabled (room kill switch)",
+                    name="Engine Enabled (kill switch)",
                     icon="mdi:power-settings",
                 ),
             )

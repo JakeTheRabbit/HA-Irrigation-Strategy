@@ -32,7 +32,7 @@ _LOGGER = logging.getLogger(__name__)
 NUMBER_DESCRIPTIONS = [
     NumberEntityDescription(
         key="max_shot_duration",
-        name="Maximum Shot Duration",
+        name="Longest shot",
         icon="mdi:timer-lock",
         native_min_value=5,
         native_max_value=3600,
@@ -45,7 +45,7 @@ NUMBER_DESCRIPTIONS = [
     # controller caps each at its maximum here.
     NumberEntityDescription(
         key="pump_prime_time",
-        name="Pump Prime Time",
+        name="Pump prime time",
         icon="mdi:pump",
         native_min_value=0,
         native_max_value=20,
@@ -55,7 +55,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="main_line_lead_time",
-        name="Main Line Lead Time",
+        name="Main-line lead time",
         icon="mdi:pipe-valve",
         native_min_value=0,
         native_max_value=10,
@@ -65,7 +65,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="substrate_volume",
-        name="Substrate Volume",
+        name="Substrate per plant",
         icon="mdi:cube-outline",
         # 0.1, as setup (SIZING) and the per-zone entity allow: a 4 in rockwool cube is 0.65 L,
         # which setup accepted and this entity then refused to be set to.
@@ -77,7 +77,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="dripper_flow_rate",
-        name="Dripper Flow Rate",
+        name="Dripper flow",
         icon="mdi:water-pump",
         native_min_value=0.1,
         native_max_value=50.0,
@@ -87,7 +87,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="drippers_per_plant",
-        name="Drippers Per Plant",
+        name="Drippers per plant",
         icon="mdi:sprinkler",
         native_min_value=1,
         native_max_value=20,  # as setup (SIZING) and the per-zone entity allow
@@ -96,7 +96,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="field_capacity",
-        name="Field Capacity",
+        name="Field capacity",
         icon="mdi:water-percent",
         native_min_value=MOISTURE_RANGES["field_capacity"][0],
         native_max_value=MOISTURE_RANGES["field_capacity"][1],
@@ -106,7 +106,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="maximum_ec",
-        name="Maximum EC",
+        name="Maximum pore EC",
         icon="mdi:lightning-bolt",
         native_min_value=1.0,
         native_max_value=20.0,
@@ -120,7 +120,7 @@ NUMBER_DESCRIPTIONS = [
     # _PARAM_BOUNDS["watchdog_hours"] = (0, 12).
     NumberEntityDescription(
         key="watchdog_hours",
-        name="Watchdog Hours",
+        name="Watchdog interval",
         icon="mdi:timer-alert",
         native_min_value=0.0,
         native_max_value=12.0,
@@ -130,7 +130,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="vegetative_dryback_target",
-        name="Vegetative Dryback Target",
+        name="Vegetative dryback target",
         icon="mdi:water-minus",
         native_min_value=5.0,
         native_max_value=80.0,
@@ -140,7 +140,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="generative_dryback_target",
-        name="Generative Dryback Target",
+        name="Generative dryback target",
         icon="mdi:water-minus",
         native_min_value=5.0,
         native_max_value=70.0,
@@ -150,7 +150,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="p1_target_vwc",
-        name="P1 Target VWC",
+        name="Peak target",
         icon="mdi:target",
         native_min_value=MOISTURE_RANGES["p1_target_vwc"][0],
         native_max_value=MOISTURE_RANGES["p1_target_vwc"][1],
@@ -160,7 +160,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="p2_vwc_threshold",
-        name="P2 VWC Threshold",
+        name="Re-water point",
         icon="mdi:water-alert",
         native_min_value=MOISTURE_RANGES["p2_vwc_threshold"][0],
         native_max_value=MOISTURE_RANGES["p2_vwc_threshold"][1],
@@ -171,7 +171,7 @@ NUMBER_DESCRIPTIONS = [
     # P0 Phase Parameters
     NumberEntityDescription(
         key="p0_maximum_wait_time",
-        name="P0 Maximum Wait Time",
+        name="Morning dryback maximum wait",
         icon="mdi:timer-alert",
         native_min_value=30.0,
         native_max_value=600.0,
@@ -181,7 +181,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="p0_dryback_drop_percent",
-        name="P0 Dryback Drop Percent",
+        name="P0 dryback drop (not used)",
         icon="mdi:water-minus",
         native_min_value=2.0,
         native_max_value=40.0,
@@ -192,7 +192,7 @@ NUMBER_DESCRIPTIONS = [
     # P1 Phase Parameters
     NumberEntityDescription(
         key="p1_initial_shot_size",
-        name="P1 Initial Shot Size",
+        name="First ramp shot size",
         icon="mdi:water-pump",
         native_min_value=0.1,
         native_max_value=20.0,
@@ -202,7 +202,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="p1_shot_size_increment",
-        name="P1 Shot Size Increment",
+        name="Ramp shot increase",
         icon="mdi:plus",
         native_min_value=0.05,
         native_max_value=10.0,
@@ -212,7 +212,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="p1_time_between_shots",
-        name="P1 Time Between Shots",
+        name="Ramp shot interval",
         icon="mdi:timer-outline",
         native_min_value=1.0,
         native_max_value=60.0,
@@ -222,7 +222,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="p1_maximum_shots",
-        name="P1 Maximum Shots",
+        name="Maximum ramp shots",
         icon="mdi:counter",
         native_min_value=1.0,
         native_max_value=30.0,
@@ -231,7 +231,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="p1_minimum_shots",
-        name="P1 Minimum Shots",
+        name="Minimum ramp shots",
         icon="mdi:counter",
         native_min_value=1.0,
         native_max_value=20.0,
@@ -243,7 +243,7 @@ NUMBER_DESCRIPTIONS = [
     # back to the same 0.5 and 3 when an older integration has no such entities.
     NumberEntityDescription(
         key="p1_rise_pts",
-        name="P1 Extra Shot Rise",
+        name="Extra shot minimum rise",
         icon="mdi:trending-up",
         native_min_value=0.1,
         native_max_value=5.0,
@@ -253,7 +253,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="p1_maximum_extra_shots",
-        name="P1 Maximum Extra Shots",
+        name="Maximum extra ramp shots",
         icon="mdi:counter",
         native_min_value=1.0,
         native_max_value=10.0,
@@ -263,7 +263,7 @@ NUMBER_DESCRIPTIONS = [
     # P2 Phase Parameters
     NumberEntityDescription(
         key="p2_shot_size",
-        name="P2 Shot Size",
+        name="Maintenance shot size",
         icon="mdi:water-pump",
         native_min_value=0.5,
         native_max_value=30.0,
@@ -276,7 +276,7 @@ NUMBER_DESCRIPTIONS = [
     # falls back to the same 0 when an older integration has no such entity.
     NumberEntityDescription(
         key="p2_time_between_shots",
-        name="P2 Time Between Shots",
+        name="Maintenance shot interval",
         icon="mdi:timer-outline",
         native_min_value=0.0,
         native_max_value=60.0,
@@ -289,7 +289,7 @@ NUMBER_DESCRIPTIONS = [
     # 10 (the default) is the gap the controller always used, and falls back to.
     NumberEntityDescription(
         key="ec_min_interval",
-        name="EC Correction Minimum Interval",
+        name="EC correction interval",
         icon="mdi:timer-sand",
         native_min_value=1.0,
         native_max_value=120.0,
@@ -299,7 +299,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="p2_ec_high_threshold",
-        name="P2 EC High (ratio x target)",
+        name="P2 high EC ratio",
         icon="mdi:arrow-up-bold",
         native_min_value=0.50,
         native_max_value=3.00,
@@ -308,7 +308,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="p2_ec_low_threshold",
-        name="P2 EC Low (ratio x target)",
+        name="P2 low EC ratio",
         icon="mdi:arrow-down-bold",
         native_min_value=0.20,
         native_max_value=2.00,
@@ -318,7 +318,7 @@ NUMBER_DESCRIPTIONS = [
     # P3 Phase Parameters
     NumberEntityDescription(
         key="p3_emergency_vwc_threshold",
-        name="P3 Emergency VWC Threshold",
+        name="Rescue floor",
         icon="mdi:alert",
         native_min_value=MOISTURE_RANGES["p3_emergency_vwc_threshold"][0],
         native_max_value=MOISTURE_RANGES["p3_emergency_vwc_threshold"][1],
@@ -328,7 +328,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="p3_emergency_shot_size",
-        name="P3 Emergency Shot Size",
+        name="Rescue shot size",
         icon="mdi:water-alert",
         native_min_value=0.1,
         native_max_value=15.0,
@@ -341,7 +341,7 @@ NUMBER_DESCRIPTIONS = [
     # 10 when an older integration has no such entity.
     NumberEntityDescription(
         key="p3_time_between_shots",
-        name="P3 Time Between Shots",
+        name="Rescue shot interval",
         icon="mdi:timer-outline",
         native_min_value=0.0,
         native_max_value=60.0,
@@ -352,7 +352,7 @@ NUMBER_DESCRIPTIONS = [
     # EC Target Parameters - CRITICAL MISSING ENTITIES
     NumberEntityDescription(
         key="ec_target_veg_p0",
-        name="EC Target Veg P0",
+        name="Vegetative P0 EC target",
         icon="mdi:lightning-bolt",
         native_min_value=0.5,
         native_max_value=15.0,
@@ -362,7 +362,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="ec_target_veg_p1",
-        name="EC Target Veg P1",
+        name="Vegetative P1 EC target",
         icon="mdi:lightning-bolt",
         native_min_value=0.5,
         native_max_value=15.0,
@@ -372,7 +372,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="ec_target_veg_p2",
-        name="EC Target Veg P2",
+        name="Vegetative P2 EC target",
         icon="mdi:lightning-bolt",
         native_min_value=0.5,
         native_max_value=15.0,
@@ -382,7 +382,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="ec_target_veg_p3",
-        name="EC Target Veg P3",
+        name="Vegetative P3 EC target",
         icon="mdi:lightning-bolt",
         native_min_value=0.5,
         native_max_value=15.0,
@@ -392,7 +392,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="ec_target_gen_p0",
-        name="EC Target Gen P0",
+        name="Generative P0 EC target",
         icon="mdi:lightning-bolt",
         native_min_value=0.5,
         native_max_value=20.0,
@@ -402,7 +402,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="ec_target_gen_p1",
-        name="EC Target Gen P1",
+        name="Generative P1 EC target",
         icon="mdi:lightning-bolt",
         native_min_value=0.5,
         native_max_value=20.0,
@@ -412,7 +412,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="ec_target_gen_p2",
-        name="EC Target Gen P2",
+        name="Generative P2 EC target",
         icon="mdi:lightning-bolt",
         native_min_value=0.5,
         native_max_value=20.0,
@@ -422,7 +422,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="ec_target_gen_p3",
-        name="EC Target Gen P3",
+        name="Generative P3 EC target",
         icon="mdi:lightning-bolt",
         native_min_value=0.5,
         native_max_value=20.0,
@@ -435,7 +435,7 @@ NUMBER_DESCRIPTIONS = [
     # these limits. Set an EC limit to 0 to disable that half of the check.
     NumberEntityDescription(
         key="irrigation_ph_min",
-        name="Irrigation pH Min",
+        name="Feed pH, lowest",
         icon="mdi:ph",
         native_min_value=3.0,
         native_max_value=9.0,
@@ -445,7 +445,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="irrigation_ph_max",
-        name="Irrigation pH Max",
+        name="Feed pH, highest",
         icon="mdi:ph",
         native_min_value=3.0,
         native_max_value=9.0,
@@ -455,7 +455,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="irrigation_ec_min",
-        name="Irrigation EC Min",
+        name="Feed EC, lowest",
         icon="mdi:lightning-bolt-outline",
         native_min_value=0.0,
         native_max_value=20.0,
@@ -465,7 +465,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="irrigation_ec_max",
-        name="Irrigation EC Max",
+        name="Feed EC, highest",
         icon="mdi:lightning-bolt",
         native_min_value=0.0,
         native_max_value=20.0,
@@ -476,7 +476,7 @@ NUMBER_DESCRIPTIONS = [
     # System-wide Light Schedule (NOT per-zone)
     NumberEntityDescription(
         key="lights_on_hour",
-        name="Lights On Hour",
+        name="Lights-on hour",
         icon="mdi:weather-sunny",
         native_min_value=0,
         native_max_value=23,
@@ -486,7 +486,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     NumberEntityDescription(
         key="lights_off_hour",
-        name="Lights Off Hour",
+        name="Lights-off hour",
         icon="mdi:weather-night",
         native_min_value=0,
         native_max_value=23,
@@ -498,7 +498,7 @@ NUMBER_DESCRIPTIONS = [
     # the plug's reading into watts first, whatever unit it reports.
     NumberEntityDescription(
         key="sump_power_threshold_w",
-        name="Sump Pump Run Threshold",
+        name="Sump pump run power",
         icon="mdi:pump",
         native_min_value=1,
         native_max_value=10000,
@@ -713,7 +713,7 @@ async def async_setup_entry(
                 entry,
                 NumberEntityDescription(
                     key=f"zone_{zone_num}_plant_count",
-                    name=f"Crop Steering Zone {zone_num} Plant Count",
+                    name=f"Crop Steering Zone {zone_num} Plants",
                     icon="mdi:sprout",
                     native_min_value=1,
                     native_max_value=1000,
@@ -769,7 +769,7 @@ async def async_setup_entry(
                 entry,
                 NumberEntityDescription(
                     key=f"zone_{zone_num}_max_daily_volume",
-                    name=f"Crop Steering Zone {zone_num} Max Daily Volume",
+                    name=f"Crop Steering Zone {zone_num} Daily water limit",
                     icon="mdi:water-check",
                     native_min_value=0,
                     native_max_value=200,
@@ -792,7 +792,7 @@ async def async_setup_entry(
                 entry,
                 NumberEntityDescription(
                     key=min_daily_key,
-                    name=f"Crop Steering Zone {zone_num} Min Daily Water Per Plant",
+                    name=f"Crop Steering Zone {zone_num} Daily minimum water per plant",
                     icon="mdi:water-plus",
                     native_min_value=0,
                     native_max_value=10000,
@@ -835,7 +835,7 @@ async def async_setup_entry(
                 entry,
                 NumberEntityDescription(
                     key=f"zone_{zone_num}_p0_additional_dryback",
-                    name=f"Crop Steering Zone {zone_num} P0 Additional Dryback",
+                    name=f"Crop Steering Zone {zone_num} P0 extra dryback",
                     icon="mdi:water-minus",
                     native_min_value=0.0,
                     native_max_value=40.0,

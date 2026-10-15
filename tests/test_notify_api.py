@@ -726,7 +726,7 @@ def test_a_repairs_card_goes_to_the_phones_that_tick_its_kind_when_it_is_raised(
     _raise(hass, "stock_low_room_b")
     service, payload = hass.services.sent[-1]
     assert service == PHONE_A
-    assert payload["title"] == "Room B: 1 stock tank(s) running low (CS-608)"
+    assert payload["title"] == "Room B: 1 stock tank(s) low (CS-608)"
     assert (
         "- Bloom: 2 L of 20 L" in payload["message"]
         and "Code CS-608." in payload["message"]
@@ -747,7 +747,7 @@ def test_a_repairs_card_goes_to_the_phones_that_tick_its_kind_when_it_is_raised(
     _raise(hass, "kill_switch_missing_room_b")
     service, payload = hass.services.sent[-1]
     assert service == PHONE_B and payload["data"]["priority"] == "high"
-    assert payload["title"] == "Room B: kill switch helper missing (CS-601)"
+    assert payload["title"] == "Room B: Kill switch missing (CS-601)"
     notifier.stop()
     assert hass.bus.listeners == []
 

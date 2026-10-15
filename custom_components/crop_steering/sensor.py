@@ -63,7 +63,7 @@ SHOT_SIZE_KEYS = {
 BASE_SENSOR_DESCRIPTIONS = [
     SensorEntityDescription(
         key="current_phase",
-        name="Current Phase",
+        name="Current phase",
         icon="mdi:water-circle",
     ),
     # dryback_percentage is OWNED BY THE ENGINE (the add-on set_state from
@@ -74,41 +74,41 @@ BASE_SENSOR_DESCRIPTIONS = [
     # Critical Template Calculations - Ported from packages
     SensorEntityDescription(
         key="p1_shot_duration_seconds",
-        name="P1 Shot Duration",
+        name="P1 shot duration",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:timer-sand",
     ),
     SensorEntityDescription(
         key="p2_shot_duration_seconds",
-        name="P2 Shot Duration",
+        name="P2 shot duration",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:timer-sand",
     ),
     SensorEntityDescription(
         key="p3_shot_duration_seconds",
-        name="P3 Emergency Shot Duration",
+        name="Rescue shot duration",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfTime.SECONDS,
         icon="mdi:timer-sand",
     ),
     SensorEntityDescription(
         key="ec_ratio",
-        name="EC Ratio",
+        name="EC ratio",
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:division",
     ),
     SensorEntityDescription(
         key="p2_vwc_threshold_adjusted",
-        name="P2 VWC Threshold Adjusted",
+        name="Adjusted re-water point",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         icon="mdi:water-alert",
     ),
     SensorEntityDescription(
         key="configured_avg_vwc",
-        name="Average VWC All Zones",
+        name="Mean VWC of all zones",
         device_class=SensorDeviceClass.MOISTURE,
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
@@ -116,7 +116,7 @@ BASE_SENSOR_DESCRIPTIONS = [
     ),
     SensorEntityDescription(
         key="configured_avg_ec",
-        name="Average EC All Zones",
+        name="Mean EC of all zones",
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement="mS/cm",
         icon="mdi:flash",
@@ -156,7 +156,7 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
         zone_sensors.append(
             SensorEntityDescription(
                 key=f"zone_{zone_num}_status",
-                name=f"Zone {zone_num} Status",
+                name=f"Zone {zone_num} status",
                 icon="mdi:information",
             )
         )
@@ -165,7 +165,7 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
         zone_sensors.append(
             SensorEntityDescription(
                 key=f"zone_{zone_num}_last_irrigation",
-                name=f"Zone {zone_num} Last Irrigation",
+                name=f"Zone {zone_num} last shot",
                 device_class=SensorDeviceClass.TIMESTAMP,
                 icon="mdi:history",
             )
@@ -175,7 +175,7 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
         zone_sensors.append(
             SensorEntityDescription(
                 key=f"zone_{zone_num}_daily_water_usage",
-                name=f"Zone {zone_num} Daily Water Usage",
+                name=f"Zone {zone_num} water today",
                 device_class=SensorDeviceClass.VOLUME,
                 state_class=SensorStateClass.TOTAL_INCREASING,
                 native_unit_of_measurement=UnitOfVolume.LITERS,
@@ -186,7 +186,7 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
         zone_sensors.append(
             SensorEntityDescription(
                 key=f"zone_{zone_num}_weekly_water_usage",
-                name=f"Zone {zone_num} Weekly Water Usage",
+                name=f"Zone {zone_num} water over seven grow-days",
                 device_class=SensorDeviceClass.VOLUME,
                 # Rolling windows decrease when old grow-days leave the total.
                 state_class=SensorStateClass.TOTAL,
@@ -198,7 +198,7 @@ def create_zone_sensor_descriptions(num_zones: int) -> list[SensorEntityDescript
         zone_sensors.append(
             SensorEntityDescription(
                 key=f"zone_{zone_num}_irrigation_count_today",
-                name=f"Zone {zone_num} Irrigations Today",
+                name=f"Zone {zone_num} shots today",
                 state_class=SensorStateClass.TOTAL_INCREASING,
                 icon="mdi:counter",
             )

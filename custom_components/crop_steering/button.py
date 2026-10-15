@@ -43,7 +43,7 @@ class CropSteeringTestShotButton(ButtonEntity):
     def __init__(self, entry: ConfigEntry, zone: int) -> None:
         self._entry, self._zone = entry, zone
         self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_zone_{zone}_test_shot"
-        self._attr_name = f"Zone {zone} Test Shot"
+        self._attr_name = f"Zone {zone} test shot"
         self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}zone_{zone}_test_shot"
         # An explicit entity_id is the suggestion Home Assistant uses at first registration.
         self.entity_id = f"button.{self._attr_object_id}"
