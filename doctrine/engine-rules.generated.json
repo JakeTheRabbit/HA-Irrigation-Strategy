@@ -175,7 +175,7 @@
     },
     {
       "id": "IR-4",
-      "text": "P0 fires nothing routine: only an EC flush (fixed 10% shot) when pore EC is over 2.5x the P0 target, the feed is dilutive and the interval has passed.",
+      "text": "P0 fires nothing routine: only an EC flush (a 10% shot) when pore EC is over 2.5x the P0 target, the feed is dilutive and the interval has passed. The room's substrate profile sets both numbers; these are the generic profile's.",
       "verified": true
     },
     {

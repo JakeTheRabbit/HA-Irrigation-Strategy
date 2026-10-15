@@ -274,8 +274,9 @@ def engine_facts(doc, paths):
         ("IR-3", f"Anti-short-cycle: an EC correction waits p2_min_interval_min after the last shot (at least {core.EC_SETTLE_MIN:g} min when judged on a settled reading); at max_ec inside that gap the zone HOLDS so the last flush can drain.",
          run({"ec": 10.0, "vwc": 50, "minutes_since_shot": 5})[4].kind == "hold_high_ec"
          and run({"ec": 10.0, "ec_settled": 10.0, "vwc": 50, "minutes_since_shot": 30})[4].kind == "hold_high_ec"),
-        ("IR-4", "P0 fires nothing routine: only an EC flush (fixed 10% shot) when pore EC is over 2.5x the P0 target, the feed is dilutive and the interval has passed.",
-         not run({"phase": "P0", "vwc": 50, "ec": 5.0})[2] and run({"phase": "P0", "vwc": 50, "ec": 8.5}, {"ec_target_p0": 3})[4].kind == "p0_ec_flush"),
+        ("IR-4", f"P0 fires nothing routine: only an EC flush (a {core.P0_EC_FLUSH_SHOT:g}% shot) when pore EC is over {core.P0_EC_FLUSH_RATIO:g}x the P0 target, the feed is dilutive and the interval has passed. The room's substrate profile sets both numbers; these are the generic profile's.",
+         not run({"phase": "P0", "vwc": 50, "ec": 5.0})[2] and run({"phase": "P0", "vwc": 50, "ec": 8.5}, {"ec_target_p0": 3})[4].kind == "p0_ec_flush"
+         and run({"phase": "P0", "vwc": 50, "ec": 8.5}, {"ec_target_p0": 3})[3] == core.P0_EC_FLUSH_SHOT),
         ("IR-5", "P1 ramp: every p1_time_between_min a shot of p1_initial + p1_incr x shots so far (capped at p1_initial + p1_incr x p1_max_shots, which in practice never binds because P1 ends at p1_max_shots), scaled by ec_adjust against the P1 EC target. Ramp shots, and the extra shot at the target, are cap-exempt.",
          run({"phase": "P1", "vwc": 50, "ec": 5.0, "shot_count": 2})[3] == 3.0
          and run({"phase": "P1", "vwc": 50, "ec": 5.0, "shot_count": 2, "minutes_since_shot": 10})[2] is False
