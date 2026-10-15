@@ -532,22 +532,44 @@ def validate_params(p):
 # ---- STATUS REPUBLISH helpers (PURE) — reproduce the master sensor.crop_steering_* vocabulary ----
 _SYS_UNSAFE = ("over_saturated", "ec_limit_exceeded")
 _SYS_WARN = ("approaching_saturation", "approaching_ec_limit", "ec_unknown")
+# A label sets at its threshold but clears only once the reading is this far back past it, and it never
+# eases to a milder label before it has been shown this long: a reading sitting on a threshold gives one
+# change, not one a minute.
+SAFETY_BAND_VWC = 1.0  # VWC points
+SAFETY_BAND_EC = 0.2  # mS/cm
+SAFETY_HOLD_MIN = 5.0
 
 
-def zone_safety_status(vwc, ec, field_capacity, max_ec):
+def _safety_rank(label):
+    return 2 if label in _SYS_UNSAFE else (1 if label in _SYS_WARN else 0)
+
+
+def zone_safety_status(vwc, ec, field_capacity, max_ec, prev=None, held_min=None):
     """PURE. Per-zone safety label (safe / over_saturated / ec_limit_exceeded /
-    approaching_saturation / approaching_ec_limit). vwc/ec may be None (blind)."""
-    if vwc is not None and field_capacity and vwc >= field_capacity:
-        return "over_saturated"
-    if ec is not None and max_ec and ec >= max_ec:
-        return "ec_limit_exceeded"
-    if vwc is not None and field_capacity and vwc >= field_capacity - 5:
-        return "approaching_saturation"
-    if ec is not None and max_ec and ec >= max_ec - 1:
-        return "approaching_ec_limit"
-    if ec is None or not math.isfinite(ec):
-        return "ec_unknown"
-    return "safe"
+    approaching_saturation / approaching_ec_limit). vwc/ec may be None (blind).
+    `prev` is the label shown now and `held_min` the minutes it has been shown; with neither, the
+    plain label at the thresholds."""
+
+    def band(label, width):
+        return width if label == prev else 0
+
+    if vwc is not None and field_capacity and vwc >= field_capacity - band("over_saturated", SAFETY_BAND_VWC):
+        label = "over_saturated"
+    elif ec is not None and max_ec and ec >= max_ec - band("ec_limit_exceeded", SAFETY_BAND_EC):
+        label = "ec_limit_exceeded"
+    elif vwc is not None and field_capacity and vwc >= field_capacity - 5 - band(
+        "approaching_saturation", SAFETY_BAND_VWC
+    ):
+        label = "approaching_saturation"
+    elif ec is not None and max_ec and ec >= max_ec - 1 - band("approaching_ec_limit", SAFETY_BAND_EC):
+        label = "approaching_ec_limit"
+    elif ec is None or not math.isfinite(ec):
+        label = "ec_unknown"
+    else:
+        label = "safe"
+    if held_min is not None and held_min < SAFETY_HOLD_MIN and _safety_rank(label) < _safety_rank(prev):
+        return prev
+    return label
 
 
 def system_safety_status(zone_labels):
