@@ -15,6 +15,7 @@ import { SensorContextCard, useSensorContext } from "@/components/sensor-context
 import { rangeText, steeringOf } from "@/lib/day-chart";
 import {
   attachOutcomes,
+  brainWords,
   jevAnswer,
   jevIds,
   jevResult,
@@ -76,7 +77,8 @@ export function ZonePage({
   );
   // Jev on this zone shows while the room runs Jev (its journal, or its word on this zone).
   const jev =
-    !!readJev(states, room.room.prefix).log ||
+    !!readJev(states, room.room.prefix).room?.on ||
+    !!readJev(states, room.room.prefix).log?.entries.some((entry) => entry.zone === zone.id) ||
     !!parseJevZone(states[jevIds(room.room.prefix).zone(zone.id)]);
   return (
     <div className="zone-page" data-zone-page={zone.id}>
@@ -179,8 +181,9 @@ function JevOnZone({
 }) {
   const { states, room } = controller;
   const ids = jevIds(room.room.prefix);
-  const { log } = readJev(states, room.room.prefix);
+  const { log, room: brain } = readJev(states, room.room.prefix);
   const sensor = parseJevZone(states[ids.zone(zone.id)]);
+  const rules = brain && !brain.on ? brainWords(brain).subtitle : null;
   const setpoints = parseJevSetpoints(states[ids.zone(zone.id)]);
   if (!log && !sensor) return null;
   const { rest, outcomes } = attachOutcomes(log?.entries ?? []);
@@ -192,9 +195,10 @@ function JevOnZone({
         <div>
           <h2 id="zone-jev-title">Jev on this zone</h2>
           <p>
-            {sensor?.acting.length
-              ? `Acting now: ${sensor.acting.map((judge) => JEV_TITLES[judge] ?? judge).join(", ")}`
-              : "Watching: no judge acting on this zone now"}
+            {rules ??
+              (sensor?.acting.length
+                ? `Acting now: ${sensor.acting.map((judge) => JEV_TITLES[judge] ?? judge).join(", ")}`
+                : "Watching: no judge acting on this zone now")}
           </p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => navigate("history/timeline", zone.id)}>

@@ -146,7 +146,9 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
       </div>
       {jev.room && (
         <div className="timeline-jev-usage">
-          <p className="muted small">Jev: {jevUsage(jev.room)}</p>
+          <p className="muted small">
+            {jev.room.on ? `Jev: ${jevUsage(jev.room)}` : `Brain: rules. ${jev.room.stateWords}`}
+          </p>
           <JevTrouble jev={jev.room} />
         </div>
       )}
