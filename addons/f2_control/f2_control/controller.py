@@ -382,6 +382,11 @@ IDLE_HOURS, IDLE_HOURS_RANGE = 3.0, (1.0, 12.0)
 # offers ["Zone total", PER_PLANT] (WATER_TODAY_VIEWS in its const.py); the vitals follow it.
 PER_PLANT = "Per plant"
 
+# What a room grows in, published as the descriptor's `substrate` from its substrate select. The
+# integration offers the same ids (SUBSTRATES in its const.py). An integration from before the select
+# publishes none, and a value this controller does not know reads as "generic": nothing changes.
+SUBSTRATES = ("generic", "rockwool", "coco")
+
 # How a room is plumbed, as DECLARED in the integration's setup and published as the descriptor's
 # `plumbing`: layout -> (has a pump switch, has a main-line valve). The integration carries the same
 # table (custom_components/crop_steering/plumbing.py); tests/test_plumbing.py pins the two together.
@@ -465,6 +470,7 @@ class Room:
         )
         self.feed_ec_sensor = (feed_ec_sensor or "").strip()
         self.feed_ph_sensor = (feed_ph_sensor or "").strip()
+        self.substrate = "generic"  # from the descriptor; see Controller._substrate
         # lights: fall back to these option values until the integration entity is read
         self.opt_lon = opt_lon
         self.opt_loff = opt_loff
@@ -1145,6 +1151,7 @@ class Controller:
                 continue
             room.zone_names = self._zone_names(attrs)  # display only; a rename needs no adoption
             room.room_name = self._room_name(attrs)
+            room.substrate = self._substrate(attrs)  # read like the names: needs no adoption
             saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_setup")
             another_room = self._is_another_room(room, attrs, saved)
             revision = attrs.get("setup_revision", 0)
@@ -2329,6 +2336,13 @@ class Controller:
             if isinstance(name, str) and name.strip() and name.strip() != f"Zone {zone}":
                 found[zone] = name.strip()[:40]
         return found
+
+    @staticmethod
+    def _substrate(attrs):
+        """What the room grows in, from its descriptor: "generic" when an older integration publishes
+        none or the value is one this controller does not know."""
+        value = (attrs or {}).get("substrate", "generic")
+        return value if value in SUBSTRATES else "generic"
 
     @staticmethod
     def _room_name(attrs):

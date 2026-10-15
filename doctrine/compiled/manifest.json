@@ -1,0 +1,157 @@
+{
+  "doctrine_version": "0.1.0",
+  "block_a": [
+    "sections/01-role-and-hard-rules.md",
+    "sections/02-engine.md",
+    "sections/03-decisions.md",
+    "sections/04-symptoms.md",
+    "sections/05-doctrine.md"
+  ],
+  "block_b": {
+    "arcs": {
+      "slab_default": "arcs/slab_default.md",
+      "rockwool_default": "arcs/rockwool_default.md"
+    },
+    "arcs_note": "a preview and drift check: the prompt renders the arc table from the rows the judges use, and a test checks these files' numbers against them",
+    "substrates": {
+      "generic": "substrates/generic.md",
+      "rockwool": "substrates/rockwool.md",
+      "coco": "substrates/coco.md"
+    },
+    "order": "the install's arc file(s), then its substrate file(s), each sorted by id"
+  },
+  "defaults": {
+    "stage_arc": "slab_default",
+    "substrate": "generic"
+  },
+  "files": {
+    "arcs/rockwool_default.md": {
+      "sha256": "d1b1e26f44412014fff0b887af000f7cad0933607d1b7164206ff1c301791f2a",
+      "chars": 1179,
+      "words": 211,
+      "tokens_est_low": 295,
+      "tokens_est_high": 357
+    },
+    "arcs/slab_default.md": {
+      "sha256": "6573a91d97f2295827e9bd3f3209dfc70f4bf3193570a826daadd1d4c9e90643",
+      "chars": 1718,
+      "words": 299,
+      "tokens_est_low": 430,
+      "tokens_est_high": 521
+    },
+    "sections/01-role-and-hard-rules.md": {
+      "sha256": "ab10ed6e07b4c7788b859cef52284bdae6f50e39b8879c9effa7e3e95f4af4a2",
+      "chars": 8844,
+      "words": 1523,
+      "tokens_est_low": 2211,
+      "tokens_est_high": 2680
+    },
+    "sections/02-engine.md": {
+      "sha256": "d4c8163d7251adf4f4ce7aaa847330def5bf8d8b9118917d577b6cd45951487a",
+      "chars": 13226,
+      "words": 2260,
+      "tokens_est_low": 3306,
+      "tokens_est_high": 4008
+    },
+    "sections/03-decisions.md": {
+      "sha256": "6a4d783c11756d7c1555070c3735160d7004c2312f219feca1c776361a03f5be",
+      "chars": 10092,
+      "words": 1717,
+      "tokens_est_low": 2523,
+      "tokens_est_high": 3058
+    },
+    "sections/04-symptoms.md": {
+      "sha256": "edb3ed8286d1e65b1678e1e18058f2dc1e0289f872e0e4e2c5d64d7a18082b4f",
+      "chars": 8002,
+      "words": 1196,
+      "tokens_est_low": 2000,
+      "tokens_est_high": 2425
+    },
+    "sections/05-doctrine.md": {
+      "sha256": "8722e8de723c7f8ebbcd6aa17cc99fad058e3e6e732498c8d00959ffafcc9432",
+      "chars": 32091,
+      "words": 5144,
+      "tokens_est_low": 8023,
+      "tokens_est_high": 9725
+    },
+    "substrates/coco.md": {
+      "sha256": "66bae098fdcff5875d44051359c76bf889b48c392126d472049c74fd7c5d651a",
+      "chars": 3027,
+      "words": 469,
+      "tokens_est_low": 757,
+      "tokens_est_high": 917
+    },
+    "substrates/generic.md": {
+      "sha256": "cea68d701edb52b5d271e8d8484641e98e72fa8b8d79caa97d3a96d9f6775035",
+      "chars": 1311,
+      "words": 217,
+      "tokens_est_low": 328,
+      "tokens_est_high": 397
+    },
+    "substrates/rockwool.md": {
+      "sha256": "bbea11ff3eedd7936ebcd20f11818c21c2d3a46efe82fcde62443dbd641001f0",
+      "chars": 3011,
+      "words": 475,
+      "tokens_est_low": 753,
+      "tokens_est_high": 912
+    }
+  },
+  "estimates": {
+    "block_a": {
+      "chars": 72255,
+      "words": 11840,
+      "tokens_est_low": 18064,
+      "tokens_est_high": 21895
+    },
+    "block_a_plus_b": {
+      "slab_default+generic": {
+        "chars": 75284,
+        "words": 12356,
+        "tokens_est_low": 18821,
+        "tokens_est_high": 22813
+      },
+      "slab_default+rockwool": {
+        "chars": 76984,
+        "words": 12614,
+        "tokens_est_low": 19246,
+        "tokens_est_high": 23328
+      },
+      "slab_default+coco": {
+        "chars": 77000,
+        "words": 12608,
+        "tokens_est_low": 19250,
+        "tokens_est_high": 23333
+      },
+      "rockwool_default+generic": {
+        "chars": 74745,
+        "words": 12268,
+        "tokens_est_low": 18686,
+        "tokens_est_high": 22650
+      },
+      "rockwool_default+rockwool": {
+        "chars": 76445,
+        "words": 12526,
+        "tokens_est_low": 19111,
+        "tokens_est_high": 23165
+      },
+      "rockwool_default+coco": {
+        "chars": 76461,
+        "words": 12520,
+        "tokens_est_low": 19115,
+        "tokens_est_high": 23170
+      }
+    }
+  },
+  "rule_counts": {
+    "hard_rules": 11,
+    "rules": 131,
+    "by_evidence": {
+      "research": 21,
+      "vendor": 20,
+      "grower-practice": 64,
+      "product-rule": 37
+    },
+    "jev_rules_audited": 123,
+    "statements_verified": 46
+  }
+}
