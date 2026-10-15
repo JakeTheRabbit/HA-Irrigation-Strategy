@@ -66,6 +66,22 @@ export const RESTING: Record<string, string> = {
   P2: "Optimal",
   P3: "Overnight dryback",
 };
+/** One zone's shot fired or held this cycle, from the room's decision record: its entries read
+ * "Z<zone> <phase> <reason or block>", and this returns the reason. Null when the zone has none. */
+export function decisionEntry(
+  decision: EntityState | undefined,
+  zoneId: number,
+  key: "fired" | "blocked",
+): string | null {
+  const list = decision?.attributes[key];
+  const hit = Array.isArray(list)
+    ? list.find(
+        (item): item is string => typeof item === "string" && item.startsWith(`Z${zoneId} `),
+      )
+    : undefined;
+  return hit === undefined ? null : hit.replace(/^Z\d+ \S+ /, "");
+}
+
 /** The controller's own zone label (`zone_status_label` in crop_steering_engine/core.py), rebuilt
  * from what it publishes beside the zone status sensor: the zone phase with its reason, and this
  * cycle's decision. The status sensor itself has a second writer, the integration's
@@ -77,16 +93,7 @@ export function controllerZoneLabel(
 ): string | null {
   if (!phase || !/^P[0-3]$/.test(phase.state)) return null;
   const reason = typeof phase.attributes.reason === "string" ? phase.attributes.reason : "";
-  // Decision entries read "Z<zone> <phase> <reason or block>".
-  const entry = (key: "fired" | "blocked") => {
-    const list = decision?.attributes[key];
-    const hit = Array.isArray(list)
-      ? list.find(
-          (item): item is string => typeof item === "string" && item.startsWith(`Z${zoneId} `),
-        )
-      : undefined;
-    return hit === undefined ? null : hit.replace(/^Z\d+ \S+ /, "");
-  };
+  const entry = (key: "fired" | "blocked") => decisionEntry(decision, zoneId, key);
   // A zone without a live probe copies a sibling or runs the blind schedule.
   if (/probe dead|no live probe|blind irrigation budget/i.test(reason))
     return "Probe dead — copying";

@@ -576,9 +576,21 @@ try {
       await day.screenshot({ path: path.join(out, "dashboard-zone-day.png") });
     },
   );
-  await check("zone page: Jev, the probes, the targets and the controls", async () => {
+  await check("zone page: why, the AI, the controls, and the rest on request", async () => {
     await go("zone/3");
-    // Jev on this zone: what it may move and within what range, and its latest decisions.
+    // Why this zone is doing this: the controller's reason from its decision record, always there.
+    const why = page.locator("[data-zone-why]");
+    await expectVisible(why);
+    assert.match(await why.locator(".zone-reasons").innerText(), /Holding — within target band/);
+    // The valve's normal state is a neutral word, never red.
+    assert.deepEqual(
+      (await pillTones(".zone-page-title .pill")).find(([text]) => text.startsWith("Valve")),
+      ["Valve closed", "neutral"],
+    );
+    // Targets, probes and the 7-day history stay closed until asked for; the 24 h chart is gone.
+    assert.equal(await page.locator(".zone-targets, .zone-probes").count(), 0);
+    assert.equal(await page.getByRole("group", { name: "History range" }).count(), 0);
+    // The AI on this zone: what it may move and within what range, and its latest decisions.
     const jev = page.locator("[data-zone-jev]");
     await expectVisible(jev);
     assert.match(
@@ -588,14 +600,18 @@ try {
     const decisions = jev.getByRole("list", { name: "Jev's latest decisions on this zone" });
     assert.ok((await decisions.locator("li").count()) > 0);
     // Probes: each one of the zone's reading, zone 3's back EC probe left out.
+    await page.getByText("Probes used and left out", { exact: true }).click();
     const probes = page.locator(".zone-probes .zone-probe-list li");
+    await expectVisible(probes.first());
     assert.equal(await probes.count(), 4);
     assert.deepEqual((await pillTones(".zone-probes .pill")).at(-1), [
       "Silent 3 h, left out of the zone's reading",
       "warn",
     ]);
     // Targets, read only, with Jev's ranges where it manages them.
+    await page.getByText("Targets, read only", { exact: true }).click();
     const targets = page.locator(".zone-targets");
+    await expectVisible(targets);
     assert.deepEqual(await targets.locator(".jev-chip").allInnerTexts(), [
       "Jev · 59–62 %",
       "Jev · 3.5–5.5 %",
@@ -609,9 +625,9 @@ try {
     await review.waitFor({ state: "hidden" });
     await expectVisible(controls.getByRole("button", { name: "Enable zone scheduling" }));
     await expectVisible(page.locator(".zone-page-title").getByText("Scheduling paused"));
-    // History: yesterday or the last week, on request.
+    // History: the last week, on request.
+    await page.getByText("7-day history", { exact: true }).click();
     const range = page.getByRole("group", { name: "History range" });
-    await range.getByRole("button", { name: "7 days" }).click();
     assert.equal(
       await range.getByRole("button", { name: "7 days" }).getAttribute("aria-pressed"),
       "true",
@@ -622,6 +638,7 @@ try {
       .getByRole("button", { name: "Zone 2" })
       .click();
     await expectVisible(page.getByRole("heading", { name: "Zone 2", exact: true }));
+    await page.getByText("Targets, read only", { exact: true }).click();
     await page.getByRole("button", { name: "Edit in Plan" }).click();
     await expectVisible(page.getByRole("heading", { name: "Targets", exact: true }));
     assert.equal(
@@ -634,6 +651,8 @@ try {
     await go("zone/3");
     await axe("zone page, lower half", ".zone-page-grid");
     await axeDark("zone page, lower half", ".zone-page-grid");
+    await axe("zone page, why", "[data-zone-why]");
+    await axeDark("zone page, why", "[data-zone-why]");
   });
   await check("zone page: a zone is moved to a phase by hand, through the review", async () => {
     await go("zone/1");

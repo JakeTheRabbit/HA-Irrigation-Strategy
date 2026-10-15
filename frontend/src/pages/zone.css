@@ -136,17 +136,37 @@
   padding-bottom: 6px;
 }
 
-/* Jev, targets, probes and controls, two columns on a laptop. */
+/* The AI on this zone and the controls, two columns on a laptop; the controls alone take the width. */
 .zone-page-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   align-items: start;
 }
-.zone-page-column {
+.zone-page-grid > :only-child {
+  grid-column: 1 / -1;
+}
+.zone-reasons {
   display: grid;
-  gap: 16px;
-  min-width: 0;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-wrap: anywhere;
+}
+.zone-ai-read {
+  margin: 0;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.zone-ai-read > span {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+}
+.zone-ai-read[data-cannot] {
+  color: var(--muted-foreground);
 }
 .zone-page .panel-heading {
   padding: 14px 18px 8px;
@@ -352,14 +372,16 @@
   color: var(--foreground);
   font-weight: 650;
 }
-.zone-recorded > summary {
+.zone-recorded > summary,
+.zone-more > summary {
   cursor: pointer;
   padding: 4px 0;
   color: var(--muted-foreground);
   font-size: var(--text-sm);
   font-weight: 550;
 }
-.zone-recorded[open] > summary {
+.zone-recorded[open] > summary,
+.zone-more[open] > summary {
   margin-bottom: 10px;
 }
 @media (max-width: 1100px) {
