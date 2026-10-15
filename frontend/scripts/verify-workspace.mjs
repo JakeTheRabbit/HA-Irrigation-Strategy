@@ -231,6 +231,9 @@ async function liveSetup(run) {
     const reply = (data, status = 200) =>
       route.fulfill({ status, contentType: "application/json", body: JSON.stringify(data) });
     if (u.pathname === "/api/states") return reply(states);
+    // Home Assistant's time zone is a read, not a service: answer with the browser's own zone.
+    if (u.pathname === "/api/config")
+      return reply({ time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone });
     const action = u.pathname.split("/").at(-1),
       data = req.postDataJSON();
     calls.push({ action, data });
@@ -820,7 +823,13 @@ try {
       assert.deepEqual(options, [
         "Custom · type the pot volume",
         "Rockwool 4 in cube · 10 × 10 × 6.5 cm · 0.65 L",
+        "Rockwool Delta 10 · 10 × 10 × 10 cm · 1 L",
         "Rockwool Hugo · 15 × 15 × 14.2 cm · 3.2 L",
+        "Nutrifield 0.9 gal · 15 × 15 × 16 cm · 3.37 L",
+        "Nutrifield 1.5 gal · 18 × 18 × 18 cm · 5.8 L",
+        "Rockwool uni-slab · 5 L",
+        "Rockwool Mama block · 8 L",
+        "Rockwool slab · 10 L",
         "1 gal pot (nominal) · 3.8 L",
         "2 gal pot (nominal) · 7.6 L",
         "3 gal pot (nominal) · 11.4 L",
@@ -844,7 +853,7 @@ try {
       await page.locator("#zone-1-substrate_volume").fill("6.5");
       assert.equal(await preset.inputValue(), "custom", "Typing a volume is a custom entry");
       await page.locator("#zone-1-substrate_volume").fill("20");
-      assert.equal(await preset.inputValue(), "pot-20l", "A typed preset volume is recognised");
+      assert.equal(await preset.inputValue(), "custom", "A typed volume is never named as a preset, even when it matches one");
       await liveSetup(async (lp, calls) => {
         await lp.locator("#zone-1-substrate-preset").selectOption("pot-5gal");
         assert.equal(await lp.locator("#zone-1-substrate_volume").inputValue(), "18.9");
@@ -1129,6 +1138,9 @@ try {
         if (req.headers().authorization !== "Bearer workspace-fixture-token")
           return reply({ message: "Fixture authentication missing" }, 401);
         if (u.pathname === "/api/states") return reply(Object.values(states));
+        // Home Assistant's time zone is a read, not a service: answer with the browser's own zone.
+        if (u.pathname === "/api/config")
+          return reply({ time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone });
         if (u.pathname.startsWith("/api/history/")) return reply([]);
         const action = u.pathname.split("/").at(-1),
           data = req.postDataJSON();
