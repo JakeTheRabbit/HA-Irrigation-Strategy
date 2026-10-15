@@ -110,3 +110,27 @@ def answering(prompt=None):
         qid = "dusk_call__v1" if "lane=1" in text else "dusk_call__v0"
         return message(choice(snap, qid, "enter_p3_now", GOOD))
     return answer
+
+
+FUSED_PROBE = "sensor.crop_steering_vwc_zone_1"  # what controller._fused_id gives the probe judge's context
+
+
+def scenarios(**over):
+    """[(judge, ctx)]: every built judge with a context it can build evidence from, the probe's real fused id and a
+    flower day on the default arc."""
+    import jev_bridge
+    import jev_kit as K
+    from jev.doctrine import stage_intent
+
+    points = [(m, 38.0 - m * 0.01, 4.4) for m in range(0, 180, 5)]
+    shots = [(40, 30.0, 36.5, 4.3, "p2"), (100, 30.0, 36.0, 4.3, "p2")]
+    out = []
+    for judge in jev_bridge.judges():
+        phase = judge.phases[0]
+        base = dict(flower_day=10, stage=stage_intent(10), steering="generative", probe_entity=FUSED_PROBE,
+                    h=K.history(points, shots), plants=4,
+                    siblings={2: {"litres_per_plant": 2.5, "litres_per_plant_words": "2500 mL a plant today"},
+                              3: {"litres_per_plant": 2.2, "litres_per_plant_words": "2200 mL a plant today"}})
+        base.update(over)
+        out.append((judge, K.ctx(phase, **base)))
+    return out
