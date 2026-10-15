@@ -1682,12 +1682,13 @@ try {
         "Sensors and drift",
         "Watering stopped",
         "Phase changes",
+        "Vitals",
         "Stock tanks",
         "Dosing",
         "Jev",
         "Setup and settings",
       ]);
-      assert.equal((await ticked("notify.mobile_app_s23ultra")).length, 9);
+      assert.equal((await ticked("notify.mobile_app_s23ultra")).length, 10);
       assert.deepEqual(await ticked("notify.mobile_app_callum_phone"), [
         "hardware",
         "stock",
@@ -1802,7 +1803,27 @@ try {
       await expectVisible(cards.first());
       assert.equal(await cards.count(), 3);
       assert.equal(await table.isVisible(), false);
-      assert.equal(await cards.first().locator("input[data-kind]").count(), 9);
+      assert.equal(await cards.first().locator("input[data-kind]").count(), 10);
+      // One card per phone, its kinds as chips: a phone's whole setup fits the screen, and a tap
+      // anywhere on a chip ticks it.
+      for (const height of await cards.evaluateAll((all) =>
+        all.map((card) => card.getBoundingClientRect().height),
+      ))
+        assert.ok(height <= 360, `a phone's card is ${Math.round(height)} px tall, over 360`);
+      const chip = cards.first().locator(".notify-chip", { hasText: "Vitals" });
+      const chipBox = await chip.boundingBox();
+      assert.ok(chipBox.height >= 30, "a chip is a finger's height");
+      assert.equal(
+        await chip.evaluate(
+          (label) =>
+            document.elementFromPoint(
+              label.getBoundingClientRect().left + 6,
+              label.getBoundingClientRect().top + 6,
+            ) === label.querySelector("input"),
+        ),
+        true,
+        "a chip's whole face is its checkbox",
+      );
       await noOverflow();
       await page.screenshot({ path: path.join(out, "mobile-notifications.png"), fullPage: true });
       await box("Callum (Callum Phone): Jev").check();
