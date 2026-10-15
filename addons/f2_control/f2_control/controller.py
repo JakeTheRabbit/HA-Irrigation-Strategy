@@ -38,6 +38,7 @@ import curve_tracker
 import dosing_runner
 import jev_bridge
 import jev_policy
+import log_words
 import runtime_env
 import setpoint_supervisor
 import zone_history
@@ -278,6 +279,23 @@ def ha_history(entity, since, timeout=12):
         return [(row.get("state"), row.get("last_changed")) for row in rows] or None
     except Exception:
         return None
+
+
+def ha_logbook(entity, since, timeout=8):
+    """Home Assistant's logbook entries for `entity` from `since` (an aware datetime) to now, oldest
+    first, each with who made it (context_user_id, or the automation or script by name). [] when
+    Home Assistant can't say."""
+    try:
+        r = _session().get(
+            f"{BASE}/logbook/{since.isoformat()}",
+            headers=HDR,
+            params={"entity": entity, "end_time": datetime.now(timezone.utc).isoformat()},
+            timeout=timeout,
+        )
+        entries = r.json() if r.status_code == 200 else []
+        return entries if isinstance(entries, list) else []
+    except Exception:
+        return []
 
 
 def ha_call(domain, service, *, timeout=12, **data):
@@ -1878,15 +1896,15 @@ class Controller:
 
     # ---------- HA read helpers ----------
     def _num(self, entity, default):
-        v, _, _ = ha_get(entity)
+        v, attributes, _ = ha_get(entity)
         try:
-            return (
-                float(v)
-                if v not in (None, "unknown", "unavailable", "")
-                else float(default)
-            )
+            value = float(v) if v not in (None, "unknown", "unavailable", "") else None
         except Exception:
+            value = None
+        if value is None:
             return float(default)
+        self._note_setting(entity, value, attributes)
+        return value
 
     def _zone_num(self, room, zone, suffix, default, optional=False):
         override = parameter_override(
@@ -1946,11 +1964,62 @@ class Controller:
 
     def _num_or_none(self, entity):
         """Read a number entity as float, or None if it doesn't exist / isn't a number."""
-        v, _, _ = ha_get(entity)
+        v, attributes, _ = ha_get(entity)
         try:
-            return float(v) if v not in (None, "unknown", "unavailable", "") else None
+            value = float(v) if v not in (None, "unknown", "unavailable", "") else None
         except Exception:
             return None
+        if value is not None:
+            self._note_setting(entity, value, attributes)
+        return value
+
+    def _note_setting(self, entity, value, attributes):
+        """A setting read with another value than at its last read: the log says who changed it and
+        how. The first read after a start only notes it; the controller's own writes are said where
+        they are made (_auto_write)."""
+        if not entity.startswith("number.crop_steering_") or not math.isfinite(value):
+            return
+        now = datetime.now()
+        settings = self.__dict__.setdefault("_settings_seen", {})
+        seen = settings.get(entity)
+        settings[entity] = (value, now)
+        if seen is None or seen[0] == value:
+            return
+        room, zone, key = self._setting_place(entity)
+        unit = str((attributes or {}).get("unit_of_measurement") or "")
+        entries = ha_logbook(entity, (seen[1] - timedelta(minutes=1)).astimezone())
+        who = log_words.who(entries, value, self._people())
+        self._say(room, zone, log_words.change(log_words.setting_name(key), unit, seen[0], value, who))
+
+    def _setting_place(self, entity):
+        """The room, zone (None for a room-wide one) and key of a setting's number entity."""
+        rest = entity[len("number.crop_steering_"):]
+        for room in sorted(getattr(self, "rooms", []), key=lambda r: len(r.prefix), reverse=True):
+            if rest.startswith(room.prefix):
+                key = rest[len(room.prefix):]
+                zoned = re.fullmatch(r"zone_(\d+)_(.+)", key)
+                return (room, int(zoned[1]), zoned[2]) if zoned else (room, None, key)
+        return None, None, rest
+
+    def _people(self):
+        """Each Home Assistant user's person name ({user id: "Sam"}), read again at most every ten
+        minutes: only a setting change asks."""
+        read, people = getattr(self, "_people_cache", (0.0, {}))
+        if not read or time.monotonic() - read > 600:
+            people = {
+                s["attributes"]["user_id"]: s["attributes"].get("friendly_name") or s["entity_id"][7:]
+                for s in ha_get_all()
+                if str(s.get("entity_id", "")).startswith("person.")
+                and (s.get("attributes") or {}).get("user_id")
+            }
+            self._people_cache = (time.monotonic(), people)
+        return people
+
+    @staticmethod
+    def _say(room, zone, text):
+        """One line of the log about a room, or one of its zones, tagged as the log tags them."""
+        tag = "" if room is None else f"[{room.slug}] " + ("" if zone is None else f"Z{zone} ")
+        log(f"{tag}{text}")
 
     def _detect_zones(self, prefix, fallback):
         """Count zones from the integration's fused VWC sensors. Returns the number of
@@ -2769,6 +2838,7 @@ class Controller:
         if not ha_call("number", "set_value", entity_id=entity, value=value):
             return False
         written[(zone, suffix)] = (value, now)
+        self.__dict__.setdefault("_settings_seen", {})[entity] = (value, now)  # said here, not again
         learn["last_change"] = f"{now.strftime('%H:%M')} {suffix} {old:g} -> {value:g}"
         tag = "" if room.prefix == "" else f"{room.slug} "
         self._activity.insert(0, f"{now.strftime('%H:%M')} {tag}Z{zone} {by} {suffix} {old:g} -> {value:g}"[:120])
@@ -4888,7 +4958,8 @@ class Controller:
                 if dur > allowed:
                     log(f"[{room.slug}] Z{zone} shot clipped {dur}s -> {allowed}s: {left_l:.2f} L of the daily budget left")
                     size, dur = round(size * allowed / dur, 2), allowed
-            log(f"[{room.slug}] Z{zone} {st['phase']} FIRE {size}% ~{dur}s — {reason}")
+            what, why = log_words.shot(reason)
+            log(f"[{room.slug}] Z{zone} {st['phase']} FIRE {size}% ~{dur}s — {what}: {why}")
             # Count configured flow x actual runtime, including caps, truncation,
             # the minimum duration and partial aborts. Preserve this flow snapshot
             # so later sizing edits cannot change an already delivered volume.
@@ -4917,7 +4988,7 @@ class Controller:
                 )
             # A gate that is closed is said out loud in every phase: overnight nothing is due, and a
             # room blocked since a restart used to look exactly like a healthy one until lights-on.
-            log(f"[{room.slug}] Z{zone} {st['phase']} hold — {reason}"
+            log(f"[{room.slug}] Z{zone} {st['phase']} hold — {log_words.hold(reason) or 'nothing due'}"
                 + (f" [blocked: {block}]" if block else ""))
 
     # ---------- CS-312: the max-run latch ----------
@@ -5369,6 +5440,7 @@ class Controller:
                 new_phase, new_thr, fire, size, reason = decide(snap, p)
             shown = snap  # what waiting_for reads: the snapshot, in the phase the zone is now in
             if new_phase != st["phase"]:
+                log(f"[{room.slug}] Z{zone} {st['phase']} -> {new_phase}: {log_words.transition(reason)}")
                 # decide()'s reason leads with why the phase moved ("lights-off -> P3 | ..."): the push says it.
                 self._notify_event("phase", room, zone, st["phase"], new_phase, str(reason).split(" | ")[0])
                 self._record_phase(room, zone, st, st["phase"], new_phase, now, str(reason).split(" | ")[0])

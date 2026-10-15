@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 from copy import deepcopy
 from datetime import datetime
+import logging
 import math
 
 from . import units
@@ -12,6 +13,7 @@ from .admin import async_require_admin
 from .const import DOMAIN, LEGACY_KILL_SWITCH, MAX_ZONES
 from .generated.defaults import SIZING_DEFAULTS
 from .plumbing import (
+    LABELS as PLUMBING_LABELS,
     PLUMBING_LAYOUTS,
     infer as infer_plumbing,
     problems as plumbing_problems,
@@ -19,6 +21,7 @@ from .plumbing import (
 from .room import room_gate
 from .sizing import prefer_setup_value
 
+_LOGGER = logging.getLogger(__name__)
 API_VERSION = 1
 # What a zone valve, main line or pump can be: the kinds of device the controller can open and close
 # (its ACTUATORS table, addons/f2_control/f2_control/controller.py).
@@ -720,6 +723,125 @@ async def create_setup(hass, payload):
     }
 
 
+# A saved setup change, in words, for Home Assistant's logbook (Activity) and its log: what each
+# mapping is called on the dashboard. tests/test_setup_changes.py holds it to HARDWARE_DOMAINS.
+HARDWARE_WORDS = {
+    "pump_switch": "pump",
+    "main_line_switch": "main-line valve",
+    "waste_switch": "waste valve",
+    "light_entity": "lights",
+    "feed_ec_sensor": "feed EC sensor",
+    "feed_ph_sensor": "feed pH sensor",
+    "temperature_sensor": "temperature sensor",
+    "humidity_sensor": "humidity sensor",
+    "vpd_sensor": "VPD sensor",
+    "water_level_sensor": "tank level sensor",
+    "tank_temperature_sensor": "tank temperature sensor",
+    "tank_ec_sensor": "tank EC sensor",
+    "tank_ph_sensor": "tank pH sensor",
+    "tank_last_fill_sensor": "tank last-fill sensor",
+    "tank_fill_entity": "tank fill",
+}
+ZONE_WORDS = {
+    "valve": "valve",
+    "vwc_sensors": "moisture probes",
+    "ec_sensors": "EC probes",
+    "plant_count": "plants",
+    "substrate_volume": "pot volume (L)",
+    "drippers_per_plant": "drippers per plant",
+    "dripper_flow_rate": "dripper flow (L/h)",
+}
+# homeassistant.const.EVENT_LOGBOOK_ENTRY: the event the logbook records a line from.
+LOGBOOK_ENTRY = "logbook_entry"
+
+
+def _said(value):
+    if isinstance(value, list):
+        return ", ".join(value) or "none"
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return f"{value:g}"
+    return value or "none"
+
+
+def setup_changes(old, new):
+    """PURE. What a saved setup changed, in words. Both rooms are as `setup_room` gives them:
+    the one the setup page showed, and the one saved."""
+    said = []
+    if old.get("room_name") != new.get("room_name"):
+        said.append(f"renamed from “{old.get('room_name')}”")
+    if old.get("active", True) != new.get("active", True):
+        said.append("restored" if new.get("active", True) else "archived")
+    if old.get("plumbing") != new.get("plumbing"):
+        layout = new.get("plumbing")
+        said.append(f"plumbing: {PLUMBING_LABELS.get(layout, layout or 'none')}")
+    old_hw, new_hw = old.get("hardware") or {}, new.get("hardware") or {}
+    for key, word in HARDWARE_WORDS.items():
+        was, now = _said(old_hw.get(key)), _said(new_hw.get(key))
+        if was != now:
+            said.append(f"{word} {was} → {now}")
+    shown = {zone.get("id"): zone for zone in old.get("zones") or []}
+    for zone in new.get("zones") or []:
+        z, prior = zone.get("id"), shown.get(zone.get("id"))
+        if prior is None:
+            said.append(f"zone {z} added")
+            continue
+        if prior.get("active", True) != zone.get("active", True):
+            said.append(
+                f"zone {z} " + ("restored" if zone.get("active", True) else "archived")
+            )
+        if prior.get("name") != zone.get("name"):
+            said.append(
+                f"zone {z} renamed from “{prior.get('name')}” to “{zone.get('name')}”"
+            )
+        for field, word in ZONE_WORDS.items():
+            was, now = _said(prior.get(field)), _said(zone.get(field))
+            if was != now:
+                said.append(f"zone {z} {word} {was} → {now}")
+    return said
+
+
+def _record(hass, action, before, result, context):
+    """A saved setup change goes in Home Assistant's logbook, on the room's engine-config sensor
+    with the person who made it (the service call's context), and in its log at INFO. Recording
+    never undoes or fails the save."""
+    try:
+        entry = _entry(hass, (result or {}).get("entry_id"))
+        if entry is None:
+            return
+        room = setup_room(hass, entry)
+        if action == "setup_create":
+            message = f"set up (revision {room['revision']})"
+        elif action == "setup_remove":
+            message = f"archived (revision {room['revision']})"
+        else:
+            changes = setup_changes(before or {}, room)
+            message = f"setup saved (revision {room['revision']}): " + (
+                "; ".join(changes) if changes else "nothing changed"
+            )
+        from homeassistant.helpers import entity_registry as er
+
+        # The id HA gave the sensor (sticky in the registry), else the one it is created with.
+        entity_id = (
+            er.async_get(hass).async_get_entity_id(
+                "sensor", DOMAIN, f"{DOMAIN}_{entry.entry_id}_engine_config"
+            )
+            or f"sensor.{DOMAIN}_{room['prefix']}engine_config"
+        )
+        hass.bus.async_fire(
+            LOGBOOK_ENTRY,
+            {
+                "name": room["room_name"],
+                "message": message,
+                "domain": DOMAIN,
+                "entity_id": entity_id,
+            },
+            context=context,
+        )
+        _LOGGER.info("%s: %s", room["room_name"], message)
+    except Exception:  # noqa: BLE001 - the save stands; say why it was not recorded
+        _LOGGER.exception("A saved room setup change could not be recorded")
+
+
 async def async_setup_setup_services(hass):
     """Response services are discoverable through the standard HA service registry."""
     from homeassistant.core import SupportsResponse
@@ -742,11 +864,13 @@ async def async_setup_setup_services(hass):
             await async_require_admin(hass, service_call, "Setup", allow_no_user=False)
             try:
                 async with lock:
-                    result = (
-                        fn(hass)
-                        if action == "setup_read"
-                        else await fn(hass, service_call.data)
-                    )
+                    if action == "setup_read":
+                        result = fn(hass)
+                    else:
+                        entry = _entry(hass, service_call.data.get("entry_id"))
+                        before = setup_room(hass, entry) if entry else None
+                        result = await fn(hass, service_call.data)
+                        _record(hass, action, before, result, service_call.context)
             except (ValueError, TypeError) as err:
                 raise HomeAssistantError(str(err)) from err
             return result if service_call.return_response else None
