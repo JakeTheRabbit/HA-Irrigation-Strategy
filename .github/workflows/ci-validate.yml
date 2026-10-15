@@ -81,6 +81,27 @@ jobs:
           fi
           exit $bad
 
+      - name: Doctrine pack current, true of the code and lint-clean
+        # doctrine/README.md, checks 1-6 (check 6, the controller's copy, whenever that directory exists).
+        # The private word list comes from the DOCTRINE_DENYLIST secret and runs on every push and
+        # on every pull request from this repository, where a missing secret fails the build. A pull
+        # request from a fork, or one Dependabot opened, gets no Actions secrets: it runs the public
+        # patterns only, the skip goes into the job summary, and the merge push runs the private list.
+        env:
+          DENYLIST: ${{ secrets.DOCTRINE_DENYLIST }}
+          NO_SECRETS: ${{ github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository || github.event.pull_request.user.login == 'dependabot[bot]') }}
+        run: |
+          set -- --check \
+            --core crop-steering-engine/src/crop_steering_engine/core.py \
+            --jev addons/f2_control/f2_control/jev/doctrine.py
+          if [ "$NO_SECRETS" = "true" ]; then
+            python doctrine/tools/build_doctrine.py "$@" \
+              --private-skip "pull request with no secrets (fork or Dependabot); the merge push runs it"
+          else
+            printf '%s' "$DENYLIST" > "$RUNNER_TEMP/doctrine-denylist.json"
+            python doctrine/tools/build_doctrine.py "$@" --private-denylist "$RUNNER_TEMP/doctrine-denylist.json"
+          fi
+
       - name: Pytest (integration + health + services + state + version)
         run: |
           PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v
