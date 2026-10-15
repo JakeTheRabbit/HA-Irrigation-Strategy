@@ -35,3 +35,19 @@ def test_every_saved_option_of_an_older_install_is_in_the_schema():
 def test_the_runtime_marker_is_environment_not_an_option():
     config = _config()
     assert "F2_RUNTIME" not in config["options"] and "F2_RUNTIME" not in config["schema"]
+
+
+def test_the_anthropic_key_is_an_empty_password_by_default():
+    """Shown on a fresh install's form without "unused optional options", masked, and empty means no key."""
+    config = _config()
+    assert config["options"]["anthropic_api_key"] == ""
+    assert config["schema"]["anthropic_api_key"] == "password?"
+
+
+def test_the_brain_options_and_their_defaults():
+    config = _config()
+    assert config["options"]["brain_provider"] == "auto"
+    assert config["schema"]["brain_provider"] == "list(auto|rules|claude_haiku|jev_legacy)?"
+    assert config["options"]["anthropic_daily_budget_usd"] == 1.0
+    assert config["options"]["brain_dry_run"] is False
+    assert config["options"]["stage_arc"] == "slab_default"

@@ -485,6 +485,12 @@ OPTION_TYPES = {
     "flow_lps": "float",
     "loop_seconds": "float",
     "rediscover_seconds": "float",
+    "brain_provider": "list(auto|rules|claude_haiku|jev_legacy)?",
+    "stage_arc": "list(slab_default)?",
+    "anthropic_api_key": "password?",
+    "anthropic_model": "str?",
+    "anthropic_daily_budget_usd": "float(0,1000)?",
+    "brain_dry_run": "bool?",
     "cf_account_id": "str?",
     "cf_api_token": "password?",
     "cf_gateway_id": "str?",
@@ -521,6 +527,19 @@ def _choices(kind):
     return found.group(1).split("|") if found else None
 
 
+def _ranged(kind):
+    """A Supervisor number type with its range, e.g. float(0,1000) -> ("float", (0.0, 1000.0)); else (kind, None)."""
+    found = re.fullmatch(r"(int|float)\(([-\d.]+),([-\d.]+)\)", kind)
+    return (found.group(1), (float(found.group(2)), float(found.group(3)))) if found else (kind, None)
+
+
+def _outside(bounds, number):
+    """Why `number` is outside a range type's `bounds`, or None."""
+    if bounds and not bounds[0] <= number <= bounds[1]:
+        return f"expected a number from {bounds[0]:g} to {bounds[1]:g}"
+    return None
+
+
 def _expected(kind):
     if _choices(kind):
         return "one of " + ", ".join(_choices(kind))
@@ -535,7 +554,7 @@ def _not_entity_ids(items):
 
 def _file_value_problem(kind, value):
     """Why a JSON value from a container's options file is not of `kind`, or None when it is."""
-    kind = kind.rstrip("?")
+    kind, bounds = _ranged(kind.rstrip("?"))
     if _choices(kind):
         ok = value in _choices(kind)
     else:
@@ -549,12 +568,12 @@ def _file_value_problem(kind, value):
     if not ok:
         hint = '; write ["input_boolean.a", "input_boolean.b"]' if kind == "[str]" else ""
         return f"expected {_expected(kind)}, got {_JSON_TYPE.get(type(value), 'something else')}{hint}"
-    return _not_entity_ids(value) if kind == "[str]" else None
+    return _not_entity_ids(value) if kind == "[str]" else _outside(bounds, value)
 
 
 def _coerced(kind, text):
     """An environment value (always a string) as `kind` -> (value, None), or (None, why it is not)."""
-    kind = kind.rstrip("?")
+    kind, bounds = _ranged(kind.rstrip("?"))
     if kind == "int":
         found = re.fullmatch(r"[+-]?\d+", text.strip())
         return (int(found.group(0)), None) if found else (None, "expected a whole number")
@@ -563,7 +582,9 @@ def _coerced(kind, text):
             number = float(text)
         except ValueError:
             number = math.nan
-        return (number, None) if math.isfinite(number) else (None, "expected a number")
+        if not math.isfinite(number):
+            return None, "expected a number"
+        return (None, _outside(bounds, number)) if _outside(bounds, number) else (number, None)
     if kind == "bool":
         word = text.strip().lower()
         return (word in _TRUE, None) if word in _TRUE + _FALSE else (None, "expected true or false")
