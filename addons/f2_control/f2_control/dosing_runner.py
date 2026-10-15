@@ -1,8 +1,9 @@
-"""Batch-tank dosing for every room, on one thread of its own (docs/DOSING.md).
+"""Batch-tank dosing for every room, as a step machine on the controller's main loop (docs/DOSING.md).
 
 The integration keeps each room's dosing setup and its one request, and publishes them as
-sensor.crop_steering_<prefix>dosing_config. This thread reads that every 2 s and takes each request
-once. A dose sets a pump's volume number and presses its start: the pump's own firmware runs the
+sensor.crop_steering_<prefix>dosing_config. The main loop wakes whenever dosing is due (step): it
+reads that every 2 s and takes each request once, and runs the dose or batch it took on to its next
+wait (a read of the pump, the fill, the mix, a pause), so nothing here sleeps through a wait. A dose sets a pump's volume number and presses its start: the pump's own firmware runs the
 motor for that volume and switches it off. A batch holds the watering it could disturb, fills the
 tank, mixes it, doses the recipe in order and stamps the fill. Nothing here ever switches a dosing
 motor on; switching one off (a stop, a dose past its time) is the only thing done to its power.
@@ -13,7 +14,8 @@ does not read off when a dose or a batch ends, and whatever a start finds record
 watering and is switched off again on every pass until all of it reads off (_release_stuck). The
 irrigation loop asks holds() before every shot. A batch sets its hold under the lock a shot starts
 under (Controller._shot_lock): a shot either started before it, and the batch waits for that shot to
-end, or never starts. Every switch-on goes through _on, which the way out (exit) never overtakes.
+end, or never starts. Every switch-on goes through _on; a stop signal that lands in the middle of one
+waits for it to land (defer_exit), so the way out (exit) never overtakes it.
 """
 from __future__ import annotations
 
@@ -43,11 +45,8 @@ REFRESH_S = 30.0  # the pumps' flow and state are read this often
 CHORES_S = 30.0  # while a dose or batch runs, stock draws, alerts and volume put-backs wait this long
 QUICK_S = 2.0  # the Home Assistant timeout for those chores, for re-sent offs and for the way out
 ON_TIMEOUT_S = 4.0  # a switch-on's Home Assistant timeout: always inside the way out's wait for it
-EXIT_GATE_S = 5.0  # the way out waits this long for a switch-on in flight to land
-EXIT_JOIN_S = 3.0  # and this long for the thread to switch its own job's hardware off
 REALERT_S = 1800.0  # hardware that does not read off is alerted again this often
 DRAW_GIVE_UP_S = 86400.0  # a stock draw not taken within this is given up, with an alert
-STALL_S = 600.0  # the thread not seen going round for this long is stalled (health)
 POLL_FAILS = 15  # one room failing this many passes in a row (30 s) is alerted
 REPUBLISH_S = 60.0  # an unchanged status is published again this often (with a new updated_at)
 HISTORY = 20
@@ -102,7 +101,7 @@ def _aware(stamp):
 
 
 class _Job:
-    """The one dose or batch this thread is running."""
+    """The one dose or batch dosing is running."""
 
     def __init__(self, room, config, request, kind):
         self.room, self.config, self.request, self.kind = room, config, request, kind
@@ -139,15 +138,18 @@ class DosingRunner:
         self._sleep, self._mono = sleep, monotonic
         self._now = now or (lambda: datetime.now(timezone.utc))
         self.path = state_path
-        self._lock = threading.RLock()  # guards everything below; never held across a Home Assistant call
-        self._gate = threading.Lock()  # held across a switch-on (_on), so exit() never overtakes one
+        # Guards everything below; never held across a Home Assistant call. Re-entrant: the stop signal
+        # runs exit() on the main loop, which may be in the middle of a step.
+        self._lock = threading.RLock()
         self._held = {}  # room slug -> the slugs of the rooms its batch, or what it left on, holds
         self._stuck = {}  # room slug -> what did not read off, held until it does (_release_stuck)
         self._job = None
+        self._steps = None  # the running dose or batch: a generator that yields the seconds to its next step
+        self._due = None  # when its next step is due, on the runner's clock
+        self._switching = False  # a switch-on is on its way (_on)
+        self._exit_pending = None  # the stop that landed in the middle of it (defer_exit)
         self._exiting = False
         self._recovered = False
-        self._thread = None
-        self.beat = None  # when the thread last went round, on the runner's clock (health)
         self._polled = None
         self._chores = None  # when the chores (draws, alerts, put-backs) last ran
         self._fails = {}  # room slug -> passes in a row that failed
@@ -172,28 +174,55 @@ class DosingRunner:
                 found = "making a batch"
         return found
 
-    def start(self):
-        thread = threading.Thread(target=self._run, name="dosing", daemon=True)
-        with self._lock:
-            self._thread = thread
-        thread.start()
-        return thread
+    def step(self):
+        """One go of dosing on the controller's main loop: every room's dosing_config is read every
+        POLL_S (which takes a new request, and starts its dose or batch at once), and the dose or batch
+        running is run on to its next wait when that is due. Never raises: an error is logged, and
+        one inside a dose or batch is recovered as after a restart (_crashed). -> the seconds until
+        dosing is next due."""
+        try:
+            if not self._exiting:
+                if self._steps is None:  # one runs only once recovered (a dose or batch is taken in poll)
+                    self.recover()
+                if self._polled is None or self._mono() - self._polled >= POLL_S:
+                    self.poll()
+                if self._steps is not None and self._mono() >= self._due:
+                    self._advance()
+        except _Exit:
+            pass
+        except Exception as e:  # dosing never stops the irrigation loop
+            self._log("dosing: error", repr(e))
+        now = self._mono()
+        due = (now if self._polled is None else self._polled) + POLL_S
+        if self._steps is not None:
+            due = min(due, self._due)
+        return max(0.0, due - now)
 
-    def health(self):
-        """For the controller's main loop: None before start() and on the way out; "dead" once the
-        thread has stopped, "stalled" when it has not gone round for STALL_S, else "ok"."""
-        with self._lock:
-            thread, exiting = self._thread, self._exiting
-        if thread is None or exiting:
-            return None
-        if not thread.is_alive():
-            return "dead"
-        beat = self.beat
-        return "stalled" if beat is not None and self._mono() - beat > STALL_S else "ok"
+    def _start(self, steps):
+        """A dose or batch just taken: its first step now (all of it, when it ends before any wait)."""
+        self._steps, self._due = steps, self._mono()
+        self._advance()
 
-    def restart(self):
-        """The thread died: recover as after a restart (whatever is recorded is held and switched
-        off; nothing is resumed), say so, and start it again."""
+    def _advance(self):
+        """The running dose or batch, on to its next wait (or its end)."""
+        try:
+            wait = next(self._steps)
+        except StopIteration:
+            self._steps = self._due = None
+            return
+        except _Exit:
+            self._steps = self._due = None
+            raise
+        except Exception as e:  # it settles its own failures: this one escaped
+            self._steps = self._due = None
+            self._crashed(e)
+            return
+        self._due = self._mono() + max(0.0, wait)
+
+    def _crashed(self, error):
+        """A dose or batch stopped with an error it did not settle: recover as after a restart (whatever
+        is recorded is held and switched off; nothing is resumed), and say so."""
+        self._log("dosing: error", repr(error))
         with self._lock:
             self._job = None
             self._held.clear()
@@ -201,15 +230,14 @@ class DosingRunner:
             self._recovered = False
         self.recover()
         self._alert(None, "CS-806", "dosing stopped with an error and was started again",
-                    "The controller's dosing thread stopped with an error, and the controller started "
-                    "it again. Whatever a dose or batch had running was switched off and holds its "
-                    "rooms' watering until it reads off; nothing was resumed. Check the controller "
+                    f"The controller's dosing stopped with an error ({error!r}), and the controller "
+                    "started it again. Whatever a dose or batch had running was switched off and holds "
+                    "its rooms' watering until it reads off; nothing was resumed. Check the controller "
                     "app's log, and the tank if a dose or batch was running.",
-                    _event("thread", self._now().isoformat()))
-        return self.start()
+                    _event("crash", self._now().isoformat()))
 
     def recover(self):
-        """At start-up, and when the thread is started again: whatever a dose or batch left recorded
+        """At start-up, and after a dose or batch crashed (_crashed): whatever a dose or batch left recorded
         holds its rooms (the batch's, or the dose's own), is switched off, and is switched off again
         on every pass until every part of it reads off (_release_stuck); a batch's hold goes off only
         then. CS-803 says so, and again every 30 min while anything does not read off. Its volume
@@ -247,33 +275,30 @@ class DosingRunner:
 
     def stop_starting(self):
         """The app is stopping (SIGTERM, before the irrigation's own safe-off): no dose, batch or
-        switch-on starts from here on. One already on its way lands; exit() waits for it."""
+        switch-on starts from here on."""
         with self._lock:
             self._exiting = True
 
-    def exit(self, within=None):
-        """The app is stopping (SIGTERM, after the irrigation's own safe-off): no switch-on starts
-        from here on (one in flight lands first, EXIT_GATE_S at most), the thread gets EXIT_JOIN_S to
-        switch its own job's hardware off, and then everything recorded is switched off again, each
-        off with a QUICK_S timeout and no read-back. The records stay, and a batch's hold stays on,
-        so the next start reads it all back off (recover) and raises CS-803. With `within` (seconds)
-        every wait and every off is cut to fit inside it, and an off that no longer fits is not sent."""
-        end = None if within is None else self._mono() + within
-
-        def fits(seconds):
-            return seconds if end is None else max(0.0, min(seconds, end - self._mono()))
-
-        got = self._gate.acquire(timeout=fits(EXIT_GATE_S))
-        try:
-            with self._lock:
-                self._exiting = True
-                thread = self._thread
-        finally:
-            if got:
-                self._gate.release()
-        if thread is not None and thread is not threading.current_thread() and thread.is_alive():
-            thread.join(fits(EXIT_JOIN_S))
+    def defer_exit(self, stop):
+        """The app is stopping while a switch-on is on its way (SIGTERM lands on the main loop, so in
+        the middle of _on): nothing more starts, and `stop` (the way out) runs as soon as that call
+        has landed, at most ON_TIMEOUT_S, so its offs come after it. -> False when none is on its way
+        (stop at once)."""
         with self._lock:
+            if not self._switching:
+                return False
+            self._exiting, self._exit_pending = True, stop
+            return True
+
+    def exit(self, within=None):
+        """The app is stopping (SIGTERM, after the irrigation's own safe-off): nothing starts from here
+        on, and everything recorded is switched off again, each off with a QUICK_S timeout and no
+        read-back. The records stay, and a batch's hold stays on, so the next start reads it all back
+        off (recover) and raises CS-803. With `within` (seconds) every off is cut to fit inside it,
+        and an off that no longer fits is not sent."""
+        end = None if within is None else self._mono() + within
+        with self._lock:
+            self._exiting = True
             records = [
                 dict(block["inflight"]) for block in self._doc["rooms"].values()
                 if isinstance(block, dict) and isinstance(block.get("inflight"), dict)
@@ -282,7 +307,7 @@ class DosingRunner:
         for record in records:
             for entity in record.get("off") or []:
                 if isinstance(entity, str) and "." in entity:
-                    timeout = fits(QUICK_S)
+                    timeout = QUICK_S if end is None else min(QUICK_S, end - self._mono())
                     if timeout > 0:
                         self._send_off(entity, timeout)
                     else:
@@ -290,25 +315,13 @@ class DosingRunner:
         if unsent:
             self._log("dosing: no time left to switch off " + ", ".join(unsent) + "; recorded for the next start")
 
-    # ------------------------------------------------------------------ the thread
-    def _run(self):
-        while not self._exiting:
-            self.beat = self._mono()
-            try:
-                if self.recover():
-                    self.poll()
-            except _Exit:
-                return
-            except Exception as e:  # the dosing thread must never die
-                self._log("dosing: error", repr(e))
-            if not self._exiting:
-                self._sleep(POLL_S)
-
+    # ------------------------------------------------------------------ every room, every POLL_S
     def poll(self, busy=None):
         """Read every room's dosing_config once: take each new request, publish each room's status.
-        `busy` is the dose or batch running (this is its pass between reads): then only a stop is
-        acted on, a dose or batch is refused, and the chores wait CHORES_S between runs."""
-        now = self._polled = self.beat = self._mono()
+        While a dose or batch runs only a stop is acted on, a dose or batch is refused, and the chores
+        wait CHORES_S between runs. `busy`: that dose or batch, when it is not the one running now."""
+        now = self._polled = self._mono()
+        busy = busy or self._job
         self._safely(self._release_stuck)
         self._safely(self._sweep_rooms)
         if busy is None or self._chores is None or now - self._chores >= CHORES_S:
@@ -317,7 +330,7 @@ class DosingRunner:
                 self._safely(chore)
         for room in list(self.c.rooms):
             try:
-                self._poll_room(room, busy)
+                self._poll_room(room, busy or self._job)  # one taken here is running from now on
             except Exception as e:  # one room's error never stops the others
                 self._room_failed(room, e)
             else:
@@ -378,9 +391,9 @@ class DosingRunner:
             block = self._block(room)
             block["handled"], block["handled_result"] = request["id"], _RUNNING[action]
             self._write()
-        if action == "dose":
-            return self._run_dose(room, config, request)
-        return self._run_batch(room, config, request)
+        self._start(self._run_dose(room, config, request) if action == "dose"
+                    else self._run_batch(room, config, request))
+        return None
 
     def _stop(self, room, config, busy, request):
         """Every pump's power in the room off, the running job's and the current setup's (a setup
@@ -419,7 +432,7 @@ class DosingRunner:
         with self._lock:
             self._job = job
         try:
-            result = self._dose(job, pump, request.get("ml"))
+            result = yield from self._dose(job, pump, request.get("ml"))
         except _Exit:
             self._exit_off(job)
             raise
@@ -500,7 +513,7 @@ class DosingRunner:
             return "refused: the dose could not be written to dosing_state.json"
         self._show(job.room, job.config)
         try:
-            result = self._run_one(job, pump, ml, flow, expected)
+            result = yield from self._run_one(job, pump, ml, flow, expected)
         except (_Exit, _Ended):
             raise
         except Exception as e:
@@ -741,7 +754,7 @@ class DosingRunner:
                     _event(pump["id"], job.dose and job.dose["started_at"]),
                 )
                 return "ran past its time"
-            self._wait(job, READ_S)
+            yield READ_S
 
     def _verdict(self, job, pump, ml, flow, expected, pressed_at, seen, blind, batch, final=True):
         """How a dose the pump no longer reads dosing ended: "finished" only when a read saw it dose,
@@ -828,13 +841,13 @@ class DosingRunner:
                 self._live_of(room)["batch"] = {
                     "step": "idle", "pump": None, "started_at": job.started_at, "step_started_at": None,
                     "steps": [], "result": None, "ended_at": None}
-            self._hold(job, held)
+            yield from self._hold(job, held)
             self._close(job, held)
-            self._fill(job)
-            self._mix(job)
-            self._pause(job, "premix", batch.get("premix_min"))
-            self._doses(job, plan)
-            self._pause(job, "postmix", batch.get("postmix_min"))
+            yield from self._fill(job)
+            yield from self._mix(job)
+            yield from self._pause(job, "premix", batch.get("premix_min"))
+            yield from self._doses(job, plan)
+            yield from self._pause(job, "postmix", batch.get("postmix_min"))
             warning, hold_left = self._finish(job)
             result = "finished" + (f"; {warning}" if warning else "")
         except _Exit:
@@ -953,7 +966,7 @@ class DosingRunner:
             self._check(job)
             if self._mono() - waited >= HOLD_WAIT_S:
                 raise _Ended("a shot was still running after 10 minutes")
-            self._wait(job, POLL_S)
+            yield POLL_S
         self._done(job)
 
     def _close(self, job, held):
@@ -1011,7 +1024,7 @@ class DosingRunner:
                 why = f"the tank did not read full within {minutes:g} min"
                 break
             self._check(job)
-            self._wait(job, POLL_S)
+            yield POLL_S
         stuck = self._switch_off([valve])  # always closed, and read back
         closed = ("It was switched off, but it still does not read off: close it by hand now."
                   if stuck else "The fill valve was switched off.")
@@ -1063,7 +1076,7 @@ class DosingRunner:
                                     f"{reading}{f' {unit}' if unit else ''})")
                     raise _Ended(f"the mix pump did not draw {watts:g} W within {MIX_POWER_S:.0f} s")
                 self._check(job)
-                self._wait(job, READ_S)
+                yield READ_S
         self._done(job)
 
     def _mix_alert(self, job, pump, what):
@@ -1080,7 +1093,7 @@ class DosingRunner:
         end = self._mono() + minutes * 60
         while self._mono() < end:
             self._check(job)
-            self._wait(job, max(0.0, min(POLL_S, end - self._mono())))
+            yield max(0.0, min(POLL_S, end - self._mono()))
         self._done(job)
 
     def _doses(self, job, plan):
@@ -1090,7 +1103,7 @@ class DosingRunner:
         for pump, ml, _flow in plan:
             with self._lock:
                 self._live_of(job.room)["batch"]["pump"] = pump["id"]
-            result = self._dose(job, pump, ml)
+            result = yield from self._dose(job, pump, ml)
             with self._lock:
                 self._live_of(job.room)["batch"]["pump"] = None
             if result != "finished":
@@ -1185,19 +1198,25 @@ class DosingRunner:
 
     def _on(self, job, entity, service=None):
         """Every switch-on (its domain's on service, _actuator), and every start press (`service`), goes
-        through here. A stop is read first (and the
-        watchdog checked); then, with the gate held across the call so the way out (exit) never
-        overtakes it, the exit and stop flags are checked under the runner lock immediately before
-        the call."""
+        through here. A stop is read first (and the watchdog checked); then the exit and stop flags
+        are checked under the runner lock immediately before the call. A stop signal that lands while
+        the call is on its way waits for it (defer_exit), and runs here once it has landed."""
         self._check(job, catch=True)
-        with self._gate:
-            with self._lock:
-                if self._exiting:
-                    raise _Exit()
-                if job.stopped:
-                    raise _Ended(self._stop_reason(job))
+        with self._lock:
+            if self._exiting:
+                raise _Exit()
+            if job.stopped:
+                raise _Ended(self._stop_reason(job))
+            self._switching = True
+        try:
             return self._call(_domain(entity), service or self._actuator(entity)[0], entity_id=entity,
                               timeout=ON_TIMEOUT_S)
+        finally:
+            with self._lock:
+                self._switching = False
+                stop, self._exit_pending = self._exit_pending, None
+            if stop is not None:
+                stop()
 
     def _late(self, job):
         return job.deadline is not None and self._mono() > job.deadline
@@ -1207,8 +1226,7 @@ class DosingRunner:
         return "stop requested" + (f" by {job.stopped_by}" if job.stopped_by else "")
 
     def _exit_off(self, job):
-        """The thread's own way out of a dose or batch (the app is stopping): its hardware off at
-        once, each with a QUICK_S timeout and no read-back. The record stays for the next start."""
+        """A dose or batch's own way out (the app is stopping): its hardware off at once, each with a QUICK_S timeout and no read-back. The record stays for the next start."""
         if job.kind == "dose":
             entities = [job.pump["power_entity"]] if job.pump else []
         else:
@@ -1663,13 +1681,6 @@ class DosingRunner:
             if self._mono() >= deadline:
                 return False
             self._sleep(CONFIRM_POLL_S)
-
-    def _wait(self, job, seconds):
-        """Sleep a moment, answering every room's requests on the way (a stop among them)."""
-        self.beat = self._mono()
-        if self._polled is None or self._mono() - self._polled >= POLL_S:
-            self.poll(busy=job)
-        self._sleep(max(0.0, seconds))
 
     # ------------------------------------------------------------------ dosing_state.json
     def _read(self):

@@ -66,20 +66,7 @@ from crop_steering_engine.defaults import UNITS, to_canonical
 BASE = os.environ.get("HA_URL", "http://supervisor/core/api")
 TOKEN = os.environ.get("SUPERVISOR_TOKEN") or os.environ.get("HA_TOKEN", "")
 HDR = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
-_S = requests.Session()  # the main loop's
-_LOCAL = threading.local()
-
-
-def _session():
-    """The calling thread's own requests.Session: the main loop's is _S, and any other thread (the
-    dosing thread, dosing_runner.py) gets one of its own. A Session is not safe to share between
-    threads, and the dosing thread reads every second while a shot's reads run on the main loop."""
-    if threading.current_thread() is threading.main_thread():
-        return _S
-    session = getattr(_LOCAL, "session", None)
-    if session is None:
-        session = _LOCAL.session = requests.Session()
-    return session
+_S = requests.Session()
 
 
 def log(*a):
@@ -99,7 +86,7 @@ class HAState(tuple):
 def ha_get(entity, timeout=8):
     """Return (state_str, attributes, last_updated_iso) or (None, {}, None); see HAState."""
     try:
-        r = _session().get(f"{BASE}/states/{entity}", headers=HDR, timeout=timeout)
+        r = _S.get(f"{BASE}/states/{entity}", headers=HDR, timeout=timeout)
         if r.status_code != 200:
             return HAState()
         d = r.json()
@@ -121,7 +108,7 @@ def ha_get_all():
     """Return the full /api/states list (or [] on failure). Used once at startup for
     multi-room discovery — find every sensor.crop_steering_*engine_config descriptor."""
     try:
-        r = _session().get(f"{BASE}/states", headers=HDR, timeout=12)
+        r = _S.get(f"{BASE}/states", headers=HDR, timeout=12)
         if r.status_code != 200:
             return []
         return r.json() or []
@@ -134,7 +121,7 @@ def ha_history(entity, since, timeout=12):
     [(state, last_changed_iso), ...]; the first is the state it was already in at `since`.
     None when Home Assistant can't say: unreachable, an error, or nothing recorded for it."""
     try:
-        r = _session().get(
+        r = _S.get(
             f"{BASE}/history/period/{since.isoformat()}",
             headers=HDR,
             params={
@@ -155,7 +142,7 @@ def ha_history(entity, since, timeout=12):
 
 def ha_call(domain, service, *, timeout=12, **data):
     try:
-        r = _session().post(
+        r = _S.post(
             f"{BASE}/services/{domain}/{service}", headers=HDR, json=data, timeout=timeout
         )
         if r.status_code >= 300:
@@ -173,7 +160,7 @@ def ha_service_response(domain, service, data, timeout=12):
     Assistant can't be reached. The status tells a refusal (4xx: sending it again changes nothing)
     from a failure worth trying again."""
     try:
-        r = _session().post(
+        r = _S.post(
             f"{BASE}/services/{domain}/{service}", headers=HDR, json=data,
             params={"return_response": ""}, timeout=timeout,
         )
@@ -191,7 +178,7 @@ def ha_service_response(domain, service, data, timeout=12):
 
 def ha_set(entity, state, attributes=None, timeout=8):
     try:
-        _session().post(
+        _S.post(
             f"{BASE}/states/{entity}",
             headers=HDR,
             json={"state": state, "attributes": attributes or {}},
@@ -664,8 +651,9 @@ class Controller:
         # override exists so a test/dev rig can redirect the file BEFORE this constructor's
         # own _load_state()/adoption pass reads and writes it.
         self._state_path = os.environ.get("F2_STATE_PATH") or "/data/state.json"
-        # Dosing runs on its own thread, started by run(). Like Jev, it can never stop the controller
-        # starting, and it only ever acts on an explicit request for a room with dosing set up.
+        # Dosing runs in steps on the main loop, which wakes whenever one is due (run, _sleep_for). Like
+        # Jev, it can never stop the controller starting, and it only ever acts on an explicit request
+        # for a room with dosing set up.
         try:
             self.dosing = dosing_runner.DosingRunner(
                 self,
@@ -2207,7 +2195,7 @@ class Controller:
     def _room_switched_off(self, room):
         """Stand the room down: its standing alerts are about a room that is now deliberately idle."""
         log(f"[{room.slug}] room switched OFF - irrigation and alerts stand down")
-        # A snapshot: the dosing thread may raise an alert meanwhile (dosing_runner.py). A dosing alert
+        # A snapshot: dismissing changes the dict (dosing_runner.py raises into it too). A dosing alert
         # is about one event in the batch tank, which a room going idle does not undo: it stays.
         for key in [k for k in list(self._alerted) if not k.startswith("dosing_")
                     and (f"_{room.slug}_" in k or k.endswith(f"_{room.slug}"))]:
@@ -2928,28 +2916,28 @@ class Controller:
         return ("Nothing called for water: no zone in P1 or P2 dried to the point where the engine waters it. If "
                 "the plants are drinking, check the probes and each zone's re-water point.")
 
-    def _dosing_alert(self, room, code, title, message, event=None, quiet=False):
+    def _dosing_alert(self, room, code, title, message, event=None):
         """An alert the dosing runner raised (docs/DOSING.md) -> True once Home Assistant has it (the
         runner keeps it until then). Only these codes exist, each written out here so the error-code
         list sees it; `room` is None for a room no longer set up, or for dosing as a whole. Each
         event (a dose, a batch, a restart) has its own notification: a second one within 30 minutes
         is never swallowed by the first. The runner paces an event's repeats itself (and a repeat
-        replaces its card), so `_alert`'s quiet period is only for a condition re-checked every loop."""
+        replaces its card)."""
         key = f"dosing_{getattr(room, 'slug', 'gone')}_{code[3:]}" + (f"_{event}" if event else "")
         if code == "CS-801":
-            return self._alert(key, "CS-801", title, message, room=room, quiet=quiet)
+            return self._alert(key, "CS-801", title, message, room=room, quiet=False)
         if code == "CS-802":
-            return self._alert(key, "CS-802", title, message, room=room, quiet=quiet)
+            return self._alert(key, "CS-802", title, message, room=room, quiet=False)
         if code == "CS-803":
-            return self._alert(key, "CS-803", title, message, room=room, quiet=quiet)
+            return self._alert(key, "CS-803", title, message, room=room, quiet=False)
         if code == "CS-804":
-            return self._alert(key, "CS-804", title, message, room=room, quiet=quiet)
+            return self._alert(key, "CS-804", title, message, room=room, quiet=False)
         if code == "CS-805":
-            return self._alert(key, "CS-805", title, message, room=room, quiet=quiet)
+            return self._alert(key, "CS-805", title, message, room=room, quiet=False)
         if code == "CS-806":
-            return self._alert(key, "CS-806", title, message, room=room, quiet=quiet)
+            return self._alert(key, "CS-806", title, message, room=room, quiet=False)
         if code == "CS-807":
-            return self._alert(key, "CS-807", title, message, room=room, quiet=quiet)
+            return self._alert(key, "CS-807", title, message, room=room, quiet=False)
         log("dosing alert refused: not in the error-code list", code)
         return True  # never deliverable: not kept
 
@@ -2957,27 +2945,6 @@ class Controller:
         """Why dosing holds this room's watering ("making a batch", or "dosing hardware still on: ..."
         while something a dose or batch left does not read off), else None."""
         return self.dosing.holds(room) if self.dosing is not None else None
-
-    def _watch_dosing(self):
-        """The dosing thread is never gone unnoticed (dosing_runner.health): dead, it is started again,
-        its records recovered as after a restart, and CS-806 says so; stalled, CS-806 says that."""
-        dosing = self.dosing
-        if dosing is None:
-            return
-        try:
-            health = dosing.health()
-            if health == "dead":
-                log("dosing: the dosing thread has stopped: starting it again")
-                dosing.restart()
-            elif health == "stalled":
-                self._dosing_alert(
-                    None, "CS-806", "dosing has stopped answering",
-                    "The controller's dosing thread has not gone round for more than 10 minutes, so "
-                    "dosing requests are not being taken. Anything it holds stays held. Restart the "
-                    "controller app if it does not recover; check the tank if a dose or batch was "
-                    "running.", "stalled", quiet=True)  # checked every loop: once per 30 min
-        except Exception as e:
-            log("dosing: could not check the dosing thread:", e)
 
     def _shot_running(self, slugs):
         """Whether a shot is in flight in one of these rooms, read under the lock a shot starts under,
@@ -3889,10 +3856,20 @@ class Controller:
         budget = runtime_env.stop_budget(os.environ)
         deadline = time.monotonic() + budget
         log(f"SIGTERM — closing what is in flight within {budget:g} s, saving state, exiting")
+        # The signal lands on the main loop: in the middle of a dosing switch-on, the way out waits for
+        # that call to land (dosing_runner.defer_exit), so dosing's offs come after it.
+        try:
+            if self.dosing is not None and self.dosing.defer_exit(lambda: self._exit_within(budget, deadline)):
+                return
+        except Exception as e:
+            log("dosing: could not be asked to hold the way out:", e)
+        self._exit_within(budget, deadline)
+
+    def _exit_within(self, budget, deadline):
         try:
             try:
                 # Dosing starts nothing from here on. Then the shot in flight: it is water running now.
-                # Dosing's way out waits on its thread, so it goes last, in the time the stop keeps for it.
+                # Dosing's own offs go last, in the time the stop keeps for them.
                 self._stop_dosing_starts()
                 reserve = min(STOP_DOSING_S, budget / 5) if self._dosing_recorded() else 0.0
                 self._safe_off(deadline - reserve)
@@ -3916,8 +3893,8 @@ class Controller:
             return True  # whether it has anything to switch off can't be told: keep it its time
 
     def _exit_dosing(self, deadline=None):
-        """Stopping: no dosing switch-on starts from here, the dosing thread switches its own job off,
-        and what a dose or batch has recorded is switched off again, each off with a short timeout
+        """Stopping: no dosing switch-on starts from here, and what a dose or batch has recorded is
+        switched off again, each off with a short timeout
         (dosing_runner.exit), all before the stop's `deadline` (the monotonic clock) when given. Its
         record stays in dosing_state.json, so the next start reads it back OFF and raises CS-803."""
         try:
@@ -3928,18 +3905,25 @@ class Controller:
 
     def _start_dosing(self):
         """Before the first loop: settle what a dose or batch left running before this start
-        (docs/DOSING.md, After a restart), then start dosing's own thread, which tries the recovery
-        again until Home Assistant takes it. Neither can stop the controller starting."""
+        (docs/DOSING.md, After a restart). It cannot stop the controller starting: a failure is tried
+        again by every dosing step (dosing_runner.step)."""
         if self.dosing is None:
             return
         try:
             self.dosing.recover()
         except Exception as e:
-            log("dosing: start-up recovery failed; the dosing thread tries again:", e)
-        try:
-            self.dosing.start()
-        except Exception as e:
-            log("dosing: off, it could not start:", e)
+            log("dosing: start-up recovery failed; dosing tries again:", e)
+
+    def _sleep_for(self, seconds):
+        """Wait `seconds` for the next pass, waking whenever dosing is due to run its next step
+        (dosing_runner.step). Dosing never runs in the middle of a shot: it waits for the shot to end."""
+        end = time.monotonic() + seconds
+        while True:
+            left = end - time.monotonic()
+            if left <= 0:
+                return
+            due = self.dosing.step() if self.dosing is not None else left
+            time.sleep(max(0.0, min(left, due)))
 
     @staticmethod
     def _step_ec_offset(cur, ec_smooth, ec_target_p2, base):
@@ -4176,7 +4160,6 @@ class Controller:
         if self._busy:
             return
         self._notify_config(refresh=True)  # who gets pushes, read here so an alert never waits on it
-        self._watch_dosing()
         self._recover_hardware_faults()
         self._reconcile_inflight()
         self._defaulted_this_loop = set()
@@ -4908,7 +4891,7 @@ class Controller:
             f"(UTC{off_h:+.1f}h) TZ={os.environ.get('TZ', 'unset')}"
         )
         try:
-            r = _session().get(f"{BASE}/config", headers=HDR, timeout=8)
+            r = _S.get(f"{BASE}/config", headers=HDR, timeout=8)
             ha_tz = (r.json() or {}).get("time_zone") if r.status_code == 200 else None
         except Exception:
             ha_tz = None
@@ -4951,7 +4934,7 @@ class Controller:
                 self.loop_once(datetime.now())
             except Exception as e:
                 log("loop error", e)
-            time.sleep(self.loop_seconds)
+            self._sleep_for(self.loop_seconds)
 
 
 if __name__ == "__main__":
