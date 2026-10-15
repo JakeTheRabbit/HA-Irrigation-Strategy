@@ -1999,7 +1999,15 @@ class Controller:
         # Home Assistant sees only this app's token: name the writer first, for the room's setpoint
         # change log (the integration's setpoint_log.py). The brain's put-back is the safety writer.
         who = "safety" if by.endswith("(put back)") else "brain" if by.startswith("Jev") else "learner"
-        ha_fire("crop_steering_setpoint_write", {"entity_id": entity, "value": value, "who": who})
+        claim = {"entity_id": entity, "value": value, "who": who}
+        if who == "brain":
+            # An AI change is an overlay that goes back by itself (the integration's overlays.py): at the
+            # lights-on that ends the grow-day it is for. A night move (P3) is for the next grow-day.
+            local = now.astimezone().replace(tzinfo=None) if now.tzinfo else now
+            day = self._grow_day_start(room, local) + timedelta(days=2 if room.state[zone].get("phase") == "P3" else 1)
+            on = datetime.combine(day, datetime.min.time()) + timedelta(hours=room.lights_on_hour)
+            claim["expires"] = on.astimezone().isoformat(timespec="seconds")
+        ha_fire("crop_steering_setpoint_write", claim)
         if not ha_call("number", "set_value", entity_id=entity, value=value):
             return False
         written[(zone, suffix)] = (value, now)

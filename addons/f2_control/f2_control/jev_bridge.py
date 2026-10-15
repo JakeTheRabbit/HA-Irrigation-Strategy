@@ -222,7 +222,9 @@ def setpoint_view(c, room, zone, p, now):
             continue  # Jev's write has not reached Home Assistant yet
         expected = rec["written"].get(suffix, rec["home"].get(suffix))
         if expected is None or abs(v - float(expected)) > 1e-6:
-            if expected is not None:
+            home = rec["home"].get(suffix)
+            # Back on the operator's own value (an AI overlay that ran out or was undone): no edit by hand.
+            if expected is not None and (home is None or abs(v - float(home)) > 1e-6):
                 _note(c, room, zone, "set by hand", f"{suffix.replace('_', ' ')} {expected:g} -> {v:g}",
                       "acted", "your value is the new centre of Jev's range")
             rec["home"][suffix] = v
