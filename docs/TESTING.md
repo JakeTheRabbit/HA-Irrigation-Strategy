@@ -67,6 +67,7 @@ partial run and exits zero, but still says PARTIAL rather than ALL CHECKS PASSED
 | `test_setup_entry.py` | **The entry itself.** It loads on a Home Assistant without `frontend.async_panel_exists`; another owner's sidebar path is left alone; the wizard's lights hours and sizing reach the entities. |
 | `test_install_to_controller.py` | **Fresh install, both layers.** That install is handed to the *real add-on controller*, which must find the room from the descriptor alone, adopt it, and fire a shot sized and scheduled from the wizard's answers. The only tests that cross the integration / controller seam. |
 | `test_upgrade_in_place.py` | **In-place upgrade with seeded data.** Starts the new code on top of a snapshot of an old install. Nothing tuned may move, no entity may change id, and the controller must carry on with the kill switch ON and no disarm cycle. |
+| `test_move_from_jev.py` | **A room moved from the Jev edition.** Runs the copy command `docs/MOVING_FROM_JEV.md` prints on a Jev 3.11.1 app's data folder, then starts the real controller on the copy with the old app's options: no disarm cycle, counters, phase, learner and dosing record kept, and the brain on wherever a Jev file or a TypeSafe key came across. Also checks the doc's app ids and that its copy list names every data file the controller keeps. |
 | `test_configure.py` | **Configure.** Editing a parameter reaches the engine; a mapping can be removed; an untouched save keeps every mapping. |
 
 **Seeded fixtures** live in `tests_ha/fixtures/`. Each is a room *as an old version actually wrote
@@ -86,7 +87,9 @@ its config entry, every entity id, the ladder its controller moved, and beside i
 `/data/options.json` on Cloudflare and on TypeSafe (`options_3_11_1_jev_cf.json`,
 `options_3_11_1_jev_typesafe.json`), the `/data/state.json` with the learner and the hourly P2 check's
 working peak (`state_3_11_1_learn_jev.json`), the `/data/jev_usage.json` (`jev_usage_3_11_1.json`) and the
-dosing store (`dosing_3_11_1.json`). The `options_<version>_*.json` files with a `data` folder
+dosing store (`dosing_3_11_1.json`). `data_3_11_1_files/` holds the rest of a 3.11.1 app's `/data`: the
+ledger, journal and setpoint memory its brain wrote and the `dosing_state.json` its dosing runner wrote,
+recorded by running 3.11.1's own controller, brain and dosing runner on its own test kit. The `options_<version>_*.json` files with a `data` folder
 (`data_3_0_0_ledger/`, `data_3_2_0/`, `data_3_3_0_typesafe/`, `data_3_0_0_quiet/`,
 `data_3_11_1_usage/`) are apps from 2.25.1 and the Jev line as each left `/data/options.json` and
 `/data`, recorded by running that version's own controller: they prove the brain starts on Cloudflare
