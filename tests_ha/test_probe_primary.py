@@ -80,7 +80,11 @@ async def test_pulling_the_primary_raises_one_alert_and_watering_carries_on(
         "switch", "turn_on", {"entity_id": ENGINE}, blocking=True
     )
     hass.states.async_set(VALVE, "on")
+    (before,) = (await _service(hass, hass_admin_user, "setup_read"))["rooms"]
     await _choose(hass, hass_admin_user, vwc_primary=B, vwc_unused=[C])
+    # ...under the same setup revision, so the controller has no new setup to wait to take on.
+    (after,) = (await _service(hass, hass_admin_user, "setup_read"))["rooms"]
+    assert after["revision"] == before["revision"]
     state = await _read(hass, freezer, **{A: "40", B: "42", C: "44"})
     assert float(state.state) == 41.0  # A and B; C does not count
     assert state.attributes["primary"] == B
