@@ -176,13 +176,13 @@ def test_the_first_tick_of_the_day_runs_on_the_base_threshold_and_fires_no_watch
     Clock.instant = now = Clock(2026, 9, 23, 10, 0)
     probe(fake, 1, vwc=44, ec=5)
     probe(fake, 2, vwc=55, ec=5)
-    room.state[1].update(phase="P3", ec_offset=4.0, ec_integral=2.0, ec_prev_err=1.0,
+    room.state[1].update(phase="P3", ec_offset=4.0,
                          last_daily_reset=date(2026, 9, 22), last_shot=now - timedelta(hours=12))
     room._was_lights_on = False  # the loop has seen the dark
     pub = c._loop_room(room, now)
     st = room.state[1]
     assert pub[1]["p"].p2_threshold == 45  # the base threshold, not 45 + yesterday's 4
-    assert st["phase"] == "P0" and st["ec_offset"] == 0 and st["ec_integral"] == 0
+    assert st["phase"] == "P0" and st["ec_offset"] == 0
     assert pub[1]["fire"] is False and "WATCHDOG" not in pub[1]["reason"]
 
 

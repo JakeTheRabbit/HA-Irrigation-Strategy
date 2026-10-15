@@ -59,17 +59,15 @@ def probe(fake, entity, value, timestamp="current"):
     ("6", None), ("6", "bad timestamp"), ("6", "2026-09-08T12:00:00"),
     ("6", "2026-09-08T11:39:00+00:00"), ("6", "2026-09-08T12:01:01+00:00"),
 ])
-@pytest.mark.parametrize("pid", [False, True])
-def test_invalid_ec_real_loop_uses_base_vwc_and_pauses_learning(rig, value, stamp, pid):
+def test_invalid_ec_real_loop_uses_base_vwc_and_pauses_learning(rig, value, stamp):
     c, fake, room, _ = rig
     probe(fake, "sensor.crop_steering_vwc_zone_1", "44")
     probe(fake, "sensor.crop_steering_ec_zone_1", value, stamp)
     fake.set_state("switch.crop_steering_ec_stacking_enabled", "on")
-    fake.set_state("input_boolean.crop_steering_ec_pid_enabled", "on" if pid else "off")
     fake.set_state(room.enable_flag, "off")  # decision allowed; physical gate must still hold
     st = room.state[1]
-    st.update(ec_offset=-8, ec_smooth=1, ec_integral=2, ec_prev_err=3)
-    before = {key: st[key] for key in ("ec_offset", "ec_smooth", "ec_integral", "ec_prev_err", "last_ec_steer")}
+    st.update(ec_offset=-8, ec_smooth=1)
+    before = {key: st[key] for key in ("ec_offset", "ec_smooth", "last_ec_steer")}
     pub = c._loop_room(room, FixedDateTime.now())
     assert pub[1]["ec"] is None
     assert pub[1]["fire"] and pub[1]["p"].p2_threshold == 45
