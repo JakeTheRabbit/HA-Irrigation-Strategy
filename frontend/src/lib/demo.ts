@@ -122,6 +122,23 @@ export function createDemo(now = Date.now()): States {
     put(`sensor.demo_${prefix}tank_level`, demoTankModel(states, prefix, now)!.level(now), {
       unit_of_measurement: "%",
     });
+    // The controller's own reading of it, with the reservoir minimum's marks: the first room has
+    // its level mapped for the minimum, the second has not, so its minimum is off.
+    if (!index)
+      put(
+        `sensor.crop_steering_${prefix}tank_level`,
+        demoTankModel(states, prefix, now)!.level(now),
+        {
+          unit_of_measurement: "%",
+          friendly_name: "Tank level",
+          stuck: false,
+          litres_per_pct: 2.4,
+          low: null,
+          below_minimum: false,
+          over_full: false,
+          minimum_pct: 8,
+        },
+      );
     number(prefix, "irrigation_ec_min", 2.3, 0, 6, 0.1, "mS/cm");
     number(prefix, "irrigation_ec_max", 3.5, 0, 8, 0.1, "mS/cm");
     number(prefix, "irrigation_ph_min", 5.5, 3, 9, 0.05, "pH");

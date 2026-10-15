@@ -12,7 +12,7 @@ export type Page =
   | "history/compare"
   | "equipment/probes"
   | "equipment/stock"
-  | "equipment/tank"
+  | "equipment/feed"
   | "equipment/dosing"
   | "equipment/setup"
   | "settings"
@@ -35,7 +35,7 @@ export const PAGES: readonly Page[] = [
   "history/compare",
   "equipment/probes",
   "equipment/stock",
-  "equipment/tank",
+  "equipment/feed",
   "equipment/dosing",
   "equipment/setup",
   "settings",
@@ -64,6 +64,7 @@ export const LEGACY_PAGES: Readonly<Record<string, Page>> = {
   sensors: "equipment/probes",
   stock: "equipment/stock",
   setup: "equipment/setup",
+  "equipment/tank": "equipment/feed",
   settings: "settings",
   help: "help",
 };

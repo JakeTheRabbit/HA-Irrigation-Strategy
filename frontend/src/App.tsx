@@ -54,10 +54,9 @@ import { GrowPlanner } from "@/pages/grow-planner";
 import { Setup } from "@/pages/setup";
 import { Comparison } from "@/pages/comparison";
 import { StockTanks } from "@/pages/stock";
+import { Reservoir } from "@/pages/reservoir";
 import { Dosing } from "@/pages/dosing";
 import { WaterUsePage } from "@/pages/water-use";
-import { TankStatus } from "@/components/tank-status";
-import { TankLevel } from "@/components/tank-level";
 
 const navigation = [
   { page: "today", label: SECTION_LABELS.today, icon: House },
@@ -368,19 +367,8 @@ export default function App() {
             {page === "equipment/stock" && (
               <StockTanks key={pageKey} controller={controller} navigate={navigate} />
             )}
-            {page === "equipment/tank" && (
-              <>
-                <TankStatus
-                  key={pageKey}
-                  controller={controller}
-                  onConfigure={() => navigate("equipment/setup")}
-                />
-                <TankLevel
-                  key={`${pageKey}:level`}
-                  controller={controller}
-                  onConfigure={() => navigate("equipment/setup")}
-                />
-              </>
+            {page === "equipment/feed" && (
+              <Reservoir key={pageKey} controller={controller} navigate={navigate} />
             )}
             {page === "equipment/dosing" && (
               <Dosing

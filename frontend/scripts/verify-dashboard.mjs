@@ -229,7 +229,7 @@ try {
     ["history/compare", "Compare runs"],
     ["equipment/probes", "Probes"],
     ["equipment/stock", "Stock tanks"],
-    ["equipment/tank", "Tank & pump"],
+    ["equipment/feed", "Tank & pump"],
     ["equipment/dosing", "Dosing"],
     ["equipment/setup", "Rooms & setup"],
     ["settings", "Settings"],

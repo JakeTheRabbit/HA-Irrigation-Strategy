@@ -482,7 +482,7 @@ try {
       await menu("Equipment");
       await page
         .getByRole("navigation", { name: "Equipment views" })
-        .getByRole("button", { name: "Tank & pump", exact: true })
+        .getByRole("button", { name: "Tank & feed", exact: true })
         .click();
       await visible(
         page

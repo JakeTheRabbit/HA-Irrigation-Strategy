@@ -647,7 +647,7 @@ export class ControllerStore {
     const allowed = new Set([
       ...room.entities.map((entity) => entity.entity_id),
       ...room.zones.flatMap((zone) => (zone.valveEntity ? [zone.valveEntity] : [])),
-      // The tank and pump its descriptor maps, charted on Equipment › Tank & pump.
+      // The tank and pump its descriptor maps, charted on Equipment › Tank & feed.
       ...Object.values(TANK_KEYS).flatMap((key) => {
         const id = mapped?.[key];
         return typeof id === "string" && id ? [id] : [];
