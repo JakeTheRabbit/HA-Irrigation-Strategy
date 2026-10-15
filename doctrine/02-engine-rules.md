@@ -55,7 +55,7 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 
 ## The brain's guard (envelope) and levers
 
-- **BR-1** The brain's answers can cause only these directives: advance (a phase forward), distrust (a probe set aside), ec_mode (steer, hold or decay) and setpoint (one notch); alerts and pushes are admitted because they never move water, and anything else is refused.
+- **BR-1** The brain's answers can cause only these directives: advance (a phase forward), distrust (a probe set aside), ec_mode (steer, hold or decay), setpoint (one notch) and catch_up (today's plan day, the plan's own previewed values, while a stale probe holds the plan's day: once a photoperiod, lights on, never during a shot); alerts and pushes are admitted because they never move water, and anything else is refused.
 - **BR-2** advance moves only to the next phase, with the lights on and a usable probe. P0 -> P1 needs the drop since lights-on at half of dryback_target or a quarter of p0_max_wait_min gone, and is refused while the probe reading has not moved for 30 min. P1 -> P2 needs max(1, p1_min_shots) ramp shots and VWC within 3 points of min(p1_target, field_capacity). P2 -> P3 needs at most 3 h to lights-off, a zone steered generative (for any other zone the answer is advice), and VWC at least 3 points above the rescue floor.
 - **BR-3** distrust needs two agreeing answers in a row plus code's own confirmation; a set-aside zone takes the blind path (CT-5).
 - **BR-4** ec_mode is admitted only in P2. The controller applies it only while EC stacking is on: steer runs the base step or PID, hold keeps the offset, decay halves the offset (and the PID integral) every 30 min.

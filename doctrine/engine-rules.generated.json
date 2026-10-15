@@ -325,7 +325,7 @@
   "brain_rules": [
     {
       "id": "BR-1",
-      "text": "The brain's answers can cause only these directives: advance (a phase forward), distrust (a probe set aside), ec_mode (steer, hold or decay) and setpoint (one notch); alerts and pushes are admitted because they never move water, and anything else is refused.",
+      "text": "The brain's answers can cause only these directives: advance (a phase forward), distrust (a probe set aside), ec_mode (steer, hold or decay), setpoint (one notch) and catch_up (today's plan day, the plan's own previewed values, while a stale probe holds the plan's day: once a photoperiod, lights on, never during a shot); alerts and pushes are admitted because they never move water, and anything else is refused.",
       "verified": true
     },
     {

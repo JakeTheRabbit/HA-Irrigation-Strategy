@@ -27,7 +27,7 @@ MOVE_REFUSALS = ("not a setting", "one notch at a time", "is outside its range")
 @dataclass(frozen=True)
 class Directive:
     judge: str
-    kind: str  # "advance" | "distrust" | "ec_mode" | "setpoint" | "alert" | "push"
+    kind: str  # "advance" | "distrust" | "ec_mode" | "setpoint" | "alert" | "push" | "catch_up"
     value: object  # the phase to go to, an EC mode, a setpoint move dict, an alert dict, True/False for a push
     why: str
     expires: datetime
@@ -110,7 +110,78 @@ def admit(d: Directive, ctx, confirmed=0, evidence_ok=False):
         return _admit_setpoint(d, ctx)
     if d.kind in ("alert", "push"):
         return True, "alerts never move water"
+    if d.kind == "catch_up":
+        return _admit_catch_up(d, ctx)
     return False, "unknown directive"
+
+
+CATCH_UP_AFTER_MIN = 30.0  # the plan's own day must have been held this long after lights-on
+CATCH_UP_DUSK_H = 3.0  # nor in the last hours before lights-off, where the night's timing hangs on the targets
+
+
+def _admit_catch_up(d, ctx):
+    """Today's plan day, applied by the controller for the rest of the photoperiod while the plan's own day is held by
+    a stale probe (the plan-day bridge, jev_bridge.plan_task). `ctx` is the room's plan_task.PlanContext; the values
+    are the integration's own preview, re-checked here, never the brain's. Once a photoperiod, with the lights on and
+    away from both edges, never during a shot or a room hold, never on stale readings, in a no-touch window or a
+    cool-down. Nothing here edits the plan or writes a number."""
+    v = d.value if isinstance(d.value, dict) else {}
+    zones = v.get("zones") if isinstance(v.get("zones"), dict) else {}
+    get = lambda name, default=None: getattr(ctx, name, default)  # noqa: E731 - the zone judges' contexts lack these
+    if get("status") != "active" or not get("required") or get("error"):
+        return False, "the plan is not active with a usable snapshot"
+    if set(get("managed") or ()) != set(get("room_zones") or ()):
+        return False, "the plan's zones are not the room's"
+    if v.get("revision") != get("revision"):
+        return False, "the plan changed since the brain was asked"
+    day, expected = v.get("day"), get("expected_day")
+    if not day or day != expected:
+        return False, "not today's plan day"
+    in_force = get("in_force_days") or {}
+    if not zones or any(z not in in_force or not in_force[z] or in_force[z] >= day for z in zones):
+        return False, "a zone is already on today's plan day"
+    lights_on_at = get("lights_on_at")
+    since = max(x for x in (lights_on_at, get("degraded_since")) if x is not None) if lights_on_at else None
+    if get("degraded_kind") != "probe_stale":
+        return False, "the plan's day is not held by a stale probe"
+    if since is None or ctx.now < since + timedelta(minutes=CATCH_UP_AFTER_MIN):
+        return False, f"held by a stale probe for less than {CATCH_UP_AFTER_MIN:.0f} min since lights-on"
+    preview = get("preview") or {}
+    for z in get("managed") or ():
+        row = preview.get(z)
+        if not isinstance(row, dict) or row.get("status") != "active" or row.get("errors"):
+            return False, f"zone {z}'s preview for today is not active and clean"
+    if any(zones[z] != (preview.get(z) or {}).get("parameters") for z in zones):
+        return False, "the values are not the plan's own preview for today"
+    current = get("parameters") or {}
+    if all(zones[z] == current.get(z) for z in zones):
+        return False, "today's plan day changes nothing in force"
+    from strategy_runtime import check_parameters  # beside the controller; the envelope stands alone without it
+
+    for z, values in zones.items():
+        try:
+            check_parameters(values)
+        except ValueError as e:
+            return False, f"zone {z}: {e}"
+    lights_off_at = get("lights_off_at")
+    if not get("lights_on") or lights_on_at is None or lights_off_at is None:
+        return False, "lights off: never at night"
+    if ctx.now > lights_off_at - timedelta(hours=CATCH_UP_DUSK_H):
+        return False, f"within {CATCH_UP_DUSK_H:.0f} h of lights-off"
+    if get("busy"):
+        return False, "a shot is in flight"
+    if get("room_hold"):
+        return False, f"the room is held: {get('room_hold')}"
+    if get("health", "ok") != "ok":
+        return False, "the room's readings are too old to act on"
+    if get("no_touch"):
+        return False, "a no-touch window is open"
+    cool = get("cooldown_until")
+    if cool is not None and ctx.now < cool:
+        return False, f"resting until {cool:%Y-%m-%d %H:%M} after a catch-up that did not work out"
+    if get("bridge_day") == day:
+        return False, "already caught up once this photoperiod"
+    return True, "today's plan values, the plan's own, while a stale probe holds its day"
 
 
 def _admit_setpoint(d, ctx):

@@ -8,7 +8,8 @@ the Feed task: a room task outside Brain, with its own "_brain" key.
 """
 from __future__ import annotations
 
-from datetime import timedelta
+from dataclasses import dataclass, field
+from datetime import datetime, timedelta
 
 import plan_adherence
 
@@ -160,3 +161,34 @@ class PlanTask:
             return None
         rec["read_seq"] = ans.seq
         return ans
+
+
+@dataclass
+class PlanContext:
+    """The room as the envelope's catch_up branch reads it (envelope._admit_catch_up): code's facts, never the
+    brain's. Days are ISO dates; times local and naive, like the controller's."""
+
+    now: datetime
+    status: str | None = None
+    required: bool = False
+    error: str | None = None
+    managed: tuple = ()
+    room_zones: tuple = ()
+    revision: int | None = None
+    expected_day: str | None = None
+    in_force_days: dict = field(default_factory=dict)  # {zone: the date whose targets are in force}
+    parameters: dict = field(default_factory=dict)  # {zone: the targets in force}
+    preview: dict = field(default_factory=dict)  # {zone: today's preview row}
+    degraded_kind: str | None = None
+    degraded_since: datetime | None = None
+    lights_on: bool = False
+    lights_on_at: datetime | None = None
+    lights_off_at: datetime | None = None
+    busy: bool = False
+    room_hold: str | None = None
+    health: str = "ok"
+    no_touch: bool = False
+    cooldown_until: datetime | None = None
+    bridge_day: str | None = None
+    snap: object = None  # what admit() reads of a zone context: a room has none
+    params: object = None

@@ -46,6 +46,32 @@ REQUIRED = {
 }
 
 
+def check_parameters(parameters):
+    """Raise ValueError unless `parameters` is a complete, finite, non-negative set whose moisture levels are in
+    order: rescue floor + 3 <= re-water threshold < P1 target <= 100."""
+    if (
+        not isinstance(parameters, dict)
+        or not REQUIRED <= parameters.keys()
+        or not parameters.keys() <= ALLOWED
+    ):
+        raise ValueError("Incomplete or unsupported strategy parameter set")
+    if any(
+        isinstance(v, bool)
+        or not isinstance(v, (int, float))
+        or not math.isfinite(v)
+        or v < 0
+        for v in parameters.values()
+    ):
+        raise ValueError("Invalid strategy number")
+    if (
+        not parameters["p3_emergency_vwc_threshold"] + 3
+        <= parameters["p2_vwc_threshold"]
+        < parameters["p1_target_vwc"]
+        <= 100
+    ):
+        raise ValueError("Invalid strategy VWC bands")
+
+
 def parse_snapshot(state, attributes, prefix, now, was_required=False):
     """Missing new capability preserves legacy behaviour unless previously activated."""
     attrs = attributes if isinstance(attributes, dict) else {}
@@ -91,27 +117,7 @@ def parse_snapshot(state, attributes, prefix, now, was_required=False):
                 raise ValueError("Invalid or duplicate strategy zone")
             parameters = zone.get("parameters")
             if zone.get("status") == "active":
-                if (
-                    not isinstance(parameters, dict)
-                    or not REQUIRED <= parameters.keys()
-                    or not parameters.keys() <= ALLOWED
-                ):
-                    raise ValueError("Incomplete or unsupported strategy parameter set")
-                if any(
-                    isinstance(v, bool)
-                    or not isinstance(v, (int, float))
-                    or not math.isfinite(v)
-                    or v < 0
-                    for v in parameters.values()
-                ):
-                    raise ValueError("Invalid strategy number")
-                if (
-                    not parameters["p3_emergency_vwc_threshold"] + 3
-                    <= parameters["p2_vwc_threshold"]
-                    < parameters["p1_target_vwc"]
-                    <= 100
-                ):
-                    raise ValueError("Invalid strategy VWC bands")
+                check_parameters(parameters)
             result["zones"][zid] = {
                 "parameters": parameters or {},
                 "status": zone.get("status"),
