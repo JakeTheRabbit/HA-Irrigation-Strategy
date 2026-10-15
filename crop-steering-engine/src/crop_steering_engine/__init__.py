@@ -15,6 +15,7 @@ from .core import (
     ec_adjust,
     ec_pid,
     decide,
+    next_shot_size,
     waiting_for,
     pick_sibling,
     feed_grace_ok,
@@ -28,7 +29,7 @@ from .core import (
 
 __all__ = [
     "CAP_EXEMPT", "EC_SETTLE_MIN", "Reason",
-    "PHASES", "ZoneParams", "ZoneSnapshot", "ec_adjust", "ec_pid", "decide", "waiting_for", "pick_sibling",
+    "PHASES", "ZoneParams", "ZoneSnapshot", "ec_adjust", "ec_pid", "decide", "next_shot_size", "waiting_for", "pick_sibling",
     "feed_grace_ok", "cross_zone_outliers", "validate_params", "detect_vmax",
     "zone_safety_status", "system_safety_status", "zone_status_label",
 ]
