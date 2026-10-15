@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { MARK_SYMBOL, WIZARD_STEPS, stepMark, switchOn, warnings } from "@/lib/commissioning";
 import type { Controller } from "@/lib/types";
 import type { Commissioning, SetupDocument, SetupRoom } from "@/lib/operator-types";
+import { startTour } from "@/lib/tour";
 import { errorText } from "@/lib/utils";
 
 /** The setup wizard for a room still being set up: each step's live check, the test shot a person
@@ -42,15 +43,15 @@ export function SetupWizard({
       setBusy(false);
     }
   }
-  const save = (data: Record<string, unknown>) =>
-    act(async () => {
-      const saved = await controller.operator<SetupRoom>("setup_commission", {
+  const commission = async (data: Record<string, unknown>) =>
+    (
+      await controller.operator<SetupRoom>("setup_commission", {
         entry_id: room.entry_id,
         expected_revision: room.revision,
         ...data,
-      });
-      return saved.commissioning;
-    });
+      })
+    ).commissioning;
+  const save = (data: Record<string, unknown>) => act(() => commission(data));
   const checkAgain = () =>
     act(async () => {
       const doc = await controller.operator<SetupDocument>("setup_read");
@@ -176,7 +177,17 @@ export function SetupWizard({
         <p className="muted">Worth a look, never blocking: {warnings(status).join(" · ")}</p>
       )}
       <div className="wizard-switch-on">
-        <Button disabled={busy || !gate.enabled} onClick={() => save({ done: true })}>
+        <Button
+          disabled={busy || !gate.enabled}
+          onClick={() =>
+            act(async () => {
+              const result = await commission({ done: true });
+              // The tour runs once, here: a room set up before the wizard never passes this way.
+              if (result?.commissioned) startTour();
+              return result;
+            })
+          }
+        >
           Switch on
         </Button>
         <span className="muted">

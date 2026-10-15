@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronRight, Search } from "lucide-react";
 import { Heading } from "@/components/dashboard";
 import { WhatsNewButton } from "@/components/whats-new";
+import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import {
@@ -12,6 +13,7 @@ import {
   findErrorCodes,
   severityLabel,
 } from "@/lib/error-codes";
+import { startTour } from "@/lib/tour";
 import type { Controller } from "@/lib/types";
 
 /** The words the dashboard uses, as a grower reads them. */
@@ -59,7 +61,17 @@ const glossary = [
 export function Help({ controller }: { controller: Controller }) {
   return (
     <>
-      <Heading title="Help" action={<WhatsNewButton controller={controller} />} />
+      <Heading
+        title="Help"
+        action={
+          <div className="help-actions">
+            <Button variant="outline" onClick={startTour}>
+              Take the tour again
+            </Button>
+            <WhatsNewButton controller={controller} />
+          </div>
+        }
+      />
       <ErrorCodes />
       <section className="panel" aria-labelledby="glossary-title">
         <div className="panel-heading">
