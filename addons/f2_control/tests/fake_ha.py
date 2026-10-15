@@ -15,6 +15,7 @@ class _Read(tuple):
     """(state, attributes, last_updated), plus `last_changed` as Home Assistant reports it."""
 
     last_changed = None
+    served_at = None  # Home Assistant's clock (ha_get_status): a fake's is this machine's
 
 
 class FakeHA:
@@ -71,8 +72,14 @@ class FakeHA:
             out.append({"entity_id": eid, "state": state, "attributes": attrs})
         return out
 
+    def ha_get_status(self, entity, timeout=8):
+        """(200, the state) as ha_get reads it, or (404, nothing) for a state Home Assistant does not have."""
+        return (200, self.ha_get(entity)) if entity in self.states else (404, _Read((None, {}, None)))
+
     def ha_set(self, entity, state, attributes=None, timeout=None):
+        """A state written lands in `states` too, stamped now, as Home Assistant's own does."""
         self.sets[entity] = (state, attributes or {})
+        self.set_state(entity, state, attributes)
 
 
 def install(controller, fake: FakeHA, options: dict):
@@ -88,9 +95,11 @@ def install(controller, fake: FakeHA, options: dict):
         controller.ha_set,
         controller.ha_history,
         controller.ha_service_response,
+        controller.ha_get_status,
     )
     controller.load_options = lambda: dict(options)
     controller.ha_get = fake.ha_get
+    controller.ha_get_status = fake.ha_get_status
     controller.ha_call = fake.ha_call
     controller.ha_get_all = fake.ha_get_all
     controller.ha_set = fake.ha_set

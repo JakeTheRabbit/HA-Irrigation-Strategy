@@ -437,3 +437,27 @@ def test_a_3_11_1_state_file_loads_and_is_written_back_as_it_was(tmp_path):
     saved = json.loads(p.read_text(encoding="utf-8"))["default"]
     for zone in ("1", "2"):
         assert {k: saved[zone][k] for k in seed[zone]} == seed[zone]
+
+
+def test_a_3_11_1_data_folder_gets_an_instance_id_once_and_keeps_it(tmp_path):
+    """No instance_id beside a 3.11.1 state.json: one uuid4 is made there, and a restart reads it back.
+    It is the duplicate-controller guard's identity; nothing else in the folder is touched.
+    """
+    (tmp_path / "state.json").write_text('{"1": {"phase": "P2"}}', encoding="utf-8")
+    path = tmp_path / "instance_id"
+    made = C._instance_id(str(path))
+    assert str(C.uuid.UUID(made)) == made and C.uuid.UUID(made).version == 4
+    assert path.read_text(encoding="utf-8").strip() == made
+    assert C._instance_id(str(path)) == made
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["instance_id", "state.json"]
+
+
+def test_a_corrupt_instance_id_is_replaced_and_an_unwritable_one_never_stops_the_start(
+    tmp_path,
+):
+    path = tmp_path / "instance_id"
+    path.write_text("not a uuid", encoding="utf-8")
+    made = C._instance_id(str(path))
+    assert path.read_text(encoding="utf-8").strip() == made != "not a uuid"
+    elsewhere = tmp_path / "missing-folder" / "instance_id"
+    assert C.uuid.UUID(C._instance_id(str(elsewhere))) and not elsewhere.exists()

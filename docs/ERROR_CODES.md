@@ -72,6 +72,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-606](#cs-606) | Grow strategy plan is holding irrigation | Critical | Repairs card |
 | [CS-607](#cs-607) | Grow strategy plan has not moved on to today | Warning | Repairs card |
 | [CS-608](#cs-608) | Stock tanks running low | Warning | Repairs card |
+| [CS-609](#cs-609) | Another controller is reporting for this room | Warning | Notification |
 | [CS-610](#cs-610) | Engine Enabled does not stop water in this room | Warning | Repairs card |
 | [CS-701](#cs-701) | Water isn't reaching this zone | Warning | Notification |
 | [CS-702](#cs-702) | This zone's water per plant is out of line with the others | Information | Notification |
@@ -947,6 +948,27 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Refill the tank, then press Refilled on Crop Steering → Stock tanks.
 - Or set the level you read off the tank. The card clears itself once every tank is above its low mark.
+
+<a id="cs-609"></a>
+
+### CS-609: Another controller is reporting for this room
+
+*Warning · Notification*
+
+**What it means.** Each controller writes its own id in the room's heartbeat every minute and reads the heartbeat before each pass. This one read a heartbeat written by another controller, or by a controller from before this check (no id), less than 3 minutes ago.
+
+**Watering meanwhile.** Nothing in the room is watered or dosed by this controller, and its settings are not moved, until no other controller has written for 3 minutes; then it carries on by itself. Dose and batch requests made meanwhile are refused (ask again after); a stop still switches the pumps off, and a dose or batch already running finishes.
+
+**Likely causes**
+
+- The first start after updating from a version before this check: the old version's last heartbeat had no id. This clears by itself in about 3 minutes.
+- Two controllers run this room: a controller app and a controller container, or two apps.
+- A controller from before this check still runs: it never holds, so only this one does.
+
+**Suggested fixes**
+
+- Right after an update, wait 3 minutes: nothing needs switching off and on.
+- If it stays, stop and remove the controller you no longer use. Only one controller may run a room.
 
 <a id="cs-610"></a>
 

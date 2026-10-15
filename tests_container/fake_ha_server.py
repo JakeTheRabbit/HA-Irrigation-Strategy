@@ -13,13 +13,17 @@ the token REFUSE_TOKEN, when that is set), for the first REFUSE_FOR_S seconds wh
 state written is logged as `STATE <entity> <json>`. ADMIN_ONLY_WRITES=1 answers 401 to a state write, as Home
 Assistant does for a token whose user is not an administrator. TIME_ZONE sets /api/config's time zone,
 CONFIG_STATUS its status, and NO_TIME_ZONE=1 leaves it out of the answer.
+
+A controller from before the duplicate-controller guard, as a test asks for it: OLD_BEAT_FOR_S > 0 writes
+the room's heartbeat every OLD_BEAT_EVERY_S seconds (60) for that long, with no controller_instance and a
+naive local last_beat OLD_BEAT_OFFSET_H hours (0) off, logged as `OLD BEAT`, then `OLD BEAT STOPPED`.
 """
 
 import json
 import os
 import threading
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import parse_qs, urlparse
 
@@ -55,6 +59,19 @@ def refusing(headers):
     if token and headers.get("Authorization") != f"Bearer {token}":
         return False
     return REFUSE and (not REFUSE_FOR_S or time.monotonic() - STARTED < REFUSE_FOR_S)
+
+
+def old_app():
+    every, off = float(os.environ.get("OLD_BEAT_EVERY_S") or 60), float(os.environ.get("OLD_BEAT_OFFSET_H") or 0)
+    until = STARTED + float(os.environ.get("OLD_BEAT_FOR_S") or 0)
+    while time.monotonic() < until:
+        with LOCK:
+            put("sensor.crop_steering_ai_heartbeat", "healthy", {
+                "engine": "f2-control", "controller_version": "3.11.1",
+                "last_beat": (datetime.now() + timedelta(hours=off)).isoformat()})
+        log("OLD BEAT")
+        time.sleep(every)
+    log("OLD BEAT STOPPED")
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -134,4 +151,6 @@ if __name__ == "__main__":
         state, attributes = value if isinstance(value, list) else (value, {})
         put(entity, state, attributes)
     log(f"serving {len(STATES)} entities on :8123")
+    if float(os.environ.get("OLD_BEAT_FOR_S") or 0) > 0:
+        threading.Thread(target=old_app, daemon=True).start()
     ThreadingHTTPServer(("0.0.0.0", 8123), Handler).serve_forever()

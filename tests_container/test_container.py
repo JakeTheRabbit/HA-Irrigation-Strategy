@@ -14,6 +14,7 @@ import shutil
 import subprocess
 import time
 import uuid
+from datetime import datetime, timezone
 
 import pytest
 
@@ -48,19 +49,28 @@ class Rig:
     def __init__(self):
         self.run = f"cs-test-{uuid.uuid4().hex[:8]}"
         self.net, self.vol, self.names = self.run, self.run + "-data", []
+        self.vols = [self.vol]
         docker("network", "create", self.net)
         docker("volume", "create", self.vol)
+
+    def volume(self):
+        """Another data volume: another install, with its own instance_id."""
+        vol = f"{self.run}-data{len(self.vols)}"
+        docker("volume", "create", vol)
+        self.vols.append(vol)
+        return vol
 
     def close(self):
         for name in self.names:
             docker("rm", "-f", name, check=False)
-        docker("volume", "rm", self.vol, check=False)
+        for vol in self.vols:
+            docker("volume", "rm", vol, check=False)
         docker("network", "rm", self.net, check=False)
 
-    def write(self, files):
+    def write(self, files, vol=None):
         """Files into the data volume: {name: text}."""
         for name, text in files.items():
-            docker("run", "--rm", "-i", "-v", f"{self.vol}:/data", "--entrypoint", "sh", IMAGE, "-c",
+            docker("run", "--rm", "-i", "-v", f"{vol or self.vol}:/data", "--entrypoint", "sh", IMAGE, "-c",
                    f"cat > /data/{name}", input=text)
 
     def read(self, name):
@@ -79,12 +89,12 @@ class Rig:
         self.ha = name
         return name
 
-    def controller(self, *extra, options=OPTIONS, **env):
+    def controller(self, *extra, options=OPTIONS, vol=None, **env):
         name = f"{self.run}-ctl-{len(self.names)}"
         self.names.append(name)
         if options is not None:
-            self.write({"options.json": json.dumps(options)})
-        docker("run", "-d", "--name", name, "--network", self.net, "-v", f"{self.vol}:/data", *extra,
+            self.write({"options.json": json.dumps(options)}, vol)
+        docker("run", "-d", "--name", name, "--network", self.net, "-v", f"{vol or self.vol}:/data", *extra,
                *[a for k, v in env.items() for a in ("-e", f"{k}={v}")], IMAGE)
         return name
 
@@ -146,7 +156,8 @@ def test_c1_a_bare_address_gets_api_and_the_heartbeat_carries_the_version(rig):
     beat = next(line for line in rig.logs(rig.ha).splitlines() if "STATE sensor.crop_steering_ai_heartbeat" in line)
     version = next(line.split('"')[1] for line in (ROOT / "addons/f2_control/config.yaml").read_text().splitlines()
                    if line.startswith("version:"))
-    assert json.loads(beat.split("ai_heartbeat ", 1)[1])["attributes"]["controller_version"] == version
+    attributes = json.loads(beat.split("ai_heartbeat ", 1)[1])["attributes"]
+    assert attributes["controller_version"] == version and attributes["controller_runtime"] == "container"
     assert "runtime: container" in rig.logs(ctl)
     assert not serves_8420(ctl)
 
@@ -311,7 +322,84 @@ def test_c5_the_app_is_built_at_once_while_home_assistant_is_unreachable(rig):
     rig.wait(ctl, "starting")
 
 
-# ------------------------------------------------------------------ C8
+# ------------------------------------------------------------------ C7
+HOLDING = "another controller wrote this room's heartbeat"
+RESUMED = "no other controller seen for 3 min: carrying on"
+REFUSED = "refused: another controller is driving this room"
+DOSING_CONFIG = "sensor.crop_steering_dosing_config"
+PUMP = {"id": "balance", "name": "Balance", "volume_entity": "number.balance_volume",
+        "start_entity": "button.balance_start", "dosing_entity": "binary_sensor.balance_dosing",
+        "dosing_prefix": "Dosing", "power_entity": "switch.balance_power", "flow_entity": "number.balance_flow",
+        "max_ml": 2000, "restore_volume": True}
+BATCH = {"fill_valve": "switch.tank_fill", "full_entity": "binary_sensor.tank_full", "full_state": "on",
+         "fill_timeout_min": 20, "mix_pump": "switch.tank_mixer", "mix_valves": [], "mix_power_sensor": None,
+         "mix_min_w": 0, "premix_min": 0, "postmix_min": 0, "close_entities": [], "hold_entity": None,
+         "filled_at_entity": None, "recipe": []}
+DOSING_DEVICES = {"number.balance_volume": "25", "button.balance_start": "unknown",
+                  "binary_sensor.balance_dosing": "off", "switch.balance_power": "off", "number.balance_flow": "10",
+                  "switch.tank_fill": "off", "binary_sensor.tank_full": "off", "switch.tank_mixer": "off"}
+
+
+def turned_on(rig, entities):
+    """The calls that switched on, pressed or set one of `entities`."""
+    return [call for call in rig.calls()
+            if call.split()[1] in ("turn_on", "press", "set_value")
+            and any(json.dumps(entity) in call for entity in entities)]
+
+
+def dosing_seed(action):
+    request = {"id": f"req-{action}", "action": action, "pump": "balance" if action == "dose" else None,
+               "ml": 50 if action == "dose" else None, "at": datetime.now(timezone.utc).isoformat(), "by": "test"}
+    return {**SEED, **DOSING_DEVICES,
+            DOSING_CONFIG: ["1", {"pumps": [PUMP], "batch": BATCH, "request": request}]}
+
+
+@pytest.mark.parametrize("zones", [("UTC", "UTC"), ("Pacific/Auckland", "UTC")], ids=["(a)", "(d) mixed zones"])
+def test_c7_two_controllers_on_one_room_both_hold(rig, zones):
+    """(a) Two installs (two data volumes, two instance_ids) on one room: both hold and raise CS-609; (d)
+    with the two in different time zones they still hold, and the one left resumes about 3 min after the
+    other stops, not hours later."""
+    rig.fake()
+    first = rig.controller(**container_env(rig, TZ=zones[0]))
+    rig.wait(rig.ha, "STATE sensor.crop_steering_ai_heartbeat")
+    second = rig.controller(vol=rig.volume(), **container_env(rig, TZ=zones[1]))
+    for ctl in (first, second):
+        rig.wait(ctl, HOLDING, timeout=90)
+        rig.wait(ctl, "(CS-609)", timeout=90)
+    assert not turned_on(rig, [VALVE, "switch.pump", "switch.main_line"])
+    docker("stop", second)
+    stopped = time.monotonic()
+    rig.wait(first, RESUMED, timeout=300)
+    assert time.monotonic() - stopped <= 260
+
+
+def test_c7_an_older_app_still_writing_holds_the_container_until_it_stops(rig):
+    """(b) A controller from before the guard (no id, last_beat 12 h off) writes the heartbeat every 60 s:
+    the container holds, raises CS-609 and switches nothing on. The older one is not stopped by it: that is
+    the documented limit. (c) Once it stops, the container resumes about 3 min after its last write."""
+    rig.fake(OLD_BEAT_FOR_S="200", OLD_BEAT_OFFSET_H="-12")
+    ctl = rig.controller(**container_env(rig))
+    rig.wait(ctl, HOLDING, timeout=90)
+    rig.wait(ctl, "(CS-609)", timeout=90)
+    rig.wait(rig.ha, "OLD BEAT STOPPED", timeout=260)
+    assert not turned_on(rig, [VALVE, "switch.pump", "switch.main_line"])
+    stopped = time.monotonic()
+    rig.wait(ctl, RESUMED, timeout=300)
+    assert time.monotonic() - stopped <= 260
+
+
+@pytest.mark.parametrize("action", ["dose", "batch"])
+def test_c7_dosing_is_refused_by_both_controllers(rig, action):
+    """(e) While two controllers hold the room, a dose or a batch request already waiting in its
+    dosing_config when they start is refused by both, and nothing on the dosing side is switched on."""
+    rig.fake(seed=dosing_seed(action), OLD_BEAT_FOR_S="200")
+    first = rig.controller(**container_env(rig))
+    second = rig.controller(vol=rig.volume(), **container_env(rig))
+    for ctl in (first, second):
+        rig.wait(ctl, f"dosing: {action} request: {REFUSED}", timeout=90)
+    assert not turned_on(rig, DOSING_DEVICES)
+
+
 def test_c8_home_assistant_restarting_never_parks_the_controller(rig):
     rig.fake()
     ctl = rig.controller(**container_env(rig))

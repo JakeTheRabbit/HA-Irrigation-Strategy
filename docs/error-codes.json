@@ -732,6 +732,23 @@
       ]
     },
     {
+      "code": "CS-609",
+      "title": "Another controller is reporting for this room",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Each controller writes its own id in the room's heartbeat every minute and reads the heartbeat before each pass. This one read a heartbeat written by another controller, or by a controller from before this check (no id), less than 3 minutes ago.",
+      "watering": "Nothing in the room is watered or dosed by this controller, and its settings are not moved, until no other controller has written for 3 minutes; then it carries on by itself. Dose and batch requests made meanwhile are refused (ask again after); a stop still switches the pumps off, and a dose or batch already running finishes.",
+      "causes": [
+        "The first start after updating from a version before this check: the old version's last heartbeat had no id. This clears by itself in about 3 minutes.",
+        "Two controllers run this room: a controller app and a controller container, or two apps.",
+        "A controller from before this check still runs: it never holds, so only this one does."
+      ],
+      "fixes": [
+        "Right after an update, wait 3 minutes: nothing needs switching off and on.",
+        "If it stays, stop and remove the controller you no longer use. Only one controller may run a room."
+      ]
+    },
+    {
       "code": "CS-610",
       "title": "Engine Enabled does not stop water in this room",
       "source": "repairs",

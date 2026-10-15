@@ -49,10 +49,10 @@ KINDS = (
     {
         "id": "watering",
         "name": "Watering stopped",
-        "detail": "Something stopping shots in a room or a zone, the engine not running, and "
-        "a room that has watered nothing for a while",
+        "detail": "Something stopping shots in a room or a zone, the engine not running, a "
+        "second controller on the room, and a room that has watered nothing for a while",
         "codes": _codes(
-            "CS-202 CS-203 CS-204 CS-205 CS-206 CS-207 CS-208 CS-209 CS-602"
+            "CS-202 CS-203 CS-204 CS-205 CS-206 CS-207 CS-208 CS-209 CS-602 CS-609"
         ),
         "events": (),
     },

@@ -399,6 +399,10 @@ class DosingRunner:
             return self._settle(room, config, request, "too old to act on")
         if action == "stop":
             return self._settle(room, config, request, self._stop(room, config, busy, request))
+        # Each controller keeps its own record of what it has handled, so two on one room would both take
+        # this request. Refused, not deferred: it would be too old by the time the hold ends.
+        if action in ("dose", "batch") and self.c.duplicate_hold(room):
+            return self._settle(room, config, request, "refused: another controller is driving this room")
         if busy is not None:
             where = "" if here else f" in room {busy.room.slug}"
             return self._settle(room, config, request, f"refused: a {busy.kind} is running{where}")
