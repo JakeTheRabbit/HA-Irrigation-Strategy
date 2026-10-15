@@ -1123,11 +1123,11 @@ try {
       // Each probe's last six hours.
       await page.locator(".probes-table [data-sensor-trend] .sparkline").first().waitFor();
       assert.equal(await page.locator(".probes-table [data-sensor-trend] .sparkline").count(), 12);
-      // Each zone's valve; the controller and Jev at the top.
+      // Each zone's valve; the controller and the AI assistant at the top.
       assert.equal(await page.locator(".probes-zone [data-zone-valve]").count(), 3);
       assert.match(
         await page.locator(".probes-status").innerText(),
-        /Probes\s+11 of 12 OK[\s\S]*Controller\s+Reporting[\s\S]*Jev\s+On/,
+        /Probes\s+11 of 12 OK[\s\S]*Controller\s+Reporting[\s\S]*AI assistant\s+On/,
       );
       // The controller's own sensors: collapsed, then as the Sensors page had them.
       const internals = page.locator("details.probes-more", { hasText: "Controller internals" });
