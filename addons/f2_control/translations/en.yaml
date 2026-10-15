@@ -2,229 +2,285 @@ configuration:
   num_zones:
     name: Number of zones (fallback)
     description: >-
-      The zones always come from the Crop Steering integration's room. This value is used
-      only for a room whose valves are hand-mapped in the options file (the `hardware` key,
-      which this form does not show). While Home Assistant cannot be reached at startup, no
-      zone is driven until it answers. Add more probes per
-      zone in the Crop Steering UI - the engine reads each zone's FUSED
-      sensor.crop_steering_vwc_zone_N / ec_zone_N (an average of every probe you map).
+      The number of zones for a room that has a `hardware` key in the options file (this
+      form does not show that key). All other rooms get their zones from the integration,
+      and this value has no effect on them. While Home Assistant does not answer at start,
+      the controller drives no zone. Keep the default, 3. Add and remove zones in the Crop
+      Steering dashboard.
   lights_on_hour:
     name: Lights-on hour (fallback)
     description: >-
-      Lights are read live from the integration (number.crop_steering_lights_on_hour) so you
-      set them ONCE in the Crop Steering UI. This option is only a fallback used if that
-      entity is missing. Hour 0-23; lights-on starts the grow-day.
+      The hour of lights-on that the controller uses only when it cannot read the Lights on
+      hour of the room from the integration (number.crop_steering_lights_on_hour).
+      Lights-on starts the grow-day. Keep the default, 10. Set the lights hours of the room
+      in the Crop Steering dashboard, not here. Use an hour from 0 to 23.
   lights_off_hour:
     name: Lights-off hour (fallback)
     description: >-
-      Fallback only - lights are read live from the integration
-      (number.crop_steering_lights_off_hour). Hour 0-23; at lights-off every zone is forced
-      into the overnight dry-back phase (P3).
+      The hour of lights-off that the controller uses only when it cannot read the Lights
+      off hour of the room from the integration (number.crop_steering_lights_off_hour). At
+      lights-off, the controller moves each zone in P1 or P2 to the overnight dryback (P3).
+      When this option and the integration do not agree, the controller can raise CS-403.
+      Keep the default, 22. Use an hour from 0 to 23.
   enable_flag:
-    name: Kill-switch entity
+    name: Kill switch entity
     description: >-
-      The kill switch of a room with no saved setup (an installation from before the
-      setup wizard). While it is OFF the engine reads sensors and makes decisions but
-      NEVER opens a valve (the safe default). Turn it ON to go live. Leave as
-      input_boolean.f2_control_enabled unless you named your helper something else.
-      A room whose setup has been saved stops on the switch its setup names (its
-      Engine Enabled switch); this option does not change that.
+      The entity ID of the kill switch for a room that has no saved setup (an installation
+      from before the setup wizard). While the kill switch is off, the controller reads the
+      probes and makes decisions, but it does not open a valve. Set it to on to start the
+      shots. A room with a saved setup uses the Engine Enabled switch of its setup, and
+      this option has no effect on that room. Keep the default,
+      input_boolean.f2_control_enabled, unless your helper has a different entity ID.
+      CAUTION: Do not set this option to an entity that is always on. The kill switch then
+      cannot stop the shots, and the room can get too much water.
   notify_service:
     name: Notification service
     description: >-
-      Where to send vitals, and alerts whenever no phone is set up under Crop Steering >
-      Settings & help > Notifications (there, each phone chooses what it gets) or an
-      alert can't be passed on there. Use the path form notify/<your_service>, for
-      example notify/mobile_app_my_phone. Find yours in Developer Tools > Actions by
-      typing "notify".
+      The Home Assistant notify action for the vitals reports and the alerts. The controller
+      uses it when no phone in Crop Steering > Settings & help > Notifications takes the
+      message, or when the integration cannot send it. Blank: the controller sends no push
+      through this option. Write the action in the form notify/<service>, for example
+      notify/mobile_app_my_phone. To find the name of your service, open Developer Tools >
+      Actions and type "notify".
   notify_min:
-    name: Minutes between routine notifications
+    name: Minutes between vitals reports
     description: >-
-      Minimum minutes between routine "vitals" messages so you are not spammed.
-      Urgent alerts ignore this throttle. Default 30.
+      The minimum time, in minutes, between two routine vitals reports. Increase: you get
+      fewer vitals reports. Decrease: you get more vitals reports. Alerts do not use this
+      limit. Keep the default, 30 min.
   instance_name:
     name: Name in notifications
     description: >-
-      The title of the controller's vitals notifications, for example
-      "Crop Steering vitals". Change it to tell two installations apart.
+      The name at the start of the title of each vitals report, for example "Crop Steering
+      vitals". The report also uses it as the name of the default room. Keep the default,
+      "Crop Steering". When you have two installations, give each one a different name.
   feed_ec_sensor:
-    name: Source-water EC sensor (optional)
+    name: Feed EC sensor
     description: >-
-      Entity id of your reservoir / source-water EC probe, e.g.
-      sensor.my_reservoir_ec. When set, the engine gates irrigation on the feed
-      EC being inside number.crop_steering_irrigation_ec_min / _max (fail-closed
-      if the probe dies). LEAVE BLANK if you have no feed-EC probe - the
-      source-water EC gate is then disabled, but dosing / tank-fill holds still
-      apply.
+      The entity ID of the sensor that measures the feed EC in the reservoir or the source
+      water, for example sensor.my_reservoir_ec. With a sensor, the controller starts no
+      shot while the feed EC is outside the feed EC limits of the room
+      (number.crop_steering_irrigation_ec_min / _max). If the sensor gives no reading for
+      more than 30 min, the controller stops all shots (fail-closed). Leave it blank if the
+      room has no feed EC probe. The EC part of the source-water gate is then off, but the
+      hold entities and the dosing holds still apply. CAUTION: Do not set a sensor that
+      gives no reading. The source-water gate then stops all shots, and the substrate can
+      become too dry.
   feed_ph_sensor:
-    name: Source-water pH sensor (optional)
+    name: Feed pH sensor
     description: >-
-      Entity id of your reservoir / source-water pH probe, e.g.
-      sensor.my_reservoir_ph. When set, the engine gates irrigation on the feed
-      pH being inside number.crop_steering_irrigation_ph_min / _max (fail-closed
-      if the probe dies). LEAVE BLANK if you have no feed-pH probe - the
-      source-water pH gate is then disabled.
+      The entity ID of the sensor that measures the feed pH in the reservoir or the source
+      water, for example sensor.my_reservoir_ph. With a sensor, the controller starts no
+      shot while the feed pH is outside the feed pH limits of the room
+      (number.crop_steering_irrigation_ph_min / _max). If the sensor gives no reading for
+      more than 30 min, the controller stops all shots (fail-closed). Leave it blank if the
+      room has no feed pH probe. The pH part of the source-water gate is then off. CAUTION:
+      Do not set a sensor that gives no reading. The source-water gate then stops all
+      shots, and the substrate can become too dry.
   hold_entities:
-    name: Hold entities (optional)
+    name: Hold entities
     description: >-
-      Entities that pause watering while they are on, such as the input_boolean
-      a dosing or tank-fill automation turns on while it works. While any of them
-      is on, no shot starts, and a shot already running ends and counts only the
-      water it gave. One that is missing or unavailable also stops new shots
-      until it reads again. Empty by default: nothing holds.
+      A list of entities that stop shots while they are on. An example is a helper that a
+      dosing or tank-fill automation sets to on. While one of them is on, no shot starts,
+      and a shot in progress stops and counts only the water that it gave. An entity that
+      is missing or that the controller cannot read also stops new shots. Empty (the
+      default): no entity holds the shots. CAUTION: Do not add an entity that stays on or
+      unavailable. The room then gets no shots, and the substrate can become too dry.
   substrate_l:
     name: Fallback substrate volume (L per plant)
     description: >-
-      Last-resort fallback ONLY, used if the integration's per-zone
-      substrate_volume number is unset. The generic default is a safe
-      placeholder - set your real per-plant block size in the Crop Steering UI.
-      Normally leave this: real shot sizing is read live from your per-zone
-      hardware numbers (substrate_volume x plant_count).
+      The substrate volume for each plant, in litres, that the controller uses only when the
+      substrate volume of a zone has no value. The controller multiplies it by the plant
+      count of the zone. Keep the default, 5 L. Set the real substrate volume for each plant
+      in the Crop Steering dashboard instead. CAUTION: Do not set this value much larger
+      than the real substrate volume. Large shots can flood the substrate and wash out the
+      nutrients.
   flow_lps:
-    name: Fallback drip flow (L per second)
+    name: Fallback zone flow (L/s)
     description: >-
-      Last-resort fallback ONLY, used if the per-zone flow cannot be computed
-      from your plant count and dripper settings. The generic default is a safe
-      placeholder. Normally leave this: real flow is
-      plant_count x drippers_per_plant x dripper_flow_rate.
+      The water flow of a zone, in L/s, for a zone that has no value for its drippers or its
+      dripper flow. Otherwise, the flow is plant_count x drippers_per_plant x
+      dripper_flow_rate (L/h) / 3600. Increase: each shot is shorter and gives less water.
+      Keep the default, 0.02 L/s. Do a catch test to find the real flow of a zone. CAUTION:
+      Do not set this value lower than the real flow of the zone. A low value makes each
+      shot longer, and the zone can get too much water.
   loop_seconds:
     name: Decision interval (seconds)
     description: >-
-      How often the engine wakes to read sensors and decide. Default 60. Lower
-      reacts faster but makes more Home Assistant API calls.
+      The time, in seconds, between two passes of the controller. In each pass, the
+      controller reads the sensors from Home Assistant and makes its decisions. Decrease:
+      the controller reacts sooner, but Home Assistant gets more requests. Keep the default,
+      60 s.
   rediscover_seconds:
-    name: Seconds between setup checks
+    name: Setup check interval (seconds)
     description: >-
-      How often the controller looks for new rooms and for setup changes saved
-      in the Crop Steering page. Default 300 (five minutes).
+      The time, in seconds, between two checks for new rooms and for setup changes that you
+      save in Crop Steering. Increase: the controller finds a new room or a setup change
+      later. Keep the default, 300 s (5 min). After you save a setup change, wait for up to
+      this time before you examine the room.
   brain_provider:
     name: AI assistant
     description: >-
-      Which brain judges the engine's decisions. rules: none, the engine decides alone.
-      claude_haiku: Claude Haiku, with the Anthropic API key below. jev_legacy
-      (deprecated): the retired Jev routes, for an install that still has them. auto
-      (default): keeps the Jev route on an install that has run it, and rules everywhere
-      else, so a new install starts on rules.
+      Selects the AI assistant that judges the decisions of the controller, or none. With
+      rules, the controller decides alone and makes no AI call. With claude_haiku, Claude
+      judges the decisions with your Anthropic API key, inside the safety limits of the
+      controller and the AI budget. With jev_legacy (deprecated), the controller uses the
+      retired Jev route, if the install has its credentials. With auto (the default), the
+      controller keeps the retired Jev route on an install that used it, and uses rules on
+      all other installs. To start the AI assistant, select claude_haiku and add your key
+      in anthropic_api_key.
   stage_arc:
     name: Stage arc
     description: >-
-      The flower stage arc the AI assistant and the stage card follow once a flower start
-      is set below (slab_default). With no flower start, no arc is used.
+      The stage arc for flower that the AI assistant uses after you set a flower start in
+      jev_flower_start. The judges then compare each zone with the stage of the arc for
+      that day of flower. Without a flower start, the controller uses no stage arc. Keep the
+      default, slab_default (the only stage arc in this release).
   anthropic_api_key:
-    name: Anthropic API key (optional)
+    name: Anthropic API key
     description: >-
-      Your own Anthropic API key, for brain_provider claude_haiku. Stored as a password and
-      never shown or logged. Empty: no key, the engine runs on its own rules. The brain sends
-      readings and settings to Anthropic, never entity ids or keys.
+      Your own Anthropic API key for the claude_haiku AI assistant. The controller keeps it
+      as a password and does not show it or write it to the log. Each call costs money on
+      your Anthropic account. Blank: the controller uses its own rules only. The AI
+      assistant sends readings and settings to Anthropic, but no entity IDs or keys. Set
+      anthropic_daily_budget_usd before you start the AI assistant.
   anthropic_model:
     name: Claude model
     description: >-
-      claude-haiku-5-5 (default), claude-sonnet-5-5 or claude-opus-5-5. Any other model runs
-      rules, because this release cannot keep it to your budget.
+      The Claude model that the AI assistant uses: claude-haiku-5-5 (default),
+      claude-sonnet-5-5 or claude-opus-5-5. A larger model costs more for each call, so the
+      same AI budget gives fewer calls. Any other model name makes the controller use its
+      own rules, because this release does not know the price of that model.
   anthropic_daily_budget_usd:
-    name: AI budget until lights-on (US$)
+    name: AI budget (US$)
     description: >-
-      The most the brain may spend between one lights-on and the next (default 1.00). Once it
-      is spent, the engine runs on its own rules until the next lights-on (CS-708). 0: the
-      brain never calls.
+      The maximum money, in US$, that the AI assistant can spend from one lights-on to the
+      next. When it spends this amount, the controller raises CS-708 and uses its own rules
+      until the next lights-on. 0: the AI assistant never calls Claude. Keep the default,
+      US$1.00, for the first grow-days. Then compare the spend with the AI budget on the AI
+      assistant panel.
   brain_dry_run:
     name: AI advises only
     description: >-
-      On: the brain judges and the log shows what it would have done, but it moves nothing;
-      the engine runs exactly as on rules. Alerts still come through.
+      On: the AI assistant judges, and the log shows what it would do, but it changes
+      nothing. The controller runs as on rules, and the alerts from the judges still come
+      through. The AI assistant still calls Claude and spends the AI budget. Set it to on
+      for the first grow-days with a new AI assistant.
   cf_account_id:
     name: Cloudflare account ID (deprecated)
     description: >-
-      A second route to Jev (typesafe/jev on Cloudflare Workers AI), which judges the
-      engine's decisions in every phase inside the controller's safety envelope
-      (docs/JEV.md). With this and the token below but no TypeSafe key, Jev starts only
-      on an install that has already run it; a new install needs the TypeSafe key
-      below. LEAVE BLANK to run the plain engine.
+      The Cloudflare account for the retired Jev route of the AI assistant (docs/JEV.md).
+      With the API token, the controller uses the Jev route only on an install that used it
+      before, or with jev_legacy. On a new install, the controller uses rules. Do not use
+      this option on a new install. Set brain_provider to claude_haiku instead.
   cf_api_token:
     name: Cloudflare API token (deprecated)
     description: >-
-      A Cloudflare API token with the Workers AI Read + Edit permission on the account
-      above. Stored as a password. Irrigation never waits on this call: if Cloudflare is
-      unreachable the controller carries on without a verdict.
+      The Cloudflare API token for the retired Jev route of the AI assistant. The controller
+      keeps it as a password. A shot does not wait for an answer from Jev. If Cloudflare
+      does not answer, the controller continues without that answer. Do not use this option
+      on a new install.
   cf_gateway_id:
     name: Cloudflare AI Gateway ID (deprecated)
     description: >-
-      Route the Jev calls through an AI Gateway (for logs and rate limits), e.g. default.
-      Leave blank to call Workers AI directly.
+      The ID of a Cloudflare AI Gateway for the calls of the retired Jev route, for example
+      default. Set: the Jev calls go through the AI Gateway. Blank: the Jev calls go
+      directly to Workers AI. Do not use this option on a new install.
   typesafe_api_key:
     name: TypeSafe API key (deprecated)
     description: >-
-      A TypeSafe API key (apikey_...). When set, Jev is asked straight from TypeSafe and the
-      Cloudflare fields above are not needed. Stored as a password.
+      A TypeSafe API key (apikey_...) for the retired Jev route of the AI assistant. The
+      controller keeps it as a password. Set: the retired route asks TypeSafe first, and the
+      Cloudflare options are not necessary. The key also marks the install as one that used
+      Jev, so auto keeps the retired route. Do not use this option on a new install.
   jev_enabled:
     name: Jev judges decisions (deprecated)
     description: >-
-      Off runs the plain engine even with Cloudflare set. On (default) lets the judges
-      below act, each only inside the controller's safety envelope.
+      The switch for the retired Jev route of the AI assistant. Off: the controller uses
+      rules when brain_provider is auto or jev_legacy. On (default): the retired route can
+      run. The option has no effect when brain_provider is claude_haiku. To stop the AI
+      assistant, set brain_provider to rules.
   jev_judges:
-    name: Jev judges that may act
+    name: Active judges
     description: >-
-      all (default), or a comma-separated list of dawn, ramp, salt, dusk, probe, shot,
-      night, zones, stage, setpoints, balance (Claude route only) and alerts. A judge
-      not listed is never asked.
-      Setpoints also needs the room's Auto setpoints switch on.
+      The judges and tasks that the AI assistant asks: all (default), or a list of names
+      with a comma between each name. The names are dawn, ramp, salt, dusk, probe, shot,
+      night, zones, stage, setpoints, channel, balance, feed, report, why and plan. The names
+      balance, feed, report, why and plan work only with claude_haiku. The AI assistant
+      never asks a judge that is not in the list, and the controller ignores a name that it
+      does not know. The setpoints judge also needs the Auto setpoints switch of the room
+      on.
   jev_daily_calls:
-    name: Jev calls a day
+    name: AI calls each day
     description: >-
-      The most calls Jev gets in a day across every room (default 5000). Once spent,
-      the engine decides alone until midnight.
+      The maximum number of AI assistant calls in one calendar day, for all rooms together.
+      When the calls reach this limit, the controller decides alone until midnight. On the
+      claude_haiku route, the AI budget in US$ also limits the calls. Keep the default,
+      5000.
   jev_budget_warn_pct:
-    name: Warn at this share of Jev's calls (%)
+    name: AI budget warning (%)
     description: >-
-      When the day's calls reach this share of the budget above (default 80), the app
-      raises CS-706, once that day.
+      The share of the daily calls, or of the AI budget, at which the controller raises
+      CS-706. The controller raises it one time for each day of calls and one time for each
+      budget window. Keep the default, 80%. Set a value below 100% to get the warning before
+      the AI assistant stops.
   jev_retries:
-    name: Tries per Jev route (deprecated)
+    name: Tries for each AI route (deprecated)
     description: >-
-      How many times each route to Jev is tried while it is busy, failing or slow
-      (default 3), inside 60 seconds. A refused key moves straight on to the next route.
+      The number of tries for each route to the AI assistant while the route is busy, fails
+      or is slow (default 3). All the tries of a route occur in 60 s. A route that refuses
+      the key gets no more tries. After the last try, the controller decides alone.
   jev_reask_max:
-    name: Second looks when Jev is unsure
+    name: Second looks when unsure
     description: >-
-      When an answer that did not act is under the sureness below, or its two phrasings
-      disagree, Jev is asked again with more evidence, up to this many times (default 2).
-      Then the engine decides.
+      The maximum number of times that the AI assistant asks a judge again, with more
+      evidence, when its answer is unsure and did not act. After that, the controller
+      decides alone. 0: no second look. Keep the default, 2. Decrease it if the AI budget
+      runs out too early in the grow-day.
   jev_unsure_below:
-    name: Jev is unsure below
+    name: Unsure below this probability
     description: >-
-      An answer with a probability under this (default 0.7) is unsure, and is asked again.
+      An answer with a probability below this value is unsure. An answer is also unsure when
+      its two phrasings do not agree. The AI assistant then asks the judge again, up to
+      jev_reask_max times. Keep the default, 0.7. Use a value between 0 and 1.
   jev_strict_after:
-    name: Bad calls before the stricter gate
+    name: Bad calls before stricter gate
     description: >-
-      After this many of a judge's calls in a row did not work out for a zone (default 3),
-      that judge acts there only when it is very sure and a second look agrees, until two
-      calls in a row work. The app raises CS-707.
+      The number of bad calls in a row by one judge for a zone. After that number, the judge
+      goes on the stricter gate for the zone, and the controller raises CS-707. On the
+      stricter gate, an answer acts only when the same sure call comes twice in a row. The
+      judge leaves the gate after two good calls in a row. Keep the default, 3.
   jev_strict_prob:
-    name: Sureness on the stricter gate
+    name: Probability on stricter gate
     description: >-
-      How sure an answer must be to act on the stricter gate (default 0.8).
+      The minimum probability that each answer must have to act while its judge is on the
+      stricter gate. Increase: a judge on the stricter gate acts less frequently. Keep the
+      default, 0.8. Keep it at or above the value of jev_unsure_below.
   jev_flower_start:
-    name: Flower start (Jev's stage arc)
+    name: Flower start
     description: >-
-      Where each room's first day of 12/12 is, so the judges know the stage: an
-      input_datetime or a date for every room, or room=value pairs, e.g.
-      default=input_datetime.flower_start, room_b=input_datetime.room_b_flower_start. Blank: the
-      judges work without a stage.
+      The first day of 12/12 for each room, so that the judges know the stage of flower.
+      The value is an input_datetime entity or a date (YYYY-MM-DD). For more than one room,
+      give room=value pairs, for example default=input_datetime.flower_start,
+      room_b=input_datetime.room_b_flower_start. Blank: the judges work without a stage.
   sump_power_sensor:
-    name: Sump pump power sensor (optional)
+    name: Sump pump power sensor
     description: >-
-      The power reading of the sump pump the room's tables drain to, e.g. sensor.sump_pump_power, in
-      W, kW or mW; for more than one room, room=sensor pairs, e.g.
-      default=sensor.sump_pump_power, veg=sensor.veg_sump_power. When set, a pump that shows no run
-      (no reading above the room's Sump Pump Run Threshold, 20 W unless changed) for the hours below
-      while the room is on raises CS-311 (critical): the tables are about to back up. Blank: not
-      watched.
+      The power sensor of the sump pump that the drains of the room go to, for example
+      sensor.sump_pump_power. For more than one room, give room=sensor pairs, for example
+      default=sensor.sump_pump_power, veg=sensor.veg_sump_power. With a sensor, the
+      controller raises CS-311 (critical) when the pump shows no run for the silent time
+      below while the room is on. A run is power above the Sump Pump Run Threshold of the
+      room (default 20 W). Blank: the controller does not monitor the sump pump.
   sump_silent_hours:
-    name: Sump pump may stand still for (hours)
+    name: Sump pump silent time (hours)
     description: >-
-      How long the sump pump may show no run before CS-311 (default 3). Set it longer than the
-      longest normal gap between its runs.
+      The time, in hours, that the sump pump can show no run before the controller raises
+      CS-311 (default 3). Set it longer than the longest normal gap between two runs of the
+      sump pump. CAUTION: Do not set this time much longer than the normal gap. A full sump
+      can flow back into the tables and flood the substrate.
   jev_flower_days:
     name: Days of flower
     description: >-
-      The cultivar's flowering length (default 56). The finish is its last 14 days.
+      The length of flower of the cultivar, in days (default 56). The stage arc puts the
+      finish in the last 14 days.
