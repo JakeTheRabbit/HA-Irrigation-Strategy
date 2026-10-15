@@ -90,13 +90,14 @@ def test_the_salt_doctrine_is_written_into_the_questions():
 # ------------------------------------------------------------------ (a) due
 def test_salt_is_due_in_p2_only_with_a_settled_ec_and_every_30_minutes():
     j = SaltJudge()
-    assert j.due(_salt_ctx(), None)
-    assert not j.due(_salt_ctx(ec_settled=None), None)
-    assert not j.due(_salt_ctx(phase="P1"), None)
-    assert not j.due(_salt_ctx(phase="P3"), None)
+    assert j.due(_salt_ctx(ec=5.2), None)
+    assert not j.due(_salt_ctx(ec=5.2, ec_settled=None), None)
+    assert not j.due(_salt_ctx(ec=5.2, phase="P1"), None)
+    assert not j.due(_salt_ctx(ec=5.2, phase="P3"), None)
     assert not j.due(K.ctx("P2", s=None), None)
-    assert not j.due(_salt_ctx(), K.NOW - timedelta(minutes=20))
-    assert j.due(_salt_ctx(), K.NOW - timedelta(minutes=30))
+    assert not j.due(_salt_ctx(ec=5.2), K.NOW - timedelta(minutes=20))
+    assert j.due(_salt_ctx(ec=5.2), K.NOW - timedelta(minutes=30))
+    assert not j.due(_salt_ctx(), None)  # inside the band and steady: the in-band skip (test_brain_in_band_skip)
 
 
 def test_shot_is_due_only_for_a_settled_shot_not_yet_judged():
