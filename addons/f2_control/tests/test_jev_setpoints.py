@@ -244,6 +244,17 @@ def test_a_move_is_written_once_and_is_not_mistaken_for_an_edit(tmp_path):
     assert not tomorrow["changed_today"]
 
 
+def test_a_move_written_names_its_number_on_the_push_for_keep_and_undo(tmp_path):
+    """The phone gets Keep and Undo for the number Jev wrote (an AI overlay in the integration); a move not
+    written (no per-zone number) names none."""
+    c, room = _Controller(tmp_path), _room()
+    c._auto_write = lambda *a, **k: True
+    ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
+    jev_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
+    [(event, zone, (words, _why, entity))] = c.events
+    assert (event, zone, entity) == ("jev_setpoint", 1, f"number.crop_steering_zone_1_{SHOT}")
+
+
 def test_a_move_that_went_back_to_the_operators_value_is_not_an_edit_by_hand(tmp_path):
     """The AI's overlay ran out or was undone (the integration's overlays.py): the operator's value is back."""
     c, room = _Controller(tmp_path), _room()

@@ -2479,7 +2479,8 @@ class Controller:
             log("notify: the push for", key, "went to no phone: none takes it in Crop Steering, and the "
                 "notify_service option is empty")
 
-    def _route(self, key, code, event, room, zone, title, message, urgent=False, timeout=NOTIFY_TIMEOUT_S):
+    def _route(self, key, code, event, room, zone, title, message, urgent=False, timeout=NOTIFY_TIMEOUT_S,
+               overlays=None):
         """Hand one push to crop_steering.notify, asking for its answer -> True when the integration took it: sent
         to the phones that ask for it, or to none because none does. False when it could not be asked, refused it
         (HTTP 4xx or 5xx, no answer in `timeout`), sent it nowhere and said why (nobody set up after all, or every
@@ -2492,6 +2493,8 @@ class Controller:
             data["room"] = room.prefix
         if urgent:
             data["urgent"] = True
+        if overlays:  # the AI's settings this push is about: Keep and Undo on the phone (the integration's overlays.py)
+            data["overlays"] = overlays
         status, answer = ha_service_response("crop_steering", "notify", data, timeout)
         if status is None or not 200 <= status < 300:
             log("notify: crop_steering.notify did not take", key, "HTTP", status)
@@ -2516,6 +2519,9 @@ class Controller:
             return cached[1]
         attrs = ha_get(NOTIFY_CONFIG)[1]
         attrs = attrs if isinstance(attrs, dict) else {}
+        # An integration that puts Keep and Undo on a push about the AI's settings says so; an older one would
+        # refuse the push that names them.
+        self._notify_overlays = attrs.get("overlay_actions") is True
         try:
             recipients = max(0, int(attrs.get("recipients") or 0))
         except (TypeError, ValueError):
@@ -2529,7 +2535,8 @@ class Controller:
         return recipients, idle
 
     def _notify_event(self, event, room, zone, *detail):
-        """A phase change ("phase": was, to, why) or a setting Jev moved ("jev_setpoint": words, why): not an
+        """A phase change ("phase": was, to, why) or a setting Jev moved ("jev_setpoint": words, why[, the number's
+        entity id when it was written, for Keep and Undo on the phone]): not an
         alert, so no card, and pushed only through crop_steering.notify, never to the notify_service option
         (docs/NOTIFICATIONS.md). Queued, and sent once the loop's shots are done (_send_events), so a slow Home
         Assistant never holds one up."""
@@ -2556,7 +2563,9 @@ class Controller:
                 zone = items[0][0] if len(items) == 1 else None
                 title, message = self._event_text(event, room, items)
                 key = f"{event}_{room.slug}" + (f"_z{zone}" if zone is not None else "")
-                self._route(key, None, event, room, zone, title, message, timeout=min(NOTIFY_TIMEOUT_S, left))
+                overlays = [d[2] for _z, d in items if event == "jev_setpoint" and len(d) > 2]
+                self._route(key, None, event, room, zone, title, message, timeout=min(NOTIFY_TIMEOUT_S, left),
+                            overlays=overlays if getattr(self, "_notify_overlays", False) else None)
             except Exception as e:
                 log("notify: event not sent", event, room.slug, e)
 
@@ -2569,7 +2578,7 @@ class Controller:
                 was, to, why = detail
                 moves.append((zone, f"{was} → {to}", why))
             else:
-                words, why = detail
+                words, why = detail[:2]
                 moves.append((zone, f"Jev changed {words}", why))
         if len(moves) == 1:
             zone, head, why = moves[0]
