@@ -844,6 +844,44 @@ try {
     },
   );
   await check(
+    "The AI assistant page shows each of the demo's seven brain states at 390 and 1440 px",
+    async () => {
+      const states = [
+        ["rules", "Watering by rules"],
+        ["acting", "AI assistant is acting"],
+        ["advising", "AI assistant is advising only"],
+        ["budget", "Daily AI limit reached"],
+        ["not_answering", /^AI not answering/],
+        ["no_key", "No working Anthropic key"],
+        ["stale", "Readings too old to judge"],
+      ];
+      for (const width of [390, 1440]) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+        for (const [state, headline] of states) {
+          const target = new URL(url);
+          target.searchParams.set("verification", String(++freshId));
+          target.searchParams.set("brain", state);
+          target.hash = "/today/ai";
+          await page.goto(target.toString(), { waitUntil: "networkidle" });
+          await visible(page.getByRole("heading", { name: "AI assistant", exact: true }));
+          await visible(page.locator(".brain-page .brain-status strong").getByText(headline));
+          assert.equal(
+            await page.getByLabel("Demo brain state").inputValue(),
+            state,
+            `${state}: the switcher shows the state`,
+          );
+          await noOverflow();
+          await axe(`brain-${state}-${width}`);
+          await page.screenshot({ path: out + `workspace-brain-${state}-${width}.png`, fullPage: true });
+        }
+      }
+      // The switcher moves the header chip with the page, with no reload.
+      await page.getByLabel("Demo brain state").selectOption("budget");
+      await visible(page.locator(".brain-chip").getByText("AI paused: budget"));
+      await page.setViewportSize({ width: 1440, height: 1000 });
+    },
+  );
+  await check(
     "Strict response-bearing API contract, revision conflict draft retention, and active/stale plan overlay",
     async () => {
       const live = await browser.newContext({ viewport: { width: 1440, height: 1000 } });

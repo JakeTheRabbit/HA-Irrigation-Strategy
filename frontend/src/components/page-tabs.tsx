@@ -30,6 +30,7 @@ export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
   settings: [
     { page: "settings", label: "Settings" },
     { page: "settings/notifications", label: "Notifications" },
+    { page: "settings/ai", label: "AI assistant" },
     { page: "help", label: "Help" },
   ],
 };
@@ -37,6 +38,7 @@ export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
 export function pageLabel(page: Page): string {
   if (page === "today") return "Today";
   if (page === "zone") return "Zone";
+  if (page === "today/ai") return "AI assistant";
   return TABS[sectionOf(page)]?.find((tab) => tab.page === page)?.label ?? SECTION_LABELS.today;
 }
 
