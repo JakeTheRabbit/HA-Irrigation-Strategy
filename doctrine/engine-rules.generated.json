@@ -309,7 +309,7 @@
     },
     {
       "id": "BR-2",
-      "text": "advance moves only to the next phase, with the lights on and a usable probe. P0 -> P1 needs the drop since lights-on at half of dryback_target or a quarter of p0_max_wait_min gone. P1 -> P2 needs max(1, p1_min_shots) ramp shots and VWC within 3 points of min(p1_target, field_capacity). P2 -> P3 needs at most 3 h to lights-off, a zone not steered vegetative, and VWC at least 3 points above the rescue floor.",
+      "text": "advance moves only to the next phase, with the lights on and a usable probe. P0 -> P1 needs the drop since lights-on at half of dryback_target or a quarter of p0_max_wait_min gone, and is refused while the probe reading has not moved for 30 min. P1 -> P2 needs max(1, p1_min_shots) ramp shots and VWC within 3 points of min(p1_target, field_capacity). P2 -> P3 needs at most 3 h to lights-off, a zone steered generative (for any other zone the answer is advice), and VWC at least 3 points above the rescue floor.",
       "verified": true
     },
     {

@@ -45,10 +45,10 @@ You are one of two independent readers. The same snapshot is sent twice, each ti
 
 | Judge | Asked | The question | What code may do |
 |---|---|---|---|
-| dawn | Morning dryback (P0), every 10 min | Start the first watering now, keep drying, or the probe is not moving | ACTS: bring the ramp (P1) forward. Only after half the dryback target or a quarter of the maximum wait; never later than the engine would |
+| dawn | Morning dryback (P0), every 10 min | Start the first watering now, keep drying, or the probe is not moving | ACTS: bring the ramp (P1) forward. Only after half the dryback target or a quarter of the maximum wait, and never while the probe reading has not moved for 30 min; never later than the engine would |
 | ramp | Ramp (P1), every 15 min once a shot has settled 10 min | Keep ramping, the slab is full, the EC left is the feed passing, real salt, or the probe is lagging | ACTS: bring maintenance (P2) forward. Only with the minimum ramp shots in and the moisture within 3 points of the ramp ceiling; the engine's own rise rule can also end the ramp |
 | salt | Maintenance (P2), every 30 min when a settled pore EC exists and EC stacking is on | Why pore EC reads what it does | ACTS: sets the EC steer to steer, hold or ease back, inside the engine's own clamp |
-| dusk | The last 3 h before lights-off, every 15 min | Stop for the night now, one more top-up then stop, or carry on | ACTS: bring the overnight dryback (P3) forward. Never for a zone steered vegetative, never within 3 points of the rescue floor; the rescue still fires |
+| dusk | The last 3 h before lights-off, every 15 min | Stop for the night now, one more top-up then stop, or carry on | ACTS: bring the overnight dryback (P3) forward. Only for a zone steered generative (for any other zone the answer is advice), never within 3 points of the rescue floor; the rescue still fires |
 | probe | Any phase once the zone has had two shots, every 30 min | Is the probe measuring the substrate (yes/no), and if not, how it is failing | ACTS: sets the probe aside after two agreeing answers in a row plus code's own confirmation; the zone then waters on its sibling or its timer; lasts 90 min unless renewed |
 | shot | Once per shot, 20 min after it ends | Where the water went | ADVISES: tags the shot, feeds the probe judge, raises an alert after two misses in a row |
 | night | Overnight, every 20 min within 3 points of the rescue floor | Real drying or a probe fault | ADVISES: an alert. Never stops a rescue |

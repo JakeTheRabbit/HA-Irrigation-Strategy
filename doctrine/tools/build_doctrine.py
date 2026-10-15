@@ -432,6 +432,9 @@ def brain_facts(doc, paths, core, base_p, base_s, ctrl):
         c.update(kw)
         return SimpleNamespace(**c)
 
+    def flat(minutes):  # a probe reading unchanged for `minutes`
+        return SimpleNamespace(readings=[(now - timedelta(minutes=minutes), 50.0, 3.0), (now, 50.0, 3.0)])
+
     def ok(kind, value, c, **k):
         return env.admit(env.Directive("t", kind, value, "why", now + timedelta(hours=1)), c, **k)[0]
 
@@ -441,13 +444,16 @@ def brain_facts(doc, paths, core, base_p, base_s, ctrl):
             and ok("advance", "P1", ctx("P0", {"dryback_pct": 2, "phase_minutes": 12}))
             and not ok("advance", "P1", ctx("P0", {"dryback_pct": 10}, lights_on=False))
             and not ok("advance", "P1", ctx("P0", snap=None))
-            and not ok("advance", "P2", ctx("P0", {"dryback_pct": 10})))
+            and not ok("advance", "P2", ctx("P0", {"dryback_pct": 10}))
+            and not ok("advance", "P1", ctx("P0", {"dryback_pct": 10}, history=flat(30)))
+            and ok("advance", "P1", ctx("P0", {"dryback_pct": 10}, history=flat(29))))
     ramp = (not ok("advance", "P2", ctx("P1", {"shot_count": 0, "vwc": 59}))
             and not ok("advance", "P2", ctx("P1", {"shot_count": 2, "vwc": 56}))
             and ok("advance", "P2", ctx("P1", {"shot_count": 1, "vwc": 57}))
             and not ok("advance", "P2", ctx("P1", {"shot_count": 2, "vwc": 57}, {"p1_min_shots": 3})))
     dusk = (ok("advance", "P3", ctx("P2", {"vwc": 50}))
             and not ok("advance", "P3", ctx("P2", {"vwc": 50}, steering="vegetative"))
+            and not ok("advance", "P3", ctx("P2", {"vwc": 50}, steering=None))
             and not ok("advance", "P3", ctx("P2", {"vwc": 50}, hours_to_off=3.5))
             and not ok("advance", "P3", ctx("P2", {"vwc": 42.5})) and ok("advance", "P3", ctx("P2", {"vwc": 43})))
     distrust = (not ok("distrust", "stuck", ctx("P2"), confirmed=1, evidence_ok=True)
@@ -478,7 +484,7 @@ def brain_facts(doc, paths, core, base_p, base_s, ctrl):
     return [
         ("BR-1", "The brain's answers can cause only these directives: advance (a phase forward), distrust (a probe set aside), ec_mode (steer, hold or decay) and setpoint (one notch); alerts and pushes are admitted because they never move water, and anything else is refused.",
          advice and "judge_levers" in bridge),
-        ("BR-2", "advance moves only to the next phase, with the lights on and a usable probe. P0 -> P1 needs the drop since lights-on at half of dryback_target or a quarter of p0_max_wait_min gone. P1 -> P2 needs max(1, p1_min_shots) ramp shots and VWC within 3 points of min(p1_target, field_capacity). P2 -> P3 needs at most 3 h to lights-off, a zone not steered vegetative, and VWC at least 3 points above the rescue floor.",
+        ("BR-2", "advance moves only to the next phase, with the lights on and a usable probe. P0 -> P1 needs the drop since lights-on at half of dryback_target or a quarter of p0_max_wait_min gone, and is refused while the probe reading has not moved for 30 min. P1 -> P2 needs max(1, p1_min_shots) ramp shots and VWC within 3 points of min(p1_target, field_capacity). P2 -> P3 needs at most 3 h to lights-off, a zone steered generative (for any other zone the answer is advice), and VWC at least 3 points above the rescue floor.",
          dawn and ramp and dusk),
         ("BR-3", "distrust needs two agreeing answers in a row plus code's own confirmation; a set-aside zone takes the blind path (CT-5).",
          distrust and 'distrusted[zone] = jev_dirs["distrust"].why' in ctrl and "snap = None" in ctrl),

@@ -90,12 +90,15 @@ def test_p1_hands_over_only_near_the_ceiling_with_the_minimum_shots():
 
 
 def test_p3_early_only_in_the_last_three_hours_and_above_the_floor():
-    early = K.ctx("P2", s=K.snap(hours_to_lights_off=5.0, vwc=34.0))
-    close = K.ctx("P2", s=K.snap(hours_to_lights_off=2.0, vwc=27.0), p=K.params(p3_emergency_floor=25.0))
-    ok = K.ctx("P2", s=K.snap(hours_to_lights_off=2.0, vwc=34.0))
+    early = K.ctx("P2", s=K.snap(hours_to_lights_off=5.0, vwc=34.0), steering="generative")
+    close = K.ctx("P2", s=K.snap(hours_to_lights_off=2.0, vwc=27.0), p=K.params(p3_emergency_floor=25.0),
+                  steering="generative")
+    ok = K.ctx("P2", s=K.snap(hours_to_lights_off=2.0, vwc=34.0), steering="generative")
+    unset = K.ctx("P2", s=K.snap(hours_to_lights_off=2.0, vwc=34.0))
     assert not admit(_d("advance", "P3", early), early)[0]
     assert not admit(_d("advance", "P3", close), close)[0]
     assert admit(_d("advance", "P3", ok), ok)[0]
+    assert not admit(_d("advance", "P3", unset), unset)[0]  # no steering mode set: advice only
 
 
 def test_p0_waits_for_half_the_dryback_or_a_quarter_of_the_wait():

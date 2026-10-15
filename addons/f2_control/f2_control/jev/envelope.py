@@ -12,6 +12,7 @@ from datetime import datetime
 
 ORDER = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
 NEXT = {"P0": "P1", "P1": "P2", "P2": "P3"}
+FLAT_MIN = 30.0  # a probe reading unchanged this long can't show a dryback: the P0 timer decides
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,20 @@ class Directive:
 
 def _p1_ceiling(p):
     return min(p.p1_target, p.field_capacity)
+
+
+def _flat_minutes(ctx, tolerance=0.05):
+    """How long the zone's VWC has read the same value (within `tolerance` points), in minutes; 0 with no
+    history. The same count as context.flat_minutes, kept here so the envelope stands on its own."""
+    pts = list(getattr(getattr(ctx, "history", None), "readings", None) or ())
+    if not pts:
+        return 0.0
+    start, last = pts[-1][0], pts[-1][1]
+    for t, v, *_ in reversed(pts):
+        if abs(v - last) > tolerance:
+            break
+        start = t
+    return (ctx.now - start).total_seconds() / 60.0
 
 
 def admit(d: Directive, ctx, confirmed=0, evidence_ok=False):
@@ -47,6 +62,9 @@ def admit(d: Directive, ctx, confirmed=0, evidence_ok=False):
             if snap.dryback_pct < half and snap.phase_minutes < quarter:
                 return False, (f"dryback {snap.dryback_pct:.1f}% under half the target ({half:.1f}%) "
                                f"and only {snap.phase_minutes:.0f} of {p.p0_max_wait_min:.0f} min waited")
+            flat = _flat_minutes(ctx)
+            if flat >= FLAT_MIN:
+                return False, f"the probe reading has not moved for {flat:.0f} min: the P0 timer decides"
             return True, "P0 far enough along"
         if target == "P2":
             if snap.shot_count < max(1, p.p1_min_shots):
@@ -57,8 +75,9 @@ def admit(d: Directive, ctx, confirmed=0, evidence_ok=False):
             return True, "ramp near its ceiling with the minimum shots in"
         if target == "P3":
             steering = ctx.steering or ((ctx.stage or {}).get("steering"))
-            if steering == "vegetative":
-                return False, "the zone is steered vegetative: its watering stops late (owner's doctrine)"
+            if steering != "generative":
+                return False, (f"the zone is steered {steering or 'with no mode set'}, not generative: an early "
+                               "stop is advice only")
             if ctx.hours_to_off > 3.0:
                 return False, f"{ctx.hours_to_off:.1f} h to lights-off: only the last 3 h"
             if snap.vwc < p.p3_emergency_floor + 3.0:
