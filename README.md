@@ -1,6 +1,6 @@
 # Crop Steering
 
-![Release](https://img.shields.io/badge/Release-3.11.1-blue)
+![Release](https://img.shields.io/badge/Release-3.12.0-blue)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.10+-41BDF5)
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
@@ -421,7 +421,7 @@ The file `state.json` keeps the phase of each zone, the counters of today, the s
 
 ### Move a room from the Jev edition
 
-A room from the `HA-Crop-Steering-Jev` repository (the Jev edition, to version 3.11.1) moves one time. Move a production room only to a stable release 3.12.3 or later. The controller from this repository is a different app with an empty data folder. The integration keeps its entities and its dashboard.
+A room from the `HA-Crop-Steering-Jev` repository (the Jev edition, to version 3.11.1) moves one time. Move a production room only to a stable release 3.12.0 or later. The controller from this repository is a different app with an empty data folder. The integration keeps its entities and its dashboard.
 
 1. Make a backup of the Jev app and Home Assistant. Record each `number.`, `select.` and `switch.crop_steering_*` state.
 2. Install the new app. Do not start it. Keep **Start on boot** and **Watchdog** off.

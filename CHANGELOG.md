@@ -9,6 +9,44 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.12.0] - 2026-10-16
+
+Pair: **controller 3.12.0**. This release brings the Jev edition (3.11.1) into this repository and adds 13 groups of
+changes on top of it. It was released by the owner's decision without a staging soak (approved rehearsal).
+
+### 🌱 In plain English
+
+**Read these first. They change when water flows on rooms that update:**
+
+- **P3 rescue shots now wait 10 minutes between shots in every zone.** Set "P3 time between shots" to 0 to go back to no gap.
+- **If a room's settings cannot be read since start, the zones that need them for shot size wait (CS-402) instead of watering on built-in values.**
+- **If a hold switch you set up becomes unavailable, its room now stops watering until it is back. Before, an unavailable hold switch was ignored.**
+- **On the first start after this update, each room holds watering for about 3 minutes while the controller checks that no second controller drives it.**
+- **The EC PID option is gone. Rooms that had it on now use the normal step rule for EC.**
+- **Auto setpoints no longer moves the rescue floor, keeps the P0 dryback, and moves the field-capacity ladder at most 1 point a grow-day.**
+- **On a room that runs a grow plan, a dead or flat EC probe no longer keeps every zone on yesterday's targets. At lights-on every zone with a working moisture probe moves to the new day.**
+- **When a zone's moisture probe comes back during the day, the zone carries on from where its day is. It does not start the morning ramp again.**
+
+What else you get:
+
+- **It works on any Home Assistant.** No built-in room names, entity ids or site numbers. One table of defaults and units. A valve, pump or main line can be a switch, an input_boolean or a valve.
+- **Run the controller as an app or as a plain Docker container** (Home Assistant Container and Core).
+- **An optional AI assistant (Claude Haiku).** It decides only inside the safety limits, and the controller goes back to its rules when the AI is off, out of budget or not available. Put the Anthropic key and a daily budget in the app options.
+- **The controller checks that each room runs its grow plan** and tells you in one line, with a CS-713 card when it does not.
+- **Safety:** a max-run latch, fail-closed holds, a settled P1 rise, guarded probe combining, a test shot button, and a stopped heartbeat.
+- **Dosing and the reservoir:** dosing runs on the main loop, tank level and reservoir minimum, feed schedule by week, and two-point probe calibration.
+- **The setup wizard checks itself**, and the dashboard has a first-run tour, a stale-data banner and a targets editor.
+- **All text is in Simplified Technical English**, and every setting has an "About" tip that tells you what it does, what it changes and what to check.
+- **Moving from the Jev edition:** follow docs/MOVING_FROM_JEV.md once.
+
+### 🔧 Technical notes
+
+- Intake: Jev 3.11.1 fast-forwarded (#132), with a guard so a 2.25.1 install that only set Cloudflare keys does not start the Jev brain.
+- Families: groundwork (#133), any Home Assistant (#134), doctrine pack and substrate per room (#135), standalone Docker (#136), safety ports (#137), engine ports and substrate profiles (#138), change log, read-back, overlays, re-notify and shot-landed check (#139), notifications (#140), dosing and reservoir (#141), setup wizard and dashboard (#142), Claude Haiku brain (#143), brain judges and plan adherence (#144), ASD-STE100 text and tooltips (#145).
+- New codes: CS-312 (max-run latch), CS-313 (undrivable actuator), CS-503 (probe unit), CS-609 (second controller), CS-610, CS-611, CS-708 to CS-713.
+- Image: requests and the Anthropic SDK closure installed from hashed requirement files; armv7 skips the SDK and runs rules.
+- Every family passed the full CI (lint, integration, controller, real Home Assistant on the newest and oldest supported versions, container smoke, dashboard browser workflows).
+
 ## [3.11.1] - 2026-10-06
 
 Pair: **controller 3.11.1**. Class **C3**. One pull request, #42, the fix to 3.11.0's first live afternoon on F2
