@@ -212,6 +212,18 @@ def model(learn):
     return ct.ZoneModel(knee=learn["peak"], gain=learn["gain"], day_rate=learn["day_rate"], night_rate=learn["night_rate"])
 
 
+def day_plan(learn, current, plan_ctx):
+    """Today's plan for this zone (curve_tracker.plan_day), or None until the model is complete. Its
+    note says when the P3 dryback target is out of reach and what the zone gets instead."""
+    m = model(learn)
+    if not (m and plan_ctx):
+        return None
+    recipe = ct.Recipe(0.0, plan_ctx["dryback_pct"], plan_ctx["p0_wait_min"], plan_ctx["p1_shot_pct"],
+                       plan_ctx["p1_gap_min"], current["p2_shot_size"],
+                       generative=bool(plan_ctx.get("generative", False)))
+    return recipe, ct.plan_day(m, recipe, plan_ctx["lights_on_h"], plan_ctx["lights_off_h"], plan_ctx["start_vwc"])
+
+
 def wanted(learn, current, vwc, phase, plan_ctx, others=()):
     """suffix -> value this zone should hold now. {} until something has been learned.
 
@@ -223,19 +235,19 @@ def wanted(learn, current, vwc, phase, plan_ctx, others=()):
 
     plan_ctx (optional, needs a complete model) adds the through-the-day schedule of the P2 threshold:
     {lights_on_h, lights_off_h, minutes_since_lights_on, shots_today, dryback_pct, p0_wait_min,
-     p1_shot_pct, p1_gap_min, start_vwc}
+     p1_shot_pct, p1_gap_min, start_vwc, generative}; `generative` (the zone's steering mode, False
+    when missing) sets how early maintenance shots may stop for the dryback.
     """
     target = p1_target(learn, vwc, phase)
     if target is None:
         return {}
     want = {"p1_target_vwc": target, "field_capacity": max(40.0, round(target + 2.0, 1))}
     m = model(learn)
+    planned = day_plan(learn, current, plan_ctx)
     if "p2_vwc_threshold" in others:
         pass  # another writer's
-    elif m and plan_ctx:
-        recipe = ct.Recipe(0.0, plan_ctx["dryback_pct"], plan_ctx["p0_wait_min"], plan_ctx["p1_shot_pct"],
-                           plan_ctx["p1_gap_min"], current["p2_shot_size"])
-        plan = ct.plan_day(m, recipe, plan_ctx["lights_on_h"], plan_ctx["lights_off_h"], plan_ctx["start_vwc"])
+    elif planned:
+        recipe, plan = planned
         d = ss.desired(m, recipe, plan, ss.Steer(current["p2_shot_size"]),
                        {"minutes_since_lights_on": plan_ctx["minutes_since_lights_on"],
                         "shots_today": plan_ctx["shots_today"], "feed_ec": 0.0}, ec_seen_max=0.0)
@@ -249,13 +261,16 @@ def wanted(learn, current, vwc, phase, plan_ctx, others=()):
     return want
 
 
-def status(learn, enabled):
+def status(learn, enabled, dryback_note=None, p2_stop=None):
+    """`dryback_note`: today's plan saying the P3 dryback target is out of reach (day_plan). `p2_stop`:
+    when today's plan stops maintenance shots for the dryback, "HH:MM" (the dashboard marks it)."""
     reason = frozen_reason(learn)
     state = "off" if not enabled else "frozen" if reason else "tracking" if model(learn) else "learning"
     return state, {
         "learned_peak": learn["peak"], "gain": learn["gain"], "day_rate": learn["day_rate"],
         "night_rate": learn["night_rate"], "p1_outcome": learn["outcome"], "hold_days": learn["hold_days"],
         "frozen_reason": reason, "last_change": learn["last_change"],
+        "dryback_note": dryback_note or None, "p2_stop": p2_stop or None,
     }
 
 

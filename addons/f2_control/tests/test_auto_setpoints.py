@@ -187,6 +187,29 @@ def test_with_a_complete_model_the_p2_threshold_is_scheduled_through_the_day():
     # held UNDER the zone overnight and through P0: no lights-on watchdog shot, a real P0, a real dryback
 
 
+def test_the_steering_mode_sets_how_early_the_afternoon_s_maintenance_shots_may_stop():
+    """A dryback the nights cannot reach: vegetative keeps its maintenance shots until 3 hours before
+    lights-off, generative until the middle of the day, and the plan says what the zone gets instead."""
+    learn = au.fresh()
+    _ramp(learn, [1.8, 1.8, 1.8, 0.1, 0.1])
+    au.ramp_outcome(learn, "P1")
+    _quiet_days(learn)
+    ctx = dict(lights_on_h=10, lights_off_h=22, shots_today=6, dryback_pct=30.0, p0_wait_min=60,
+               p1_shot_pct=3.0, p1_gap_min=20, start_vwc=31.0, minutes_since_lights_on=420)  # 17:00
+    band = round(learn["peak"] - learn["gain"] * 3.0, 1)
+    veg = au.wanted(learn, CURRENT, vwc=35.0, phase="P2", plan_ctx=dict(ctx, generative=False))
+    gen = au.wanted(learn, CURRENT, vwc=35.0, phase="P2", plan_ctx=dict(ctx, generative=True))
+    assert veg["p2_vwc_threshold"] == band  # still watering at 17:00
+    assert gen["p2_vwc_threshold"] < band  # drying since 16:00
+    _recipe, plan = au.day_plan(learn, CURRENT, dict(ctx, generative=False))
+    assert plan.note.startswith("30% dryback unreachable at this zone's uptake: about ")
+    assert plan.note.endswith(", with maintenance shots until 19:00")
+    assert au.day_plan(au.fresh(), CURRENT, ctx) is None  # nothing planned before the model is complete
+    assert au.status(learn, True, plan.note, "19:00")[1]["dryback_note"] == plan.note
+    assert au.status(learn, True, plan.note, "19:00")[1]["p2_stop"] == "19:00"
+    assert au.status(learn, True)[1]["dryback_note"] is None and au.status(learn, True)[1]["p2_stop"] is None
+
+
 def test_nothing_is_wanted_until_something_has_been_learned():
     assert au.wanted(au.fresh(), CURRENT, vwc=31.0, phase="P0", plan_ctx=None) == {}
 

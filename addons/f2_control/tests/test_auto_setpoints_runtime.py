@@ -260,3 +260,26 @@ def test_jev_nudges_survive_a_restart_so_the_day_is_not_nudged_twice(monkeypatch
     saved = c._serialize_zone(room.state[1])
     restored = c._apply_saved_zone(c._fresh_zone(), saved)
     assert "ec" in restored["learn"]["jev"]["nudged"]
+
+
+@pytest.mark.parametrize("mode, stop", [("Vegetative", "19:00"), ("Generative", "16:00")])
+def test_a_dryback_the_nights_cannot_reach_keeps_the_zones_afternoon_by_its_steering_mode(mode, stop):
+    """Vegetative, a 30% P3 dryback its nights could not reach, and no maintenance shot all day after the
+    ramp. At 17:00 (lights 10:00-22:00) a vegetative zone is still watered, a generative one has been
+    drying since the middle of the day, and the dashboard is told why and from when."""
+    c, fake, room = _rig(numbers={**NUMBERS, "select.crop_steering_zone_1_steering_mode": (mode, {})})
+    room.lights_on_hour, room.lights_off_hour = 10.0, 22.0
+    room.state[1]["learn"] = dict(
+        au.fresh(), peak=36.0, gain=0.6, day_rate=0.72, night_rate=0.37,
+        day_n=au.MIN_RATE_DAYS, night_n=au.MIN_RATE_DAYS, outcome="reached", hold_days=2,
+    )
+    room.state[1]["phase"], room.state[1]["shots"] = "P2", 6
+    _Clock.current = datetime(2026, 9, 19, 17, 0)
+    p = SimpleNamespace(**{**vars(_p(fake)), "dryback_target": 30.0})
+    c._auto_tick(room, 1, SimpleNamespace(vwc=35.0, ec=5.0, dryback_rate=0.0), p, True, _Clock.current)
+    trigger = float(fake.states["number.crop_steering_zone_1_p2_vwc_threshold"][0])
+    band = round(36.0 - 0.6 * 3.0, 1)
+    assert (trigger == band) is (mode == "Vegetative")
+    attrs = fake.sets["sensor.crop_steering_zone_1_auto_setpoints"][1]
+    assert attrs["dryback_note"].startswith("30% dryback unreachable at this zone's uptake")
+    assert attrs["dryback_note"].endswith(stop) and attrs["p2_stop"] == stop
