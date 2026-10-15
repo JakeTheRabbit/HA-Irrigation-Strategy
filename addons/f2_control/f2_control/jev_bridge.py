@@ -32,6 +32,7 @@ from jev.triage import Triage
 
 ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "alerts")
 PENDING_S = 300  # a write Home Assistant has not reflected yet is not an operator's edit for this long
+RETRIES = 3  # a write still not read back is sent again this many times, PENDING_S apart and doubling, then failed
 REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the old value back
 PAUSE_H = 48  # and the zone's setpoints are left alone this long
 # Only Jev's own code writes these into /data, so any one of them (empty or unreadable too) says Jev has run here.
@@ -158,6 +159,7 @@ def tick(c, room, zone, snap, p, now, lights_on):
     """Record this pass's reading, run the judges, raise their alerts, apply a setpoint move.
     -> {kind: Directive} for the controller's pass (advance, distrust, ec_mode)."""
     _hist(room, zone).add_reading(now, snap.vwc, snap.ec)
+    readback(c, room, zone, now)
     guard_setpoints(c, room, zone, now)
     ctx = zone_context(c, room, zone, snap, p, now, lights_on)
     out = {}
@@ -212,7 +214,8 @@ def setpoint_view(c, room, zone, p, now):
     rec = mem.zone(room.slug, zone)
     current, changed = {}, False
     pending = rec.get("pending") or {}
-    fresh = pending and (now - datetime.fromisoformat(pending["at"])).total_seconds() < PENDING_S
+    # a write still being read back (readback) is never an edit; one an older memory left waits PENDING_S
+    fresh = pending and ("to" in pending or (now - datetime.fromisoformat(pending["at"])).total_seconds() < PENDING_S)
     for suffix in (SHOT, THRESHOLD):
         v = _zone_number(c, room, zone, suffix)
         if v is None:
@@ -242,9 +245,60 @@ def setpoint_view(c, room, zone, p, now):
         "enabled": bool(enabled), "current": current, "home": dict(rec["home"]),
         "bands": {s: setpoint_band(s, rec["home"][s], p) for s in current},
         "changed_today": last.get("day") == day, "frozen": frozen, "day": day,
-        "last_words": None if not last else f"{last.get('at', '')[:16].replace('T', ' ')}: {last.get('words')}"
-                                            + (" (put back after a rescue shot)" if last.get("reverted") else ""),
+        "last_words": _last_words(last),
     }
+
+
+def _last_words(last):
+    if not last:
+        return None
+    return (f"{last.get('at', '')[:16].replace('T', ' ')}: {last.get('words')}"
+            + (" (did not reach Home Assistant)" if last.get("failed")
+               else " (put back after a rescue shot)" if last.get("reverted") else ""))
+
+
+def _pending(suffix, frm, to, by, now):
+    """A write to read back: sent once now, again RETRIES times, PENDING_S apart and doubling, while it has not landed."""
+    return {"suffix": suffix, "from": frm, "to": to, "by": by, "at": now.isoformat(timespec="seconds"),
+            "tries": 0, "next": (now + timedelta(seconds=PENDING_S)).isoformat(timespec="seconds")}
+
+
+def readback(c, room, zone, now):
+    """Read back the zone's number after a Jev write (SF-25): landed, it is done; an edit by hand since then is the
+    operator's (setpoint_view); still the old value or unreadable, it is sent again with a doubling wait, and after
+    RETRIES it is recorded as failed and Jev's memory goes back to the value Home Assistant still holds."""
+    mem = getattr(getattr(c, "jev", None), "setpoints", None)
+    rec = None if mem is None else mem.zone(room.slug, zone)
+    pend = (rec or {}).get("pending") or {}
+    if "to" not in pend:
+        return  # nothing to read back, or a pending write an older memory left (setpoint_view times it out)
+    suffix, frm, to = pend["suffix"], float(pend["from"]), float(pend["to"])
+    cur = _zone_number(c, room, zone, suffix)
+    if cur is not None and abs(cur - frm) > 1e-6:
+        rec["pending"] = None  # landed, or set by hand since: either way nothing is left to send
+        mem.save()
+        return
+    if now < datetime.fromisoformat(pend["next"]):
+        return
+    # Jev's own move stops when the operator stops automatic targets; a put-back restores theirs, so it never does
+    allowed = pend["by"] != "Jev" or (owns_setpoints(c) and not getattr(room, "strategy_required", False)
+                                      and c._on(f"switch.crop_steering_{room.prefix}auto_setpoints", False))
+    if allowed and pend["tries"] < RETRIES:
+        pend["tries"] += 1
+        pend["next"] = (now + timedelta(seconds=PENDING_S * 2 ** pend["tries"])).isoformat(timespec="seconds")
+        learn = room.state[zone].get("learn") if isinstance(room.state[zone].get("learn"), dict) else {}
+        c._auto_write(room, zone, suffix, frm, to, learn, now, by=pend["by"])
+        mem.save()
+        return
+    rec["pending"] = None
+    rec["written"][suffix] = frm  # what Home Assistant still holds is not an edit by hand
+    last = rec.get("last") or {}
+    if pend["by"] == "Jev" and last.get("suffix") == suffix and last.get("to") == to:
+        last["failed"] = True
+    mem.save()
+    why = (f"Home Assistant still shows {frm:g} after {pend['tries'] + 1} tries" if allowed
+           else "automatic targets were switched off before it landed")
+    _note(c, room, zone, "write failed", f"{suffix.replace('_', ' ')} {frm:g} -> {to:g}", "failed", why)
 
 
 def apply_setpoint(c, room, zone, d, ctx, now):
@@ -255,7 +309,7 @@ def apply_setpoint(c, room, zone, d, ctx, now):
     learn = room.state[zone].get("learn") if isinstance(room.state[zone].get("learn"), dict) else {}
     c._auto_write(room, zone, v["suffix"], float(v["from"]), float(v["to"]), learn, now, by="Jev")
     rec["written"][v["suffix"]] = float(v["to"])
-    rec["pending"] = {"suffix": v["suffix"], "from": float(v["from"]), "at": now.isoformat(timespec="seconds")}
+    rec["pending"] = _pending(v["suffix"], float(v["from"]), float(v["to"]), "Jev", now)
     rec["last"] = {"suffix": v["suffix"], "from": float(v["from"]), "to": float(v["to"]),
                    "at": now.isoformat(timespec="seconds"), "day": (ctx.setpoints or {}).get("day"),
                    "words": v["words"], "choice": v["choice"], "reverted": False}
@@ -286,7 +340,7 @@ def guard_setpoints(c, room, zone, now):
         c._auto_write(room, zone, last["suffix"], float(last["to"]), float(last["from"]), learn, now,
                       by="Jev (put back)")
         rec["written"][last["suffix"]] = float(last["from"])
-        rec["pending"] = {"suffix": last["suffix"], "from": float(last["to"]), "at": now.isoformat(timespec="seconds")}
+        rec["pending"] = _pending(last["suffix"], float(last["to"]), float(last["from"]), "Jev (put back)", now)
     last["reverted"] = True
     rec["frozen_until"] = (now + timedelta(hours=PAUSE_H)).isoformat(timespec="seconds")
     mem.save()
@@ -439,8 +493,7 @@ def setpoints_published(c, room, zone, now, managed):
     return {
         "managed": bool(managed), "home": home, "current": current,
         "range": {s: [round(x, 2) for x in setpoint_band(s, home[s], p)] for s in current},
-        "last": None if not last else f"{last.get('at', '')[:16].replace('T', ' ')}: {last.get('words')}"
-                                      + (" (put back after a rescue shot)" if last.get("reverted") else ""),
+        "last": _last_words(last),
         "paused_until": frozen if frozen and datetime.fromisoformat(frozen) > now else None,
     }
 
