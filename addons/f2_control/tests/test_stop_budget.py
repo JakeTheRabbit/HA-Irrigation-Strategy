@@ -329,11 +329,15 @@ def test_the_normal_close_after_a_shot_waits_as_it_always_did(rig, monkeypatch):
     assert seen == [None]
 
 
+APP = {"F2_RUNTIME": "addon", "SUPERVISOR_TOKEN": "t"}  # what the Supervisor gives the app
+
+
+@pytest.mark.parametrize("runtime, default", [(APP, 25.0), ({"F2_RUNTIME": "container"}, 75.0), ({}, 75.0)])
 @pytest.mark.parametrize(
     "value, budget",
-    [(None, 25.0), ("", 25.0), ("40", 40.0), ("7.5", 7.5), ("0", 25.0), ("-3", 25.0), ("soon", 25.0),
-     ("nan", 25.0), ("inf", 25.0)],
+    [(None, None), ("", None), ("40", 40.0), ("7.5", 7.5), ("0", None), ("-3", None), ("soon", None),
+     ("nan", None), ("inf", None)],
 )
-def test_the_stop_budget_is_f2_stop_budget_s_when_it_is_a_number_above_0(value, budget):
-    env = {} if value is None else {"F2_STOP_BUDGET_S": value}
-    assert runtime_env.stop_budget(env) == budget
+def test_the_stop_budget_is_f2_stop_budget_s_when_it_is_a_number_above_0(runtime, default, value, budget):
+    env = dict(runtime) if value is None else {**runtime, "F2_STOP_BUDGET_S": value}
+    assert runtime_env.stop_budget(env) == (default if budget is None else budget)
