@@ -368,10 +368,14 @@ def test_a_dose_sets_the_volume_presses_start_waits_for_it_and_puts_the_volume_b
     state, status = r.status()
     assert state == "idle"
     assert (status["handled"], status["handled_result"]) == (request["id"], "finished")
-    assert status["pumps"]["balance"]["last"] == {"ml": 50, "at": BASE.isoformat(), "result": "finished"}
+    assert status["pumps"]["balance"]["last"] == {"ml": 50, "given": 50, "at": BASE.isoformat(),
+                                                  "result": "finished"}
     assert status["pumps"]["balance"]["flow_ml_s"] == 10.0
     assert status["history"][0] == {"kind": "dose", "at": BASE.isoformat(), "ended_at": r.clock.now().isoformat(),
-                                    "result": "finished", "doses": {"balance": 50}, "by": "Ben"}
+                                    "result": "finished", "doses": {"balance": 50},
+                                    "dosed": [{"pump": "balance", "name": "Balance", "ml": 50, "given": 50,
+                                               "result": "finished", "at": BASE.isoformat()}],
+                                    "by": "Ben"}
     assert r.saved()["inflight"] is None and r.saved()["handled"] == request["id"]
     assert r.codes() == [] and ("turn_off", "switch.balance_power") not in r.actions()
     # Taken once: the same request read again does nothing.
@@ -799,7 +803,7 @@ def test_a_dose_that_fails_in_a_batch_ends_it_with_both_codes(rig):
     status = r.status()[1]
     assert status["handled_result"] == "stopped: dose: Bloom: not confirmed"
     assert status["history"][0]["doses"] == {"balance": 300, "bloom": 150.0}
-    assert "Dosed before it stopped: 300 mL of Balance, 150 mL of Bloom." in (
+    assert "Dosed before it stopped: 300 mL of Balance, an unknown amount of Bloom." in (
         r.alert("CS-806")["message"])
 
 
