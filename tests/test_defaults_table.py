@@ -78,7 +78,8 @@ ENTITY_DEFAULTS_12C6D1A = {
     "ec_min_interval": 10.0,
 }
 
-# The literal at each controller _zone_num call site at 12c6d1a, plus P3 and P2 Time Between Shots.
+# The literal at each controller _zone_num call site at 12c6d1a, plus P3 and P2 Time Between Shots and the
+# EC-correction minimum interval (the engine's own 10 minutes before it was a setting).
 CONTROLLER_FALLBACKS_12C6D1A = {
     "p2_vwc_threshold": 45,
     "p1_target_vwc": 60,
@@ -108,6 +109,7 @@ CONTROLLER_FALLBACKS_12C6D1A = {
     "min_floor_drown_ceiling": 90,
     "p3_time_between_shots": 10.0,
     "p2_time_between_shots": 0.0,
+    "ec_min_interval": 10.0,
 }
 
 

@@ -1634,6 +1634,9 @@ class Controller:
             p2_time_between_min=self._zone_num(
                 room, zone, "p2_time_between_shots", FALLBACK["p2_time_between_shots"], optional=True
             ),
+            p2_min_interval_min=self._zone_num(
+                room, zone, "ec_min_interval", FALLBACK["ec_min_interval"], optional=True
+            ),
             p3_time_between_min=self._zone_num(
                 room, zone, "p3_time_between_shots", FALLBACK["p3_time_between_shots"], optional=True
             ),

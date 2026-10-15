@@ -57,7 +57,7 @@ DEFAULTS = {
     "p2_vwc_threshold": (60.0, 45),
     "p2_shot_size": (5.0, 5),
     "p2_time_between_shots": (0.0, 0.0),
-    "ec_min_interval": (10.0, None),
+    "ec_min_interval": (10.0, 10.0),
     "p2_ec_high_threshold": (1.2, None),
     "p2_ec_low_threshold": (0.8, None),
     # P3
