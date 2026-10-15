@@ -1,11 +1,9 @@
 # Crop Steering Controller as a standalone container, for Home Assistant Container or Core.
 #
-# NOT READY FOR A GROWING ROOM YET. This file builds the controller image from addons/f2_control,
-# the same Dockerfile the Home Assistant app is built from, so the packaging can be built and
-# checked:   docker compose build
-# The controller's container mode (the address and token settings below, the time-zone and data
-# checks) arrives in a later release; until its release notes say container mode is supported,
-# run the controller as the Home Assistant app.
+# This file builds the controller image from addons/f2_control, the same Dockerfile the Home
+# Assistant app is built from, in the checkout of the release that matches your integration:
+#   docker compose up -d --build
+# docs/INSTALL.md, "Home Assistant Container or Core", has every step and what the log should say.
 #
 # Next to this file, create (keep both out of git; .gitignore already lists them):
 #   ha_token.txt   only the long-lived access token of a Home Assistant ADMINISTRATOR
