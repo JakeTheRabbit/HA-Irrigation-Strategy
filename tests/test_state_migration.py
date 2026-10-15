@@ -536,3 +536,39 @@ def test_an_old_zone_loads_unlatched_and_a_latch_survives_a_restart(tmp_path):
         c._load_state()
         st = c.rooms[0].state[1]
         assert (st["capped_in_a_row"], st["max_run_latch"]) == (0, None), junk
+
+
+def test_vmax_series_absent_from_a_3_11_1_file_loads_empty(tmp_path):
+    """A 3.11.1 state file has no Vmax wet-up series: it loads as an empty one, with no advisory yet."""
+    fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
+    seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
+    assert "vmax_wetup" not in seed["1"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": seed}), encoding="utf-8")
+    c = _make([1, 2], p)
+    c._load_state()
+    assert c.rooms[0].state[1]["vmax_wetup"] == []
+    assert c.rooms[0]._vmax == {}
+
+
+def test_vmax_series_round_trips_and_its_advisory_survives_a_restart(tmp_path):
+    p = tmp_path / "state.json"
+    c = _make([1], p)
+    c._load_state()
+    c.rooms[0].state[1]["vmax_wetup"] = [50.0, 55.0, 60.0, 62.0, 62.3, 62.4]
+    c._save_state()
+    c2 = _make([1], p)
+    c2._load_state()
+    assert c2.rooms[0].state[1]["vmax_wetup"] == [50.0, 55.0, 60.0, 62.0, 62.3, 62.4]
+    assert c2.rooms[0]._vmax[1] == C.detect_vmax([50.0, 55.0, 60.0, 62.0, 62.3, 62.4])
+    assert c2.rooms[0]._vmax[1][0] is not None
+
+
+def test_vmax_series_stays_bounded_and_drops_bad_readings(tmp_path):
+    p = tmp_path / "state.json"
+    series = [40.0 + i * 0.1 for i in range(C.VMAX_SERIES_MAX + 25)]
+    saved = {"vmax_wetup": [None, "x", True, float("nan"), 140.0] + series}
+    p.write_text(json.dumps({"default": {"1": saved}}), encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()
+    assert c.rooms[0].state[1]["vmax_wetup"] == series[25:]

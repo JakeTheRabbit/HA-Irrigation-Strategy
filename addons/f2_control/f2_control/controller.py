@@ -664,6 +664,8 @@ FC_SHIFT_MIN = SUBSTRATE_PROFILES["generic"]["fc_shift_min"]
 # ladder this far a day.
 FC_STEP_MAX = 1.0
 FC_LADDER = ("field_capacity", "p1_target_vwc", "p2_vwc_threshold")  # what the follower moves
+# The Vmax advisory's P1 wet-up series is kept in state.json (per zone) with at most this many readings.
+VMAX_SERIES_MAX = 40
 # CS-311: the sump pump a room drains to (option sump_power_sensor) drawing no power for SUMP_SILENT_H while the
 # room is on. Observed on a production room: its sump ran every 1 to 1.5 hours, day and night, 22-28 Sep 2026 (its
 # longest gap 2.37 h) and then not at all for 41.6 h: its tables backed up. Checked every SUMP_CHECK_MIN from Home
@@ -832,8 +834,7 @@ class Room:
         )
         # write-ahead record of the shot in flight: what it opened and when (see _execute_shot)
         self.shot_inflight = None
-        self._vmax_wetup = {}  # z -> P1 wet-up VWC series (resets each P0)
-        self._vmax = {}  # z -> (vmax, confidence) advisory
+        self._vmax = {}  # z -> (vmax, confidence) advisory, from the zone's saved P1 wet-up series
         self._blind_zones = set()
         self._blind_since = {}  # z -> when its probe was first seen unreadable in this run of it
         self._test_seen = {}  # z -> its Test Shot button's state last seen (the time it was last pressed)
@@ -1242,6 +1243,7 @@ class Controller:
             "max_run_latch": None,  # ...and, once latched, {"since", "resets"} (_count_capped)
             "p1_settled_before": None,  # ...its settled reading right before its last P1 shot (core.settled_reading)
             "p1_expected_rise": None,  # ...and what that shot should lift it by, from the learned gain
+            "vmax_wetup": [],  # this grow-day's P1 wet-up VWC readings, for the Vmax advisory (resets each P0)
             **zone_history.fresh(),
         }
 
@@ -1345,6 +1347,11 @@ class Controller:
                               if isinstance(fc.get("used"), dict) else {}}
         else:  # absent before the bounded follower: the grow-day's own peak stands in until the next lights-on
             s["fc_follow"]["peak"] = _pct_or_none(s.get("peak")) or 0.0
+        series = d.get("vmax_wetup")  # absent from 3.11.1 files: an empty series, as at a P0
+        if isinstance(series, list):
+            s["vmax_wetup"] = [float(v) for v in series
+                               if isinstance(v, (int, float)) and not isinstance(v, bool)
+                               and math.isfinite(v) and 0.0 <= v <= 100.0][-VMAX_SERIES_MAX:]
         s.update(zone_history.restore(d))
         return s
 
@@ -1394,6 +1401,9 @@ class Controller:
             for z in room.zones:
                 d = block.get(str(z)) or block.get(z)
                 room.state[z] = self._apply_saved_zone(room.state[z], d)
+                v, c = detect_vmax(room.state[z]["vmax_wetup"])
+                if v is not None:
+                    room._vmax[z] = (v, c)
 
     def _load_state(self):
         """Load /data/state.json into every room (non-ephemeral, survives restart/Rebuild)."""
@@ -1711,6 +1721,7 @@ class Controller:
             "plateau_hist": s.get("plateau_hist") or [],
             "night_hist": s.get("night_hist") or [],
             "night": s.get("night"),
+            "vmax_wetup": list(s.get("vmax_wetup") or []),
         }
 
     def _save_state(self):
@@ -2700,7 +2711,7 @@ class Controller:
                 "water_history": old.get("water_history"),
                 "water_history_legacy_excluded_l": old.get("water_history_legacy_excluded_l", 0.0),
             }
-        room._vmax, room._vmax_wetup = {}, {}
+        room._vmax = {}
         self._save_state()
 
     # A shot holds the loop, which is synchronous, and a batch of them can hold it past every "not
@@ -5233,7 +5244,7 @@ class Controller:
                     st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, snap.vwc
                     st["ec_offset"], st["last_ec_steer"] = 0.0, None
                     st["last_daily_reset"] = self._grow_day_start(room, now)
-                    room._vmax_wetup[zone] = []  # fresh wet-up curve for today's ramp
+                    st["vmax_wetup"] = []  # fresh wet-up curve for today's ramp
                 if new_phase == "P1":
                     st["shots"] = 0
                     # entering P1 already at the target: the shot decide() fires on this tick is the extra shot
@@ -5272,10 +5283,8 @@ class Controller:
             # Vmax advisory: watch the P1 wet-up for the field-capacity ceiling.
             # Published as a sensor only — it does NOT change any irrigation decision.
             if st["phase"] == "P1":
-                series = room._vmax_wetup.setdefault(zone, [])
-                series.append(snap.vwc)
-                room._vmax_wetup[zone] = series[-40:]
-                v, c = detect_vmax(room._vmax_wetup[zone])
+                st["vmax_wetup"] = ((st.get("vmax_wetup") or []) + [snap.vwc])[-VMAX_SERIES_MAX:]
+                v, c = detect_vmax(st["vmax_wetup"])
                 if v is not None:
                     room._vmax[zone] = (v, c)
             decisions[zone] = (fire, size, reason)
