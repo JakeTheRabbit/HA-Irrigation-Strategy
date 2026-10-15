@@ -863,6 +863,9 @@ class CropSteeringSensor(SensorEntity):
             self._fusion["excluded"].update(
                 {pid: "set aside for its unit" for pid in aside}
             )
+            self._fusion["quality"].update(
+                {pid: {"quality": "bad", "reason": "unknown_unit"} for pid in aside}
+            )
             self._fusion["unit_set_aside"] = aside
         self._fusion["excluded"].update(dict.fromkeys(sorted(unused), "not counted"))
         primary = zone.get(f"{kind}_primary")

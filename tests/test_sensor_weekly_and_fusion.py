@@ -321,6 +321,11 @@ def test_a_zones_reading_names_the_probes_it_was_made_from():
         "spread": 2.0,
         "method": "Median",
         "steered_by": "Median",
+        "quality": {
+            "sensor.a": {"quality": "good", "reason": "fresh"},
+            "sensor.b": {"quality": "good", "reason": "fresh"},
+            "sensor.c": {"quality": "bad", "reason": "excluded_outlier"},
+        },
         "offsets_learned": None,
         "primary": None,
     }
@@ -345,6 +350,9 @@ def test_a_probe_set_aside_for_its_unit_is_named_with_that_unit():
         "sensor.a": "set aside for its unit"
     }
     assert entity.extra_state_attributes["unit_set_aside"] == {"sensor.a": "mV"}
+    assert entity.extra_state_attributes["quality"] == {
+        "sensor.a": {"quality": "bad", "reason": "unknown_unit"}
+    }
     states["sensor.a"] = _reported(45, "%", 0)  # its unit corrected: it counts again
     assert entity._get_zone_vwc(1) == 45.0
     assert "unit_set_aside" not in entity.extra_state_attributes

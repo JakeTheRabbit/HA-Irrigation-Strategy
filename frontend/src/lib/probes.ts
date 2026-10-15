@@ -28,6 +28,15 @@ export const PROBE_TONE: Record<ProbeHealth, PillTone> = {
   "left-out": "warn",
   "not-counted": "neutral",
 };
+/** The integration's reason for each probe's reading quality (calculations.py fuse_probes `quality`),
+ * in words. */
+export const READING_REASON: Record<string, string> = {
+  fresh: "Fresh",
+  stale: "Stale",
+  out_of_range: "Out of range",
+  excluded_outlier: "Far from the others",
+  unknown_unit: "Unit not known",
+};
 export interface Probe {
   id: string;
   name: string;
@@ -42,6 +51,10 @@ export interface Probe {
   used: boolean | null;
   /** The zone's setup names it primary: the controller says when it goes offline (CS-505). */
   primary: boolean;
+  /** The integration's quality of its reading (good, suspect, bad) and why; null from an older
+   * integration, which does not say. */
+  quality: string | null;
+  reason: string | null;
   health: ProbeHealth;
   /** The health in a few words. */
   text: string;
@@ -103,6 +116,11 @@ export function zoneProbes(zone: Zone, states: States, now: number): Probe[] {
     const used = Array.isArray(fused?.attributes.used)
       ? (fused!.attributes.used as unknown[]).filter((id): id is string => typeof id === "string")
       : null;
+    const graded = fused?.attributes.quality;
+    const grades =
+      graded && typeof graded === "object" && !Array.isArray(graded)
+        ? (graded as Record<string, { quality?: unknown; reason?: unknown }>)
+        : {};
     const raw = fused?.attributes.excluded;
     const excluded =
       raw && typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
@@ -140,6 +158,8 @@ export function zoneProbes(zone: Zone, states: States, now: number): Probe[] {
         changed,
         used: used === null ? null : used.includes(id),
         primary: fused?.attributes.primary === id,
+        quality: typeof grades[id]?.quality === "string" ? String(grades[id].quality) : null,
+        reason: typeof grades[id]?.reason === "string" ? String(grades[id].reason) : null,
         ...probeHealth({
           kind,
           state: entity?.state,
