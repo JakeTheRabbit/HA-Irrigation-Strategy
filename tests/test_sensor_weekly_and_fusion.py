@@ -11,7 +11,12 @@ import pytest
 
 from custom_components.crop_steering import units
 from custom_components.crop_steering.calculations import fuse_probes
-from custom_components.crop_steering.const import PROBE_RANGE, PROBE_STALE_SECONDS
+from custom_components.crop_steering.const import (
+    DOMAIN,
+    PROBE_FAR,
+    PROBE_RANGE,
+    PROBE_STALE_SECONDS,
+)
 
 NOW = datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc)
 SOURCE = (
@@ -34,6 +39,7 @@ def sensor(states, prefix=""):
         "_average_sensor_values",
         "_probe_readings",
         "_fuse_zone",
+        "_probe_method_entity",
         "_get_zone_vwc",
         "_get_zone_ec",
     }
@@ -51,6 +57,8 @@ def sensor(states, prefix=""):
         "_LOGGER": logging.getLogger(__name__),
         "to_native": units.to_native,
         "fuse_probes": fuse_probes,
+        "DOMAIN": DOMAIN,
+        "PROBE_FAR": PROBE_FAR,
         "PROBE_RANGE": PROBE_RANGE,
         "PROBE_STALE_SECONDS": PROBE_STALE_SECONDS,
         "dt_util": SimpleNamespace(
@@ -66,6 +74,7 @@ def sensor(states, prefix=""):
     instance._zone_number = 1
     instance._zones_config = {}
     instance._probe_offsets = {}
+    instance._offsets_at = None
     instance._fusion = None
     instance.entity_description = SimpleNamespace(key="zone_1_weekly_water_usage")
     return instance
@@ -302,12 +311,15 @@ def test_a_zones_reading_names_the_probes_it_was_made_from():
         "sensor.c": _reported(90, "%", 1),
     }
     entity = _zone(states, vwc_sensors=["sensor.a", "sensor.b", "sensor.c"])
-    assert entity._get_zone_vwc(1) == 42.0
+    assert entity._get_zone_vwc(1) == 41.0
     assert entity.extra_state_attributes == {
         "probes": 3,
-        "used": ["sensor.a", "sensor.b", "sensor.c"],
-        "excluded": {},
-        "spread": 50.0,
+        "used": ["sensor.a", "sensor.b"],
+        "excluded": {"sensor.c": "far from the others"},
+        "spread": 2.0,
+        "method": "Median",
+        "steered_by": "Median",
+        "offsets_learned": None,
     }
 
 

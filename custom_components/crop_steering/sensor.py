@@ -28,6 +28,7 @@ from homeassistant.helpers.event import (
 )
 from homeassistant.util import dt as dt_util
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers.restore_state import RestoredExtraData, RestoreEntity
 
 from .const import (
     DOMAIN,
@@ -36,6 +37,7 @@ from .const import (
     DEFAULT_EC_FALLBACK,
     VWC_ADJUSTMENT_PERCENT,
     SOFTWARE_VERSION,
+    PROBE_FAR,
     PROBE_RANGE,
     PROBE_STALE_SECONDS,
 )
@@ -222,7 +224,11 @@ async def async_setup_entry(
         cls = (
             CropSteeringZoneStatusSensor
             if re.fullmatch(r"zone_\d+_status", description.key)
-            else CropSteeringSensor
+            else (
+                CropSteeringProbeSensor
+                if re.fullmatch(r"(vwc|ec)_zone_\d+", description.key)
+                else CropSteeringSensor
+            )
         )
         sensors.append(cls(entry, description, zones_config, hardware_config))
 
@@ -454,8 +460,9 @@ class CropSteeringSensor(SensorEntity):
         # (number.p1_target_vwc). Existing installs keep the id the registry already holds.
         self.entity_id = f"sensor.{self._attr_object_id}"
         # A zone VWC/EC sensor's memory of how its probes read against each other (fuse_probes),
-        # and what the last reading was made from.
+        # when every probe last reported together, and what the last reading was made from.
         self._probe_offsets: dict[str, float] = {}
+        self._offsets_at: str | None = None
         self._fusion: dict | None = None
 
         # Extract zone number from key if this is a zone sensor.
@@ -769,15 +776,28 @@ class CropSteeringSensor(SensorEntity):
             readings.append((sensor_id, value, age))
         return readings
 
+    def _probe_method_entity(self, kind: str) -> str:
+        """The zone's select of how its probes become its `kind` reading (select.py)."""
+        return f"select.{DOMAIN}_{self._prefix}zone_{self._zone_number}_{kind}_method"
+
     def _fuse_zone(self, sensor_ids: list[str], kind: str) -> float | None:
-        """One zone's reading from its probes (calculations.fuse_probes)."""
+        """One zone's reading from its probes (calculations.fuse_probes), combined as the zone's
+        select says; Median without it."""
         lo, hi = PROBE_RANGE[kind]
+        method = self.hass.states.get(self._probe_method_entity(kind))
         value, self._fusion = fuse_probes(
             self._probe_readings(sensor_ids, kind),
             self._probe_offsets,
             lo,
             hi,
             PROBE_STALE_SECONDS,
+            method.state if method is not None else "Median",
+            PROBE_FAR[kind],
+        )
+        if value is not None and not self._fusion["excluded"]:
+            self._offsets_at = dt_util.utcnow().isoformat()
+        self._fusion["offsets_learned"] = (
+            self._offsets_at if self._probe_offsets else None
         )
         return value
 
@@ -912,6 +932,44 @@ class CropSteeringSensor(SensorEntity):
     def available(self) -> bool:
         """Return if sensor is available."""
         return True
+
+
+class CropSteeringProbeSensor(CropSteeringSensor, RestoreEntity):
+    """A zone's moisture or EC reading from its probes. What it learned of how they read against each
+    other is kept over a restart, keyed by probe, with when every probe last reported together, so
+    a probe missing at start-up does not step the reading. A new choice in the zone's method select
+    shows at once, not at the next poll."""
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        last = await self.async_get_last_extra_data()
+        data = last.as_dict() if last is not None else {}
+        offsets = data.get("probe_offsets")
+        if isinstance(offsets, dict) and all(
+            isinstance(pid, str) and isinstance(v, (int, float)) and math.isfinite(v)
+            for pid, v in offsets.items()
+        ):
+            self._probe_offsets.update(offsets)
+            self._offsets_at = data.get("offsets_learned")
+        kind = self.entity_description.key.split("_", 1)[0]
+        self.async_on_remove(
+            async_track_state_change_event(
+                self.hass, [self._probe_method_entity(kind)], self._method_changed
+            )
+        )
+
+    @callback
+    def _method_changed(self, _event) -> None:
+        self.async_write_ha_state()
+
+    @property
+    def extra_restore_state_data(self) -> RestoredExtraData:
+        return RestoredExtraData(
+            {
+                "probe_offsets": dict(self._probe_offsets),
+                "offsets_learned": self._offsets_at,
+            }
+        )
 
 
 class CropSteeringZoneStatusSensor(CropSteeringSensor):

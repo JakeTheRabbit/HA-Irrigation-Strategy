@@ -56,8 +56,9 @@ async def test_a_zone_with_one_probe_reads_it_exactly(hass):
 async def test_one_wild_probe_among_three_does_not_move_the_zone(hass, freezer):
     await _install(hass, [A, B, C])
     state = await _read(hass, freezer, **{A: "40", B: "42", C: "90"})
-    assert float(state.state) == 42.0  # averaged, the zone read 57.33
-    assert state.attributes["spread"] == 50.0
+    assert float(state.state) == 41.0  # averaged, the zone read 57.33
+    assert state.attributes["excluded"] == {C: "far from the others"}
+    assert state.attributes["spread"] == 2.0
 
 
 async def test_a_probe_going_offline_does_not_step_what_the_controller_reads(

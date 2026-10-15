@@ -15,6 +15,7 @@ from .const import (
     DOMAIN,
     CONF_NUM_ZONES,
     PHASES,
+    PROBE_METHODS,
     STEERING_MODES,
     GROWTH_STAGES,
     RECIPE_STAGES,
@@ -113,6 +114,26 @@ async def async_setup_entry(
                 zone_num=zone_num,
             )
         )
+
+        # How the zone's probes become its moisture reading, and apart its EC reading: Median
+        # unless chosen otherwise (Lowest and Highest need three probes that agree). The zone's
+        # VWC and EC sensors apply it; the controller steers on those.
+        for metric, label, icon in (
+            ("vwc", "Moisture", "mdi:water-percent"),
+            ("ec", "EC", "mdi:lightning-bolt"),
+        ):
+            selects.append(
+                CropSteeringSelect(
+                    entry,
+                    SelectEntityDescription(
+                        key=f"zone_{zone_num}_{metric}_method",
+                        name=f"Zone {zone_num} {label} From Probes",
+                        options=PROBE_METHODS,
+                        icon=icon,
+                    ),
+                    zone_num=zone_num,
+                )
+            )
 
     async_add_entities(selects)
 

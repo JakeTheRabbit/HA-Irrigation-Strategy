@@ -7,7 +7,12 @@ one probe going offline moved the zone to whatever the others read, in a single 
 """
 
 from custom_components.crop_steering.calculations import fuse_probes
-from custom_components.crop_steering.const import PROBE_RANGE, PROBE_STALE_SECONDS
+from custom_components.crop_steering.const import (
+    PROBE_FAR,
+    PROBE_METHODS,
+    PROBE_RANGE,
+    PROBE_STALE_SECONDS,
+)
 
 LO, HI = PROBE_RANGE["vwc"]
 FRESH = 60.0
@@ -26,6 +31,8 @@ def test_one_probe_reads_exactly_what_it_reads():
         "used": ["sensor.a"],
         "excluded": {},
         "spread": 0.0,
+        "method": "Median",
+        "steered_by": "Median",
     }
 
 
@@ -117,7 +124,14 @@ def test_no_usable_probe_is_no_reading():
     assert detail["excluded"] == {"sensor.a": "no reading", "sensor.b": "no reading"}
     assert fuse([], {}) == (
         None,
-        {"probes": 0, "used": [], "excluded": {}, "spread": None},
+        {
+            "probes": 0,
+            "used": [],
+            "excluded": {},
+            "spread": None,
+            "method": "Median",
+            "steered_by": "Median",
+        },
     )
 
 
@@ -132,3 +146,134 @@ def test_pore_ec_uses_its_own_range():
     )
     assert value == 3.1  # an unconverted uS/cm figure is not a pore EC
     assert detail["excluded"] == {"sensor.b": "out of range"}
+
+
+def guarded(readings, offsets, method="Median", kind="vwc"):
+    """As the zone sensors call it: the zone's chosen method and the far-from-the-others filter."""
+    lo, hi = PROBE_RANGE[kind]
+    return fuse_probes(
+        readings, offsets, lo, hi, PROBE_STALE_SECONDS, method, PROBE_FAR[kind]
+    )
+
+
+THREE = [
+    ("sensor.a", 48.0, FRESH),
+    ("sensor.b", 50.0, FRESH),
+    ("sensor.c", 52.0, FRESH),
+]
+
+
+def test_median_is_the_first_choice_and_each_method_reads_as_it_says():
+    assert PROBE_METHODS[0] == "Median"
+    readings = THREE + [("sensor.d", 58.0, FRESH)]
+    got = {method: guarded(readings, {}, method)[0] for method in PROBE_METHODS}
+    assert got == {"Median": 51.0, "Average": 52.0, "Lowest": 48.0, "Highest": 58.0}
+    # A method this does not know steers as the default does.
+    assert guarded(readings, {}, "Mode")[1]["steered_by"] == "Median"
+
+
+def test_a_probe_pulled_out_of_its_cube_does_not_drive_lowest():
+    readings = [
+        ("sensor.a", 50.0, FRESH),
+        ("sensor.b", 52.0, FRESH),
+        ("sensor.c", 3.0, FRESH),
+    ]
+    value, detail = guarded(readings, {}, "Lowest")
+    assert (
+        value == 51.0
+    )  # Lowest of every probe would have said 3: water until the daily cap
+    assert detail["excluded"] == {"sensor.c": "far from the others"}
+    assert detail["used"] == ["sensor.a", "sensor.b"] and detail["spread"] == 2.0
+    # Two probes left are too few to let one steer: the zone steers on their median.
+    assert (detail["method"], detail["steered_by"]) == ("Lowest", "Median")
+
+
+def test_a_probe_in_a_puddle_does_not_starve_the_zone_under_highest():
+    readings = [
+        ("sensor.a", 40.0, FRESH),
+        ("sensor.b", 42.0, FRESH),
+        ("sensor.c", 95.0, FRESH),
+    ]
+    value, detail = guarded(readings, {}, "Highest")
+    assert value == 41.0 and detail["steered_by"] == "Median"
+
+
+def test_lowest_and_highest_need_three_probes_that_agree():
+    two = [("sensor.a", 40.0, FRESH), ("sensor.b", 46.0, FRESH)]
+    for method in ("Lowest", "Highest"):
+        value, detail = guarded(two, {}, method)
+        assert value == 43.0 and detail["steered_by"] == "Median"
+        value, detail = guarded(THREE, {}, method)
+        assert detail["steered_by"] == method
+    for method in ("Median", "Average"):
+        assert guarded(two, {}, method)[1]["steered_by"] == method
+
+
+def test_probes_that_simply_read_apart_are_all_used():
+    readings = [
+        ("sensor.a", 38.0, FRESH),
+        ("sensor.b", 50.0, FRESH),
+        ("sensor.c", 62.0, FRESH),
+    ]
+    value, detail = guarded(readings, {}, "Lowest")
+    assert value == 38.0 and detail["excluded"] == {}
+
+
+def test_pore_ec_far_from_the_others_is_left_out_by_its_own_measure():
+    readings = [
+        ("sensor.a", 3.0, FRESH),
+        ("sensor.b", 3.2, FRESH),
+        ("sensor.c", 0.1, FRESH),
+    ]
+    value, detail = guarded(readings, {}, "Lowest", kind="ec")
+    assert value == 3.1 and detail["excluded"] == {"sensor.c": "far from the others"}
+    # 8.0 beside 9.6 is a spread, not a fault: within 40 % of the median.
+    spread = [
+        ("sensor.a", 8.0, FRESH),
+        ("sensor.b", 8.4, FRESH),
+        ("sensor.c", 9.6, FRESH),
+    ]
+    assert guarded(spread, {}, "Highest", kind="ec")[0] == 9.6
+
+
+def test_the_filter_never_leaves_a_zone_with_nothing():
+    readings = [
+        ("sensor.a", 5.0, FRESH),
+        ("sensor.b", 10.0, FRESH),
+        ("sensor.c", 90.0, FRESH),
+        ("sensor.d", 95.0, FRESH),
+    ]
+    value, detail = guarded(readings, {})
+    assert value == 50.0 and detail["excluded"] == {}
+
+
+def test_offsets_are_learned_against_the_reading_the_zone_steered_by():
+    offsets = {}
+    assert guarded(THREE, offsets, "Lowest")[0] == 48.0
+    assert offsets == {"sensor.a": 0.0, "sensor.b": 2.0, "sensor.c": 4.0}
+    # C is pulled out: the zone carries on from the lowest reading instead of stepping to 3 or 51.
+    pulled = THREE[:2] + [("sensor.c", 3.0, FRESH)]
+    value, detail = guarded(pulled, offsets, "Lowest")
+    assert value == 48.0 and detail["steered_by"] == "Median"
+    # ...and keeps following the probes that are left.
+    assert (
+        guarded(
+            [
+                ("sensor.a", 46.0, FRESH),
+                ("sensor.b", 48.0, FRESH),
+                ("sensor.c", 3.0, FRESH),
+            ],
+            offsets,
+            "Lowest",
+        )[0]
+        == 46.0
+    )
+
+
+def test_offsets_are_forgotten_when_the_zones_probes_change():
+    offsets = {}
+    guarded(THREE, offsets)
+    # Probe C is unmapped and D mapped in its place, D not yet reporting: B's old offset would
+    # shift the zone by what it once read against a probe that is gone.
+    value, _detail = guarded([THREE[0], THREE[1], ("sensor.d", None, None)], offsets)
+    assert value == 49.0 and offsets == {}
