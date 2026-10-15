@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { ArrowRight, Check } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowRight, Check, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Empty,
@@ -21,8 +21,24 @@ import { jevIds, parseJevSetpoints } from "@/lib/jev";
 import { setpointParam } from "@/lib/sensor-context";
 import { settingWords } from "@/lib/setting-words";
 import { jevChip, SETUP_GROUPS, TARGET_GROUPS } from "@/lib/targets";
+import {
+  exportTargets,
+  loadTargets,
+  readTargets,
+  targetsFileName,
+  type LoadedTargets,
+} from "@/lib/targets-file";
 import "./setpoint-preview.css";
 import "./targets.css";
+
+function download(text: string, name: string) {
+  const url = URL.createObjectURL(new Blob([text], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
 
 export type Drafts = Record<
   string,
@@ -57,6 +73,10 @@ export function Strategy({
   const [saved, setSaved] = useState(false);
   const [expanded, setExpanded] = useState(false);
   const [roomPreviewZone, setRoomPreviewZone] = useState(room.zones[0]?.id);
+  // What the last targets file loaded into the draft, or why it could not be read.
+  const [loaded, setLoaded] = useState<{ from: string; result: LoadedTargets } | null>(null);
+  const [fileError, setFileError] = useState("");
+  const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (selectedZone !== undefined) setZoneId(String(selectedZone));
   }, [selectedZone]);
@@ -190,6 +210,26 @@ export function Strategy({
       return next;
     });
   }
+  function exportFile() {
+    const now = new Date();
+    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    download(exportTargets(room, now.toISOString()), targetsFileName(room.room.name, date));
+  }
+  async function importFile(file: File | undefined) {
+    if (fileRef.current) fileRef.current.value = "";
+    if (!file) return;
+    setLoaded(null);
+    setFileError("");
+    try {
+      const targets = readTargets(await file.text());
+      const result = loadTargets(targets, room);
+      setSaved(false);
+      setDrafts(result.drafts);
+      setLoaded({ from: `${targets.room || "another room"}’s targets`, result });
+    } catch (e) {
+      setFileError(e instanceof Error ? e.message : String(e));
+    }
+  }
   /** One setting as a row, with Jev's range and the probe's hints. */
   const row = (setting: Setting, label: string, unit: string) => {
     const param = setpointParam(setting.entityId, prefix);
@@ -224,6 +264,30 @@ export function Strategy({
           <div className="heading-actions">
             <AutoSetpointsControl controller={controller} jevManaged={jevManaged} />
             <Button
+              variant="outline"
+              onClick={exportFile}
+              disabled={planEngaged || !allSettings.length}
+              title={
+                planEngaged
+                  ? "While a grow plan is armed the room follows it: export the plan instead"
+                  : "Save these targets to a file, both steering modes, for another room"
+              }
+            >
+              <Download size={16} /> Export
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => fileRef.current?.click()}
+              disabled={!canEdit || Object.keys(drafts).length > 0}
+              title={
+                Object.keys(drafts).length
+                  ? "Review or discard your draft first"
+                  : "Load a targets file into the draft, to review before anything changes"
+              }
+            >
+              <Upload size={16} /> Import
+            </Button>
+            <Button
               disabled={!items.length || Boolean(errors.length) || !canEdit}
               onClick={() => setReview(true)}
             >
@@ -239,6 +303,45 @@ export function Strategy({
           <Button asChild variant="outline">
             <a href="#/plan/schedule">Open schedule</a>
           </Button>
+        </div>
+      )}
+      <input
+        ref={fileRef}
+        type="file"
+        accept="application/json,.json"
+        className="sr-only"
+        aria-label="Import targets"
+        onChange={(e) => void importFile(e.target.files?.[0])}
+      />
+      {fileError && (
+        <div className="workspace-message error" role="alert">
+          {fileError}
+        </div>
+      )}
+      {loaded && (
+        <div className="workspace-message targets-loaded" role="status">
+          <p>
+            <strong>
+              {Object.keys(loaded.result.drafts).length
+                ? `Loaded ${Object.keys(loaded.result.drafts).length} ${
+                    Object.keys(loaded.result.drafts).length === 1 ? "change" : "changes"
+                  } from ${loaded.from}.`
+                : `Nothing to change: ${loaded.from} match this room’s.`}
+            </strong>{" "}
+            {Object.keys(loaded.result.drafts).length > 0 &&
+              "They’re in your draft: nothing changes until you review and apply them."}
+          </p>
+          {loaded.result.zoneMismatch && <p>{loaded.result.zoneMismatch}</p>}
+          {loaded.result.left.length > 0 && (
+            <p>Left as this room has them: {loaded.result.left.join(", ")}.</p>
+          )}
+          {loaded.result.rounded.length > 0 && (
+            <p>Rounded to this room’s steps: {loaded.result.rounded.join("; ")}.</p>
+          )}
+          {loaded.result.skipped.length > 0 && <p>Skipped: {loaded.result.skipped.join("; ")}.</p>}
+          {loaded.result.missingZones.length > 0 && (
+            <p>Not in this room: {loaded.result.missingZones.join(", ")}.</p>
+          )}
         </div>
       )}
       <nav className="zone-switcher targets-zones" aria-label="Targets for">
@@ -508,6 +611,7 @@ export function Strategy({
             onClick={() => {
               setDrafts({});
               setSaved(false);
+              setLoaded(null);
             }}
           >
             Discard draft
