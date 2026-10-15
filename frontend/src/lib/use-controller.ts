@@ -100,7 +100,7 @@ export class ControllerStore {
         // ?whats-new=2.22.0: the demo as an installation updated from 2.22.0, ?whats-new=unknown
         // from one running before What's new existed. Otherwise it has nothing new to show.
         search?.get("whats-new") ?? null,
-        // ?notify-user=callum: Settings & help › Notifications as that phone's owner, who is not an
+        // ?notify-user=grower: Settings & help › Notifications as that phone's owner, who is not an
         // administrator.
         search?.get("notify-user") ?? null,
       );

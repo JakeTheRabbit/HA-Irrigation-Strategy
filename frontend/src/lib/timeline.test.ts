@@ -207,9 +207,7 @@ describe("the merged timeline", () => {
     expect(csv).toContain(
       '"2026-09-27 22:48:00","Room A","3","setpoint","Jev · Setpoints: smaller shots, 70% → P2 shot 4.5% → 4%","Acted; worked"',
     );
-    expect(csv).toContain(
-      '"2026-09-27 12:00:00","Room A","Room","alert","Pump fault: holding",""',
-    );
+    expect(csv).toContain('"2026-09-27 12:00:00","Room A","Room","alert","Pump fault: holding",""');
     expect(
       timelineCsv(
         mergeTimeline([event("f", "2026-09-27T10:00:00", "=HYPERLINK()", "info")], [], now),
@@ -232,7 +230,7 @@ describe("a setpoint the grower changed", () => {
     const [row] = mergeTimeline([], [entry], now);
     expect(byHand(entry)).toBe(true);
     expect(row.kind).toBe("setpoint");
-    expect(timelineText(row)).toBe("By hand · Setpoints: p2 vwc threshold 62 → 61");
+    expect(timelineText(row)).toBe("By hand · Setpoints: maintenance trigger 62 → 61");
     expect(timelineResult(row)).toBe("Noted by Jev");
     expect(byHand(jev({ judge: "setpoints", verdict: "smaller shots", result: "acted" }))).toBe(
       false,
@@ -291,7 +289,7 @@ describe("the Timeline page", () => {
   it("shows a room without Jev its controller records, without Jev's controls", () => {
     const states = createDemo(noon);
     const html = renderToStaticMarkup(
-      createElement(Timeline, { controller: controller(states, "f1_") }),
+      createElement(Timeline, { controller: controller(states, "room_b_") }),
     );
     expect(html).toContain('class="timeline-row"');
     expect(html).not.toContain("All Jev decisions");

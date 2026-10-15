@@ -11,7 +11,6 @@ import { Button } from "@/components/ui/button";
 import { dailyLimit, Empty, number, time as clock } from "@/components/dashboard";
 import { ageText, ageTone, readHeartbeat } from "@/lib/controller-health";
 import {
-  athenaDryback,
   bandStatus,
   CHART_LAYERS,
   dayScales,
@@ -22,6 +21,7 @@ import {
   placeBadges,
   placeMarkers,
   rangeText,
+  referenceDryback,
   runoffBand,
   smoothPath,
   steeringOf,
@@ -264,7 +264,7 @@ function useEarlierDays(
   return earlier?.key === key ? earlier : null;
 }
 
-/** One zone's grow-day in the language of Athena's irrigation phase reference chart: today in
+/** One zone's grow-day as a phase reference chart: today in
  * numbers, then what the zone did today (its phases, shots and pore EC), where it is now against
  * today's stage, and what comes next. Today is downloaded once when the page opens and live updates
  * extend it; the earlier days (yesterday, the typical day, last night's dryback) are downloaded once. */
@@ -338,11 +338,9 @@ export function ZoneDay({ controller, zone }: { controller: Controller; zone: Zo
   const age = Number.isFinite(newest) ? now - newest : null;
   const lane =
     rows && day ? buildLane(controller, zone, entities, day, rows, now, earlier, compare) : null;
-  const stage = readJev(states, prefix).room?.stage ?? null;
-  const athena = athenaDryback(stage?.name);
   return (
     <div className="day-timeline zone-day" data-day-timeline data-zone={zone.id}>
-      <ZoneNumbers controller={controller} zone={zone} lane={lane} day={day} athena={athena} />
+      <ZoneNumbers controller={controller} zone={zone} lane={lane} day={day} />
       <section className="panel zone-day-chart" aria-labelledby={`zone-day-${zone.id}`}>
         <div className="panel-heading">
           <h2 id={`zone-day-${zone.id}`}>Today</h2>
@@ -639,20 +637,18 @@ function buildLane(
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
 /** Today in numbers: moisture, pore EC against the stage's band, water today and each plant's
- * share, shots and the last one, the overnight dryback against Athena's target, and what comes
+ * share, shots and the last one, the overnight dryback against the stage's reference, and what comes
  * next. Readings are live; the lane adds what only today's record knows. */
 function ZoneNumbers({
   controller,
   zone,
   lane,
   day,
-  athena,
 }: {
   controller: Controller;
   zone: Zone;
   lane: Lane | null;
   day: GrowDay | null;
-  athena: [number, number] | null;
 }) {
   const stage = readJev(controller.states, controller.room.room.prefix).room?.stage ?? null;
   const band = lane?.ecBand?.band ?? stage?.poreEc ?? null;
@@ -666,6 +662,7 @@ function ZoneNumbers({
   const lastShot = zone.lastIrrigation.timestamp ?? null;
   const next = lane && day ? nextWords(lane, day) : null;
   const dryback = lane?.dryback;
+  const reference = referenceDryback(stage?.drybackPoints, dryback?.value.peak);
   // How fast it dries since the last shot settled, from today's readings.
   const rate = lane
     ? drybackTrend(
@@ -751,7 +748,7 @@ function ZoneNumbers({
         <div
           title={
             dryback
-              ? `From the evening peak of ${number(dryback.value.peak)}% (the highest reading in the 2 h before lights-off) to the low of ${number(dryback.value.low)}%: ${number(dryback.value.drop)} points. Athena’s dryback targets are this share of the peak.`
+              ? `From the evening peak of ${number(dryback.value.peak)}% (the highest reading in the 2 h before lights-off) to the low of ${number(dryback.value.low)}%: ${number(dryback.value.drop)} points, as a share of the peak.`
               : "Needs readings on both sides of lights-off."
           }
         >
@@ -760,12 +757,12 @@ function ZoneNumbers({
             {dryback ? number(dryback.value.percent) : "—"}
             {dryback && <span className="unit">% of peak</span>}
           </dd>
-          {athena && (
+          {reference && stage?.drybackPoints && (
             <dd
               className="zone-sub"
-              title="Athena’s relative dryback target for this stage; the zone’s own P3 target is under Targets"
+              title={`Reference dryback for ${stage.name}: ${rangeText(stage.drybackPoints, 0)} points of true water content, as a share of this zone’s peak; the zone’s own P3 target is under Targets`}
             >
-              Athena {rangeText(athena, 0)}%
+              Reference {rangeText(reference, 0)}%
             </dd>
           )}
         </div>

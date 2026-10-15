@@ -54,9 +54,9 @@ describe("what the tank chart reads", () => {
       "switch.demo_valve_2",
       "switch.demo_valve_3",
     ]);
-    expect(tankEntities(roomOf(states, "f1_"), states).ids).toMatchObject({
-      level: "sensor.demo_f1_tank_level",
-      pump: "switch.demo_f1_pump",
+    expect(tankEntities(roomOf(states, "room_b_"), states).ids).toMatchObject({
+      level: "sensor.demo_room_b_tank_level",
+      pump: "switch.demo_room_b_pump",
     });
   });
   it("leaves out what is not mapped, or that Home Assistant does not have", () => {

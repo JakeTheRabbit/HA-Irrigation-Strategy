@@ -436,7 +436,7 @@ describe("verified transport and demo isolation", () => {
     expect(rooms).toHaveLength(2);
     for (const room of rooms) expect(buildRoom(states, room).zones).toHaveLength(3);
     expect(
-      demoHistory(states, ["sensor.crop_steering_f1_vwc_zone_1"], 24)[0].points.length,
+      demoHistory(states, ["sensor.crop_steering_room_b_vwc_zone_1"], 24)[0].points.length,
     ).toBeGreaterThan(10);
     expect(fetch).not.toHaveBeenCalled();
     fetch.mockRestore();

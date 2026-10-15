@@ -150,11 +150,11 @@ describe("controller lifecycle", () => {
     await store.connect("http://example.test", "test");
     read.mockReturnValueOnce(pending.promise).mockResolvedValue(states);
     const oldRefresh = store.refresh();
-    store.changeRoom("room:f1_");
+    store.changeRoom("room:room_b_");
     pending.resolve({});
     await oldRefresh;
     await Promise.resolve();
-    expect(store.getSnapshot().roomId).toBe("room:f1_");
+    expect(store.getSnapshot().roomId).toBe("room:room_b_");
     expect(store.getSnapshot().rooms).toHaveLength(2);
     store.disconnect();
   });
@@ -169,12 +169,12 @@ describe("controller lifecycle", () => {
       field.entityId,
     ]);
     const originalOther =
-      store.getSnapshot().states["number.crop_steering_f1_zone_1_p1_target_vwc"].state;
-    store.changeRoom("room:f1_");
-    expect(store.getSnapshot().states["number.crop_steering_f1_zone_1_p1_target_vwc"].state).toBe(
-      originalOther,
-    );
-    const series = await store.history(["sensor.crop_steering_f1_vwc_zone_1"], 24);
+      store.getSnapshot().states["number.crop_steering_room_b_zone_1_p1_target_vwc"].state;
+    store.changeRoom("room:room_b_");
+    expect(
+      store.getSnapshot().states["number.crop_steering_room_b_zone_1_p1_target_vwc"].state,
+    ).toBe(originalOther);
+    const series = await store.history(["sensor.crop_steering_room_b_vwc_zone_1"], 24);
     expect(series[0].points.length).toBeGreaterThan(0);
     expect((await store.write([{ entityId: field.entityId, value: 71 }])).failed).toHaveLength(1);
     await expect(store.history(["sensor.crop_steering_vwc_zone_1"], 24)).rejects.toThrow(
@@ -189,12 +189,14 @@ describe("controller lifecycle", () => {
     const [ec, ph] = await store.history(["sensor.demo_tank_ec", "sensor.demo_tank_ph"], 720);
     expect(ec.points.length).toBeGreaterThan(700);
     expect(ph.points.at(-1)!.value).toBeCloseTo(5.66, 2);
-    await expect(store.history(["sensor.demo_f1_tank_ec"], 24)).rejects.toThrow(/selected room/);
-    await expect(store.history(["sensor.demo_tank_ec"], 721)).rejects.toThrow(/720 hours/);
-    store.changeRoom("room:f1_");
-    expect((await store.history(["sensor.demo_f1_tank_ph"], 24))[0].points.length).toBeGreaterThan(
-      0,
+    await expect(store.history(["sensor.demo_room_b_tank_ec"], 24)).rejects.toThrow(
+      /selected room/,
     );
+    await expect(store.history(["sensor.demo_tank_ec"], 721)).rejects.toThrow(/720 hours/);
+    store.changeRoom("room:room_b_");
+    expect(
+      (await store.history(["sensor.demo_room_b_tank_ph"], 24))[0].points.length,
+    ).toBeGreaterThan(0);
   });
   it("reads a long history one day per request and joins the days in order", async () => {
     vi.useFakeTimers({ toFake: ["Date"] });
@@ -261,10 +263,10 @@ describe("controller lifecycle", () => {
     const store = new ControllerStore(false);
     await store.connect("http://example.test", "test");
     const first = store.history(["sensor.demo_tank_ec"], 720);
-    store.changeRoom("room:f1_");
+    store.changeRoom("room:room_b_");
     await expect(first).rejects.toThrow(/cancelled/);
     const caller = new AbortController();
-    const second = store.history(["sensor.demo_f1_tank_ec"], 720, caller.signal);
+    const second = store.history(["sensor.demo_room_b_tank_ec"], 720, caller.signal);
     caller.abort();
     await expect(second).rejects.toThrow(/cancelled/);
     expect(seen.map((signal) => signal.aborted)).toEqual([true, true]);

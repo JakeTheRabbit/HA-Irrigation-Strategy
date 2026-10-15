@@ -1,9 +1,6 @@
-import { athenaDryback } from "./day-chart";
-
 /** The grow by stage, as the controller's Jev steers it: the owner's stage arc (the slab guide,
- * chosen 26 Sep 2026; addons/f2_control/f2_control/jev/doctrine.py STAGE_ARC and stage_intent),
- * with Athena's relative overnight dryback for each stage beside it. Day 1 is the first day of
- * 12/12. Pure, so the arc and today's place in it are tested on their own. */
+ * chosen 26 Sep 2026; addons/f2_control/f2_control/jev/doctrine.py STAGE_ARC and stage_intent).
+ * Day 1 is the first day of 12/12. Pure, so the arc and today's place in it are tested on their own. */
 
 export type StageSteering = "vegetative" | "generative" | "ripening";
 export interface Stage {
@@ -16,8 +13,6 @@ export interface Stage {
   poreEc: [number, number];
   /** The guide's overnight dryback, in points of true water content. */
   drybackPoints: [number, number];
-  /** Athena's overnight dryback, relative to the day's peak (%): what the P3 dryback target is. */
-  athena: [number, number];
   /** Runoff, % of the water fed. */
   runoff: [number, number];
   /** When the guide moves on to the next stage. */
@@ -53,7 +48,6 @@ export function stageArc(days = NOMINAL_FLOWER_DAYS): Stage[] {
     steering,
     poreEc,
     drybackPoints,
-    athena: athenaDryback(name)!,
     runoff,
     moveOn,
   });

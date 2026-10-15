@@ -5,6 +5,12 @@ import { createDemo } from "./demo";
 describe("adapter review regressions", () => {
   it("resolves only explicit unambiguous legacy room aliases", () => {
     const states = createDemo();
+    // A legacy f1 room beside the demo's unprefixed one.
+    states["sensor.crop_steering_f1_engine_config"] = {
+      entity_id: "sensor.crop_steering_f1_engine_config",
+      state: "ready",
+      attributes: { prefix: "f1_", slug: "f1", num_zones: 1 },
+    };
     expect(resolveRequestedRoom(discoverRooms(states), "f2")?.prefix).toBe("");
     expect(resolveRequestedRoom(discoverRooms(states), "f1")?.prefix).toBe("f1_");
     expect(resolveRequestedRoom(discoverRooms(states), "missing")).toBeUndefined();

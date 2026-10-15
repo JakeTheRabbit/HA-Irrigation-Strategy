@@ -90,11 +90,11 @@ export const DEMO_KINDS: NotifyKind[] = [
 ];
 /** The demo site's phones: made-up mobile apps, each registered by a made-up user. */
 export const DEMO_PHONES: NotifyPhone[] = [
-  ["s23ultra", "S23Ultra", "ben", "Ben"],
-  ["callum_phone", "Callum Phone", "callum", "Callum"],
-  ["stews_iphone", "Stews iPhone", "stewart", "Stewart"],
-  ["sean_iphone", "Sean iPhone", "sean", "Sean"],
-  ["pete", "Pete", "pete", "Pete"],
+  ["phone_1", "Phone 1", "owner", "Owner"],
+  ["phone_2", "Phone 2", "grower", "Grower"],
+  ["phone_3", "Phone 3", "manager", "Manager"],
+  ["phone_4", "Phone 4", "assistant", "Assistant"],
+  ["phone_5", "Phone 5", "visitor", "Visitor"],
 ].map(([device, name, user, userName]) => ({
   service: `notify.mobile_app_${device}`,
   name,
@@ -109,8 +109,8 @@ const row = (index: number, kinds: string[], urgent: boolean): NotifyRecipient =
   rooms: [],
   urgent_high_priority: urgent,
 });
-/** Saved before the demo starts: Ben gets everything, Callum stock tanks, dosing and hardware
- * lockouts, Stewart emergencies only. Sean and Pete are not listed yet. */
+/** Saved before the demo starts: the owner gets everything, the grower stock tanks, dosing and
+ * hardware lockouts, the manager emergencies only. The assistant and the visitor are not listed yet. */
 export const DEMO_NOTIFY: NotifyConfig = {
   revision: 3,
   idle_hours: 3,
@@ -124,7 +124,7 @@ export const DEMO_NOTIFY: NotifyConfig = {
     row(2, ["emergency"], true),
   ],
 };
-const ADMIN = "demo-user-ben";
+const ADMIN = "demo-user-owner";
 const rowKey = (item: NotifyRecipient) =>
   JSON.stringify([
     item.name,
@@ -134,8 +134,8 @@ const rowKey = (item: NotifyRecipient) =>
     item.urgent_high_priority,
   ]);
 
-/** The integration's notification services, in memory, for the demo. It answers as Ben, an
- * administrator, or with `user` (?demo&notify-user=callum) as that phone's owner, who is not: they
+/** The integration's notification services, in memory, for the demo. It answers as the owner, an
+ * administrator, or with `user` (?demo&notify-user=grower) as that phone's owner, who is not: they
  * may change only their own phone's row, as the integration allows. A test push is never sent. */
 export class NotifyDemo {
   private config: NotifyConfig = structuredClone(DEMO_NOTIFY);

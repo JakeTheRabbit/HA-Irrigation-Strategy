@@ -427,7 +427,7 @@ try {
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(new URL(page.url()).hash, "#/plan/schedule");
-      await page.locator("#desktop-room").selectOption({ label: "Flower 1" });
+      await page.locator("#desktop-room").selectOption({ label: "Room B" });
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(await page.locator("#desktop-room").inputValue(), "room:");
@@ -461,7 +461,7 @@ try {
     await openPlanner("Steering balance");
     await page.getByRole("button", { name: "Review & save", exact: true }).click();
     await visible(page.getByRole("heading", { name: "Review grow plan", exact: true }));
-    assert.match(await page.getByRole("dialog").innerText(), /Flower 2 only/);
+    assert.match(await page.getByRole("dialog").innerText(), /Room A only/);
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
     await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
     assert.equal(
@@ -489,11 +489,11 @@ try {
       await fresh("setup");
       await visible(page.locator("#room-name"));
       await page.locator("#room-name").fill("Must be discarded");
-      await page.locator("#desktop-room").selectOption({ label: "Flower 1" });
+      await page.locator("#desktop-room").selectOption({ label: "Room B" });
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Discard and continue" }).click();
-      assert.equal(await page.locator("#room-name").inputValue(), "Flower 1");
-      assert.equal(await page.locator("#setup-room option:checked").innerText(), "Flower 1");
+      assert.equal(await page.locator("#room-name").inputValue(), "Room B");
+      assert.equal(await page.locator("#setup-room option:checked").innerText(), "Room B");
     },
   );
   await check(
@@ -539,7 +539,7 @@ try {
       await page.getByRole("button", { name: "Restore zone", exact: true }).click();
       await saveSetup();
       assert.equal(await page.locator("#zone-4-plant_count").inputValue(), "12");
-      await page.locator("#setup-room").selectOption({ label: "Flower 1" });
+      await page.locator("#setup-room").selectOption({ label: "Room B" });
       assert.equal(
         await page.getByRole("textbox", { name: "Zone 4 name", exact: true }).count(),
         0,

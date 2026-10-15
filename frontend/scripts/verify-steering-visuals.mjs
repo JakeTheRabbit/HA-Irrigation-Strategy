@@ -407,7 +407,7 @@ try {
         .filter({ hasText: "Previous room run" })
         .getByRole("button", { name: "Restore", exact: true })
         .click();
-      await page.locator("#desktop-room").selectOption("room:f1_");
+      await page.locator("#desktop-room").selectOption("room:room_b_");
       await page.waitForFunction(
         () => document.querySelectorAll(".comparison-run-list article").length >= 2,
       );

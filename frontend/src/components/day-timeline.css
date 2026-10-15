@@ -1,4 +1,4 @@
-/* The grow day in Athena's chart language: a light band on top, phase columns with P0-P3 badges,
+/* The grow day as a phase reference chart: a light band on top, phase columns with P0-P3 badges,
    field capacity in red with the steering's runoff zone (green vegetative, purple generative), VWC in
    blue with its shots as dots, pore EC in the steering's colour. Every text is at least 12 px. */
 .day-timeline {

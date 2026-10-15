@@ -186,7 +186,7 @@ describe("watched entities", () => {
         entity("sensor.crop_steering_dosing_config", "3", {
           pumps: [
             {
-              id: "bloom",
+              id: "part_b",
               flow_entity: "number.bloom_flow",
               dosing_entity: "binary_sensor.bloom_dosing",
             },
@@ -368,15 +368,15 @@ describe("inside Home Assistant", () => {
     expect(store.getSnapshot().states[VWC].state).toBe("61.5");
   });
   it("shows a Jev log first posted after the page opened, and each decision after it", async () => {
-    // The demo's second room has not posted its log yet (an older controller, or Jev just switched on).
-    const LOG = "sensor.crop_steering_f1_jev_log";
+    // Room B's controller has not posted its log yet (an older controller, or Jev just switched on).
+    const LOG = "sensor.crop_steering_room_b_jev_log";
     const { home, store } = await started();
     const [, message] = home.connection.subscribeMessage.mock.calls[0] as unknown as [
       unknown,
       { entity_ids: string[] },
     ];
     expect(message.entity_ids).toContain(LOG);
-    expect(readJev(store.getSnapshot().states, "f1_").log).toBeNull();
+    expect(readJev(store.getSnapshot().states, "room_b_").log).toBeNull();
     const entry = (t: string, verdict: string) => ({
       t,
       zone: 1,
@@ -393,12 +393,12 @@ describe("inside Home Assistant", () => {
     const first = entry("2026-09-28T08:05:00", "keep drying");
     home.push({ a: { [LOG]: { s: "08:05 Z1 Morning start", a: { entries: [first] }, lc: 1 } } });
     await vi.advanceTimersByTimeAsync(250);
-    expect(readJev(store.getSnapshot().states, "f1_").log!.entries).toHaveLength(1);
+    expect(readJev(store.getSnapshot().states, "room_b_").log!.entries).toHaveLength(1);
     const second = entry("2026-09-28T08:35:00", "start ramp now");
     home.push({ c: { [LOG]: { "+": { s: "08:35 Z1", a: { entries: [second, first] }, lu: 2 } } } });
     await vi.advanceTimersByTimeAsync(250);
     expect(
-      readJev(store.getSnapshot().states, "f1_").log!.entries.map((item) => item.verdict),
+      readJev(store.getSnapshot().states, "room_b_").log!.entries.map((item) => item.verdict),
     ).toEqual(["start ramp now", "keep drying"]);
     store.stop();
   });
@@ -547,7 +547,7 @@ describe("inside Home Assistant", () => {
     expect(home.calls[0]).toMatch(/^GET history\/period\/.*minimal_response=&no_attributes=$/);
     await expect(
       store.getSnapshot().waterRecord({
-        entityIds: ["sensor.crop_steering_f1_zone_1_daily_water_app"],
+        entityIds: ["sensor.crop_steering_room_b_zone_1_daily_water_app"],
         start: 0,
         end: 1,
       }),
@@ -629,7 +629,7 @@ describe("inside Home Assistant", () => {
     const start = Date.now() - 3_600_000,
       end = Date.now();
     const timeline = store.getSnapshot().timeline;
-    for (const id of ["light.kitchen", "number.crop_steering_f1_zone_1_p1_target_vwc"])
+    for (const id of ["light.kitchen", "number.crop_steering_room_b_zone_1_p1_target_vwc"])
       await expect(timeline({ entityIds: [id], attributeIds: [], start, end })).rejects.toThrow(
         "History is limited to entities in the selected room.",
       );
@@ -658,7 +658,7 @@ describe("inside Home Assistant", () => {
       }),
     );
     await expect(
-      timeline({ entityIds: ["sensor.demo_f1_tank_level"], attributeIds: [], start, end }),
+      timeline({ entityIds: ["sensor.demo_room_b_tank_level"], attributeIds: [], start, end }),
     ).rejects.toThrow("History is limited to entities in the selected room.");
     store.stop();
   });

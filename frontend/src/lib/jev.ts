@@ -1,5 +1,6 @@
 import { parseControllerTime } from "./controller-health";
 import type { EntityState, States } from "./types";
+import { growerWords } from "./words";
 
 /** What the controller's Jev bridge publishes for a room (addons/f2_control/f2_control/jev_bridge.py):
  * `sensor.crop_steering_<prefix>jev_log` (every decision, newest first), `sensor.crop_steering_<prefix>jev`
@@ -102,8 +103,8 @@ export function parseJevEntry(raw: unknown, index = 0): JevEntry | null {
   const written = text(item.result);
   const legacy = written.match(/^(refused|waiting|no[ _]action)\s*[:—-]\s*(.+)$/i);
   const resultText = (legacy ? legacy[1] : written).replaceAll("_", " ").toLowerCase();
-  const reason = text(item.reason ?? item.note) || (legacy ? legacy[2].trim() : "");
-  const action = text(item.action);
+  const reason = growerWords(text(item.reason ?? item.note) || (legacy ? legacy[2].trim() : ""));
+  const action = growerWords(text(item.action));
   const outcome =
     text(item.kind).toLowerCase() === "outcome" ||
     RESULTS[resultText] === "worked" ||
@@ -122,7 +123,7 @@ export function parseJevEntry(raw: unknown, index = 0): JevEntry | null {
     judge,
     title: title.charAt(0).toUpperCase() + title.slice(1),
     kind: outcome ? "outcome" : "decision",
-    verdict: words(item.verdict),
+    verdict: growerWords(words(item.verdict)),
     p: probability(item.p),
     agreed: agreement(item.agreed),
     action,
@@ -278,11 +279,11 @@ export function parseJevZone(
             {
               judge,
               title: JEV_TITLES[judge] ?? words(judge),
-              answer: words(main?.answer),
+              answer: growerWords(words(main?.answer)),
               p: probability(main?.p),
               agreed: agreement(main?.agreed),
-              directive: words(item.directive),
-              why: text(item.why),
+              directive: growerWords(words(item.directive)),
+              why: growerWords(text(item.why)),
             },
           ];
         })
@@ -390,7 +391,7 @@ export function parseJevSetpoints(entity: EntityState | undefined): JevSetpoints
     home: numbers(item.home),
     range: ranges,
     current: numbers(item.current),
-    last: text(item.last) || null,
+    last: growerWords(text(item.last)) || null,
     pausedUntil: paused === null || paused === undefined ? null : entryTime(paused),
   };
 }

@@ -178,15 +178,15 @@ async function axeDark(label, include) {
 try {
   await check("primary entry preserves room, demo and route", async () => {
     // An old bookmark: the Zones page is now Today.
-    await page.goto(`${base}/index.html?demo&room=f1#/zones`);
-    await expectVisible(page.getByRole("heading", { name: "Flower 1 today", exact: true }));
-    assert.match(page.url(), /dashboard\.html\?demo=&room=f1#\/today$/);
-    assert.equal(await page.locator("#desktop-room").inputValue(), "room:f1_");
+    await page.goto(`${base}/index.html?demo&room=room_b#/zones`);
+    await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
+    assert.match(page.url(), /dashboard\.html\?demo=&room=room_b#\/today$/);
+    assert.equal(await page.locator("#desktop-room").inputValue(), "room:room_b_");
   });
   await check("every old address lands where its content lives now", async () => {
     const moved = [
-      ["overview", "today", "Flower 2 today"],
-      ["zones", "today", "Flower 2 today"],
+      ["overview", "today", "Room A today"],
+      ["zones", "today", "Room A today"],
       ["strategy", "plan/targets", "Targets"],
       ["grow-plan", "plan/schedule", "Schedule"],
       ["compare", "history/compare", "Compare runs"],
@@ -217,10 +217,10 @@ try {
     assert.equal(new URL(page.url()).hash, "#/equipment/probes");
     assert.equal(await page.evaluate(() => history.length), before + 1);
     await page.goBack();
-    await expectVisible(page.getByRole("heading", { name: "Flower 2 today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
   });
   const routes = [
-    ["today", "Flower 2 today"],
+    ["today", "Room A today"],
     ["zone/1", "Zone 1"],
     ["plan/targets", "Targets"],
     ["plan/schedule", "Schedule"],
@@ -305,9 +305,9 @@ try {
       assert.equal(await chips.count(), 2, "one chip per room");
       const chip = (id) => page.locator(`.room-chip[data-room="${id}"]`);
       assert.equal(await chip("room:").getAttribute("aria-pressed"), "true");
-      assert.match(await chip("room:").innerText(), /Flower 2\s+Watering/);
+      assert.match(await chip("room:").innerText(), /Room A\s+Watering/);
       assert.match(await page.locator(".data-age").innerText(), /old|<1 min/);
-      const switches = page.getByRole("group", { name: "Flower 2 safety switches" });
+      const switches = page.getByRole("group", { name: "Room A safety switches" });
       await expectVisible(
         switches.getByRole("button", { name: "Watering on: switch watering off…", exact: true }),
       );
@@ -318,9 +318,9 @@ try {
       for (const gone of [".breadcrumb", ".status-line", ".demo-banner"])
         assert.equal(await page.locator(gone).count(), 0, `no ${gone}`);
       // Another room's chip opens it.
-      await chip("room:f1_").click();
-      await expectVisible(page.getByRole("heading", { name: "Flower 1 today", exact: true }));
-      assert.equal(await page.locator("#desktop-room").inputValue(), "room:f1_");
+      await chip("room:room_b_").click();
+      await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
+      assert.equal(await page.locator("#desktop-room").inputValue(), "room:room_b_");
       // Watering switched off from the header, through its review.
       await page
         .getByRole("button", { name: "Watering on: switch watering off…", exact: true })
@@ -336,7 +336,7 @@ try {
     },
   );
   await check("today: a room not watering says why, and opens its Settings", async () => {
-    await go("settings", "f1");
+    await go("settings", "room_b");
     await page.getByRole("button", { name: "Switch watering off…", exact: true }).click();
     await page.getByRole("button", { name: /Apply \d+ change/ }).click();
     await page.getByRole("dialog").waitFor({ state: "hidden" });
@@ -344,20 +344,20 @@ try {
       .getByRole("navigation", { name: "Main navigation" })
       .getByRole("button", { name: "Today", exact: true })
       .click();
-    await expectVisible(page.getByRole("heading", { name: "Flower 1 today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
     const stopped = page.locator(".today-stopped");
     assert.match(
       await stopped.innerText(),
       /Not watering\. Watering is switched off for this room \(its engine switch\)/,
     );
     assert.match(
-      await page.locator('.room-chip[data-room="room:f1_"]').innerText(),
+      await page.locator('.room-chip[data-room="room:room_b_"]').innerText(),
       /Not watering/,
     );
     assert.match(await page.locator("[data-today-line]").innerText(), /Watering off/);
     await stopped.getByRole("button", { name: "Switch it on in Settings", exact: true }).click();
     await expectVisible(page.getByRole("heading", { name: "Settings", exact: true }));
-    assert.equal(await page.locator("#desktop-room").inputValue(), "room:f1_");
+    assert.equal(await page.locator("#desktop-room").inputValue(), "room:room_b_");
     await expectVisible(page.getByText("Watering off", { exact: true }).first());
     await expectVisible(page.getByRole("button", { name: "Switch watering on…", exact: true }));
   });
@@ -471,7 +471,7 @@ try {
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
   await check(
-    "zone page: the day in Athena's chart language, fitted to today, against yesterday or a typical day",
+    "zone page: the day as a phase reference chart, fitted to today, against yesterday or a typical day",
     async () => {
       await go("zone/1");
       const day = page.locator("[data-day-timeline]");
@@ -481,14 +481,14 @@ try {
       for (const name of ["vwc", "ec", "fc", "runoff", "maintenance", "projected", "shots", "jev"])
         assert.equal(await layer(name).count(), 1, `the ${name} layer is drawn`);
       // Today in numbers: moisture and its drying rate, pore EC against the stage's band, water and
-      // each plant's share, shots, the overnight dryback against Athena's.
+      // each plant's share, shots, the overnight dryback against the stage's reference.
       const numbers = await day.locator(".zone-numbers").innerText();
       for (const part of [
         /Moisture\s+[\d.]+%/,
         /Pore EC\s+[\d.]+\s+below 3\.5–6/,
         /Water today\s+[\d.]+ L\s+\d+ mL\/plant\s+\d+% of the 40 L limit/,
         /Shots\s+\d+\s+last /,
-        /dryback\s+[\d.]+% of peak\s+Athena 30–40%/,
+        /dryback\s+[\d.]+% of peak\s+Reference \d+–\d+%/,
       ])
         assert.match(numbers, part);
       assert.match(await day.locator(".zone-next").innerText(), /^Next: \S/);
@@ -498,7 +498,7 @@ try {
         .map(Number.parseFloat);
       assert.ok(ticks.length >= 3, `VWC gridlines: ${ticks}`);
       assert.ok(Math.max(...ticks) - Math.min(...ticks) <= 30, `VWC axis ${ticks}`);
-      // Phases along the bottom as Athena's badges, every one there was today.
+      // Phases along the bottom as badges, every one there was today.
       assert.deepEqual(await day.locator(".phase-badge .badge-text").allTextContents(), [
         "P0",
         "P1",
@@ -681,7 +681,7 @@ try {
         await trigger().click();
         await expectVisible(help());
         const text = await help().innerText();
-        for (const part of ["What it is", "When it acts", "What it affects", "Athena Handbook"])
+        for (const part of ["What it is", "When it acts", "What it affects", "In practice"])
           assert.match(text, new RegExp(part, "i"), `the explainer has "${part}"`);
         assert.match(text, /a level, not a crossing/);
       });
@@ -755,7 +755,7 @@ try {
       /1$/,
     );
     await page.getByRole("button", { name: /^Review 1 change/ }).click();
-    await expectVisible(page.getByRole("dialog").getByText(/Flower 2 only/));
+    await expectVisible(page.getByRole("dialog").getByText(/Room A only/));
     await axe("targets review");
     await page.screenshot({ path: path.join(out, "dashboard-review.png") });
     await page
@@ -765,7 +765,7 @@ try {
     await expectVisible(page.getByText("Changes applied and verified by controller readback."));
     assert.equal(await field.inputValue(), String(original + 1));
     await field.fill(String(original + 2));
-    await page.locator("#desktop-room").selectOption("room:f1_");
+    await page.locator("#desktop-room").selectOption("room:room_b_");
     await expectVisible(
       page.getByRole("heading", {
         name: "Discard unsaved workspace changes?",
@@ -773,11 +773,11 @@ try {
     );
     await page.getByRole("button", { name: "Keep editing" }).click();
     assert.equal(await field.inputValue(), String(original + 2));
-    await page.locator("#desktop-room").selectOption("room:f1_");
+    await page.locator("#desktop-room").selectOption("room:room_b_");
     await page.getByRole("button", { name: "Discard and continue" }).click();
-    assert.equal(await page.locator("#desktop-room").inputValue(), "room:f1_");
+    assert.equal(await page.locator("#desktop-room").inputValue(), "room:room_b_");
     await expectVisible(
-      page.locator('input[id="setting-number.crop_steering_f1_zone_1_p1_target_vwc"]'),
+      page.locator('input[id="setting-number.crop_steering_room_b_zone_1_p1_target_vwc"]'),
     );
   });
   await check(
@@ -788,7 +788,10 @@ try {
       assert.equal(await stages.count(), 3);
       const current = page.locator(".grow-stage-table tr[data-current]");
       assert.match(await current.innerText(), /^Flower bulk\s+Now · week 6/);
-      assert.match(await current.innerText(), /Vegetative\s+3\.5–6 mS\/cm\s+30–40 % of peak/);
+      assert.match(
+        await current.innerText(),
+        /Vegetative\s+3\.5–6 mS\/cm\s+10–15 points of true water content/,
+      );
       assert.match(
         await page.locator(".grow-stages .panel-heading p").innerText(),
         /^Flower day 37 of 56, week 6: flower bulk, steered vegetative\. Finish from .+ \(day 43\)\.$/,
@@ -853,7 +856,7 @@ try {
       await expectVisible(page.locator(".timeline-row").first());
     });
     // A room without Jev: its controller records, without Jev's toggle.
-    await go("history/timeline", "f1");
+    await go("history/timeline", "room_b");
     await expectVisible(page.locator(".timeline-row").first());
     assert.equal(await page.getByLabel("All Jev decisions").count(), 0);
     assert.equal(await page.locator('.timeline-row[data-source="jev"]').count(), 0);
@@ -871,7 +874,7 @@ try {
     const downloadPromise = page.waitForEvent("download");
     await page.getByRole("button", { name: "Export CSV" }).click();
     const download = await downloadPromise;
-    assert.match(download.suggestedFilename(), /flower-2-timeline-.+\.csv/);
+    assert.match(download.suggestedFilename(), /room-a-timeline-.+\.csv/);
     await download.saveAs(path.join(out, "timeline-export.csv"));
     const csv = await readFile(path.join(out, "timeline-export.csv"), "utf8");
     assert.match(csv, /Timestamp.*Room.*Zone.*Type.*Message.*Result/);
@@ -1068,32 +1071,32 @@ try {
     async () => {
       await go("equipment/stock");
       const card = (id) => page.locator(`[data-stock-tank="${id}"]`);
-      await expectVisible(card("bloom"));
+      await expectVisible(card("part_b"));
       assert.equal(await page.locator("[data-stock-tank]").count(), 4);
       assert.equal(
         await page.locator("[data-stock-next]").innerText(),
-        "Next to run out: Bloom, about 3 batches left.",
+        "Next to run out: Part B, about 3 batches left.",
       );
       await page.screenshot({ path: img("stock-tanks.png") });
       // Each tank is linked to its dosing pump: drawn by what the pump doses, its draws listed.
       assert.equal(
-        await card("bloom").locator("[data-stock-drawn]").innerText(),
-        "Drawn by\nBloom as it doses",
+        await card("part_b").locator("[data-stock-drawn]").innerText(),
+        "Drawn by\nPart B as it doses",
       );
       assert.match(
-        await card("balance").locator("[data-stock-draws] li").first().innerText(),
+        await card("silica").locator("[data-stock-draws] li").first().innerText(),
         /Dose\s+25 mL$/,
       );
-      // Bloom starts within half again of its low mark: amber, "Getting low".
-      assert.equal(await card("bloom").locator(".pill").textContent(), "Getting low");
-      await card("bloom").getByRole("button", { name: "Refilled" }).click();
-      await expectVisible(card("bloom").getByText("OK", { exact: true }));
-      assert.match(await card("bloom").locator("dd").first().textContent(), /^20 of 20 L$/);
+      // Part B starts within half again of its low mark: amber, "Getting low".
+      assert.equal(await card("part_b").locator(".pill").textContent(), "Getting low");
+      await card("part_b").getByRole("button", { name: "Refilled" }).click();
+      await expectVisible(card("part_b").getByText("OK", { exact: true }));
+      assert.match(await card("part_b").locator("dd").first().textContent(), /^20 of 20 L$/);
 
-      await card("cleanse").getByRole("button", { name: "Set level" }).click();
-      await card("cleanse").getByLabel("Level read off the tank (L)").fill("0.8");
-      await card("cleanse").getByRole("button", { name: "Save level" }).click();
-      await expectVisible(card("cleanse").getByText("Low", { exact: true }));
+      await card("cleaner").getByRole("button", { name: "Set level" }).click();
+      await card("cleaner").getByLabel("Level read off the tank (L)").fill("0.8");
+      await card("cleaner").getByRole("button", { name: "Save level" }).click();
+      await expectVisible(card("cleaner").getByText("Low", { exact: true }));
 
       await page.getByRole("button", { name: "Record a batch" }).click();
       const confirm = page.getByRole("dialog");
@@ -1105,18 +1108,18 @@ try {
       assert.equal(await history.getAttribute("open"), null);
       await history.locator("summary").click();
       await expectVisible(history.getByRole("heading", { name: "Recent draws" }));
-      assert.match(await card("bloom").locator("dd").first().textContent(), /^18\.2 of 20 L$/);
+      assert.match(await card("part_b").locator("dd").first().textContent(), /^18\.2 of 20 L$/);
 
       await page.getByRole("button", { name: "Edit stock tanks" }).click();
       const editor = page.getByRole("dialog");
       await editor.getByRole("button", { name: "Add a stock tank" }).click();
       const names = editor.getByLabel("Name");
-      await names.last().fill("Silica");
+      await names.last().fill("Enzymes");
       await editor.getByRole("button", { name: "Save stock tanks" }).click();
-      await expectVisible(card("silica"));
-      // No pump draws Silica: each batch takes its dose.
-      assert.equal(await card("silica").locator("[data-stock-drawn]").count(), 0);
-      await expectVisible(card("silica").getByText("Per batch"));
+      await expectVisible(card("enzymes"));
+      // No pump draws Enzymes: each batch takes its dose.
+      assert.equal(await card("enzymes").locator("[data-stock-drawn]").count(), 0);
+      await expectVisible(card("enzymes").getByText("Per batch"));
       await axe("stock tanks after edits");
       await noOverflow();
     },
@@ -1124,42 +1127,42 @@ try {
   await check(
     "dosing: each room's pumps, a dose and a batch through their reviews, and stop; only requests are sent",
     async () => {
-      // Flower 2's four pumps and Flower 1's six, one of them not calibrated yet.
+      // Room A's four pumps and Room B's six, one of them not calibrated yet.
       const cards = page.locator("[data-dosing-pump]");
       const strip = page.locator("[data-stock-strip]");
       const stockOf = (id) => page.locator(`[data-dosing-pump="${id}"] [data-pump-stock]`);
       await go("equipment/dosing");
       await expectVisible(cards.first());
       assert.deepEqual(await cards.locator(".dosing-pump-select").allInnerTexts(), [
-        "Balance",
-        "Bloom",
-        "Core",
-        "Cleanse",
+        "Silica",
+        "Part B",
+        "Part A",
+        "Line cleaner",
       ]);
       assert.match(
         await page.locator("[data-batch-line]").innerText(),
         /^No batch running · last batch finished \S/,
       );
-      await go("equipment/dosing", "f1");
+      await go("equipment/dosing", "room_b");
       await expectVisible(cards.first());
       assert.equal(await cards.count(), 6, "one card per pump");
-      assert.deepEqual(await pillTones('[data-dosing-pump="fade"] .pill'), [
+      assert.deepEqual(await pillTones('[data-dosing-pump="finisher"] .pill'), [
         ["Not calibrated", "warn"],
       ]);
       assert.deepEqual(await strip.locator("[data-stock-gauge] strong").allInnerTexts(), [
-        "Grow",
-        "Cleanse",
-        "Balance",
-        "Fade",
-        "Core",
-        "Bloom",
+        "Veg base",
+        "Line cleaner",
+        "Silica",
+        "Finisher",
+        "Part A",
+        "Part B",
       ]);
-      // Core, passed by in the recipe and dosed by hand: its tank lasts doses at its last one.
+      // Part A, passed by in the recipe and dosed by hand: its tank lasts doses at its last one.
       assert.equal(
-        await stockOf("core").locator(".dosing-stock-left").innerText(),
+        await stockOf("part_a").locator(".dosing-stock-left").innerText(),
         "about 287 doses left",
       );
-      // Flower 1's tank is filled by hand: its batch passes the fill by.
+      // Room B's tank is filled by hand: its batch passes the fill by.
       assert.equal(
         await page.locator('.dosing-steps [data-step="fill"]').getAttribute("data-state"),
         "skipped",
@@ -1168,76 +1171,76 @@ try {
         await go("equipment/dosing");
         await expectVisible(cards.first());
       });
-      // A fresh Flower 2: each card shows the stock tank its pump is linked to, Bloom's drawn to
+      // A fresh Room A: each card shows the stock tank its pump is linked to, Part B's drawn to
       // scale with its litres and the batches its recipe amount leaves, and the stock strip every
       // linked tank in pump order.
       await go("equipment/dosing");
       await expectVisible(cards.first());
-      assert.equal(await stockOf("bloom").getAttribute("data-pump-stock"), "bloom");
+      assert.equal(await stockOf("part_b").getAttribute("data-pump-stock"), "part_b");
       assert.equal(
-        await stockOf("bloom").locator(".dosing-stock-litres").innerText(),
+        await stockOf("part_b").locator(".dosing-stock-litres").innerText(),
         "5.4 L of 20 L",
       );
       assert.equal(
-        await stockOf("bloom").locator(".dosing-stock-left").innerText(),
+        await stockOf("part_b").locator(".dosing-stock-left").innerText(),
         "about 3 batches left",
       );
       assert.deepEqual(await strip.locator("[data-stock-gauge] strong").allInnerTexts(), [
-        "Balance",
-        "Bloom",
-        "Core",
-        "Cleanse",
+        "Silica",
+        "Part B",
+        "Part A",
+        "Line cleaner",
       ]);
-      // A dose of Bloom, through its review: its card doses, then the history has it.
-      await page.locator('[data-dosing-pump="bloom"] .dosing-pump-select').click();
+      // A dose of Part B, through its review: its card doses, then the history has it.
+      await page.locator('[data-dosing-pump="part_b"] .dosing-pump-select').click();
       await page.getByLabel("Amount (mL)").fill("60");
       assert.match(
         await page.locator("[data-dose-summary]").innerText(),
-        /^Your request: 60 mL of Bloom, about 5\.7 s$/,
+        /^Your request: 60 mL of Part B, about 5\.7 s$/,
       );
-      await page.getByRole("button", { name: /^Start Bloom/ }).click();
-      const review = page.getByRole("dialog", { name: "Dose Bloom?" });
+      await page.getByRole("button", { name: /^Start Part B/ }).click();
+      const review = page.getByRole("dialog", { name: "Dose Part B?" });
       await expectVisible(review);
       await axe("dosing: the dose's review");
-      await review.getByRole("button", { name: "Start Bloom", exact: true }).click();
+      await review.getByRole("button", { name: "Start Part B", exact: true }).click();
       await review.waitFor({ state: "hidden" });
-      await expectVisible(page.locator('[data-dosing-pump="bloom"][data-state="dosing"]'));
-      await expectVisible(page.locator('[data-dosing-pump="bloom"] [role="progressbar"]'));
+      await expectVisible(page.locator('[data-dosing-pump="part_b"][data-state="dosing"]'));
+      await expectVisible(page.locator('[data-dosing-pump="part_b"] [role="progressbar"]'));
       await page.screenshot({ path: path.join(out, "dashboard-dosing-dose.png"), fullPage: true });
       await page.waitForFunction(
         () =>
           document
             .querySelector('tr[data-history-kind="dose"]')
-            ?.textContent.includes("Bloom 60 mL"),
+            ?.textContent.includes("Part B 60 mL"),
         null,
         { timeout: 20_000 },
       );
       assert.match(
         await page.locator('tr[data-history-kind="dose"]').first().innerText(),
-        /Dose Bloom\s+Finished\s+Bloom 60 mL/,
+        /Dose Part B\s+Finished\s+Part B 60 mL/,
       );
       assert.equal(
-        await page.locator('[data-dosing-pump="bloom"]').getAttribute("data-state"),
+        await page.locator('[data-dosing-pump="part_b"]').getAttribute("data-state"),
         "idle",
       );
-      // What it dosed came off Bloom's stock tank: 5.4 L less 60 mL, on its card and in the strip.
+      // What it dosed came off Part B's stock tank: 5.4 L less 60 mL, on its card and in the strip.
       await expectVisible(
-        stockOf("bloom").locator(".dosing-stock-litres", { hasText: "5.3 L of 20 L" }),
+        stockOf("part_b").locator(".dosing-stock-litres", { hasText: "5.3 L of 20 L" }),
       );
       assert.equal(
-        await strip.locator('[data-stock-gauge="bloom"] .dosing-stock-litres').innerText(),
+        await strip.locator('[data-stock-gauge="part_b"] .dosing-stock-litres').innerText(),
         "5.3 L of 20 L",
       );
       // A batch, through its review: its steps walk, and stop ends it where it is.
       await page.getByRole("button", { name: "Make a batch", exact: true }).click();
-      const batch = page.getByRole("dialog", { name: "Make a batch in Flower 2?" });
+      const batch = page.getByRole("dialog", { name: "Make a batch in Room A?" });
       await expectVisible(batch);
       await axe("dosing: the batch's review");
       await batch.getByRole("button", { name: "Make the batch", exact: true }).click();
       await batch.waitFor({ state: "hidden" });
       await expectVisible(page.locator('.dosing-steps [data-step="fill"][data-state="running"]'));
       await page.getByRole("button", { name: "Stop the batch", exact: true }).click();
-      const stop = page.getByRole("dialog", { name: "Stop dosing in Flower 2?" });
+      const stop = page.getByRole("dialog", { name: "Stop dosing in Room A?" });
       await expectVisible(stop);
       await stop.getByRole("button", { name: "Send stop", exact: true }).click();
       await stop.waitFor({ state: "hidden" });
@@ -1302,8 +1305,12 @@ try {
         ended_at: null,
       };
       for (const [prefix, name, pumps] of [
-        ["", "Flower 2", [pump("bloom", "Bloom", 10.5), pump("grow", "Grow", 10.9, "unavailable")]],
-        ["f1_", "Flower 1", []],
+        [
+          "",
+          "Room A",
+          [pump("part_b", "Part B", 10.5), pump("veg_base", "Veg base", 10.9, "unavailable")],
+        ],
+        ["room_b_", "Room B", []],
       ]) {
         put(`sensor.crop_steering_${prefix}engine_config`, "ready", {
           prefix,
@@ -1412,26 +1419,26 @@ try {
       await live.goto(`${base}/dashboard.html?room=room:#/equipment/dosing`, {
         waitUntil: "networkidle",
       });
-      const bloom = live.locator('[data-dosing-pump="bloom"]');
-      await expectVisible(bloom);
+      const part_b = live.locator('[data-dosing-pump="part_b"]');
+      await expectVisible(part_b);
       // No pump is linked to a stock tank here: the cards say so, and there is no stock strip.
-      assert.equal(await bloom.locator("[data-pump-stock]").innerText(), "No stock tank linked");
+      assert.equal(await part_b.locator("[data-pump-stock]").innerText(), "No stock tank linked");
       assert.equal(await live.locator("[data-stock-strip]").count(), 0);
       // A pump whose dosing sensor is unavailable: greyed out, a question mark on its head.
-      const grow = live.locator('[data-dosing-pump="grow"]');
-      assert.equal(await grow.getAttribute("data-state"), "unavailable");
-      assert.equal(await grow.locator(".pp-unknown").textContent(), "?");
+      const veg_base = live.locator('[data-dosing-pump="veg_base"]');
+      assert.equal(await veg_base.getAttribute("data-state"), "unavailable");
+      assert.equal(await veg_base.locator(".pp-unknown").textContent(), "?");
       await live.getByLabel("Amount (mL)").fill("60");
-      await live.getByRole("button", { name: /^Start Bloom/ }).click();
+      await live.getByRole("button", { name: /^Start Part B/ }).click();
       await live
         .getByRole("dialog")
-        .getByRole("button", { name: "Start Bloom", exact: true })
+        .getByRole("button", { name: "Start Part B", exact: true })
         .click();
       await expectVisible(live.locator('[data-request-stage="taken"]'));
-      // The controller would refuse a batch with Grow unavailable: said before it is asked for.
+      // The controller would refuse a batch with Veg base unavailable: said before it is asked for.
       assert.equal(
         await live.locator("[data-batch-warning]").innerText(),
-        "Grow is unavailable: the controller would refuse a batch now.",
+        "Veg base is unavailable: the controller would refuse a batch now.",
       );
       await live.getByRole("button", { name: "Make a batch", exact: true }).click();
       await live.getByRole("dialog").getByRole("button", { name: "Make the batch" }).click();
@@ -1441,7 +1448,7 @@ try {
       assert.deepEqual(
         posts.filter((post) => post.path.endsWith("/dosing_request")).map((post) => post.body),
         [
-          { action: "dose", pump: "bloom", ml: 60, room_id: "room:" },
+          { action: "dose", pump: "part_b", ml: 60, room_id: "room:" },
           { action: "batch", room_id: "room:" },
           { action: "stop", room_id: "room:" },
         ],
@@ -1456,8 +1463,8 @@ try {
         "the page wrote nothing but its dosing requests",
       );
       // A room without pumps says what dosing does, and offers to set it up.
-      await live.locator("#desktop-room").selectOption("room:f1_");
-      await expectVisible(live.getByRole("heading", { name: "No dosing pumps in Flower 1" }));
+      await live.locator("#desktop-room").selectOption("room:room_b_");
+      await expectVisible(live.getByRole("heading", { name: "No dosing pumps in Room B" }));
       await expectVisible(live.getByRole("button", { name: "Set up dosing", exact: true }));
       await ha.close();
     },
@@ -1469,7 +1476,7 @@ try {
       const gauges = strip.locator("[data-stock-gauge]");
       for (const [room, count] of [
         ["f2", 4],
-        ["f1", 6],
+        ["room_b", 6],
       ]) {
         await go("equipment/dosing", room);
         await expectVisible(strip);
@@ -1482,8 +1489,8 @@ try {
           );
         assert.equal(await gauges.locator(".sb-low").count(), count);
       }
-      await inBothThemes("dosing, Flower 1", async () => {
-        await go("equipment/dosing", "f1");
+      await inBothThemes("dosing, Room B", async () => {
+        await go("equipment/dosing", "room_b");
         await expectVisible(strip);
       });
       await go("equipment/dosing");
@@ -1496,7 +1503,7 @@ try {
       await page.evaluate(() => localStorage.setItem("irrigation-theme", "light"));
       // A phone: both rooms fit, the strip two tanks to a row.
       await page.setViewportSize({ width: 390, height: 844 });
-      for (const room of ["f1", "f2"]) {
+      for (const room of ["room_b", "f2"]) {
         await go("equipment/dosing", room);
         await expectVisible(strip);
         await noOverflow();
@@ -1591,10 +1598,10 @@ try {
     },
   );
   await check("settings: one switch flips every zone, through the review", async () => {
-    // Flower 1's zone 3 is paused for inspection: the switch is on while any zone is on, as the
+    // Room B's zone 3 is paused for inspection: the switch is on while any zone is on, as the
     // entities card's header toggle is, and switching it on again switches zone 3 on too.
-    await go("settings", "f1");
-    const all = page.getByRole("switch", { name: "Every zone in Flower 1", exact: true });
+    await go("settings", "room_b");
+    const all = page.getByRole("switch", { name: "Every zone in Room B", exact: true });
     const count = page.locator(".settings-zones .all-zones-count");
     const flip = async (title, rows, after) => {
       await all.click();
@@ -1634,8 +1641,8 @@ try {
       ),
     );
     await axe("settings: water per plant");
-    // The choice is Flower 2's: Flower 1 keeps each zone's total.
-    await page.locator("#desktop-room").selectOption("room:f1_");
+    // The choice is Room A's: Room B keeps each zone's total.
+    await page.locator("#desktop-room").selectOption("room:room_b_");
     await page.waitForTimeout(300);
     assert.equal(await pressed("Zone total"), "true");
     await page.locator("#desktop-room").selectOption("room:");
@@ -1668,13 +1675,13 @@ try {
         page.getByRole("button", { name: "Discard draft", exact: true }).click();
       await go("settings/notifications");
       await expectVisible(table);
-      // The demo's saved setup: Ben everything, Callum hardware lockouts, stock tanks and dosing,
-      // Stewart emergencies only; a column per kind, in the order notify_get gives them.
+      // The demo's saved setup: Owner everything, Grower hardware lockouts, stock tanks and dosing,
+      // Manager emergencies only; a column per kind, in the order notify_get gives them.
       assert.equal(await rows.count(), 3);
       assert.deepEqual(await table.locator("tbody .notify-phone-name").allInnerTexts(), [
-        "Ben",
-        "Callum",
-        "Stewart",
+        "Owner",
+        "Grower",
+        "Manager",
       ]);
       assert.deepEqual(await table.locator("thead [data-kind]").allInnerTexts(), [
         "Emergencies",
@@ -1687,13 +1694,9 @@ try {
         "Jev",
         "Setup and settings",
       ]);
-      assert.equal((await ticked("notify.mobile_app_s23ultra")).length, 9);
-      assert.deepEqual(await ticked("notify.mobile_app_callum_phone"), [
-        "hardware",
-        "stock",
-        "dosing",
-      ]);
-      assert.deepEqual(await ticked("notify.mobile_app_stews_iphone"), ["emergency"]);
+      assert.equal((await ticked("notify.mobile_app_phone_1")).length, 9);
+      assert.deepEqual(await ticked("notify.mobile_app_phone_2"), ["hardware", "stock", "dosing"]);
+      assert.deepEqual(await ticked("notify.mobile_app_phone_3"), ["emergency"]);
       assert.equal(await page.locator("[data-uncovered]").count(), 0);
       // A heading says what its kind covers: its codes with Help's titles, its events in words.
       await table.getByRole("button", { name: "Hardware lockouts", exact: true }).click();
@@ -1710,40 +1713,38 @@ try {
         /A zone changing phase, as a push/,
       );
       await page.keyboard.press("Escape");
-      // Callum ticks Phase changes and keeps to Flower 1: a draft, reviewed phone by phone, saved.
-      await box("Callum (Callum Phone): Phase changes").check();
-      await rooms("Callum (Callum Phone)").getByRole("button", { name: "Flower 1" }).click();
+      // Grower ticks Phase changes and keeps to Room B: a draft, reviewed phone by phone, saved.
+      await box("Grower (Phone 2): Phase changes").check();
+      await rooms("Grower (Phone 2)").getByRole("button", { name: "Room B" }).click();
       await expectVisible(page.locator(".draft-bar", { hasText: "Unsaved changes to 1 phone" }));
       await saveDraft();
       await expectVisible(review);
       assert.deepEqual(await review.locator(".review-row").allInnerTexts(), [
-        "Callum (Callum Phone)\nStarts getting: Phase changes\nRooms: All rooms → Flower 1",
+        "Grower (Phone 2)\nStarts getting: Phase changes\nRooms: All rooms → Room B",
       ]);
       await axe("notifications: the review");
       await review.getByRole("button", { name: "Save notifications", exact: true }).click();
       await review.waitFor({ state: "hidden" });
       await expectVisible(page.getByText("Saved as revision 4. The next push follows it."));
-      assert.equal(await box("Callum (Callum Phone): Phase changes").isChecked(), true);
+      assert.equal(await box("Grower (Phone 2): Phase changes").isChecked(), true);
       assert.equal(await page.locator(".draft-bar").count(), 0);
       // A test push, its answer beside the button.
       await page
-        .getByRole("button", { name: "Send a test to Stewart (Stews iPhone)", exact: true })
+        .getByRole("button", { name: "Send a test to Manager (Phone 3)", exact: true })
         .click();
       await expectVisible(
-        page.locator(
-          'tr[data-notify-row="notify.mobile_app_stews_iphone"] [data-test-result="sent"]',
-        ),
+        page.locator('tr[data-notify-row="notify.mobile_app_phone_3"] [data-test-result="sent"]'),
       );
       // A room nobody gets emergencies for is named above the grid.
-      await box("Ben (S23Ultra): Emergencies").uncheck();
-      await rooms("Stewart (Stews iPhone)").getByRole("button", { name: "Flower 2" }).click();
+      await box("Owner (Phone 1): Emergencies").uncheck();
+      await rooms("Manager (Phone 3)").getByRole("button", { name: "Room A" }).click();
       assert.deepEqual(await page.locator("[data-uncovered] strong").allInnerTexts(), [
-        "Nobody gets emergencies for Flower 1",
+        "Nobody gets emergencies for Room B",
       ]);
-      await box("Stewart (Stews iPhone): Emergencies").uncheck();
+      await box("Manager (Phone 3): Emergencies").uncheck();
       assert.deepEqual(await page.locator("[data-uncovered] strong").allInnerTexts(), [
-        "Nobody gets emergencies for Flower 2",
-        "Nobody gets emergencies for Flower 1",
+        "Nobody gets emergencies for Room A",
+        "Nobody gets emergencies for Room B",
       ]);
       await discard();
       assert.equal(await page.locator("[data-uncovered]").count(), 0);
@@ -1752,27 +1753,25 @@ try {
       const add = page.getByRole("dialog", { name: "Add a phone" });
       await expectVisible(add);
       assert.deepEqual(await add.locator(".notify-add-choice strong").allInnerTexts(), [
-        "Sean (Sean iPhone)",
-        "Pete (Pete)",
+        "Assistant (Phone 4)",
+        "Visitor (Phone 5)",
         "A notify service by its name",
       ]);
       await axe("notifications: add a phone");
       await add.getByRole("button", { name: "Add", exact: true }).click();
       await add.waitFor({ state: "hidden" });
-      assert.deepEqual(await ticked("notify.mobile_app_sean_iphone"), ["emergency"]);
+      assert.deepEqual(await ticked("notify.mobile_app_phone_4"), ["emergency"]);
       assert.equal(
         await page.evaluate(() => document.activeElement?.getAttribute("aria-label")),
-        "Sean (Sean iPhone): Emergencies",
+        "Assistant (Phone 4): Emergencies",
         "focus carries on from the new row's first tick",
       );
-      await page
-        .getByRole("button", { name: "Remove Stewart (Stews iPhone)", exact: true })
-        .click();
+      await page.getByRole("button", { name: "Remove Manager (Phone 3)", exact: true }).click();
       assert.equal(await rows.count(), 3);
       await saveDraft();
       assert.deepEqual(await review.locator(".review-row > strong").allInnerTexts(), [
-        "Sean (Sean iPhone) · added",
-        "Stewart (Stews iPhone) · removed",
+        "Assistant (Phone 4) · added",
+        "Manager (Phone 3) · removed",
       ]);
       await review.getByRole("button", { name: "Back to editing", exact: true }).click();
       await review.waitFor({ state: "hidden" });
@@ -1805,14 +1804,14 @@ try {
       assert.equal(await cards.first().locator("input[data-kind]").count(), 9);
       await noOverflow();
       await page.screenshot({ path: path.join(out, "mobile-notifications.png"), fullPage: true });
-      await box("Callum (Callum Phone): Jev").check();
+      await box("Grower (Phone 2): Jev").check();
       await expectVisible(page.locator(".draft-bar"));
       await noOverflow();
       await axe("notifications on a phone");
       await discard();
       await page.setViewportSize({ width: 1440, height: 1000 });
-      // Callum, who is not an administrator (the demo as him): his own phone's row, nothing else.
-      await page.goto(`${base}/dashboard.html?demo&notify-user=callum#/settings/notifications`, {
+      // Grower, who is not an administrator (the demo as them): their own phone's row, nothing else.
+      await page.goto(`${base}/dashboard.html?demo&notify-user=grower#/settings/notifications`, {
         waitUntil: "networkidle",
       });
       await expectVisible(table);
@@ -1821,7 +1820,7 @@ try {
           hasText: "Only an administrator can change other people's phones.",
         }),
       );
-      for (const name of ["Ben (S23Ultra)", "Stewart (Stews iPhone)"]) {
+      for (const name of ["Owner (Phone 1)", "Manager (Phone 3)"]) {
         assert.equal(await box(`${name}: Emergencies`).isDisabled(), true, `${name} is read-only`);
         assert.equal(await box(`${name}: High priority for emergencies`).isDisabled(), true);
         assert.equal(
@@ -1835,7 +1834,7 @@ try {
         await page.getByLabel("Tell me when a room has watered nothing for").isDisabled(),
         true,
       );
-      await box("Callum (Callum Phone): Emergencies").check();
+      await box("Grower (Phone 2): Emergencies").check();
       await saveDraft();
       await review.getByRole("button", { name: "Save notifications", exact: true }).click();
       await expectVisible(page.getByText("Saved as revision 4. The next push follows it."));
@@ -1855,8 +1854,8 @@ try {
       const stamp = () => new Date().toISOString();
       const fixture = {};
       for (const [prefix, name] of [
-        ["", "Flower 2"],
-        ["f1_", "Flower 1"],
+        ["", "Room A"],
+        ["room_b_", "Room B"],
       ]) {
         const flag = `switch.crop_steering_${prefix}engine_enabled`;
         for (const [entity_id, state, attributes] of [
@@ -1878,7 +1877,7 @@ try {
       const pixel = {
         service: "notify.mobile_app_pixel_7",
         name: "Pixel 7",
-        user_id: "u-callum",
+        user_id: "u-grower",
         kinds: ["stock"],
         rooms: [],
         urgent_high_priority: false,
@@ -1886,13 +1885,13 @@ try {
       const iphone = {
         service: "notify.mobile_app_iphone",
         name: "iPhone",
-        user_id: "u-ben",
+        user_id: "u-owner",
         kinds: ["emergency"],
-        rooms: ["f1_"],
+        rooms: ["room_b_"],
         urgent_high_priority: true,
       };
       let saved = { revision: 7, idle_hours: 3, recipients: [pixel, iphone] };
-      // The first save meets one made elsewhere meanwhile: Ben's phone now covers every room.
+      // The first save meets one made elsewhere meanwhile: the owner's phone now covers every room.
       let elsewhere = true;
       const answer = () => ({
         schema_version: 1,
@@ -1903,11 +1902,11 @@ try {
           { id: "phases", name: "Phase changes", detail: "", codes: [], events: ["phase"] },
         ],
         phones: [
-          { service: pixel.service, name: "Pixel 7", user_id: "u-callum", user_name: "Callum" },
-          { service: iphone.service, name: "iPhone", user_id: "u-ben", user_name: "Ben" },
+          { service: pixel.service, name: "Pixel 7", user_id: "u-grower", user_name: "Grower" },
+          { service: iphone.service, name: "iPhone", user_id: "u-owner", user_name: "Owner" },
         ],
         can_edit_all: true,
-        user_id: "u-ben",
+        user_id: "u-owner",
       });
       await ha.route("**/*", async (route) => {
         const request = route.request(),
@@ -1950,10 +1949,10 @@ try {
       const grid = live.locator("table.notify-table");
       await expectVisible(grid);
       assert.deepEqual(await grid.locator("tbody .notify-phone-name").allInnerTexts(), [
-        "Callum",
-        "Ben",
+        "Grower",
+        "Owner",
       ]);
-      await box("Callum (Pixel 7): Phase changes", live).check();
+      await box("Grower (Pixel 7): Phase changes", live).check();
       await live.getByLabel("Tell me when a room has watered nothing for").fill("4");
       await live.getByRole("button", { name: /^Review and save/ }).click();
       const liveReview = live.getByRole("dialog", { name: "Save notifications?" });
@@ -1972,7 +1971,9 @@ try {
           { expected_revision: 8, recipients: [callum, { ...iphone, rooms: [] }], idle_hours: 4 },
         ],
       );
-      await live.getByRole("button", { name: "Send a test to Ben (iPhone)", exact: true }).click();
+      await live
+        .getByRole("button", { name: "Send a test to Owner (iPhone)", exact: true })
+        .click();
       await expectVisible(
         live.locator(`tr[data-notify-row="${iphone.service}"] [data-test-result="sent"]`),
       );
@@ -2131,7 +2132,7 @@ try {
     await go("today");
     await page.getByRole("link", { name: "Skip to content" }).focus();
     await page.keyboard.press("Enter");
-    await expectVisible(page.getByRole("heading", { name: "Flower 2 today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
     assert.equal(await page.evaluate(() => document.activeElement?.id), "main-content");
     assert.match(page.url(), /#\/today$/);
     await page
@@ -2140,7 +2141,7 @@ try {
       .click();
     await expectVisible(page.getByRole("heading", { name: "Probes", exact: true }));
     await page.goBack();
-    await expectVisible(page.getByRole("heading", { name: "Flower 2 today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
     await page.goForward();
     await expectVisible(page.getByRole("heading", { name: "Probes", exact: true }));
   });

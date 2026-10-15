@@ -2,7 +2,13 @@ import { describe, expect, it } from "vitest";
 import { buildRoom, discoverRooms, ROOM_PARAMETERS, ZONE_PARAMETERS } from "./model";
 import { createDemo } from "./demo";
 import { parameterHelp, parameterLabels } from "./grow-plan";
-import { DETAIL_HEADINGS, GROUP_HELP, PHASE_GROUPS, settingWords } from "./setting-words";
+import {
+  DETAIL_HEADINGS,
+  GROUP_HELP,
+  PHASE_GROUPS,
+  settingWords,
+  type SettingDetail,
+} from "./setting-words";
 
 /** Every parameter the Irrigation plan can show (model.ts `setting()` accepts exactly these). */
 const shown = [
@@ -59,13 +65,19 @@ describe("setting words", () => {
     );
     expect(settingWords("max_daily_volume")!.detail).toBeUndefined();
   });
-  it("cites the handbook's printed page for every Athena line, and shows every part", () => {
+  it("shows every part, in its own words: no printed page cited, no outside text quoted", () => {
     const shownParts = new Set(DETAIL_HEADINGS.map(([key]) => key));
+    const labels = shown.map((key) => settingWords(key)!.label);
     for (const param of [...shown, "dryback_target", "ec_target_p1"]) {
-      const detail = settingWords(param)!.detail;
-      if (!detail) continue;
+      const words = settingWords(param)!;
+      const detail: Partial<SettingDetail> = words.detail ?? {};
       for (const key of Object.keys(detail)) expect(shownParts.has(key as never), key).toBe(true);
-      if (detail.athena) expect(detail.athena, param).toMatch(/\(p\. (3[3-9]|4[01])\)/);
+      for (const text of [words.help, ...Object.values(detail)] as string[]) {
+        expect(text, param).not.toMatch(/\(p\. \d+\)|handbook/i);
+        // A quotation is only ever another setting's name.
+        for (const [, quoted] of text.matchAll(/“([^”]*)”/g))
+          expect(labels, param).toContain(quoted);
+      }
     }
   });
   it("files the dryback targets under P3 and full saturation under Substrate", () => {
