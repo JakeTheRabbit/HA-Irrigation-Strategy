@@ -30,7 +30,7 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 - **IR-11** While steering is held (a grow plan held, stale or missing) only the water-safety shots run: the P3 emergency, the watchdog and the minimum floor. Phases still move.
 - **IR-12** When a settled pore-EC reading is supplied, every EC rule uses it instead of the raw reading.
 - **IR-13** With pore EC unknown the zone waters by VWC alone; EC corrections do not fire and the reason says salt protection is unverified.
-- **PH-11** At the integration's default dryback_target (40 % generative, 50 % vegetative) a morning drop of a few percent never ends P0: it waits for p0_max_wait_min (default 120 min), the bypass or a brain start.
+- **PH-11** At the integration's default dryback_target (45 % generative, 35 % vegetative) a morning drop of a few percent never ends P0: it waits for p0_max_wait_min (default 120 min), the bypass or a brain start.
 
 ## Shot scaling
 

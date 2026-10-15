@@ -23,7 +23,7 @@ VWC and dryback points are percentage points of volumetric water content. Relati
 - While steering is held (a grow plan held, stale or missing) only the water-safety shots run: the P3 emergency, the watchdog and the minimum floor. Phases still move.
 - When a settled pore-EC reading is supplied, every EC rule uses it instead of the raw reading.
 - With pore EC unknown the zone waters by VWC alone; EC corrections do not fire and the reason says salt protection is unverified.
-- At the integration's default dryback_target (40 % generative, 50 % vegetative) a morning drop of a few percent never ends P0: it waits for p0_max_wait_min (default 120 min), the bypass or a brain start.
+- At the integration's default dryback_target (45 % generative, 35 % vegetative) a morning drop of a few percent never ends P0: it waits for p0_max_wait_min (default 120 min), the bypass or a brain start.
 - ec_adjust multiplies a shot by pore EC / target: ratio 0.4 -> x0.5; ratio 0.6 -> x0.7; ratio 0.9 -> x1; ratio 1.1 -> x1.2; ratio 1.3 -> x1.5; ratio 1.6 -> x2 (thresholds: >1.5 x2.0, >1.2 x1.5, >1.0 x1.2, <0.8 x0.7, <0.5 x0.5, else x1).
 - CT-1 The P2 threshold the engine sees is p2_vwc_threshold plus the controller's EC offset (offset dropped while EC is unknown), clamped between rescue floor + 3 and min(p1_target, field_capacity) - 1.
 - CT-2 EC steer (only with EC stacking on, in P2, every 30 min, on the settled EC): step the offset toward +1 when EC > 110% of the P2 target, toward -1 when < 90%, else toward 0, within +/-20% of the base threshold. An optional PID replaces the step.

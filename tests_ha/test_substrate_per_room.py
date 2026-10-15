@@ -122,7 +122,10 @@ async def test_a_3_11_1_room_gets_only_the_substrate_select_and_its_controller_c
     entry, _seed = await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
     assert hass.states.get(SUBSTRATE).state == "generic"
     assert hass.states.get(DESCRIPTOR).attributes["substrate"] == "generic"
-    assert _new_since(hass, entry, seed) == ({SUBSTRATE}, set())  # nothing else appears or moves
+    new, moved = _new_since(hass, entry, seed)
+    # nothing else appears or moves, beside P3 Time Between Shots (its own additive change)
+    assert {e for e in new if "p3_time_between_shots" not in e} == {SUBSTRATE}
+    assert moved == set()
 
     hass.states.async_set(KILL, "on")
     c, _fake, _built, _usage, state = _jev_3_11_1_app(

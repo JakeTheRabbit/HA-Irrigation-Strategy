@@ -221,8 +221,11 @@ def engine_facts(doc, paths):
 
     nums = Path(paths["numbers"]).read_text(encoding="utf-8")
 
+    # The integration's entity defaults live in the one defaults table, beside the engine's core.py.
+    table = Path(paths["core"]).with_name("defaults.py").read_text(encoding="utf-8")
+
     def num_default(key):
-        m = re.search(rf'"{key}":\s*([0-9.]+)', nums)
+        m = re.search(rf'"{key}":\s*\(([0-9.]+),', table)
         return float(m.group(1)) if m else None
 
     veg_dt, gen_dt, p0_wait = (num_default("vegetative_dryback_target"), num_default("generative_dryback_target"),
@@ -348,7 +351,7 @@ def engine_facts(doc, paths):
         ("CT-8", f"With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller hands decide() an assumed feed EC of {core.ZoneSnapshot.__dataclass_fields__['feed_ec'].default:.1f} mS/cm, not a measurement, for every dilutive test.",
          "feed_ec=(feed_ec if feed_ec is not None else 3.0)" in ctrl and core.ZoneSnapshot.__dataclass_fields__["feed_ec"].default == 3.0),
         ("CT-9", "The minimum daily floor is read from a per-zone helper (min_daily_ml_per_plant, made by hand; the integration creates no such setting) times the zone's plant count, defaulting to 0: a fresh install runs with the floor off.",
-         re.search(r'zone_\{zone\}_min_daily_ml_per_plant",\s*0\.0,\s*\)\s*\*\s*self\._zone_num\(room, zone, "plant_count", 0\)', ctrl) is not None
+         re.search(r'zone_\{zone\}_min_daily_ml_per_plant",\s*0\.0,\s*\)\s*\*\s*self\._zone_num\(room, zone, "plant_count", (?:0|FALLBACK\["plant_count"\])\)', ctrl) is not None
          and "min_daily" not in nums),
         ("CT-10", "A zone whose moisture rises with no water going in (a backed-up table) gets the floor set to 0 and no EC correction.",
          "dataclasses.replace(p, min_daily_volume=0.0)" in ctrl and "dataclasses.replace(snap, backed_up=True)" in ctrl),

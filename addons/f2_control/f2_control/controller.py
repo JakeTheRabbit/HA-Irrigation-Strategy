@@ -55,6 +55,9 @@ from crop_steering_engine import (
     system_safety_status,
     zone_status_label,
 )
+# What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
+# controller column of the one defaults table, pinned to the values installed controllers use.
+from crop_steering_engine.defaults import CONTROLLER_FALLBACKS as FALLBACK
 
 # ---------------------------------------------------------------- HA REST (Supervisor proxy)
 BASE = os.environ.get("HA_URL", "http://supervisor/core/api")
@@ -1604,10 +1607,10 @@ class Controller:
     def _params(self, room, zone, ec_known=True):
         veg = self._veg(room, zone)
         sfx = "veg" if veg else "gen"
-        base = self._zone_num(room, zone, "p2_vwc_threshold", 45)
-        p1t = self._zone_num(room, zone, "p1_target_vwc", 60)
-        fc = self._zone_num(room, zone, "field_capacity", 70)
-        efloor = self._zone_num(room, zone, "p3_emergency_vwc_threshold", 40)
+        base = self._zone_num(room, zone, "p2_vwc_threshold", FALLBACK["p2_vwc_threshold"])
+        p1t = self._zone_num(room, zone, "p1_target_vwc", FALLBACK["p1_target_vwc"])
+        fc = self._zone_num(room, zone, "field_capacity", FALLBACK["field_capacity"])
+        efloor = self._zone_num(room, zone, "p3_emergency_vwc_threshold", FALLBACK["p3_emergency_vwc_threshold"])
         # EC-steer offset is shell-owned (decide() no longer nudges). Bake it into the
         # P2 rewater threshold, clamped to the same safe band the engine used: never
         # below the emergency-floor band, never above the ramp ceiling.
@@ -1617,44 +1620,47 @@ class Controller:
         raw = ZoneParams(
             p1_target=p1t,
             p2_threshold=p2_thr,
-            p2_shot_size=self._zone_num(room, zone, "p2_shot_size", 5),
-            p1_initial=self._zone_num(room, zone, "p1_initial_shot_size", 2),
-            p1_incr=self._zone_num(room, zone, "p1_shot_size_increment", 0.5),
-            p1_max_shots=int(self._zone_num(room, zone, "p1_maximum_shots", 12)),
-            p1_min_shots=int(self._zone_num(room, zone, "p1_minimum_shots", 0)),
-            p1_time_between_min=self._zone_num(room, zone, "p1_time_between_shots", 15),
+            p2_shot_size=self._zone_num(room, zone, "p2_shot_size", FALLBACK["p2_shot_size"]),
+            p1_initial=self._zone_num(room, zone, "p1_initial_shot_size", FALLBACK["p1_initial_shot_size"]),
+            p1_incr=self._zone_num(room, zone, "p1_shot_size_increment", FALLBACK["p1_shot_size_increment"]),
+            p1_max_shots=int(self._zone_num(room, zone, "p1_maximum_shots", FALLBACK["p1_maximum_shots"])),
+            p1_min_shots=int(self._zone_num(room, zone, "p1_minimum_shots", FALLBACK["p1_minimum_shots"])),
+            p1_time_between_min=self._zone_num(room, zone, "p1_time_between_shots", FALLBACK["p1_time_between_shots"]),
             dryback_target=self._zone_num(
                 room,
                 zone,
                 f"{'vegetative' if veg else 'generative'}_dryback_target",
-                20,
+                FALLBACK[f"{'vegetative' if veg else 'generative'}_dryback_target"],
             ),
-            p0_max_wait_min=self._zone_num(room, zone, "p0_maximum_wait_time", 45),
-            ec_target_p0=self._zone_num(room, zone, f"ec_target_{sfx}_p0", 4),
-            ec_target_p1=self._zone_num(room, zone, f"ec_target_{sfx}_p1", 5),
-            ec_target_p2=self._zone_num(room, zone, f"ec_target_{sfx}_p2", 6),
+            p0_max_wait_min=self._zone_num(room, zone, "p0_maximum_wait_time", FALLBACK["p0_maximum_wait_time"]),
+            ec_target_p0=self._zone_num(room, zone, f"ec_target_{sfx}_p0", FALLBACK[f"ec_target_{sfx}_p0"]),
+            ec_target_p1=self._zone_num(room, zone, f"ec_target_{sfx}_p1", FALLBACK[f"ec_target_{sfx}_p1"]),
+            ec_target_p2=self._zone_num(room, zone, f"ec_target_{sfx}_p2", FALLBACK[f"ec_target_{sfx}_p2"]),
             p3_emergency_floor=efloor,
-            p3_emergency_shot=self._zone_num(room, zone, "p3_emergency_shot_size", 2),
+            p3_emergency_shot=self._zone_num(room, zone, "p3_emergency_shot_size", FALLBACK["p3_emergency_shot_size"]),
+            p3_time_between_min=self._zone_num(
+                room, zone, "p3_time_between_shots", FALLBACK["p3_time_between_shots"], optional=True
+            ),
             # Fallback used ONLY when a zone has no readable max_daily_volume entity — e.g. a zone the
             # engine detected from its VWC sensor but the integration never built a cap entity for
             # (num_zones < detected zones). Must fail LOW: the integration's own entity maxes at 200 L,
             # so the engine can never grant more daily water than the UI can express. Was 300 (above the
             # UI max) which let orphaned zones free-run to 300 L/day while wired zones honoured their cap.
-            max_daily_volume=self._zone_num(room, zone, "max_daily_volume", 150),
+            max_daily_volume=self._zone_num(room, zone, "max_daily_volume", FALLBACK["max_daily_volume"]),
             field_capacity=fc,
-            max_ec=self._zone_num(room, zone, "maximum_ec", 9),
+            max_ec=self._zone_num(room, zone, "maximum_ec", FALLBACK["maximum_ec"]),
             stacking_on=self._on(
                 f"switch.crop_steering_{room.prefix}ec_stacking_enabled", False
             ),
-            watchdog_hours=self._zone_num(room, zone, "watchdog_hours", 3),
+            watchdog_hours=self._zone_num(room, zone, "watchdog_hours", FALLBACK["watchdog_hours"]),
             min_daily_volume=self._num(
                 f"input_number.crop_steering_{room.prefix}zone_{zone}_min_daily_ml_per_plant",
                 0.0,
             )
-            * self._zone_num(room, zone, "plant_count", 0)
+            * self._zone_num(room, zone, "plant_count", FALLBACK["plant_count"])
             / 1000.0,  # mL/plant x plants -> zone-L floor (0 if either unset)
             drown_ceiling=self._zone_num(
-                room, zone, "min_floor_drown_ceiling", 90, optional=True
+                room, zone, "min_floor_drown_ceiling", FALLBACK["min_floor_drown_ceiling"], optional=True
             ),  # hard anti-drown VWC cap on the floor (engine-only knob — no integration entity)
         )
         p, warns = validate_params(raw)
@@ -1863,7 +1869,7 @@ class Controller:
         if writes:
             current = {
                 "p1_target_vwc": p.p1_target, "field_capacity": p.field_capacity,
-                "p2_vwc_threshold": self._zone_num(room, zone, "p2_vwc_threshold", 45, optional=True),
+                "p2_vwc_threshold": self._zone_num(room, zone, "p2_vwc_threshold", FALLBACK["p2_vwc_threshold"], optional=True),
                 "p3_emergency_vwc_threshold": p.p3_emergency_floor, "p2_shot_size": p.p2_shot_size,
             }
             h = now.hour + now.minute / 60.0
@@ -3675,7 +3681,7 @@ class Controller:
         (the machine-gun: per-plant 6 L / zone flow -> ~36x too short, VWC never rises).
         """
         per_plant = self._zone_num(room, zone, "substrate_volume", self.substrate_l)
-        pc = self._zone_num(room, zone, "plant_count", 0)
+        pc = self._zone_num(room, zone, "plant_count", FALLBACK["plant_count"])
         return per_plant * pc if pc > 0 else per_plant
 
     def _zone_flow_lps(self, room, zone):
@@ -3695,8 +3701,8 @@ class Controller:
                     if not math.isfinite(value) or value <= 0:
                         return 0.0
                     break
-        pc = self._zone_num(room, zone, "plant_count", 0) or 1
-        dpp = self._zone_num(room, zone, "drippers_per_plant", 1)
+        pc = self._zone_num(room, zone, "plant_count", FALLBACK["plant_count"]) or 1
+        dpp = self._zone_num(room, zone, "drippers_per_plant", FALLBACK["drippers_per_plant"])
         fr = self._zone_num(
             room,
             zone,
@@ -4158,7 +4164,7 @@ class Controller:
             # The EC steer runs on ec_smooth, which only settled readings feed (see _settled_ec).
             if (snap.ec is not None and snap.ec_smooth is not None and p.stacking_on
                     and st["phase"] == "P2" and p.ec_target_p2 > 0):
-                base = self._zone_num(room, zone, "p2_vwc_threshold", 45)
+                base = self._zone_num(room, zone, "p2_vwc_threshold", FALLBACK["p2_vwc_threshold"])
                 les = st.get("last_ec_steer")
                 # Jev's Salt judge chooses how: steer (as always), hold the offset, or decay it toward 0.
                 ec_mode = getattr(jev_dirs.get("ec_mode"), "value", "steer")
@@ -4574,7 +4580,7 @@ class Controller:
                 fc = f"{st['peak']:.0f}" if st.get("peak") else "—"
                 water = f"{st['daily_vol']:.1f}L day"
                 if per_plant:  # each plant's share; a zone without a plant count stays in litres
-                    plants = self._zone_num(room, z, "plant_count", 0)
+                    plants = self._zone_num(room, z, "plant_count", FALLBACK["plant_count"])
                     if plants >= 1 and float(plants).is_integer():
                         ml = st["daily_vol"] * 1000 / plants
                         water = f"{ml:.0f} mL/plant day" if ml < 1000 else f"{ml / 1000:.1f} L/plant day"

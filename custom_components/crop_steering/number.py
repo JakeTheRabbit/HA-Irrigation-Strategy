@@ -13,6 +13,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
+from .generated.defaults import ENTITY_DEFAULTS
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .sizing import SIZING_KEYS, configured_sizing, prefer_setup_value
 
@@ -254,6 +255,19 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
     ),
+    # Minutes from the last shot before a P3 emergency shot may go, so a rescue reaches the probe
+    # before moisture is judged again. 0 turns the gap off. The controller falls back to the same
+    # 10 when an older integration has no such entity.
+    NumberEntityDescription(
+        key="p3_time_between_shots",
+        name="P3 Time Between Shots",
+        icon="mdi:timer-outline",
+        native_min_value=0.0,
+        native_max_value=60.0,
+        native_step=1.0,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        mode="box",
+    ),
     # EC Target Parameters - CRITICAL MISSING ENTITIES
     NumberEntityDescription(
         key="ec_target_veg_p0",
@@ -401,48 +415,9 @@ NUMBER_DESCRIPTIONS = [
     ),
 ]
 
-# Default values (shared by global + per-zone entities).
-DEFAULT_VALUES = {
-    "max_shot_duration": 900,
-    "substrate_volume": 10.0,
-    "dripper_flow_rate": 1.2,
-    "drippers_per_plant": 2,
-    "field_capacity": 70.0,
-    "maximum_ec": 9.0,
-    "watchdog_hours": 3.0,
-    # The middle of Athena's overnight dryback ranges (veg 30-40%, gen 40-50%, % below the peak).
-    # A room set up before keeps its own (restored), the old 50/40 included.
-    "vegetative_dryback_target": 35.0,
-    "generative_dryback_target": 45.0,
-    "p1_target_vwc": 65.0,
-    "p2_vwc_threshold": 60.0,
-    "p0_maximum_wait_time": 120.0,
-    "p0_dryback_drop_percent": 15.0,
-    "p1_initial_shot_size": 2.0,
-    "p1_shot_size_increment": 0.5,
-    "p1_time_between_shots": 15.0,
-    "p1_maximum_shots": 6.0,
-    "p1_minimum_shots": 3.0,
-    "p2_shot_size": 5.0,
-    "p2_ec_high_threshold": 1.2,
-    "p2_ec_low_threshold": 0.8,
-    "p3_emergency_vwc_threshold": 40.0,
-    "p3_emergency_shot_size": 2.0,
-    "ec_target_veg_p0": 3.0,
-    "ec_target_veg_p1": 3.0,
-    "ec_target_veg_p2": 3.2,
-    "ec_target_veg_p3": 3.0,
-    "ec_target_gen_p0": 4.0,
-    "ec_target_gen_p1": 5.0,
-    "ec_target_gen_p2": 6.0,
-    "ec_target_gen_p3": 4.5,
-    "irrigation_ph_min": 5.8,
-    "irrigation_ph_max": 6.2,
-    "irrigation_ec_min": 0.0,
-    "irrigation_ec_max": 0.0,
-    "lights_on_hour": 12,
-    "lights_off_hour": 0,
-}
+# Default values (shared by global + per-zone entities): the entity-default column of the one
+# defaults table, which the controller's fallbacks sit beside (generated/defaults.py).
+DEFAULT_VALUES = ENTITY_DEFAULTS
 
 # Steering params that ALSO get per-zone overrides (number.crop_steering_zone_N_<...>).
 # Hardware/substrate (substrate_volume, dripper_flow_rate, drippers_per_plant) and
@@ -465,6 +440,7 @@ PER_ZONE_STEERING_KEYS = [
     "p2_shot_size",
     "p3_emergency_vwc_threshold",
     "p3_emergency_shot_size",
+    "p3_time_between_shots",
     "ec_target_veg_p0",
     "ec_target_veg_p1",
     "ec_target_veg_p2",
@@ -582,7 +558,9 @@ async def async_setup_entry(
                     mode="box",
                 ),
                 zone_num=zone_num,
-                default_value=zone_cfg.get("plant_count", 4),
+                default_value=zone_cfg.get(
+                    "plant_count", ENTITY_DEFAULTS["plant_count"]
+                ),
             )
         )
 
@@ -637,7 +615,9 @@ async def async_setup_entry(
                     mode="box",
                 ),
                 zone_num=zone_num,
-                default_value=zone_cfg.get("max_daily_volume", 20.0),
+                default_value=zone_cfg.get(
+                    "max_daily_volume", ENTITY_DEFAULTS["max_daily_volume"]
+                ),
             )
         )
 

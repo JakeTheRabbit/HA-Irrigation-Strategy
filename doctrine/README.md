@@ -37,7 +37,7 @@ The build fails when any of these checks fails:
 3. **Statements come from the code.** 46 statements are checked:
    - 24 about `decide()`, each by **calling** the engine on constructed scenarios (constants, bounds and cap
      exemptions are read from the module). PH-8 to PH-10 pin down what `dryback_target` does and does not do;
-     PH-11 reads the integration's default dryback targets and P0 wait from `number.py`; IR-2 shows that a
+     PH-11 reads the integration's default dryback targets and P0 wait from the engine's `defaults.py`; IR-2 shows that a
      maximum-EC block or hold stops every other shot on that tick.
    - 14 controller and integration facts (CT-1 to CT-14), checked against the source text of `controller.py`,
      `auto_setpoints.py` and `number.py`. CT-14 also calls `zone_safety_status()`. These are **text checks**:
@@ -79,7 +79,7 @@ The build fails when any of these checks fails:
 5. **Generated files current** (`--check`): every output matches, and no file is left in `compiled/` that the
    build no longer produces (a write run deletes such files). An output goes stale only when a value the pack
    prints changes: from `core.py` (constants, parameter bounds, cap exemptions, the `ec_adjust` table, the
-   status-tile words, the assumed feed EC default) or from `number.py` (the default dryback targets and P0 wait
+   status-tile words, the assumed feed EC default) or from `defaults.py` (the default dryback targets and P0 wait
    that PH-11 quotes).
 6. **Controller copy.** When the controller's copy of `compiled/` exists (`addons/<app>/<package>/doctrine/`),
    `--check` compares it byte for byte with `compiled/` (a one-byte edit, a missing file or an extra file fails)
@@ -91,7 +91,7 @@ The hashes of the code files a run was checked against are printed in the log an
 
 ### What a change to the code owes this pack
 
-- A change to a value the pack prints (from `core.py`, or `number.py`'s default dryback targets and P0 wait)
+- A change to a value the pack prints (from `core.py`, or `defaults.py`'s default dryback targets and P0 wait)
   regenerates `02-engine-rules.md`, `engine-rules.generated.json` and `compiled/` in the same commit, and the
   controller's copy once it exists.
 - A change that makes a checked sentence false in `core.py`, the controller, `jev_bridge.py`,
