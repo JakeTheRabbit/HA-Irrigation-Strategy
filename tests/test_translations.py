@@ -59,7 +59,7 @@ def test_every_configure_menu_entry_has_a_label():
         1
     )
     entries = set(re.findall(r'"([a-z_]+)"', menu))
-    assert len(entries) >= 3  # the scan still works
+    assert len(entries) >= 2  # the scan still works
     assert entries == set(_strings()["options"]["step"]["init"]["menu_options"])
 
 
@@ -127,7 +127,7 @@ RUNTIME = [
     *(ROOT / "crop-steering-engine" / "src").rglob("*.py"),
 ]
 # Modules that collect, validate or parse the answer. Using it at runtime is something else.
-SETUP_ONLY = {"config_flow.py", "setup_api.py", "env_parser.py"}
+SETUP_ONLY = {"config_flow.py", "setup_api.py"}
 
 
 def _runtime_consumers(key):

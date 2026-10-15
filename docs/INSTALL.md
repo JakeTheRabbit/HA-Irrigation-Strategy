@@ -96,6 +96,8 @@ Update an existing controller in place from this repository. The old `JakeTheRab
 
 If an update is missing from the app store, refresh the repository information first. Use Update for published versions or Rebuild for a local source installation. HACS and the app store update separate components.
 
+A room first set up from a `crop_steering.env` file keeps loading and running on what its entry stored; the file is no longer read. Setup no longer imports one and Configure no longer reloads one. To set up another room, or to rebuild one, keep the old file open as a checklist and pick the same switches and probes in the setup wizard, which checks units, valves and the pump before it saves.
+
 ### Moving a room's kill switch
 
 Each room has one kill switch: the switch that must be ON before anything in it is watered. The controller names it on the room's heartbeat, and the sidebar and Settings → Repairs name the same switch. An update never moves it; moving it is your decision.

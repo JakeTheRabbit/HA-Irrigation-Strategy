@@ -6,13 +6,11 @@ set up first, and a room that was deleted and set up again moved between the two
 new room is always `crop_steering_<slug>_*`, from its name. Rooms already installed keep the ids
 their registry holds: dashboards, automations and history hang off them.
 
-One exception: a .env import still makes the un-prefixed room. The controller app's kill switch and
-feed probe options govern that room, and this integration cannot see them, so a slug would move its
-kill switch and drop its source-water gate without a word.
+A room set up from a crop_steering.env file before setup stopped reading one keeps the un-prefixed ids
+it was given, as every upgraded room does.
 """
 
 import pytest
-from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 
 from conftest import room_of, switch_calls
@@ -45,56 +43,6 @@ async def test_a_new_installs_first_room_has_a_slug_and_every_id_carries_it(hass
     assert hass.states.get("sensor.crop_steering_tent_engine_config").attributes["prefix"] == "tent_"
     assert hass.states.get("sensor.crop_steering_engine_config") is None
 
-
-ENV_FILE = "ZONE_1_SWITCH=switch.bench_valve\nZONE_1_VWC_SENSORS=sensor.bench_vwc\nZONE_1_EC_SENSORS=sensor.bench_ec\n"
-
-
-async def _import_env(hass, tmp_path, name):
-    """A fresh install set up from a crop_steering.env file instead of the wizard."""
-    (tmp_path / "crop_steering.env").write_text(ENV_FILE, encoding="utf-8")
-    hass.config.config_dir = str(tmp_path)
-    hass.states.async_set("switch.bench_valve", "off")
-    hass.states.async_set("sensor.bench_vwc", "41", {"unit_of_measurement": "%"})
-    hass.states.async_set("sensor.bench_ec", "3.1", {"unit_of_measurement": "mS/cm"})
-    flow = hass.config_entries.flow
-    result = await flow.async_init(DOMAIN, context={"source": "user"})
-    assert result["step_id"] == "user"
-    result = await flow.async_configure(result["flow_id"], {"name": name, "config_method": "env"})
-    await hass.async_block_till_done()
-    return result
-
-
-async def test_a_new_install_imported_from_env_stays_the_un_prefixed_room_the_app_options_govern(
-    hass, tmp_path, controller_for
-):
-    result = await _import_env(hass, tmp_path, "Veg Tent")
-    assert result["type"] is FlowResultType.CREATE_ENTRY, result
-    entry = result["result"]
-    assert entry.data["config_method"] == "env"
-    assert (entry.data["room_slug"], entry.data["room_prefix"]) == ("default", "")
-    assert entry.unique_id == "default"
-    assert not any("crop_steering_veg_tent_" in i for i in _ids(hass, entry))
-    descriptor = hass.states.get("sensor.crop_steering_engine_config").attributes
-    assert descriptor["prefix"] == "" and descriptor["setup_revision"] == 0
-
-    kill = "input_boolean.bench_kill_switch"  # the operator's own helper, named in the app option
-    hass.states.async_set(kill, "on")
-    hass.states.async_set("sensor.app_feed_ec", "3.5", {"unit_of_measurement": "mS/cm"})
-    hass.states.async_set("sensor.app_feed_ph", "6.0")
-    c, fake, _clock = controller_for(
-        {"enable_flag": kill, "feed_ec_sensor": "sensor.app_feed_ec", "feed_ph_sensor": "sensor.app_feed_ph"}
-    )
-    room = room_of(c, "")
-    assert sorted(room.zones) == [1] and room.hw["valves"] == {1: "switch.bench_valve"}
-    assert room.enable_flag == kill
-    assert (room.feed_ec_sensor, room.feed_ph_sensor) == ("sensor.app_feed_ec", "sensor.app_feed_ph")
-    fake.set_state("switch.crop_steering_room_active", "on")
-    fake.set_state("switch.crop_steering_zone_1_enabled", "on")
-    fake.set_state("number.crop_steering_irrigation_ec_min", "1.0")
-    fake.set_state("number.crop_steering_irrigation_ec_max", "2.0")
-    assert "source-water EC 3.5" in c._blocked(room, 1)  # the app's feed probe gates the room
-    fake.set_state(kill, "off")
-    assert "disabled" in c._blocked(room, 1)  # the app's kill switch holds the room
 
 
 @pytest.mark.parametrize(

@@ -50,7 +50,7 @@ async def test_the_first_page_of_setup_asks_how_the_room_drains(hass):
     assert result["step_id"] == "user"
     asked = {str(marker): marker for marker in result["data_schema"].schema}
     assert asked["drainage"].default() == "unknown"  # a person who is not sure is watched, as tables are
-    entry = await _wizard(hass, {"name": "Tent", "config_method": "manual", "drainage": "free_drain"})
+    entry = await _wizard(hass, {"name": "Tent", "drainage": "free_drain"})
     assert entry.data["drainage"] == "free_drain"
     drainage = hass.states.get(NEW_DRAINAGE)
     assert drainage.state == "free_drain"
@@ -65,7 +65,7 @@ async def test_the_first_page_of_setup_asks_how_the_room_drains(hass):
 
 
 async def test_a_new_room_left_unsaid_reads_unknown_and_its_threshold_starts_at_20_w(hass):
-    await _wizard(hass, {"name": "Tent", "config_method": "manual"})
+    await _wizard(hass, {"name": "Tent"})
     assert hass.states.get(NEW_DRAINAGE).state == "unknown"
     threshold = hass.states.get(NEW_THRESHOLD)
     assert float(threshold.state) == 20 and threshold.attributes["unit_of_measurement"] == "W"
@@ -74,7 +74,7 @@ async def test_a_new_room_left_unsaid_reads_unknown_and_its_threshold_starts_at_
 
 
 async def test_a_room_added_later_is_asked_too(hass):
-    await _wizard(hass, {"name": "Tent", "config_method": "manual"})
+    await _wizard(hass, {"name": "Tent"})
     hass.states.async_set("switch.veg_valve", "off")
     flow = hass.config_entries.flow
     result = await flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
