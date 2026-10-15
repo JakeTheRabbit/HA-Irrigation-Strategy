@@ -522,7 +522,8 @@ def retryable(error):
     if error.startswith("HTTP "):
         code = error[5:8]
         return code == "429" or code.startswith("5")
-    return error not in (NO_REQUESTS, NOT_JSON, NO_ANSWERS)
+    return not error.startswith((NO_REQUESTS, NOT_JSON, NO_ANSWERS, BAD_OUTPUT, REFUSED, BUDGET, NO_SDK, PAUSED,
+                                 NO_CONTEXT, INTERNAL))
 
 
 @dataclass
@@ -532,7 +533,7 @@ class Route:
     name: str
     fn: object
     account: str
-    token: str
+    token: str = field(repr=False)
     gateway: str | None = None
 
 
