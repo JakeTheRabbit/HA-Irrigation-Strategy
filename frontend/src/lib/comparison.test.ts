@@ -135,7 +135,7 @@ describe("bounded Recorder windows", () => {
     );
     expect(result.series[0].daily).toEqual([]);
     expect(result.series[0].points.every((p) => p.value === null)).toBe(true);
-    expect(result.warnings.join(" ")).toMatch(/retention expired/);
+    expect(result.warnings.join(" ")).toMatch(/retention time is over/);
   });
   it("drops end boundary, NaN and unavailable states from numeric summaries", async () => {
     const result = await loadHistoryWindow(

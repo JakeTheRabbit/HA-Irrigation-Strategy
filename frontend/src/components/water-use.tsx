@@ -305,10 +305,10 @@ function WaterUseBody({
                   This week
                   <Hint label="About this week">
                     {rows.every((row) => row.use.week.growWeek)
-                      ? "The current grow week: grow-days counted in sevens from the grow start, today included."
+                      ? "The current grow week: grow-days in groups of 7 from the grow start, today included."
                       : rows.some((row) => row.use.week.growWeek)
-                        ? "The current grow week where a zone has a grow start, otherwise the last 7 grow-days, today included."
-                        : "The last 7 grow-days, today included: there is no grow start to count weeks from."}
+                        ? "The current grow week of a zone with a grow start: grow-days in groups of 7, today included. A zone without a grow start uses the last 7 grow-days."
+                        : "The last 7 grow-days, today included. No zone has a grow start, so the dashboard cannot count grow weeks."}
                   </Hint>
                 </span>
               </th>
@@ -317,8 +317,9 @@ function WaterUseBody({
                 <span className="wu-th">
                   Estimated total
                   <Hint label="About the estimate">
-                    Used so far plus the last 7 full grow-days’ average for every grow-day left in
-                    the grow plan. Without a plan length: that average for 7 days, per week.
+                    The water used so far, plus the average of the last 7 full grow-days for each
+                    grow-day left in the grow plan. Without a plan length, the dashboard gives that
+                    average for 7 days, as the water for one week.
                   </Hint>
                 </span>
               </th>

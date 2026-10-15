@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ReviewDialog, Status } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
+import { UI_COPY } from "@/lib/ste-copy";
 import { allZones, allZonesChanges } from "@/lib/all-zones";
 import {
   autoFrozenReason,
@@ -50,8 +51,8 @@ function RoomDialog({
       ]}
       note={
         on
-          ? `Nothing growing in ${name}? Irrigation and alerts stop until you switch it back on.`
-          : "Back on within a day, it carries on where it was. After longer, it starts a fresh run: daily counters and learned phase state reset."
+          ? `Set ${name} to off only when no plants are in it. Off: the controller does not water the room and sends no alerts for it.`
+          : "On within one day: the room continues from where it stopped. On after more than one day: the counters and the phase data reset."
       }
     />
   );
@@ -86,7 +87,9 @@ function WateringDialog({
             ]
           : []
       }
-      note="Switching watering off also stops a running shot within a few seconds. It is not an emergency stop: use the installation's physical shut-off for that."
+      note={UI_COPY["review watering"].impact}
+      warning={UI_COPY["review watering"].warning}
+      caution={UI_COPY["review watering"].caution}
     />
   );
 }
@@ -184,8 +187,8 @@ export function SafetySwitches({ controller }: { controller: Controller }) {
           watering === null
             ? "This room's watering switch is missing or unavailable in Home Assistant."
             : watering
-              ? "The controller may water this room. Switch it off to stop every shot."
-              : "The controller opens no valve in this room. Switch it on to let it water."
+              ? "The controller can water this room. Set the switch to off, and the controller gives no shots."
+              : "The controller opens no valve in this room. Set the switch to on, and the controller can water again."
         }
         disabled={
           !room.engine.entityId ||
@@ -207,8 +210,8 @@ export function SafetySwitches({ controller }: { controller: Controller }) {
           aria-label={`${on ? "Room on" : "Room off"}: ${on ? "switch room off…" : "switch room on…"}`}
           title={
             on
-              ? "Switch the room off when nothing is growing: no irrigation and no alerts."
-              : "Nothing is growing: no irrigation and no alerts. Switch it on for the next crop."
+              ? "Set the room to off when no plants are in it: no shots and no alerts."
+              : "No plants in the room: no shots and no alerts. Set it to on for the next crop."
           }
           disabled={!writable(controller, room.roomActiveEntity)}
           onClick={() => setReview("room")}
@@ -287,10 +290,10 @@ export function RoomOffBanner({ controller }: { controller: Controller }) {
     <div className="room-off-banner" role="status">
       <Power size={18} aria-hidden="true" />
       <div>
-        <strong>Room off – no irrigation, no alerts</strong>
+        <strong>Room off – no shots, no alerts</strong>
         <p>
-          Nothing is growing in {controller.room.room.name}. Readings are still shown, but the
-          engine will not water this room or raise alerts for it.
+          No plants are in {controller.room.room.name}. The dashboard still shows the readings, but
+          the controller does not water this room or send alerts for it.
         </p>
       </div>
       <RoomPower controller={controller} showStatus={false} />
@@ -313,7 +316,7 @@ export function AutoSetpointsControl({
   const { entityId, enabled } = controller.room.autoSetpoints;
   if (!entityId) return null;
   const name = controller.room.room.name;
-  const what = jevManaged ? "Jev manages the P2 shot size and re-water point" : "Auto setpoints";
+  const what = jevManaged ? "AI assistant: P2 shot size, re-water point" : "Auto setpoints";
   return (
     <>
       <div className="room-power" role="group" aria-label={`${name} auto setpoints`}>
@@ -324,8 +327,8 @@ export function AutoSetpointsControl({
               ? enabled === true
                 ? what
                 : enabled === false
-                  ? "Jev leaves the setpoints alone"
-                  : "Jev’s setpoints unavailable"
+                  ? "The AI assistant does not change the setpoints"
+                  : "AI assistant setpoints unavailable"
               : enabled === true
                 ? "Auto setpoints on"
                 : enabled === false
@@ -359,11 +362,11 @@ export function AutoSetpointsControl({
         note={
           jevManaged
             ? enabled
-              ? "The engine still fires every shot. Jev stops moving each zone's P2 shot size and re-water point; they keep their current values until you change them."
-              : "The engine still fires every shot. Jev may move each zone's P2 shot size and re-water point within its range, one small step a night; your own value stays the centre of that range."
+              ? "The controller continues to give every shot. The AI assistant stops changes to the P2 shot size and the re-water point of each zone. They keep their current values until you change them."
+              : "The controller continues to give every shot. The AI assistant can change the P2 shot size and the re-water point of each zone inside its range, one small step each night. Your own value stays the centre of that range."
             : enabled
-              ? "The engine still fires every shot. Managed setpoints will no longer be rewritten automatically; they keep their current values until you change them."
-              : "The engine still fires every shot. Managed setpoints will be rewritten automatically from what the probes do, so manual edits to those fields will be overwritten."
+              ? "The controller continues to give every shot. The controller stops changes to the managed setpoints. They keep their current values until you change them."
+              : "The controller continues to give every shot. The controller changes the managed setpoints from the probe readings, and it replaces a value that you set by hand."
         }
       />
     </>
@@ -401,7 +404,7 @@ export function AutoZoneChip({ status, name }: { status: AutoSetpointStatus; nam
         Last change <b>{status.lastChange ?? "none yet"}</b>
       </span>
       <span>
-        Jev: <b>{status.jev ?? "not reported"}</b>
+        AI assistant: <b>{status.jev ?? "not reported"}</b>
       </span>
     </div>
   );

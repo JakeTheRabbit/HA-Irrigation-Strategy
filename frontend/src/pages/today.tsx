@@ -36,7 +36,7 @@ import "./today.css";
 const H = 3_600_000;
 const PHASE_NAMES: Record<string, string> = {
   P0: "Morning dryback",
-  P1: "Ramp-up",
+  P1: "Ramp",
   P2: "Maintenance",
   P3: "Overnight dryback",
 };
@@ -746,7 +746,7 @@ function JevToday({
   );
   const check =
     day && managed
-      ? ` · Jev’s next setpoint check tonight ${clock(day.lightsOff)}–${clock(day.lightsOff + 3 * H)}`
+      ? ` · Next setpoint check of the AI assistant tonight ${clock(day.lightsOff)}–${clock(day.lightsOff + 3 * H)}`
       : "";
   return (
     <section className="panel today-jev" aria-labelledby="today-jev-title" data-jev-today>

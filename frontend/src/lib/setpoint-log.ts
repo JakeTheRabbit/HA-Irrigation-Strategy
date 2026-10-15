@@ -23,7 +23,7 @@ export interface SetpointLogDocument {
 export const WRITER_WORDS: Record<SetpointWriter, string> = {
   operator: "By hand",
   learner: "Auto setpoints",
-  brain: "AI brain",
+  brain: "AI assistant",
   safety: "Put back for safety",
   home_assistant: "Home Assistant",
 };

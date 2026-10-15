@@ -12,8 +12,8 @@ const TOKENS = /p[0-3]_|_threshold|\bvwc\b|pwec|enter p/;
 describe("grower words", () => {
   it("names a setting the way the Irrigation plan does", () => {
     expect(growerWords("setpoint p2_shot_size 4")).toBe("setpoint maintenance shot 4");
-    expect(growerWords("p2 vwc threshold 62 -> 61")).toBe("maintenance trigger 62 -> 61");
-    expect(growerWords("zone_2_p3_emergency_vwc_threshold below")).toBe("rescue level below");
+    expect(growerWords("p2 vwc threshold 62 -> 61")).toBe("re-water point 62 -> 61");
+    expect(growerWords("zone_2_p3_emergency_vwc_threshold below")).toBe("rescue floor below");
     expect(growerWords("vegetative_dryback_target 30")).toBe("P3 dryback target 30");
   });
   it("says what a phase call does", () => {
@@ -35,7 +35,7 @@ describe("grower words", () => {
       "P1 → P2: target VWC reached (demo).",
       "CS-705: this zone is off the stage's arc",
       "Peak VWC target 64 -> 66",
-      "inside Jev's range 3.5–5.5%",
+      "inside the AI assistant's range 3.5–5.5%",
     ])
       expect(growerWords(text)).toBe(text);
   });

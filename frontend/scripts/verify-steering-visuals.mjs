@@ -205,7 +205,7 @@ try {
     await open("overview");
     const banner = page.locator(".room-off-banner");
     await banner.waitFor();
-    assert.match(await banner.innerText(), /no irrigation, no alerts/i);
+    assert.match(await banner.innerText(), /no shots, no alerts/i);
     assert.match(await page.locator('.room-chip[data-room="room:"]').innerText(), /Room off/);
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({

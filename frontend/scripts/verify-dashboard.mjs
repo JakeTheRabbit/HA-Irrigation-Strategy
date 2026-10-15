@@ -331,6 +331,14 @@ try {
         .click();
       const review = page.getByRole("dialog", { name: "Review the kill switch" });
       await expectVisible(review);
+      // The review says, before the values, that the kill switch is no emergency stop.
+      const warning = review.getByRole("note").filter({ hasText: /^WARNING:/ });
+      await expectVisible(warning);
+      assert.match(
+        await warning.innerText(),
+        /^WARNING: Do not use this switch as an emergency stop\. Use the physical shut-off/,
+      );
+      await expectVisible(review.getByRole("note").filter({ hasText: /^CAUTION:/ }));
       await axe("header: watering review");
       await review.getByRole("button", { name: /Apply 1 change/ }).click();
       await review.waitFor({ state: "hidden" });
@@ -352,7 +360,7 @@ try {
     const stopped = page.locator(".today-stopped");
     assert.match(
       await stopped.innerText(),
-      /Not watering\. Watering is switched off for this room \(its engine switch\)/,
+      /Not watering\. The kill switch \(Watering\) of this room is off/,
     );
     assert.match(
       await page.locator('.room-chip[data-room="room:room_b_"]').innerText(),
@@ -599,7 +607,7 @@ try {
     await expectVisible(jev);
     assert.match(
       await jev.locator(".zone-jev-setpoints").innerText(),
-      /^Jev may move the P2 shot size 3\.5–5\.5% \(yours 4\.5%, now 4%\) and re-water point 59–62% \(yours 61%\)\. Last change /,
+      /^The AI assistant can change the P2 shot size 3\.5–5\.5% \(yours 4\.5%, now 4%\) and re-water point 59–62% \(yours 61%\)\. Last change /,
     );
     const decisions = jev.getByRole("list", { name: "Last AI assistant decisions" });
     assert.ok((await decisions.locator("li").count()) > 0);
@@ -617,8 +625,8 @@ try {
     const targets = page.locator(".zone-targets");
     await expectVisible(targets);
     assert.deepEqual(await targets.locator(".jev-chip").allInnerTexts(), [
-      "Jev · 59–62 %",
-      "Jev · 3.5–5.5 %",
+      "AI assistant · 59–62 %",
+      "AI assistant · 3.5–5.5 %",
     ]);
     // Pause scheduling, through its review.
     const controls = page.locator(".zone-controls");
@@ -700,9 +708,9 @@ try {
       await review.waitFor({ state: "hidden" });
       await expectVisible(page.locator(`.zone-page-title .pill[data-phase="${to.slice(0, 2)}"]`));
     };
-    await move("P1 · Ramp-up", "P2 · Maintenance");
+    await move("P1 · Ramp", "P2 · Maintenance");
     await axe("zone phase picker");
-    await move("P2 · Maintenance", "P1 · Ramp-up");
+    await move("P2 · Maintenance", "P1 · Ramp");
   });
   await check("zone page: each zone says what the controller waits for next", async () => {
     // The controller's own thresholds against the readings now, as the demo's controller publishes
@@ -757,12 +765,12 @@ try {
       const phases = await table.locator(".targets-phase th").allInnerTexts();
       assert.deepEqual(
         phases.map((text) => text.replace(/\s+/g, " ").trim()),
-        ["P0 Morning dryback", "P1 Ramp-up", "P2 Maintenance", "P3 Overnight dryback"],
+        ["P0 Morning dryback", "P1 Ramp", "P2 Maintenance", "P3 Overnight dryback"],
       );
       const chips = await table.locator(".jev-chip").allInnerTexts();
-      assert.deepEqual(chips, ["Jev · 59–62 %", "Jev · 3–5 %"]);
+      assert.deepEqual(chips, ["AI assistant · 59–62 %", "AI assistant · 3–5 %"]);
       // With Jev's Setpoints judge on the room, the Auto switch says what it lets Jev do.
-      await expectVisible(page.getByText("Jev manages the P2 shot size and re-water point"));
+      await expectVisible(page.getByText("AI assistant: P2 shot size, re-water point"));
       // Edit, Review, Apply & verify: the stepper is on its first step while editing.
       assert.match(
         await page.locator('.workflow-steps [aria-current="step"]').innerText(),
@@ -908,7 +916,7 @@ try {
       "YESTERDAY",
     ]);
     // Jev's actions by default; every decision on request.
-    const toggle = page.getByLabel("All Jev decisions");
+    const toggle = page.getByLabel("All AI assistant decisions");
     await toggle.check();
     assert.ok((await rows.count()) > all, "every decision shows more rows");
     await toggle.uncheck();
@@ -931,7 +939,7 @@ try {
     // A setpoint changed by hand is yours; Jev only noted it.
     await types.getByRole("button", { name: "Setpoints", exact: true }).click();
     await expectVisible(page.locator('.timeline-jev-tag[data-by="you"]').first());
-    await expectVisible(page.getByText("Noted by Jev").first());
+    await expectVisible(page.getByText("Noted by the AI assistant").first());
     await types.getByRole("button", { name: "All", exact: true }).click();
     await inBothThemes("timeline", async () => {
       await go("history/timeline");
@@ -940,7 +948,7 @@ try {
     // A room without Jev: its controller records, without Jev's toggle.
     await go("history/timeline", "room_b");
     await expectVisible(page.locator(".timeline-row").first());
-    assert.equal(await page.getByLabel("All Jev decisions").count(), 0);
+    assert.equal(await page.getByLabel("All AI assistant decisions").count(), 0);
     assert.equal(await page.locator('.timeline-row[data-source="jev"]').count(), 0);
     // Every kind of record is coloured the way the pills are: water blue, phase violet, alerts amber.
     const colours = await page
@@ -960,7 +968,7 @@ try {
     await download.saveAs(path.join(out, "timeline-export.csv"));
     const csv = await readFile(path.join(out, "timeline-export.csv"), "utf8");
     assert.match(csv, /Timestamp.*Room.*Zone.*Type.*Message.*Result/);
-    assert.match(csv, /"Jev · /);
+    assert.match(csv, /"AI assistant · /);
   });
   await check("a zone page's Jev history opens the timeline on that zone", async () => {
     await go("zone/2");
@@ -2254,7 +2262,7 @@ try {
       "Pore EC",
       "Dryback",
       "P0 · Morning dryback",
-      "P1 · Ramp-up",
+      "P1 · Ramp",
       "P2 · Maintenance",
       "P3 · Overnight dryback",
     ])

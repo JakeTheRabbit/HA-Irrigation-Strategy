@@ -553,7 +553,7 @@ export function Dosing({
             : "by itself: the pump times the dose.",
         },
       ],
-      note: "Watering carries on while a single dose runs.",
+      note: "The shots continue while a single dose runs.",
       confirm: `Start ${view.pump.name}`,
       data: { action: "dose", pump: view.pump.id, ml },
     });

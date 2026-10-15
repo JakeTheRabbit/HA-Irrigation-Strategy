@@ -75,7 +75,7 @@ describe("setpoint planning curve", () => {
     const plan = buildPlanningCurve({ ...rest, p2_vwc_threshold: 75 }, 6, 18);
     expect(plan.morningDrybackVwc).toBeCloseTo(54.4);
     expect(plan.notes.join(" ")).toMatch(/peak VWC target.*reference/);
-    expect(plan.warnings.join(" ")).toMatch(/trigger.*above.*target/i);
+    expect(plan.warnings.join(" ")).toMatch(/re-water point.*above.*target/i);
   });
   it("draws only supplied eligible ramp-up windows before the P3 cutoff", () => {
     const plan = buildPlanningCurve(parameters, 6, 18);
@@ -119,7 +119,7 @@ describe("setpoint planning curve", () => {
     expect(draft.ec).toEqual(baseline.ec);
     expect(draft.emergencyReferenceActive).toBe(true);
     expect(baseline.emergencyReferenceActive).toBe(false);
-    expect(draft.warnings.join(" ")).toMatch(/rescue level.*does not predict or schedule one/);
+    expect(draft.warnings.join(" ")).toMatch(/rescue floor.*does not predict or schedule one/);
   });
   it("does not invent a night rise when the relative endpoint exceeds the daytime reference", () => {
     const plan = buildPlanningCurve({ ...parameters, dryback_target: 5 }, 6, 18);
@@ -239,7 +239,7 @@ describe("rendered planning curve", () => {
     expect(after).toContain("Rescue shot when below 42.5% VWC");
     for (const html of [before, after]) {
       expect(line(html, "baseline-p3-floor")).toBeDefined();
-      expect(html).toContain("Saved rescue level: 38% VWC");
+      expect(html).toContain("Saved rescue floor: 38% VWC");
     }
     expect(after).toContain('data-planning-line="baseline-vwc"');
     expect(after).toContain('data-planning-line="ec"');

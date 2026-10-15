@@ -41,8 +41,8 @@ export const DETAIL_HEADINGS: ReadonlyArray<readonly [keyof SettingDetail, strin
 
 /** The phase groups, in order; the Irrigation plan files the EC targets under them too. */
 export const PHASE_GROUPS = [
-  "P0 · Additional dryback",
-  "P1 · Ramp-up",
+  "P0 · Extra dryback",
+  "P1 · Ramp",
   "P2 · Maintenance",
   "P3 · Overnight dryback",
 ] as const;
@@ -66,11 +66,11 @@ const WORDS: Record<string, SettingWords> = {
     label: "Latest first shot",
     short: "Latest first shot",
     tag: "time",
-    help: "The ramp starts this long after lights-on at the latest; sooner if moisture falls to the maintenance trigger.",
+    help: "The ramp starts this long after lights-on at the latest; sooner if moisture falls to the re-water point.",
   },
   p0_additional_dryback: {
-    label: "Additional dryback",
-    short: "Additional dryback",
+    label: "Extra dryback",
+    short: "Extra dryback",
     tag: "dries",
     help: "The ramp starts once moisture is this far below the highest reading since lights-on. 0 is off: P0 waits for the P3 dryback target.",
   },
@@ -102,7 +102,7 @@ const WORDS: Record<string, SettingWords> = {
   },
   p2_vwc_threshold: {
     label: "Maintenance shot when below",
-    short: "Maintenance trigger",
+    short: "Re-water point",
     tag: "waters",
     help: "Through the day, a maintenance shot fires whenever moisture reads below this. The peak VWC target down to here is the daytime dryback.",
   },
@@ -113,7 +113,7 @@ const WORDS: Record<string, SettingWords> = {
   },
   p3_emergency_vwc_threshold: {
     label: "Rescue shot when below",
-    short: "Rescue level",
+    short: "Rescue floor",
     tag: "rescues",
     help: "In P3, a rescue shot fires whenever moisture reads below this. Keep it above the wilting point.",
   },
@@ -248,20 +248,20 @@ const EC_STAGES =
 const DETAILS: Record<string, SettingDetail> = {
   p0_maximum_wait_time: {
     what: "How long after lights-on the first shot can wait: the plants start drinking before the day’s watering does.",
-    when: "P0 ends and the ramp starts at the first of: this long after lights-on; moisture at or below the maintenance trigger; moisture down by the additional dryback (or, while that is 0, the P3 dryback target) from its highest reading since lights-on. The ramp’s first shot then fires straight away, unless moisture is still at the peak VWC target.",
+    when: "P0 ends and the ramp starts at the first of: this long after lights-on; moisture at or below the re-water point; moisture down by the additional dryback (or, while that is 0, the P3 dryback target) from its highest reading since lights-on. The ramp’s first shot then fires straight away, unless moisture is still at the peak VWC target.",
     practice:
       "The first shot commonly comes 30 minutes to 2 hours after lights-on. The extra fall before it, the additional dryback, is commonly 1 to 5% and is planned, not a missed shot.",
   },
   p0_additional_dryback: {
     what: "How far moisture dries below its highest reading since lights-on before the first shot of the day, as a percentage of that reading: 3% of a 60% reading is 1.8 points.",
-    when: "In P0. The ramp starts once moisture is down by this much, or earlier at the latest first shot or the maintenance trigger. 0 turns it off, and P0 then waits for the P3 dryback target instead.",
+    when: "In P0. The ramp starts once moisture is down by this much, or earlier at the latest first shot or the re-water point. 0 turns it off, and P0 then waits for the P3 dryback target instead.",
     practice: "Commonly 1 to 5% after lights-on, before the first shot.",
   },
   p1_target_vwc: {
     what: "The moisture the morning ramp brings the substrate up to: the top of the day’s range.",
     when: "In P1, a ramp shot fires while moisture is below it (or below full saturation, if that is lower) and the time between P1 shots has passed. P1 hands over to P2 once moisture has reached it, the P1 minimum shots have fired (3 by default, set in Home Assistant) and substrate EC is no more than 15% above the P1 target; or after the most P1 shots.",
     affects:
-      "Where the day peaks, which the P3 dryback target is measured from, and how much runoff the ramp makes. The maintenance trigger is always kept at least 1 point below it.",
+      "Where the day peaks, which the P3 dryback target is measured from, and how much runoff the ramp makes. The re-water point is always kept at least 1 point below it.",
     auto: AUTO,
     practice:
       "Set between field capacity and full saturation, the ramp makes runoff, which steers vegetative; at or below field capacity it holds runoff back, which steers generative.",
@@ -286,13 +286,13 @@ const DETAILS: Record<string, SettingDetail> = {
   },
   p1_maximum_shots: {
     what: "The most shots the ramp fires.",
-    when: "After this many ramp shots P1 hands over to P2, wherever moisture is. P2 then waters whenever moisture reads below the maintenance trigger.",
+    when: "After this many ramp shots P1 hands over to P2, wherever moisture is. P2 then waters whenever moisture reads below the re-water point.",
   },
   p2_vwc_threshold: {
     what: "The level that triggers a daytime maintenance shot. The peak VWC target minus this is how far the substrate dries back during the day.",
     when: "Each time the controller checks in P2 (every minute by default), from the end of the ramp until P3: whenever moisture reads below it, a maintenance shot fires. It is a level, not a crossing: moisture does not need to have been above it first, and reading exactly the value does not fire. There is no minimum wait between maintenance shots; the daily water limit still applies.",
     affects:
-      "How often maintenance shots fire, runoff and substrate EC. In P0, reaching it ends the wait and starts the ramp. After P0, with lights on, the watchdog waters a zone below it that has had no shot for the watchdog interval. It is always kept at least 1 point below the peak VWC target and 3 points above the rescue level, whatever is entered.",
+      "How often maintenance shots fire, runoff and substrate EC. In P0, reaching it ends the wait and starts the ramp. After P0, with lights on, the watchdog waters a zone below it that has had no shot for the watchdog interval. It is always kept at least 1 point below the peak VWC target and 3 points above the rescue floor, whatever is entered.",
     stacking:
       "Moved 1 point down while substrate EC is under 90% of the P2 target (a bigger dryback, less runoff) and 1 point up while it is over 110%, checked every 30 minutes.",
     auto: "The controller adjusts this zone’s value itself: by day, one maintenance shot under the peak VWC target; from the time its plan stops maintenance shots for the dryback (3 hours before lights-off at the earliest on a vegetative zone, the middle of the day on a generative one), under where the P3 dryback target ends, through the night and P0. Auto setpoints is off by default.",
@@ -311,7 +311,7 @@ const DETAILS: Record<string, SettingDetail> = {
     what: "The overnight safety level.",
     when: "Each time the controller checks in P3, a rescue shot fires if moisture reads below it. The daily water limit does not hold rescue shots.",
     affects:
-      "It can cut the P3 dryback short: if the P3 dryback target ends below this level, a rescue shot fires before the substrate gets there. The maintenance trigger is always kept at least 3 points above it.",
+      "It can cut the P3 dryback short: if the P3 dryback target ends below this level, a rescue shot fires before the substrate gets there. The re-water point is always kept at least 3 points above it.",
     auto: AUTO,
     practice:
       "Large plants dry back fast overnight: watch that the dryback never reaches the wilting point, and set this above it.",
@@ -345,7 +345,7 @@ const EC_DETAILS: Record<string, SettingDetail> = {
   "2": {
     what: "The substrate (pore water) EC the day is steered toward.",
     when: "Maintenance shots are sized against it, from half to twice the maintenance shot size. More than 20% above it, a dilution shot of 1.5 times the maintenance shot runs, if the feed is weaker than the substrate and there is room below full saturation.",
-    stacking: "The maintenance trigger moves to steer substrate EC toward it.",
+    stacking: "The re-water point moves to steer substrate EC toward it.",
     practice: EC_STAGES,
   },
 };

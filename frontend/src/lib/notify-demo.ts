@@ -32,7 +32,7 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "hardware",
     name: "Hardware lockouts",
     detail:
-      "A pump or valve that did not do what it was told, a hardware hold, a shot cut, a zone that keeps hitting its longest allowed shot, water that isn't reaching a zone or may be bypassing its substrate, a table that isn't draining, a sump pump that stopped and a pump or valve the controller can't switch.",
+      "A pump or valve that did not do what it was told, a hardware hold, a shot cut, a zone that keeps hitting its longest allowed shot, water that does not get to a zone or that possibly goes around its substrate, a table that isn't draining, a sump pump that stopped and a pump or valve the controller can't switch.",
     codes: [...codes(301, 312), "CS-313", "CS-701", "CS-710"],
     events: [],
   },
@@ -40,7 +40,7 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "sensors",
     name: "Sensors and drift",
     detail:
-      "A probe the controller cannot use, a probe set aside for its unit, a zone without one, a zone whose probes disagree or whose primary probe is offline, a zone steering on bulk EC, and a probe Jev set aside.",
+      "A probe the controller cannot use, a probe set aside for its unit, a zone without one, a zone whose probes disagree or whose primary probe is offline, a zone steering on bulk EC, and a probe that the AI assistant set aside.",
     codes: [...codes(101, 104), "CS-502", "CS-503", "CS-504", "CS-505", "CS-603", "CS-604", "CS-703", "CS-704"],
     events: [],
   },
@@ -77,7 +77,7 @@ export const DEMO_KINDS: NotifyKind[] = [
   {
     id: "dosing",
     name: "Dosing",
-    detail: "A dose or batch that did not end as it should, or a mix off its EC or pH band.",
+    detail: "A dose or a batch that did not end correctly, or a mix outside its EC or pH band.",
     codes: [...codes(801, 806), "CS-808"],
     events: [],
   },
@@ -85,7 +85,7 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "jev",
     name: "AI assistant",
     detail:
-      "Jev's advice, Jev moving a zone's P2 shot size or re-water point (a push only), the AI assistant's budget, key, retired route and feed proposals, and whether the room runs its grow plan.",
+      "The advice of the AI assistant, and its changes to the P2 shot size or the re-water point of a zone (a push only). Also its AI budget, key, retired route and feed proposals, and the grow plan state of the room.",
     codes: [
       "CS-501",
       "CS-702",

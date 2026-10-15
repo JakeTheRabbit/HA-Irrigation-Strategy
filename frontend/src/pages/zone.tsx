@@ -43,7 +43,7 @@ import "./zone.css";
 
 const PHASE_NAMES: Record<string, string> = {
   P0: "Morning dryback",
-  P1: "Ramp-up",
+  P1: "Ramp",
   P2: "Maintenance",
   P3: "Overnight dryback",
 };
@@ -123,7 +123,7 @@ export function ZonePage({
           dot
           tone={zone.valveOn === true ? "on" : zone.valveOn === false ? "neutral" : "unknown"}
           data-zone-valve={zone.id}
-          title={zone.valveEntity ?? "No valve mapped in this room's engine configuration"}
+          title={zone.valveEntity ?? "No valve is mapped in the configuration of this room"}
         >
           Valve {zone.valveOn === true ? "open" : zone.valveOn === false ? "closed" : "unknown"}
         </Pill>
@@ -398,8 +398,8 @@ function JevSetpointsLine({ setpoints }: { setpoints: JevSetpoints }) {
   return (
     <p className="zone-jev-setpoints" data-managed={setpoints.managed}>
       {setpoints.managed
-        ? `Jev may move the P2 ${parts.filter(Boolean).join(" and ")}.`
-        : "Jev leaves this zone’s setpoints alone (Auto setpoints off, or a grow plan holds them)."}
+        ? `The AI assistant can change the P2 ${parts.filter(Boolean).join(" and ")}.`
+        : "The AI assistant does not change the setpoints of this zone (Auto setpoints is off, or a grow plan holds them)."}
       {setpoints.last && ` Last change ${lastChange(setpoints.last).replaceAll("->", "→")}.`}
       {paused && ` Paused until ${clock(setpoints.pausedUntil)} after a rescue put a change back.`}
     </p>
@@ -611,7 +611,7 @@ function ZoneControls({ controller, zone }: { controller: Controller; zone: Zone
                   size="sm"
                   variant="outline"
                   aria-pressed={phase === zone.phase}
-                  title={`${phase} · ${name}: the controller moves the zone within a minute and carries on from there. Lights-off still moves it to P3, and lights-on to P0.`}
+                  title={`${phase} · ${name}: the controller moves the zone within a minute and continues from there. Lights-off still moves it to P3, and lights-on to P0.`}
                   disabled={phase === zone.phase || !connected}
                   onClick={() => setPhaseChoice(phase)}
                 >

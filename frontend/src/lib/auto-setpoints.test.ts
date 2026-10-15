@@ -127,19 +127,19 @@ describe("auto setpoint status", () => {
       entity("tracking", { learned_peak: 35.9, last_change: "P1 target → 36.5 %", jev: "ok" }),
     )!;
     expect(autoStatusText(status)).toBe(
-      "Tracking · learned peak 35.9% · last change: P1 target → 36.5 % · Jev: ok",
+      "Tracking · learned peak 35.9% · last change: P1 target → 36.5 % · AI assistant: ok",
     );
     expect(autoStatusText(parseAutoSetpoints(entity("learning", { jev: "unavailable" }))!)).toBe(
-      "Learning · learned peak not yet known · no changes yet · Jev: unavailable",
+      "Learning · learned peak not yet known · no changes yet · AI assistant: unavailable",
     );
     expect(autoStatusText(parseAutoSetpoints(entity("off"))!)).toBe(
-      "Off · learned peak not yet known · no changes yet · Jev: not reported",
+      "Off · learned peak not yet known · no changes yet · AI assistant: not reported",
     );
   });
   it("adds hold days while a learned peak is held, and why a supervisor is frozen", () => {
     const held = parseAutoSetpoints(entity("tracking", { learned_peak: 35.9, hold_days: 3 }))!;
     expect(autoStatusText(held)).toBe(
-      "Tracking · learned peak 35.9%, held 3 days · no changes yet · Jev: not reported",
+      "Tracking · learned peak 35.9%, held 3 days · no changes yet · AI assistant: not reported",
     );
     const oneDay = parseAutoSetpoints(entity("tracking", { learned_peak: 35.9, hold_days: 1 }))!;
     expect(autoStatusText(oneDay)).toMatch(/held 1 day ·/);
@@ -152,7 +152,7 @@ describe("auto setpoint status", () => {
       entity("frozen", { frozen_reason: "probe response looks suspect", jev: "unavailable" }),
     )!;
     expect(autoStatusText(frozen)).toBe(
-      "Frozen: probe response looks suspect · learned peak not yet known · no changes yet · Jev: unavailable",
+      "Frozen: probe response looks suspect · learned peak not yet known · no changes yet · AI assistant: unavailable",
     );
     // A reason left over from an earlier freeze is not shown once the supervisor runs again.
     const recovered = parseAutoSetpoints(entity("tracking", { frozen_reason: "old reason" }))!;
@@ -187,10 +187,10 @@ describe("what the judge said in P2", () => {
         jev_changed_today: "12:00 p2_shot_size 3 -> 4",
       }),
     )!;
-    expect(autoStatusText(spoke)).toContain("Jev changed today: 12:00 p2_shot_size 3 -> 4");
-    expect(autoStatusText(spoke)).toContain("Jev last said: 14:00 no change");
+    expect(autoStatusText(spoke)).toContain("AI assistant changed today: 12:00 p2_shot_size 3 -> 4");
+    expect(autoStatusText(spoke)).toContain("AI assistant last said: 14:00 no change");
     const silent = parseAutoSetpoints(entity({ jev: "disabled", jev_last: 7 }))!;
     expect(silent.jevLast).toBeNull();
-    expect(autoStatusText(silent)).not.toContain("Jev last said");
+    expect(autoStatusText(silent)).not.toContain("AI assistant last said");
   });
 });

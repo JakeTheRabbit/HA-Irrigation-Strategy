@@ -305,7 +305,7 @@ export function Setup({
     setDraft((room) => room && { ...room, commissioning });
     if (commissioning.commissioned)
       setNotice(
-        "This room is set up. Switch watering on with the Watering switch; it asks you to review first.",
+        "The setup of this room is complete. Set the Watering switch to on. The dashboard shows a review first.",
       );
   }
   function editZone(id: number, patch: Partial<SetupZone>) {
@@ -413,7 +413,7 @@ export function Setup({
       setNotice(
         review === "remove"
           ? "Room archived. Its identifiers and stored configuration are retained."
-          : "Configuration saved in Home Assistant. Controller discovery and acknowledgement may follow on its next refresh; keep watering off until verified.",
+          : "The configuration is saved in Home Assistant. The controller can find and accept it at its next refresh. Keep the kill switch at off until you verify it.",
       );
     } catch (e) {
       setError(errorText(e));

@@ -696,7 +696,7 @@ const JEV_DAY: [
     true,
     "P2 shot 4.5% -> 4%",
     "acted",
-    "inside Jev's range 3.5–5.5%",
+    "inside the AI assistant's range 3.5–5.5%",
   ],
   // Zone 2's re-water point set by hand (demoDay records it): Jev only notes it. Today only (22).
   [
@@ -708,7 +708,7 @@ const JEV_DAY: [
     null,
     "p2 vwc threshold 62 -> 61",
     "acted",
-    "your value is the new centre of Jev's range",
+    "your value is the new centre of the AI assistant's range",
   ],
 ];
 /** The controller's Jev sensors for a demo room: its usage and stage (flower day 37, the bulk), the
@@ -770,7 +770,7 @@ function demoJev(
     newest
       ? `${newest.t.slice(11, 16)} ${newest.zone === null ? "" : `Z${newest.zone} `}${newest.title}: ${newest.verdict} -> ${newest.action || newest.result}`
       : "no decisions yet",
-    { entries, friendly_name: "Jev decisions", engine: "f2-control" },
+    { entries, friendly_name: "AI assistant decisions", engine: "f2-control" },
   );
   const calls = Math.round(4 + 2.6 * Math.min(24, hours));
   put(`sensor.crop_steering_${prefix}jev`, "on", {
@@ -804,7 +804,7 @@ function demoJev(
       dryback_points: [10, 15],
       runoff_pct: [8, 16],
     },
-    friendly_name: "Jev",
+    friendly_name: "AI assistant",
     engine: "f2-control",
   });
   const judge = (answer: string, p: number, directive: string | null, why: string) => ({
@@ -837,7 +837,7 @@ function demoJev(
   put(`sensor.crop_steering_${prefix}zone_1_jev`, "watching", {
     judges: { dusk: judge("continue_p2", 0.77, null, "no action") },
     setpoints: setpoints(1),
-    friendly_name: "Zone 1 Jev",
+    friendly_name: "Zone 1 AI assistant",
     engine: "f2-control",
   });
   put(`sensor.crop_steering_${prefix}zone_2_jev`, "salt", {
@@ -850,16 +850,16 @@ function demoJev(
       ),
     },
     setpoints: setpoints(2),
-    friendly_name: "Zone 2 Jev",
+    friendly_name: "Zone 2 AI assistant",
     engine: "f2-control",
   });
   put(`sensor.crop_steering_${prefix}zone_3_jev`, "watching", {
     judges: {
       shot: judge("landed", 0.93, null, "no action"),
-      setpoints: judge("smaller_shots", 0.7, "setpoint p2_shot_size 4", "inside Jev's range"),
+      setpoints: judge("smaller_shots", 0.7, "setpoint p2_shot_size 4", "inside the AI assistant's range"),
     },
     setpoints: setpoints(3),
-    friendly_name: "Zone 3 Jev",
+    friendly_name: "Zone 3 AI assistant",
     engine: "f2-control",
   });
 }

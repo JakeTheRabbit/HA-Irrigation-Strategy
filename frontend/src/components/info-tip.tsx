@@ -12,7 +12,7 @@ export function fillCopy(text: string, values: readonly (string | number)[] = []
 
 /** One safety notice: "WARNING: ..." (a risk to a person) or "CAUTION: ..." (a risk to the plants
  * or the equipment), with its type in bold. */
-function Notice({ kind, text }: { kind: "warning" | "caution"; text: string }) {
+export function Notice({ kind, text }: { kind: "warning" | "caution"; text: string }) {
   const body = text.replace(/^(WARNING|CAUTION):\s*/, "");
   return (
     <p className={`info-tip-notice is-${kind}`} role="note">

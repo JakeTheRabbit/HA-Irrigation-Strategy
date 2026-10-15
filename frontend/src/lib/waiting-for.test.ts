@@ -90,7 +90,7 @@ describe("saying what a zone waits for", () => {
       /^ramp shot when VWC < 85% \(now 86%\) · P2 at VWC ≥ 85% after 1 more shot, /,
     );
   });
-  it("P2: the maintenance trigger, the dilution limit, and lights-off", () => {
+  it("P2: the re-water point, the dilution limit, and lights-off", () => {
     const p2 = waiting(
       { rule: "p2_topup", shot: true, metric: "vwc", op: "<", value: 70, now: 84.1 },
       { rule: "p2_dilute", shot: true, metric: "ec", op: ">", value: 3.84, now: 0.5 },
@@ -124,7 +124,7 @@ describe("saying what a zone waits for", () => {
       "P3 by 17:36",
     );
   });
-  it("P3: the rescue level and lights-on", () => {
+  it("P3: the rescue floor and lights-on", () => {
     const p3 = waiting(
       { rule: "p3_emergency", shot: true, metric: "vwc", op: "<", value: 60, now: 84.1 },
       { rule: "lights_on", to: "P0", in_min: 660 },

@@ -50,7 +50,7 @@ const TYPES: { type: TimelineType; label: string }[] = [
   { type: "phase", label: "Phase" },
   { type: "setpoint", label: "Setpoints" },
   { type: "alert", label: "Alerts" },
-  { type: "jev", label: "Jev" },
+  { type: "jev", label: "AI assistant" },
 ];
 
 /** History › Timeline: what watered, when and why; phase changes; setpoint changes, the grower's and
@@ -155,7 +155,7 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
               checked={filter.allJev}
               onChange={(event) => set({ allJev: event.target.checked })}
             />
-            All Jev decisions
+            All AI assistant decisions
             {quiet > 0 && <span className="muted">({quiet} that changed nothing)</span>}
           </label>
         )}
@@ -166,7 +166,9 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
       {jev.room && (
         <div className="timeline-jev-usage">
           <p className="muted small">
-            {jev.room.on ? `Jev: ${jevUsage(jev.room)}` : `Brain: rules. ${jev.room.stateWords}`}
+            {jev.room.on
+              ? `AI assistant: ${jevUsage(jev.room)}`
+              : `AI assistant off: the controller uses its rules. ${jev.room.stateWords}`}
           </p>
           <JevTrouble jev={jev.room} />
         </div>
@@ -179,7 +181,7 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
             detail={
               items.length
                 ? "Change the search or the filters to see more."
-                : "The controller has published no activity records and Jev no decisions. This does not confirm that no irrigation occurred."
+                : "The controller published no activity records, and the AI assistant published no decisions. This does not show that no shot occurred."
             }
             action={
               items.length ? (
@@ -203,9 +205,9 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
         )}
       </section>
       <p className="footnote">
-        The controller’s own activity records and Jev’s journal, as the controller publishes them.
-        Home Assistant’s logbook may hold more. Jev answers; code decides what it may do and refuses
-        what it may not.
+        The activity records of the controller and the journal of the AI assistant, as the
+        controller publishes them. The logbook of Home Assistant can hold more. The AI assistant
+        answers. The controller code decides what it can do and refuses what it cannot do.
       </p>
     </>
   );
@@ -252,7 +254,7 @@ function Row({ item, names }: { item: TimelineItem; names: Map<number, string> }
           </>
         ) : entry ? (
           <>
-            {item.kind !== "jev" && <span className="timeline-jev-tag">Jev</span>}{" "}
+            {item.kind !== "jev" && <span className="timeline-jev-tag">AI assistant</span>}{" "}
             <strong>{entry.title}</strong>{" "}
             {entry.kind === "outcome"
               ? `after “${entry.verdict || "an earlier call"}”`
@@ -275,7 +277,7 @@ function Row({ item, names }: { item: TimelineItem; names: Map<number, string> }
         <span className="timeline-result">
           {hand ? (
             <Pill tone="neutral" data-jev-result="by hand">
-              Noted by Jev
+              Noted by the AI assistant
             </Pill>
           ) : (
             <Pill tone={jevResult(entry).tone} data-jev-result={entry.result}>

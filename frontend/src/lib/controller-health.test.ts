@@ -365,12 +365,12 @@ describe("room status line", () => {
     [
       "watering is switched off",
       [entity("input_boolean.f2_control_enabled", "off")],
-      /^Watering is switched off for this room \(its engine switch\), so the controller opens no valve\./,
+      /^The kill switch \(Watering\) of this room is off, so the controller opens no valve\./,
     ],
     [
       "the engine switch is unavailable",
       [entity("input_boolean.f2_control_enabled", "unavailable")],
-      /^This room's engine switch, input_boolean\.f2_control_enabled, is missing or unavailable in Home Assistant\. The controller treats that as off/,
+      /^The kill switch of this room, input_boolean\.f2_control_enabled, is missing or unavailable in Home Assistant\. The controller operates as if it is off/,
     ],
     [
       "Home Assistant's System Enabled is off",

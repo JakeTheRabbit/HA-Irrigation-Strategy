@@ -32,7 +32,7 @@ describe("the setpoint change log on the Timeline", () => {
     expect(rows.map((row) => row.message)).toEqual([
       "By hand: p2 vwc threshold 40.4 → 41.4",
       "Auto setpoints: p2 vwc threshold 40.4 → 41.4",
-      "AI brain: p2 vwc threshold 40.4 → 41.4",
+      "AI assistant: p2 vwc threshold 40.4 → 41.4",
       "Put back for safety: p2 vwc threshold 40.4 → 41.4",
     ]);
     expect(rows.map((row) => row.zoneId)).toEqual([1, 1, 1, undefined]);
@@ -47,7 +47,7 @@ describe("the setpoint change log on the Timeline", () => {
       now,
     );
     expect(items.map((item) => [item.kind, item.event?.message.split(":")[0]])).toEqual([
-      ["setpoint", "AI brain"],
+      ["setpoint", "AI assistant"],
       ["setpoint", "By hand"],
     ]);
     expect(filterTimeline(items, { ...NO_FILTER, type: "setpoint" })).toHaveLength(2);

@@ -52,7 +52,7 @@ try {
 
   await go(page, "history/timeline");
   const types = page.getByRole("group", { name: "Record type" });
-  await types.getByRole("button", { name: "Jev", exact: true }).click();
+  await types.getByRole("button", { name: "AI assistant", exact: true }).click();
   await page.locator(".timeline-panel").screenshot({ path: img("jev-history.png") });
   await types.getByRole("button", { name: "Setpoints", exact: true }).click();
   await page.locator(".timeline-panel").screenshot({ path: img("jev-history-setpoints.png") });

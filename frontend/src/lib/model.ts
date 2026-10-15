@@ -729,7 +729,7 @@ export function buildRoom(states: States, room: Room): RoomView {
       title: strategyValid ? "Grow plan controls this room" : "Grow plan snapshot unavailable",
       detail: strategyValid
         ? "Displayed VWC and EC references come from the active plan. Manual setpoints are retained for use after the plan is disarmed."
-        : "The controller requires a valid plan snapshot. Targets are unavailable until plan status is restored; do not treat legacy number values as active targets.",
+        : "The controller needs a valid plan snapshot. The targets are unavailable until the plan status is available again. Do not use the old number values as active targets.",
     });
   const shot = config && beat.health === "stale" ? shotRunning(states, room, now) : null;
   if (shot)
@@ -766,8 +766,8 @@ export function buildRoom(states: States, room: Room): RoomView {
       title: "Watering switch unavailable",
       detail:
         typeof flag === "string" && flag
-          ? `This room's engine switch, ${flag}, is missing or unavailable in Home Assistant, so the controller treats watering as off.`
-          : "The controller has not said which switch lets it water this room. Check the controller app and its log.",
+          ? `The kill switch of this room, ${flag}, is missing or unavailable in Home Assistant, so the controller operates as if it is off.`
+          : "The controller did not report the switch that lets it water this room. Examine the controller app and its log.",
     });
   // The integration's stock sensor lists every stock tank; the low ones get one notice.
   const stockTanks = resolve(states, room, "sensor", "stock_low")?.attributes.tanks;
@@ -882,7 +882,7 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
       `Hardware fault: ${fault}. Switch watering off, fix the stuck hardware and check it is off, then switch watering back on.`,
     );
   if (!roomIsActive(states, room))
-    return say("off", "Room off", "Nothing growing: no irrigation, no alerts.");
+    return say("off", "Room off", "No plants in the room: no shots, no alerts.");
   if (beat.health === "stopped")
     return say(
       "stopped",
@@ -943,14 +943,14 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
     return say(
       "stopped",
       "Not watering",
-      "Watering is switched off for this room (its engine switch), so the controller opens no valve. It still reads the probes and follows the phases. A new room starts with watering off, so nothing is watered before its hardware has been checked.",
+      "The kill switch (Watering) of this room is off, so the controller opens no valve. It continues to read the probes and to follow the phases. A new room starts with the kill switch at off, so no water flows before you examine its hardware.",
       { label: "Switch it on in Settings", route: "settings" },
     );
   if (engine !== "on")
     return say(
       "stopped",
       "Not watering",
-      `This room's engine switch${flagId ? `, ${flagId},` : ""} is missing or unavailable in Home Assistant. The controller treats that as off, so nothing is watered until it reads on.`,
+      `The kill switch of this room${flagId ? `, ${flagId},` : ""} is missing or unavailable in Home Assistant. The controller operates as if it is off, and gives no shots until it reads on.`,
     );
   const plan = note("strategy_error");
   if (plan)

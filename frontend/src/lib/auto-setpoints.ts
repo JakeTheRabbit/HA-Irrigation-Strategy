@@ -102,9 +102,9 @@ export function autoStatusText(status: AutoSetpointStatus): string {
       : `learned peak ${status.learnedPeak.toFixed(1)}%${hold ? `, ${hold}` : ""}`,
     status.lastChange ? `last change: ${status.lastChange}` : "no changes yet",
     ...(status.drybackNote ? [status.drybackNote] : []),
-    `Jev: ${status.jev ?? "not reported"}`,
-    ...(status.jevChangedToday ? [`Jev changed today: ${status.jevChangedToday}`] : []),
-    ...(status.jevLast ? [`Jev last said: ${status.jevLast}`] : []),
+    `AI assistant: ${status.jev ?? "not reported"}`,
+    ...(status.jevChangedToday ? [`AI assistant changed today: ${status.jevChangedToday}`] : []),
+    ...(status.jevLast ? [`AI assistant last said: ${status.jevLast}`] : []),
   ].join(" · ");
 }
 /** A setpoint is "Auto" only while a supervisor that owns it is running. */

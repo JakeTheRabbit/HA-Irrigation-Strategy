@@ -23,6 +23,7 @@ import {
 } from "@/components/ui/dialog";
 import { Heading, ReviewDialog, Status } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
+import { UI_COPY } from "@/lib/ste-copy";
 import { Pill, type PillTone } from "@/components/mini-visuals";
 import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
@@ -202,17 +203,17 @@ export function Settings({
                 Room on or off <UiTip copyKey="room on / off" />
               </h2>
               <p>
-                Switch {controller.room.room.name} off when nothing is growing in it, and on again
-                when the next crop goes in.
+                Set {controller.room.room.name} to off when no plants are in it. Set it to on again
+                for the next crop.
               </p>
             </div>
             <div>
               <RoomPower controller={controller} />
               <p className="small muted mt-3">
-                Off: the controller will not water this room and raises no alerts for it, and a shot
-                already running stops within a few seconds. On within a day: it carries on where it
-                was. On after longer: daily counters and learned phase state reset for a fresh run.
-                This is not an emergency stop.
+                Off: the controller does not water this room and sends no alerts for it. A shot that
+                runs stops within a few seconds. On within one day: the room continues from where it
+                stopped. On after more than one day: the counters and the phase data reset. This is
+                not an emergency stop.
               </p>
             </div>
           </section>
@@ -223,8 +224,8 @@ export function Settings({
               Watering <UiTip copyKey="watering" />
             </h2>
             <p>
-              Lets the controller water {controller.room.room.name}. This is the room’s engine
-              switch
+              Lets the controller water {controller.room.room.name}. This is the kill switch of the
+              room
               {controller.room.engine.entityId ? ` (${controller.room.engine.entityId})` : ""}.
             </p>
           </div>
@@ -253,18 +254,18 @@ export function Settings({
               </Button>
             </div>
             <p className="small muted mt-3">
-              Off: the controller opens no valve in this room, and a shot already running stops
-              within a few seconds. It keeps reading the probes and following the phases. A new room
-              starts with watering off, so nothing is watered before its hardware has been checked.
-              This is not an emergency stop.
+              Off: the controller opens no valve in this room, and a shot that runs stops within a
+              few seconds. The controller continues to read the probes and to follow the phases. A
+              new room starts with the kill switch at off, so no water flows before you examine its
+              hardware. This is not an emergency stop.
             </p>
             {controller.room.zones.length > 0 && (
               <div className="settings-zones">
                 <h3>All zone switches</h3>
                 <AllZonesSwitch controller={controller} />
                 <p className="small muted">
-                  Pause or switch on every zone of {controller.room.room.name} at once, through a
-                  review. Each zone also has its own switch on its page.
+                  Pause or start all the zones of {controller.room.room.name} at one time. The
+                  dashboard shows a review first. Each zone also has its own switch on its page.
                 </p>
               </div>
             )}
@@ -485,7 +486,9 @@ export function Settings({
               ]
             : []
         }
-        note="Switching watering off also stops a running shot within a few seconds. It is not an emergency stop: use the installation's physical shut-off for that."
+        note={UI_COPY["review watering"].impact}
+        warning={UI_COPY["review watering"].warning}
+        caution={UI_COPY["review watering"].caution}
       />
     </>
   );

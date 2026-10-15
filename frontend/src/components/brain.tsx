@@ -325,8 +325,8 @@ const WHERE = {
   addon: [
     "Open the controller app in Home Assistant (Settings › Apps) and its Configuration tab.",
     "Paste the key into Anthropic API key (a password field).",
-    "Set Brain provider to claude_haiku. The default, auto, stays on rules for a new install.",
-    "Save, then restart the app.",
+    "Set AI assistant (brain_provider) to claude_haiku. With the default, auto, a new install uses the rules.",
+    "Save the configuration. Then restart the app.",
   ],
   docker: [
     "Put the key alone in a file next to docker-compose.yml, for example anthropic_key.txt. Never in the compose file or .env: docker inspect shows environment values.",
@@ -409,7 +409,7 @@ export function AiSettings({ controller }: { controller: Controller }) {
           </p>,
         )}
         {row("Mode", <p className="brain-line">{modeWords(panel)}</p>)}
-        {row("What it may do", <MayDo panel={panel} />)}
+        {row("What it can do", <MayDo panel={panel} />)}
         {row(
           "Privacy",
           <p className="brain-line">

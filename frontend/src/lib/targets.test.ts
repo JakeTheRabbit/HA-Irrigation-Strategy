@@ -16,8 +16,8 @@ describe("the range chips beside the targets Jev manages", () => {
     range: { p2_shot_size: [4, 6], p2_vwc_threshold: [28.5, 31.5] },
   });
   it("name Jev's range for the P2 shot size and re-water point", () => {
-    expect(jevChip(managed, "p2_shot_size", "%")).toBe("Jev · 4–6 %");
-    expect(jevChip(managed, "p2_vwc_threshold", "%")).toBe("Jev · 28.5–31.5 %");
+    expect(jevChip(managed, "p2_shot_size", "%")).toBe("AI assistant · 4–6 %");
+    expect(jevChip(managed, "p2_vwc_threshold", "%")).toBe("AI assistant · 28.5–31.5 %");
   });
   it("say nothing for a target Jev does not move", () => {
     expect(jevChip(managed, "p1_target_vwc", "%")).toBeNull();

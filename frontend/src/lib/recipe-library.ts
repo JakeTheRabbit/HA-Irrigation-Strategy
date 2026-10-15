@@ -37,9 +37,9 @@ function profileId(value: unknown): string {
 }
 function validateRelationships(values: Record<string, number>) {
   if (values.p2_vwc_threshold >= values.p1_target_vwc)
-    throw new Error("The maintenance trigger must be below the peak VWC target.");
+    throw new Error("The re-water point must be below the peak VWC target.");
   if (values.p3_emergency_vwc_threshold + 3 > values.p2_vwc_threshold)
-    throw new Error("The maintenance trigger must be at least 3 points above the rescue level.");
+    throw new Error("The re-water point must be at least 3 points above the rescue floor.");
   if ("field_capacity" in values && values.p1_target_vwc > values.field_capacity)
     throw new Error("The peak VWC target exceeds full saturation.");
   if (

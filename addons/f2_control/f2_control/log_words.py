@@ -15,9 +15,9 @@ SETTING_NAMES = {
     "p1_shot_size_increment": "Each P1 shot adds",
     "p1_time_between_shots": "Time between P1 shots",
     "p1_maximum_shots": "Most P1 shots",
-    "p2_vwc_threshold": "Maintenance trigger",
+    "p2_vwc_threshold": "Re-water point",
     "p2_shot_size": "Maintenance shot",
-    "p3_emergency_vwc_threshold": "Rescue level",
+    "p3_emergency_vwc_threshold": "Rescue floor",
     "p3_emergency_shot_size": "Rescue shot",
     "field_capacity": "Full saturation",
     "max_daily_volume": "Daily water limit",
@@ -25,7 +25,7 @@ SETTING_NAMES = {
     "watchdog_hours": "Watchdog interval",
     "min_floor_drown_ceiling": "Daily minimum stops at",
     "min_daily_ml_per_plant": "Daily minimum",
-    "p0_additional_dryback": "Additional dryback",
+    "p0_additional_dryback": "Extra dryback",
     "sump_power_threshold_w": "Sump pump runs above",
     "irrigation_ec_min": "Feed EC, lowest",
     "irrigation_ec_max": "Feed EC, highest",
@@ -46,7 +46,7 @@ _MODES = {"veg": "vegetative", "vegetative": "vegetative", "gen": "generative", 
 
 def setting_name(key):
     """A setting's short name from its key, a zone's without its "zone_N_": "p2_vwc_threshold" is
-    "Maintenance trigger", "ec_target_veg_p1" "P1 EC target (vegetative)". A key nobody has named
+    "Re-water point", "ec_target_veg_p1" "P1 EC target (vegetative)". A key nobody has named
     reads as its own words."""
     ec = re.fullmatch(r"ec_target_(?:(veg|gen)_)?p([012])", key)
     if ec:

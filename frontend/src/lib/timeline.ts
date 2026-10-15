@@ -135,13 +135,13 @@ export function timelineText(item: TimelineItem): string {
   if (byHand(entry)) return `By hand · ${entry.title}: ${action}`;
   const said =
     entry.kind === "outcome" ? `after “${entry.verdict || "an earlier call"}”` : jevAnswer(entry);
-  return `Jev · ${entry.title}: ${said}${action ? ` → ${action}` : ""}`;
+  return `AI assistant · ${entry.title}: ${said}${action ? ` → ${action}` : ""}`;
 }
 
 /** What code did with a Jev row, and how its outcome checks came out. Empty for a controller record. */
 export function timelineResult(item: TimelineItem): string {
   if (!item.jev) return "";
-  if (byHand(item.jev)) return "Noted by Jev";
+  if (byHand(item.jev)) return "Noted by the AI assistant";
   const checks = item.outcomes.map((outcome) =>
     outcome.result === "worked" ? "worked" : "did not work",
   );

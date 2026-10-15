@@ -187,7 +187,7 @@ export const BRAIN_JUDGES: Record<string, { title: string; may: string }> = {
   },
   salt: {
     title: "Pore EC",
-    may: "The EC steer's mode (steer, hold or ease back) inside the engine's own limits",
+    may: "The mode of the EC steer (steer, hold or ease back), inside the limits of the controller",
   },
   probe: {
     title: "Probe trust",
@@ -239,7 +239,7 @@ export function brainView(
   const rules = say(
     "AI off",
     "Watering by rules",
-    "The controller waters from your probes and targets. The AI assistant is not set up. Settings › AI assistant explains how to add it.",
+    "The controller waters from your probes and targets. The AI assistant is not configured. Settings › AI assistant tells how to add it.",
     "neutral",
   );
   if (!panel) return rules;
@@ -295,7 +295,7 @@ export function brainView(
       return say(
         "AI paused: not answering",
         `AI not answering${since}`,
-        "Watering carries on by its rules. It tries again by itself.",
+        "The controller continues to water by its rules. The AI assistant tries again automatically.",
         "warning",
       );
     case "rules_no_key":
@@ -303,7 +303,7 @@ export function brainView(
       return say(
         "AI paused: no key",
         "No working Anthropic key",
-        "Add or replace the key in the controller app, then restart the app. Rules carry on.",
+        "Add or replace the key in the controller app. Then restart the app. Until then, the rules continue.",
         "warning",
       );
     case "model_invalid":
@@ -326,7 +326,7 @@ export function brainView(
         "AI off",
         "AI assistant off",
         panel.stateWords ||
-          "The brain could not start, so rules are running. The app log says why.",
+          "The AI assistant could not start, so the controller uses its rules. The app log gives the cause.",
         panel.state === "start_failed" ? "warning" : "neutral",
       );
     default:

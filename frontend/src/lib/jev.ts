@@ -113,7 +113,7 @@ export function parseJevEntry(raw: unknown, index = 0): JevEntry | null {
   // A judge's alert (CS-7xx) is advice to the grower; the alert-triage judge's own call is not.
   if (result === "acted" && !outcome && judge !== "alerts" && /^CS-\d+/i.test(action))
     result = "advice";
-  const title = text(item.title) || JEV_TITLES[judge] || (judge ? words(judge) : "Jev");
+  const title = text(item.title) || JEV_TITLES[judge] || (judge ? words(judge) : "AI assistant");
   return {
     key: `${index}:${text(item.t)}:${judge}`,
     time: entryTime(item.t ?? item.time),

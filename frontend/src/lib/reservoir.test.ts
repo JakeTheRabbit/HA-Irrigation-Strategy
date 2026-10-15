@@ -43,7 +43,7 @@ describe("the reservoir minimum in words", () => {
   it("stops a fill over the full mark while watering carries on", () => {
     const view = reservoirView(level("103", { over_full: true }), "");
     expect(view).toMatchObject({ state: "over", code: "CS-904" });
-    expect(view.detail).toContain("Watering carries on");
+    expect(view.detail).toContain("The shots continue");
   });
   it("reads the room's own sensor by its prefix", () => {
     const states = createDemo(Date.parse("2026-09-28T04:00:00Z"));

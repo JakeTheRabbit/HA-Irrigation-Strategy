@@ -93,7 +93,7 @@ import "./day-timeline.css";
 /** Each phase as the zone views name it, and as its chart column says it where there is room. */
 const PHASES: Record<string, { name: string; short: string; what: string }> = {
   P0: { name: "Morning dryback", short: "Dryback", what: "VWC falls after lights-on" },
-  P1: { name: "Ramp-up", short: "Ramp", what: "the first shots after lights-on" },
+  P1: { name: "Ramp", short: "Ramp", what: "the first shots after lights-on" },
   P2: { name: "Maintenance", short: "Maintenance", what: "shots through the lights-on hours" },
   P3: { name: "Overnight dryback", short: "Night", what: "dries back until lights-on" },
 };
@@ -984,7 +984,7 @@ function Legend({
       )}
       {entry(
         "band",
-        "From the maintenance trigger (P2 re-waters under it) up to the peak target, over the ramp and maintenance hours.",
+        "From the re-water point up to the peak target, in the ramp and maintenance hours. Below the re-water point, P2 gives a maintenance shot.",
         <>
           <i className="key-band" aria-hidden="true" />
           Maintenance band
@@ -1004,7 +1004,7 @@ function Legend({
           "Filled: code acted on it. Outline: advice, no action, or refused.",
           <>
             <i className="key-jev" aria-hidden="true" />
-            Jev decision
+            AI assistant decision
           </>,
         )}
       {compare &&
@@ -1601,7 +1601,7 @@ function linePath(points: Reading[], x: (time: number) => number, y: (value: num
     })
     .join("");
 }
-/** The maintenance band over one ramp or maintenance column: from the maintenance trigger up to the
+/** The maintenance band over one ramp or maintenance column: from the re-water point up to the
  * peak target, stepping where either setpoint changed. */
 function bandSegments(steps: Steps, column: Column) {
   const high = steps("p1_target_vwc", column),
@@ -1801,7 +1801,7 @@ function jevText(entry: JevEntry, lane: Lane): string {
         ? " (the two phrasings disagreed)"
         : "";
   return [
-    `${clock(entry.time)} · ${lane.zone.name} · Jev: ${entry.title}`,
+    `${clock(entry.time)} · ${lane.zone.name} · AI assistant: ${entry.title}`,
     `${jevAnswer(entry)}${agreed}`,
     ...(entry.action ? [`Asked to ${entry.action}`] : []),
     entry.reason ? `${result}: ${entry.reason}` : result,

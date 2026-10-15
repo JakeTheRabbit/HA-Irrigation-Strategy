@@ -93,7 +93,7 @@ export function reservoirView(states: States, prefix: string): ReservoirView {
       "over",
       "Filling stopped: over the full mark",
       "warn",
-      `The tank reads at or over ${OVER_PCT} % of its full mark, so no fill valve opens until it reads ${OVER_RELEASE_PCT} % or less. Watering carries on.`,
+      `The tank reads at or over ${OVER_PCT} % of its full mark, so no fill valve opens until it reads ${OVER_RELEASE_PCT} % or less. The shots continue.`,
       "CS-904",
     );
   return view(

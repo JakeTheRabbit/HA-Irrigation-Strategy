@@ -21,7 +21,7 @@ import type { Controller } from "@/lib/types";
 const glossary = [
   [
     "VWC (moisture)",
-    "Volumetric water content: the share of the substrate’s volume that is water, in %. Every moisture target, the peak, the re-water point and the rescue level, is a VWC.",
+    "Volumetric water content: the share of the substrate’s volume that is water, in %. Every moisture target, the peak, the re-water point and the rescue floor, is a VWC.",
   ],
   [
     "Pore EC",
@@ -36,7 +36,7 @@ const glossary = [
     "From lights-on to the first shot: the plants drink before the day’s watering starts. It ends at the latest first shot, or sooner if moisture falls to the re-water point.",
   ],
   [
-    "P1 · Ramp-up",
+    "P1 · Ramp",
     "The first shots of the day, spaced out, up to the peak target or the most P1 shots.",
   ],
   [
@@ -45,7 +45,7 @@ const glossary = [
   ],
   [
     "P3 · Overnight dryback",
-    "From the day’s last shot to lights-on: no routine watering, only a rescue shot if moisture reads below the rescue level.",
+    "From the day’s last shot to lights-on: no routine watering, only a rescue shot if moisture reads below the rescue floor.",
   ],
   [
     "Steering",

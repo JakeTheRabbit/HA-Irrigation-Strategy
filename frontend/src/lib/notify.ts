@@ -228,7 +228,7 @@ export const phoneLabel = (phone: NotifyPhone) =>
  * each event in words. */
 export const EVENT_WORDS: Readonly<Record<string, string>> = {
   phase: "a zone changing phase",
-  jev_setpoint: "Jev moving a setting",
+  jev_setpoint: "AI assistant setting change",
   vitals: "the controller's regular report on every zone",
 };
 export const eventWords = (id: string) => EVENT_WORDS[id] ?? id.replaceAll("_", " ");

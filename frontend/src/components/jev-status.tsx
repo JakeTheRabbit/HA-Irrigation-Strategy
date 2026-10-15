@@ -3,7 +3,7 @@ import "./jev-status.css";
 
 /** Today's calls, tokens, errors and what they cost. */
 export function jevUsage(jev: JevRoom | null, short = false): string {
-  if (!jev) return short ? "" : "The controller does not report Jev’s usage.";
+  if (!jev) return short ? "" : "The controller does not report the usage of the AI assistant.";
   if (!jev.on) return brainWords(jev).detail;
   const calls =
     jev.calls === null
@@ -42,9 +42,9 @@ export function JevTrouble({
   return (
     <p className="jev-trouble" role="note">
       {down
-        ? `Jev is not answering${why} The controller carries on without it.`
+        ? `The AI assistant does not answer${why} The controller continues without it.`
         : failing.length
-          ? `A judge failed: ${said(judges)} The others carry on.`
+          ? `A judge failed: ${said(judges)} The other judges continue.`
           : `Last error today${why}`}
     </p>
   );

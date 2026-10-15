@@ -91,9 +91,10 @@ export function GrowByStage({ controller }: { controller: Controller }) {
         </table>
       </div>
       <p className="small muted grow-stages-note">
-        Day 1 is the first day of 12/12. Stages, pore EC, dryback and runoff are the guide Jev
-        steers by. The dryback is the overnight fall in points; each zone’s day shows it as a share
-        of its own peak. The grow plan below sets each zone’s targets day by day.
+        Day 1 is the first day of 12/12. The AI assistant steers by these stages, pore EC, dryback
+        and runoff values. The dryback is the overnight decrease in points. The day of each zone
+        shows it as a percentage of the peak of that zone. The grow plan below sets the targets of
+        each zone for each day.
       </p>
     </section>
   );

@@ -32,7 +32,7 @@ export const TARGET_GROUPS: readonly TargetGroup[] = [
   },
   {
     phase: "P1",
-    title: "P1 · Ramp-up",
+    title: "P1 · Ramp",
     rows: [
       { key: "p1_target_vwc", label: "Peak target", unit: "%" },
       { key: "p1_initial_shot_size", label: "First shot", unit: "%" },
@@ -56,7 +56,7 @@ export const TARGET_GROUPS: readonly TargetGroup[] = [
     title: "P3 · Overnight dryback",
     rows: [
       { key: "dryback_target", label: "Dryback target", unit: "% of peak" },
-      { key: "p3_emergency_vwc_threshold", label: "Rescue level", unit: "%" },
+      { key: "p3_emergency_vwc_threshold", label: "Rescue floor", unit: "%" },
       { key: "p3_emergency_shot_size", label: "Rescue shot", unit: "%" },
     ],
   },
@@ -72,7 +72,7 @@ export const SETUP_GROUPS: readonly string[] = ["Substrate", "Hardware sizing", 
 export function jevChip(setpoints: JevSetpoints | null, key: string, unit: string): string | null {
   if (!setpoints?.managed) return null;
   const range = setpoints.range[key as JevSetpointKey];
-  return range ? `Jev · ${rangeText(range)}${unit ? ` ${unit}` : ""}` : null;
+  return range ? `AI assistant · ${rangeText(range)}${unit ? ` ${unit}` : ""}` : null;
 }
 
 /** What a steering mode does, in one sentence under the select: the overnight dryback it asks for

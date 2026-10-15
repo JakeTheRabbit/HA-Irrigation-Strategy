@@ -23,7 +23,7 @@ import { errorText } from "@/lib/utils";
 import { coreWaterValue, waterParameters } from "@/lib/water-delivery";
 import type { Page } from "@/lib/routes";
 import { plantAmount } from "@/lib/water-view";
-import { UiTip } from "@/components/info-tip";
+import { Notice, UiTip } from "@/components/info-tip";
 import { Pill, type PillTone } from "./mini-visuals";
 
 export type { Page };
@@ -429,6 +429,8 @@ export function ReviewDialog({
   onApplied,
   title = "Review changes",
   note,
+  warning,
+  caution,
   run,
 }: {
   open: boolean;
@@ -438,6 +440,10 @@ export function ReviewDialog({
   onApplied?: (applied: string[]) => void;
   title?: string;
   note?: string;
+  /** A "WARNING: ..." line (a risk to a person), shown before the values, styled as in an About tip. */
+  warning?: string | null;
+  /** A "CAUTION: ..." line (a risk to the plants or the equipment), shown after any warning. */
+  caution?: string | null;
   /** Applies the reviewed change some other way than writing its values (an AI overlay's Keep or
    * Undo); it throws when Home Assistant refuses. */
   run?: () => Promise<void>;
@@ -488,6 +494,8 @@ export function ReviewDialog({
             only. Confirm each value before applying.
           </DialogDescription>
         </DialogHeader>
+        {warning && <Notice kind="warning" text={warning} />}
+        {caution && <Notice kind="caution" text={caution} />}
         <div className="review-list">
           {items.map((item) => (
             <div className="review-row" key={item.change.entityId}>

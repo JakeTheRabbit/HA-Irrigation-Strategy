@@ -49,7 +49,7 @@ const HINTS: Record<string, string> = {
   mix_pump: "Choose the switch that runs the mixing pump.",
   mix_valves: "Choose the valves opened before the mixing pump starts.",
   mix_power_sensor: "Choose the mixing pump's power sensor, in W.",
-  close_entities: "Choose the switches turned off before filling, such as another room's feed.",
+  close_entities: "Choose the switches that are set to off before a fill, for example the feed of another room.",
   hold_entity: "Choose a helper that is on for the whole batch, for other automations to read.",
   filled_at_entity:
     "Choose a date and time helper stamped when a batch finishes; stock tanks count batches by it.",

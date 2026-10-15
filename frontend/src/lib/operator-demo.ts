@@ -114,7 +114,7 @@ export class OperatorDemo {
         blockers:
           states[flag]?.state === "off"
             ? []
-            : ["Turn off this room's engine in Settings before changing mappings."],
+            : ["Set the kill switch of this room to off in Settings before you change the mapping."],
       };
     }
     const candidates = Object.values(states).map((e) => ({

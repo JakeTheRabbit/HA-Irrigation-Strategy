@@ -278,7 +278,7 @@ describe("who may change a row, and what it is called", () => {
       "a zone changing phase",
     ]);
     expect(kindCoverage(DEMO_KINDS.find((kind) => kind.id === "jev")!).events).toEqual([
-      "Jev moving a setting",
+      "AI assistant setting change",
     ]);
     expect(kindCoverage(DEMO_KINDS.find((kind) => kind.id === "vitals")!).events).toEqual([
       "the controller's regular report on every zone",
