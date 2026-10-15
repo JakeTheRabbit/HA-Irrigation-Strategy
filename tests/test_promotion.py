@@ -6,6 +6,7 @@ import hashlib
 import importlib.util
 import json
 from pathlib import Path
+import re
 from types import SimpleNamespace
 
 import pytest
@@ -68,7 +69,9 @@ class FakeGitHub(promotion.GitHub):
                 "status": "completed",
                 "conclusion": "success",
             }
-            for number, name in enumerate(sorted(promotion.REQUIRED_JOBS), 100)
+            for number, name in enumerate(
+                sorted(names[0] for names in promotion.REQUIRED_JOBS), 100
+            )
         ]
         self.release = {"id": 56, "tag_name": TAG, "prerelease": True, "draft": False}
         self.missing_audit = False
@@ -258,6 +261,45 @@ def test_missing_required_job_rejects_green_workflow():
     api = FakeGitHub()
     api.jobs.pop()
     with pytest.raises(promotion.Rejected, match="Required Validate job"):
+        promotion.promote(api, TAG, apply=True)
+    assert not api.writes
+
+
+OLD_BUILD = "Build f2-control add-on image (amd64)"
+NEW_BUILD = "Build controller add-on image (amd64)"
+
+
+def build_job(api):
+    return next(job for job in api.jobs if job["name"] == OLD_BUILD)
+
+
+@pytest.mark.parametrize("name", [OLD_BUILD, NEW_BUILD])
+def test_the_add_on_build_job_passes_under_either_name(name):
+    api = FakeGitHub()
+    job = build_job(api)
+    job["name"] = name
+    plan = promotion.promote(api, TAG)
+    assert plan["validate_jobs"][name] == job["id"]
+    assert not api.writes
+
+
+@pytest.mark.parametrize(
+    "mutate",
+    [
+        lambda api: api.jobs.remove(build_job(api)),
+        lambda api: build_job(api).update(name="Build add-on image (amd64)"),
+        lambda api: build_job(api).update(name=NEW_BUILD, conclusion="failure"),
+        lambda api: api.jobs.append({**build_job(api), "id": 99, "name": NEW_BUILD}),
+    ],
+    ids=["neither-name", "other-name", "new-name-failed", "both-names"],
+)
+def test_the_add_on_build_job_is_required_under_one_name(mutate):
+    api = FakeGitHub()
+    mutate(api)
+    message = re.escape(
+        f"Required Validate job did not pass for the candidate: {OLD_BUILD} or {NEW_BUILD}"
+    )
+    with pytest.raises(promotion.Rejected, match=message):
         promotion.promote(api, TAG, apply=True)
     assert not api.writes
 
