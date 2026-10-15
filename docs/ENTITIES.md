@@ -140,6 +140,7 @@ for that zone. (3 zones × 27 = 81 entities on a 3-zone system.)
 |---|---|
 | `zone_N_enabled` | The zone's own switch ("zone scheduling" on the dashboard). Off = the controller waters nothing in this zone, not even a rescue shot, and a shot already running in it stops within a few seconds. |
 | `zone_N_manual_override` | Absolute lockout: **nothing** opens that valve (auto, emergency, manual). For maintenance. |
+| `zone_N_p3_dryback_hold` | Off by default. On = overnight (P3), each time the zone dries to the day's peak less its dryback target it gets a shot the size of its emergency shot, `p3_time_between_shots` apart, instead of drying on to the emergency level. It steers: a held plan stops it and the daily water limit holds it; the emergency shot still runs beneath it. |
 
 ---
 

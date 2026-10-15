@@ -2132,6 +2132,10 @@ class Controller:
             p3_time_between_min=self._zone_num(
                 room, zone, "p3_time_between_shots", FALLBACK["p3_time_between_shots"], optional=True
             ),
+            # Opt-in: an older integration has no such switch, and a missing one is off (P3 as before).
+            p3_hold=self._on(
+                f"switch.crop_steering_{room.prefix}zone_{zone}_p3_dryback_hold", False
+            ),
             # Fallback used ONLY when a zone has no readable max_daily_volume entity — e.g. a zone the
             # engine detected from its VWC sensor but the integration never built a cap entity for
             # (num_zones < detected zones). Must fail LOW: the integration's own entity maxes at 200 L,
