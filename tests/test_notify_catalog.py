@@ -68,7 +68,7 @@ def test_the_table_is_the_contracts():
         "CS-710",
     }
     assert set(_kind("stock")) == {"CS-608", "CS-807"}
-    assert set(_kind("dosing")) == {f"CS-80{n}" for n in range(1, 7)}
+    assert set(_kind("dosing")) == {f"CS-80{n}" for n in range(1, 7)} | {"CS-808"}
     # The reservoir's codes are CS-9xx, never Jev's CS-701 to CS-707, and a hold at the tank reaches a phone.
     reservoir = {f"CS-90{n}" for n in range(1, 5)}
     assert reservoir <= set(_kind("watering"))

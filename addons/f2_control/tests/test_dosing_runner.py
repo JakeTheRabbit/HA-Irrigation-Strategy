@@ -1198,11 +1198,11 @@ def test_the_controller_builds_its_runner_and_recovers_before_the_first_loop(mon
 
 def test_every_dosing_code_goes_out_through_the_alert_list():
     c, fake = _build({"num_zones": 1})
-    for code in ("CS-801", "CS-802", "CS-803", "CS-804", "CS-805", "CS-806", "CS-807"):
+    for code in ("CS-801", "CS-802", "CS-803", "CS-804", "CS-805", "CS-806", "CS-807", "CS-808"):
         assert c._dosing_alert(c.rooms[0], code, "a title", "a message") is True
     assert c._dosing_alert(c.rooms[0], "CS-899", "made up", "never shown") is True  # never kept
     ids = [d["notification_id"] for dom, svc, d in fake.calls if dom == "persistent_notification"]
-    assert ids == [f"f2_dosing_default_{n}" for n in (801, 802, 803, 804, 805, 806, 807)]
+    assert ids == [f"f2_dosing_default_{n}" for n in (801, 802, 803, 804, 805, 806, 807, 808)]
     # One notification per event: a second event within 30 minutes is its own card, and an update of
     # the same event (it reads off now) replaces its card at once: the runner paces the repeats.
     assert c._dosing_alert(c.rooms[0], "CS-801", "a title", "another", "balance_2026_09_28t02") is True

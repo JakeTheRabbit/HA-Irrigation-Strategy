@@ -30,7 +30,7 @@ either gets it once.
 | `phases` | Phase changes | A zone moving P0 → P1 → P2 → P3 (new event, no card) |
 | `vitals` | Vitals | The controller's regular report on every zone (event `vitals`, no new card). Not ticked on any row until someone ticks it, an upgraded row included |
 | `stock` | Stock tanks | CS-608, CS-807 |
-| `dosing` | Dosing | CS-801 to CS-806 |
+| `dosing` | Dosing | CS-801 to CS-806, CS-808 |
 | `jev` | Jev | CS-501, CS-702, CS-705, CS-706, CS-707, CS-404, and Jev moving a setting (new event, no card) |
 | `setup` | Setup and settings | CS-201, CS-401 to CS-405 (except 404), CS-601, CS-605, CS-606, CS-607, CS-610, CS-611 |
 

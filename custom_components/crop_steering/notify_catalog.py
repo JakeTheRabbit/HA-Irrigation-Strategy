@@ -86,8 +86,9 @@ KINDS = (
     {
         "id": "dosing",
         "name": "Dosing",
-        "detail": "A dose or a batch that did not end as it should",
-        "codes": _codes("CS-801 CS-802 CS-803 CS-804 CS-805 CS-806"),
+        "detail": "A dose or a batch that did not end as it should, and a batch's mix off "
+        "its EC or pH band",
+        "codes": _codes("CS-801 CS-802 CS-803 CS-804 CS-805 CS-806 CS-808"),
         "events": (),
     },
     {

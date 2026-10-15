@@ -95,6 +95,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-805](#cs-805) | The mixing pump did not start | Warning | Notification |
 | [CS-806](#cs-806) | Dosing was stopped, or needs a check | Warning | Notification |
 | [CS-807](#cs-807) | A dose was not taken off its stock tank | Warning | Notification |
+| [CS-808](#cs-808) | A batch's mix is off its band, or could not be checked | Warning | Notification |
 | [CS-901](#cs-901) | Tank at its minimum | Critical | Notification |
 | [CS-902](#cs-902) | Tank level can't be read | Critical | Notification |
 | [CS-903](#cs-903) | Refill the tank before the next round of shots | Warning | Notification |
@@ -1435,6 +1436,30 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Set the tank's level in Stock tanks (Set level) to what is in it.
 - Check the pump's stock tank in the dosing setup.
+
+<a id="cs-808"></a>
+
+### CS-808: A batch's mix is off its band, or could not be checked
+
+*Warning · Notification*
+
+**What it means.** A batch finished, and 5 minutes after its mix stopped the tank was read with the room's feed EC and pH probes: a reading was outside the room's irrigation EC or pH band, or a probe could not be read (offline, not a number, or in a unit with no exact conversion, such as ppm). Only a probe that is mapped and has a band is checked; a room with neither has no mix check. The batch is not marked good, and a batch an automation asks for is refused until a batch made by hand passes the check. The notification names each reading and its band.
+
+**Watering meanwhile.** Carries on: the mix check never holds watering. The source-water gate still holds it on its own when the feed probe reads off its band or stays dead.
+
+**Likely causes**
+
+- A recipe amount, a stock tank or a dosing pump that is off.
+- A fill that brought in too much or too little water.
+- The irrigation EC or pH band was set for another stage.
+- A feed probe that is offline, needs calibrating, or reports in ppm.
+
+**Suggested fixes**
+
+- Check the tank with a hand meter, and correct it with single doses or fresh water.
+- Check the recipe, the stock tanks and the irrigation EC and pH bands.
+- Bring the probe back online, calibrate it, or set it to report mS/cm or µS/cm.
+- Make the next batch by hand: once one passes the check, an automation's batches run again.
 
 ## Reservoir (CS-9xx)
 

@@ -1121,6 +1121,26 @@
       ]
     },
     {
+      "code": "CS-808",
+      "title": "A batch's mix is off its band, or could not be checked",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "A batch finished, and 5 minutes after its mix stopped the tank was read with the room's feed EC and pH probes: a reading was outside the room's irrigation EC or pH band, or a probe could not be read (offline, not a number, or in a unit with no exact conversion, such as ppm). Only a probe that is mapped and has a band is checked; a room with neither has no mix check. The batch is not marked good, and a batch an automation asks for is refused until a batch made by hand passes the check. The notification names each reading and its band.",
+      "watering": "Carries on: the mix check never holds watering. The source-water gate still holds it on its own when the feed probe reads off its band or stays dead.",
+      "causes": [
+        "A recipe amount, a stock tank or a dosing pump that is off.",
+        "A fill that brought in too much or too little water.",
+        "The irrigation EC or pH band was set for another stage.",
+        "A feed probe that is offline, needs calibrating, or reports in ppm."
+      ],
+      "fixes": [
+        "Check the tank with a hand meter, and correct it with single doses or fresh water.",
+        "Check the recipe, the stock tanks and the irrigation EC and pH bands.",
+        "Bring the probe back online, calibrate it, or set it to report mS/cm or µS/cm.",
+        "Make the next batch by hand: once one passes the check, an automation's batches run again."
+      ]
+    },
+    {
       "code": "CS-901",
       "title": "Tank at its minimum",
       "source": "notification",

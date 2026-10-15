@@ -272,7 +272,7 @@ def test_a_fill_valve_that_does_not_close_takes_the_stuck_hardware_path(rig, fil
 
 # ------------------------------------------------------------------ no read or command skips the tables
 NUMBERS = {"number.balance_volume", "number.balance_flow", "input_number.bloom_volume", "sensor.bloom_flow",
-           "number.recipe_bloom", "sensor.mixer_power"}
+           "number.recipe_bloom", "sensor.mixer_power", "sensor.tank_ec", "sensor.tank_ph"}
 ACTUATORS = {"valve.tank_fill", "valve.mix_valve", "switch.tank_mixer", "switch.balance_power",
              "switch.bloom_power"}
 
@@ -309,6 +309,12 @@ def test_every_dosing_number_and_actuator_goes_through_the_tables(rig):
     r = _valve_rig(rig)
     _batch(r, **VALVES)
     r.set("sensor.mixer_power", "0")
+    room = r.c.rooms[0]  # the tank probes the mix check reads (test_mix_check.py)
+    room.feed_ec_sensor, room.feed_ph_sensor = "sensor.tank_ec", "sensor.tank_ph"
+    r.fake.set_state("sensor.tank_ec", "2000", {"unit_of_measurement": "µS/cm"})
+    r.fake.set_state("sensor.tank_ph", "5.9", {})
+    r.fake.set_state("number.crop_steering_irrigation_ec_max", "2.5", {})
+    r.fake.set_state("number.crop_steering_irrigation_ph_max", "6.4", {})
     reads, calls = _spy(r)
     r.ask(ml=50)
     r.poll()
@@ -318,7 +324,10 @@ def test_every_dosing_number_and_actuator_goes_through_the_tables(rig):
     r.behaviour.clear()
     r.ask("batch")
     r.poll()
+    r.clock.sleep(dosing_runner.MIX_SETTLE_S)
+    r.runner.poll()
     assert [entry["result"] for entry in r.status()[1]["history"]] == ["finished", "ran past its time", "finished"]
+    assert r.status()[1]["mix"]["verdict"] == "good"
     assert _bypasses(reads, calls) == []
     assert {entity for entity, _how in reads} == NUMBERS | ACTUATORS  # every one was read
     # and every actuator driven but Bloom's power, which nothing in this run switches off

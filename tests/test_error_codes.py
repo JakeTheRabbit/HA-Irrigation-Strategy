@@ -65,6 +65,7 @@ RESERVED = {
     "CS-710": ("feat/brain-channel", "the brain: water finding a channel"),
     "CS-711": ("feat/brain-feed-proposal", "the brain: a feed proposal"),
     "CS-712": ("feat/claude-haiku-brain", "the brain"),
+    "CS-808": ("feat/mix-check", "a batch's mix off its EC or pH band"),
     "CS-9xx": ("feat/reservoir-minimum", "reservoir and feed"),
 }
 

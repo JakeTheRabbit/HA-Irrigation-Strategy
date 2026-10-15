@@ -17,7 +17,7 @@ pump name or recipe is assumed.
 | Layer | Owns | Never does |
 |---|---|---|
 | Integration | Each room's dosing configuration and its one pending request, in a revisioned store; the services to read, save and request; `sensor.crop_steering_<prefix>dosing_config` for the controller | Switch, press or set any hardware |
-| Controller app | Every action: doses, batches, stops, the irrigation hold during a batch and while dosing hardware does not read off, recovery after a restart, alerts CS-801 to CS-807; `sensor.crop_steering_<prefix>dosing` with live status | Act on a dose or batch asked for more than 120 s before, or on a room whose configuration it cannot read; switch a dosing pump's power on |
+| Controller app | Every action: doses, batches, stops, the irrigation hold during a batch and while dosing hardware does not read off, recovery after a restart, the mix check after a batch, alerts CS-801 to CS-808; `sensor.crop_steering_<prefix>dosing` with live status | Act on a dose or batch asked for more than 120 s before, or on a room whose configuration it cannot read; switch a dosing pump's power on |
 | Dashboard | Equipment › Dosing: pumps, a dose form, the batch, the recipe, history, and the dosing setup | Write any hardware entity; everything goes through `dosing_request` |
 
 ## Configuration (integration store `crop_steering.dosing.<entry_id>`)
@@ -255,6 +255,32 @@ take more than 20 minutes. The watchdog is set from these doses.
   a stock tank whose per-batch dose points at the same recipe number is drawn down by exactly what
   was dosed. A tank linked to a pump is drawn by the pump's runs (Stock tanks, below).
 
+### The mix check
+
+Five minutes after a batch finishes (its mix stopped and its hold released), the controller reads the
+tank with the room's feed EC and pH probes (the add-on's `feed_ec_sensor` and `feed_ph_sensor`, or the
+room's own) and compares each reading with the room's irrigation band:
+`number.crop_steering_<prefix>irrigation_ec_min` / `_max` and `irrigation_ph_min` / `_max`, a bound of 0
+or less being no bound. Only a probe that is mapped and has a band is checked; a room with neither has
+no check, and its batches run exactly as before. The probes are read through the device-unit table
+(Units and hardware): EC in mS/cm, µS/cm or dS/m converts exactly, an unknown unit counts only while
+plausible, and one with no exact conversion (ppm, ppt) is not read. pH is read as the source-water
+gate reads it.
+
+- Every reading inside its band: the batch is marked good (`mix.verdict` "good").
+- A reading outside its band ("off target"), or a probe that reads nothing usable ("not read"):
+  **CS-808** names each reading and its band, the batch is not marked good, and a `batch` asked for
+  with no user (`by` null: an automation) is refused, "refused: the last batch's mix check failed
+  (...); make the next batch by hand", until a batch made by hand passes the check. A dose, a stop
+  and a batch made by hand are never refused for it.
+- While the check is still due, an automation's batch is refused too ("the last batch's mix is not
+  checked yet").
+
+The mix check never holds watering, whatever it finds. The source-water gate still holds a zone on its
+own, as it always did, while the feed probe reads off its band or stays dead past its grace. The
+verdict is kept in `dosing_state.json` (`mix`), so a restart while the tank settles still checks it,
+and a batch that finishes replaces it. A file from before the check has none and loads unchanged.
+
 ### Holding: dosing hardware that does not read off
 
 Whatever a dose or a batch switched off, or tried to, and does not read off (a dosing pump's power,
@@ -326,7 +352,10 @@ State: `idle` | `dosing` | `batch` | `unavailable` (the room's configuration can
             "result": null | "finished" | "stopped: <reason>", "ended_at": null | "…"},
   "handled": "<request id>", "handled_result": "…",
   "history": [{"kind": "dose" | "batch" | "draw", "at": "…", "ended_at": "…", "result": "…",
-               "doses": {"balance": 300, "bloom": 1800}, "by": "…"}],  // newest first, 20 kept
+               "doses": {"balance": 300, "bloom": 1800}, "by": "…",
+               "mix": "good" | "off target" | "not read"}],  // newest first, 20 kept; mix once checked
+  "mix": null | {"batch": "<its started_at>", "due": "…", "verdict": null | "good" | "off target" | "not read",
+                 "checked_at": "…", "why": "…", "ec": 2.1, "ph": 5.9},  // the last batch's mix check
   "updated_at": "…"                    // the controller's last publish
 }
 ```
@@ -354,6 +383,7 @@ still to put back across a restart.
 | CS-805 | The mixing pump did not start | held rooms water again |
 | CS-806 | Dosing was stopped, or needs a check | held rooms water again once the hardware reads off; a dose's pump that does not read off holds its room |
 | CS-807 | A dose was not taken off its stock tank | carries on |
+| CS-808 | A batch's mix is off its band, or could not be checked | carries on; an automation's next batch is refused |
 
 Each event (a dose, a batch, a restart) raises its own notification, so a second one within half an
 hour is never swallowed by the first, and an alert about hardware that does not read off is updated
