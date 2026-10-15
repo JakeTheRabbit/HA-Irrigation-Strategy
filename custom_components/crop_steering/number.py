@@ -11,9 +11,10 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.restore_state import async_get as restore_state_data
 
 from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
-from .generated.defaults import ENTITY_DEFAULTS
+from .generated.defaults import ENTITY_DEFAULTS, SUBSTRATE_PROFILES
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .sizing import SIZING_KEYS, configured_sizing, prefer_setup_value
 
@@ -419,6 +420,27 @@ NUMBER_DESCRIPTIONS = [
 # defaults table, which the controller's fallbacks sit beside (generated/defaults.py).
 DEFAULT_VALUES = ENTITY_DEFAULTS
 
+
+def _room_substrate(hass: HomeAssistant, entry: ConfigEntry) -> str:
+    """What the room grows in: its substrate select, or the value Home Assistant is about to restore to
+    it (the selects and these numbers are set up side by side). generic when neither is known.
+    """
+    entity_id = f"select.{DOMAIN}_{room_prefix(entry)}substrate"
+    state = hass.states.get(entity_id)
+    if state is None:
+        stored = restore_state_data(hass).last_states.get(entity_id)
+        if stored is not None and restored_state_is_ours(entry, stored.state):
+            state = stored.state
+    value = state.state if state is not None else "generic"
+    return value if value in SUBSTRATE_PROFILES else "generic"
+
+
+def substrate_default(hass: HomeAssistant, entry: ConfigEntry, key: str):
+    """The room's substrate profile's starting value for a setting (VWC bands, dryback targets), or None."""
+    profile = SUBSTRATE_PROFILES[_room_substrate(hass, entry)]
+    return {**profile["vwc"], **profile["dryback"]}.get(key)
+
+
 # Steering params that ALSO get per-zone overrides (number.crop_steering_zone_N_<...>).
 # Hardware/substrate (substrate_volume, dripper_flow_rate, drippers_per_plant) and
 # system (lights_*) stay GLOBAL only. field_capacity / maximum_ec / watchdog_hours are
@@ -684,32 +706,47 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
         # (number.p1_target_vwc). Existing installs keep the id the registry already holds.
         self.entity_id = f"number.{self._attr_object_id}"
 
+        # For per-zone steering entities the description key is "zone_N_<base>"; strip
+        # the zone prefix so the seed lookup uses the bare entity key.
+        base_key = description.key
+        if zone_num is not None:
+            prefix = f"zone_{zone_num}_"
+            if base_key.startswith(prefix):
+                base_key = base_key[len(prefix) :]
+        seed_value = (entity_seed or {}).get(base_key)
         if default_value is not None:
             # Caller supplied an explicit value (e.g. zone tunables from .env zones dict).
             self._attr_native_value = default_value
+        elif seed_value is not None:
+            self._attr_native_value = seed_value
         else:
-            # For per-zone steering entities the description key is "zone_N_<base>"; strip
-            # the zone prefix so the seed lookup uses the bare entity key.
-            base_key = description.key
-            if zone_num is not None:
-                prefix = f"zone_{zone_num}_"
-                if base_key.startswith(prefix):
-                    base_key = base_key[len(prefix) :]
-
-            seed_value = (entity_seed or {}).get(base_key)
-            if seed_value is not None:
-                self._attr_native_value = seed_value
-            else:
-                self._attr_native_value = DEFAULT_VALUES.get(
-                    description.key, description.native_min_value
-                )
+            self._attr_native_value = DEFAULT_VALUES.get(
+                description.key, description.native_min_value
+            )
+        # A setting still at the table's value (nothing seeded or given for it) starts at the room's
+        # substrate profile instead, once the room's choice can be read (async_added_to_hass).
+        self._substrate_key = (
+            base_key
+            if seed_value is None
+            and base_key in DEFAULT_VALUES
+            and self._attr_native_value == DEFAULT_VALUES[base_key]
+            else None
+        )
 
     async def async_added_to_hass(self) -> None:
         """Restore state when added to hass."""
         await super().async_added_to_hass()
         last_state = await self.async_get_last_state()
+        restored = last_state is not None and restored_state_is_ours(
+            self._entry, last_state
+        )
+        if not restored and self._substrate_key is not None:
+            # A setting with no value yet: the room's substrate profile (generic = the table).
+            value = substrate_default(self.hass, self._entry, self._substrate_key)
+            if value is not None:
+                self._attr_native_value = value
         # A state left behind by a DELETED room is not this room's: keep the wizard's answer.
-        if last_state is not None and restored_state_is_ours(self._entry, last_state):
+        if restored:
             if self._setup_value is not None and prefer_setup_value(
                 last_state.attributes, self._setup_revision, self._setup_value
             ):

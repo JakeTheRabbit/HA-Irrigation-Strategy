@@ -142,7 +142,7 @@ for that zone. (3 zones × 24 = 72 entities on a 3-zone system.)
 | `irrigation_phase` | P0 · P1 · P2 · P3 | A manual phase indicator, read by `current_phase` and `ec_ratio`. The controller keeps each zone's phase itself and does not read it. |
 | `recipe_stage` | Veg · Transition · Bulk · Ripen · Custom | Picking a stage applies its setpoints to the zones. |
 | `water_today_view` | Zone total · Per plant | How Water today reads for the room: each zone's total, or its water and daily limit divided by its plant count. The dashboard shows it that way for everyone (Settings → Appearance), and the controller's vitals notification follows it. Zone total by default. |
-| `substrate` | generic · rockwool · coco | What the room grows in. Published in the room's `engine_config` descriptor and read by the controller, which takes a change with no disarm cycle. `generic` by default, and on every upgraded room; choosing another changes nothing the controller does yet. |
+| `substrate` | generic · rockwool · coco | What the room grows in. Published in the room's `engine_config` descriptor and read by the controller, which takes a change with no disarm cycle. `generic` by default, and on every upgraded room, and runs exactly as before. `rockwool` and `coco` choose the substrate profile in the engine's defaults table: the controller's EC settle time, P1 rise, P0 flush, shot scaling by EC and Auto setpoints bounds, and the starting VWC bands and dryback targets of any setting that has no value yet (a value the room already holds never moves). |
 
 ### Per-zone (`select.crop_steering_zone_N_*`)
 | Entity | Options | What it does |
