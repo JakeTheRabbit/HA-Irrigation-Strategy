@@ -60,7 +60,7 @@ def test_an_unreachable_dryback_is_replaced_by_the_deepest_one_possible():
 def test_threshold_is_held_under_the_zone_overnight_and_through_p0_so_p0_really_happens():
     night = _want(minutes_since_lights_on=None, lights_on=False, phase="P3")
     p0 = _want(minutes_since_lights_on=20, phase="P0", shots_today=0)
-    assert night["p2_vwc_threshold"] == p0["p2_vwc_threshold"] == round(PLAN.floor - 2.0, 1)
+    assert night["p2_vwc_threshold"] == p0["p2_vwc_threshold"] == round(36.0 * (1 - 0.15) - 2.0, 1)
     assert p0["dryback_target"] == ss.ADDITIONAL_DRYBACK_PCT  # Athena's 1-5% after lights-on ends P0
     assert p0["p0_maximum_wait_time"] == 75.0  # ...or the planned delay does
     assert night["dryback_target"] == 15.0
@@ -70,7 +70,7 @@ def test_threshold_rises_to_the_band_for_the_watering_day_then_drops_to_start_th
     assert _want(minutes_since_lights_on=90, phase="P1", shots_today=2)["p2_vwc_threshold"] == 34.8
     assert _want(minutes_since_lights_on=400, phase="P2")["p2_vwc_threshold"] == 34.8
     after_stop = _want(minutes_since_lights_on=(PLAN.p2_stop_h - 10) * 60 + 5, phase="P2")
-    assert after_stop["p2_vwc_threshold"] == round(PLAN.floor - 2.0, 1)  # no more top-ups: the dryback has begun
+    assert after_stop["p2_vwc_threshold"] == round(36.0 * (1 - 0.15) - 2.0, 1)  # no more top-ups: dryback begun
 
 
 def test_the_ramp_is_even_shots_with_room_to_finish():

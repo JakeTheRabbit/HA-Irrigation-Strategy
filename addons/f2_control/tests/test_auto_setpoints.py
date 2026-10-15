@@ -199,3 +199,44 @@ def test_status_tells_the_operator_what_it_is_doing():
     au.ramp_outcome(learn, "P1")
     state, attrs = au.status(learn, enabled=True)
     assert state == "frozen" and attrs["p1_outcome"] == "suspect" and attrs["learned_peak"] is None
+
+
+def test_the_overnight_threshold_sits_under_where_the_dryback_target_ends_so_p0_still_runs():
+    """A real day: the plan reckoned only about 25% of a 30% dryback reachable (P1 ran to 17:00) and held the
+    threshold 2 points under that, 62.2%, through the night. The night dried to the target anyway, so at
+    lights-on the zone read under the threshold and P0 was skipped: "P0 bypass VWC 61<=rewater 63". The
+    threshold now sits 2 points under where the 30% target ends."""
+    import curve_tracker as ct
+    import engine_twin as et
+    from crop_steering_engine import ZoneSnapshot, decide
+
+    learn = dict(au.fresh(), peak=85.4, gain=0.4, day_rate=2.0, night_rate=1.38,
+                 day_n=au.MIN_RATE_DAYS, night_n=au.MIN_RATE_DAYS, outcome="reached", hold_days=2)
+    current = dict(p1_target_vwc=85.4, field_capacity=87.4, p2_vwc_threshold=80.1,
+                   p3_emergency_vwc_threshold=50.0, p2_shot_size=3.0)
+    ctx = dict(lights_on_h=7, lights_off_h=20, shots_today=8, dryback_pct=30.0, p0_wait_min=60,
+               p1_shot_pct=3.0, p1_gap_min=15, start_vwc=61.0)
+    plan = ct.plan_day(au.model(learn), ct.Recipe(0.0, 30.0, 60, 3.0, 15, 3.0), 7, 20, 61.0)
+    assert round(plan.floor - 2.0, 1) == 62.2 and plan.p2_stop_h == 17.0  # where the threshold used to sit
+    night = au.wanted(learn, current, vwc=72.2, phase="P3", plan_ctx=dict(ctx, minutes_since_lights_on=None))
+    dawn = au.wanted(learn, current, vwc=60.6, phase="P0",
+                     plan_ctx=dict(ctx, minutes_since_lights_on=1, shots_today=0))
+    assert night["p2_vwc_threshold"] == dawn["p2_vwc_threshold"] == round(85.4 * 0.7 - 2.0, 1) == 57.8
+    assert "p3_emergency_vwc_threshold" not in night  # 50 already sits 3 under it
+
+    # The engine at lights-on, the zone held at its 30% dryback from the 86.5% peak (60.55%).
+    def p0_tick(threshold):
+        p = et.params_from(dict(
+            p1_target_vwc=85.4, p2_vwc_threshold=threshold, p2_shot_size=3.0, p1_initial_shot_size=3.0,
+            p1_shot_size_increment=0.0, p1_maximum_shots=20, p1_time_between_shots=15, dryback_target=3.0,
+            p0_maximum_wait_time=60, ec_target_p0=3.0, ec_target_p1=4.5, ec_target_p2=6.0,
+            p3_emergency_vwc_threshold=50.0, p3_emergency_shot_size=2.0, max_daily_volume=200.0,
+            field_capacity=87.4, maximum_ec=8.5))
+        s = ZoneSnapshot(vwc=60.6, ec=3.0, phase="P0", peak_vwc=60.6, dryback_pct=0.0, dryback_rate=0.5,
+                         shot_count=0, phase_minutes=1.0, minutes_since_shot=600.0, daily_vol=0.0, ec_smooth=3.0,
+                         lights_on=True, lights_just_on=False, hours_to_lights_on=24.0, hours_to_lights_off=13.0,
+                         uptime_min=600.0)
+        return decide(s, p)[0]
+
+    assert p0_tick(62.2) == "P1"  # skipped, as it was
+    assert p0_tick(night["p2_vwc_threshold"]) == "P0"  # P0 runs: its additional dryback first
