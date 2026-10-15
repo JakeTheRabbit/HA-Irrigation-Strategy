@@ -1,6 +1,9 @@
 {
   "domain": "crop_steering",
   "name": "Crop Steering",
+  "after_dependencies": [
+    "input_number"
+  ],
   "codeowners": [
     "@JakeTheRabbit"
   ],
