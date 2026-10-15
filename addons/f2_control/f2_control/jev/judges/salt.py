@@ -21,6 +21,7 @@ from ..doctrine import doctrine
 from .base import Judge, choice, common, with_doctrine
 
 BAND = 0.10  # the steer leaves pore EC alone within 10 % of its target (controller._step_ec_offset)
+STEADY = 0.1  # mS/cm an hour: pore EC moving less than this is steady (the in-band skip)
 SETTLE_MIN = 45.0  # pore EC read sooner than this after a shot is the feed passing (engine EC_SETTLE_MIN)
 FLUSHES = ("flush_high_ec", "p0_ec_flush", "p1_flush", "p2_dilute", "p2_rescue")
 
@@ -84,8 +85,17 @@ class SaltJudge(Judge):
         self._note_feed(ctx)
         # Its only action is the EC steer's mode, and the steer runs only while the room's EC stacking is on:
         # asked with stacking off it chose holds that changed nothing and filled the log with their outcomes.
+        # The in-band skip: inside the band and steady the steer is at rest and the only call is "in band, hold",
+        # so it is not asked (it costs money); out of the band or moving, it is asked on its cadence again.
         return (super().due(ctx, last_asked) and ctx.snap.ec_settled is not None
-                and getattr(ctx.params, "stacking_on", True))
+                and getattr(ctx.params, "stacking_on", True) and not self.in_band(ctx))
+
+    @staticmethod
+    def in_band(ctx):
+        """Settled pore EC inside the steer's band around the target, and steady over the last hour."""
+        target, ec = ctx.params.ec_target_p2, ctx.snap.ec_settled
+        move = trend(ctx.history, ctx.now, 60, index=2)
+        return target * (1 - BAND) <= ec <= target * (1 + BAND) and move is not None and abs(move) < STEADY
 
     def _note_feed(self, ctx):
         if ctx.feed_ec is None:

@@ -49,12 +49,24 @@ QUESTIONS = with_doctrine({
 class ProbeJudge(Judge):
     name = "probe"
     cadence_min = 30.0
+    nominal_cadence_min = 120.0  # the in-band skip: while code sees nothing wrong, asked every 2 hours
     max_age_min = 90.0
     deciding = ("tracking",)  # `mode` only names the fault once `tracking` says the probe is off
     questions = QUESTIONS
 
     def due(self, ctx, last_asked):
-        return super().due(ctx, last_asked) and len(ctx.history.shots) >= 2
+        if not (super().due(ctx, last_asked) and len(ctx.history.shots) >= 2):
+            return False
+        return (last_asked is None or not self.nominal(ctx)
+                or ctx.now - last_asked >= timedelta(minutes=self.nominal_cadence_min))
+
+    def nominal(self, ctx):
+        """Code sees a working probe: every settled shot of the last 6 hours kept a normal rise (the "(normal)" of
+        words_response) and the reading is not a flat line. Anything else and the judge is back on its cadence."""
+        typical = ctx.typical_rise()
+        rs = [r for r in self._responses(ctx) if r.settled]
+        return (typical is not None and bool(rs) and flat_minutes(ctx.history, ctx.now) < 30.0
+                and all(r.retained is not None and r.retained >= 0.6 * typical for r in rs))
 
     def _responses(self, ctx, hours=6):
         since = ctx.now - timedelta(hours=hours)
