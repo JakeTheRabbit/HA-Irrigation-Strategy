@@ -63,6 +63,10 @@ pump name or recipe is assumed.
                                                         // at batch start and wins over ml; 0 skips the pump
     ]
   },
+  "profile": {                         // the room's hardware profile (Hardware profile, below)
+    "hold_wait_s": 600, "fill_open_s": 10, "full_blind_s": 15, "mix_power_s": 20,
+    "min_flow_ml_s": 0.05, "max_dose_s": 1200
+  },
   "request": null,                     // see Requests
   "updated_at": "2026-09-28T12:00:00+13:00"
 }
@@ -78,12 +82,33 @@ tank is linked to at most one pump. A room with no pumps is valid and does nothi
 when a setup is saved; a stored setup read back at start-up is kept although a device has not come
 back yet.
 
+### Hardware profile
+
+The times and limits the controller works to are the room's own, so a slower fill valve, a mix pump
+that takes longer to draw its power or a slow pump that needs longer doses can be set for that room
+alone. Each key is optional; one left out takes its default, and the defaults are the values every
+room used before the profile existed, so a setup stored without one (any install before it) runs
+exactly as before.
+
+| Key | Default | Range | What it sets |
+|---|---|---|---|
+| `hold_wait_s` | 600 | 60..3600 | how long a batch waits at Hold for a shot in flight |
+| `fill_open_s` | 10 | 2..120 | how long the fill valve has to read on |
+| `full_blind_s` | 15 | 5..300 | how long `full_entity` may read nothing while the tank fills |
+| `mix_power_s` | 20 | 5..300 | how long the mix pump has to draw `mix_min_w` |
+| `min_flow_ml_s` | 0.05 | 0.01..100 | the lowest flow that counts as a calibration |
+| `max_dose_s` | 1200 | 60..3600 | the longest expected dose; no dose runs past it + 60 s |
+
+The numbers below (10 s, 15 s, 20 s, 0.05 mL/s, 20 and 21 minutes, 10 min) are these defaults. The
+controller reads the profile from `dosing_config`; a value it cannot use (missing, not a positive
+number) takes the default.
+
 ## Services
 
 | Service | Who | Data | Response |
 |---|---|---|---|
 | `crop_steering.dosing_get` | any user | `room_id` | `{schema_version: 1, room_id, config, candidates[], can_edit, error}` |
-| `crop_steering.dosing_save` | admin | `room_id, expected_revision, pumps, batch` | the same as `dosing_get`, or `error` |
+| `crop_steering.dosing_save` | admin | `room_id, expected_revision, pumps, batch, profile?` (left out: the stored one is kept) | the same as `dosing_get`, or `error` |
 | `crop_steering.dosing_request` | admin; a `stop`: any signed-in user | `room_id, action ("dose" \| "batch" \| "stop"), pump?, ml?` | `{request, error}` |
 
 - `room_id` is `"room:<prefix>"`, as for the stock services.
@@ -114,7 +139,7 @@ back yet.
   pump saved without an `id` gets one made from its name.
 
 `sensor.crop_steering_<prefix>dosing_config`: state = the revision; attributes `pumps`, `batch`,
-`request`. This is what the controller reads (every 2 s).
+`profile`, `request`. This is what the controller reads (every 2 s).
 
 ## Requests and the controller
 

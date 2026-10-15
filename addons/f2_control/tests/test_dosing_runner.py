@@ -1024,7 +1024,7 @@ def test_each_step_recovers_first_reads_every_two_seconds_and_survives_an_error(
 def test_a_batch_that_overruns_its_watchdog_is_ended(rig):
     r = rig()
     _full_batch(r)
-    r.runner._watchdog = lambda batch, plan: 100.0
+    r.runner._watchdog = lambda batch, plan, profile: 100.0
     r.ask("batch")
     r.poll()
     assert r.status()[1]["handled_result"] == "stopped: premix: it ran past its watchdog"
