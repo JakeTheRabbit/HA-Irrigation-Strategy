@@ -325,8 +325,11 @@ def ha_service_response(domain, service, data, timeout=12):
 
 def ha_fire(event, data, timeout=4):
     """Fire a Home Assistant event, best effort -> True when Home Assistant took it."""
+    if not _GATE.allows("other"):
+        return False
     try:
         r = _session().post(f"{BASE}/events/{event}", headers=HDR, json=data, timeout=timeout)
+        _GATE.saw("other", r.status_code, f"POST {BASE}/events/{event}")
         return r.status_code < 300
     except Exception:
         return False

@@ -28,7 +28,7 @@ PUMP, MAIN, VALVE = "switch.p", "switch.m", "switch.v1"
 OPTIONS = {"num_zones": 1, "enable_flag": KILL, "hardware": {"pump": PUMP, "mainline": MAIN, "valves": {"1": VALVE}}}
 CONTAINER = {"F2_RUNTIME": "container", "HA_URL": "http://ha:8123", "HA_TOKEN": "tok"}
 # The controller's own REST functions, before any other test module's fake_ha.install replaces them.
-REST = ("ha_get", "ha_get_status", "ha_call", "ha_get_all", "ha_set", "ha_service_response")
+REST = ("ha_get", "ha_get_status", "ha_call", "ha_get_all", "ha_set", "ha_service_response", "ha_fire")
 REAL = {name: getattr(controller, name) for name in REST}
 
 
@@ -297,6 +297,16 @@ def test_the_gate_lets_through_only_this_processs_own_offs_once_and_their_read_b
     assert not gate.allows("read", VALVE)  # a read-back stops at its first refused read
     gate.saw("off", 200, "POST z")
     assert gate.state is None and gate.allows("other")
+
+
+def test_a_closed_gate_fires_no_event(rig):
+    """The controller's naming of its own setpoint writes (an event) goes through the gate like a service call."""
+    c, fake, session, clock = rig()
+    refuse_from(session, 0, 401)
+    assert not controller.ha_fire("crop_steering_setpoint_write", {"entity_id": "number.x"})
+    assert controller._GATE.state == "all" and len(session.sent) == 1
+    assert not controller.ha_fire("crop_steering_setpoint_write", {"entity_id": "number.x"})
+    assert len(session.sent) == 1
 
 
 # ------------------------------------------------------------------ U8 (m): the close-only start
