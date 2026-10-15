@@ -411,6 +411,10 @@ dosing_save:
       required: true
       selector:
         object:
+    feed:
+      required: false
+      selector:
+        object:
 dosing_request:
   fields:
     room_id:

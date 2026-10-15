@@ -5,7 +5,7 @@ switch that is both a pump's power and batch hardware. Plus the request checks a
 still counts as waiting for the controller."""
 
 from copy import deepcopy
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 import pytest
 
@@ -340,3 +340,100 @@ def test_a_request_waits_until_it_is_handled_or_too_old_to_act_on():
     assert not dosing.pending(None, None, NOW)
     assert not dosing.pending({"id": "abc", "at": "yesterday"}, None, NOW)
     assert not dosing.pending({"id": "abc", "at": "2026-09-28T12:00:00"}, None, NOW)
+
+
+# ------------------------------------------------------------------ the feed schedule
+def feed(**changes):
+    """Vege, Bloom and Fade, each dosing the one pump; Week 1 from Monday 5 October 2026: Vege, then
+    Bloom, Bloom, Fade."""
+    recipes = [
+        {"id": rid, "name": rid.title(), "doses": [{"pump": "balance", "ml": ml}]}
+        for rid, ml in (("vege", 200), ("bloom", 300), ("fade", 100))
+    ]
+    raw = {
+        "recipes": recipes,
+        "schedule": {
+            "start": "2026-10-05",
+            "weeks": ["vege", "bloom", "bloom", "fade"],
+        },
+        **changes,
+    }
+    return dosing.clean_feed(raw, [deepcopy(PUMP)], KNOWN.__contains__)
+
+
+def test_each_week_of_the_schedule_doses_its_recipe_and_the_last_one_carries_on():
+    doc = feed()
+    assert doc["recipes"][1] == {
+        "id": "bloom",
+        "name": "Bloom",
+        "doses": [{"pump": "balance", "ml": 300, "ml_entity": None}],
+    }
+    days = {
+        date(2026, 10, 4): None,  # before it starts
+        date(2026, 10, 5): (1, "vege"),
+        date(2026, 10, 11): (1, "vege"),
+        date(2026, 10, 12): (2, "bloom"),  # the midnight that starts week 2
+        date(2026, 10, 26): (4, "fade"),
+        date(2027, 1, 1): (13, "fade"),  # after the last week, its recipe carries on
+    }
+    for day, expected in days.items():
+        assert dosing.schedule_week(doc, day) == expected
+    assert dosing.in_use(doc, date(2026, 10, 12))["name"] == "Bloom"
+    # Before it starts, and with no schedule, nothing is picked: the batch's own recipe.
+    assert dosing.in_use(doc, date(2026, 10, 4)) is None
+    assert dosing.feed_now(doc, date(2026, 10, 4))["source"] == "batch"
+    assert dosing.in_use(dosing.empty_feed(), date(2026, 10, 12)) is None
+
+
+def test_a_recipe_picked_by_hand_holds_until_the_next_week_starts():
+    doc = feed()
+    wednesday = date(2026, 10, 7)
+    dosing.pick(doc, "fade", wednesday)
+    assert doc["held_until"] == "2026-10-12"
+    assert dosing.feed_now(doc, wednesday) == {
+        "recipe": "Fade",
+        "recipe_id": "fade",
+        "week": 1,
+        "weeks": 4,
+        "start": "2026-10-05",
+        "held_until": "2026-10-12",
+        "source": "held",
+    }
+    monday = dosing.feed_now(doc, date(2026, 10, 12))
+    assert (monday["recipe"], monday["source"], monday["held_until"]) == (
+        "Bloom",
+        "schedule",
+        None,
+    )
+    # This week's own recipe ends a hold; without a schedule, a pick is simply the one in use.
+    assert dosing.pick(doc, "vege", wednesday)["held_until"] is None
+    none = feed(schedule=None)
+    dosing.pick(none, "fade", wednesday)
+    assert none["held_until"] is None
+    assert dosing.feed_now(none, wednesday)["source"] == "hand"
+
+
+def test_a_feed_schedule_that_cannot_be_dosed_is_refused():
+    assert feed(stage="gone")["stage"] is None  # a pick of no recipe there is no pick
+    for changes, match in (
+        ({"schedule": {"start": "2026-10-05", "weeks": ["vege", "flower"]}}, "week 2"),
+        ({"schedule": {"start": "5 October", "weeks": ["vege"]}}, "must be a date"),
+        ({"schedule": {"start": None, "weeks": ["vege"] * 53}}, "at most 52 weeks"),
+        ({"recipes": [{"name": "A"}, {"name": "a"}]}, "two feed recipes are called"),
+        (
+            {"recipes": [{"name": "A", "doses": [{"pump": "bloom", "ml": 5}]}]},
+            "feed recipe A: the recipe doses pump bloom",
+        ),
+        (
+            {"recipes": [{"name": "A", "doses": [{"pump": "balance", "ml": 2001}]}]},
+            "feed recipe A:",
+        ),
+    ):
+        with pytest.raises(dosing.DosingError, match=match):
+            feed(**changes)
+    # A recipe sent without an id gets one from its name, never another's.
+    made = feed(
+        recipes=[{"id": "late", "name": "Late"}, {"name": "Late Flower"}], schedule=None
+    )
+    assert [recipe["id"] for recipe in made["recipes"]] == ["late", "late_flower"]
+    assert dosing.clean_feed(None, []) == dosing.empty_feed()

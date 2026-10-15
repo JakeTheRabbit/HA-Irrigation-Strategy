@@ -884,6 +884,10 @@
         "batch": {
           "name": "Batch",
           "description": "The batch tank's fill, mixing and hold hardware, and the recipe."
+        },
+        "feed": {
+          "name": "Feed schedule",
+          "description": "Named feed recipes, the recipe each week of the grow uses from the day the first week starts, and the recipe picked by hand. Left out, the stored feed schedule is kept."
         }
       }
     },

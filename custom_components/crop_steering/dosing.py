@@ -5,19 +5,28 @@ directly; dosing_api.py stores it and serves the services. The contract is docs/
 The integration only ever stores this. The controller app does every action, and only on a request
 younger than REQUEST_MAX_AGE_S seconds, so a request is "pending" only until the controller has
 handled it or it is too old for the controller to act on.
+
+The feed schedule: a room may keep named feed recipes, each a recipe like the batch's own, and give
+each week of the grow one of them (Week 1 Vege, Weeks 2-6 Bloom, Weeks 7-8 Fade) from the day its
+first week starts, counted in Home Assistant's days, so the recipe moves on by itself at the midnight
+that starts a week; after the last week, that week's recipe carries on. A recipe picked by hand while
+the schedule runs holds until the schedule's next week starts. Without a schedule running, the
+recipe picked by hand is the one in use, and with none picked the batch's own recipe is.
 """
 
 from __future__ import annotations
 
 import math
 import re
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 MAX_PUMPS = 8
 MAX_MIX_VALVES = 4
 MAX_CLOSE = 16
 MAX_ML = 5000
 REQUEST_MAX_AGE_S = 120
+MAX_RECIPES = 12
+MAX_WEEKS = 52  # a feed schedule's weeks
 ACTIONS = ("dose", "batch", "stop")
 # Every domain a dosing setup can use: what dosing_get offers to pick from.
 CANDIDATE_DOMAINS = (
@@ -67,11 +76,22 @@ def empty_batch() -> dict:
     }
 
 
+def empty_feed() -> dict:
+    return {
+        "recipes": [],
+        # Each week's recipe id from the day the first week starts; no start or no weeks = none.
+        "schedule": {"start": None, "weeks": []},
+        "stage": None,  # the recipe picked by hand
+        "held_until": None,  # a recipe picked while the schedule runs holds until this day
+    }
+
+
 def empty() -> dict:
     return {
         "revision": 0,
         "pumps": [],
         "batch": empty_batch(),
+        "feed": empty_feed(),
         "request": None,
         "updated_at": None,
     }
@@ -334,6 +354,153 @@ def clean(pumps, batch, exists=None, stock_tanks=None) -> tuple[list[dict], dict
                 "hardware: it cannot be both"
             )
     return out, cleaned
+
+
+def _day(value, what) -> str | None:
+    """A day, YYYY-MM-DD, or None."""
+    if value in (None, ""):
+        return None
+    try:
+        return date.fromisoformat(str(value)).isoformat()
+    except ValueError:
+        raise DosingError(f"{what} must be a date (YYYY-MM-DD)") from None
+
+
+def clean_feed(raw, pumps: list[dict], exists=None) -> dict:
+    """The room's feed recipes and schedule -> what is stored. Each recipe doses only the room's
+    pumps, each at most once, as the batch's recipe does; each week of the schedule names one of the
+    recipes. `exists` as for clean()."""
+    if raw is None:
+        return empty_feed()
+    if not isinstance(raw, dict):
+        raise DosingError("the feed schedule must be an object")
+    recipes = raw.get("recipes") or []
+    if not isinstance(recipes, list) or len(recipes) > MAX_RECIPES:
+        raise DosingError(f"send a list of at most {MAX_RECIPES} feed recipes")
+    by_id = {pump["id"]: pump for pump in pumps}
+    given = {
+        str(item.get("id")).strip()
+        for item in recipes
+        if isinstance(item, dict) and item.get("id") not in (None, "")
+    }
+    out, names = [], set()
+    for item in recipes:
+        if not isinstance(item, dict):
+            raise DosingError("each feed recipe must be an object")
+        name = _text(item.get("name"), "", "a feed recipe's name")
+        if name.casefold() in names:
+            raise DosingError(f"two feed recipes are called {name}")
+        names.add(name.casefold())
+        own = str(item["id"]).strip() if item.get("id") not in (None, "") else None
+        taken = {recipe["id"] for recipe in out} | (given - {own})
+        recipe_id = own or _slug(name, taken)
+        if not _ID.match(recipe_id):
+            raise DosingError(
+                f"feed recipe {name}: its id must be 1 to 24 characters of a-z, 0-9 and _"
+            )
+        if recipe_id in taken:
+            raise DosingError(f"two feed recipes have the id {recipe_id}")
+        try:
+            doses = _recipe(item.get("doses"), by_id, exists)
+        except DosingError as error:
+            raise DosingError(f"feed recipe {name}: {error}") from None
+        out.append({"id": recipe_id, "name": name, "doses": doses})
+    ids = {recipe["id"] for recipe in out}
+    schedule = raw.get("schedule") or {}
+    if not isinstance(schedule, dict):
+        raise DosingError("the feed schedule's weeks must be an object")
+    weeks = schedule.get("weeks") or []
+    if not isinstance(weeks, list) or len(weeks) > MAX_WEEKS:
+        raise DosingError(f"a feed schedule has at most {MAX_WEEKS} weeks")
+    for number, recipe_id in enumerate(weeks, start=1):
+        if recipe_id not in ids:
+            raise DosingError(
+                f"week {number} of the feed schedule uses a feed recipe that is not there"
+            )
+    stage = raw.get("stage")
+    return {
+        "recipes": out,
+        "schedule": {
+            "start": _day(schedule.get("start"), "the feed schedule's first week"),
+            "weeks": list(weeks),
+        },
+        "stage": stage if stage in ids else None,
+        "held_until": _day(raw.get("held_until"), "a feed recipe held by hand"),
+    }
+
+
+def schedule_week(feed: dict, today: date) -> tuple[int, str] | None:
+    """The feed schedule's week today and the recipe id it doses then; None without a schedule (no
+    first day, or no weeks) or before it starts. Week 1 is the 7 days from its first day; after its
+    last week, the last week's recipe carries on."""
+    schedule = feed.get("schedule") or {}
+    start, weeks = schedule.get("start"), schedule.get("weeks") or []
+    if not start or not weeks:
+        return None
+    days = (today - date.fromisoformat(start)).days
+    if days < 0:
+        return None
+    week = days // 7 + 1
+    return week, weeks[min(week, len(weeks)) - 1]
+
+
+def held(feed: dict, today: date) -> str | None:
+    """Until when a recipe picked by hand holds over the schedule (YYYY-MM-DD), or None."""
+    until = feed.get("held_until")
+    if until and schedule_week(feed, today) and today < date.fromisoformat(until):
+        return until
+    return None
+
+
+def in_use(feed: dict, today: date) -> dict | None:
+    """The feed recipe in use today: the schedule's this week, unless one picked by hand still
+    holds; without a schedule running, the one picked by hand. None = the batch's own recipe.
+    """
+    now = schedule_week(feed, today)
+    wanted = feed.get("stage") if now is None or held(feed, today) else now[1]
+    return next((r for r in feed.get("recipes") or [] if r["id"] == wanted), None)
+
+
+def pick(feed: dict, recipe_id, today: date) -> dict:
+    """A recipe picked by hand, in `feed`: with the schedule running it holds until the schedule's
+    next week starts (this week's own recipe ends a hold); without one it is simply the one in use.
+    """
+    feed["stage"] = recipe_id
+    now = schedule_week(feed, today)
+    feed["held_until"] = (
+        (
+            date.fromisoformat(feed["schedule"]["start"]) + timedelta(days=7 * now[0])
+        ).isoformat()
+        if now is not None and recipe_id != now[1]
+        else None
+    )
+    return feed
+
+
+def feed_now(feed: dict, today: date) -> dict:
+    """What the room doses today and why: the recipe's name and id (None = the batch's own recipe),
+    the schedule's week and its length, and `source`: "schedule", "held" (picked by hand over the
+    schedule), "hand" (picked, no schedule running) or "batch" (the batch's own recipe).
+    """
+    recipe, now, holding = (
+        in_use(feed, today),
+        schedule_week(feed, today),
+        held(feed, today),
+    )
+    schedule = feed.get("schedule") or {}
+    if recipe is None:
+        source = "batch"
+    else:
+        source = "held" if holding else "schedule" if now else "hand"
+    return {
+        "recipe": recipe["name"] if recipe else None,
+        "recipe_id": recipe["id"] if recipe else None,
+        "week": now[0] if now else None,
+        "weeks": len(schedule.get("weeks") or []),
+        "start": schedule.get("start"),
+        "held_until": holding,
+        "source": source,
+    }
 
 
 def check_request(config: dict, action, pump=None, ml=None) -> tuple:
