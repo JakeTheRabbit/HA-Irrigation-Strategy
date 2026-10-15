@@ -34,6 +34,10 @@ from custom_components.crop_steering.generated.defaults import UNITS, to_canonic
         ("volume", 25, "ml", 25.0),
         ("flow", 60, "mL/min", 1.0),
         ("flow", 36, "L/h", 10.0),
+        ("distance", 12.5, "cm", 125.0),
+        ("distance", 1.2, "m", 1200.0),
+        ("distance", 10, "in", 254.0),
+        ("distance", 2, "ft", 609.6),
     ],
 )
 def test_recognised_units_convert_exactly(quantity, value, unit, expected):
@@ -51,6 +55,7 @@ def test_recognised_units_convert_exactly(quantity, value, unit, expected):
         ("power", "W"),
         ("volume", "mL"),
         ("flow", "mL/s"),
+        ("distance", "mm"),
     ],
 )
 def test_a_reading_already_in_the_steering_unit_is_untouched(quantity, unit):

@@ -214,6 +214,20 @@ UNITS = {
         "refused": {},
         "plausible": (0.0, 1000.0),
     },
+    # A tank level sensor's distance to the water (ultrasonic or radar), turned into a level by the
+    # room's full and empty distances. Setup refuses a unit this table does not know.
+    "distance": {
+        "canonical": "mm",
+        "convert": {
+            "mm": (0.0, 1, 1),
+            "cm": (0.0, 10, 1),
+            "m": (0.0, 1000, 1),
+            "in": (0.0, 254, 10),
+            "ft": (0.0, 3048, 10),
+        },
+        "refused": {},
+        "plausible": (0.0, 10000.0),
+    },
 }
 
 

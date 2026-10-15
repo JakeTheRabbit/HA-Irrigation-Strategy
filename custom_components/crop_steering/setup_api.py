@@ -42,6 +42,9 @@ HARDWARE_DOMAINS = {
     "tank_ph_sensor": {"sensor"},
     "tank_last_fill_sensor": {"sensor", "input_datetime"},
     "tank_fill_entity": {"switch", "binary_sensor"},
+    # The tank level the controller reads: a distance down to the water, and/or a low-level float.
+    "tank_distance_sensor": {"sensor"},
+    "tank_low_float": {"binary_sensor"},
 }
 SIZING = {
     "plant_count": (1, 1000, True),
@@ -54,12 +57,23 @@ UNITS = {
     "ec": units.accepted("ec"),  # converted to mS/cm where the probe reports uS/cm
     "ph": units.accepted("ph"),
     "tank_temperature": units.accepted("temperature"),
+    "distance": units.accepted("distance"),  # to mm; any other unit is refused
 }
 # Per zone and reading: the mapped probes that do not count, and the one that leads (calculations
 # fuse_probes). They map no hardware, so a change of only these needs nothing switched off.
 PROBE_CHOICE = {
     f"{kind}_{what}" for kind in ("vwc", "ec") for what in ("unused", "primary")
 }
+# Which unit check each mapped sensor gets.
+SENSOR_KINDS = {
+    "feed_ec_sensor": "ec",
+    "tank_ec_sensor": "ec",
+    "feed_ph_sensor": "ph",
+    "tank_ph_sensor": "ph",
+    "tank_temperature_sensor": "tank_temperature",
+    "tank_distance_sensor": "distance",
+}
+TANK_LEVEL_FIELDS = {"full_mm", "empty_mm", "float_low_state"}
 
 
 def effective(entry):
@@ -263,6 +277,45 @@ def _tank_timestamp(hass, eid):
         raise ValueError(f"{eid}: last fill timestamp must include a timezone")
 
 
+def _tank_level(raw, hw):
+    """How a tank distance sensor's reading becomes a level, and which state of the float means low.
+
+    full_mm and empty_mm are the sensor's distances down to the water when the tank is full and when it
+    is empty, in millimetres whatever unit the sensor reports.
+    """
+    if not isinstance(raw, dict) or set(raw) - TANK_LEVEL_FIELDS:
+        raise ValueError("Unknown tank level field")
+    out = {}
+    for key in ("full_mm", "empty_mm"):
+        value = raw.get(key)
+        if value is None:
+            continue
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (float, int))
+            or not math.isfinite(value)
+            or not 0 <= value <= 10000
+        ):
+            raise ValueError(f"{key} must be a distance within 0–10000 mm")
+        out[key] = float(value)
+    if hw.get("tank_distance_sensor"):
+        if "full_mm" not in out or "empty_mm" not in out:
+            raise ValueError(
+                "A tank distance sensor needs its distance down to the water when the tank is "
+                "full (full_mm) and when it is empty (empty_mm)"
+            )
+        if out["empty_mm"] <= out["full_mm"]:
+            raise ValueError(
+                "empty_mm must be further from the sensor than full_mm: the water is further "
+                "away when the tank is empty"
+            )
+    state = raw.get("float_low_state", "on")
+    if state not in ("on", "off"):
+        raise ValueError("float_low_state must be on or off")
+    out["float_low_state"] = state
+    return out
+
+
 def prepare_setup(hass, payload, old=None, entry_id=None):
     """Normalize a complete edit while retaining old fields and immutable IDs."""
     old = old or {}
@@ -408,24 +461,7 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
         raise ValueError("Unknown hardware mapping field")
     for key, value in incoming.items():
         if value:
-            _entity(
-                hass,
-                value,
-                HARDWARE_DOMAINS[key],
-                (
-                    "ec"
-                    if key in ("feed_ec_sensor", "tank_ec_sensor")
-                    else (
-                        "ph"
-                        if key in ("feed_ph_sensor", "tank_ph_sensor")
-                        else (
-                            "tank_temperature"
-                            if key == "tank_temperature_sensor"
-                            else None
-                        )
-                    )
-                ),
-            )
+            _entity(hass, value, HARDWARE_DOMAINS[key], SENSOR_KINDS.get(key))
             if key == "tank_last_fill_sensor":
                 _tank_timestamp(hass, value)
         hw[key] = value or ""
@@ -465,6 +501,10 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
         if found:
             raise ValueError(". ".join(found))
         result["plumbing"] = layout
+    # Absent from the payload keeps what the room had, like the plumbing.
+    tank = payload.get("tank_level", old.get("tank_level"))
+    if tank is not None or hw.get("tank_distance_sensor") or hw.get("tank_low_float"):
+        result["tank_level"] = _tank_level(tank or {}, hw)
     result.update(zones=zones, num_zones=max(ids), hardware=hw)
     return result
 
@@ -499,6 +539,7 @@ def configuration_payload(data):
             k: v for k, v in data.get("hardware", {}).items() if k in HARDWARE_DOMAINS
         },
         **({"plumbing": data["plumbing"]} if data.get("plumbing") else {}),
+        **({"tank_level": data["tank_level"]} if data.get("tank_level") else {}),
     }
 
 
@@ -583,6 +624,7 @@ def setup_room(hass, entry):
         # to PREFILL; it becomes a declaration only when the operator saves it.
         "plumbing": data.get("plumbing") or "",
         "plumbing_inferred": infer_plumbing(data.get("hardware", {})),
+        "tank_level": data.get("tank_level") or {},
         "safety": {"ready": not blockers, "blockers": blockers},
     }
 

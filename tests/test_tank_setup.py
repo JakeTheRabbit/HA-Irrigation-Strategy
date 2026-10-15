@@ -251,3 +251,93 @@ def test_last_fill_helper_requires_complete_date_time_and_finite_epoch(attribute
     data["hardware"]["tank_last_fill_sensor"] = entity
     with pytest.raises(ValueError, match="both date and time|finite epoch timestamp"):
         api.prepare_setup(hass, data, entry.data, entry.entry_id)
+
+
+# ------------------------------------------------- the tank level the controller reads
+def level_rig(unit="cm"):
+    hass, entry, states = tank_rig()
+    for entity, state, attrs in [
+        ("sensor.tank_distance", "42", {"unit_of_measurement": unit}),
+        ("binary_sensor.tank_low", "off", {}),
+    ]:
+        states[entity] = SimpleNamespace(
+            entity_id=entity, state=state, attributes=attrs
+        )
+    return hass, entry, states
+
+
+@pytest.mark.parametrize("unit", ["mm", "cm", "m", "in", "ft", "CM"])
+def test_a_tank_distance_sensor_in_any_distance_unit_is_mapped_with_its_levels(unit):
+    hass, entry, _states = level_rig(unit)
+    data = payload()
+    data["hardware"].update(
+        tank_distance_sensor="sensor.tank_distance",
+        tank_low_float="binary_sensor.tank_low",
+    )
+    data["tank_level"] = {"full_mm": 150, "empty_mm": 1150, "float_low_state": "off"}
+    result = api.prepare_setup(hass, data, entry.data, entry.entry_id)
+    assert result["hardware"]["tank_distance_sensor"] == "sensor.tank_distance"
+    assert result["tank_level"] == {
+        "full_mm": 150.0,
+        "empty_mm": 1150.0,
+        "float_low_state": "off",
+    }
+    attrs = build_engine_config(
+        "", "default", 2, result["zones"], result["hardware"], result
+    )
+    assert attrs["tank_distance_sensor"] == "sensor.tank_distance"
+    assert attrs["tank_low_float"] == "binary_sensor.tank_low"
+    assert attrs["tank_level"] == result["tank_level"]
+    assert api.configuration_payload(result)["tank_level"] == result["tank_level"]
+    # Not plumbing: mapping a level never puts hardware behind the safety gate.
+    assert "sensor.tank_distance" not in api.hardware_entities(result)
+
+
+@pytest.mark.parametrize("unit", ["%", "L", "gal", "", None])
+def test_a_tank_distance_sensor_in_an_unrecognised_unit_is_refused(unit):
+    hass, entry, _states = level_rig(unit)
+    data = payload()
+    data["hardware"]["tank_distance_sensor"] = "sensor.tank_distance"
+    data["tank_level"] = {"full_mm": 150, "empty_mm": 1150}
+    with pytest.raises(ValueError, match="DISTANCE unit"):
+        api.prepare_setup(hass, data, entry.data, entry.entry_id)
+
+
+@pytest.mark.parametrize(
+    "tank",
+    [
+        None,
+        {"full_mm": 150},
+        {"full_mm": 900, "empty_mm": 150},
+        {"full_mm": -1, "empty_mm": 150},
+        {"full_mm": True, "empty_mm": 150},
+        {"full_mm": 150, "empty_mm": 1150, "float_low_state": "wet"},
+        {"full_mm": 150, "empty_mm": 1150, "litres": 400},
+    ],
+)
+def test_a_tank_distance_sensor_needs_sane_full_and_empty_distances(tank):
+    hass, entry, _states = level_rig()
+    data = payload()
+    data["hardware"]["tank_distance_sensor"] = "sensor.tank_distance"
+    if tank is not None:
+        data["tank_level"] = tank
+    with pytest.raises(ValueError):
+        api.prepare_setup(hass, data, entry.data, entry.entry_id)
+
+
+def test_a_room_without_a_tank_level_mapping_gains_nothing():
+    hass, entry, _states = level_rig()
+    result = api.prepare_setup(hass, payload(), entry.data, entry.entry_id)
+    assert "tank_level" not in result
+    attrs = build_engine_config(
+        "", "default", 2, result["zones"], result["hardware"], result
+    )
+    assert not {"tank_distance_sensor", "tank_low_float", "tank_level"} & set(attrs)
+    # The levels are kept when the payload leaves them out, like the plumbing.
+    data = payload()
+    data["hardware"]["tank_low_float"] = "binary_sensor.tank_low"
+    first = api.prepare_setup(hass, data, entry.data, entry.entry_id)
+    assert first["tank_level"] == {"float_low_state": "on"}
+    again = api.prepare_setup(hass, payload(), first, entry.entry_id)
+    assert again["tank_level"] == first["tank_level"]
+    assert again["hardware"]["tank_low_float"] == "binary_sensor.tank_low"

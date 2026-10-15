@@ -188,6 +188,20 @@ An older integration publishes only each zone's combined reading, which then sta
 
 Unmapped inputs show **Not mapped**; invalid readings show **Unavailable**, **Check units** or **Out of range**. An unknown pump is not shown as off and an unknown tank is not drawn empty. When disconnected, the panel identifies retained readings as last received.
 
+#### Tank level for the controller
+
+The percentage sensor above only draws the tank. For the controller to read the tank's level, map a **tank distance sensor** (`tank_distance_sensor`: an ultrasonic or radar sensor reporting the distance down to the water), a **low float** (`tank_low_float`: a binary sensor), or both, through the setup API's `hardware`, with the room's `tank_level`:
+
+| `tank_level` field | Meaning |
+| --- | --- |
+| `full_mm` | The distance sensor's distance down to the water when the tank is full, in millimetres. Required with a distance sensor. |
+| `empty_mm` | The same when the tank is empty; further than `full_mm`. Required with a distance sensor. |
+| `float_low_state` | `on` (the default) or `off`: the float's state that means the tank is low. |
+
+The distance sensor's unit must be mm, cm, m, in or ft; it is converted to millimetres through the device-unit table, so the same tank reads the same level whatever unit its sensor reports. A sensor in any other unit, or none, is refused at mapping. The level is 0 % at `empty_mm` and 100 % at `full_mm`, and reads over 100 % above the full mark. The controller reads it once a loop and publishes it as `sensor.crop_steering_tank_level` ([ENTITIES.md](ENTITIES.md)); nothing acts on it yet. The batch tank's full float in the dosing setup is not a level and is not read here.
+
+The sensor is trusted unless it is unavailable, because many sensors send a reading only when it changes, so a quiet tank's sensor can go hours without one. What the controller checks instead is the drawdown: it counts the litres the shots draw against the level's fall. Each time the level falls 5 %, it learns the litres drawn per 1 % of level from it. Once it knows them, shots that should have lowered the level by 5 % or more while it moved less than a quarter of that mean the sensor is stuck: its level is published as unknown, the log says why, and it is trusted again when it falls 5 % or a refill raises it. Until the tank has fallen 5 % once with the shots counted, a stuck sensor cannot be told from a full one. Mapping a level does not put the sensor behind the safety gate.
+
 ### Dosing
 
 **Equipment › Dosing** runs the room's batch tank: it doses one pump by hand, and it makes a batch (fill the tank, mix it, dose each nutrient in order, mix again). Each room has its own page for its own tank. The page switches nothing itself: every action is reviewed, then sent as a request that the controller carries out within a few seconds. A request the controller could not take within two minutes is dropped, so nothing starts later by surprise. The pumps' own firmware times each dose: Home Assistant sets the amount and presses start, and the controller switches a pump's power off only if it runs past its time.

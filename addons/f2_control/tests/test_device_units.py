@@ -21,6 +21,7 @@ EC1, VWC1, VWC2 = "sensor.crop_steering_ec_zone_1", "sensor.crop_steering_vwc_zo
 SUMP = "sensor.sump_plug_power"
 FEED_EC, FEED_PH, RAW2 = "sensor.feed_ec", "sensor.feed_ph", "sensor.zone_2_raw_moisture"
 RAW1 = "sensor.zone_1_raw_moisture"
+TANK = "sensor.tank_distance"
 
 
 def _now():
@@ -293,6 +294,7 @@ def test_every_device_read_in_a_loop_goes_through_the_unit_table(rig, monkeypatc
     room.feed_ec_sensor, room.feed_ph_sensor = FEED_EC, FEED_PH
     room.zones[2]["vwc"] = RAW2  # a probe mapped to the zone by hand, read directly
     c.sump_sensors = {"*": SUMP}
+    room.tank = {"distance": TANK, "full_mm": 100.0, "empty_mm": 1100.0}
     for key, value in {"irrigation_ec_min": 1, "irrigation_ec_max": 4,
                        "irrigation_ph_min": 5, "irrigation_ph_max": 7}.items():
         fake.set_state(f"number.crop_steering_{key}", str(value))
@@ -301,11 +303,12 @@ def test_every_device_read_in_a_loop_goes_through_the_unit_table(rig, monkeypatc
     fake.set_state(FEED_PH, "5.9", {"unit_of_measurement": "pH"}, last_updated=stamp)
     fake.set_state(RAW2, "0.31", {"unit_of_measurement": "m³/m³"}, last_updated=stamp)
     fake.set_state(SUMP, "0.4", {"unit_of_measurement": "kW"})
+    fake.set_state(TANK, "45", {"unit_of_measurement": "cm"})
     fake.history[SUMP] = [("0", "a"), ("0.4", "b")]
     probe(fake, 1, 30)  # dry, in P2 and three hours since its last shot: a shot is due, so the gate is read
     for zone in (1, 2):
         room.state[zone].update(phase="P2", last_shot=now - timedelta(hours=3))
-    devices = {VWC1, EC1, "sensor.crop_steering_ec_zone_2", RAW2, FEED_EC, FEED_PH, SUMP}
+    devices = {VWC1, EC1, "sensor.crop_steering_ec_zone_2", RAW2, FEED_EC, FEED_PH, SUMP, TANK}
     monkeypatch.setattr(controller, "ha_history", fake.ha_history)
     fetched = _spy(monkeypatch, devices)
     c.loop_once(now)
