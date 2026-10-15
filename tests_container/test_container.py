@@ -10,6 +10,7 @@ default) and its record case refuses for RECORD_REFUSE_S (150).
 import json
 import os
 import pathlib
+import re
 import shutil
 import subprocess
 import time
@@ -26,6 +27,9 @@ RECORD_REFUSE_S = float(os.environ.get("RECORD_REFUSE_S", "150"))
 pytestmark = pytest.mark.skipif(not IMAGE or not shutil.which("docker"),
                                 reason="needs Docker and CONTROLLER_IMAGE, an image built from addons/f2_control")
 os.environ["MSYS_NO_PATHCONV"] = "1"
+# The fake's log lines, matched whole: `[fake-ha <time>] REQ <method> <path> <status>` and `... CALL <rest>`.
+REQ_LINE = re.compile(r"^\[fake-ha [0-9.]+\] REQ (\S+) (\S+) (\d{3})$")
+CALL_LINE = re.compile(r"^\[fake-ha [0-9.]+\] CALL (.+)$")
 
 VALVE = "switch.zone_1_valve"
 OPTIONS = {"num_zones": 1, "lights_on_hour": 0, "lights_off_hour": 24, "enable_flag": "input_boolean.engine",
@@ -104,15 +108,12 @@ class Rig:
 
     def requests(self):
         """Every request the fake answered: (method, path, status)."""
-        out = []
-        for line in self.logs(self.ha).splitlines():
-            parts = line.split()
-            if len(parts) >= 6 and parts[2] == "REQ":
-                out.append((parts[3], parts[4], int(parts[5])))
-        return out
+        found = [REQ_LINE.match(line) for line in self.logs(self.ha).splitlines()]
+        return [(m[1], m[2], int(m[3])) for m in found if m]
 
     def calls(self):
-        return [line.split("CALL ", 1)[1] for line in self.logs(self.ha).splitlines() if " CALL " in line]
+        found = [CALL_LINE.match(line) for line in self.logs(self.ha).splitlines()]
+        return [m[1] for m in found if m]
 
     def wait(self, name, text, timeout=60):
         end = time.monotonic() + timeout
@@ -145,6 +146,23 @@ def rig():
 def container_env(rig, **extra):
     return {"F2_RUNTIME": "container", "HA_URL": "http://fakeha:8123", "HA_TOKEN": "good-token", "TZ": "UTC",
             **extra}
+
+
+# ------------------------------------------------------------------ the fake itself
+def test_the_fake_logs_whole_lines_when_requests_arrive_together(rig):
+    """The controller's loop and its dosing thread ask the fake at once: every line it logs stays whole."""
+    rig.fake()
+    rig.wait(rig.ha, "serving")
+    docker("exec", rig.ha, "python3", "-c", "\n".join([
+        "import threading, urllib.request",
+        "def ask():",
+        "    for _ in range(25):",
+        "        urllib.request.urlopen('http://127.0.0.1:8123/api/').read()",
+        "threads = [threading.Thread(target=ask) for _ in range(16)]",
+        "[t.start() for t in threads]",
+        "[t.join() for t in threads]"]))
+    assert rig.requests() == [("GET", "/api/", 200)] * 400
+    assert len([line for line in rig.logs(rig.ha).splitlines() if " REQ " in line]) == 400
 
 
 # ------------------------------------------------------------------ C1
