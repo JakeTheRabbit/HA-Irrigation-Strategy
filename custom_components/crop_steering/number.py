@@ -229,6 +229,19 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement=UnitOfTime.MINUTES,
         mode="box",
     ),
+    # Minutes from the last shot before an EC correction (a flush or a dilute) or the
+    # minimum-daily floor may go, so a shot drains and is read again before the next.
+    # 10 (the default) is the gap the controller always used, and falls back to.
+    NumberEntityDescription(
+        key="ec_min_interval",
+        name="EC Correction Minimum Interval",
+        icon="mdi:timer-sand",
+        native_min_value=1.0,
+        native_max_value=120.0,
+        native_step=1.0,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        mode="box",
+    ),
     NumberEntityDescription(
         key="p2_ec_high_threshold",
         name="P2 EC High (ratio x target)",
@@ -452,6 +465,7 @@ PER_ZONE_STEERING_KEYS = [
     "p2_vwc_threshold",
     "p2_shot_size",
     "p2_time_between_shots",
+    "ec_min_interval",
     "p3_emergency_vwc_threshold",
     "p3_emergency_shot_size",
     "p3_time_between_shots",

@@ -5,7 +5,8 @@ Before the table, the same settings had two sets of built-in values: the integra
 can be read, around a Home Assistant restart for example). They disagree for some settings, and both
 are what installed rooms run on today. The table keeps both columns, so this pins each column to the
 values the release before it shipped (Jev 3.11.1, commit 12c6d1a), plus the P3 Time Between Shots
-added since at 10 minutes in both and the P2 Time Between Shots at 0 (off) in both. Making the columns agree is a change of its own, with a bold line
+added since at 10 minutes in both and the P2 Time Between Shots at 0 (off) in both,
+and the EC-correction minimum interval at the 10 minutes the engine always used. Making the columns agree is a change of its own, with a bold line
 in the changelog; it is never a side effect of editing the table.
 
 The controller half is checked where it is used: every _zone_num call reads its fallback from the
@@ -30,7 +31,8 @@ def table():
 
 
 # number.py DEFAULT_VALUES at 12c6d1a, and the per-zone plant count and daily cap defaults beside it,
-# plus P3 Time Between Shots (10 minutes) and P2 Time Between Shots (0, off), added after it.
+# plus P3 Time Between Shots (10 minutes), P2 Time Between Shots (0, off) and the EC-correction minimum
+# interval (10 minutes, the gap the engine always used), added after it.
 ENTITY_DEFAULTS_12C6D1A = {
     "max_shot_duration": 900,
     "substrate_volume": 10.0,
@@ -73,6 +75,7 @@ ENTITY_DEFAULTS_12C6D1A = {
     "max_daily_volume": 20.0,
     "p3_time_between_shots": 10.0,
     "p2_time_between_shots": 0.0,
+    "ec_min_interval": 10.0,
 }
 
 # The literal at each controller _zone_num call site at 12c6d1a, plus P3 and P2 Time Between Shots.
