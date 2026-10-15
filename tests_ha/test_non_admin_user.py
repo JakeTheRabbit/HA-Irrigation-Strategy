@@ -18,9 +18,9 @@ from pytest_homeassistant_custom_component.common import MockUser
 from test_setup_entry import _install
 
 DOMAIN = "crop_steering"
-ROOM = "room:"
-OVERRIDE = "switch.crop_steering_zone_1_manual_override"
-PLAN = "sensor.crop_steering_strategy_plan"
+ROOM = "room:tent_"
+OVERRIDE = "switch.crop_steering_tent_zone_1_manual_override"
+PLAN = "sensor.crop_steering_tent_strategy_plan"
 REFUSED = "requires an authenticated Home Assistant administrator"
 # Every service that changes something, with data its schema accepts: what refuses it must be the
 # administrator check, not validation.
@@ -131,7 +131,7 @@ async def test_an_ordinary_user_may_stop_dosing(hass):
     assert answer["error"] is None
     assert (answer["request"]["action"], answer["request"]["by"]) == ("stop", "Staff phone")
     await hass.async_block_till_done()
-    stored = hass.states.get("sensor.crop_steering_dosing_config").attributes["request"]
+    stored = hass.states.get("sensor.crop_steering_tent_dosing_config").attributes["request"]
     assert stored == answer["request"]
 
 

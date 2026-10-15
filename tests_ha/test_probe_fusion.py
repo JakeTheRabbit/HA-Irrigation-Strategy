@@ -14,7 +14,7 @@ from pytest_homeassistant_custom_component.common import async_fire_time_changed
 from custom_components.crop_steering.plumbing import infer
 from test_real_flow import ZONES, _seed, _to_zones_step
 
-ZONE = "sensor.crop_steering_vwc_zone_1"
+ZONE = "sensor.crop_steering_tent_vwc_zone_1"
 A, B, C = "sensor.gt1_vwc", "sensor.gt1_vwc_b", "sensor.gt1_vwc_c"
 
 
@@ -73,7 +73,7 @@ async def test_a_probe_going_offline_does_not_step_what_the_controller_reads(
 
     assert float((await _read(hass, freezer, **{A: "38"})).state) == 41.0
     c, _fake, _clock = controller_for()
-    assert c._read_sensor(c._fused_id("", "vwc", 1), "vwc") == 41.0
+    assert c._read_sensor(c._fused_id("tent_", "vwc", 1), "vwc") == 41.0
 
 
 async def test_a_probe_that_stops_reporting_is_set_aside_while_another_still_reports(

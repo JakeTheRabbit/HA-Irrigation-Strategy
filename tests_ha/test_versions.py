@@ -13,7 +13,8 @@ MANIFEST = json.loads(
 
 async def test_a_fresh_install_publishes_the_integration_version(hass):
     await _install(hass)
-    assert hass.states.get(DESCRIPTOR).attributes["integration_version"] == MANIFEST["version"]
+    descriptor = hass.states.get("sensor.crop_steering_tent_engine_config")  # a new room's slug
+    assert descriptor.attributes["integration_version"] == MANIFEST["version"]
 
 
 async def test_an_upgraded_old_install_publishes_it_too_and_its_fingerprint_inputs_do_not_move(hass):

@@ -5,12 +5,12 @@
         "title": "Crop Steering — setup method",
         "description": "Choose how to configure the system. The UI wizard maps everything with dropdowns (no file). The .env file is for power users who prefer text.\n\nRunning: **Crop Steering {version}**. {restart_notice}",
         "data": {
-          "name": "System name",
+          "name": "Room name",
           "config_method": "Setup method",
           "drainage": "How does this room drain?"
         },
         "data_description": {
-          "name": "A label for this integration in Home Assistant.",
+          "name": "A name for your grow room (e.g. Veg, Flower B). Its entity ids are named after it, for example number.crop_steering_veg_lights_on_hour (a .env import keeps un-prefixed ids).",
           "config_method": "UI = pick entities with dropdowns. .env = read your crop_steering.env text file.",
           "drainage": "Rooms on flood tables or trays are watched for a table that is not draining (CS-310): moisture rising with no water going in. A free-draining room has nothing that can back up, so it is not watched. You can change this later on the room's Drainage setting."
         }

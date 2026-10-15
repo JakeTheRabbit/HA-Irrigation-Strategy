@@ -299,7 +299,7 @@ def _build_parameters(data: dict) -> dict:
 
 STEP_USER_DATA_SCHEMA = vol.Schema(
     {
-        vol.Required("name", default="Crop Steering System"): str,
+        vol.Required("name", default="Grow room"): str,
         vol.Required("config_method", default="manual"): vol.In(
             {
                 "manual": "Search and select devices (Recommended)",
@@ -358,9 +358,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> FlowResult:
-        """Initial step. The first config is the default (un-prefixed) room — existing
-        single-room installs are unchanged. Any further config adds another fully-isolated
-        room (own zones/sensors/pump/setpoints), namespaced as crop_steering_<slug>_*.
+        """Initial step. Every new room, the first one included, is namespaced as
+        crop_steering_<slug>_* from its name, with its own zones, sensors, pump and setpoints.
+        Only a room created before that, or imported from a .env file, has un-prefixed ids.
         """
         # Never set a room up on code that is waiting for a restart: whatever it creates is
         # created by the OLD code, and entity ids are for life.
@@ -375,15 +375,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
             try:
                 data = prepare_setup(self.hass, user_input["setup_payload"])
-                named = bool(self._async_current_entries())
-                slug = slugify_room(data["room_name"]) if named else "default"
-                if named and slug == "default":
+                slug = slugify_room(data["room_name"])
+                if slug == "default":
                     return self.async_abort(reason="reserved_room_name")
-                await self.async_set_unique_id(f"room_{slug}" if named else "default")
+                await self.async_set_unique_id(f"room_{slug}")
                 self._abort_if_unique_id_configured()
                 data.update(
                     room_slug=slug,
-                    room_prefix=f"{slug}_" if named else "",
+                    room_prefix=f"{slug}_",
                     config_method="manual",
                     setup_revision=1,
                 )
@@ -416,14 +415,24 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 },
             )
 
-        await self.async_set_unique_id("default")
-        self._abort_if_unique_id_configured()
         self._data.update(user_input)
-        self._data["room_prefix"] = ""
         self._data["room_name"] = user_input.get("name", "Crop Steering")
 
         if user_input["config_method"] == "env":
+            # A .env import stays the un-prefixed room it has always been. The controller app's
+            # enable_flag and feed probe options govern that room and this integration cannot see
+            # them, so a slug would silently move its kill switch and drop its source-water gate.
+            await self.async_set_unique_id("default")
+            self._abort_if_unique_id_configured()
+            self._data["room_prefix"] = ""
             return await self.async_step_load_env()
+        slug = slugify_room(self._data["room_name"])
+        if slug == "default":
+            return self.async_abort(reason="reserved_room_name")
+        await self.async_set_unique_id(f"room_{slug}")
+        self._abort_if_unique_id_configured()
+        self._data["room_slug"] = slug
+        self._data["room_prefix"] = f"{slug}_"
         return await self.async_step_manual_zones()
 
     async def async_step_room(

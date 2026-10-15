@@ -25,6 +25,9 @@ DRAINAGE = "select.crop_steering_drainage"
 THRESHOLD = "number.crop_steering_sump_power_threshold_w"
 SUMP = "sensor.sump_pump_power"
 F_38 = "entry_3_8_learned_tent.json"
+# A new room has a slug: the wizard's "Tent" is tent_.
+NEW_DRAINAGE = "select.crop_steering_tent_drainage"
+NEW_THRESHOLD = "number.crop_steering_tent_sump_power_threshold_w"
 
 
 async def _wizard(hass, first_page):
@@ -49,25 +52,25 @@ async def test_the_first_page_of_setup_asks_how_the_room_drains(hass):
     assert asked["drainage"].default() == "unknown"  # a person who is not sure is watched, as tables are
     entry = await _wizard(hass, {"name": "Tent", "config_method": "manual", "drainage": "free_drain"})
     assert entry.data["drainage"] == "free_drain"
-    drainage = hass.states.get(DRAINAGE)
+    drainage = hass.states.get(NEW_DRAINAGE)
     assert drainage.state == "free_drain"
     assert drainage.attributes["options"] == ["unknown", "flood_table", "free_drain"]
     await hass.services.async_call(
-        "select", "select_option", {"entity_id": DRAINAGE, ATTR_OPTION: "flood_table"}, blocking=True
+        "select", "select_option", {"entity_id": NEW_DRAINAGE, ATTR_OPTION: "flood_table"}, blocking=True
     )
     # The room's answer is its select from then on: a reload (or a restart) restores it, not setup's.
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
-    assert hass.states.get(DRAINAGE).state == "flood_table"
+    assert hass.states.get(NEW_DRAINAGE).state == "flood_table"
 
 
 async def test_a_new_room_left_unsaid_reads_unknown_and_its_threshold_starts_at_20_w(hass):
     await _wizard(hass, {"name": "Tent", "config_method": "manual"})
-    assert hass.states.get(DRAINAGE).state == "unknown"
-    threshold = hass.states.get(THRESHOLD)
+    assert hass.states.get(NEW_DRAINAGE).state == "unknown"
+    threshold = hass.states.get(NEW_THRESHOLD)
     assert float(threshold.state) == 20 and threshold.attributes["unit_of_measurement"] == "W"
     registry = er.async_get(hass)
-    assert registry.async_get(DRAINAGE) is not None and registry.async_get(THRESHOLD) is not None
+    assert registry.async_get(NEW_DRAINAGE) is not None and registry.async_get(NEW_THRESHOLD) is not None
 
 
 async def test_a_room_added_later_is_asked_too(hass):
@@ -84,7 +87,7 @@ async def test_a_room_added_later_is_asked_too(hass):
     assert result["type"] is FlowResultType.CREATE_ENTRY, result
     await hass.async_block_till_done()
     assert hass.states.get("select.crop_steering_veg_drainage").state == "flood_table"
-    assert hass.states.get(DRAINAGE).state == "unknown"  # the first room keeps its own
+    assert hass.states.get(NEW_DRAINAGE).state == "unknown"  # the first room keeps its own
 
 
 # ------------------------------------------------------------------ upgraded rooms

@@ -24,14 +24,15 @@ from homeassistant.helpers import issue_registry as ir
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from custom_components.crop_steering import health
+from conftest import room_of
 from test_real_flow import VALVE
 from test_setup_entry import _install
 from test_upgrade_in_place import _upgrade
 
 DOMAIN = "crop_steering"
 LEGACY = "input_boolean.f2_control_enabled"
-OWN = "switch.crop_steering_engine_enabled"
-HEARTBEAT = "sensor.crop_steering_ai_heartbeat"
+OWN = "switch.crop_steering_tent_engine_enabled"  # every new room has a slug: the wizard's "Tent"
+UPGRADED_OWN = "switch.crop_steering_engine_enabled"  # a room from before that keeps its ids
 _CONFIG = Path(__file__).resolve().parents[1] / "addons" / "f2_control" / "config.yaml"
 
 
@@ -52,11 +53,12 @@ def _shipped_options():
     return options
 
 
-def _report(hass, controller, fake):
-    """The controller's next heartbeat, as Home Assistant holds it after the REST write."""
-    controller._heartbeat(controller.rooms[0], datetime.now(), None)
-    state, attributes = fake.sets[HEARTBEAT]
-    hass.states.async_set(HEARTBEAT, state, attributes)
+def _report(hass, controller, fake, prefix="tent_"):
+    """The controller's next heartbeat for one room, as Home Assistant holds it after the REST write."""
+    heartbeat = f"sensor.crop_steering_{prefix}ai_heartbeat"
+    controller._heartbeat(room_of(controller, prefix), datetime.now(), None)
+    state, attributes = fake.sets[heartbeat]
+    hass.states.async_set(heartbeat, state, attributes)
     return attributes
 
 
@@ -92,8 +94,10 @@ async def _health_check_fires(hass, checks):
     assert len(checks) > before, "the scheduled health check did not run"
 
 
-def _repair(hass):
-    return ir.async_get(hass).async_get_issue(DOMAIN, "kill_switch_missing")
+def _repair(hass, slug="tent"):
+    """The room's card: "kill_switch_missing", suffixed with the slug of a room that has one."""
+    issue_id = f"kill_switch_missing_{slug}" if slug else "kill_switch_missing"
+    return ir.async_get(hass).async_get_issue(DOMAIN, issue_id)
 
 
 def test_the_premise_a_new_install_is_shipped_the_legacy_helper_as_its_enable_flag():
@@ -106,14 +110,14 @@ async def test_the_controller_started_first_and_setup_second_raises_no_repair(ha
     c.loop_once(datetime.now())
     for entity_id, (state, attributes) in fake.sets.items():
         hass.states.async_set(entity_id, state, attributes)  # whatever it has already published
-    assert _report(hass, c, fake)["enable_flag"] == LEGACY
+    assert _report(hass, c, fake, prefix="")["enable_flag"] == LEGACY  # its built-in room
     assert hass.states.get(LEGACY) is None  # and a fresh install has no such helper
 
     await _install(hass)
     assert hass.states.get(OWN).state == "off"  # the kill switch this room really has
-    descriptor = hass.states.get("sensor.crop_steering_engine_config").attributes
+    descriptor = hass.states.get("sensor.crop_steering_tent_engine_config").attributes
     assert descriptor["enable_flag"] == OWN and descriptor["setup_revision"] == 1
-    assert _report(hass, c, fake)["setup_revision"] == 0  # the controller has not caught up yet
+    assert [room.prefix for room in c.rooms] == [""]  # the controller has not caught up yet
 
     await _health_check_fires(hass, checks)
     assert _repair(hass) is None  # was: ERROR "create input_boolean.f2_control_enabled"
@@ -121,7 +125,7 @@ async def test_the_controller_started_first_and_setup_second_raises_no_repair(ha
     # The controller catches up by itself (everything reads OFF), and nothing changes its mind.
     _see(hass, fake)
     c._rediscover(datetime.now())
-    room = c.rooms[0]
+    room = room_of(c)
     assert room.setup_revision == 1 and room._setup_pending is None
     assert room.enable_flag == OWN and sorted(room.zones) == [1]
     assert room.hw["valves"] == {1: VALVE}
@@ -134,7 +138,7 @@ async def test_a_room_whose_own_kill_switch_is_gone_is_still_reported_while_the_
     hass, controller_for, checks
 ):
     c, fake, _clock = controller_for(_shipped_options())
-    _report(hass, c, fake)
+    _report(hass, c, fake, prefix="")
     await _install(hass)
     er.async_get(hass).async_remove(OWN)
     await hass.async_block_till_done()
@@ -147,7 +151,7 @@ async def test_a_room_whose_own_kill_switch_is_gone_is_still_reported_while_the_
 async def test_setup_first_and_the_controller_second_raises_no_repair(hass, controller_for, checks):
     await _install(hass)
     c, fake, _clock = controller_for(_shipped_options())
-    assert c.rooms[0].enable_flag == OWN  # the documented order always worked
+    assert room_of(c).enable_flag == OWN  # the documented order always worked
     assert _report(hass, c, fake)["enable_flag"] == OWN
     await _health_check_fires(hass, checks)
     assert _repair(hass) is None
@@ -160,10 +164,11 @@ async def test_an_upgraded_wizard_room_raises_no_repair(hass, controller_for, ch
     c, fake, _clock = controller_for(
         _shipped_options(), saved_state=seed.get("controller_saved")
     )
-    beat = _report(hass, c, fake)
-    assert beat["enable_flag"] == OWN and beat["setup_revision"] == seed["data"]["setup_revision"]
+    beat = _report(hass, c, fake, prefix="")
+    assert beat["enable_flag"] == UPGRADED_OWN
+    assert beat["setup_revision"] == seed["data"]["setup_revision"]
     await _health_check_fires(hass, checks)
-    assert _repair(hass) is None
+    assert _repair(hass, "") is None
 
 
 async def test_an_upgraded_legacy_room_is_judged_on_its_helper_exactly_as_before(
@@ -175,11 +180,11 @@ async def test_an_upgraded_legacy_room_is_judged_on_its_helper_exactly_as_before
     hass.states.async_set(LEGACY, "off")
     await _upgrade(hass, "entry_env_era.json")
     c, fake, _clock = controller_for(_shipped_options())
-    beat = _report(hass, c, fake)
+    beat = _report(hass, c, fake, prefix="")
     assert beat["enable_flag"] == LEGACY and beat["setup_revision"] == 0
     await _health_check_fires(hass, checks)
-    assert _repair(hass) is None
+    assert _repair(hass, "") is None
 
     hass.states.async_remove(LEGACY)
     await _health_check_fires(hass, checks)
-    assert _repair(hass) is not None
+    assert _repair(hass, "") is not None

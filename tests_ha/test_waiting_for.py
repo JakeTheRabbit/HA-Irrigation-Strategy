@@ -7,15 +7,16 @@ zone's "Next:", so they have to be the room's own setpoints, read from the integ
 
 from datetime import datetime
 
+from conftest import room_of
 from test_setup_entry import _install
 
-WAITING = "sensor.crop_steering_zone_1_waiting_for_app"
+WAITING = "sensor.crop_steering_tent_zone_1_waiting_for_app"
 
 
 def _setpoint(hass, key):
     """As the controller reads it: the zone's own number when it has one, else the room's."""
-    own = hass.states.get(f"number.crop_steering_zone_1_{key}")
-    return float((own or hass.states.get(f"number.crop_steering_{key}")).state)
+    own = hass.states.get(f"number.crop_steering_tent_zone_1_{key}")
+    return float((own or hass.states.get(f"number.crop_steering_tent_{key}")).state)
 
 
 async def test_a_zone_in_p2_waits_for_its_own_trigger_and_lights_off(hass, controller_for):
@@ -28,12 +29,12 @@ async def test_a_zone_in_p2_waits_for_its_own_trigger_and_lights_off(hass, contr
         await hass.services.async_call(
             "number",
             "set_value",
-            {"entity_id": f"number.crop_steering_{key}", "value": hour},
+            {"entity_id": f"number.crop_steering_tent_{key}", "value": hour},
             blocking=True,
         )
     c, fake, _clock = controller_for({})
     c.loop_once(datetime.now())  # the first pass starts the grow-day
-    c.rooms[0].state[1]["phase"] = "P2"
+    room_of(c).state[1]["phase"] = "P2"
     c.loop_once(datetime.now())
     for entity_id, (state, attributes) in fake.sets.items():  # what its REST writes put in HA
         hass.states.async_set(entity_id, state, attributes)
@@ -45,6 +46,6 @@ async def test_a_zone_in_p2_waits_for_its_own_trigger_and_lights_off(hass, contr
     conditions = {item["rule"]: item for item in shown.attributes["conditions"]}
     topup = conditions["p2_topup"]
     assert (topup["op"], topup["value"]) == ("<", _setpoint(hass, "p2_vwc_threshold"))
-    assert topup["now"] == float(hass.states.get("sensor.crop_steering_vwc_zone_1").state)
+    assert topup["now"] == float(hass.states.get("sensor.crop_steering_tent_vwc_zone_1").state)
     to_off = (off * 60 - (at.hour * 60 + at.minute + at.second / 60)) % 1440
     assert abs(conditions["lights_off"]["in_min"] - to_off) <= 1

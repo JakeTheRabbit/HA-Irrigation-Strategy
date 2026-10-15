@@ -11,7 +11,7 @@ from test_dosing import DEVICES, PUMP, _call, _devices
 from test_setup_entry import _install
 
 DOMAIN = "crop_steering"
-STATUS = "sensor.crop_steering_dosing"
+STATUS = "sensor.crop_steering_tent_dosing"
 DOSING = PUMP["dosing_entity"]
 
 

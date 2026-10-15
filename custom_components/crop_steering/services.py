@@ -30,13 +30,23 @@ def _resolve_prefix(hass: HomeAssistant, room_slug: str | None) -> str:
     """Map a service `room` slug to its entity-id prefix.
 
     Omitted or "default" targets the default (un-prefixed) room, so existing
-    single-room callers are unchanged. A named slug resolves to that room's
-    ``<slug>_`` prefix via its config entry. An unknown slug raises — silently
-    acting on a different room than the caller named is exactly the wrong-room
-    hazard the room parameter exists to prevent.
+    single-room callers are unchanged. Where there is no such room (every new room has a
+    slug), it targets the only room, and with several rooms it raises: the caller must say
+    which. A named slug resolves to that room's ``<slug>_`` prefix via its config entry.
+    An unknown slug raises — silently acting on a different room than the caller named is
+    exactly the wrong-room hazard the room parameter exists to prevent.
     """
     if not room_slug or room_slug == "default":
-        return ""
+        prefixes = {
+            room_prefix(entry) for entry in hass.config_entries.async_entries(DOMAIN)
+        }
+        if "" in prefixes or not prefixes:
+            return ""
+        if len(prefixes) == 1:
+            return prefixes.pop()
+        raise HomeAssistantError(
+            "Several crop_steering rooms are set up — name the room this call is for"
+        )
     for entry in hass.config_entries.async_entries(DOMAIN):
         data = getattr(entry, "data", None) or {}
         if (

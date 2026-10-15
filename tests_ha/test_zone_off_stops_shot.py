@@ -5,11 +5,12 @@ is the one the real integration creates, switched off through Home Assistant the
 "Pause zone scheduling" does it, and the controller sees it over REST at its next round.
 """
 
+from conftest import room_of
 from test_recreated_room_controller import _see
 from test_setup_entry import _install
 
-KILL = "switch.crop_steering_engine_enabled"
-ZONE = "switch.crop_steering_zone_1_enabled"
+KILL = "switch.crop_steering_tent_engine_enabled"
+ZONE = "switch.crop_steering_tent_zone_1_enabled"
 
 
 async def test_the_zone_switch_stops_the_shot_running_in_it(hass, controller_for, monkeypatch):
@@ -17,7 +18,7 @@ async def test_the_zone_switch_stops_the_shot_running_in_it(hass, controller_for
     await hass.services.async_call("switch", "turn_on", {"entity_id": KILL}, blocking=True)
     assert hass.states.get(ZONE).state == "on"
     c, fake, clock = controller_for({"enable_flag": KILL})
-    room = c.rooms[0]
+    room = room_of(c)
     fake.set_state(room.hw["valves"][1], "on")  # the shot's valve, as _execute_shot leaves it
 
     await hass.services.async_call("switch", "turn_off", {"entity_id": ZONE}, blocking=True)

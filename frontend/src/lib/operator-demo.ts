@@ -13,7 +13,7 @@ import type {
   PlanZonePreview,
 } from "./operator-types";
 import type { States } from "./types";
-import { discoverRooms, numeric } from "./model";
+import { discoverRooms, numeric, roomSlug } from "./model";
 import { blockForDay, dateForDay, growDay, interpolate, localDate, planErrors } from "./grow-plan";
 import { inferPlumbing, plumbingErrors } from "./plumbing";
 import { DEMO_WHATS_NEW } from "./whats-new-demo";
@@ -362,6 +362,12 @@ export class OperatorDemo {
           if (valves.some((v) => otherValves.has(v)))
             throw new Error("A valve is already mapped to another room.");
           if (!String(data.room_name || "").trim()) throw new Error("Enter a room name.");
+          // As the integration does: a new room's slug comes from its name, and is its own.
+          const slug = roomSlug(String(data.room_name));
+          if (!room && slug === "default")
+            throw new Error("Default is reserved for the original room. Choose another room name.");
+          if (!room && this.rooms!.some((r) => r.slug === slug))
+            throw new Error("A room with this name already exists.");
           // As the integration does: a declared layout has to match the switches, both ways.
           const layout = String(data.plumbing || room?.plumbing || "");
           const contradictions =
@@ -373,8 +379,8 @@ export class OperatorDemo {
             entry_id: "demo-entry-" + this.rooms!.length,
             revision: 0,
             room_name: "",
-            prefix: "demo" + this.rooms!.length + "_",
-            slug: "demo" + this.rooms!.length,
+            prefix: slug + "_",
+            slug,
             active: true,
             num_zones: 0,
             active_zone_ids: [],

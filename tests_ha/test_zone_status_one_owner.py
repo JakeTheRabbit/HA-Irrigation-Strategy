@@ -12,9 +12,9 @@ from pytest_homeassistant_custom_component.common import async_fire_time_changed
 
 from test_setup_entry import _install
 
-STATUS = "sensor.crop_steering_zone_1_status"
-APP = "sensor.crop_steering_zone_1_status_app"
-KILL = "switch.crop_steering_engine_enabled"
+STATUS = "sensor.crop_steering_tent_zone_1_status"
+APP = "sensor.crop_steering_tent_zone_1_status_app"
+KILL = "switch.crop_steering_tent_engine_enabled"
 
 
 async def _later(hass, freezer, minutes):
