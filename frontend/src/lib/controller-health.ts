@@ -57,6 +57,11 @@ export function ageText(ms: number): string {
   if (minutes < 120) return `${minutes} min`;
   return minutes < 2880 ? `${Math.floor(minutes / 60)} h` : `${Math.floor(minutes / 1440)} d`;
 }
+/** The header's data age in words: "Updated 20 s ago", then minutes, hours and days. */
+export function updatedText(ms: number): string {
+  const seconds = Math.floor(Math.max(0, ms) / 1000);
+  return `Updated ${seconds < 60 ? `${seconds} s` : ageText(ms)} ago`;
+}
 export function ageTone(ms: number | null): "fresh" | "amber" | "red" {
   return ms === null || ms > AGE_RED_MS ? "red" : ms > AGE_AMBER_MS ? "amber" : "fresh";
 }

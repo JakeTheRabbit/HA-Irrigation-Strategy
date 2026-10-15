@@ -26,8 +26,9 @@ export function ActivityPanel({
     <Sheet open={open} onOpenChange={setOpen}>
       {/* The trigger gets focus back when the panel closes and announces open or closed. */}
       <SheetTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Recent activity" title="Recent activity">
+        <Button variant="ghost" size="sm" aria-label="Recent activity">
           <Activity size={17} />
+          Activity
         </Button>
       </SheetTrigger>
       <SheetContent className="activity-sheet">

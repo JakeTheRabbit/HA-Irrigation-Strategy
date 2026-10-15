@@ -142,13 +142,65 @@
 .safety-switch[data-safety="watering"][data-state="off"] .safety-switch-dot {
   background: var(--destructive);
 }
+/* The controller is not reporting: one band across the page, under the header. */
+.stale-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 9px 28px;
+  border-bottom: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border));
+  background: var(--warning-bg);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  line-height: 1.5;
+}
+.stale-banner > svg {
+  flex: none;
+  margin-top: 3px;
+  color: var(--warning);
+}
+.stale-banner > p {
+  flex: 1;
+  margin: 0;
+}
+.stale-banner-link {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary-strong);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.stale-banner-link:hover {
+  text-decoration: underline;
+}
 @media (max-width: 1200px) {
   .room-chip {
     max-width: 220px;
   }
 }
-/* A phone: the selected room in words, the others as dots; the switches as icons with their dot. */
+/* A phone: the selected room in words, the others as dots, and the data's age on the first row;
+   the two switches, in words, share the second. */
 @media (max-width: 720px) {
+  header.topbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 56px;
+    row-gap: 6px;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  .topbar .connection-info {
+    display: contents;
+  }
+  .stale-banner {
+    padding: 9px 16px;
+    flex-wrap: wrap;
+  }
   .room-chips {
     gap: 4px;
   }
@@ -180,20 +232,15 @@
     font-size: var(--text-xs);
   }
   .safety-switches {
-    gap: 4px;
-    padding-left: 6px;
+    flex-basis: 100%;
+    gap: 6px;
+    padding: 0 0 0 6px;
+    border-left: 0;
   }
   .safety-switch {
-    height: 30px;
-    padding: 0 7px;
-    gap: 4px;
-  }
-  .safety-switch-text {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip: rect(0 0 0 0);
-    white-space: nowrap;
+    flex: 1;
+    justify-content: center;
+    height: 32px;
+    padding: 0 8px;
   }
 }

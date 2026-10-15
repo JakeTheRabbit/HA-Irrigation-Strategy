@@ -21,7 +21,7 @@ import {
   readJev,
   type JevEntry,
 } from "@/lib/jev";
-import { numeric, readable, roomStatus } from "@/lib/model";
+import { numeric, readable, roomStatus, staleBanner } from "@/lib/model";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { tankTelemetry } from "@/lib/tank-telemetry";
 import { eventTimes } from "@/lib/timeline";
@@ -272,6 +272,7 @@ function TodayStatus({
   const listId = useId();
   const { room, states } = controller;
   const status = roomStatus(states, room.room, now);
+  const banner = staleBanner(states, room.room, now) !== null;
   const stage = readJev(states, room.room.prefix).room?.stage ?? null;
   const steering = stage
     ? steeringOf(null, stage.steering)
@@ -366,7 +367,8 @@ function TodayStatus({
         {notices.length === 0 && <span className="today-fact muted">No alerts</span>}
       </p>
       {!room.roomActive && <RoomOffBanner controller={controller} />}
-      {room.roomActive && (status.tone === "stopped" || status.tone === "stale") && (
+      {/* A controller that is not reporting has the band under the header instead. */}
+      {room.roomActive && status.tone === "stopped" && !banner && (
         <p className="today-stopped" role="status">
           <TriangleAlert size={16} aria-hidden="true" />
           <span>

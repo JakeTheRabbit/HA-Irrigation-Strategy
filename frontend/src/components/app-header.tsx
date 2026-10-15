@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { House, Menu, RefreshCw } from "lucide-react";
+import { ArrowRight, House, Menu, RefreshCw, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ActivityPanel } from "@/components/activity-panel";
 import { SafetySwitches } from "@/components/room-controls";
-import { ageText, ageTone } from "@/lib/controller-health";
-import { roomStatus } from "@/lib/model";
+import { ageText, ageTone, updatedText } from "@/lib/controller-health";
+import { roomStatus, staleBanner } from "@/lib/model";
 import type { Controller } from "@/lib/types";
 import "./app-header.css";
 
@@ -107,19 +107,13 @@ export function AppHeader({
           data-age={connection === "offline" ? "red" : ageTone(age)}
           title="How old the selected room's latest controller report is"
         >
-          {connection === "offline" ? (
-            "Offline"
-          ) : connection === "connecting" ? (
-            "Connecting…"
-          ) : age === null ? (
-            "No controller data"
-          ) : (
-            <>
-              <span className="wide-only">Data </span>
-              {ageText(age)}
-              <span className="wide-only"> old</span>
-            </>
-          )}
+          {connection === "offline"
+            ? "Offline"
+            : connection === "connecting"
+              ? "Connecting…"
+              : age === null
+                ? "No controller data"
+                : updatedText(age)}
         </span>
         <ActivityPanel controller={controller} openLog={openLog} />
         <Button
@@ -134,5 +128,27 @@ export function AppHeader({
         <SafetySwitches controller={controller} />
       </div>
     </header>
+  );
+}
+
+/** One full-width band under the header while the selected room's controller is not reporting:
+ * the numbers on the page are its last report. It links to the probes, which say what reports. */
+export function StaleBanner({
+  controller,
+  openProbes,
+}: {
+  controller: Controller;
+  openProbes: () => void;
+}) {
+  const words = staleBanner(controller.states, controller.room.room);
+  if (words === null) return null;
+  return (
+    <div className="stale-banner" role="status">
+      <TriangleAlert size={16} aria-hidden="true" />
+      <p>{words}</p>
+      <button type="button" className="stale-banner-link" onClick={openProbes}>
+        Probes <ArrowRight size={14} aria-hidden="true" />
+      </button>
+    </div>
   );
 }
