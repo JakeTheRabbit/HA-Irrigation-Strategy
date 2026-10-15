@@ -1,0 +1,299 @@
+{
+ "_about": "The /data/state.json controller 3.11.1 saved for entry_3_11_1_pumped_room.json (its own _save_state), recorded by running that release's own wizard and controller (v3.11.1, 12c6d1a) in a real Home Assistant 2026.9.3 with every Jev answer stubbed and no network, not written by hand. The room ran from 14:00 on 12 Oct 2026 to 15:00 on 14 Oct, minute by minute, against probes that answered its shots: both zones are in P2 on the second grow-day with the day before's peak kept, the Auto setpoints learner has learned each zone (peak, gain, both dryback rates), and the hourly P2 check over Cloudflare has held the working peak 1 point above the learned one (learn.peak_adj, learn.jev).",
+ "state": {
+  "default": {
+   "1": {
+    "phase": "P2",
+    "peak": 53.52,
+    "peak_prev": 55.54,
+    "p1_reached": false,
+    "p1_peak_before": 51.79,
+    "p1_extra": 0,
+    "shots": 5,
+    "daily_vol": 20.0,
+    "water_history": [
+     {
+      "grow_day": "2026-10-12",
+      "litres": 0.0,
+      "complete": false
+     },
+     {
+      "grow_day": "2026-10-13",
+      "litres": 25.986666666666668,
+      "complete": true
+     },
+     {
+      "grow_day": "2026-10-14",
+      "litres": 20.0,
+      "complete": true
+     }
+    ],
+    "water_history_legacy_excluded_l": 0.0,
+    "learn": {
+     "peak_adj": 1.0,
+     "jev": {
+      "day": "2026-10-14",
+      "nudged": [
+       "peak"
+      ],
+      "asked": "2026-10-14T14",
+      "last": "14:00 no change (ec_steer level 2 (0.85); peak_fit raise_peak (0.85))",
+      "changed": "06:47 working peak +1 on the learned 53.56"
+     },
+     "peak": 53.56,
+     "gain": 0.524,
+     "day_rate": 1.092,
+     "night_rate": 0.267,
+     "day_n": 2,
+     "night_n": 2,
+     "day_acc": [
+      479.08965517241563,
+      437
+     ],
+     "night_acc": [
+      0.0,
+      0
+     ],
+     "hold_days": 0,
+     "day": "2026-10-14",
+     "ramp_start": 46.38,
+     "ramp": [
+      {
+       "pct": 2.4,
+       "rise": 1.73,
+       "settled": 48.09,
+       "flat": false
+      },
+      {
+       "pct": 3.0,
+       "rise": 1.72,
+       "settled": 49.81,
+       "flat": false
+      },
+      {
+       "pct": 3.6,
+       "rise": 1.73,
+       "settled": 51.54,
+       "flat": false
+      },
+      {
+       "pct": 4.2,
+       "rise": 1.63,
+       "settled": 53.17,
+       "flat": false
+      }
+     ],
+     "pending": null,
+     "outcome": "reached",
+     "stalled_at": null,
+     "last_change": "10:46 p2_vwc_threshold 40.9 -> 40.4",
+     "prev_peak": null,
+     "prev_hold": 0,
+     "veto": null
+    },
+    "ec_smooth": 3.4035294117647057,
+    "ec_settled": 3.42,
+    "ec_settled_at": "2026-10-14T14:59:00",
+    "ec_offset": 0.0,
+    "ec_integral": 0.0,
+    "ec_prev_err": 0.0,
+    "last_shot": "2026-10-14T09:11:00",
+    "last_shot_is_anchor": false,
+    "last_phase_change": "2026-10-14T06:47:00",
+    "last_ec_steer": null,
+    "last_daily_reset": "2026-10-14",
+    "plateau_hist": [
+     {
+      "date": "2026-10-13",
+      "value": 55.54,
+      "how": "Jev's ramp judge: ramp done: ec_is_feed_front (hand over p=1.00)",
+      "shots": 4
+     },
+     {
+      "date": "2026-10-14",
+      "value": 53.52,
+      "how": "Jev's ramp judge: ramp done: ec_is_feed_front (hand over p=1.00)",
+      "shots": 4
+     }
+    ],
+    "night_hist": [
+     {
+      "date": "2026-10-13",
+      "plateau": null,
+      "off_at": "2026-10-12T18:00:00",
+      "off_vwc": 53.6,
+      "on_at": "2026-10-13T06:00:00",
+      "on_vwc": 50.58,
+      "first_at": "2026-10-13T08:00:00",
+      "landing": 48.38,
+      "night_rate": 0.2516666666666669,
+      "p0_drop": 2.1999999999999957,
+      "dryback_pct": null,
+      "night_shots": 0
+     },
+     {
+      "date": "2026-10-14",
+      "plateau": 55.54,
+      "off_at": "2026-10-13T18:00:00",
+      "off_vwc": 49.4,
+      "on_at": "2026-10-14T06:00:00",
+      "on_vwc": 46.38,
+      "first_at": "2026-10-14T06:01:00",
+      "landing": 46.36,
+      "night_rate": 0.2516666666666663,
+      "p0_drop": 0.020000000000003126,
+      "dryback_pct": 16.528628015844436,
+      "night_shots": 0
+     }
+    ],
+    "night": null
+   },
+   "2": {
+    "phase": "P2",
+    "peak": 51.79,
+    "peak_prev": 53.54,
+    "p1_reached": false,
+    "p1_peak_before": 50.07,
+    "p1_extra": 0,
+    "shots": 4,
+    "daily_vol": 13.988888888888889,
+    "water_history": [
+     {
+      "grow_day": "2026-10-12",
+      "litres": 0.0,
+      "complete": false
+     },
+     {
+      "grow_day": "2026-10-13",
+      "litres": 24.98888888888889,
+      "complete": true
+     },
+     {
+      "grow_day": "2026-10-14",
+      "litres": 13.988888888888889,
+      "complete": true
+     }
+    ],
+    "water_history_legacy_excluded_l": 0.0,
+    "learn": {
+     "peak_adj": 1.0,
+     "jev": {
+      "day": "2026-10-14",
+      "nudged": [
+       "peak"
+      ],
+      "asked": "2026-10-14T14",
+      "last": "14:00 no change (ec_steer level 2 (0.85); peak_fit raise_peak (0.85))",
+      "changed": "06:32 working peak +1 on the learned 51.56"
+     },
+     "peak": 51.56,
+     "gain": 0.626,
+     "day_rate": 1.092,
+     "night_rate": 0.263,
+     "day_n": 2,
+     "night_n": 2,
+     "day_acc": [
+      495.6206896551744,
+      452
+     ],
+     "night_acc": [
+      0.0,
+      0
+     ],
+     "hold_days": 0,
+     "day": "2026-10-14",
+     "ramp_start": 46.38,
+     "ramp": [
+      {
+       "pct": 2.4,
+       "rise": 1.73,
+       "settled": 48.09,
+       "flat": false
+      },
+      {
+       "pct": 3.0,
+       "rise": 1.72,
+       "settled": 49.81,
+       "flat": false
+      },
+      {
+       "pct": 3.6,
+       "rise": 1.64,
+       "settled": 51.45,
+       "flat": false
+      }
+     ],
+     "pending": null,
+     "outcome": "reached",
+     "stalled_at": null,
+     "last_change": "09:46 p2_vwc_threshold 38.4 -> 37.4",
+     "prev_peak": null,
+     "prev_hold": 0,
+     "veto": null
+    },
+    "ec_smooth": 3.103529411764705,
+    "ec_settled": 3.12,
+    "ec_settled_at": "2026-10-14T14:59:00",
+    "ec_offset": 0.0,
+    "ec_integral": 0.0,
+    "ec_prev_err": 0.0,
+    "last_shot": "2026-10-14T09:38:00",
+    "last_shot_is_anchor": false,
+    "last_phase_change": "2026-10-14T06:32:00",
+    "last_ec_steer": null,
+    "last_daily_reset": "2026-10-14",
+    "plateau_hist": [
+     {
+      "date": "2026-10-13",
+      "value": 53.54,
+      "how": "Jev's ramp judge: ramp done: ec_is_feed_front (hand over p=1.00)",
+      "shots": 4
+     },
+     {
+      "date": "2026-10-14",
+      "value": 51.79,
+      "how": "Jev's ramp judge: ramp done: ec_is_feed_front (hand over p=1.00)",
+      "shots": 3
+     }
+    ],
+    "night_hist": [
+     {
+      "date": "2026-10-13",
+      "plateau": null,
+      "off_at": "2026-10-12T18:00:00",
+      "off_vwc": 51.6,
+      "on_at": "2026-10-13T06:00:00",
+      "on_vwc": 48.58,
+      "first_at": "2026-10-13T08:00:00",
+      "landing": 46.38,
+      "night_rate": 0.2516666666666669,
+      "p0_drop": 2.1999999999999957,
+      "dryback_pct": null,
+      "night_shots": 0
+     },
+     {
+      "date": "2026-10-14",
+      "plateau": 53.54,
+      "off_at": "2026-10-13T18:00:00",
+      "off_vwc": 49.4,
+      "on_at": "2026-10-14T06:00:00",
+      "on_vwc": 46.38,
+      "first_at": "2026-10-14T06:01:00",
+      "landing": 46.36,
+      "night_rate": 0.2516666666666663,
+      "p0_drop": 0.020000000000003126,
+      "dryback_pct": 13.410534180052297,
+      "night_shots": 0
+     }
+    ],
+    "night": null
+   },
+   "_setup": {
+    "revision": 1,
+    "fingerprint": "{\"active\": true, \"enable_flag\": \"switch.crop_steering_engine_enabled\", \"feed_ec_sensor\": \"sensor.feed_ec\", \"feed_ph_sensor\": \"sensor.feed_ph\", \"mainline\": \"switch.irrigation_main_line\", \"plumbing\": \"pump_mainline_valves\", \"pump\": \"switch.irrigation_pump\", \"valves\": {\"1\": \"switch.zone_1_valve\", \"2\": \"switch.zone_2_valve\"}, \"zones\": [1, 2]}",
+    "entry_id": "01M4Y59172ZF84T17BP0WJZNG9"
+   },
+   "_room_active": true
+  }
+ }
+}
