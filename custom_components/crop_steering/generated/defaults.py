@@ -56,6 +56,10 @@ DEFAULTS = {
     "p1_time_between_shots": (15.0, 15),
     "p1_maximum_shots": (6.0, 12),
     "p1_minimum_shots": (3.0, 0),
+    # The rise an extra P1 shot must give to keep P1 going, and how many extra shots P1 may
+    # give once it has read its target (the engine's P1_RISE_PTS and P1_MAX_EXTRA_SHOTS).
+    "p1_rise_pts": (0.5, 0.5),
+    "p1_maximum_extra_shots": (3.0, 3),
     # P2
     "p2_vwc_threshold": (60.0, 45),
     "p2_shot_size": (5.0, 5),

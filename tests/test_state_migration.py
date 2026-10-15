@@ -351,7 +351,8 @@ def test_a_learned_zone_saved_by_3_10_0_loads_without_the_retired_limit_keys(tmp
 
 def test_an_old_zone_loads_with_the_day_befores_peak_and_the_p1_rule_empty(tmp_path):
     """Before 3.11.0 a zone kept no peak_prev (the grow-day before's highest reading, the next
-    P1 target) and no P1 rule state: it loads with them empty, its own peak as it was.
+    P1 target) and no P1 rule state, and before the settled P1 rise no settled reading or
+    expected rise: it loads with them empty, its own peak as it was.
     """
     p = tmp_path / "state.json"
     p.write_text(
@@ -367,11 +368,15 @@ def test_an_old_zone_loads_with_the_day_befores_peak_and_the_p1_rule_empty(tmp_p
         st["p1_reached"],
         st["p1_peak_before"],
         st["p1_extra"],
+        st["p1_settled_before"],
+        st["p1_expected_rise"],
     ) == (
         None,
         False,
         None,
         0,
+        None,
+        None,
     )
 
 
