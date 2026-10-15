@@ -429,10 +429,10 @@ def test_strategy_catalog_respects_actual_controller_clamps(monkeypatch):
     manager, _, _ = manager_fixture(monkeypatch)
     fields = manager.catalog()[1]
     assert fields["p1_target_vwc"]["min"] == 20
-    assert fields["p1_target_vwc"]["max"] == 85
+    assert fields["p1_target_vwc"]["max"] == 100
     assert fields["dryback_target"]["max"] == 60
     invalid = plan()
-    invalid["profiles"][0]["vegetative"]["p1_target_vwc"] = 90
+    invalid["profiles"][0]["vegetative"]["p1_target_vwc"] = 101
     with pytest.raises(ValueError, match="bounds"):
         normalize_plan(invalid, [1], manager.catalog())
 

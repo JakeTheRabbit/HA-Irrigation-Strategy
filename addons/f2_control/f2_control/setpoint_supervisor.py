@@ -25,8 +25,8 @@ PEAK_ADJ_RANGE = (-2.0, 2.0)  # how far judgement may move the peak off the lear
 MAX_STEP = {"p1_target_vwc": 6.0, "field_capacity": 20.0, "p2_vwc_threshold": 10.0,
             "p3_emergency_vwc_threshold": 10.0, "dryback_target": 15.0}
 BOUNDS = {  # the engine's own _PARAM_BOUNDS, by setpoint suffix
-    "p1_target_vwc": (20, 85), "p2_vwc_threshold": (10, 70), "field_capacity": (40, 90), "dryback_target": (2, 60),
-    "p0_maximum_wait_time": (5, 240), "p3_emergency_vwc_threshold": (10, 60), "p2_shot_size": (0.5, 20),
+    "p1_target_vwc": (20, 100), "p2_vwc_threshold": (10, 100), "field_capacity": (40, 100), "dryback_target": (2, 60),
+    "p0_maximum_wait_time": (5, 240), "p3_emergency_vwc_threshold": (10, 65), "p2_shot_size": (0.5, 20),
     "p1_initial_shot_size": (0.5, 15), "p1_shot_size_increment": (0, 5), "p1_maximum_shots": (1, 40),
     "p1_time_between_shots": (1, 120), "ec_target_p1": (0.5, 9), "ec_target_p2": (0.5, 9),
 }
@@ -83,10 +83,26 @@ def in_order(ladder):
             < ladder["p1_target_vwc"] <= ladder["field_capacity"])
 
 
+LADDER = ("p3_emergency_vwc_threshold", "p2_vwc_threshold", "p1_target_vwc", "field_capacity")
+
+
 def writes(current, want):
-    """current + desired -> [(suffix, value, why)], clamped to the engine's bounds, big moves taken in steps."""
+    """current + desired -> [(suffix, value, why)], clamped to the engine's bounds, big moves taken in steps.
+    The ladder is judged as one set, then written so it stays in order after every write: Home Assistant
+    refuses a level that breaks it, so the levels going down go from the bottom up, those going up top down."""
     out = proposed(current, want)
-    return out if in_order(dict(current, **{s: v for s, v, _w in out})) else []  # never an inverted ladder
+    if not in_order(dict(current, **{s: v for s, v, _w in out})):
+        return []  # never an inverted ladder
+
+    def step(write):
+        suffix, value, _why = write
+        if suffix not in LADDER:
+            return (0, 0)
+        cur = current.get(suffix)
+        rung = LADDER.index(suffix)
+        return (1, rung) if cur is not None and value < cur else (2, -rung)
+
+    return sorted(out, key=step)
 
 
 def proposed(current, want):

@@ -41,13 +41,13 @@ entities scale with your zone count, `N` = 1…zones).
 | `p1_maximum_shots` | 1-30 | 6 | - | After this many shots P1 exits to P2 even if the target wasn't hit. |
 | `p1_rise_pts` | 0.1-5 | 0.5 | % | Once P1 reads its target it gives one more shot, and another while each raises the settled moisture reading (the median of the last 10 minutes) by at least this much, or by 0.3 of what the zone's learned gain says the shot should give if that is more. |
 | `p1_maximum_extra_shots` | 1-10 | 3 | - | The most extra shots P1 gives after reading its target; at this many it moves to P2. Extra shots count toward the daily water limit, and none is given while the table is not draining (CS-310). |
-| `p1_target_vwc` | 5-95 | 65 | % | VWC that ends the ramp and moves the zone to P2. |
+| `p1_target_vwc` | 20-100 | 65 | % | VWC that ends the ramp and moves the zone to P2. |
 | `p1_time_between_shots` | 1-60 | 15 | min | Spacing between ramp shots. |
 
 ### P2: maintenance
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `p2_vwc_threshold` | 5-85 | 60 | % | Shoot a maintenance top-up when VWC falls below this. |
+| `p2_vwc_threshold` | 10-100 | 60 | % | Shoot a maintenance top-up when VWC falls below this. |
 | `p2_shot_size` | 0.5-30 | 5 | % | Size of a P2 maintenance shot. |
 | `p2_ec_high_threshold` | 0.5-3.0 | 1.2 | ×target | EC ratio above which the threshold is raised (water more to flush salts). |
 | `p2_ec_low_threshold` | 0.2-2.0 | 0.8 | ×target | EC ratio below which the threshold is lowered. |
@@ -55,7 +55,7 @@ entities scale with your zone count, `N` = 1…zones).
 ### P3: pre-lights-off / overnight
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
-| `p3_emergency_vwc_threshold` | 20-65 | 40 | % | Overnight emergency floor: a rescue shot fires below this. |
+| `p3_emergency_vwc_threshold` | 10-65 | 40 | % | Overnight emergency floor: a rescue shot fires below this. |
 | `p3_emergency_shot_size` | 0.1-15 | 2 | % | Size of an emergency rescue shot. |
 | `p3_time_between_shots` | 0-60 | 10 | min | Minutes from the last shot before an emergency rescue may go, so it reaches the probe before moisture is judged again. The first rescue of a night still goes at once. `0` turns the gap off. |
 
@@ -88,7 +88,7 @@ The active EC target = the row for the current phase **and** the zone's steering
 | `substrate_volume` | 1-200 | 10 | L | Substrate volume per plant: converts shot % → mL → valve seconds. |
 | `dripper_flow_rate` | 0.1-50 | 1.2 | L/hr | Per-dripper flow: the other half of the % → seconds conversion. |
 | `drippers_per_plant` | 1-6 | 2 | - | Drippers feeding each plant. |
-| `field_capacity` | 5-100 | 70 | % | VWC at/above which irrigation is blocked (over-water guard / P1 clamp). |
+| `field_capacity` | 40-100 | 70 | % | VWC at/above which irrigation is blocked (over-water guard / P1 clamp). |
 | `vegetative_dryback_target` | 5-80 | 50 | % | Overnight dryback target in vegetative mode. |
 | `generative_dryback_target` | 5-70 | 40 | % | Overnight dryback target in generative mode. |
 | `lights_on_hour` | 0-23 | 12 | hour | Photoperiod start: P3→P0 + daily-counter reset fire here. |

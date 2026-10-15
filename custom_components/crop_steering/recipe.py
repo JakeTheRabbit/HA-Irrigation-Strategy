@@ -87,29 +87,40 @@ class RecipeManager:
 
         Operator-initiated only; every value is still clamped by each number
         entity's min/max, and the kill switch independently gates actuation.
+        The stage's moisture levels are judged as one set against each zone's
+        ladder (ladder.py): a stage that would break the order writes nothing.
         """
+        from .ladder import refusal
+        from .number import async_set_numbers, read_ladder
+
         stage = stage or self.active_stage
         if stage not in RECIPE_STAGES:
             _LOGGER.warning("crop_steering: unknown recipe stage %s", stage)
             return 0
         num_zones = self.hass.data[DOMAIN][self.entry.entry_id].get(CONF_NUM_ZONES, 1)
+        stage_vals = (self.recipe.get("stages") or {}).get(stage, {})
+        for zone in (None, *range(1, int(num_zones) + 1)):
+            current = read_ladder(self.hass, self.entry, zone)
+            moves = {k: float(v) for k, v in stage_vals.items() if k in current}
+            why = refusal(current, moves)
+            if why:
+                from homeassistant.exceptions import ServiceValidationError
+
+                where = "the room" if zone is None else f"zone {zone}"
+                raise ServiceValidationError(
+                    f"Stage '{stage}' not applied: in {where}, {why}."
+                )
         targets = build_targets(stage, self.recipe, num_zones, room_prefix(self.entry))
-        applied = 0
-        for eid, val in targets:
-            if self.hass.states.get(eid) is None:
-                continue  # not every param has a per-zone copy on every install
-            try:
-                await self.hass.services.async_call(
-                    "number",
-                    "set_value",
-                    {"entity_id": eid, "value": float(val)},
-                    blocking=True,
-                )
-                applied += 1
-            except Exception as err:  # pragma: no cover - defensive
-                _LOGGER.warning(
-                    "crop_steering: recipe apply failed for %s: %s", eid, err
-                )
+        applied, failed = await async_set_numbers(
+            self.hass,
+            [  # not every param has a per-zone copy on every install
+                (eid, float(val))
+                for eid, val in targets
+                if self.hass.states.get(eid) is not None
+            ],
+        )
+        for eid, err in failed:
+            _LOGGER.warning("crop_steering: recipe apply failed for %s: %s", eid, err)
         self.recipe["active_stage"] = stage
         if self._store is not None:
             await self._store.async_save(self.recipe)

@@ -31,6 +31,18 @@ VWC_ADJUSTMENT_PERCENT = 5.0
 PROBE_RANGE = {"vwc": (0.0, 100.0), "ec": (0.0, 20.0)}
 PROBE_STALE_SECONDS = 20 * 60
 
+# The four moisture levels, (lowest, highest) %: each setting accepts exactly this, and grow plans,
+# Auto setpoints and the engine (crop-steering-engine _PARAM_BOUNDS) use the same range, so the
+# engine never clips a value its setting accepted (tests_ha/test_moisture_ranges.py). The tops are
+# 100 because the order between the levels bounds the water, not a fixed number. The floors are the
+# engine's long-standing ones: they catch a slipped digit (6.5 for 65).
+MOISTURE_RANGES = {
+    "p1_target_vwc": (20.0, 100.0),
+    "p2_vwc_threshold": (10.0, 100.0),
+    "field_capacity": (40.0, 100.0),
+    "p3_emergency_vwc_threshold": (10.0, 65.0),
+}
+
 
 # Software version - single source of truth
 SOFTWARE_VERSION = "3.11.1"

@@ -12,8 +12,9 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 
-from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
+from .const import DOMAIN, CONF_NUM_ZONES, MOISTURE_RANGES, SOFTWARE_VERSION
 from .generated.defaults import ENTITY_DEFAULTS
+from .ladder import LADDER, peak_above_field_capacity, refusal
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .sizing import SIZING_KEYS, configured_sizing, prefer_setup_value
 
@@ -88,8 +89,8 @@ NUMBER_DESCRIPTIONS = [
         key="field_capacity",
         name="Field Capacity",
         icon="mdi:water-percent",
-        native_min_value=5.0,
-        native_max_value=100.0,
+        native_min_value=MOISTURE_RANGES["field_capacity"][0],
+        native_max_value=MOISTURE_RANGES["field_capacity"][1],
         native_step=1.0,
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
@@ -142,8 +143,8 @@ NUMBER_DESCRIPTIONS = [
         key="p1_target_vwc",
         name="P1 Target VWC",
         icon="mdi:target",
-        native_min_value=5.0,
-        native_max_value=95.0,
+        native_min_value=MOISTURE_RANGES["p1_target_vwc"][0],
+        native_max_value=MOISTURE_RANGES["p1_target_vwc"][1],
         native_step=1.0,
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
@@ -152,8 +153,8 @@ NUMBER_DESCRIPTIONS = [
         key="p2_vwc_threshold",
         name="P2 VWC Threshold",
         icon="mdi:water-alert",
-        native_min_value=5.0,
-        native_max_value=85.0,
+        native_min_value=MOISTURE_RANGES["p2_vwc_threshold"][0],
+        native_max_value=MOISTURE_RANGES["p2_vwc_threshold"][1],
         native_step=1.0,
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
@@ -284,8 +285,8 @@ NUMBER_DESCRIPTIONS = [
         key="p3_emergency_vwc_threshold",
         name="P3 Emergency VWC Threshold",
         icon="mdi:alert",
-        native_min_value=20.0,
-        native_max_value=65.0,
+        native_min_value=MOISTURE_RANGES["p3_emergency_vwc_threshold"][0],
+        native_max_value=MOISTURE_RANGES["p3_emergency_vwc_threshold"][1],
         native_step=1.0,
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
@@ -559,6 +560,51 @@ PARAM_TO_ENTITY_KEY: dict[str, str] = {
     "lights_on_hour": "lights_on_hour",
     "lights_off_hour": "lights_off_hour",
 }
+
+
+def read_ladder(hass, entry, zone=None) -> dict[str, float]:
+    """{level: value} of one zone's moisture ladder (zone None: the room-level numbers), as Home
+    Assistant holds it now. Found by unique id, so a renamed entity id is still found; a level with
+    no number or no numeric state is left out."""
+    from homeassistant.helpers import entity_registry as er
+
+    registry = er.async_get(hass)
+    scope = "" if zone is None else f"zone_{zone}_"
+    out = {}
+    for key in LADDER:
+        entity_id = registry.async_get_entity_id(
+            "number", DOMAIN, f"{DOMAIN}_{entry.entry_id}_{scope}{key}"
+        )
+        state = hass.states.get(entity_id) if entity_id else None
+        try:
+            out[key] = float(state.state)
+        except (AttributeError, TypeError, ValueError):
+            continue
+    return out
+
+
+async def async_set_numbers(hass, values) -> tuple[int, list]:
+    """Write [(entity_id, value)] as one move. A moisture level refused because its neighbour has
+    not moved yet is written on a later pass. Returns (how many were written, [(entity_id, error)]
+    for each that never was)."""
+    written, pending = 0, list(values)
+    while pending:
+        refused = []
+        for entity_id, value in pending:
+            try:
+                await hass.services.async_call(
+                    "number",
+                    "set_value",
+                    {"entity_id": entity_id, "value": value},
+                    blocking=True,
+                )
+                written += 1
+            except Exception as err:  # noqa: BLE001 - reported to the caller
+                refused.append((entity_id, value, err))
+        if len(refused) == len(pending):
+            return written, [(entity_id, err) for entity_id, _v, err in refused]
+        pending = [(entity_id, value) for entity_id, value, _err in refused]
+    return written, []
 
 
 # Reverse map: entity key → parsed parameter value (built at setup time).
@@ -844,7 +890,25 @@ class CropSteeringNumber(NumberEntity, RestoreEntity):
             )
 
     async def async_set_native_value(self, value: float) -> None:
-        """Update the value."""
+        """Update the value. A moisture level that breaks the ladder's order is refused
+        (ladder.py); a recipe stage is judged as one set before any of it is written."""
+        key = self.entity_description.key
+        if self._zone_num is not None:
+            key = key.removeprefix(f"zone_{self._zone_num}_")
+        if key in LADDER:
+            current = read_ladder(self.hass, self._entry, self._zone_num)
+            why = refusal(current, {key: float(value)})
+            if why:
+                from homeassistant.exceptions import ServiceValidationError
+
+                raise ServiceValidationError(
+                    f"{self.name} not changed: {why}. Move the other level first."
+                )
+            if peak_above_field_capacity(current, {key: float(value)}):
+                _LOGGER.warning(
+                    "%s: the peak target is above field capacity; the ramp stops at field capacity",
+                    self.entity_id,
+                )
         self._attr_native_value = value
         self.async_write_ha_state()
 
