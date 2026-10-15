@@ -1,0 +1,37 @@
+/* The tour's card: bottom right over the page on a desktop, the window's width on a phone. */
+.tour {
+  position: fixed;
+  z-index: 40;
+  right: 20px;
+  bottom: 20px;
+  width: min(380px, calc(100% - 24px));
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  background: var(--card);
+  color: var(--card-foreground);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 28px rgb(0 0 0 / 0.18);
+  font-size: var(--text-md);
+  line-height: 1.5;
+}
+.tour h2 {
+  font-size: var(--text-lg);
+  font-weight: 600;
+}
+.tour-count {
+  font-size: var(--text-xs);
+}
+.tour-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}
+@media (max-width: 720px) {
+  .tour {
+    right: 12px;
+    bottom: 12px;
+  }
+}

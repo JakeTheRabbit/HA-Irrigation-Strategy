@@ -42,6 +42,7 @@ import { AppHeader } from "@/components/app-header";
 import { PageTabs, pageLabel, SECTION_LABELS } from "@/components/page-tabs";
 import { WaterViewProvider } from "@/lib/water-view";
 import { WhatsNewOnUpdate } from "@/components/whats-new";
+import { Tour } from "@/components/tour";
 import { ZonePage } from "@/pages/zone";
 import { Today } from "@/pages/today";
 import { Strategy, type Drafts } from "@/pages/strategy";
@@ -414,6 +415,7 @@ export default function App() {
         </main>
       </div>
       <WhatsNewOnUpdate controller={controller} />
+      <Tour navigate={navigate} />
       <Dialog
         open={Boolean(pending)}
         onOpenChange={(open) => {

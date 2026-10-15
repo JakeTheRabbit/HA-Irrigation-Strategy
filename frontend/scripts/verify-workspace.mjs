@@ -652,8 +652,41 @@ try {
       assert.ok(!(await switchOn.isDisabled()), "Every safety check passed: Switch on is enabled");
       await switchOn.click();
       await wizard.waitFor({ state: "hidden" });
-      await visible(page.getByText(/This room is set up/));
+      // The first-run tour runs once, straight after Switch on, over the real pages.
+      const tour = page.getByRole("dialog", { name: "Today" });
+      await visible(tour.getByText("Stop 1 of 5"));
+      assert.equal(new URL(page.url()).hash, "#/today");
       await noOverflow();
+      const stops = [
+        ["Plan", "#/plan/targets"],
+        ["History", "#/history/timeline"],
+        ["Equipment", "#/equipment/probes"],
+        ["Help", "#/help"],
+      ];
+      for (const [title, hash] of stops) {
+        await page.locator(".tour").getByRole("button", { name: "Next", exact: true }).click();
+        await visible(page.getByRole("dialog", { name: title }));
+        assert.equal(new URL(page.url()).hash, hash);
+      }
+      await page.locator(".tour").getByRole("button", { name: "Done", exact: true }).click();
+      await page.locator(".tour").waitFor({ state: "detached" });
+    },
+  );
+  await check(
+    "The tour never starts by itself on a room already set up, and Help takes it again",
+    async () => {
+      await fresh("today");
+      await visible(page.locator(".main-inner"));
+      assert.equal(await page.locator(".tour").count(), 0, "No tour on an upgraded installation");
+      await fresh("help");
+      await page.getByRole("button", { name: "Take the tour again", exact: true }).click();
+      await visible(page.getByRole("dialog", { name: "Today" }).getByText("Stop 1 of 5"));
+      assert.equal(new URL(page.url()).hash, "#/today");
+      await page.setViewportSize({ width: 390, height: 844 });
+      await noOverflow();
+      await page.locator(".tour").getByRole("button", { name: "End tour", exact: true }).click();
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.locator(".tour").waitFor({ state: "detached" });
     },
   );
   await check(
