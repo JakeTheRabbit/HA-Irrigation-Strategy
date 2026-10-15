@@ -28,10 +28,11 @@ KINDS = (
         "id": "hardware",
         "name": "Hardware lockouts",
         "detail": "A pump or valve that did not do what it was told, a hardware hold, a shot "
-        "cut, water that isn't reaching a zone, a table that isn't draining and a sump pump that stopped",
+        "cut, a zone that keeps hitting its longest allowed shot, water that isn't reaching a "
+        "zone, a table that isn't draining and a sump pump that stopped",
         "codes": _codes(
             "CS-301 CS-302 CS-303 CS-304 CS-305 CS-306 CS-307 CS-308 CS-309 CS-310 CS-311 "
-            "CS-701"
+            "CS-312 CS-701"
         ),
         "events": (),
     },
