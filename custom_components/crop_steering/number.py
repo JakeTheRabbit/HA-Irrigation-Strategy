@@ -205,6 +205,28 @@ NUMBER_DESCRIPTIONS = [
         native_step=1.0,
         mode="box",
     ),
+    # Once P1 reads its target it gives one more shot, and another while each raises the settled
+    # moisture reading by at least this much, up to the maximum extra shots. The controller falls
+    # back to the same 0.5 and 3 when an older integration has no such entities.
+    NumberEntityDescription(
+        key="p1_rise_pts",
+        name="P1 Extra Shot Rise",
+        icon="mdi:trending-up",
+        native_min_value=0.1,
+        native_max_value=5.0,
+        native_step=0.1,
+        native_unit_of_measurement=PERCENTAGE,
+        mode="box",
+    ),
+    NumberEntityDescription(
+        key="p1_maximum_extra_shots",
+        name="P1 Maximum Extra Shots",
+        icon="mdi:counter",
+        native_min_value=1.0,
+        native_max_value=10.0,
+        native_step=1.0,
+        mode="box",
+    ),
     # P2 Phase Parameters
     NumberEntityDescription(
         key="p2_shot_size",
@@ -448,6 +470,8 @@ PER_ZONE_STEERING_KEYS = [
     "p1_time_between_shots",
     "p1_maximum_shots",
     "p1_minimum_shots",
+    "p1_rise_pts",
+    "p1_maximum_extra_shots",
     "p2_vwc_threshold",
     "p2_shot_size",
     "p3_emergency_vwc_threshold",
