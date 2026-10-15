@@ -191,7 +191,9 @@ export function MappingPicker({
     </div>
   );
 }
-function newZone(id: number): SetupZone {
+/** A new zone, its sizing from the integration's one defaults table (`defaults`; these values
+ * where an older integration does not send it). */
+function newZone(id: number, defaults: SetupDocument["sizing_defaults"] = {}): SetupZone {
   return {
     id,
     name: "Zone " + id,
@@ -203,6 +205,7 @@ function newZone(id: number): SetupZone {
     substrate_volume: 5,
     drippers_per_plant: 1,
     dripper_flow_rate: 2,
+    ...defaults,
   };
 }
 const hardwareFields = [
@@ -283,7 +286,7 @@ export function Setup({
       active: true,
       num_zones: 1,
       active_zone_ids: [1],
-      zones: [newZone(1)],
+      zones: [newZone(1, data?.sizing_defaults)],
       hardware: {},
       plumbing: "",
       safety: { ready: true, blockers: [] },
@@ -808,7 +811,10 @@ export function Setup({
                     }
                     onClick={() => {
                       const id = Math.max(0, ...draft.zones.map((z) => z.id)) + 1;
-                      setDraft({ ...draft, zones: [...draft.zones, newZone(id)] });
+                      setDraft({
+                        ...draft,
+                        zones: [...draft.zones, newZone(id, data?.sizing_defaults)],
+                      });
                     }}
                   >
                     <Plus size={16} />

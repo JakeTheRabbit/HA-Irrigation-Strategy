@@ -63,6 +63,11 @@ async def test_setup_offers_a_new_room_the_sizing_its_numbers_start_at(hass):
     assert (offered["field_capacity"], offered["max_ec"]) == (70.0, 9.0)
 
 
+async def test_the_dashboards_setup_is_handed_the_same_sizing_for_a_new_zone(hass):
+    _seed(hass)
+    assert setup_api.read_setup(hass)["sizing_defaults"] == SIZING_DEFAULTS
+
+
 async def test_a_new_room_left_on_the_generic_sizing_is_marked_until_it_is_changed(hass):
     entry = await _install(hass)
     for key in ("substrate_volume", "dripper_flow_rate", "drippers_per_plant"):
