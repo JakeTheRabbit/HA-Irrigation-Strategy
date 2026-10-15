@@ -489,6 +489,7 @@ export class ControllerStore {
       action.startsWith("strategy_") ||
       action.startsWith("runs_") ||
       action.startsWith("setpoint_log_") ||
+      action.startsWith("overlay_") ||
       action.startsWith("stock_") ||
       action.startsWith("calibration_") ||
       action.startsWith("dosing_");
@@ -504,6 +505,7 @@ export class ControllerStore {
         "setup_read",
         "runs_get",
         "setpoint_log_get",
+        "overlay_get",
         "stock_get",
         "calibration_get",
         "dosing_get",

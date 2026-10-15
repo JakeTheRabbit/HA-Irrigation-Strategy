@@ -19,6 +19,7 @@ import type { States } from "./types";
 import { discoverRooms, numeric, roomSlug } from "./model";
 import { blockForDay, dateForDay, growDay, interpolate, localDate, planErrors } from "./grow-plan";
 import { inferPlumbing, plumbingErrors } from "./plumbing";
+import type { Overlay } from "./overlays";
 import { DEMO_WHATS_NEW } from "./whats-new-demo";
 import { compareVersions } from "./whats-new";
 
@@ -37,6 +38,7 @@ export class OperatorDemo {
     string,
     { water_seen: Record<string, string>; sizing_confirmed: boolean; done: boolean }
   >();
+  private overlays = new Map<string, Overlay[]>();
   /** The last release What's new showed: the demo's own unless the page asks otherwise. */
   private whatsNewSeen: string | null;
   constructor(
@@ -343,6 +345,47 @@ export class OperatorDemo {
       draft: { water_seen: { ...draft.water_seen }, sizing_confirmed: draft.sizing_confirmed },
     };
   }
+  /** The AI overlays: in the room that runs Jev, last night's notch of zone 3's shot size, which
+   * goes back at the next lights-on unless kept or undone. */
+  private overlay(action: OperatorAction, data: Record<string, unknown>) {
+    const roomId = String(data.room_id);
+    const prefix = roomId.replace(/^room:/, "");
+    const states = this.getStates();
+    const entity = `number.crop_steering_${prefix}zone_3_p2_shot_size`;
+    if (!this.overlays.has(roomId)) {
+      const now = Date.now();
+      const value = Number(states[entity]?.state);
+      this.overlays.set(
+        roomId,
+        states[`sensor.crop_steering_${prefix}zone_3_jev`] && Number.isFinite(value)
+          ? [
+              {
+                entity_id: entity,
+                zone: 3,
+                field: "p2_shot_size",
+                old: 4.5,
+                new: value,
+                by: "brain",
+                at: new Date(now - 3 * 3_600_000).toISOString(),
+                expires: new Date(now + 9 * 3_600_000).toISOString(),
+              },
+            ]
+          : [],
+      );
+    }
+    const rows = this.overlays.get(roomId)!;
+    if (action === "overlay_get")
+      return { schema_version: 1, room_id: roomId, overlays: clone(rows), error: null };
+    const row = rows.find((item) => item.entity_id === data.entity_id);
+    if (!row) throw new Error(`No AI overlay on ${String(data.entity_id)}`);
+    rows.splice(rows.indexOf(row), 1);
+    if (action === "overlay_undo" && states[row.entity_id])
+      this.updateStates({
+        ...states,
+        [row.entity_id]: { ...states[row.entity_id], state: String(row.old) },
+      });
+    return undefined;
+  }
   async call<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
     if (action === "test_shot") {
       // The demo's controller answers at once: the button records the press, the shot runs.
@@ -387,6 +430,7 @@ export class OperatorDemo {
     }
     if (action === "setpoint_log_get")
       return { schema_version: 1, room_id: data.room_id, changes: [], error: null } as T;
+    if (action.startsWith("overlay_")) return this.overlay(action, data) as T;
     if (action.startsWith("runs_")) {
       this.runDemo ||= new RunDemo(this.getStates);
       return this.runDemo.call(action, data) as T;
