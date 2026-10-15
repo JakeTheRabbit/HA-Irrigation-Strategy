@@ -25,8 +25,9 @@ from custom_components.crop_steering.setup_api import LOGBOOK_ENTRY
 from test_setup_entry import _install
 
 DOMAIN = "crop_steering"
-DESCRIPTOR = "sensor.crop_steering_engine_config"
-ENGINE = "switch.crop_steering_engine_enabled"
+# The wizard's room is new, so it has a slug: "Tent" is tent_.
+DESCRIPTOR = "sensor.crop_steering_tent_engine_config"
+ENGINE = "switch.crop_steering_tent_engine_enabled"
 
 
 @pytest.fixture

@@ -210,7 +210,7 @@ def test_a_setting_change_is_logged_with_who_made_it(monkeypatch, capsys):
     fake.set_state(SHOTS, "10")
     assert c._zone_num(c.rooms[0], 1, "p1_maximum_shots", 12) == 10
     said = [line for line in capsys.readouterr().out.splitlines() if "Most P1 shots" in line]
-    assert said == [f"[f2-control] [{slug}] Z1 Sam raised Most P1 shots to 10 (was 6)"]
+    assert said == [f"[Crop Steering Controller] [{slug}] Z1 Sam raised Most P1 shots to 10 (was 6)"]
     assert asked == [SHOTS]
     # Said once: the next read has nothing new.
     c._zone_num(c.rooms[0], 1, "p1_maximum_shots", 12)

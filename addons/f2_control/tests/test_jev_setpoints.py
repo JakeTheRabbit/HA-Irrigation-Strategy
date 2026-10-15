@@ -233,7 +233,7 @@ def test_a_move_is_written_once_and_is_not_mistaken_for_an_edit(tmp_path):
     jev_bridge.apply_setpoint(c, room, 1, d, ctx, NIGHT)
     assert c.writes == [(1, SHOT, 5.0, 4.5, "Jev")]
     # The phones that tick Jev hear of it (docs/NOTIFICATIONS.md): a push, no card.
-    [(event, zone, (words, why))] = c.events
+    [(event, zone, (words, why, _entity))] = c.events
     assert (event, zone, words) == ("jev_setpoint", 1, "P2 shot 5% -> 4.5%")
     assert why.startswith("Smaller maintenance shots tomorrow") and "smaller_shots (p=" in why
     assert c.alerts == []

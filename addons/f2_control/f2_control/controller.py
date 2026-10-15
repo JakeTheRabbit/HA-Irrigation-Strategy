@@ -1980,7 +1980,7 @@ class Controller:
         if not entity.startswith("number.crop_steering_") or not math.isfinite(value):
             return
         now = datetime.now()
-        settings = self.__dict__.setdefault("_settings_seen", {})
+        settings = self.__dict__.setdefault("_settings_noted", {})  # entity -> (value, when) last read
         seen = settings.get(entity)
         settings[entity] = (value, now)
         if seen is None or seen[0] == value:
@@ -2838,7 +2838,7 @@ class Controller:
         if not ha_call("number", "set_value", entity_id=entity, value=value):
             return False
         written[(zone, suffix)] = (value, now)
-        self.__dict__.setdefault("_settings_seen", {})[entity] = (value, now)  # said here, not again
+        self.__dict__.setdefault("_settings_noted", {})[entity] = (value, now)  # said here, not again
         learn["last_change"] = f"{now.strftime('%H:%M')} {suffix} {old:g} -> {value:g}"
         tag = "" if room.prefix == "" else f"{room.slug} "
         self._activity.insert(0, f"{now.strftime('%H:%M')} {tag}Z{zone} {by} {suffix} {old:g} -> {value:g}"[:120])

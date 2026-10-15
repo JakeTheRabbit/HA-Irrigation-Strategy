@@ -6,13 +6,14 @@ exactly as they did, none of them gaining Vitals."""
 
 from datetime import datetime
 
-from conftest import fixture
+from conftest import fixture, room_of
 from test_notify import LINK, STAFF_PHONE, TABLET, _call, _set_up, _staff
 from test_setup_entry import _install
 from test_upgrade_in_place import JEV_3_11_1, _upgrade
 
 DOMAIN = "crop_steering"
 SWITCH = "switch.crop_steering_notify_predictions"
+NEW_SWITCH = "switch.crop_steering_tent_notify_predictions"  # a new room has a slug: tent_
 OPTION = "notify/mobile_app_old_phone"
 
 
@@ -34,18 +35,18 @@ async def _lights_around_now(hass):
         await hass.services.async_call(
             "number",
             "set_value",
-            {"entity_id": f"number.crop_steering_{key}", "value": value},
+            {"entity_id": f"number.crop_steering_tent_{key}", "value": value},
             blocking=True,
         )
 
 
 async def test_the_vitals_say_what_comes_next_until_the_room_switches_it_off(hass, controller_for):
     await _install(hass)
-    assert hass.states.get(SWITCH).state == "on"
+    assert hass.states.get(NEW_SWITCH).state == "on"
     await _lights_around_now(hass)
     c, fake, _clock = controller_for({})
     c.loop_once(datetime.now())  # the first pass starts the grow-day
-    c.rooms[0].state[1]["phase"] = "P2"
+    room_of(c).state[1]["phase"] = "P2"
     fake.calls.clear()
     c._last_notify = None  # the next vitals are due
     c.loop_once(datetime.now())
@@ -53,9 +54,9 @@ async def test_the_vitals_say_what_comes_next_until_the_room_switches_it_off(has
     zone = next(i for i, line in enumerate(lines) if line.startswith("  Z1 P2:"))
     assert lines[zone + 1].startswith("  Next: shot when VWC < ")
 
-    await hass.services.async_call("switch", "turn_off", {"entity_id": SWITCH}, blocking=True)
+    await hass.services.async_call("switch", "turn_off", {"entity_id": NEW_SWITCH}, blocking=True)
     # What the controller reads over REST from now on (the fake is the REST view it was built on).
-    fake.set_state(SWITCH, hass.states.get(SWITCH).state)
+    fake.set_state(NEW_SWITCH, hass.states.get(NEW_SWITCH).state)
     fake.calls.clear()
     c._last_notify = None
     c.loop_once(datetime.now())
@@ -127,7 +128,10 @@ async def test_a_3_11_1_sites_phone_routes_are_unchanged_and_none_gains_vitals(
     # The new switch is on for the upgraded room, as for a new one.
     assert hass.states.get(SWITCH).state == "on"
     doc = await _call(hass, hass_admin_user, "notify_get")
-    assert doc["error"] is None and doc["config"] == store["data"]
+    assert doc["error"] is None
+    # As saved, beside the digest each phone now has (off) and the site's mutes (none).
+    config = {key: doc["config"][key] for key in store["data"]}
+    assert config == {**store["data"], "recipients": [dict(r, digest=False) for r in store["data"]["recipients"]]}
     assert "vitals" in [kind["id"] for kind in doc["kinds"]]
     sensor = hass.states.get("sensor.crop_steering_notify_config")
     assert (sensor.state, sensor.attributes["recipients"], sensor.attributes["idle_hours"]) == ("3", 2, 2)
