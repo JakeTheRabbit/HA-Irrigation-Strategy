@@ -46,8 +46,8 @@ SIZING = {
 UNITS = {
     "vwc": units.accepted("vwc"),  # converted to % where the probe reports a fraction
     "ec": units.accepted("ec"),  # converted to mS/cm where the probe reports uS/cm
-    "ph": {"ph", ""},
-    "tank_temperature": {"°c", "°f", "k"},
+    "ph": units.accepted("ph"),
+    "tank_temperature": units.accepted("temperature"),
 }
 
 

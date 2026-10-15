@@ -1,6 +1,9 @@
 """One table of setting defaults, shared by the integration and the controller.
 
-Pure data with no imports, so every layer can carry it. This file is the source,
+Also the one table of device units, further down: how a reading from a probe or a power
+plug becomes the unit the system steers in.
+
+Pure data and one pure function, with no imports, so every layer can carry it. This file is the source,
 crop-steering-engine/src/crop_steering_engine/defaults.py. Two byte-for-byte copies
 ship: the controller's vendored engine and the integration's
 custom_components/crop_steering/generated/defaults.py (Home Assistant installs the
@@ -101,3 +104,95 @@ SIZING_DEFAULTS = {
         "dripper_flow_rate",
     )
 }
+
+# Device units. Every number read from a device (a moisture or EC probe, a feed probe, a
+# thermometer, a power plug) is put into its quantity's canonical unit through this table, by
+# the integration and the controller alike, so the two can never read one probe differently.
+#
+# - canonical: the unit the system steers in.
+# - convert: each recognised unit -> (offset, multiply, divide), so that
+#   canonical = (reading + offset) * multiply / divide. Only exact conversions are listed.
+# - refused: units that look convertible and are not, with the reason an operator needs.
+# - plausible: the range of a sane reading in the canonical unit. A reading whose unit is not
+#   recognised, or that has none, is taken in the canonical unit inside this range (as installs
+#   older than unit checks always were read) and set aside outside it.
+#
+# A unit is matched with its spaces removed, first exactly and then in lower case, so "mW" is a
+# milliwatt while "MW" is not recognised. A volume fraction becomes a percentage only when the
+# probe says m³/m³: a reading with no unit is taken as percent, never guessed from its size.
+UNITS = {
+    "vwc": {
+        "canonical": "%",
+        "convert": {
+            "%": (0.0, 1, 1),
+            "m³/m³": (0.0, 100, 1),
+            "m3/m3": (0.0, 100, 1),
+        },
+        "refused": {},
+        "plausible": (0.0, 100.0),
+    },
+    "ec": {
+        "canonical": "mS/cm",
+        "convert": {
+            "ms/cm": (0.0, 1, 1),
+            "ds/m": (0.0, 1, 1),
+            "µs/cm": (0.0, 1, 1000),  # micro sign, U+00B5
+            "μs/cm": (0.0, 1, 1000),  # Greek mu, U+03BC: what many integrations emit
+            "us/cm": (0.0, 1, 1000),
+        },
+        "refused": {
+            "ppm": "ppm depends on the meter's 500 or 700 scale, which a sensor does not "
+            "report; use the probe's EC reading instead",
+            "ppt": "ppt depends on the meter's conversion scale; use the probe's EC reading "
+            "instead",
+        },
+        "plausible": (0.0, 20.0),
+    },
+    "ph": {
+        "canonical": "pH",
+        "convert": {"ph": (0.0, 1, 1), "": (0.0, 1, 1)},
+        "refused": {},
+        "plausible": (0.0, 14.0),
+    },
+    "temperature": {
+        "canonical": "°C",
+        "convert": {
+            "°c": (0.0, 1, 1),
+            "°f": (-32.0, 5, 9),
+            "k": (-273.15, 1, 1),
+        },
+        "refused": {},
+        "plausible": (-10.0, 60.0),
+    },
+    "power": {
+        "canonical": "W",
+        "convert": {
+            "w": (0.0, 1, 1),
+            "kw": (0.0, 1000, 1),
+            "mW": (0.0, 1, 1000),
+        },
+        "refused": {},
+        "plausible": (0.0, 10000.0),
+    },
+}
+
+
+def to_canonical(quantity, value, unit):
+    """A device reading in its quantity's canonical unit, and how its unit was taken.
+
+    (value, "recognised"): the unit converts exactly. (None, "refused"): the unit has no exact
+    conversion. (value, "unrecognised"): an unknown or missing unit, inside the plausible range,
+    taken as the canonical unit. (None, "implausible"): the same, outside that range.
+    """
+    table = UNITS[quantity]
+    key = "".join(str(unit or "").split())
+    for candidate in (key, key.lower()):
+        if candidate in table["convert"]:
+            offset, multiply, divide = table["convert"][candidate]
+            return (value + offset) * multiply / divide, "recognised"
+        if candidate in table["refused"]:
+            return None, "refused"
+    low, high = table["plausible"]
+    if low <= value <= high:
+        return value, "unrecognised"
+    return None, "implausible"

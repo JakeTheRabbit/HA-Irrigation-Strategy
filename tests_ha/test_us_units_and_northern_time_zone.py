@@ -42,6 +42,6 @@ async def test_the_controller_reads_the_same_numbers_and_carries_the_room_on(has
     room = c.rooms[0]
     assert room._setup_pending is None and room.setup_revision == 1
     assert room.state[1]["phase"] == "P2"
-    vwc = c._read_sensor(c._fused_id(room.prefix, "vwc", 1, room.zones[1].get("vwc")), lo=0, hi=100)
-    ec = c._read_sensor(c._fused_id(room.prefix, "ec", 1, room.zones[1].get("ec")), lo=0, hi=20)
+    vwc = c._read_sensor(c._fused_id(room.prefix, "vwc", 1, room.zones[1].get("vwc")), "vwc")
+    ec = c._read_sensor(c._fused_id(room.prefix, "ec", 1, room.zones[1].get("ec")), "ec")
     assert vwc == pytest.approx(41.0) and ec == pytest.approx(3.1)

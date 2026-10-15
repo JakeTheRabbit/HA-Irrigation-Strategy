@@ -39,8 +39,9 @@ export const DEMO_KINDS: NotifyKind[] = [
   {
     id: "sensors",
     name: "Sensors and drift",
-    detail: "A probe the controller cannot use, a zone without one, and a probe Jev set aside.",
-    codes: [...codes(101, 104), "CS-603", "CS-604", "CS-703", "CS-704"],
+    detail:
+      "A probe the controller cannot use, a probe set aside for its unit, a zone without one, and a probe Jev set aside.",
+    codes: [...codes(101, 104), "CS-503", "CS-603", "CS-604", "CS-703", "CS-704"],
     events: [],
   },
   {
