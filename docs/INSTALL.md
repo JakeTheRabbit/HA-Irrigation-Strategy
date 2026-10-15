@@ -150,8 +150,9 @@ caps what it spends between one lights-on and the next, and the engine runs on i
 
 **What is sent.** Each question carries the zone's readings, its settings, the day's stage and the room and zone
 names you typed. Never an entity id, a key or personal data. The brain's answers only act through the
-controller's own limits, and every failure runs the engine exactly as on rules. The AI assistant tile on the
-dashboard says which brain runs and why.
+controller's own limits, and every failure runs the engine exactly as on rules. While any switched-on zone's
+moisture reading is stale or missing, nothing is asked for that room until the probes report again. The AI
+assistant tile on the dashboard says which brain runs and why.
 
 ### Retired Jev routes
 
