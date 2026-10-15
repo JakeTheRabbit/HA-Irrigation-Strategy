@@ -254,6 +254,19 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
     ),
+    # Minutes from the last shot before a P3 emergency shot may go, so a rescue reaches the probe
+    # before moisture is judged again. 0 turns the gap off. The controller falls back to the same
+    # 10 when an older integration has no such entity.
+    NumberEntityDescription(
+        key="p3_time_between_shots",
+        name="P3 Time Between Shots",
+        icon="mdi:timer-outline",
+        native_min_value=0.0,
+        native_max_value=60.0,
+        native_step=1.0,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        mode="box",
+    ),
     # EC Target Parameters - CRITICAL MISSING ENTITIES
     NumberEntityDescription(
         key="ec_target_veg_p0",
@@ -426,6 +439,7 @@ DEFAULT_VALUES = {
     "p2_ec_low_threshold": 0.8,
     "p3_emergency_vwc_threshold": 40.0,
     "p3_emergency_shot_size": 2.0,
+    "p3_time_between_shots": 10.0,
     "ec_target_veg_p0": 3.0,
     "ec_target_veg_p1": 3.0,
     "ec_target_veg_p2": 3.2,
@@ -463,6 +477,7 @@ PER_ZONE_STEERING_KEYS = [
     "p2_shot_size",
     "p3_emergency_vwc_threshold",
     "p3_emergency_shot_size",
+    "p3_time_between_shots",
     "ec_target_veg_p0",
     "ec_target_veg_p1",
     "ec_target_veg_p2",

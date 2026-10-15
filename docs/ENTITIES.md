@@ -45,6 +45,7 @@ entities scale with your zone count, `N` = 1…zones).
 |---|---|---|---|---|
 | `p3_emergency_vwc_threshold` | 20-65 | 40 | % | Overnight emergency floor: a rescue shot fires below this. |
 | `p3_emergency_shot_size` | 0.1-15 | 2 | % | Size of an emergency rescue shot. |
+| `p3_time_between_shots` | 0-60 | 10 | min | Minutes from the last shot before an emergency rescue may go, so it reaches the probe before moisture is judged again. The first rescue of a night still goes at once. `0` turns the gap off. |
 
 ### EC targets: vegetative & generative (per phase)
 | Entity | Range | Default | Unit |
@@ -83,13 +84,13 @@ The active EC target = the row for the current phase **and** the zone's steering
 ## 2. Numbers: per-zone overrides (`number.crop_steering_zone_N_*`)
 
 Every zone gets its own copy of the setpoints below. The engine uses the zone's value
-for that zone. (3 zones × 23 = 69 entities on a 3-zone system.)
+for that zone. (3 zones × 24 = 72 entities on a 3-zone system.)
 
 **Per-zone copies of the global setpoints:** `p0_dryback_drop_percent`,
 `p0_maximum_wait_time`, `p1_initial_shot_size`, `p1_shot_size_increment`,
 `p1_minimum_shots`, `p1_maximum_shots`, `p1_target_vwc`, `p1_time_between_shots`,
 `p2_vwc_threshold`, `p2_shot_size`, `p3_emergency_vwc_threshold`,
-`p3_emergency_shot_size`, `vegetative_dryback_target`, `generative_dryback_target`,
+`p3_emergency_shot_size`, `p3_time_between_shots`, `vegetative_dryback_target`, `generative_dryback_target`,
 `ec_target_veg_p0` to `_p2`, `ec_target_gen_p0` to `_p2`, `field_capacity`,
 `maximum_ec` and `watchdog_hours`. Ranges match the globals above.
 
