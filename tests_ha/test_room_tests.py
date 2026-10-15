@@ -103,7 +103,10 @@ async def test_each_zone_has_a_test_shot_button_on_its_own_device_named_for_its_
 async def test_the_dashboards_test_shot_waters_the_zone_through_the_real_controller(
     hass, hass_admin_user, controller_for
 ):
-    await _install(hass)
+    # The room's night, whatever the hour the test runs at: with its lights on, the engine's own morning ramp
+    # fired on the third pass, so the test failed from lights-on (12:00 by the wizard's default) to midnight.
+    hour = datetime.now().hour
+    await _install(hass, {"lights_on_hour": (hour + 2) % 24, "lights_off_hour": (hour + 4) % 24})
     c, fake, _clock = controller_for({"enable_flag": KILL})
     room = room_of(c)
     for switch in ARMED:
