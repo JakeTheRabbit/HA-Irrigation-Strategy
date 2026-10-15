@@ -74,7 +74,7 @@ The active EC target = the row for the current phase **and** the zone's steering
 | `irrigation_ph_min` | 3.0-9.0 | 5.8 | pH | Source-water pH gate (low bound). |
 | `irrigation_ph_max` | 3.0-9.0 | 6.2 | pH | Source-water pH gate (high bound). |
 | `maximum_ec` | 1-20 | 9.0 | mS/cm | Hard substrate-EC cutoff: no shot above it (salt-burn guard). |
-| `max_shot_duration` | 5-3600 | 900 | s | Longest a single shot may run. The controller refuses to water a room whose cap is missing or below 5 s (CS-203). |
+| `max_shot_duration` | 5 to the room's limit | 900 | s | Longest a single shot may run. The limit follows the zones' size: the time the slowest zone's drippers take to deliver its whole substrate, never under 900 s. The controller refuses to water a room whose cap is missing or below 5 s (CS-203). |
 | `watchdog_hours` | 0-12 | 3 | h | Lights-on backstop: a zone below its P2 trigger that has had no water for this long gets a watchdog shot, or an urgent alert (CS-207) when watering is blocked. `0` turns it off. |
 
 ### Substrate & schedule
@@ -108,7 +108,7 @@ for that zone. (3 zones × 24 = 72 entities on a 3-zone system.)
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
 | `zone_N_plant_count` | 1-50 | 4 | - | Plants in the zone: scales total water volume. |
-| `zone_N_max_daily_volume` | 0-200 | 20 | L | Daily water budget for the zone. Top-ups and EC-correction shots stop at it, and a shot that would cross it gets only what is left; rescues (watchdog, P3 emergency, high-EC flushes) and the P1 ramp are exempt. |
+| `zone_N_max_daily_volume` | 0 to the zone's limit | 20 | L | Daily water budget for the zone. The limit is 4 times the zone's substrate (plants x litres per plant), never under 20 L; a value already above it is kept and listed in Repairs (CS-609). Top-ups and EC-correction shots stop at it, and a shot that would cross it gets only what is left; rescues (watchdog, P3 emergency, high-EC flushes) and the P1 ramp are exempt. |
 | `zone_N_substrate_volume` / `zone_N_drippers_per_plant` / `zone_N_dripper_flow_rate` | as the globals | from setup | - | Created only when setup sizes the zone itself; otherwise the room-wide value applies. |
 
 ---

@@ -32,6 +32,8 @@ ISSUE_IDS = (
     # Raised and cleared by stock_api.py, not by the checks here; listed so every card this
     # integration can show is in one place.
     "stock_low",
+    # Raised and cleared by bounds.py, when the room sets up and when a setting changes.
+    "outside_zone_bounds",
 )
 # The platforms whose entities the controller reads by exact id and has no other way to find.
 # Fused sensors are left out: the controller tolerates their legacy naming and an add-on option
@@ -204,8 +206,8 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
         if room is not None and str(room.state).lower() == "off":
             for base in ISSUE_IDS:
                 # Stock runs low whether or not anything grows, and only its own store
-                # raises that card again.
-                if base not in ("entities_moved", "stock_low"):
+                # raises that card again; the same goes for a setting held above its limit.
+                if base not in ("entities_moved", "stock_low", "outside_zone_bounds"):
                     _issue(hass, False, _iid(base, slug), ir.IssueSeverity.WARNING)
             return
 

@@ -695,6 +695,22 @@
       ]
     },
     {
+      "code": "CS-609",
+      "title": "Settings above the limit for the zone's size",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "The limits on a zone's daily water and the room's maximum shot length follow each zone's size: its plants, litres per plant and dripper flow. These settings were already above their limit when it arrived, so they are kept exactly as they were.",
+      "watering": "Carries on exactly as before: the controller uses the settings as they are.",
+      "causes": [
+        "A setting was raised for a bigger zone than the one now set up.",
+        "A zone's plant count, litres per plant or dripper flow is set smaller than the real zone."
+      ],
+      "fixes": [
+        "If the zone's size is wrong, correct it in Rooms & setup and the limit follows.",
+        "Otherwise lower the setting to within its limit when you next change it. The card clears itself once every setting is within its limit."
+      ]
+    },
+    {
       "code": "CS-701",
       "title": "Water isn't reaching this zone",
       "source": "notification",

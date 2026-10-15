@@ -102,6 +102,20 @@ SIZING_DEFAULTS = {
     )
 }
 
+# Upper limits that follow a zone's size, for the two settings a fixed limit cannot
+# fit: a big zone needs more than a small one. An edit above the limit is refused. A
+# value a room already holds above it is kept and used, never moved, and listed in
+# Repairs. Each limit is never below its floor, so every entity default fits.
+#
+# - max_daily_volume (litres per zone per grow-day): this many times the zone's
+#   substrate, plants x litres per plant.
+# - max_shot_duration (seconds, one per room): the time the slowest zone's drippers
+#   take to deliver this many times its substrate (plant count cancels out).
+ZONE_BOUNDS = {
+    "max_daily_volume": {"substrate_multiple": 4.0, "floor": 20.0},
+    "max_shot_duration": {"substrate_multiple": 1.0, "floor": 900.0},
+}
+
 # Substrate profiles: the numbers that depend on what a room grows in, keyed by the
 # room's substrate select (generic, rockwool, coco). "generic" is exactly what every
 # room ran on before the select existed, so a room nobody has set, every upgraded room

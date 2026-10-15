@@ -88,7 +88,7 @@ KINDS = (
         "detail": "A setup change waiting, a setting missing, out of range or read from "
         "somewhere new, and the grow strategy plan",
         "codes": _codes(
-            "CS-201 CS-401 CS-402 CS-403 CS-405 CS-601 CS-605 CS-606 CS-607"
+            "CS-201 CS-401 CS-402 CS-403 CS-405 CS-601 CS-605 CS-606 CS-607 CS-609"
         ),
         "events": (),
     },
@@ -97,7 +97,7 @@ KIND_IDS = tuple(kind["id"] for kind in KINDS)
 EVENTS = {event: kind["id"] for kind in KINDS for event in kind["events"]}
 EMERGENCY = KINDS[0]["codes"]
 
-# The integration's own Repairs cards (health.py, stock_api.py) by translation key, with the code each one
+# The integration's own Repairs cards (health.py, stock_api.py, bounds.py) by translation key, with the code each one
 # carries in its title (strings.json). tests/test_notify_catalog.py keeps the two in step.
 REPAIRS = {
     "kill_switch_missing": "CS-601",
@@ -108,6 +108,7 @@ REPAIRS = {
     "strategy_hold": "CS-606",
     "strategy_degraded": "CS-607",
     "stock_low": "CS-608",
+    "outside_zone_bounds": "CS-609",
 }
 
 

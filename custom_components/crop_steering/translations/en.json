@@ -815,6 +815,10 @@
     "stock_low": {
       "title": "Crop Steering: {count} stock tank(s) running low (CS-608)",
       "description": "These stock tanks are at or below their low mark:\n\n{tanks}\n\nRefill them, then open Crop Steering → Stock tanks and press Refilled, or set the level you read off the tank. Each batch tank the room makes takes its dose from every stock tank; this card clears itself once every tank is above its low mark.\n\nCode CS-608. What it means and what to do: Crop Steering → Help & tools → Error codes."
+    },
+    "outside_zone_bounds": {
+      "title": "Crop Steering: {count} setting(s) above the limit for the zone's size (CS-609)",
+      "description": "The limits on the daily water and the maximum shot length now follow each zone's size: its plants, litres per plant and dripper flow. These settings were already above their new limit, so they are kept exactly as they were and the controller uses them as before:\n\n{settings}\n\nNothing changes until you edit one of them; an edit must then be within the limit. If a zone's size is set too small, correct it in Rooms & setup and the limit follows. This card clears itself once every setting is within its limit.\n\nCode CS-609. What it means and what to do: Crop Steering → Help & tools → Error codes."
     }
   },
   "selector": {

@@ -70,6 +70,7 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 | [CS-606](#cs-606) | Grow strategy plan is holding irrigation | Critical | Repairs card |
 | [CS-607](#cs-607) | Grow strategy plan has not moved on to today | Warning | Repairs card |
 | [CS-608](#cs-608) | Stock tanks running low | Warning | Repairs card |
+| [CS-609](#cs-609) | Settings above the limit for the zone's size | Warning | Repairs card |
 | [CS-701](#cs-701) | Water isn't reaching this zone | Warning | Notification |
 | [CS-702](#cs-702) | This zone's water per plant is out of line with the others | Information | Notification |
 | [CS-703](#cs-703) | Overnight low reading looks like a probe fault | Warning | Notification |
@@ -899,6 +900,26 @@ setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309) are still rep
 
 - Refill the tank, then press Refilled on Crop Steering → Stock tanks.
 - Or set the level you read off the tank. The card clears itself once every tank is above its low mark.
+
+<a id="cs-609"></a>
+
+### CS-609: Settings above the limit for the zone's size
+
+*Warning · Repairs card*
+
+**What it means.** The limits on a zone's daily water and the room's maximum shot length follow each zone's size: its plants, litres per plant and dripper flow. These settings were already above their limit when it arrived, so they are kept exactly as they were.
+
+**Watering meanwhile.** Carries on exactly as before: the controller uses the settings as they are.
+
+**Likely causes**
+
+- A setting was raised for a bigger zone than the one now set up.
+- A zone's plant count, litres per plant or dripper flow is set smaller than the real zone.
+
+**Suggested fixes**
+
+- If the zone's size is wrong, correct it in Rooms & setup and the limit follows.
+- Otherwise lower the setting to within its limit when you next change it. The card clears itself once every setting is within its limit.
 
 ## Jev (CS-7xx)
 
