@@ -96,9 +96,10 @@ KINDS = (
         "name": "Jev",
         "detail": "Jev's advice about a zone, its automatic targets paused, Jev moving a "
         "setting, its calls running low, a zone on its stricter gate, the AI assistant's "
-        "budget spent, its key refused or a retired route, and its feed proposals",
+        "budget spent, its key refused or a retired route, its feed proposals, and whether "
+        "the room is running its grow plan",
         "codes": _codes(
-            "CS-404 CS-501 CS-702 CS-705 CS-706 CS-707 CS-708 CS-709 CS-711 CS-712"
+            "CS-404 CS-501 CS-702 CS-705 CS-706 CS-707 CS-708 CS-709 CS-711 CS-712 CS-713"
         ),
         "events": ("jev_setpoint",),
     },
@@ -109,7 +110,8 @@ KINDS = (
         "somewhere new, the grow strategy plan, and an Engine Enabled switch that does not "
         "stop water",
         "codes": _codes(
-            "CS-201 CS-401 CS-402 CS-403 CS-405 CS-601 CS-605 CS-606 CS-607 CS-610 CS-611"
+            "CS-201 CS-401 CS-402 CS-403 CS-405 CS-601 CS-605 CS-606 CS-607 CS-610 CS-611 "
+            "CS-713"
         ),
         "events": (),
     },

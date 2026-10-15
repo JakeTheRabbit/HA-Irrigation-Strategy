@@ -84,6 +84,8 @@ def test_a_code_in_two_kinds_is_in_both():
     assert catalog.kinds_for("CS-301") == {"emergency", "hardware"}
     assert catalog.kinds_for("CS-207") == {"emergency", "watering"}
     assert catalog.kinds_for("CS-608") == {"stock"}
+    # The grow plan not running as written: Jev's card, and a plan card beside CS-606/607.
+    assert catalog.kinds_for("CS-713") == {"jev", "setup"}
 
 
 def test_events_and_codes_the_catalog_does_not_know():
