@@ -355,7 +355,7 @@ def siblings(c, room, snaps, params, now):
 
 
 def stage_info(c, room, now):
-    """Today's row of the owner's stage arc for the room, as numbers the dashboard can draw, or None."""
+    """Today's row of the stage arc for the room, as numbers the dashboard can draw, or None."""
     brain = c.jev
     days = getattr(brain, "flower_days", 56)
     day = flower_day(c, room, now)

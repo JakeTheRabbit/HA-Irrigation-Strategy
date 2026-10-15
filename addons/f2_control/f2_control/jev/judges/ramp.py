@@ -1,9 +1,10 @@
 """P1: is the morning ramp done?
 
 The base engine ends P1 when VWC reaches the ceiling AND pore EC is within 15 % of the P1 target, or at
-the maximum shots. Seen live (23 Sep 2026): during a ramp the fresh feed passing the probe lifts pore EC
-30-65 %, the EC gate never passes, and "flush" shots burn the day's budget by 13:00. A person looking at
-the curve knows when the slab is full and the EC is just the feed going by. So does this judge.
+the maximum shots. Observed on a production room (23 Sep 2026): during a ramp the fresh feed passing the
+probe lifts pore EC 30-65 %, the EC gate never passes, and "flush" shots burn the day's budget by 13:00. A
+person looking at the curve knows when the slab is full and the EC is just the feed going by. So does this
+judge.
 """
 from ..context import response, trend, words_response, words_trend
 from ..doctrine import doctrine

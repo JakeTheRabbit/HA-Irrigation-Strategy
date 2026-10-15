@@ -1,10 +1,11 @@
 """Every phase: did the water land?
 
-A shot the controller fired is not a shot the plants got. On 24 Sep 2026 F2 zone 2 did not land from 14:36
-to 16:42: four shots of about 270 s, moisture falling 30.5 -> 26.4 while zones 1 and 3 landed normally.
-The watchdog meant to catch it could never fire (it was gated on health sensors that no longer existed).
-A person reads a shot the way this judge does: water went in; did the probe go up and stay up, did pore
-EC move toward the feed, and what did the sibling zones watered at the same time do?
+A shot the controller fired is not a shot the plants got. Observed on a production room (24 Sep 2026): a
+zone did not land from 14:36 to 16:42: four shots of about 270 s, moisture falling 30.5 -> 26.4 while
+zones 1 and 3 landed normally. The watchdog meant to catch it could never fire (it was gated on health
+sensors that no longer existed). A person reads a shot the way this judge does: water went in; did the
+probe go up and stay up, did pore EC move toward the feed, and what did the sibling zones watered at the
+same time do?
 
 Each shot is audited once, about 20 minutes after it ends (the newest one, when shots come faster than
 the cadence). The judge never adds water: its only directive is the CS-701 alert, raised when two shots

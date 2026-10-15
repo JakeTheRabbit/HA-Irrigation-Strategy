@@ -348,18 +348,18 @@ EVENTS_BUDGET_S = 10.0
 CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-301", "CS-308", "CS-310",
                             "CS-311", "CS-402", "CS-601", "CS-606", "CS-801"})
 # CS-310: a zone's moisture rising by BACKUP_RISE_PTS within BACKUP_WINDOW_MIN while no water went in, its valve
-# closed for BACKUP_GRACE_MIN before (the wetting front of a shot keeps rising a while): water coming up from
-# below, a table that isn't draining. Backtested on F2's 22-30 Sep 2026 readings: the two real episodes (Zone 2
-# filling from a stopped sump, 28 Sep 21:19 and 29 Sep 12:09) and nothing else. Cleared after BACKUP_CLEAR_MIN
+# closed for BACKUP_GRACE_MIN before (the wetting front of a shot keeps rising a while): water coming up from below,
+# a table that isn't draining. Backtested on a production room's 22-30 Sep 2026 readings: the two real episodes (one
+# zone filling from a stopped sump, 28 Sep 21:19 and 29 Sep 12:09) and nothing else. Cleared after BACKUP_CLEAR_MIN
 # without a rise.
 BACKUP_RISE_PTS, BACKUP_WINDOW_MIN, BACKUP_GRACE_MIN, BACKUP_CLEAR_MIN = 3.0, 60.0, 45.0, 60.0
 # Field capacity follows the zone's highest readings (_follow_fc). When it moves by this many points or more, the P2
 # re-water threshold and the rescue (P3 emergency) floor move with it; a smaller move is field capacity only.
 FC_SHIFT_MIN = 1.0
 # CS-311: the sump pump a room drains to (option sump_power_sensor) drawing no power for SUMP_SILENT_H while the
-# room is on. F2's ran every 1 to 1.5 hours, day and night, 22-28 Sep 2026 (its longest gap 2.37 h) and then not
-# at all for 41.6 h: its tables backed up. Checked every SUMP_CHECK_MIN from Home Assistant's history, as a run
-# lasts about a minute and a loop could miss it; a run is more than SUMP_RUN_W.
+# room is on. Observed on a production room: its sump ran every 1 to 1.5 hours, day and night, 22-28 Sep 2026 (its
+# longest gap 2.37 h) and then not at all for 41.6 h: its tables backed up. Checked every SUMP_CHECK_MIN from Home
+# Assistant's history, as a run lasts about a minute and a loop could miss it; a run is more than SUMP_RUN_W.
 SUMP_SILENT_H, SUMP_CHECK_MIN, SUMP_RUN_W = 3.0, 5.0, 20.0
 # The default room's kill switch on an installation from before the setup wizard: a helper the operator
 # made by hand, and this app's shipped `enable_flag` option (config.yaml). A room made by the wizard stops
@@ -1925,9 +1925,9 @@ class Controller:
 
         `peak` is the highest VWC since this grow-day's lights-on (the engine's own daily peak); `peak_prev` is the
         grow-day before's, kept at lights-on. Field capacity is the higher of the two; the P1 target is the day
-        before's. Until the first lights-on after the update keeps one, nothing is written: the grow-day in progress
-        is no stand-in for it (6 Oct 2026, updated after lights-on: F2 zone 2's ramp stopped at its shot limit at
-        51.4, and field capacity followed it down from 67.5)."""
+        before's. Until the first lights-on after the update keeps one, nothing is written: the grow-day in progress is
+        no stand-in for it (observed on a production room, 6 Oct 2026, updated after lights-on: a zone's ramp stopped at
+        its shot limit at 51.4, and field capacity followed it down from 67.5)."""
         prev = st.get("peak_prev")
         if prev is None or prev <= 0.0:
             return None, None
@@ -1936,10 +1936,9 @@ class Controller:
     def _follow_fc(self, room, zone, p, now):
         """The zone's setpoints follow its own highest readings -> True when anything was written.
 
-        The owner, 6 Oct 2026: "the P1 target should be the VWC MAX the previous days actual field capacity, the
-        highest value that the VWC got to during the day is the next days p1 target", "the FC needs to increase as
-        the sensor does", "the p2 dryback and shit needs to move as well to be in line with the new FC", "the rescue
-        floor should increase too", "the system needs to do this shit automatically". So:
+        The rule (adopted 6 Oct 2026): the P1 target is the highest reading the zone reached the day before, field
+        capacity rises as the probe's readings do, and the P2 dryback and the rescue floor move with field capacity,
+        all without the operator having to do it. So:
           - field capacity = the highest reading of this grow-day or the one before (_vwc_maxima);
           - the P1 target = the highest reading of the grow-day before, with no limit on how far it moves;
           - when field capacity moves by FC_SHIFT_MIN or more, the P2 re-water threshold and the rescue (P3
