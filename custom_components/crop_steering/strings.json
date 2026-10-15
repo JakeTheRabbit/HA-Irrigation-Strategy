@@ -849,12 +849,11 @@
     },
     "max_run_latch": {
       "title": "Crop Steering: a zone keeps hitting its longest allowed shot (CS-312)",
-      "description": "The last shots of zone(s) {zones} all wanted to run longer than the room's maximum shot length and were cut to it. A probe stuck dry, or a pot size or dripper flow set wrong, can keep a zone asking for long shots all day. {what}\n\nCheck the zone's probe, its pot size and its dripper flow; if they are right, raise the room's maximum shot length.\n\nCode CS-312. What it means and what to do: Crop Steering → Help & tools → Error codes.",
       "fix_flow": {
         "step": {
           "confirm": {
             "title": "Water these zones again",
-            "description": "Zone(s) {zones} start watering again at the controller's next pass. Do this once the cause is found: if they keep hitting the longest allowed shot, they are stopped again."
+            "description": "The last shots of zone(s) {zones} all wanted to run longer than the room's maximum shot length and were cut to it. A probe stuck dry, or a pot size or dripper flow set wrong, can keep a zone asking for long shots all day. {what}\n\nCheck the zone's probe, its pot size and its dripper flow; if they are right, raise the room's maximum shot length.\n\nCode CS-312. What it means and what to do: Crop Steering → Help & tools → Error codes.\n\nZone(s) {zones} start watering again at the controller's next pass. Do this once the cause is found: if they keep hitting the longest allowed shot, they are stopped again."
           }
         },
         "abort": {
