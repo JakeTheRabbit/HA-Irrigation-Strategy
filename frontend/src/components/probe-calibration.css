@@ -1,0 +1,101 @@
+/* Equipment › Probes: the feed-water probes' two-point checks and their history. */
+.calibration-probes {
+  margin: 0;
+  padding: 0 20px 14px;
+  list-style: none;
+}
+.calibration-probes li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 8px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  font-size: var(--text-sm);
+}
+.calibration-probes li > span:first-child {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.calibration-probes code {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  overflow-wrap: anywhere;
+}
+.probe-calibration > p {
+  margin: 0 20px 14px;
+}
+.calibration-last {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+}
+.calibration-form {
+  display: grid;
+  gap: 12px;
+  margin: 0 20px 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.calibration-point {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr)) auto;
+  gap: 10px;
+  align-items: end;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.calibration-point legend {
+  margin-bottom: 4px;
+  font-weight: 650;
+}
+.calibration-note {
+  display: grid;
+  gap: 4px;
+}
+.calibration-result {
+  margin: 0;
+}
+.calibration-actions {
+  display: flex;
+  gap: 8px;
+}
+.calibration-error {
+  color: var(--destructive);
+}
+.calibration-form .calibration-error {
+  margin: 0;
+}
+.calibration-history caption {
+  padding: 0 20px 6px;
+  text-align: left;
+  font-weight: 650;
+}
+@media (max-width: 640px) {
+  .calibration-probes {
+    padding: 0 14px 12px;
+  }
+  .probe-calibration > p {
+    margin: 0 14px 12px;
+  }
+  .calibration-form {
+    margin: 0 14px 14px;
+  }
+  .calibration-probes li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .calibration-probes li .calibration-last,
+  .calibration-probes li > .muted {
+    grid-column: 1;
+  }
+  .calibration-point {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .calibration-point > button {
+    grid-column: 1 / -1;
+    justify-self: start;
+  }
+}

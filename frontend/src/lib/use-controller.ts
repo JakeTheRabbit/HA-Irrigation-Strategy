@@ -469,6 +469,7 @@ export class ControllerStore {
       action.startsWith("strategy_") ||
       action.startsWith("runs_") ||
       action.startsWith("stock_") ||
+      action.startsWith("calibration_") ||
       action.startsWith("dosing_");
     const payload = scoped ? { ...data, room_id: roomId } : data;
     if (scoped && !roomId) throw new Error("Select an available room.");
@@ -482,6 +483,7 @@ export class ControllerStore {
         "setup_read",
         "runs_get",
         "stock_get",
+        "calibration_get",
         "dosing_get",
         "notify_get",
         "notify_test",
