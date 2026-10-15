@@ -14,7 +14,7 @@ Eight properties. Each one is concrete and checked by a test or a published numb
 
 | # | Property | What it means | How it is checked |
 |---|---|---|---|
-| 1 | **Jev everywhere a judgement lives** | Every decision the engine makes on ambiguous evidence is asked of Jev: when the morning ramp starts, when it is done, whether a probe is telling the truth, whether a shot landed, why pore EC moved, when the day's watering stops, why one zone drinks differently, which alert is worth waking someone for. Ten judges cover P0, P1, P2 and P3 for every zone. | The coverage map below; one test per judge. |
+| 1 | **Jev everywhere a judgement lives** | Every decision the engine makes on ambiguous evidence is asked of Jev: when the morning ramp starts, when it is done, whether a probe is telling the truth, whether a shot landed, why pore EC moved, when the day's watering stops, why one zone drinks differently. Ten judges cover P0, P1, P2 and P3 for every zone. | The coverage map below; one test per judge. |
 | 2 | **Code owns physics and safety** | Jev never opens a valve, never sizes a shot, never crosses the daily floor or cap, the drown ceiling or max EC, never stops a rescue shot and never removes the last probe. Every Jev decision is a *directive* that the **envelope** admits or refuses on arithmetic Jev can't do. | Envelope tests for every directive type. |
 | 3 | **Never waits** | Jev is asked in the background; the 60-second loop reads the last answer and carries on. A slow, failing or absent Jev leaves the engine exactly as the base engine behaves. | A golden test: with Jev off or erroring, every decision and every switch call equals the base engine's. |
 | 4 | **A council, not a coin toss** | Jev's confidence moves with how a question is worded. So every judge asks each question in two independent phrasings in the same call and acts only when both land on answers that lead to the same action, and the calibrated probabilities of those answers add up ("the slab is full" and "the EC left is the feed passing" both mean hand the ramp over). | Council tests: disagreement means no action. |
@@ -36,7 +36,6 @@ Eight properties. Each one is concrete and checked by a test or a published numb
 | **Night** | P3 | every 20 min within 3 points of the emergency floor | real drying / a probe fault | raises CS-703 | never stops a rescue |
 | **Zones** | P1, P2 | hourly with lights on, when a zone's water per plant is under 70 % or over 140 % of the room's median zone (itself included; the other zone in a room of two) | why one zone differs (recipe, plants drinking less, wet spot, delivery fault, water not landing) | raises CS-702 with the likely cause | alert only |
 | **Stage** | P2 | once a grow-day, with lights on, when the flower day is known | is last night's dryback, the settled pore EC, and the stage's move-on signs where the owner's stage arc wants them for today | CS-705 advice; code itself states a steering mode that is not the stage's | advice only: never changes a setting |
-| **Alerts** | all | once per alert, again after 6 h | escalate / remind / quiet | whether its repeats push to a phone (every alert is always a card; its first raise always pushes) | pump and valve faults (CS-3xx), lost probes (CS-101 to 103), CS-207, CS-701, CS-703, CS-704, and dosing's CS-801, CS-803 and CS-806 always push |
 | **Setpoints** | P3 | once a grow-day, in the first 3 h after lights-off, while the room's **Auto setpoints** switch is on | tomorrow's maintenance watering: smaller shots / bigger shots / re-water later / re-water sooner / keep, from the day's water per plant against the room, the shots and how they held, pore EC against the stage's range (code states which way the EC and the room call for) | one notch on the zone's OWN number: P2 shot size ±0.5 % or P2 re-water threshold ±0.5 points | one notch a grow-day; inside a range around the operator's own value (shot ±1 %, never under 3 %; threshold 2 under to 1 over, 4 above the rescue floor, 2 under the ramp ceiling); an edit by hand always wins and re-centres the range; a P3 rescue shot within 30 h puts the old value back, pauses the zone 48 h and raises CS-404; the base engine's own Auto Setpoints learner never writes these two, and keeps the P1 target and field capacity ([who writes which setpoint](#who-writes-which-setpoint)) |
 
 ## The owner's doctrine
@@ -111,7 +110,7 @@ Add-on options (the controller app):
 | `typesafe_api_key` | empty | A TypeSafe API key (`apikey_...`): Jev straight from TypeSafe (`api.typesafe.ai/v1/systemone`, model `jev-latest`). Tried first when set; Cloudflare, when set too, is the second route. |
 | `cf_account_id`, `cf_api_token`, `cf_gateway_id` | empty | Or Jev through Cloudflare Workers AI: the account, a token with Workers AI access, and the AI Gateway (optional). With neither a TypeSafe key nor these, Jev is off. These alone start Jev only on an install that has run it before (one of the `/data/jev_*` files below is there), because an install updated from a line without Jev may have set them just for the Auto Setpoints check. |
 | `jev_enabled` | on | Off runs the plain engine even with Cloudflare set. |
-| `jev_judges` | all | The judges that may act, e.g. `dawn,ramp,salt,dusk,probe,shot,night,zones,stage,setpoints,alerts`. Setpoints also needs the room's **Auto setpoints** switch on; while it runs, it owns the P2 shot size and re-water threshold, and the base engine's own Auto Setpoints learner the P1 target and field capacity. |
+| `jev_judges` | all | The judges that may act, e.g. `dawn,ramp,salt,dusk,probe,shot,night,zones,stage,setpoints`. Setpoints also needs the room's **Auto setpoints** switch on; while it runs, it owns the P2 shot size and re-water threshold, and the base engine's own Auto Setpoints learner the P1 target and field capacity. |
 | `jev_daily_calls` | 5000 | The day's call budget across rooms. |
 | `jev_budget_warn_pct` | 80 | CS-706 once a day when the calls reach this share of the budget. |
 | `jev_retries` | 3 | Tries per route, inside 60 seconds, while a failure may pass. |
@@ -153,7 +152,7 @@ each page with screenshots.
   `entries` holds the room's last 30, newest first: time, zone, judge, Jev's answer with its probability and
   whether both phrasings agreed, what it asked for, and what code did (`acted`, `refused` with why, `no action`,
   `waiting`), plus each outcome (`worked` or `did not work`, with `of` = the time of the decision it checks and
-  the action in words) and each alert-triage call (push or card only).
+  the action in words).
 - `/data/jev_ledger.jsonl`: every directive that acted, what Jev saw, and later how it turned out.
 - `/data/jev_journal.jsonl`: every decision behind the live log (the last 400), kept across restarts.
 - `/data/jev_usage.json`: today's calls, input tokens and errors, so the count survives a restart.

@@ -1,14 +1,13 @@
 """Who gets a phone push is the integration's to say (docs/NOTIFICATIONS.md).
 
-Every alert is a card first, exactly as before, and Jev's Alerts judge still decides whether a repeat pushes at
-all. The push itself: with a phone set up in the integration (sensor.crop_steering_notify_config), it is handed to
-crop_steering.notify and nothing is pushed here; with none, or when that call fails, it goes to the notify_service
+Every alert is a card first, exactly as before, and its severity decides whether a repeat pushes at all
+(test_decaying_renotify.py). The push itself: with a phone set up in the integration
+(sensor.crop_steering_notify_config), it is handed to crop_steering.notify and nothing is pushed here; with none, or when that call fails, it goes to the notify_service
 option as it always has. Never both, and never lost to the router. Phase changes and the settings Jev moves go to
 the phones that ask for them, never to the option. And CS-209: a room with its lights on and a zone in P1 or P2
 that has watered nothing for a while.
 """
 from datetime import date, datetime
-from types import SimpleNamespace
 
 import pytest
 
@@ -166,30 +165,6 @@ def test_with_no_option_a_failed_router_pushes_nothing_as_before(router):
     assert c._alert("k", "CS-102", "t", "m", room=c.rooms[0], zone=1)
     assert len(routed.calls) == 1 and _option(fake) == []
     assert _cards(fake, "f2_k")
-
-
-def test_a_repeat_jevs_alerts_judge_holds_goes_to_no_phone(router):
-    for recipients, option in ((1, OPTION), (1, ""), (0, OPTION)):
-        c, fake = _setup(recipients=recipients, notify_service=option)
-        routed = router()
-        asked = []
-
-        def push(key, *_args):
-            asked.append(key)
-            return False, "Jev: quiet (p=0.90), card only"
-
-        c.jev = SimpleNamespace(triage=SimpleNamespace(push=push))
-        assert c._alert("xzone_default_1", "CS-501", "less water", "m", room=c.rooms[0], zone=1)
-        assert asked == ["xzone_default_1"]  # asked whenever a phone could get it
-        assert routed.calls == [] and _option(fake) == []
-        assert _cards(fake, "f2_xzone_default_1")  # the card, always
-
-
-def test_jev_is_not_asked_when_no_phone_could_get_the_push(router):
-    c, fake = _setup(recipients=0, notify_service="")
-    router()
-    c.jev = SimpleNamespace(triage=SimpleNamespace(push=lambda *a: pytest.fail("asked")))
-    assert c._alert("k", "CS-501", "t", "m", room=c.rooms[0], zone=1)
 
 
 def test_the_integrations_setup_is_read_by_the_loop_at_most_once_a_minute_and_never_waited_on_by_an_alert(

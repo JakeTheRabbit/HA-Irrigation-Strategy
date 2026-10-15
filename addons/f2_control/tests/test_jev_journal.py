@@ -116,15 +116,3 @@ def test_the_room_sensor_carries_todays_stage_for_the_chart(tmp_path):
     stage = _published(tmp_path)["sensor.crop_steering_jev"][1]["stage"]
     assert stage["day"] == 37 and stage["name"] == "flower bulk" and stage["steering"] == "vegetative"
     assert stage["pore_ec"] == [3.5, 6.0] and stage["runoff_pct"] == [8, 16]
-
-
-def test_alert_triage_is_logged_only_when_its_call_changes(tmp_path):
-    brain = _brain(tmp_path, K.choice_answer("keep_ramping", {"keep_ramping": 0.9}))
-    c = SimpleNamespace(jev=brain)
-    room = SimpleNamespace(slug="default")
-    for push, why in ((True, "first time: pushed as always"), (True, "first time: pushed as always"),
-                      (False, "Jev: remind (p=0.81), card only")):
-        jev_bridge.triaged(c, room, 1, "jev_stage_default_z1", "CS-705", "off the stage's arc", push, why)
-    held, first = brain.journal.recent("default")
-    assert first["action"] == "CS-705: push to the phone" and held["action"] == "CS-705: card only"
-    assert held["title"] == "Alert triage" and held["verdict"] == "Jev: remind (p=0.81), card only"

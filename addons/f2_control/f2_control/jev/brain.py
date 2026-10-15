@@ -57,7 +57,6 @@ class Brain:
         self.judges = [j for j in judges if allowed is None or j.name in allowed]
         self.state: dict[tuple, JudgeState] = {}
         self.errors: dict[str, str] = {}
-        self.triage = None
         self.journal = None  # jev.journal.Journal: every decision, for the dashboard's live log
         self.reask_max, self.unsure_below = reask_max, unsure_below
         self.strict_after, self.strict_prob = strict_after, strict_prob

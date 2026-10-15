@@ -171,6 +171,26 @@ def test_the_controller_sends_exactly_the_critical_codes_as_urgent():
     assert set(ast.literal_eval(urgent.args[0])) == critical
 
 
+def _controller_set(name):
+    tree = ast.parse(CONTROLLER.read_text(encoding="utf-8"))
+    [value] = [
+        node.value
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Assign)
+        and any(getattr(t, "id", "") == name for t in node.targets)
+    ]
+    assert ast.unparse(value.func) == "frozenset"
+    return set(ast.literal_eval(value.args[0]))
+
+
+def test_the_controller_pushes_an_info_code_once_and_a_not_watering_warning_every_half_hour():
+    """A standing alert's repeat pushes by its severity here (controller.INFO_CODES, NOT_WATERING_CODES)."""
+    info = {code for code, entry in CODES.items() if entry["severity"] == "info"}
+    assert _controller_set("INFO_CODES") == info
+    for code in _controller_set("NOT_WATERING_CODES"):
+        assert CODES[code]["severity"] == "warning", code
+
+
 def test_every_repairs_card_carries_its_code_in_both_languages_files():
     strings = _repairs_codes(INTEGRATION / "strings.json")
     assert _repairs_codes(INTEGRATION / "translations" / "en.json") == strings
