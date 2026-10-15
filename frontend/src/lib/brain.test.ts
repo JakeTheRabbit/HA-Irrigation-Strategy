@@ -133,3 +133,37 @@ describe("the rest of the panel", () => {
     expect(new Set(chips).size).toBe(7);
   });
 });
+
+describe("the grow plan line", () => {
+  it("reads the plan's headline and its drifts, and nothing with no plan", () => {
+    const panel = parseBrainPanel(
+      sensor("rules", {
+        state: "rules",
+        plan: {
+          status: "active",
+          headline: "Plan: Autumn run · day 17 of 84 (week 3) · on track",
+          bridged: false,
+          drifts: [
+            { class: "shadowed_edit", zone: 2, line: "a change", suggestion: "Change the plan's days", why: "" },
+            { class: "x", zone: "junk", line: "" },
+          ],
+        },
+      }),
+    );
+    expect(panel?.plan?.headline).toBe("Plan: Autumn run · day 17 of 84 (week 3) · on track");
+    expect(panel?.plan?.drifts).toEqual([
+      {
+        kind: "shadowed_edit",
+        zone: 2,
+        line: "a change",
+        suggestion: "Change the plan's days",
+        why: "",
+        action: "advise",
+      },
+    ]);
+    expect(parseBrainPanel(sensor("rules", { plan: { status: "none", headline: null } }))?.plan).toBe(
+      null,
+    );
+    expect(parseBrainPanel(sensor("rules", {}))?.plan).toBe(null);
+  });
+});

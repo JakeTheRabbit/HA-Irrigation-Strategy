@@ -81,6 +81,7 @@ export function BrainCard({ controller, navigate }: { controller: Controller; na
       </div>
       <div className="brain-body">
         <Status view={view} />
+        {panel?.plan && <p className="brain-line">{panel.plan.headline}</p>}
         {budget && <p className="brain-line">{budget}</p>}
         {last && <p className="brain-line">Last decision: {last}</p>}
       </div>
@@ -200,6 +201,24 @@ export function BrainPage({ controller, navigate }: { controller: Controller; na
           <Status view={view} />
         </div>
       </section>
+      {panel?.plan && (
+        <section className="panel" aria-labelledby="brain-plan-title" data-brain-plan>
+          <div className="panel-heading">
+            <h2 id="brain-plan-title">Grow plan</h2>
+          </div>
+          <div className="brain-body">
+            <p className="brain-line">
+              <strong>{panel.plan.headline}</strong>
+            </p>
+            {panel.plan.drifts.map((drift, i) => (
+              <div key={`${drift.kind}-${drift.zone ?? "room"}-${i}`} className="brain-line">
+                <p>{drift.suggestion || drift.line}</p>
+                {drift.why && <p className="muted">{drift.why}</p>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
       {panel && budget && (
         <section className="panel" aria-labelledby="brain-budget-title">
           <div className="panel-heading">

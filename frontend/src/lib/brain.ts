@@ -20,6 +20,24 @@ export interface BrainDecision {
   why: string;
 }
 
+/** One difference code found between the grower's plan and the room (plan_adherence.panel). */
+export interface BrainPlanDrift {
+  kind: string;
+  zone: number | null;
+  line: string;
+  suggestion: string;
+  why: string;
+  /** advise, acted (the controller applied today's plan day) or would act (advising only). */
+  action: string;
+}
+/** Whether the room runs its grow plan: the `plan` attribute, published under every brain. Null with no plan. */
+export interface BrainPlan {
+  status: string;
+  headline: string;
+  bridged: boolean;
+  drifts: BrainPlanDrift[];
+}
+
 export interface BrainPanel {
   /** rules, claude_haiku or jev_legacy; "" from a controller before the AI assistant. */
   provider: string;
@@ -44,6 +62,7 @@ export interface BrainPanel {
   declined: string[];
   notice: string;
   deprecatedRoute: boolean;
+  plan: BrainPlan | null;
 }
 
 const text = (value: unknown): string =>
@@ -70,6 +89,28 @@ export const BRAIN_JUDGING = ["acting", "dry_run", "legacy"];
 /** The brain sensor as the panel reads it; null without one. A sensor from a controller before the panel
  * (no `state` attribute) reads from its entity state: "rules" is rules, "error" is not answering, anything
  * else is the old Jev connection, the only brain those controllers had. */
+export function parseBrainPlan(value: unknown): BrainPlan | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const p = value as Record<string, unknown>;
+  const headline = text(p.headline);
+  if (!headline) return null;
+  const drifts = (Array.isArray(p.drifts) ? p.drifts : [])
+    .filter((d): d is Record<string, unknown> => !!d && typeof d === "object" && !Array.isArray(d))
+    .map((d) => {
+      const zone = finite(d.zone);
+      return {
+        kind: text(d.class),
+        zone: zone !== null && Number.isInteger(zone) && zone >= 1 ? zone : null,
+        line: text(d.line),
+        suggestion: text(d.suggestion),
+        why: text(d.why),
+        action: text(d.action) || "advise",
+      };
+    })
+    .filter((d) => d.line);
+  return { status: text(p.status), headline, bridged: p.bridged === true, drifts };
+}
+
 export function parseBrainPanel(entity: EntityState | undefined): BrainPanel | null {
   if (!entity) return null;
   const a = entity.attributes ?? {};
@@ -115,6 +156,7 @@ export function parseBrainPanel(entity: EntityState | undefined): BrainPanel | n
     declined: names(a.declined),
     notice: text(a.notice),
     deprecatedRoute: a.deprecated_route === true,
+    plan: parseBrainPlan(a.plan),
   };
 }
 
@@ -162,6 +204,10 @@ export const BRAIN_JUDGES: Record<string, { title: string; may: string }> = {
   },
   zones: { title: "Zone comparison", may: "Flags a zone drinking very differently" },
   stage: { title: "Stage check", may: "Flags a zone off its stage's plan" },
+  plan: {
+    title: "Grow plan",
+    may: "Says what a drift from the grower's plan means; applies today's plan day only while a stale probe holds it",
+  },
   alerts: { title: "Alert note", may: "Adds one line to an alert card" },
 };
 export const judgeTitle = (judge: string) =>
