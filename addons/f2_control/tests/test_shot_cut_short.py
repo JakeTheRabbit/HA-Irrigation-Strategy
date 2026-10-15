@@ -254,3 +254,18 @@ def test_the_kill_switch_still_wins_and_closes_as_before(rig, monkeypatch, valve
     assert st["daily_vol"] == pytest.approx(FLOW * 22) and st["shots"] == 1  # to the check that saw it
     assert [n["title"] for n in notifications(fake)] == ["Zone 1: shot stopped early (CS-305)"]
     assert room.hardware_fault is None and room.shot_inflight is None
+
+
+def test_a_hold_that_goes_unavailable_mid_shot_ends_nothing(rig, monkeypatch):
+    """An unreadable hold stops the next shot starting (_blocked), but a shot in flight ends only on a
+    definite ON: unavailable says nothing about the feed path."""
+    c, fake, clock = rig
+    after_the_valve_opens(monkeypatch, fake, clock,
+                          (10.5, lambda at: fake.set_state(HOLD, "unavailable", last_updated=at(10.5))))
+    c._execute_shot(c.rooms[0], 1, 60, 5, flow_lps=FLOW)
+
+    st = c.rooms[0].state[1]
+    assert switched(fake) == [("turn_on", PUMP), ("turn_on", MAIN), ("turn_on", VALVE),
+                              ("turn_off", VALVE), ("turn_off", MAIN), ("turn_off", PUMP)]
+    assert st["daily_vol"] == pytest.approx(FLOW * 60) and notifications(fake) == []
+    assert c._blocked(c.rooms[0], 1) == f"external hold {HOLD} unreadable (reads neither on nor off)"

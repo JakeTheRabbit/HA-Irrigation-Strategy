@@ -70,7 +70,8 @@ configuration:
       Entities that pause watering while they are on, such as the input_boolean
       a dosing or tank-fill automation turns on while it works. While any of them
       is on, no shot starts, and a shot already running ends and counts only the
-      water it gave. Empty by default: nothing holds.
+      water it gave. One that is missing or unavailable also stops new shots
+      until it reads again. Empty by default: nothing holds.
   substrate_l:
     name: Fallback substrate volume (L per plant)
     description: >-
