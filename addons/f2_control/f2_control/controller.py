@@ -2249,8 +2249,14 @@ class Controller:
             return "manual override"
         # External operator holds (tank dosing / manual fill / flush) are configurable
         # (self.hold_entities, empty by default) — an install without them never holds here.
+        # One that can't be read (missing, unknown, unavailable) holds too, as an unreadable zone
+        # switch does: whether its tank is being dosed or filled can't be known. A shot already
+        # running still ends only on a definite ON (_wait_shot).
         for f in self.hold_entities:
-            if self._on(f, False):
+            state = ha_get(f)[0]
+            if state in (None, "unknown", "unavailable", ""):
+                return f"external hold {f} unreadable (reads neither on nor off)"
+            if str(state).lower() in ON_STATES:
                 return f"external hold ({f.split('.')[-1]})"
         # Source-water EC gate — only when a feed-EC sensor is configured. With no feed sensor
         # the gate is disabled (the dosing/fill holds above still apply) so the add-on is safe
