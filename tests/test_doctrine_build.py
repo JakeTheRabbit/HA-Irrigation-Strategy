@@ -94,8 +94,10 @@ def test_private_word_list_fails_the_build_on_a_planted_word(pack, tmp_path):
     _plant(pack, token)
     r = _build(pack, "--private-denylist", denylist)
     assert r.returncode == 1
-    assert f"doctrine.rules.json: canary: '{token}'" in r.stdout
-    assert f"04-doctrine-rules.md: canary: '{token}'" in r.stdout
+    assert "doctrine.rules.json:" in r.stdout and "04-doctrine-rules.md:" in r.stdout
+    assert r.stdout.count(": a word on the private denylist") >= 2
+    # The list is a secret, so the log never shows the word or the entry's reason.
+    assert token not in r.stdout + r.stderr and "canary" not in r.stdout + r.stderr
 
 
 @pytest.mark.parametrize(

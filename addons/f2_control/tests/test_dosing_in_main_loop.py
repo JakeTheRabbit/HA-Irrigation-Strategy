@@ -61,6 +61,26 @@ def test_dosing_starts_no_thread_and_the_loop_wakes_when_a_step_is_due(monkeypat
     assert clock[0] == 3.0
 
 
+def test_a_shots_wait_steps_a_running_dose_or_batch_and_only_then(monkeypatch):
+    """A shot in another room can hold the loop for minutes: a batch's open fill valve is still watched
+    through it. With nothing running, the wait is the plain sleep it always was."""
+    c, _fake = _build({"num_zones": 1, "hardware": {"pump": "switch.p", "mainline": "switch.m",
+                                                     "valves": {"1": "switch.v1"}},
+                       "enable_flag": "input_boolean.kill"},
+                      states={"input_boolean.kill": ("on", {})})
+    clock, steps = [0.0], []
+    monkeypatch.setattr(controller.time, "monotonic", lambda: clock[0])
+    monkeypatch.setattr(controller.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    monkeypatch.setattr(c.dosing, "step", lambda: steps.append(clock[0]) or 0.5)
+    monkeypatch.setattr(c.dosing, "running", lambda: True)
+    assert c._wait_shot(c.rooms[0], 1, 6) == (6, None)  # the shot still runs its time, no longer
+    assert steps == [0.5 * n for n in range(12)]
+    steps.clear()
+    monkeypatch.setattr(c.dosing, "running", lambda: False)
+    assert c._wait_shot(c.rooms[0], 1, 6) == (6, None)
+    assert steps == []
+
+
 def test_a_batch_runs_in_steps_and_the_main_loop_keeps_going_between_them(rig):
     r = rig()
     _full_batch(r)

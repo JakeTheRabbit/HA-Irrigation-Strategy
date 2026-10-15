@@ -248,6 +248,10 @@ class DosingRunner:
             due = min(due, self._due)
         return max(0.0, due - now)
 
+    def running(self):
+        """Whether a dose or batch is running: a shot's wait steps it on too (Controller._wait_shot)."""
+        return self._steps is not None
+
     def _start(self, steps):
         """A dose or batch just taken: its first step now (all of it, when it ends before any wait)."""
         self._steps, self._due = steps, self._mono()

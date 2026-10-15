@@ -131,3 +131,21 @@ async def test_archiving_and_restoring_the_room_are_recorded(
         "archived (revision 2)",
         "setup saved (revision 3): restored",
     ]
+
+
+async def test_the_setup_wizard_says_what_it_saved(hass, hass_admin_user, room):
+    """A wizard step is not a setup change, and the room's activity does not say it is one."""
+    first = room["rooms"][0]
+    await _call(
+        hass,
+        hass_admin_user,
+        "setup_commission",
+        {
+            "entry_id": first["entry_id"],
+            "expected_revision": first["revision"],
+            "sizing_confirmed": True,
+        },
+    )
+    (line,) = await _activity(hass)
+    assert line["message"] == "setup wizard progress saved"
+    assert line["context_user_id"] == hass_admin_user.id

@@ -78,6 +78,7 @@ PRODUCT = "Crop Steering Controller"
 
 # ---------------------------------------------------------------- HA REST (Supervisor proxy, or HA_URL)
 BASE = runtime_env.resolve_base(os.environ)
+SHOWN_BASE = runtime_env._shown(BASE)  # for the log: no user name or password in it
 TOKEN = runtime_env.resolve_token(os.environ)[0]
 HDR = {"Authorization": f"Bearer {TOKEN}", "Content-Type": "application/json"}
 _S = requests.Session()
@@ -195,7 +196,7 @@ def ha_get(entity, timeout=8):
         return HAState()
     try:
         r = _session().get(f"{BASE}/states/{entity}", headers=HDR, timeout=timeout)
-        _GATE.saw("read", r.status_code, f"GET {BASE}/states/{entity}")
+        _GATE.saw("read", r.status_code, f"GET {SHOWN_BASE}/states/{entity}")
         if r.status_code != 200:
             return HAState()
         d = r.json()
@@ -211,7 +212,7 @@ def ha_get_status(entity, timeout=8):
         return None, HAState()
     try:
         r = _session().get(f"{BASE}/states/{entity}", headers=HDR, timeout=timeout)
-        _GATE.saw("read", r.status_code, f"GET {BASE}/states/{entity}")
+        _GATE.saw("read", r.status_code, f"GET {SHOWN_BASE}/states/{entity}")
         if r.status_code != 200:
             return r.status_code, HAState()
         d = r.json()
@@ -241,7 +242,7 @@ def ha_get_all():
         return []
     try:
         r = _session().get(f"{BASE}/states", headers=HDR, timeout=12)
-        _GATE.saw("other", r.status_code, f"GET {BASE}/states")
+        _GATE.saw("other", r.status_code, f"GET {SHOWN_BASE}/states")
         if r.status_code != 200:
             return []
         return r.json() or []
@@ -267,7 +268,7 @@ def ha_history(entity, since, timeout=12):
             },
             timeout=timeout,
         )
-        _GATE.saw("other", r.status_code, f"GET {BASE}/history/period")
+        _GATE.saw("other", r.status_code, f"GET {SHOWN_BASE}/history/period")
         if r.status_code != 200:
             return None
         rows = (r.json() or [[]])[0]
@@ -280,6 +281,8 @@ def ha_logbook(entity, since, timeout=8):
     """Home Assistant's logbook entries for `entity` from `since` (an aware datetime) to now, oldest
     first, each with who made it (context_user_id, or the automation or script by name). [] when
     Home Assistant can't say."""
+    if not _GATE.allows("other"):
+        return []
     try:
         r = _session().get(
             f"{BASE}/logbook/{since.isoformat()}",
@@ -287,6 +290,7 @@ def ha_logbook(entity, since, timeout=8):
             params={"entity": entity, "end_time": datetime.now(timezone.utc).isoformat()},
             timeout=timeout,
         )
+        _GATE.saw("other", r.status_code, f"GET {BASE}/logbook")
         entries = r.json() if r.status_code == 200 else []
         return entries if isinstance(entries, list) else []
     except Exception:
@@ -301,7 +305,7 @@ def ha_call(domain, service, *, timeout=12, **data):
         r = _session().post(
             f"{BASE}/services/{domain}/{service}", headers=HDR, json=data, timeout=timeout
         )
-        _GATE.saw(kind, r.status_code, f"POST {BASE}/services/{domain}/{service}")
+        _GATE.saw(kind, r.status_code, f"POST {SHOWN_BASE}/services/{domain}/{service}")
         if r.status_code >= 300:
             log("call_service FAILED", domain, service, "HTTP", r.status_code)
             return False
@@ -326,7 +330,7 @@ def ha_service_response(domain, service, data, timeout=12):
     except Exception as e:
         log("call_service failed", domain, service, e)
         return None, None
-    _GATE.saw("other", r.status_code, f"POST {BASE}/services/{domain}/{service}")
+    _GATE.saw("other", r.status_code, f"POST {SHOWN_BASE}/services/{domain}/{service}")
     if r.status_code >= 300:
         log("call_service FAILED", domain, service, "HTTP", r.status_code)
     try:
@@ -338,8 +342,11 @@ def ha_service_response(domain, service, data, timeout=12):
 
 def ha_fire(event, data, timeout=4):
     """Fire a Home Assistant event, best effort -> True when Home Assistant took it."""
+    if not _GATE.allows("other"):
+        return False
     try:
         r = _session().post(f"{BASE}/events/{event}", headers=HDR, json=data, timeout=timeout)
+        _GATE.saw("other", r.status_code, f"POST {BASE}/events/{event}")
         return r.status_code < 300
     except Exception:
         return False
@@ -358,7 +365,7 @@ def ha_set(entity, state, attributes=None, timeout=8):
         )
     except Exception:
         return None
-    _GATE.saw("write", r.status_code, f"POST {BASE}/states/{entity}")
+    _GATE.saw("write", r.status_code, f"POST {SHOWN_BASE}/states/{entity}")
     return r.status_code
 
 
@@ -4556,7 +4563,12 @@ class Controller:
             self._keep_alive(deadline - time.monotonic())
             remaining = deadline - time.monotonic()
             if remaining > 0:
-                time.sleep(min(step, remaining))
+                # A dose or batch running goes on through the wait: a batch's open fill valve is still
+                # watched for its full sensor (dosing_runner._fill). With none running, a plain sleep.
+                if self.dosing is not None and self.dosing.running():
+                    self._sleep_for(min(step, remaining))
+                else:
+                    time.sleep(min(step, remaining))
         return time.monotonic() - started, None
 
     def _close_cut_short(self, room, zone, by, elapsed, duration_s, valve_opened):
@@ -4980,6 +4992,8 @@ class Controller:
                     {
                         "engine": PRODUCT,
                         "controller_version": CONTROLLER_VERSION,
+                        "controller_instance": self.instance_id,  # ours: not another controller's write
+                        "controller_runtime": "container" if _GATE.container else "addon",
                         "stopped_at": now.isoformat(),
                         "last_beat": now.isoformat(),
                         "enable_flag": room_gate(room),
@@ -5030,7 +5044,7 @@ class Controller:
 
     def _sleep_for(self, seconds):
         """Wait `seconds` for the next pass, waking whenever dosing is due to run its next step
-        (dosing_runner.step). Dosing never runs in the middle of a shot: it waits for the shot to end."""
+        (dosing_runner.step). A shot's wait does the same while a dose or batch runs (_wait_shot)."""
         end = time.monotonic() + seconds
         while True:
             left = end - time.monotonic()
@@ -6204,7 +6218,7 @@ class Controller:
         try:
             r = _session().get(f"{BASE}/config", headers=HDR, timeout=8) if _GATE.allows("other") else None
             if r is not None:
-                _GATE.saw("other", r.status_code, f"GET {BASE}/config")
+                _GATE.saw("other", r.status_code, f"GET {SHOWN_BASE}/config")
             ha_tz = (r.json() or {}).get("time_zone") if r is not None and r.status_code == 200 else None
         except Exception:
             ha_tz = None
@@ -6244,7 +6258,7 @@ class Controller:
             self.notify_service or "(none)",
             f"| loop {self.loop_seconds:.0f}s",
         )
-        log("token present:", bool(TOKEN), "| base:", BASE)
+        log("token present:", bool(TOKEN), "| base:", SHOWN_BASE)
         self._log_timezone()
         self._start_dosing()
         while True:
