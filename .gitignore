@@ -56,3 +56,6 @@ output/
 venv/
 .coverage
 htmlcov/
+
+# The standalone controller's token file (docker-compose.yml)
+/ha_token.txt

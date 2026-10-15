@@ -1,4 +1,7 @@
-ARG BUILD_FROM
+# The Supervisor passes BUILD_FROM from build.yaml for each architecture. The default (build.yaml's
+# amd64 base, kept equal by a test) lets a plain `docker build addons/f2_control` or the root
+# docker-compose.yml build the same image without the Supervisor.
+ARG BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
 FROM ${BUILD_FROM}
 
 # Stopping the app sends SIGTERM to the controller itself, so it gets the whole `timeout:` in
@@ -23,6 +26,9 @@ COPY f2_control /app
 # this copy of the config.yaml Supervisor built the image from: one source of truth, nothing
 # to bump anywhere else.
 COPY config.yaml /app/addon.yaml
+# The licence travels with the image. LICENSE here is a copy of the repository's root LICENSE (the
+# build context is this directory, so the root file is out of reach); a test keeps the two equal.
+COPY LICENSE /app/LICENSE
 WORKDIR /app
 
 # web UI: nginx config + the static dashboards (www/public is written by the dashboard
