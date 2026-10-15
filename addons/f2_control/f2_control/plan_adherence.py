@@ -634,16 +634,16 @@ def panel(view, drifts, notes=None, bridged=None):
     shown = []
     for d in drifts:
         pick, why, action = notes.get(d.cls, (None, "", None))
-        shown.append({"class": d.cls, "zone": d.zone, "severity": d.sev, "line": d.line,
-                      "suggestion": pick or (d.suggestions[0] if d.suggestions else ""), "why": why or "",
-                      "since": d.since, "action": action or "advise"})
+        shown.append({"class": d.cls, "zone": d.zone, "severity": d.sev, "line": d.line[:240],
+                      "suggestion": (pick or (d.suggestions[0] if d.suggestions else ""))[:320],
+                      "why": (why or "")[:140], "since": d.since, "action": action or "advise"})
     line = headline(view, drifts)
     if bridged and view.status == "active":
         line = (f"Plan: day {bridged.get('day')}'s targets applied by the controller at "
                 f"{str(bridged.get('since', ''))[11:16]} while the plan waits for: "
                 f"{view.attrs.get('degraded_reason') or 'a stale probe'}.")
     return {
-        "status": view.status, "headline": line,
+        "status": view.status, "headline": line[:255] if line else line,  # one line, as a state could hold it
         "zones": [zone_plan(view, z) for z in sorted(view.in_force())] if view.status in ("active", "disarming")
         else [],
         "expected_day": view.expected_day.isoformat(),

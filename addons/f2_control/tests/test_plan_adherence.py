@@ -306,3 +306,13 @@ def test_the_record_round_trips_and_an_empty_one_is_not_written():
     adh = A.load({"alerted": {"old": "2026-01-01", "new": TODAY.isoformat()}, "later": 1})
     out = A.dump(adh, TODAY)
     assert out["alerted"] == {"new": TODAY.isoformat()} and out["later"] == 1
+
+
+def test_the_panel_stays_short_however_long_a_reason_is():
+    attrs = {"revision": 7, "grow_day": TODAY.isoformat(), "degraded_reason": "x" * 2000,
+             "zones": [_row(1), _row(2, 16, {**view().attrs["zones"][1]["parameters"], "p2_shot_size": 9.0},
+                                      YESTERDAY, held="stale")]}
+    v = view(attrs=attrs)
+    out = A.panel(v, A.detect(v, A.fresh()))
+    assert len(out["headline"]) <= 255
+    assert all(len(d["line"]) <= 240 and len(d["suggestion"]) <= 320 for d in out["drifts"])
