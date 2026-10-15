@@ -5485,16 +5485,19 @@ class Controller:
             )
         self._heartbeat(room, now, self._hardware_fault_block(room))
 
-    def _blind_time_transition(self, room, zone, now, lights_on, lights_just_on):
+    def _blind_time_transition(self, room, zone, now, lights_on, lights_just_on, p=None):
         """Time-only phase forces for a BLIND zone (dead/missing probe), so it can never
         strand overnight while `decide()` is skipped: lights-off -> P3, and P3 -> P0 at the
         new photoperiod (with the daily-counter reset, mirroring the P0 branch in _loop_room),
         also from a P1/P2 left over from a grow-day the controller did not see end (as decide()).
-        The VWC-driven transitions (P0->P1->P2, predictive P3) need a probe and stay paused.
+        With the zone's params `p`, decide()'s two exits that need no probe as well: P0 -> P1
+        once p0_max_wait_min has passed, and P1 -> P2 at p1_max_shots. The VWC-driven
+        transitions (dryback, the P1 rise rule, predictive P3) need a probe and stay paused.
         """
         st = room.state[zone]
         gds = self._grow_day_start(room, now)
         new_grow_day = self._new_grow_day(room, st, now, lights_on)
+        waited = (now - st["last_phase_change"]).total_seconds() / 60.0
         new_phase = None
         why = None
         if not lights_on and st["phase"] != "P3":
@@ -5503,15 +5506,23 @@ class Controller:
             new_phase, why = "P0", "lights-on (no moisture reading)"
         elif st["phase"] in ("P1", "P2") and new_grow_day:
             new_phase, why = "P0", "a new grow-day (no moisture reading)"
+        elif p is not None and st["phase"] == "P0" and waited >= p.p0_max_wait_min:
+            new_phase, why = "P1", f"P0 timeout {waited:.0f}min (no moisture reading)"
+        elif p is not None and st["phase"] == "P1" and st["shots"] >= p.p1_max_shots:
+            new_phase, why = "P2", f"P1 max shots {st['shots']}/{p.p1_max_shots} (no moisture reading)"
         if new_phase and new_phase != st["phase"]:
             if new_phase == "P0":
                 self._keep_day_peak(st)  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
                 st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, 0.0  # _snapshot takes the peak from the next reading
                 st["ec_offset"], st["last_ec_steer"] = 0.0, None
                 st["last_daily_reset"] = gds
+            if new_phase == "P1":  # the ramp counts its shots from one again, as the engine's own P1 does
+                self._record_phase(room, zone, st, st["phase"], "P1", now, why)
+                st["shots"] = 0
             was = st["phase"]
             st["phase"] = new_phase
             st["last_phase_change"] = now
+            log(f"[{room.slug}] Z{zone} {was} -> {new_phase}: {why}")
             self._save_state()
             self._notify_event("phase", room, zone, was, new_phase, why)
 
@@ -5798,7 +5809,7 @@ class Controller:
             # A dead probe must NOT freeze the daily cycle: still honour the time-based
             # phase forces (lights-off -> P3, P3 -> P0 at the new photoperiod). Only the
             # VWC-driven transitions are paused while blind.
-            self._blind_time_transition(room, zone, now, lights_on, lights_just_on)
+            self._blind_time_transition(room, zone, now, lights_on, lights_just_on, p)
             out_min = (now - room._blind_since[zone]).total_seconds() / 60.0
             if out_min < BLIND_GRACE_MIN:
                 # 25 Sep 2026: the probes read unknown for a minute, and a timer shot fired at once.

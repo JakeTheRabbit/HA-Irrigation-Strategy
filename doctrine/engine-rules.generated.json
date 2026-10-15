@@ -273,7 +273,7 @@
     },
     {
       "id": "CT-5",
-      "text": "Dead or set-aside probe: after a 15 min grace the zone copies the healthiest sibling's shot (closest p1_target) or, with no sibling, waters every blind_fallback_min (default 90) within its own budget; VWC-driven phase changes wait, time-driven ones still happen.",
+      "text": "Dead or set-aside probe: after a 15 min grace the zone copies the healthiest sibling's shot (closest p1_target) or, with no sibling, waters every blind_fallback_min (default 90) within its own budget; VWC-driven phase changes wait; the lights' edges, the P0 maximum wait (p0_max_wait_min) and the P1 maximum shots still move it.",
       "verified": true
     },
     {

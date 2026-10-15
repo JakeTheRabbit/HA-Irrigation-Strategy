@@ -352,8 +352,10 @@ def engine_facts(doc, paths):
         ("CT-4", "Relative dryback the engine compares: (peak - vwc) / peak x 100. The peak restarts at the lights-on reading when the zone enters P0 and then follows the highest reading of the grow-day, so in P0 the figure is the drop since lights-on and later in the day it is the drop from the day's peak.",
          '(st["peak"] - vwc) / st["peak"] * 100' in ctrl and 'if vwc > st["peak"]:' in ctrl
          and 'st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, snap.vwc' in ctrl),
-        ("CT-5", "Dead or set-aside probe: after a 15 min grace the zone copies the healthiest sibling's shot (closest p1_target) or, with no sibling, waters every blind_fallback_min (default 90) within its own budget; VWC-driven phase changes wait, time-driven ones still happen.",
-         "BLIND_GRACE_MIN = 15" in ctrl and 'o.get("blind_fallback_min", 90)' in ctrl),
+        ("CT-5", "Dead or set-aside probe: after a 15 min grace the zone copies the healthiest sibling's shot (closest p1_target) or, with no sibling, waters every blind_fallback_min (default 90) within its own budget; VWC-driven phase changes wait; the lights' edges, the P0 maximum wait (p0_max_wait_min) and the P1 maximum shots still move it.",
+         "BLIND_GRACE_MIN = 15" in ctrl and 'o.get("blind_fallback_min", 90)' in ctrl
+         and 'st["phase"] == "P0" and waited >= p.p0_max_wait_min' in ctrl
+         and 'st["phase"] == "P1" and st["shots"] >= p.p1_max_shots' in ctrl),
         ("CT-6", "Source-water gate, two halves (feed EC, feed pH), each only when its feed sensor is configured and its band is set (feed sensors default to empty): a feed outside its band holds the zone; a dead feed probe holds after feed_grace_min (default 30). External holds apply only when configured (none by default). Offline pump or valve switches hold too.",
          'o.get("feed_grace_min", 30)' in ctrl and "holding (fail-closed)" in ctrl
          and "if room.feed_ec_sensor:" in ctrl and "if room.feed_ph_sensor:" in ctrl and "if lo > 0 or hi > 0:" in ctrl),
