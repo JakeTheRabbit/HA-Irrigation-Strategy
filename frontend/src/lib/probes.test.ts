@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createDemo } from "./demo";
 import { buildRoom, discoverRooms } from "./model";
-import { fusionMethod, probeHealth, roomProbeIds, STUCK_MS, zoneProbes } from "./probes";
+import { ecType, fusionMethod, probeHealth, roomProbeIds, STUCK_MS, zoneProbes } from "./probes";
 
 const now = new Date(2026, 8, 28, 16, 0).getTime();
 const H = 3_600_000;
@@ -121,5 +121,20 @@ describe("how a zone's reading is made from its probes", () => {
   it("says nothing for an older integration", () => {
     expect(fusionMethod(fused({ used: ["sensor.a"] }))).toBeNull();
     expect(fusionMethod(undefined)).toBeNull();
+  });
+});
+
+describe("which EC a zone with pore and bulk EC probes steers on", () => {
+  const fused = (attributes: Record<string, unknown>) =>
+    ({ entity_id: "sensor.crop_steering_ec_zone_1", state: "3.0", attributes }) as never;
+  it("says pore, and bulk with why", () => {
+    expect(ecType(fused({ ec_type: "pore" }))).toBe("steers on its pore EC probes");
+    expect(ecType(fused({ ec_type: "bulk" }))).toBe(
+      "steers on its bulk EC probes: no pore EC probe is reporting",
+    );
+  });
+  it("says nothing for a zone without both, or an older integration", () => {
+    expect(ecType(fused({ used: ["sensor.a"] }))).toBeNull();
+    expect(ecType(undefined)).toBeNull();
   });
 });
