@@ -443,6 +443,12 @@ that draws a linked tank:
   at all is not logged (a fill entity stamped many times a day would push the pumps' draws out of
   the history). A batch recorded by hand (`crop_steering.stock_record_batch`) skips them the same
   way; its answer lists the linked tanks it skipped (`skipped`).
+- **Batches left.** What one batch takes from a linked tank (`stock_get`'s `doses`, the stock
+  sensor's `dose_ml` and `batches_left`, the low-stock card) is its pump's dose in the recipe in use:
+  the feed schedule's this week, a recipe picked by hand, else the batch's own (its `ml_entity`
+  reading when usable, else its `ml`); 0 when that recipe passes the pump by. It follows a dosing
+  setup saved and the schedule's week moving on at midnight. A tank no pump is linked to keeps its
+  own `dose_ml` / `dose_entity`.
 - `sensor.crop_steering_<prefix>stock_low` gives each entry of its `tanks` attribute an `id`, and a
   `pump`: the id of the pump linked to it, or null.
 

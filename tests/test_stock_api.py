@@ -161,11 +161,11 @@ def test_a_corrupt_store_is_kept_and_every_change_refused():
     }
 
 
-def _link(hass, **tanks):
+def _link(hass, recipe=(), **tanks):
     """The room's dosing setup, linking stock tanks to pumps (docs/DOSING.md, Stock tanks)."""
     pumps = [{"id": pump, "stock_tank": tank} for tank, pump in tanks.items()]
     hass.data[DOMAIN].setdefault("_dosing", {})["entry"] = types.SimpleNamespace(
-        data={"pumps": pumps}, error=None
+        data={"pumps": pumps}, error=None, recipe=lambda: list(recipe)
     )
 
 
@@ -210,6 +210,24 @@ def test_a_fill_skips_the_tanks_a_dosing_pump_draws():
     assert [t["level_l"] for t in store.data["tanks"]] == [50, 4.75]
     assert len(store.data["history"]) == 1
     assert store.data["last_batch"] == "2026-09-26T19:00:00+12:00"
+
+
+def test_a_linked_tanks_batches_left_follow_the_recipe_in_use():
+    hass, store = rig()
+    cal = {"name": "Cal", "capacity_l": 5, "dose_ml": 250}
+    mutate(store, "stock_save", tanks=[{**BLOOM, "level_l": 9}, cal])
+    assert store.doses() == {"bloom": 1800, "cal": 250}
+    # Bloom linked to a pump the recipe in use doses 900 mL: a batch takes that, Cal its own.
+    _link(hass, recipe=[{"pump": "bloom_pump", "ml": 900}], bloom="bloom_pump")
+    assert store.doses() == {"bloom": 900, "cal": 250}
+    store._alert()
+    assert (
+        "Bloom: 9 L of 50 L, about 10 batches left"
+        in hass._issues["stock_low"]["translation_placeholders"]["tanks"]
+    )
+    # A recipe that passes the pump by takes nothing from the tank.
+    _link(hass, recipe=[], bloom="bloom_pump")
+    assert store.doses() == {"bloom": 0, "cal": 250}
 
 
 def test_a_batch_recorded_by_hand_skips_the_tanks_a_dosing_pump_draws():
@@ -310,7 +328,9 @@ def pumped(value=None, level=10, pumps=(PUMP,)):
     if value is None:
         mutate(store, "stock_save", tanks=[{**BALANCE, "level_l": level}, CAL])
     hass.data[DOMAIN]["_dosing"] = {
-        "entry": types.SimpleNamespace(data={"pumps": list(pumps)}, error=None)
+        "entry": types.SimpleNamespace(
+            data={"pumps": list(pumps)}, error=None, recipe=lambda: []
+        )
     }
     store._watch()
     return hass, store
