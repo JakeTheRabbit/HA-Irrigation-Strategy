@@ -86,7 +86,10 @@ The build fails when any of these checks fails:
 6. **Controller copy.** When the controller's copy of `compiled/` exists (`addons/<app>/<package>/doctrine/`),
    `--check` compares it byte for byte with `compiled/` (a one-byte edit, a missing file or an extra file fails)
    and a write run rewrites it. Until then the build prints "controller doctrine copy: none yet, skipped", so the
-   CI step needs no change when the copy arrives.
+   CI step needs no change when the copy arrives. The stage arcs are the one arc source: the controller's
+   `stage_rows()` reads the tables in its copy (`arcs/`), and the build also writes the same rows as data to the
+   dashboard's `frontend/src/lib/generated/arcs.json` whenever the dashboard source exists, where `--check` fails
+   on a one-byte difference too.
 
 The hashes of the code files a run was checked against are printed in the log and the job summary
 (`checked against: core ..., controller ...`), never written to a generated file.
