@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   Bot,
   Check,
@@ -18,6 +18,7 @@ import { Empty, Heading, time as clock } from "@/components/dashboard";
 import { JevTrouble, jevUsage } from "@/components/jev-status";
 import { Pill } from "@/components/mini-visuals";
 import { jevAnswer, jevResult, outcomeText, readJev } from "@/lib/jev";
+import { changeEvents, type SetpointLogDocument } from "@/lib/setpoint-log";
 import {
   byHand,
   filterTimeline,
@@ -55,10 +56,27 @@ const TYPES: { type: TimelineType; label: string }[] = [
  * Jev's; alerts; and Jev's decisions with how they turned out. One list, newest first. */
 export function Timeline({ controller, zone }: { controller: Controller; zone?: number }) {
   const [filter, setFilter] = useState<TimelineFilter>({ ...NO_FILTER, zone: zone ?? "all" });
+  const [changes, setChanges] = useState<SetpointLogDocument | null>(null);
   const { room, states } = controller;
+  // Who changed which setting: the integration's change log. An older integration has none.
+  useEffect(() => {
+    let cancelled = false;
+    setChanges(null);
+    if (!controller.roomId) return;
+    controller
+      .operator<SetpointLogDocument>("setpoint_log_get")
+      .then((doc) => {
+        if (!cancelled) setChanges(doc);
+      })
+      .catch(() => undefined);
+    return () => {
+      cancelled = true;
+    };
+  }, [controller.roomId, controller.operator]);
   const jev = readJev(states, room.room.prefix);
   const now = Date.now();
-  const items = mergeTimeline(room.events, jev.log?.entries ?? [], now);
+  const logged = changes?.room_id === controller.roomId ? changeEvents(changes) : [];
+  const items = mergeTimeline([...room.events, ...logged], jev.log?.entries ?? [], now);
   const shown = filterTimeline(items, filter);
   const quiet = items.filter((item) => item.jev && !jevActed(item.jev)).length;
   const names = new Map(room.zones.map((item) => [item.id, item.name]));
