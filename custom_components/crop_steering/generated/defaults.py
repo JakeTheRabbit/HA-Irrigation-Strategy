@@ -36,6 +36,10 @@ DEFAULTS = {
     "drippers_per_plant": (2, 1),
     "plant_count": (4, 0),
     "max_shot_duration": (900, None),  # seconds
+    # The pump runs this long before the main line opens, and the main line this long
+    # before a zone's valve. Seconds; the waits were fixed at 2 and 1 before these.
+    "pump_prime_time": (2.0, 2.0),
+    "main_line_lead_time": (1.0, 1.0),
     "max_daily_volume": (20.0, 150),  # litres per zone per grow-day
     # Substrate limits
     "field_capacity": (70.0, 70),

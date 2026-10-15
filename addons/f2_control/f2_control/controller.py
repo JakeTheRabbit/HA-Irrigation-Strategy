@@ -289,10 +289,22 @@ RETIRED_SWITCHES = (
 # (_blocked) and ends one in flight (_wait_shot): the same test, so the two can never disagree.
 ON_STATES = ("on", "true", "open", "1", "home")
 
+# The most the room's Pump Prime Time and Main Line Lead Time may make a shot wait, in seconds: the
+# top of each setting.
+PUMP_PRIME_MAX_S, MAIN_LINE_LEAD_MAX_S = 20.0, 10.0
+
+
+def _lead_time(value, default, top):
+    """A Pump Prime Time or Main Line Lead Time read, as the seconds to wait: from 0 to `top`, and
+    `default` for a value that is not a number."""
+    return max(0.0, min(top, value)) if math.isfinite(value) else float(default)
+
+
 # A switch a shot opened changed state inside this window of the shot's recorded start, in seconds:
-# the pump prime (2 s), the main-line lead (1 s) and, at worst, a slow Home Assistant acknowledging
-# each command. A switch that changed outside it was already on, or has been touched by a person since,
-# unless its recorded history shows only Home Assistant losing it and finding it again (_on_since_shot).
+# the pump prime and the main-line lead (at most 20 s and 10 s) and, at worst, a slow Home Assistant
+# acknowledging each command. A switch that changed outside it was already on, or has been touched by
+# a person since, unless its recorded history shows only Home Assistant losing it and finding it
+# again (_on_since_shot).
 INFLIGHT_OPEN_WINDOW_S = (-5.0, 60.0)
 
 
@@ -3404,6 +3416,17 @@ class Controller:
         hw = room.hw
         valve = hw["valves"].get(zone)
         pump, mainline = hw.get("pump"), hw.get("mainline")
+        # Read before anything opens, so nothing waits on Home Assistant between the steps.
+        # An integration older than these settings has neither: the 2 s and 1 s always waited apply.
+        prime = lead = 0.0
+        if pump:
+            prime = _lead_time(
+                self._zone_num(room, zone, "pump_prime_time", FALLBACK["pump_prime_time"], optional=True),
+                FALLBACK["pump_prime_time"], PUMP_PRIME_MAX_S)
+        if mainline:
+            lead = _lead_time(
+                self._zone_num(room, zone, "main_line_lead_time", FALLBACK["main_line_lead_time"], optional=True),
+                FALLBACK["main_line_lead_time"], MAIN_LINE_LEAD_MAX_S)
         # WRITE-AHEAD: what this shot is about to open, and when, saved BEFORE anything opens. If the
         # controller dies, is killed or loses Home Assistant mid-shot, the next loop closes exactly what
         # this shot opened, from this record, and nothing else (see _reconcile_room_inflight).
@@ -3435,7 +3458,7 @@ class Controller:
                 )
                 return
             if pump:
-                time.sleep(2)
+                time.sleep(prime)
             if mainline and not ha_call("switch", "turn_on", entity_id=mainline):
                 if pump:
                     ha_call("switch", "turn_off", entity_id=pump)
@@ -3451,7 +3474,7 @@ class Controller:
                 )
                 return
             if mainline:
-                time.sleep(1)
+                time.sleep(lead)
             valve_started = time.monotonic()
             valve_opened = datetime.now(timezone.utc)  # on Home Assistant's clock too: see _close_cut_short
             if not ha_call("switch", "turn_on", entity_id=valve):

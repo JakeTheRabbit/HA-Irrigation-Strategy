@@ -5,7 +5,8 @@ Before the table, the same settings had two sets of built-in values: the integra
 can be read, around a Home Assistant restart for example). They disagree for some settings, and both
 are what installed rooms run on today. The table keeps both columns, so this pins each column to the
 values the release before it shipped (Jev 3.11.1, commit 12c6d1a), plus the P3 Time Between Shots
-added since at 10 minutes in both. Making the columns agree is a change of its own, with a bold line
+added since at 10 minutes in both, and the pump prime and main-line lead, at the 2 s and 1 s the
+controller always waited, in both. Making the columns agree is a change of its own, with a bold line
 in the changelog; it is never a side effect of editing the table.
 
 The controller half is checked where it is used: every _zone_num call reads its fallback from the
@@ -30,7 +31,8 @@ def table():
 
 
 # number.py DEFAULT_VALUES at 12c6d1a, and the per-zone plant count and daily cap defaults beside it,
-# plus P3 Time Between Shots (10 minutes, added after it).
+# plus P3 Time Between Shots (10 minutes, added after it) and the pump prime and main-line lead (2 s
+# and 1 s, the waits 12c6d1a's controller had fixed).
 ENTITY_DEFAULTS_12C6D1A = {
     "max_shot_duration": 900,
     "substrate_volume": 10.0,
@@ -72,9 +74,12 @@ ENTITY_DEFAULTS_12C6D1A = {
     "plant_count": 4,
     "max_daily_volume": 20.0,
     "p3_time_between_shots": 10.0,
+    "pump_prime_time": 2.0,
+    "main_line_lead_time": 1.0,
 }
 
-# The literal at each controller _zone_num call site at 12c6d1a, plus P3 Time Between Shots.
+# The literal at each controller _zone_num call site at 12c6d1a, plus P3 Time Between Shots, and the
+# pump prime and main-line lead it waited as fixed sleeps.
 CONTROLLER_FALLBACKS_12C6D1A = {
     "p2_vwc_threshold": 45,
     "p1_target_vwc": 60,
@@ -103,6 +108,8 @@ CONTROLLER_FALLBACKS_12C6D1A = {
     "drippers_per_plant": 1,
     "min_floor_drown_ceiling": 90,
     "p3_time_between_shots": 10.0,
+    "pump_prime_time": 2.0,
+    "main_line_lead_time": 1.0,
 }
 
 
