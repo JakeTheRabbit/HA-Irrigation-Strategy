@@ -124,8 +124,10 @@ class StockStore:
         @callback
         def rewatch(*_):
             self._watch()
+            self._alert()  # batches left follow the recipe in use
 
-        # Which pumps are linked is the room's dosing setup: followed again whenever it is saved.
+        # Which pumps are linked is the room's dosing setup, and the recipe in use what a batch takes
+        # from them: followed again whenever it is saved, and at each midnight (dosing_api.py).
         stops = [
             async_dispatcher_connect(
                 self.hass, f"{DOSING_SIGNAL}_{self.entry.entry_id}", rewatch
@@ -154,12 +156,17 @@ class StockStore:
 
         return stop
 
-    def _dosing_pumps(self) -> list[dict]:
-        """The room's dosing pumps that are linked to a stock tank, from its dosing setup."""
+    def _dosing(self):
+        """The room's dosing setup (dosing_api.py), or None when there is none to read."""
         dosing = (
             self.hass.data.get(DOMAIN, {}).get("_dosing", {}).get(self.entry.entry_id)
         )
-        if dosing is None or dosing.error:
+        return None if dosing is None or dosing.error else dosing
+
+    def _dosing_pumps(self) -> list[dict]:
+        """The room's dosing pumps that are linked to a stock tank, from its dosing setup."""
+        dosing = self._dosing()
+        if dosing is None:
             return []
         return [pump for pump in dosing.data.get("pumps", []) if pump.get("stock_tank")]
 
@@ -284,7 +291,9 @@ class StockStore:
                 )
 
     def doses(self) -> dict[str, float]:
-        """What one batch takes from each tank right now, in mL."""
+        """What one batch takes from each tank right now, in mL: a tank linked to a dosing pump,
+        its pump's dose in the recipe in use (stock.recipe_doses); any other, its own dose.
+        """
         doses = {}
         for tank in self.data["tanks"]:
             state = (
@@ -293,6 +302,12 @@ class StockStore:
                 else None
             )
             doses[tank["id"]] = stock.dose_ml(tank, state.state if state else None)
+        dosing = self._dosing()
+        if dosing is not None:
+            linked = stock.recipe_doses(
+                dosing.data["pumps"], dosing.recipe(), self._read
+            )
+            doses.update({tank: ml for tank, ml in linked.items() if tank in doses})
         return doses
 
     async def _fill(self, state):

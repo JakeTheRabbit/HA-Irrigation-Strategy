@@ -7,7 +7,8 @@ tank then loses its dose per batch: a fixed amount, or what a dose entity reads 
 doser's dose-volume number), so the draw follows the doser's own setting.
 
 A tank linked to a dosing pump is drawn by what that pump runs instead (docs/DOSING.md, Stock
-tanks): the seconds its motor ran times its calibrated flow, whoever started it.
+tanks): the seconds its motor ran times its calibrated flow, whoever started it. What one batch takes
+from it, and so how many batches it has left, is its pump's dose in the recipe in use.
 
 The first fill time the integration ever sees is only a starting point: counting it would draw the
 stock down for a batch made before the tanks were set up.
@@ -152,6 +153,27 @@ def dose_ml(tank: dict, reading: str | None) -> float:
         if 0 <= value <= 100000:
             return value
     return float(tank.get("dose_ml") or 0)
+
+
+def recipe_doses(pumps: list[dict], recipe, read) -> dict[str, float]:
+    """What one batch takes from each tank linked to a pump, in mL: that pump's dose in the recipe in
+    use (the feed schedule's this week, a recipe picked by hand, else the batch's own), its mL entity's
+    reading when it has a usable one, otherwise its fixed amount; 0 when the recipe passes the pump by.
+    `read(entity_id)` is that entity's state, or None."""
+    lines = {line.get("pump"): line for line in recipe or [] if isinstance(line, dict)}
+    doses = {}
+    for pump in pumps:
+        line = lines.get(pump.get("id"))
+        if pump.get("stock_tank"):
+            doses[pump["stock_tank"]] = (
+                dose_ml(
+                    {"dose_entity": line.get("ml_entity"), "dose_ml": line.get("ml")},
+                    read(line.get("ml_entity")),
+                )
+                if line is not None
+                else 0.0
+            )
+    return doses
 
 
 def draw(data: dict, doses: dict[str, float], at: str, source: str) -> dict:

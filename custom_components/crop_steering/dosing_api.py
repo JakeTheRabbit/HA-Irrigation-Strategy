@@ -154,17 +154,19 @@ class DosingStore:
         controller acts on nothing it cannot read."""
         if self.error:
             return None, {"error": self.error}
-        today = _today()
         batch = deepcopy(self.data["batch"])
-        recipe = dosing.in_use(self.data["feed"], today)
-        if recipe is not None:
-            batch["recipe"] = deepcopy(recipe["doses"])
+        batch["recipe"] = self.recipe()
         return self.data["revision"], {
             "pumps": deepcopy(self.data["pumps"]),
             "batch": batch,
             "request": deepcopy(self.data["request"]),
-            "feed": dosing.feed_now(self.data["feed"], today),
+            "feed": dosing.feed_now(self.data["feed"], _today()),
         }
+
+    def recipe(self) -> list[dict]:
+        """The doses of the recipe in use today (dosing.in_use), else the batch's own recipe."""
+        recipe = dosing.in_use(self.data["feed"], _today())
+        return deepcopy(recipe["doses"] if recipe else self.data["batch"]["recipe"])
 
     async def save(self, data, can_edit=False) -> dict:
         async with self._lock:
