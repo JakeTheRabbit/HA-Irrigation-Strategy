@@ -196,12 +196,13 @@ def test_sigterm_closes_the_shot_in_flight_before_dosing_goes(monkeypatch):
     c, _fake = _build({"num_zones": 1, "hardware": {"pump": "switch.p", "mainline": "switch.m",
                                                      "valves": {"1": "switch.v1"}}})
     order = []
-    monkeypatch.setattr(c, "_safe_off", lambda: order.append("irrigation"))
-    monkeypatch.setattr(c.dosing, "exit", lambda: order.append("dosing"))
+    monkeypatch.setattr(c.dosing, "stop_starting", lambda: order.append("no dosing starts"))
+    monkeypatch.setattr(c, "_safe_off", lambda deadline: order.append("irrigation"))
+    monkeypatch.setattr(c.dosing, "exit", lambda within: order.append("dosing"))
     monkeypatch.setattr(c, "_save_state", lambda: order.append("saved"))
     with pytest.raises(SystemExit):
         c._safe_exit()
-    assert order == ["irrigation", "dosing", "saved"]
+    assert order == ["no dosing starts", "irrigation", "dosing", "saved"]
 
 
 def test_a_service_asked_for_its_answer_says_how_it_went(monkeypatch):
