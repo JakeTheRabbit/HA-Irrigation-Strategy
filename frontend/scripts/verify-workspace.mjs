@@ -482,6 +482,28 @@ try {
     assert.equal(await page.locator("#steering-balance").isEnabled(), true);
     assert.equal(await gridCell.isEditable(), true);
   });
+  await check("Plan state says why a saved plan is or is not live, at 1440 and 390px", async () => {
+    for (const width of [1440, 390]) {
+      await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+      await fresh("plan/schedule");
+      await openPlanner();
+      const label = page.locator(".plan-state"),
+        why = page.locator(".plan-state-why");
+      assert.equal(await label.innerText(), "Draft");
+      assert.match(await why.innerText(), /^Saved, not running\./);
+      await page.getByRole("button", { name: "Arm plan", exact: true }).click();
+      await page.getByRole("button", { name: "Arm for next lights-on", exact: true }).click();
+      await visible(page.getByRole("button", { name: "Disarm plan", exact: true }));
+      await label.filter({ hasText: /^Scheduled$/ }).waitFor({ state: "visible" });
+      assert.match(await why.innerText(), /^Armed for the next lights-on\./);
+      await noOverflow();
+      await page.screenshot({ path: out + `workspace-plan-state-${width}.png`, fullPage: true });
+      await page.getByRole("button", { name: "Disarm plan", exact: true }).click();
+      await page.getByRole("button", { name: "Confirm disarm", exact: true }).click();
+      await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
+    }
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  });
   await check(
     "Setup room-change discard resets selected configuration and stale draft",
     async () => {
