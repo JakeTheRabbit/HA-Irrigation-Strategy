@@ -391,6 +391,9 @@ class StrategyManager:
         return bool(due) and _utc(boundary) >= _utc(datetime.fromisoformat(due))
 
     def _readiness(self, now, zone_ids):
+        """Raise for what holds the whole room; -> {zone: why} for each zone whose moisture reading is
+        unusable. A zone's root-zone EC is never waited for: the engine waters a zone without one on
+        moisture alone, with only its EC rules paused."""
         if not self.controller_supported(now):
             raise ValueError(
                 "A fresh controller heartbeat with strategy_snapshot_version=1 is required"
@@ -400,18 +403,15 @@ class StrategyManager:
         flag_state = self.hass.states.get(flag) if isinstance(flag, str) else None
         if getattr(flag_state, "state", None) not in ("on", "off"):
             raise ValueError("The current room engine flag is unreadable")
+        stale = {}
         for zone in zone_ids:
             enabled = self._state(f"zone_{zone}_enabled", "switch")
             if getattr(enabled, "state", None) not in ("on", "off"):
                 raise ValueError(f"Zone {zone} enable configuration is unreadable")
-            for metric in ("vwc", "ec"):
-                state = self._state(f"{metric}_zone_{zone}") or self._state(
-                    f"zone_{zone}_{metric}"
-                )
-                if _number(state) is None or not -60 <= _age(state, now) <= 1200:
-                    raise ValueError(
-                        f"Zone {zone} {metric.upper()} is unavailable or stale"
-                    )
+            state = self._state(f"vwc_zone_{zone}") or self._state(f"zone_{zone}_vwc")
+            if _number(state) is None or not -60 <= _age(state, now) <= 1200:
+                stale[zone] = f"Zone {zone} VWC is unavailable or stale"
+        return stale
 
     async def activate(self, expected_revision, now=None):
         now = now or _now()
@@ -421,7 +421,9 @@ class StrategyManager:
             if self.document["status"] != "draft":
                 raise ValueError("Only a saved draft can be armed")
             preview = self.preview()
-            self._readiness(now, [row["zone_id"] for row in preview["zones"]])
+            stale = self._readiness(now, [row["zone_id"] for row in preview["zones"]])
+            if stale:  # arming needs every zone's moisture reading
+                raise ValueError("; ".join(stale.values()))
             if any(row["errors"] for row in preview["zones"]):
                 raise ValueError(
                     "Resolve hydraulic configuration errors before activation"
@@ -493,7 +495,21 @@ class StrategyManager:
                     # Recoverable: the plan keeps its last valid snapshot and tries again next tick.
                     self.document = prior
                     self.degraded_reason = str(error)
+                else:
+                    self.degraded_reason = self._held_reason()
             self._publish(now)
+
+    def _held_reason(self):
+        """Why some zones are still on an earlier day's targets, or None."""
+        held = [z for z in self.document["active"]["zones"] if z.get("held")]
+        return (
+            "; ".join(
+                f"{z['held']}: zone {z['zone_id']} stays on the targets of "
+                f"{z.get('applied_day') or 'an earlier day'} until it reads again"
+                for z in held
+            )
+            or None
+        )
 
     async def _advance(self, now):
         """Move the plan on to the latest lights-on, on whichever tick first sees it: a lights-on
@@ -528,22 +544,72 @@ class StrategyManager:
         # An error/reload must never invent an activation that was not explicitly armed and
         # successfully stored by the user. A day already applied is never applied again, and a
         # lights_on_hour moved later never takes the plan back a day.
-        if (
-            not self._due("armed", boundary)
-            or (self.document["active"].get("grow_day") or "") >= day
-        ):
+        if not self._due("armed", boundary):
+            return
+        applied = self.document["active"].get("grow_day") or ""
+        if applied > day:
+            return
+        if applied == day:
+            await self._release_held(now, day)
             return
         preview = self.preview(grow_day=day)
-        self._readiness(now, [row["zone_id"] for row in preview["zones"]])
+        stale = self._readiness(now, [row["zone_id"] for row in preview["zones"]])
         if any(row["errors"] for row in preview["zones"]):
             raise ValueError(
                 "Hydraulic preview failed; the day is applied once it passes"
             )
+        # The day moves on for every zone whose moisture reads. A zone whose does not keeps the
+        # targets it had until it reads again, unless no zone reads or it has none to keep.
+        before = {row["zone_id"]: row for row in self.document["active"]["zones"]}
+        if stale and (
+            len(stale) == len(preview["zones"]) or any(z not in before for z in stale)
+        ):
+            raise ValueError("; ".join(stale.values()))
+        zones = [
+            (
+                {
+                    **before[row["zone_id"]],
+                    "applied_day": before[row["zone_id"]].get("applied_day") or applied,
+                    "held": stale[row["zone_id"]],
+                }
+                if row["zone_id"] in stale
+                else {**row, "applied_day": day}
+            )
+            for row in preview["zones"]
+        ]
         self.document.update(
             status="active",
-            active={"grow_day": day, "zones": preview["zones"]},
+            active={"grow_day": day, "zones": zones},
             error=None,
         )
+        await self._persist()
+
+    async def _release_held(self, now, day):
+        """Apply `day` to each zone kept on an earlier day's targets whose moisture reads again."""
+        rows = self.document["active"]["zones"]
+        waiting = [row["zone_id"] for row in rows if row.get("held")]
+        if not waiting:
+            return
+        stale = self._readiness(now, waiting)
+        ready = {z for z in waiting if z not in stale}
+        if not ready:
+            return
+        preview = {row["zone_id"]: row for row in self.preview(grow_day=day)["zones"]}
+        if any(preview[z]["errors"] for z in ready):
+            raise ValueError(
+                "Hydraulic preview failed; the day is applied once it passes"
+            )
+        self.document["active"] = {
+            "grow_day": day,
+            "zones": [
+                (
+                    {**preview[row["zone_id"]], "applied_day": day}
+                    if row["zone_id"] in ready
+                    else row
+                )
+                for row in rows
+            ],
+        }
         await self._persist()
 
     def _publish(self, now):
