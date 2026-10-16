@@ -91,7 +91,7 @@ production leg only; the oldest-supported leg below stays in CI.
 | `test_setup_entry.py` | **The entry itself.** It loads on a Home Assistant without `frontend.async_panel_exists`; another owner's sidebar path is left alone; the wizard's lights hours and sizing reach the entities. |
 | `test_install_to_controller.py` | **Fresh install, both layers.** That install is handed to the *real add-on controller*, which must find the room from the descriptor alone, adopt it, and fire a shot sized and scheduled from the wizard's answers. The only tests that cross the integration / controller seam. |
 | `test_upgrade_in_place.py` | **In-place upgrade with seeded data.** Starts the new code on top of a snapshot of an old install. Nothing tuned may move, no entity may change id, and the controller must carry on with the kill switch ON and no disarm cycle. |
-| `test_move_from_jev.py` | **A room moved from the Jev edition.** Runs the copy command `docs/MOVING_FROM_JEV.md` prints on a Jev 3.11.1 app's data folder, then starts the real controller on the copy with the old app's options: no disarm cycle, counters, phase, learner and dosing record kept, and the brain on wherever a Jev file or a TypeSafe key came across. Also checks the doc's app ids and that its copy list names every data file the controller keeps. |
+| `test_move_from_jev.py` | **A room moved from the first AI edition.** Runs the copy command `docs/MOVING_FROM_JEV.md` prints on a 3.11.1 app's data folder, then starts the real controller on the copy with the old app's options: no disarm cycle, counters, phase, learner and dosing record kept, and the brain moved to Claude with every judge wherever a brain file or a TypeSafe key came across and a key is added, else the rules. Also checks the doc's app ids and that its copy list names every data file the controller keeps. |
 | `test_configure.py` | **Configure.** Editing a parameter reaches the engine; a mapping can be removed; an untouched save keeps every mapping. |
 
 **Seeded fixtures** live in `tests_ha/fixtures/`. Each is a room *as an old version actually wrote
@@ -108,8 +108,8 @@ reporting m³/m³ and μS/cm: derived from the recorded file rather than recorde
 read those units as percent and mS/cm. `entry_2_25_1_pumped_room.json` is a
 pumped two-zone room as upstream 2.25.1 left it, recorded from that release's own wizard and
 controller: its config entry, every entity id it registered, its app `/data/options.json` and the
-`/data/state.json` its controller wrote. `entry_3_11_1_pumped_room.json` is the same kind of room as Jev
-3.11.1 left it after two grow-days under its own controller with Auto setpoints on, recorded the same way:
+`/data/state.json` its controller wrote. `entry_3_11_1_pumped_room.json` is the same kind of room as the first AI
+edition's 3.11.1 left it after two grow-days under its own controller with Auto setpoints on, recorded the same way:
 its config entry, every entity id, the ladder its controller moved, and beside it the app's
 `/data/options.json` on Cloudflare and on TypeSafe (`options_3_11_1_jev_cf.json`,
 `options_3_11_1_jev_typesafe.json`), the `/data/state.json` with the learner and the hourly P2 check's
@@ -120,9 +120,9 @@ recorded by running 3.11.1's own controller, brain and dosing runner on its own 
 notification stores with two phones, in the shape 3.11.1 saves them, from before a vitals kind, a digest or a
 muted room. The `options_<version>_*.json` files with a `data` folder
 (`data_3_0_0_ledger/`, `data_3_2_0/`, `data_3_3_0_typesafe/`, `data_3_0_0_quiet/`,
-`data_3_11_1_usage/`) are apps from 2.25.1 and the Jev line as each left `/data/options.json` and
-`/data`, recorded by running that version's own controller: they prove the brain starts on Cloudflare
-credentials only where a Jev file shows it has run.
+`data_3_11_1_usage/`) are apps from 2.25.1 and the first AI route's line as each left `/data/options.json` and
+`/data`, recorded by running that version's own controller: they prove each still loads after the route's
+removal, moves to Claude only where a brain file shows that route ran and a key is set, and otherwise runs the rules.
 `entities_moved_2_25_1.json` (F-605) is that 2.25.1 room with a few setting ids moved, as CS-605 describes:
 it names the snapshot it starts from and the ids it moves, and proves a controller-only update keeps the
 room watering and holds only the zone whose water-sizing setting it cannot read (`test_settings_wait.py`).

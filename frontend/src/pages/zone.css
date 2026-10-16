@@ -1,4 +1,4 @@
-/* One zone: its day chart full width, then Jev, targets, probes and controls, then its history. */
+/* One zone: its day chart full width, then the AI assistant, targets, probes and controls, then its history. */
 .zone-page {
   display: grid;
   gap: 16px;

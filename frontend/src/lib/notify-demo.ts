@@ -85,7 +85,7 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "jev",
     name: "AI assistant",
     detail:
-      "The advice of the AI assistant, and its changes to the P2 shot size or the re-water point of a zone (a push only). Also its AI budget, key, retired route and feed proposals, and the grow plan state of the room.",
+      "The advice of the AI assistant, and its changes to the P2 shot size or the re-water point of a zone (a push only). Also its AI budget, key, the removed first AI route and feed proposals, and the grow plan state of the room.",
     codes: [
       "CS-501",
       "CS-702",

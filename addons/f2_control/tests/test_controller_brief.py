@@ -1,15 +1,15 @@
-"""How this controller works, in the Claude brain's cached system prompt (jev/controller_brief.py): generated from the
+"""How this controller works, in the Claude brain's cached system prompt (brain/controller_brief.py): generated from the
 code, so a phase, a setting, an error code or a power the code has and the brief lacks fails here, and the cached
 system prompt is byte-stable between calls, with the cache breakpoint on its last block."""
 from crop_steering_engine.core import PHASES
 from crop_steering_engine.defaults import CONTROLLER_FALLBACKS
 
-from jev import controller_brief as cb
-from jev import powers, prompt
+from brain import controller_brief as cb
+from brain import powers, prompt
 
 
 def test_the_committed_brief_is_a_fresh_render_of_the_code():
-    assert cb.read() == cb.render(cb.load_codes()), "run: python -m jev.controller_brief --write"
+    assert cb.read() == cb.render(cb.load_codes()), "run: python -m brain.controller_brief --write"
 
 
 def test_every_phase_setting_error_code_and_power_is_in_the_brief():

@@ -2,13 +2,13 @@ import { parseControllerTime } from "./controller-health";
 import type { EntityState, States } from "./types";
 import { growerWords } from "./words";
 
-/** What the controller's Jev bridge publishes for a room (addons/f2_control/f2_control/jev_bridge.py):
+/** What the controller's AI assistant bridge publishes for a room (addons/f2_control/f2_control/brain_bridge.py):
  * `sensor.crop_steering_<prefix>jev_log` (every decision, newest first), `sensor.crop_steering_<prefix>jev`
  * (calls, tokens, errors and today's stage) and `sensor.crop_steering_<prefix>zone_N_jev` (what each judge
  * last said about the zone). Read tolerantly: a controller older than the log, or one entry missing a
  * field, must never break the page. */
 
-/** Each judge's plain title, for an entry that carries none (jev/journal.py TITLES). */
+/** Each judge's plain title, for an entry that carries none (brain/journal.py TITLES). */
 export const JEV_TITLES: Record<string, string> = {
   dawn: "Morning start",
   ramp: "Ramp hand-over",
@@ -29,7 +29,7 @@ export type JevResult =
 export interface JevEntry {
   /** Unique within one list, for React keys. */
   key: string;
-  /** When Jev decided (epoch ms); null when the entry's time could not be read. */
+  /** When the AI assistant decided (epoch ms); null when the entry's time could not be read. */
   time: number | null;
   /** The entry's time as the controller wrote it: what an outcome's `of` names. */
   stamp: string;
@@ -40,13 +40,13 @@ export interface JevEntry {
   judge: string;
   title: string;
   kind: "decision" | "outcome";
-  /** Jev's answer, in plain words. */
+  /** The AI assistant's answer, in plain words. */
   verdict: string;
   /** How sure the council was, 0 to 1; null when not given. */
   p: number | null;
   /** Both phrasings of the question agreed. */
   agreed: boolean | null;
-  /** What Jev asked for, in plain words; "" when nothing. */
+  /** What the AI assistant asked for, in plain words; "" when nothing. */
   action: string;
   /** What code did with it. An alert a judge raised is advice: it never moves water. */
   result: JevResult;
@@ -134,7 +134,7 @@ export function parseJevEntry(raw: unknown, index = 0): JevEntry | null {
 }
 
 /** The room's live log: its one-line headline and its entries, newest first. Null when the controller
- * does not publish one (a room without Jev, or a controller from before the log). */
+ * does not publish one (a room without the AI assistant, or a controller from before the log). */
 export function parseJevLog(
   entity: EntityState | undefined,
 ): { headline: string; entries: JevEntry[] } | null {
@@ -299,7 +299,7 @@ export interface JevZoneJudge {
   directive: string;
   why: string;
 }
-/** A zone's Jev sensor: which judges act on it now ("watching" when none), and each judge's last word. */
+/** A zone's AI assistant sensor: which judges act on it now ("watching" when none), and each judge's last word. */
 export function parseJevZone(
   entity: EntityState | undefined,
 ): { acting: string[]; judges: JevZoneJudge[] } | null {
@@ -348,13 +348,13 @@ export const jevIds = (prefix: string) => ({
   room: `sensor.crop_steering_${prefix}jev`,
   zone: (zone: number) => `sensor.crop_steering_${prefix}zone_${zone}_jev`,
 });
-/** Everything the page shows of Jev for one room, read from the live states. */
+/** Everything the page shows of the AI assistant for one room, read from the live states. */
 export function readJev(states: States, prefix: string) {
   const ids = jevIds(prefix);
   return { log: parseJevLog(states[ids.log]), room: parseJevRoom(states[ids.room]) };
 }
 
-/** One answer to a grower's "why" (sensor.crop_steering_<prefix>brain_answers, jev_bridge.why_task). */
+/** One answer to a grower's "why" (sensor.crop_steering_<prefix>brain_answers, brain_bridge.why_task). */
 export interface BrainAnswer {
   id: string;
   question: string;
@@ -396,7 +396,7 @@ export function parseBrainAnswers(entity: EntityState | undefined): {
   };
 }
 
-/** Workers AI input at $0.042 per million tokens; output is free (docs/JEV.md). The legacy route only: the Claude
+/** Workers AI input at $0.042 per million tokens; output is free (docs/AI_ASSISTANT.md). The legacy route only: the Claude
  * brain publishes what it spent (`cost_usd_today`), which wins. */
 export const JEV_USD_PER_MILLION = 0.042;
 export function jevCost(tokens: number | null, costUsd: number | null = null): string | null {
@@ -434,29 +434,29 @@ export function jevResult(entry: JevEntry): { label: string; tone: JevTone; acte
   }
 }
 
-/** Jev's answer with how sure it was: "below band vegetative, 72%". */
+/** The AI assistant's answer with how sure it was: "below band vegetative, 72%". */
 export function jevAnswer(entry: Pick<JevEntry, "verdict" | "p">): string {
   const verdict = entry.verdict || "no answer";
   return entry.p === null ? verdict : `${verdict}, ${Math.round(entry.p * 100)}%`;
 }
 
-/** The two setpoints Jev's Setpoints judge may move on a zone. */
+/** The two setpoints the AI assistant's Setpoints judge may move on a zone. */
 export const JEV_SETPOINTS = ["p2_shot_size", "p2_vwc_threshold"] as const;
 export type JevSetpointKey = (typeof JEV_SETPOINTS)[number];
 export interface JevSetpoints {
-  /** Jev moves these setpoints tonight (Auto setpoints on, no grow plan holding them). */
+  /** The AI assistant moves these setpoints tonight (Auto setpoints on, no grow plan holding them). */
   managed: boolean;
   /** The grower's own value: the middle of each range. */
   home: Partial<Record<JevSetpointKey, number>>;
-  /** How far Jev may move each one. */
+  /** How far the AI assistant may move each one. */
   range: Partial<Record<JevSetpointKey, [number, number]>>;
   current: Partial<Record<JevSetpointKey, number>>;
-  /** Jev's last change, in its own words ("2026-09-28 22:30: P2 shot 5% -> 4.5%"). */
+  /** The AI assistant's last change, in its own words ("2026-09-28 22:30: P2 shot 5% -> 4.5%"). */
   last: string | null;
-  /** A rescue shot after a change put it back: Jev leaves the zone alone until then (epoch ms). */
+  /** A rescue shot after a change put it back: the AI assistant leaves the zone alone until then (epoch ms). */
   pausedUntil: number | null;
 }
-/** A zone Jev sensor's `setpoints` attribute; null from a controller before it. */
+/** A zone AI assistant sensor's `setpoints` attribute; null from a controller before it. */
 export function parseJevSetpoints(entity: EntityState | undefined): JevSetpoints | null {
   const raw = entity?.attributes?.setpoints;
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
@@ -493,7 +493,7 @@ export function parseJevSetpoints(entity: EntityState | undefined): JevSetpoints
 
 /** What a decision changed, when it changed something: a phase brought forward, a setpoint moved, a
  * probe set aside, the EC steer's mode, or an alert raised. Null for everything else (no action,
- * waiting, refused, an outcome, and a setpoint the grower set by hand, which Jev only noted). */
+ * waiting, refused, an outcome, and a setpoint the grower set by hand, which the AI assistant only noted). */
 export type JevChange = "phase" | "setpoint" | "probe" | "ec" | "alert" | "other";
 export function jevChange(entry: JevEntry): JevChange | null {
   if (entry.kind !== "decision") return null;

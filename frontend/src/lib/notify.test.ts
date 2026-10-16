@@ -96,8 +96,8 @@ describe("reading what notify_get returns", () => {
       kinds: [
         {
           id: "jev",
-          name: "Jev",
-          detail: "Jev's advice",
+          name: "AI assistant",
+          detail: "The AI assistant's advice",
           codes: ["CS-501"],
           events: ["jev_setpoint"],
         },
@@ -127,8 +127,8 @@ describe("reading what notify_get returns", () => {
       kinds: [
         {
           id: "jev",
-          name: "Jev",
-          detail: "Jev's advice",
+          name: "AI assistant",
+          detail: "The AI assistant's advice",
           codes: ["CS-501"],
           events: ["jev_setpoint"],
         },

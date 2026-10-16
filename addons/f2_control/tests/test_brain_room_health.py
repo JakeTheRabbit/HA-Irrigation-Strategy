@@ -5,9 +5,9 @@ import functools
 from datetime import datetime, timedelta, timezone
 
 import brain_kit as B
-import jev_bridge
+import brain_bridge
 import pytest
-from jev import client as jc
+from brain import client as jc
 from test_brain_wiring import Clock, _zone
 from test_controller import _build, _desc
 from test_jev_controller import KILL, NOW, _states
@@ -26,9 +26,9 @@ def two_zones(monkeypatch):
         client = B.FakeClient(B.judging())
         monkeypatch.setattr(jc, "anthropic", B.FakeSDK(client))
         clock = Clock(NOW.timestamp())
-        monkeypatch.setattr(jev_bridge, "Asker", functools.partial(jc.Asker, threaded=False, clock=clock))
-        monkeypatch.setattr(jev_bridge, "Meter", functools.partial(jc.Meter, clock=clock))
-        monkeypatch.setattr(jev_bridge, "Routes", functools.partial(jc.Routes, sleep=lambda s: None))
+        monkeypatch.setattr(brain_bridge, "Asker", functools.partial(jc.Asker, threaded=False, clock=clock))
+        monkeypatch.setattr(brain_bridge, "Meter", functools.partial(jc.Meter, clock=clock))
+        monkeypatch.setattr(brain_bridge, "Routes", functools.partial(jc.Routes, sleep=lambda s: None))
         states = _states()
         states["sensor.crop_steering_engine_config"] = ("ok", _desc(
             enable_flag=KILL, num=2, valves={"1": "switch.v1", "2": "switch.v2"}))

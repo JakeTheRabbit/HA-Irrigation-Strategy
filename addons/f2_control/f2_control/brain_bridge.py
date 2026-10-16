@@ -1,7 +1,7 @@
-"""The controller's side of Jev: build the brain, feed it each zone's pass, apply what it admits.
+"""The controller's side of the AI assistant: build the brain, feed it each zone's pass, apply what it admits.
 
-Every function here is called inside a try/except in the controller: whatever goes wrong in Jev, the
-zone is decided and watered by the base engine exactly as it would be without it (docs/JEV.md).
+Every function here is called inside a try/except in the controller: whatever goes wrong in the AI assistant, the
+zone is decided and watered by the base engine exactly as it would be without it (docs/AI_ASSISTANT.md).
 """
 from __future__ import annotations
 
@@ -12,57 +12,63 @@ import sys
 from datetime import datetime, timedelta
 from functools import partial
 
-from jev import client as jev_client
-from jev.brain import Brain
-from jev.client import (DEFAULT_MODEL, PRICES, Asker, Meter, Route, Routes, anthropic_base_url, anthropic_key,
-                        base_url_ok, call, call_anthropic, call_typesafe, make_client, price_key, show_url)
-from jev.context import Shot, ZoneContext, ZoneHistory, response, words_response
-from jev.doctrine import DEFAULT_ARC, ArcInvalid, stage_intent, stage_rows
-from jev.doctrine import STAGE_ARC as STAGE_ROWS
-from jev import feed as jev_feed
-from jev import journal as jn
-from jev.enrich import enrich
-from jev.judges.channel import ChannelJudge
-from jev.prompt import Prompt
-from jev.judges.balance import HARDWARE as ZONES_HARDWARE
-from jev.judges.balance import BalanceJudge
-from jev.judges.dawn import DawnJudge
-from jev.judges.dusk import DuskJudge
-from jev.judges.night import NightJudge
-from jev.judges.probe import ProbeJudge
-from jev.judges.ramp import RampJudge
-from jev.judges.salt import SaltJudge
-from jev.judges.setpoints import CHOICES, MOVES, SHOT, THRESHOLD, SetpointsJudge
-from jev.judges.setpoints import band as setpoint_band
-from jev.judges.shot import ShotJudge
-from jev.judges import targets as targets_judge
-from jev.judges.targets import ShotSizeJudge, TargetsJudge
-from jev.judges.stage import StageJudge
-from jev.judges.zones import ZonesJudge
-from jev.envelope import Directive, admit
-from jev.journal import Journal
-from jev.ledger import Ledger
-from jev import council
-from jev import plan_task as jev_plan
-from jev import powers as jev_powers
-from jev.setpoint_memory import SetpointMemory
+from brain import client as jev_client
+from brain.brain import Brain
+from brain.client import (DEFAULT_MODEL, PRICES, Asker, Meter, Route, Routes, anthropic_base_url, anthropic_key,
+                        base_url_ok, call_anthropic, make_client, price_key, show_url)
+from brain.context import Shot, ZoneContext, ZoneHistory, response, words_response
+from brain.doctrine import DEFAULT_ARC, ArcInvalid, stage_intent, stage_rows
+from brain.doctrine import STAGE_ARC as STAGE_ROWS
+from brain import feed as jev_feed
+from brain import journal as jn
+from brain.enrich import enrich
+from brain.judges.channel import ChannelJudge
+from brain.prompt import Prompt
+from brain.judges.balance import HARDWARE as ZONES_HARDWARE
+from brain.judges.balance import BalanceJudge
+from brain.judges.dawn import DawnJudge
+from brain.judges.dusk import DuskJudge
+from brain.judges.night import NightJudge
+from brain.judges.probe import ProbeJudge
+from brain.judges.ramp import RampJudge
+from brain.judges.salt import SaltJudge
+from brain.judges.setpoints import CHOICES, MOVES, SHOT, THRESHOLD, SetpointsJudge
+from brain.judges.setpoints import band as setpoint_band
+from brain.judges.shot import ShotJudge
+from brain.judges import targets as targets_judge
+from brain.judges.targets import ShotSizeJudge, TargetsJudge
+from brain.judges.stage import StageJudge
+from brain.judges.zones import ZonesJudge
+from brain.envelope import Directive, admit
+from brain.journal import Journal
+from brain.ledger import Ledger
+from brain import council
+from brain import plan_task as jev_plan
+from brain import powers as jev_powers
+from brain.setpoint_memory import SetpointMemory
 
 ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel", "balance", "feed", "report", "why",
        "plan", "targets", "shotsize")
-# The judges behind the two powers that came with the power switches: asked whatever jev_judges lists, because their
-# power switches (off until the owner turns them on) decide whether they act; off, they advise.
+# The judges behind the two powers that came with the power switches: always asked, because their power switches (off
+# until the owner turns them on) decide whether they act; off, they advise.
 POWER_JUDGES = ("targets", "shotsize")
-RETIRED = "alerts"  # the alert-urgency judge the decaying re-notify replaced: a copied old jev_judges still names it
-# The judges that came after it: an explicit list that still names it was written before them.
-SINCE_RETIRED = ("stage", "setpoints", "channel", "balance", "feed", "report", "why", "plan")
-_retired_said = False  # the note about a copied old jev_judges is logged once a process, not on every rebuild
+# Every name a judge list could hold when the AI assistant moved to Claude (3.12): the judges then, and the retired
+# alert-urgency judge ("alerts", replaced by the decaying re-notify) an old list may still name.
+KNOWN_AT_MOVE = frozenset(ALL) | {"alerts"}
+# What the old jev_* options are now called: the controller reads each under its new name, the old one as an alias.
+OLD_NAMES = {f"ai_{k}": f"jev_{k}" for k in ("judges", "daily_calls", "budget_warn_pct", "reask_max", "unsure_below",
+                                             "strict_after", "strict_prob", "flower_start", "flower_days")}
+MOVED = "legacy_route_removed"  # BrainStatus.notice: the options name the removed first AI route (CS-712 once)
+_upgrade_said = False  # the note about an old jev_judges list read as all is logged once a process
 PENDING_S = 300  # a write Home Assistant has not reflected yet is not an operator's edit for this long
 RETRIES = 3  # a write still not read back is sent again this many times, PENDING_S apart and doubling, then failed
 REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the old value back
 PAUSE_H = 48  # and the zone's setpoints are left alone this long
-# Only Jev's own code writes these into /data, so any one of them (empty or unreadable too) says Jev has run here.
-JEV_FILES = ("jev_usage.json", "jev_ledger.jsonl", "jev_journal.jsonl", "jev_setpoints.json")
-PRODUCT = "Crop Steering Controller"  # controller.PRODUCT: the `engine` value on what Jev publishes
+# Only the brain writes these into /data (each keeps the name it was given first, so an old install keeps its
+# record), so any one of them (empty or unreadable too) says it has run here.
+BRAIN_FILES = ("jev_usage.json", "jev_ledger.jsonl", "jev_journal.jsonl", "jev_setpoints.json")
+PRODUCT = "Crop Steering Controller"  # controller.PRODUCT: the `engine` value on what the AI assistant publishes
+# jev_legacy names the removed first route: an old options.json may still hold it (moved_from_legacy reads it).
 PROVIDERS = ("auto", "rules", "claude_haiku", "jev_legacy")
 NOTICES = "brain_notices.json"  # {"cs712": "<release>"}: the retired-route card is shown once a release
 REPORTS = "brain_report.json"  # {room: {"grow_day", "asked_at", "report"}}: the daily report, across a restart
@@ -71,11 +77,16 @@ REPORT_QUESTION = {"report": {"type": "report", "instructions": "Write the repor
                                                                 "with write_report."}}
 # The judges whose answers can act (the rest advise); empty on the panel while the brain cannot act.
 ACTING_JUDGES = ("dawn", "ramp", "salt", "dusk", "probe", "setpoints", "targets", "shotsize")
-# Each acting judge's power (jev.powers): with it off the judge only advises.
+# Each acting judge's power (brain.powers): with it off the judge only advises.
 JUDGE_POWER = {"dawn": "advance_phase", "dusk": "advance_phase", "ramp": "ramp_control", "salt": "ec_mode",
                "probe": "set_probe_aside", "setpoints": "nudge_setpoints", "targets": "set_targets_from_achievable",
                "shotsize": "tune_shot_sizes"}
 AI_BY = "AI assistant"  # the writer the setpoint change log names for a power's write (who: brain, no overlay)
+# The Setpoints judge's own writes and put-backs (who: brain, an overlay that expires; who: safety). A pending write
+# saved by an older release names its writer "Jev": OURS reads both.
+SETPOINTS_BY = "AI setpoints judge"
+PUT_BACK_BY = f"{SETPOINTS_BY} (put back)"
+OURS = (SETPOINTS_BY, "Jev")
 DAYS_KEEP = 7  # grow-days of each zone's scorecard kept for the targets and shot size judges
 CHANGES_KEEP = 10  # the AI assistant's own changes kept per zone, with what it expected
 FRIENDLY = "AI assistant"
@@ -98,28 +109,32 @@ def judges():
             ShotSizeJudge()]
 
 
-def routes(options, cf):
-    """Every legacy route Jev has, in the order they are tried: TypeSafe direct when its key is set, then
-    Cloudflare's /ai/run when its account and token are."""
-    account, token, gateway = cf
-    found = []
-    typesafe = str(options.get("typesafe_api_key") or "").strip()
-    if typesafe:
-        found.append(Route("TypeSafe", call_typesafe, "typesafe", typesafe))
-    if account and token:
-        found.append(Route("Cloudflare", call, account, token, gateway or None))
-    return found
+def option(options, name, default):
+    """The option `name` (ai_*), or its old jev_* name: the Supervisor fills the new key in with its default on
+    update, so a new key still at its default gives way to a value the operator saved under the old one."""
+    new, old = options.get(name), options.get(OLD_NAMES.get(name, ""))
+    if new is not None and new != "" and new != default:
+        return new
+    if old is not None and old != "":
+        return old
+    return default if new is None or new == "" else new
 
 
 def has_run(data):
-    """True when a file only Jev writes is in `data` (the state file's folder): this install has run Jev before."""
-    return any(os.path.lexists(os.path.join(data, name)) for name in JEV_FILES)
+    """True when a file only the AI assistant writes is in `data` (the state file's folder): it has run here."""
+    return any(os.path.lexists(os.path.join(data, name)) for name in BRAIN_FILES)
 
 
-def jev_lineage(options, data):
-    """JEV lineage evidence, first match wins (haiku-brain-design 4.3): a usage file that names the brain which wrote
-    it says so (claude_haiku does not count); else any file only Jev writes; else a TypeSafe key, an option only the
-    Jev line ever had. Never `jev_enabled`, which the Supervisor fills in from defaults."""
+def legacy_settings(options):
+    """True when the options still hold settings of the removed first AI route: its Cloudflare or TypeSafe keys."""
+    cf = all(str(options.get(k) or "").strip() for k in ("cf_account_id", "cf_api_token"))
+    return cf or bool(str(options.get("typesafe_api_key") or "").strip())
+
+
+def lineage(options, data):
+    """True when this install ran the removed first AI route, first match wins: a usage file that names the brain
+    which wrote it says so; else any file only the brain writes; else a key only that route had. Never
+    `jev_enabled`, which the Supervisor fills in from defaults."""
     try:
         with open(os.path.join(data, "jev_usage.json"), encoding="utf-8") as fh:
             saved = json.load(fh)
@@ -134,13 +149,13 @@ def jev_lineage(options, data):
 @dataclasses.dataclass(frozen=True)
 class BrainStatus:
     """Which brain runs and why, decided once at start (resolve_provider); the brain panel says it in every case."""
-    provider: str  # rules, claude_haiku or jev_legacy
-    state: str  # rules, rules_no_key, model_invalid, sdk_missing, brain_off, start_failed, acting, dry_run, legacy
+    provider: str  # rules or claude_haiku
+    state: str  # rules, rules_no_key, model_invalid, sdk_missing, brain_off, start_failed, acting, dry_run
     words: str
     model: str | None = None
     key_set: bool = False
-    deprecated_route: bool = False
-    notice: str | None = None  # cloudflare_route_retired: Cloudflare settings no brain uses now (CS-712 once)
+    deprecated_route: bool = False  # always False now that no retired route runs; the panel keeps the field
+    notice: str | None = None  # legacy_route_removed: the options name the removed first route (CS-712 once)
     since: str = ""
 
 
@@ -148,23 +163,36 @@ def _now():
     return datetime.now().isoformat(timespec="seconds")
 
 
-def resolve_provider(options, cf, data):
+def moved_from_legacy(options, data):
+    """True when these options chose the removed first AI route: brain_provider jev_legacy, or auto on an install
+    that ran it with its settings still saved. Such an install moves to Claude when it has a key, else to rules."""
+    provider = str(options.get("brain_provider") or "auto").strip()
+    if provider == "jev_legacy":
+        return True
+    return provider not in ("rules", "claude_haiku") and legacy_settings(options) and lineage(options, data)
+
+
+def resolve_provider(options, data):
     """The BrainStatus for these options and the /data folder `data`. Pure: no network, never the key's value."""
     provider = str(options.get("brain_provider") or "auto").strip()
     provider = provider if provider in PROVIDERS else "auto"
     model = str(options.get("anthropic_model") or DEFAULT_MODEL).strip()
     key = bool(anthropic_key(options))
     base = anthropic_base_url(options)
-    legacy = bool(routes(options, cf))
+    moved = moved_from_legacy(options, data)
+    notice = MOVED if moved or legacy_settings(options) else None
 
-    def rules(state, words, notice=None):
+    def rules(state, words):
         return BrainStatus("rules", state, words, key_set=key, notice=notice, since=_now())
 
     if provider == "rules":
         return rules("rules", "Rules.")
-    if provider == "claude_haiku":
+    if provider == "claude_haiku" or moved:
+        if moved and options.get("jev_enabled", True) is False:
+            return rules("brain_off", "Rules (brain off).")
         if not key:
-            return rules("rules_no_key", "Rules: no Anthropic key.")
+            return rules("rules_no_key", "Rules: no Anthropic key." + (
+                " The first AI route was removed: choose claude_haiku and add an Anthropic key." if moved else ""))
         if base and not base_url_ok(base):
             return rules("start_failed", "Rules: anthropic_base_url is not an http or https address. Correct it or "
                                          "make it blank.")
@@ -178,20 +206,8 @@ def resolve_provider(options, cf, data):
         dry = options.get("brain_dry_run") is True
         return BrainStatus("claude_haiku", "dry_run" if dry else "acting",
                            "Claude Haiku, advising only." if dry else "Claude Haiku, acting.", model=model,
-                           key_set=True, since=_now())
-    if options.get("jev_enabled", True) is False:
-        return rules("brain_off", "Rules (brain off).")
-    if provider == "jev_legacy":
-        if not legacy:
-            return rules("rules_no_key", "Rules: no Jev credentials.")
-        return BrainStatus("jev_legacy", "legacy", "Jev (retired route). Switch to Claude Haiku.", key_set=key,
-                           deprecated_route=True, since=_now())
-    if legacy and jev_lineage(options, data):
-        return BrainStatus("jev_legacy", "legacy", "Jev (retired route, still running). Switch to Claude Haiku.",
-                           key_set=key, deprecated_route=True, since=_now())
-    if legacy:
-        return rules("rules", "Rules.", notice="cloudflare_route_retired")
-    return rules("rules", "Rules. Choose Claude Haiku and add a key to turn the brain on.")
+                           key_set=True, notice=notice, since=_now())
+    return rules("rules", "Rules." if notice else "Rules. Choose Claude Haiku and add a key to turn the brain on.")
 
 
 def start_failed():
@@ -199,27 +215,43 @@ def start_failed():
                                                 "why.", since=_now())
 
 
-def build(options, cf, state_path, log, status=None):
-    """The brain, or None when rules run (BrainStatus says why). Under claude_haiku its one route is the Anthropic
-    API (or the router at anthropic_base_url) with the key, a Meter for the budget and the cached prompt; under jev_legacy every legacy route it has,
-    TypeSafe first, each retried while a failure may pass (jev.client.Routes), exactly as before."""
+def judge_names(options, log):
+    """The judges asked. `ai_judges` is honoured as written: all (the default), or a list of names. The old
+    `jev_judges` counts only while ai_judges is all. A list there was written for the first AI route, before the move
+    to Claude: when every name in it is one known then, it is read as all, and the log says once which judges that
+    adds. A list that names one never known then was not copied from that route's list, and is honoured as a list."""
+    global _upgrade_said
+    new = str(options.get("ai_judges") or "all").replace(" ", "")
+    if new not in ("", "all"):
+        return set(new.split(",")) & set(ALL)
+    old = [n for n in str(options.get("jev_judges") or "all").replace(" ", "").split(",") if n]
+    if not old or old == ["all"]:
+        return set(ALL)
+    if not set(old) <= KNOWN_AT_MOVE:
+        return set(old) & set(ALL)
+    added = [j for j in ALL if j not in old]
+    if added and not _upgrade_said:
+        _upgrade_said = True
+        log(f"brain: the old jev_judges list ({', '.join(old)}) is read as all judges, so the AI assistant also "
+            f"asks {', '.join(added)}. To ask fewer, list them in ai_judges")
+    return set(ALL)
+
+
+def build(options, state_path, log, status=None):
+    """The brain, or None when rules run (BrainStatus says why). Its one route is the Anthropic API (or the router at
+    anthropic_base_url) with the key, a Meter for the budget and the cached prompt, retried while a failure may pass
+    (brain.client.Routes)."""
     data = os.path.dirname(state_path) or "."
-    status = status or resolve_provider(options, cf, data)
+    status = status or resolve_provider(options, data)
+    if status.notice == MOVED:
+        log("brain: these options name the first AI route, which this release removed"
+            + (f", so the AI assistant uses {status.model} with your Anthropic key" if status.provider != "rules"
+               else ", so the controller uses its rules until you choose claude_haiku and add an Anthropic key")
+            + ". Its old Cloudflare and TypeSafe settings are not used")
     if status.provider == "rules":
-        if status.notice == "cloudflare_route_retired":
-            log("jev: off. The Cloudflare credentials start Jev only on an install that has run it before, and no Jev"
-                f" file is in {data}; set brain_provider to jev_legacy to keep the old route")
         return None
     jev_client.log = log
-    wanted = str(options.get("jev_judges") or "all").replace(" ", "")
-    allowed = set(ALL) if wanted in ("", "all") else set(wanted.split(",")) & set(ALL)
-    _say_retired(wanted, allowed, log)
-    if status.provider == "claude_haiku":
-        allowed |= set(POWER_JUDGES)  # their power switches decide whether they act
-    haiku = status.provider == "claude_haiku"
-    if not haiku:
-        allowed.discard("balance")  # its answer reaches the setpoints judge only through the Claude route's evidence
-        allowed -= set(POWER_JUDGES)  # set_values is a Claude tool: no legacy route can answer them
+    allowed = judge_names(options, log) | set(POWER_JUDGES)  # their power switches decide whether they act
     arc = str(options.get("stage_arc") or DEFAULT_ARC).strip()
     try:
         rows, arc_note = stage_rows(arc), None
@@ -227,64 +259,42 @@ def build(options, cf, state_path, log, status=None):
         rows, arc_note = (), (f"The stage arc {arc} is not complete in this release ({e}), so no stage arc is used. "
                               "Choose slab_default.")
     dry = options.get("brain_dry_run") is True
-    meter = prompt = None
-    if status.provider == "claude_haiku":
-        budget = options.get("anthropic_daily_budget_usd")
-        budget = 1.0 if budget is None else max(0.0, float(budget))
-        meter = Meter(budget, status.model, warn_pct=float(options.get("jev_budget_warn_pct", 80)))
-        prompt = Prompt(rows, arc if rows else None)
-        key, base = anthropic_key(options), anthropic_base_url(options)
-        found = [Route("Anthropic", partial(call_anthropic, model=status.model, prompt=prompt, meter=meter,
-                                            client=make_client(key, base)), "anthropic", key)]
-    else:
-        found = routes(options, cf)
-    first = found[0]
-    asker = Asker(first.account, first.token, first.gateway, daily_budget=int(options.get("jev_daily_calls", 5000)),
-                  transport=Routes(found, tries=int(options.get("jev_retries", 3))),
-                  warn_pct=float(options.get("jev_budget_warn_pct", 80)), meter=meter)
+    budget = options.get("anthropic_daily_budget_usd")
+    budget = 1.0 if budget is None else max(0.0, float(budget))
+    warn_pct = float(option(options, "ai_budget_warn_pct", 80))
+    meter = Meter(budget, status.model, warn_pct=warn_pct)
+    prompt = Prompt(rows, arc if rows else None)
+    key, base = anthropic_key(options), anthropic_base_url(options)
+    found = [Route("Anthropic", partial(call_anthropic, model=status.model, prompt=prompt, meter=meter,
+                                        client=make_client(key, base)), "anthropic", key)]
+    asker = Asker("anthropic", key, None, daily_budget=int(option(options, "ai_daily_calls", 5000)),
+                  transport=Routes(found, tries=int(options.get("jev_retries", 3))), warn_pct=warn_pct, meter=meter)
     ledger = Ledger(os.path.join(data, "jev_ledger.jsonl"))
-    names = [r.name for r in found]
-    if meter is not None:
-        log(f"brain: claude_haiku, model {status.model}, budget US${meter.budget:.2f} until lights-on, key set"
-            + (f", through the router at {show_url(base)}" if base else "")
-            + (", advising only (dry run)" if dry else "") + f", judges {', '.join(sorted(allowed))}")
-        log(prompt.describe())
-    else:
-        log(f"jev: on via {' then '.join(names)}, judges {', '.join(sorted(allowed))}, {asker.daily_budget} calls a "
-            "day (deprecated; brain_provider: claude_haiku replaces it)" + (", advising only (dry run)" if dry else ""))
+    log(f"brain: claude_haiku, model {status.model}, budget US${meter.budget:.2f} until lights-on, key set"
+        + (f", through the router at {show_url(base)}" if base else "")
+        + (", advising only (dry run)" if dry else "") + f", judges {', '.join(sorted(allowed))}")
+    log(prompt.describe())
     brain = Brain(asker, ledger, judges(), allowed=allowed, log=log,
-                  reask_max=int(options.get("jev_reask_max", 2)),
-                  unsure_below=float(options.get("jev_unsure_below", 0.7)),
-                  strict_after=int(options.get("jev_strict_after", 3)),
-                  strict_prob=float(options.get("jev_strict_prob", 0.8)),
-                  enrich=enrich if haiku else None, dry_run=dry)
-    brain.routes, brain.status, brain.prompt = names, status, prompt
+                  reask_max=int(option(options, "ai_reask_max", 2)),
+                  unsure_below=float(option(options, "ai_unsure_below", 0.7)),
+                  strict_after=int(option(options, "ai_strict_after", 3)),
+                  strict_prob=float(option(options, "ai_strict_prob", 0.8)),
+                  enrich=enrich, dry_run=dry)
+    brain.routes, brain.status, brain.prompt = [r.name for r in found], status, prompt
     brain.arc, brain.arc_rows, brain.arc_note = arc, rows, arc_note
     brain.journal = Journal(os.path.join(data, "jev_journal.jsonl"))
     brain.setpoints = SetpointMemory(os.path.join(data, "jev_setpoints.json"))
     brain.usage_path = os.path.join(data, "jev_usage.json")
     restore_usage(asker, brain.usage_path)
-    save_usage(brain)  # names this brain in /data before its first ask: the next start reads it (jev_lineage)
-    brain.feed = jev_feed.Feed(asker, feed_meta) if haiku and "feed" in allowed else None
-    brain.report = haiku and "report" in allowed  # write_report is a Claude tool: no legacy route can answer it
+    save_usage(brain)  # names this brain in /data before its first ask: the next start reads it (lineage)
+    brain.feed = jev_feed.Feed(asker, feed_meta) if "feed" in allowed else None
+    brain.report = "report" in allowed
     brain.report_path = os.path.join(data, REPORTS)
-    brain.why = haiku and "why" in allowed  # only the Claude route has the answer_why tool
-    brain.plan = jev_plan.PlanTask(asker, plan_meta) if haiku and "plan" in allowed else None
-    brain.flower_start = flower_option(options.get("jev_flower_start"))
-    brain.flower_days = int(options.get("jev_flower_days") or 56)
+    brain.why = "why" in allowed
+    brain.plan = jev_plan.PlanTask(asker, plan_meta) if "plan" in allowed else None
+    brain.flower_start = flower_option(option(options, "ai_flower_start", ""))
+    brain.flower_days = int(option(options, "ai_flower_days", 56) or 56)
     return brain
-
-
-def _say_retired(wanted, allowed, log):
-    """A jev_judges that names the retired alerts judge was copied from an old install: the name is dropped like any
-    unknown one, and the log says once which newer judges the list leaves off."""
-    global _retired_said
-    missing = [j for j in SINCE_RETIRED if j not in allowed]
-    if _retired_said or RETIRED not in wanted.split(",") or not missing:
-        return
-    _retired_said = True
-    log(f"brain: jev_judges names the retired {RETIRED} judge, which is ignored. It lists its judges one by one, so "
-        f"the newer judges {', '.join(missing)} are not asked. Set jev_judges to all to ask every judge")
 
 
 def plan_meta(room, now):
@@ -302,7 +312,7 @@ def feed_meta(room, now):
 
 
 def flower_option(value):
-    """`jev_flower_start`: one entity or date for every room, or `room=value` pairs, comma separated.
+    """`ai_flower_start` (old name jev_flower_start): one entity or date for every room, or `room=value` pairs, comma separated.
     e.g. "input_datetime.flip" or "default=input_datetime.f2_flip_date, f1=input_datetime.f1_flip_date"."""
     out = {}
     for part in str(value or "").split(","):
@@ -340,8 +350,8 @@ def haiku(c):
 
 
 def _status(brain):
-    """The brain's BrainStatus; a brain built without one (a test, a script) is a legacy brain."""
-    return getattr(brain, "status", None) or BrainStatus("jev_legacy", "legacy", "Jev.")
+    """The brain's BrainStatus; a brain built without one (a test, a script) is taken as acting."""
+    return getattr(brain, "status", None) or BrainStatus("claude_haiku", "acting", "Claude Haiku, acting.")
 
 
 def _setting(c, room, zone, suffix):
@@ -487,9 +497,9 @@ def tick(c, room, zone, snap, p, now, lights_on):
     return out
 
 
-# ---------- the Setpoints judge's side (docs/JEV.md) ----------
+# ---------- the Setpoints judge's side (docs/AI_ASSISTANT.md) ----------
 def owns_setpoints(c):
-    """True when Jev's Setpoints judge runs: it then owns each zone's P2 shot size and re-water threshold."""
+    """True when the AI assistant's Setpoints judge runs: it then owns each zone's P2 shot size and re-water threshold."""
     brain = getattr(c, "jev", None)
     return brain is not None and any(j.name == "setpoints" for j in getattr(brain, "judges", ()))
 
@@ -618,7 +628,7 @@ def hand_back(c, room, zone, p, now):
 
 
 def _zone_number(c, room, zone, suffix):
-    """The zone's OWN number for `suffix`, or None: Jev never moves a room-level value."""
+    """The zone's OWN number for `suffix`, or None: the AI assistant never moves a room-level value."""
     raw = c._jev_read(f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}")
     try:
         return round(float(raw), 2)
@@ -637,7 +647,7 @@ def _note(c, room, zone, verdict, action, result, reason):
 def setpoint_view(c, room, zone, p, now):
     """What the Setpoints judge may move on this zone tonight (ZoneContext.setpoints), or None.
 
-    The operator's own value ("home") is the centre of each band. A value Jev did not write is the operator's:
+    The operator's own value ("home") is the centre of each band. A value the AI assistant did not write is the operator's:
     it becomes the new home, so an edit by hand always wins and the band follows it."""
     mem = getattr(getattr(c, "jev", None), "setpoints", None)
     if mem is None or not owns_setpoints(c):
@@ -653,7 +663,7 @@ def setpoint_view(c, room, zone, p, now):
             continue
         current[suffix] = v
         if fresh and pending.get("suffix") == suffix and abs(v - pending["from"]) < 1e-6:
-            continue  # Jev's write has not reached Home Assistant yet
+            continue  # the AI assistant's write has not reached Home Assistant yet
         expected = rec["written"].get(suffix, rec["home"].get(suffix))
         if expected is None or abs(v - float(expected)) > 1e-6:
             home = rec["home"].get(suffix)
@@ -697,9 +707,9 @@ def _pending(suffix, frm, to, by, now):
 
 
 def readback(c, room, zone, now):
-    """Read back the zone's number after a Jev write (SF-25): landed, it is done; an edit by hand since then is the
+    """Read back the zone's number after a AI assistant write (SF-25): landed, it is done; an edit by hand since then is the
     operator's (setpoint_view); still the old value or unreadable, it is sent again with a doubling wait, and after
-    RETRIES it is recorded as failed and Jev's memory goes back to the value Home Assistant still holds."""
+    RETRIES it is recorded as failed and the AI assistant's memory goes back to the value Home Assistant still holds."""
     mem = getattr(getattr(c, "jev", None), "setpoints", None)
     rec = None if mem is None else mem.zone(room.slug, zone)
     pend = (rec or {}).get("pending") or {}
@@ -713,8 +723,8 @@ def readback(c, room, zone, now):
         return
     if now < datetime.fromisoformat(pend["next"]):
         return
-    # Jev's own move stops when the operator stops automatic targets; a put-back restores theirs, so it never does
-    allowed = pend["by"] != "Jev" or (owns_setpoints(c) and not getattr(room, "strategy_required", False)
+    # The AI assistant's own move stops when the operator stops automatic targets; a put-back restores theirs, so it never does
+    allowed = pend["by"] not in OURS or (owns_setpoints(c) and not getattr(room, "strategy_required", False)
                                       and c._on(f"switch.crop_steering_{room.prefix}auto_setpoints", False))
     if allowed and pend["tries"] < RETRIES:
         pend["tries"] += 1
@@ -726,7 +736,7 @@ def readback(c, room, zone, now):
     rec["pending"] = None
     rec["written"][suffix] = frm  # what Home Assistant still holds is not an edit by hand
     last = rec.get("last") or {}
-    if pend["by"] == "Jev" and last.get("suffix") == suffix and last.get("to") == to:
+    if pend["by"] in OURS and last.get("suffix") == suffix and last.get("to") == to:
         last["failed"] = True
     mem.save()
     why = (f"Home Assistant still shows {frm:g} after {pend['tries'] + 1} tries" if allowed
@@ -764,17 +774,17 @@ def apply_setpoint(c, room, zone, d, ctx, now):
     mem = c.jev.setpoints
     rec = mem.zone(room.slug, zone)
     learn = room.state[zone].get("learn") if isinstance(room.state[zone].get("learn"), dict) else {}
-    wrote = c._auto_write(room, zone, v["suffix"], float(v["from"]), float(v["to"]), learn, now, by="Jev")
+    wrote = c._auto_write(room, zone, v["suffix"], float(v["from"]), float(v["to"]), learn, now, by=SETPOINTS_BY)
     rec["written"][v["suffix"]] = float(v["to"])
-    rec["pending"] = _pending(v["suffix"], float(v["from"]), float(v["to"]), "Jev", now)
+    rec["pending"] = _pending(v["suffix"], float(v["from"]), float(v["to"]), SETPOINTS_BY, now)
     rec["last"] = {"suffix": v["suffix"], "from": float(v["from"]), "to": float(v["to"]),
                    "at": now.isoformat(timespec="seconds"), "day": (ctx.setpoints or {}).get("day"),
                    "words": v["words"], "choice": v["choice"], "reverted": False}
     mem.save()
-    # For the phones that tick Jev (docs/NOTIFICATIONS.md): no card, a push only, with Keep and Undo for the
+    # For the phones that tick the AI assistant (docs/NOTIFICATIONS.md): no card, a push only, with Keep and Undo for the
     # number written (an AI overlay in the integration).
     c._notify_event("jev_setpoint", room, zone, v["words"],
-                    f"{CHOICES.get(v['choice'], v['choice'])} Jev's Setpoints judge, {d.why}.",
+                    f"{CHOICES.get(v['choice'], v['choice'])} the AI assistant's Setpoints judge, {d.why}.",
                     *([f"number.crop_steering_{room.prefix}zone_{zone}_{v['suffix']}"] if wrote else []))
 
 
@@ -794,12 +804,12 @@ def guard_setpoints(c, room, zone, now):
     if rescue is None:
         return
     cur = _zone_number(c, room, zone, last["suffix"])
-    if cur is not None and abs(cur - float(last["to"])) < 1e-6:  # still Jev's value: put the operator's back
+    if cur is not None and abs(cur - float(last["to"])) < 1e-6:  # still the AI assistant's value: put the operator's back
         learn = room.state[zone].get("learn") if isinstance(room.state[zone].get("learn"), dict) else {}
         c._auto_write(room, zone, last["suffix"], float(last["to"]), float(last["from"]), learn, now,
-                      by="Jev (put back)")
+                      by=PUT_BACK_BY)
         rec["written"][last["suffix"]] = float(last["from"])
-        rec["pending"] = _pending(last["suffix"], float(last["to"]), float(last["from"]), "Jev (put back)", now)
+        rec["pending"] = _pending(last["suffix"], float(last["to"]), float(last["from"]), PUT_BACK_BY, now)
     last["reverted"] = True
     rec["frozen_until"] = (now + timedelta(hours=PAUSE_H)).isoformat(timespec="seconds")
     mem.save()
@@ -814,16 +824,16 @@ def guard_setpoints(c, room, zone, now):
 
 
 def advance(c, room, zone, snap, d, now, p=None):
-    """Move the zone forward one phase as Jev judged, with the bookkeeping the engine does itself (a ramp handed
+    """Move the zone forward one phase as the AI assistant judged, with the bookkeeping the engine does itself (a ramp handed
     over while it stalls re-waters under what it reached: Controller._record_phase)."""
     st = room.state[zone]
     was, st["phase"] = st["phase"], d.value
-    c._record_phase(room, zone, st, was, d.value, now, f"Jev's {d.judge} judge: {d.why}", snap, p)
+    c._record_phase(room, zone, st, was, d.value, now, f"the AI assistant's {d.judge} judge: {d.why}", snap, p)
     st["last_phase_change"] = now
     if d.value == "P1":
         st["shots"] = 0
     c._save_state()
-    c._notify_event("phase", room, zone, was, d.value, f"Jev's {d.judge} judge: {d.why}")
+    c._notify_event("phase", room, zone, was, d.value, f"the AI assistant's {d.judge} judge: {d.why}")
     return dataclasses.replace(snap, phase=d.value, phase_minutes=0.0,
                                **({"shot_count": 0} if d.value == "P1" else {}))
 
@@ -866,7 +876,7 @@ def siblings(c, room, snaps, params, now):
         if v:
             out[zone] = v
     room._jev_sib = out
-    room._jev_params = params  # this pass's params, for the setpoints published with the zone's Jev sensor
+    room._jev_params = params  # this pass's params, for the setpoints published with the zone's AI assistant sensor
 
 
 def stage_info(c, room, now):
@@ -910,11 +920,11 @@ def restore_usage(asker, path):
 
 
 def save_usage(brain):
-    """The usage file, named for the brain that writes it (jev_lineage reads `provider` first). Never the key."""
+    """The usage file, named for the brain that writes it (lineage reads `provider` first). Never the key."""
     path = getattr(brain, "usage_path", None)
     s = brain.asker.stats
     data = {k: s.get(k) for k in USAGE_KEYS}
-    data["provider"] = getattr(getattr(brain, "status", None), "provider", "jev_legacy")
+    data["provider"] = getattr(getattr(brain, "status", None), "provider", "claude_haiku")
     meter = getattr(brain.asker, "meter", None)
     if meter is not None:
         data["meter"] = {k: v for k, v in meter.snapshot().items() if k != "state"}
@@ -932,8 +942,8 @@ def save_usage(brain):
 
 
 def setpoints_published(c, room, zone, now, managed):
-    """What the dashboard shows of the Setpoints judge for a zone: the operator's values, Jev's range around them,
-    the current values, the last move and any pause. None without Jev's Setpoints judge or this pass's params."""
+    """What the dashboard shows of the Setpoints judge for a zone: the operator's values, the AI assistant's range around them,
+    the current values, the last move and any pause. None without the AI assistant's Setpoints judge or this pass's params."""
     mem = getattr(c.jev, "setpoints", None)
     p = (room.__dict__.get("_jev_params") or {}).get(zone)
     if mem is None or p is None or not owns_setpoints(c):
@@ -979,27 +989,30 @@ def _route_card_shown(c):
         pass
 
 
-def route_card(c, room, legacy):
-    """CS-712, once a release (only once Home Assistant has the card): the retired Jev routes."""
+def route_card(c, room):
+    """CS-712, once a release (only once Home Assistant has the card): the options still name the first AI route,
+    which this release removed. The card says what runs instead and what to change."""
     if not _route_card_due(c):
         return
-    if legacy:
-        words = ("The AI assistant of this room still uses a retired Jev route. It continues to work, but it gets no "
-                 "new features. To change, set brain_provider to claude_haiku and add your Anthropic API key.")
+    status = getattr(c, "brain_status", None)
+    if status is not None and status.provider == "claude_haiku":
+        words = ("The first AI route of the AI assistant was removed. This room now uses Claude with your Anthropic "
+                 "API key, with every judge. The water does not change. To stop this message, remove the old "
+                 "Cloudflare and TypeSafe options and set brain_provider to claude_haiku.")
     else:
-        words = ("The controller does not use your Cloudflare settings now, unless you choose them. The AI assistant "
-                 "now uses Claude Haiku, or rules with no key. To keep the old Jev route, set brain_provider to "
-                 "jev_legacy.")
-    if c._jev_alert(room, None, "route", {"code": "CS-712", "title": "the Jev route of the AI assistant is retired",
+        words = ("The first AI route of the AI assistant was removed, so the controller uses its own rules. To turn "
+                 "the AI assistant on again, set brain_provider to claude_haiku and add your Anthropic API key. The "
+                 "old Cloudflare and TypeSafe options are not used.")
+    if c._jev_alert(room, None, "route", {"code": "CS-712", "title": "the first AI route was removed",
                                           "message": words}):
         _route_card_shown(c)
 
 
 def runtime_alerts(c, room):
-    """CS-706 once a day when Jev's calls reach the warning share of the budget (or once a window when the Claude
+    """CS-706 once a day when the AI assistant's calls reach the warning share of the budget (or once a window when the Claude
     brain's spend reaches it), CS-707 when one of this room's zones has a judge go on the stricter gate
     (Brain.events), CS-708 once a window when the Claude brain's budget is spent, CS-709 when its key is refused or it
-    stops answering, and CS-712 on a retired route. A card Home Assistant could not take is raised again."""
+    stops answering, and CS-712 when the options name the removed first route. A card Home Assistant could not take is raised again."""
     brain, asker = c.jev, c.jev.asker
     meter = getattr(asker, "meter", None)
     if asker.take_warning() or (meter is not None and meter.take("warn")):
@@ -1007,7 +1020,7 @@ def runtime_alerts(c, room):
             "code": "CS-706", "title": "the AI assistant used most of the calls of today",
             "message": (f"The AI assistant made {asker.stats.get('calls')} of its {asker.daily_budget} calls today, "
                         "for all rooms. When it uses all the calls, the rules of the controller decide. If this "
-                        "occurs on a usual day, increase jev_daily_calls in the controller options."
+                        "occurs on a usual day, increase ai_daily_calls in the controller options."
                         if meter is None else
                         f"The AI assistant used most of its AI budget of US${meter.budget:.2f} until the next "
                         "lights-on. When it spends the budget, the rules of the controller decide until then.")})
@@ -1034,8 +1047,8 @@ def runtime_alerts(c, room):
                 "message": ("The AI assistant cannot reach Claude. " + _STATE_WORDS.get(meter.state(), "It does "
                             "not answer.") + " The controller uses its own rules.")}):
             meter.again("brain")
-    if _status(brain).deprecated_route:
-        route_card(c, room, legacy=True)
+    if _status(brain).notice == MOVED:
+        route_card(c, room)
 
 
 _STATE_WORDS = {
@@ -1159,7 +1172,7 @@ def _plan_note(c, room, verdict, drift, action, reason, why, result="advised"):
 
 
 def plan_task(c, room, now, view, drifts):
-    """The plan task's pass for the room (jev/plan_task.py), under the Claude brain only: an answer that came in is
+    """The plan task's pass for the room (brain/plan_task.py), under the Claude brain only: an answer that came in is
     read once and picks the suggestion the panel shows for its drift; the room is asked about the highest drift the
     brain may be asked about when it is due, with the kill switch on, no no-touch window and fresh readings (SF-26).
     -> {class: (suggestion, why, action)} for the panel, or None. Never a write, never an arm, edit or disarm."""
@@ -1383,7 +1396,7 @@ def feed_facts(c, room, now):
 
 
 def feed_task(c, room, now):
-    """The Feed task's pass for the room (jev/feed.py): in a room whose feed EC sensor is mapped, asked once a grow-day
+    """The Feed task's pass for the room (brain/feed.py): in a room whose feed EC sensor is mapped, asked once a grow-day
     an hour after lights-on with the kill switch on; a firm proposal is a CS-711 card for a person. Never a write."""
     task = getattr(c.jev, "feed", None)
     if task is None or not room.feed_ec_sensor:
@@ -1497,7 +1510,7 @@ def report_task(c, room, now, ha_set):
 def publish_rules(c, room, now, ha_set):
     """With no brain built, the brain panel still says why rules run (every BrainStatus rules case), and each zone's
     sensor says rules: a state written over REST replaces every attribute, so nothing from an earlier brain shows.
-    The decision log is left as it is (its entries are history). CS-712 once when Cloudflare settings are unused."""
+    The decision log is left as it is (its entries are history). CS-712 once when the options name the removed route."""
     status = getattr(c, "brain_status", None) or start_failed()
     ha_set(f"sensor.crop_steering_{room.prefix}jev", "rules", {
         "provider": "rules", "state": status.state, "state_words": status.words, "key_set": status.key_set,
@@ -1509,8 +1522,8 @@ def publish_rules(c, room, now, ha_set):
                {"judges": {}, "strict": [], "provider": "rules", "friendly_name": f"Zone {zone} AI assistant",
 
                 "engine": PRODUCT})
-    if status.notice == "cloudflare_route_retired":
-        route_card(c, room, legacy=False)
+    if status.notice == MOVED:
+        route_card(c, room)
 
 
 def lights_on(c, room, now):
@@ -1658,7 +1671,7 @@ def why_task(c, room, now, ha_get, ha_set, gates=None):
             "daily_limit": WHY_PER_DAY, "friendly_name": "AI assistant answers", "engine": PRODUCT})
 
 
-# ---------- the AI assistant's powers (docs/JEV.md, "Powers") ----------
+# ---------- the AI assistant's powers (docs/AI_ASSISTANT.md, "Powers") ----------
 def room_powers(c, room, now=None):
     """{power: on} for the room, read from its switches once a pass (a missing switch is the power's default);
     `now` None reads this pass's, once read."""
@@ -1678,7 +1691,7 @@ def powers_published(c, room, now):
 
 
 def _ai(c, room, zone):
-    """The powers' memory for a zone, in jev_setpoints.json beside the Setpoints judge's (jev.setpoint_memory)."""
+    """The powers' memory for a zone, in jev_setpoints.json beside the Setpoints judge's (brain.setpoint_memory)."""
     rec = c.jev.setpoints.zone(room.slug, zone)
     ai = rec.get("ai") if isinstance(rec.get("ai"), dict) else None
     if ai is None:

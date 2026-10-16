@@ -1,4 +1,4 @@
-"""What Jev decided, newest first: every answer it gave, what code did with it, and how it turned out.
+"""What the AI assistant decided, newest first: every answer it gave, what code did with it, and how it turned out.
 
 The ledger keeps only what acted, for track records. The journal keeps every decision, including the answers
 that asked for nothing and the directives code refused, so the dashboard's live log can show the whole story.
@@ -18,7 +18,8 @@ WHY_SHOWN = 10  # ...on the newest this many entries only, so the published list
 TITLES = {
     "dawn": "Morning start", "ramp": "Ramp hand-over", "salt": "Pore EC", "dusk": "Day end",
     "probe": "Probe trust", "shot": "Shot landing", "night": "Night low", "zones": "Zone comparison",
-    "stage": "Stage arc", "setpoints": "Setpoints",
+    "stage": "Stage arc", "setpoints": "Setpoints", "channel": "Water path", "balance": "Room balance",
+    "targets": "Targets", "shotsize": "Shot sizes",
 }
 ADVANCE = {"P1": "start the ramp now", "P2": "hand over to maintenance", "P3": "end the day's watering"}
 EC_MODE = {"hold": "hold the EC steer", "decay": "ease the EC steer back", "steer": "let the EC steer work"}

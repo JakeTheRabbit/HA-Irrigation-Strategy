@@ -4,7 +4,7 @@ Before the table, the same settings had two sets of built-in values: the integra
 (number.py) and the controller's fallbacks (what it uses when neither the zone's nor the room's setting
 can be read, around a Home Assistant restart for example). They disagree for some settings, and both
 are what installed rooms run on today. The table keeps both columns, so this pins each column to the
-values the release before it shipped (Jev 3.11.1, commit 12c6d1a), plus the P3 Time Between Shots
+values the release before it shipped (the AI assistant 3.11.1, commit 12c6d1a), plus the P3 Time Between Shots
 added since at 10 minutes in both, the source-water pH band a new room starts with, 5.5-6.5 (a
 room that has a band keeps its own), the pump prime and main-line lead, at the 2 s and 1 s the
 controller always waited, in both, the P2 Time Between Shots at 0 (off) in both, and the EC-correction

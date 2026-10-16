@@ -42,8 +42,8 @@ def test_a_second_hand_over_the_same_day_replaces_the_first():
     st = _zone(peak=35.2, shots=4)
     H.phase_changed(st, "P1", "P2", day="2026-10-01", how="set by hand")
     st.update(peak=36.1, shots=6)
-    H.phase_changed(st, "P1", "P2", day="2026-10-01", how="Jev's ramp judge: ramp done")
-    assert [(e["value"], e["how"]) for e in st["plateau_hist"]] == [(36.1, "Jev's ramp judge: ramp done")]
+    H.phase_changed(st, "P1", "P2", day="2026-10-01", how="the AI assistant's ramp judge: ramp done")
+    assert [(e["value"], e["how"]) for e in st["plateau_hist"]] == [(36.1, "the AI assistant's ramp judge: ramp done")]
 
 
 def test_only_p1_to_p2_is_a_plateau():

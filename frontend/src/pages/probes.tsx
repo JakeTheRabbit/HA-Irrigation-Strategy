@@ -32,7 +32,7 @@ const asId = (value: unknown) =>
   typeof value === "string" && /^[a-z_]+\.[a-z0-9_]+$/.test(value) ? value : "";
 
 /** Equipment › Probes: is every probe reporting, and believable; which one is off, and since when.
- * Then the valves and pump, the controller's heartbeat and Jev, and, one tap down, the room map and
+ * Then the valves and pump, the controller's heartbeat and the AI assistant, and, one tap down, the room map and
  * the controller's own sensors. */
 export function Probes({
   controller,

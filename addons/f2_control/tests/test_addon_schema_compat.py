@@ -53,16 +53,17 @@ def test_the_brain_options_and_their_defaults():
     assert config["options"]["stage_arc"] == "slab_default"
 
 
-DEPRECATED = {"cf_account_id", "cf_api_token", "cf_gateway_id", "typesafe_api_key", "jev_enabled", "jev_retries"}
-REUSED = {"jev_judges", "jev_reask_max", "jev_unsure_below", "jev_strict_after", "jev_strict_prob",
-          "jev_flower_start", "jev_flower_days", "jev_daily_calls", "jev_budget_warn_pct"}
+REMOVED = {"cf_account_id", "cf_api_token", "cf_gateway_id", "typesafe_api_key", "jev_enabled", "jev_retries"}
+OLD_NAMES = {"jev_judges", "jev_reask_max", "jev_unsure_below", "jev_strict_after", "jev_strict_prob",
+             "jev_flower_start", "jev_flower_days", "jev_daily_calls", "jev_budget_warn_pct"}
 
 
-def test_the_deprecated_jev_route_keys_are_off_the_form_but_still_allowed():
-    """A new install's form leaves the six out; the schema keeps them, so a saved value survives the update.
-    The nine the brain reuses stay on the form."""
+def test_the_old_keys_are_off_the_form_but_still_allowed():
+    """A new install's form shows the ai_* names only; the schema keeps every old key, so a saved value survives the
+    update (the first route's keys to move the install, each jev_* tuning key as the old name of its ai_* key)."""
     config = _config()
     legacy = {k for k in config["schema"] if k.startswith(("cf_", "jev_")) or k == "typesafe_api_key"}
-    assert legacy == DEPRECATED | REUSED
-    assert DEPRECATED.isdisjoint(config["options"]) and REUSED <= set(config["options"])
-    assert all(config["schema"][k].endswith("?") for k in DEPRECATED)
+    assert legacy == REMOVED | OLD_NAMES
+    assert legacy.isdisjoint(config["options"]) and all(config["schema"][k].endswith("?") for k in legacy)
+    assert {"ai_" + k[4:] for k in OLD_NAMES} <= set(config["options"])
+    assert config["options"]["ai_judges"] == "all"

@@ -1,4 +1,4 @@
-"""The AI assistant's powers (docs/JEV.md, "Powers"): one switch per power per room says what the AI assistant may
+"""The AI assistant's powers (docs/AI_ASSISTANT.md, "Powers"): one switch per power per room says what the AI assistant may
 change. Off, its judge still runs and advises, and the envelope refuses to act; a missing switch is the power's
 default, so an install from before the switches does what it did. Two new powers, off until the owner turns them on:
 the AI assistant sets a zone's targets, and its shot sizes, itself; code writes its values as given, clamped only to
@@ -10,17 +10,17 @@ from types import SimpleNamespace
 import pytest
 
 import controller
-import jev_bridge
+import brain_bridge
 import jev_kit as K
-from jev import council
-from jev import powers as pw
-from jev.brain import Brain
-from jev.client import Asker
-from jev.envelope import Directive, admit, cools_down
-from jev.journal import Journal
-from jev.judges import targets as tg
-from jev.ledger import Ledger
-from jev.setpoint_memory import SetpointMemory
+from brain import council
+from brain import powers as pw
+from brain.brain import Brain
+from brain.client import Asker
+from brain.envelope import Directive, admit, cools_down
+from brain.journal import Journal
+from brain.judges import targets as tg
+from brain.ledger import Ledger
+from brain.setpoint_memory import SetpointMemory
 from test_controller import _build, _desc
 
 NIGHT = datetime(2026, 9, 27, 23, 0)  # an hour after lights-off (lights 10:00-22:00)
@@ -100,7 +100,7 @@ def _values_answer(values, expected="the zone reaches 58 tomorrow", confidence=0
 
 
 def test_set_values_is_checked_against_the_questions_own_settings_only():
-    from jev.client import validate_answer
+    from brain.client import validate_answer
 
     lane = {"targets__v0": tg.values("q", {P1: "peak", RESCUE: "floor"})}
 
@@ -266,9 +266,9 @@ def _params():
 
 
 def test_a_night_records_the_zones_card_once_from_its_own_records(tmp_path, monkeypatch):
-    monkeypatch.setattr(jev_bridge, "stage_info", lambda c, room, now: {"pore_ec": [3.5, 6.0]})
+    monkeypatch.setattr(brain_bridge, "stage_info", lambda c, room, now: {"pore_ec": [3.5, 6.0]})
     c, room = _Controller(tmp_path), _room()
-    view = jev_bridge.targets_view(c, room, 1, _params(), NIGHT)
+    view = brain_bridge.targets_view(c, room, 1, _params(), NIGHT)
     (day,) = view["days"]
     assert {k: day[k] for k in ("day", "trusted")} == {"day": "2026-09-27", "trusted": True}
     assert day["p0"] == {"target": 20.0, "actual": 14.5, "hit": False}
@@ -276,42 +276,42 @@ def test_a_night_records_the_zones_card_once_from_its_own_records(tmp_path, monk
     assert day["p2"] == {"ec": 6.6, "band": [3.5, 6.0], "hit": False}
     assert day["p3"] == {"rescues": 0, "hit": True} and day["uniformity"]["hit"]
     assert set(view["current"]) == {FC, P1, THR, RESCUE, tg.GEN_DB}  # the zone's own steering mode's dryback
-    jev_bridge.targets_view(c, room, 1, _params(), NIGHT + timedelta(minutes=30))
-    assert len(jev_bridge._ai(c, room, 1)["days"]) == 1  # once a grow-day
+    brain_bridge.targets_view(c, room, 1, _params(), NIGHT + timedelta(minutes=30))
+    assert len(brain_bridge._ai(c, room, 1)["days"]) == 1  # once a grow-day
     room.state[1]["fc_follow"]["peak"] = None  # a CS-310 day is recorded as not trusted
-    jev_bridge._ai(c, room, 1)["day_recorded"] = None
-    assert "CS-310" in jev_bridge.targets_view(c, room, 1, _params(), NIGHT)["days"][-1]["why"]
+    brain_bridge._ai(c, room, 1)["day_recorded"] = None
+    assert "CS-310" in brain_bridge.targets_view(c, room, 1, _params(), NIGHT)["days"][-1]["why"]
 
 
 def test_the_values_are_written_as_given_from_the_top_with_reason_and_expected_result(tmp_path):
     c, room = _Controller(tmp_path), _room()
-    view = jev_bridge.targets_view(c, room, 1, _params(), NIGHT)
+    view = brain_bridge.targets_view(c, room, 1, _params(), NIGHT)
     d, ctx = _decide({FC: 62.0, P1: 60.0, THR: 54.0, RESCUE: 25.0}, view=view)
-    jev_bridge.apply_values(c, room, 1, d, ctx, NIGHT)
+    brain_bridge.apply_values(c, room, 1, d, ctx, NIGHT)
     by = "AI assistant (targets)"
     assert c.writes == [(FC, 52.0, 62.0, by), (P1, 50.0, 60.0, by), (THR, 45.0, 54.0, by), (RESCUE, 30.0, 25.0, by)]
     assert all(reason == f"because {k}" and expected == "the zone reaches 58 tomorrow" for k, reason, expected in
                c.claims)
     [(event, _zone, (words, why))] = c.events
     assert event == "jev_setpoint" and "p3 emergency vwc threshold 30 -> 25" in words and "58 tomorrow" in why
-    [change] = jev_bridge._ai(c, room, 1)["changes"]
+    [change] = brain_bridge._ai(c, room, 1)["changes"]
     assert change["values"][P1] == [50.0, 60.0] and change["expected"] == "the zone reaches 58 tomorrow"
-    assert jev_bridge.targets_view(c, room, 1, _params(), NIGHT + timedelta(minutes=5))["changed_today"]
+    assert brain_bridge.targets_view(c, room, 1, _params(), NIGHT + timedelta(minutes=5))["changed_today"]
 
 
 def test_lowering_writes_from_the_bottom_and_a_refused_write_is_taken_after_the_others(tmp_path):
     c, room = _Controller(tmp_path, refuse={THR}), _room()
-    view = jev_bridge.targets_view(c, room, 1, _params(), NIGHT)
+    view = brain_bridge.targets_view(c, room, 1, _params(), NIGHT)
     d, ctx = _decide({FC: 48.0, P1: 46.0, THR: 41.0}, view=view)
-    jev_bridge.apply_values(c, room, 1, d, ctx, NIGHT)
+    brain_bridge.apply_values(c, room, 1, d, ctx, NIGHT)
     assert [w[0] for w in c.writes] == [P1, FC, THR]  # the threshold, refused first, went in after the others
 
 
 def test_a_value_outside_its_own_range_is_clamped_to_it_and_the_clamp_is_logged(tmp_path):
     c, room = _Controller(tmp_path, ranges={P1: (20.0, 55.0)}), _room()
-    view = jev_bridge.targets_view(c, room, 1, _params(), NIGHT)
+    view = brain_bridge.targets_view(c, room, 1, _params(), NIGHT)
     d, ctx = _decide({P1: 70.0}, view=view)
-    jev_bridge.apply_values(c, room, 1, d, ctx, NIGHT)
+    brain_bridge.apply_values(c, room, 1, d, ctx, NIGHT)
     assert c.writes == [(P1, 50.0, 55.0, "AI assistant (targets)")]
     assert "asked 70, clamped to its range" in c.claims[0][1]
     note = next(e for e in c.jev.journal.recent("default") if e["verdict"] == "clamped")
@@ -320,15 +320,15 @@ def test_a_value_outside_its_own_range_is_clamped_to_it_and_the_clamp_is_logged(
 
 def test_a_write_that_does_not_land_is_sent_again_then_recorded_as_failed(tmp_path):
     c, room = _Controller(tmp_path), _room()
-    view = jev_bridge.targets_view(c, room, 1, _params(), NIGHT)
+    view = brain_bridge.targets_view(c, room, 1, _params(), NIGHT)
     d, ctx = _decide({P1: 51.0}, view=view)
-    jev_bridge.apply_values(c, room, 1, d, ctx, NIGHT)
+    brain_bridge.apply_values(c, room, 1, d, ctx, NIGHT)
     c.numbers[P1] = 50.0  # Home Assistant keeps showing the old value
     for minutes in (5, 15, 35, 80):
-        jev_bridge.ai_readback(c, room, 1, NIGHT + timedelta(minutes=minutes))
+        brain_bridge.ai_readback(c, room, 1, NIGHT + timedelta(minutes=minutes))
         c.numbers[P1] = 50.0
-    jev_bridge.ai_readback(c, room, 1, NIGHT + timedelta(hours=3))
-    assert len(c.writes) > 1 and jev_bridge._ai(c, room, 1)["pending"] == []
+    brain_bridge.ai_readback(c, room, 1, NIGHT + timedelta(hours=3))
+    assert len(c.writes) > 1 and brain_bridge._ai(c, room, 1)["pending"] == []
     assert any(e["verdict"] == "write failed" for e in c.jev.journal.recent("default"))
 
 
@@ -349,7 +349,7 @@ def test_dry_run_only_reports_what_it_would_set(tmp_path):
 
 def test_the_brain_sensor_publishes_the_powers(tmp_path):
     c, room = _Controller(tmp_path, powers={"ec_mode": False}), _room()
-    out = jev_bridge.powers_published(c, room, NIGHT)
+    out = brain_bridge.powers_published(c, room, NIGHT)
     rows = {r["key"]: (r["on"], r["default"]) for r in out["powers"]}
     assert rows["ec_mode"] == (False, True) and rows["tune_shot_sizes"] == (True, False)
     assert "ec_mode" not in out["powers_active"] and "advance_phase" in out["powers_active"]
@@ -378,17 +378,13 @@ def _states(**extra):
 def brain_with(monkeypatch):
     def make(answers, states, now=NOON, haiku=False):
         import brain_kit as B
-        from jev import client as jc
+        from brain import client as jc
 
         transport = K.FakeTransport(answers)
-        monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: transport)
-        monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: now.timestamp()))
-        K.has_run()
-        opts = {"num_zones": 1, "enable_flag": KILL, "cf_account_id": "acct", "cf_api_token": "tok"}
-        if haiku:
-            monkeypatch.setattr(jc, "anthropic", B.FakeSDK(B.FakeClient()))
-            opts = {"num_zones": 1, "enable_flag": KILL, "brain_provider": "claude_haiku",
-                    "anthropic_api_key": B.SENTINEL}
+        monkeypatch.setattr(brain_bridge, "Routes", lambda found, **kw: transport)
+        monkeypatch.setattr(brain_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: now.timestamp()))
+        monkeypatch.setattr(jc, "anthropic", B.FakeSDK(B.FakeClient()))
+        opts = {"num_zones": 1, "enable_flag": KILL, "brain_provider": "claude_haiku", "anthropic_api_key": B.SENTINEL}
         c, fake = _build(opts, states=states)
         return c, fake
     return make
@@ -433,7 +429,7 @@ def test_with_the_targets_power_on_the_learner_leaves_the_ladder_to_the_ai(brain
                                    "switch.crop_steering_ai_power_set_targets_from_achievable": ("on", {})})
     c, fake = brain_with({}, states, now=NIGHT, haiku=True)
     room = c.rooms[0]
-    assert jev_bridge.targets_owned(c, room)
+    assert brain_bridge.targets_owned(c, room)
     st = room.state[1]
     st["peak_prev"], st["fc_follow"]["peak"] = 58.0, 58.0  # the follower would raise field capacity...
     c._auto_tick(room, 1, SimpleNamespace(vwc=50.0, ec=5.0, dryback_rate=0.0, backed_up=False),

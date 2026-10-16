@@ -56,15 +56,15 @@ options:
   anthropic_base_url: ""
   anthropic_daily_budget_usd: 1.0
   brain_dry_run: false
-  jev_judges: all
-  jev_daily_calls: 5000
-  jev_budget_warn_pct: 80
-  jev_reask_max: 2
-  jev_unsure_below: 0.7
-  jev_strict_after: 3
-  jev_strict_prob: 0.8
-  jev_flower_start: ""
-  jev_flower_days: 56
+  ai_judges: all
+  ai_daily_calls: 5000
+  ai_budget_warn_pct: 80
+  ai_reask_max: 2
+  ai_unsure_below: 0.7
+  ai_strict_after: 3
+  ai_strict_prob: 0.8
+  ai_flower_start: ""
+  ai_flower_days: 56
 schema:
   num_zones: int
   lights_on_hour: float
@@ -90,8 +90,19 @@ schema:
   anthropic_base_url: str?
   anthropic_daily_budget_usd: float(0,1000)?
   brain_dry_run: bool?
-  # Deprecated Jev route keys: in the schema only, so a new install's form leaves them out and a
-  # saved value is kept (YAML mode sets one). The controller reads each with its old default.
+  ai_judges: str?
+  ai_daily_calls: int?
+  ai_budget_warn_pct: int?
+  ai_reask_max: int?
+  ai_unsure_below: float?
+  ai_strict_after: int?
+  ai_strict_prob: float?
+  ai_flower_start: str?
+  ai_flower_days: int?
+  # Old keys: in the schema only, so a new install's form leaves them out and an old install's saved
+  # value still loads. The keys of the removed first AI route (cf_*, typesafe_api_key, jev_enabled,
+  # jev_retries) are read only to move that install to Claude or rules; each jev_* tuning key is read
+  # as the old name of its ai_* key (brain_bridge.option), and jev_judges as described for ai_judges.
   cf_account_id: str?
   cf_api_token: password?
   cf_gateway_id: str?

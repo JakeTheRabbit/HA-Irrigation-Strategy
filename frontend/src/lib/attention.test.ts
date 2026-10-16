@@ -187,7 +187,7 @@ describe("the zone's own notices", () => {
   });
 });
 
-describe("rescue shots and Jev", () => {
+describe("rescue shots and the AI assistant", () => {
   it("flags a rescue shot in the last 12 hours", () => {
     const flags = run([zone(1), zone(2)], {
       rescues: [
@@ -198,7 +198,7 @@ describe("rescue shots and Jev", () => {
     expect(flags.get(1)?.[0].text).toBe("Rescue shot at 23:00");
     expect(flags.has(2)).toBe(false);
   });
-  it("flags Jev's setpoints paused after a revert, until the pause ends", () => {
+  it("flags the AI assistant's setpoints paused after a revert, until the pause ends", () => {
     expect(run([zone(1, { jevPausedUntil: now + 2 * H })]).get(1)?.[0].text).toBe(
       "AI assistant setpoint changes paused until 06:00 after a revert",
     );

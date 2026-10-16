@@ -1,4 +1,4 @@
-/* A table of controller settings: name and "?", input and unit, Jev's range or Auto, and a
+/* A table of controller settings: name and "?", input and unit, the AI assistant's range or Auto, and a
    note under a row being edited. Plan › Targets and Equipment › Setup. */
 .targets-table {
   width: 100%;
@@ -150,7 +150,7 @@
 .controller-settings .setpoint-water {
   margin-top: 16px;
 }
-/* A phone: the name on its own line with the input beside it, Jev's range under them. */
+/* A phone: the name on its own line with the input beside it, the AI assistant's range under them. */
 @media (max-width: 720px) {
   .targets-table tbody tr:not(.targets-phase):not(.targets-note):not(.targets-missing) {
     display: grid;

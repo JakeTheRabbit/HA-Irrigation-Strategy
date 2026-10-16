@@ -69,7 +69,7 @@ def test_the_table_is_the_contracts():
     }
     assert set(_kind("stock")) == {"CS-608", "CS-807"}
     assert set(_kind("dosing")) == {f"CS-80{n}" for n in range(1, 7)} | {"CS-808"}
-    # The reservoir's codes are CS-9xx, never Jev's CS-701 to CS-707, and a hold at the tank reaches a phone.
+    # The reservoir's codes are CS-9xx, never the AI assistant's CS-701 to CS-707, and a hold at the tank reaches a phone.
     reservoir = {f"CS-90{n}" for n in range(1, 5)}
     assert reservoir <= set(_kind("watering"))
     assert reservoir & set(catalog.EMERGENCY) == {"CS-901", "CS-902"}
@@ -84,7 +84,7 @@ def test_a_code_in_two_kinds_is_in_both():
     assert catalog.kinds_for("CS-301") == {"emergency", "hardware"}
     assert catalog.kinds_for("CS-207") == {"emergency", "watering"}
     assert catalog.kinds_for("CS-608") == {"stock"}
-    # The grow plan not running as written: Jev's card, and a plan card beside CS-606/607.
+    # The grow plan not running as written: the AI assistant's card, and a plan card beside CS-606/607.
     assert catalog.kinds_for("CS-713") == {"jev", "setup"}
 
 

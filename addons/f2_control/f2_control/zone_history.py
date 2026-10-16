@@ -100,7 +100,7 @@ def plateau(st, *, day, value, how, shots):
 
 
 def phase_changed(st, was, new, *, day, how):
-    """A phase change by anyone (the engine, a Jev judge, the operator). P1 handing over to P2 is the day's plateau:
+    """A phase change by anyone (the engine, a AI assistant judge, the operator). P1 handing over to P2 is the day's plateau:
     the highest VWC since lights-on, which the controller keeps in `peak`."""
     if was == "P1" and new == "P2":
         return plateau(st, day=day, value=st.get("peak"), how=how, shots=st.get("shots"))

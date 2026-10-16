@@ -146,7 +146,7 @@ async def test_any_other_write_ends_the_overlay_and_its_value_stands(
 
     # The safety put-back after a rescue shot ends it too.
     threshold = await _write(hass, c, fake, room, THRESHOLD, _value(hass, THRESHOLD) + 1)
-    await _write(hass, c, fake, room, THRESHOLD, threshold, by="Jev (put back)")
+    await _write(hass, c, fake, room, THRESHOLD, threshold, by="the AI assistant (put back)")
     assert await _overlays(hass) == []
     assert (await _log(hass))[-1] == ("safety", threshold + 1, threshold)
 

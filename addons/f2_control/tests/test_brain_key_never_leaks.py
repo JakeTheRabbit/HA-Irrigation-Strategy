@@ -2,8 +2,8 @@
 the call does (haiku-brain-design section 9). The same sentinel runs through the wired brain in test_brain_wiring."""
 import brain_kit as B
 import pytest
-from jev import client
-from jev.client import Meter, call_anthropic, redact
+from brain import client
+from brain.client import Meter, call_anthropic, redact
 
 
 @pytest.mark.parametrize("script", [

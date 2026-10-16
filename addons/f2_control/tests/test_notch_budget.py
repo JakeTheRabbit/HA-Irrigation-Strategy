@@ -4,12 +4,12 @@ defaults, so a ledger an older controller wrote loads as it is."""
 import json
 from datetime import timedelta
 
-import jev_bridge
+import brain_bridge
 import jev_kit as K
 import test_jev_setpoints as T
-from jev.envelope import COOL_DOWN_H, admit, notch_budget
-from jev.judges.setpoints import SHOT, THRESHOLD, SetpointsJudge
-from jev.ledger import Ledger
+from brain.envelope import COOL_DOWN_H, admit, notch_budget
+from brain.judges.setpoints import SHOT, THRESHOLD, SetpointsJudge
+from brain.ledger import Ledger
 
 NIGHT = T.NIGHT
 
@@ -76,17 +76,17 @@ def test_the_history_reads_an_older_ledger_with_defaults(tmp_path):
     path.write_text("".join(json.dumps(e) + "\n" for e in lines))
     c, room = T._Controller(tmp_path), T._room()
     c.jev.ledger = Ledger(str(path))
-    h = jev_bridge.notch_history(c, room, 1, NIGHT)
+    h = brain_bridge.notch_history(c, room, 1, NIGHT)
     assert h["notches"] == [(NIGHT - timedelta(days=1), SHOT, 0.5), (NIGHT - timedelta(days=2), THRESHOLD, 0.5)]
     assert h["setbacks"] == [NIGHT]  # the bad check, known at its check_at
-    sp = jev_bridge.setpoint_view(c, room, 1, T.Z1, NIGHT)
+    sp = brain_bridge.setpoint_view(c, room, 1, T.Z1, NIGHT)
     assert sp["notches"] == h["notches"] and sp["setbacks"] == h["setbacks"]
 
 
 def test_a_controller_without_a_ledger_has_no_history(tmp_path):
     c, room = T._Controller(tmp_path), T._room()
     del c.jev.ledger
-    assert jev_bridge.notch_history(c, room, 1, NIGHT) == {"notches": [], "setbacks": []}
+    assert brain_bridge.notch_history(c, room, 1, NIGHT) == {"notches": [], "setbacks": []}
 
 
 # ------------------------------------------------------------------ through the brain
@@ -94,7 +94,7 @@ def _night(c, label, now):
     answer = K.choice_answer(label, {label: 0.8, "keep": 0.2})
     c.jev.asker.transport = K.FakeTransport(K.both("tomorrow", answer))
     c.jev.asker.clock = lambda: now.timestamp()
-    return c.jev.tick(T._ctx(sp=jev_bridge.setpoint_view(c, T._room(), 1, T.Z1, now), now=now))
+    return c.jev.tick(T._ctx(sp=brain_bridge.setpoint_view(c, T._room(), 1, T.Z1, now), now=now))
 
 
 def test_a_move_past_its_range_is_filed_and_rests_the_zone(tmp_path):
@@ -102,10 +102,10 @@ def test_a_move_past_its_range_is_filed_and_rests_the_zone(tmp_path):
     assert _night(c, "smaller_shots", NIGHT) == []
     refused = c.jev.ledger.entries[-1]
     assert refused["action"] == "refused" and "outside its range" in refused["evidence"]["why"]
-    sp = jev_bridge.setpoint_view(c, T._room(), 1, T.Z1, NIGHT + timedelta(days=1))
+    sp = brain_bridge.setpoint_view(c, T._room(), 1, T.Z1, NIGHT + timedelta(days=1))
     assert sp["setbacks"] == [NIGHT] and not SetpointsJudge().due(T._ctx(sp=sp, now=NIGHT + timedelta(days=1)), None)
     later = NIGHT + timedelta(days=2)  # the rest is over
-    assert SetpointsJudge().due(T._ctx(sp=jev_bridge.setpoint_view(c, T._room(), 1, T.Z1, later), now=later), None)
+    assert SetpointsJudge().due(T._ctx(sp=brain_bridge.setpoint_view(c, T._room(), 1, T.Z1, later), now=later), None)
 
 
 def test_the_budget_refusing_starts_no_rest_of_its_own(tmp_path):

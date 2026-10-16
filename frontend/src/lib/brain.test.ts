@@ -28,7 +28,7 @@ describe("each brain state in grower words", () => {
     ["rules", "AI off", "Watering by rules", "neutral"],
     ["acting", "AI acting", "AI assistant is acting", "positive"],
     ["dry_run", "AI advising", "AI assistant is advising only", "info"],
-    ["legacy", "AI acting", "AI assistant on the old Jev connection", "info"],
+    ["legacy", "AI acting", "AI assistant on the first AI route", "info"],
     ["budget_spent", "AI paused: budget", "Daily AI limit reached", "warning"],
     ["paused", "AI paused: not answering", "AI not answering", "warning"],
     ["unavailable", "AI paused: not answering", "AI not answering", "warning"],
@@ -120,7 +120,7 @@ describe("the rest of the panel", () => {
       "Claude Haiku (Anthropic)",
     );
     expect(providerWords(parseBrainPanel(sensor("on", { provider: "jev_legacy" })))).toMatch(
-      /^Old Jev connection \(deprecated\)/,
+      /^First AI route \(removed\)/,
     );
   });
   it("says how sure the last decision was", () => {

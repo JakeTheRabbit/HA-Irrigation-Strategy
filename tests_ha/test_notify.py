@@ -384,7 +384,7 @@ async def test_an_install_from_before_notifications_loads_with_nobody_set_up(has
 
 
 async def test_the_grow_plan_card_reaches_a_jev_phone_and_a_setup_phone(hass, hass_admin_user):
-    """CS-713 (the room not running its grow plan as written) is in two kinds: a phone that ticks only Jev and a
+    """CS-713 (the room not running its grow plan as written) is in two kinds: a phone that ticks only the AI assistant and a
     phone that ticks only Setup and settings both get it, and a phone that ticks neither does not."""
     await _install(hass)
     staff = await _staff(hass)

@@ -12,7 +12,7 @@ Why setpoints have to move during the day (from the engine's actual rules):
     is what starts the dryback early enough to land the overnight target.
 
 Arithmetic (knee, band, stop time, attainable dryback) is done here. Judgement is asked of a `judge`
-(Jev): is the probe believable, is water landing, which way should pore EC be steered, does the peak
+(the AI assistant): is the probe believable, is water landing, which way should pore EC be steered, does the peak
 target fit what the ramp is showing. Any judge failure leaves the arithmetic in charge.
 """
 from dataclasses import dataclass

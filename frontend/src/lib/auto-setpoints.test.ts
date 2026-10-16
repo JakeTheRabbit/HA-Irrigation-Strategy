@@ -122,7 +122,7 @@ describe("auto setpoint status", () => {
       36.25,
     );
   });
-  it("describes state, learned peak, last change and Jev in one line", () => {
+  it("describes state, learned peak, last change and the AI assistant in one line", () => {
     const status = parseAutoSetpoints(
       entity("tracking", { learned_peak: 35.9, last_change: "P1 target → 36.5 %", jev: "ok" }),
     )!;

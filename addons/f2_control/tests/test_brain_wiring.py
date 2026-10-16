@@ -7,9 +7,9 @@ import os
 from datetime import timedelta
 
 import brain_kit as B
-import jev_bridge
+import brain_bridge
 import pytest
-from jev import client as jc
+from brain import client as jc
 from test_controller import _build
 from test_jev_controller import KILL, NOW, _p1_zone, _states, _switches
 
@@ -38,9 +38,9 @@ def claude(monkeypatch):
         made = B.FakeSDK(fake_client)
         monkeypatch.setattr(jc, "anthropic", made if sdk else None)
         clock = Clock(NOW.timestamp())
-        monkeypatch.setattr(jev_bridge, "Asker", functools.partial(jc.Asker, threaded=False, clock=clock))
-        monkeypatch.setattr(jev_bridge, "Meter", functools.partial(jc.Meter, clock=clock))
-        monkeypatch.setattr(jev_bridge, "Routes", functools.partial(jc.Routes, sleep=lambda s: None))
+        monkeypatch.setattr(brain_bridge, "Asker", functools.partial(jc.Asker, threaded=False, clock=clock))
+        monkeypatch.setattr(brain_bridge, "Meter", functools.partial(jc.Meter, clock=clock))
+        monkeypatch.setattr(brain_bridge, "Routes", functools.partial(jc.Routes, sleep=lambda s: None))
         opts = {"num_zones": 1, "enable_flag": KILL, "brain_provider": "claude_haiku",
                 "anthropic_api_key": B.SENTINEL, **options}
         c, fake = _build(opts, states=_states())
@@ -118,12 +118,12 @@ def test_a_spent_budget_runs_rules_until_lights_on_and_says_so(claude):
     assert len(c._client.requests) == asked  # no new ask once it is spent
     panel = fake.sets["sensor.crop_steering_jev"][1]
     assert panel["state"] == "budget_spent" and "Rules until the next lights-on" in panel["state_words"]
-    assert jev_bridge.judge_levers(c, c.rooms[0]) == ()  # the learner holds the Setpoints judge's numbers
+    assert brain_bridge.judge_levers(c, c.rooms[0]) == ()  # the learner holds the Setpoints judge's numbers
     created = [d for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "create")]
     assert [d["notification_id"] for d in created if "(CS-708)" in d["title"]] == ["f2_jev_spent_default"]
     c._clock.t += 21 * 3600
-    jev_bridge.lights_on(c, c.rooms[0], NOW + timedelta(hours=21))
-    assert c.jev.asker.meter.state() is None and jev_bridge.judge_levers(c, c.rooms[0])
+    brain_bridge.lights_on(c, c.rooms[0], NOW + timedelta(hours=21))
+    assert c.jev.asker.meter.state() is None and brain_bridge.judge_levers(c, c.rooms[0])
 
 
 def test_dry_run_journals_what_it_would_do_and_moves_nothing(claude):
@@ -136,7 +136,7 @@ def test_dry_run_journals_what_it_would_do_and_moves_nothing(claude):
     entry = next(e for e in c.jev.journal.recent("default") if e["judge"] == "ramp")
     assert entry["result"] == "would act" and entry["action"] == "hand over to maintenance"
     assert fake.sets["sensor.crop_steering_jev"][1]["mode"] == "dry_run"
-    assert jev_bridge.judge_levers(c, c.rooms[0]) == ()
+    assert brain_bridge.judge_levers(c, c.rooms[0]) == ()
 
 
 @pytest.mark.parametrize("options, sdk, state", [
@@ -158,7 +158,7 @@ def test_every_rules_case_reaches_the_brain_panel(claude, options, sdk, state):
 
 
 def test_a_start_that_raises_runs_rules_and_says_so(claude, monkeypatch):
-    monkeypatch.setattr(jev_bridge, "build", lambda *a, **k: (_ for _ in ()).throw(RuntimeError(B.SENTINEL)))
+    monkeypatch.setattr(brain_bridge, "build", lambda *a, **k: (_ for _ in ()).throw(RuntimeError(B.SENTINEL)))
     c, fake = claude()
     assert c.jev is None and c.brain_status.state == "start_failed"
     _zone(c)
@@ -166,15 +166,17 @@ def test_a_start_that_raises_runs_rules_and_says_so(claude, monkeypatch):
     assert fake.sets["sensor.crop_steering_jev"][1]["state"] == "start_failed"
 
 
-def test_cloudflare_settings_no_brain_uses_raise_the_retired_route_card_once_a_release(monkeypatch):
+def test_old_route_settings_no_brain_uses_raise_the_removed_route_card_once_a_release(monkeypatch):
     c, fake = _build({"num_zones": 1, "enable_flag": KILL, "cf_account_id": "acct", "cf_api_token": "tok"},
                      states=_states())
-    assert c.jev is None and c.brain_status.notice == "cloudflare_route_retired"
+    assert c.jev is None and c.brain_status.notice == "legacy_route_removed"
     _zone(c)
     c.loop_once(NOW)
     c.loop_once(NOW + timedelta(minutes=1))
     created = [d for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "create")]
-    assert [d["notification_id"] for d in created if "(CS-712)" in d["title"]] == ["f2_jev_route_default"]
+    cards = [d for d in created if "(CS-712)" in d["title"]]
+    assert [d["notification_id"] for d in cards] == ["f2_jev_route_default"]
+    assert "Jev" not in cards[0]["title"] + cards[0]["message"] and "rules" in cards[0]["message"]
     again, fake2 = _build({"num_zones": 1, "enable_flag": KILL, "cf_account_id": "acct", "cf_api_token": "tok"},
                           states=_states())
     again._state_path = c._state_path  # the same /data after a restart
@@ -183,7 +185,7 @@ def test_cloudflare_settings_no_brain_uses_raise_the_retired_route_card_once_a_r
     assert not [d for dom, svc, d in fake2.calls if "(CS-712)" in str(d.get("title"))]
 
 
-def test_a_legacy_install_switched_to_rules_shows_rules_on_its_first_pass():
+def test_an_install_that_ran_the_old_route_switched_to_rules_shows_rules_on_its_first_pass():
     import jev_kit as K
 
     K.has_run()

@@ -160,8 +160,8 @@ def read(path=OUT):
         return ""
 
 
-if __name__ == "__main__":  # python -m jev.controller_brief --write, from addons/f2_control/f2_control
-    from jev import controller_brief as me
+if __name__ == "__main__":  # python -m brain.controller_brief --write, from addons/f2_control/f2_control
+    from brain import controller_brief as me
 
     text = me.render(me.load_codes())
     if "--write" in sys.argv:
