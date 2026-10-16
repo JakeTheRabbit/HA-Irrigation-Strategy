@@ -231,6 +231,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .grow_day_store import async_setup_grow_days
 
     await async_setup_grow_days(hass, entry)
+    from .long_history import async_setup_long_history
+
+    await async_setup_long_history(hass, entry)
     from .setpoint_log import async_setup_setpoint_log
 
     await async_setup_setpoint_log(hass, entry)
@@ -390,6 +393,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .grow_day_store import async_unload_grow_days
 
     await async_unload_grow_days(hass, entry)
+    from .long_history import async_unload_long_history
+
+    await async_unload_long_history(hass, entry)
     from .setpoint_log import async_unload_setpoint_log
 
     await async_unload_setpoint_log(hass, entry)

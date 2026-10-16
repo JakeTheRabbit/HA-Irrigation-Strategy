@@ -1398,3 +1398,58 @@ runs_set_harvest:
       required: true
       selector:
         object:
+history_connection_get:
+  name: Read long history connection
+  description: Returns the room history source and connection fields with secrets removed. Requires a signed-in administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: Canonical room ID.
+      required: true
+      selector:
+        text:
+history_connection_save:
+  name: Save long history connection
+  description: Tests and saves an optional read-only InfluxDB connection. Recorder is the default. Requires a signed-in administrator.
+  fields:
+    room_id:
+      name: Room ID
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    connection:
+      name: Connection
+      required: true
+      selector:
+        object:
+history_long:
+  name: Read long history
+  description: Reads at most four mapped sensors, 1000 downsampled points each and 366 days from InfluxDB. Requires a signed-in administrator. Never writes to InfluxDB.
+  fields:
+    room_id:
+      name: Room ID
+      required: true
+      selector:
+        text:
+    entity_ids:
+      name: Sensor entities
+      required: true
+      selector:
+        object:
+    start:
+      name: Start timestamp
+      required: true
+      selector:
+        text:
+    end:
+      name: End timestamp
+      required: true
+      selector:
+        text:
