@@ -12,6 +12,7 @@ import {
   keyWords,
   modeWords,
   money,
+  parsePowers,
   providerWords,
   setDemoBrain,
   useBrain,
@@ -20,6 +21,7 @@ import {
   type BrainView,
 } from "@/lib/brain";
 import { jevAnswer, jevResult, readJev } from "@/lib/jev";
+import { SETTING_COPY, UI_COPY } from "@/lib/ste-copy";
 import type { Controller } from "@/lib/types";
 import "./brain.css";
 
@@ -158,6 +160,67 @@ function MayDo({ panel }: { panel: BrainPanel | null }) {
   );
 }
 
+/** What the AI assistant may do in the room: a checkbox per power switch. Home Assistant decides who may switch
+ * one; a refused or failed write shows inline and the box stays at the switch's real state. */
+function AiPowers({ controller }: { controller: Controller }) {
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState("");
+  const powers = parsePowers(controller.states, controller.room.room.prefix);
+  const locked = controller.admin === false;
+  const connected = ["live", "demo"].includes(controller.connection);
+  const copy = UI_COPY["what the ai assistant may do"];
+  async function toggle(entityId: string, on: boolean) {
+    setBusy(entityId);
+    setError("");
+    try {
+      const result = await controller.write([{ entityId, value: on }]);
+      if (result.failed.length) setError(result.failed.map((f) => f.reason).join(" "));
+    } finally {
+      setBusy(null);
+    }
+  }
+  return (
+    <section className="panel" aria-labelledby="brain-powers-title" data-brain-powers>
+      <div className="panel-heading">
+        <h2 id="brain-powers-title">
+          {copy.label} <UiTip copyKey="what the ai assistant may do" />
+        </h2>
+      </div>
+      <div className="brain-body">
+        <p className="brain-line">{copy.tooltip}</p>
+        {locked && <p className="brain-line">{copy.guidance}</p>}
+        <ul className="brain-powers">
+          {powers.map((power) => (
+            <li key={power.key} data-power={power.key} data-missing={power.missing || undefined}>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={power.on}
+                  disabled={power.missing || locked || !connected || busy !== null}
+                  title={locked ? "Needs a Home Assistant administrator" : undefined}
+                  onChange={(event) => void toggle(power.entityId, event.target.checked)}
+                />
+                <span>{power.label}</span>
+              </label>
+              <p>{SETTING_COPY[`ai_power_${power.key}`]?.tooltip}</p>
+            </li>
+          ))}
+        </ul>
+        {powers.some((power) => power.missing) && (
+          <p className="brain-line">
+            Update the integration to change these. Until then, each power keeps its default.
+          </p>
+        )}
+        {error && (
+          <p className="jev-trouble" role="alert">
+            {error}
+          </p>
+        )}
+      </div>
+    </section>
+  );
+}
+
 function DemoSwitcher({ demo }: { demo: BrainDemoState }) {
   const id = useId();
   return (
@@ -289,6 +352,7 @@ export function BrainPage({ controller, navigate }: { controller: Controller; na
           <MayDo panel={panel} />
         </div>
       </section>
+      <AiPowers controller={controller} />
       <section className="panel" aria-labelledby="brain-list-title">
         <div className="panel-heading">
           <h2 id="brain-list-title">Decisions</h2>
