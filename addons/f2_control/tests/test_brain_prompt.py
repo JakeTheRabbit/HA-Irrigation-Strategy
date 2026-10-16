@@ -98,3 +98,11 @@ def test_the_start_line_names_hashes_never_the_text():
     line = prompt.Prompt().describe()
     assert re.fullmatch(r"brain: prompt A=[0-9a-f]{8} B=[0-9a-f]{8}, about \d+\.\dk tokens", line)
 
+
+
+def test_the_cached_prompt_describes_every_judge_and_task_and_no_retired_one():
+    import jev_bridge
+
+    a = prompt.Prompt(doctrine.STAGE_ARC, "slab_default").a
+    assert [name for name in jev_bridge.ALL if f"\n| {name} " not in a] == []
+    assert "\n| alerts |" not in a and "Jev" not in a

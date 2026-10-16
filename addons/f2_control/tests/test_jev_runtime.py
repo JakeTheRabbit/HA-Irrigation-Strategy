@@ -3,10 +3,9 @@ import os
 from datetime import timedelta
 
 import jev_kit as K
-import pytest
 from jev import council
 from jev.brain import Brain
-from jev.client import Asker, parse
+from jev.client import Asker
 from jev.envelope import Directive, admit
 from jev.judges.probe import ProbeJudge
 from jev.judges.ramp import RampJudge
@@ -43,12 +42,6 @@ def test_a_malformed_answer_is_no_verdict():
 
 
 # ------------------------------------------------------------------ asker
-def test_parse_reads_cloudflares_envelope():
-    answers, usage = parse({"result": {"result": {"answers": {"q": {}}, "usage": {"input_tokens": 5}}}})
-    assert answers == {"q": {}} and usage == {"input_tokens": 5}
-    assert parse({"result": {"answers": {}}}) == (None, None)
-
-
 def test_the_asker_is_off_without_credentials_and_never_calls():
     t = K.FakeTransport({})
     a = Asker("", "", transport=t, threaded=False)
@@ -226,63 +219,19 @@ def test_a_moving_probe_is_not_confirmed_dead():
     assert not ProbeJudge().evidence_ok(K.ctx(h=h, siblings={2: {"rise": 1.4}}))
 
 
-# ------------------------------------------------------------------ TypeSafe direct
-def test_typesafe_answers_are_read_from_the_top_level():
-    from jev.client import parse_typesafe
-    answers, usage = parse_typesafe({"model": "jev-1.13.0", "answers": {"q__v0": {"type": "noul", "noul": 0.7}},
-                                     "usage": {"input_tokens": 327}})
-    assert answers["q__v0"]["noul"] == 0.7 and usage["input_tokens"] == 327
-    assert parse_typesafe({"result": {"result": {"answers": {"q": {}}}}}) == (None, None)
-    assert parse_typesafe(None) == (None, None)
-
-
-def test_every_route_jev_has_is_used_typesafe_first(tmp_path):
-    import jev_bridge
-    from jev.client import Routes, call, call_typesafe
-
-    both = jev_bridge.build({"typesafe_api_key": "apikey_x"}, ("acct", "tok", ""), "/tmp/state.json", lambda *a: None)
-    assert isinstance(both.asker.transport, Routes) and both.routes == ["TypeSafe", "Cloudflare"]
-    assert [(r.fn, r.token) for r in both.asker.transport.routes] == [(call_typesafe, "apikey_x"), (call, "tok")]
-    ran = str(tmp_path / "state.json")
-    K.has_run(ran)  # Cloudflare alone starts Jev only where it has run before
-    cf_only = jev_bridge.build({}, ("acct", "tok", ""), ran, lambda *a: None)
-    assert cf_only.routes == ["Cloudflare"] and cf_only.asker.daily_budget == 5000
-    assert jev_bridge.build({}, ("", "", ""), "/tmp/state.json", lambda *a: None) is None
-
-
-def test_cloudflare_alone_starts_no_jev_where_jev_has_never_run(tmp_path):
-    """An install updated from a line without Jev may have set Cloudflare for the Auto Setpoints check: no brain."""
+# ------------------------------------------------------------------ an old options file
+def test_an_old_options_file_keeps_its_budget_and_takes_the_new_defaults(monkeypatch):
+    """3.8.0's options (the first AI route, its tuning under the old names), after the Supervisor merged in the new
+    defaults: the install moves to Claude with its key and keeps its daily calls."""
     import jev_bridge
 
-    said = []
-    state = str(tmp_path / "state.json")
-    assert jev_bridge.build({"jev_enabled": True}, ("acct", "tok", ""), state, said.append) is None
-    assert "jev: off" in said[0] and str(tmp_path) in said[0] and "tok" not in said[0]
-    assert os.listdir(tmp_path) == []  # nothing written, so the next start decides the same
-    typesafe = jev_bridge.build({"typesafe_api_key": "apikey_x"}, ("", "", ""), state, said.append)
-    assert typesafe.routes == ["TypeSafe"]  # only the Jev line has a TypeSafe key: it starts as before
-
-
-@pytest.mark.parametrize("name", ["jev_usage.json", "jev_ledger.jsonl", "jev_journal.jsonl", "jev_setpoints.json"])
-@pytest.mark.parametrize("content", [b"", b"\xff\x00 not json"], ids=["empty", "unreadable"])
-def test_any_one_jev_file_in_the_state_folder_starts_jev_on_cloudflare_alone(tmp_path, name, content):
-    import jev_bridge
-
-    (tmp_path / name).write_bytes(content)
-    brain = jev_bridge.build({}, ("acct", "tok", ""), str(tmp_path / "state.json"), lambda *a: None)
-    assert brain is not None and brain.routes == ["Cloudflare"]
-    elsewhere = tmp_path / "other"
-    elsewhere.mkdir()
-    assert jev_bridge.build({}, ("acct", "tok", ""), str(elsewhere / "state.json"), lambda *a: None) is None
-
-
-def test_an_old_options_file_keeps_its_budget_and_takes_the_new_defaults():
-    import jev_bridge
-
+    K.sdk(monkeypatch)
+    K.has_run()
     options_3_8_0 = {"typesafe_api_key": "apikey_x", "jev_enabled": True, "jev_judges": "all",
-                "jev_daily_calls": 2000, "jev_flower_start": "", "jev_flower_days": 56}
-    brain = jev_bridge.build(options_3_8_0, ("", "", ""), "/tmp/state.json", lambda *a: None)
-    assert brain.routes == ["TypeSafe"] and brain.asker.daily_budget == 2000
+                     "jev_daily_calls": 2000, "jev_flower_start": "", "jev_flower_days": 56,
+                     "anthropic_api_key": "k", "brain_provider": "auto", "ai_daily_calls": 5000, "ai_judges": "all"}
+    brain = jev_bridge.build(options_3_8_0, os.environ["F2_STATE_PATH"], lambda *a: None)
+    assert brain.routes == ["Anthropic"] and brain.asker.daily_budget == 2000
     assert (brain.reask_max, brain.unsure_below, brain.strict_after, brain.strict_prob) == (2, 0.7, 3, 0.8)
     assert (brain.asker.warn_pct, brain.asker.transport.tries) == (80, 3)
 

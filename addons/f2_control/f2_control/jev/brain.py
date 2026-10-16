@@ -183,7 +183,7 @@ class Brain:
             self.ledger.record(judge.name, ctx.room, ctx.zone, _label(d), d.kind,
                                evidence={q: (v.label if v else None) for q, v in st.verdicts.items()},
                                check_at=check_at, check=self._check_basis(ctx), at=ctx.now)
-            self.log(f"[jev] {ctx.room} Z{ctx.zone} {judge.name}: {d.kind} {_label(d)} ({d.why}; {why})")
+            self.log(f"[brain] {ctx.room} Z{ctx.zone} {judge.name}: {d.kind} {_label(d)} ({d.why}; {why})")
             self._note(ctx, judge, st, d, "acted", why)
         return d, why
 

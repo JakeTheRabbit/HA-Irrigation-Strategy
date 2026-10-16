@@ -195,7 +195,7 @@ async def test_the_channel_judges_alert_reaches_the_phone_that_ticks_hardware(
 async def test_the_ai_assistants_cards_reach_the_phone_that_ticks_jev(
     hass, hass_admin_user, controller_for, monkeypatch
 ):
-    """CS-708 (its budget spent), CS-709 (its key refused) and CS-712 (a retired route, raised by
+    """CS-708 (its budget spent), CS-709 (its key refused) and CS-712 (the removed first route, raised by
     the rules panel with no brain built) are in the jev kind: the phone that ticks Jev gets them."""
     await _install(hass)
     staff = await _staff(hass)
@@ -222,7 +222,7 @@ async def test_the_ai_assistants_cards_reach_the_phone_that_ticks_jev(
     for code, label in (("CS-708", "spent"), ("CS-709", "brain")):
         assert c._jev_alert(room, None, label, {"code": code, "title": "t", "message": f"{code} words."})
     c.brain_status = jev_bridge.BrainStatus(
-        "rules", "rules", "Rules.", notice="cloudflare_route_retired"
+        "rules", "rules", "Rules.", notice="legacy_route_removed"
     )
     jev_bridge.publish_rules(c, room, controller.datetime.now(), controller.ha_set)
     asked = _asked(fake)
@@ -236,7 +236,7 @@ async def test_the_ai_assistants_cards_reach_the_phone_that_ticks_jev(
             DOMAIN, "notify", one, blocking=True, return_response=True
         )
         assert answer == {"sent_to": [STAFF_PHONE], "error": None}
-    assert received[STAFF_PHONE][-1]["message"].startswith("The controller does not use your Cloudflare settings")
+    assert received[STAFF_PHONE][-1]["message"].startswith("The first AI route of the AI assistant was removed")
 
 
 async def test_the_feed_proposal_reaches_the_phone_that_ticks_jev(

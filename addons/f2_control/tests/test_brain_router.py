@@ -175,7 +175,7 @@ def test_the_option_is_stripped_and_blank_is_the_api():
 
 def _resolve(tmp_path, **options):
     return jev_bridge.resolve_provider({"brain_provider": "claude_haiku", "anthropic_api_key": "k", **options},
-                                       ("", "", ""), str(tmp_path))
+                                       str(tmp_path))
 
 
 def test_which_brain_runs_with_a_router(tmp_path, monkeypatch):

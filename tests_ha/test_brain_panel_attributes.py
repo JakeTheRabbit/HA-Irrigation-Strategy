@@ -53,8 +53,9 @@ def _sizes_fit(stored):
 async def test_a_3_11_1_room_publishes_its_brain_under_the_ids_it_always_had_and_within_the_limit(
     hass, controller_for, monkeypatch
 ):
-    """F-3111 on Cloudflare, with the journal, ledger and setpoint memory its brain wrote: the room keeps the
-    old route, and the panel's sensors carry its words under the 3.11.1 ids, each under the recorder's limit.
+    """F-3111 on Cloudflare, with the journal, ledger and setpoint memory its brain wrote, and an Anthropic key
+    added: the room's brain moves to Claude, and the panel's sensors carry its words under the 3.11.1 ids, each
+    under the recorder's limit, with the old journal still shown.
     """
     seed = fixture(JEV_3_11_1)
     await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
@@ -76,10 +77,10 @@ async def test_a_3_11_1_room_publishes_its_brain_under_the_ids_it_always_had_and
     )
     _sizes_fit(stored)
     panel = stored[room_id].attributes
-    assert (panel["provider"], panel["state"], panel["deprecated_route"]) == (
-        "jev_legacy",
-        "legacy",
-        True,
+    assert (panel["provider"], panel["notice"], panel["deprecated_route"]) == (
+        "claude_haiku",
+        "legacy_route_removed",
+        False,
     )
     assert isinstance(panel["key_set"], bool) and panel["state_words"]
     assert panel["stage"] is None or isinstance(panel["stage"], dict)

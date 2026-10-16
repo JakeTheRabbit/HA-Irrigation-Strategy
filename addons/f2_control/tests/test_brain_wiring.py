@@ -166,15 +166,17 @@ def test_a_start_that_raises_runs_rules_and_says_so(claude, monkeypatch):
     assert fake.sets["sensor.crop_steering_jev"][1]["state"] == "start_failed"
 
 
-def test_cloudflare_settings_no_brain_uses_raise_the_retired_route_card_once_a_release(monkeypatch):
+def test_old_route_settings_no_brain_uses_raise_the_removed_route_card_once_a_release(monkeypatch):
     c, fake = _build({"num_zones": 1, "enable_flag": KILL, "cf_account_id": "acct", "cf_api_token": "tok"},
                      states=_states())
-    assert c.jev is None and c.brain_status.notice == "cloudflare_route_retired"
+    assert c.jev is None and c.brain_status.notice == "legacy_route_removed"
     _zone(c)
     c.loop_once(NOW)
     c.loop_once(NOW + timedelta(minutes=1))
     created = [d for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "create")]
-    assert [d["notification_id"] for d in created if "(CS-712)" in d["title"]] == ["f2_jev_route_default"]
+    cards = [d for d in created if "(CS-712)" in d["title"]]
+    assert [d["notification_id"] for d in cards] == ["f2_jev_route_default"]
+    assert "Jev" not in cards[0]["title"] + cards[0]["message"] and "rules" in cards[0]["message"]
     again, fake2 = _build({"num_zones": 1, "enable_flag": KILL, "cf_account_id": "acct", "cf_api_token": "tok"},
                           states=_states())
     again._state_path = c._state_path  # the same /data after a restart
@@ -183,7 +185,7 @@ def test_cloudflare_settings_no_brain_uses_raise_the_retired_route_card_once_a_r
     assert not [d for dom, svc, d in fake2.calls if "(CS-712)" in str(d.get("title"))]
 
 
-def test_a_legacy_install_switched_to_rules_shows_rules_on_its_first_pass():
+def test_an_install_that_ran_the_old_route_switched_to_rules_shows_rules_on_its_first_pass():
     import jev_kit as K
 
     K.has_run()

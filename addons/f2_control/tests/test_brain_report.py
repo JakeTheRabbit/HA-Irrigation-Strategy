@@ -101,7 +101,7 @@ def test_a_spent_budget_asks_for_no_report(claude):  # noqa: F811
 
 
 def test_the_report_is_off_when_it_is_not_among_the_judges(claude):  # noqa: F811
-    c, fake = claude(reporting, jev_judges="dawn,ramp,setpoints")
+    c, fake = claude(reporting, ai_judges="dawn,ramp,setpoints")
     c._clock.t = NIGHT.timestamp()
     c.loop_once(NIGHT)
     assert not _asked(c) and "report" not in fake.sets["sensor.crop_steering_jev"][1]["judges_advising"]

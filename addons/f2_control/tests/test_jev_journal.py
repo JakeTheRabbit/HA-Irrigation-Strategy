@@ -116,3 +116,10 @@ def test_the_room_sensor_carries_todays_stage_for_the_chart(tmp_path):
     stage = _published(tmp_path)["sensor.crop_steering_jev"][1]["stage"]
     assert stage["day"] == 37 and stage["name"] == "flower bulk" and stage["steering"] == "vegetative"
     assert stage["pore_ec"] == [3.5, 6.0] and stage["runoff_pct"] == [8, 16]
+
+
+def test_every_judge_has_a_plain_title():
+    import jev_bridge
+    from jev import journal
+
+    assert [j.name for j in jev_bridge.judges() if j.name not in journal.TITLES] == []

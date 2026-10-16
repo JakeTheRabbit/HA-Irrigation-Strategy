@@ -34,7 +34,7 @@
     {
       "prefix": "CS-7",
       "name": "AI assistant",
-      "detail": "Decisions of the AI assistant about a zone (advice, or a probe that it sets aside). Also the status of the AI assistant (docs/JEV.md). For example, its calls or its AI budget are almost used or used, or its key is refused. Other examples are a retired route and a judge on the stricter gate."
+      "detail": "Decisions of the AI assistant about a zone (advice, or a probe that it sets aside). Also the status of the AI assistant (docs/AI_ASSISTANT.md). For example, its calls or its AI budget are almost used or used, or its key is refused. Other examples are a retired route and a judge on the stricter gate."
     },
     {
       "prefix": "CS-8",
@@ -1044,7 +1044,7 @@
       "fixes": [
         "Compare the settings of the zone with the stage arc.",
         "If the growth stage has changed, change the settings.",
-        "Check that jev_flower_start has the correct flip date."
+        "Check that ai_flower_start has the correct flip date."
       ]
     },
     {
@@ -1060,7 +1060,7 @@
         "The budget option is still at an older, lower value."
       ],
       "fixes": [
-        "Increase jev_daily_calls in the options of the controller.",
+        "Increase ai_daily_calls in the options of the controller.",
         "Restart the controller.",
         "Read reasks_today and errors_today on the AI assistant sensor to find what used the calls."
       ]
@@ -1160,17 +1160,17 @@
     },
     {
       "code": "CS-712",
-      "title": "Jev route retired",
+      "title": "First AI route removed",
       "source": "notification",
       "severity": "info",
-      "meaning": "This installation has settings for the Jev route of the AI assistant. These routes are retired. A room on them continues to work, but gets no new features.",
-      "watering": "The water does not change. The engine rules water the room, or the Jev route where it still runs.",
+      "meaning": "The options of the controller still name the first AI route of the AI assistant, or keep its Cloudflare or TypeSafe settings. This release removed that route. An installation that used it now uses Claude when it has an Anthropic API key, with every judge, and the rules of the controller when it has none.",
+      "watering": "The water does not change. Claude judges the decisions inside the same safety limits, or the engine rules water the room.",
       "causes": [
-        "The installation was upgraded from a release that used the Jev routes."
+        "The installation was upgraded from a release that used the first AI route."
       ],
       "fixes": [
-        "To use the AI assistant, set brain_provider to claude_haiku and add an API key.",
-        "To keep the old route, set brain_provider to jev_legacy.",
+        "To use the AI assistant, set brain_provider to claude_haiku and add an Anthropic API key.",
+        "Remove the old Cloudflare and TypeSafe options. The controller does not use them.",
         "To stop the AI assistant, set brain_provider to rules."
       ]
     },

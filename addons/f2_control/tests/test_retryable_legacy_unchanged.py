@@ -1,5 +1,5 @@
 """retryable() matches its non-retryable constants by prefix, and Route hides its token (haiku-brain-design section 2,
-the client.py rows). Every error the TypeSafe and Cloudflare routes can return keeps the verdict it had; a billed
+the client.py rows). Every transport error keeps the verdict it had in 3.11.1; a billed
 Claude call is never handed back to Routes as one to try again."""
 import functools
 
@@ -20,7 +20,7 @@ def _before(error):
 LEGACY = [NO_REQUESTS, NOT_JSON, NO_ANSWERS, "HTTP 400: {\"error\": \"bad\"}", "HTTP 401: Unauthorized",
           "HTTP 403: forbidden", "HTTP 404: no such model", "HTTP 408: timeout", "HTTP 429: rate limited",
           "HTTP 500: boom", "HTTP 502: bad gateway", "HTTP 503: busy", "HTTP 524: timeout",
-          "ReadTimeout: HTTPSConnectionPool(host='api.typesafe.ai'): read timed out",
+          "ReadTimeout: HTTPSConnectionPool(host='api.example.com'): read timed out",
           "ConnectTimeout: connect timed out", "ConnectionError: [Errno 111] Connection refused",
           "SSLError: certificate verify failed", "ChunkedEncodingError: connection broken",
           "TooManyRedirects: exceeded 30 redirects", "InvalidURL: no host", "RuntimeError: refused",
@@ -38,7 +38,7 @@ def test_no_claude_constant_is_retried_with_or_without_a_suffix(constant):
 
 
 def test_a_route_never_prints_its_token():
-    r = Route("Cloudflare", print, "acct", B.SENTINEL, "gw")
+    r = Route("Anthropic", print, "acct", B.SENTINEL, "gw")
     assert B.SENTINEL not in repr(r) and "acct" in repr(r)
 
 

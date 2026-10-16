@@ -1,12 +1,11 @@
-"""Asking Jev (TypeSafe System One) without ever making the loop wait, over every route the app has to it:
-TypeSafe's own API and Cloudflare's AI REST API.
+"""Asking the AI assistant (Claude, over the Anthropic API or an Anthropic-compatible router) without ever making the
+loop wait.
 
-`Asker.submit()` queues a question set and returns at once; a single background worker calls Jev and
+`Asker.submit()` queues a question set and returns at once; a single background worker calls Claude and
 stores the answers under the caller's key. The control loop only ever reads `Asker.result()`: an answer
 from an earlier pass, or None. Every failure (no credentials, budget spent, timeout, HTTP error, an
 envelope that doesn't parse, a question that waited too long) is recorded and yields no answer, so the
-caller carries on as the base engine would. `Routes` tries each route in turn, retrying a failure that may
-pass.
+caller carries on as the base engine would. `Routes` tries its route, retrying a failure that may pass.
 """
 from __future__ import annotations
 
@@ -32,88 +31,9 @@ try:
 except ImportError:  # armv7 images skip the SDK, and the lean test harness has none: the brain runs rules
     anthropic = None
 
-URL = "https://api.cloudflare.com/client/v4/accounts/{account}/ai/run"
-MODEL = "typesafe/jev"
 NO_REQUESTS = "requests not installed"
 NOT_JSON = "response is not JSON"
 NO_ANSWERS = "no answers in the response"
-
-
-def parse(payload):
-    """Cloudflare wraps TypeSafe's body as result.result: (answers, usage). Anything else: (None, None)."""
-    try:
-        body = payload["result"]["result"]
-        answers = body["answers"]
-    except (KeyError, TypeError):
-        return None, None
-    if not isinstance(answers, dict) or not answers:
-        return None, None
-    return answers, body.get("usage") or {}
-
-
-LEGACY_FIELDS = ("type", "instructions", "criteria")
-
-
-def legacy_questions(questions):
-    """Each phrasing as the legacy routes have always had it: the Claude route's extra keys never reach them."""
-    return {k: {f: v[f] for f in LEGACY_FIELDS if f in v} if isinstance(v, dict) else v for k, v in questions.items()}
-
-
-def call(account, token, state, questions, gateway=None, timeout=20.0):
-    """One Jev evaluation -> (answers, usage, error). Never raises."""
-    if requests is None:
-        return None, None, NO_REQUESTS
-    headers = {"Authorization": f"Bearer {token}"}
-    if gateway:
-        headers["cf-aig-gateway-id"] = gateway
-    body = {"model": MODEL, "input": {"state": state, "questions": legacy_questions(questions)}}
-    try:
-        resp = requests.post(URL.format(account=account), json=body, headers=headers, timeout=timeout)
-    except Exception as e:  # noqa: BLE001 - a network fault of any kind is a missing answer
-        return None, None, f"{type(e).__name__}: {e}"[:200]
-    if resp.status_code != 200:
-        return None, None, f"HTTP {resp.status_code}: {resp.text[:160]}"
-    try:
-        answers, usage = parse(resp.json())
-    except ValueError:
-        return None, None, NOT_JSON
-    if answers is None:
-        return None, None, NO_ANSWERS
-    return answers, usage, None
-
-
-TYPESAFE_URL = "https://api.typesafe.ai/v1/systemone"
-TYPESAFE_MODEL = "jev-latest"
-
-
-def parse_typesafe(payload):
-    """TypeSafe's own API answers at the top level: (answers, usage). Anything else: (None, None)."""
-    answers = payload.get("answers") if isinstance(payload, dict) else None
-    if not isinstance(answers, dict) or not answers:
-        return None, None
-    return answers, payload.get("usage") or {}
-
-
-def call_typesafe(account, token, state, questions, gateway=None, timeout=20.0):
-    """One Jev evaluation straight from TypeSafe with a TypeSafe API key (`token`; `account` and
-    `gateway` are unused) -> (answers, usage, error). Never raises. One try: Routes retries."""
-    if requests is None:
-        return None, None, NO_REQUESTS
-    headers = {"Authorization": f"Bearer {token}"}
-    body = {"model": TYPESAFE_MODEL, "state": state, "questions": legacy_questions(questions)}
-    try:
-        resp = requests.post(TYPESAFE_URL, json=body, headers=headers, timeout=timeout)
-    except Exception as e:  # noqa: BLE001 - a network fault of any kind is a missing answer
-        return None, None, f"{type(e).__name__}: {e}"[:200]
-    if resp.status_code != 200:
-        return None, None, f"HTTP {resp.status_code}: {resp.text[:160]}"
-    try:
-        answers, usage = parse_typesafe(resp.json())
-    except ValueError:
-        return None, None, NOT_JSON
-    if answers is None:
-        return None, None, NO_ANSWERS
-    return answers, usage, None
 
 
 # ---------- Claude over the Anthropic API (brain_provider: claude_haiku) ----------
@@ -720,7 +640,7 @@ def retryable(error):
 
 @dataclass
 class Route:
-    """One way to reach Jev: `fn` is `call` (Cloudflare /ai/run) or `call_typesafe` (TypeSafe direct)."""
+    """One way to reach the AI assistant: `fn` is `call_anthropic` with its client, model, prompt and meter bound."""
 
     name: str
     fn: object
@@ -730,7 +650,7 @@ class Route:
 
 
 class Routes:
-    """Jev's transport over every route it has to the same model, tried in order. A route gets `tries` tries while
+    """The AI assistant's transport over every route it has to the same model, tried in order. A route gets `tries` tries while
     its failure may pass (retryable), 2 s and then 4 s apart, and no try starts that could end more than `window_s`
     after the route's first; any other failure moves straight on to the next route. It runs on the Asker's worker,
     so the control loop never waits for it. Its usage says which route answered, whether that was a failover, and
@@ -768,12 +688,12 @@ class Answer:
 
 
 class Asker:
-    """Background Jev calls, keyed by the caller. `transport` is a `Routes` in the add-on and a fake in tests;
+    """Background AI assistant calls, keyed by the caller. `transport` is a `Routes` in the add-on and a fake in tests;
     `threaded=False` runs each submission at once (tests, and one-shot scripts). The day's calls stop at
     `daily_budget`, and take_warning() is true once a day when they reach `warn_pct` of it. A question that waited
     more than `max_wait_s` in the queue (behind calls that were failing) is dropped unasked: its evidence is stale."""
 
-    def __init__(self, account, token, gateway=None, daily_budget=5000, transport=call,
+    def __init__(self, account, token, gateway=None, daily_budget=5000, transport=None,
                  threaded=True, clock=time.time, timeout=20.0, warn_pct=80, max_wait_s=300.0, meter=None):
         self.account, self.token, self.gateway, self.meter = account, token, gateway, meter
         self.daily_budget, self.transport, self.clock, self.timeout = daily_budget, transport, clock, timeout
@@ -788,7 +708,7 @@ class Asker:
         self._queue = None
         if threaded and self.enabled:
             self._queue = queue.Queue()
-            threading.Thread(target=self._work, name="jev-asker", daemon=True).start()
+            threading.Thread(target=self._work, name="brain-asker", daemon=True).start()
 
     def __repr__(self):
         return f"Asker(account={self.account!r}, calls={self.stats.get('calls')})"
@@ -804,7 +724,7 @@ class Asker:
                               warned=False)
 
     def submit(self, key, state, questions):
-        """Queue one evaluation. False when Jev is off, the day's budget is spent, or `key` is in flight."""
+        """Queue one evaluation. False when the AI assistant is off, the day's budget is spent, or `key` is in flight."""
         if not self.enabled or (self.meter is not None and self.meter.state() is not None):
             return False  # off, or the Claude brain's budget, pause or latch says no new ask
         with self._lock:
@@ -823,7 +743,7 @@ class Asker:
         return True
 
     def note(self, stat):
-        """Count one of today's events (e.g. "reasks") in the stats the Jev sensor shows."""
+        """Count one of today's events (e.g. "reasks") in the stats the AI assistant sensor shows."""
         with self._lock:
             self._roll_day()
             self.stats[stat] = self.stats.get(stat, 0) + 1

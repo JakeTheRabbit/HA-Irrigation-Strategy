@@ -383,12 +383,8 @@ def brain_with(monkeypatch):
         transport = K.FakeTransport(answers)
         monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: transport)
         monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: now.timestamp()))
-        K.has_run()
-        opts = {"num_zones": 1, "enable_flag": KILL, "cf_account_id": "acct", "cf_api_token": "tok"}
-        if haiku:
-            monkeypatch.setattr(jc, "anthropic", B.FakeSDK(B.FakeClient()))
-            opts = {"num_zones": 1, "enable_flag": KILL, "brain_provider": "claude_haiku",
-                    "anthropic_api_key": B.SENTINEL}
+        monkeypatch.setattr(jc, "anthropic", B.FakeSDK(B.FakeClient()))
+        opts = {"num_zones": 1, "enable_flag": KILL, "brain_provider": "claude_haiku", "anthropic_api_key": B.SENTINEL}
         c, fake = _build(opts, states=states)
         return c, fake
     return make

@@ -39,7 +39,7 @@ def test_a_firm_proposal_is_a_cs711_card_for_a_person_and_nothing_is_written(cla
     assert "pore EC 6.50 mS/cm" in sent
     assert _created(fake, "CS-711") == ["f2_jev_feed_default"]
     assert "feed" in fake.sets["sensor.crop_steering_jev"][1]["judges_advising"]
-    without, without_fake = _run(claude, "feed_ec_down_small", feed_ec_sensor=FEED, jev_judges=ALL_BUT_FEED)
+    without, without_fake = _run(claude, "feed_ec_down_small", feed_ec_sensor=FEED, ai_judges=ALL_BUT_FEED)
     assert not _feed_asks(without) and not _created(without_fake, "CS-711")
     assert _writes(fake) == _writes(without_fake) and _switches(fake) == _switches(without_fake)
 
@@ -68,12 +68,6 @@ def test_asked_once_a_grow_day_and_not_before_an_hour_after_lights_on(claude):  
     _zone(c)
     c.loop_once(nxt)
     assert len(_feed_asks(c)) == 4
-
-
-def test_the_legacy_route_never_builds_it(tmp_path):
-    brain = jev_bridge.build({"jev_judges": "all"}, ("acct", "tok", None), str(tmp_path / "state.json"), print,
-                             jev_bridge.BrainStatus("jev_legacy", "legacy", "Jev."))
-    assert brain.feed is None
 
 
 def test_only_a_firm_change_is_a_proposal():

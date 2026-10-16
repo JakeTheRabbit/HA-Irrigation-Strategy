@@ -214,9 +214,9 @@ def _admit_setpoint(d, ctx):
     band = (sp.get("bands") or {}).get(suffix)
     cur = (sp.get("current") or {}).get(suffix)
     if band is None or cur is None or frm is None or to is None:
-        return False, "not a setting Jev may move on this zone"
+        return False, "not a setting the AI assistant may move on this zone"
     if abs(float(frm) - float(cur)) > 1e-6:
-        return False, f"the setting changed since Jev was asked ({frm:g} -> {cur:g})"
+        return False, f"the setting changed since the AI assistant was asked ({frm:g} -> {cur:g})"
     if abs(float(to) - float(frm)) > 0.5 + 1e-9 or to == frm:
         return False, "one notch at a time"
     lo, hi = band

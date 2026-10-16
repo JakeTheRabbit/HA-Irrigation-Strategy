@@ -1,10 +1,9 @@
-"""Jev's routes and its asker: TypeSafe direct, then Cloudflare's /ai/run, each retried while a failure may pass
-and inside a window, any failure moving on to the next route; the day's budget warning, a question that waited too
-long, and the day's counts (docs/JEV.md, Availability)."""
+"""The AI assistant's routes and its asker: each route retried while a failure may pass and inside a window, any
+other failure moving on to the next route; the day's budget warning, a question that waited too long, and the day's
+counts (docs/AI_ASSISTANT.md, Availability)."""
 import json
 
 import jev_kit as K
-from jev import client
 from jev.client import NO_ANSWERS, NO_REQUESTS, NOT_JSON, Asker, Route, Routes, retryable
 
 ANSWERS = {"q__v0": K.noul_answer(0.9)}
@@ -39,7 +38,7 @@ class Flaky:
 
 def _routes(*fns, tries=3, clock=None):
     clock = clock or FakeClock()
-    named = [Route(name, fn, f"{name}-acct", f"{name}-key") for name, fn in zip(("TypeSafe", "Cloudflare"), fns)]
+    named = [Route(name, fn, f"{name}-acct", f"{name}-key") for name, fn in zip(("Anthropic", "Second"), fns)]
     return Routes(named, tries=tries, sleep=clock.sleep, clock=clock), clock
 
 
@@ -57,9 +56,9 @@ def test_a_server_error_is_tried_again_with_backoff_then_answers():
     send, clock = _routes(ts)
     answers, usage, error = send("ignored", "ignored", {"s": 1}, {"q__v0": {}})
     assert error is None and answers == ANSWERS and len(ts.calls) == 3
-    assert (usage["route"], usage["failover"], usage["retries"], usage["input_tokens"]) == ("TypeSafe", False, 2, 900)
+    assert (usage["route"], usage["failover"], usage["retries"], usage["input_tokens"]) == ("Anthropic", False, 2, 900)
     assert clock.slept == [2.0, 4.0]
-    assert ts.calls[0] == ("TypeSafe-acct", "TypeSafe-key", None)  # each route uses its own credentials
+    assert ts.calls[0] == ("Anthropic-acct", "Anthropic-key", None)  # each route uses its own credentials
 
 
 def test_a_refused_key_moves_straight_to_the_next_route():
@@ -67,7 +66,7 @@ def test_a_refused_key_moves_straight_to_the_next_route():
     send, clock = _routes(ts, cf)
     answers, usage, error = send("", "", {}, {})
     assert error is None and len(ts.calls) == 1 and len(cf.calls) == 1
-    assert (usage["route"], usage["failover"], usage["retries"]) == ("Cloudflare", True, 0)
+    assert (usage["route"], usage["failover"], usage["retries"]) == ("Second", True, 0)
     assert clock.slept == []
 
 
@@ -76,7 +75,7 @@ def test_three_server_errors_then_the_next_route():
     send, _clock = _routes(ts, cf)
     answers, usage, error = send("", "", {}, {})
     assert len(ts.calls) == 3 and len(cf.calls) == 1
-    assert (usage["route"], usage["failover"], usage["retries"]) == ("Cloudflare", True, 2)
+    assert (usage["route"], usage["failover"], usage["retries"]) == ("Second", True, 2)
 
 
 def test_timeouts_stop_once_another_try_would_pass_the_window():
@@ -85,33 +84,14 @@ def test_timeouts_stop_once_another_try_would_pass_the_window():
     send, _ = _routes(ts, clock=clock)
     answers, usage, error = send("", "", {}, {}, timeout=20.0)
     assert answers is None and len(ts.calls) == 2  # 20 s, a 2 s wait, 20 s: a third try could end past 60 s
-    assert error == "TypeSafe: ReadTimeout: 20 s"
+    assert error == "Anthropic: ReadTimeout: 20 s"
 
 
 def test_every_route_failing_names_each_one():
     send, _clock = _routes(Flaky("HTTP 401: bad key"), Flaky("HTTP 403: no access"))
     answers, usage, error = send("", "", {}, {})
     assert (answers, usage) == (None, None)
-    assert error == "TypeSafe: HTTP 401: bad key; Cloudflare: HTTP 403: no access"
-
-
-def test_typesafe_direct_makes_one_try(monkeypatch):
-    """The TypeSafe call no longer retries a 429 itself: Routes retries every route alike."""
-    posts = []
-
-    class Resp:
-        status_code, text = 429, "slow down"
-
-    class Requests:
-        @staticmethod
-        def post(*args, **kwargs):
-            posts.append(1)
-            return Resp()
-
-    monkeypatch.setattr(client, "requests", Requests)
-    monkeypatch.setattr(client.time, "sleep", lambda s: posts.append(f"slept {s}"))
-    assert client.call_typesafe("typesafe", "key", {}, {})[2] == "HTTP 429: slow down"
-    assert posts == [1]
+    assert error == "Anthropic: HTTP 401: bad key; Second: HTTP 403: no access"
 
 
 def test_the_asker_warns_once_a_day_at_80_percent_of_the_budget():
@@ -141,11 +121,11 @@ def test_the_asker_counts_retries_failovers_and_second_looks():
     ts, cf = Flaky("HTTP 503: busy", "HTTP 401: bad key"), Flaky()
     send, _clock = _routes(ts, cf)
     a = Asker("acct", "tok", transport=send, threaded=False, clock=lambda: K.NOW.timestamp())
-    assert a.submit("k1", {}, {})  # TypeSafe: busy, a retry, then a refused key: Cloudflare answers
-    assert a.submit("k2", {}, {})  # TypeSafe answers
+    assert a.submit("k1", {}, {})  # the first route: busy, a retry, then a refused key: the second answers
+    assert a.submit("k2", {}, {})  # the first route answers
     a.note("reasks")
     assert (a.stats["retries"], a.stats["failovers"], a.stats["reasks"]) == (1, 1, 1)
-    assert a.stats["route"] == "TypeSafe" and a.daily_budget == 5000
+    assert a.stats["route"] == "Anthropic" and a.daily_budget == 5000
 
 
 def test_an_old_usage_file_loads_and_a_restart_does_not_warn_twice(tmp_path):

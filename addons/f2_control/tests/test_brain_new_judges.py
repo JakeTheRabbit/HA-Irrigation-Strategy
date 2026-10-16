@@ -120,12 +120,8 @@ def test_the_controller_hands_the_balance_answer_and_the_zones_hardware_cause_to
     assert jev_bridge.brain_context(c, room, 1, None, NOW)["zones_hardware"] is None
 
 
-def test_balance_is_built_only_on_the_claude_route(tmp_path, monkeypatch):
+def test_balance_is_built_on_the_claude_route(tmp_path, monkeypatch):
     monkeypatch.setattr(jc, "anthropic", B.FakeSDK(B.FakeClient(B.judging())))
-    haiku = jev_bridge.build({"brain_provider": "claude_haiku", "anthropic_api_key": "k"}, ("", "", ""),
+    haiku = jev_bridge.build({"brain_provider": "claude_haiku", "anthropic_api_key": "k"},
                              str(tmp_path / "s.json"), lambda *a: None)
     assert "balance" in [j.name for j in haiku.judges]
-    (tmp_path / "legacy").mkdir()
-    legacy = jev_bridge.build({"typesafe_api_key": "t"}, ("", "", ""), str(tmp_path / "legacy" / "s.json"),
-                              lambda *a: None)
-    assert "balance" not in [j.name for j in legacy.judges]

@@ -20,7 +20,7 @@ from test_controller import _desc
 
 KILL = "input_boolean.kill"
 NOW = datetime(2026, 9, 27, 13, 0)
-SENTINEL = "cf-SENTINEL-never-shown"
+SENTINEL = "key-SENTINEL-never-shown"
 REAL_LOAD = controller.load_options  # before any other test module's fake_ha.install replaces it
 
 
@@ -57,35 +57,34 @@ def container(monkeypatch, tmp_path):
 
 @pytest.mark.parametrize("source", ["variable", "file"])
 def test_a_containers_secret_reaches_no_log_file_or_home_assistant(container, monkeypatch, tmp_path, capsys, source):
-    """U7, end to end: cf_api_token from F2_OPT_CF_API_TOKEN or its _FILE, with Jev on (the whole options
-    dict reaches jev_bridge.build) and one pass of the loop."""
+    """U7, end to end: anthropic_api_key from F2_OPT_ANTHROPIC_API_KEY or its _FILE, with the AI assistant on (the
+    whole options dict reaches jev_bridge.build) and one pass of the loop."""
     data, build = container
     if source == "file":
-        secret = tmp_path / "cf_api_token"
+        secret = tmp_path / "anthropic_api_key"
         secret.write_text(SENTINEL)
-        monkeypatch.setenv("F2_OPT_CF_API_TOKEN_FILE", str(secret))
+        monkeypatch.setenv("F2_OPT_ANTHROPIC_API_KEY_FILE", str(secret))
     else:
-        monkeypatch.setenv("F2_OPT_CF_API_TOKEN", SENTINEL)
-    monkeypatch.setenv("F2_OPT_CF_ACCOUNT_ID", "acct")
+        monkeypatch.setenv("F2_OPT_ANTHROPIC_API_KEY", SENTINEL)
+    monkeypatch.setenv("F2_OPT_BRAIN_PROVIDER", "claude_haiku")
     monkeypatch.setenv("F2_OPT_ENABLE_FLAG", KILL)
     transport = K.FakeTransport({})
-    monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: transport)
+    K.sdk(monkeypatch, transport)
     monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: NOW.timestamp()))
-    K.has_run(str(data / "state.json"))
     clock = [0.0]  # a shot's waits on a test clock
     monkeypatch.setattr(controller.time, "sleep", lambda s: clock.__setitem__(0, clock[0] + s))
     monkeypatch.setattr(controller.time, "monotonic", lambda: clock[0])
     fake = _fake()
     c = build(fake)
-    assert c._options["cf_api_token"] == SENTINEL and c.jev is not None  # it reached what uses it
+    assert c._options["anthropic_api_key"] == SENTINEL and c.jev is not None  # it reached what uses it
     c.loop_once(NOW)
     c._save_state()
     out = capsys.readouterr().out
-    assert "cf_api_token=<set>" in out
+    assert "anthropic_api_key=<set>" in out
     assert SENTINEL not in out
     assert SENTINEL not in json.dumps([fake.calls, fake.sets, fake.states], default=str)
     files = {p.name: p.read_text(encoding="utf-8", errors="replace") for p in data.iterdir() if p.is_file()}
-    assert "state.json" in files and "jev_ledger.jsonl" in files
+    assert "state.json" in files and "jev_usage.json" in files
     for name in ("dosing_state.json", "jev_journal.jsonl", "jev_setpoints.json", "jev_usage.json"):
         assert SENTINEL not in files.get(name, ""), name
     assert not [name for name, text in files.items() if SENTINEL in text]

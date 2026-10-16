@@ -22,8 +22,8 @@ from test_recreated_room_controller import _see
 from test_upgrade_in_place import _upgrade
 
 KILL = "switch.crop_steering_engine_enabled"
-# Jev on, so its Setpoints judge runs. Nothing here asks Jev anything.
-JEV = {"enable_flag": KILL, "cf_account_id": "acc", "cf_api_token": "tok"}
+# The AI assistant on, so its Setpoints judge runs. Nothing here asks it anything.
+JEV = {"enable_flag": KILL, "brain_provider": "claude_haiku", "anthropic_api_key": "fixture-anthropic-key"}
 NUMBER = "number.crop_steering_zone_1_"
 SENSOR = "sensor.crop_steering_zone_1_auto_setpoints"
 
@@ -44,12 +44,12 @@ async def _learned_tent(hass, controller_for, monkeypatch):
     import jev_kit
     from jev.client import Asker
 
-    # Jev's asker without its background worker: nothing in this test asks Jev anything, and a
+    # The brain's asker without its background worker: nothing in this test asks it anything, and a
     # worker thread would outlive the test (Home Assistant's test harness fails on that).
     monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False))
     _entry, seed = await _upgrade(hass, "entry_3_8_learned_tent.json")
     assert hass.states.get("switch.crop_steering_auto_setpoints").state == "on"
-    jev_kit.has_run()  # a 3.8.0 box has run Jev, so Cloudflare alone starts it
+    jev_kit.sdk(monkeypatch, jev_kit.FakeTransport({}))
     c, fake, _clock = controller_for(JEV, saved_state=seed["controller_saved"])
     assert jev_bridge.owns_setpoints(c)
     room = c.rooms[0]
@@ -101,7 +101,7 @@ async def test_the_p1_target_and_field_capacity_follow_the_highest_reading_and_t
     owners = fake.sets[SENSOR][1]["managed_by"]
     assert owners[NUMBER + "p1_target_vwc"] == "the zone's highest reading of the grow-day before"
     assert owners[NUMBER + "field_capacity"] == "the zone's highest reading of this grow-day or the one before"
-    assert owners[NUMBER + "p2_shot_size"] == "Jev's Setpoints judge, one notch a night"
+    assert owners[NUMBER + "p2_shot_size"] == "the AI assistant's Setpoints judge, one notch a night"
 
     # The rest of the grow-day moves nothing more: its point is spent.
     fake.calls.clear()

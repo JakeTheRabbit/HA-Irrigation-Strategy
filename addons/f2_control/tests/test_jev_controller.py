@@ -49,9 +49,8 @@ def jev_with(monkeypatch):
         monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: transport)
         monkeypatch.setattr(jev_bridge, "Asker", functools.partial(
             Asker, threaded=False, clock=lambda: NOW.timestamp()))
-        K.has_run()  # Cloudflare alone starts Jev only where it has run before
-        c, fake = _build({"num_zones": 1, "enable_flag": KILL, "cf_account_id": "acct",
-                          "cf_api_token": "tok"}, states=_states())
+        K.sdk(monkeypatch)
+        c, fake = _build({"num_zones": 1, "enable_flag": KILL, **K.HAIKU}, states=_states())
         c._jev_transport = transport
         return c, fake
     return make
@@ -61,7 +60,7 @@ def _switches(fake):
     return [(svc, d.get("entity_id")) for dom, svc, d in fake.calls if dom == "switch"]
 
 
-def test_without_cloudflare_the_jev_edition_is_the_plain_engine():
+def test_without_a_key_the_controller_is_the_plain_engine():
     c, _ = _build({"num_zones": 1, "enable_flag": KILL}, states=_states())
     assert c.jev is None
     _p1_zone(c)
@@ -117,19 +116,18 @@ def test_a_broken_brain_never_stops_the_loop(jev_with, monkeypatch):
 
 def test_the_controller_starts_even_if_jev_cannot(monkeypatch):
     monkeypatch.setattr(jev_bridge, "build", lambda *a, **k: (_ for _ in ()).throw(OSError("no /data")))
-    c, _ = _build({"num_zones": 1, "enable_flag": KILL, "cf_account_id": "a", "cf_api_token": "t"},
-                  states=_states())
+    c, _ = _build({"num_zones": 1, "enable_flag": KILL, **K.HAIKU}, states=_states())
     assert c.jev is None
 
 
 def test_the_options_choose_the_judges(jev_with, monkeypatch, tmp_path):
     monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: K.FakeTransport({}))
     monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False))
+    K.sdk(monkeypatch)
     state = str(tmp_path / "state.json")
-    K.has_run(state)
-    brain = jev_bridge.build({"jev_judges": "ramp, salt"}, ("a", "t", ""), state, lambda *a: None)
-    assert sorted(j.name for j in brain.judges) == ["ramp", "salt"]
-    assert jev_bridge.build({"jev_enabled": False}, ("a", "t", ""), "/tmp/s.json", lambda *a: None) is None
+    brain = jev_bridge.build({**K.HAIKU, "ai_judges": "ramp, salt"}, state, lambda *a: None)
+    assert sorted(j.name for j in brain.judges) == ["ramp", "salt", "shotsize", "targets"]  # with the two powers
+    assert jev_bridge.build({"brain_provider": "rules", "anthropic_api_key": "k"}, state, lambda *a: None) is None
     assert controller.Controller.__dict__  # controller imports the bridge
 
 
@@ -145,7 +143,7 @@ def test_the_jev_sensor_shows_the_routes_the_budget_and_the_stricter_gate(jev_wi
         c.jev.ledger.resolve(c.jev.ledger.record("ramp", "default", 1, "P2", "advance"), "fell back", False)
     c.loop_once(NOW)
     room = fake.sets["sensor.crop_steering_jev"][1]
-    assert room["routes"] == ["Cloudflare"] and room["daily_budget"] == 5000
+    assert room["routes"] == ["Anthropic"] and room["daily_budget"] == 5000
     assert {"last_route", "retries_today", "failovers_today", "reasks_today"} <= set(room)
     assert fake.sets["sensor.crop_steering_zone_1_jev"][1]["strict"] == ["ramp"]
 

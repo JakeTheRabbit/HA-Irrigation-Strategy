@@ -137,9 +137,9 @@ def test_the_envelope_refuses_everything_else():
         (_d(5.0, 4.5), _sp(frozen="2026-09-29T23:00:00"), "paused after a safety revert"),
         (_d(5.0, 4.5), _sp(changed_today=True), "one change per zone per grow-day"),
         (_d(5.0, 4.0), _sp(), "one notch at a time"),
-        (_d(5.0, 4.5), _sp(current={SHOT: 5.5, THRESHOLD: 30.5}), "changed since Jev was asked"),
+        (_d(5.0, 4.5), _sp(current={SHOT: 5.5, THRESHOLD: 30.5}), "changed since the AI assistant was asked"),
         (_d(4.0, 3.5), _sp(current={SHOT: 4.0, THRESHOLD: 30.5}), "outside its range 4-6"),
-        (_d(30.5, 30.0, suffix="p1_target_vwc"), _sp(), "not a setting Jev may move"),
+        (_d(30.5, 30.0, suffix="p1_target_vwc"), _sp(), "not a setting the AI assistant may move"),
     ]
     for d, sp, why in cases:
         ok, reason = admit(d, _ctx(sp=sp))
@@ -231,7 +231,7 @@ def test_a_move_is_written_once_and_is_not_mistaken_for_an_edit(tmp_path):
     ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
     d = SetpointsJudge().decide(_verdict("smaller_shots"), ctx)
     jev_bridge.apply_setpoint(c, room, 1, d, ctx, NIGHT)
-    assert c.writes == [(1, SHOT, 5.0, 4.5, "Jev")]
+    assert c.writes == [(1, SHOT, 5.0, 4.5, "AI setpoints judge")]
     # The phones that tick Jev hear of it (docs/NOTIFICATIONS.md): a push, no card.
     [(event, zone, (words, why, _entity))] = c.events
     assert (event, zone, words) == ("jev_setpoint", 1, "P2 shot 5% -> 4.5%")
@@ -281,7 +281,7 @@ def test_a_rescue_shot_after_a_change_puts_it_back_and_pauses_the_zone(tmp_path)
     assert len(c.writes) == 1
     jev_bridge._hist(room, 1).add_shot(Shot(NIGHT + timedelta(hours=4), 120, 5.0, "p3_emergency", 20.5, 3.0))
     jev_bridge.guard_setpoints(c, room, 1, NIGHT + timedelta(hours=4, minutes=5))
-    assert c.writes[-1] == (1, THRESHOLD, 30.0, 30.5, "Jev (put back)")
+    assert c.writes[-1] == (1, THRESHOLD, 30.0, 30.5, "AI setpoints judge (put back)")
     assert c.alerts and c.alerts[-1][1] == "CS-404" and "03:00" in c.alerts[-1][2]
     c.numbers[THRESHOLD] = 30.5  # Home Assistant reflects the put-back
     sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(hours=5))
@@ -303,7 +303,19 @@ def test_a_write_that_lands_is_read_back_and_never_sent_again(tmp_path):
     jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=1))
     assert rec["pending"] is None
     jev_bridge.readback(c, room, 1, NIGHT + timedelta(hours=2))
-    assert c.writes == [(1, SHOT, 5.0, 4.5, "Jev")]
+    assert c.writes == [(1, SHOT, 5.0, 4.5, "AI setpoints judge")]
+
+
+def test_a_pending_write_an_older_release_saved_as_jev_is_still_the_judges_own(tmp_path):
+    """3.12 named the Setpoints judge's writer "Jev" in jev_setpoints.json: after the update it is resent and, once
+    it fails, marked failed exactly as a write saved by this release."""
+    c, room, rec = _moved(tmp_path)
+    rec["pending"]["by"] = "Jev"
+    rec["last"]["to"] = 4.5
+    for minutes in (4, 5, 15, 35, 75):
+        jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=minutes))
+    assert len(c.writes) == 4 and {w[4] for w in c.writes} == {"AI setpoints judge", "Jev"}
+    assert rec["pending"] is None and rec["last"].get("failed") is True
 
 
 def test_a_write_that_does_not_land_is_sent_again_backing_off_then_recorded_as_failed(tmp_path):
@@ -313,7 +325,7 @@ def test_a_write_that_does_not_land_is_sent_again_backing_off_then_recorded_as_f
         assert len(c.writes) == sent, minutes
         sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=minutes))
         assert sp["home"][SHOT] == 5.0  # the old value is never taken for an edit by hand while it is retried
-    assert set(c.writes) == {(1, SHOT, 5.0, 4.5, "Jev")}
+    assert set(c.writes) == {(1, SHOT, 5.0, 4.5, "AI setpoints judge")}
     jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=75))
     assert len(c.writes) == 4 and rec["pending"] is None and rec["written"][SHOT] == 5.0
     top = c.jev.journal.recent("default")[0]
@@ -380,10 +392,16 @@ def test_the_outcome_asks_whether_water_or_ec_moved_the_way_the_change_meant():
 # With the Setpoints judge running, the P2 shot size and re-water threshold are its own and the base engine's Auto
 # Setpoints learner keeps the rest. Until 4 Oct 2026 the learner wrote nothing at all once the judge ran, so nothing
 # wrote the P1 target: zone 2 sat at 29.5 from 26 Sep while its probe read 42-44 % at lights-on, and P1 never ramped.
-JUDGE = {"cf_account_id": "acc", "cf_api_token": "tok"}
+JUDGE = dict(K.HAIKU)
 Z2 = {f"number.crop_steering_zone_1_{s}": (str(v), {}) for s, v in Z2.items()}  # zone 2, as the rig's zone 1
 LIGHTS_ON = datetime(2026, 10, 4, 10, 0)
 LEARNER, JUDGED = ("p1_target_vwc", "field_capacity"), (SHOT, THRESHOLD)  # the rescue floor is nobody's
+
+
+@pytest.fixture(autouse=True)
+def _claude(monkeypatch):
+    """The brain these rigs start is the Claude route, answering nothing unless a test says otherwise."""
+    K.sdk(monkeypatch, K.FakeTransport({}))
 
 
 @pytest.fixture
@@ -394,7 +412,6 @@ def ramp_clock(monkeypatch):
 
 def _zone_2(auto="on", plan=False, numbers=Z2):
     """Zone 2 with what its learner had learned by 4 Oct, loaded from the block controller 3.8.0 saved."""
-    K.has_run()  # a box that has run Jev: Cloudflare alone starts it
     c, fake, room = asr._rig(auto=auto, numbers=numbers, options=JUDGE)
     room.state[1]["learn"] = c._apply_saved_zone(c._fresh_zone(), {"learn": SAVED_BY_3_8_0})["learn"]
     room.strategy_required = plan
@@ -453,7 +470,7 @@ def test_the_published_attributes_say_which_writer_owns_which_lever(ramp_clock):
     number = "number.crop_steering_zone_1_"
     assert sorted(attrs["managed"]) == sorted(number + s for s in LEARNER + JUDGED)
     owners = attrs["managed_by"]
-    assert {owners[number + s] for s in JUDGED} == {"Jev's Setpoints judge, one notch a night"}
+    assert {owners[number + s] for s in JUDGED} == {"the AI assistant's Setpoints judge, one notch a night"}
     # the zone's own highest readings set these two, not the learner (6 Oct 2026)
     assert owners[number + "p1_target_vwc"] == "the zone's highest reading of the grow-day before"
     assert owners[number + "field_capacity"] == "the zone's highest reading of this grow-day or the one before"
