@@ -1,13 +1,13 @@
-"""Which brain runs (jev_bridge.resolve_provider), one case per row, an empty key included; how an install that
+"""Which brain runs (brain_bridge.resolve_provider), one case per row, an empty key included; how an install that
 chose the removed first AI route moves (to Claude with a key, else rules, said once in the log and by a CS-712
 card); and which judges run: all by default, an old jev_judges list read as all, an ai_judges list as written."""
 import json
 import pathlib
 
 import brain_kit as B
-import jev_bridge
+import brain_bridge
 import pytest
-from jev import client as jc
+from brain import client as jc
 
 ADDON = pathlib.Path(__file__).resolve().parents[1]
 KEY = {"anthropic_api_key": "k"}
@@ -20,11 +20,11 @@ LIVE = "dawn, salt, dusk, probe, shot, night, zones, stage, setpoints, channel, 
 @pytest.fixture(autouse=True)
 def _sdk(monkeypatch):
     monkeypatch.setattr(jc, "anthropic", B.FakeSDK(B.FakeClient(B.judging())))
-    monkeypatch.setattr(jev_bridge, "_upgrade_said", False)
+    monkeypatch.setattr(brain_bridge, "_upgrade_said", False)
 
 
 def _resolve(tmp_path, options):
-    return jev_bridge.resolve_provider(options, str(tmp_path))
+    return brain_bridge.resolve_provider(options, str(tmp_path))
 
 
 def _ran(tmp_path):
@@ -94,26 +94,26 @@ def test_a_usage_file_naming_its_brain_wins(tmp_path):
 def test_the_move_is_said_once_at_start_and_never_names_a_secret(tmp_path):
     said = []
     _ran(tmp_path)
-    brain = jev_bridge.build({**CF, **KEY, "cf_gateway_id": "cf-gw-secret"}, str(tmp_path / "state.json"), said.append)
+    brain = brain_bridge.build({**CF, **KEY, "cf_gateway_id": "cf-gw-secret"}, str(tmp_path / "state.json"), said.append)
     assert brain is not None and brain.routes == ["Anthropic"]
     notes = [s for s in said if "first AI route" in s]
     assert len(notes) == 1 and "uses claude-haiku-5-5 with your Anthropic key" in notes[0]
     assert not any(secret in " ".join(said) for secret in ("cf-token-secret", "cf-acct-secret", "cf-gw-secret")) and "Jev" not in " ".join(said)
     said.clear()
-    assert jev_bridge.build({**CF}, str(tmp_path / "state.json"), said.append) is None
+    assert brain_bridge.build({**CF}, str(tmp_path / "state.json"), said.append) is None
     assert [s for s in said if "first AI route" in s and "uses its rules" in s]
 
 
 def test_build_names_its_brain_in_the_usage_file_before_any_ask(tmp_path):
-    brain = jev_bridge.build({"brain_provider": "claude_haiku", **KEY}, str(tmp_path / "state.json"), lambda *a: None)
+    brain = brain_bridge.build({"brain_provider": "claude_haiku", **KEY}, str(tmp_path / "state.json"), lambda *a: None)
     assert brain is not None and brain.asker.stats["calls"] == 0
     assert json.loads((tmp_path / "jev_usage.json").read_text())["provider"] == "claude_haiku"
-    assert jev_bridge.build({"brain_provider": "rules"}, str(tmp_path / "other" / "s.json"), lambda *a: None) is None
+    assert brain_bridge.build({"brain_provider": "rules"}, str(tmp_path / "other" / "s.json"), lambda *a: None) is None
 
 
 def test_a_haiku_brain_is_built_with_its_hook_meter_and_prompt(tmp_path):
     said = []
-    brain = jev_bridge.build({"brain_provider": "claude_haiku", "anthropic_api_key": B.SENTINEL,
+    brain = brain_bridge.build({"brain_provider": "claude_haiku", "anthropic_api_key": B.SENTINEL,
                               "anthropic_daily_budget_usd": 2.5}, str(tmp_path / "s.json"), said.append)
     assert brain.enrich is not None and brain.asker.meter.budget == 2.5 and brain.prompt is not None
     assert brain.arc_rows and brain.arc_note is None
@@ -122,14 +122,14 @@ def test_a_haiku_brain_is_built_with_its_hook_meter_and_prompt(tmp_path):
 
 
 def test_an_arc_this_release_refuses_runs_no_arc_and_says_why(tmp_path):
-    brain = jev_bridge.build({"brain_provider": "claude_haiku", **KEY, "stage_arc": "rockwool_default"},
+    brain = brain_bridge.build({"brain_provider": "claude_haiku", **KEY, "stage_arc": "rockwool_default"},
                              str(tmp_path / "s.json"), lambda *a: None)
     assert brain.arc_rows == () and "rockwool_default is not complete" in brain.arc_note
 
 
 # ------------------------------------------------------------------ which judges
 def _judges(tmp_path, said=None, **options):
-    brain = jev_bridge.build({"brain_provider": "claude_haiku", **KEY, **options}, str(tmp_path / "s.json"),
+    brain = brain_bridge.build({"brain_provider": "claude_haiku", **KEY, **options}, str(tmp_path / "s.json"),
                              (said if said is not None else []).append)
     tasks = {name for name, on in (("feed", brain.feed), ("report", brain.report), ("why", brain.why),
                                    ("plan", brain.plan)) if on}
@@ -137,21 +137,21 @@ def _judges(tmp_path, said=None, **options):
 
 
 def test_by_default_claude_asks_every_judge_and_task_ramp_included(tmp_path):
-    assert _judges(tmp_path) == set(jev_bridge.ALL) and "ramp" in jev_bridge.ALL
-    assert {j.name for j in jev_bridge.judges()} | {"feed", "report", "why", "plan"} == set(jev_bridge.ALL)
+    assert _judges(tmp_path) == set(brain_bridge.ALL) and "ramp" in brain_bridge.ALL
+    assert {j.name for j in brain_bridge.judges()} | {"feed", "report", "why", "plan"} == set(brain_bridge.ALL)
 
 
 @pytest.mark.parametrize("old", ["all", "", None, LIVE, "dawn,ramp,salt,dusk,probe,shot,night,zones,alerts",
                                  "ramp, salt", "setpoints"])
 def test_an_old_jev_judges_value_is_read_as_all(tmp_path, old):
-    assert _judges(tmp_path, jev_judges=old) == set(jev_bridge.ALL)
+    assert _judges(tmp_path, jev_judges=old) == set(brain_bridge.ALL)
 
 
 def test_the_live_list_without_ramp_says_once_which_judges_it_adds(tmp_path):
     said = []
     for n in range(3):
         (tmp_path / str(n)).mkdir()
-        jev_bridge.build({"brain_provider": "claude_haiku", **KEY, "jev_judges": LIVE, "ai_judges": "all"},
+        brain_bridge.build({"brain_provider": "claude_haiku", **KEY, "jev_judges": LIVE, "ai_judges": "all"},
                          str(tmp_path / str(n) / "s.json"), said.append)
     notes = [s for s in said if "old jev_judges list" in s]
     assert len(notes) == 1 and notes[0].endswith("also asks ramp, targets, shotsize. To ask fewer, list them in "
@@ -176,7 +176,7 @@ def test_each_tuning_option_reads_its_new_name_then_its_old_one(tmp_path):
                 "ai_strict_after": 3, "ai_strict_prob": 0.8, "ai_flower_days": 56, "ai_flower_start": ""}
 
     def brain(**options):
-        return jev_bridge.build({"brain_provider": "claude_haiku", **KEY, **options}, str(tmp_path / "s.json"),
+        return brain_bridge.build({"brain_provider": "claude_haiku", **KEY, **options}, str(tmp_path / "s.json"),
                                 lambda *a: None)
 
     # The Supervisor fills in every new key with its default on update: the operator's old values still count.
@@ -191,7 +191,7 @@ def test_each_tuning_option_reads_its_new_name_then_its_old_one(tmp_path):
 
 # ------------------------------------------------------------------ no first-route code is left
 def test_no_cloudflare_or_typesafe_code_path_remains():
-    assert not hasattr(jev_bridge, "routes") and not hasattr(jc, "call") and not hasattr(jc, "call_typesafe")
+    assert not hasattr(brain_bridge, "routes") and not hasattr(jc, "call") and not hasattr(jc, "call_typesafe")
     for path in (ADDON / "f2_control").rglob("*.py"):
         text = path.read_text(encoding="utf-8").lower()
         for word in ("api.cloudflare.com", "api.typesafe.ai", "cf-aig-gateway", "typesafe/jev", "/ai/run"):

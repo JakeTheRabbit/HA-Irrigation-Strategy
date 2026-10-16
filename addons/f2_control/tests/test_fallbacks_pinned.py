@@ -3,7 +3,7 @@
 Around a Home Assistant restart every setting entity can read unavailable (or be missing, on an
 integration older than the setting). The controller then runs on its built-in fallbacks, which now
 come from the one defaults table instead of numbers typed at each call site. The table keeps them
-at the values the release before it used (Jev 3.11.1, commit 12c6d1a), so the parameters below are
+at the values the release before it used (the AI assistant 3.11.1, commit 12c6d1a), so the parameters below are
 that controller's, written out by hand from its call sites; only P3 Time Between Shots is newer.
 """
 

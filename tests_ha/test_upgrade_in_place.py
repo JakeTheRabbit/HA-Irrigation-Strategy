@@ -286,12 +286,12 @@ async def test_3_8_0_app_options_keep_their_ai_budget_and_take_the_new_defaults(
     does."""
     import functools
 
-    import jev_bridge
+    import brain_bridge
     import jev_kit
-    from jev.client import Asker
+    from brain.client import Asker
 
     # No asker worker thread: Home Assistant's test harness fails a test that leaves one running.
-    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False))
+    monkeypatch.setattr(brain_bridge, "Asker", functools.partial(Asker, threaded=False))
     jev_kit.sdk(monkeypatch)
     await _upgrade(hass, "entry_2_17_wizard.json")
     options = {**fixture("options_3_8_0_jev_typesafe.json")["options"], **KEY}
@@ -309,7 +309,7 @@ UPSTREAM_2_25_1 = "entry_2_25_1_pumped_room.json"
 
 
 async def test_a_2_25_1_room_keeps_every_entity_id_and_everything_the_operator_tuned(hass):
-    """The last HA-Irrigation-Strategy release before Jev became upstream
+    """The last HA-Irrigation-Strategy release before the AI assistant became upstream
     (tests_ha/fixtures/entry_2_25_1_pumped_room.json, recorded from 2.25.1's own wizard). Every
     entity 2.25.1 registered keeps its id and has a state, except those this code retires on
     purpose; the entry is loaded as it is, never rewritten."""
@@ -354,7 +354,7 @@ async def test_the_controller_carries_a_2_25_1_room_straight_on_with_its_options
 ):
     """Both layers updated on an armed 2.25.1 box: the app keeps the /data/options.json and
     /data/state.json 2.25.1 left. The new controller resumes the adopted setup with no disarm
-    cycle, takes every new option at its default (no Jev without a key), keeps every counter, and
+    cycle, takes every new option at its default (no the AI assistant without a key), keeps every counter, and
     writing the state back keeps every value 2.25.1 wrote."""
     seed = fixture(UPSTREAM_2_25_1)
     await _upgrade(hass, UPSTREAM_2_25_1, registry_ids=seed["registry"])
@@ -367,7 +367,7 @@ async def test_the_controller_carries_a_2_25_1_room_straight_on_with_its_options
     assert room._setup_pending is None, room._setup_pending
     assert room.setup_revision == 1
     assert "Setup" not in (c._blocked(room, 1) or "")
-    assert c.jev is None  # 2.25.1 options carry no Jev route: the controller stays deterministic
+    assert c.jev is None  # 2.25.1 options carry no the AI assistant route: the controller stays deterministic
     c._refresh_lights(room)
     assert (room.lights_on_hour, room.lights_off_hour) == (6.0, 18.0)
     for zone in (1, 2):
@@ -439,9 +439,9 @@ def _seeded_app(controller_for, monkeypatch, name, saved_state=None, key=False):
     import functools
     import shutil
 
-    import jev_bridge
+    import brain_bridge
     import jev_kit
-    from jev.client import Asker
+    from brain.client import Asker
 
     jev_kit.sdk(monkeypatch)
     seed = fixture(name)
@@ -452,8 +452,8 @@ def _seeded_app(controller_for, monkeypatch, name, saved_state=None, key=False):
         for path in (Path(__file__).parent / "fixtures" / seed["data"]).iterdir():
             shutil.copy(path, data / path.name)
     built, stub = [], jev_kit.FakeTransport({})
-    monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: built.append(found) or stub)
-    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False))
+    monkeypatch.setattr(brain_bridge, "Routes", lambda found, **kw: built.append(found) or stub)
+    monkeypatch.setattr(brain_bridge, "Asker", functools.partial(Asker, threaded=False))
     c, _fake, _clock = controller_for(seed["options"], saved_state=saved_state)
     return c, seed, built, stub, data
 
@@ -518,7 +518,7 @@ async def test_a_first_route_app_given_a_key_moves_to_claude_with_every_judge_an
 ):
     """The same apps once the operator adds an Anthropic key: the brain starts on Claude, the
     one route there is, with every judge, and keeps the record the old route left."""
-    import jev_bridge
+    import brain_bridge
 
     await _upgrade(hass, "entry_2_17_wizard.json")
     c, _app, built, stub, data = _seeded_app(controller_for, monkeypatch, options, key=True)
@@ -529,7 +529,7 @@ async def test_a_first_route_app_given_a_key_moves_to_claude_with_every_judge_an
     )
     assert [r.name for r in built[0]] == ["Anthropic"] and c.jev.asker.transport is stub
     assert built[0][0].token == KEY["anthropic_api_key"]
-    assert {j.name for j in c.jev.judges} == {j.name for j in jev_bridge.judges()}
+    assert {j.name for j in c.jev.judges} == {j.name for j in brain_bridge.judges()}
     if (data / "jev_ledger.jsonl").exists() and (data / "jev_ledger.jsonl").stat().st_size:
         assert c.jev.ledger.entries  # its ledger is read back, not started again
 
@@ -548,14 +548,14 @@ async def test_a_3_0_0_app_on_cloudflare_whose_brain_never_acted_runs_without_a_
     assert (c.brain_status.provider, c.brain_status.notice) == ("rules", "legacy_route_removed")
 
 
-# ------------------------------------------------------------------ a Jev 3.11.1 install
+# ------------------------------------------------------------------ a AI assistant 3.11.1 install
 JEV_3_11_1 = "entry_3_11_1_pumped_room.json"
 
 
 async def test_a_3_11_1_room_keeps_every_entity_id_its_moved_ladder_and_its_dosing_setup(
     hass, hass_storage
 ):
-    """The last Jev release (tests_ha/fixtures/entry_3_11_1_pumped_room.json, recorded from 3.11.1's own
+    """The last the AI assistant release (tests_ha/fixtures/entry_3_11_1_pumped_room.json, recorded from 3.11.1's own
     wizard and controller): every entity it registered keeps its id and has a state, except those this
     code retires on purpose; each zone's ladder stays where 3.11.1's Auto setpoints moved it; the entry
     is loaded as it is; and the dosing setup it saved is the one the controller app is shown."""
@@ -617,9 +617,9 @@ def _jev_3_11_1_app(controller_for, monkeypatch, options, key=True):
     was written. The brain's route is stubbed: `built` records every route list the brain was given."""
     import functools
 
-    import jev_bridge
+    import brain_bridge
     import jev_kit
-    from jev.client import Asker
+    from brain.client import Asker
 
     jev_kit.sdk(monkeypatch)
     usage = fixture("jev_usage_3_11_1.json")["usage"]
@@ -627,9 +627,9 @@ def _jev_3_11_1_app(controller_for, monkeypatch, options, key=True):
     (data / "jev_usage.json").write_text(json.dumps(usage), encoding="utf-8")
     noon = datetime.fromisoformat(usage["day"]).replace(hour=12).timestamp()
     built, stub = [], jev_kit.FakeTransport({})
-    monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: built.append(found) or stub)
+    monkeypatch.setattr(brain_bridge, "Routes", lambda found, **kw: built.append(found) or stub)
     monkeypatch.setattr(
-        jev_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: noon)
+        brain_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: noon)
     )
     state = fixture("state_3_11_1_learn_jev.json")["state"]
     opts = {**fixture(options)["options"], **(KEY if key else {})}

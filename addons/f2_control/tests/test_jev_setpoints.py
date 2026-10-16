@@ -9,19 +9,19 @@ import re
 from datetime import datetime, timedelta
 from types import SimpleNamespace
 
-import jev_bridge
+import brain_bridge
 import jev_kit as K
 import pytest
 import test_auto_setpoints_runtime as asr
-from jev import council
-from jev.brain import Brain
-from jev.client import Asker
-from jev.context import Shot, ZoneHistory
-from jev.envelope import Directive, admit
-from jev.journal import Journal
-from jev.judges.setpoints import SHOT, THRESHOLD, SetpointsJudge, band
-from jev.ledger import Ledger
-from jev.setpoint_memory import SetpointMemory
+from brain import council
+from brain.brain import Brain
+from brain.client import Asker
+from brain.context import Shot, ZoneHistory
+from brain.envelope import Directive, admit
+from brain.journal import Journal
+from brain.judges.setpoints import SHOT, THRESHOLD, SetpointsJudge, band
+from brain.ledger import Ledger
+from brain.setpoint_memory import SetpointMemory
 
 NIGHT = datetime(2026, 9, 27, 23, 0)  # an hour after lights-off (lights 10:00-22:00)
 Z1 = K.params(p2_shot_size=5.0, p2_threshold=30.5, p3_emergency_floor=20.7, p1_target=36.5, field_capacity=40.0)
@@ -146,7 +146,7 @@ def test_the_envelope_refuses_everything_else():
         assert not ok and why in reason, (why, reason)
 
 
-# ------------------------------------------------------------------ what Jev is shown
+# ------------------------------------------------------------------ what the AI assistant is shown
 def _today():
     """Readings through today (lights on 10:00) and four maintenance shots, all before NIGHT (23:00)."""
     h = ZoneHistory()
@@ -164,7 +164,7 @@ def test_the_evidence_is_plain_words_with_the_ranges_and_the_room():
     assert e["settings_now"][0] == "P2 shot size 5%; your value 5, may move 4-6"
     assert e["settings_now"][1] == "re-waters under 30.5% VWC; your value 30.5, may move 28.5-31.5"
     assert e["pore_ec_today"] == "from 2.80 at lights-on to 3.05 mS/cm now; the stage asks 3.5-6"
-    # the lever's direction is doctrine, so code states it (live, without these Jev split 0.45 / 0.35 between
+    # the lever's direction is doctrine, so code states it (live, without these the AI assistant split 0.45 / 0.35 between
     # smaller and bigger shots on zone 1's heavy day; with them, smaller shots at 0.94)
     assert e["pore_ec_calls_for"].startswith("less runoff") and e["water_calls_for"].startswith("less water")
     assert e["shots_today"] == 4 and e["safety_shots_today"] == "none"
@@ -210,7 +210,7 @@ def _room():
 
 def test_the_first_look_takes_the_operators_values_as_the_centre(tmp_path):
     c, room = _Controller(tmp_path), _room()
-    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT)
+    sp = brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT)
     assert sp["enabled"] and sp["home"] == {SHOT: 5.0, THRESHOLD: 30.5}
     assert sp["bands"] == {SHOT: (4.0, 6.0), THRESHOLD: (28.5, 31.5)} and not sp["changed_today"]
     assert SetpointMemory(str(tmp_path / "sp.json")).zone("default", 1)["home"] == {SHOT: 5.0, THRESHOLD: 30.5}
@@ -218,9 +218,9 @@ def test_the_first_look_takes_the_operators_values_as_the_centre(tmp_path):
 
 def test_an_edit_by_hand_always_wins_and_moves_the_band(tmp_path):
     c, room = _Controller(tmp_path), _room()
-    jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT)
+    brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT)
     c.numbers[SHOT] = 6.0
-    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT)
+    sp = brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT)
     assert sp["home"][SHOT] == 6.0 and sp["bands"][SHOT] == (5.0, 7.0)
     top = c.jev.journal.recent("default")[0]
     assert top["verdict"] == "set by hand" and top["action"] == "p2 shot size 5 -> 6"
@@ -228,31 +228,31 @@ def test_an_edit_by_hand_always_wins_and_moves_the_band(tmp_path):
 
 def test_a_move_is_written_once_and_is_not_mistaken_for_an_edit(tmp_path):
     c, room = _Controller(tmp_path), _room()
-    ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
+    ctx = _ctx(sp=brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
     d = SetpointsJudge().decide(_verdict("smaller_shots"), ctx)
-    jev_bridge.apply_setpoint(c, room, 1, d, ctx, NIGHT)
+    brain_bridge.apply_setpoint(c, room, 1, d, ctx, NIGHT)
     assert c.writes == [(1, SHOT, 5.0, 4.5, "AI setpoints judge")]
-    # The phones that tick Jev hear of it (docs/NOTIFICATIONS.md): a push, no card.
+    # The phones that tick the AI assistant hear of it (docs/NOTIFICATIONS.md): a push, no card.
     [(event, zone, (words, why, _entity))] = c.events
     assert (event, zone, words) == ("jev_setpoint", 1, "P2 shot 5% -> 4.5%")
     assert why.startswith("Smaller maintenance shots tomorrow") and "smaller_shots (p=" in why
     assert c.alerts == []
-    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=1))  # HA still shows 5.0
+    sp = brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=1))  # HA still shows 5.0
     assert sp["home"][SHOT] == 5.0 and sp["changed_today"]
     c.numbers[SHOT] = 4.5  # HA reflects the write
-    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=2))
+    sp = brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=2))
     assert sp["home"][SHOT] == 5.0 and sp["current"][SHOT] == 4.5 and "P2 shot 5% -> 4.5%" in sp["last_words"]
-    tomorrow = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(days=1))
+    tomorrow = brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(days=1))
     assert not tomorrow["changed_today"]
 
 
 def test_a_move_written_names_its_number_on_the_push_for_keep_and_undo(tmp_path):
-    """The phone gets Keep and Undo for the number Jev wrote (an AI overlay in the integration); a move not
+    """The phone gets Keep and Undo for the number the AI assistant wrote (an AI overlay in the integration); a move not
     written (no per-zone number) names none."""
     c, room = _Controller(tmp_path), _room()
     c._auto_write = lambda *a, **k: True
-    ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
-    jev_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
+    ctx = _ctx(sp=brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
+    brain_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
     [(event, zone, (words, _why, entity))] = c.events
     assert (event, zone, entity) == ("jev_setpoint", 1, f"number.crop_steering_zone_1_{SHOT}")
 
@@ -260,13 +260,13 @@ def test_a_move_written_names_its_number_on_the_push_for_keep_and_undo(tmp_path)
 def test_a_move_that_went_back_to_the_operators_value_is_not_an_edit_by_hand(tmp_path):
     """The AI's overlay ran out or was undone (the integration's overlays.py): the operator's value is back."""
     c, room = _Controller(tmp_path), _room()
-    ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
-    jev_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
+    ctx = _ctx(sp=brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
+    brain_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
     c.numbers[SHOT] = 4.5
-    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=5))  # the write landed
-    jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=10))
+    brain_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=5))  # the write landed
+    brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=10))
     c.numbers[SHOT] = 5.0  # put back to the operator's own value
-    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(days=2))
+    sp = brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(days=2))
     assert sp["home"][SHOT] == 5.0 and sp["current"][SHOT] == 5.0
     assert all(row["verdict"] != "set by hand" for row in c.jev.journal.recent("default"))
     assert SHOT not in SetpointMemory(str(tmp_path / "sp.json")).zone("default", 1)["written"]
@@ -274,35 +274,35 @@ def test_a_move_that_went_back_to_the_operators_value_is_not_an_edit_by_hand(tmp
 
 def test_a_rescue_shot_after_a_change_puts_it_back_and_pauses_the_zone(tmp_path):
     c, room = _Controller(tmp_path), _room()
-    ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
-    jev_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("later_rewater"), ctx), ctx, NIGHT)
+    ctx = _ctx(sp=brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
+    brain_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("later_rewater"), ctx), ctx, NIGHT)
     c.numbers[THRESHOLD] = 30.0
-    jev_bridge.guard_setpoints(c, room, 1, NIGHT + timedelta(hours=2))  # nothing has happened yet
+    brain_bridge.guard_setpoints(c, room, 1, NIGHT + timedelta(hours=2))  # nothing has happened yet
     assert len(c.writes) == 1
-    jev_bridge._hist(room, 1).add_shot(Shot(NIGHT + timedelta(hours=4), 120, 5.0, "p3_emergency", 20.5, 3.0))
-    jev_bridge.guard_setpoints(c, room, 1, NIGHT + timedelta(hours=4, minutes=5))
+    brain_bridge._hist(room, 1).add_shot(Shot(NIGHT + timedelta(hours=4), 120, 5.0, "p3_emergency", 20.5, 3.0))
+    brain_bridge.guard_setpoints(c, room, 1, NIGHT + timedelta(hours=4, minutes=5))
     assert c.writes[-1] == (1, THRESHOLD, 30.0, 30.5, "AI setpoints judge (put back)")
     assert c.alerts and c.alerts[-1][1] == "CS-404" and "03:00" in c.alerts[-1][2]
     c.numbers[THRESHOLD] = 30.5  # Home Assistant reflects the put-back
-    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(hours=5))
+    sp = brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(hours=5))
     assert sp["frozen"] and "put back" in sp["last_words"]
-    jev_bridge.guard_setpoints(c, room, 1, NIGHT + timedelta(hours=6))  # once only
+    brain_bridge.guard_setpoints(c, room, 1, NIGHT + timedelta(hours=6))  # once only
     assert len(c.writes) == 2 and c.jev.journal.recent("default")[0]["verdict"] == "safety revert"
 
 
 def _moved(tmp_path):
     c, room = _Controller(tmp_path), _room()
-    ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
-    jev_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
+    ctx = _ctx(sp=brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
+    brain_bridge.apply_setpoint(c, room, 1, SetpointsJudge().decide(_verdict("smaller_shots"), ctx), ctx, NIGHT)
     return c, room, c.jev.setpoints.zone("default", 1)
 
 
 def test_a_write_that_lands_is_read_back_and_never_sent_again(tmp_path):
     c, room, rec = _moved(tmp_path)
     c.numbers[SHOT] = 4.5
-    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=1))
+    brain_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=1))
     assert rec["pending"] is None
-    jev_bridge.readback(c, room, 1, NIGHT + timedelta(hours=2))
+    brain_bridge.readback(c, room, 1, NIGHT + timedelta(hours=2))
     assert c.writes == [(1, SHOT, 5.0, 4.5, "AI setpoints judge")]
 
 
@@ -313,7 +313,7 @@ def test_a_pending_write_an_older_release_saved_as_jev_is_still_the_judges_own(t
     rec["pending"]["by"] = "Jev"
     rec["last"]["to"] = 4.5
     for minutes in (4, 5, 15, 35, 75):
-        jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=minutes))
+        brain_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=minutes))
     assert len(c.writes) == 4 and {w[4] for w in c.writes} == {"AI setpoints judge", "Jev"}
     assert rec["pending"] is None and rec["last"].get("failed") is True
 
@@ -321,17 +321,17 @@ def test_a_pending_write_an_older_release_saved_as_jev_is_still_the_judges_own(t
 def test_a_write_that_does_not_land_is_sent_again_backing_off_then_recorded_as_failed(tmp_path):
     c, room, rec = _moved(tmp_path)  # Home Assistant keeps showing 5.0
     for minutes, sent in ((4, 1), (5, 2), (14, 2), (15, 3), (35, 4), (74, 4)):
-        jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=minutes))
+        brain_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=minutes))
         assert len(c.writes) == sent, minutes
-        sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=minutes))
+        sp = brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=minutes))
         assert sp["home"][SHOT] == 5.0  # the old value is never taken for an edit by hand while it is retried
     assert set(c.writes) == {(1, SHOT, 5.0, 4.5, "AI setpoints judge")}
-    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=75))
+    brain_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=75))
     assert len(c.writes) == 4 and rec["pending"] is None and rec["written"][SHOT] == 5.0
     top = c.jev.journal.recent("default")[0]
     assert (top["verdict"], top["action"], top["result"]) == ("write failed", "p2 shot size 5 -> 4.5", "failed")
     assert "still shows 5 after 4 tries" in top["reason"]
-    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=76))
+    sp = brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=76))
     assert sp["home"][SHOT] == 5.0 and sp["last_words"].endswith("(did not reach Home Assistant)")
     assert c.jev.journal.recent("default")[0]["verdict"] == "write failed"  # and not "set by hand"
     assert SetpointMemory(str(tmp_path / "sp.json")).zone("default", 1)["last"]["failed"]
@@ -340,7 +340,7 @@ def test_a_write_that_does_not_land_is_sent_again_backing_off_then_recorded_as_f
 def test_switching_automatic_targets_off_stops_the_retries(tmp_path):
     c, room, rec = _moved(tmp_path)
     c.auto = "off"
-    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=5))
+    brain_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=5))
     assert len(c.writes) == 1 and rec["pending"] is None
     assert "switched off" in c.jev.journal.recent("default")[0]["reason"]
 
@@ -348,9 +348,9 @@ def test_switching_automatic_targets_off_stops_the_retries(tmp_path):
 def test_an_edit_by_hand_during_the_retries_ends_them(tmp_path):
     c, room, rec = _moved(tmp_path)
     c.numbers[SHOT] = 5.5
-    jev_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=5))
+    brain_bridge.readback(c, room, 1, NIGHT + timedelta(minutes=5))
     assert len(c.writes) == 1 and rec["pending"] is None
-    assert jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=6))["home"][SHOT] == 5.5
+    assert brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(minutes=6))["home"][SHOT] == 5.5
 
 
 def test_a_pending_write_an_older_memory_left_still_loads_and_times_out(tmp_path):
@@ -358,9 +358,9 @@ def test_a_pending_write_an_older_memory_left_still_loads_and_times_out(tmp_path
                          "pending": {"suffix": SHOT, "from": 5.0, "at": NIGHT.isoformat()}}}
     (tmp_path / "sp.json").write_text(json.dumps(old))
     c, room = _Controller(tmp_path), _room()
-    jev_bridge.readback(c, room, 1, NIGHT + timedelta(hours=1))
+    brain_bridge.readback(c, room, 1, NIGHT + timedelta(hours=1))
     assert c.writes == []
-    sp = jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(hours=1))
+    sp = brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT + timedelta(hours=1))
     assert sp["home"][SHOT] == 5.0 and c.jev.setpoints.zone("default", 1)["pending"] is None
 
 
@@ -369,7 +369,7 @@ def test_the_whole_loop_through_the_brain_logs_and_files_the_move(tmp_path):
     answer = K.choice_answer("smaller_shots", {"smaller_shots": 0.8, "keep": 0.2})
     c.jev.asker.transport = K.FakeTransport(K.both("tomorrow", answer))
     c.jev.asker.clock = lambda: NIGHT.timestamp()
-    ctx = _ctx(sp=jev_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
+    ctx = _ctx(sp=brain_bridge.setpoint_view(c, room, 1, Z1, NIGHT))
     [(d, why)] = c.jev.tick(ctx)
     assert d.kind == "setpoint" and why == "one notch inside its range around your value"
     top = c.jev.journal.recent("default")[0]

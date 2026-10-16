@@ -4,7 +4,7 @@ refuses a code the error-code list does not explain. The decision log stays unde
 import json
 from datetime import datetime
 
-from jev import journal as jn
+from brain import journal as jn
 from test_controller import _build
 from test_jev_controller import KILL, _states
 
@@ -36,16 +36,16 @@ def test_an_unlisted_code_is_refused(capsys):
 
 def test_a_card_home_assistant_did_not_take_is_raised_again(monkeypatch):
     import controller
-    import jev_bridge
+    import brain_bridge
 
     c, fake, room = _c()
     took = controller.ha_call
     monkeypatch.setattr(controller, "ha_call", lambda *a, **k: False)
-    jev_bridge.route_card(c, room)
-    assert jev_bridge._route_card_due(c)
+    brain_bridge.route_card(c, room)
+    assert brain_bridge._route_card_due(c)
     monkeypatch.setattr(controller, "ha_call", took)
-    jev_bridge.route_card(c, room)
-    assert not jev_bridge._route_card_due(c) and _created(fake, "CS-712") == ["f2_jev_route_default"]
+    brain_bridge.route_card(c, room)
+    assert not brain_bridge._route_card_due(c) and _created(fake, "CS-712") == ["f2_jev_route_default"]
 
 
 def test_thirty_entries_at_every_cap_stay_under_16_kb():

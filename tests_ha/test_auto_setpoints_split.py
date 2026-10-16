@@ -3,7 +3,7 @@
 6 Oct 2026, the owner: the P1 target is the highest VWC of the grow-day before, field capacity rises as the sensor
 does, and the re-water threshold moves with field capacity, within each number's own min and max. Bounded: each moves
 at most a point a grow-day, the rescue floor never moves, and nothing is written until a lights-on has kept a day
-before. Jev's
+before. The AI assistant's
 Setpoints judge keeps its P2 shot size (and centres its range on the moved threshold); the learner writes neither
 the P1 target nor field capacity.
 
@@ -40,18 +40,18 @@ class _Clock(datetime):
 
 async def _learned_tent(hass, controller_for, monkeypatch):
     import controller
-    import jev_bridge
+    import brain_bridge
     import jev_kit
-    from jev.client import Asker
+    from brain.client import Asker
 
     # The brain's asker without its background worker: nothing in this test asks it anything, and a
     # worker thread would outlive the test (Home Assistant's test harness fails on that).
-    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False))
+    monkeypatch.setattr(brain_bridge, "Asker", functools.partial(Asker, threaded=False))
     _entry, seed = await _upgrade(hass, "entry_3_8_learned_tent.json")
     assert hass.states.get("switch.crop_steering_auto_setpoints").state == "on"
     jev_kit.sdk(monkeypatch, jev_kit.FakeTransport({}))
     c, fake, _clock = controller_for(JEV, saved_state=seed["controller_saved"])
-    assert jev_bridge.owns_setpoints(c)
+    assert brain_bridge.owns_setpoints(c)
     room = c.rooms[0]
     assert room._setup_pending is None  # 3.8.0's state file is carried straight on
     c._refresh_lights(room)

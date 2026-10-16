@@ -1,4 +1,4 @@
-"""The Jev edition inside the real controller: Jev off or failing changes nothing; Jev's admitted
+"""The AI assistant edition inside the real controller: the AI assistant off or failing changes nothing; the AI assistant's admitted
 directives move the zone, and everything it judged is published (docs/AI_ASSISTANT.md, properties 2, 3 and 7)."""
 import functools
 from datetime import datetime, timedelta
@@ -6,9 +6,9 @@ from datetime import datetime, timedelta
 import pytest
 
 import controller
-import jev_bridge
+import brain_bridge
 import jev_kit as K
-from jev.client import Asker
+from brain.client import Asker
 from test_controller import _build, _desc
 
 KILL = "input_boolean.kill"
@@ -43,11 +43,11 @@ def _p1_zone(c):
 
 @pytest.fixture
 def jev_with(monkeypatch):
-    """Build controllers whose Jev answers with `answers` (or fails with `error`), synchronously."""
+    """Build controllers whose the AI assistant answers with `answers` (or fails with `error`), synchronously."""
     def make(answers=None, error=None):
         transport = K.FakeTransport(answers, error)
-        monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: transport)
-        monkeypatch.setattr(jev_bridge, "Asker", functools.partial(
+        monkeypatch.setattr(brain_bridge, "Routes", lambda found, **kw: transport)
+        monkeypatch.setattr(brain_bridge, "Asker", functools.partial(
             Asker, threaded=False, clock=lambda: NOW.timestamp()))
         K.sdk(monkeypatch)
         c, fake = _build({"num_zones": 1, "enable_flag": KILL, **K.HAIKU}, states=_states())
@@ -108,26 +108,26 @@ def test_a_ramp_hand_over_the_envelope_refuses_does_not_move_the_zone(jev_with):
 
 def test_a_broken_brain_never_stops_the_loop(jev_with, monkeypatch):
     c, _ = jev_with({})
-    monkeypatch.setattr(jev_bridge, "tick", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
+    monkeypatch.setattr(brain_bridge, "tick", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("boom")))
     _p1_zone(c)
     c.loop_once(NOW)  # must not raise
     assert c.rooms[0].state[1]["phase"] == "P1"
 
 
 def test_the_controller_starts_even_if_jev_cannot(monkeypatch):
-    monkeypatch.setattr(jev_bridge, "build", lambda *a, **k: (_ for _ in ()).throw(OSError("no /data")))
+    monkeypatch.setattr(brain_bridge, "build", lambda *a, **k: (_ for _ in ()).throw(OSError("no /data")))
     c, _ = _build({"num_zones": 1, "enable_flag": KILL, **K.HAIKU}, states=_states())
     assert c.jev is None
 
 
 def test_the_options_choose_the_judges(jev_with, monkeypatch, tmp_path):
-    monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: K.FakeTransport({}))
-    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False))
+    monkeypatch.setattr(brain_bridge, "Routes", lambda found, **kw: K.FakeTransport({}))
+    monkeypatch.setattr(brain_bridge, "Asker", functools.partial(Asker, threaded=False))
     K.sdk(monkeypatch)
     state = str(tmp_path / "state.json")
-    brain = jev_bridge.build({**K.HAIKU, "ai_judges": "ramp, salt"}, state, lambda *a: None)
+    brain = brain_bridge.build({**K.HAIKU, "ai_judges": "ramp, salt"}, state, lambda *a: None)
     assert sorted(j.name for j in brain.judges) == ["ramp", "salt", "shotsize", "targets"]  # with the two powers
-    assert jev_bridge.build({"brain_provider": "rules", "anthropic_api_key": "k"}, state, lambda *a: None) is None
+    assert brain_bridge.build({"brain_provider": "rules", "anthropic_api_key": "k"}, state, lambda *a: None) is None
     assert controller.Controller.__dict__  # controller imports the bridge
 
 
@@ -171,5 +171,5 @@ def test_the_zone_context_carries_the_zone_total_substrate():
     fake.set_state("number.crop_steering_zone_1_substrate_volume", "6", {})
     fake.set_state("number.crop_steering_zone_1_plant_count", "4", {})
     room = c.rooms[0]
-    ctx = jev_bridge.zone_context(c, room, 1, K.snap(), K.params(), NOW, True)
+    ctx = brain_bridge.zone_context(c, room, 1, K.snap(), K.params(), NOW, True)
     assert ctx.substrate_l == 24.0  # 6 L a plant x 4 plants: the shot-landed check's denominator

@@ -6,14 +6,14 @@ import re
 from datetime import datetime
 
 import brain_kit as B
-import jev_bridge
+import brain_bridge
 import pytest
-from jev.client import HA_STATE_MAX, MAX_TEXT, validate_answer
-from jev.prompt import REPORT_MAX_TOKENS, Prompt
+from brain.client import HA_STATE_MAX, MAX_TEXT, validate_answer
+from brain.prompt import REPORT_MAX_TOKENS, Prompt
 from test_brain_wiring import claude  # noqa: F401 - the fixture
 from test_jev_controller import KILL
 
-LANE = jev_bridge.REPORT_QUESTION
+LANE = brain_bridge.REPORT_QUESTION
 SNAP = "default:zroom:report:2026-09-28T01:30:abcd"
 NIGHT = datetime(2026, 9, 28, 1, 30)  # lights 10-22: three and a half hours after lights-off
 EARLY = datetime(2026, 9, 27, 23, 30)  # an hour and a half after: the setpoints judge's window

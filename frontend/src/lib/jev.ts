@@ -2,13 +2,13 @@ import { parseControllerTime } from "./controller-health";
 import type { EntityState, States } from "./types";
 import { growerWords } from "./words";
 
-/** What the controller's AI assistant bridge publishes for a room (addons/f2_control/f2_control/jev_bridge.py):
+/** What the controller's AI assistant bridge publishes for a room (addons/f2_control/f2_control/brain_bridge.py):
  * `sensor.crop_steering_<prefix>jev_log` (every decision, newest first), `sensor.crop_steering_<prefix>jev`
  * (calls, tokens, errors and today's stage) and `sensor.crop_steering_<prefix>zone_N_jev` (what each judge
  * last said about the zone). Read tolerantly: a controller older than the log, or one entry missing a
  * field, must never break the page. */
 
-/** Each judge's plain title, for an entry that carries none (jev/journal.py TITLES). */
+/** Each judge's plain title, for an entry that carries none (brain/journal.py TITLES). */
 export const JEV_TITLES: Record<string, string> = {
   dawn: "Morning start",
   ramp: "Ramp hand-over",
@@ -354,7 +354,7 @@ export function readJev(states: States, prefix: string) {
   return { log: parseJevLog(states[ids.log]), room: parseJevRoom(states[ids.room]) };
 }
 
-/** One answer to a grower's "why" (sensor.crop_steering_<prefix>brain_answers, jev_bridge.why_task). */
+/** One answer to a grower's "why" (sensor.crop_steering_<prefix>brain_answers, brain_bridge.why_task). */
 export interface BrainAnswer {
   id: string;
   question: string;

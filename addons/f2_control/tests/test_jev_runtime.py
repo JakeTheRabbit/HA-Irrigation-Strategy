@@ -1,15 +1,15 @@
-"""The Jev runtime: the council, the background asker, the envelope, the ledger and the brain."""
+"""The AI assistant runtime: the council, the background asker, the envelope, the ledger and the brain."""
 import os
 from datetime import timedelta
 
 import jev_kit as K
-from jev import council
-from jev.brain import Brain
-from jev.client import Asker
-from jev.envelope import Directive, admit
-from jev.judges.probe import ProbeJudge
-from jev.judges.ramp import RampJudge
-from jev.ledger import Ledger
+from brain import council
+from brain.brain import Brain
+from brain.client import Asker
+from brain.envelope import Directive, admit
+from brain.judges.probe import ProbeJudge
+from brain.judges.ramp import RampJudge
+from brain.ledger import Ledger
 
 
 # ------------------------------------------------------------------ council
@@ -96,7 +96,7 @@ def test_a_stalled_ramp_far_under_the_ceiling_may_hand_over_on_a_probe_code_trus
 
 
 def test_the_ramp_judge_is_asked_at_once_about_a_ramp_shot_that_did_not_rise():
-    from jev.judges.ramp import stalling
+    from brain.judges.ramp import stalling
 
     p = K.params(p1_target=45.0, field_capacity=50.0)
     s = K.snap(phase="P1", vwc=25.1, shot_count=4, minutes_since_shot=16.0, vwc_settled=25.1,
@@ -223,14 +223,14 @@ def test_a_moving_probe_is_not_confirmed_dead():
 def test_an_old_options_file_keeps_its_budget_and_takes_the_new_defaults(monkeypatch):
     """3.8.0's options (the first AI route, its tuning under the old names), after the Supervisor merged in the new
     defaults: the install moves to Claude with its key and keeps its daily calls."""
-    import jev_bridge
+    import brain_bridge
 
     K.sdk(monkeypatch)
     K.has_run()
     options_3_8_0 = {"typesafe_api_key": "apikey_x", "jev_enabled": True, "jev_judges": "all",
                      "jev_daily_calls": 2000, "jev_flower_start": "", "jev_flower_days": 56,
                      "anthropic_api_key": "k", "brain_provider": "auto", "ai_daily_calls": 5000, "ai_judges": "all"}
-    brain = jev_bridge.build(options_3_8_0, os.environ["F2_STATE_PATH"], lambda *a: None)
+    brain = brain_bridge.build(options_3_8_0, os.environ["F2_STATE_PATH"], lambda *a: None)
     assert brain.routes == ["Anthropic"] and brain.asker.daily_budget == 2000
     assert (brain.reask_max, brain.unsure_below, brain.strict_after, brain.strict_prob) == (2, 0.7, 3, 0.8)
     assert (brain.asker.warn_pct, brain.asker.transport.tries) == (80, 3)

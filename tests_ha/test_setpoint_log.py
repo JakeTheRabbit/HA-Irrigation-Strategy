@@ -60,7 +60,7 @@ async def test_every_writer_is_recorded_as_who_it_is(
         (THRESHOLD, "p2_vwc_threshold", 43.4, "auto", "learner"),
         (FC, "field_capacity", 56.5, "auto (highest reading)", "learner"),
         (SHOT, "p2_shot_size", shot + 1, "Jev", "brain"),
-        (SHOT, "p2_shot_size", shot, "Jev (put back)", "safety"),
+        (SHOT, "p2_shot_size", shot, "the AI assistant (put back)", "safety"),
     ):
         old = _value(hass, entity)
         assert c._auto_write(room, 1, suffix, old, value, {}, now, by=by)

@@ -4,13 +4,13 @@ from datetime import timedelta
 
 import jev_kit as K
 import pytest
-from jev import council
-from jev.brain import Brain
-from jev.client import Asker
-from jev.judges.salt import MODE, SaltJudge
-from jev.context import Shot, ShotResponse, expected_rise, landed_share
-from jev.judges.shot import CODE, ShotJudge
-from jev.ledger import Ledger
+from brain import council
+from brain.brain import Brain
+from brain.client import Asker
+from brain.judges.salt import MODE, SaltJudge
+from brain.context import Shot, ShotResponse, expected_rise, landed_share
+from brain.judges.shot import CODE, ShotJudge
+from brain.ledger import Ledger
 
 
 # ------------------------------------------------------------------ helpers
@@ -284,7 +284,7 @@ def test_the_brain_admits_the_salt_mode_in_p2_and_the_envelope_refuses_it_in_p1(
     assert brain.tick(_salt_ctx(ec=5.2, phase="P1")) == []  # the same answer, now in P1
     # The brain stops an answer outside its judge's phases before the envelope (which refuses it too).
     assert brain.zone_status("default", 1)["salt"]["why"] == "waiting for its phase"
-    assert not __import__("jev.envelope", fromlist=["admit"]).admit(
+    assert not __import__("brain.envelope", fromlist=["admit"]).admit(
         brain.state[("default", 1, "salt")].directive, _salt_ctx(ec=5.2, phase="P1"))[0]
     assert len(t.calls) == 1  # never asked in P1
 

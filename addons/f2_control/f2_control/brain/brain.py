@@ -6,13 +6,13 @@ envelope (the zone changes between passes, so admission is checked every pass), 
 the ledger, and returns the admitted directives for the controller to apply. Nothing here raises into the
 caller: a broken judge is skipped and logged in `errors`.
 
-When Jev is unsure (an answer to a question the judge decides on, Judge.deciding, under `unsure_below`, two
+When the AI assistant is unsure (an answer to a question the judge decides on, Judge.deciding, under `unsure_below`, two
 phrasings that disagree, or one missing) and the answer did not act, the judge is asked again at once with more
 evidence (Judge.more_evidence), up to `reask_max` times, before the engine decides alone. A second look re-checks
 that answer only: it is dropped once the zone leaves the judge's phase or the answer is older than the judge's
 `max_age_min`. After `strict_after` of a judge's calls in a row did not work out for a zone (Ledger.strict), the
 judge is on the stricter gate there: an answer acts only when the same call came twice in a row, each answer
-within `max_age_min` of the one before, with every deciding phrasing agreed at `strict_prob` or more. Jev keeps
+within `max_age_min` of the one before, with every deciding phrasing agreed at `strict_prob` or more. The AI assistant keeps
 judging throughout. The pass on which a run tips a judge onto the gate adds
 an event, for the controller to push CS-707.
 """
@@ -55,7 +55,7 @@ def _label(d):
 class Brain:
     def __init__(self, asker, ledger, judges, allowed=None, log=print, reask_max=2, unsure_below=0.7,
                  strict_after=3, strict_prob=0.8, enrich=None, dry_run=False):
-        """`enrich(ctx, judge, evidence)` adds what the Claude route needs to every ask (jev.enrich; None on the
+        """`enrich(ctx, judge, evidence)` adds what the Claude route needs to every ask (brain.enrich; None on the
         legacy routes). `dry_run`: an admitted directive that would act is journalled "would act", never returned
         or recorded; alerts still pass."""
         self.asker, self.ledger, self.log = asker, ledger, log
@@ -63,7 +63,7 @@ class Brain:
         self.judges = [j for j in judges if allowed is None or j.name in allowed]
         self.state: dict[tuple, JudgeState] = {}
         self.errors: dict[str, str] = {}
-        self.journal = None  # jev.journal.Journal: every decision, for the dashboard's live log
+        self.journal = None  # brain.journal.Journal: every decision, for the dashboard's live log
         self.reask_max, self.unsure_below = reask_max, unsure_below
         self.strict_after, self.strict_prob = strict_after, strict_prob
         self.strict: dict[tuple, bool] = {}  # (room, zone, judge) -> on the stricter gate, as of its last pass
@@ -246,5 +246,5 @@ class Brain:
                 "why": why, "streak": st.streak}
 
     def zone_status(self, room, zone):
-        """What the zone's Jev sensor shows: every judge's latest verdicts and what code did."""
+        """What the zone's AI assistant sensor shows: every judge's latest verdicts and what code did."""
         return {name: st.last for (r, z, name), st in self.state.items() if r == room and z == zone and st.last}

@@ -290,12 +290,12 @@ async def test_the_brain_bridges_the_missed_day_until_the_plan_applies_it(
     hass, hass_storage, controller_for, monkeypatch
 ):
     import brain_kit as B
-    import jev_bridge
-    from jev import client as jc
+    import brain_bridge
+    from brain import client as jc
 
     client = B.FakeClient(B.judging(picks={"cause": "reading_holds_plan"}, p_yes=0.1))
     monkeypatch.setattr(jc, "anthropic", B.FakeSDK(client))
-    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(jc.Asker, threaded=False))
+    monkeypatch.setattr(brain_bridge, "Asker", functools.partial(jc.Asker, threaded=False))
     manager, c, fake, at, held, today = await _held_room(
         hass, hass_storage, controller_for, monkeypatch,
         {"brain_provider": "claude_haiku", "anthropic_api_key": B.SENTINEL, "jev_judges": "plan"})

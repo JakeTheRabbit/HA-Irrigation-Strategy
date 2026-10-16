@@ -5,7 +5,7 @@ import functools
 
 import brain_kit as B
 import pytest
-from jev.client import (BAD_OUTPUT, BUDGET, INTERNAL, NO_ANSWERS, NO_CONTEXT, NO_REQUESTS, NO_SDK, NOT_JSON, PAUSED,
+from brain.client import (BAD_OUTPUT, BUDGET, INTERNAL, NO_ANSWERS, NO_CONTEXT, NO_REQUESTS, NO_SDK, NOT_JSON, PAUSED,
                         REFUSED, Meter, Route, Routes, call_anthropic, retryable)
 
 

@@ -7,7 +7,7 @@ import os
 from datetime import datetime, timedelta
 
 from crop_steering_engine import ZoneParams, ZoneSnapshot
-from jev.context import Shot, ZoneContext, ZoneHistory
+from brain.context import Shot, ZoneContext, ZoneHistory
 
 NOW = datetime(2026, 9, 27, 13, 0)
 
@@ -20,16 +20,16 @@ def sdk(monkeypatch, transport=None):
     """The Claude route needs the SDK, which the lean harness has none of: a stand-in whose client a test with a faked
     transport never calls. With `transport`, the brain's transport is that (FakeTransport({}): no verdicts)."""
     import brain_kit as B
-    import jev_bridge
-    from jev import client
+    import brain_bridge
+    from brain import client
 
     monkeypatch.setattr(client, "anthropic", B.FakeSDK(B.FakeClient(B.judging())))
     if transport is not None:
-        monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: transport)
+        monkeypatch.setattr(brain_bridge, "Routes", lambda found, **kw: transport)
 
 
 def has_run(state_path=None):
-    """Make the test's /data one the brain has run in (jev_bridge.has_run): an empty ledger, a file only it writes."""
+    """Make the test's /data one the brain has run in (brain_bridge.has_run): an empty ledger, a file only it writes."""
     data = os.path.dirname(state_path or os.environ["F2_STATE_PATH"])
     open(os.path.join(data, "jev_ledger.jsonl"), "a").close()
     return data
@@ -101,7 +101,7 @@ def both(name, answer, answer_b=None):
 
 
 class FakeTransport:
-    """Stands in for the brain's transport (jev.client.Routes): returns `answers` (or an error) and records what was asked."""
+    """Stands in for the brain's transport (brain.client.Routes): returns `answers` (or an error) and records what was asked."""
 
     def __init__(self, answers=None, error=None):
         self.answers, self.error, self.calls = answers, error, []

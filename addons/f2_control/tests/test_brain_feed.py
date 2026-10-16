@@ -3,14 +3,14 @@ hour after lights-on, a firm proposal is a CS-711 card for a person, and it neve
 from datetime import timedelta
 
 import brain_kit as B
-import jev_bridge
+import brain_bridge
 import pytest
-from jev import council, feed
+from brain import council, feed
 from test_brain_wiring import _writes, _zone, claude  # noqa: F401 - claude is a fixture
 from test_jev_controller import NOW, _switches
 
 FEED = "sensor.feed_ec"
-ALL_BUT_FEED = ",".join(j for j in jev_bridge.ALL if j != "feed")
+ALL_BUT_FEED = ",".join(j for j in brain_bridge.ALL if j != "feed")
 
 
 def _feed_asks(c):

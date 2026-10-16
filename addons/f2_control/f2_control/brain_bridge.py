@@ -12,40 +12,40 @@ import sys
 from datetime import datetime, timedelta
 from functools import partial
 
-from jev import client as jev_client
-from jev.brain import Brain
-from jev.client import (DEFAULT_MODEL, PRICES, Asker, Meter, Route, Routes, anthropic_base_url, anthropic_key,
+from brain import client as jev_client
+from brain.brain import Brain
+from brain.client import (DEFAULT_MODEL, PRICES, Asker, Meter, Route, Routes, anthropic_base_url, anthropic_key,
                         base_url_ok, call_anthropic, make_client, price_key, show_url)
-from jev.context import Shot, ZoneContext, ZoneHistory, response, words_response
-from jev.doctrine import DEFAULT_ARC, ArcInvalid, stage_intent, stage_rows
-from jev.doctrine import STAGE_ARC as STAGE_ROWS
-from jev import feed as jev_feed
-from jev import journal as jn
-from jev.enrich import enrich
-from jev.judges.channel import ChannelJudge
-from jev.prompt import Prompt
-from jev.judges.balance import HARDWARE as ZONES_HARDWARE
-from jev.judges.balance import BalanceJudge
-from jev.judges.dawn import DawnJudge
-from jev.judges.dusk import DuskJudge
-from jev.judges.night import NightJudge
-from jev.judges.probe import ProbeJudge
-from jev.judges.ramp import RampJudge
-from jev.judges.salt import SaltJudge
-from jev.judges.setpoints import CHOICES, MOVES, SHOT, THRESHOLD, SetpointsJudge
-from jev.judges.setpoints import band as setpoint_band
-from jev.judges.shot import ShotJudge
-from jev.judges import targets as targets_judge
-from jev.judges.targets import ShotSizeJudge, TargetsJudge
-from jev.judges.stage import StageJudge
-from jev.judges.zones import ZonesJudge
-from jev.envelope import Directive, admit
-from jev.journal import Journal
-from jev.ledger import Ledger
-from jev import council
-from jev import plan_task as jev_plan
-from jev import powers as jev_powers
-from jev.setpoint_memory import SetpointMemory
+from brain.context import Shot, ZoneContext, ZoneHistory, response, words_response
+from brain.doctrine import DEFAULT_ARC, ArcInvalid, stage_intent, stage_rows
+from brain.doctrine import STAGE_ARC as STAGE_ROWS
+from brain import feed as jev_feed
+from brain import journal as jn
+from brain.enrich import enrich
+from brain.judges.channel import ChannelJudge
+from brain.prompt import Prompt
+from brain.judges.balance import HARDWARE as ZONES_HARDWARE
+from brain.judges.balance import BalanceJudge
+from brain.judges.dawn import DawnJudge
+from brain.judges.dusk import DuskJudge
+from brain.judges.night import NightJudge
+from brain.judges.probe import ProbeJudge
+from brain.judges.ramp import RampJudge
+from brain.judges.salt import SaltJudge
+from brain.judges.setpoints import CHOICES, MOVES, SHOT, THRESHOLD, SetpointsJudge
+from brain.judges.setpoints import band as setpoint_band
+from brain.judges.shot import ShotJudge
+from brain.judges import targets as targets_judge
+from brain.judges.targets import ShotSizeJudge, TargetsJudge
+from brain.judges.stage import StageJudge
+from brain.judges.zones import ZonesJudge
+from brain.envelope import Directive, admit
+from brain.journal import Journal
+from brain.ledger import Ledger
+from brain import council
+from brain import plan_task as jev_plan
+from brain import powers as jev_powers
+from brain.setpoint_memory import SetpointMemory
 
 ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel", "balance", "feed", "report", "why",
        "plan", "targets", "shotsize")
@@ -77,7 +77,7 @@ REPORT_QUESTION = {"report": {"type": "report", "instructions": "Write the repor
                                                                 "with write_report."}}
 # The judges whose answers can act (the rest advise); empty on the panel while the brain cannot act.
 ACTING_JUDGES = ("dawn", "ramp", "salt", "dusk", "probe", "setpoints", "targets", "shotsize")
-# Each acting judge's power (jev.powers): with it off the judge only advises.
+# Each acting judge's power (brain.powers): with it off the judge only advises.
 JUDGE_POWER = {"dawn": "advance_phase", "dusk": "advance_phase", "ramp": "ramp_control", "salt": "ec_mode",
                "probe": "set_probe_aside", "setpoints": "nudge_setpoints", "targets": "set_targets_from_achievable",
                "shotsize": "tune_shot_sizes"}
@@ -240,7 +240,7 @@ def judge_names(options, log):
 def build(options, state_path, log, status=None):
     """The brain, or None when rules run (BrainStatus says why). Its one route is the Anthropic API (or the router at
     anthropic_base_url) with the key, a Meter for the budget and the cached prompt, retried while a failure may pass
-    (jev.client.Routes)."""
+    (brain.client.Routes)."""
     data = os.path.dirname(state_path) or "."
     status = status or resolve_provider(options, data)
     if status.notice == MOVED:
@@ -499,7 +499,7 @@ def tick(c, room, zone, snap, p, now, lights_on):
 
 # ---------- the Setpoints judge's side (docs/AI_ASSISTANT.md) ----------
 def owns_setpoints(c):
-    """True when Jev's Setpoints judge runs: it then owns each zone's P2 shot size and re-water threshold."""
+    """True when the AI assistant's Setpoints judge runs: it then owns each zone's P2 shot size and re-water threshold."""
     brain = getattr(c, "jev", None)
     return brain is not None and any(j.name == "setpoints" for j in getattr(brain, "judges", ()))
 
@@ -628,7 +628,7 @@ def hand_back(c, room, zone, p, now):
 
 
 def _zone_number(c, room, zone, suffix):
-    """The zone's OWN number for `suffix`, or None: Jev never moves a room-level value."""
+    """The zone's OWN number for `suffix`, or None: the AI assistant never moves a room-level value."""
     raw = c._jev_read(f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}")
     try:
         return round(float(raw), 2)
@@ -647,7 +647,7 @@ def _note(c, room, zone, verdict, action, result, reason):
 def setpoint_view(c, room, zone, p, now):
     """What the Setpoints judge may move on this zone tonight (ZoneContext.setpoints), or None.
 
-    The operator's own value ("home") is the centre of each band. A value Jev did not write is the operator's:
+    The operator's own value ("home") is the centre of each band. A value the AI assistant did not write is the operator's:
     it becomes the new home, so an edit by hand always wins and the band follows it."""
     mem = getattr(getattr(c, "jev", None), "setpoints", None)
     if mem is None or not owns_setpoints(c):
@@ -663,7 +663,7 @@ def setpoint_view(c, room, zone, p, now):
             continue
         current[suffix] = v
         if fresh and pending.get("suffix") == suffix and abs(v - pending["from"]) < 1e-6:
-            continue  # Jev's write has not reached Home Assistant yet
+            continue  # the AI assistant's write has not reached Home Assistant yet
         expected = rec["written"].get(suffix, rec["home"].get(suffix))
         if expected is None or abs(v - float(expected)) > 1e-6:
             home = rec["home"].get(suffix)
@@ -707,9 +707,9 @@ def _pending(suffix, frm, to, by, now):
 
 
 def readback(c, room, zone, now):
-    """Read back the zone's number after a Jev write (SF-25): landed, it is done; an edit by hand since then is the
+    """Read back the zone's number after a AI assistant write (SF-25): landed, it is done; an edit by hand since then is the
     operator's (setpoint_view); still the old value or unreadable, it is sent again with a doubling wait, and after
-    RETRIES it is recorded as failed and Jev's memory goes back to the value Home Assistant still holds."""
+    RETRIES it is recorded as failed and the AI assistant's memory goes back to the value Home Assistant still holds."""
     mem = getattr(getattr(c, "jev", None), "setpoints", None)
     rec = None if mem is None else mem.zone(room.slug, zone)
     pend = (rec or {}).get("pending") or {}
@@ -723,7 +723,7 @@ def readback(c, room, zone, now):
         return
     if now < datetime.fromisoformat(pend["next"]):
         return
-    # Jev's own move stops when the operator stops automatic targets; a put-back restores theirs, so it never does
+    # The AI assistant's own move stops when the operator stops automatic targets; a put-back restores theirs, so it never does
     allowed = pend["by"] not in OURS or (owns_setpoints(c) and not getattr(room, "strategy_required", False)
                                       and c._on(f"switch.crop_steering_{room.prefix}auto_setpoints", False))
     if allowed and pend["tries"] < RETRIES:
@@ -781,7 +781,7 @@ def apply_setpoint(c, room, zone, d, ctx, now):
                    "at": now.isoformat(timespec="seconds"), "day": (ctx.setpoints or {}).get("day"),
                    "words": v["words"], "choice": v["choice"], "reverted": False}
     mem.save()
-    # For the phones that tick Jev (docs/NOTIFICATIONS.md): no card, a push only, with Keep and Undo for the
+    # For the phones that tick the AI assistant (docs/NOTIFICATIONS.md): no card, a push only, with Keep and Undo for the
     # number written (an AI overlay in the integration).
     c._notify_event("jev_setpoint", room, zone, v["words"],
                     f"{CHOICES.get(v['choice'], v['choice'])} the AI assistant's Setpoints judge, {d.why}.",
@@ -804,7 +804,7 @@ def guard_setpoints(c, room, zone, now):
     if rescue is None:
         return
     cur = _zone_number(c, room, zone, last["suffix"])
-    if cur is not None and abs(cur - float(last["to"])) < 1e-6:  # still Jev's value: put the operator's back
+    if cur is not None and abs(cur - float(last["to"])) < 1e-6:  # still the AI assistant's value: put the operator's back
         learn = room.state[zone].get("learn") if isinstance(room.state[zone].get("learn"), dict) else {}
         c._auto_write(room, zone, last["suffix"], float(last["to"]), float(last["from"]), learn, now,
                       by=PUT_BACK_BY)
@@ -824,7 +824,7 @@ def guard_setpoints(c, room, zone, now):
 
 
 def advance(c, room, zone, snap, d, now, p=None):
-    """Move the zone forward one phase as Jev judged, with the bookkeeping the engine does itself (a ramp handed
+    """Move the zone forward one phase as the AI assistant judged, with the bookkeeping the engine does itself (a ramp handed
     over while it stalls re-waters under what it reached: Controller._record_phase)."""
     st = room.state[zone]
     was, st["phase"] = st["phase"], d.value
@@ -876,7 +876,7 @@ def siblings(c, room, snaps, params, now):
         if v:
             out[zone] = v
     room._jev_sib = out
-    room._jev_params = params  # this pass's params, for the setpoints published with the zone's Jev sensor
+    room._jev_params = params  # this pass's params, for the setpoints published with the zone's AI assistant sensor
 
 
 def stage_info(c, room, now):
@@ -942,8 +942,8 @@ def save_usage(brain):
 
 
 def setpoints_published(c, room, zone, now, managed):
-    """What the dashboard shows of the Setpoints judge for a zone: the operator's values, Jev's range around them,
-    the current values, the last move and any pause. None without Jev's Setpoints judge or this pass's params."""
+    """What the dashboard shows of the Setpoints judge for a zone: the operator's values, the AI assistant's range around them,
+    the current values, the last move and any pause. None without the AI assistant's Setpoints judge or this pass's params."""
     mem = getattr(c.jev, "setpoints", None)
     p = (room.__dict__.get("_jev_params") or {}).get(zone)
     if mem is None or p is None or not owns_setpoints(c):
@@ -1009,7 +1009,7 @@ def route_card(c, room):
 
 
 def runtime_alerts(c, room):
-    """CS-706 once a day when Jev's calls reach the warning share of the budget (or once a window when the Claude
+    """CS-706 once a day when the AI assistant's calls reach the warning share of the budget (or once a window when the Claude
     brain's spend reaches it), CS-707 when one of this room's zones has a judge go on the stricter gate
     (Brain.events), CS-708 once a window when the Claude brain's budget is spent, CS-709 when its key is refused or it
     stops answering, and CS-712 when the options name the removed first route. A card Home Assistant could not take is raised again."""
@@ -1172,7 +1172,7 @@ def _plan_note(c, room, verdict, drift, action, reason, why, result="advised"):
 
 
 def plan_task(c, room, now, view, drifts):
-    """The plan task's pass for the room (jev/plan_task.py), under the Claude brain only: an answer that came in is
+    """The plan task's pass for the room (brain/plan_task.py), under the Claude brain only: an answer that came in is
     read once and picks the suggestion the panel shows for its drift; the room is asked about the highest drift the
     brain may be asked about when it is due, with the kill switch on, no no-touch window and fresh readings (SF-26).
     -> {class: (suggestion, why, action)} for the panel, or None. Never a write, never an arm, edit or disarm."""
@@ -1396,7 +1396,7 @@ def feed_facts(c, room, now):
 
 
 def feed_task(c, room, now):
-    """The Feed task's pass for the room (jev/feed.py): in a room whose feed EC sensor is mapped, asked once a grow-day
+    """The Feed task's pass for the room (brain/feed.py): in a room whose feed EC sensor is mapped, asked once a grow-day
     an hour after lights-on with the kill switch on; a firm proposal is a CS-711 card for a person. Never a write."""
     task = getattr(c.jev, "feed", None)
     if task is None or not room.feed_ec_sensor:
@@ -1691,7 +1691,7 @@ def powers_published(c, room, now):
 
 
 def _ai(c, room, zone):
-    """The powers' memory for a zone, in jev_setpoints.json beside the Setpoints judge's (jev.setpoint_memory)."""
+    """The powers' memory for a zone, in jev_setpoints.json beside the Setpoints judge's (brain.setpoint_memory)."""
     rec = c.jev.setpoints.zone(room.slug, zone)
     ai = rec.get("ai") if isinstance(rec.get("ai"), dict) else None
     if ai is None:

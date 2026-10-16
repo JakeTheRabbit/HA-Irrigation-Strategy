@@ -1,7 +1,7 @@
-"""The only things Jev can cause, and the code that admits or refuses each one.
+"""The only things the AI assistant can cause, and the code that admits or refuses each one.
 
-A judge turns Jev's answer into a `Directive`. `admit()` then checks it against arithmetic Jev can't do
-and limits Jev can't cross: the daily order of the phases, how far into a phase the zone is, the P3
+A judge turns the AI assistant's answer into a `Directive`. `admit()` then checks it against arithmetic the AI assistant can't do
+and limits the AI assistant can't cross: the daily order of the phases, how far into a phase the zone is, the P3
 emergency floor, the ramp's minimum shots, the evidence needed to set a probe aside, the notch budget on
 the setpoints. A refused directive does nothing; the base engine decides as it always has.
 """
@@ -135,7 +135,7 @@ CATCH_UP_DUSK_H = 3.0  # nor in the last hours before lights-off, where the nigh
 
 def _admit_catch_up(d, ctx):
     """Today's plan day, applied by the controller for the rest of the photoperiod while the plan's own day is held by
-    a stale probe (the plan-day bridge, jev_bridge.plan_task). `ctx` is the room's plan_task.PlanContext; the values
+    a stale probe (the plan-day bridge, brain_bridge.plan_task). `ctx` is the room's plan_task.PlanContext; the values
     are the integration's own preview, re-checked here, never the brain's. Once a photoperiod, with the lights on and
     away from both edges, never during a shot or a room hold, never on stale readings, in a no-touch window or a
     cool-down. Nothing here edits the plan or writes a number."""
@@ -230,7 +230,7 @@ def _admit_setpoint(d, ctx):
 
 def notch_budget(sp, suffix, now, step=0.5):
     """Why a notch of `step` on `suffix` may not be made at `now`, or None. `sp["setbacks"]` holds when a move was
-    refused or did not work out, `sp["notches"]` the (at, suffix, step) moves made (jev_bridge reads both from the
+    refused or did not work out, `sp["notches"]` the (at, suffix, step) moves made (brain_bridge reads both from the
     ledger); either may be missing."""
     for at in sp.get("setbacks") or ():
         until = at + timedelta(hours=COOL_DOWN_H)
@@ -245,7 +245,7 @@ def notch_budget(sp, suffix, now, step=0.5):
 
 def cools_down(why):
     """True when a refused setpoint move starts the cool-down: the move itself was wrong, not its timing (the
-    switch, a pause, today's change, the budget) and not an edit by hand made while Jev was asked."""
+    switch, a pause, today's change, the budget) and not an edit by hand made while the AI assistant was asked."""
     return any(r in why for r in MOVE_REFUSALS)
 
 
@@ -253,7 +253,7 @@ def cools_down(why):
 def _admit_values(d, ctx, attr):
     """The values the AI assistant set with the owner's power (targets, shot_size): admitted as given, only its own
     settings and only numbers. No limit applies here: the owner's power hands them to code, which clamps each only to
-    the setting's own range (jev_bridge.apply_values). The power itself, and dry run, are checked before."""
+    the setting's own range (brain_bridge.apply_values). The power itself, and dry run, are checked before."""
     view = getattr(ctx, attr, None) or {}
     vals = (d.value or {}).get("values") if isinstance(d.value, dict) else None
     if not view.get("current") or not isinstance(vals, dict) or not vals:

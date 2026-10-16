@@ -10,11 +10,11 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 import brain_kit as B
-import jev_bridge
+import brain_bridge
 import pytest
 import runtime_env
-from jev import client as jc
-from jev.client import BAD_OUTPUT, Meter, RouterClient, call_anthropic, cost, tool_name
+from brain import client as jc
+from brain.client import BAD_OUTPUT, Meter, RouterClient, call_anthropic, cost, tool_name
 from test_controller import _build
 from test_jev_controller import KILL, NOW, _states, _switches
 from test_brain_wiring import Clock, _base, _writes, _zone
@@ -174,7 +174,7 @@ def test_the_option_is_stripped_and_blank_is_the_api():
 
 
 def _resolve(tmp_path, **options):
-    return jev_bridge.resolve_provider({"brain_provider": "claude_haiku", "anthropic_api_key": "k", **options},
+    return brain_bridge.resolve_provider({"brain_provider": "claude_haiku", "anthropic_api_key": "k", **options},
                                        str(tmp_path))
 
 
@@ -203,9 +203,9 @@ def routed(monkeypatch):
         monkeypatch.setattr(jc, "anthropic", None)
         monkeypatch.setattr(jc, "requests", SimpleNamespace(post=router))
         clock = Clock(NOW.timestamp())
-        monkeypatch.setattr(jev_bridge, "Asker", functools.partial(jc.Asker, threaded=False, clock=clock))
-        monkeypatch.setattr(jev_bridge, "Meter", functools.partial(jc.Meter, clock=clock))
-        monkeypatch.setattr(jev_bridge, "Routes", functools.partial(jc.Routes, sleep=lambda s: None))
+        monkeypatch.setattr(brain_bridge, "Asker", functools.partial(jc.Asker, threaded=False, clock=clock))
+        monkeypatch.setattr(brain_bridge, "Meter", functools.partial(jc.Meter, clock=clock))
+        monkeypatch.setattr(brain_bridge, "Routes", functools.partial(jc.Routes, sleep=lambda s: None))
         opts = {"num_zones": 1, "enable_flag": KILL, "brain_provider": "claude_haiku",
                 "anthropic_api_key": B.SENTINEL, "anthropic_base_url": ROUTER, "anthropic_model": ROUTED, **options}
         c, fake = _build(opts, states=_states())

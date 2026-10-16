@@ -6,7 +6,7 @@ import type { Controller, EntityState, States } from "./types";
 
 /** The AI assistant's panel, read from the room's brain sensor `sensor.crop_steering_<prefix>jev` (its id is
  * kept for upgraded installs). The controller publishes it on every provider, under rules too
- * (jev_bridge.panel and publish_rules). `key_set` is the only word about the key this page reads: the key
+ * (brain_bridge.panel and publish_rules). `key_set` is the only word about the key this page reads: the key
  * itself lives in the controller's options, which the page never reads. */
 
 export interface BrainDecision {

@@ -100,14 +100,14 @@ async def test_a_fresh_install_on_claude_builds_its_brain_from_the_options_alone
     """The one stand-in is the Anthropic API itself (a client whose every call fails): the brain is
     built from the options alone, with its prompt and arc, and the key shows in nothing printable."""
     import brain_kit as B
-    from jev import client as jc
+    from brain import client as jc
 
     import functools
 
-    import jev_bridge
+    import brain_bridge
 
     monkeypatch.setattr(jc, "anthropic", B.FakeSDK(B.FakeClient(B.APIStatusError(503))))
-    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(jc.Asker, threaded=False))
+    monkeypatch.setattr(brain_bridge, "Asker", functools.partial(jc.Asker, threaded=False))
     await _install(hass)
     c, fake, _clock = controller_for(
         {"enable_flag": KILL, "brain_provider": "claude_haiku", "anthropic_api_key": B.SENTINEL}

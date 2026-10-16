@@ -1,15 +1,15 @@
-"""The journal behind the dashboard's live Jev log: every decision, what code did with it, and outcomes."""
+"""The journal behind the dashboard's live the AI assistant log: every decision, what code did with it, and outcomes."""
 import json
 from datetime import timedelta
 from types import SimpleNamespace
 
-import jev_bridge
+import brain_bridge
 import jev_kit as K
-from jev.brain import Brain
-from jev.client import Asker
-from jev.journal import MAX_KEPT, SHOWN, Journal
-from jev.judges.ramp import RampJudge
-from jev.ledger import Ledger
+from brain.brain import Brain
+from brain.client import Asker
+from brain.journal import MAX_KEPT, SHOWN, Journal
+from brain.judges.ramp import RampJudge
+from brain.ledger import Ledger
 
 
 def _ramp_ctx(**snap_over):
@@ -95,7 +95,7 @@ def _published(tmp_path, entries=0, reason="x"):
     c = SimpleNamespace(jev=brain, _jev_read=lambda e: "2026-08-22", _no_touch_until=lambda room, now: None)
     room = SimpleNamespace(slug="default", prefix="", zones={1: {}, 2: {}, 3: {}})
     out = {}
-    jev_bridge.publish(c, room, K.NOW, lambda eid, state, attrs: out.__setitem__(eid, (state, attrs)))
+    brain_bridge.publish(c, room, K.NOW, lambda eid, state, attrs: out.__setitem__(eid, (state, attrs)))
     return out
 
 
@@ -119,7 +119,7 @@ def test_the_room_sensor_carries_todays_stage_for_the_chart(tmp_path):
 
 
 def test_every_judge_has_a_plain_title():
-    import jev_bridge
-    from jev import journal
+    import brain_bridge
+    from brain import journal
 
-    assert [j.name for j in jev_bridge.judges() if j.name not in journal.TITLES] == []
+    assert [j.name for j in brain_bridge.judges() if j.name not in journal.TITLES] == []

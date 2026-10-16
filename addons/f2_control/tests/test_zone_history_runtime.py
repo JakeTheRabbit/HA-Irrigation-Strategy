@@ -1,5 +1,5 @@
 """The plateau and night history inside the real controller: the lights edges, each way P1 hands over (the engine,
-Jev's Ramp judge, the operator), the day's first shot, and an app restart in the night."""
+The AI assistant's Ramp judge, the operator), the day's first shot, and an app restart in the night."""
 import json
 from datetime import date, datetime, timedelta, timezone
 
@@ -7,9 +7,9 @@ import pytest
 
 import controller
 import fake_ha
-import jev_bridge
+import brain_bridge
 import jev_kit as K
-from jev.envelope import Directive
+from brain.envelope import Directive
 
 
 class Clock(datetime):
@@ -126,7 +126,7 @@ def test_the_ramp_judge_handing_over_records_the_plateau(rig):
     st = room.state[1]
     st.update(phase="P1", peak=36.1, shots=5)
     d = Directive("ramp", "advance", "P2", "ramp done: block_is_full (hand over p=0.84)", now + timedelta(minutes=45))
-    jev_bridge.advance(c, room, 1, K.snap(phase="P1", vwc=36.0), d, now)
+    brain_bridge.advance(c, room, 1, K.snap(phase="P1", vwc=36.0), d, now)
     assert st["phase"] == "P2"
     assert st["plateau_hist"] == [{"date": "2026-09-23", "value": 36.1, "shots": 5,
                                    "how": "the AI assistant's ramp judge: ramp done: block_is_full (hand over p=0.84)"}]

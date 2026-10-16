@@ -4,7 +4,7 @@ counts (docs/AI_ASSISTANT.md, Availability)."""
 import json
 
 import jev_kit as K
-from jev.client import NO_ANSWERS, NO_REQUESTS, NOT_JSON, Asker, Route, Routes, retryable
+from brain.client import NO_ANSWERS, NO_REQUESTS, NOT_JSON, Asker, Route, Routes, retryable
 
 ANSWERS = {"q__v0": K.noul_answer(0.9)}
 
@@ -129,17 +129,17 @@ def test_the_asker_counts_retries_failovers_and_second_looks():
 
 
 def test_an_old_usage_file_loads_and_a_restart_does_not_warn_twice(tmp_path):
-    import jev_bridge
+    import brain_bridge
 
     path = tmp_path / "jev_usage.json"
     today = K.NOW.date().isoformat()
     path.write_text(json.dumps({"day": today, "calls": 41, "errors": 0, "input_tokens": 9, "last_error": None}))
     a = Asker("acct", "tok", transport=K.FakeTransport(ANSWERS), threaded=False, clock=lambda: K.NOW.timestamp())
-    jev_bridge.restore_usage(a, str(path))  # 3.8.0's file: no retries, failovers, reasks or warned
+    brain_bridge.restore_usage(a, str(path))  # 3.8.0's file: no retries, failovers, reasks or warned
     assert (a.stats["calls"], a.stats["retries"], a.stats["warned"]) == (41, 0, False)
     path.write_text(json.dumps({"day": today, "calls": 4100, "warned": True}))
     b = Asker("acct", "tok", transport=K.FakeTransport(ANSWERS), threaded=False, clock=lambda: K.NOW.timestamp())
-    jev_bridge.restore_usage(b, str(path))
+    brain_bridge.restore_usage(b, str(path))
     assert b.submit("k", {}, {}) and not b.take_warning()  # warned before the restart: not again today
 
 

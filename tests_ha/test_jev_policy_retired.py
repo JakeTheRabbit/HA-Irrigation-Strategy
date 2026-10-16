@@ -81,7 +81,7 @@ async def test_a_2_25_1_room_with_cloudflare_set_asks_nothing_and_keeps_its_shot
     await _upgrade(hass, UPSTREAM_2_25_1, registry_ids=seed["registry"])
     hass.states.async_set(KILL, "on")
     app = fixture(options)
-    assert not app["data"]  # no Jev file: no brain, so nothing but the old check ever used the keys
+    assert not app["data"]  # no the AI assistant file: no brain, so nothing but the old check ever used the keys
     c, fake, _clock = controller_for(app["options"], saved_state=seed["controller_saved"])
     assert c.jev is None
     assert c.brain_status.notice == "legacy_route_removed"  # the keys load, and nothing uses them

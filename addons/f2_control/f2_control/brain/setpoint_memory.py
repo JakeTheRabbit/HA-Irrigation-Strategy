@@ -1,13 +1,13 @@
 """What the Setpoints judge remembers per zone, in /data/jev_setpoints.json (docs/AI_ASSISTANT.md).
 
-- `home`: the operator's own value of each setting Jev may move, the centre of its band. It is the value first
-  seen, and it follows the operator: any value Jev did not write becomes the new home.
-- `written`: the last value Jev wrote for each setting, so an operator's edit can be told from Jev's own.
+- `home`: the operator's own value of each setting the AI assistant may move, the centre of its band. It is the value first
+  seen, and it follows the operator: any value the AI assistant did not write becomes the new home.
+- `written`: the last value the AI assistant wrote for each setting, so an operator's edit can be told from the AI assistant's own.
 - `pending`: a write Home Assistant has not reflected yet {suffix, from, to, by, at, tries, next}: the old value is
-  not an edit while it is read back, sent again and, if it never lands, recorded as failed (jev_bridge.readback).
+  not an edit while it is read back, sent again and, if it never lands, recorded as failed (brain_bridge.readback).
 - `last`: the last move {suffix, from, to, at, day, words, choice, reverted}.
 - `frozen_until`: when a zone paused after a safety revert may be moved again.
-- `ai`: the AI powers' memory for the zone (jev_bridge, "the AI assistant's powers"): the zone's scorecard by grow-day
+- `ai`: the AI powers' memory for the zone (brain_bridge, "the AI assistant's powers"): the zone's scorecard by grow-day
   (`days`), the AI assistant's own changes with what it expected (`changes`), what the powers wrote (`written`) and
   writes being read back (`pending`).
 """

@@ -1,11 +1,11 @@
-"""The Claude brain's budget (jev.client.Meter and PRICES): every billed token priced at its model's row, a window
+"""The Claude brain's budget (brain.client.Meter and PRICES): every billed token priced at its model's row, a window
 from one lights-on to the next, the reasons it may not ask, and safe under a worker thread (haiku-brain-design 10)."""
 import random
 import threading
 
 import brain_kit as B
 import pytest
-from jev.client import DEFAULT_MODEL, PRICES, Meter, cost
+from brain.client import DEFAULT_MODEL, PRICES, Meter, cost
 
 H = 3600.0
 

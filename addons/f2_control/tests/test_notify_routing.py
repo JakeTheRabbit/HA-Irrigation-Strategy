@@ -3,7 +3,7 @@
 Every alert is a card first, exactly as before, and its severity decides whether a repeat pushes at all
 (test_decaying_renotify.py). The push itself: with a phone set up in the integration
 (sensor.crop_steering_notify_config), it is handed to crop_steering.notify and nothing is pushed here; with none, or when that call fails, it goes to the notify_service
-option as it always has. Never both, and never lost to the router. Phase changes and the settings Jev moves go to
+option as it always has. Never both, and never lost to the router. Phase changes and the settings the AI assistant moves go to
 the phones that ask for them, never to the option. And CS-209: a room with its lights on and a zone in P1 or P2
 that has watered nothing for a while.
 """
@@ -223,7 +223,7 @@ def test_what_the_controller_makes_of_the_integrations_setup(attrs, expected):
     assert c._notify_config() == expected
 
 
-# ------------------------------------------------------------------ phase changes and Jev's settings
+# ------------------------------------------------------------------ phase changes and the AI assistant's settings
 def test_a_phase_change_goes_to_the_phones_that_ask_and_never_to_the_option(router):
     c, fake = _setup()
     routed = router()

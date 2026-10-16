@@ -4,18 +4,18 @@ no hardware cause; it never directs anything, and its answer reaches tonight's s
 from datetime import timedelta
 
 import brain_kit as B
-import jev_bridge
+import brain_bridge
 import jev_kit as K
 import pytest
-from jev import client as jc
-from jev import council
-from jev.brain import Brain, JudgeState
-from jev.client import Asker
-from jev.enrich import enrich
-from jev.judges.balance import CHOICES, BalanceJudge
-from jev.judges.dusk import DuskJudge
-from jev.judges.setpoints import SetpointsJudge
-from jev.ledger import Ledger
+from brain import client as jc
+from brain import council
+from brain.brain import Brain, JudgeState
+from brain.client import Asker
+from brain.enrich import enrich
+from brain.judges.balance import CHOICES, BalanceJudge
+from brain.judges.dusk import DuskJudge
+from brain.judges.setpoints import SetpointsJudge
+from brain.ledger import Ledger
 from test_controller import _build
 from test_jev_controller import KILL, NOW, _states
 
@@ -108,20 +108,20 @@ def haiku(monkeypatch):
 
 def test_the_controller_hands_the_balance_answer_and_the_zones_hardware_cause_to_the_context(haiku):
     c, room = haiku, haiku.rooms[0]
-    j = jev_bridge._judge(c.jev, "balance")
+    j = brain_bridge._judge(c.jev, "balance")
     j.latest[("default", 1)] = (NOW, "the balance judge said more_water_toward_room, p 0.81, at 13:00: ...")
     st = c.jev.state[("default", 1, "zones")] = JudgeState(last_asked=NOW - timedelta(hours=1))
     st.verdicts = {"why_different": council.combine(K.both("why_different", K.choice_answer(
         "delivery_fault", {"delivery_fault": 0.8, "insufficient_evidence": 0.2})), "why_different")}
-    got = jev_bridge.brain_context(c, room, 1, None, NOW)
+    got = brain_bridge.brain_context(c, room, 1, None, NOW)
     assert got["room_balance"].startswith("the balance judge said more_water_toward_room")
     assert got["zones_hardware"] == "delivery_fault"
     st.last_asked = NOW - timedelta(hours=20)  # before this grow-day's lights-on: not today's cause
-    assert jev_bridge.brain_context(c, room, 1, None, NOW)["zones_hardware"] is None
+    assert brain_bridge.brain_context(c, room, 1, None, NOW)["zones_hardware"] is None
 
 
 def test_balance_is_built_on_the_claude_route(tmp_path, monkeypatch):
     monkeypatch.setattr(jc, "anthropic", B.FakeSDK(B.FakeClient(B.judging())))
-    haiku = jev_bridge.build({"brain_provider": "claude_haiku", "anthropic_api_key": "k"},
+    haiku = brain_bridge.build({"brain_provider": "claude_haiku", "anthropic_api_key": "k"},
                              str(tmp_path / "s.json"), lambda *a: None)
     assert "balance" in [j.name for j in haiku.judges]

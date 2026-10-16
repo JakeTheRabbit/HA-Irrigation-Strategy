@@ -1,11 +1,11 @@
-"""The Claude transport (jev.client.call_anthropic): two lanes, every tool call checked before it counts, every
+"""The Claude transport (brain.client.call_anthropic): two lanes, every tool call checked before it counts, every
 response charged, never a raise, never the key in what comes back (haiku-brain-design sections 3 and 9)."""
 import types
 
 import brain_kit as B
 import pytest
-from jev import client
-from jev.client import (BAD_OUTPUT, INTERNAL, NO_CONTEXT, NO_SDK, Meter, call_anthropic, classify, split_lanes,
+from brain import client
+from brain.client import (BAD_OUTPUT, INTERNAL, NO_CONTEXT, NO_SDK, Meter, call_anthropic, classify, split_lanes,
                         validate_answer)
 
 SNAP = B.FakePrompt.snap

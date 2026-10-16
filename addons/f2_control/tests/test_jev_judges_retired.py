@@ -6,9 +6,9 @@ import functools
 import pytest
 
 import controller
-import jev_bridge
+import brain_bridge
 import jev_kit as K
-from jev.client import Asker
+from brain.client import Asker
 from test_controller import _build
 from test_jev_controller import KILL, NOW, _p1_zone, _states
 
@@ -18,14 +18,14 @@ NOTE = "old jev_judges list"
 
 @pytest.fixture(autouse=True)
 def _fresh_process(monkeypatch):
-    monkeypatch.setattr(jev_bridge, "_upgrade_said", False)
+    monkeypatch.setattr(brain_bridge, "_upgrade_said", False)
 
 
 def test_the_old_list_is_read_as_all_once_across_controller_restarts_and_passes(monkeypatch):
     said = []
     monkeypatch.setattr(controller, "log", lambda *a: said.append(" ".join(map(str, a))))
     K.sdk(monkeypatch, K.FakeTransport({}, None))
-    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: NOW.timestamp()))
+    monkeypatch.setattr(brain_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: NOW.timestamp()))
     for _ in range(2):
         c, _fake = _build({"num_zones": 1, "enable_flag": KILL, **K.HAIKU, "jev_judges": OLD}, states=_states())
         names = [j.name for j in c.jev.judges]

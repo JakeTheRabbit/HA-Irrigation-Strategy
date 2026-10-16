@@ -3,9 +3,9 @@ section 15, test_jev_behaviour_edits): the judges' phrasings, the doctrine topic
 judges, and the day's stage on the default arc."""
 import sys
 
-import jev_bridge
+import brain_bridge
 import jev_kit as K
-from jev import council
+from brain import council
 
 TOPICS = {  # each judge's with_doctrine(...) call, as written at its call site
     "dawn": ("dryback", "stage", "probe", "closed_loop"), "dusk": ("dryback", "stage", "maintenance"),
@@ -18,7 +18,7 @@ TOPICS = {  # each judge's with_doctrine(...) call, as written at its call site
 
 
 def test_each_judge_keeps_its_phrasing_and_names_its_doctrine_topics():
-    for judge in jev_bridge.judges():
+    for judge in brain_bridge.judges():
         for variants in judge.questions.values():
             for v in variants:
                 assert v["instructions"].startswith(v["base_instructions"] + " Doctrine: ")
@@ -27,12 +27,12 @@ def test_each_judge_keeps_its_phrasing_and_names_its_doctrine_topics():
 
 def test_the_acting_judges_are_those_whose_answers_can_act():
     acting = set()
-    for judge in jev_bridge.judges():
+    for judge in brain_bridge.judges():
         src = open(sys.modules[type(judge).__module__].__file__, encoding="utf-8").read()
         if any(f'directive(ctx, "{kind}"' in src for kind in ("advance", "distrust", "ec_mode", "setpoint")) or (
                 "directive(ctx, self.kind" in src and judge.kind in ("targets", "shot_size")):
             acting.add(judge.name)
-    assert acting == set(jev_bridge.ACTING_JUDGES)
+    assert acting == set(brain_bridge.ACTING_JUDGES)
 
 
 def test_council_keeps_each_phrasings_reason():

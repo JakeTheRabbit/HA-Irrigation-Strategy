@@ -7,12 +7,12 @@ plant count and pot size. Its only directive is the CS-710 alert, and its latest
 from datetime import timedelta
 from types import SimpleNamespace
 
-import jev_bridge
+import brain_bridge
 import jev_kit as K
-from jev import council
-from jev.envelope import admit
-from jev.judges.channel import CHANNEL_MIN_DRINK_FRAC, CODE, ChannelJudge, fell_back, signs, under_drinking
-from jev.judges.probe import ProbeJudge
+from brain import council
+from brain.envelope import admit
+from brain.judges.channel import CHANNEL_MIN_DRINK_FRAC, CODE, ChannelJudge, fell_back, signs, under_drinking
+from brain.judges.probe import ProbeJudge
 from test_controller import _build
 
 
@@ -56,8 +56,8 @@ def test_every_question_is_asked_in_exactly_two_phrasings():
 
 
 def test_the_judge_is_built_and_selectable():
-    assert "channel" in jev_bridge.ALL
-    assert "channel" in [j.name for j in jev_bridge.judges()]
+    assert "channel" in brain_bridge.ALL
+    assert "channel" in [j.name for j in brain_bridge.judges()]
 
 
 # ------------------------------------------------------------------ the trigger
@@ -124,16 +124,16 @@ def test_its_latest_answer_reaches_the_probe_judge():
     c = _small(2.0)
     j = ChannelJudge()
     brain = SimpleNamespace(judges=[ProbeJudge(), j])
-    assert jev_bridge.channel_words(brain, "default", 1, K.NOW) is None
+    assert brain_bridge.channel_words(brain, "default", 1, K.NOW) is None
     j.decide(_verdicts("channeling_at_probe"), c)
-    words = jev_bridge.channel_words(brain, "default", 1, K.NOW + timedelta(hours=1))
+    words = brain_bridge.channel_words(brain, "default", 1, K.NOW + timedelta(hours=1))
     assert words.startswith("channeling_at_probe (p 0.80) at 13:00: Water runs down past the probe")
     probe = ProbeJudge().evidence(K.replace(c, channel=words))
     assert probe["channel_judge_latest"] == words
     assert "channel_judge_latest" not in ProbeJudge().evidence(c)
-    assert jev_bridge.channel_words(brain, "default", 1, K.NOW + timedelta(hours=7)) is None  # stale
-    assert jev_bridge.channel_words(brain, "default", 2, K.NOW) is None
-    assert jev_bridge.channel_words(SimpleNamespace(judges=[ProbeJudge()]), "default", 1, K.NOW) is None
+    assert brain_bridge.channel_words(brain, "default", 1, K.NOW + timedelta(hours=7)) is None  # stale
+    assert brain_bridge.channel_words(brain, "default", 2, K.NOW) is None
+    assert brain_bridge.channel_words(SimpleNamespace(judges=[ProbeJudge()]), "default", 1, K.NOW) is None
 
 
 def test_the_controller_raises_cs_710_as_a_zone_card():

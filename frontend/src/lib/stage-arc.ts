@@ -2,7 +2,7 @@ import generated from "./generated/arcs.json";
 
 /** The grow by stage, as the controller steers it: the doctrine pack's default stage arc, read from
  * frontend/src/lib/generated/arcs.json (written by doctrine/tools/build_doctrine.py from the same rows
- * the controller's jev/doctrine.py stage_rows reads). Day 1 is the first day of 12/12. Pure, so the arc
+ * the controller's brain/doctrine.py stage_rows reads). Day 1 is the first day of 12/12. Pure, so the arc
  * and today's place in it are tested on their own. */
 
 export type StageSteering = "vegetative" | "generative" | "ripening";

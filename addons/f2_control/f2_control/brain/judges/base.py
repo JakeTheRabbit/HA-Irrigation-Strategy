@@ -19,7 +19,7 @@ def score(instructions, criteria):
 
 
 def with_doctrine(questions, text):
-    """Every phrasing of every question, with the doctrine (jev.doctrine) appended: Jev knows
+    """Every phrasing of every question, with the doctrine (brain.doctrine) appended: the AI assistant knows
     none of its own, so each question carries the rules it is to judge by. Each phrasing also keeps its bare
     wording and the doctrine topics the text holds: the Claude brain has the doctrine in its system prompt, so it
     is sent those instead (the legacy routes send the appended text, byte for byte)."""
@@ -30,7 +30,7 @@ def with_doctrine(questions, text):
 
 
 def doctrine_topics(text):
-    """The jev.doctrine topics one of whose rules occurs in `text`, in order of first occurrence."""
+    """The brain.doctrine topics one of whose rules occurs in `text`, in order of first occurrence."""
     from ..doctrine import RULES
 
     found = {}

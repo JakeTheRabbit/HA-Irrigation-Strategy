@@ -21,23 +21,23 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "addons/f2_control/f2_control"), str(ROOT / "addons/f2_control/tests")]
 
 import jev_kit as K  # noqa: E402
-from jev import council  # noqa: E402
-from jev.client import DEFAULT_MODEL, Asker, Meter, Route, Routes, call_anthropic, make_client  # noqa: E402
-from jev.context import Shot, ZoneHistory  # noqa: E402
-from jev.doctrine import STAGE_ARC, stage_intent  # noqa: E402
-from jev.enrich import enrich  # noqa: E402
-from jev.envelope import admit  # noqa: E402
-from jev.prompt import Prompt  # noqa: E402
-from jev.judges.dawn import DawnJudge  # noqa: E402
-from jev.judges.dusk import DuskJudge  # noqa: E402
-from jev.judges.night import NightJudge  # noqa: E402
-from jev.judges.probe import ProbeJudge  # noqa: E402
-from jev.judges.ramp import RampJudge  # noqa: E402
-from jev.judges.salt import SaltJudge  # noqa: E402
-from jev.judges.setpoints import SHOT, THRESHOLD, SetpointsJudge, band  # noqa: E402
-from jev.judges.shot import ShotJudge  # noqa: E402
-from jev.judges.stage import StageJudge  # noqa: E402
-from jev.judges.zones import ZonesJudge  # noqa: E402
+from brain import council  # noqa: E402
+from brain.client import DEFAULT_MODEL, Asker, Meter, Route, Routes, call_anthropic, make_client  # noqa: E402
+from brain.context import Shot, ZoneHistory  # noqa: E402
+from brain.doctrine import STAGE_ARC, stage_intent  # noqa: E402
+from brain.enrich import enrich  # noqa: E402
+from brain.envelope import admit  # noqa: E402
+from brain.prompt import Prompt  # noqa: E402
+from brain.judges.dawn import DawnJudge  # noqa: E402
+from brain.judges.dusk import DuskJudge  # noqa: E402
+from brain.judges.night import NightJudge  # noqa: E402
+from brain.judges.probe import ProbeJudge  # noqa: E402
+from brain.judges.ramp import RampJudge  # noqa: E402
+from brain.judges.salt import SaltJudge  # noqa: E402
+from brain.judges.setpoints import SHOT, THRESHOLD, SetpointsJudge, band  # noqa: E402
+from brain.judges.shot import ShotJudge  # noqa: E402
+from brain.judges.stage import StageJudge  # noqa: E402
+from brain.judges.zones import ZonesJudge  # noqa: E402
 
 
 def ramp_feed_front():
@@ -229,7 +229,7 @@ SCENARIOS = [
 
 
 def claude(key):
-    """The Claude route exactly as jev_bridge.build() makes it, with a Meter and the cached prompt."""
+    """The Claude route exactly as brain_bridge.build() makes it, with a Meter and the cached prompt."""
     model = os.environ.get("ANTHROPIC_MODEL") or DEFAULT_MODEL
     prompt, meter, client = Prompt(STAGE_ARC, "slab_default"), Meter(5.0, model), make_client(key)
     if client is None:
@@ -264,7 +264,7 @@ def main():
         v = council.combine(ans.answers, question)
         d = judge.decide({q: council.combine(ans.answers, q) for q in judge.questions}, ctx)
         admitted, why = admit(d, ctx, confirmed=2, evidence_ok=True) if d is not None else (False, "no directive")
-        if expect == "no early stop":  # judged on what code lets happen, not on Jev's label
+        if expect == "no early stop":  # judged on what code lets happen, not on the AI assistant's label
             ok = not (admitted and d.kind == "advance")
         elif expect == "steering flagged":
             ok = d is not None and d.kind == "alert" and "steering, but the stage calls for" in d.value["message"]

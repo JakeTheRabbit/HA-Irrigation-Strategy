@@ -3,7 +3,7 @@
 The base engine has no idea what week of flower it is: the operator's steering mode and setpoints are all
 it knows, and nothing notices when they belong to another stage, or when the overnight dryback and the
 pore EC drift out of the stage's bands. This judge reads the zone against the stage arc (the slab
-guide chosen on 26 Sep 2026, jev.doctrine.STAGE_ARC) and says what is off, as advice (CS-705). It never
+guide chosen on 26 Sep 2026, brain.doctrine.STAGE_ARC) and says what is off, as advice (CS-705). It never
 changes a setting: moving to a new stage is the grower's call.
 """
 from datetime import timedelta
@@ -96,7 +96,7 @@ class StageJudge(Judge):
         st = ctx.stage
         if not st:
             return None
-        # The steering mode against the stage is arithmetic, so code states it; Jev judges the rest.
+        # The steering mode against the stage is arithmetic, so code states it; the AI assistant judges the rest.
         mismatch = bool(ctx.steering) and ctx.steering != st["steering"]
         v = verdicts.get("arc")
         judged = v is not None and v.firm_in(ADVICE, 0.6) and v.label in ADVICE

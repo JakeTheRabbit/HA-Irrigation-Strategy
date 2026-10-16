@@ -1,4 +1,4 @@
-"""What Jev decided, newest first: every answer it gave, what code did with it, and how it turned out.
+"""What the AI assistant decided, newest first: every answer it gave, what code did with it, and how it turned out.
 
 The ledger keeps only what acted, for track records. The journal keeps every decision, including the answers
 that asked for nothing and the directives code refused, so the dashboard's live log can show the whole story.

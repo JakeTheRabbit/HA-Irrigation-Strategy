@@ -13,9 +13,9 @@ import pytest
 
 import controller
 import fake_ha
-import jev_bridge
+import brain_bridge
 import jev_kit as K
-from jev.client import Asker
+from brain.client import Asker
 from test_controller import _desc
 
 KILL = "input_boolean.kill"
@@ -58,7 +58,7 @@ def container(monkeypatch, tmp_path):
 @pytest.mark.parametrize("source", ["variable", "file"])
 def test_a_containers_secret_reaches_no_log_file_or_home_assistant(container, monkeypatch, tmp_path, capsys, source):
     """U7, end to end: anthropic_api_key from F2_OPT_ANTHROPIC_API_KEY or its _FILE, with the AI assistant on (the
-    whole options dict reaches jev_bridge.build) and one pass of the loop."""
+    whole options dict reaches brain_bridge.build) and one pass of the loop."""
     data, build = container
     if source == "file":
         secret = tmp_path / "anthropic_api_key"
@@ -70,7 +70,7 @@ def test_a_containers_secret_reaches_no_log_file_or_home_assistant(container, mo
     monkeypatch.setenv("F2_OPT_ENABLE_FLAG", KILL)
     transport = K.FakeTransport({})
     K.sdk(monkeypatch, transport)
-    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: NOW.timestamp()))
+    monkeypatch.setattr(brain_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: NOW.timestamp()))
     clock = [0.0]  # a shot's waits on a test clock
     monkeypatch.setattr(controller.time, "sleep", lambda s: clock.__setitem__(0, clock[0] + s))
     monkeypatch.setattr(controller.time, "monotonic", lambda: clock[0])

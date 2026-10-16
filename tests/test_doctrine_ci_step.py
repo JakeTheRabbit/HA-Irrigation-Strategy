@@ -69,7 +69,7 @@ def test_the_step_checks_against_the_engine_and_the_old_doctrine_explicitly():
     run = _step()["run"]
     assert "--check" in run
     assert "--core crop-steering-engine/src/crop_steering_engine/core.py" in run
-    assert "--jev addons/f2_control/f2_control/jev/doctrine.py" in run
+    assert "--jev addons/f2_control/f2_control/brain/doctrine.py" in run
     assert "--controller-copy" not in run  # derived, and checked whenever it exists
 
 
