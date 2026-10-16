@@ -732,6 +732,7 @@ try {
           "Opening optional settings reads its redacted configuration once");
         await summary.click();
         assert.equal(await history.getAttribute("open"), null);
+        await lp.locator('#zone-1-substrate_volume').fill('7');
         await saveSetup(lp);
         assert.equal(calls.filter(call => call.action === "history_connection_get").length, 1,
           "Saving unrelated sizing after closing must send no history service");
@@ -1588,3 +1589,4 @@ try {
     );
 }
 if (checks.some((c) => c.status === "fail")) process.exitCode = 1;
+
