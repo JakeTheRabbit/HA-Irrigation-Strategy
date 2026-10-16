@@ -94,6 +94,15 @@ async def test_only_an_administrator_records_and_anyone_reads(hass, hass_admin_u
     assert len((await _call(hass, hass_read_only_user, "grow_days_get"))["days"]) == 1
 
 
+def _mean_metadata():
+    """A statistic with a mean, as this Home Assistant describes one (mean_type from 2025.x, has_mean before)."""
+    try:
+        from homeassistant.components.recorder.models import StatisticMeanType
+    except ImportError:
+        return {"has_mean": True}
+    return {"mean_type": StatisticMeanType.ARITHMETIC, "unit_class": None}
+
+
 @pytest.fixture
 def mock_recorder_before_hass(async_test_recorder):
     """The recorder's database is made before Home Assistant is (test_setup_changes_recorded.py)."""
@@ -102,7 +111,6 @@ def mock_recorder_before_hass(async_test_recorder):
 async def test_grow_days_are_filled_from_statistics_and_a_recorded_one_is_never_replaced(
     recorder_mock, hass, hass_admin_user
 ):
-    from homeassistant.components.recorder.models import StatisticMeanType
     from homeassistant.components.recorder.statistics import async_import_statistics
     from pytest_homeassistant_custom_component.components.recorder.common import async_wait_recording_done
 
@@ -117,7 +125,7 @@ async def test_grow_days_are_filled_from_statistics_and_a_recorded_one_is_never_
         for i, v in enumerate(values):
             rows.append({"start": start + timedelta(hours=i), "min": v - 1, "max": v + 1, "mean": v})
     meta = {"source": "recorder", "statistic_id": vwc, "name": None, "unit_of_measurement": "%",
-            "has_sum": False, "mean_type": StatisticMeanType.ARITHMETIC, "unit_class": None}
+            "has_sum": False, **_mean_metadata()}
     async_import_statistics(hass, meta, rows)
     await async_wait_recording_done(hass)
     await _call(hass, hass_admin_user, "grow_day_record", days=[_summary(day="2026-09-21")])
