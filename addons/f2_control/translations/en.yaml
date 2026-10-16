@@ -330,6 +330,15 @@ configuration:
       CS-311 (default 3). Set it longer than the longest normal gap between two runs of the
       sump pump. CAUTION: Do not set this time much longer than the normal gap. A full sump
       can flow back into the tables and flood the substrate.
+  pump_power_sensor:
+    name: Feed pump power sensor
+    description: >-
+      The power sensor of the pump that feeds the zones of the room, for example
+      sensor.feed_pump_power. For more than one room, give room=sensor pairs, as for the
+      sump pump. With a sensor, the controller raises CS-317 when the pump uses more than
+      the Pump Dead-Head Power of the room for 1 min while every zone valve reads off and no
+      shot, hold or batch uses the pump. It only alerts: it never switches the pump off.
+      Blank: the controller does not watch the pump.
   jev_flower_days:
     name: Days of flower (old name)
     description: >-

@@ -44,6 +44,7 @@ options:
   feed_ph_sensor: ""
   sump_power_sensor: ""
   sump_silent_hours: 3
+  pump_power_sensor: ""
   hold_entities: []
   substrate_l: 5
   flow_lps: 0.02
@@ -77,6 +78,7 @@ schema:
   feed_ph_sensor: str?
   sump_power_sensor: str?
   sump_silent_hours: float?
+  pump_power_sensor: str?
   hold_entities:
     - str
   substrate_l: float

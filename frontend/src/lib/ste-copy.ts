@@ -252,7 +252,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The size of the first ramp shot, as a percentage of the substrate volume. Each later ramp shot adds the ramp shot increase to the shot before it."
   },
   "p1_maximum_extra_shots": {
-    "guidance": "The default is 3. The controller uses values from 1 to 10. Extra shots count toward the daily water limit. P1 gives no extra shot while the zone does not drain (CS-310). The controller reads the zone value first, so the zone value overrides the room value for that zone only.",
+    "guidance": "The default is 3. The controller uses values from 1 to 30. Extra shots count toward the daily water limit and toward the maximum ramp shots: P1 ends at the maximum ramp shots first, so to give more extra shots, also increase the maximum ramp shots. P1 gives no extra shot while the zone does not drain (CS-310). The controller reads the zone value first, so the zone value overrides the room value for that zone only.",
     "impact": "Increase: P1 can give more extra shots to fill the substrate, with more runoff. Decrease: P1 ends sooner after it reaches the peak target.",
     "tooltip": "The highest number of extra shots that P1 gives after VWC reaches the peak target. At this number, the zone goes to P2."
   },
@@ -499,6 +499,12 @@ export const UI_COPY = {
     "label": "Dose entity (optional)",
     "tooltip": "A number, input_number or sensor entity that gives the mL of this tank for each batch. When it has no value, the fixed dose applies."
   },
+  "dryback drivers": {
+    "guidance": "The rate is in percentage points each hour. The dryback target of the controller is a percent of the peak. Do not compare the two numbers directly.",
+    "impact": "Shows recorded values only. It changes nothing.",
+    "label": "Dryback drivers",
+    "tooltip": "Each point is one zone and one night: the drop of VWC from lights-off to lights-on, in percentage points each hour, against the mean of the climate value for that night. A night with a shot is not shown."
+  },
   "end date · blank while ongoing": {
     "label": "End date · empty if open",
     "tooltip": "The last day of the run. Keep it empty while the run continues."
@@ -507,6 +513,11 @@ export const UI_COPY = {
     "impact": "Changes the local draft only.",
     "label": "Endpoint profile",
     "tooltip": "Select the endpoint profile for the selected days of this zone."
+  },
+  "equipment lanes": {
+    "impact": "Shows recorded states only. It changes nothing.",
+    "label": "Equipment today",
+    "tooltip": "Each mapped device of the room on one time axis, from lights-on: a bar shows when the device was on. The shaded part is lights-off."
   },
   "every zone in {x}": {
     "caution": "CAUTION: Do not pause every zone while plants are in the room. A paused zone gets no water, also no rescue shot.",
@@ -528,6 +539,12 @@ export const UI_COPY = {
     "impact": "Closes the window. It changes no setting.",
     "label": "Close",
     "tooltip": "Closes the list of new changes."
+  },
+  "hardware panel": {
+    "caution": "CAUTION: Make sure that the drippers are in the substrate or in a container before a test shot. Loose drippers can flood the area.",
+    "impact": "The list changes nothing. The test shot opens the valve of this zone for 10 s when Watering is on.",
+    "label": "Hardware",
+    "tooltip": "The valve of this zone, the pump, the main line, the lights and the tank fill of the room: on or off now, and since when. The test shot is a 10 s shot through the safety checks of the controller."
   },
   "history could not load": {
     "guidance": "Select \"Retry history\". If the problem continues, examine the connection to Home Assistant.",
@@ -734,6 +751,12 @@ export const UI_COPY = {
     "label": "Reference ({x})",
     "tooltip": "The known value of the reference solution, in {x}."
   },
+  "reference rows": {
+    "guidance": "Give the low and the high value of each band. A band with one value only is not kept.",
+    "impact": "The room climate on a zone page shows a value in colour when it is outside the band of today.",
+    "label": "Reference only",
+    "tooltip": "Bands for the climate and the feed, for this profile. They drive nothing. The controller does not get them."
+  },
   "refilled": {
     "guidance": "Use this only after you fill the tank to its capacity. For a different level, type the level that you read.",
     "impact": "Sets the level of the stock tank to its capacity and records the refill time.",
@@ -796,9 +819,25 @@ export const UI_COPY = {
     "label": "Room",
     "tooltip": "The room that the dashboard shows. Each room has its own lights, zones and kill switch."
   },
+  "room camera": {
+    "impact": "Shows an image only. It changes no setting.",
+    "label": "Room camera",
+    "tooltip": "A still image from the camera of the room. The image changes each 30 s while the page is open."
+  },
+  "room climate": {
+    "guidance": "A value shows in colour only when it is outside the band of the grow plan for today.",
+    "impact": "Shows values only. It changes no setting.",
+    "label": "Room climate",
+    "tooltip": "The air temperature, humidity and VPD of the room, from the sensors in Equipment › Setup. The dew point comes from the air temperature and the humidity."
+  },
   "room configuration": {
     "label": "Room",
     "tooltip": "Select the room to configure."
+  },
+  "room day lanes": {
+    "impact": "Shows recorded states only. It changes nothing.",
+    "label": "Zones today",
+    "tooltip": "Each zone on one time axis, from lights-on: the colour shows the phase, a mark shows a shot."
   },
   "room name": {
     "label": "Room name",
@@ -810,6 +849,11 @@ export const UI_COPY = {
     "impact": "Off: the controller does not water the room and sends no alerts for it. On after more than one day: the counters and the phase data reset.",
     "label": "Room on or off",
     "tooltip": "Set the room to off when no plants are in it. Set it to on for the next crop."
+  },
+  "root-zone temperature": {
+    "impact": "Shows a value only. The controller does not use it.",
+    "label": "Root-zone temperature",
+    "tooltip": "The temperature in the substrate of this zone, from the probe in Equipment › Setup."
   },
   "run name": {
     "label": "Run name",

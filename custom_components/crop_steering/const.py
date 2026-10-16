@@ -74,6 +74,13 @@ WATER_TODAY_VIEWS = ["Zone total", "Per plant"]
 # room drains freely, and matches "free_drain" by this id. Unknown, the first, is every room that has
 # not said, which is watched as before.
 DRAINAGE_TYPES = ["unknown", "flood_table", "free_drain"]
+# The runoff estimator (the controller's sump water balance): off, shadow (published only), shown_alerts (also
+# CS-314 when a grow-day's balance does not close), ai (also in the AI assistant's evidence). Each includes the ones
+# before it; none waters from the estimate.
+RUNOFF_ESTIMATOR_MODES = ["off", "shadow", "shown_alerts", "ai"]
+# The shot check (the controller's code-only shot table): off (the AI shot judge only), the table on
+# the zone page, or the table plus CS-701 from code when the AI assistant is off.
+SHOT_CHECK_MODES = ["off", "table", "table_and_alert"]
 # A room's no-touch window: Off, or how long the AI assistant asks nothing and changes nothing there
 # (an operator sampling or visiting). The controller matches these words and sets Off when it ends.
 NO_TOUCH_OPTIONS = ["Off", "1 h", "Until lights-on", "24 h"]
@@ -195,3 +202,9 @@ DEFAULT_RECIPE = {
 SERVICE_SET_MANUAL_OVERRIDE = "set_manual_override"
 SERVICE_APPLY_RECIPE = "apply_recipe"
 SERVICE_SAVE_RECIPE = "save_recipe"
+
+# A zone's P2 mode (select zone_N_p2_mode): the first is the default, moisture-driven P2 as always.
+# The controller maps them to the engine's p2_mode moisture / timed / timed_guarded.
+P2_MODES = ["Moisture", "Timed", "Timed with guards"]
+# Which automatic writers the room's Max setpoint move per day holds; the first is the default.
+SETPOINT_STEP_SCOPES = ["Auto setpoints", "Auto setpoints and AI"]

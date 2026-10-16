@@ -6,6 +6,7 @@ import {
   alignToCurrent,
   chunks,
   DEFAULT_CHOICE,
+  drybackMarkers,
   explorerSensors,
   pickRuns,
   previousWindow,
@@ -237,5 +238,36 @@ describe("the room's sensors", () => {
     expect(
       explorerSensors(room, rest).some((sensor) => sensor.entityId === "sensor.demo_vpd"),
     ).toBe(false);
+  });
+});
+
+describe("the 30 d range and the dryback markers", () => {
+  it("offers 30 d, kept in the address with the dryback overlay", () => {
+    const choice = readChoice("#/zone/1?range=30d&dryback=1");
+    expect(choice.preset).toBe("30d");
+    expect(choice.dryback).toBe(true);
+    expect(readChoice("#/zone/1").dryback).toBe(false);
+    expect(writeChoice("#/zone/1", { ...choice, dryback: false })).not.toContain("dryback");
+    const now = Date.parse("2026-09-28T16:00:00Z");
+    const span = resolveRange(choice, {
+      now,
+      timeZone: "UTC",
+      lightsOn: 6,
+      lightsOff: 18,
+      run: null,
+    })!;
+    expect(span.end - span.start).toBe(30 * DAY);
+  });
+  it("marks each grow day's peak and the low after it, in percent of the peak", () => {
+    const H = 3_600_000;
+    const times = [0, 2, 4, 10, 20, 24, 26, 30, 44].map((h) => h * H);
+    const values = [40, 60, 58, 55, 48, 50, 62, 59, 49.6];
+    const markers = drybackMarkers(times, values, [0, 24 * H]);
+    expect(markers.map((m) => [m.peak.value, m.low.value])).toEqual([
+      [60, 48],
+      [62, 49.6],
+    ]);
+    expect(markers[0].percent).toBeCloseTo(20, 6);
+    expect(drybackMarkers(times, values.map(() => null), [0])).toEqual([]);
   });
 });

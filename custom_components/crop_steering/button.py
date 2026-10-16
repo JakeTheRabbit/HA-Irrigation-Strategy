@@ -29,8 +29,45 @@ async def async_setup_entry(
 ) -> None:
     zones = hass.data[DOMAIN][entry.entry_id].get(CONF_NUM_ZONES, 1)
     async_add_entities(
-        CropSteeringTestShotButton(entry, zone) for zone in range(1, zones + 1)
+        [
+            *(CropSteeringTestShotButton(entry, zone) for zone in range(1, zones + 1)),
+            CropSteeringRoomButton(entry, "stop_all", "Stop all", "mdi:octagon"),
+            CropSteeringRoomButton(
+                entry, "tank_filled", "Tank filled", "mdi:storage-tank"
+            ),
+        ]
     )
+
+
+class CropSteeringRoomButton(ButtonEntity):
+    """A room button. Stop all switches the room's kill switch off and every pump and valve of the room
+    off, here in the integration, so it works with the controller app stopped (safety_ops.py). Tank
+    filled records the press time, which the controller app reads to start its estimated tank level
+    again (only with a tank size given and no level sensor mapped)."""
+
+    def __init__(self, entry: ConfigEntry, key: str, name: str, icon: str) -> None:
+        self._entry, self._key = entry, key
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_{key}"
+        self._attr_name = name
+        self._attr_icon = icon
+        self._attr_object_id = f"{DOMAIN}_{room_prefix(entry)}{key}"
+        self.entity_id = f"button.{self._attr_object_id}"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name="Crop Steering",
+            manufacturer="Home Assistant Community",
+            model="Professional Irrigation Controller",
+            sw_version=SOFTWARE_VERSION,
+        )
+
+    async def async_press(self) -> None:
+        if self._key == "stop_all":
+            from .safety_ops import async_stop_all
+
+            await async_stop_all(self.hass, self._entry, self._context)
 
 
 class CropSteeringTestShotButton(ButtonEntity):

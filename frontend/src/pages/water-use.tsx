@@ -1,6 +1,7 @@
 import { Empty, Heading } from "@/components/dashboard";
 import { DailyWaterSummary } from "@/components/water-delivery";
 import { WaterUsePanel } from "@/components/water-use";
+import { WaterVpdCard } from "@/components/sensing";
 import type { Controller } from "@/lib/types";
 
 /** History › Water use: each zone's litres today, this grow week and since the grow began, the
@@ -14,6 +15,7 @@ export function WaterUsePage({ controller }: { controller: Controller }) {
         <>
           <WaterUsePanel controller={controller} zones={zones} title="Litres by zone" />
           <DailyWaterSummary controller={controller} zones={zones} />
+          <WaterVpdCard controller={controller} />
         </>
       ) : (
         <section className="panel">

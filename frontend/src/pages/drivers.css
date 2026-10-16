@@ -1,0 +1,46 @@
+.dryback-drivers .panel-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.dryback-drivers-pick {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--text-sm);
+}
+.dryback-drivers-chart {
+  height: 360px;
+}
+.dryback-drivers-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.dryback-drivers-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 50%;
+}
+@media (max-width: 720px) {
+  .dryback-drivers-chart {
+    height: 280px;
+  }
+}
+.dryback-drivers > p,
+.dryback-drivers-chart,
+.dryback-drivers-legend {
+  margin-right: 20px;
+  margin-left: 20px;
+}
+.dryback-drivers-legend {
+  padding-bottom: 16px;
+}

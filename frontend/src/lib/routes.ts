@@ -11,6 +11,8 @@ export type Page =
   | "history/timeline"
   | "history/water"
   | "history/compare"
+  | "history/grows"
+  | "history/drivers"
   | "equipment/probes"
   | "equipment/stock"
   | "equipment/feed"
@@ -37,6 +39,8 @@ export const PAGES: readonly Page[] = [
   "history/timeline",
   "history/water",
   "history/compare",
+  "history/grows",
+  "history/drivers",
   "equipment/probes",
   "equipment/stock",
   "equipment/feed",

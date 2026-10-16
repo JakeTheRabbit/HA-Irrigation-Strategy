@@ -1,0 +1,212 @@
+[
+  {
+    "entity": "select.crop_steering_<prefix>zone_<zone>_p2_mode",
+    "label": "P2 mode",
+    "scope": "zone",
+    "kind": "select",
+    "default": "Moisture",
+    "help": "Choose Timed with guards for scheduled shots with a moisture ceiling and floor rescue.",
+    "group": "Phase logic",
+    "id": "NEW-01"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p2_timed_interval_min",
+    "label": "Timed P2 interval",
+    "scope": "zone",
+    "kind": "number",
+    "default": "60",
+    "help": "Minutes between timed shots; only used by a timed P2 mode.",
+    "group": "Phase logic",
+    "id": "NEW-01"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p2_timed_shot_size",
+    "label": "Timed P2 shot size",
+    "scope": "zone",
+    "kind": "number",
+    "default": "0",
+    "help": "Percent of substrate; zero uses the maintenance shot size.",
+    "group": "Phase logic",
+    "id": "NEW-01"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p2_timed_first_hours",
+    "label": "Timed P2 first shot",
+    "scope": "zone",
+    "kind": "number",
+    "default": "0",
+    "help": "Hours after lights-on before scheduled P2 shots can begin.",
+    "group": "Phase logic",
+    "id": "NEW-01"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p2_end_hours_before_off",
+    "label": "P2 ends before lights-off",
+    "scope": "zone",
+    "kind": "number",
+    "default": "0",
+    "help": "Hours before lights-off to enter P3; zero keeps predictive P3.",
+    "group": "Phase logic",
+    "id": "NEW-01"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p0_minimum_wait",
+    "label": "Morning dryback minimum wait",
+    "scope": "zone",
+    "kind": "number",
+    "default": "0",
+    "help": "Minimum minutes in P0; the low moisture bypass remains available.",
+    "group": "Phase logic",
+    "id": "LF-09"
+  },
+  {
+    "entity": "switch.crop_steering_<prefix>p0_stall_exit",
+    "label": "P0 stall exit",
+    "scope": "room",
+    "kind": "switch",
+    "default": "off",
+    "help": "Start P1 when reliable dryback is too slow to finish within the maximum wait.",
+    "group": "Phase logic",
+    "id": "LF-09"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_ec_flush_target",
+    "label": "EC flush target",
+    "scope": "zone",
+    "kind": "number",
+    "default": "0",
+    "help": "Continue budgeted flush shots to this target, with a feed EC floor; zero disables.",
+    "group": "Phase logic",
+    "id": "LF-20"
+  },
+  {
+    "entity": "switch.crop_steering_<prefix>use_p2_ec_thresholds",
+    "label": "Use zone P2 EC ratios",
+    "scope": "room",
+    "kind": "switch",
+    "default": "off",
+    "help": "Use each zone dilute ratio instead of the existing 1.2 ratio.",
+    "group": "Phase logic",
+    "id": "LF-21"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p2_dilute_ratio",
+    "label": "P2 dilute EC ratio",
+    "scope": "zone",
+    "kind": "number",
+    "default": "1.2",
+    "help": "Dilute above this multiple of the P2 EC target when zone ratios are enabled.",
+    "group": "Phase logic",
+    "id": "LF-21"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>setpoint_max_step_per_day",
+    "label": "Max setpoint move per day",
+    "scope": "room",
+    "kind": "number",
+    "default": "1",
+    "help": "Limit automatic moisture setpoint movement in VWC points; zero removes the limit.",
+    "group": "Phase logic",
+    "id": "LF-149"
+  },
+  {
+    "entity": "select.crop_steering_<prefix>setpoint_step_limit_applies_to",
+    "label": "Setpoint step limit applies to",
+    "scope": "room",
+    "kind": "select",
+    "default": "Auto setpoints",
+    "help": "Choose whether the limit also applies to the AI and the learner.",
+    "group": "Phase logic",
+    "id": "LF-149"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p1_maximum_extra_shots",
+    "label": "Maximum extra ramp shots",
+    "scope": "zone",
+    "kind": "number",
+    "default": "3",
+    "help": "Choose 1 to 30 extra ramp shots; also raise Maximum ramp shots and retain the daily cap.",
+    "group": "Phase logic",
+    "id": "LF-155"
+  },
+  {
+    "label": "Timed P2 interval (room default)",
+    "group": "Phase logic",
+    "id": "NEW-01",
+    "help": "Minutes between timed shots; only used by a timed P2 mode.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p2_timed_interval_min",
+    "scope": "room",
+    "default": "60"
+  },
+  {
+    "label": "Timed P2 shot size (room default)",
+    "group": "Phase logic",
+    "id": "NEW-01",
+    "help": "Percent of substrate; zero uses the maintenance shot size.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p2_timed_shot_size",
+    "scope": "room",
+    "default": "0"
+  },
+  {
+    "label": "Timed P2 first shot (room default)",
+    "group": "Phase logic",
+    "id": "NEW-01",
+    "help": "Hours after lights-on before scheduled P2 shots can begin.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p2_timed_first_hours",
+    "scope": "room",
+    "default": "0"
+  },
+  {
+    "label": "P2 ends before lights-off (room default)",
+    "group": "Phase logic",
+    "id": "NEW-01",
+    "help": "Hours before lights-off to enter P3; zero keeps predictive P3.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p2_end_hours_before_off",
+    "scope": "room",
+    "default": "0"
+  },
+  {
+    "label": "Morning dryback minimum wait (room default)",
+    "group": "Phase logic",
+    "id": "LF-09",
+    "help": "Minimum minutes in P0; the low moisture bypass remains available.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p0_minimum_wait",
+    "scope": "room",
+    "default": "0"
+  },
+  {
+    "label": "EC flush target (room default)",
+    "group": "Phase logic",
+    "id": "LF-20",
+    "help": "Continue budgeted flush shots to this target, with a feed EC floor; zero disables.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>ec_flush_target",
+    "scope": "room",
+    "default": "0"
+  },
+  {
+    "label": "P2 dilute EC ratio (room default)",
+    "group": "Phase logic",
+    "id": "LF-21",
+    "help": "Dilute above this multiple of the P2 EC target when zone ratios are enabled.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p2_dilute_ratio",
+    "scope": "room",
+    "default": "1.2"
+  },
+  {
+    "label": "Maximum extra ramp shots (room default)",
+    "group": "Phase logic",
+    "id": "LF-155",
+    "help": "Choose 1 to 30 extra ramp shots; also raise Maximum ramp shots and retain the daily cap.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p1_maximum_extra_shots",
+    "scope": "room",
+    "default": "3"
+  }
+]

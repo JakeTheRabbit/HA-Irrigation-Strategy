@@ -47,6 +47,19 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="Max-run latch",
         icon="mdi:timer-lock",
     ),
+    # Opt-in, OFF: P0 starts the ramp early when its dryback is too slow to finish before the
+    # maximum wait.
+    SwitchEntityDescription(
+        key="p0_stall_exit",
+        name="P0 stall exit",
+        icon="mdi:timer-play",
+    ),
+    # Opt-in, OFF: P2 dilutes at each zone's own P2 dilute EC ratio. Off: the engine's 1.2, as always.
+    SwitchEntityDescription(
+        key="use_p2_ec_thresholds",
+        name="Use P2 EC ratios",
+        icon="mdi:arrow-up-bold",
+    ),
     SwitchEntityDescription(
         key="ec_stacking_enabled",
         name="EC stacking",
@@ -58,6 +71,14 @@ BASE_SWITCH_DESCRIPTIONS = [
         key="notify_predictions",
         name="Predictions in notifications",
         icon="mdi:crystal-ball",
+    ),
+    # OFF until an administrator sets it to on: the zone page then shows each zone's Test shot and
+    # the state of the room's mapped valves, pump and lights (read-only). A test shot still runs
+    # through the controller's full shot sequence; this switch opens nothing itself.
+    SwitchEntityDescription(
+        key="manual_hardware_enabled",
+        name="Hardware panel on zone pages",
+        icon="mdi:valve",
     ),
     # Opt-in, OFF on new and updated rooms. ON: the controller sends each zone's grow-day summary to the
     # room's grow-day store at lights-on (grow_day_store.py), so grows stay comparable after the recorder
@@ -82,6 +103,20 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="Auto irrigation enabled (retired)",
         icon="mdi:auto-mode",
         entity_registry_visible_default=False,
+    ),
+    # Opt-in, OFF on new and updated rooms. ON: the controller keeps each zone's grow-day records of
+    # litres, quiet dryback rate and VPD, and publishes how its drying answers VPD (read only).
+    SwitchEntityDescription(
+        key="water_vpd_insight",
+        name="Water vs VPD",
+        icon="mdi:chart-scatter-plot",
+    ),
+    # Opt-in, OFF. ON shows the plant-stress card (leaf minus air temperature, leaf VPD) where a
+    # leaf temperature sensor is mapped. Display only.
+    SwitchEntityDescription(
+        key="plant_stress_card",
+        name="Plant stress card",
+        icon="mdi:leaf",
     ),
     # Opt-in, OFF on new and updated rooms: pH auto-correct of the batch tank and dimming the
     # lights on dry substrate (ph_and_dim.py, docs/DOSING.md).
@@ -149,6 +184,11 @@ async def async_setup_entry(
 
     # Add base switches
     for description in BASE_SWITCH_DESCRIPTIONS:
+        switches.append(CropSteeringSwitch(entry, description))
+    # Safety and operations (safety_ops.py): off, as the room was.
+    from .safety_ops import SWITCHES
+
+    for description in SWITCHES:
         switches.append(CropSteeringSwitch(entry, description))
 
     # Named rooms and new default rooms receive an engine switch, initially OFF.
@@ -370,6 +410,14 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on directly; a manual hold stays on until explicitly cleared."""
+        if self.entity_description.key == "manual_hardware_enabled":
+            from .admin import async_require_admin
+
+            context = self._context
+            if context is not None:
+                await async_require_admin(
+                    self.hass, context_call(context), self.entity_id
+                )
         self._cancel_override_timer()
         self._override_deadline = None
         self._attr_is_on = True
@@ -386,3 +434,14 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
     def available(self) -> bool:
         """Return if switch is available."""
         return True
+
+
+def context_call(context):
+    """A stand-in for a service call carrying `context`, for async_require_admin."""
+
+    class _Call:
+        pass
+
+    call = _Call()
+    call.context = context
+    return call
