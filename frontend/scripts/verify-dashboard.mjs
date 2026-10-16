@@ -127,7 +127,7 @@ async function inBothThemes(label, open) {
       await page.evaluate(() => document.documentElement.classList.contains("dark")),
       theme === "dark",
     );
-    // Colours transition (even at reduced motion); measure after two frames, not mid-change.
+    // Let the reopened view reach its next paint before measuring.
     await page.evaluate(
       () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
     );
@@ -2497,6 +2497,28 @@ try {
       assert.ok(terms.includes(term), `the glossary has ${term}`);
     for (const gone of ["ol.daily-routine", ".specialist-links", ".help-note"])
       assert.equal(await page.locator(gone).count(), 0, `no ${gone}`);
+  });
+  await check("reduced motion: theme text changes without transient light colours", async () => {
+    await go("zone/1");
+    await expectVisible(page.locator(".zone-jev-what strong").first());
+    // Without a declared transition, CSS defaults transition-property to `all`. Giving every
+    // element even a tiny duration creates staggered inherited colour transitions during themes.
+    // Reduced motion must change the panel's text together with the root, in the same style flush.
+    for (const dark of [false, true, false]) {
+      const colours = await page.evaluate((value) => {
+        document.documentElement.classList.toggle("dark", value);
+        const probe = document.createElement("span");
+        probe.style.color = "var(--foreground)";
+        document.body.append(probe);
+        const palette = getComputedStyle(probe).color;
+        probe.remove();
+        return {
+          root: palette,
+          text: getComputedStyle(document.querySelector(".zone-jev-what strong")).color,
+        };
+      }, dark);
+      assert.equal(colours.text, colours.root, "theme text follows its root without a colour transition");
+    }
   });
   await check("dark theme persists and remains accessible", async () => {
     await go("settings");

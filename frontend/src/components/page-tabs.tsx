@@ -19,6 +19,7 @@ export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
     { page: "history/timeline", label: "Timeline" },
     { page: "history/water", label: "Water use" },
     { page: "history/compare", label: "Compare runs" },
+    { page: "history/grows", label: "Grows" },
     // Settings › Display › Dryback drivers: hidden while that is off.
     { page: "history/drivers", label: "Dryback drivers" },
   ],

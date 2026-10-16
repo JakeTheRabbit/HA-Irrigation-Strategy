@@ -1,3 +1,4 @@
+import { GrowsDemo } from "./grows-demo";
 import { RunDemo } from "./comparison-demo";
 import { DosingDemo } from "./dosing-demo";
 import { NotifyDemo } from "./notify-demo";
@@ -27,6 +28,7 @@ import { DISPLAY_DEFAULTS, displayEntityId, readDisplay, type DisplayOptions } f
 const clone = <T>(value: T): T => structuredClone(value);
 export class OperatorDemo {
   private runDemo?: RunDemo;
+  private growsDemo?: GrowsDemo;
   /** From the start: the tanks drew what the demo's dosing history dosed before it began. */
   private stockDemo: StockDemo;
   private dosingDemo?: DosingDemo;
@@ -473,6 +475,15 @@ export class OperatorDemo {
         question: { id: `demo-${Date.now()}`, question: data.question, zone: data.zone ?? null },
         error: null,
       } as T;
+    if (
+      action.startsWith("grow_days_") ||
+      action === "harvests_get" ||
+      action === "runs_set_harvest"
+    ) {
+      this.runDemo ||= new RunDemo(this.getStates);
+      this.growsDemo ||= new GrowsDemo((room_id) => this.runDemo!.call("runs_get", { room_id }));
+      return this.growsDemo.call(action, data) as T;
+    }
     if (action.startsWith("runs_")) {
       this.runDemo ||= new RunDemo(this.getStates);
       return this.runDemo.call(action, data) as T;

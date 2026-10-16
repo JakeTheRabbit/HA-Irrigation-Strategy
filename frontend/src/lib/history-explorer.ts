@@ -157,6 +157,8 @@ export interface Choice {
   /** The ticked sensors' entity ids; null: the zone's own VWC and EC. */
   sensors: string[] | null;
   compare: boolean;
+  /** The grow compared with: a run's id; null for the last grow before this one. */
+  compareRun: string | null;
   shots: boolean;
   phases: boolean;
   /** Each grow day's peak and the low after it, on the zone's VWC (ranges of 14 d at most). */
@@ -168,6 +170,7 @@ export const DEFAULT_CHOICE: Choice = {
   to: null,
   sensors: null,
   compare: false,
+  compareRun: null,
   shots: true,
   phases: true,
   dryback: false,
@@ -193,6 +196,7 @@ export function readChoice(hash: string): Choice {
     sensors:
       sensors === null ? null : sensors.split(",").filter((id) => /^[a-z_]+\.[a-z0-9_]+$/.test(id)),
     compare: query.get("compare") === "1",
+    compareRun: /^[a-zA-Z0-9_-]{1,64}$/.test(query.get("vs") ?? "") ? query.get("vs") : null,
     shots: query.get("shots") !== "0",
     phases: query.get("phases") !== "0",
     dryback: query.get("dryback") === "1",
@@ -203,7 +207,7 @@ export function readChoice(hash: string): Choice {
 export function writeChoice(hash: string, choice: Choice): string {
   const [path, rest = ""] = hash.split("?");
   const query = new URLSearchParams(rest);
-  for (const key of ["range", "from", "to", "s", "compare", "shots", "phases", "dryback"])
+  for (const key of ["range", "from", "to", "s", "compare", "vs", "shots", "phases", "dryback"])
     query.delete(key);
   query.set("range", choice.preset);
   if (choice.preset === "custom" && choice.from !== null && choice.to !== null) {
@@ -212,6 +216,7 @@ export function writeChoice(hash: string, choice: Choice): string {
   }
   if (choice.sensors) query.set("s", choice.sensors.join(","));
   if (choice.compare) query.set("compare", "1");
+  if (choice.compare && choice.compareRun) query.set("vs", choice.compareRun);
   if (!choice.shots) query.set("shots", "0");
   if (!choice.phases) query.set("phases", "0");
   if (choice.dryback) query.set("dryback", "1");
