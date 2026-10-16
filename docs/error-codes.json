@@ -306,6 +306,25 @@
       ]
     },
     {
+      "code": "CS-210",
+      "title": "Hold entity missing",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The hold entities option of the controller app names one or more entities that Home Assistant does not have. The controller checks them when it starts, before it waters, also while the kill switch is off. The alert names each missing entity.",
+      "watering": "No room gets shots while a hold entity is missing, the same as while a hold is on. The status of each held zone tells which entity is missing. The alert clears by itself when each entity exists.",
+      "causes": [
+        "The entity ID in the option has a typo.",
+        "A person deleted or renamed the helper or switch that the option names."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the rooms in this hold for a long time. The substrate dries out and the plants can wilt.",
+        "Compare each entity that the alert names with the entities in Settings → Entities.",
+        "Correct or remove the entity in the hold entities option of the controller app, and restart the app.",
+        "Or make the missing helper or switch with that entity ID.",
+        "If you removed the entity from the option, dismiss the alert."
+      ]
+    },
+    {
       "code": "CS-301",
       "title": "Hardware fault latch",
       "source": "notification",
