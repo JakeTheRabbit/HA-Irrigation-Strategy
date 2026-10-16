@@ -39,7 +39,7 @@
     {
       "prefix": "CS-8",
       "name": "Dosing",
-      "detail": "Batch tank dosing: a dose or a batch that did not end correctly (docs/DOSING.md)."
+      "detail": "Batch tank dosing: a dose or a batch that did not end correctly (docs/DOSING.md). Also pH auto-correct, and the light dimmed on dry substrate."
     },
     {
       "prefix": "CS-9",
@@ -322,6 +322,26 @@
         "Correct or remove the entity in the hold entities option of the controller app, and restart the app.",
         "Or make the missing helper or switch with that entity ID.",
         "If you removed the entity from the option, dismiss the alert."
+      ]
+    },
+    {
+      "code": "CS-211",
+      "title": "Shots held for too long",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "A zone asked for water, and a hold stopped every shot for longer than the hours that you set (Shots held alert, 0 = off). A hold that a person sets on purpose (the kill switch, a zone switch, manual override) does not count. The alert names the hold.",
+      "watering": "The alert does not change the water. The zone gets no water until the hold clears. The alert comes again every 30 minutes, and clears at the next shot of the zone.",
+      "causes": [
+        "The source-water gate holds the shots: the feed pH or feed EC is outside its band, or the feed probe is dead.",
+        "A hardware hold after a pump or valve fault (CS-301), a hold entity that is on, or a batch or a dose that holds the room.",
+        "A pump or valve that reads neither on nor off."
+      ],
+      "fixes": [
+        "CAUTION: Do not ignore this alert. The zone gets no water, and the substrate can dry out.",
+        "Read the hold in the alert, and remove it.",
+        "If the feed pH or EC is outside its band, correct the tank, or turn on pH auto-correct.",
+        "If you cannot remove the hold soon, water the zone by hand.",
+        "To change the hours, or to turn the alert off, set Shots held alert in the settings of the room."
       ]
     },
     {
@@ -1372,6 +1392,63 @@
         "Calibrate the feed probe, or connect it again.",
         "Set the probe to report mS/cm or µS/cm, not ppm.",
         "Make the next batch by hand."
+      ]
+    },
+    {
+      "code": "CS-809",
+      "title": "Tank pH not corrected",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "pH auto-correct is on, and the batch tank read outside the feed pH band of the room. A correction did not bring the tank into the band: a dose did not move the pH, the pH went past the other side of the band, the probe could not be read after the mix, the doses were not enough, or the correction stopped. Or the controller could not start a correction (for example no pump has the pH role, there is no mixing pump, or the doses of the day are used).",
+      "watering": "The source-water gate holds the shots while the feed pH is outside its band. After a failed correction, pH auto-correct is locked for this tank: it doses no more until a person switches it off and on again, or the tank is filled again.",
+      "causes": [
+        "The pH probe needs calibration, or it is dirty or offline.",
+        "The pH pump is empty, blocked, or not calibrated.",
+        "The pH adjuster is too weak or too strong for the dose size.",
+        "No dosing pump has the pH up or pH down role, or the tank has no mixing pump."
+      ],
+      "fixes": [
+        "WARNING: Wear gloves and eye protection when you touch the batch tank or a pH adjuster. pH adjusters can injure the skin and the eyes.",
+        "Measure the tank with a hand-held meter, and correct it by hand.",
+        "Calibrate or clean the pH probe.",
+        "Check the pH pump, its stock and its calibration.",
+        "Change the dose length or the number of doses in the pH auto-correct settings of the room.",
+        "Switch pH auto-correct off and on again to unlock it."
+      ]
+    },
+    {
+      "code": "CS-810",
+      "title": "Lights dimmed on dry substrate",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Dimming on dry substrate is on. A zone read under the dry floor with the lights on, and the controller dimmed the light of the room. Or the controller set the light back, or another controller changed the light while it was dimmed, so the controller no longer dims or restores it.",
+      "watering": "The alert does not change the water. A dimmed light slows the drying of the substrate. The controller never switches a light off or on, and never dims below 30%.",
+      "causes": [
+        "A hold stops the shots of a zone, the tank is empty, or a dripper is blocked.",
+        "The dry floor is too high for the substrate.",
+        "Another automation or a person changed the light while it was dimmed."
+      ],
+      "fixes": [
+        "Find out why the zone is dry, and water it.",
+        "Check the brightness of the light.",
+        "Change the dry floor, the dim level or the delay in the settings of the room, or switch dimming off."
+      ]
+    },
+    {
+      "code": "CS-811",
+      "title": "Light dimmed too long",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "The light of the room stayed dimmed for the longest time that you set (4 h by default), and the controller set it back. Or the light did not come back to its brightness when the controller asked.",
+      "watering": "The alert does not change the water. The zone that was dry is probably still dry.",
+      "causes": [
+        "A hold stops the shots of a zone for a long time.",
+        "The light is offline, or does not accept a brightness."
+      ],
+      "fixes": [
+        "CAUTION: Do not ignore this alert. The substrate of the zone is dry.",
+        "Find out why the zone is dry, and water it by hand if needed.",
+        "Check the light, and set its brightness by hand."
       ]
     },
     {

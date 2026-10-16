@@ -120,6 +120,7 @@
 - CS-208 Retired switch is off: System Enabled and Auto Irrigation Enabled are retired. Does: The room gets no shots.
 - CS-209 No shots for some hours: The room is on, its lights are on, and one or more zones are in P1 or P2. Does: The alert does not change the water.
 - CS-210 Hold entity missing: The hold entities option of the controller app names one or more entities that Home Assistant does not have. Does: No room gets shots while a hold entity is missing, the same as while a hold is on.
+- CS-211 Shots held for too long: A zone asked for water, and a hold stopped every shot for longer than the hours that you set (Shots held alert, 0 = off). Does: The alert does not change the water.
 - CS-301 Hardware fault latch: A pump or a valve did not read back off after the controller closed it. Does: No shot starts on that hardware, in each room that shares it, until the hold clears.
 - CS-302 Pump command error: Home Assistant returned an error when the controller tried to start the pump. Does: The controller cancels the shot and does not count it.
 - CS-303 Main-line valve command error: Home Assistant returned an error when the controller tried to start the main-line valve. Does: The controller cancels the shot and does not count it.
@@ -175,6 +176,9 @@
 - CS-806 Stopped batch or dose: A batch stopped before its end, or a dose needs a check. Does: The controller sets all the dosing pumps, the fill valve, the mix pump and the mix valves to off.
 - CS-807 Stock draw not recorded: A dose took nutrient from a stock tank, but Home Assistant did not record the draw. Does: Water continues as usual.
 - CS-808 Batch mix outside band: After the mix of a batch stopped, the controller waited 5 min and read the tank with the feed EC and feed pH probes. Does: The mix check never holds the water.
+- CS-809 Tank pH not corrected: pH auto-correct is on, and the batch tank read outside the feed pH band of the room. Does: The source-water gate holds the shots while the feed pH is outside its band.
+- CS-810 Lights dimmed on dry substrate: Dimming on dry substrate is on. Does: The alert does not change the water.
+- CS-811 Light dimmed too long: The light of the room stayed dimmed for the longest time that you set (4 h by default), and the controller set it back. Does: The alert does not change the water.
 - CS-901 Tank at minimum level: The tank level of this room is 8% or less, or its low float switch reads low. Does: The controller holds each zone of the room, so the pump does not run dry.
 - CS-902 Tank level not readable: The tank level of this room gives no usable reading, or the distance sensor seems stuck. Does: The controller holds each zone of the room until the level reads again, or until a stuck sensor moves.
 - CS-903 Refill needed before next shots: One more set of shots, the last shot of each zone, takes the tank to its 8% minimum or below. Does: Water continues.
