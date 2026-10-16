@@ -1,10 +1,8 @@
 """P1: is the morning ramp done?
 
-The base engine ends P1 when VWC reaches the ceiling AND pore EC is within 15 % of the P1 target, or at
-the maximum shots. Observed on a production room (23 Sep 2026): during a ramp the fresh feed passing the
-probe lifts pore EC 30-65 %, the EC gate never passes, and "flush" shots burn the day's budget by 13:00. A
-person looking at the curve knows when the slab is full and the EC is just the feed going by. So does this
-judge.
+The engine ends P1 on its settled-rise test, a below-target stall, the extra-shot cap, the budget at target,
+or maximum shots. Pore EC does not hold the ramp open. This judge can recognise a full or stalled substrate
+sooner, within the envelope's minimum-shot and trusted-probe guards.
 """
 from datetime import timedelta
 
@@ -17,7 +15,7 @@ from .base import Judge, choice, common, with_doctrine
 STATES = {
     "keep_ramping": "The slab is still taking water: each ramp shot still lifts moisture that stays. Keep ramping.",
     "slab_full": "The slab is full: the last shots barely lifted moisture that stays, or it spiked and fell straight back, and moisture is at or near the ramp ceiling. Hand over to maintenance.",
-    "ec_is_feed_front": "Moisture has reached the ceiling and the only thing holding the ramp open is pore EC, which is up because fresh feed is passing the probe right after the shots, not because salt is building. Hand over to maintenance.",
+    "ec_is_feed_front": "Moisture has reached the ceiling; pore EC is up because fresh feed is passing the probe after the shots, not because salt is building. Hand over to maintenance.",
     "real_salt": "Pore EC is genuinely high and not falling after the shots: salt is built up. The ramp only refills the slab; salt leaves in the runoff of the maintenance shots once the slab is full, so hand over and let maintenance flush it.",
     "probe_lagging": "The probe has not caught up with the last shot yet (it reads late): wait before judging.",
     "insufficient_evidence": "The facts do not support any of the other answers.",
@@ -81,8 +79,8 @@ class RampJudge(Judge):
             or ["none recorded yet"],
             "moisture_last_30_min": words_trend(trend(ctx.history, ctx.now, 30)),
             "pore_ec_vs_ramp_target": ("unknown" if ec is None else
-                                       f"{ec:.2f} against a ramp target of {p.ec_target_p1:.2f} "
-                                       f"(the base engine waits for {p.ec_target_p1 * 1.15:.2f} or less)"),
+                                       f"{ec:.2f} against a ramp target of {p.ec_target_p1:.2f}; "
+                                       "pore EC does not gate the engine's P1 exit"),
             "pore_ec_last_hour": words_trend(trend(ctx.history, ctx.now, 60, index=2), "mS/cm", "pore EC"),
         })
         if stalling(ctx):
