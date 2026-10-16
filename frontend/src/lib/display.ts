@@ -13,7 +13,6 @@ export interface DisplayOptions {
   show_climate: boolean;
   show_substrate_temp: boolean;
   zone_day_deltas: boolean;
-  show_hardware: boolean;
   show_equipment_lanes: boolean;
   show_room_day_lanes: boolean;
   show_dryback_drivers: boolean;
@@ -29,7 +28,6 @@ export const DISPLAY_DEFAULTS: DisplayOptions = {
   show_climate: false,
   show_substrate_temp: false,
   zone_day_deltas: false,
-  show_hardware: false,
   show_equipment_lanes: false,
   show_room_day_lanes: false,
   show_dryback_drivers: false,
