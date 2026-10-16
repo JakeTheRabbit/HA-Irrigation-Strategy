@@ -206,6 +206,13 @@ def p1_target(learn, vwc, phase):
     return round(working_peak(learn) + (PROBE_STEP_PTS if learn["hold_days"] == 0 else 0.0), 1)
 
 
+def p2_band(learn, p2_shot_size):
+    """How far under its peak a zone re-waters: what a P2 shot lifts it by from the learned gain, or
+    DEFAULT_BAND_PTS until the gain is known."""
+    gain = learn.get("gain")
+    return gain * p2_shot_size if gain else DEFAULT_BAND_PTS
+
+
 def working_peak(learn):
     """The learned ceiling, plus whatever the judge has asked to hold it above or below."""
     return learn["peak"] + learn["peak_adj"]
@@ -273,8 +280,7 @@ def wanted(learn, current, vwc, phase, plan_ctx, others=()):
                         "shots_today": plan_ctx["shots_today"], "feed_ec": 0.0}, ec_seen_max=0.0)
         want["p2_vwc_threshold"] = d["p2_vwc_threshold"]
     else:
-        band = learn["gain"] * current["p2_shot_size"] if learn["gain"] else DEFAULT_BAND_PTS
-        want["p2_vwc_threshold"] = round(working_peak(learn) - band, 1)
+        want["p2_vwc_threshold"] = round(working_peak(learn) - p2_band(learn, current["p2_shot_size"]), 1)
     if "p2_vwc_threshold" in want:  # the rescue level is never moved: the trigger keeps the ladder over it
         want["p2_vwc_threshold"] = max(want["p2_vwc_threshold"],
                                        round(current["p3_emergency_vwc_threshold"] + LADDER_PTS, 1))

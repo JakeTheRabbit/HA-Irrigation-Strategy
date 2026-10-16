@@ -472,16 +472,127 @@ try {
     });
     await go("today");
     await page.locator(".today-spark").first().waitFor();
+    const strip = page.locator("[data-run-progress]");
+    await strip.waitFor();
     await page
       .waitForFunction(() => document.documentElement.scrollHeight <= 2 * innerHeight, null, {
         timeout: 3_000,
       })
       .catch(() => {});
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    assert.ok(height <= 2 * 844, `Today is ${height}px tall on a 844px phone`);
+    // The run strip sits above the zones and adds its own height; the rest keeps its two screens.
+    const run = await strip.evaluate((el) => el.getBoundingClientRect().height + 16);
+    assert.ok(run <= 190, `the run strip is ${run}px tall on a phone`);
+    assert.ok(height - run <= 2 * 844, `Today is ${height}px tall on a 844px phone`);
     await noOverflow();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
+  await check(
+    "today: the run strip shows the day, the phases, the grow plan and the feed recipe",
+    async () => {
+      await go("today");
+      const strip = page.locator('[data-run-progress="running"]');
+      await expectVisible(strip);
+      // The demo run started 14 days ago; the demo grow plan runs 84 days in four phases.
+      const figure = (name) => strip.locator(`[data-run-figure="${name}"]`).innerText();
+      assert.match(await figure("day"), /^Day\s+15 of 84$/);
+      assert.match(await figure("done"), /^Done\s+14$/);
+      assert.match(await figure("left"), /^Left\s+70$/);
+      assert.match(await figure("end"), /^Harvest\s+\S+/);
+      const bar = strip.getByRole("progressbar", { name: "Run progress" });
+      assert.deepEqual(
+        await bar.evaluate((el) =>
+          ["aria-valuemin", "aria-valuenow", "aria-valuemax"].map((name) => el.getAttribute(name)),
+        ),
+        ["0", "14", "84"],
+      );
+      assert.equal(
+        await bar.getAttribute("aria-valuetext"),
+        "Day 15 of 84: 14 days done, 70 days left",
+      );
+      const phases = strip.getByRole("list", { name: "Phases of the grow" }).getByRole("listitem");
+      assert.deepEqual(
+        await phases.evaluateAll((items) =>
+          items.map((item) => [
+            item.querySelector(".run-phase-full").textContent,
+            item.getAttribute("aria-current"),
+          ]),
+        ),
+        [
+          ["20% generative", null],
+          ["70% generative", "step"],
+          ["40% generative", null],
+          ["60% generative", null],
+        ],
+      );
+      // Each phase is as wide as its days: 14, 21, 28 and 21 of 84.
+      const widths = await phases.evaluateAll((items) =>
+        items.map((item) => item.getBoundingClientRect().width),
+      );
+      const whole = widths.reduce((sum, width) => sum + width, 0);
+      [14, 21, 28, 21].forEach((days, index) =>
+        assert.ok(Math.abs(widths[index] / whole - days / 84) < 0.01, `phase ${index + 1} width`),
+      );
+      const recipe = (name) => strip.locator(`[data-run-recipe="${name}"]`).innerText();
+      assert.match(await recipe("plan"), /^Grow plan\s+Unnamed plan · Draft$/);
+      assert.match(await recipe("stage"), /^Stage\s+Flower bulk$/);
+      assert.match(await recipe("feed"), /^Feed\s+Bloom · week 3 of 12 · EC 2\.4 mS\/cm$/);
+      // A tooltip on each element, on keyboard focus too.
+      await phases.nth(1).focus();
+      assert.match(
+        await page.getByRole("tooltip").innerText(),
+        /^Phase 2, days 15 to 35: 70% generative\. The grow plan sets this phase\./,
+      );
+      await strip.locator('[data-run-figure="left"]').focus();
+      assert.match(await page.getByRole("tooltip").innerText(), /^70 days stay in the run\./);
+      await page.keyboard.press("Escape");
+      await page.evaluate(() => document.activeElement?.blur());
+      await strip.screenshot({ path: path.join(out, "run-progress-desktop.png") });
+      await axe("today run strip", '[data-run-progress="running"]');
+      await axeDark("today run strip", '[data-run-progress="running"]');
+      // At 375px the bar stays on the screen and the phases take their short labels.
+      await page.setViewportSize({ width: 375, height: 812 });
+      await go("today");
+      await expectVisible(strip);
+      await noOverflow();
+      const box = await bar.boundingBox();
+      assert.ok(box.x >= 0 && box.x + box.width <= 375, "the bar fits a 375px screen");
+      assert.deepEqual(
+        await phases.evaluateAll((items) =>
+          items.map((item) => [
+            item.querySelector(".run-phase-short").checkVisibility() &&
+              item.querySelector(".run-phase-short").textContent,
+            item.querySelector(".run-phase-full").getBoundingClientRect().width <= 1,
+          ]),
+        ),
+        [
+          ["20% G", true],
+          ["70% G", true],
+          ["40% G", true],
+          ["60% G", true],
+        ],
+      );
+      await strip.screenshot({ path: path.join(out, "run-progress-mobile.png") });
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      // A room with no run in progress: one line, and the way to add one.
+      await go("settings");
+      const ongoing = page.locator(".comparison-run-list article", { hasText: "Ongoing" });
+      await ongoing.getByRole("button", { name: "Archive" }).click();
+      // An archived run leaves the list.
+      await ongoing.waitFor({ state: "detached" });
+      await page
+        .locator(".desktop-sidebar")
+        .getByRole("button", { name: "Today", exact: true })
+        .click();
+      const empty = page.locator('[data-run-progress="none"]');
+      await expectVisible(empty);
+      assert.equal(await empty.locator("span").innerText(), "No run is active in this room.");
+      assert.equal(await page.getByRole("progressbar", { name: "Run progress" }).count(), 0);
+      await axe("today run strip, no run", '[data-run-progress="none"]');
+      await empty.getByRole("button", { name: "Add a run" }).click();
+      await expectVisible(page.locator("#run-records"));
+    },
+  );
   await check(
     "zone page: the day as a phase reference chart, fitted to today, against yesterday or a typical day",
     async () => {

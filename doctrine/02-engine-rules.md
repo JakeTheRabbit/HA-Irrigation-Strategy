@@ -117,6 +117,7 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 | min_floor_finish_h | 0 | 12 |
 | p1_rise_pts | 0.1 | 5 |
 | p1_max_extra_shots | 1 | 10 |
+| p1_stall_shots | 0 | 10 |
 | p0_additional_dryback | 0 | 40 |
 | p2_time_between_min | 0 | 120 |
 | p2_min_interval_min | 1 | 120 |
