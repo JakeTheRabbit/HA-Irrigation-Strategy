@@ -38,6 +38,18 @@ SETTLED_VWC_MIN = 10.0
 # P0 flushes when pore EC is over this multiple of the P0 EC target, with a shot this size (% of substrate).
 P0_EC_FLUSH_RATIO = 2.5
 P0_EC_FLUSH_SHOT = 10.0
+# P0 stall exit (ZoneParams.p0_stall_exit): judged only once P0 has run this long, and a dryback slower than this
+# (VWC points per hour) counts as stalled. Points/h, as the controller measures dryback_rate.
+P0_STALL_AFTER_MIN = 30.0
+P0_STALL_RATE_FLOOR = 0.1
+# P2 dilutes at pore EC over this multiple of the P2 EC target: the fallback of ZoneParams.p2_dilute_ratio.
+P2_DILUTE_RATIO = 1.2
+# A flush to an EC target (ZoneParams.ec_flush_target) never aims under the feed EC plus this margin: water at the
+# feed's own EC cannot bring the slab below it.
+EC_FLUSH_FEED_MARGIN = 0.2
+# P2 modes (ZoneParams.p2_mode): moisture-driven top-ups (as always), a timer, or a timer with a moisture ceiling and
+# the moisture top-up kept as a floor rescue.
+P2_MODES = ("moisture", "timed", "timed_guarded")
 # ec_adjust's multipliers by pore EC / target, the first row that matches: over the ratio, then under it.
 EC_ADJUST_UP = ((1.5, 2.0), (1.2, 1.5), (1.0, 1.2))
 EC_ADJUST_DOWN = ((0.5, 0.5), (0.8, 0.7))
@@ -70,6 +82,7 @@ CAP_EXEMPT = {
     "p2_rescue": True,  # pore EC within 1 of max_ec
     "p2_dilute": False,
     "p2_topup": False,
+    "p2_timed": False,  # a timed P2 shot (p2_mode timed / timed_guarded): steering, inside the budget
     "p3_emergency": True,
     "p3_hold": False,  # holds the overnight dryback at its target: steering, not a rescue
     "watchdog": True,
@@ -146,6 +159,17 @@ class ZoneParams:
     p0_ec_flush_shot: float = P0_EC_FLUSH_SHOT
     ec_adjust_up: tuple = EC_ADJUST_UP
     ec_adjust_down: tuple = EC_ADJUST_DOWN
+    # Opt-in phase settings. Each default is the rule as it was, so a caller that passes none decides as before.
+    p0_min_wait_min: float = 0.0  # nothing but the P0 bypass ends P0 before this many minutes. 0 = off.
+    p0_stall_exit: bool = False  # P0 starts P1 early when its dryback is too slow to finish before p0_max_wait_min
+    ec_flush_target: float = 0.0  # once an EC flush has fired, budgeted dilute shots go on until the settled pore
+    #                               EC is at or under this (never under the feed EC + EC_FLUSH_FEED_MARGIN). 0 = off.
+    p2_dilute_ratio: float = P2_DILUTE_RATIO  # P2 dilutes at pore EC over this multiple of the P2 EC target
+    p2_mode: str = "moisture"  # one of P2_MODES
+    p2_timed_interval_min: float = 60.0  # timed P2: a shot every this many minutes since the last shot
+    p2_timed_shot_size: float = 0.0  # timed P2 shot size, % of substrate; 0 = p2_shot_size
+    p2_timed_first_h: float = 0.0  # timed P2: no timed shot before this many hours after lights-on
+    p2_end_h_before_off: float = 0.0  # P1/P2 hand over to P3 this many hours before lights-off. 0 = off (as before)
 
 
 @dataclass
@@ -191,6 +215,8 @@ class ZoneSnapshot:
     #                         caller counts them; p1_stall adds the last one)
     p1_probe_suspect: bool = False  # the caller doubts this probe today (water bypassing it, CS-710, or a flat
     #                                 reading): a ramp that does not rise is then not read as a stalled slab
+    ec_flushing: bool = False  # an EC flush fired and the zone has not reached its ec_flush_target yet (the caller
+    #                            latches it, and clears it at the target, at lights-off and at lights-on)
 
 
 def settled_reading(readings):
@@ -238,6 +264,40 @@ def p1_stall_rewater(stalled_at: float, p2_threshold: float, band: float) -> flo
 def p0_dryback(p: ZoneParams) -> float:
     """PURE. How far below the highest reading since lights-on P0 lets a zone dry before the ramp starts."""
     return p.p0_additional_dryback if p.p0_additional_dryback > 0 else p.dryback_target
+
+
+def p0_stalled(s: ZoneSnapshot, p: ZoneParams) -> bool:
+    """PURE. The P0 stall exit (p0_stall_exit): after P0_STALL_AFTER_MIN of P0, the dryback is drying slower than
+    P0_STALL_RATE_FLOOR points/h, or at its measured rate it would not reach its target before p0_max_wait_min. Never
+    while the probe is in doubt (a flat or bypassed reading fakes a stall) or the table is backing up."""
+    if not p.p0_stall_exit or s.phase_minutes < P0_STALL_AFTER_MIN or s.p1_probe_suspect or s.backed_up:
+        return False
+    if s.peak_vwc <= 0:
+        return False
+    rate = s.dryback_rate if s.dryback_rate and math.isfinite(s.dryback_rate) else 0.0
+    if rate < P0_STALL_RATE_FLOOR:
+        return True
+    remaining = max(0.0, s.vwc - s.peak_vwc * (1.0 - p0_dryback(p) / 100.0))
+    return s.phase_minutes + remaining / rate * 60.0 > p.p0_max_wait_min
+
+
+def ec_flush_goal(s: ZoneSnapshot, p: ZoneParams) -> float | None:
+    """PURE. The pore EC a flush episode stops at (ec_flush_target), never under the feed EC + EC_FLUSH_FEED_MARGIN;
+    None when the target is off."""
+    if not p.ec_flush_target or p.ec_flush_target <= 0:
+        return None
+    feed = s.feed_ec if s.feed_ec is not None and math.isfinite(s.feed_ec) else 0.0
+    return max(p.ec_flush_target, feed + EC_FLUSH_FEED_MARGIN)
+
+
+def p2_timed_size(p: ZoneParams) -> float:
+    """PURE. The size of a timed P2 shot: its own, or the maintenance shot size when it is 0."""
+    return p.p2_timed_shot_size if p.p2_timed_shot_size and p.p2_timed_shot_size > 0 else p.p2_shot_size
+
+
+def p2_timed_ceiling(p: ZoneParams) -> float:
+    """PURE. Guarded timed P2 skips a slot while VWC is at or over this: the P1 target, or field capacity - 2."""
+    return min(p.p1_target, p.field_capacity - 2.0)
 
 
 def floor_share(s: ZoneSnapshot, p: ZoneParams) -> float:
@@ -326,11 +386,19 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
         # running across lights-off, or the schedule moved): today starts at P0 with its own budget and
         # counters, instead of carrying yesterday's spent budget through the whole day.
         phase, treason = "P0", "new grow-day -> P0 (reset)"
+    elif phase in ("P1", "P2") and p.p2_end_h_before_off > 0 and s.hours_to_lights_off <= p.p2_end_h_before_off:
+        # Timed P2 end (opt-in): the day's watering ends this long before lights-off, whatever moisture reads.
+        phase, treason = "P3", f"timed P2 end {s.hours_to_lights_off:.1f}h<={p.p2_end_h_before_off:g}h to lights-off"
     elif phase == "P0":
+        # The bypass first: a zone already at its re-water point never waits out the minimum wait.
         if s.vwc <= p.p2_threshold:
             phase, treason = "P1", f"P0 bypass VWC {s.vwc:.0f}<=rewater {p.p2_threshold:.0f}"
+        elif s.phase_minutes < p.p0_min_wait_min:
+            pass  # the minimum wait (opt-in): nothing else ends P0 before it
         elif s.dryback_pct >= p0_dryback(p):
             phase, treason = "P1", f"P0 dryback done {s.dryback_pct:.0f}%"
+        elif p0_stalled(s, p):
+            phase, treason = "P1", f"P0 stalled: dryback {s.dryback_rate:.2f} pts/h too slow to finish"
         elif s.phase_minutes >= p.p0_max_wait_min:
             phase, treason = "P1", f"P0 timeout {s.phase_minutes:.0f}min"
     elif phase == "P1":
@@ -364,8 +432,8 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
             what = "settled reading" if s.vwc_settled is not None and s.p1_settled_before_shot is not None else "peak"
             phase, treason = "P2", f"P1 full: the last shot raised the {what} {max(rise, 0.0):.1f} (< {round(need, 2):g})"
     elif phase == "P2":
-        # predictive P3: only if starting dryback NOW would finish by lights-on.
-        if s.uptime_min >= 10 and s.vwc >= p.p3_emergency_floor and s.hours_to_lights_off <= 3.0:
+        # predictive P3: only if starting dryback NOW would finish by lights-on. A timed P2 end replaces it.
+        if p.p2_end_h_before_off <= 0 and s.uptime_min >= 10 and s.vwc >= p.p3_emergency_floor and s.hours_to_lights_off <= 3.0:
             rate = s.dryback_rate if (s.dryback_rate and s.dryback_rate > 0) else 0.1
             # Target is relative % of detected peak; measured rate is VWC
             # percentage points/hour. Predict only the still-needed point drop.
@@ -444,12 +512,31 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
                 if kind != "hold_backed_up":
                     fire, size = True, ec_adjust(raw, ec, p.ec_target_p1, p.ec_adjust_up, p.ec_adjust_down)
         elif phase == "P2":
+            goal = ec_flush_goal(s, p) if s.ec_flushing else None
+            timed = p.p2_mode in ("timed", "timed_guarded")
+            topup_due = s.vwc < p2_thr and s.minutes_since_shot >= p.p2_time_between_min
+            topup = ec_adjust(p.p2_shot_size, ec, p.ec_target_p2, p.ec_adjust_up, p.ec_adjust_down)
             if ec_known and ec >= p.max_ec - 1.0 and flush_ok and ec_gap_ok:
                 fire, size, ir, kind = True, p.p2_shot_size * 1.5, f"P2 rescue flush EC {ec:.1f}", "p2_rescue"
-            elif ec_known and p.ec_target_p2 > 0 and ec / p.ec_target_p2 > 1.2 and dilutive and ec_gap_ok:
+            elif ec_known and p.ec_target_p2 > 0 and ec / p.ec_target_p2 > p.p2_dilute_ratio and dilutive and ec_gap_ok:
                 fire, size, ir, kind = True, p.p2_shot_size * 1.5, f"P2 dilute EC {ec:.1f}", "p2_dilute"
-            elif s.vwc < p2_thr and s.minutes_since_shot >= p.p2_time_between_min:
-                fire, size, ir, kind = True, ec_adjust(p.p2_shot_size, ec, p.ec_target_p2, p.ec_adjust_up, p.ec_adjust_down), f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}", "p2_topup"
+            elif goal is not None and ec_known and ec > goal and flush_ok and ec_gap_ok:
+                # A flush episode carries on to its target: budgeted dilute shots, gated as every other flush.
+                fire, size, ir, kind = True, p.p2_shot_size * 1.5, f"P2 flush to EC target {ec:.1f}>{goal:.1f}", "p2_dilute"
+            elif timed:
+                ceiling = p2_timed_ceiling(p)
+                slot_open = s.hours_since_lights_on is None or s.hours_since_lights_on >= p.p2_timed_first_h
+                if p.p2_mode == "timed_guarded" and topup_due:  # the floor rescue: the moisture top-up still fires
+                    fire, size, ir, kind = True, topup, f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}", "p2_topup"
+                elif slot_open and s.minutes_since_shot >= p.p2_timed_interval_min:
+                    if p.p2_mode == "timed_guarded" and s.vwc >= ceiling:
+                        ir = f"SKIP timed P2 shot: VWC {s.vwc:.1f}>={ceiling:.1f} (ceiling)"
+                    else:
+                        fire, size, kind = True, p2_timed_size(p), "p2_timed"
+                        ir = (f"P2 timed shot every {p.p2_timed_interval_min:g}min "
+                              f"({s.minutes_since_shot:.0f}min since the last)")
+            elif topup_due:
+                fire, size, ir, kind = True, topup, f"P2 top-up VWC {s.vwc:.0f}<{p2_thr:.0f}", "p2_topup"
     p3_gap = p.p3_time_between_min or 0.0
     if not fire and phase == "P3" and s.vwc < p.p3_emergency_floor and s.minutes_since_shot >= p3_gap:
         fire, size, ir, kind = True, p.p3_emergency_shot, f"P3 emergency VWC {s.vwc:.0f}<{p.p3_emergency_floor:.0f}", "p3_emergency"
@@ -523,6 +610,8 @@ def next_shot_size(s: ZoneSnapshot, p: ZoneParams) -> float:
         raw = min(p.p1_initial + p.p1_incr * count, p.p1_initial + p.p1_incr * p.p1_max_shots)
         return ec_adjust(raw, ec, p.ec_target_p1, p.ec_adjust_up, p.ec_adjust_down)
     if phase == "P2":
+        if p.p2_mode in ("timed", "timed_guarded"):
+            return p2_timed_size(p)
         return ec_adjust(p.p2_shot_size, ec, p.ec_target_p2, p.ec_adjust_up, p.ec_adjust_down)
     return p.p3_emergency_shot
 
@@ -556,12 +645,14 @@ def waiting_for(s: ZoneSnapshot, p: ZoneParams) -> list:
         items.append(item)
 
     if s.phase == "P0":
-        add("p0_timeout", to="P1", in_min=p.p0_max_wait_min - s.phase_minutes)
+        add("p0_timeout", to="P1", in_min=max(p.p0_max_wait_min, p.p0_min_wait_min) - s.phase_minutes)
         add("p0_bypass", to="P1", metric="vwc", op="<=", value=p.p2_threshold, now=s.vwc)
         if s.peak_vwc > 0:
+            wait = p.p0_min_wait_min - s.phase_minutes
             add("p0_dryback", to="P1", metric="vwc", op="<=",
                 value=s.peak_vwc * (1.0 - p0_dryback(p) / 100.0), now=s.vwc,
-                dryback=round(p0_dryback(p), 2), peak=round(s.peak_vwc, 1))
+                dryback=round(p0_dryback(p), 2), peak=round(s.peak_vwc, 1),
+                **({"in_min": round(wait, 1)} if wait > 0 else {}))
     elif s.phase == "P1":
         ceiling = min(p.p1_target, p.field_capacity)
         reached = s.p1_reached or s.vwc >= ceiling
@@ -576,11 +667,21 @@ def waiting_for(s: ZoneSnapshot, p: ZoneParams) -> list:
     elif s.phase == "P2":
         if not s.steering_held:
             gap = p.p2_time_between_min
-            add("p2_topup", shot=True, metric="vwc", op="<", value=p.p2_threshold, now=s.vwc,
-                in_min=gap - s.minutes_since_shot if gap > 0 else None)
+            if p.p2_mode != "timed":  # a pure timer has no moisture top-up
+                add("p2_topup", shot=True, metric="vwc", op="<", value=p.p2_threshold, now=s.vwc,
+                    in_min=gap - s.minutes_since_shot if gap > 0 else None)
+            if p.p2_mode in ("timed", "timed_guarded"):
+                waits = [p.p2_timed_interval_min - s.minutes_since_shot]
+                if s.hours_since_lights_on is not None:
+                    waits.append((p.p2_timed_first_h - s.hours_since_lights_on) * 60.0)
+                extra = {"ceiling": round(p2_timed_ceiling(p), 2)} if p.p2_mode == "timed_guarded" else {}
+                add("p2_timed", shot=True, in_min=max(waits), size=round(p2_timed_size(p), 2), **extra)
             if ec_known and p.ec_target_p2 > 0:
-                add("p2_dilute", shot=True, metric="ec", op=">", value=p.ec_target_p2 * 1.2, now=ec)
-        add("lights_off", to="P3", in_min=s.hours_to_lights_off * 60.0)
+                add("p2_dilute", shot=True, metric="ec", op=">", value=p.ec_target_p2 * p.p2_dilute_ratio, now=ec)
+        if p.p2_end_h_before_off > 0:
+            add("lights_off", to="P3", in_min=(s.hours_to_lights_off - p.p2_end_h_before_off) * 60.0, timed_end=True)
+        else:
+            add("lights_off", to="P3", in_min=s.hours_to_lights_off * 60.0)
     elif s.phase == "P3":
         p3_gap = p.p3_time_between_min or 0.0
         add("p3_emergency", shot=True, metric="vwc", op="<", value=p.p3_emergency_floor, now=s.vwc,
@@ -683,10 +784,13 @@ _PARAM_BOUNDS = {
     "p0_max_wait_min": (5.0, 240.0), "p3_emergency_shot": (0.5, 15.0),
     "max_daily_volume": (10.0, 2000.0), "min_daily_volume": (0.0, 500.0),
     "drown_ceiling": (50.0, 100.0), "min_floor_finish_h": (0.0, 12.0),
-    "p1_rise_pts": (0.1, 5.0), "p1_max_extra_shots": (1.0, 10.0), "p1_stall_shots": (0.0, 10.0),
+    "p1_rise_pts": (0.1, 5.0), "p1_max_extra_shots": (1.0, 30.0), "p1_stall_shots": (0.0, 10.0),
     "p0_additional_dryback": (0.0, 40.0),
     "p2_time_between_min": (0.0, 120.0),
     "p2_min_interval_min": (1.0, 120.0),
+    "p0_min_wait_min": (0.0, 240.0), "ec_flush_target": (0.0, 9.0), "p2_dilute_ratio": (1.0, 3.0),
+    "p2_timed_interval_min": (5.0, 720.0), "p2_timed_shot_size": (0.0, 20.0), "p2_timed_first_h": (0.0, 24.0),
+    "p2_end_h_before_off": (0.0, 12.0),
 }
 
 
@@ -701,6 +805,15 @@ def validate_params(p):
                 nv = int(nv)
             fixes[name] = nv
             warns.append(f"{name}={v:g} out of [{lo:g},{hi:g}] -> clamped to {nv:g}")
+    if p.p2_mode not in P2_MODES:
+        fixes["p2_mode"] = "moisture"
+        warns.append(f"p2_mode={p.p2_mode!s} unknown -> moisture")
+    # the P0 minimum wait never exceeds the maximum wait
+    eff_max_wait = fixes.get("p0_max_wait_min", p.p0_max_wait_min)
+    eff_min_wait = fixes.get("p0_min_wait_min", p.p0_min_wait_min)
+    if eff_min_wait > eff_max_wait:
+        fixes["p0_min_wait_min"] = eff_max_wait
+        warns.append(f"p0_min_wait_min={eff_min_wait:g} > p0_max_wait_min={eff_max_wait:g} -> clamped to {eff_max_wait:g}")
     # the ramp minimum can never exceed the ramp maximum (else P1 could only exit at max shots anyway)
     eff_p1max = int(fixes.get("p1_max_shots", p.p1_max_shots))
     if p.p1_min_shots > eff_p1max:

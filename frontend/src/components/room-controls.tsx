@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Droplets, Power, Sparkles } from "lucide-react";
+import { Droplets, OctagonX, Power, Sparkles } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { ReviewDialog, Status } from "@/components/dashboard";
@@ -163,7 +163,7 @@ export function WateringPower({ controller }: { controller: Controller }) {
 /** The selected room's two safety switches, in the header of every page: its watering and the
  * room itself, each through the same confirmation as in Settings. On a phone, icons with a dot. */
 export function SafetySwitches({ controller }: { controller: Controller }) {
-  const [review, setReview] = useState<"watering" | "room" | null>(null);
+  const [review, setReview] = useState<"watering" | "room" | "stop" | null>(null);
   const { room } = controller;
   if (!controller.roomId) return null;
   const watering = room.engine.enabled;
@@ -221,6 +221,45 @@ export function SafetySwitches({ controller }: { controller: Controller }) {
           <span className="safety-switch-text">{on ? "Room on" : "Room off"}</span>
         </button>
       )}
+      <button
+        type="button"
+        className="safety-switch"
+        data-safety="stop-all"
+        aria-label={`Stop all water in ${room.room.name}…`}
+        title="Sets the kill switch to off, then every pump and valve of this room to off. Works when the controller app is stopped."
+        disabled={!["live", "demo"].includes(controller.connection)}
+        onClick={() => setReview("stop")}
+      >
+        <OctagonX size={15} aria-hidden="true" />
+        <span className="safety-switch-text">Stop all</span>
+      </button>
+      <ReviewDialog
+        open={review === "stop"}
+        onOpenChange={(open) => setReview(open ? "stop" : null)}
+        controller={controller}
+        title={`Stop all water in ${room.room.name}?`}
+        items={
+          room.engine.entityId
+            ? [
+                {
+                  change: { entityId: room.engine.entityId, value: false },
+                  label: `${room.room.name} watering`,
+                  before: watering === false ? "Off" : "On",
+                  after: "Off",
+                },
+              ]
+            : []
+        }
+        note="The kill switch goes to off first. Then the pump, the main-line valve, the waste valve and every zone valve of this room go to off, and each one is read back. Nothing is switched on. To water again, set the watering switch to on."
+        caution="CAUTION: A pump that this room shares with another room or with the batch tank also stops."
+        run={async () => {
+          const result = await controller.operator<{ still_on?: string[] }>("stop_all", {
+            room_id: "room:" + controller.room.room.prefix,
+          });
+          if (result?.still_on?.length)
+            throw new Error(`Still not off: ${result.still_on.join(", ")}. Stop them by hand now.`);
+        }}
+      />
       <WateringDialog
         controller={controller}
         open={review === "watering"}

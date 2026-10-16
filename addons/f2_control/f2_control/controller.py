@@ -41,9 +41,11 @@ import dry_dim
 import brain_bridge
 import gate_report
 import log_words
+import phase_options
 import plan_adherence
 import runoff_balance
 import runtime_env
+import safety_ops
 import sensing
 import shot_audit
 from brain import client as jev_client
@@ -70,7 +72,7 @@ from crop_steering_engine import (
     zone_status_label,
     settled_reading,
 )
-from crop_steering_engine.core import SETTLED_VWC_MIN, p1_stall, p1_stall_rewater
+from crop_steering_engine.core import SETTLED_VWC_MIN, ec_flush_goal, p1_stall, p1_stall_rewater
 # What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
 # controller column of the one defaults table, pinned to the values installed controllers use.
 from crop_steering_engine.defaults import CONTROLLER_FALLBACKS as FALLBACK
@@ -698,14 +700,14 @@ EVENTS_BUDGET_S = 10.0
 # The codes whose severity is critical in docs/error-codes.json (tests/test_error_codes.py keeps the two equal):
 # their push is urgent, a high-priority one on a phone whose row asks for that.
 CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-211", "CS-301", "CS-308",
-                            "CS-310", "CS-311", "CS-402", "CS-601", "CS-606", "CS-801", "CS-809", "CS-811",
-                            "CS-901", "CS-902"})
+                            "CS-310", "CS-311", "CS-315", "CS-402", "CS-601", "CS-606", "CS-801", "CS-809",
+                            "CS-811", "CS-901", "CS-902"})
 # How often a standing alert pushes again, by its severity in docs/error-codes.json (tests/test_error_codes.py
 # keeps INFO_CODES equal to the info codes): a critical code, or a warning that means a zone is not being watered,
 # every 30 minutes for as long as it lasts; any other warning after 15 minutes, then 1, 2 and 4 hours, then every
 # 8 hours; an info code once. Each episode starts the schedule again: an alert cleared (or not raised for
 # ALERT_EPISODE_GAP_S) and raised again, or raised under another code. Held in memory only: a restart pushes once.
-NOT_WATERING_CODES = frozenset({"CS-206", "CS-208", "CS-209", "CS-210", "CS-602"})
+NOT_WATERING_CODES = frozenset({"CS-206", "CS-208", "CS-209", "CS-210", "CS-316", "CS-602"})
 INFO_CODES = frozenset({"CS-205", "CS-305", "CS-403", "CS-501", "CS-702", "CS-705", "CS-711", "CS-712", "CS-906"})
 WARNING_REPUSH_MIN = (15, 60, 120, 240, 480)
 ALERT_EPISODE_GAP_S = 3600
@@ -720,7 +722,7 @@ BACKUP_RISE_PTS, BACKUP_WINDOW_MIN, BACKUP_GRACE_MIN, BACKUP_CLEAR_MIN = 3.0, 60
 # The room's substrate profile sets it (fc_shift_min); this is the generic profile's.
 FC_SHIFT_MIN = SUBSTRATE_PROFILES["generic"]["fc_shift_min"]
 # The most the follower moves any one setpoint in a grow-day, in points: a drifting probe or a flood can only drag the
-# ladder this far a day.
+# ladder this far a day. The fallback of the room's Max setpoint move per day (_step_limit).
 FC_STEP_MAX = 1.0
 FC_LADDER = ("field_capacity", "p1_target_vwc", "p2_vwc_threshold")  # what the follower moves
 # The Vmax advisory's P1 wet-up series is kept in state.json (per zone) with at most this many readings.
@@ -732,6 +734,11 @@ VMAX_SERIES_MAX = 40
 # Pump Run Threshold, or SUMP_RUN_W where the integration has no such setting (compared in W, whatever unit the
 # plug reports: _device_history).
 SUMP_SILENT_H, SUMP_CHECK_MIN, SUMP_RUN_W = 3.0, 5.0, 20.0
+# CS-317: the pump (option pump_power_sensor) draws more than the room's Pump Dead-Head Power with every zone
+# valve of the room reading off for this long, outside a shot, a hold or a batch. It only tells.
+DEADHEAD_S, DEADHEAD_W = 60.0, 20.0
+# The room's waste-valve rule (select waste_valve_rule): Off (as before), Check closed, Close for each shot.
+WASTE_CHECK, WASTE_CLOSE = "Check closed", "Close for each shot"
 # The runoff estimator (runoff_balance.py, select runoff_estimator, off by default): the sump's runs and each mapped AC
 # and dehumidifier's run time are read from Home Assistant's history every RUNOFF_CHECK_MIN (RUNOFF_FIRST_H back the
 # first time) and the balance refitted every RUNOFF_FIT_MIN. A unit mapped by its power counts as running above the
@@ -857,11 +864,12 @@ def next_text(conditions, at):
             f"P2 at {test(done, '%', 'VWC')}{shots}{ec}" + (f", or after {more(most, 'ramp shot')}" if most else "")
         )
         return " · ".join(parts)
-    topup, off = find("p2_topup"), find("lights_off")
-    if topup or off:
+    topup, off, timed = find("p2_topup"), find("lights_off"), find("p2_timed")
+    if topup or off or timed:
         # A held plan leaves the routine shots out: then only lights-off is left.
         dilute = find("p2_dilute")
         parts = [
+            f"timed shot {'at ' + when(timed) if when(timed) else 'due'}" if timed else None,
             f"shot when {test(topup, '%', 'VWC')}{reading(topup, '%')}" if topup else None,
             f"dilution if {test(dilute, '', 'pwEC')}{reading(dilute, '')}" if dilute else None,
             # By, not at: in its last three hours P2 moves early when the night is too short to dry.
@@ -1015,6 +1023,9 @@ class Room:
         self.tank = {}
         self.tank_drawdown = tank_level.fresh()
         self.tank_round = {}  # z -> litres of its last shot asked for, for the plan-ahead refill (_tank_plan)
+        self.waste = ""  # the room's waste valve (descriptor `waste`), only when mapped: never opened
+        self.tank_estimate = safety_ops.tank_fresh()  # the estimated level, with no level sensor (durable)
+        self._deadhead_since = None  # when the pump was first seen drawing power with every valve shut
 
 
 def room_gate(room):
@@ -1054,6 +1065,8 @@ class Controller:
         # `room=sensor` pairs, and how long it may stand still while the room is on. Unset = not watched.
         self.sump_sensors = room_option(o.get("sump_power_sensor"))
         self.sump_silent_h = float(o.get("sump_silent_hours") or SUMP_SILENT_H)
+        # Optional (CS-317): the power sensor of a room's feed pump, like the sump's. Unset = not watched.
+        self.pump_power = room_option(o.get("pump_power_sensor"))
         # The AI assistant: a brain judges the engine's decisions inside a code envelope (docs/AI_ASSISTANT.md). None = rules;
         # brain_status says which brain runs and why, whether or not one is built (the brain panel shows it).
         logging.getLogger("anthropic").setLevel(logging.WARNING)  # no request or header ever reaches the log
@@ -1419,7 +1432,11 @@ class Controller:
             "p1_flat": 0,  # ...the ramp shots in a row under the target that did not give the rise P1 needs
             # this grow-day's stalled ramp (core.p1_stall): {"day", "at", "rewater"}, re-watering under what it reached
             "p1_stall": None,
+            # an EC flush fired and the zone has not reached its EC flush target yet (core: ZoneSnapshot.ec_flushing)
+            "ec_flushing": False,
             "vmax_wetup": [],  # this grow-day's P1 wet-up VWC readings, for the Vmax advisory (resets each P0)
+            "rescue_misses": 0,  # CS-315: rescue shots in a row that did not raise the moisture (safety_ops)
+            "rescue_check": None,  # ...and the last rescue waiting to be judged: {"before", "at"}
             **zone_history.fresh(),
             **sensing.fresh(),  # the water-and-VPD record (sensing.py), kept only while its switch is on
             **day_summary.fresh(),  # the grow-day summary being measured, and those not yet sent (day_summary)
@@ -1503,6 +1520,8 @@ class Controller:
         latch = d.get("max_run_latch")
         if isinstance(latch, dict) and type(latch.get("resets")) is int and isinstance(latch.get("since"), str):
             s["max_run_latch"] = {"since": latch["since"], "resets": latch["resets"]}
+        if isinstance(d.get("ec_flushing"), bool):  # absent before the EC flush target: False
+            s["ec_flushing"] = d["ec_flushing"]
         flat = d.get("p1_flat")  # absent before the P1 stall exit: 0, and None
         if type(flat) is int and 0 <= flat <= 100:
             s["p1_flat"] = flat
@@ -1542,6 +1561,7 @@ class Controller:
                                if isinstance(v, (int, float)) and not isinstance(v, bool)
                                and math.isfinite(v) and 0.0 <= v <= 100.0][-VMAX_SERIES_MAX:]
         s.update(zone_history.restore(d))
+        s.update(safety_ops.restore_zone(d))
         s.update(sensing.restore(d))
         s.update(day_summary.restore(d))
         return s
@@ -1576,6 +1596,9 @@ class Controller:
         # Plan adherence's own record (plan_adherence.load): absent on an older file, field by field otherwise.
         room._adherence = plan_adherence.load(block.get("_adherence") if isinstance(block, dict) else None)
         room.tank_drawdown = tank_level.load(block.get("_tank") if isinstance(block, dict) else None)
+        room.tank_estimate = safety_ops.tank_load(block.get("_tank_estimate") if isinstance(block, dict) else None)
+        remembered = block.get("_waste_rule") if isinstance(block, dict) else None
+        room._waste_rule_known = remembered if remembered in ("Off", WASTE_CHECK, WASTE_CLOSE) else None
         room._runoff = runoff_balance.load(block.get("_runoff") if isinstance(block, dict) else None)
         # A dim the controller did not finish (dry_dim.py): absent on an older file. Restored on the first pass.
         room._dim = dry_dim.load(block.get("_dim") if isinstance(block, dict) else None)
@@ -1769,6 +1792,8 @@ class Controller:
             room.substrate = self._substrate(attrs)  # read like the names: needs no adoption
             room.light_entity = str(attrs.get("light_entity") or "").strip()  # checked, never actuated
             room.tank = tank_level.mapping(attrs)  # read only, never actuated: needs no adoption
+            # Only ever switched OFF, and only under the room's waste-valve rule; setup changes need it off.
+            room.waste = str(attrs.get("waste") or "").strip()
             # each AC and dehumidifier the room maps, read only for the runoff estimator (runoff_balance.py)
             room.hvac_units = [str(e) for key in ("ac_entities", "dehumidifier_entities")
                                for e in (attrs.get(key) or []) if isinstance(e, str) and e]
@@ -1913,6 +1938,7 @@ class Controller:
             "p1_expected_rise": s.get("p1_expected_rise"),
             "p1_flat": int(s.get("p1_flat") or 0),
             "p1_stall": s.get("p1_stall"),
+            "ec_flushing": bool(s.get("ec_flushing")),
             "shots": s.get("shots"),
             "daily_vol": s.get("daily_vol"),
             "water_history": s.get("water_history"),
@@ -1931,6 +1957,8 @@ class Controller:
             "night_hist": s.get("night_hist") or [],
             "night": s.get("night"),
             "vmax_wetup": list(s.get("vmax_wetup") or []),
+            "rescue_misses": int(s.get("rescue_misses") or 0),
+            "rescue_check": s.get("rescue_check"),
             "water_vpd": s.get("water_vpd"),
             "day_hist": s.get("day_hist") or [],
             "day_acc": s.get("day_acc"),
@@ -1961,8 +1989,14 @@ class Controller:
                 block.pop("_shot_inflight", None)
             if hasattr(room, "_room_active_known"):
                 block["_room_active"] = room._room_active_known
+            waste_rule = getattr(room, "_waste_rule_known", None)
+            if waste_rule in ("Off", WASTE_CHECK, WASTE_CLOSE):
+                block["_waste_rule"] = waste_rule
             if room.tank_drawdown["base_pct"] is not None:  # only once a level has been read
                 block["_tank"] = room.tank_drawdown
+            estimate = getattr(room, "tank_estimate", None) or {}
+            if estimate.get("filled_at"):  # only once the tank has been marked filled
+                block["_tank_estimate"] = estimate
             runoff = getattr(room, "_runoff", None)
             if runoff and runoff_balance.has_data(runoff):  # only once the estimator has recorded something
                 block["_runoff"] = runoff
@@ -2431,6 +2465,33 @@ class Controller:
                 FALLBACK[f"{'vegetative' if veg else 'generative'}_dryback_target"],
             ),
             p0_max_wait_min=self._zone_num(room, zone, "p0_maximum_wait_time", FALLBACK["p0_maximum_wait_time"]),
+            # Opt-in phase settings (phase_options). Optional: an integration older than them has none, and each
+            # fallback is the rule as it was.
+            p0_min_wait_min=self._zone_num(
+                room, zone, "p0_minimum_wait", FALLBACK["p0_minimum_wait"], optional=True
+            ),
+            p0_stall_exit=self._on(f"switch.crop_steering_{room.prefix}p0_stall_exit", False),
+            ec_flush_target=self._zone_num(room, zone, "ec_flush_target", FALLBACK["ec_flush_target"], optional=True),
+            # The zone's own P2 dilute ratio only behind the room's switch (never the room's p2_ec_high_threshold,
+            # editable and unread for months: reading it unasked would change watering on update).
+            p2_dilute_ratio=(
+                self._zone_num(room, zone, "p2_dilute_ratio", FALLBACK["p2_dilute_ratio"], optional=True)
+                if self._on(f"switch.crop_steering_{room.prefix}use_p2_ec_thresholds", False)
+                else FALLBACK["p2_dilute_ratio"]
+            ),
+            p2_mode=phase_options.p2_mode(ha_get(f"select.crop_steering_{room.prefix}zone_{zone}_p2_mode")[0]),
+            p2_timed_interval_min=self._zone_num(
+                room, zone, "p2_timed_interval_min", FALLBACK["p2_timed_interval_min"], optional=True
+            ),
+            p2_timed_shot_size=self._zone_num(
+                room, zone, "p2_timed_shot_size", FALLBACK["p2_timed_shot_size"], optional=True
+            ),
+            p2_timed_first_h=self._zone_num(
+                room, zone, "p2_timed_first_hours", FALLBACK["p2_timed_first_hours"], optional=True
+            ),
+            p2_end_h_before_off=self._zone_num(
+                room, zone, "p2_end_hours_before_off", FALLBACK["p2_end_hours_before_off"], optional=True
+            ),
             # Per zone only. Optional: an integration older than the setting leaves it at 0 (off), so
             # P0 waits for the dryback target as it always has, and nothing alerts.
             p0_additional_dryback=self._zone_num(
@@ -2654,6 +2715,7 @@ class Controller:
             # ...and the ramp shots before the last one that did not rise, unless the probe is in doubt (core.p1_stall)
             p1_flat_shots=int(st.get("p1_flat") or 0),
             p1_probe_suspect=self._p1_probe_suspect(room, zone, st, now) is not None,
+            ec_flushing=bool(st.get("ec_flushing")),
             ec_settled=ec_settled,
             # a held plan holds the steering; decide() then fires only the rescues (PLAN_HOLD_EXEMPT)
             steering_held=bool(strategy_block(getattr(room, "strategy_snapshot", None), zone)),
@@ -2806,7 +2868,13 @@ class Controller:
                     want.pop(suffix, None)
                 stall = auto_setpoints.stalled(current, want)
                 for suffix, value, _why in setpoint_supervisor.writes(current, want):
-                    if (self._auto_write(room, zone, suffix, current[suffix], value, learn, now)
+                    value = self._step_bounded(room, zone, suffix, current[suffix], value, now)
+                    if value is None:
+                        continue
+                    wrote = self._auto_write(room, zone, suffix, current[suffix], value, learn, now)
+                    if wrote:
+                        self._step_count(room, zone, suffix, current[suffix], value, now)
+                    if (wrote
                             and suffix in ("p2_shot_size", "p2_vwc_threshold") and brain_bridge.owns_setpoints(self)):
                         # the learner holds the judge's lever while the brain cannot act: not an edit by hand
                         brain_bridge.learner_wrote(self, room, zone, suffix, current[suffix], value, now)
@@ -3028,8 +3096,8 @@ class Controller:
             return False
         follow = st["fc_follow"]
         day = self._grow_day_start(room, now).isoformat()
-        if follow["day"] != day:
-            follow.update(day=day, used={})
+        limit = self._step_limit(room)
+        phase_options.step_left(follow, day, "field_capacity", limit)  # a new grow-day starts the ledger afresh
         used = follow["used"]
 
         def bounded(suffix, old, value):
@@ -3043,7 +3111,7 @@ class Controller:
                 hi = min(hi, float(attrs["max"]))
             except (KeyError, TypeError, ValueError):
                 pass
-            left = max(0.0, FC_STEP_MAX - used.get(suffix, 0.0))  # what is left of this grow-day's step
+            left = max(0.0, limit - used.get(suffix, 0.0))  # what is left of this grow-day's step
             return round(max(lo, old - left, min(hi, old + left, value)), 1)
 
         fc = bounded("field_capacity", p.field_capacity, seen)
@@ -3076,6 +3144,51 @@ class Controller:
         if wrote:
             self._save_state()
         return wrote
+
+    def _step_limit(self, room):
+        """The room's Max setpoint move per day, in VWC points (inf: no limit); FC_STEP_MAX when it cannot be read
+        (an integration older than the setting)."""
+        value = self._num_or_none(f"number.crop_steering_{room.prefix}setpoint_max_step_per_day")
+        return phase_options.step_limit(value, FC_STEP_MAX)
+
+    def _step_limit_all(self, room):
+        """True when the room's daily limit also holds the AI assistant's targets power and the learner (the select's
+        second option). A missing select, as on an older integration, is the follower only, as before."""
+        state = ha_get(f"select.crop_steering_{room.prefix}setpoint_step_limit_applies_to")[0]
+        return state == phase_options.STEP_SCOPE_ALL
+
+    def _step_allowance(self, room, zone, suffix, now):
+        """What is left of today's allowance for a ladder setpoint when the room's limit holds the learner and the AI
+        assistant too (the follower's ledger, shared), or None when it does not apply to `suffix` or to them."""
+        if suffix not in FC_LADDER or not self._step_limit_all(room):
+            return None
+        return phase_options.step_left(room.state[zone]["fc_follow"], self._grow_day_start(room, now).isoformat(),
+                                       suffix, self._step_limit(room))
+
+    def _step_bounded(self, room, zone, suffix, old, value, now):
+        """A learner write of a ladder setpoint inside what is left of today's allowance (_step_allowance); None when
+        nothing is left. Any other setpoint, or the limit holding the follower only, is returned as it came."""
+        left = None if old is None else self._step_allowance(room, zone, suffix, now)
+        if left is None:
+            return value
+        bounded = phase_options.clamp_step(float(old), float(value), left)
+        return None if abs(bounded - float(old)) < 0.05 else bounded
+
+    def _step_count(self, room, zone, suffix, old, value, now):
+        """A written ladder move, counted on today's ledger when the room's limit holds the learner and the AI too."""
+        if self._step_allowance(room, zone, suffix, now) is not None:
+            phase_options.step_used(room.state[zone]["fc_follow"], suffix, float(value) - float(old))
+
+    def _flush_episode(self, room, zone, st, snap, p, fire, reason):
+        """Latch or clear the zone's EC flush episode (core: ZoneSnapshot.ec_flushing) after this pass's decision."""
+        was = bool(st.get("ec_flushing"))
+        now_on = phase_options.flushing(was, p.ec_flush_target, getattr(reason, "kind", None) if fire else None,
+                                        snap.ec_settled, ec_flush_goal(snap, p))
+        if now_on != was:
+            st["ec_flushing"] = now_on
+            log(f"[{room.slug}] Z{zone} EC flush " + (f"to {ec_flush_goal(snap, p):.1f} started" if now_on
+                                                       else "episode ended"))
+            self._save_state()
 
     def _zone_bounded(self, room, zone, suffix, value):
         """`value` inside the engine's bounds for `suffix` and the zone number's own min and max (which Home
@@ -3444,6 +3557,9 @@ class Controller:
                 return f"external hold {f} unreadable (reads neither on nor off)"
             if str(state).lower() in ON_STATES:
                 return f"external hold ({f.split('.')[-1]})"
+        waste = self._waste_hold(room)
+        if waste:
+            return waste
         settings = self._settings_hold(room, zone)
         if settings:
             return settings
@@ -3467,7 +3583,7 @@ class Controller:
                             else None
                         ),
                         self.feed_grace_min,
-                    ):
+                    ) and not self._rescue_past_dead_probe(room, zone, reason, "EC"):
                         return f"source-water EC dead >{self.feed_grace_min:.0f}min — holding (fail-closed)"
                     # Inside the grace window we skip the EC band check only — fall through
                     # so the pH gate below still runs. Returning None here would report the
@@ -3490,7 +3606,7 @@ class Controller:
                             else None
                         ),
                         self.feed_grace_min,
-                    ):
+                    ) and not self._rescue_past_dead_probe(room, zone, reason, "pH"):
                         return f"source-water pH probe dead >{self.feed_grace_min:.0f}min — holding (fail-closed)"
                 elif (ph_lo > 0 and ph < ph_lo) or (ph_hi > 0 and ph > ph_hi):
                     return f"source-water pH {ph:.2f} out of [{ph_lo:g},{ph_hi:g}]"
@@ -3504,6 +3620,95 @@ class Controller:
         if offline:
             return f"{', '.join(offline)} offline (reads neither on nor off)"
         return None
+
+    def _rescue_past_dead_probe(self, room, zone, reason, half):
+        """True when a rescue may pass the source-water gate although its feed probe is dead: only while the room's
+        switch rescue_past_dead_feed_probe reads ON, and only for a P3 emergency or a watchdog shot. Off (or
+        unreadable), and for every other shot, the dead probe holds as it always did. An out-of-band reading is
+        never passed, and nothing before the gate (kill switch, holds, dosing, tank minimum, faults) is skipped."""
+        if getattr(reason, "kind", None) not in safety_ops.RESCUE_KINDS:
+            return False
+        if not self._on(f"switch.crop_steering_{room.prefix}rescue_past_dead_feed_probe", False):
+            return False
+        log(f"[{room.slug}] Z{zone} source-water {half} probe dead: a {reason.kind} rescue passes the gate "
+            "(Rescues past a dead feed probe is on)")
+        return True
+
+    def _waste_rule(self, room):
+        """The room's waste-valve rule: Off (the controller never reads it, as before), WASTE_CHECK or WASTE_CLOSE.
+        No mapped waste valve or a confirmed absent legacy select keeps the old Off behavior. A transient
+        unreadable/invalid policy is a hold, never permission to ignore an enabled interlock."""
+        if not getattr(room, "waste", ""):
+            return "Off"
+        entity = f"select.crop_steering_{room.prefix}waste_valve_rule"
+        state = ha_get(entity)[0]
+        if state in ("Off", WASTE_CHECK, WASTE_CLOSE):
+            room._waste_rule_known = state
+            return state
+        if state is None and ha_get_status(entity)[0] == 404 and not getattr(room, "_waste_rule_known", None):
+            return "Off"
+        return "Unreadable"
+
+    def _waste_hold(self, room):
+        """Why the waste valve holds the room's shots, else None (CS-316). Check closed: it must read OFF. Close for
+        each shot: it must be a switch the controller can close and read (it is closed at the shot's start)."""
+        rule = self._waste_rule(room)
+        if rule == "Off":
+            return None
+        waste = room.waste
+        state = str(hw_get(waste)[0]).lower()
+        if rule == WASTE_CLOSE and waste.split(".", 1)[0] in ACTUATORS and state in ("on", "off"):
+            self._dismiss(f"waste_{room.slug}")
+            return None
+        if rule == WASTE_CHECK and state == "off":
+            self._dismiss(f"waste_{room.slug}")
+            return None
+        why = (f"waste valve {waste} reads {state}" if state in ("on", "off")
+               else f"waste valve {waste} offline (reads neither on nor off)")
+        if rule == "Unreadable":
+            why = "waste valve rule unreadable (no shot until its policy can be confirmed)"
+        if rule == WASTE_CLOSE and waste.split(".", 1)[0] not in ACTUATORS:
+            why = f"waste valve {waste} can't be switched by the controller"
+        self._alert(
+            f"waste_{room.slug}",
+            "CS-316",
+            "the waste valve is not closed, no shots",
+            "The waste valve rule of this room says that the waste valve must be closed for a shot. "
+            + ("It does not read off, so the feed would go to waste while the controller counts it as given. "
+               if rule == WASTE_CHECK else
+               "The controller closes it before each shot, but it cannot switch it or read it now. ")
+            + "No shot starts until it reads off. Check the waste valve and its switch, or change the waste "
+            f"valve rule in the room settings.\n\nDetail: {why}.",
+            room=room,
+        )
+        return why
+
+    def _close_waste(self, room, zone):
+        """Close for each shot: switch the waste valve OFF before anything opens, read back. False (and CS-316) when
+        it will not read OFF: the shot does not start. Never opened again by the controller."""
+        rule = self._waste_rule(room)
+        if rule == "Off":
+            return True
+        if rule != WASTE_CLOSE:
+            return self._waste_hold(room) is None if rule == WASTE_CHECK else False
+        waste = room.waste
+        if hw_get(waste)[0] == "off":
+            return True
+        hw_call(waste, False)
+        if self._confirm_switches((waste,), "off"):
+            log(f"[{room.slug}] Z{zone} waste valve {waste} closed for the shot")
+            return True
+        self._alert(
+            f"waste_{room.slug}",
+            "CS-316",
+            "the waste valve is not closed, no shots",
+            "The controller set the waste valve to off before a shot, but it did not read off. The shot did not "
+            "start, so no feed went to waste. Check the waste valve and its switch."
+            f"\n\nDetail: waste valve {waste} still reads {hw_get(waste)[0]}.",
+            room=room,
+            zone=zone,
+        )
+        return False
 
     # ---------- alerts / notify ----------
     @staticmethod
@@ -4059,6 +4264,7 @@ class Controller:
         and overfill latches, and ask for a refill ahead of the minimum (_tank_plan). A room with no tank level
         mapped reads and publishes nothing."""
         if not room.tank:
+            self._watch_tank_estimate(room)  # a tank size given instead: estimated, never holding
             return
         pct, low = room.tank_reading = self._tank_level(room)
         drawdown = room.tank_drawdown
@@ -4721,6 +4927,8 @@ class Controller:
         st["daily_vol"] += delivered_l
         if room.tank.get("distance"):  # what the tank gave, for the level's drawdown check
             tank_level.drawn(room.tank_drawdown, delivered_l)
+        elif not room.tank:  # no level mapped: the estimate counts it (only once a fill has been seen)
+            safety_ops.tank_used(room.tank_estimate, delivered_l)
         self._save_state()
         if room.__dict__.get("_runoff_mode", "off") != "off":
             runoff_balance.add_shot(room._runoff, now.timestamp(), delivered_l)  # the sump balance's feed
@@ -4742,6 +4950,8 @@ class Controller:
             st["p1_settled_before"], st["p1_expected_rise"], st["p1_flat"] = None, None, 0
         if new == "P0":
             st["p1_stall"] = None
+        if new in ("P0", "P3"):
+            st["ec_flushing"] = False  # an EC flush episode ends at lights-off and never carries into a new day
         if (was == "P1" and new == "P2" and snap is not None and p is not None and not snap.backed_up
                 and not snap.p1_probe_suspect and snap.vwc < min(p.p1_target, p.field_capacity)
                 and p1_stall(snap, p) >= 1):
@@ -5186,6 +5396,8 @@ class Controller:
         step = 2.0
         valve = room.hw.get("valves", {}).get(zone)
         valve_seen_on = False
+        # The waste valve, under a waste-valve rule: opened during the shot, it ends it (CS-307).
+        waste = (room.waste,) if self._waste_rule(room) != "Off" else ()
         while time.monotonic() < deadline:
             for entity, stop_state in (
                 (room_gate(room), "off"),
@@ -5207,7 +5419,7 @@ class Controller:
                 state = ha_get(entity, timeout=min(step, remaining))[0]
                 if state == stop_state:
                     return time.monotonic() - started, ("abort", entity)
-            for entity in [e for e in (*self.hold_entities, valve) if e]:
+            for entity in [e for e in (*self.hold_entities, *waste, valve) if e]:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     break
@@ -5265,6 +5477,7 @@ class Controller:
         closed_after = (changed - valve_opened).total_seconds() if changed else None
         open_s = closed_after if closed_after is not None and 0 <= closed_after <= elapsed else elapsed
         what = (f"a device other than this controller set its valve {by} to OFF" if by == valve
+                else f"the waste valve {by} opened" if by == getattr(room, "waste", None)
                 else f"the hold {by} started")
         outcome = " ".join(
             ([f"The controller set {', '.join(close)} to off."] if close else [])
@@ -5351,6 +5564,9 @@ class Controller:
         short = self._tank_short(room, zone, nominal_l)
         if short:  # the plan-ahead half of the reservoir minimum: _tank_plan asks for the refill
             log(f"[{room.slug}] Z{zone} shot held: {short}")
+            return
+        if not self._close_waste(room, zone):  # Close for each shot: a waste valve still open, nothing opens
+            log(f"[{room.slug}] Z{zone} shot held: the waste valve did not close")
             return
         with self._shot_lock:  # a batch holds rooms under this lock (see _shot_running)
             making = self._dosing_hold(room)
@@ -5754,9 +5970,17 @@ class Controller:
             return None
         flow, substrate = self._zone_flow_lps(room, zone), self._substrate_l(room, zone)
         sized = math.isfinite(flow) and flow > 0 and math.isfinite(substrate) and substrate > 0
+        # The zone's Manual shot length, when its number can be read (an integration before it has none):
+        # TEST_SHOT_S otherwise. _act_zone still cuts it to the room's longest shot and the day's budget left.
+        asked = self._num_or_none(f"number.crop_steering_{room.prefix}zone_{zone}_manual_shot_seconds")
+        seconds = int(asked) if asked is not None and math.isfinite(asked) and asked >= MIN_SHOT_S else TEST_SHOT_S
         # Unsized, _act_zone says why (CS-204) and runs nothing.
-        size = TEST_SHOT_S * flow / substrate * 100.0 if sized else 0.0
-        return True, size, Reason(f"TEST shot {TEST_SHOT_S} s (asked for)", "test_shot")
+        size = seconds * flow / substrate * 100.0 if sized else 0.0
+        reason = Reason(f"TEST shot {seconds} s (asked for)", "test_shot")
+        reason.seconds = seconds
+        if seconds != TEST_SHOT_S:
+            log(f"[{room.slug}] Z{zone} MANUAL shot {seconds} s (asked for)")
+        return True, size, reason
 
     def _substrate_l(self, room, zone):
         """ZONE-TOTAL substrate (L) = per-plant block x plant_count. The substrate_volume entity is the
@@ -5855,7 +6079,7 @@ class Controller:
                 )
                 return
             test = getattr(reason, "kind", None) == "test_shot"
-            raw_dur = float(TEST_SHOT_S) if test else size / 100.0 * substrate / flow
+            raw_dur = float(getattr(reason, "seconds", TEST_SHOT_S)) if test else size / 100.0 * substrate / flow
             max_dur = self._room_duration_cap(room)
             if max_dur is None:
                 return
@@ -5893,9 +6117,17 @@ class Controller:
             # Count configured flow x actual runtime, including caps, truncation,
             # the minimum duration and partial aborts. Preserve this flow snapshot
             # so later sizing edits cannot change an already delivered volume.
+            rescue = getattr(reason, "kind", None) in safety_ops.RESCUE_KINDS and self._rescue_watch_on(room)
+            if rescue and snap is not None:  # the last rescue, judged before this one changes the moisture
+                self._rescue_judged(room, zone, safety_ops.rescue_judge(st, snap.vwc, now, early=True))
+            was = st.get("last_shot")
             self._execute_shot(room, zone, dur, size, flow_lps=flow,
                                plan_exempt=getattr(reason, "kind", None) in PLAN_HOLD_EXEMPT, steering=not test)
-            self._count_capped(room, zone, raw_dur > max_dur)
+            if rescue and snap is not None and st.get("last_shot") is not was:
+                safety_ops.rescue_fired(st, snap.vwc, now)
+                self._save_state()
+            # A test or manual shot cut to the longest shot is not one of CS-312's run (it resets it, as before).
+            self._count_capped(room, zone, raw_dur > max_dur and not test)
         else:
             if "BLOCK" in reason and (
                 getattr(reason, "kind", None) == "block_daily_cap" or "daily-cap" in reason
@@ -5919,6 +6151,130 @@ class Controller:
             # room blocked since a restart used to look exactly like a healthy one until lights-on.
             log(f"[{room.slug}] Z{zone} {st['phase']} hold — {log_words.hold(reason) or 'nothing due'}"
                 + (f" [blocked: {block}]" if block else ""))
+
+    # ---------- CS-315: rescue shots that do not raise the moisture (alert only) ----------
+    def _rescue_watch_on(self, room):
+        """The room's select rescue_miss_action reads Alert. Off (or unreadable): nothing is counted, as before."""
+        return ha_get(f"select.crop_steering_{room.prefix}rescue_miss_action")[0] == "Alert"
+
+    def _watch_rescues(self, room, zone, snap, now):
+        """Judge the zone's last rescue once it has settled (safety_ops.rescue_judge). Never holds water."""
+        st = room.state[zone]
+        if not self._rescue_watch_on(room):
+            st["rescue_check"] = None
+            return
+        if st.get("rescue_check"):
+            self._rescue_judged(room, zone, safety_ops.rescue_judge(st, snap.vwc, now))
+
+    def _rescue_judged(self, room, zone, missed):
+        """After a rescue was judged: CS-315 at the room's Rescue misses before alert in a row, down at the next rise."""
+        if missed is None:
+            return
+        self._save_state()
+        st, key = room.state[zone], f"rescue_miss_{room.slug}_z{zone}"
+        if not missed:
+            self._dismiss(key)
+            return
+        limit = self._num(f"number.crop_steering_{room.prefix}rescue_miss_count", safety_ops.RESCUE_MISS_DEFAULT)
+        misses = int(st.get("rescue_misses") or 0)
+        log(f"[{room.slug}] Z{zone} rescue shot not absorbed: moisture rose less than "
+            f"{safety_ops.RESCUE_MIN_RISE:g} points ({misses} in a row)")
+        if misses >= max(1, int(limit)):
+            self._alert(
+                key,
+                "CS-315",
+                "rescue shots do not raise the moisture",
+                f"The last {misses} rescue shots of this zone did not raise its moisture. Possible causes are a "
+                "blocked dripper or line, a valve that does not open, or a probe that is out of the substrate. The "
+                "controller continues the rescue shots; this alert does not stop any water. CAUTION: Go to the zone "
+                "now. Check the drippers, the valve and the probe. A blocked line keeps the plants dry, and a line "
+                "that leaks puts the water on the floor.",
+                room=room,
+                zone=zone,
+            )
+
+    # ---------- CS-317: the feed pump runs with every valve shut (dead-head, alert only) ----------
+    def _watch_deadhead(self, room, now):
+        """The room's pump (option pump_power_sensor) draws more than its Pump Dead-Head Power while every zone valve
+        of the room reads off, for DEADHEAD_S, with no shot in flight, no hold on and no batch running. Only tells."""
+        entity = self.pump_power.get(room.slug) or self.pump_power.get("*")
+        if not entity or not room.hw.get("pump"):
+            return
+        key = f"deadhead_{room.slug}"
+        busy = (getattr(room, "shot_inflight", None) or self._dosing_hold(room)
+                or (self.dosing is not None and self.dosing.running())
+                or any(self._on(f, False) for f in self.hold_entities))
+        watts = self._device(entity, "power")[0]
+        limit = self._num(f"number.crop_steering_{room.prefix}pump_deadhead_watts", DEADHEAD_W)
+        shut = all(hw_get(v)[0] == "off" for v in room.hw.get("valves", {}).values())
+        if busy or watts is None or watts <= limit or not shut:
+            room._deadhead_since = None
+            if not busy and watts is not None:
+                self._dismiss(key)
+            return
+        since = room._deadhead_since = room._deadhead_since or now
+        if (now - since).total_seconds() < DEADHEAD_S:
+            return
+        self._alert(
+            key,
+            "CS-317",
+            "the pump runs with every valve shut",
+            f"The pump of this room uses {watts:.0f} W, more than its {limit:g} W dead-head power, and every zone valve "
+            "reads off. No shot, hold or batch uses the pump now. A pump that runs against shut valves heats up and "
+            "can be damaged. The controller does not switch it off. CAUTION: Check the pump now. Stop it, or open "
+            f"the valve that it should feed.\n\nSensor: {entity}",
+            room=room,
+        )
+
+    # ---------- CS-905: the tank level estimated from the water the shots used (alert only) ----------
+    def _tank_estimate_filled(self, room, at=None):
+        """The tank was filled (a batch that read full, or the room's Tank filled button): the count starts again."""
+        at = at or datetime.now(timezone.utc).isoformat()
+        if safety_ops.tank_filled(room.tank_estimate, at):
+            log(f"[{room.slug}] estimated tank level: filled at {at[:16]}, the count starts again")
+            self._save_state()
+
+    def _watch_tank_estimate(self, room):
+        """With no tank level mapped and a Tank size above 0: publish the level estimated from the litres the shots
+        used since the tank was last filled, on the room's tank_level sensor (source estimate). Never holds a shot."""
+        size = self._num(f"number.crop_steering_{room.prefix}tank_size_l", 0)
+        if not size or size <= 0:
+            return
+        pressed = ha_get(f"button.crop_steering_{room.prefix}tank_filled")[0]
+        if pressed not in (None, "", "unknown", "unavailable"):
+            self._tank_estimate_filled(room, pressed)
+        estimate = room.tank_estimate
+        pct, left = safety_ops.tank_percent(estimate, size)
+        low = self._num(f"number.crop_steering_{room.prefix}tank_estimate_low_pct", safety_ops.TANK_LOW_DEFAULT)
+        ha_set(
+            f"sensor.crop_steering_{room.prefix}tank_level",
+            pct if pct is not None else "unknown",
+            {
+                "unit_of_measurement": "%",
+                "friendly_name": "Tank level",
+                "source": "estimate",
+                "litres_left": left,
+                "size_l": size,
+                "used_l": round(float(estimate.get("used_l") or 0.0), 1),
+                "filled_at": estimate.get("filled_at"),
+                "low_alert_pct": low,
+                "holds_shots": False,
+                "engine": PRODUCT,
+            },
+        )
+        key = f"tank_estimate_{room.slug}"
+        if pct is not None and pct <= low:
+            self._alert(
+                key,
+                "CS-905",
+                "the estimated tank level is low",
+                f"From the water that the shots used since the tank was filled, the tank of this room has about "
+                f"{left:.0f} L left ({pct:.0f}% of {size:g} L). This is an estimate from the dripper flow settings, "
+                "not a measurement, so the shots continue. Refill the tank, then press Tank filled.",
+                room=room,
+            )
+        else:
+            self._dismiss(key)
 
     # ---------- CS-312: the max-run latch ----------
     def _max_run_switch(self, room):
@@ -6471,6 +6827,11 @@ class Controller:
     def _loop_room(self, room, now):
         """One room's full control pass: snapshot -> decide -> act -> build the publish dict.
         Reads/writes only this room's prefixed entities + its own state."""
+        try:
+            import prompt_runtime
+            prompt_runtime.sync(self, room, ha_get, ha_call)
+        except Exception as err:
+            log("AI instructions synchronization unavailable", room.slug, type(err).__name__)
         if getattr(room, "setup_active", True) is False:
             self._idle_reset(room, now)
             return {}
@@ -6573,6 +6934,10 @@ class Controller:
             if stall is not None and st["phase"] in ("P2", "P3") and stall["rewater"] < p.p2_threshold:
                 p = params[zone] = dataclasses.replace(p, p2_threshold=stall["rewater"])
             self._count_peak(st, snap)
+            try:  # CS-315 only ever tells
+                self._watch_rescues(room, zone, snap, now)
+            except Exception as e:
+                log("rescue watch error", room.slug, zone, e)
             if snap.ec is None:
                 self._alert(
                     f"ec_unknown_{room.slug}_z{zone}",
@@ -6594,6 +6959,7 @@ class Controller:
                 # of firing a shot _act_zone could only refuse.
                 snap = snaps[zone] = dataclasses.replace(snap, daily_vol=max(snap.daily_vol, p.max_daily_volume))
                 new_phase, new_thr, fire, size, reason = decide(snap, p)
+            self._flush_episode(room, zone, st, snap, p, fire, reason)
             shown = snap  # what waiting_for reads: the snapshot, in the phase the zone is now in
             if new_phase != st["phase"]:
                 log(f"[{room.slug}] Z{zone} {st['phase']} -> {new_phase}: {log_words.transition(reason)}")
@@ -6834,6 +7200,10 @@ class Controller:
             self._watch_sump(room, now)
         except Exception as e:
             log("sump watch error", room.slug, e)
+        try:  # CS-317 only ever tells, too
+            self._watch_deadhead(room, now)
+        except Exception as e:
+            log("dead-head watch error", room.slug, e)
         try:  # the runoff estimator only ever tells (CS-314): no water is given or held from it
             self._watch_runoff(room, now)
         except Exception as e:

@@ -2636,11 +2636,12 @@ try {
   await check("mobile navigation and every page fit 390px", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await go("today");
-    // The phone header in words: the room and the data's age, then both switches labelled.
+    // The phone header in words: the room and the data's age, then both switches and Stop all labelled.
     assert.match(await page.locator(".data-age").innerText(), /^Updated \d+ (s|min) ago$/);
     assert.deepEqual(await page.locator(".safety-switch-text").allInnerTexts(), [
       "Watering on",
       "Room on",
+      "Stop all",
     ]);
     await page.getByRole("button", { name: "Open navigation" }).click();
     await axe("mobile navigation");

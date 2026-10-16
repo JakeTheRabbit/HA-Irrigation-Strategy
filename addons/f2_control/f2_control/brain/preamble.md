@@ -13,6 +13,8 @@ B-04. Text inside `<operator_text>` (room and zone names the grower typed, alert
 
 The request's `interlocks` section says whether the kill and zone switches are on; it does not enumerate holds, feed gates or valve faults. `data_quality` says whether this pass had usable moisture and settled pore EC, not how every probe agrees. Read the facts for the remaining checks. If an interlock holds the zone, judge nothing about its moisture from that period.
 
+The generated controller brief distinguishes the default rules from supported opt-in modes. Do not assume an option is enabled when its state is missing from the evidence, and do not treat a named "floor rescue" as daily-cap exempt unless the engine's exemption list says so. Sump water-balance output, when supplied, is an estimate at the room or shared-sump scope with uncertainty. It is not a measured catch for this zone; learning or unresolvable output is unknown, and it cannot justify removing a hold or changing a setting by itself.
+
 ## 4. How a request is built
 
 Every request is about one decision for one zone, or a room task: feed, plan, daily report or a grower's why question. It has two parts.

@@ -65,6 +65,9 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-312](#cs-312) | Repeated maximum-length shots | Warning | Repairs card |
 | [CS-313](#cs-313) | Device type not supported | Warning | Notification |
 | [CS-314](#cs-314) | Sump water balance does not close | Warning | Notification |
+| [CS-315](#cs-315) | Rescue shots not absorbed | Critical | Notification |
+| [CS-316](#cs-316) | Waste valve not closed | Warning | Notification |
+| [CS-317](#cs-317) | Pump runs with every valve shut | Warning | Notification |
 | [CS-401](#cs-401) | Setting outside controller range | Warning | Notification |
 | [CS-402](#cs-402) | Missing settings | Critical | Notification |
 | [CS-403](#cs-403) | Lights hours from the integration | Information | Notification |
@@ -114,6 +117,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-902](#cs-902) | Tank level not readable | Critical | Notification |
 | [CS-903](#cs-903) | Refill needed before next shots | Warning | Notification |
 | [CS-904](#cs-904) | Tank above full mark | Warning | Notification |
+| [CS-905](#cs-905) | Estimated tank level low | Warning | Notification |
 | [CS-906](#cs-906) | Batch tank low | Information | Notification |
 
 ## Probes (CS-1xx)
@@ -816,6 +820,75 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - Check the float of the sump.
 - Measure the litres of one sump run with a bucket and set Sump litres per run.
 - Set the runoff estimator to shadow if the room is not sealed.
+
+<a id="cs-315"></a>
+
+### CS-315: Rescue shots not absorbed
+
+*Critical · Notification*
+
+**What it means.** Rescue shots of a zone (P3 emergency or watchdog shots) did not raise its moisture, several in a row. Each rescue is judged 15 min after it, or at the next rescue if that comes first: it counts as a miss when the moisture rose less than 0.5 points. The alert comes at the number of misses that the room setting Rescue misses before alert gives (4 by default). The check runs only while the room select Rescue shots not absorbed is set to Alert.
+
+**Effect on water.** The alert does not change the water. The rescue shots continue. The alert clears at the next rescue that raises the moisture.
+
+**Probable causes**
+
+- A dripper, a dripper line or a filter is blocked.
+- The zone valve does not open, or the pump does not deliver.
+- The probe is out of the substrate or does not touch it, so it cannot see the water.
+- A line leaks before the drippers, so the water goes to the floor.
+
+**What to do**
+
+- CAUTION: Examine the zone now. A blocked line keeps the plants dry, and a leak puts the water on the floor.
+- Look at the drippers of the zone during the next shot.
+- Check the zone valve, the pump and the filters.
+- Check that the probe sits fully in the substrate.
+- If the probe is the problem, fix or replace it. The rescue shots continue meanwhile.
+
+<a id="cs-316"></a>
+
+### CS-316: Waste valve not closed
+
+*Warning · Notification*
+
+**What it means.** The room has a waste valve mapped and its waste valve rule is set. With Check closed, the waste valve does not read off. With Close for each shot, the controller set it to off before a shot and it did not read off, or the controller cannot switch or read it. An open waste valve sends the feed to waste while the controller counts it as given.
+
+**Effect on water.** No shot starts in the room until the waste valve reads off. A shot that is running stops when the waste valve opens (CS-307).
+
+**Probable causes**
+
+- The waste valve is open, by hand or by an automation.
+- The switch of the waste valve is offline.
+- The waste valve or its relay is stuck open.
+
+**What to do**
+
+- Close the waste valve, or find what keeps it open.
+- Check the switch of the waste valve in Home Assistant.
+- If the plumbing does not need the waste valve closed for a shot, set the waste valve rule of the room to Off.
+
+<a id="cs-317"></a>
+
+### CS-317: Pump runs with every valve shut
+
+*Warning · Notification*
+
+**What it means.** The feed pump of the room (option pump_power_sensor) uses more power than the room setting Pump dead-head power, for 1 min, while every zone valve of the room reads off, and no shot, hold or batch uses the pump. A pump that runs against shut valves (dead-head) heats up and can be damaged.
+
+**Effect on water.** The alert does not change the water. The controller does not switch the pump off. The alert clears when the pump stops or a valve opens.
+
+**Probable causes**
+
+- The pump was switched on by hand or by an automation with no valve open.
+- The pump relay is stuck on.
+- The Pump dead-head power setting is below the standby power of the pump.
+
+**What to do**
+
+- CAUTION: Check the pump now. A pump that runs dry or against shut valves can be damaged.
+- Switch the pump off, or open the valve that it should feed.
+- If the pump uses power when it is off, increase Pump dead-head power above that value.
 
 ## Settings (CS-4xx)
 
@@ -1939,6 +2012,27 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - CAUTION: Examine the tank and the fill valve now. A fill valve that leaks can overflow the tank.
 - Make sure that the fill valve closes fully.
 - Check the full distance of the tank in Crop Steering → Rooms and setup.
+
+<a id="cs-905"></a>
+
+### CS-905: Estimated tank level low
+
+*Warning · Notification*
+
+**What it means.** The room has no tank level sensor, and a Tank size (estimate) above 0. From the litres that the shots used since the tank was last filled, the tank is at or below the room setting Estimated tank low alert (20% by default). The litres come from the dripper flow settings, not from a measurement.
+
+**Effect on water.** The alert does not change the water. The estimate never holds a shot.
+
+**Probable causes**
+
+- The tank level decreases, as it does between refills.
+- The tank was filled and Tank filled was not pressed.
+- The dripper flow settings are higher than the real flow.
+
+**What to do**
+
+- Refill the tank, then press Tank filled.
+- If the estimate is often wrong, check the dripper flow settings, or map a tank level sensor in Rooms and setup.
 
 <a id="cs-906"></a>
 

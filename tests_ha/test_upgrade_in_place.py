@@ -269,6 +269,9 @@ async def test_a_3_8_0_state_file_loads_with_its_history_empty_and_nothing_moves
         assert (written.pop("capped_in_a_row"), written.pop("max_run_latch")) == (0, None)
         assert written.pop("vmax_wetup") == []
         assert (written.pop("p1_flat"), written.pop("p1_stall")) == (0, None)  # no stalled ramp: saved empty
+        # no rescue counted yet, nothing to judge (CS-315): saved empty
+        assert (written.pop("rescue_misses"), written.pop("rescue_check")) == (0, None)
+        assert written.pop("ec_flushing") is False  # no EC flush episode: saved off
         assert (written.pop("water_vpd"), written.pop("day_hist")) == (None, [])  # no water-and-VPD record
         assert (written.pop("day_acc"), written.pop("day_out")) == (None, [])  # no grow-day summary: saved empty
         old = {k: v for k, v in seed["default"][zone].items() if k not in PID_TERMS}

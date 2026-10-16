@@ -190,6 +190,17 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement=PERCENTAGE,
         mode="box",
     ),
+    # Opt-in: minutes after lights-on that nothing but the bypass ends P0. 0 (the default) is off.
+    NumberEntityDescription(
+        key="p0_minimum_wait",
+        name="Morning dryback minimum wait",
+        icon="mdi:timer-sand",
+        native_min_value=0.0,
+        native_max_value=240.0,
+        native_step=5.0,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        mode="box",
+    ),
     # P1 Phase Parameters
     NumberEntityDescription(
         key="p1_initial_shot_size",
@@ -257,7 +268,8 @@ NUMBER_DESCRIPTIONS = [
         name="Maximum extra ramp shots",
         icon="mdi:counter",
         native_min_value=1.0,
-        native_max_value=10.0,
+        # Extra shots also count toward Maximum ramp shots, which ends P1 first: raise both.
+        native_max_value=30.0,
         native_step=1.0,
         mode="box",
     ),
@@ -296,6 +308,71 @@ NUMBER_DESCRIPTIONS = [
         native_max_value=120.0,
         native_step=1.0,
         native_unit_of_measurement=UnitOfTime.MINUTES,
+        mode="box",
+    ),
+    # Opt-in: once an EC flush fires, budgeted dilute shots go on until pore EC is at or under this.
+    # 0 (the default) is off: a flush stops when its trigger clears, as before.
+    NumberEntityDescription(
+        key="ec_flush_target",
+        name="EC flush target",
+        icon="mdi:water-sync",
+        native_min_value=0.0,
+        native_max_value=9.0,
+        native_step=0.1,
+        native_unit_of_measurement="mS/cm",
+        mode="box",
+    ),
+    # Timed P2 (the zone's P2 mode select). Read only while the zone's mode is a timed one.
+    NumberEntityDescription(
+        key="p2_timed_interval_min",
+        name="Timed P2 shot interval",
+        icon="mdi:timer-outline",
+        native_min_value=5.0,
+        native_max_value=720.0,
+        native_step=5.0,
+        native_unit_of_measurement=UnitOfTime.MINUTES,
+        mode="box",
+    ),
+    NumberEntityDescription(
+        key="p2_timed_shot_size",
+        name="Timed P2 shot size",
+        icon="mdi:water-pump",
+        native_min_value=0.0,
+        native_max_value=20.0,
+        native_step=0.5,
+        native_unit_of_measurement=PERCENTAGE,
+        mode="box",
+    ),
+    NumberEntityDescription(
+        key="p2_timed_first_hours",
+        name="Timed P2 first shot after lights-on",
+        icon="mdi:clock-start",
+        native_min_value=0.0,
+        native_max_value=24.0,
+        native_step=0.5,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        mode="box",
+    ),
+    # Opt-in: P1/P2 hand over to P3 this many hours before lights-off. 0 (the default) is off.
+    NumberEntityDescription(
+        key="p2_end_hours_before_off",
+        name="P2 ends before lights-off",
+        icon="mdi:clock-end",
+        native_min_value=0.0,
+        native_max_value=12.0,
+        native_step=0.5,
+        native_unit_of_measurement=UnitOfTime.HOURS,
+        mode="box",
+    ),
+    # Opt-in: P2 dilutes above this multiple of the P2 EC target, read only while the room's
+    # "use P2 EC ratios" switch is on. Off, the engine's 1.2, as always.
+    NumberEntityDescription(
+        key="p2_dilute_ratio",
+        name="P2 dilute EC ratio",
+        icon="mdi:arrow-up-bold",
+        native_min_value=1.0,
+        native_max_value=3.0,
+        native_step=0.05,
         mode="box",
     ),
     NumberEntityDescription(
@@ -495,6 +572,18 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement="hour",
         mode="box",
     ),
+    # The most the automatic writers move field capacity, the peak target or the re-water point in one
+    # grow-day, VWC points; 0 = no limit. 1 (the default) is the limit the controller always had.
+    NumberEntityDescription(
+        key="setpoint_max_step_per_day",
+        name="Max setpoint move per day",
+        icon="mdi:stairs",
+        native_min_value=0.0,
+        native_max_value=50.0,
+        native_step=0.5,
+        native_unit_of_measurement=PERCENTAGE,
+        mode="box",
+    ),
     # CS-311: the sump pump counts as running while its plug reads above this. The controller puts
     # the plug's reading into watts first, whatever unit it reports.
     NumberEntityDescription(
@@ -611,6 +700,7 @@ PER_ZONE_STEERING_KEYS = [
     "generative_dryback_target",
     "p0_maximum_wait_time",
     "p0_dryback_drop_percent",
+    "p0_minimum_wait",
     "p1_target_vwc",
     "p1_initial_shot_size",
     "p1_shot_size_increment",
@@ -623,6 +713,12 @@ PER_ZONE_STEERING_KEYS = [
     "p2_shot_size",
     "p2_time_between_shots",
     "ec_min_interval",
+    "ec_flush_target",
+    "p2_dilute_ratio",
+    "p2_timed_interval_min",
+    "p2_timed_shot_size",
+    "p2_timed_first_hours",
+    "p2_end_hours_before_off",
     "p3_emergency_vwc_threshold",
     "p3_emergency_shot_size",
     "p3_time_between_shots",
@@ -934,6 +1030,19 @@ async def async_setup_entry(
                 default_value=default,
             )
         )
+
+    # Safety and operations settings (safety_ops.py): each starts at what keeps the room as it was.
+    from .safety_ops import ROOM_NUMBERS, zone_numbers
+
+    for description, value in ROOM_NUMBERS:
+        numbers.append(CropSteeringNumber(entry, description, default_value=value))
+    for zone_num in range(1, num_zones + 1):
+        for description, value in zone_numbers(zone_num):
+            numbers.append(
+                CropSteeringNumber(
+                    entry, description, zone_num=zone_num, default_value=value
+                )
+            )
 
     # Each number reads its siblings for a limit that follows the zone's size (bounds.py).
     room = {number.entity_description.key: number for number in numbers}

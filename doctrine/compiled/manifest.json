@@ -47,11 +47,11 @@
       "tokens_est_high": 2905
     },
     "sections/02-engine.md": {
-      "sha256": "f20f54d3c2b4fa0fa25e7bbe4aa005e1a25201c232eed199585039fbd24b106d",
-      "chars": 16275,
-      "words": 2721,
-      "tokens_est_low": 4069,
-      "tokens_est_high": 4932
+      "sha256": "83c7febb0b2dbaeceb95817cc5976525277389d2bdd264ce0c59cebd3212d853",
+      "chars": 16670,
+      "words": 2777,
+      "tokens_est_low": 4168,
+      "tokens_est_high": 5052
     },
     "sections/03-decisions.md": {
       "sha256": "ae93b001a6a29daa80f1f895993d6336e0801d89f8c0cbb6adcfb418bc809617",
@@ -98,47 +98,47 @@
   },
   "estimates": {
     "block_a": {
-      "chars": 81902,
-      "words": 13331,
-      "tokens_est_low": 20476,
-      "tokens_est_high": 24819
+      "chars": 82297,
+      "words": 13387,
+      "tokens_est_low": 20574,
+      "tokens_est_high": 24938
     },
     "block_a_plus_b": {
       "slab_default+generic": {
-        "chars": 84877,
-        "words": 13837,
-        "tokens_est_low": 21219,
-        "tokens_est_high": 25720
+        "chars": 85272,
+        "words": 13893,
+        "tokens_est_low": 21318,
+        "tokens_est_high": 25840
       },
       "slab_default+rockwool": {
-        "chars": 86631,
-        "words": 14105,
-        "tokens_est_low": 21658,
-        "tokens_est_high": 26252
+        "chars": 87026,
+        "words": 14161,
+        "tokens_est_low": 21756,
+        "tokens_est_high": 26372
       },
       "slab_default+coco": {
-        "chars": 86647,
-        "words": 14099,
-        "tokens_est_low": 21662,
-        "tokens_est_high": 26257
+        "chars": 87042,
+        "words": 14155,
+        "tokens_est_low": 21760,
+        "tokens_est_high": 26376
       },
       "rockwool_default+generic": {
-        "chars": 84338,
-        "words": 13749,
-        "tokens_est_low": 21084,
-        "tokens_est_high": 25557
+        "chars": 84733,
+        "words": 13805,
+        "tokens_est_low": 21183,
+        "tokens_est_high": 25677
       },
       "rockwool_default+rockwool": {
-        "chars": 86092,
-        "words": 14017,
-        "tokens_est_low": 21523,
-        "tokens_est_high": 26088
+        "chars": 86487,
+        "words": 14073,
+        "tokens_est_low": 21622,
+        "tokens_est_high": 26208
       },
       "rockwool_default+coco": {
-        "chars": 86108,
-        "words": 14011,
-        "tokens_est_low": 21527,
-        "tokens_est_high": 26093
+        "chars": 86503,
+        "words": 14067,
+        "tokens_est_low": 21626,
+        "tokens_est_high": 26213
       }
     }
   },

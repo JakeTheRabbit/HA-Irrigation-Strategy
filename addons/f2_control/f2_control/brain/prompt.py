@@ -125,6 +125,7 @@ class Prompt:
 
     def __init__(self, rows=(), arc=None, substrates=("generic",), pack=PACK):
         self.tools, self.rows, self.arc, self.pack = load_tools(), rows, arc, pack
+        self.contexts = {}  # optional room-scoped administrator notes and cache breakpoints
         self.a, self.substrates = block_a(pack), None
         self.use(substrates)
 
@@ -197,13 +198,20 @@ class Prompt:
         out += ["</questions>", "Answer each question above with one tool call."]
         return nfc("\n".join(out))
 
-    def request(self, model, evidence, questions, max_tokens):
+    def request(self, model, evidence, questions, max_tokens, room=None):
         """The Messages API request for one lane: no sampling parameters, no prefill, no forced tool choice."""
+        from .prompt_context import blocks, settings
+
+        config = self.contexts.get(room, {})
+        system = blocks(self, config) if config else self.system
+        evidence_block = {"type": "text", "text": evidence}
+        if settings(config)["evidence"]:
+            evidence_block["cache_control"] = {"type": "ephemeral"}
         return {"model": model, "max_tokens": max_tokens, "thinking": {"type": "adaptive"},
                 "output_config": {"effort": EFFORT}, "tool_choice": {"type": "auto"}, "tools": self.tools,
-                "system": self.system,
+                "system": system,
                 "messages": [{"role": "user", "content": [
-                    {"type": "text", "text": evidence, "cache_control": {"type": "ephemeral"}},
+                    evidence_block,
                     {"type": "text", "text": questions}]}]}
 
     @staticmethod

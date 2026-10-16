@@ -51,9 +51,28 @@ EC steering runs in P2 only with ec_stacking_enabled on: every 30 minutes the of
 clamped to +/-20% of re-water. The salt power can hold or halve it. ec_min_interval spaces EC-correction shots,
 not the offset steps. An armed plan owns its targets; drift raises CS-713.
 
+
+### 3a. Restored optional modes and evidence
+
+The phase and gate descriptions above are the default behavior. These supported options change it only when explicitly enabled; when the evidence omits a setting, do not assume it is on.
+- P0 minimum wait (p0_minimum_wait, default 0/off): before that many minutes in P0, normal dryback completion, stall exit, timeout and an AI dawn advance do not start P1. The engine's low-moisture bypass still starts P1 when VWC is at or below p2_vwc_threshold. The minimum is clamped to the maximum wait; it never prevents safety checks or an EC flush.
+- P0 stall exit (p0_stall_exit switch, default off): after 30 minutes in P0, a dryback below 0.1 VWC points/hour, or projected to miss the maximum wait, can start P1. The minimum wait still applies. Never classify a backed-up table or a suspect/flat/bypassed probe as a stalled dryback; no positive peak means no stall verdict.
+- P2 mode (zone p2_mode select, default Moisture): Moisture retains the normal top-up rule. Timed uses p2_timed_interval_min since the last delivered shot and waits until p2_timed_first_hours after lights-on; p2_timed_shot_size 0 uses p2_shot_size. Timed with guards keeps the moisture-triggered top-up as a floor rescue and skips a timer slot at or above min(p1_target_vwc, field_capacity - 2). The floor rescue is a budgeted p2_topup, not a daily-cap exemption. Plain Timed has no moisture top-up; both modes retain EC correction priority, the daily cap and every hardware/feed interlock.
+- Timed P2 end (p2_end_hours_before_off, default 0/off): a positive value replaces predictive P3 and sends a zone in P1 or P2 to P3 that many hours before lights-off, independent of moisture. Lights-off still forces P3 and its emergency floor remains available; a zero value retains predictive P3.
+- EC flush target (ec_flush_target, default 0/off): a fired EC correction can latch a flush episode. In P2 it continues with budgeted p2_dilute shots toward the settled pore EC target, never below feed EC + 0.2 mS/cm. Continuation requires dilutive feed, drainage, VWC below field capacity - 2 and the EC correction settling/minimum interval. The episode clears at its goal, when switched off, at lights-off or a new grow-day; existing high-EC rescue triggers keep their own rules.
+- Zone P2 dilute ratios apply only with the room's use_p2_ec_thresholds switch on (default off). Otherwise the dilute trigger remains 1.2 times the P2 EC target. Changing the ratio changes when dilution triggers; it does not bypass the correction interval, drainage, feed or budget checks.
+- Maximum extra ramp shots accepts 1-30. Extra shots still count inside p1_maximum_shots and the daily cap. Increasing the extra-shot setting alone cannot extend a ramp already stopped by its maximum total shots.
+- Max setpoint move per day (setpoint_max_step_per_day, default 1 VWC point) limits the highest-reading follower by default. With setpoint_step_limit_applies_to set to Auto setpoints and AI, the same per-grow-day ledger also clips learner and AI target moves for field capacity, P1 peak and P2 re-water; exhausted allowance prevents further movement. The ladder must still validate after clipping. This does not limit shot-size writes or move the rescue floor. Zero removes this movement limit, not any watering interlock or daily water cap.
+- Rescues past a dead feed probe (rescue_past_dead_feed_probe, default off): only p3_emergency and watchdog shots can pass the dead EC/pH probe gate while this switch reads ON. A routine shot or an out-of-band reading still holds. This never skips the kill switch, dosing/external holds, plan rules, tank minimum, hardware faults, max-run latch or the shot kind's normal daily-cap policy.
+- Waste valve rule (waste_valve_rule, default Off): no mapped valve or a confirmed absent legacy policy keeps the old Off behavior. Check closed requires the waste valve to read OFF before a shot. Close for each shot closes it before the pump primes and verifies readback; a refused/unverified close starts no shot. An unreadable or invalid policy holds rather than silently disabling the interlock; a disappeared previously seen policy also holds. Under an enabled policy a waste valve seen ON during delivery aborts the shot. The controller never opens it.
+- Rescue misses (rescue_miss_action, default Off): Alert counts rescue shots whose settled moisture fails to rise and tells the grower after rescue_miss_count consecutive misses. This is hardware/probe evidence, never permission to abandon or hold watering; a subsequent moisture rise clears the miss run.
+- Estimated tank level (tank_size_l, default 0/off): only without a mapped level sensor, count shot litres from the last confirmed/manual fill. Configured flow is not measured delivery. Low-estimate alerts never drive the reservoir hold.
+- Sump water balance (runoff_estimator, default off): model runoff and condensate from sump cycles, feed history, mapped AC/dehumidifier runtime and substrate-water change. Use the sealed-room daily closure only when its water-balance assumptions hold. Output is a room-wide or shared-sump estimate with fit/error evidence, not a measured zone catch and not measured transpiration. A shared sump cannot be attributed to an individual room or zone without separable evidence. Learning or unresolvable output is unknown, not zero. Only ai mode adds the estimate as a hint to AI evidence; shown/shown_alerts do not. Closure/fit warnings do not water, hold or move settings. A recommendation still needs repeated zone evidence and the normal enabled power/envelope; this estimate grants no authority to act.
+
 ### 4. The settings: each zone's own number for the setting, else the room's, else the controller's built-in fallback shown here (these are not the fresh-room defaults)
 
 - drippers_per_plant: 1
+- ec_flush_target: 0
 - ec_min_interval: 10
 - ec_target_gen_p0: 4
 - ec_target_gen_p1: 5
@@ -68,6 +87,7 @@ not the offset steps. An armed plan owns its targets; drift raises CS-713.
 - maximum_ec: 9
 - p0_additional_dryback: 0
 - p0_maximum_wait_time: 45 (range 5-240)
+- p0_minimum_wait: 0
 - p1_initial_shot_size: 2 (range 0.5-15)
 - p1_maximum_extra_shots: 3
 - p1_maximum_shots: 12 (range 1-40)
@@ -76,8 +96,13 @@ not the offset steps. An armed plan owns its targets; drift raises CS-713.
 - p1_shot_size_increment: 0.5 (range 0-5)
 - p1_target_vwc: 60 (range 20-100)
 - p1_time_between_shots: 15 (range 1-120)
+- p2_dilute_ratio: 1.2
+- p2_end_hours_before_off: 0
 - p2_shot_size: 5 (range 0.5-20)
 - p2_time_between_shots: 0
+- p2_timed_first_hours: 0
+- p2_timed_interval_min: 60
+- p2_timed_shot_size: 0
 - p2_vwc_threshold: 45 (range 10-100)
 - p3_emergency_shot_size: 2
 - p3_emergency_vwc_threshold: 40 (range 10-65)
@@ -146,6 +171,9 @@ not the offset steps. An armed plan owns its targets; drift raises CS-713.
 - CS-312 Repeated maximum-length shots: The last 3 shots of a zone each needed more time than the maximum shot length of the room. The controller cut each shot (CS-306). This often shows a probe that reads dry, or a wrong substrate volume or dripper flow. Does: If the max-run latch switch of the room is on, the zone gets no more shots, rescue shots included, until you fix the Repairs card. If the latch switch is off, the card only reports. It clears after the next shot that the controller does not cut.
 - CS-313 Device type not supported: A zone valve, pump or main-line valve has a device type that the controller cannot open or close. The controller can use a switch, an input_boolean or a valve. The setup does not accept other types, so a person mapped this device by hand. Does: The zone gets no shots, and the controller sends no command to the device. Other zones continue.
 - CS-314 Sump water balance does not close: With the runoff estimator at shown_alerts or ai, a grow-day whose sump litres (its runs times the litres per run) miss what a sealed room must send to the sump (the water fed minus the change of water in the substrate) by more than 30%. In a sealed room the water the plants transpire comes back as AC and dehumidifier condensate, so the two agree on a normal day. Does: The alert does not change the water. The runoff estimate is a room-wide hint and never waters or holds a zone.
+- CS-315 Rescue shots not absorbed: Rescue shots of a zone (P3 emergency or watchdog shots) did not raise its moisture, several in a row. Each rescue is judged 15 min after it, or at the next rescue if that comes first: it counts as a miss when the moisture rose less than 0.5 points. The alert comes at the number of misses that the room setting Rescue misses before alert gives (4 by default). The check runs only while the room select Rescue shots not absorbed is set to Alert. Does: The alert does not change the water. The rescue shots continue. The alert clears at the next rescue that raises the moisture.
+- CS-316 Waste valve not closed: The room has a waste valve mapped and its waste valve rule is set. With Check closed, the waste valve does not read off. With Close for each shot, the controller set it to off before a shot and it did not read off, or the controller cannot switch or read it. An open waste valve sends the feed to waste while the controller counts it as given. Does: No shot starts in the room until the waste valve reads off. A shot that is running stops when the waste valve opens (CS-307).
+- CS-317 Pump runs with every valve shut: The feed pump of the room (option pump_power_sensor) uses more power than the room setting Pump dead-head power, for 1 min, while every zone valve of the room reads off, and no shot, hold or batch uses the pump. A pump that runs against shut valves (dead-head) heats up and can be damaged. Does: The alert does not change the water. The controller does not switch the pump off. The alert clears when the pump stops or a valve opens.
 - CS-401 Setting outside controller range: The entity accepts a wider range than the controller uses, and the value is outside the range of the controller. The alert names the setting, its value and the range. For a check of two settings, for example a minimum above its maximum, it names the two. Does: Water continues. The controller uses the nearest value inside its range.
 - CS-402 Missing settings: The controller cannot read some settings by their entity IDs for 3 loops. It uses the last value that it read since its start, or its built-in value. The alert lists the settings. Does: All shots wait for 3 loops. Then water continues on the last value or the built-in value, which can be wrong for the room. A zone gets no shots, rescue shots included, if the controller has not read one of its water size settings since its start. These are the substrate volume, plant count, drippers per plant, dripper flow and daily water limit.
 - CS-403 Lights hours from the integration: The controller now reads the lights-on and lights-off hours from the integration, not from its own options. The two sources do not agree. Does: Water continues on the hours of the integration. The controller uses its own options only when it has not read the hours of the integration since its start.
@@ -195,4 +223,5 @@ not the offset steps. An armed plan owns its targets; drift raises CS-713.
 - CS-902 Tank level not readable: The tank level of this room gives no usable reading, or the distance sensor seems stuck. The shots took enough water to decrease the level, but the reading did not change. The controller cannot know how much water remains. Does: The controller holds each zone of the room until the level reads again, or until a stuck sensor moves. This hold prevents a pump that runs dry.
 - CS-903 Refill needed before next shots: One more set of shots, the last shot of each zone, takes the tank to its 8% minimum or below. The controller calculates this from the litres for each 1% that the tank showed, and needs a distance sensor for it. Does: Water continues. A shot that takes the tank to its minimum waits until you refill the tank. The card clears when the tank has enough water for a full set of shots.
 - CS-904 Tank above full mark: The tank level reads 102% or more of its full distance. Does: Water continues. The controller closes the fill valve of a batch, and does not open it until the level reads 98% or less.
+- CS-905 Estimated tank level low: The room has no tank level sensor, and a Tank size (estimate) above 0. From the litres that the shots used since the tank was last filled, the tank is at or below the room setting Estimated tank low alert (20% by default). The litres come from the dripper flow settings, not from a measurement. Does: The alert does not change the water. The estimate never holds a shot.
 - CS-906 Batch tank low: The batch tank of the room read at or below its refill reminder level (remind_pct) 3 times, 1 min apart. Nothing refills the tank automatically. Does: Water continues as usual. The reminder clears when the level is 5 points above the reminder level. It comes again each day while the level stays low.
