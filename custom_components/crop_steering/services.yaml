@@ -1197,3 +1197,54 @@ brain_ask:
           min: 1
           max: 24
           mode: box
+display_get:
+  name: Read display options
+  description: >-
+    Returns the display options of the room: which extra panels the dashboard shows. Every option
+    is off until an administrator turns it on. Changes nothing. It has no administrator check. Use
+    it to read the revision before you save.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID reads a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
+      required: true
+      selector:
+        text:
+display_save:
+  name: Save display options
+  description: >-
+    Turns display options of the room on or off. The options only select which panels the
+    dashboard shows. They do not change watering, a setpoint or hardware. Everyone who opens the
+    room sees the result. When a signed-in user calls it, that user must be a Home Assistant
+    administrator. An automation can call it without this check. Give the revision that you read
+    with display_get. The integration refuses the save when the options changed after you read them.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. Example: `room:f1_`.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that display_get returned. Example: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    options:
+      name: Options
+      description: >-
+        The options to change, each with its new value. A switch option takes true or false.
+        today_zone_layout takes "cards" or "table". Example: {"show_climate": true}.
+      required: true
+      selector:
+        object:
