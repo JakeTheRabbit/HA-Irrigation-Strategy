@@ -46,6 +46,7 @@ from brain import client as jev_client
 import setpoint_supervisor
 import tank_level
 import zone_history
+import day_summary
 from strategy_runtime import merge_bridge, parse_snapshot, parameter_override, strategy_block
 
 from crop_steering_engine import (
@@ -667,6 +668,7 @@ PLAN_HOLD_EXEMPT = frozenset(
     {"p3_emergency", "watchdog", "min_daily", "blind_fallback", "blind_copy_rescue", "test_shot"}
 )
 TEST_SHOT_S = 10  # how long a zone's Test Shot waters it
+GROW_DAY_PROBE_S = 600  # how often the probes behind each zone are read for its grow-day summary (day_summary)
 # A Test Shot press older than this when the controller sees it is not acted on: the person testing is
 # watching the drippers, and a shot long after they asked for it tests nothing for them.
 TEST_REQUEST_S = 600.0
@@ -1401,6 +1403,7 @@ class Controller:
             "p1_stall": None,
             "vmax_wetup": [],  # this grow-day's P1 wet-up VWC readings, for the Vmax advisory (resets each P0)
             **zone_history.fresh(),
+            **day_summary.fresh(),  # the grow-day summary being measured, and those not yet sent (day_summary)
         }
 
     def _apply_saved_zone(self, fresh, d):
@@ -1520,6 +1523,7 @@ class Controller:
                                if isinstance(v, (int, float)) and not isinstance(v, bool)
                                and math.isfinite(v) and 0.0 <= v <= 100.0][-VMAX_SERIES_MAX:]
         s.update(zone_history.restore(d))
+        s.update(day_summary.restore(d))
         return s
 
     def _read_state_file(self):
@@ -1900,6 +1904,8 @@ class Controller:
             "night_hist": s.get("night_hist") or [],
             "night": s.get("night"),
             "vmax_wetup": list(s.get("vmax_wetup") or []),
+            "day_acc": s.get("day_acc"),
+            "day_out": s.get("day_out") or [],
         }
 
     def _save_state(self):
@@ -2825,6 +2831,135 @@ class Controller:
             st["peak_prev"] = fc["peak"]
         fc["peak"] = 0.0
 
+    # ---------- grow-day summaries (day_summary): read-only, never a reason to water or not ----------
+    def _recording_days(self, room, now):
+        """The room's Record grow days switch, read once a pass (off when it cannot be read)."""
+        seen = room.__dict__.get("_record_days")
+        if seen is None or seen[0] != now:
+            seen = room._record_days = (now, self._on(f"switch.crop_steering_{room.prefix}record_grow_days", False))
+        return seen[1]
+
+    def _observe_grow_day(self, room, zone, st, snap, now):
+        try:
+            if not self._recording_days(room, now):
+                day_summary.stop(st)
+                return
+            if snap is None:
+                return
+            day = self._grow_day_start(room, now).isoformat()
+            stall = st.get("p1_stall")
+
+            def recent(at):
+                return isinstance(at, datetime) and (now - at).total_seconds() < 600
+
+            day_summary.observe(
+                st, day=day, now=now, vwc=snap.vwc, ec=snap.ec,
+                feed_ec=getattr(room, "_feed_last_good_value", None)
+                if recent(getattr(room, "_feed_last_good_time", None)) else None,
+                feed_ph=getattr(room, "_feed_ph_last_good", None)
+                if recent(getattr(room, "_feed_ph_last_good_time", None)) else None,
+                stalled=isinstance(stall, dict) and stall.get("day") == day)
+        except Exception as e:  # a record never stops the room being decided and watered
+            log("grow-day summary error", room.slug, zone, e)
+
+    def _grow_day_shot(self, room, zone, kind, litres, now):
+        try:
+            if litres > 0 and self._recording_days(room, now):
+                day_summary.shot(room.state[zone], day=self._grow_day_start(room, now).isoformat(), now=now,
+                                 kind=kind, litres=litres)
+        except Exception as e:
+            log("grow-day summary error", room.slug, zone, e)
+
+    def _close_grow_day(self, room, zone, st, now, p=None):
+        """Lights-on: the grow-day that ended, summarised and queued for Home Assistant (_send_grow_days)."""
+        try:
+            if not st.get("day_acc"):
+                return
+            if not self._recording_days(room, now):
+                day_summary.stop(st)
+                return
+            ended = st.get("last_daily_reset")
+            day = ended.isoformat() if isinstance(ended, date) else st["day_acc"]["day"]
+            targets = {k: getattr(p, k, None) for k in ("p1_target", "field_capacity", "p2_threshold", "dryback_target",
+                                                        "p3_emergency_floor", "max_daily_volume", "ec_target_p2")}
+            info = {
+                "zone": zone,
+                "lights": {"on": room.lights_on_hour, "off": room.lights_off_hour},
+                "plant_count": self._zone_num(room, zone, "plant_count", FALLBACK["plant_count"]),
+                "mode": "Vegetative" if self._veg(room, zone) else "Generative",
+                "targets": {k: v for k, v in targets.items()
+                            if isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)},
+                "litres": st.get("daily_vol"),
+                "plan_day": (getattr(room, "strategy_snapshot", None) or {}).get("grow_day"),
+                "day_start": datetime.combine(date.fromisoformat(day), datetime.min.time())
+                + timedelta(hours=room.lights_on_hour),
+            }
+            summary = day_summary.close(st, day=day, now=now, info=info)
+            if summary is not None:
+                room._grow_days_due = True
+                log(f"[{room.slug}] Z{zone} grow-day {day} summarised: {summary['litres']:g} L, "
+                    f"{sum(summary['shots'].values())} shot(s)" + (" (partial)" if summary["partial"] else ""))
+        except Exception as e:
+            log("grow-day summary error", room.slug, zone, e)
+
+    def _sample_probes(self, room, now):
+        """Every probe behind each zone, read in one request every GROW_DAY_PROBE_S, for the summaries."""
+        last = room.__dict__.get("_probes_sampled")
+        if last is not None and (now - last).total_seconds() < GROW_DAY_PROBE_S:
+            return
+        room._probes_sampled = now
+        states = {s.get("entity_id"): s for s in ha_get_all() if isinstance(s, dict)}
+        day = self._grow_day_start(room, now).isoformat()
+        for zone in room.zones if states else ():
+            rows = []
+            for kind in ("vwc", "ec"):
+                fused = states.get(self._fused_id(room.prefix, kind, zone, room.zones[zone].get(kind))) or {}
+                attrs = fused.get("attributes") or {}
+                used = [x for x in attrs.get("used") or [] if isinstance(x, str)]
+                aside = attrs.get("excluded") if isinstance(attrs.get("excluded"), dict) else {}
+                for pid in used + [x for x in aside if isinstance(x, str) and x not in used]:
+                    probe = states.get(pid) or {}
+                    pa = probe.get("attributes") or {}
+                    try:
+                        value = float(probe.get("state"))
+                    except (TypeError, ValueError):
+                        value = None
+                    rows.append((kind, pid, pa.get("friendly_name"), pa.get("unit_of_measurement"), value, pid in used))
+            if rows:
+                day_summary.probes(room.state[zone], day=day, now=now, readings=rows)
+
+    def _send_grow_days(self, room, now):
+        """The summaries not yet taken, sent in one call (crop_steering.grow_day_record): at lights-on, else
+        every GROW_DAY_PROBE_S while any wait. An integration without the service keeps them waiting, the
+        newest day_summary.KEEP grow-days, and the log says so once."""
+        try:
+            if self._recording_days(room, now):
+                self._sample_probes(room, now)
+            pending = {z: list(room.state[z].get("day_out") or []) for z in room.zones}
+            days = [s for rows in pending.values() for s in rows]
+            if not days:
+                return
+            last = room.__dict__.get("_grow_days_tried")
+            due = room.__dict__.pop("_grow_days_due", False)
+            if not due and last is not None and (now - last).total_seconds() < GROW_DAY_PROBE_S:
+                return
+            room._grow_days_tried = now
+            status, _answer = ha_service_response(
+                "crop_steering", "grow_day_record", {"room_id": f"room:{room.prefix}", "days": days})
+            if status is not None and 200 <= status < 300:
+                for z, rows in pending.items():
+                    day_summary.taken(room.state[z], [s.get("date") for s in rows])
+                self._save_state()
+                room._grow_days_refused = False
+                log(f"[{room.slug}] {len(days)} grow-day summary(ies) recorded in Home Assistant")
+            elif not room.__dict__.get("_grow_days_refused"):
+                room._grow_days_refused = True
+                log(f"[{room.slug}] Home Assistant did not take the grow-day summaries (HTTP {status}): kept, the "
+                    f"newest {day_summary.KEEP} grow-days, and sent again later. An integration older than this "
+                    "controller has no grow-day store: update it.")
+        except Exception as e:
+            log("grow-day summary error", room.slug, e)
+
     def _follow_fc(self, room, zone, p, now):
         """The zone's setpoints follow its own highest readings -> True when anything was written.
 
@@ -3470,6 +3605,8 @@ class Controller:
         with the wording: an update replaces an old notification instead of adding a second one.
         True once Home Assistant has it; False while it is inside its quiet period (`quiet`: for a
         condition re-checked every loop) or could not be created."""
+        if room is not None and zone is not None and zone in getattr(room, "state", {}):
+            day_summary.alert(room.state[zone], code)  # the code, for the zone's grow-day summary
         if quiet and not self._alert_due(key, code):
             return False
         now = datetime.now()
@@ -5872,6 +6009,7 @@ class Controller:
             new_phase, why = "P2", f"P1 max shots {st['shots']}/{p.p1_max_shots} (no moisture reading)"
         if new_phase and new_phase != st["phase"]:
             if new_phase == "P0":
+                self._close_grow_day(room, zone, st, now, p)
                 self._keep_day_peak(st)  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
                 st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, 0.0  # _snapshot takes the peak from the next reading
                 st["ec_offset"], st["last_ec_steer"] = 0.0, None
@@ -6227,6 +6365,7 @@ class Controller:
                 st["ec_offset"], st["last_ec_steer"] = 0.0, None
             snap, p = self._snapshot(room, zone, now, lights_on, lights_just_on)
             params[zone] = p
+            self._observe_grow_day(room, zone, st, snap, now)
             if lights_just_off or lights_just_on:  # the night's two readings (zone_history), kept across a restart
                 try:
                     vwc = snap.vwc if snap is not None else None
@@ -6299,6 +6438,7 @@ class Controller:
                 self._notify_event("phase", room, zone, st["phase"], new_phase, str(reason).split(" | ")[0])
                 self._record_phase(room, zone, st, st["phase"], new_phase, now, str(reason).split(" | ")[0], snap, p)
                 if new_phase == "P0":
+                    self._close_grow_day(room, zone, st, now, p)
                     self._keep_day_peak(st)  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
                     st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, snap.vwc
                     st["ec_offset"], st["last_ec_steer"] = 0.0, None
@@ -6448,6 +6588,7 @@ class Controller:
                      else strategy_block(getattr(room, "strategy_snapshot", None), zone))
             if fire and not block and getattr(self, "jev", None) is not None and getattr(reason, "kind", None) != "test_shot":
                 brain_bridge.shot_started(room, zone, snaps.get(zone), getattr(reason, "kind", None))
+            fed_before = room.state[zone]["daily_vol"]
             acted = self._act_zone(
                 room,
                 zone,
@@ -6458,6 +6599,7 @@ class Controller:
                 lights_on,
                 now,
             )
+            self._grow_day_shot(room, zone, getattr(reason, "kind", None), room.state[zone]["daily_vol"] - fed_before, now)
             if acted is not None:  # held back at the daily budget after all: publish what happened
                 fire, size, reason = decisions[zone] = acted
             snap = snaps.get(zone)
@@ -6537,6 +6679,7 @@ class Controller:
             self._watch_tank(room)
         except Exception as e:
             log("tank level error", room.slug, e)
+        self._send_grow_days(room, now)
         room._was_lights_on = lights_on
         return pub
 

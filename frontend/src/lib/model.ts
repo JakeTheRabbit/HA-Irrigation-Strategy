@@ -16,6 +16,7 @@ import { parseAutoSetpoints } from "./auto-setpoints";
 import { readWaiting } from "./waiting-for";
 import { PHASE_GROUPS, settingWords } from "./setting-words";
 import { growerWords } from "./words";
+import { numberLimits, registeredControl } from "./features";
 import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
 
 const ROOT = "crop_steering_";
@@ -1039,7 +1040,12 @@ export function validateChange(room: RoomView, states: States, change: Change): 
     return typeof change.value === "string" && choice.options.includes(change.value)
       ? null
       : "Select an available steering mode.";
-  const field = room.settings.find((s) => s.entityId === change.entityId);
+  // A registered number the room's Targets do not list (features.json): its own entity's limits.
+  const field =
+    room.settings.find((s) => s.entityId === change.entityId) ??
+    (registeredControl(room.room.prefix, change.entityId)?.control.domain === "number"
+      ? numberLimits(entity)
+      : null);
   if (field) {
     if (typeof change.value !== "number" || !Number.isFinite(change.value))
       return "Enter a finite number.";
@@ -1059,10 +1065,21 @@ export function validateChange(room: RoomView, states: States, change: Change): 
       `switch.${ROOT}${room.room.prefix}zone_${z.id}_manual_override`,
     ]),
   ]);
-  // What the AI assistant may do in the room (brain.ts AI_POWERS): one switch per power.
-  const aiPower = change.entityId.startsWith(`switch.${ROOT}${room.room.prefix}ai_power_`);
+  // A registered select of the room (features.json): one of its own options.
+  const registered = registeredControl(room.room.prefix, change.entityId);
+  if (registered?.control.domain === "select") {
+    const options = entity.attributes.options;
+    return Array.isArray(options) && options.includes(change.value)
+      ? null
+      : "Select one of the available options.";
+  }
+  // What the AI assistant may do in the room (brain.ts AI_POWERS): one switch per power. Any other
+  // switch registered in features.json is a configuration control too.
+  const registeredSwitch =
+    change.entityId.startsWith(`switch.${ROOT}${room.room.prefix}ai_power_`) ||
+    registered?.control.domain === "switch";
   if (
-    (safeSwitches.has(change.entityId) || aiPower) &&
+    (safeSwitches.has(change.entityId) || registeredSwitch) &&
     /^(switch|input_boolean)\./.test(change.entityId) &&
     boolean(entity) !== null &&
     typeof change.value === "boolean"
