@@ -268,6 +268,7 @@ async def test_a_3_8_0_state_file_loads_with_its_history_empty_and_nothing_moves
         assert new == (None, False, None, 0, None, None)  # the day before's peak and the P1 rule's state, saved empty
         assert (written.pop("capped_in_a_row"), written.pop("max_run_latch")) == (0, None)
         assert written.pop("vmax_wetup") == []
+        assert (written.pop("p1_flat"), written.pop("p1_stall")) == (0, None)  # no stalled ramp: saved empty
         old = {k: v for k, v in seed["default"][zone].items() if k not in PID_TERMS}
         assert written.pop("fc_follow") == {"peak": old["peak"], "day": None, "used": {}}
         assert learn == old.pop("learn")
