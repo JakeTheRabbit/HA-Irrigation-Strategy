@@ -1,3 +1,7 @@
+# 3.12.2
+
+Pair with integration 3.12.2. **C3.** #149: a missing hold entity is named at start and in the block message (CS-210), still fail-closed. #151: the why-evidence names the kill switch and holds. #150: one log line when a copied `jev_judges` leaves out newer judges. No state-file change.
+
 # 3.12.1
 
 Pair with integration 3.12.1. **C3.** #147: optional `anthropic_base_url`, so the Claude brain can call an Anthropic-compatible router (tolerant reply parsing, router-prefixed model ids). Blank keeps the direct Anthropic path. No state-file change.

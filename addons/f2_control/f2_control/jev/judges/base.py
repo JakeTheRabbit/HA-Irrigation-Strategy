@@ -70,6 +70,11 @@ class Judge:
     def evidence(self, ctx) -> dict:
         raise NotImplementedError
 
+    def questions_for(self, ctx):
+        """The questions as asked of this zone now. A judge whose answers are candidates code made for the zone
+        (targets, shot size) words them with the zone's numbers; its answer keys stay those of `questions`."""
+        return self.questions
+
     def decide(self, verdicts, ctx):
         """verdicts: {question: council.Verdict or None} -> a Directive or None."""
         return None

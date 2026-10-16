@@ -1,186 +1,284 @@
-# AI brain
+# AI assistant
 
-The controller's optional AI brain puts **TypeSafe Jev**, a typed-decision model served through
-Cloudflare, in charge of every judgement the crop-steering engine makes, while code keeps charge of
-everything physical.
+The AI assistant is optional. It judges the decisions of the controller that need a grower's judgement. The code of the controller keeps control of the pump, the valves, the shot sizes and all the safety limits.
 
-The base engine is rules: fixed thresholds that are right most of the time and wrong in the cases
-nobody wrote down (a probe channeling, a salt front still passing, a ramp that is done but not by the
-numbers). Each fix added another "if". The AI brain replaces the "ifs" with a judge.
+The AI assistant uses Claude from Anthropic, with your own API key. Anthropic bills you for each question. Without the AI assistant, the controller uses its rules, and the rules are always safe.
 
-## What "truly insane and amazing" means here
+This page tells how the AI assistant works, which options control it, and what it can change. The [README](../README.md#the-ai-assistant) gives the short procedure to start it.
 
-Eight properties. Each one is concrete and checked by a test or a published number.
+## How the AI assistant works
 
-| # | Property | What it means | How it is checked |
-|---|---|---|---|
-| 1 | **Jev everywhere a judgement lives** | Every decision the engine makes on ambiguous evidence is asked of Jev: when the morning ramp starts, when it is done, whether a probe is telling the truth, whether a shot landed, why pore EC moved, when the day's watering stops, why one zone drinks differently. Ten judges cover P0, P1, P2 and P3 for every zone. | The coverage map below; one test per judge. |
-| 2 | **Code owns physics and safety** | Jev never opens a valve, never sizes a shot, never crosses the daily floor or cap, the drown ceiling or max EC, never stops a rescue shot and never removes the last probe. Every Jev decision is a *directive* that the **envelope** admits or refuses on arithmetic Jev can't do. | Envelope tests for every directive type. |
-| 3 | **Never waits** | Jev is asked in the background; the 60-second loop reads the last answer and carries on. A slow, failing or absent Jev leaves the engine exactly as the base engine behaves. | A golden test: with Jev off or erroring, every decision and every switch call equals the base engine's. |
-| 4 | **A council, not a coin toss** | Jev's confidence moves with how a question is worded. So every judge asks each question in two independent phrasings in the same call and acts only when both land on answers that lead to the same action, and the calibrated probabilities of those answers add up ("the slab is full" and "the EC left is the feed passing" both mean hand the ramp over). | Council tests: disagreement means no action. |
-| 5 | **It remembers and checks itself** | Every verdict and what code did with it goes into a ledger. When the outcome can be measured (EC after a flush call, the ramp after a hand-over, water after a probe was set aside), code measures it and shows Jev its own track record next time. A move that did not work is not repeated blindly. | Ledger tests; the track record in the evidence. |
-| 6 | **Code does the maths, Jev does the judging** | Jev cannot do arithmetic and knows no crop-steering doctrine. Code turns the raw series into plain facts ("rose 3.1 points after the 10:40 shot and held", "EC rising 0.4 an hour since the last flush"), and every question carries the owner's own doctrine from his GrowLabs wiki (below). What is certain goes in code; what is judgement goes to Jev. | Evidence tests: no raw series ever reaches Jev; every question carries its doctrine. |
-| 7 | **Explains everything** | Every verdict is published in Home Assistant with its answer, its confidence, whether the council agreed, what code did and why. `sensor.crop_steering_<prefix>zone_N_jev` per zone, `sensor.crop_steering_<prefix>jev` per room, and every decision in the dashboard's live log (`sensor.crop_steering_<prefix>jev_log`). | Publish and journal tests. |
-| 8 | **Cheap and bounded** | Each judge has a cadence and a trigger, so Jev is asked when there is something to decide. A room of three zones costs cents a day (input $0.042 per million tokens, output free). A daily call budget caps it. | The room sensor shows calls and tokens today. |
+1. The controller reads the probes of each zone each minute and decides each shot with its rules.
+2. When a decision needs judgement, the controller asks a judge in the background. A judge is one question about one decision. An example is "Is the substrate full?".
+3. The control loop never waits for the answer. It uses the last answer that it has, or its rules.
+4. Each question has the readings and the settings of the zone, the stage of the day, and the doctrine pack (`doctrine/`). The code calculates the facts. The AI assistant does only the judgement.
+5. The controller asks each judge in two phrasings. An answer acts only when the two phrasings agree.
+6. The code then admits or refuses the answer against the safety limits. The dashboard shows the answer, the confidence and what the controller did.
+7. Later, the code measures the result. The AI assistant sees its own record the next time that it answers.
 
-## The judges (coverage map)
+## Start the AI assistant
 
-| Judge | Phase | Asked | Jev decides | Code does with it | Envelope |
-|---|---|---|---|---|---|
-| **Dawn** | P0 | every 10 min in P0 | start the ramp now / keep drying / the probe isn't moving | brings P1 forward | only after half the dryback target or a quarter of the max wait; never while the probe reading has not moved for 30 min (code refuses it, whatever Jev says); never later than the base engine |
-| **Ramp** | P1 | every 15 min once a ramp shot is 10 min old | keep ramping / slab is full / the EC left is the feed passing / real salt (all three: hand over; the ramp only refills, salt leaves in maintenance runoff) / the probe is lagging, wait | brings P2 forward | minimum ramp shots in; VWC within 3 points of the ceiling; never past `p1_maximum_shots` (the base engine still ends it there) |
-| **Salt** | P2 | every 30 min when EC is settled, only while the room's EC stacking is on (its only action is the EC steer's mode); not asked while the settled pore EC is inside the band and steady, where the only call is "in band, hold" | salts accumulating / salt front still passing / the feed changed / the probe is suspect / the target can't be reached / in band | chooses the EC steer: steer, hold, or decay the offset | only changes the P2 offset the base engine already steers, inside its clamp |
-| **Dusk** | P2 | every 15 min in the last 3 h before lights-off, never for a zone steered vegetative | go to P3 now / one more top-up then P3 / carry on | brings P3 forward | only in the last 3 hours; only for a zone steered generative (for a vegetative zone, the owner's doctrine: it stops late; with no mode set or another mode the answer is advice only); VWC at least 3 points above the P3 emergency floor; the P3 rescue still fires |
-| **Probe** | all | every 30 min once the zone has had two shots; every 2 h while every recent shot kept a normal rise and the reading is not a flat line | is this probe tracking the substrate; if not, how (stuck, channeling, out of the block, wrong zone, drifting) | sets the zone's probe aside: the zone runs on the existing dead-probe path (copies a healthy sibling, or its timer) | two agreeing verdicts in a row, **and** code-confirmed evidence (two shots with no rise while a sibling rose, or a flat line for an hour with water going in); lasts only while Jev's latest answer (90 min) still says so |
-| **Shot** | all | once per shot, 20 min after it ends | landed / landed slowly / reached the probe but moisture didn't rise / didn't reach the zone | tags the shot, feeds the probe judge, raises CS-701 on two misses in a row | never adds water |
-| **Night** | P3 | every 20 min within 3 points of the emergency floor | real drying / a probe fault | raises CS-703 | never stops a rescue |
-| **Zones** | P1, P2 | hourly with lights on, when a zone's water per plant is under 70 % or over 140 % of the room's median zone (itself included; the other zone in a room of two) | why one zone differs (recipe, plants drinking less, wet spot, delivery fault, water not landing) | raises CS-702 with the likely cause | alert only |
-| **Balance** | P2 | once a grow-day, in the last 2 h before lights-off, when a zone's water per plant is outside 85-115 % of the room's median zone and the zones judge has named no hardware cause today; Claude route only | move toward the room with less water / with more water / the difference is intended / it is hardware / keep as is | nothing itself: its answer is shown to tonight's Setpoints judge for the same zone as `room_balance` | advice only: the Setpoints judge stays the one writer of the zone's shot size and re-water threshold |
-| **Stage** | P2 | once a grow-day, with lights on, when the flower day is known | is last night's dryback, the settled pore EC, and the stage's move-on signs where the owner's stage arc wants them for today | CS-705 advice; code itself states a steering mode that is not the stage's | advice only: never changes a setting |
-| **Channel** | all | hourly with lights on, when two of the last four shots spiked and fell back to under a quarter of the zone's typical rise, or the zone's water per plant is under 40 % of the room's median zone while that median is at least a tenth of a plant's substrate | is water running past the probe or through the block, a dry block, restricted delivery, or plants drinking less | raises CS-710 with a catch-test and block-check suggestion; its latest answer is evidence for the probe judge | alert only: never adds water |
-| **Plan** | room | Claude Haiku only: 30 min after lights-on when code found a drift from the grower's plan it may ask about, on a new kind of drift once it has lasted 10 min, every 6 h while it lasts, at most 4 times a photoperiod | what the drift most likely means: a deliberate change, a plan out of date, a reading holding the plan, a setting outside the plan that disagrees, no effect today | picks which of code's suggestions the plan line shows; code raises CS-713 itself under every brain. Only when today's plan day is held by a stale probe, it is also asked whether to keep yesterday's targets: a firm no applies today's plan values, the plan's own, until the plan applies the day itself or the next lights-on (the plan-day catch-up) | the catch-up only: the same revision and day, held by a stale probe for 30 min, the values exactly the plan's preview and passing its band checks, lights on and more than 3 h before lights-off, no shot in flight or room hold, fresh readings, no no-touch window, once a photoperiod, a 7-day rest after one that did not work out; never writes a setting, never arms, edits or disarms a plan |
-| **Setpoints** | P3 | once a grow-day, in the first 3 h after lights-off, while the room's **Auto setpoints** switch is on | tomorrow's maintenance watering: smaller shots / bigger shots / re-water later / re-water sooner / keep, from the day's water per plant against the room, the shots and how they held, pore EC against the stage's range (code states which way the EC and the room call for) | one notch on the zone's OWN number: P2 shot size ±0.5 % or P2 re-water threshold ±0.5 points | one notch a grow-day; inside a range around the operator's own value (shot ±1 %, never under 3 %; threshold 2 under to 1 over, 4 above the rescue floor, 2 under the ramp ceiling); an edit by hand always wins and re-centres the range; a P3 rescue shot within 30 h puts the old value back, pauses the zone 48 h and raises CS-404; the base engine's own Auto Setpoints learner never writes these two, and keeps the P1 target and field capacity ([who writes which setpoint](#who-writes-which-setpoint)) |
+For the app:
 
-## The owner's doctrine
+1. Get an API key at console.anthropic.com, under **API keys**.
+2. Open **Settings → Apps → Crop Steering Controller → Configuration**.
+3. Set `brain_provider` to `claude_haiku`.
+4. Put the key in `anthropic_api_key`.
+5. Set `anthropic_daily_budget_usd` to the most that you want to spend in one grow-day.
+6. Restart the app.
 
-Jev knows no crop steering, so every question carries its rules. They are the owner's own GrowLabs wiki pages (root-zone TEROS-12, closed loop, flowering stages, rockwool crop steering, one steering law, slab irrigation strategy, ripening and harvest timing), then Athena's Grow Guide Handbook (metric, Precision Irrigation Strategy, pp. 33-41: first-shot timing, small P1 shots against channeling, the maintenance and EC levers, relative drybacks, the stage table and day climate, runoff targets, probe placement and the runoff check), restated as one-sentence rules with their source in `jev/doctrine.py`: 123 rules (99 from the owner's pages, 24 from Athena's, added 28 Sep 2026) across ramp, dryback, maintenance, EC, probe, stage, ripening, closed loop and slab. The owner's rules come first in every topic, and where the two differ (Athena states drybacks as a share of the peak, the owner's arc in points of true water content) the owner's arc leads. The stage arc is the slab guide the owner chose on 26 Sep 2026 (flower setting days 1-21 generative, bulk 22-42 vegetative, finish the last 14 days); set `jev_flower_start` and every judge sees today's stage and the operator's steering mode.
+The log then shows `brain: claude_haiku`, the model, the budget, `key set` and the judges. It never shows the key.
 
-The live runs drew the line between doctrine for Jev and doctrine for code. Told in the question that a vegetative stage stops late, Jev still called an early stop for a well-watered zone near lights-off (both phrasings, p 0.7): so "a vegetative zone stops late" is an envelope rule. Whether the operator's steering mode matches the stage is arithmetic on the flower day: so the Stage judge's code states it, and Jev judges only what needs judgement.
+For a container, set `F2_OPT_BRAIN_PROVIDER=claude_haiku`. Give the key in `F2_OPT_ANTHROPIC_API_KEY_FILE` (a Docker secret) or in `F2_OPT_ANTHROPIC_API_KEY`. When neither is set, the controller also reads the usual `ANTHROPIC_API_KEY` variable.
 
-## The envelope (what code never hands over)
+> **CAUTION:** Set `brain_dry_run` to on for the first grow-days with a new AI assistant. Then read its decisions before you let it act. A judgement that you did not examine can change when the shots start and stop.
 
-- **Hardware:** valve, main line and pump sequencing, read-backs, fault latches and every interlock.
-- **Water limits:** the daily minimum floor, the daily cap, the drown ceiling, max EC flushes, the P3
-  emergency rescue, the watchdog. Jev can bring a phase forward; it can never stop one of these firing.
-- **Arithmetic:** shot size, duration, litres, rates, peaks and the clock.
-- **Direction:** phase directives only ever move a zone *forward* through its day (P0 → P1 → P2 → P3),
-  and only earlier than the base engine would; the base engine's own transitions always still happen.
-- **Doctrine that is certain:** a zone steered vegetative is never stopped early; pore EC under the stage's range
-  calls for less runoff and over it for more (the Setpoints judge is told which way, and judges only whether and
-  with which lever).
-- **Setpoints:** only the zone's own P2 shot size and re-water threshold, one notch a night, inside a range around
-  the operator's value that no string of notches can leave; never a room-level number, a daily limit, a floor or
-  a ceiling. However that range moves, a setting moves at most one notch in any 24 hours and two in any 7 days,
-  and nothing moves for 36 hours after a move code refused or one whose next-day check came back bad (the notch
-  budget, read from the ledger). 26 Sep 2026 is why: the base engine's learner walked zone 1's shot from 3 % to 1 % (30-second shots
-  every 96 seconds) and ratcheted zone 3's targets to 74.5 in four days.
-- **Probes:** the last usable probe is never set aside by Jev alone: it takes the council, the code-confirmed
-  evidence, and it expires.
+## Options
+
+| Option | Default | What it does |
+| --- | --- | --- |
+| `brain_provider` | `auto` | `rules`: no AI assistant. `claude_haiku`: the AI assistant with your Anthropic key. `jev_legacy`: the deprecated Jev routes (below). `auto`: keeps a Jev route on an install that ran it before. All other installs use rules. |
+| `anthropic_api_key` | empty | Your Anthropic API key. It is a password field. The controller never shows, logs or publishes it. Empty: rules. |
+| `anthropic_model` | `claude-haiku-5-5` | Also `claude-sonnet-5-5` or `claude-opus-5-5`. A larger model costs more for each call. With another model name, the controller uses its rules, because it does not know the price. |
+| `anthropic_base_url` | empty | The address of an Anthropic-compatible router, for example `http://router.example.local:20128`. Empty: the Anthropic API. |
+| `anthropic_daily_budget_usd` | 1.0 (US$1.00) | The AI budget: the most that the AI assistant can spend from one lights-on to the next. The limits are 0 and 1000. With 0, the AI assistant never asks. |
+| `brain_dry_run` | off | On: the AI assistant judges, and the log and the dashboard show what it would do. It changes nothing. |
+| `jev_judges` | `all` | The judges and tasks that the AI assistant asks: `all`, or a list of names with a comma between each name. |
+| `jev_daily_calls` | 5000 | The maximum number of calls in one calendar day, for all rooms together. |
+| `jev_budget_warn_pct` | 80 | The share of the daily calls, or of the AI budget, at which the controller raises CS-706. |
+| `jev_reask_max` | 2 | The maximum number of second looks, with more evidence, when an answer is unsure. 0: no second look. |
+| `jev_unsure_below` | 0.7 | An answer with a probability below this value is unsure. An answer is also unsure when its two phrasings do not agree. |
+| `jev_strict_after` | 3 | The number of bad calls in a row by one judge for a zone before the stricter gate (CS-707). |
+| `jev_strict_prob` | 0.8 | The minimum probability of each answer that acts on the stricter gate. |
+| `stage_arc` | `slab_default` | The stage arc for flower. `slab_default` is the only stage arc in this release. |
+| `jev_flower_start` | empty | The first day of 12/12 for each room: a date (YYYY-MM-DD) or an `input_datetime` helper. For more than one room, use `room=value` pairs. Without it, the judges use no stage. |
+| `jev_flower_days` | 56 | The flower length of the cultivar. The finish is the last 14 days. |
+
+The option names that start with `jev_` keep their names from earlier releases, so an old options file loads unchanged.
+
+### The router
+
+With `anthropic_base_url`, the controller sends each question to an Anthropic-compatible router, and not to the Anthropic API. The router must accept the Messages API.
+
+- The controller sends the key in `anthropic_api_key` to the router. Use the key that the router needs.
+- With a router, `anthropic_model` can have a router prefix before the model name, for example `cc/claude-haiku-5-5`. The AI budget uses the price of the model after the prefix.
+- The address must start with `http://` or `https://`. With another address, the controller uses its rules and the AI assistant panel tells why.
+
+> **WARNING:** Use only a router that you control. The controller sends your API key to the address in `anthropic_base_url`. A router that another person controls can read and use your key.
+
+### The AI budget
+
+The AI budget limits the cost of one grow-day. A grow-day starts at lights-on. The controller counts the cost of each answer at the price of its model. A question that timed out can still cost money, so the controller counts a high estimate for it.
+
+At `jev_budget_warn_pct` of the budget, the controller raises CS-706. When the budget is spent, the controller raises CS-708 and uses its rules until the next lights-on. The AI assistant panel shows the cost of today and the budget.
+
+The call limit in `jev_daily_calls` also applies. It resets at midnight.
+
+### Dry run
+
+With `brain_dry_run` on, the AI assistant asks each judge and spends the AI budget. The code admits or refuses each answer as usual. An answer that would act is recorded as "would act". The controller then uses its rules for that decision. The alerts from the judges still come through.
+
+## The judges and the tasks
+
+A judge is one question about one decision of one zone. A task is a question about the room. The name in bold is the name on the dashboard. The name in brackets is the name in `jev_judges`.
+
+| Judge | When the controller asks | The question | What the controller can do with the answer |
+| --- | --- | --- | --- |
+| **Morning start** (`dawn`) | P0, each 10 min | Is the morning dryback large enough to start the ramp? | Start the ramp earlier. Never later than the rules. |
+| **Ramp hand-over** (`ramp`) | P1, each 15 min | Is the substrate full, or does the EC increase only because new feed flows past the probe? | Start maintenance earlier. |
+| **Pore EC** (`salt`) | P2, each 30 min, only when EC stacking is on | Why did the pore EC change? | Let EC stacking move the re-water point, hold it, or move it back, inside its limits. |
+| **Day end** (`dusk`) | The last 3 h before lights-off | Must the shots of today stop now? | Start P3 earlier. Only for a zone with generative steering. |
+| **Probe trust** (`probe`) | Each 30 min, after two shots | Is this probe correct, or is it stuck, drifting, out of the block or in the wrong zone? | Set the probe aside. The zone then copies a healthy zone, or uses its timer. |
+| **Shot landing** (`shot`) | 20 min after each shot | Did the water get to the zone? | Send alert CS-701 after two misses in sequence. It never adds water. |
+| **Night low** (`night`) | Overnight, near the rescue floor | Is the substrate dry, or is the probe defective? | Send alert CS-703. The rescue shot still occurs. |
+| **Zone comparison** (`zones`) | When the water of a zone is far from the other zones | Why does this zone get much more or much less water? | Send alert CS-702 with the probable cause. |
+| Water channel (`channel`) | With the lights on, a maximum of one time each hour | Does the water flow past the substrate or the probe? | Send alert CS-710, which asks for a catch test. It never adds water. |
+| **Stage arc** (`stage`) | One time each grow-day | Are the dryback and the pore EC of the zone correct for the stage of today? | Send advice CS-705. It never changes a setting. |
+| **Setpoints** (`setpoints`) | One time each night, only with Auto setpoints on | Must the maintenance shots of tomorrow be smaller or bigger, or start later or sooner? | Move one setting by one step, inside a range around your value. |
+| Balance (`balance`) | One time each grow-day, in the last 2 h before lights-off | Must the water of tomorrow move toward the water of the room? | Advice only. The Setpoints judge sees the answer. |
+
+| Task | When the controller asks | What the controller does with the answer |
+| --- | --- | --- |
+| Feed (`feed`) | One time each grow-day, 1 h after lights-on, in a room with a feed EC sensor | Sends proposal CS-711 when the two questions agree firmly. It never writes a feed, a dose or a setting. |
+| Report (`report`) | One time each grow-day, 3 h after lights-off | Publishes the daily report on `sensor.crop_steering_<prefix>brain_report`. |
+| Why (`why`) | When a person asks with the `crop_steering.brain_ask` action, a maximum of 20 questions for each room each day | Publishes the answer on `sensor.crop_steering_<prefix>brain_answers`. It never changes a setting. |
+| Plan (`plan`) | When the room differs from its grow plan, a maximum of 4 times each photoperiod | Selects the suggestion that the plan line shows. When a stale probe holds the plan day, it can apply the targets of the plan day. |
+
+Only six judges can act: `dawn`, `ramp`, `salt`, `dusk`, `probe` and `setpoints`. The other judges and the tasks give alerts or advice. The plan task can only apply the targets that the grow plan already has for today.
+
+The judges `balance`, `feed`, `report`, `why` and `plan` work only with `claude_haiku`.
+
+### Make sure that all the judges run
+
+With `jev_judges` set to `all` (the default) or empty, all the judges and all the tasks run. With a list, only the names in the list run. The controller ignores a name that it does not know.
+
+An options file from an older install can have a list of names. That list does not have the judges and the tasks that came later: `why`, `feed`, `report`, `plan`, `channel` and `balance`. A very old list also does not have `stage` and `setpoints`. Those judges and tasks do not run until you add them.
+
+A very old list can also name `alerts`, a retired judge. The controller ignores that name. One time after each start, the log then names the newer judges that the list does not have, and tells you to set `jev_judges` to `all`.
+
+1. Open the Configuration of the controller.
+2. Set `jev_judges` to `all`.
+3. Restart the controller.
+4. Find the `judges` list in the start line of the log.
+
+To stop one judge, put a list of all the other names in `jev_judges`. The Setpoints judge also needs the **Auto setpoints** switch of the room on.
+
+## When the controller uses its rules
+
+The AI assistant is optional at each level. In each of these conditions, the decision of a judge is the decision of the rules, without change.
+
+| Condition | Effect | How you know |
+| --- | --- | --- |
+| `brain_provider` is `rules`, or `auto` on an install that never ran Jev | No AI assistant. | The panel and the log show `Rules.` |
+| `claude_haiku` with no key | No AI assistant. | `Rules: no Anthropic key.` |
+| `anthropic_base_url` is not an `http` or `https` address | No AI assistant. | The panel tells you to correct the address or make it blank. |
+| `anthropic_model` has no price in this release | No AI assistant. | The panel names the models that you can use. |
+| 32-bit ARM (armv7), with no router | No AI assistant, because the device cannot load the Anthropic library. | The panel says that rules are running. |
+| A call fails or times out | The controller tries again while the failure can pass, inside 60 s. Then it continues without that answer. | The panel shows the last error. |
+| A question waited more than 5 min behind failed calls | The controller does not ask it, because its evidence is old. | — |
+| The API refuses the key or the model | No more questions until the controller restarts. | CS-709. |
+| The API refuses three requests in sequence | No more questions for 1 h. | CS-709. |
+| The AI budget is spent | No more questions until the next lights-on. | CS-708. |
+| The calls reach `jev_daily_calls` | No more questions until midnight. | CS-706 first warns you. |
+| An answer is not valid, or is unsure after its second looks | No action from that answer. | The live log shows the answer and "no action". |
+| A probe of a zone that is on is stale or missing | The controller asks nothing for that room until the probes report. | — |
+| A judge is not in `jev_judges` | That judge never runs. | The start line of the log lists the judges. |
+
+While the AI assistant cannot act, the Auto setpoints learner of the controller writes all the setpoints of the zone. The Setpoints judge gets its two settings back only at a lights-on at which the AI assistant can act. Thus a short pause does not change the writer of a setting during a grow-day.
+
+## The safety limits
+
+The code of the controller admits or refuses each answer. The AI assistant cannot change these limits.
+
+- **Hardware:** the sequence of the valves, the main line and the pump, the readbacks, the latches and all the interlocks.
+- **Water limits:** the daily minimum, the daily cap, the drown ceiling, the max EC flushes, the rescue shot and the watchdog. The AI assistant can start a phase earlier. It cannot stop one of these limits.
+- **Arithmetic:** the shot size, the duration, the litres, the rates, the peaks and the clock.
+- **Direction:** an answer can only move a zone forward through its day (P0 → P1 → P2 → P3), and only earlier than the rules. The rules still do all their own phase changes.
+- **Morning start:** only after half the dryback target or a quarter of the maximum wait. Never while the probe has not moved for 30 min.
+- **Ramp hand-over:** only after the minimum ramp shots, and only with VWC within 3 points of the peak target (or of field capacity, when it is lower).
+- **Day end:** only in the last 3 h before lights-off, only for a zone with generative steering, and only with VWC at least 3 points above the rescue floor.
+- **Probes:** the code sets a probe aside only after two answers in sequence that agree, and evidence from the code. The evidence is two shots with no increase while another zone increased, or a flat reading while water goes in.
+- **Setpoints:** see the next section.
+
+## Powers
+
+The owner ticks what the AI assistant may do in each room: one switch per power,
+`switch.crop_steering_<prefix>ai_power_<key>`, shown as a checklist on the dashboard's AI assistant page. With a power
+off, its judge still asks and its answer is advice in the decision log; the envelope refuses to act on it. A missing
+switch (an integration from before the powers) reads as its default, so a room updated in place does what it did.
+
+| Power | Default | What it lets the AI assistant do |
+|---|---|---|
+| `advance_phase` | on | start the morning ramp or the night dryback early (dawn, dusk) |
+| `ramp_control` | on | end the morning ramp (ramp) |
+| `set_probe_aside` | on | set a probe aside (probe) |
+| `ec_mode` | on | choose the EC steer's mode (salt) |
+| `nudge_setpoints` | on | one notch on the maintenance shot size or re-water point (setpoints, its band and notch budget unchanged) |
+| `plan_catch_up` | on | apply today's plan day while a stale probe holds it (plan) |
+| `set_targets_from_achievable` | off | set a zone's field capacity, peak target, re-water point, rescue floor and dryback target itself (targets) |
+| `tune_shot_sizes` | off | set a zone's ramp and maintenance shot sizes itself (shotsize) |
+
+The last two are the owner's full authority. Once a night, in the first 3 h after lights-off (Claude route), the
+targets and shot size judges are shown the zone's scorecard (each of the last 5 grow-days against the goal of each
+phase, hit or missed and by how much), the AI assistant's own earlier changes with the result it expected and what
+followed, and each setting's value and range; they answer with `set_values`: the values they want, each with its
+reason, the expected result and a confidence. With the power on, code writes them as given, clamped only to each
+setting's own range (a clamp is logged), the ladder from the top when the peak rises and from the bottom when it
+falls, read back, and named in the room's setpoint change log with the reason and the expected result. No other
+limit of code's applies: the doctrine's goal and rules for the owner's powers (POW-01 to POW-10) are in the cached
+system prompt, and the AI assistant is trusted to follow them. While `set_targets_from_achievable` is on and the brain
+can act, the Auto setpoints learner and the follower of the highest readings leave the ladder alone. Dry run still
+only reports. The watering safety (daily cap, kill switch, valve read-back, feed gate, max-run latch) is unchanged.
+
+The cached system prompt also carries "How this controller works" (`jev/controller_brief.md`), generated from the code
+by `python -m jev.controller_brief --write`: the phase machine, shot sizing, the gates in order, every setting, what
+each AI-writable setting moves downstream, the powers and every error code. A test fails when the code has a phase,
+setting, power or error code the brief lacks, or when the brief is not a fresh render.
 
 ## Who writes which setpoint
 
-With a room's **Auto setpoints** switch on and no armed grow plan, each of a zone's own numbers has exactly one
-automatic writer. With the switch off, or under a plan, neither writes anything.
+With the **Auto setpoints** switch of a room on and no armed grow plan, each setpoint of a zone has one automatic writer. With the switch off, or with an armed grow plan, neither writer changes a setpoint.
 
-| Zone number | Written by | How |
-|---|---|---|
-| P2 shot size, P2 re-water threshold | Jev's Setpoints judge | One notch a night, inside a range around the operator's value (the Setpoints row above). |
-| P1 target, field capacity | The zone's own highest readings (the controller) | The P1 target is the highest reading of the grow-day before, kept at lights-on. Field capacity is the higher of today's and the day before's highest readings. When field capacity moves by a point or more, the re-water threshold moves by the same points (the threshold's move re-centres the Setpoints judge's range). Bounded: each moves at most 1 point a grow-day, only readings from a trusted probe count, a grow-day with moisture rising from below (CS-310) does not count, a zone watering without its probe is not followed, and the threshold stays at least 3 points over the rescue floor. |
-| P3 rescue floor | The operator | Nothing automatic moves it. Without the judge, the learner keeps its re-water threshold at least 3 points over it, and plans a dryback that would end under it only as deep as it lets the zone go. When no threshold fits between it and the P1 target, the learner writes nothing and its sensor says why. |
+| Setpoint of the zone | Writer | How |
+| --- | --- | --- |
+| P2 shot size, re-water point | The Setpoints judge | One step of 0.5 each night, inside a range around your value. |
+| Peak target, field capacity | The Auto setpoints learner of the controller | The peak target follows the highest VWC of the grow-day before. Field capacity follows the highest VWC of this grow-day or the grow-day before. Each moves 1 point or less each grow-day. |
+| Rescue floor | You | The controller never changes it. |
 
-The old hourly P2 check is retired: nothing asks it, with or without the Setpoints judge. Each zone's
-`sensor.crop_steering_<prefix>zone_N_auto_setpoints` lists these numbers in `managed` and names each one's writer
-in `managed_by`.
+The limits of the Setpoints judge:
 
-Two runs of the learner shaped this. From 22 to 26 Sep 2026, writing every target alone, it took zone 3's P1
-target from 40.9 to 74.5. From 26 Sep it wrote nothing at all while the judge ran, so nobody wrote the P1
-target: after a sump flood on 29 Sep moved zone 2's probe up 15 to 20 points, its target sat at 29.5 under a
-probe reading 42 to 44 % at lights-on and P1 never ramped (4 Oct). Since 6 Oct the learner writes neither the P1
-target nor field capacity: they follow the zone's own highest readings, as the owner set out, and P1 ends by the
-rise rule (core.decide): reach the target, give one more shot, and hand over only when a shot no longer raises
-the zone's highest reading by 0.5 points (or at the maximum P1 shots). The ramp judge does not run on F2.
+- The shot size stays within 1 point of your value, and never goes below 3%.
+- The re-water point stays between 2 points below and 1 point above your value. It also stays at least 4 points above the rescue floor and at least 2 points below the peak target and field capacity.
+- A setting moves one step (0.5) or less in any 24 h, and two steps (1.0) or less in any 7 days.
+- After a move that the code refused, or a move that did not work, no setting moves for 36 h.
+- A rescue shot within 30 h after a move puts the old value back. The zone then pauses for 48 h, and the controller raises CS-404.
+- When you change a value by hand, your value wins. The range then moves to your new value.
 
-In a room without the judge, the learner also owns the re-water threshold.
+When the Setpoints judge does not run, the learner also writes the re-water point. When field capacity moves by 1 point or more, the re-water point moves by the same number of points. The learner keeps the re-water point at least 3 points above the rescue floor.
 
-## Failing safe
+Each zone has `sensor.crop_steering_<prefix>zone_N_auto_setpoints`. Its `managed` attribute lists these setpoints, and `managed_by` names the writer of each one.
 
-Jev is optional at every level: no TypeSafe key and no Cloudflare credentials, `jev_enabled` off, a judge left out of
-`jev_judges`, the daily budget spent, every route down, or an answer that fails to parse: each means that judge's
-decisions are the base engine's, unchanged. Jev is reached over every route it has, TypeSafe direct first and then
-Cloudflare's `/ai/run`; each is tried up to `jev_retries` times inside 60 seconds while its failure may pass (a busy
-or failing server, a timeout), and a refused key moves straight on. A question that waited more than five minutes
-behind failing calls is dropped unasked, because its evidence is stale, and an answer is as old as its question.
-When an answer that did not act is unsure (under `jev_unsure_below`, or two phrasings that disagree), Jev is asked
-again with more evidence, up to `jev_reask_max` times, before the engine decides; the second look is dropped once
-the zone leaves the judge's phase or the answer is older than the judge's window. After `jev_strict_after` of a judge's calls in a row did not work out for a zone,
-that judge is on the stricter gate there: it acts only when both phrasings agree at `jev_strict_prob` or more and a
-second look inside the judge's window gives the same call, until two calls in a row work. Jev keeps judging throughout.
+## Alerts
 
-## Configuration
+| Code | Name |
+| --- | --- |
+| CS-701 | No water at the zone |
+| CS-702 | Unusual water for each plant |
+| CS-703 | Overnight probe fault suspected |
+| CS-704 | Probe set aside by AI |
+| CS-705 | Zone outside stage arc |
+| CS-706 | AI call budget almost used |
+| CS-707 | Stricter gate for a judge |
+| CS-708 | AI budget used |
+| CS-709 | AI assistant not available |
+| CS-710 | Possible water bypass |
+| CS-711 | AI feed change proposal |
+| CS-712 | Jev route retired |
 
-Add-on options (the controller app):
+The code raises CS-713 (room differs from grow plan) with each brain, also with rules. [ERROR_CODES.md](ERROR_CODES.md) tells what each code means and what to do.
+
+## What the dashboard and Home Assistant show
+
+The dashboard shows the decisions of the AI assistant on **Today**, on the page of each zone, on **Plan › Targets**, on **History › Timeline** and on **Equipment › Probes**. A room without the AI assistant shows none of it. The [README](../README.md#daily-use) shows each page.
+
+- `sensor.crop_steering_<prefix>jev`: the AI assistant panel of the room. It shows the brain, the model, the mode (acting or dry run), the calls, the cost and the budget of today, the last error and the judges. It also shows the stage of today.
+- `sensor.crop_steering_<prefix>zone_N_jev`: the judges that act on the zone, the setpoint range, and the last answers of each judge with what the code did.
+- `sensor.crop_steering_<prefix>jev_log`: the live log. Its `entries` attribute has the last 30 decisions of the room, newest first, with each result.
+- `sensor.crop_steering_<prefix>brain_report`: the daily report. Its state is the headline.
+- `sensor.crop_steering_<prefix>brain_answers`: the answers to the last questions that a person asked.
+
+The controller keeps these files in its data folder:
+
+- `jev_usage.json`: the calls, the tokens, the cost and the budget window of today. It also names the brain that wrote it.
+- `jev_ledger.jsonl`: each answer that acted, what the AI assistant saw, and the result.
+- `jev_journal.jsonl`: the last 400 decisions behind the live log.
+- `jev_setpoints.json`: the setpoint memory of the Setpoints judge.
+- `brain_report.json`: the last daily report of each room.
+
+## Deprecated: the Jev routes
+
+> **NOTE:** The Jev routes are deprecated. They get no new features. Use `brain_provider: claude_haiku` for a new install.
+
+Before 3.12.0, the AI assistant was Jev, a typed-decision model. The controller reached it through two routes: TypeSafe direct, then Cloudflare Workers AI. A room that used these routes continues to work on them.
 
 | Option | Default | What it does |
-|---|---|---|
-| `typesafe_api_key` | empty | A TypeSafe API key (`apikey_...`): Jev straight from TypeSafe (`api.typesafe.ai/v1/systemone`, model `jev-latest`). Tried first when set; Cloudflare, when set too, is the second route. |
-| `cf_account_id`, `cf_api_token`, `cf_gateway_id` | empty | Or Jev through Cloudflare Workers AI: the account, a token with Workers AI access, and the AI Gateway (optional). With neither a TypeSafe key nor these, Jev is off. These alone start Jev only on an install that has run it before (one of the `/data/jev_*` files below is there), because an install updated from a line without Jev may have set them just for the Auto Setpoints check. |
-| `jev_enabled` | on | Off runs the plain engine even with Cloudflare set. |
-| `jev_judges` | all | The judges that may act, e.g. `dawn,ramp,salt,dusk,probe,shot,night,zones,stage,setpoints,channel,balance` (balance runs on the Claude route only). Setpoints also needs the room's **Auto setpoints** switch on; while it runs, it owns the P2 shot size and re-water threshold, and the base engine's own Auto Setpoints learner the P1 target and field capacity. |
-| `jev_daily_calls` | 5000 | The day's call budget across rooms. |
-| `jev_budget_warn_pct` | 80 | CS-706 once a day when the calls reach this share of the budget. |
-| `jev_retries` | 3 | Tries per route, inside 60 seconds, while a failure may pass. |
-| `jev_reask_max` | 2 | Second looks, with more evidence, when Jev is unsure. |
-| `jev_unsure_below` | 0.7 | Under this probability, or with phrasings that disagree, an answer is unsure. |
-| `jev_strict_after` | 3 | Bad calls in a row before a judge is on the stricter gate for a zone (CS-707). |
-| `jev_strict_prob` | 0.8 | How sure an answer must be to act on the stricter gate. |
-| `jev_flower_start` | empty | Each room's first day of 12/12: an input_datetime or a date, for every room or as `room=value` pairs, e.g. `default=input_datetime.flower_start, room_b=input_datetime.room_b_flower_start`. |
-| `jev_flower_days` | 56 | The cultivar's flowering length; the finish is its last 14 days. |
+| --- | --- | --- |
+| `typesafe_api_key` | empty | A TypeSafe API key (`apikey_...`). The controller tries this route first. |
+| `cf_account_id`, `cf_api_token`, `cf_gateway_id` | empty | The Cloudflare account, an API token with Workers AI access, and an optional AI Gateway. |
+| `jev_enabled` | on | Off: rules, when `brain_provider` is `auto` or `jev_legacy`. It has no effect with `claude_haiku`. |
+| `jev_retries` | 3 | The tries for each route, inside 60 s, while a failure can pass. |
 
-## What Jev can raise
+The form of a new install does not show these options. Set them in YAML mode (the Configuration tab menu, **Edit in YAML**).
 
-Eight codes, in their own group of the error-code list (docs/ERROR_CODES.md): **CS-701** water isn't reaching a
-zone, **CS-702** a zone's water per plant is out of line, **CS-703** an overnight low looks like a probe fault,
-**CS-704** Jev set a zone's probe aside, **CS-705** a zone is off its stage's arc, **CS-706** Jev has used most of
-today's calls, **CS-707** a judge is on the stricter gate for a zone, **CS-710** water may be bypassing the substrate or the probe. The controller raises them through one method with each code written
-out, so a judge can never raise anything the list does not explain.
+With `brain_provider: auto`, the controller keeps the Jev route only when the install ran it before. The evidence is a `jev_*` file in the data folder, or a TypeSafe key. Cloudflare settings alone on a new install start rules. To keep the Jev route, set `brain_provider` to `jev_legacy`. The controller raises CS-712 one time for each release on a room with Jev route settings.
 
-**CS-713**, the room not running its grow plan as written, is raised by code under every brain, rules included
-(plan adherence, [docs/GROW_PLANS.md](GROW_PLANS.md#how-the-controller-checks-the-plan-is-running)).
+On the Jev routes, the judges `balance`, `feed`, `report`, `why` and `plan` do not run, and the AI budget in US$ does not apply. Only `jev_daily_calls` limits the calls.
 
-## What it shows
+To move from the Jev routes to the AI assistant:
 
-The dashboard reads these live. **Today** puts today's stage in the room's line and lists what Jev changed
-today. Each zone's page marks every decision above its day chart (filled when code acted) and shows **Jev on
-this zone**: the range Jev may use for the P2 shot size and re-water point, and its latest decisions with the
-later check of how they worked. **Plan › Targets** puts Jev's range beside the values it manages, and **Plan ›
-Schedule** opens with the stage arc. **History › Timeline** lists every decision (the actions by default, all of
-them with **All Jev decisions**) with today's calls, tokens and cost, and **Equipment › Probes** says whether Jev
-is on. A room without Jev shows none of it. The [README](../README.md#daily-use) walks through
-each page with screenshots.
+1. Set `brain_provider` to `claude_haiku`.
+2. Put your key in `anthropic_api_key`.
+3. Set `jev_judges` to `all`.
+4. Restart the controller.
 
-- `sensor.crop_steering_<prefix>zone_N_jev`: the judges acting on the zone (or `watching`); `setpoints` (the
-  operator's values, Jev's range around them, the current values, the last move and any pause, and whether the
-  room's Auto setpoints switch hands them to Jev); and per judge its
-  latest verdicts (answer, probability, whether both phrasings agreed), the directive, and why code admitted or
-  refused it.
-- `sensor.crop_steering_<prefix>jev`: calls and input tokens today, errors and the last error, the judges on, and
-  `stage`: today's row of the owner's stage arc as numbers (day of flower, stage, steering, pore EC range, dryback
-  points, runoff %), which the dashboard draws on its day chart.
-- `plan` on the same sensor, under every brain: the grow plan's status, its one-line headline ("Plan: Bulk · day 17
-  of 84 (week 3) · on track"), each zone's day, week, profile and next change, the day expected and the day in
-  force, and each drift code found with its suggestion (docs/GROW_PLANS.md). Null headline with no plan.
-- `sensor.crop_steering_<prefix>jev_log`: the dashboard's live log. Its state is the newest decision in one line;
-  `entries` holds the room's last 30, newest first: time, zone, judge, Jev's answer with its probability and
-  whether both phrasings agreed, what it asked for, and what code did (`acted`, `refused` with why, `no action`,
-  `waiting`), plus each outcome (`worked` or `did not work`, with `of` = the time of the decision it checks and
-  the action in words).
-- `/data/jev_ledger.jsonl`: every directive that acted, what Jev saw, and later how it turned out.
-- `/data/jev_journal.jsonl`: every decision behind the live log (the last 400), kept across restarts.
-- `sensor.crop_steering_<prefix>brain_report` (Claude Haiku only): the daily report, asked once a grow-day three
-  hours after lights-off. Its state is the headline; `grow_day`, `zones` (one line each), `watch` (up to three
-  things to check), `generated_at` and `cost_usd`. Kept in `/data/brain_report.json` across a restart.
-- `/data/jev_usage.json`: today's calls, input tokens and errors, so the count survives a restart.
-
-## Checked against the real Jev
-
-`scripts/brain_live_smoke.py` builds realistic zone situations, runs each judge's own evidence and questions through
-Cloudflare and compares the council's verdict (and what the envelope then admits) with what an experienced grower
-would say. On 27 September 2026, with the doctrine in every question: 14 of 14, about 3,000 input tokens a
-question (cents a day for a room), no errors. The same zone two hours before lights-off was stopped early in
-flower setting and left watering in flower bulk; a zone left on generative steering in bulk was flagged.
-
-On 28 September 2026 the Setpoints judge joined: 17 of 17 through TypeSafe. Zone 1's heavy day of 27 Sep (235 % of
-the room's water, pore EC 3.05 under the bulk range) became smaller shots, 5 % to 4.5 % (p 0.94); a zone on course
-kept its settings (p 0.92); a thirsty zone with EC over the range got bigger shots (p 0.95). Before code stated
-which way the EC and the room called for, Jev split zone 1 between smaller (0.45) and bigger shots (0.35): the
-direction is doctrine, the lever and the timing are judgement.
+[MOVING_FROM_JEV.md](MOVING_FROM_JEV.md) tells how to move a room from the Jev edition repository.

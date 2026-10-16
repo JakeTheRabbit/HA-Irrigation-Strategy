@@ -7,6 +7,9 @@
   not an edit while it is read back, sent again and, if it never lands, recorded as failed (jev_bridge.readback).
 - `last`: the last move {suffix, from, to, at, day, words, choice, reverted}.
 - `frozen_until`: when a zone paused after a safety revert may be moved again.
+- `ai`: the AI powers' memory for the zone (jev_bridge, "the AI assistant's powers"): the zone's scorecard by grow-day
+  (`days`), the AI assistant's own changes with what it expected (`changes`), what the powers wrote (`written`) and
+  writes being read back (`pending`).
 """
 from __future__ import annotations
 
@@ -16,7 +19,7 @@ import threading
 
 
 def _blank():
-    return {"home": {}, "written": {}, "pending": None, "last": None, "frozen_until": None}
+    return {"home": {}, "written": {}, "pending": None, "last": None, "frozen_until": None, "ai": {}}
 
 
 class SetpointMemory:
