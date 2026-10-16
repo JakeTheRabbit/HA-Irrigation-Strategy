@@ -9,10 +9,11 @@ import {
 import { LoaderCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { UiTip } from "@/components/info-tip";
+import { gauge, probeGaps, vwcGauge, type ProbeGap } from "@/lib/hmi";
+import { GaugeRow, QualityChip, StatusLine } from "@/components/hmi";
 import { dailyLimit, Empty, number, time as clock } from "@/components/dashboard";
 import { ageText, ageTone, readHeartbeat } from "@/lib/controller-health";
 import {
-  bandStatus,
   CHART_LAYERS,
   dayScales,
   hourTicks,
@@ -147,6 +148,8 @@ interface Lane {
   shots: Shot[];
   blocks: Block[];
   points: Reading[];
+  /** Today's probe gaps: VWC readings at 0 % that are left out of `points`. */
+  gaps: ProbeGap[];
   /** Today's pore EC, in ten-minute medians. */
   ec: Reading[];
   changes: Change[];
@@ -450,7 +453,9 @@ function buildLane(
   const shots = valveShots(ids?.valve ? rows[ids.valve] : [], decisions, zone.id, day.start, now);
   const bands = alignBands(phaseBands(ids && rows[ids.phase], day.start, now), shots);
   const blocks = zoneBlocks(decisions, zone.id, day.start, now);
-  const points = ids?.vwc ? readings(rows[ids.vwc], day.start, now) : [];
+  const { clean: points, gaps } = probeGaps(
+    ids?.vwc ? readings(rows[ids.vwc], day.start, now) : [],
+  );
   const ec = smoothRecorded(ids?.ec ? readings(rows[ids.ec], day.start, now) : []);
   const water = waterParameters(controller, zone.id);
   // The phase now is the band that reaches now: none while the sensor is unreadable.
@@ -600,6 +605,7 @@ function buildLane(
     shots,
     blocks,
     points,
+    gaps,
     ec,
     changes: changes.filter((change) => change.zoneId === zone.id),
     roomChanges: changes.filter((change) => change.zoneId === undefined),
@@ -649,10 +655,16 @@ function buildLane(
 }
 
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+const PHASE_WORDS: Record<string, string> = {
+  P0: "Morning dryback",
+  P1: "Ramp",
+  P2: "Maintenance",
+  P3: "Overnight dryback",
+};
 
-/** Today in numbers: moisture, pore EC against the stage's band, water today and each plant's
- * share, shots and the last one, the overnight dryback against the stage's reference, and what comes
- * next. Readings are live; the lane adds what only today's record knows. */
+/** Today in numbers: a status line, four gauges (VWC now, the peak, the overnight dryback and pore EC,
+ * each against its target), then water today, shots and the dryback rate, and what comes next.
+ * Readings are live; the lane adds what only today's record knows. */
 function ZoneNumbers({
   controller,
   zone,
@@ -666,7 +678,6 @@ function ZoneNumbers({
 }) {
   const stage = readJev(controller.states, controller.room.room.prefix).room?.stage ?? null;
   const band = lane?.ecBand?.band ?? stage?.poreEc ?? null;
-  const ec = bandStatus(zone.ec.value, band);
   const water = dailyWater(zone, zonePlants(controller, zone.id));
   const each = water.mlPerPlant === null ? null : plantAmount(water.mlPerPlant);
   const { view } = useWaterView();
@@ -676,7 +687,6 @@ function ZoneNumbers({
   const lastShot = zone.lastIrrigation.timestamp ?? null;
   const next = lane && day ? nextWords(lane, day) : null;
   const dryback = lane?.dryback;
-  const reference = referenceDryback(stage?.drybackPoints, dryback?.value.peak);
   // How fast it dries since the last shot settled, from today's readings.
   const rate = lane
     ? drybackTrend(
@@ -689,38 +699,79 @@ function ZoneNumbers({
         Date.now(),
       ).rate
     : null;
+  // The four key values against their targets; water and shots are the facts under them.
+  const targets = buildSetpointPreview(controller.room, controller.states, zone.id, {}).saved
+    .parameters;
+  const phase = lane?.phase ?? (/^P[0-3]$/.test(zone.phase) ? zone.phase : null);
+  const peak = lane?.points.length ? Math.max(...lane.points.map((point) => point.value)) : null;
+  const gauges = [
+    {
+      id: "vwc",
+      model: vwcGauge({
+        value: zone.vwc.value,
+        phase,
+        rewater: targets.p2_vwc_threshold ?? null,
+        peak: targets.p1_target_vwc ?? null,
+        rescue: targets.p3_emergency_vwc_threshold ?? null,
+      }),
+    },
+    {
+      id: "peak",
+      model: gauge({
+        label: "Peak today",
+        value: peak,
+        target: targets.p1_target_vwc ?? null,
+        unit: "%",
+        tolerance: 3,
+        underIsNormal: phase === "P0" || phase === "P1",
+      }),
+    },
+    {
+      id: "dryback",
+      model: gauge({
+        label: dryback?.night === "tonight" ? "Dryback tonight" : "Last night’s dryback",
+        value: dryback?.value.percent ?? null,
+        target: targets.dryback_target ?? null,
+        reference: referenceDryback(stage?.drybackPoints, dryback?.value.peak),
+        unit: "%",
+        points: "%",
+        tolerance: 3,
+        underIsNormal: dryback?.night === "tonight",
+      }),
+    },
+    {
+      id: "pore-ec",
+      model: gauge({
+        label: "Pore EC",
+        value: zone.ec.value,
+        band,
+        unit: "",
+        digits: 2,
+        points: "mS/cm",
+      }),
+    },
+  ];
+  const offPlan = gauges.some((item) => item.model.state === "abnormal");
   return (
     <div className="zone-numbers-wrap">
+      <StatusLine
+        name="Today"
+        phase={phase ? `${phase} · ${PHASE_WORDS[phase] ?? phase}` : null}
+        state={{ text: offPlan ? "off plan" : "on plan", abnormal: offPlan }}
+      >
+        {!!lane?.gaps.length && (
+          <QualityChip data-probe-gap>
+            Probe gap{" "}
+            {lane.gaps
+              .map((gap) =>
+                gap.start === gap.end ? clock(gap.start) : `${clock(gap.start)}–${clock(gap.end)}`,
+              )
+              .join(", ")}
+          </QualityChip>
+        )}
+      </StatusLine>
+      <GaugeRow gauges={gauges} label={`${zone.name} key values`} />
       <dl className="zone-numbers" aria-label={`${zone.name} today in numbers`}>
-        <div>
-          <dt>Moisture</dt>
-          <dd>
-            {number(zone.vwc.value)}
-            {zone.vwc.value !== null && <span className="unit">%</span>}
-          </dd>
-          {rate !== null && (
-            <dd
-              className="zone-sub"
-              title={`Dryback rate. The VWC points that the zone lost each hour since the last shot settled. The calculation uses up to the last ${DRYBACK_WINDOW_H} hours.`}
-            >
-              {Math.abs(rate) < 0.05
-                ? "steady"
-                : `${rate > 0 ? "drying" : "wetting"} ${number(Math.abs(rate), Math.abs(rate) < 1 ? 2 : 1)} pts/h`}
-            </dd>
-          )}
-        </div>
-        <div data-status={ec ?? undefined}>
-          <dt>Pore EC</dt>
-          <dd>{number(zone.ec.value, 2)}</dd>
-          {band && (
-            <dd
-              className="zone-sub"
-              title={lane?.ecBand ? `Against ${lane.ecBand.source}` : undefined}
-            >
-              {ec === "in" ? "in" : (ec ?? "band")} {rangeText(band)}
-            </dd>
-          )}
-        </div>
         <div data-status={share !== null && share >= 80 ? "above" : undefined}>
           <dt>Water today</dt>
           {/* The room's choice (Settings › Appearance) leads; the other reading sits under it. */}
@@ -759,27 +810,26 @@ function ZoneNumbers({
           <dd>{zone.shots.value === null ? "—" : number(zone.shots.value, 0)}</dd>
           {lastShot !== null && <dd className="zone-sub">last {clock(lastShot)}</dd>}
         </div>
-        <div
-          title={
-            dryback
-              ? `From the evening peak of ${number(dryback.value.peak)}% (the highest reading in the 2 h before lights-off) to the low of ${number(dryback.value.low)}%: ${number(dryback.value.drop)} points, as a share of the peak.`
-              : "Needs readings on both sides of lights-off."
-          }
-        >
-          <dt>{dryback?.night === "tonight" ? "Dryback tonight" : "Last night’s dryback"}</dt>
-          <dd>
-            {dryback ? number(dryback.value.percent) : "—"}
-            {dryback && <span className="unit">% of peak</span>}
-          </dd>
-          {reference && stage?.drybackPoints && (
-            <dd
-              className="zone-sub"
-              title={`Reference dryback. The reference dryback for ${stage.name}: ${rangeText(stage.drybackPoints, 0)} points of VWC, as a part of the peak of this zone. The P3 target of the zone is on the Targets page.`}
-            >
-              Reference {rangeText(reference, 0)}%
+        {rate !== null && (
+          <div
+            title={`Dryback rate. The VWC points that the zone lost each hour since the last shot settled. The calculation uses up to the last ${DRYBACK_WINDOW_H} hours.`}
+          >
+            <dt>Dryback rate</dt>
+            <dd>
+              {Math.abs(rate) < 0.05 ? (
+                "steady"
+              ) : (
+                <>
+                  {number(Math.abs(rate), Math.abs(rate) < 1 ? 2 : 1)}
+                  <span className="unit"> pts/h</span>
+                </>
+              )}
             </dd>
-          )}
-        </div>
+            {Math.abs(rate) >= 0.05 && (
+              <dd className="zone-sub">{rate > 0 ? "drying" : "wetting"}</dd>
+            )}
+          </div>
+        )}
       </dl>
       {next && (
         <p className="zone-next" title={next.detail} data-tone={next.tone}>

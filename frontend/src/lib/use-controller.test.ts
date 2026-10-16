@@ -75,7 +75,7 @@ describe("controller lifecycle", () => {
     const result = await store.write([{ entityId: numberId, value: 76 }]);
     expect(result.applied).toEqual([numberId]);
     expect(service).toHaveBeenCalledWith("number", "set_value", { entity_id: numberId, value: 76 });
-    expect(states["number.crop_steering_zone_1_p1_target_vwc"].state).toBe("64");
+    expect(states["number.crop_steering_zone_1_p1_target_vwc"].state).toBe("70");
     await store.history([sensorId], 24);
     expect(history).toHaveBeenCalledWith([sensorId], 24, states, expect.any(AbortSignal));
     await expect(store.history(["sensor.crop_steering_vwc_zone_1"], 24)).rejects.toThrow(

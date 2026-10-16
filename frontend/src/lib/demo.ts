@@ -233,8 +233,11 @@ export function createDemo(now = Date.now()): States {
       number(prefix, `${key}p0_maximum_wait_time`, 60, 5, 240, 1, "min");
       number(prefix, `${key}p0_additional_dryback`, 3, 0, 40, 0.5, "%");
       number(prefix, `${key}generative_dryback_target`, 14, 2, 60, 0.5, "% of peak");
-      number(prefix, `${key}p1_target_vwc`, 64 + index * 2, 20, 90, 0.5, "%");
-      number(prefix, `${key}p2_vwc_threshold`, 61 + index * 2, 10, 90, 0.5, "%");
+      // Room A's zone 1 ramps to a high peak and re-waters a long way under it: its first
+      // maintenance shot comes late in P2, which the plan card raises as its one advisory.
+      const late = !index && id === 1;
+      number(prefix, `${key}p1_target_vwc`, late ? 70 : 64 + index * 2, 20, 90, 0.5, "%");
+      number(prefix, `${key}p2_vwc_threshold`, late ? 60 : 61 + index * 2, 10, 90, 0.5, "%");
       number(prefix, `${key}p1_initial_shot_size`, 6, 0.5, 20, 0.5, "%");
       number(prefix, `${key}p1_shot_size_increment`, 0.5, 0.05, 10, 0.05, "%");
       number(prefix, `${key}p1_maximum_shots`, 6, 1, 30, 1);
@@ -260,7 +263,7 @@ export function createDemo(now = Date.now()): States {
           supervisor === "tracking" ? "plateau" : supervisor === "frozen" ? "suspect" : "pending",
         last_change:
           supervisor === "tracking"
-            ? "P1 target 66.0 → 64.0 % (demo)"
+            ? "P1 target 72.0 → 70.0 % (demo)"
             : supervisor === "frozen"
               ? "P2 threshold 56.0 → 54.0 % (demo)"
               : "",
@@ -1203,13 +1206,30 @@ function cycleHistory(
   const step = (hours <= 24 ? 5 : hours <= 72 ? 10 : 15) * 60_000;
   const count = Math.floor((hours * 3_600_000) / step);
   const offset = base - raw(now);
+  // Room A's zone 1 VWC probe dropped out for 20 minutes earlier in this grow-day and read 0 %: the
+  // dashboard shows it as a probe gap, not as a dry zone.
+  const gap = !prefix && kind === "vwc" && entityId.endsWith("vwc_zone_1") ? dropout(on, now) : null;
   return Array.from({ length: count + 1 }, (_, index) => {
     const time = now - (count - index) * step;
     return {
       time: new Date(time).toISOString(),
-      value: Number((offset + raw(time)).toFixed(kind === "ec" ? 3 : 2)),
+      value:
+        gap && time >= gap[0] && time <= gap[1]
+          ? 0
+          : Number((offset + raw(time)).toFixed(kind === "ec" ? 3 : 2)),
     };
   });
+}
+/** A 20-minute window in the grow-day that is under way: three hours before now, but never in the
+ * morning dryback, the ramp or the peak (the first 4.5 hours), so the day's peak stays. Null in the
+ * first five hours. */
+function dropout(lightsOn: number, now: number): [number, number] | null {
+  const start = new Date(now);
+  start.setHours(Math.floor(lightsOn), Math.round((lightsOn % 1) * 60), 0, 0);
+  if (start.getTime() > now) start.setDate(start.getDate() - 1);
+  if (now - start.getTime() < 5 * 3_600_000) return null;
+  const end = Math.max(start.getTime() + 4.5 * 3_600_000 + 20 * 60_000, now - 3 * 3_600_000);
+  return [end - 20 * 60_000, end];
 }
 /** Plausible room climate: warmer and drier while the lights are on, a little different each day.
  * Ends at the live reading. */
@@ -1529,7 +1549,7 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
       }
     }
     if (!prefix) {
-      moved("number.crop_steering_zone_1_p1_target_vwc", 66, request.start + 0.4 * 3_600_000);
+      moved("number.crop_steering_zone_1_p1_target_vwc", 72, request.start + 0.4 * 3_600_000);
       moved("number.crop_steering_zone_2_p2_vwc_threshold", 62, request.start + 5.2 * 3_600_000);
     }
     const fired = new Map<number, string>(),

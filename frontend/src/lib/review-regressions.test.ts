@@ -73,7 +73,7 @@ describe("adapter review regressions", () => {
     const view = buildRoom(states, discoverRooms(states)[0]);
     expect(view.zones[0].vwc.value).toBeNull();
     expect(view.zones[0].ec.value).toBeNull();
-    expect(view.zones[0].target.value).toBe(64);
+    expect(view.zones[0].target.value).toBe(70);
     expect(view.zones[0].enabled).toBe(true);
     expect(view.alerts.some((alert) => /stale/i.test(alert.detail))).toBe(true);
     expect(view.metrics[0].value).toBeNull();

@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, number, time as clock, type Page } from "@/components/dashboard";
 import { RoomOffBanner } from "@/components/room-controls";
 import { BrainCard } from "@/components/brain";
+import { GaugeRow, QualityChip, StatusLine } from "@/components/hmi";
 import { RunProgress } from "@/components/run-progress";
 import {
   roomReference,
@@ -11,8 +12,9 @@ import {
   type AttentionReason,
   type ZoneFacts,
 } from "@/lib/attention";
-import { bandStatus, rangeText, steeringOf } from "@/lib/day-chart";
+import { rangeText, steeringOf } from "@/lib/day-chart";
 import { growDay, type GrowDay } from "@/lib/day-timeline";
+import { gauge, probeGaps, vwcGauge } from "@/lib/hmi";
 import {
   attachOutcomes,
   jevChanges,
@@ -118,6 +120,8 @@ interface Card {
   peak: number | null;
   rescue: number | null;
   readings: { time: number; value: number }[];
+  /** Probe gaps today: readings at 0 % that are not drawn. */
+  gaps: number;
   water: ReturnType<typeof dailyWater>;
   stopped: string | null;
 }
@@ -160,9 +164,11 @@ export function Today({
     const saved = buildSetpointPreview(room, states, zone.id, {}).saved.parameters;
     const water = dailyWater(zone, plants[zone.id] ?? null);
     const series = history?.find((item) => item.entityId === zone.vwc.entityId);
-    const readings = (series?.points ?? [])
-      .map((point) => ({ time: Date.parse(point.time), value: point.value }))
-      .filter((point) => Number.isFinite(point.time) && point.time >= from && point.time <= now);
+    const { clean: readings, gaps } = probeGaps(
+      (series?.points ?? [])
+        .map((point) => ({ time: Date.parse(point.time), value: point.value }))
+        .filter((point) => Number.isFinite(point.time) && point.time >= from && point.time <= now),
+    );
     if (zone.vwc.value !== null && readings.length && readings.at(-1)!.time < now - 60_000)
       readings.push({ time: now, value: zone.vwc.value });
     const stopped = !room.roomActive
@@ -180,6 +186,7 @@ export function Today({
       peak: saved.p1_target_vwc ?? null,
       rescue: saved.p3_emergency_vwc_threshold ?? null,
       readings,
+      gaps: gaps.length,
       water,
       stopped,
       facts: {
@@ -477,63 +484,6 @@ function TankLine({
   );
 }
 
-/** Where moisture sits between the rescue floor, the re-water point and the peak target. */
-function MoistureBar({
-  value,
-  rescue,
-  rewater,
-  peak,
-}: {
-  value: number | null;
-  rescue: number | null;
-  rewater: number | null;
-  peak: number | null;
-}) {
-  const known = [value, rescue, rewater, peak].filter((item): item is number => item !== null);
-  if (value === null || known.length < 2) return null;
-  const lo = Math.max(0, Math.min(...known) - 4),
-    hi = Math.min(100, Math.max(...known) + 4);
-  const at = (level: number) => `${((level - lo) / (hi - lo)) * 100}%`;
-  const marks = [
-    { key: "rescue", level: rescue, label: "Rescue floor" },
-    { key: "rewater", level: rewater, label: "Re-water" },
-    { key: "peak", level: peak, label: "Peak" },
-  ].filter((mark): mark is { key: string; level: number; label: string } => mark.level !== null);
-  const words = marks.map((mark) => `${mark.label} ${number(mark.level)}%`).join(", ");
-  return (
-    <div className="moisture-bar">
-      <div
-        className="moisture-track"
-        role="img"
-        aria-label={`VWC ${number(value)}%: ${words}`}
-      >
-        {rewater !== null && peak !== null && peak > rewater && (
-          <span
-            className="moisture-band"
-            style={{ left: at(rewater), width: `calc(${at(peak)} - ${at(rewater)})` }}
-          />
-        )}
-        {marks.map((mark) => (
-          <span
-            key={mark.key}
-            className="moisture-mark"
-            data-mark={mark.key}
-            style={{ left: at(mark.level) }}
-          />
-        ))}
-        <span className="moisture-now" style={{ left: at(Math.max(lo, Math.min(hi, value))) }} />
-      </div>
-      <p className="moisture-legend" aria-hidden="true">
-        {marks.map((mark) => (
-          <span key={mark.key} data-mark={mark.key}>
-            {mark.label} {number(mark.level)}
-          </span>
-        ))}
-      </p>
-    </div>
-  );
-}
-
 /** Today's moisture as one line, no axes: its shape, not its numbers. */
 function DaySpark({ points, name }: { points: { time: number; value: number }[]; name: string }) {
   if (points.length < 2)
@@ -590,7 +540,6 @@ function ZoneCard({
 }) {
   const { zone, facts, water } = card;
   const top = reasons[0];
-  const ec = bandStatus(zone.ec.value, band);
   const reference = roomReference(
     cards.map((item) => item.facts),
     zone.id,
@@ -606,6 +555,33 @@ function ZoneCard({
       (reason) => `${reason.level === "critical" ? "Needs you now" : "Check"}: ${reason.text}`,
     ),
   ].join("\n");
+  const phase = /^P[0-3]$/.test(zone.phase) ? zone.phase : null;
+  const gauges = [
+    {
+      id: "vwc",
+      model: vwcGauge({
+        value: zone.vwc.value,
+        phase,
+        rewater: facts.rewater,
+        peak: card.peak,
+        rescue: card.rescue,
+        quality: facts.vwcIssue ?? undefined,
+      }),
+    },
+    {
+      id: "pore-ec",
+      model: gauge({
+        label: "Pore EC",
+        value: zone.ec.value,
+        band,
+        unit: "",
+        digits: 2,
+        points: "mS/cm",
+        quality: facts.ecIssue ?? undefined,
+      }),
+    },
+  ];
+  const abnormal = reasons.length > 0 || gauges.some((item) => item.model.state === "abnormal");
   return (
     <article
       className="today-zone"
@@ -628,15 +604,12 @@ function ZoneCard({
             <ChevronRight size={17} aria-hidden="true" className="today-zone-go" />
           </a>
         </h2>
-        {/^P[0-3]$/.test(zone.phase) ? (
-          <span className="pill" data-phase={zone.phase}>
-            {zone.phase} · {PHASE_NAMES[zone.phase]}
-          </span>
-        ) : (
-          <span className="pill" data-tone="unknown">
-            Phase unavailable
-          </span>
-        )}
+        <StatusLine
+          phase={phase ? `${phase} · ${PHASE_NAMES[phase]}` : "Phase unavailable"}
+          state={{ text: abnormal ? "check" : "on plan", abnormal }}
+        >
+          {card.gaps > 0 && <QualityChip data-probe-gap>probe gap</QualityChip>}
+        </StatusLine>
       </header>
       {top && (
         <p className="today-flag" data-level={top.level}>
@@ -649,32 +622,14 @@ function ZoneCard({
           </span>
         </p>
       )}
-      <div className="today-moisture">
-        <p className="today-vwc">
-          <span className="sr-only">Moisture </span>
-          <strong>{zone.vwc.value === null ? "—" : number(zone.vwc.value)}</strong>
-          {zone.vwc.value !== null && <span className="unit">%</span>}
-        </p>
-        <DaySpark points={card.readings} name={zone.name} />
-      </div>
-      <MoistureBar
-        value={zone.vwc.value}
-        rescue={card.rescue}
-        rewater={facts.rewater}
-        peak={card.peak}
+      <DaySpark points={card.readings} name={zone.name} />
+      <GaugeRow
+        className="moisture-bar today-gauges"
+        gauges={gauges}
+        label={`${zone.name} VWC and pore EC`}
+        marksBelow
       />
       <dl className="today-zone-facts">
-        <div>
-          <dt>Pore EC</dt>
-          <dd>
-            {zone.ec.value === null ? "—" : number(zone.ec.value, 2)}
-            {band && ec && ec !== "in" && top?.rule !== "pore-ec" && (
-              <span className="today-chip" data-status={ec}>
-                {ec} {rangeText(band)}
-              </span>
-            )}
-          </dd>
-        </div>
         <div>
           <dt>Water</dt>
           <dd>

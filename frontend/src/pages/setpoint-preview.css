@@ -40,32 +40,6 @@
   line-height: 1.6;
   margin: 12px 0;
 }
-.planning-comparison-key {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px 16px;
-  padding: 0 16px 10px;
-  font-size: var(--text-xs);
-  color: var(--muted-foreground);
-}
-.planning-comparison-key span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-.planning-comparison-key i {
-  width: 22px;
-  border-top: 2px dashed var(--muted-foreground);
-  opacity: 0.6;
-}
-.planning-comparison-key span:nth-child(2) i {
-  border-top: 2px solid var(--primary);
-  opacity: 1;
-}
-.planning-comparison-key small {
-  flex-basis: 100%;
-}
 .setpoint-preview-zone {
   display: flex;
   flex-wrap: wrap;
@@ -85,12 +59,6 @@
   color: var(--muted-foreground);
   font-size: var(--text-xs);
 }
-.setpoint-preview .planning-phase-legend {
-  gap: 10px;
-}
-.setpoint-preview .planning-phase-legend > span {
-  font-size: var(--text-xs);
-}
 .setpoint-expand {
   display: none;
 }
@@ -105,29 +73,17 @@
   .setpoint-expand {
     display: inline-flex;
   }
-  .setpoint-preview:not(.is-expanded) .planning-phase-legend,
   .setpoint-preview:not(.is-expanded) .planning-assumptions,
-  .setpoint-preview:not(.is-expanded) .planning-curve > p.muted,
   .setpoint-preview:not(.is-expanded) .setpoint-preview-note,
   .setpoint-preview:not(.is-expanded) .setpoint-water {
     display: none;
-  }
-  .setpoint-preview:not(.is-expanded) .planning-svg-wrap svg {
-    height: 250px;
   }
   .setpoint-preview:not(.is-expanded) .planning-curve .panel-heading p {
     display: none;
   }
 }
 @media (max-width: 620px) {
-  .setpoint-preview:not(.is-expanded) .planning-svg-wrap svg {
-    height: 220px;
-  }
-
   .setpoint-preview-context strong {
     font-size: 12px;
-  }
-  .setpoint-preview .planning-chart-key {
-    font-size: var(--text-xs);
   }
 }

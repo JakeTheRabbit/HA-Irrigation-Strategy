@@ -1,9 +1,11 @@
 import { useEffect, useId, useRef, useState, type PointerEvent } from "react";
 import { SlidersHorizontal } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UiTip } from "@/components/info-tip";
+import { CheckChip, GaugeRow, QualityChip, StatusLine } from "@/components/hmi";
+import { gauge, probeGaps, valueAt, PROBE_GAP_VWC } from "@/lib/hmi";
+import { referenceDryback } from "@/lib/day-chart";
 import {
   buildPlanningCurve,
   dryRates,
@@ -43,16 +45,22 @@ export interface PlanningCurveProps {
   };
   /** Learned VWC points retained per 1% shot, when the zone's supervisor knows it. */
   retention?: number | null;
+  /** The zone's name and its phase now, for the status line. */
+  zoneName?: string;
+  phase?: string | null;
+  /** The pore EC band of the growth stage, when there is one. */
+  ecBand?: [number, number] | null;
+  /** The stage's reference overnight dryback, in VWC points, when there is one. */
+  drybackPoints?: [number, number] | null;
 }
 const trim = (value: number | null | undefined, digits = 1) =>
   typeof value === "number" && Number.isFinite(value) ? String(Number(value.toFixed(digits))) : "—";
-const extremes = (points: readonly RecordedPoint[]) =>
-  points.length
-    ? {
-        peak: points.reduce((a, b) => (b.value > a.value ? b : a)),
-        trough: points.reduce((a, b) => (b.value < a.value ? b : a)),
-      }
-    : null;
+const PHASE_WORDS: Record<string, string> = {
+  P0: "Morning dryback",
+  P1: "Ramp",
+  P2: "Maintenance",
+  P3: "Overnight dryback",
+};
 const editors = [
   { key: "p1_target_vwc", unit: "% VWC", max: 100, step: 1 },
   { key: "p2_vwc_threshold", unit: "% VWC", max: 100, step: 1 },
@@ -65,6 +73,12 @@ const editors = [
   { key: "p3_emergency_vwc_threshold", unit: "% VWC", max: 100, step: 1 },
   { key: "p3_emergency_shot_size", unit: "% substrate volume", max: 100, step: 1 },
 ].map((editor) => ({ ...editor, label: settingWords(editor.key)?.label ?? editor.key }));
+/** Chart geometry: phase names over the plot, the clock under it, then one row of shot ticks. */
+const TOP = 26,
+  HEIGHT = 172,
+  CLOCK_Y = TOP + HEIGHT + 17,
+  SHOT_Y = CLOCK_Y + 10,
+  SVG_HEIGHT = SHOT_Y + 14;
 export function PlanningCurve({
   parameters,
   lightsOn,
@@ -77,6 +91,10 @@ export function PlanningCurve({
   description,
   recorded,
   retention,
+  zoneName,
+  phase,
+  ecBand,
+  drybackPoints,
 }: PlanningCurveProps) {
   const limits =
     bounds ??
@@ -86,6 +104,8 @@ export function PlanningCurve({
   const id = useId();
   const container = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
+  const [showEc, setShowEc] = useState(false);
+  const [showEarlier, setShowEarlier] = useState(true);
   const dragging = useRef<string | null>(null);
   // The axis follows what is plotted; it must not move under the pointer mid-drag.
   const [heldAxis, setHeldAxis] = useState<{ min: number; max: number } | null>(null);
@@ -101,18 +121,40 @@ export function PlanningCurve({
   const saved = baseline
     ? buildPlanningCurve(baseline.parameters, baseline.lightsOn, baseline.lightsOff)
     : null;
+  // A draft is only a draft while it differs from what the controller has.
+  const dirty =
+    !!baseline &&
+    (baseline.lightsOn !== lightsOn ||
+      baseline.lightsOff !== lightsOff ||
+      [...new Set([...Object.keys(parameters), ...Object.keys(baseline.parameters)])].some(
+        (key) => parameters[key] !== baseline.parameters[key],
+      ));
   const left = 43,
-    right = 42,
-    top = 38,
-    height = 220,
+    right = showEc ? 42 : 14,
     plotWidth = width - left - right;
   const x = (hour: number) => left + (Math.min(24, Math.max(0, hour)) / 24) * plotWidth;
   const fold = (readings: readonly RecordedReading[] = []) =>
     foldRecorded(readings, lightsOn, recorded?.now ?? NaN, recorded?.timeZone);
-  const vwcRecorded = fold(recorded?.vwc);
+  // A probe dropout reads 0 %: it is a gap in the data, not a dry zone, so it is left out of the
+  // lines and of the peak, and the card says so.
+  const vwcFolded = fold(recorded?.vwc);
+  const todaySplit = probeGaps(vwcFolded.today);
+  const hourOf = (time: number) =>
+    vwcFolded.today.find((point) => point.time === time)?.hour ?? NaN;
+  const gaps = todaySplit.gaps.map((gap) => ({
+    ...gap,
+    from: hourOf(gap.start),
+    to: hourOf(gap.end),
+  }));
+  const vwcRecorded = {
+    today: todaySplit.clean,
+    previous: vwcFolded.previous.map((day) => probeGaps(day).clean),
+  };
   const ecRecorded = fold(recorded?.ec);
+  const ecToday = probeGaps(ecRecorded.today, 0).clean;
   const hasRecorded = vwcRecorded.today.length + vwcRecorded.previous.length > 0;
-  // The day drawn the way the engine runs it, timed by this zone's own measured dry-down.
+  const nowHour = recorded ? (fold([{ time: recorded.now, value: 1 }]).today[0]?.hour ?? null) : null;
+  // The day drawn the way the engine runs it, timed by this zone's own measured dryback.
   const rates = dryRates([vwcRecorded.today, ...vwcRecorded.previous], plan.photoperiod);
   const projection = projectDay(plan, parameters, { rates, retention });
   const savedProjection =
@@ -121,6 +163,19 @@ export function PlanningCurve({
   const drybackVwc = projection ? projection.drybackVwc : plan.morningDrybackVwc;
   const drybackPeak = projection ? projection.peak : plan.drybackReference;
   const previousDay = vwcRecorded.previous[0] ?? [];
+  // The previous grow-day's peak and low, from its usable readings: a quiet line under the gauges.
+  const previous =
+    previousDay.length > 1
+      ? {
+          peak: previousDay.reduce((a, b) => (b.value > a.value ? b : a)),
+          low: previousDay.reduce((a, b) => (b.value < a.value ? b : a)),
+        }
+      : null;
+  // The stage's reference dryback as VWC levels under the peak, drawn as a muted band overnight.
+  const referenceBand: [number, number] | null =
+    drybackPoints && drybackPeak
+      ? [drybackPeak - drybackPoints[1], drybackPeak - drybackPoints[0]]
+      : null;
   const plotted = (model: PlanningModel | null, projected: PlanningProjection | null) =>
     model
       ? [
@@ -135,12 +190,13 @@ export function PlanningCurve({
       ...plotted(plan, projection),
       ...plotted(saved, savedProjection),
       drybackVwc ?? NaN,
+      ...(referenceBand ?? []),
       ...vwcRecorded.today.map((point) => point.value),
-      ...previousDay.map((point) => point.value),
+      ...(showEarlier ? previousDay.map((point) => point.value) : []),
     ]);
   const span = axis.max - axis.min;
   const y = (value: number) =>
-    top + height * (1 - (Math.min(axis.max, Math.max(axis.min, value)) - axis.min) / span);
+    TOP + HEIGHT * (1 - (Math.min(axis.max, Math.max(axis.min, value)) - axis.min) / span);
   const ecMax = Math.max(
     6,
     Math.ceil(
@@ -148,11 +204,11 @@ export function PlanningCurve({
         0,
         ...plan.ec.map((point) => point.value),
         ...(saved?.ec.map((point) => point.value) ?? []),
-        ...ecRecorded.today.map((point) => point.value),
+        ...ecToday.map((point) => point.value),
       ) * 1.15,
     ),
   );
-  const ey = (value: number) => top + height * (1 - Math.min(ecMax, Math.max(0, value)) / ecMax);
+  const ey = (value: number) => TOP + HEIGHT * (1 - Math.min(ecMax, Math.max(0, value)) / ecMax);
   const p1 = plan.phases[1],
     p2 = plan.phases[2],
     p3 = plan.phases[3];
@@ -198,7 +254,7 @@ export function PlanningCurve({
     point.x = event.clientX;
     point.y = event.clientY;
     const local = point.matrixTransform(matrix.inverse());
-    const fraction = 1 - (local.y - top) / height;
+    const fraction = 1 - (local.y - TOP) / HEIGHT;
     const vwcAt = axis.min + fraction * span;
     const next =
       handle.axis === "ec"
@@ -225,7 +281,8 @@ export function PlanningCurve({
     points
       .map((point, index) => `${index ? "L" : "M"}${x(point.hour)},${y(point.value)}`)
       .join(" ");
-  const targetPath = linePath(projection?.points ?? drawn);
+  const targetPoints = projection?.points ?? drawn;
+  const targetPath = linePath(targetPoints);
   // The axis follows the data, so pixel paths move when it rescales; this names a line by what it
   // plots, for checks that a saved line did not change while its draft did.
   const plottedValues = (points: readonly { hour: number; value: number }[]) =>
@@ -241,15 +298,20 @@ export function PlanningCurve({
           !/Overnight is shown flat|overnight reference reaches or crosses/.test(warning),
       )
     : plan.warnings;
+  // A recorded line breaks across a probe gap instead of joining over it.
   const recordedPath = (points: readonly RecordedPoint[], scale: (value: number) => number) =>
     points
-      .map((point, index) => `${index ? "L" : "M"}${x(point.hour)},${scale(point.value)}`)
+      .map((point, index) => {
+        const broken =
+          index > 0 &&
+          todaySplit.gaps.some((gap) => gap.start > points[index - 1].time && gap.start < point.time);
+        return `${index && !broken ? "L" : "M"}${x(point.hour)},${scale(point.value)}`;
+      })
       .join(" ");
-  const nowVwc = vwcRecorded.today.at(-1);
-  const nowEc = ecRecorded.today.at(-1);
-  const todayVwc = extremes(vwcRecorded.today);
-  const yesterdayVwc = extremes(vwcRecorded.previous[0] ?? []);
-  const at = (point: RecordedPoint) => planningClock(lightsOn, point.hour);
+  const inGap = (vwcFolded.today.at(-1)?.value ?? Infinity) <= PROBE_GAP_VWC;
+  const nowVwc = inGap ? undefined : vwcRecorded.today.at(-1);
+  const nowEc = ecToday.at(-1);
+  const at = (hour: number) => planningClock(lightsOn, hour);
   const ecPath = (points: PlanningPoint[]) =>
     points
       .map(
@@ -257,6 +319,138 @@ export function PlanningCurve({
           `${index && !point.breakBefore ? "L" : "M"}${x(point.hour)},${ey(point.value)}`,
       )
       .join(" ");
+
+  // The four key values, each against its target.
+  const phaseNow =
+    phase && /^P[0-3]$/.test(phase)
+      ? phase
+      : nowHour === null
+        ? null
+        : (plan.phases.find((item) => nowHour >= item.start && nowHour < item.end)?.id ?? null);
+  const todayPeak = vwcRecorded.today.length
+    ? Math.max(...vwcRecorded.today.map((point) => point.value))
+    : null;
+  const p1Done = nowHour !== null && nowHour >= p1.end;
+  const ecTarget = phaseNow && phaseNow !== "P3" ? parameters[`ec_target_${phaseNow.toLowerCase()}`] : NaN;
+  const gauges = hasRecorded
+    ? [
+        {
+          id: "vwc-now",
+          model: gauge({
+            label: "VWC now",
+            value: nowVwc?.value ?? null,
+            target: nowHour === null ? null : valueAt(targetPoints, nowHour),
+            unit: "%",
+            tolerance: 5,
+            quality: inGap ? "probe gap" : undefined,
+          }),
+        },
+        {
+          id: "peak",
+          model: gauge({
+            label: "Peak today",
+            value: todayPeak,
+            target: parameters.p1_target_vwc,
+            unit: "%",
+            tolerance: 3,
+            underIsNormal: !p1Done,
+          }),
+        },
+        {
+          id: "dryback",
+          model: gauge({
+            label: "Dryback so far",
+            value:
+              todayPeak && nowVwc ? ((todayPeak - nowVwc.value) / todayPeak) * 100 : null,
+            target: parameters.dryback_target,
+            reference: referenceDryback(drybackPoints, todayPeak),
+            unit: "%",
+            points: "%",
+            tolerance: 3,
+            underIsNormal: true,
+            quality: inGap ? "probe gap" : undefined,
+          }),
+        },
+        {
+          id: "pore-ec",
+          model: gauge({
+            label: "Pore EC",
+            value: nowEc?.value ?? null,
+            band: ecBand ?? null,
+            target: ecBand ? null : ecTarget,
+            tolerance: Number.isFinite(ecTarget) ? ecTarget * 0.15 : 0,
+            unit: "",
+            digits: 2,
+            points: "mS/cm",
+          }),
+        },
+      ]
+    : [];
+  const offPlan = gauges.some((item) => item.model.state === "abnormal");
+
+  // At most one advisory: the first that applies. Its fix goes into the draft only.
+  const suggestedDryback =
+    projection && drybackVwc !== null && drybackPeak
+      ? Math.floor((1 - projection.lightsOnVwc / drybackPeak) * 100 * 2) / 2
+      : null;
+  const check = advice
+    ? {
+        kind: "p2",
+        text: `${
+          advice.shots
+            ? `The first maintenance shot is at ${at(advice.firstShotHour ?? 0)}, late in P2.`
+            : "P2 gives no maintenance shot before P3."
+        } Raise the re-water point to ${trim(advice.suggestedThreshold)}%.`,
+        apply: () => commit("p2_vwc_threshold", advice.suggestedThreshold),
+      }
+    : projection && drybackVwc !== null && projection.lightsOnVwc > drybackVwc + 0.5
+      ? {
+          kind: "dryback",
+          text: `The zone gets to ${trim(projection.lightsOnVwc)}% at lights-on, ${trim(projection.lightsOnVwc - drybackVwc)} points short of the dryback target.${
+            suggestedDryback !== null && suggestedDryback > 0
+              ? ` Set the dryback target to ${trim(suggestedDryback)}%.`
+              : ""
+          }`,
+          apply:
+            suggestedDryback !== null && suggestedDryback > 0
+              ? () => commit("dryback_target", suggestedDryback)
+              : null,
+        }
+      : warnings.length
+        ? { kind: "warning", text: warnings[0], apply: null }
+        : null;
+  const canApply = (key: string) => !!onChange && !!limits[key];
+
+  const phaseEnd = (id: PlanningPhaseId) =>
+    projection?.points.filter((point) => point.phase === id).at(-1)?.value ?? null;
+  const rows = plan.photoperiod
+    ? plan.phases.map((item) => ({
+        id: item.id,
+        name: `${item.id} ${PHASE_WORDS[item.id] ?? item.label}`,
+        starts: at(item.start),
+        target:
+          item.id === "P0"
+            ? drybackVwc === null
+              ? "—"
+              : `${trim(drybackVwc)}% (${trim(parameters.dryback_target)}% dryback)`
+            : item.id === "P1"
+              ? `${trim(parameters.p1_target_vwc)}%`
+              : item.id === "P2"
+                ? `re-water ${trim(parameters.p2_vwc_threshold)}%`
+                : `rescue floor ${trim(parameters.p3_emergency_vwc_threshold)}%`,
+        shots: projection || item.id === "P1" ? String(shotCount(item.id)) : "—",
+        end: `${at(item.end)}${
+          item.id === "P3"
+            ? projection
+              ? ` · ${trim(projection.lightsOnVwc)}%`
+              : ""
+            : phaseEnd(item.id) !== null
+              ? ` · ${trim(phaseEnd(item.id))}%`
+              : ""
+        }`,
+      }))
+    : [];
+
   return (
     <section className="panel planning-curve" aria-labelledby={`${id}-title`}>
       <div className="panel-heading">
@@ -272,136 +466,131 @@ export function PlanningCurve({
                 : "Setpoints for the selected day and zone.")}
           </p>
         </div>
-        <Badge variant="outline">
-          {hasRecorded ? "Targets + recorded sensor" : "Planning illustration"}
-        </Badge>
       </div>
-      <div className="planning-chart-key">
-        <span>
-          <i className="vwc-key" />
-          VWC · left (%)
-        </span>
-        <span>
-          <i className="ec-key" />
-          EC schematic · right (mS/cm)
-        </span>
-        {hasRecorded && (
-          <>
-            <span>
-              <i className="recorded-key" />
-              Recorded, this grow-day
-            </span>
-            <span>
-              <i className="recorded-key previous" />
-              Recorded, earlier grow-days
-            </span>
-          </>
+      <div className="planning-hmi">
+        <StatusLine
+          name={zoneName}
+          phase={phaseNow ? `${phaseNow} · ${PHASE_WORDS[phaseNow]}` : null}
+          state={
+            hasRecorded
+              ? { text: offPlan ? "off plan" : "on plan", abnormal: offPlan }
+              : { text: "plan only, no readings", abnormal: false }
+          }
+        >
+          {dirty && <span className="hmi-chip">draft not applied</span>}
+          {gaps.length > 0 && (
+            <QualityChip
+              data-probe-gap
+              title="The probe gave no usable reading. These readings are not drawn and are not used."
+            >
+              Probe gap{" "}
+              {gaps
+                .map((gap) =>
+                  gap.from === gap.to ? at(gap.from) : `${at(gap.from)}–${at(gap.to)}`,
+                )
+                .join(", ")}
+            </QualityChip>
+          )}
+        </StatusLine>
+        {previous && (
+          <p className="planning-previous" data-planning-previous>
+            Previous grow-day: peak {trim(previous.peak.value)}% at {at(previous.peak.hour)} · low{" "}
+            {trim(previous.low.value)}% at {at(previous.low.hour)}
+          </p>
+        )}
+        {gauges.length > 0 && (
+          <GaugeRow className="planning-recorded" gauges={gauges} label="Recorded VWC and EC against the plan" />
         )}
       </div>
-      {hasRecorded && (
-        <dl className="planning-recorded" aria-label="Recorded VWC for this zone">
-          {nowVwc && (
-            <div>
-              <dt>Now</dt>
-              <dd>{trim(nowVwc.value)}%</dd>
-            </div>
-          )}
-          {todayVwc && (
-            <>
-              <div>
-                <dt>Peak · this grow-day</dt>
-                <dd>
-                  {trim(todayVwc.peak.value)}% <small>{at(todayVwc.peak)}</small>
-                </dd>
-              </div>
-              <div>
-                <dt>Trough · this grow-day</dt>
-                <dd>
-                  {trim(todayVwc.trough.value)}% <small>{at(todayVwc.trough)}</small>
-                </dd>
-              </div>
-            </>
-          )}
-          {yesterdayVwc && (
-            <>
-              <div>
-                <dt>Peak · previous grow-day</dt>
-                <dd>
-                  {trim(yesterdayVwc.peak.value)}% <small>{at(yesterdayVwc.peak)}</small>
-                </dd>
-              </div>
-              <div>
-                <dt>Trough · previous grow-day</dt>
-                <dd>
-                  {trim(yesterdayVwc.trough.value)}% <small>{at(yesterdayVwc.trough)}</small>
-                </dd>
-              </div>
-            </>
-          )}
-          {nowEc && (
-            <div>
-              <dt>Pore EC now</dt>
-              <dd>{trim(nowEc.value, 2)}</dd>
-            </div>
-          )}
-        </dl>
-      )}
-      <p className="muted small" style={{ padding: "0 16px 12px", margin: 0 }}>
-        VWC is absolute water content (%). Dryback is a relative drop from the reference peak, not
-        percentage points. Dashed EC connects configured phase anchors through the night; it does
-        not predict EC or salt concentration.
-        {drybackPeak !== null && drybackVwc !== null && (
-          <>
-            {" "}
-            Relative dryback: {parameters.dryback_target}% of the {Number(drybackPeak.toFixed(2))}%
-            VWC {projection ? "projected peak" : "reference"} gives a{" "}
-            {Number(drybackVwc.toFixed(2))}% VWC dryback target.
-          </>
+      <div className="planning-legend" role="group" aria-label="Chart key">
+        <span>
+          <i className="key-recorded" aria-hidden="true" />
+          Recorded
+        </span>
+        <span>
+          <i className="key-target" aria-hidden="true" />
+          {dirty ? "Saved target" : "Target"}
+        </span>
+        {dirty && (
+          <span>
+            <i className="key-draft" aria-hidden="true" />
+            Draft
+          </span>
         )}
-      </p>
-      {baseline && (
-        <div className="planning-comparison-key">
+        <span>
+          <i className="key-shot" aria-hidden="true" />
+          Shot
+        </span>
+        <span>
+          <i className="key-limit" aria-hidden="true" />
+          Re-water, dryback, rescue
+        </span>
+        {referenceBand && (
           <span>
-            <i />
-            Saved on controller
+            <i className="key-reference" aria-hidden="true" />
+            Reference dryback
           </span>
+        )}
+        {gaps.length > 0 && (
           <span>
-            <i />
-            Local draft
+            <i className="key-gap" aria-hidden="true" />
+            Probe gap
           </span>
-          <small>Aligned to lights-on; times follow the draft schedule.</small>
-        </div>
-      )}
+        )}
+        <span className="planning-legend-toggles">
+          {previousDay.length > 1 && (
+            <button
+              type="button"
+              className="planning-toggle"
+              aria-pressed={showEarlier}
+              onClick={() => setShowEarlier(!showEarlier)}
+            >
+              <i className="key-earlier" aria-hidden="true" />
+              Earlier days
+            </button>
+          )}
+          <button
+            type="button"
+            className="planning-toggle"
+            aria-pressed={showEc}
+            onClick={() => setShowEc(!showEc)}
+          >
+            <i className="key-ec" aria-hidden="true" />
+            EC
+          </button>
+        </span>
+      </div>
       <div ref={container} className="planning-svg-wrap">
         <svg
-          viewBox={`0 0 ${width} 322`}
+          viewBox={`0 0 ${width} ${SVG_HEIGHT}`}
           width="100%"
-          height="322"
+          height={SVG_HEIGHT}
           role="group"
           aria-label="24-hour phase and setpoint chart"
         >
           <title>
             {hasRecorded
-              ? "Targets from lights-on to the next lights-on, with this zone’s recorded probe readings drawn underneath. Blue is the VWC target; dashed pink is the EC target; the dark line is recorded VWC today."
-              : "Setpoint illustration from lights-on to the next lights-on. Blue is VWC; dashed pink is EC. This is not recorded or forecast sensor data."}
+              ? "Targets from lights-on to the next lights-on. The dashed line is the target; the solid line is the VWC that the probe recorded on this grow-day."
+              : "Setpoint illustration from lights-on to the next lights-on. This is not recorded or forecast sensor data."}
           </title>
-          {plan.phases.map((phase) => (
-            <g key={phase.id}>
+          {plan.phases.map((phase, index) => (
+            <g key={phase.id} data-planning-phase={phase.id}>
               <rect
                 x={x(phase.start)}
-                y={top}
+                y={TOP}
                 width={Math.max(0, x(phase.end) - x(phase.start))}
-                height={height}
-                fill={phase.color}
-                fillOpacity={selectedPhase === phase.id ? 0.16 : 0.06}
+                height={HEIGHT}
+                fill="var(--muted-foreground)"
+                fillOpacity={selectedPhase === phase.id ? 0.14 : index % 2 ? 0.07 : 0.025}
               />
               {x(phase.end) - x(phase.start) > 20 && (
                 <text
                   x={(x(phase.start) + x(phase.end)) / 2}
-                  y={20}
+                  y={TOP - 8}
                   textAnchor="middle"
                   fill="var(--muted-foreground)"
                   fontSize="12"
+                  fontWeight="600"
                 >
                   {phase.id}
                 </text>
@@ -409,7 +598,7 @@ export function PlanningCurve({
             </g>
           ))}
           {[0, 25, 50, 75, 100].map((tick) => {
-            const line = top + height * (1 - tick / 100);
+            const line = TOP + HEIGHT * (1 - tick / 100);
             return (
               <g key={tick}>
                 <line
@@ -429,25 +618,52 @@ export function PlanningCurve({
                 >
                   {trim(axis.min + (span * tick) / 100)}%
                 </text>
-                <text
-                  x={width - right + 7}
-                  y={line + 4}
-                  fill="var(--muted-foreground)"
-                  fontSize="12"
-                >
-                  {((ecMax * tick) / 100).toFixed(1)}
-                </text>
+                {showEc && (
+                  <text
+                    x={width - right + 7}
+                    y={line + 4}
+                    fill="var(--muted-foreground)"
+                    fontSize="12"
+                  >
+                    {((ecMax * tick) / 100).toFixed(1)}
+                  </text>
+                )}
               </g>
             );
           })}
+          {gaps.map((gap) => (
+            <g key={gap.start} data-probe-gap>
+              <rect
+                x={x(gap.from) - 2}
+                y={TOP}
+                width={Math.max(4, x(gap.to) - x(gap.from) + 4)}
+                height={HEIGHT}
+                fill="var(--muted-foreground)"
+                fillOpacity={0.18}
+              >
+                <title>{`Probe gap ${at(gap.from)}–${at(gap.to)}: no usable reading`}</title>
+              </rect>
+              <text
+                x={x(gap.from)}
+                y={TOP + HEIGHT - 6}
+                textAnchor="middle"
+                fill="var(--muted-foreground)"
+                fontSize="12"
+                fontStyle="italic"
+              >
+                gap
+              </text>
+            </g>
+          ))}
           {previousDay.length > 1 && (
             <path
               data-planning-line="recorded-vwc-previous"
               d={recordedPath(previousDay, y)}
+              display={showEarlier ? undefined : "none"}
               fill="none"
               stroke="var(--foreground)"
               strokeWidth="1.25"
-              opacity="0.3"
+              opacity="0.22"
             >
               <title>Recorded VWC, previous grow-day</title>
             </path>
@@ -456,8 +672,8 @@ export function PlanningCurve({
             <text
               key={hour}
               x={x(hour)}
-              y={281}
-              textAnchor="middle"
+              y={CLOCK_Y}
+              textAnchor={hour === 0 ? "start" : hour === 24 ? "end" : "middle"}
               fill="var(--muted-foreground)"
               fontSize="12"
             >
@@ -465,7 +681,7 @@ export function PlanningCurve({
             </text>
           ))}
           {saved && saved.photoperiod > 0 && (
-            <g opacity="0.45" aria-label="Saved controller setpoints">
+            <g opacity={dirty ? 0.75 : 0} aria-label="Saved controller setpoints">
               {saved.vwc.length > 0 && (
                 <path
                   data-planning-line="baseline-vwc"
@@ -473,18 +689,19 @@ export function PlanningCurve({
                   d={linePath(savedProjection?.points ?? saved.vwc)}
                   fill="none"
                   stroke="var(--muted-foreground)"
-                  strokeWidth="2"
-                  strokeDasharray="4 5"
+                  strokeWidth="1.75"
+                  strokeDasharray="6 4"
                 />
               )}
               {saved.ec.length > 0 && (
                 <path
                   data-planning-line="baseline-ec"
                   d={ecPath(saved.ec)}
+                  display={showEc ? undefined : "none"}
                   fill="none"
-                  stroke="#df78b5"
-                  strokeWidth="1.5"
-                  strokeDasharray="2 6"
+                  stroke="var(--muted-foreground)"
+                  strokeWidth="1.25"
+                  strokeDasharray="2 5"
                 />
               )}
               {saved.emergencyFloor !== null && (
@@ -510,8 +727,8 @@ export function PlanningCurve({
                   y={y(plan.p2Envelope[1])}
                   width={Math.max(0, x(p2.end) - x(p2.start))}
                   height={y(plan.p2Envelope[0]) - y(plan.p2Envelope[1])}
-                  fill="#03a9f4"
-                  fillOpacity={0.15}
+                  fill="var(--muted-foreground)"
+                  fillOpacity={0.12}
                 >
                   <title>Nominal P2 shot envelope assuming full retention</title>
                 </rect>
@@ -526,8 +743,10 @@ export function PlanningCurve({
                   x2={x(24)}
                   y1={y(plan.emergencyFloor)}
                   y2={y(plan.emergencyFloor)}
-                  stroke="var(--destructive)"
-                  strokeDasharray="3 4"
+                  stroke={
+                    plan.emergencyReferenceActive ? "var(--warning)" : "var(--muted-foreground)"
+                  }
+                  strokeDasharray="2 4"
                 >
                   <title>{`Rescue shot when below ${plan.emergencyFloor}% VWC`}</title>
                 </line>
@@ -535,11 +754,13 @@ export function PlanningCurve({
               {targetPath && (
                 <path
                   data-planning-line="vwc"
-                  data-planning-values={plottedValues(projection?.points ?? drawn)}
+                  data-planning-draft={dirty ? "" : undefined}
+                  data-planning-values={plottedValues(targetPoints)}
                   d={targetPath}
                   fill="none"
-                  stroke="#03a9f4"
-                  strokeWidth="2.5"
+                  stroke={dirty ? "var(--primary)" : "var(--muted-foreground)"}
+                  strokeWidth={dirty ? 2.25 : 1.75}
+                  strokeDasharray="6 4"
                 />
               )}
               {projection && Number.isFinite(parameters.p2_vwc_threshold) && p2.end > p2.start && (
@@ -549,38 +770,45 @@ export function PlanningCurve({
                     x2={x(p2.end)}
                     y1={y(parameters.p2_vwc_threshold)}
                     y2={y(parameters.p2_vwc_threshold)}
-                    stroke="#42b995"
+                    stroke="var(--muted-foreground)"
                     strokeOpacity="0.8"
-                    strokeDasharray="5 4"
+                    strokeDasharray="2 4"
                   >
                     <title>{`Maintenance shot when below ${trim(parameters.p2_vwc_threshold)}% VWC: one fires whenever the zone reads below here`}</title>
                   </line>
-                  <text
-                    x={x(p2.end) - 6}
-                    y={y(parameters.p2_vwc_threshold) + 13}
-                    textAnchor="end"
-                    fill="#42b995"
-                    fontSize="12"
-                  >
-                    Re-water point {trim(parameters.p2_vwc_threshold)}%
-                  </text>
-                  {advice && x(p2.end) - x(p2.start) > 190 && (
+                  {x(p2.end) - x(p2.start) > 110 && (
                     <text
-                      data-planning-advice="p2"
-                      x={(x(p2.start) + x(p2.end)) / 2}
-                      y={y(parameters.p2_vwc_threshold) - 8}
-                      textAnchor="middle"
-                      fill="var(--destructive)"
+                      x={x(p2.end) - 6}
+                      y={y(parameters.p2_vwc_threshold) + 13}
+                      textAnchor="end"
+                      fill="var(--muted-foreground)"
                       fontSize="12"
-                      fontWeight="600"
                     >
-                      {advice.shots
-                        ? `First P2 shot not until ${planningClock(lightsOn, advice.firstShotHour ?? 0)}`
-                        : `No P2 shot: ${trim(advice.pointsToThreshold)} points to dry, ${trim(advice.hoursToThreshold)} h at this rate`}
+                      Re-water {trim(parameters.p2_vwc_threshold)}%
                     </text>
                   )}
                 </g>
               )}
+              {referenceBand &&
+                [
+                  [p3.start, 24],
+                  [0, plan.phases[0].end],
+                ].map(([from, to]) => (
+                  <rect
+                    key={from}
+                    data-planning-line="reference-dryback"
+                    x={x(from)}
+                    y={y(referenceBand[1])}
+                    width={Math.max(0, x(to) - x(from))}
+                    height={Math.max(1, y(referenceBand[0]) - y(referenceBand[1]))}
+                    fill="var(--muted-foreground)"
+                    fillOpacity={0.14}
+                  >
+                    <title>
+                      {`Reference dryback for the stage: ${trim(drybackPoints![0])}–${trim(drybackPoints![1])} points under the ${trim(drybackPeak)}% peak (${trim(referenceBand[0])}–${trim(referenceBand[1])}% VWC)`}
+                    </title>
+                  </rect>
+                ))}
               {drybackVwc !== null &&
                 [
                   [p3.start, 24],
@@ -593,9 +821,9 @@ export function PlanningCurve({
                     x2={x(to)}
                     y1={y(drybackVwc)}
                     y2={y(drybackVwc)}
-                    stroke="#03a9f4"
-                    strokeOpacity="0.55"
-                    strokeDasharray="7 4"
+                    stroke="var(--muted-foreground)"
+                    strokeOpacity="0.7"
+                    strokeDasharray="2 4"
                   >
                     <title>
                       Dryback target: {trim(drybackVwc)}% VWC ({parameters.dryback_target}% below
@@ -611,11 +839,10 @@ export function PlanningCurve({
                     data-planning-shot={shot.phase}
                     x1={x(shot.hour)}
                     x2={x(shot.hour)}
-                    y1={y(shot.from)}
-                    y2={y(shot.to)}
-                    stroke={shot.emergency ? "var(--destructive)" : "#03a9f4"}
-                    strokeWidth="7"
-                    strokeOpacity={shot.emergency ? 0.35 : 0}
+                    y1={SHOT_Y - 6}
+                    y2={SHOT_Y + 6}
+                    stroke={shot.emergency ? "var(--warning)" : "var(--muted-foreground)"}
+                    strokeWidth="2"
                   >
                     <title>
                       {shot.emergency ? "Rescue shot" : `${shot.phase} shot`}{" "}
@@ -627,18 +854,36 @@ export function PlanningCurve({
                   </line>
                 );
               })}
-              {ecRecorded.today.length > 1 && (
-                <path
-                  data-planning-line="recorded-ec"
-                  d={recordedPath(ecRecorded.today, ey)}
-                  fill="none"
-                  stroke="#b8478a"
-                  strokeWidth="1.25"
-                  strokeOpacity="0.75"
-                >
-                  <title>Recorded pore EC, this grow-day</title>
-                </path>
-              )}
+              <g data-planning-ec display={showEc ? undefined : "none"}>
+                {ecToday.length > 1 && (
+                  <path
+                    data-planning-line="recorded-ec"
+                    d={recordedPath(ecToday, ey)}
+                    fill="none"
+                    stroke="var(--foreground)"
+                    strokeWidth="1"
+                    strokeOpacity="0.55"
+                  >
+                    <title>Recorded pore EC, this grow-day</title>
+                  </path>
+                )}
+                {plan.ec.length > 0 && (
+                  <path
+                    data-planning-line="ec"
+                    d={ecPath(plan.ec)}
+                    fill="none"
+                    stroke="var(--muted-foreground)"
+                    strokeWidth="1.5"
+                    strokeDasharray="1 4"
+                    strokeLinecap="round"
+                  >
+                    <title>
+                      EC phase-anchor schematic; overnight interpolates to the next morning
+                      reference, not a predicted salt response
+                    </title>
+                  </path>
+                )}
+              </g>
               {vwcRecorded.today.length > 1 && (
                 <path
                   data-planning-line="recorded-vwc"
@@ -651,53 +896,32 @@ export function PlanningCurve({
                 </path>
               )}
               {nowVwc && (
-                <g data-planning-now="vwc">
-                  <circle
-                    cx={x(nowVwc.hour)}
-                    cy={y(nowVwc.value)}
-                    r="3.5"
-                    fill="var(--foreground)"
-                  />
-                  <text
-                    x={Math.min(x(nowVwc.hour) + 7, width - right - 58)}
-                    y={y(nowVwc.value) - 8}
-                    fill="var(--foreground)"
-                    fontSize="12"
-                    fontWeight="600"
-                  >
-                    Now {trim(nowVwc.value)}%
-                  </text>
-                </g>
-              )}
-              {plan.ec.length > 0 && (
-                <path
-                  data-planning-line="ec"
-                  d={ecPath(plan.ec)}
-                  fill="none"
-                  stroke="#df78b5"
-                  strokeWidth="2"
-                  strokeDasharray="6 4"
+                <circle
+                  data-planning-now="vwc"
+                  cx={x(nowVwc.hour)}
+                  cy={y(nowVwc.value)}
+                  r="3.5"
+                  fill="var(--foreground)"
                 >
-                  <title>
-                    EC phase-anchor schematic; overnight interpolates to the next morning reference,
-                    not a predicted salt response
-                  </title>
-                </path>
+                  <title>{`Now ${trim(nowVwc.value)}%`}</title>
+                </circle>
               )}
               {handles.map((handle) => {
                 const editor = editors.find((item) => item.key === handle.key)!;
                 const position = handle.position as number;
                 const limit = limits[handle.key];
                 const editable = !!onChange && !!limit;
+                const isEc = handle.axis === "ec";
                 return (
                   <circle
                     key={handle.key}
                     cx={x(handle.hour)}
-                    cy={handle.axis === "ec" ? ey(position) : y(position)}
-                    r={editable ? 6 : 4}
+                    cy={isEc ? ey(position) : y(position)}
+                    r={editable ? 5.5 : 3.5}
+                    display={isEc && !showEc ? "none" : undefined}
                     fill="var(--surface)"
-                    stroke={handle.axis === "ec" ? "#df78b5" : "#03a9f4"}
-                    strokeWidth="2.5"
+                    stroke={dirty ? "var(--primary)" : "var(--muted-foreground)"}
+                    strokeWidth="2"
                     className={editable ? "planning-handle" : ""}
                     role={editable ? "slider" : undefined}
                     tabIndex={editable ? 0 : undefined}
@@ -751,74 +975,12 @@ export function PlanningCurve({
                   </circle>
                 );
               })}
-              {plan.p1Windows.length > 0 && (
-                <g data-planning-cadence="p1">
-                  <line
-                    x1={x(p1.start)}
-                    x2={x(p1.end)}
-                    y1={304}
-                    y2={304}
-                    stroke="#03a9f4"
-                    strokeOpacity={0.4}
-                  />
-                  {plan.p1Windows.map((hour, index) => (
-                    <line
-                      key={index}
-                      x1={x(hour)}
-                      x2={x(hour)}
-                      y1={297}
-                      y2={311}
-                      stroke="#03a9f4"
-                      strokeWidth={2}
-                    >
-                      <title>
-                        Eligible P1 window {index + 1}: {planningClock(lightsOn, hour)} in this
-                        illustration
-                      </title>
-                    </line>
-                  ))}
-                </g>
-              )}
-              {shots.some((shot) => shot.phase !== "P1") ? (
-                <g data-planning-cadence="projected">
-                  {shots
-                    .filter((shot) => shot.phase !== "P1")
-                    .map((shot) => (
-                      <line
-                        key={`${shot.phase}-${shot.hour}`}
-                        x1={x(shot.hour)}
-                        x2={x(shot.hour)}
-                        y1={297}
-                        y2={311}
-                        stroke={shot.emergency ? "var(--destructive)" : "#42b995"}
-                        strokeWidth={2}
-                      >
-                        <title>
-                          Projected {shot.emergency ? "emergency" : shot.phase} shot ·{" "}
-                          {planningClock(lightsOn, shot.hour)}
-                        </title>
-                      </line>
-                    ))}
-                </g>
-              ) : (
-                x(p2.end) - x(p2.start) > 110 && (
-                  <text
-                    x={(x(p2.start) + x(p2.end)) / 2}
-                    y={307}
-                    textAnchor="middle"
-                    fill="var(--muted-foreground)"
-                    fontSize="12"
-                  >
-                    {projection ? "P2 · no shot projected" : "P2 · sensor-triggered"}
-                  </text>
-                )
-              )}
               {plan.photoperiod > 0 && (
                 <line
                   x1={x(plan.photoperiod)}
                   x2={x(plan.photoperiod)}
-                  y1={top}
-                  y2={top + height}
+                  y1={TOP}
+                  y2={TOP + HEIGHT}
                   stroke="var(--muted-foreground)"
                   strokeDasharray="2 5"
                 />
@@ -827,98 +989,62 @@ export function PlanningCurve({
           )}
         </svg>
       </div>
-      {projection ? (
-        <div className="planning-projection" role="note">
-          <p>
-            <strong>Projected day.</strong> P0 dries on from {trim(projection.lightsOnVwc)}% at
-            lights-on.{" "}
-            {shotCount("P1")
-              ? `P1 fires ${shotCount("P1")} shots, ${parameters.p1_time_between_shots} minutes apart, to ${trim(parameters.p1_target_vwc)}%.`
-              : `P1 climbs to ${trim(parameters.p1_target_vwc)}% (shot count or spacing not set, so no steps are drawn).`}{" "}
-            P2 fires a {trim(parameters.p2_shot_size)}% shot each time VWC falls below{" "}
-            {trim(parameters.p2_vwc_threshold)}%: {shotCount("P2") || "none"} projected. P3 dries
-            down overnight to {trim(projection.lightsOnVwc)}%
-            {shotCount("P3") ? `, with ${shotCount("P3")} rescue shot(s) at the rescue floor` : ""}.
-            Hover any riser for its time and size.
-          </p>
-          <p>
-            Dry-down: {projection.rates.day} points/h lights-on (
-            {projection.measured.day
-              ? "measured from this zone"
-              : "a typical flowering-room rate, until this zone has history"}
-            ), {projection.rates.night} points/h lights-off (
-            {projection.measured.night ? "measured" : "nominal"}). Each shot is drawn retaining{" "}
-            {retention && retention > 0
-              ? `${trim(projection.retention, 2)} points per 1% (this zone's learned gain)`
-              : "all of its water, which is the most it can do"}
-            . Shot timing is a projection from those rates, not a schedule: the engine fires on the
-            probe.
-          </p>
-          {advice && (
-            <p className="planning-projection-warning" data-planning-advice="p2-text">
-              <strong>
-                {advice.shots
-                  ? "P2 maintenance starts late."
-                  : "No P2 sawtooth with these targets."}
-              </strong>{" "}
-              The controller gives a maintenance shot only when VWC falls below the re-water point.
-              From {trim(advice.pointsToThreshold + parameters.p2_vwc_threshold)}% at the start of
-              P2 that is {trim(advice.pointsToThreshold)} points, about{" "}
-              {trim(advice.hoursToThreshold)} hours at {projection.rates.day} points/h
-              {advice.shots
-                ? `, so the first shot is not until ${planningClock(lightsOn, advice.firstShotHour ?? 0)}.`
-                : ", longer than P2 lasts."}{" "}
-              For a sawtooth from the start of P2, drag the re-water point up to about{" "}
-              {trim(advice.suggestedThreshold)}%, just under the peak VWC target. Shots then repeat
-              about every {trim(advice.repeatHours)} hours at this dry-down; a smaller P2 shot gives
-              a finer sawtooth.
-            </p>
-          )}
-          {drybackVwc !== null && projection.lightsOnVwc > drybackVwc + 0.5 && (
-            <p className="planning-projection-warning">
-              At this dry-down the zone reaches lights-on at {trim(projection.lightsOnVwc)}%, which
-              is {trim(projection.lightsOnVwc - drybackVwc)} points short of the {trim(drybackVwc)}%
-              dryback target. P0 would run its full {parameters.p0_maximum_wait_time ?? 60} minutes.
-            </p>
-          )}
-        </div>
-      ) : (
-        plan.p1Windows.length > 0 && (
-          <p className="muted small" style={{ padding: "0 16px 12px", margin: 0 }}>
-            P1 shows all {plan.p1Windows.length} eligible shots as steps,{" "}
-            {parameters.p1_time_between_shots} minutes apart; hover a step for its time and size.
-          </p>
-        )
+      {check && (
+        <CheckChip
+          className="hmi-check planning-check"
+          data-planning-advice={check.kind}
+          text={check.text}
+          action={
+            check.apply &&
+            canApply(check.kind === "p2" ? "p2_vwc_threshold" : "dryback_target")
+              ? { label: "Apply to draft", run: check.apply }
+              : null
+          }
+        />
       )}
-      <p className="muted small" style={{ padding: "0 16px 12px", margin: 0 }}>
-        The rescue floor stays separate from the dry-down; routine watering stops at the P3
-        boundary.
-        {Number.isFinite(parameters.p3_emergency_shot_size)
-          ? ` Its ${parameters.p3_emergency_shot_size}% rescue shot is conditional on controller safety checks.`
-          : ""}
-      </p>
-      <div className="planning-phase-legend">
-        {plan.phases.map((phase) => (
-          <span key={phase.id}>
-            <i style={{ background: phase.color }} />
-            <strong>{phase.id}</strong> {phase.label}
-            <small>
-              {planningClock(lightsOn, phase.start)}–{planningClock(lightsOn, phase.end)}
-            </small>
-          </span>
-        ))}
-      </div>
-      {warnings.length > 0 && (
-        <div className="planning-warnings" role="status">
-          {warnings.map((warning) => (
-            <p key={warning}>{warning}</p>
-          ))}
+      {rows.length > 0 && (
+        <div
+          className="planning-projection"
+          role="region"
+          aria-label="Projected day by phase"
+          tabIndex={0}
+        >
+          <table>
+            <caption>
+              {projection ? (
+                <>
+                  <strong>Projected day.</strong> Dryback rate{" "}
+                  {projection.measured.day
+                    ? "measured from this zone"
+                    : "of a typical flowering room, until this zone has history"}
+                  .
+                </>
+              ) : (
+                <strong>Planned phases.</strong>
+              )}
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">Phase</th>
+                <th scope="col">Starts</th>
+                <th scope="col">Target</th>
+                <th scope="col">Shots</th>
+                <th scope="col">Expected end</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.id} data-phase-row={row.id}>
+                  <th scope="row">{row.name}</th>
+                  <td>{row.starts}</td>
+                  <td>{row.target}</td>
+                  <td>{row.shots}</td>
+                  <td>{row.end}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
-      )}
-      {plan.missing.length > 0 && (
-        <p className="planning-missing">
-          Not supplied: {plan.missing.join(", ")}. Missing targets are not plotted.
-        </p>
       )}
       {onChange && showEditors && (
         <details className="planning-editors">
@@ -957,11 +1083,82 @@ export function PlanningCurve({
         </details>
       )}
       <details className="planning-assumptions">
-        <summary>How to read this plan</summary>
+        <summary>How this is worked out</summary>
         <ul>
+          <li>
+            VWC is absolute water content (%). Dryback is a relative drop from the reference peak,
+            not percentage points.
+            {drybackPeak !== null && drybackVwc !== null && (
+              <>
+                {" "}
+                A {parameters.dryback_target}% dryback from the {Number(drybackPeak.toFixed(2))}%
+                VWC {projection ? "projected peak" : "reference"} gives a{" "}
+                {Number(drybackVwc.toFixed(2))}% VWC dryback target.
+              </>
+            )}
+          </li>
+          <li>
+            Dashed EC connects configured phase anchors through the night; it does not predict EC
+            or salt concentration. Use the EC button to show it.
+          </li>
+          {projection && (
+            <li>
+              Dryback rate: {projection.rates.day} points/h with the lights on (
+              {projection.measured.day ? "measured" : "nominal"}),{" "}
+              {projection.rates.night} points/h with the lights off (
+              {projection.measured.night ? "measured" : "nominal"}). Each shot keeps{" "}
+              {retention && retention > 0
+                ? `${trim(projection.retention, 2)} points per 1% (the learned gain of this zone)`
+                : "all of its water, which is the most it can keep"}
+              . The shot times are a projection from these rates, not a schedule: the controller
+              fires on the probe.
+            </li>
+          )}
+          {advice && (
+            <li data-planning-advice="p2-text">
+              The controller gives a maintenance shot only when VWC falls below the re-water
+              point. From {trim(advice.pointsToThreshold + parameters.p2_vwc_threshold)}% at the
+              start of P2 that is {trim(advice.pointsToThreshold)} points, about{" "}
+              {trim(advice.hoursToThreshold)} hours at this rate. At{" "}
+              {trim(advice.suggestedThreshold)}% the shots repeat about every{" "}
+              {trim(advice.repeatHours)} hours; a smaller P2 shot gives smaller steps.
+            </li>
+          )}
+          <li>
+            The rescue floor is separate from the dryback; routine shots stop at the P3 boundary.
+            {Number.isFinite(parameters.p3_emergency_shot_size)
+              ? ` Its ${parameters.p3_emergency_shot_size}% rescue shot is conditional on controller safety checks.`
+              : ""}
+          </li>
+          <li>
+            The P3 boundary is at lights-off here; the controller can stop earlier on the measured
+            dryback. P2 can also change for EC and safety limits.
+          </li>
+          {gaps.length > 0 && (
+            <li>
+              A reading of {PROBE_GAP_VWC}% VWC or less is a probe gap, not a dry zone. Those
+              readings are not drawn, and the peak and the dryback do not use them.
+            </li>
+          )}
+          {baseline && (
+            <li>
+              The saved line and the draft line are aligned to lights-on; the times follow the
+              draft schedule.
+            </li>
+          )}
           {plan.notes.map((note) => (
             <li key={note}>{note}</li>
           ))}
+          {warnings.slice(check?.kind === "warning" ? 1 : 0).map((warning) => (
+            <li key={warning} className="planning-warning">
+              {warning}
+            </li>
+          ))}
+          {plan.missing.length > 0 && (
+            <li className="planning-missing">
+              Not supplied: {plan.missing.join(", ")}. Missing targets are not plotted.
+            </li>
+          )}
         </ul>
       </details>
     </section>

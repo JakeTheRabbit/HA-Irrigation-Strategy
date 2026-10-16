@@ -440,11 +440,25 @@ try {
     assert.match(flags[0], /^Pore EC 2\.8, under the stage’s 3\.5–6/);
     assert.equal(flags[1], null);
     assert.match(flags[2], /^A pore EC probe left out: not reporting/);
-    // Each card: moisture with its bar, water per plant against the room, the last shot and the next.
+    // Each card: a status line, VWC and pore EC as gauges against their band, water per plant
+    // against the room, the last shot and the next.
     for (const index of [0, 1, 2]) {
       const card = cards.nth(index);
-      assert.match(await card.locator(".today-vwc").innerText(), /^Moisture\s*[\d.]+\s*%$/);
+      await expectVisible(card.locator(".today-zone-head [data-hmi-status]"));
       await expectVisible(card.locator(".moisture-bar"));
+      assert.match(
+        await card.locator('[data-gauge="vwc"]').getAttribute("aria-label"),
+        /^VWC now [\d.]+%, (band [\d.]+% to [\d.]+%|target [\d.]+%), /,
+      );
+      assert.match(
+        await card.locator('[data-gauge="pore-ec"]').getAttribute("aria-label"),
+        /^Pore EC [\d.]+, band 3\.5 to 6, /,
+      );
+      // The levels the bar marks keep their key: rescue floor, re-water point and peak.
+      assert.match(
+        await card.locator(".hmi-gauge-marks").innerText(),
+        /^Rescue floor [\d.]+\s+Re-water [\d.]+\s+Peak [\d.]+$/,
+      );
       const facts = await card.locator(".today-zone-facts").innerText();
       assert.match(facts, /Water\s+[\d.]+ (mL|L)\/plant · (≈ the room|[\d.]+× the room)/);
       assert.match(facts, /Last shot\s+\S/);
@@ -603,15 +617,24 @@ try {
       await expectVisible(layer("yesterday"));
       for (const name of ["vwc", "ec", "fc", "runoff", "maintenance", "projected", "shots", "jev"])
         assert.equal(await layer(name).count(), 1, `the ${name} layer is drawn`);
-      // Today in numbers: moisture and its drying rate, pore EC against the stage's band, water and
-      // each plant's share, shots, the overnight dryback against the stage's reference.
+      // Today: a status line and four gauges, each against its target (VWC now, the peak, the
+      // overnight dryback, pore EC against the stage's band); then water and each plant's share,
+      // and shots.
+      await expectVisible(day.locator(".zone-numbers-wrap [data-hmi-status]"));
+      assert.equal(await day.locator(".zone-numbers-wrap [data-gauge]").count(), 4);
+      const speech = (id) => day.locator(`[data-gauge="${id}"]`).getAttribute("aria-label");
+      assert.match(await speech("vwc"), /^VWC now [\d.]+%, /);
+      assert.match(await speech("peak"), /^Peak today [\d.]+%, target [\d.]+%, /);
+      assert.match(
+        await speech("dryback"),
+        /dryback (no reading|[\d.]+%), target [\d.]+%.*, reference [\d.]+% to [\d.]+%$/,
+      );
+      assert.match(await speech("pore-ec"), /^Pore EC 2\.8, band 3\.5 to 6, 0\.7 mS\/cm under$/);
+      assert.equal(await day.locator('[data-gauge="pore-ec"]').getAttribute("data-state"), "abnormal");
       const numbers = await day.locator(".zone-numbers").innerText();
       for (const part of [
-        /Moisture\s+[\d.]+%/,
-        /Pore EC\s+[\d.]+\s+below 3\.5–6/,
         /Water today\s+[\d.]+ L\s+\d+ mL\/plant\s+\d+% of the 40 L limit/,
         /Shots\s+\d+\s+last /,
-        /dryback\s+[\d.]+% of peak\s+Reference \d+–\d+%/,
       ])
         assert.match(numbers, part);
       assert.match(await day.locator(".zone-next").innerText(), /^Next: \S/);
