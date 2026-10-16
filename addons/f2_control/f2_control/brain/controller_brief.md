@@ -58,7 +58,7 @@
 - maximum_ec: 9
 - p0_additional_dryback: 0
 - p0_maximum_wait_time: 45 (range 5-240)
-- p0_minimum_wait_time: 0
+- p0_minimum_wait: 0
 - p1_initial_shot_size: 2 (range 0.5-15)
 - p1_maximum_extra_shots: 3
 - p1_maximum_shots: 12 (range 1-40)
@@ -67,7 +67,7 @@
 - p1_shot_size_increment: 0.5 (range 0-5)
 - p1_target_vwc: 60 (range 20-100)
 - p1_time_between_shots: 15 (range 1-120)
-- p2_ec_high_threshold: 1.2
+- p2_dilute_ratio: 1.2
 - p2_end_hours_before_off: 0
 - p2_shot_size: 5 (range 0.5-20)
 - p2_time_between_shots: 0

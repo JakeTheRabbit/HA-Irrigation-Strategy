@@ -2391,7 +2391,7 @@ class Controller:
             # Opt-in phase settings (phase_options). Optional: an integration older than them has none, and each
             # fallback is the rule as it was.
             p0_min_wait_min=self._zone_num(
-                room, zone, "p0_minimum_wait_time", FALLBACK["p0_minimum_wait_time"], optional=True
+                room, zone, "p0_minimum_wait", FALLBACK["p0_minimum_wait"], optional=True
             ),
             p0_stall_exit=self._on(f"switch.crop_steering_{room.prefix}p0_stall_exit", False),
             ec_flush_target=self._zone_num(room, zone, "ec_flush_target", FALLBACK["ec_flush_target"], optional=True),

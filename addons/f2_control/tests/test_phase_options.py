@@ -18,7 +18,7 @@ from test_plan_hold_never_stops_rescues import Clock, probe, rig  # noqa: F401 (
 from test_setpoints_follow_highest_reading import _ladder, _peaks, _room, _writes
 
 HARDWARE = {"pump": "switch.p", "mainline": "switch.m", "valves": {"1": "switch.v1"}}
-NEW_NUMBERS = ("p0_minimum_wait_time", "ec_flush_target", "p2_timed_interval_min", "p2_timed_shot_size",
+NEW_NUMBERS = ("p0_minimum_wait", "ec_flush_target", "p2_timed_interval_min", "p2_timed_shot_size",
                "p2_timed_first_hours", "p2_end_hours_before_off", "p2_dilute_ratio")
 
 
@@ -40,7 +40,7 @@ def test_an_integration_without_them_decides_as_before_and_alerts_nothing():
 def test_the_zones_own_values_reach_the_engine():
     z = "number.crop_steering_zone_1_"
     _c, _room, p = _params({
-        z + "p0_minimum_wait_time": ("30", {}), "switch.crop_steering_p0_stall_exit": ("on", {}),
+        z + "p0_minimum_wait": ("30", {}), "switch.crop_steering_p0_stall_exit": ("on", {}),
         z + "ec_flush_target": ("4.5", {}), "select.crop_steering_zone_1_p2_mode": ("Timed with guards", {}),
         z + "p2_timed_interval_min": ("45", {}), z + "p2_timed_shot_size": ("3", {}),
         z + "p2_timed_first_hours": ("2", {}), z + "p2_end_hours_before_off": ("1.5", {}),
@@ -145,7 +145,7 @@ def test_the_limit_holds_the_learner_and_the_ai_only_when_the_room_chooses(rig):
 def test_the_ai_cannot_start_the_ramp_inside_the_minimum_wait(rig):  # noqa: F811
     c, fake, room = rig
     now = Clock.now()
-    fake.set_state("number.crop_steering_zone_1_p0_minimum_wait_time", "60")
+    fake.set_state("number.crop_steering_zone_1_p0_minimum_wait", "60")
     room.state[1].update(phase="P0", last_phase_change=now - timedelta(minutes=20))
     probe(fake, 1, 60.0)
     p = c._params(room, 1)
