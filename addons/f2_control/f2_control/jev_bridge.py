@@ -46,6 +46,10 @@ from jev.setpoint_memory import SetpointMemory
 
 ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel", "balance", "feed", "report", "why",
        "plan")
+RETIRED = "alerts"  # the alert-urgency judge the decaying re-notify replaced: a copied old jev_judges still names it
+# The judges that came after it: an explicit list that still names it was written before them.
+SINCE_RETIRED = ("stage", "setpoints", "channel", "balance", "feed", "report", "why", "plan")
+_retired_said = False  # the note about a copied old jev_judges is logged once a process, not on every rebuild
 PENDING_S = 300  # a write Home Assistant has not reflected yet is not an operator's edit for this long
 RETRIES = 3  # a write still not read back is sent again this many times, PENDING_S apart and doubling, then failed
 REVERT_WINDOW_H = 30  # a rescue shot this soon after a setpoint change puts the old value back
@@ -195,6 +199,7 @@ def build(options, cf, state_path, log, status=None):
     jev_client.log = log
     wanted = str(options.get("jev_judges") or "all").replace(" ", "")
     allowed = set(ALL) if wanted in ("", "all") else set(wanted.split(",")) & set(ALL)
+    _say_retired(wanted, allowed, log)
     haiku = status.provider == "claude_haiku"
     if not haiku:
         allowed.discard("balance")  # its answer reaches the setpoints judge only through the Claude route's evidence
@@ -251,6 +256,18 @@ def build(options, cf, state_path, log, status=None):
     brain.flower_start = flower_option(options.get("jev_flower_start"))
     brain.flower_days = int(options.get("jev_flower_days") or 56)
     return brain
+
+
+def _say_retired(wanted, allowed, log):
+    """A jev_judges that names the retired alerts judge was copied from an old install: the name is dropped like any
+    unknown one, and the log says once which newer judges the list leaves off."""
+    global _retired_said
+    missing = [j for j in SINCE_RETIRED if j not in allowed]
+    if _retired_said or RETIRED not in wanted.split(",") or not missing:
+        return
+    _retired_said = True
+    log(f"brain: jev_judges names the retired {RETIRED} judge, which is ignored. It lists its judges one by one, so "
+        f"the newer judges {', '.join(missing)} are not asked. Set jev_judges to all to ask every judge")
 
 
 def plan_meta(room, now):
