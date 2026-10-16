@@ -217,6 +217,7 @@ export interface Placement {
 }
 export const RESTORED_MANIFEST = restored;
 const PLACEMENT_PAGES: Record<string, { group: string; page: Page; location: string }> = {
+  "AI-INSTRUCTIONS": { group: "ai", page: "settings/ai", location: "Settings > AI assistant > Instructions" },
   "LF-05": { group: "display", page: "zone", location: "Zone page" },
   "LF-97": { group: "display", page: "help", location: "Help > Rules" },
   "LF-124": { group: "display", page: "today", location: "Today" },

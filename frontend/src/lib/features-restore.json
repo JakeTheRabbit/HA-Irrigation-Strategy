@@ -798,5 +798,15 @@
     "group": "Equipment",
     "label": "Room daily light integral",
     "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
+  },
+  {
+    "id": "AI-INSTRUCTIONS",
+    "entity": "none (Settings > AI assistant > Instructions)",
+    "kind": "display",
+    "scope": "dashboard",
+    "default": "visible",
+    "group": "AI assistant",
+    "label": "AI instructions",
+    "help": "Review the instructions and editable context used by the AI assistant."
   }
 ]
