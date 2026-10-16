@@ -81,7 +81,7 @@ NO_TOUCH_OPTIONS = ["Off", "1 h", "Until lights-on", "24 h"]
 # (key, friendly name, default). Each power that acted before the switches existed is ON, so a room
 # updated in place keeps what its AI assistant did; a new power is OFF until the owner turns it on.
 # With a power off its judge still runs and advises; the controller refuses to act on it. The
-# controller reads the same keys and defaults (jev/powers.py) and takes a missing switch as its default.
+# controller reads the same keys and defaults (its brain package, powers.py) and takes a missing switch as its default.
 AI_POWERS = (
     ("advance_phase", "AI power: start the next phase early", True),
     ("ramp_control", "AI power: end the morning ramp", True),

@@ -104,9 +104,9 @@ KINDS = (
         "name": "AI assistant",
         "detail": "Messages from the AI assistant: its advice about a zone, a "
         "setting that it moves, and a pause of its automatic targets. Also low "
-        "calls, a zone on its stricter gate, a spent AI budget, a refused key and a "
-        "retired route. Also its feed proposals, and the grow plan state of the "
-        "room.",
+        "calls, a zone on its stricter gate, a spent AI budget, a refused key and "
+        "the removed first AI route. Also its feed proposals, and the grow plan "
+        "state of the room.",
         "codes": _codes(
             "CS-404 CS-501 CS-702 CS-705 CS-706 CS-707 CS-708 CS-709 CS-711 CS-712 CS-713"
         ),
