@@ -345,7 +345,7 @@ export class OperatorDemo {
       draft: { water_seen: { ...draft.water_seen }, sizing_confirmed: draft.sizing_confirmed },
     };
   }
-  /** The AI overlays: in the room that runs Jev, last night's notch of zone 3's shot size, which
+  /** The AI overlays: in the room that runs the AI assistant, last night's notch of zone 3's shot size, which
    * goes back at the next lights-on unless kept or undone. */
   private overlay(action: OperatorAction, data: Record<string, unknown>) {
     const roomId = String(data.room_id);

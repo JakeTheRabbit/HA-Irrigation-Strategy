@@ -84,7 +84,7 @@ export function ZonePage({
     states[`select.crop_steering_${room.room.prefix}zone_${zone.id}_steering_mode`]?.state,
     readJev(states, room.room.prefix).room?.stage?.steering,
   );
-  // Jev on this zone shows while the room runs Jev (its journal, or its word on this zone).
+  // The AI assistant on this zone shows while the room runs the AI assistant (its journal, or its word on this zone).
   const jev =
     !!readJev(states, room.room.prefix).room?.on ||
     !!readJev(states, room.room.prefix).log?.entries.some((entry) => entry.zone === zone.id) ||
@@ -281,7 +281,7 @@ function Collapsed({ title, children }: { title: string; children: () => ReactNo
   );
 }
 
-/** What Jev says about this zone: which judges act on it now, each judge's last word, the setpoints
+/** What the AI assistant says about this zone: which judges act on it now, each judge's last word, the setpoints
  * it may move and within what range, and its latest decisions here with how they turned out. */
 function JevOnZone({
   controller,
@@ -406,7 +406,7 @@ function JevSetpointsLine({ setpoints }: { setpoints: JevSetpoints }) {
   );
 }
 
-/** Jev's own "2026-09-27 22:57: P2 shot 4.5% -> 4%" with the stamp as a day and a clock time. */
+/** The AI assistant's own "2026-09-27 22:57: P2 shot 4.5% -> 4%" with the stamp as a day and a clock time. */
 function lastChange(last: string) {
   const parts = last.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::\d{2})?: (.+)$/);
   if (!parts) return last;
@@ -416,7 +416,7 @@ function lastChange(last: string) {
   return `${word === "Yesterday" ? "yesterday" : word || "today"} ${clock(at)}: ${what}`;
 }
 
-/** The zone's targets as the controller uses them now, with Jev's range where it manages one; they
+/** The zone's targets as the controller uses them now, with the AI assistant's range where it manages one; they
  * are edited in Plan. */
 function ZoneTargets({
   controller,

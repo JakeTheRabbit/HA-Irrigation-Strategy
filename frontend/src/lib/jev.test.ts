@@ -38,7 +38,7 @@ const decision = {
   reason: "the EC steer stays inside its own clamp",
 };
 
-describe("the Jev log sensor", () => {
+describe("the AI assistant's log sensor", () => {
   it("reads every field of a published decision, in the controller's naive local time", () => {
     const entry = parseJevEntry(decision)!;
     expect(entry).toMatchObject({
@@ -55,7 +55,7 @@ describe("the Jev log sensor", () => {
     });
     expect(entry.time).toBe(new Date(2026, 8, 28, 10, 5, 12).getTime());
   });
-  it("is null without the sensor: a room without Jev, or a controller from before the log", () => {
+  it("is null without the sensor: a room without the AI assistant, or a controller from before the log", () => {
     expect(parseJevLog(undefined)).toBeNull();
     expect(parseJevLog(entity("sensor.crop_steering_jev_log", "no decisions yet"))).toEqual({
       headline: "no decisions yet",
@@ -156,13 +156,13 @@ describe("the Jev log sensor", () => {
       tone: "neutral",
     });
   });
-  it("says Jev's answer with how sure it was", () => {
+  it("says the AI assistant's answer with how sure it was", () => {
     expect(jevAnswer(parseJevEntry(decision)!)).toBe("below band vegetative, 72%");
     expect(jevAnswer({ verdict: "", p: null })).toBe("no answer");
   });
 });
 
-describe("the room's Jev sensor", () => {
+describe("the room's AI assistant sensor", () => {
   const stage = {
     day: 37,
     days: 56,
@@ -241,7 +241,7 @@ describe("the room's Jev sensor", () => {
   });
 });
 
-describe("a zone's Jev sensor", () => {
+describe("a zone's AI assistant sensor", () => {
   it("names the judges acting on it, or none while it watches", () => {
     const acting = parseJevZone(
       entity("sensor.crop_steering_zone_2_jev", "salt, stage", {
@@ -400,7 +400,7 @@ describe("an outcome, on the decision it checks", () => {
   });
 });
 
-describe("the setpoints Jev manages on a zone", () => {
+describe("the setpoints the AI assistant manages on a zone", () => {
   const zone = (setpoints: unknown) =>
     parseJevSetpoints(entity("sensor.crop_steering_zone_1_jev", "watching", { setpoints }));
   it("reads the range, the grower's home value and the last change", () => {

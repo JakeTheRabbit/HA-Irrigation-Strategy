@@ -217,7 +217,7 @@ const ROOM_SENSORS = [
   "app_status",
   "current_decision",
   "activity_log",
-  // Jev: the room's usage and stage, and its decision log.
+  // The AI assistant: the room's usage and stage, and its decision log.
   "jev",
   "jev_log",
   // Batch-tank dosing: pumps, the batch and their history (docs/DOSING.md).

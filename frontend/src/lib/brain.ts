@@ -88,7 +88,7 @@ export const BRAIN_JUDGING = ["acting", "dry_run", "legacy"];
 
 /** The brain sensor as the panel reads it; null without one. A sensor from a controller before the panel
  * (no `state` attribute) reads from its entity state: "rules" is rules, "error" is not answering, anything
- * else is the old Jev connection, the only brain those controllers had. */
+ * else is the first AI route, the only brain those controllers had. */
 export function parseBrainPlan(value: unknown): BrainPlan | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const p = value as Record<string, unknown>;
@@ -318,8 +318,8 @@ export function brainView(
     case "legacy":
       return say(
         "AI acting",
-        "AI assistant on the old Jev connection",
-        "It still works, but the connection is retired. Switch to Claude Haiku: same judges, one key.",
+        "AI assistant on the first AI route",
+        "An older controller app still runs it. Update the controller app: it moves to Claude Haiku, with every judge, when it has an Anthropic key.",
         "info",
       );
     case "budget_spent": {
@@ -387,7 +387,7 @@ export function providerWords(panel: BrainPanel | null): string {
     case "claude_haiku":
       return "Claude Haiku (Anthropic)";
     case "jev_legacy":
-      return "Old Jev connection (deprecated). Switch to Claude Haiku: same judges, one key.";
+      return "First AI route (removed). Update the controller app and add an Anthropic key: it moves to Claude Haiku.";
     default:
       return "Not reported by the controller";
   }

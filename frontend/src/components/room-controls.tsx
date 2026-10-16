@@ -301,15 +301,15 @@ export function RoomOffBanner({ controller }: { controller: Controller }) {
   );
 }
 
-/** Room-level Auto setpoints On/Off. Hidden when the controller has no such switch. With Jev's
- * Setpoints judge on the room, the switch is what lets Jev move each zone's P2 shot size and
+/** Room-level Auto setpoints On/Off. Hidden when the controller has no such switch. With the AI assistant's
+ * Setpoints judge on the room, the switch is what lets the AI assistant move each zone's P2 shot size and
  * re-water point, and it says so. */
 export function AutoSetpointsControl({
   controller,
   jevManaged = false,
 }: {
   controller: Controller;
-  /** Jev's Setpoints judge runs on this room (a zone's Jev sensor says it manages its setpoints). */
+  /** The AI assistant's Setpoints judge runs on this room (a zone's AI assistant sensor says it manages its setpoints). */
   jevManaged?: boolean;
 }) {
   const [review, setReview] = useState(false);
@@ -380,7 +380,7 @@ const STATE_CLASS: Record<AutoSetpointStatus["state"], string> = {
   off: "status-neutral",
   unavailable: "status-neutral",
 };
-/** Per-zone supervisor status: state (and why it is frozen), learned peak, last change, Jev. */
+/** Per-zone supervisor status: state (and why it is frozen), learned peak, last change, the AI assistant. */
 export function AutoZoneChip({ status, name }: { status: AutoSetpointStatus; name?: string }) {
   const hold = autoHoldText(status),
     reason = autoFrozenReason(status);

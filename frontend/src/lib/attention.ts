@@ -35,7 +35,7 @@ export interface ZoneFacts {
   readings: Reading[];
   /** When the zone's last shot started (epoch ms). */
   lastShot: number | null;
-  /** Until when Jev leaves this zone's setpoints alone after putting a change back (epoch ms). */
+  /** Until when the AI assistant leaves this zone's setpoints alone after putting a change back (epoch ms). */
   jevPausedUntil: number | null;
   /** The controller is watering the zone: not when the room, its watering or the zone is off. */
   watering: boolean;
