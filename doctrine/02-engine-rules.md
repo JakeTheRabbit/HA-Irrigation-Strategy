@@ -49,7 +49,7 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 - **CT-9** The minimum daily floor is each zone's Min Daily Water Per Plant setting (min_daily_ml_per_plant, mL per plant per grow-day; an integration older than the setting has only the hand-made helper of the same name, read in its place) times the zone's plant count, defaulting to 0: a fresh install runs with the floor off. Its VWC ceiling is field capacity plus a margin, inside 50-100.
 - **CT-10** A zone whose moisture rises with no water going in (a backed-up table) gets the floor set to 0 and no EC correction.
 - **CT-11** dryback_target is read from vegetative_dryback_target or generative_dryback_target by the zone's steering mode; the integration's p0_dryback_drop_percent setting is not read by the controller.
-- **CT-12** Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity follows the zone's highest counted reading of this grow-day or the one before, and the P1 target the highest reading of the grow-day before (no higher than field capacity); when field capacity moves by 1 point or more, the P2 re-water threshold moves by the same points, down as well as up. Each of the three moves at most 1 point a grow-day, counted from where it stood, so a drifting probe or a flood drags the ladder no further than that a day and an edit by hand is moved from, never undone; all within the engine's bounds and each number's own min and max. The readings counted are the trusted ones outside a day the table backed up (CS-310), and a zone without a usable probe is not followed. The rescue floor (the P3 emergency threshold) is the operator's and never moves. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity): then field capacity alone moves if that is valid (CT-13 says when the learner writes the threshold itself).
+- **CT-12** Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity follows the zone's highest counted reading of this grow-day or the one before, and the P1 target the highest reading of the grow-day before (no higher than field capacity); when field capacity moves by 1 point or more, the P2 re-water threshold moves by the same points, down as well as up. Each of the three moves at most the room's Max setpoint move per day (default, and the fallback when it cannot be read, 1 point; 0 = no limit) a grow-day, counted from where it stood, and the room may make that limit hold the learner and the AI assistant's targets power too, on one shared ledger; so a drifting probe or a flood drags the ladder no further than that a day and an edit by hand is moved from, never undone; all within the engine's bounds and each number's own min and max. The readings counted are the trusted ones outside a day the table backed up (CS-310), and a zone without a usable probe is not followed. The rescue floor (the P3 emergency threshold) is the operator's and never moves. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity): then field capacity alone moves if that is valid (CT-13 says when the learner writes the threshold itself).
 - **CT-13** With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge holds it (with one running and able to act, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12; from the first loop the brain cannot act, in dry run, with its budget spent, paused, unavailable or its key refused, the learner writes the threshold again until a lights-on at which the brain can act). With the room's set_targets_from_achievable power on and the brain able to act, neither the learner nor the follower of CT-12 writes field capacity, the P1 target or the threshold: the brain sets them (BR-8). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.
 - **CT-14** So with Auto Setpoints on, field capacity sits at the zone's own followed peak (moved at most 1 point a grow-day): the safety label (zone_safety_status) reads over_saturated whenever the zone reaches that field capacity, and approaching_saturation within 5 points of it. Under the switch those labels say where the zone sits against its own peak, not that it is over-watered.
 
@@ -85,6 +85,7 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 | p2_rescue | yes |
 | p2_dilute | no |
 | p2_topup | no |
+| p2_timed | no |
 | p3_emergency | yes |
 | p3_hold | no |
 | watchdog | yes |
@@ -116,11 +117,18 @@ Doctrine 0.1.0. Every statement under 'decide()' is checked by calling the engin
 | drown_ceiling | 50 | 100 |
 | min_floor_finish_h | 0 | 12 |
 | p1_rise_pts | 0.1 | 5 |
-| p1_max_extra_shots | 1 | 10 |
+| p1_max_extra_shots | 1 | 30 |
 | p1_stall_shots | 0 | 10 |
 | p0_additional_dryback | 0 | 40 |
 | p2_time_between_min | 0 | 120 |
 | p2_min_interval_min | 1 | 120 |
+| p0_min_wait_min | 0 | 240 |
+| ec_flush_target | 0 | 9 |
+| p2_dilute_ratio | 1 | 3 |
+| p2_timed_interval_min | 5 | 720 |
+| p2_timed_shot_size | 0 | 20 |
+| p2_timed_first_h | 0 | 24 |
+| p2_end_h_before_off | 0 | 12 |
 
 ## Constants
 

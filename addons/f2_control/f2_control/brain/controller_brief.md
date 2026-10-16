@@ -27,7 +27,7 @@
 - Shot litres = substrate litres per plant x plants x shot % / 100. Flow L/s = plants x drippers per plant x L/h per
   dripper / 3600. Duration = litres / flow, then the room's safety cap on a shot's length. Positive flow is required:
   no hidden clamp.
-- Daily caps: max_daily_volume per zone (rescue and the safety shots are exempt: flush_high_ec, min_daily, p0_ec_flush, p1_extra, p1_flush, p1_ramp, p2_dilute, p2_rescue, p2_topup, p3_emergency, p3_hold, watchdog); the minimum-daily floor
+- Daily caps: max_daily_volume per zone (rescue and the safety shots are exempt: flush_high_ec, min_daily, p0_ec_flush, p1_extra, p1_flush, p1_ramp, p2_dilute, p2_rescue, p2_timed, p2_topup, p3_emergency, p3_hold, watchdog); the minimum-daily floor
   and the lights-on watchdog (watchdog_hours) still fire.
 
 ### 3. Gates and safety layers, in order, each fail-closed
@@ -43,6 +43,7 @@
 ### 4. The settings: each zone's own number for the setting, else the room's, else the controller's built-in value shown here
 
 - drippers_per_plant: 1
+- ec_flush_target: 0
 - ec_min_interval: 10
 - ec_target_gen_p0: 4
 - ec_target_gen_p1: 5
@@ -57,6 +58,7 @@
 - maximum_ec: 9
 - p0_additional_dryback: 0
 - p0_maximum_wait_time: 45 (range 5-240)
+- p0_minimum_wait_time: 0
 - p1_initial_shot_size: 2 (range 0.5-15)
 - p1_maximum_extra_shots: 3
 - p1_maximum_shots: 12 (range 1-40)
@@ -65,8 +67,13 @@
 - p1_shot_size_increment: 0.5 (range 0-5)
 - p1_target_vwc: 60 (range 20-100)
 - p1_time_between_shots: 15 (range 1-120)
+- p2_ec_high_threshold: 1.2
+- p2_end_hours_before_off: 0
 - p2_shot_size: 5 (range 0.5-20)
 - p2_time_between_shots: 0
+- p2_timed_first_hours: 0
+- p2_timed_interval_min: 60
+- p2_timed_shot_size: 0
 - p2_vwc_threshold: 45 (range 10-100)
 - p3_emergency_shot_size: 2
 - p3_emergency_vwc_threshold: 40 (range 10-65)

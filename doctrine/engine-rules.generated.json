@@ -16,6 +16,7 @@
     "p2_rescue": true,
     "p2_dilute": false,
     "p2_topup": false,
+    "p2_timed": false,
     "p3_emergency": true,
     "p3_hold": false,
     "watchdog": true,
@@ -112,7 +113,7 @@
     ],
     "p1_max_extra_shots": [
       1.0,
-      10.0
+      30.0
     ],
     "p1_stall_shots": [
       0.0,
@@ -129,6 +130,34 @@
     "p2_min_interval_min": [
       1.0,
       120.0
+    ],
+    "p0_min_wait_min": [
+      0.0,
+      240.0
+    ],
+    "ec_flush_target": [
+      0.0,
+      9.0
+    ],
+    "p2_dilute_ratio": [
+      1.0,
+      3.0
+    ],
+    "p2_timed_interval_min": [
+      5.0,
+      720.0
+    ],
+    "p2_timed_shot_size": [
+      0.0,
+      20.0
+    ],
+    "p2_timed_first_h": [
+      0.0,
+      24.0
+    ],
+    "p2_end_h_before_off": [
+      0.0,
+      12.0
     ]
   },
   "ec_adjust": "ec_adjust multiplies a shot by pore EC / target: ratio 0.4 -> x0.5; ratio 0.6 -> x0.7; ratio 0.9 -> x1; ratio 1.1 -> x1.2; ratio 1.3 -> x1.5; ratio 1.6 -> x2 (thresholds: >1.5 x2.0, >1.2 x1.5, >1.0 x1.2, <0.8 x0.7, <0.5 x0.5, else x1).",
@@ -312,7 +341,7 @@
     },
     {
       "id": "CT-12",
-      "text": "Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity follows the zone's highest counted reading of this grow-day or the one before, and the P1 target the highest reading of the grow-day before (no higher than field capacity); when field capacity moves by 1 point or more, the P2 re-water threshold moves by the same points, down as well as up. Each of the three moves at most 1 point a grow-day, counted from where it stood, so a drifting probe or a flood drags the ladder no further than that a day and an edit by hand is moved from, never undone; all within the engine's bounds and each number's own min and max. The readings counted are the trusted ones outside a day the table backed up (CS-310), and a zone without a usable probe is not followed. The rescue floor (the P3 emergency threshold) is the operator's and never moves. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity): then field capacity alone moves if that is valid (CT-13 says when the learner writes the threshold itself).",
+      "text": "Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity follows the zone's highest counted reading of this grow-day or the one before, and the P1 target the highest reading of the grow-day before (no higher than field capacity); when field capacity moves by 1 point or more, the P2 re-water threshold moves by the same points, down as well as up. Each of the three moves at most the room's Max setpoint move per day (default, and the fallback when it cannot be read, 1 point; 0 = no limit) a grow-day, counted from where it stood, and the room may make that limit hold the learner and the AI assistant's targets power too, on one shared ledger; so a drifting probe or a flood drags the ladder no further than that a day and an edit by hand is moved from, never undone; all within the engine's bounds and each number's own min and max. The readings counted are the trusted ones outside a day the table backed up (CS-310), and a zone without a usable probe is not followed. The rescue floor (the P3 emergency threshold) is the operator's and never moves. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity): then field capacity alone moves if that is valid (CT-13 says when the learner writes the threshold itself).",
       "verified": true
     },
     {
