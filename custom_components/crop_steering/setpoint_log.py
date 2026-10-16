@@ -34,8 +34,11 @@ class SetpointLog:
         self.room_id = "room:" + room_prefix(entry)
         self._store = store
         self._lock = asyncio.Lock()
-        # entity_id -> (value, who, monotonic seconds, expires or None)
+        # entity_id -> (value, who, monotonic seconds, expires or None, reason or None, expected or None)
         self._claims = {}
+        self._reasons = (
+            {}
+        )  # entity_id -> (reason, expected) the last named write gave, for record()
         self.changes = []
         self.error = None
 
@@ -68,7 +71,21 @@ class SetpointLog:
         if isinstance(entity_id, str) and who in CONTROLLER_WRITERS:
             # `expires`: a brain write that is an overlay going back by itself then (overlays.py).
             expires = data.get("expires")
-            self._claims[entity_id] = (value, who, time.monotonic(), expires)
+            # `reason`: why the controller moved it, in words (an AI assistant change says why).
+            # `reason` and `expected`: why the controller moved it and the result it expects, in words (an AI
+            # assistant power's write names both; the next night's scorecard compares the result).
+            reason, expected = (
+                text[:200] if isinstance(text, str) and text else None
+                for text in (data.get("reason"), data.get("expected"))
+            )
+            self._claims[entity_id] = (
+                value,
+                who,
+                time.monotonic(),
+                expires,
+                reason,
+                expected,
+            )
 
     async def who(self, entity_id, value, context):
         """-> (who, the expiry the controller named with its write, or None)."""
@@ -78,6 +95,8 @@ class SetpointLog:
             and abs(claim[0] - float(value)) < 1e-6
             and time.monotonic() - claim[2] <= CLAIM_S
         ):
+            if claim[4] or claim[5]:
+                self._reasons[entity_id] = (claim[4], claim[5])
             return claim[1], claim[3]
         user_id = getattr(context, "user_id", None)
         user = await self.hass.auth.async_get_user(user_id) if user_id else None
@@ -91,21 +110,26 @@ class SetpointLog:
         """Append one change -> (who, expires) as who(). A log that could not be loaded is never overwritten."""
         from homeassistant.util import dt as dt_util
 
+        self._reasons.pop(entity_id, None)
         who, expires = await self.who(entity_id, new, context)
+        reason, expected = self._reasons.pop(entity_id, None) or (None, None)
         if self.error is not None or old == new:
             return who, expires
+        row = {
+            "at": dt_util.utcnow().isoformat(timespec="seconds"),
+            "entity_id": entity_id,
+            "field": field,
+            "zone": zone,
+            "old": old,
+            "new": new,
+            "who": who,
+        }
+        if reason:  # only a write the controller named with a reason carries one
+            row["reason"] = reason
+        if expected:
+            row["expected"] = expected
         async with self._lock:
-            self.changes.append(
-                {
-                    "at": dt_util.utcnow().isoformat(timespec="seconds"),
-                    "entity_id": entity_id,
-                    "field": field,
-                    "zone": zone,
-                    "old": old,
-                    "new": new,
-                    "who": who,
-                }
-            )
+            self.changes.append(row)
             del self.changes[:-MAX_CHANGES]
             await self._store.async_save({"changes": self.changes})
         return who, expires

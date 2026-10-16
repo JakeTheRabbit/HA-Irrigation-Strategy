@@ -117,6 +117,20 @@
     "probe.tracking",
     "plan.keep_yesterday"
   ],
+  "values_keys_by_question": {
+    "targets.targets": [
+      "field_capacity",
+      "p1_target_vwc",
+      "p2_vwc_threshold",
+      "p3_emergency_vwc_threshold",
+      "vegetative_dryback_target",
+      "generative_dryback_target"
+    ],
+    "shotsize.shot_sizes": [
+      "p1_initial_shot_size",
+      "p2_shot_size"
+    ]
+  },
   "tools": [
     {
       "name": "answer_choice",
@@ -447,6 +461,82 @@
           "answer",
           "grounded_in",
           "cannot_answer"
+        ],
+        "additionalProperties": false
+      }
+    },
+    {
+      "name": "set_values",
+      "description": "Set settings yourself, for a question that asks for values (kind values: the owner has given you this power, or asks what you would set). Call it once for that question, and only with that question's own settings. Give only the settings you change, each with the number you want, your reason and nothing else; an empty list keeps every setting. Code writes the values as you give them, clamped only to each setting's own range, so you are trusted to follow the goal and the rules for the owner's powers in your doctrine. 'expected_outcome' is the result you expect tomorrow, which the next night's scorecard checks; 'confidence' (0 to 1) how well the evidence supports the change; 'rationale' at most two plain sentences for the grower's journal.",
+      "strict": true,
+      "input_schema": {
+        "type": "object",
+        "properties": {
+          "snapshot_id": {
+            "type": "string",
+            "description": "Copy the snapshot id from the request exactly. An answer with another id is discarded."
+          },
+          "question_id": {
+            "type": "string",
+            "description": "The question id exactly as the request gives it, for example targets__v0."
+          },
+          "values": {
+            "type": "array",
+            "description": "The settings you change; empty to keep them all.",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "enum": [
+                    "field_capacity",
+                    "generative_dryback_target",
+                    "p1_initial_shot_size",
+                    "p1_target_vwc",
+                    "p2_shot_size",
+                    "p2_vwc_threshold",
+                    "p3_emergency_vwc_threshold",
+                    "vegetative_dryback_target"
+                  ],
+                  "description": "One of the question's own settings."
+                },
+                "value": {
+                  "type": "number",
+                  "description": "The new value, in the setting's own unit."
+                },
+                "reason": {
+                  "type": "string",
+                  "description": "Why, in one plain sentence naming the deciding fact."
+                }
+              },
+              "required": [
+                "key",
+                "value",
+                "reason"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "expected_outcome": {
+            "type": "string",
+            "description": "What you expect tomorrow, in one plain sentence the next scorecard can check."
+          },
+          "confidence": {
+            "type": "number",
+            "description": "0 to 1: how well the evidence supports the change."
+          },
+          "rationale": {
+            "type": "string",
+            "description": "At most two plain sentences for the grower's journal."
+          }
+        },
+        "required": [
+          "snapshot_id",
+          "question_id",
+          "values",
+          "expected_outcome",
+          "confidence",
+          "rationale"
         ],
         "additionalProperties": false
       }

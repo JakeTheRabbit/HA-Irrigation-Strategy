@@ -45,9 +45,10 @@ TOPIC_TITLES = {
     "ec": "Pore EC", "probe": "Probes and hardware evidence", "stage": "Growth stage", "ripening": "Ripening",
     "closed_loop": "Closed-loop discipline", "substrate": "Substrate", "feed": "Feed and source water",
     "climate": "Climate", "contract": "Brain contract (observer -> planner -> guarded controller -> executor -> audit)",
+    "powers": "The owner's powers: the goal and the rules when you set targets yourself",
 }
 SECTIONS = ("01-role-and-hard-rules.md", "02-engine.md", "03-decisions.md", "04-symptoms.md", "05-doctrine.md")
-JUDGE_FILE = {"plan": "plan_task.py"}  # a judge whose question lives outside judges/
+JUDGE_FILE = {"plan": "plan_task.py", "shotsize": "judges/targets.py"}  # a judge whose question lives elsewhere
 SYMPTOM_CLASS = ("Symptom entries carry no evidence class of their own: they are product-rule, drawn from the "
                  "decision rules and engine facts they cite.")
 
@@ -381,12 +382,13 @@ def engine_facts(doc, paths):
          and "rescue = p.p3_emergency_floor" in follow and "if rescue + 3.0 <= new_thr < target <= fc:" in follow
          and "left = max(0.0, FC_STEP_MAX - used.get(suffix, 0.0))" in follow and blind_follow is None
          and 'if ha_get(entity)[0] in (None, "unknown", "unavailable", ""):' in ctrl),
-        ("CT-13", "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge holds it (with one running and able to act, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12; from the first loop the brain cannot act, in dry run, with its budget spent, paused, unavailable or its key refused, the learner writes the threshold again until a lights-on at which the brain can act). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.",
+        ("CT-13", "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge holds it (with one running and able to act, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12; from the first loop the brain cannot act, in dry run, with its budget spent, paused, unavailable or its key refused, the learner writes the threshold again until a lights-on at which the brain can act). With the room's set_targets_from_achievable power on and the brain able to act, neither the learner nor the follower of CT-12 writes field capacity, the P1 target or the threshold: the brain sets them (BR-8). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.",
          'want = auto_setpoints.wanted(learn, current, snap.vwc, st["phase"], ctx, others=judged)' in ctrl
-         and "if self._follow_fc(room, zone, p, now):" in ctrl and "writes = enabled and not planned" in ctrl
+         and "elif self._follow_fc(room, zone, p, now):" in ctrl and "writes = enabled and not planned" in ctrl
+         and "owned = jev_bridge.targets_owned(self, room)" in ctrl
          and 'if "p2_vwc_threshold" in others:' in auto
          and 'MANAGED = ("p1_target_vwc", "field_capacity", "p2_vwc_threshold")' in auto
-         and "return (SHOT, THRESHOLD) if held[room.slug] else ()" in bridge
+         and "return (SHOT, THRESHOLD) if _acting_latch(c, room) else ()" in bridge
          and "elif held[room.slug] and not can_act(c):" in bridge
          and "judged = jev_bridge.judge_levers(self, room)" in ctrl),
         ("CT-14", f"So with Auto Setpoints on, field capacity sits at the zone's own followed peak (moved at most {step if step is not None else 0:g} point a grow-day): the safety label (zone_safety_status) reads over_saturated whenever the zone reaches that field capacity, and approaching_saturation within 5 points of it. Under the switch those labels say where the zone sits against its own peak, not that it is over-watered.",
@@ -439,7 +441,12 @@ def brain_facts(doc, paths, core, base_p, base_s, ctrl):
     engine_src = str(Path(paths["core"]).parent.parent)
     if engine_src not in sys.path:
         sys.path.insert(0, engine_src)
-    env = load_module(brain / "envelope.py", "envelope_snapshot")
+    # The envelope imports its sibling powers.py relatively: load it as a member of a stand-in package.
+    pkg = importlib.util.spec_from_file_location("jev_snapshot", brain / "__init__.py",
+                                                 submodule_search_locations=[str(brain)])
+    sys.modules["jev_snapshot"] = importlib.util.module_from_spec(pkg)
+    pkg.loader.exec_module(sys.modules["jev_snapshot"])
+    env = load_module(brain / "envelope.py", "jev_snapshot.envelope")
     bridge = Path(paths["bridge"]).read_text(encoding="utf-8")
     judge_src = {d["judge"]: (brain / JUDGE_FILE.get(d["judge"], f"judges/{d['judge']}.py")).read_text(encoding="utf-8")
                  for d in doc["decisions"]}
@@ -455,8 +462,8 @@ def brain_facts(doc, paths, core, base_p, base_s, ctrl):
     def flat(minutes):  # a probe reading unchanged for `minutes`
         return SimpleNamespace(readings=[(now - timedelta(minutes=minutes), 50.0, 3.0), (now, 50.0, 3.0)])
 
-    def ok(kind, value, c, **k):
-        return env.admit(env.Directive("t", kind, value, "why", now + timedelta(hours=1)), c, **k)[0]
+    def ok(kind, value, c, judge="t", **k):
+        return env.admit(env.Directive(judge, kind, value, "why", now + timedelta(hours=1)), c, **k)[0]
 
     # base_p: dryback_target 20 (half = 10), p0_max_wait_min 45 (quarter = 11.25), p1 ceiling 60, floor 40
     dawn = (not ok("advance", "P1", ctx("P0", {"dryback_pct": 8, "phase_minutes": 5}))
@@ -520,7 +527,7 @@ def brain_facts(doc, paths, core, base_p, base_s, ctrl):
          and "SHOT_FLOOR = 3.0" in sp_src and "return max(SHOT_FLOOR, home - 1.0), home + 1.0" in sp_src
          and "lo = max(home - 2.0, params.p3_emergency_floor + 4.0)" in sp_src
          and "hi = min(home + 1.0, min(params.p1_target, params.field_capacity) - 2.0)" in sp_src
-         and "return (SHOT, THRESHOLD) if held[room.slug] else ()" in bridge
+         and "return (SHOT, THRESHOLD) if _acting_latch(c, room) else ()" in bridge
          and "def learner_wrote(" in bridge and "def hand_back(" in bridge
          and "elif not p.p3_emergency_floor + 3.0 <= value < p.p1_target <= p.field_capacity:" in bridge
          and 'enabled = (c._on(f"' in bridge and '{room.prefix}auto_setpoints", False)' in bridge
@@ -534,6 +541,22 @@ def brain_facts(doc, paths, core, base_p, base_s, ctrl):
          and 'float(last["to"]), float(last["from"])' in bridge and "frozen_until" not in ctrl),
         ("BR-7", "Every answer key the decision catalogue names exists in the code's questions.",
          all(keys_in_code(d) for d in doc["decisions"])),
+        ("BR-8", "Each acting directive needs the room's power for it (one switch per power per room): advance by the ramp judge ramp_control, any other advance advance_phase, distrust set_probe_aside, ec_mode ec_mode, setpoint nudge_setpoints, catch_up plan_catch_up, targets set_targets_from_achievable, shot_size tune_shot_sizes. With the power off the envelope refuses it and the answer is advice; a missing switch is the power's default, on for the six that acted before the switches and off for the two new ones. With targets or shot_size on, the values set are admitted as given (only the question's own settings, only numbers) and written clamped only to each setting's own range; dry run still only reports.",
+         not ok("ec_mode", "hold", ctx("P2", powers={"ec_mode": False}))
+         and ok("ec_mode", "hold", ctx("P2", powers={}))
+         and not ok("advance", "P2", ctx("P1", {"shot_count": 1, "vwc": 57}, powers={"ramp_control": False}),
+                    judge="ramp")
+         and ok("advance", "P2", ctx("P1", {"shot_count": 1, "vwc": 57}, powers={"advance_phase": False}),
+                judge="ramp")
+         and ok("targets", {"values": {"p1_target_vwc": 99.0, "p3_emergency_vwc_threshold": 11.0}},
+                ctx("P3", powers={"set_targets_from_achievable": True},
+                    targets={"current": {"p1_target_vwc": 50.0, "p3_emergency_vwc_threshold": 30.0}}))
+         and not ok("targets", {"values": {"p1_target_vwc": 99.0}},
+                    ctx("P3", powers={}, targets={"current": {"p1_target_vwc": 50.0}}))
+         and "def _admit_values(" in (brain / "envelope.py").read_text(encoding="utf-8")
+         and "val = round(min(hi, max(lo, float(asked))), 2)" in bridge
+         and '("set_targets_from_achievable", False,' in (brain / "powers.py").read_text(encoding="utf-8")
+         and '("tune_shot_sizes", False,' in (brain / "powers.py").read_text(encoding="utf-8")),
     ]
 
 

@@ -8,6 +8,7 @@ import {
 import type { EntityState, LogEvent, Series, States } from "./types";
 import type { CounterSample, WaterRecordRequest } from "./water-use";
 import { addDays, daysBetween } from "./comparison";
+import { AI_POWERS, aiPowerId } from "./brain";
 import { stockSensorId } from "./dosing";
 import { dateForDay, localDate } from "./grow-plan";
 import { numeric } from "./model";
@@ -99,6 +100,13 @@ export function createDemo(now = Date.now()): States {
     put(`switch.crop_steering_${prefix}auto_setpoints`, index ? "off" : "on");
     // The vitals notification says what each zone does next (Settings → Notifications) until switched off.
     put(`switch.crop_steering_${prefix}notify_predictions`, "on");
+    // What the AI assistant may do: Room A has a switch per power at its default; Room B models an
+    // integration from before the powers (each shows its default, read-only).
+    if (!index)
+      for (const power of AI_POWERS)
+        put(aiPowerId(prefix, power.key), power.default ? "on" : "off", {
+          friendly_name: `AI power: ${power.label}`,
+        });
     // How Water today reads in the room (Settings → Appearance): each zone's total until chosen.
     put(`select.crop_steering_${prefix}water_today_view`, "Zone total", {
       options: ["Zone total", "Per plant"],

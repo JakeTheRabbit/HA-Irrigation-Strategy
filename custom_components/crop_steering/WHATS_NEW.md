@@ -19,6 +19,13 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.12.2 - 2026-10-16
+
+- Compare runs now shows charts for each grow week, with both runs on top of each other.
+- A hold switch that does not exist in Home Assistant is now named, so you can fix it fast.
+- The AI assistant now says when the kill switch or a hold stopped watering.
+- Bug fixes and improvements.
+
 ## 3.12.1 - 2026-10-16
 
 - The AI assistant can now use your own Anthropic-compatible router. Set its address in the app options.

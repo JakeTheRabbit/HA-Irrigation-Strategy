@@ -1,6 +1,6 @@
 # Crop Steering
 
-![Release](https://img.shields.io/badge/Release-3.12.1-blue)
+![Release](https://img.shields.io/badge/Release-3.12.2-blue)
 ![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.10+-41BDF5)
 ![HACS](https://img.shields.io/badge/HACS-Custom-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)

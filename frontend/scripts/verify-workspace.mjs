@@ -976,6 +976,11 @@ try {
             state,
             `${state}: the switcher shows the state`,
           );
+          // What the AI assistant may do shows under every state: the powers are settings.
+          const powers = page.locator("[data-brain-powers]");
+          assert.equal(await powers.getByRole("checkbox").count(), 8, `${state}: 8 powers`);
+          for (const label of ["Start the next phase early", "Tune shot sizes"])
+            await visible(powers.getByRole("checkbox", { name: label, exact: true }));
           await noOverflow();
           await axe(`brain-${state}-${width}`);
           await page.screenshot({ path: out + `workspace-brain-${state}-${width}.png`, fullPage: true });
@@ -984,6 +989,15 @@ try {
       // The switcher moves the header chip with the page, with no reload.
       await page.getByLabel("Sample AI state", { exact: true }).selectOption("budget");
       await visible(page.locator(".brain-chip").getByText("AI paused: budget"));
+      // A power off by default is ticked on through the demo's switch.
+      const tune = page
+        .locator("[data-brain-powers]")
+        .getByRole("checkbox", { name: "Tune shot sizes", exact: true });
+      assert.equal(await tune.isChecked(), false);
+      await tune.click();
+      await page.waitForFunction(
+        () => document.querySelector('[data-power="tune_shot_sizes"] input')?.checked === true,
+      );
       await page.setViewportSize({ width: 1440, height: 1000 });
     },
   );

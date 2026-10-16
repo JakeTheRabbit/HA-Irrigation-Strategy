@@ -20,6 +20,30 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "impact": "Off: the AI assistant works as usual. 1 h: the pause ends 1 h after the choice. Until lights-on: the pause ends at the next lights-on. 24 h: the pause ends 24 h after the choice. At the end, the controller sets the select back to Off. The shots continue by the rules of the controller during the pause.",
     "tooltip": "Starts a no-touch period for the room, for example while a person takes samples. During the period, the AI assistant asks nothing and changes nothing in the room."
   },
+  "ai_power_advance_phase": {
+    "tooltip": "Starts the morning ramp or the night dryback early. Only forward, only near the end of the phase, never near the rescue floor."
+  },
+  "ai_power_ec_mode": {
+    "tooltip": "Selects steer, hold or decay for the EC steer in maintenance. Only inside the EC limits of the controller."
+  },
+  "ai_power_nudge_setpoints": {
+    "tooltip": "Moves the maintenance shot size or the re-water point by one 0.5 step a night, near your own value. Auto setpoints must be on."
+  },
+  "ai_power_plan_catch_up": {
+    "tooltip": "Applies the values of today's plan day when a stale probe holds the plan. Once a day, only the values of the plan."
+  },
+  "ai_power_ramp_control": {
+    "tooltip": "Ends the morning ramp when the slab is full. Only after the minimum ramp shots and near the peak target."
+  },
+  "ai_power_set_probe_aside": {
+    "tooltip": "Sets aside a probe that does not follow the substrate. The zone then waters on its timer. Two firm answers and a code check are necessary."
+  },
+  "ai_power_set_targets_from_achievable": {
+    "tooltip": "Sets the peak target, field capacity, re-water point, rescue floor and dryback target of each zone. When on, the AI assistant sets these targets itself. No limits apply other than each setting's own range."
+  },
+  "ai_power_tune_shot_sizes": {
+    "tooltip": "Sets the ramp and maintenance shot sizes of each zone. When on, the AI assistant sets these targets itself. No limits apply other than each setting's own range."
+  },
   "auto_irrigation_enabled": {
     "guidance": "Do not set this switch to off. Use the kill switch to stop the water of the room. If alert CS-208 shows, set this switch to on. Then set the kill switch to on in Settings, Watering.",
     "impact": "On: no effect on a current controller. Off: a current controller sets the kill switch of the room to off and raises alert CS-208. A controller of version 2.24.0 or older holds every shot while this switch is off or missing.",
@@ -967,6 +991,12 @@ export const UI_COPY = {
     "impact": "Off: the controller opens no valve in the room, and a shot that runs now stops in a few seconds. On: the controller gives shots again.",
     "label": "Watering",
     "tooltip": "The kill switch of the room. It lets the controller water the room."
+  },
+  "what the ai assistant may do": {
+    "guidance": "Only a Home Assistant administrator can change these switches.",
+    "impact": "On: the AI assistant can make this change. Off: the AI assistant only advises. It does not change that part.",
+    "label": "What the AI assistant may do",
+    "tooltip": "When a power is off, the AI assistant only advises. It does not change that part."
   },
   "work out dripper flow from a catch test": {
     "guidance": "Start and stop the water yourself. Let one dripper run into a cup with a scale for a known time.",

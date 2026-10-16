@@ -25,7 +25,7 @@ from . import council
 from . import journal as jn
 from .envelope import admit, cools_down
 
-ACTING_KINDS = ("advance", "distrust", "ec_mode", "setpoint")  # what dry run journals instead of returning
+ACTING_KINDS = ("advance", "distrust", "ec_mode", "setpoint", "targets", "shot_size")  # what dry run journals instead of returning
 
 
 @dataclass
@@ -115,7 +115,7 @@ class Brain:
                 ev["second_look"] = judge.more_evidence(ctx, st.verdicts)
             if self.enrich is not None:
                 ev = self.enrich(ctx, judge, ev)
-            if self.asker.submit(key, ev, council.expand(judge.questions)):
+            if self.asker.submit(key, ev, council.expand(judge.questions_for(ctx))):
                 st.last_asked = ctx.now
                 st.reasks, st.reask_due = (st.reasks + 1 if reask else 0), False
                 if reask:
@@ -194,11 +194,13 @@ class Brain:
 
     def _unsure(self, verdicts):
         """An answer under `unsure_below`, two phrasings that disagree, or a question one phrasing left unanswered."""
-        return any(v is None or v.n < 2 or not v.agreed or v.prob < self.unsure_below for v in verdicts)
+        return any(v is None or (v.kind != "values" and (v.n < 2 or not v.agreed or v.prob < self.unsure_below))
+                   for v in verdicts)
 
     def _sure(self, verdicts):
         """Every phrasing answered and agreed at `strict_prob` or more: sure enough for the stricter gate."""
-        return all(v is not None and v.n >= 2 and v.agreed and v.prob >= self.strict_prob for v in verdicts)
+        return all(v is not None and (v.kind == "values" or (v.n >= 2 and v.agreed and v.prob >= self.strict_prob))
+                   for v in verdicts)
 
     def _note(self, ctx, judge, st, d, result, reason):
         """One line in the journal (the dashboard's live log). Never raises into the pass."""
