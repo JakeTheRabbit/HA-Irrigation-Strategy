@@ -37,7 +37,9 @@ export const DISPLAY_DEFAULTS: DisplayOptions = {
 
 /** One row of Settings › Display: an on/off option, or a choice between two values. */
 export interface DisplayRow {
-  key: DisplayKey;
+  key: DisplayKey | "manual_hardware_enabled";
+  /** A row kept in a switch of its own rather than the display store: that switch's id. */
+  entity?: (prefix: string) => string;
   group: "Today" | "Zone page" | "History" | "Plan";
   label: string;
   copy: SteCopy;
@@ -60,6 +62,82 @@ export const DISPLAY_ROWS: DisplayRow[] = [
         "The room must have tank sensors in Equipment › Setup. Without them, Today shows no tank values. A phone does not show the tank values on Today. Use Equipment › Feed.",
     },
   },
+  {
+    key: "today_zone_layout",
+    group: "Today",
+    label: "Zones as",
+    choice: [
+      { value: "cards", label: "Cards" },
+      { value: "table", label: "Table" },
+    ],
+    copy: {
+      tooltip:
+        "Shows the zones on Today as cards, or as one table with a row for each zone: phase, VWC, EC, dryback, water, shots and the next action.",
+      impact:
+        "Cards: each zone has a card, as before. Table: a laptop shows one table. A phone always shows the cards.",
+      guidance: "A table is easier to read in a room with many zones. Select a row to open its zone.",
+    },
+  },
+  {
+    key: "show_climate",
+    group: "Zone page",
+    label: "Room climate",
+    copy: {
+      tooltip:
+        "Shows the air temperature, humidity, VPD and dew point of the room on each zone page, in grey.",
+      impact: "Off: the zone page does not show them. The history chart shows the climate either way.",
+      guidance:
+        "The room must have climate sensors in Equipment › Setup. A value shows in colour only when it is outside the band of the grow plan.",
+    },
+  },
+  {
+    key: "show_substrate_temp",
+    group: "Zone page",
+    label: "Root-zone temperature",
+    copy: {
+      tooltip: "Shows the root-zone temperature of the zone on its page, from its probe.",
+      impact: "Off: the zone page does not show it. The history chart shows the probe either way.",
+      guidance: "Each zone needs a root-zone temperature probe in Equipment › Setup.",
+    },
+  },
+  {
+    key: "zone_day_deltas",
+    group: "Zone page",
+    label: "Today against yesterday",
+    copy: {
+      tooltip:
+        "Shows up to three chips under the day chart of a zone: VWC against yesterday at this hour, when the zone got to its ramp target, and the water until now.",
+      impact:
+        "Off: no chips. On: the chips use the day that “Compare with” selects. A chip shows in colour only when the difference is large.",
+    },
+  },
+  {
+    key: "show_camera",
+    group: "Zone page",
+    label: "Room camera",
+    copy: {
+      tooltip:
+        "Shows a still image from the camera of the room on each zone page. The image changes each 30 s.",
+      impact: "Off: no image. On: the page reads one image each 30 s while it is open.",
+      guidance: "The room must have a camera in Equipment › Setup.",
+    },
+  },
+  {
+    key: "manual_hardware_enabled",
+    entity: (prefix) => `switch.crop_steering_${prefix}manual_hardware_enabled`,
+    group: "Zone page",
+    label: "Hardware panel",
+    copy: {
+      tooltip:
+        "Shows a Hardware panel on each zone page: the test shot of the zone, and the valve, pump, main line, lights and tank fill on or off now.",
+      impact:
+        "Off: no panel. On: an administrator can start a 10 s test shot from the zone page. The controller does the shot with all its safety checks. The panel opens and closes nothing itself.",
+      guidance: "Only an administrator can set this to on.",
+      caution:
+        "CAUTION: Make sure that the drippers are in the substrate or in a container before a test shot. Loose drippers can flood the area.",
+    },
+  },
+
 ];
 
 export interface RoomDisplay {
@@ -101,5 +179,10 @@ export function demoDisplay(states: States, param: string | null): States {
       if (key in DISPLAY_DEFAULTS) attributes[key] = key === "today_zone_layout" ? "table" : true;
     next[id] = { ...entity, attributes };
   }
+  // The Hardware panel is a switch of its own.
+  if (param === "all" || wanted.includes("manual_hardware_enabled"))
+    for (const id of Object.keys(states))
+      if (/^switch\.crop_steering_[a-z0-9_]*manual_hardware_enabled$/.test(id))
+        next[id] = { ...states[id], state: "on" };
   return next;
 }

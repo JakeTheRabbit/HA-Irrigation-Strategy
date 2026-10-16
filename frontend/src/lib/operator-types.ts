@@ -125,6 +125,9 @@ export interface SetupZone {
   vwc_primary?: string;
   ec_unused?: string[];
   ec_primary?: string;
+  /** The zone's root-zone temperature probe, for the dashboard only ("" none). Absent from an
+   * older integration. */
+  substrate_temperature_sensor?: string;
 }
 export interface SetupRoom {
   entry_id: string;

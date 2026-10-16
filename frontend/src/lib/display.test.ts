@@ -38,7 +38,7 @@ describe("room display options", () => {
     const keys = DISPLAY_ROWS.map((row) => row.key);
     expect(new Set(keys).size).toBe(keys.length);
     for (const row of DISPLAY_ROWS) {
-      expect(row.key in DISPLAY_DEFAULTS).toBe(true);
+      expect(!!row.entity || row.key in DISPLAY_DEFAULTS).toBe(true);
       expect(row.copy.tooltip.length).toBeGreaterThan(0);
     }
   });

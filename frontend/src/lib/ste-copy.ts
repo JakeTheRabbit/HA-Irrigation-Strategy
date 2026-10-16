@@ -529,6 +529,12 @@ export const UI_COPY = {
     "label": "Close",
     "tooltip": "Closes the list of new changes."
   },
+  "hardware panel": {
+    "caution": "CAUTION: Make sure that the drippers are in the substrate or in a container before a test shot. Loose drippers can flood the area.",
+    "impact": "The list changes nothing. The test shot opens the valve of this zone for 10 s when Watering is on.",
+    "label": "Hardware",
+    "tooltip": "The valve of this zone, the pump, the main line, the lights and the tank fill of the room: on or off now, and since when. The test shot is a 10 s shot through the safety checks of the controller."
+  },
   "history could not load": {
     "guidance": "Select \"Retry history\". If the problem continues, examine the connection to Home Assistant.",
     "label": "History did not load",
@@ -796,6 +802,17 @@ export const UI_COPY = {
     "label": "Room",
     "tooltip": "The room that the dashboard shows. Each room has its own lights, zones and kill switch."
   },
+  "room camera": {
+    "impact": "Shows an image only. It changes no setting.",
+    "label": "Room camera",
+    "tooltip": "A still image from the camera of the room. The image changes each 30 s while the page is open."
+  },
+  "room climate": {
+    "guidance": "A value shows in colour only when it is outside the band of the grow plan for today.",
+    "impact": "Shows values only. It changes no setting.",
+    "label": "Room climate",
+    "tooltip": "The air temperature, humidity and VPD of the room, from the sensors in Equipment › Setup. The dew point comes from the air temperature and the humidity."
+  },
   "room configuration": {
     "label": "Room",
     "tooltip": "Select the room to configure."
@@ -810,6 +827,11 @@ export const UI_COPY = {
     "impact": "Off: the controller does not water the room and sends no alerts for it. On after more than one day: the counters and the phase data reset.",
     "label": "Room on or off",
     "tooltip": "Set the room to off when no plants are in it. Set it to on for the next crop."
+  },
+  "root-zone temperature": {
+    "impact": "Shows a value only. The controller does not use it.",
+    "label": "Root-zone temperature",
+    "tooltip": "The temperature in the substrate of this zone, from the probe in Equipment › Setup."
   },
   "run name": {
     "label": "Run name",
