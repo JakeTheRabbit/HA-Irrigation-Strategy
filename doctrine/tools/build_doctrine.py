@@ -315,11 +315,13 @@ def engine_facts(doc, paths):
     if None not in (veg_dt, gen_dt, p0_wait):
         lo = min(veg_dt, gen_dt)
         probes.append((
-            "PH-11", f"At the integration's default dryback_target ({gen_dt:g} % generative, {veg_dt:g} % vegetative) a morning drop of a few percent never ends P0: it waits for p0_max_wait_min (default {p0_wait:g} min), the bypass or a brain start.",
+            "PH-11", f"With p0_additional_dryback at 0 and the integration's default dryback_target ({gen_dt:g} % generative, {veg_dt:g} % vegetative), a morning drop of a few percent does not end P0: it waits for p0_max_wait_min (default {p0_wait:g} min), the bypass or a brain start. A positive p0_additional_dryback replaces that target; a 3% setting can therefore end P0 after a 3% morning drop, once any configured minimum wait has passed.",
             phase({"dryback_target": lo, "p0_max_wait_min": p0_wait}, phase="P0", vwc=55, peak_vwc=58, dryback_pct=5,
                   phase_minutes=p0_wait - 1) == "P0"
             and phase({"dryback_target": lo, "p0_max_wait_min": p0_wait}, phase="P0", vwc=55, peak_vwc=58,
-                      dryback_pct=5, phase_minutes=p0_wait) == "P1"))
+                      dryback_pct=5, phase_minutes=p0_wait) == "P1"
+            and phase({"dryback_target": lo, "p0_additional_dryback": 3, "p0_max_wait_min": p0_wait},
+                      phase="P0", vwc=55, peak_vwc=58, dryback_pct=3, phase_minutes=1) == "P1"))
     else:
         probes.append(("PH-11", "integration dryback defaults not found", False))
 
