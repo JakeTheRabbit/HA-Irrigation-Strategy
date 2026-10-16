@@ -1,4 +1,5 @@
-"""Shared helpers for the Jev tests: a zone context with history, and Jev answers as Cloudflare returns them."""
+"""Shared helpers for the AI assistant tests: a zone context with history, the brain's answers as its transport returns
+them, and the options that start the Claude route."""
 from __future__ import annotations
 
 import dataclasses
@@ -6,13 +7,29 @@ import os
 from datetime import datetime, timedelta
 
 from crop_steering_engine import ZoneParams, ZoneSnapshot
-from jev.context import Shot, ZoneContext, ZoneHistory
+from brain.context import Shot, ZoneContext, ZoneHistory
 
 NOW = datetime(2026, 9, 27, 13, 0)
 
 
+# The options that start the brain (brain_provider claude_haiku with a key). A test fakes the transport itself.
+HAIKU = {"brain_provider": "claude_haiku", "anthropic_api_key": "sk-ant-test-key"}
+
+
+def sdk(monkeypatch, transport=None):
+    """The Claude route needs the SDK, which the lean harness has none of: a stand-in whose client a test with a faked
+    transport never calls. With `transport`, the brain's transport is that (FakeTransport({}): no verdicts)."""
+    import brain_kit as B
+    import brain_bridge
+    from brain import client
+
+    monkeypatch.setattr(client, "anthropic", B.FakeSDK(B.FakeClient(B.judging())))
+    if transport is not None:
+        monkeypatch.setattr(brain_bridge, "Routes", lambda found, **kw: transport)
+
+
 def has_run(state_path=None):
-    """Make the test's /data one Jev has run in (jev_bridge.has_run): an empty ledger, a file only Jev writes."""
+    """Make the test's /data one the brain has run in (brain_bridge.has_run): an empty ledger, a file only it writes."""
     data = os.path.dirname(state_path or os.environ["F2_STATE_PATH"])
     open(os.path.join(data, "jev_ledger.jsonl"), "a").close()
     return data
@@ -84,7 +101,7 @@ def both(name, answer, answer_b=None):
 
 
 class FakeTransport:
-    """Stands in for jev.client.call: returns `answers` (or an error) and records what was asked."""
+    """Stands in for the brain's transport (brain.client.Routes): returns `answers` (or an error) and records what was asked."""
 
     def __init__(self, answers=None, error=None):
         self.answers, self.error, self.calls = answers, error, []

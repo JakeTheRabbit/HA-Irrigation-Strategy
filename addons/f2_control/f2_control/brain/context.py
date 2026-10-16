@@ -1,6 +1,6 @@
 """What a judge sees: one zone's recent history, and code-made facts about it in plain words.
 
-Jev cannot do arithmetic, so no raw series ever reaches it. `ZoneHistory` keeps the last day of readings
+The AI assistant cannot do arithmetic, so no raw series ever reaches it. `ZoneHistory` keeps the last day of readings
 and shots; the helpers below turn them into sentences ("rose 3.1 points after the 10:40 shot and held
 2.8"), which is what goes into a judge's evidence.
 """
@@ -168,17 +168,17 @@ class ZoneContext:
     flower_days: int = 56  # the cultivar's flowering length
     stage: dict | None = None  # doctrine.stage_intent(flower_day): the stage arc's row for today
     steering: str | None = None  # the operator's steering mode for the zone: "vegetative" or "generative"
-    # What the Setpoints judge may move tonight (jev_bridge.setpoint_view): {"enabled", "current", "home", "bands",
+    # What the Setpoints judge may move tonight (brain_bridge.setpoint_view): {"enabled", "current", "home", "bands",
     # "changed_today", "frozen", "day", "last_words"}; None when the room has no setpoint memory.
     setpoints: dict | None = None
     substrate_l: float | None = None  # the zone's total substrate in litres (per-plant block x plants)
     channel: str | None = None  # the channel judge's latest answer for the zone, in words (fresh ones only)
-    # What the AI assistant may do in the room ({power: on}, jev.powers); None reads every power at its default.
+    # What the AI assistant may do in the room ({power: on}, brain.powers); None reads every power at its default.
     powers: dict | None = None
-    # What the targets and shot size judges may move tonight (jev_bridge.targets_view, shots_view); None by day.
+    # What the targets and shot size judges may move tonight (brain_bridge.targets_view, shots_view); None by day.
     targets: dict | None = None
     shots: dict | None = None
-    # What only the controller knows, for the Claude brain's evidence (jev.enrich): zone settings, interlocks, data
+    # What only the controller knows, for the Claude brain's evidence (brain.enrich): zone settings, interlocks, data
     # quality, the arc in force. None on the legacy routes and under rules.
     brain: dict | None = None
 

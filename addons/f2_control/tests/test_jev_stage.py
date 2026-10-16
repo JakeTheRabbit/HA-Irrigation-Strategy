@@ -2,18 +2,18 @@
 from datetime import timedelta
 from types import SimpleNamespace
 
-import jev_bridge
+import brain_bridge
 import jev_kit as K
-from jev.doctrine import stage_intent
-from jev.judges.dawn import DawnJudge
-from jev.judges.dusk import DuskJudge
-from jev.judges.night import NightJudge
-from jev.judges.probe import MODES, ProbeJudge
-from jev.judges.ramp import RampJudge
-from jev.judges.salt import MODE, SaltJudge
-from jev.judges.shot import ShotJudge
-from jev.judges.stage import StageJudge
-from jev.judges.zones import ZonesJudge
+from brain.doctrine import stage_intent
+from brain.judges.dawn import DawnJudge
+from brain.judges.dusk import DuskJudge
+from brain.judges.night import NightJudge
+from brain.judges.probe import MODES, ProbeJudge
+from brain.judges.ramp import RampJudge
+from brain.judges.salt import MODE, SaltJudge
+from brain.judges.shot import ShotJudge
+from brain.judges.stage import StageJudge
+from brain.judges.zones import ZonesJudge
 
 ALL = [DawnJudge(), RampJudge(), SaltJudge(), DuskJudge(), ProbeJudge(), ShotJudge(), NightJudge(), ZonesJudge(),
        StageJudge()]
@@ -44,7 +44,7 @@ def test_every_judge_sees_the_stage_and_the_steering_mode():
 
 
 def test_the_ramp_hands_over_on_real_salt_because_maintenance_flushes_it():
-    from jev import council
+    from brain import council
     answers = K.both("ramp_state", K.choice_answer("real_salt", {"real_salt": 0.8}))
     verdicts = {"ramp_state": council.combine(answers, "ramp_state")}
     d = RampJudge().decide(verdicts, K.ctx("P1", s=K.snap(phase="P1", vwc=39.5, shot_count=3)))
@@ -65,21 +65,21 @@ def test_the_probe_judge_knows_a_temperature_artefact():
 
 
 def test_the_flower_start_option_names_rooms_or_all_of_them():
-    assert jev_bridge.flower_option("input_datetime.flip") == {"*": "input_datetime.flip"}
-    assert jev_bridge.flower_option("default=input_datetime.flip_date, room_b=2026-07-12") == {
+    assert brain_bridge.flower_option("input_datetime.flip") == {"*": "input_datetime.flip"}
+    assert brain_bridge.flower_option("default=input_datetime.flip_date, room_b=2026-07-12") == {
         "default": "input_datetime.flip_date", "room_b": "2026-07-12"}
-    assert jev_bridge.flower_option("") == {}
+    assert brain_bridge.flower_option("") == {}
 
 
 def test_the_flower_day_comes_from_the_rooms_entity_or_date():
     now = K.NOW  # 27 Sep 2026
     c = SimpleNamespace(jev=SimpleNamespace(flower_start={"default": "input_datetime.flip_date", "room_b": "2026-07-12"}),
                         _jev_read=lambda e: {"input_datetime.flip_date": "2026-08-22"}.get(e))
-    assert jev_bridge.flower_day(c, SimpleNamespace(slug="default"), now) == 37
-    assert jev_bridge.flower_day(c, SimpleNamespace(slug="room_b"), now) == 78
-    assert jev_bridge.flower_day(c, SimpleNamespace(slug="veg"), now) is None
+    assert brain_bridge.flower_day(c, SimpleNamespace(slug="default"), now) == 37
+    assert brain_bridge.flower_day(c, SimpleNamespace(slug="room_b"), now) == 78
+    assert brain_bridge.flower_day(c, SimpleNamespace(slug="veg"), now) is None
     c.jev.flower_start = {"default": "input_datetime.missing"}
-    assert jev_bridge.flower_day(c, SimpleNamespace(slug="default"), now) is None
+    assert brain_bridge.flower_day(c, SimpleNamespace(slug="default"), now) is None
 
 
 # ------------------------------------------------------------------ the Stage judge
@@ -106,17 +106,17 @@ def test_the_stage_judge_asks_once_a_grow_day_when_the_stage_is_known():
 
 
 def test_the_stage_judge_advises_and_never_acts_on_water():
-    from jev import council
+    from brain import council
     j = StageJudge()
     ctx = _stage_ctx()
     on_arc = {"arc": council.combine(K.both("arc", K.choice_answer("on_arc", {"on_arc": 0.9})), "arc")}
-    # code finds the steering mismatch itself (generative steering in flower bulk), whatever Jev says
+    # code finds the steering mismatch itself (generative steering in flower bulk), whatever the AI assistant says
     d = j.decide(on_arc, ctx)
     assert d.kind == "alert" and d.value["code"] == "CS-705"
     assert "uses generative steering, but the stage needs vegetative" in d.value["message"]
     assert "flower day 37" in d.value["message"] and "changed nothing" in d.value["message"]
     matched = _stage_ctx(steering="vegetative")
-    assert j.decide(on_arc, matched) is None  # steering right, Jev content: nothing to say
+    assert j.decide(on_arc, matched) is None  # steering right, the AI assistant content: nothing to say
     firm = {"arc": council.combine(K.both("arc", K.choice_answer("ec_above_band", {"ec_above_band": 0.8})), "arc")}
     assert "AI assistant: The settled pore EC sits above" in j.decide(firm, matched).value["message"]
     split = {"arc": council.combine(K.both("arc", K.choice_answer("ec_above_band", {"ec_above_band": 0.9}),
@@ -126,7 +126,7 @@ def test_the_stage_judge_advises_and_never_acts_on_water():
 
 # ------------------------------------------------------------------ the council on actions, and vegetative dusk
 def test_answers_that_mean_the_same_action_add_up():
-    from jev import council
+    from brain import council
     split = K.both("q", K.choice_answer("slab_full", {"slab_full": 0.34, "ec_is_feed_front": 0.33, "keep_ramping": 0.33}),
                    K.choice_answer("ec_is_feed_front", {"slab_full": 0.3, "ec_is_feed_front": 0.4, "keep_ramping": 0.3}))
     v = council.combine(split, "q")
@@ -137,7 +137,7 @@ def test_answers_that_mean_the_same_action_add_up():
 
 
 def test_a_vegetative_zone_is_never_stopped_early():
-    from jev.envelope import Directive, admit
+    from brain.envelope import Directive, admit
     c = K.ctx(s=K.snap(hours_to_lights_off=2.0, vwc=36.0), hours_to_off=2.0, **_bulk())
     d = Directive("dusk", "advance", "P3", "why", K.NOW + timedelta(minutes=10))
     ok, why = admit(d, c)

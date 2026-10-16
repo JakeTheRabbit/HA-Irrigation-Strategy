@@ -81,10 +81,10 @@ async def test_a_2_25_1_room_with_cloudflare_set_asks_nothing_and_keeps_its_shot
     await _upgrade(hass, UPSTREAM_2_25_1, registry_ids=seed["registry"])
     hass.states.async_set(KILL, "on")
     app = fixture(options)
-    assert not app["data"]  # no Jev file: no brain, so nothing but the old check ever used the keys
+    assert not app["data"]  # no the AI assistant file: no brain, so nothing but the old check ever used the keys
     c, fake, _clock = controller_for(app["options"], saved_state=seed["controller_saved"])
     assert c.jev is None
-    assert c._cf[:2] == ("fixture-account", "fixture-token")  # the keys are still read, only never sent
+    assert c.brain_status.notice == "legacy_route_removed"  # the keys load, and nothing uses them
     room = _p2_hours(c, fake, monkeypatch)
 
     assert network == []
@@ -104,7 +104,7 @@ async def test_a_3_11_1_room_on_cloudflare_asks_nothing_and_keeps_its_working_pe
     await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
     hass.states.async_set(KILL, "on")
     c, fake, _built, _usage, state = _jev_3_11_1_app(controller_for, monkeypatch, "options_3_11_1_jev_cf.json")
-    assert c.jev is not None and c.jev.routes == ["Cloudflare"]  # the brain itself is untouched
+    assert c.jev is not None and c.jev.routes == ["Anthropic"]  # the brain moved to Claude with the key added
     old = state["default"]
     for zone in (1, 2):  # the state file loads as 3.11.1 wrote it, the check's record included
         assert c.rooms[0].state[zone]["learn"] == old[str(zone)]["learn"]

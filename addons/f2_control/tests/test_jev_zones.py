@@ -5,8 +5,8 @@ was compared with the upper of its two siblings, so zones 2 and 3 were flagged (
 zone 1's 2477 and told of a valve or dripper fault they did not have.
 """
 import jev_kit as K
-from jev import council
-from jev.judges.zones import ZonesJudge
+from brain import council
+from brain.judges.zones import ZonesJudge
 
 LIVE = {1: 2.477, 2: 1.052, 3: 0.974}  # litres a plant, a production room at 19:28 on 27 Sep 2026
 

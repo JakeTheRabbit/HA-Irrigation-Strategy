@@ -453,7 +453,7 @@ def test_the_history_survives_a_restart_and_junk_in_it_is_dropped(tmp_path):
 def test_a_3_11_1_state_file_loads_and_is_written_back_as_it_was(tmp_path):
     """What controller 3.11.1 saved for a learned two-zone room mid-grow
     (tests_ha/fixtures/state_3_11_1_learn_jev.json, recorded from that release): the learner with the
-    working peak Jev held above the learned one (learn.peak_adj, learn.jev), the day before's peak, the
+    working peak the AI assistant held above the learned one (learn.peak_adj, learn.jev), the day before's peak, the
     P1 rule's state and both histories load, and saving writes back every value 3.11.1 wrote except
     the removed EC PID's two terms.
     """

@@ -1,6 +1,6 @@
 """Asking each question twice, in two independent phrasings, and acting only when both agree.
 
-Jev's confidence moves with how a question is worded (observed on a production room's first calls: the
+The AI assistant's confidence moves with how a question is worded (observed on a production room's first calls: the
 same state gave 0.84 and 0.72). A judge therefore writes every question as a list of variants; `expand()`
 sends them all in one call, and `combine()` averages their calibrated probabilities and says whether they
 agreed.
@@ -13,7 +13,7 @@ SEP = "__v"
 
 
 def expand(questions):
-    """{name: [variant, ...]} -> the flat question dict Jev takes: {name__v0: variant, ...}."""
+    """{name: [variant, ...]} -> the flat question dict the AI assistant takes: {name__v0: variant, ...}."""
     flat = {}
     for name, variants in questions.items():
         for i, variant in enumerate(variants):

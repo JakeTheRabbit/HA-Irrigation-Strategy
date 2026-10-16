@@ -1,13 +1,13 @@
-"""The enrichment hook (jev/enrich.py), called directly: what a judge's evidence carries to Claude beyond the
+"""The enrichment hook (brain/enrich.py), called directly: what a judge's evidence carries to Claude beyond the
 judge's own sentences, and what it no longer carries (haiku-brain-design sections 2, 7)."""
 import brain_kit as B
 import jev_kit as K
-from jev import doctrine
-from jev.enrich import PROBE_WORDS, enrich, neutral
-from jev.judges.probe import ProbeJudge
-from jev.judges.salt import SaltJudge
-from jev.judges.stage import StageJudge
-from jev.scrub import scrub
+from brain import doctrine
+from brain.enrich import PROBE_WORDS, enrich, neutral
+from brain.judges.probe import ProbeJudge
+from brain.judges.salt import SaltJudge
+from brain.judges.stage import StageJudge
+from brain.scrub import scrub
 
 
 def _ctx(name, **over):
@@ -67,6 +67,6 @@ def test_the_scrub_takes_every_domain_and_leaves_ordinary_dots():
 
 def test_a_context_built_without_a_brain_still_works():
     ctx = K.ctx("P2")
-    from jev.judges.dusk import DuskJudge
+    from brain.judges.dusk import DuskJudge
 
     assert enrich(ctx, DuskJudge(), DuskJudge().evidence(ctx))["_brain"]["interlocks"] == "not known"

@@ -464,7 +464,7 @@ try {
       assert.match(facts, /Last shot\s+\S/);
       assert.match(facts, /Next\s+\S/);
     }
-    // What Jev changed today: three at most, newest first, with the way to the rest.
+    // What the AI assistant changed today: three at most, newest first, with the way to the rest.
     const jev = page.locator("[data-jev-today]");
     const changes = jev.locator(".today-jev-list li");
     assert.ok((await changes.count()) > 0 && (await changes.count()) <= 3);
@@ -754,7 +754,7 @@ try {
       "Silent 3 h, left out of the zone's reading",
       "warn",
     ]);
-    // Targets, read only, with Jev's ranges where it manages them.
+    // Targets, read only, with the AI assistant's ranges where it manages them.
     await page.getByText("Targets (read only)", { exact: true }).click();
     const targets = page.locator(".zone-targets");
     await expectVisible(targets);
@@ -903,7 +903,7 @@ try {
       );
       const chips = await table.locator(".jev-chip").allInnerTexts();
       assert.deepEqual(chips, ["AI assistant · 59–62 %", "AI assistant · 3–5 %"]);
-      // With Jev's Setpoints judge on the room, the Auto switch says what it lets Jev do.
+      // With the AI assistant's Setpoints judge on the room, the Auto switch says what it lets the AI assistant do.
       await expectVisible(page.getByText("AI assistant: P2 shot size, re-water point"));
       // Edit, Review, Apply & verify: the stepper is on its first step while editing.
       assert.match(
@@ -1049,7 +1049,7 @@ try {
       "TODAY",
       "YESTERDAY",
     ]);
-    // Jev's actions by default; every decision on request.
+    // The AI assistant's actions by default; every decision on request.
     const toggle = page.getByLabel("All AI assistant decisions");
     await toggle.check();
     assert.ok((await rows.count()) > all, "every decision shows more rows");
@@ -1070,7 +1070,7 @@ try {
     await zone.selectOption("room");
     assert.deepEqual([...new Set(await rows.locator(".timeline-zone").allInnerTexts())], ["Room"]);
     await zone.selectOption("all");
-    // A setpoint changed by hand is yours; Jev only noted it.
+    // A setpoint changed by hand is yours; the AI assistant only noted it.
     await types.getByRole("button", { name: "Setpoints", exact: true }).click();
     await expectVisible(page.locator('.timeline-jev-tag[data-by="you"]').first());
     await expectVisible(page.getByText("Noted by the AI assistant").first());
@@ -1079,7 +1079,7 @@ try {
       await go("history/timeline");
       await expectVisible(page.locator(".timeline-row").first());
     });
-    // A room without Jev: its controller records, without Jev's toggle.
+    // A room without the AI assistant: its controller records, without the AI assistant's toggle.
     await go("history/timeline", "room_b");
     await expectVisible(page.locator(".timeline-row").first());
     assert.equal(await page.getByLabel("All AI assistant decisions").count(), 0);

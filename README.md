@@ -303,15 +303,15 @@ The AI assistant is not available on 32-bit ARM (armv7). On armv7, the controlle
 
 | Option | Default | What it does |
 | --- | --- | --- |
-| `brain_provider` | `auto` | `rules`: no AI assistant. `claude_haiku`: the AI assistant with your Anthropic key. `jev_legacy`: the retired Jev routes. `auto`: keeps a Jev route that ran before, else rules. |
+| `brain_provider` | `auto` | `rules`: no AI assistant. `claude_haiku`: the AI assistant with your Anthropic key. `auto`: rules, except on an install that used the removed first AI route, which moves to Claude when it has a key. |
 | `anthropic_api_key` | empty | Your Anthropic API key. It is a password field. The controller never shows, logs or publishes it. |
 | `anthropic_model` | `claude-haiku-5-5` | Also `claude-sonnet-5-5` or `claude-opus-5-5`. With another model, the controller uses its rules. With a router, also a model after a router prefix, for example `cc/claude-haiku-5-5`. |
 | `anthropic_base_url` | empty | The address of an Anthropic-compatible router, for example `http://router.example.local:20128`. Empty: the Anthropic API. The controller sends your key to this address, so use only a router that you control. If the router does not answer, the controller uses its rules. |
 | `anthropic_daily_budget_usd` | US$1.00 | The most that the AI assistant can spend from one lights-on to the next. When the budget is spent, the controller uses its rules until the next lights-on, and alert CS-708 tells you. With 0, the AI assistant never asks. |
 | `brain_dry_run` | off | On: the AI assistant judges, and the log shows its decisions. It changes nothing. |
-| `jev_judges` | `all` | The judges that can act. Remove a judge from the list to stop it. |
-| `jev_flower_start` | empty | The first day of 12/12 for each room: a date or an `input_datetime` helper. Without it, the judges do not use a stage. |
-| `jev_flower_days` | 56 | The flower length of the cultivar. The finish is the last 14 days. |
+| `ai_judges` | `all` | The judges that the AI assistant asks. `all` asks every judge. An old `jev_judges` list is read as `all`. |
+| `ai_flower_start` | empty | The first day of 12/12 for each room: a date or an `input_datetime` helper. Without it, the judges do not use a stage. |
+| `ai_flower_days` | 56 | The flower length of the cultivar. The finish is the last 14 days. |
 
 Anthropic bills each question. The AI budget limits the cost of one grow-day. A question that timed out can still cost money, so the controller counts a high estimate for it.
 
@@ -319,7 +319,7 @@ Anthropic bills each question. The AI budget limits the cost of one grow-day. A 
 
 ### The judges
 
-A judge is one question that the controller asks the AI assistant. The name in bold is the name on the dashboard. The name in brackets is the name in the option `jev_judges`.
+A judge is one question that the controller asks the AI assistant. The name in bold is the name on the dashboard. The name in brackets is the name in the option `ai_judges`.
 
 | Judge | When the controller asks | The question | What the controller can do with the answer |
 | --- | --- | --- | --- |
@@ -334,9 +334,11 @@ A judge is one question that the controller asks the AI assistant. The name in b
 | Water channel (`channel`, no dashboard name) | With the lights on, a maximum of one time each hour | Does the water flow past the substrate or the probe? | Send alert CS-710, which asks for a catch test. It never adds water. |
 | **Stage arc** (`stage`) | One time each grow-day | Are the dryback and the pore EC of the zone correct for the stage of today? | Send advice CS-705. It never changes a setting. |
 | **Setpoints** (`setpoints`) | One time each night, only with Auto setpoints on | Must the maintenance shots of tomorrow be smaller or bigger, or start later or sooner? | Move one setting by one small step, inside a range around your value. |
-| Balance (`balance`, no dashboard name) | One time each grow-day, in the last 2 h before lights-off. Claude Haiku only. | Must the water of tomorrow move toward the water of the room? | Advice only. The Setpoints judge sees the answer. |
+| Balance (`balance`, no dashboard name) | One time each grow-day, in the last 2 h before lights-off. | Must the water of tomorrow move toward the water of the room? | Advice only. The Setpoints judge sees the answer. |
 
-The controller also gives these tasks to the AI assistant (Claude Haiku only). Their names in `jev_judges` are `feed`, `plan`, `report` and `why`.
+Two more judges, **Targets** (`targets`) and **Shot sizes** (`shotsize`), set a zone's targets and shot sizes once a night, only with their powers on ([the AI assistant in full](docs/AI_ASSISTANT.md#powers)).
+
+The controller also gives these tasks to the AI assistant. Their names in `ai_judges` are `feed`, `plan`, `report` and `why`.
 
 - **Feed**: one time each grow-day, one hour after lights-on, in a room with a feed EC sensor. It can propose a change to the feed on a CS-711 card. It never changes the feed or the dosing. A person decides.
 - **Grow plan**: when the room does not follow its grow plan, code sends a CS-713 card. The AI assistant selects the suggestion that the plan line shows.
@@ -377,7 +379,7 @@ Code keeps control of all physical actions. An answer from the AI assistant is o
 | --- | --- |
 | Stop setpoint changes | Use **Turn auto off…** in **Plan › Targets**. The values stay until you change them. |
 | Change a value that the AI assistant controls | Type your value in **Plan › Targets**. It becomes the new centre of the range. |
-| Stop one judge | Remove it from the app option `jev_judges`. |
+| Stop one action | Turn off its switch in the AI powers list of the room. To stop a judge that has no power, list the other judges in the app option `ai_judges`. |
 | Pause the AI assistant in one room | Set **Pause AI Changes** to 1 h, until lights-on, or 24 h. The rules continue. |
 | Stop the AI assistant | Set `brain_provider` to `rules`, then restart the app. |
 | Limit the cost | Set `anthropic_daily_budget_usd`. |
@@ -420,15 +422,15 @@ The `JakeTheRabbit/f2-control` mirror is retired. A controller from the mirror m
 
 The file `state.json` keeps the phase of each zone, the counters of today, the setup revision and what Auto setpoints learned.
 
-### Move a room from the Jev edition
+### Move a room from the first AI edition
 
-A room from the `HA-Crop-Steering-Jev` repository (the Jev edition, to version 3.11.1) moves one time. Move a production room only to a stable release 3.12.0 or later. The controller from this repository is a different app with an empty data folder. The integration keeps its entities and its dashboard.
+A room from the `HA-Crop-Steering-Jev` repository (the first AI edition, to version 3.11.1) moves one time. Move a production room only to a stable release 3.12.0 or later. The controller from this repository is a different app with an empty data folder. The integration keeps its entities and its dashboard.
 
-1. Make a backup of the Jev app and Home Assistant. Record each `number.`, `select.` and `switch.crop_steering_*` state.
+1. Make a backup of the old app and Home Assistant. Record each `number.`, `select.` and `switch.crop_steering_*` state.
 2. Install the new app. Do not start it. Keep **Start on boot** and **Watchdog** off.
-3. Copy all the options of the old app into the new app. Use YAML mode for the deprecated options.
+3. Copy all the options of the old app into the new app. Set `brain_provider` to `claude_haiku` and add your Anthropic key.
 4. Set the kill switch of each room to off. Wait until the pump, the main line and the valves are off.
-5. Stop the Jev app. Set its **Start on boot** and its **Watchdog** to off.
+5. Stop the old app. Set its **Start on boot** and its **Watchdog** to off.
 6. Copy `state.json`, `dosing_state.json` and the `jev_*` files to the data folder of the new app. Do not copy `instance_id`.
 7. In HACS, remove the `HA-Crop-Steering-Jev` repository.
 8. Add this repository in HACS, and download the same version as the new app.
@@ -436,14 +438,14 @@ A room from the `HA-Crop-Steering-Jev` repository (the Jev edition, to version 3
 10. Start the new app, and compare the states with your record.
 11. Set the kill switches back to their earlier states.
 
-The full procedure is in [the Jev edition move guide](docs/MOVING_FROM_JEV.md).
+The full procedure is in [the move guide](docs/MOVING_FROM_JEV.md).
 
-### The retired Jev routes
+### The removed first AI route
 
-The TypeSafe and Cloudflare routes of Jev are retired. An installation that used them keeps them with `brain_provider` set to `auto` or `jev_legacy`. It gets a CS-712 card one time each release. A new installation cannot use them.
+The first AI route (through Cloudflare or TypeSafe) is removed. An installation that used it loads with no change: with an Anthropic key it uses Claude, with every judge; without one it uses the rules. It gets a CS-712 card one time each release, and its old Cloudflare and TypeSafe options are not used.
 
 - To use the AI assistant, set `brain_provider` to `claude_haiku` and set an Anthropic key.
-- To stop the AI assistant and keep the old settings, set `brain_provider` to `rules`.
+- To stop the AI assistant, set `brain_provider` to `rules`.
 
 ### Restore an earlier version
 
@@ -500,10 +502,10 @@ Some facts to know:
 
 ## Documents
 
-- [The AI assistant in full: each judge, the envelope and the options](docs/JEV.md)
+- [The AI assistant in full: each judge, the envelope and the options](docs/AI_ASSISTANT.md)
 - [User guide: each page of the dashboard](docs/USER_GUIDE.md) and [grow plans](docs/GROW_PLANS.md)
 - [Install, upgrade and roll back](docs/INSTALL.md)
-- [The Jev edition move guide](docs/MOVING_FROM_JEV.md)
+- [Moving a room from the first AI edition](docs/MOVING_FROM_JEV.md)
 - [Error codes](docs/ERROR_CODES.md) · [Troubleshooting](docs/troubleshooting.md)
 - [Tested functions and known limits](docs/FEATURE_MATRIX.md)
 - [Entity reference](docs/ENTITIES.md) · [Sidebar and menu button](docs/HA_SIDEBAR.md) · [Notifications](docs/NOTIFICATIONS.md) · [Dosing](docs/DOSING.md)

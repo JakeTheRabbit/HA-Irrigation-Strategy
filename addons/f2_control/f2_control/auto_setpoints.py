@@ -177,7 +177,7 @@ def ramp_outcome(learn, phase):
 
 
 def distrust(learn, why):
-    """A guard (Jev) read today's plateau as a delivery or probe problem: forget it, keep the old ceiling."""
+    """A guard (the AI assistant) read today's plateau as a delivery or probe problem: forget it, keep the old ceiling."""
     if learn["outcome"] == "plateau":
         learn.update(outcome="suspect", stalled_at=learn["peak"], peak=learn["prev_peak"],
                      hold_days=learn["prev_hold"], veto=why)
@@ -254,7 +254,7 @@ def day_plan(learn, current, plan_ctx):
 def wanted(learn, current, vwc, phase, plan_ctx, others=()):
     """suffix -> value this zone should hold now. {} until something has been learned.
 
-    `others`: setpoints another writer owns (Jev's Setpoints judge: the P2 shot size and re-water threshold). They
+    `others`: setpoints another writer owns (the AI assistant's Setpoints judge: the P2 shot size and re-water threshold). They
     are never wanted here, so each lever has one writer.
 
     The P1 target and field capacity it returns are not written: the controller sets those from the zone's own

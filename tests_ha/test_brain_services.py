@@ -105,8 +105,8 @@ async def test_the_controller_answers_on_brain_answers(
     from datetime import datetime
 
     import brain_kit as B
-    import jev_bridge
-    from jev import client as jc
+    import brain_bridge
+    from brain import client as jc
 
     def why(request):
         text = request["messages"][0]["content"][1]["text"]
@@ -124,7 +124,7 @@ async def test_the_controller_answers_on_brain_answers(
         )
 
     monkeypatch.setattr(jc, "anthropic", B.FakeSDK(B.FakeClient(why)))
-    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(jc.Asker, threaded=False))
+    monkeypatch.setattr(brain_bridge, "Asker", functools.partial(jc.Asker, threaded=False))
     await _install(hass)
     said = "Why no water yet?"
     asked = (await _ask(hass, hass_admin_user, question=said, zone=1))["question"]

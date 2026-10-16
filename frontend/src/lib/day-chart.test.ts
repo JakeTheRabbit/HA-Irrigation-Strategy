@@ -131,7 +131,7 @@ describe("a zone's day scales", () => {
 });
 
 describe("markers and badges", () => {
-  it("puts each Jev decision on the first row that clears the one before", () => {
+  it("puts each AI assistant decision on the first row that clears the one before", () => {
     const placed = placeMarkers(
       [
         { x: 10, item: "a" },

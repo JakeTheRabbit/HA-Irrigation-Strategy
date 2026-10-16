@@ -1,4 +1,4 @@
-"""What the AI assistant may do in a room: its powers, one switch each (docs/JEV.md, "Powers").
+"""What the AI assistant may do in a room: its powers, one switch each (docs/AI_ASSISTANT.md, "Powers").
 
 The owner ticks what the AI assistant may change. A power that is off leaves its judge asking and advising (the
 journal and the panel show what it would do), and the envelope refuses to act on it. The integration names the

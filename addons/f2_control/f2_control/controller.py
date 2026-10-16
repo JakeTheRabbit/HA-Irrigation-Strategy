@@ -37,11 +37,11 @@ import requests
 import auto_setpoints
 import curve_tracker
 import dosing_runner
-import jev_bridge
+import brain_bridge
 import log_words
 import plan_adherence
 import runtime_env
-from jev import client as jev_client
+from brain import client as jev_client
 import setpoint_supervisor
 import tank_level
 import zone_history
@@ -686,7 +686,7 @@ NOTIFY_CONFIG = "sensor.crop_steering_notify_config"
 NOTIFY_CONFIG_S = 60.0
 # How long crop_steering.notify may take to push to the phones: what a push to notify_service always could.
 NOTIFY_TIMEOUT_S = 12
-# The most one loop spends sending its phase changes and Jev's moves: they are only news, and the loop is not.
+# The most one loop spends sending its phase changes and the AI assistant's moves: they are only news, and the loop is not.
 EVENTS_BUDGET_S = 10.0
 # The codes whose severity is critical in docs/error-codes.json (tests/test_error_codes.py keeps the two equal):
 # their push is urgent, a high-priority one on a phone whose row asks for that.
@@ -1032,9 +1032,7 @@ class Controller:
         # `room=sensor` pairs, and how long it may stand still while the room is on. Unset = not watched.
         self.sump_sensors = room_option(o.get("sump_power_sensor"))
         self.sump_silent_h = float(o.get("sump_silent_hours") or SUMP_SILENT_H)
-        # Optional: Jev (TypeSafe, via Cloudflare AI) as a guard on auto setpoints. Unset = arithmetic only.
-        self._cf = tuple((o.get(k) or "").strip() for k in ("cf_account_id", "cf_api_token", "cf_gateway_id"))
-        # The AI assistant: a brain judges the engine's decisions inside a code envelope (docs/JEV.md). None = rules;
+        # The AI assistant: a brain judges the engine's decisions inside a code envelope (docs/AI_ASSISTANT.md). None = rules;
         # brain_status says which brain runs and why, whether or not one is built (the brain panel shows it).
         logging.getLogger("anthropic").setLevel(logging.WARNING)  # no request or header ever reaches the log
         logging.getLogger("httpx").setLevel(logging.WARNING)
@@ -1042,13 +1040,13 @@ class Controller:
                              if jev_client.anthropic is not None else "not installed (rules only on this device)"))
         data_dir = os.path.dirname(runtime_env.state_path(os.environ)) or "."
         try:
-            self.brain_status = jev_bridge.resolve_provider(o, self._cf, data_dir)
-            self.jev = jev_bridge.build(o, self._cf, runtime_env.state_path(os.environ), log, self.brain_status)
+            self.brain_status = brain_bridge.resolve_provider(o, data_dir)
+            self.jev = brain_bridge.build(o, runtime_env.state_path(os.environ), log, self.brain_status)
             if self.jev is None:
                 log(f"brain: rules ({self.brain_status.state}). {self.brain_status.words}")
         except Exception as e:  # the brain can never stop the controller starting
-            log("jev: off, it could not start:", jev_client.redact(str(e)))
-            self.jev, self.brain_status = None, jev_bridge.start_failed()
+            log("brain: off, it could not start:", jev_client.redact(str(e)))
+            self.jev, self.brain_status = None, brain_bridge.start_failed()
         self.loop_seconds = float(o.get("loop_seconds", 60))
         self.flow_lps = float(
             o.get("flow_lps", 0.02)
@@ -1068,7 +1066,7 @@ class Controller:
         self._guard = {}  # room slug -> {"answered", "seen", "until"} (_guard_read)
         self._guard_lock = threading.Lock()
         # Dosing runs in steps on the main loop, which wakes whenever one is due (run, _sleep_for). Like
-        # Jev, it can never stop the controller starting, and it only ever acts on an explicit request
+        # The AI assistant, it can never stop the controller starting, and it only ever acts on an explicit request
         # for a room with dosing set up.
         try:
             self.dosing = dosing_runner.DosingRunner(
@@ -2690,7 +2688,7 @@ class Controller:
     def _auto_tick(self, room, zone, snap, p, lights_on, now):
         """Learn this zone from its own shots every loop. Rewrite its targets only when the room's
         opt-in switch is on, only on its own per-zone numbers, never while a grow plan owns the room,
-        and never one that Jev's Setpoints judge owns."""
+        and never one that the AI assistant's Setpoints judge owns."""
         st = room.state[zone]
         if not isinstance(st.get("learn"), dict):
             st["learn"] = auto_setpoints.fresh()
@@ -2701,14 +2699,14 @@ class Controller:
                             snap.dryback_rate, self._minutes_since_shot(st, now))
         enabled = self._on(f"switch.crop_steering_{room.prefix}auto_setpoints", False)
         planned = bool(getattr(room, "strategy_required", False))
-        # Each lever has one writer. With Jev's Setpoints judge running, the P2 shot size and re-water threshold
-        # are its own (jev_bridge) and this learner writes the rest. Writing nothing at all under the judge left
+        # Each lever has one writer. With the AI assistant's Setpoints judge running, the P2 shot size and re-water threshold
+        # are its own (brain_bridge) and this learner writes the rest. Writing nothing at all under the judge left
         # nobody on the P1 target: zone 2 sat at 29.5 under a probe reading 44 % and never ramped (4 Oct 2026).
-        judged = jev_bridge.judge_levers(self, room)
+        judged = brain_bridge.judge_levers(self, room)
         # With the room's set_targets_from_achievable power on and the brain able to act, the AI assistant sets the
         # peak target, field capacity, re-water threshold and rescue floor itself: the learner's ladder (and the
         # follower of the highest readings) steps aside for them, and comes back when the power is off.
-        owned = jev_bridge.targets_owned(self, room)
+        owned = brain_bridge.targets_owned(self, room)
         if owned != room.__dict__.setdefault("_targets_owned", {}).get(zone, False):
             room._targets_owned[zone] = owned
             log(f"[{room.slug}] Z{zone} " + ("the AI assistant sets the peak target, field capacity and re-water "
@@ -2749,7 +2747,7 @@ class Controller:
             if today:
                 note, stop = today[1].note, curve_tracker.clock(today[1].p2_stop_h)
             if owned:
-                pass  # the AI assistant owns the ladder (jev_bridge.targets_owned): the learner writes none of it
+                pass  # the AI assistant owns the ladder (brain_bridge.targets_owned): the learner writes none of it
             elif self._follow_fc(room, zone, p, now):
                 pass  # the setpoints moved with the zone's highest readings; the learner acts on the next pass
             else:
@@ -2759,16 +2757,16 @@ class Controller:
                 stall = auto_setpoints.stalled(current, want)
                 for suffix, value, _why in setpoint_supervisor.writes(current, want):
                     if (self._auto_write(room, zone, suffix, current[suffix], value, learn, now)
-                            and suffix in ("p2_shot_size", "p2_vwc_threshold") and jev_bridge.owns_setpoints(self)):
+                            and suffix in ("p2_shot_size", "p2_vwc_threshold") and brain_bridge.owns_setpoints(self)):
                         # the learner holds the judge's lever while the brain cannot act: not an edit by hand
-                        jev_bridge.learner_wrote(self, room, zone, suffix, current[suffix], value, now)
+                        brain_bridge.learner_wrote(self, room, zone, suffix, current[suffix], value, now)
         state, attrs = auto_setpoints.status(learn, enabled, stall, note, stop)
         if enabled and planned:
             state, attrs["frozen_reason"] = "frozen", "an armed grow plan owns this room's targets"
         who = dict.fromkeys(auto_setpoints.MANAGED, "Auto setpoints learner")
         who["p1_target_vwc"] = "the zone's highest reading of the grow-day before"
         who["field_capacity"] = "the zone's highest reading of this grow-day or the one before"
-        who.update(dict.fromkeys(judged, "Jev's Setpoints judge, one notch a night"))
+        who.update(dict.fromkeys(judged, "the AI assistant's Setpoints judge, one notch a night"))
         if owned:  # the owner's power: the AI assistant sets the ladder and the rescue floor itself
             who.update(dict.fromkeys(("p1_target_vwc", "field_capacity", "p2_vwc_threshold",
                                       "p3_emergency_vwc_threshold"), "the AI assistant, with the owner's power"))
@@ -2826,8 +2824,8 @@ class Controller:
           - field capacity = the highest reading of this grow-day or the one before (_vwc_maxima);
           - the P1 target = the highest reading of the grow-day before;
           - when field capacity moves by FC_SHIFT_MIN or more, the P2 re-water threshold moves by the same points, so
-            the dryback under full keeps its size. Jev's Setpoints judge takes a moved threshold as the new centre of
-            its range (jev_bridge).
+            the dryback under full keeps its size. The AI assistant's Setpoints judge takes a moved threshold as the new centre of
+            its range (brain_bridge).
         Bounded, as following its own readings feeds a drifting probe back into the ladder (a 15-20 point flood jump
         dragged the whole ladder with it): each setpoint moves at most FC_STEP_MAX points a grow-day, counted from
         where it stood, so an operator's edit is moved from, never undone. The readings counted are the trusted
@@ -2891,11 +2889,11 @@ class Controller:
                     break  # refused: what is still to move waits for the next loop, the ladder holds
                 used[suffix] = round(used.get(suffix, 0.0) + abs(value - old), 1)
                 wrote = True
-                if suffix == "p2_vwc_threshold" and jev_bridge.owns_setpoints(self):
+                if suffix == "p2_vwc_threshold" and brain_bridge.owns_setpoints(self):
                     try:  # the judge's range follows field capacity while the learner holds its levers
-                        jev_bridge.fc_moved(self, room, zone, old, value, now)
+                        brain_bridge.fc_moved(self, room, zone, old, value, now)
                     except Exception as e:
-                        log("jev fc error", room.slug, zone, e)
+                        log("brain fc error", room.slug, zone, e)
         if wrote:
             self._save_state()
         return wrote
@@ -2943,14 +2941,14 @@ class Controller:
             return True  # HA has not reflected the last write yet: do not spam it
         # Home Assistant sees only this app's token: name the writer first, for the room's setpoint
         # change log (the integration's setpoint_log.py). The brain's put-back is the safety writer.
-        who = ("safety" if by.endswith("(put back)") else "brain" if by.startswith(("Jev", "AI assistant"))
+        who = ("safety" if by.endswith("(put back)") else "brain" if by.startswith(("Jev", "AI "))
                else "learner")
         claim = {"entity_id": entity, "value": value, "who": who}
         if reason:
             claim["reason"] = str(reason)[:200]
         if expected:
             claim["expected"] = str(expected)[:200]
-        if by.startswith("Jev") and who == "brain":
+        if by.startswith(("Jev", "AI setpoints judge")) and who == "brain":
             # An AI change is an overlay that goes back by itself (the integration's overlays.py): at the
             # lights-on that ends the grow-day it is for. A night move (P3) is for the next grow-day.
             local = now.astimezone().replace(tzinfo=None) if now.tzinfo else now
@@ -3572,7 +3570,7 @@ class Controller:
         return until is not None and until > datetime.now(timezone.utc)
 
     def _notify_event(self, event, room, zone, *detail):
-        """A phase change ("phase": was, to, why) or a setting Jev moved ("jev_setpoint": words, why[, the number's
+        """A phase change ("phase": was, to, why) or a setting the AI assistant moved ("jev_setpoint": words, why[, the number's
         entity id when it was written, for Keep and Undo on the phone]): not an
         alert, so no card, and pushed only through crop_steering.notify, never to the notify_service option
         (docs/NOTIFICATIONS.md). Queued, and sent once the loop's shots are done (_send_events), so a slow Home
@@ -3953,7 +3951,7 @@ class Controller:
         self._alert_codes.pop(key, None)
 
     def _why_gates(self, room, pub):
-        """What stops this room being watered, for the AI assistant's why answers (jev_bridge.why_state): its kill
+        """What stops this room being watered, for the AI assistant's why answers (brain_bridge.why_state): its kill
         switch, each external hold (hold_entities) that reads on or cannot be read, and each zone's hold and decision
         from this pass (pub: _blocked, as the shots saw it). Read only when a question is asked; bounded in size."""
         def read(entity):
@@ -4038,7 +4036,7 @@ class Controller:
         return room is not None and room.slug in slugs
 
     def _jev_alert(self, room, zone, judge, alert):
-        """An alert one of Jev's judges, or Jev's runtime, raised (docs/JEV.md). Only these codes exist: a judge can
+        """An alert one of the AI assistant's judges, or the AI assistant's runtime, raised (docs/AI_ASSISTANT.md). Only these codes exist: a judge can
         never raise anything the error-code list does not explain. `zone` None is a room-wide alert."""
         key = f"jev_{judge}_{room.slug}" + ("" if zone is None else f"_z{zone}")
         code, title, message = alert.get("code"), alert.get("title", ""), alert.get("message", "")
@@ -4066,12 +4064,12 @@ class Controller:
             return self._alert(key, "CS-712", title, message, room=room, zone=zone)
         elif code == "CS-713":
             return self._alert(key, "CS-713", title, message, room=room, zone=zone)
-        log("jev alert refused: not in the error-code list", judge, code)
+        log("brain alert refused: not in the error-code list", judge, code)
         return False
 
     @staticmethod
     def _jev_read(entity):
-        """One entity's state for Jev's context (the room's flower start date)."""
+        """One entity's state for the AI assistant's context (the room's flower start date)."""
         return ha_get(entity)[0]
 
     def _unreadable(self, entity, max_age_min=20):
@@ -4216,13 +4214,13 @@ class Controller:
             tank_level.drawn(room.tank_drawdown, delivered_l)
         self._save_state()
         if getattr(self, "jev", None) is not None:
-            try:  # the shot, for Jev's Shot and Probe judges to read its answer later
-                jev_bridge.shot_counted(room, zone, delivered_l)
+            try:  # the shot, for the AI assistant's Shot and Probe judges to read its answer later
+                brain_bridge.shot_counted(room, zone, delivered_l)
             except Exception as e:
-                log("jev shot record error", room.slug, zone, e)
+                log("brain shot record error", room.slug, zone, e)
 
     def _record_phase(self, room, zone, st, was, new, now, how, snap=None, p=None):
-        """Keep the zone's history on a phase change by anyone (the engine, a Jev judge, the operator's Set Phase):
+        """Keep the zone's history on a phase change by anyone (the engine, a AI assistant judge, the operator's Set Phase):
         P1 handing over to P2 is the day's plateau. A history error never stops the phase change.
         With the pass's snapshot and params, a ramp handed over while it stalls under its target (core.p1_stall)
         re-waters under what it reached for the rest of the grow-day."""
@@ -5830,8 +5828,8 @@ class Controller:
                 plan_adherence.raised(adh, d, view.expected_day)
         notes = None
         if getattr(self, "jev", None) is not None:
-            try:  # the brain's plan task (jev_bridge.plan_task): what a drift means, never a write
-                notes = jev_bridge.plan_task(self, room, now, view, drifts)
+            try:  # the brain's plan task (brain_bridge.plan_task): what a drift means, never a write
+                notes = brain_bridge.plan_task(self, room, now, view, drifts)
             except Exception as e:
                 log("plan task error", room.slug, e)
         room._plan_panel = plan_adherence.panel(view, drifts, notes, adh.get("bridge"))
@@ -5995,9 +5993,9 @@ class Controller:
         lights_just_off = room._was_lights_on is True and not lights_on
         if lights_just_on and getattr(self, "jev", None) is not None:
             try:  # the brain's budget window and the Setpoints judge's levers, before any zone is judged
-                jev_bridge.lights_on(self, room, now)
+                brain_bridge.lights_on(self, room, now)
             except Exception as e:
-                log("jev lights-on error", room.slug, e)
+                log("brain lights-on error", room.slug, e)
         snaps, decisions, healthy, blind, params = {}, {}, [], [], {}
         for zone in room.zones:
             st = room.state[zone]
@@ -6024,15 +6022,15 @@ class Controller:
             distrusted = room.__dict__.setdefault("_jev_distrusted", {})
             distrusted.pop(zone, None)
             if snap is not None and getattr(self, "jev", None) is not None:
-                try:  # Jev's judges (docs/JEV.md): whatever goes wrong here, the base engine decides
-                    jev_dirs = jev_bridge.tick(self, room, zone, snap, p, now, lights_on)
+                try:  # the AI assistant's judges (docs/AI_ASSISTANT.md): whatever goes wrong here, the base engine decides
+                    jev_dirs = brain_bridge.tick(self, room, zone, snap, p, now, lights_on)
                     if "distrust" in jev_dirs:
                         distrusted[zone] = jev_dirs["distrust"].why  # the zone takes the dead-probe path
                         snap = None
                     elif "advance" in jev_dirs:
-                        snap = jev_bridge.advance(self, room, zone, snap, jev_dirs["advance"], now, p)
+                        snap = brain_bridge.advance(self, room, zone, snap, jev_dirs["advance"], now, p)
                 except Exception as e:
-                    log("jev error", room.slug, zone, e)
+                    log("brain error", room.slug, zone, e)
                     jev_dirs = {}
             if snap is None:
                 room._blind_since.setdefault(zone, now)
@@ -6106,7 +6104,7 @@ class Controller:
                     and st["phase"] == "P2" and p.ec_target_p2 > 0):
                 base = self._zone_num(room, zone, "p2_vwc_threshold", FALLBACK["p2_vwc_threshold"])
                 les = st.get("last_ec_steer")
-                # Jev's Salt judge chooses how: steer (as always), hold the offset, or decay it toward 0.
+                # The AI assistant's Salt judge chooses how: steer (as always), hold the offset, or decay it toward 0.
                 ec_mode = getattr(jev_dirs.get("ec_mode"), "value", "steer")
                 if ec_mode != "steer" and (les is None or (now - les).total_seconds() >= 1800):
                     if ec_mode == "decay":
@@ -6230,7 +6228,7 @@ class Controller:
             block = (self._blocked(room, zone, reason) if fire
                      else strategy_block(getattr(room, "strategy_snapshot", None), zone))
             if fire and not block and getattr(self, "jev", None) is not None and getattr(reason, "kind", None) != "test_shot":
-                jev_bridge.shot_started(room, zone, snaps.get(zone), getattr(reason, "kind", None))
+                brain_bridge.shot_started(room, zone, snaps.get(zone), getattr(reason, "kind", None))
             acted = self._act_zone(
                 room,
                 zone,
@@ -6287,17 +6285,17 @@ class Controller:
             log("plan watch error", room.slug, e)
         if getattr(self, "jev", None) is not None:
             try:
-                jev_bridge.siblings(self, room, snaps, params, now)
-                jev_bridge.publish(self, room, now, ha_set)
+                brain_bridge.siblings(self, room, snaps, params, now)
+                brain_bridge.publish(self, room, now, ha_set)
             except Exception as e:
-                log("jev publish error", room.slug, e)
+                log("brain publish error", room.slug, e)
         else:
             try:  # with no brain built, the brain panel still says why rules run
-                jev_bridge.publish_rules(self, room, now, ha_set)
+                brain_bridge.publish_rules(self, room, now, ha_set)
             except Exception as e:
                 log("brain panel error", room.slug, e)
         try:  # Ask why: the grower's questions, answered on the room's brain_answers sensor
-            jev_bridge.why_task(self, room, now, ha_get, ha_set, gates=lambda: self._why_gates(room, pub))
+            brain_bridge.why_task(self, room, now, ha_get, ha_set, gates=lambda: self._why_gates(room, pub))
         except Exception as e:
             log("ask why error", room.slug, e)
         try:  # CS-209 only ever tells: it can never stop the room being watered

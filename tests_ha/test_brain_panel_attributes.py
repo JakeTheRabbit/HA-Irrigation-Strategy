@@ -2,7 +2,7 @@
 
 The dashboard's AI assistant page reads the room's brain sensor (`sensor.crop_steering_<prefix>jev`), its decision
 log and each zone's brain sensor. The controller writes them over REST, so nothing in Home Assistant registers
-them: their ids are the ones Jev 3.11.1 wrote, kept so an upgraded install's history and cards still find them.
+them: their ids are the ones the AI assistant 3.11.1 wrote, kept so an upgraded install's history and cards still find them.
 These tests run the real controller, put what it published into the real state machine, and check what the
 recorder would get: every set of attributes under its 16 KB limit (a larger one is dropped from the database),
 the panel's fields where the page looks for them, and no key anywhere.
@@ -53,8 +53,9 @@ def _sizes_fit(stored):
 async def test_a_3_11_1_room_publishes_its_brain_under_the_ids_it_always_had_and_within_the_limit(
     hass, controller_for, monkeypatch
 ):
-    """F-3111 on Cloudflare, with the journal, ledger and setpoint memory its brain wrote: the room keeps the
-    old route, and the panel's sensors carry its words under the 3.11.1 ids, each under the recorder's limit.
+    """F-3111 on Cloudflare, with the journal, ledger and setpoint memory its brain wrote, and an Anthropic key
+    added: the room's brain moves to Claude, and the panel's sensors carry its words under the 3.11.1 ids, each
+    under the recorder's limit, with the old journal still shown.
     """
     seed = fixture(JEV_3_11_1)
     await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
@@ -76,10 +77,10 @@ async def test_a_3_11_1_room_publishes_its_brain_under_the_ids_it_always_had_and
     )
     _sizes_fit(stored)
     panel = stored[room_id].attributes
-    assert (panel["provider"], panel["state"], panel["deprecated_route"]) == (
-        "jev_legacy",
-        "legacy",
-        True,
+    assert (panel["provider"], panel["notice"], panel["deprecated_route"]) == (
+        "claude_haiku",
+        "legacy_route_removed",
+        False,
     )
     assert isinstance(panel["key_set"], bool) and panel["state_words"]
     assert panel["stage"] is None or isinstance(panel["stage"], dict)
@@ -93,12 +94,12 @@ async def test_a_claude_brain_that_cannot_reach_anthropic_publishes_its_panel_wi
     panel says so, carries its spend and judges, stays under the recorder's limit, and holds no key.
     """
     import brain_kit as B
-    import jev_bridge
-    from jev import client as jc
+    import brain_bridge
+    from brain import client as jc
 
     monkeypatch.setattr(jc, "anthropic", B.FakeSDK(B.FakeClient(B.APIStatusError(503))))
     monkeypatch.setattr(
-        jev_bridge, "Asker", functools.partial(jc.Asker, threaded=False)
+        brain_bridge, "Asker", functools.partial(jc.Asker, threaded=False)
     )
     await _install(hass)
     c, fake, _clock = controller_for(

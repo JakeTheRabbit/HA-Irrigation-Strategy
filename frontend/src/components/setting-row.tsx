@@ -19,7 +19,7 @@ function helpFor(setting: Setting, param: string | null): SettingDetail | null {
   return what ? { what, when: "" } : null;
 }
 
-/** One controller setting as a table row: its name and "?", its input, and Jev's range or Auto
+/** One controller setting as a table row: its name and "?", its input, and the AI assistant's range or Auto
  * where either moves it; under it, only what matters while editing it (the value now, an error,
  * what the probe recorded, a suggestion or a warning). Inputs keep the `setting-<entity id>` id. */
 export function SettingRow({

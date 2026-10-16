@@ -126,7 +126,7 @@ def data_dir(env):
 
 def state_path(env):
     """state.json: F2_STATE_PATH (the tests' seam), else in F2_DATA_DIR, else /data/state.json. Every other
-    file the controller keeps (dosing_state.json, the jev_* files) lives beside it."""
+    file the controller keeps (dosing_state.json, the AI assistant's jev_* files) lives beside it."""
     return env.get("F2_STATE_PATH") or os.path.join(data_dir(env), "state.json")
 
 
@@ -495,6 +495,15 @@ OPTION_TYPES = {
     "anthropic_base_url": "str?",
     "anthropic_daily_budget_usd": "float(0,1000)?",
     "brain_dry_run": "bool?",
+    "ai_judges": "str?",
+    "ai_daily_calls": "int?",
+    "ai_budget_warn_pct": "int?",
+    "ai_reask_max": "int?",
+    "ai_unsure_below": "float?",
+    "ai_strict_after": "int?",
+    "ai_strict_prob": "float?",
+    "ai_flower_start": "str?",
+    "ai_flower_days": "int?",
     "cf_account_id": "str?",
     "cf_api_token": "password?",
     "cf_gateway_id": "str?",

@@ -5,7 +5,7 @@ does (checked against the code on every build), what each of the brain's acting 
 symptoms, and the agronomy rules, each with an evidence class and its sources.
 
 **The AI assistant reads this pack** (`brain_provider: claude_haiku`). Its prompt module
-(`addons/f2_control/f2_control/jev/prompt.py`) reads a generated copy of `compiled/` placed beside the controller
+(`addons/f2_control/f2_control/brain/prompt.py`) reads a generated copy of `compiled/` placed beside the controller
 code (the app's build context cannot reach the repository root), `addons/f2_control/f2_control/doctrine/`. The
 pack is advice to the brain; the engine and the brain's guard decide what moves water, so a change here never
 changes watering on its own.
@@ -23,8 +23,8 @@ python doctrine/tools/build_doctrine.py --check --private-denylist FILE
 ```
 
 The build reads the code of the repository it sits in: the engine's `core.py`, the one
-`addons/*/*/controller.py`, the brain package beside it (`jev/doctrine.py`, `jev/envelope.py`, `jev/judges/*.py`,
-`jev/triage.py`), `jev_bridge.py`, `auto_setpoints.py` and the integration's `number.py`. `--repo` points it at
+`addons/*/*/controller.py`, the brain package beside it (`brain/doctrine.py`, `brain/envelope.py`, `brain/judges/*.py`,
+`brain/triage.py`), `brain_bridge.py`, `auto_setpoints.py` and the integration's `number.py`. `--repo` points it at
 another checkout, and each path has its own flag (`--core`, `--controller`, `--jev`, `--brain`, `--bridge`,
 `--auto`, `--numbers`, `--controller-copy`).
 
@@ -33,7 +33,7 @@ The build fails when any of these checks fails:
 1. **Rules valid.** Ids are unique, every rule carries one evidence class, every source id resolves, every
    decision names a rule, and every symptom lever tagged `ACTS` names a decision and an answer key that **acts**
    in it (`via`), taken from the decision catalogue. An answer that acts on nothing cannot be an `ACTS` lever.
-2. **JEV audit.** Every one of the 123 rules in the brain package's `jev/doctrine.py` (99 owner-written plus 24
+2. **JEV audit.** Every one of the 123 rules in the brain package's `brain/doctrine.py` (99 owner-written plus 24
    from a vendor handbook) is either merged into a doctrine rule (`merged_from`) or listed under `dropped` with a
    reason.
 3. **Statements come from the code.** 46 statements are checked:
@@ -47,7 +47,7 @@ The build fails when any of these checks fails:
      CT-7's close-and-save, for example, rest on a constant and a signal handler being there.
    - 7 about the brain's guard and levers (BR-1 to BR-7): the build **calls the envelope's `admit()`** on
      constructed cases for every directive kind and reads the setpoint bands, the levers, the band centre, the
-     grow-plan lock-out and the revert pause from the judges and `jev_bridge.py`. BR-7 checks that every answer
+     grow-plan lock-out and the revert pause from the judges and `brain_bridge.py`. BR-7 checks that every answer
      key the catalogue names exists in the judges' questions.
    - The `ec_adjust` table, by calling the function.
 
@@ -100,10 +100,10 @@ The hashes of the code files a run was checked against are printed in the log an
 - A change to a value the pack prints (from `core.py`, or `defaults.py`'s default dryback targets and P0 wait)
   regenerates `02-engine-rules.md`, `engine-rules.generated.json` and `compiled/` in the same commit, and the
   controller's copy once it exists.
-- A change that makes a checked sentence false in `core.py`, the controller, `jev_bridge.py`,
+- A change that makes a checked sentence false in `core.py`, the controller, `brain_bridge.py`,
   `auto_setpoints.py`, the envelope, a judge or `number.py` rewords the rule in the same commit.
 - Any other edit to those files needs nothing.
-- Check 2 expects `jev/doctrine.py` with `RULES` and exactly one second `*_RULES` table, and audits by position
+- Check 2 expects `brain/doctrine.py` with `RULES` and exactly one second `*_RULES` table, and audits by position
   (`jev:topic#i`). Rewording a rule there passes silently, and inserting or deleting one shifts the refs. The pull
   request that renames that table, edits its rules or retires the package rewrites check 2 and the `merged_from`
   refs in the same commit.
@@ -183,7 +183,7 @@ Vendors are named only in `09-sources.md`; here they go by source id.
 | Source | Class | Licence / handling |
 |---|---|---|
 | `ENGINE` the engine's `core.py`, `CTRL` the controller, `BRAIN` the brain package (envelope, judges, triage, bridge), `INTEG` the integration's `number.py`, all in this repository | product-rule | MIT. Regenerated and checked, not paraphrased. |
-| `JEV` the brain package's `jev/doctrine.py` RULES and STAGE_ARC | grower-practice | MIT. All 123 rules merged and de-duplicated into the doctrine rules, hard rules and arcs, rewritten more tightly. |
+| `JEV` the brain package's `brain/doctrine.py` RULES and STAGE_ARC | grower-practice | MIT. All 123 rules merged and de-duplicated into the doctrine rules, hard rules and arcs, rewritten more tightly. |
 | `SKILL-CONCEPTS`, `SKILL-PLAYBOOK` crop-steering advisor notes | grower-practice | Owner-authored, unpublished. Re-keyed to engine parameter names. |
 | `GL-*` the owner's GrowLabs wiki pages (rockwool, slab, one law, probe, closed loop, stages, ripening, coco, VPD) | grower-practice | Published under CC BY-NC 4.0 by their author, who grants them for this pack under MIT (`LICENSE`). Paraphrased and cited by URL. |
 | `VND-IRRIGATION` a nutrient vendor's grow handbook (precision irrigation chapter), `VND-COCO` its coco prefill guidance | vendor | Proprietary. Facts and numbers only, paraphrased. **No quotes.** |

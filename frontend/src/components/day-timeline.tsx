@@ -170,7 +170,7 @@ interface Lane {
   ecBand: { band: [number, number]; source: string } | null;
   dryback: { night: "tonight" | "last night"; value: Dryback } | null;
   jev: JevEntry[];
-  /** The room publishes Jev's log: the chart keeps a lane for its decisions. */
+  /** The room publishes the AI assistant's log: the chart keeps a lane for its decisions. */
   jevOn: boolean;
   plants: number | null;
   /** Why the rest of the zone's day is not projected, or what holds it back: for the details. */
@@ -1109,7 +1109,7 @@ interface Tip {
   pinned: boolean;
 }
 
-/** The chart: light band, Jev's decisions, phase columns, field capacity with the runoff zone, the
+/** The chart: light band, the AI assistant's decisions, phase columns, field capacity with the runoff zone, the
  * maintenance band, the rescue floor, VWC with its shots, and pore EC on the right. */
 function Chart({
   lane,
@@ -1138,7 +1138,7 @@ function Chart({
   const name = zone.name;
   const narrow = width < 420;
   const jevLane = lane.jevOn;
-  // Left: VWC. Right: pore EC. Top: the light band, then Jev's lane. Bottom: phases, then the clock.
+  // Left: VWC. Right: pore EC. Top: the light band, then the AI assistant's lane. Bottom: phases, then the clock.
   const L = 38,
     R = 34,
     TOP = jevLane ? 27 : 15,
@@ -1221,7 +1221,7 @@ function Chart({
     const at = projection!.points.find((point) => point.time >= shot.time);
     return { shot, cx: x(shot.time), cy: at ? y(at.value) : bottom - 6 };
   });
-  // Jev's decisions in their own lane above the plot; ones too close to tell apart share a mark.
+  // The AI assistant's decisions in their own lane above the plot; ones too close to tell apart share a mark.
   const markers = placeMarkers(
     lane.jev.map((entry) => ({ x: x(entry.time!), item: entry })),
     12,
@@ -1841,7 +1841,7 @@ function blockText(block: Block, lane: Lane): string {
     `${capital(HELD[block.kind])} for ${duration(block.end - block.start)}: ${block.text}`,
   ].join("\n");
 }
-/** A decision Jev made: who, what it answered, what it asked for and what code did. */
+/** A decision the AI assistant made: who, what it answered, what it asked for and what code did. */
 function jevText(entry: JevEntry, lane: Lane): string {
   const result = jevResult(entry).label;
   const agreed =

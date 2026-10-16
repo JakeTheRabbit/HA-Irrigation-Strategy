@@ -4,7 +4,7 @@ Every alert still becomes a Home Assistant notification card, as before. What th
 phone push for what**: each phone has a row of checkboxes (stock tanks, emergencies, sensors and drift,
 phase changes, hardware lockouts, watering stopped, and so on), and a push goes only to the phones whose
 row ticks that kind of alert. It also adds the events a person can now subscribe to that were never
-alerts: phase changes, Jev's setting changes, and "no watering for a while".
+alerts: phase changes, the AI assistant's setting changes, and "no watering for a while".
 
 This document is the contract between the three layers. Nothing in it names a site's phones or people.
 
@@ -31,7 +31,7 @@ either gets it once.
 | `vitals` | Vitals | The controller's regular report on every zone (event `vitals`, no new card). Not ticked on any row until someone ticks it, an upgraded row included |
 | `stock` | Stock tanks | CS-608, CS-807 |
 | `dosing` | Dosing | CS-801 to CS-806, CS-808 |
-| `jev` | Jev | CS-501, CS-702, CS-705, CS-706, CS-707, CS-404, CS-708 (the AI assistant's budget is spent until lights-on), CS-709 (its key was refused or it is not answering), CS-711 (a proposal to change the feed, for a person to decide), CS-712 (a retired Jev route), CS-713 (the room not running its grow plan as written), and Jev moving a setting (new event, no card) |
+| `jev` | AI assistant | CS-501, CS-702, CS-705, CS-706, CS-707, CS-404, CS-708 (the AI assistant's budget is spent until lights-on), CS-709 (its key was refused or it is not answering), CS-711 (a proposal to change the feed, for a person to decide), CS-712 (the options name the removed first AI route), CS-713 (the room not running its grow plan as written), and the AI assistant moving a setting (new event, no card) |
 | `setup` | Setup and settings | CS-201, CS-401 to CS-405 (except 404), CS-601, CS-605, CS-606, CS-607, CS-610, CS-611, CS-713 (the room not running its grow plan as written: also under `jev`) |
 
 The mapping lives in one place in the integration (`notify_catalog.py`) and is returned by `notify_get`,
@@ -43,8 +43,8 @@ docs/error-codes.json is in no kind at all.
 
 - **Phase change** (`event: "phase"`): the controller sends one when a zone's phase changes, with the room,
   zone, from and to (for example "F2 · Zone 2: P1 → P2, ramp target reached"). No card; a push only.
-- **Jev setting change** (`event: "jev_setpoint"`): when Jev moves a zone's P2 shot size or re-water point
-  (docs/JEV.md). No card; a push only. The move is an AI overlay that goes back to your own value by itself
+- **AI assistant setting change** (`event: "jev_setpoint"`): when the AI assistant moves a zone's P2 shot size or
+  re-water point (docs/AI_ASSISTANT.md). No card; a push only. The move is an AI overlay that goes back to your own value by itself
   at lights-on, and on a phone with the Home Assistant app the push carries two buttons: **Keep** keeps the
   AI's value as your own, **Undo** puts your own value back now. The controller names the numbers it wrote
   (`overlays`, their entity ids) and the integration adds the buttons; a tap comes back as the app's
@@ -175,14 +175,14 @@ not the whole setup.
 - A room muted in the sensor's `muted` pushes nothing but a critical code until its time, through
   `crop_steering.notify` or to the `notify_service` option alike (the card is still raised). An integration
   from before mutes publishes none.
-- Phase changes and Jev's setting changes are sent through `crop_steering.notify` only (never the fallback:
+- Phase changes and the AI assistant's setting changes are sent through `crop_steering.notify` only (never the fallback:
   they are not alerts).
 - CS-209 is raised by the controller like any alert (key `idle_<room>`), with its code written out.
 
 In detail:
 
-- A standing alert's card is updated every 30 minutes; its push decays by severity, the same with Jev on or
-  off. A critical code, or a warning that means a zone is not being watered (the controller's
+- A standing alert's card is updated every 30 minutes; its push decays by severity, the same with the AI
+  assistant on or off. A critical code, or a warning that means a zone is not being watered (the controller's
   `NOT_WATERING_CODES`: CS-206, CS-208, CS-209, CS-602), pushes every 30 minutes for as long as it lasts. Any
   other warning pushes after 15 minutes, then 1, 2 and 4 hours, then every 8 hours, each with the card's
   first update at or after it. An info code pushes once. The schedule starts again with each episode: the
@@ -207,11 +207,11 @@ In detail:
   (`EVENTS_BUDGET_S`). An event that fails, or is left when the time is up, is dropped, never retried and
   never sent to `notify_service`. A zone's phase change on its own is key `phase_<room>_z<zone>`, title
   "F2 · Zone 2: P1 → P2" and message why: the engine's own reason ("lights-off -> P3"), "set by hand",
-  "Jev's ramp judge: …", or "lights-off (no moisture reading)" for a zone without a probe. Several in one
+  "the AI assistant's ramp judge: …", or "lights-off (no moisture reading)" for a zone without a probe. Several in one
   loop are key `phase_<room>`, title "F2: phase changes" and a line per zone ("Zone 1: P2 → P3, lights-off
-  -> P3"). Jev's move is key `jev_setpoint_<room>_z<zone>`, title "F2 · Zone 1: Jev changed P2 shot 5% ->
-  4.5%" and message the change in words with Jev's answer and probability; several are "F2: settings Jev
-  changed", a line per zone.
+  -> P3"). The AI assistant's move is key `jev_setpoint_<room>_z<zone>`, title "Room A · Zone 1: the AI assistant changed P2
+  shot 5% -> 4.5%" and message the change in words with its answer and probability; several are "Room A: settings
+  the AI assistant changed", a line per zone.
 - An alert raised while hardware may still be on is raised after it is switched off (a pump whose turn_on
   errored, CS-302; a batch's mix pump that did not start, CS-805), as its push can take a while.
 - CS-209's clock starts, as far as can be told, after the last loop that saw the room not meeting the

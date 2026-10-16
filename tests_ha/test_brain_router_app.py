@@ -34,8 +34,8 @@ async def test_a_fresh_install_with_a_router_sends_the_brain_there_and_never_sho
     hass, controller_for, monkeypatch, capsys
 ):
     import brain_kit as B
-    import jev_bridge
-    from jev import client as jc
+    import brain_bridge
+    from brain import client as jc
 
     def router(url, json=None, headers=None, timeout=None):
         return SimpleNamespace(status_code=503, content=b"{}", headers={})
@@ -43,7 +43,7 @@ async def test_a_fresh_install_with_a_router_sends_the_brain_there_and_never_sho
     monkeypatch.setattr(jc, "anthropic", None)
     monkeypatch.setattr(jc, "requests", SimpleNamespace(post=router))
     monkeypatch.setattr(
-        jev_bridge, "Asker", functools.partial(jc.Asker, threaded=False)
+        brain_bridge, "Asker", functools.partial(jc.Asker, threaded=False)
     )
     await _install(hass)
     c, fake, _clock = controller_for(

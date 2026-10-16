@@ -9,12 +9,12 @@ from datetime import timedelta
 
 import controller
 import jev_kit as K
-from jev.brain import Brain
-from jev.client import Asker
-from jev.context import Shot, ZoneHistory
-from jev.judges.probe import ProbeJudge
-from jev.judges.salt import SaltJudge
-from jev.ledger import Ledger
+from brain.brain import Brain
+from brain.client import Asker
+from brain.context import Shot, ZoneHistory
+from brain.judges.probe import ProbeJudge
+from brain.judges.salt import SaltJudge
+from brain.ledger import Ledger
 
 START = K.NOW.replace(hour=8, minute=0)
 

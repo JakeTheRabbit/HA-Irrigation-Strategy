@@ -67,8 +67,8 @@ export const TARGET_GROUPS: readonly TargetGroup[] = [
  * keeps the rest. */
 export const SETUP_GROUPS: readonly string[] = ["Substrate", "Hardware sizing", "Safety"];
 
-/** How far Jev may move a target tonight, as the chip beside it says: "Jev · 4–6 %". Null for a
- * target Jev does not manage on this zone, or while it does not manage any. */
+/** How far the AI assistant may move a target tonight, as the chip beside it says: "AI assistant · 4–6 %". Null for a
+ * target the AI assistant does not manage on this zone, or while it does not manage any. */
 export function jevChip(setpoints: JevSetpoints | null, key: string, unit: string): string | null {
   if (!setpoints?.managed) return null;
   const range = setpoints.range[key as JevSetpointKey];

@@ -1,4 +1,4 @@
-/* Today: one line for the room, a card per zone, and what Jev changed. Quiet unless something
+/* Today: one line for the room, a card per zone, and what the AI assistant changed. Quiet unless something
    needs a person: a flagged card gets a coloured edge and its reason in words. */
 .today {
   display: grid;
@@ -323,11 +323,11 @@
   color: var(--destructive);
   font-weight: 550;
 }
-/* What Jev changed today. */
+/* What the AI assistant changed today. */
 .today-jev {
   margin-bottom: 0;
 }
-/* The AI assistant's card beside what Jev changed: side by side when there is room. */
+/* The AI assistant's card beside what the AI assistant changed: side by side when there is room. */
 .today-pair {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));

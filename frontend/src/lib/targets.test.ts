@@ -9,21 +9,21 @@ const setpoints = (value: Record<string, unknown>) =>
     attributes: { setpoints: value },
   });
 
-describe("the range chips beside the targets Jev manages", () => {
+describe("the range chips beside the targets the AI assistant manages", () => {
   const managed = setpoints({
     managed: true,
     home: { p2_shot_size: 5, p2_vwc_threshold: 30.5 },
     range: { p2_shot_size: [4, 6], p2_vwc_threshold: [28.5, 31.5] },
   });
-  it("name Jev's range for the P2 shot size and re-water point", () => {
+  it("name the AI assistant's range for the P2 shot size and re-water point", () => {
     expect(jevChip(managed, "p2_shot_size", "%")).toBe("AI assistant · 4–6 %");
     expect(jevChip(managed, "p2_vwc_threshold", "%")).toBe("AI assistant · 28.5–31.5 %");
   });
-  it("say nothing for a target Jev does not move", () => {
+  it("say nothing for a target the AI assistant does not move", () => {
     expect(jevChip(managed, "p1_target_vwc", "%")).toBeNull();
     expect(jevChip(managed, "ec_target_p2", "mS/cm")).toBeNull();
   });
-  it("say nothing while Jev manages nothing on the zone, or where no controller says", () => {
+  it("say nothing while the AI assistant manages nothing on the zone, or where no controller says", () => {
     const off = setpoints({ managed: false, range: { p2_shot_size: [4, 6] } });
     expect(jevChip(off, "p2_shot_size", "%")).toBeNull();
     expect(jevChip(null, "p2_shot_size", "%")).toBeNull();

@@ -992,7 +992,7 @@
         },
         "event": {
           "name": "Event",
-          "description": "The event type, for a notification that is not an alert: `phase` or `jev_setpoint`. The event sets which phones get the notification. Optional. Leave it empty for an alert."
+          "description": "The event type, for a notification that is not an alert: `phase` (a zone changed phase) or `jev_setpoint` (the AI assistant moved a setting). The event sets which phones get the notification. Optional. Leave it empty for an alert."
         },
         "room": {
           "name": "Room prefix",

@@ -7,7 +7,7 @@ strategy_preview, fetched only when the plan changes, after lights-on and every 
 what code expected since lights-on with what happened. A drift is reported, never corrected here: a plan is armed,
 edited or disarmed only by a person, and a number changed by hand while it runs is advised about, never written.
 
-Every drift's words are code's. The brain (jev/plan_task.py) may pick which of a drift's suggestions is shown, and
+Every drift's words are code's. The brain (brain/plan_task.py) may pick which of a drift's suggestions is shown, and
 only under the Claude Haiku brain; with no brain the first one stands.
 """
 from __future__ import annotations

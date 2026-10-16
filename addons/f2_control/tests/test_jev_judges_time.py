@@ -4,13 +4,13 @@ import json
 from datetime import timedelta
 
 import jev_kit as K
-from jev import council
-from jev.brain import Brain
-from jev.client import Asker
-from jev.judges.dawn import DawnJudge
-from jev.judges.dusk import DuskJudge
-from jev.judges.night import NightJudge
-from jev.ledger import Ledger
+from brain import council
+from brain.brain import Brain
+from brain.client import Asker
+from brain.judges.dawn import DawnJudge
+from brain.judges.dusk import DuskJudge
+from brain.judges.night import NightJudge
+from brain.ledger import Ledger
 
 
 # ------------------------------------------------------------------ helpers

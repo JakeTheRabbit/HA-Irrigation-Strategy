@@ -6,14 +6,14 @@ import re
 from datetime import datetime
 
 import brain_kit as B
-import jev_bridge
+import brain_bridge
 import pytest
-from jev.client import HA_STATE_MAX, MAX_TEXT, validate_answer
-from jev.prompt import REPORT_MAX_TOKENS, Prompt
+from brain.client import HA_STATE_MAX, MAX_TEXT, validate_answer
+from brain.prompt import REPORT_MAX_TOKENS, Prompt
 from test_brain_wiring import claude  # noqa: F401 - the fixture
 from test_jev_controller import KILL
 
-LANE = jev_bridge.REPORT_QUESTION
+LANE = brain_bridge.REPORT_QUESTION
 SNAP = "default:zroom:report:2026-09-28T01:30:abcd"
 NIGHT = datetime(2026, 9, 28, 1, 30)  # lights 10-22: three and a half hours after lights-off
 EARLY = datetime(2026, 9, 27, 23, 30)  # an hour and a half after: the setpoints judge's window
@@ -101,7 +101,7 @@ def test_a_spent_budget_asks_for_no_report(claude):  # noqa: F811
 
 
 def test_the_report_is_off_when_it_is_not_among_the_judges(claude):  # noqa: F811
-    c, fake = claude(reporting, jev_judges="dawn,ramp,setpoints")
+    c, fake = claude(reporting, ai_judges="dawn,ramp,setpoints")
     c._clock.t = NIGHT.timestamp()
     c.loop_once(NIGHT)
     assert not _asked(c) and "report" not in fake.sets["sensor.crop_steering_jev"][1]["judges_advising"]

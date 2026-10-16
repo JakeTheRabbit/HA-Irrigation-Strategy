@@ -54,7 +54,7 @@ const TYPES: { type: TimelineType; label: string }[] = [
 ];
 
 /** History › Timeline: what watered, when and why; phase changes; setpoint changes, the grower's and
- * Jev's; alerts; and Jev's decisions with how they turned out. One list, newest first. */
+ * The AI assistant's; alerts; and the AI assistant's decisions with how they turned out. One list, newest first. */
 export function Timeline({ controller, zone }: { controller: Controller; zone?: number }) {
   const [filter, setFilter] = useState<TimelineFilter>({ ...NO_FILTER, zone: zone ?? "all" });
   const [changes, setChanges] = useState<SetpointLogDocument | null>(null);

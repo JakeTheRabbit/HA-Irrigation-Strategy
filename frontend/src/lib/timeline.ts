@@ -2,8 +2,8 @@ import { attachOutcomes, jevAnswer, jevResult, type JevEntry } from "./jev";
 import { CHANGE_ID } from "./setpoint-log";
 import type { LogEvent } from "./types";
 
-/** History › Timeline: the controller's activity records and Jev's journal as one list, newest
- * first, each Jev outcome check on the decision it checks. Pure, so the merge is tested on its own. */
+/** History › Timeline: the controller's activity records and the AI assistant's journal as one list, newest
+ * first, each AI assistant outcome check on the decision it checks. Pure, so the merge is tested on its own. */
 
 /** An activity record's time: an ISO stamp, or the controller's feed "HH:MM" on `reference`'s day
  * (the day before when that is still to come: the same wall-clock time, across a daylight-saving
@@ -39,10 +39,10 @@ export interface TimelineItem {
   /** The zone it is about; null for the room. */
   zone: number | null;
   kind: TimelineKind;
-  /** The controller's record, or Jev's entry: exactly one of the two. */
+  /** The controller's record, or the AI assistant's entry: exactly one of the two. */
   event: LogEvent | null;
   jev: JevEntry | null;
-  /** Jev's checks of this decision (worked or not), oldest first. */
+  /** The AI assistant's checks of this decision (worked or not), oldest first. */
   outcomes: JevEntry[];
 }
 
@@ -58,8 +58,8 @@ export function eventKind(event: LogEvent): TimelineKind {
   return SETPOINT_CHANGE.test(event.message) ? "setpoint" : "note";
 }
 
-/** Jev's Setpoints judge (its own changes, and the grower's that it noted) is a setpoint change, an
- * alert raised or triaged an alert; every other judge is Jev. */
+/** The AI assistant's Setpoints judge (its own changes, and the grower's that it noted) is a setpoint change, an
+ * alert raised or triaged an alert; every other judge is the AI assistant. */
 export function jevKind(entry: JevEntry): TimelineKind {
   if (entry.judge === "setpoints") return "setpoint";
   if (entry.judge === "alerts" || /^CS-\d+/i.test(entry.action)) return "alert";
@@ -107,7 +107,7 @@ export function mergeTimeline(
   );
 }
 
-/** Jev did something or tried to: acted, raised an alert, was refused, or an outcome of its own. */
+/** The AI assistant did something or tried to: acted, raised an alert, was refused, or an outcome of its own. */
 export const jevActed = (entry: JevEntry) =>
   !["no action", "waiting", "unknown"].includes(entry.result);
 
@@ -115,19 +115,19 @@ export type TimelineType = "all" | "water" | "phase" | "setpoint" | "alert" | "j
 export interface TimelineFilter {
   zone: "all" | "room" | number;
   type: TimelineType;
-  /** Every Jev decision; otherwise only the ones that acted or tried to. */
+  /** Every AI assistant decision; otherwise only the ones that acted or tried to. */
   allJev: boolean;
   query: string;
 }
 export const NO_FILTER: TimelineFilter = { zone: "all", type: "all", allJev: false, query: "" };
 
-/** A setpoint the grower changed, which Jev's Setpoints judge only noted (its range follows it):
- * the answer to "who changed this, me or Jev?". */
+/** A setpoint the grower changed, which the AI assistant's Setpoints judge only noted (its range follows it):
+ * the answer to "who changed this, me or the AI assistant?". */
 export const byHand = (entry: JevEntry) =>
   entry.judge === "setpoints" && /\bby hand\b/i.test(entry.verdict);
 
 /** The row in words, for search and the CSV: the controller's message, the grower's change, or
- * Jev's answer and ask. */
+ * The AI assistant's answer and ask. */
 export function timelineText(item: TimelineItem): string {
   if (item.event) return item.event.message;
   const entry = item.jev!;
@@ -138,7 +138,7 @@ export function timelineText(item: TimelineItem): string {
   return `AI assistant · ${entry.title}: ${said}${action ? ` → ${action}` : ""}`;
 }
 
-/** What code did with a Jev row, and how its outcome checks came out. Empty for a controller record. */
+/** What code did with a AI assistant row, and how its outcome checks came out. Empty for a controller record. */
 export function timelineResult(item: TimelineItem): string {
   if (!item.jev) return "";
   if (byHand(item.jev)) return "Noted by the AI assistant";
@@ -163,7 +163,7 @@ export function filterTimeline(
   );
 }
 
-/** The rows as CSV: time as the local wall clock, zone, type, the row in words and Jev's result. A
+/** The rows as CSV: time as the local wall clock, zone, type, the row in words and the AI assistant's result. A
  * cell that a spreadsheet would run as a formula starts with a quote. */
 export function timelineCsv(items: readonly TimelineItem[], room: string): string {
   const cell = (value: string) => `"${value.replace(/^[=+@-]/, "'$&").replaceAll('"', '""')}"`;

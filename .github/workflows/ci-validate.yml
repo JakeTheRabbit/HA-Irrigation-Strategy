@@ -93,7 +93,7 @@ jobs:
         run: |
           set -- --check \
             --core crop-steering-engine/src/crop_steering_engine/core.py \
-            --jev addons/f2_control/f2_control/jev/doctrine.py
+            --jev addons/f2_control/f2_control/brain/doctrine.py
           if [ "$NO_SECRETS" = "true" ]; then
             python doctrine/tools/build_doctrine.py "$@" \
               --private-skip "pull request with no secrets (fork or Dependabot); the merge push runs it"

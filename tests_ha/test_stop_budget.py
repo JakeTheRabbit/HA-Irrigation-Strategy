@@ -1,6 +1,6 @@
 """Stopping the app in the middle of a shot, on an upgraded room, with Home Assistant answering slowly.
 
-The real integration is started on a seeded old install (2.25.1, and the Jev 3.11.1 line), and the real
+The real integration is started on a seeded old install (2.25.1, and the AI assistant 3.11.1 line), and the real
 controller resumes it with the options and state file that version left. A shot runs; half a minute
 in, every answer from Home Assistant starts arriving 3 or 3.5 s after it is asked for (a call whose
 timeout is shorter fails when it is up, as a requests timeout does), or never, and the app is stopped.

@@ -1,11 +1,11 @@
 """MOVING A ROOM FROM THE JEV EDITION (docs/MOVING_FROM_JEV.md), in a real Home Assistant.
 
-The controller app from this repository is a different Supervisor app from the Jev edition's, with an
+The controller app from this repository is a different Supervisor app from the AI assistant edition's, with an
 empty data folder: a room moves once, by the copy command the doc prints. These tests run that command
-exactly as the doc prints it on a Jev 3.11.1 app's data folder, then start the real controller on the
+exactly as the doc prints it on a AI assistant 3.11.1 app's data folder, then start the real controller on the
 copy with the old app's options, the way the doc's steps 3 to 7 do.
 
-The old data folder is what Jev 3.11.1 left: its state.json (state_3_11_1_learn_jev.json) and
+The old data folder is what the AI assistant 3.11.1 left: its state.json (state_3_11_1_learn_jev.json) and
 jev_usage.json (jev_usage_3_11_1.json) recorded with entry_3_11_1_pumped_room.json, and data_3_11_1_files/: the ledger,
 journal and setpoint memory its brain wrote and the dosing record its dosing runner wrote, recorded by
 running 3.11.1's own controller, brain and dosing runner (12c6d1a) on its own test kit with every brain
@@ -24,7 +24,7 @@ from pathlib import Path
 import pytest
 import yaml
 from conftest import fixture
-from test_upgrade_in_place import JEV_3_11_1, KILL, _upgrade
+from test_upgrade_in_place import JEV_3_11_1, KEY, KILL, _upgrade
 
 DOC = Path(__file__).resolve().parents[1] / "docs" / "MOVING_FROM_JEV.md"
 APP_CODE = Path(__file__).resolve().parents[1] / "addons" / "f2_control" / "f2_control"
@@ -33,7 +33,7 @@ RECORDED = Path(__file__).parent / "fixtures" / "data_3_11_1_files"
 OLD, NEW = "e031e6d4_f2_control", "6db5faba_f2_control"
 JEV_FILES = ("jev_usage.json", "jev_ledger.jsonl", "jev_journal.jsonl", "jev_setpoints.json")
 EVERYTHING = ("state.json", "dosing_state.json", *JEV_FILES)
-# The files Jev 3.11.1 writes into its data folder, as the doc's copy list names them. Changing that list is a
+# The files the AI assistant 3.11.1 writes into its data folder, as the doc's copy list names them. Changing that list is a
 # decision: the doc, this pin and the old-install proof move together.
 COPIED_SHA256 = "b9619c1ff9a1566a19df45c739ac8306fffede4ca6b3b6ad1ccc5db72f4413d3"
 
@@ -49,7 +49,7 @@ def _copied():
 
 
 def _old_app(root, names, folder="apps"):
-    """A Jev 3.11.1 app's data folder holding `names` of its files (and the Supervisor's own options.json),
+    """A AI assistant 3.11.1 app's data folder holding `names` of its files (and the Supervisor's own options.json),
     and the new app's data folder as installing the app leaves it: empty."""
     recorded = {
         "state.json": json.dumps(fixture("state_3_11_1_learn_jev.json")["state"]).encode(),
@@ -78,22 +78,25 @@ def _move(root, new=NEW):
     )
 
 
-def _start(controller_for, monkeypatch, new, options, **kw):
-    """The real controller started on the new app's data folder with the old app's options (doc step 3), on the
-    day the usage file was written. The brain's routes are stubbed: `built` records every route list it was given."""
-    import jev_bridge
+def _start(controller_for, monkeypatch, new, options, key=True, **kw):
+    """The real controller started on the new app's data folder with the old app's options (doc step 3), plus an
+    Anthropic key when `key` (doc step 4), on the day the usage file was written. The brain's route is stubbed:
+    `built` records every route list it was given."""
+    import brain_bridge
     import jev_kit
-    from jev.client import Asker
+    from brain.client import Asker
 
+    jev_kit.sdk(monkeypatch)
     noon = datetime.fromisoformat(fixture("jev_usage_3_11_1.json")["usage"]["day"])
     noon = noon.replace(hour=12).timestamp()
     built, stub = [], jev_kit.FakeTransport({})
-    monkeypatch.setattr(jev_bridge, "Routes", lambda found, **kw: built.append(found) or stub)
+    monkeypatch.setattr(brain_bridge, "Routes", lambda found, **kw: built.append(found) or stub)
     monkeypatch.setattr(
-        jev_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: noon)
+        brain_bridge, "Asker", functools.partial(Asker, threaded=False, clock=lambda: noon)
     )
     monkeypatch.setenv("F2_STATE_PATH", str(new / "state.json"))
-    c, fake, _clock = controller_for(fixture(options)["options"] if isinstance(options, str) else options, **kw)
+    options = fixture(options)["options"] if isinstance(options, str) else options
+    c, fake, _clock = controller_for({**options, **(KEY if key else {})}, **kw)
     return c, fake, built
 
 
@@ -140,10 +143,10 @@ async def test_a_3_11_1_room_moved_by_the_doc_carries_straight_on_with_its_brain
         )
         assert st["learn"] == old_zone["learn"]
 
-    # The brain is on, on its own route, with the day's count, its ledger, journal and setpoint memory.
+    # The brain is on Claude, with the day's count, its ledger, journal and setpoint memory.
     usage = fixture("jev_usage_3_11_1.json")["usage"]
-    assert c.jev is not None and c.jev.routes == ["Cloudflare"]
-    assert built[0][0].token == "fixture-token"
+    assert c.jev is not None and c.jev.routes == ["Anthropic"]
+    assert built[0][0].token == KEY["anthropic_api_key"]
     assert c.jev.asker.stats["calls"] == usage["calls"]
     lines = (RECORDED / "jev_ledger.jsonl").read_text(encoding="utf-8").splitlines()
     assert c.jev.ledger.entries == [json.loads(line) for line in lines]
@@ -162,33 +165,33 @@ async def test_a_3_11_1_room_moved_by_the_doc_carries_straight_on_with_its_brain
 
 
 @pytest.mark.parametrize("only", JEV_FILES)
-async def test_any_one_jev_file_copied_keeps_a_cloudflare_brain_on(
+async def test_any_one_brain_file_copied_moves_the_brain_to_claude(
     hass, hass_storage, controller_for, monkeypatch, tmp_path, only
 ):
-    """A Jev app whose brain has not asked yet, or one from 3.0 to 3.3, holds only some of these files."""
+    """An old app whose brain has not asked yet, or one from 3.0 to 3.3, holds only some of these files."""
     await _room(hass, hass_storage)
     _old, new = _old_app(tmp_path, ("state.json", only))
     assert _move(tmp_path).returncode == 0
     assert sorted(p.name for p in new.iterdir()) == sorted(("state.json", only))
     c, _fake, built = _start(controller_for, monkeypatch, new, "options_3_11_1_jev_cf.json")
-    assert c.jev is not None and c.jev.routes == ["Cloudflare"] and built
-    assert (c.brain_status.provider, c.brain_status.state) == ("jev_legacy", "legacy")  # Jev has run here
+    assert c.jev is not None and c.jev.routes == ["Anthropic"] and built
+    assert (c.brain_status.provider, c.brain_status.notice) == ("claude_haiku", "legacy_route_removed")
     assert c.rooms[0]._setup_pending is None
 
 
-async def test_a_typesafe_key_keeps_the_brain_on_with_no_jev_file(
+async def test_a_typesafe_key_moves_the_brain_with_no_brain_file(
     hass, hass_storage, controller_for, monkeypatch, tmp_path
 ):
     await _room(hass, hass_storage)
     _old, new = _old_app(tmp_path, ("state.json",))
     assert _move(tmp_path).returncode == 0
     c, _fake, built = _start(controller_for, monkeypatch, new, "options_3_11_1_jev_typesafe.json")
-    assert c.jev is not None and c.jev.routes == ["TypeSafe"]
-    assert built[0][0].token == "fixture-typesafe-key"
-    assert c.brain_status.provider == "jev_legacy"  # only the Jev line ever had a TypeSafe key
+    assert c.jev is not None and c.jev.routes == ["Anthropic"]
+    assert built[0][0].token == KEY["anthropic_api_key"]
+    assert c.brain_status.provider == "claude_haiku"  # only the first route ever had a TypeSafe key
 
 
-async def test_cloudflare_with_no_jev_file_runs_on_the_rules_and_asks_nothing(
+async def test_cloudflare_with_no_brain_file_runs_on_the_rules_and_asks_nothing(
     hass, hass_storage, controller_for, monkeypatch, tmp_path, capsys
 ):
     await _room(hass, hass_storage)
@@ -196,9 +199,9 @@ async def test_cloudflare_with_no_jev_file_runs_on_the_rules_and_asks_nothing(
     assert _move(tmp_path).returncode == 0
     c, _fake, built = _start(controller_for, monkeypatch, new, "options_3_11_1_jev_cf.json")
     assert c.jev is None and built == []  # no brain, and no route to ask anything through
-    assert (c.brain_status.provider, c.brain_status.notice) == ("rules", "cloudflare_route_retired")
+    assert (c.brain_status.provider, c.brain_status.notice) == ("rules", "legacy_route_removed")
     said = capsys.readouterr().out
-    assert "jev: off. The Cloudflare credentials start Jev only on an install that has run it before" in said
+    assert "first AI route, which this release removed, so the controller uses its rules" in said
     assert "fixture-token" not in said
     assert c.rooms[0]._setup_pending is None  # the room carries straight on
 
@@ -240,7 +243,7 @@ def test_the_copy_list_names_every_file_the_controller_keeps_in_its_data_folder(
         for name in re.findall(r"[\"'](?:/data/)?([A-Za-z0-9_.-]+\.jsonl?)[\"']", path.read_text(encoding="utf-8")):
             named.add(name)
     # Not data to move: the Supervisor's options.json, files that ship beside the code (the brain's tools and the
-    # doctrine manifest), and brain_notices.json and brain_report.json, which only this app writes (a Jev app never
+    # doctrine manifest), and brain_notices.json and brain_report.json, which only this app writes (a AI assistant app never
     # had either); error-codes.json is the repository's table the controller brief is generated from, never data.
     assert set(_copied()) == named - {
         "options.json", "brain_tools.json", "manifest.json", "brain_notices.json", "brain_report.json",
@@ -250,18 +253,22 @@ def test_the_copy_list_names_every_file_the_controller_keeps_in_its_data_folder(
 
 
 @pytest.mark.parametrize(
-    "options, names, route",
+    "options, names",
     [
-        ("options_3_11_1_jev_cf.json", EVERYTHING, "Cloudflare"),
-        ("options_3_11_1_jev_typesafe.json", ("state.json",), "TypeSafe"),
+        ("options_3_11_1_jev_cf.json", EVERYTHING),
+        ("options_3_11_1_jev_typesafe.json", ("state.json",)),
     ],
 )
-async def test_the_route_keys_off_the_form_still_reach_the_old_brain(
-    hass, hass_storage, controller_for, monkeypatch, tmp_path, options, names, route
+@pytest.mark.parametrize("key", [True, False], ids=["with-a-key", "without"])
+async def test_the_old_route_keys_off_the_form_still_load_and_move_the_brain(
+    hass, hass_storage, controller_for, monkeypatch, tmp_path, options, names, key
 ):
-    """The new app's form leaves out the deprecated route keys, which step 3 sets in YAML mode. The Supervisor
-    keeps a saved key its schema still allows and lays this app's defaults under the rest; the controller reads
-    that file itself and reaches the old brain on its own route."""
+    """The new app's form leaves out the old route keys, which step 3 sets in YAML mode. The Supervisor keeps a
+    saved key its schema still allows and lays this app's defaults under the rest (ai_judges: all beside the saved
+    jev_judges list); the controller reads that file itself and moves the brain to Claude with every judge when a
+    key is there, and runs the rules when none is."""
+    import brain_bridge
+
     await _room(hass, hass_storage)
     _old, new = _old_app(tmp_path, names)
     assert _move(tmp_path).returncode == 0
@@ -269,7 +276,12 @@ async def test_the_route_keys_off_the_form_still_reach_the_old_brain(
     saved = fixture(options)["options"]
     assert set(saved) <= set(config["schema"])  # nothing is stripped
     served = {**config["options"], **saved}
-    c, _fake, built = _start(controller_for, monkeypatch, new, served, options_file=True)
-    assert c.jev is not None and c.jev.routes == [route]
-    assert built[0][0].token == (saved["typesafe_api_key"] or saved["cf_api_token"])
-    assert (c.brain_status.provider, c.brain_status.state) == ("jev_legacy", "legacy")
+    c, _fake, built = _start(controller_for, monkeypatch, new, served, key=key, options_file=True)
+    assert c.brain_status.notice == "legacy_route_removed"
+    if key:
+        assert c.jev is not None and c.jev.routes == ["Anthropic"]
+        assert built[0][0].token == KEY["anthropic_api_key"]
+        assert {j.name for j in c.jev.judges} == {j.name for j in brain_bridge.judges()}
+    else:
+        assert c.jev is None and built == []
+        assert (c.brain_status.provider, c.brain_status.state) == ("rules", "rules_no_key")
