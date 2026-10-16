@@ -685,6 +685,11 @@ export class ControllerStore {
         const id = mapped?.[key];
         return typeof id === "string" && id ? [id] : [];
       }),
+      // The main line and the lights: History › Timeline's equipment lanes (Settings › Display).
+      ...(["mainline", "light_entity"] as const).flatMap((key) => {
+        const id = mapped?.[key];
+        return typeof id === "string" && id ? [id] : [];
+      }),
       // Every sensor the zone page's history explorer offers: probes, climate, feed and tank.
       ...explorerSensors(room, this.states).map((sensor) => sensor.entityId),
     ]);

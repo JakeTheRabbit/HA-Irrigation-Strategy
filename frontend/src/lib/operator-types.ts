@@ -49,6 +49,8 @@ export interface SteeringProfile {
   name: string;
   vegetative: Record<string, number>;
   generative: Record<string, number>;
+  /** Climate and feed bands for reference only (lib/plan-reference.ts); absent when none. */
+  reference?: Partial<Record<string, [number, number]>>;
 }
 export interface ScheduleBlock {
   start_day: number;

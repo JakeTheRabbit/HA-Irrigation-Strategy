@@ -138,6 +138,59 @@ export const DISPLAY_ROWS: DisplayRow[] = [
     },
   },
 
+  {
+    key: "show_equipment_lanes",
+    group: "History",
+    label: "Equipment lanes",
+    copy: {
+      tooltip:
+        "Shows a row for each mapped device on History › Timeline: the lights, tank fill, pump, main line and each zone valve, on or off through the grow day.",
+      impact: "Off: no lanes. On: the timeline reads one grow day of these devices from Home Assistant.",
+      guidance: "A pump that ran with no valve open shows as a pump bar with no valve bar under it.",
+    },
+  },
+  {
+    key: "show_room_day_lanes",
+    group: "History",
+    label: "Zone lanes",
+    copy: {
+      tooltip:
+        "Shows a row for each zone on History › Timeline: its phases and its shots through the grow day, on one time axis.",
+      impact: "Off: no lanes. On: a zone that is late or early against the others is easy to see.",
+    },
+  },
+  {
+    key: "show_dryback_drivers",
+    group: "History",
+    label: "Dryback drivers",
+    copy: {
+      tooltip:
+        "Adds the History › Dryback drivers page: the overnight dryback rate of each zone against the VPD, temperature, humidity or CO2 of the room, for the last 14 nights.",
+      impact: "Off: no page. On: the page reads 14 days of history when you open it.",
+      guidance: "The chart shows how two values go together. It does not show a cause.",
+    },
+  },
+  {
+    key: "planner_reference_rows",
+    group: "Plan",
+    label: "Reference rows",
+    copy: {
+      tooltip:
+        "Adds rows under the endpoints of a profile in Plan › Schedule: bands for air temperature, humidity, VPD, CO2, PPFD, DLI and feed pH.",
+      impact:
+        "The rows drive nothing. The controller does not get them. The room climate on a zone page shows a value in colour when it is outside the band of today.",
+    },
+  },
+  {
+    key: "planner_day_curve",
+    group: "Plan",
+    label: "Day curve in the planner",
+    copy: {
+      tooltip:
+        "Shows the curve and the water of the preview day in Plan › Schedule, read only.",
+      impact: "Off: no curve. To change the curve of today with the mouse, use Plan › Targets.",
+    },
+  },
 ];
 
 export interface RoomDisplay {

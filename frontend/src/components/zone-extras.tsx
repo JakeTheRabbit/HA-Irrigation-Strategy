@@ -1,4 +1,8 @@
 import { useEffect, useState } from "react";
+import { blockForDay, growDay, localDate } from "@/lib/grow-plan";
+import type { StrategyDocument } from "@/lib/operator-types";
+import { climateBands } from "@/lib/plan-reference";
+import { growDay as lightsDay } from "@/lib/day-timeline";
 import { Camera, Droplets } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ReviewDialog, time as clock } from "@/components/dashboard";
@@ -14,8 +18,9 @@ import "./zone-extras.css";
 
 /** Settings › Display › Room climate: air temperature, humidity, VPD and the dew point worked out from
  * the first two, as grey gauges (ISA-101). Only the sensors the room maps; none mapped, no panel. */
-export function ClimatePanel({ controller }: { controller: Controller }) {
-  const readings = climateReadings(controller.states, controller.room.room);
+export function ClimatePanel({ controller, zone }: { controller: Controller; zone: number }) {
+  const bands = usePlanBands(controller, zone);
+  const readings = climateReadings(controller.states, controller.room.room, bands);
   if (!readings.length) return null;
   return (
     <section className="panel zone-extra" aria-labelledby="zone-climate-title" data-zone-climate>
@@ -39,6 +44,38 @@ export function ClimatePanel({ controller }: { controller: Controller }) {
       />
     </section>
   );
+}
+
+/** With Settings › Display › Reference rows on: today's climate bands from the room's grow plan, for
+ * this zone (its block's profile), the temperature band by the lights. None without a plan. */
+function usePlanBands(controller: Controller, zone: number) {
+  const on = controller.room.display.options.planner_reference_rows;
+  const [plan, setPlan] = useState<StrategyDocument | null>(null);
+  useEffect(() => {
+    if (!on || !["live", "demo"].includes(controller.connection)) return;
+    let current = true;
+    controller
+      .operator<StrategyDocument>("strategy_get")
+      .then((doc) => current && setPlan(doc))
+      .catch(() => current && setPlan(null));
+    return () => {
+      current = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [on, controller.roomId, controller.connection]);
+  if (!on || !plan) return {};
+  const assignment = plan.plan.zones.find((item) => item.zone_id === zone);
+  if (!assignment) return {};
+  const block = blockForDay(assignment, growDay(assignment.start_date, localDate()));
+  const profile = plan.plan.profiles.find((item) => item.id === block?.profile_id);
+  const prefix = controller.room.room.prefix;
+  const day = lightsDay(
+    numeric(controller.states[`number.crop_steering_${prefix}lights_on_hour`]),
+    numeric(controller.states[`number.crop_steering_${prefix}lights_off_hour`]),
+    Date.now(),
+    controller.timeZone,
+  );
+  return climateBands(profile?.reference, day ? Date.now() < day.lightsOff : true);
 }
 
 /** Settings › Display › Root-zone temperature: the zone's mapped probe as one grey gauge. */
