@@ -30,6 +30,9 @@ REQUEST_MAX_AGE_S = 120
 MAX_RECIPES = 12
 MAX_WEEKS = 52  # a feed schedule's weeks
 ACTIONS = ("dose", "batch", "stop")
+# A pump's pH role for pH auto-correct (docs/DOSING.md): at most one pump per role in a room. Stored only
+# when set, so a setup from before it reads back unchanged.
+PH_ROLES = ("ph_up", "ph_down")
 # Every domain a dosing setup can use: what dosing_get offers to pick from.
 CANDIDATE_DOMAINS = (
     "number",
@@ -213,7 +216,12 @@ def _pump(raw, taken, exists, stock_tanks=None) -> dict:
     restore = raw.get("restore_volume", True)
     if not isinstance(restore, bool):
         raise DosingError(f"{label}: restore volume must be true or false")
-    return {
+    role = raw.get("ph_role")
+    if role in ("", "none"):
+        role = None
+    if role is not None and role not in PH_ROLES:
+        raise DosingError(f"{label}: its pH role must be ph_up, ph_down or none")
+    pump = {
         "id": pump_id,
         "name": name,
         "volume_entity": _entity(
@@ -238,6 +246,9 @@ def _pump(raw, taken, exists, stock_tanks=None) -> dict:
         "restore_volume": restore,
         "stock_tank": _stock_tank(raw.get("stock_tank"), label, stock_tanks),
     }
+    if role:
+        pump["ph_role"] = role
+    return pump
 
 
 def whole_ml(ml) -> int:
@@ -404,6 +415,10 @@ def clean(pumps, batch, exists=None, stock_tanks=None) -> tuple[list[dict], dict
     twice = next((tank for tank in links if links.count(tank) > 1), None)
     if twice:
         raise DosingError(f"stock tank {twice} is linked to two pumps")
+    roles = [pump.get("ph_role") for pump in out if pump.get("ph_role")]
+    twice = next((role for role in roles if roles.count(role) > 1), None)
+    if twice:
+        raise DosingError(f"two pumps have the {twice.replace('_', ' ')} role")
     by_id = {pump["id"]: pump for pump in out}
     cleaned = _batch(batch, by_id, exists)
     hardware = {

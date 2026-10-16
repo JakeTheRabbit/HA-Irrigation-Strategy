@@ -537,3 +537,26 @@ def test_a_recipe_name_is_kept_by_a_save_from_a_page_that_does_not_know_it():
     assert store.data["batch"]["name"] == "Week 3"
     assert save(store, batch={**copy.deepcopy(BATCH), "name": ""})["error"] is None
     assert store.data["batch"]["name"] == ""
+
+
+def test_a_save_without_ph_roles_keeps_the_stored_ones_and_the_sensor_publishes_them():
+    """A page from before pH roles sends pumps without one: each pump keeps its stored role. A page that
+    knows them can clear one (null)."""
+    hass, store = rig()
+    assert (
+        save(store, pumps=[{**copy.deepcopy(PUMP), "ph_role": "ph_up"}])["error"]
+        is None
+    )
+    assert save(store)["error"] is None  # an older page: no ph_role key
+    assert store.data["pumps"][0]["ph_role"] == "ph_up"
+    assert store.sensor()[1]["pumps"][0]["ph_role"] == "ph_up"
+    assert (
+        save(store, pumps=[{**copy.deepcopy(PUMP), "ph_role": None}])["error"] is None
+    )
+    assert "ph_role" not in store.data["pumps"][0]
+
+
+def test_a_store_from_before_ph_roles_loads_unchanged():
+    old = {"revision": 3, "pumps": [copy.deepcopy(PUMP)], "batch": copy.deepcopy(BATCH)}
+    hass, store = rig(old)
+    assert store.error is None and "ph_role" not in store.data["pumps"][0]

@@ -37,6 +37,7 @@ import requests
 import auto_setpoints
 import curve_tracker
 import dosing_runner
+import dry_dim
 import brain_bridge
 import log_words
 import plan_adherence
@@ -690,8 +691,9 @@ NOTIFY_TIMEOUT_S = 12
 EVENTS_BUDGET_S = 10.0
 # The codes whose severity is critical in docs/error-codes.json (tests/test_error_codes.py keeps the two equal):
 # their push is urgent, a high-priority one on a phone whose row asks for that.
-CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-301", "CS-308", "CS-310",
-                            "CS-311", "CS-402", "CS-601", "CS-606", "CS-801", "CS-901", "CS-902"})
+CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-211", "CS-301", "CS-308",
+                            "CS-310", "CS-311", "CS-402", "CS-601", "CS-606", "CS-801", "CS-809", "CS-811",
+                            "CS-901", "CS-902"})
 # How often a standing alert pushes again, by its severity in docs/error-codes.json (tests/test_error_codes.py
 # keeps INFO_CODES equal to the info codes): a critical code, or a warning that means a zone is not being watered,
 # every 30 minutes for as long as it lasts; any other warning after 15 minutes, then 1, 2 and 4 hours, then every
@@ -1550,6 +1552,9 @@ class Controller:
         # Plan adherence's own record (plan_adherence.load): absent on an older file, field by field otherwise.
         room._adherence = plan_adherence.load(block.get("_adherence") if isinstance(block, dict) else None)
         room.tank_drawdown = tank_level.load(block.get("_tank") if isinstance(block, dict) else None)
+        # A dim the controller did not finish (dry_dim.py): absent on an older file. Restored on the first pass.
+        room._dim = dry_dim.load(block.get("_dim") if isinstance(block, dict) else None)
+        room._dimmer = dry_dim.Dimmer(restarted=room._dim is not None)
         if isinstance(block, dict):
             room.strategy_required = bool(block.get("_strategy_required", False))
             try:
@@ -1923,6 +1928,10 @@ class Controller:
                 block["_room_active"] = room._room_active_known
             if room.tank_drawdown["base_pct"] is not None:  # only once a level has been read
                 block["_tank"] = room.tank_drawdown
+            if getattr(room, "_dim", None):
+                block["_dim"] = room._dim
+            else:
+                block.pop("_dim", None)
             if getattr(room, "_off_since", None):
                 block["_room_off_since"] = room._off_since.isoformat()
             else:
@@ -4022,6 +4031,8 @@ class Controller:
             return self._alert(key, "CS-807", title, message, room=room, quiet=False)
         if code == "CS-808":
             return self._alert(key, "CS-808", title, message, room=room, quiet=False)
+        if code == "CS-809":
+            return self._alert(key, "CS-809", title, message, room=room, quiet=False)
         if code == "CS-906":
             return self._alert(key, "CS-906", title, message, room=room, quiet=False)
         log("dosing alert refused: not in the error-code list", code)
@@ -4038,6 +4049,194 @@ class Controller:
         self._alerted.pop(key, None)
         self._alert_codes.pop(key, None)
         return ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
+
+    def _dosing_may_act(self, room):
+        """Whether dosing may act on its own in this room (pH auto-correct): the room is on and its kill
+        switch reads on. A request a person makes is not asked this."""
+        return self._room_active(room) and self._on(room_gate(room), False)
+
+    # ---------- CS-211: shots held for too long ----------
+    @staticmethod
+    def _held_by_a_person(block):
+        """A hold a person set on purpose: the kill switch, a zone switched off, a manual override."""
+        text = str(block)
+        return ("kill switch off" in text or "engine switch switched off" in text
+                or text in ("zone disabled", "manual override"))
+
+    def _watch_held(self, room, now, pub):
+        """CS-211 (opt-in: the room's held_alert_hours, 0 = off): a zone that has asked for water and been held
+        by the same kind of block, never a person's (_held_by_a_person), with no shot since, for that many hours.
+        The clock starts at the first held shot and stops at the next shot the zone gets; a pass where the zone
+        asks for nothing leaves it running. Held in memory: a restart starts it again. It only ever tells."""
+        hours = self._num_or_none(f"number.crop_steering_{room.prefix}held_alert_hours")
+        since = room.__dict__.setdefault("_held_since", {})
+        raised = room.__dict__.setdefault("_held_raised", set())
+        for zone in sorted(pub):
+            d = pub[zone]
+            block = d.get("block")
+            if not d.get("fire"):
+                continue
+            if block and not self._held_by_a_person(block) and hours and hours > 0:
+                since.setdefault(zone, (now, block))
+            else:
+                since.pop(zone, None)
+        for zone in list(since):
+            if not hours or hours <= 0 or zone not in room.zones:
+                since.pop(zone, None)
+        for zone in sorted(raised - set(since)):
+            key = f"held_{room.slug}_z{zone}"
+            if ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}"):
+                raised.discard(zone)
+            self._alerted.pop(key, None)
+            self._alert_codes.pop(key, None)
+        for zone, (started, first) in sorted(since.items()):
+            held_h = (now - started).total_seconds() / 3600.0
+            if held_h < hours:
+                continue
+            now_block = (pub.get(zone) or {}).get("block") or first
+            if self._alert(
+                f"held_{room.slug}_z{zone}",
+                "CS-211",
+                "shots held for too long",
+                f"This zone asked for water and got no shot for {held_h:.1f} h: a hold stops its shots. The hold "
+                f"now: {now_block}. Your limit for this alert is {hours:g} h (Shots held alert). Remove the hold, "
+                "or water the zone by hand. This alert comes again every 30 minutes while the hold lasts. It clears "
+                "at the next shot of the zone.",
+                room=room,
+                zone=zone,
+            ):
+                raised.add(zone)
+
+    # ---------- light dimming on dry substrate (dry_dim.py) ----------
+    def _dim_settings(self, room):
+        return {key: dry_dim.setting(self._num_or_none(f"number.crop_steering_{room.prefix}dry_dim_{key}"), key)
+                for key in dry_dim.SETTINGS}
+
+    def _dim_alert(self, room, code, title, message, quiet=False):
+        """An alert about the room's dimmed light: CS-810 for each dim, restore and hand-over, CS-811 (critical)
+        for a room dimmed past its longest time or a light that does not come back."""
+        key = f"dim_{room.slug}"
+        if code == "CS-810":
+            return self._alert(key, "CS-810", title, message, room=room, quiet=quiet)
+        if code == "CS-811":
+            return self._alert(key, "CS-811", title, message, room=room, quiet=quiet)
+        return False
+
+    def _light_reads(self, light, want, tries=5):
+        """Read a light back until its brightness is within dry_dim.TOLERANCE of `want` -> True when it is."""
+        for attempt in range(tries):
+            state, attributes, _ = ha_get(light)
+            got = dry_dim.brightness(attributes)
+            if str(state).lower() == "on" and got is not None and abs(got - want) <= dry_dim.TOLERANCE:
+                return True
+            if attempt < tries - 1:
+                time.sleep(1.0)
+        return False
+
+    def _watch_dim(self, room, now, lights_on, snaps, off_why=None):
+        """Light dimming on dry substrate (dry_dim.py), once a pass. `off_why`: the room is off this pass,
+        so a dim it holds is restored for that reason and nothing new is dimmed."""
+        record = getattr(room, "_dim", None)
+        dimmer = room.__dict__.get("_dimmer") or room.__dict__.setdefault("_dimmer", dry_dim.Dimmer())
+        enabled = self._on(f"switch.crop_steering_{room.prefix}dry_dim", False)
+        if record is None and (not enabled or off_why):
+            dimmer.dry_since = dimmer.ok_since = None
+            return
+        light = (record or {}).get("light") or getattr(room, "light_entity", "")
+        state, attributes, _ = ha_get(light) if light else (None, {}, None)
+        s = self._dim_settings(room)
+        if off_why:
+            action, why = "restore", off_why
+        else:
+            px = room.prefix
+            readings = {z: snap.vwc for z, snap in (snaps or {}).items()
+                        if self._on(f"switch.crop_steering_{px}zone_{z}_enabled", False)}
+            action, why = dimmer.step(
+                record, now=now, enabled=enabled, allowed=self._on(room_gate(room), False), lights_on=lights_on,
+                to_off_min=self._hours_to(now, room.lights_off_hour) * 60.0,
+                light=getattr(room, "light_entity", ""), state=None if state is None else str(state).lower(),
+                attributes=attributes, readings=readings, s=s)
+            if action == "dim":
+                dry = ", ".join(f"{self._zone_title(room, z)} {v:g}%" for z, v in sorted(readings.items())
+                                if dry_dim.DEAD_VWC <= v < s["floor_vwc"])
+                return self._dim(room, now, light, attributes, why, dry, s)
+        if action == "restore":
+            return self._undim(room, record, why, s)
+        if action == "drop":
+            room._dim = None
+            self._save_state()
+            log(f"[{room.slug}] dimming: {why}; the light is left as it is")
+            self._dim_alert(room, "CS-810", "dimming handed back",
+                            f"The controller had dimmed {record['light']} because the substrate was dry. Then {why}. "
+                            "The controller does not fight another controller: it no longer dims or restores this "
+                            f"light. It was at {round(record['was'] / 2.55)}% before the dim. Check its brightness.")
+
+    def _dim(self, room, now, light, attributes, target, dry, s):
+        was = dry_dim.brightness(attributes)
+        room._dim = {"light": light, "was": was, "set": target, "since": now.isoformat()}
+        self._save_state()  # before the light moves, so a restart restores it
+        ha_call("light", "turn_on", entity_id=light, brightness=target)
+        if not self._light_reads(light, target):
+            ha_call("light", "turn_on", entity_id=light, brightness=was)
+            back = self._light_reads(light, was)
+            if back:
+                room._dim = None
+                self._save_state()
+            log(f"[{room.slug}] dimming: {light} did not read {target}; set back to {was}: {back}")
+            self._dim_alert(room, "CS-810", "the light did not dim",
+                            f"The substrate is dry ({dry}, under {s['floor_vwc']:g}%) and the controller asked "
+                            f"{light} to dim to {s['level_pct']:g}%, but it did not read that brightness. The "
+                            "controller set it back to its brightness before"
+                            + ("." if back else ", but it does not read that either. Check the light now."))
+            return
+        log(f"[{room.slug}] dimming: dry substrate ({dry}): {light} {was} -> {target}")
+        self._dim_alert(room, "CS-810", "lights dimmed: the substrate is dry",
+                        f"The substrate is dry: {dry}, under the floor of {s['floor_vwc']:g}% for "
+                        f"{s['after_min']:g} min with the lights on. The controller dimmed {light} from "
+                        f"{round(was / 2.55)}% to {s['level_pct']:g}% to slow the drying. It restores the light when "
+                        f"every zone reads {s['floor_vwc'] + dry_dim.RECOVER_PTS:g}% for "
+                        f"{dry_dim.RECOVER_MIN:g} min, before lights-off, when you switch dimming or the kill switch "
+                        f"off, and after {s['max_h']:g} h at most. Find out why the zone is dry: a hold on its shots, "
+                        "an empty tank or a blocked dripper.")
+
+    def _undim(self, room, record, why, s):
+        light, was = record["light"], record["was"]
+        state = str(ha_get(light)[0]).lower()
+        if state != "on":  # a restore never switches a light on: an off light is left to its own controller
+            if state in ("none", "unknown", "unavailable", ""):
+                room._dimmer.restarted = True  # can't be read now: tried again next pass
+                return
+            room._dim = None
+            self._save_state()
+            log(f"[{room.slug}] dimming: {light} reads {state}, so it was not set back to {was} ({why})")
+            self._dim_alert(room, "CS-810", "a dimmed light was not set back",
+                            f"The controller had dimmed {light} because the substrate was dry, and wanted to set it "
+                            f"back to {round(was / 2.55)}% ({why}), but the light is off. The controller never switches "
+                            "a light on, so it left it. When it comes on again it may still be dimmed: check its "
+                            "brightness.")
+            return
+        ha_call("light", "turn_on", entity_id=light, brightness=was)
+        if not self._light_reads(light, was):
+            room._dimmer.restarted = True  # tried again every pass
+            log(f"[{room.slug}] dimming: {light} did not come back to {was} ({why})")
+            self._dim_alert(room, "CS-811", "the light did not come back from a dim",
+                            f"The controller dimmed {light} because the substrate was dry, and now asks it back to "
+                            f"{round(was / 2.55)}% ({why}), but it does not read that brightness. The controller "
+                            "asks again each pass. Check the light now, and set its brightness by hand.", quiet=True)
+            return
+        room._dim = None
+        self._save_state()
+        log(f"[{room.slug}] dimming: {light} back to {was} ({why})")
+        if why == "max":
+            self._dim_alert(room, "CS-811", "lights were dimmed for too long",
+                            f"The controller dimmed {light} because the substrate was dry, and it stayed dry for "
+                            f"{s['max_h']:g} h, the longest the room may stay dimmed. The controller set the light "
+                            f"back to {round(was / 2.55)}%. The zone is still dry: find out why now (a hold on its "
+                            "shots, an empty tank, a blocked dripper) and water it by hand if needed.")
+        else:
+            self._dim_alert(room, "CS-810", "lights back to full",
+                            f"The controller set {light} back to {round(was / 2.55)}% after a dim on dry substrate: "
+                            f"{why}.")
 
     def _dosing_hold(self, room):
         """Why dosing holds this room's watering ("making a batch", or "dosing hardware still on: ..."
@@ -5993,6 +6192,10 @@ class Controller:
             if was is not False:
                 self._room_switched_off(room)
             self._idle_reset(room, now)  # CS-209 runs only while the room is on
+            try:  # a light dimmed on dry substrate is restored when the room goes off
+                self._watch_dim(room, now, False, {}, off_why="the room was switched off")
+            except Exception as e:
+                log("dimming error", room.slug, e)
             self._publish_room_off(room, now)
             return {}  # no snapshot, no decision, no blind schedule, no alerts, no vitals line
         if was is False:
@@ -6322,6 +6525,14 @@ class Controller:
             self._watch_sump(room, now)
         except Exception as e:
             log("sump watch error", room.slug, e)
+        try:  # CS-211 only ever tells, too
+            self._watch_held(room, now, pub)
+        except Exception as e:
+            log("held watch error", room.slug, e)
+        try:  # opt-in: dims the room's light on dry substrate, and restores it (dry_dim.py)
+            self._watch_dim(room, now, lights_on, snaps)
+        except Exception as e:
+            log("dimming error", room.slug, e)
         try:  # the tank level is read and published, and the plan-ahead refill asked for (CS-903)
             self._watch_tank(room)
         except Exception as e:
