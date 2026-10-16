@@ -45,6 +45,12 @@ HARDWARE_DOMAINS = {
     # The tank level the controller reads: a distance down to the water, and/or a low-level float.
     "tank_distance_sensor": {"sensor"},
     "tank_low_float": {"binary_sensor"},
+    # Shown on the dashboard only (Settings > Display): the room camera, its CO2 and its light
+    # level (PPFD). The controller reads none of them.
+    "camera_entity": {"camera"},
+    "co2_sensor": {"sensor"},
+    "ppfd_sensor": {"sensor"},
+    "dli_sensor": {"sensor"},
 }
 SIZING = {
     "plant_count": (1, 1000, True),
@@ -73,6 +79,8 @@ SENSOR_KINDS = {
     "tank_temperature_sensor": "tank_temperature",
     "tank_distance_sensor": "distance",
 }
+# Each zone may map one root-zone temperature probe, for the dashboard only (no controller use).
+ZONE_TEMPERATURE = "substrate_temperature_sensor"
 TANK_LEVEL_FIELDS = {"full_mm", "empty_mm", "float_low_state"}
 
 
@@ -459,6 +467,16 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
                     prior[key] = value
                 else:
                     prior.pop(key, None)
+        temperature = row.get(ZONE_TEMPERATURE, prior.get(ZONE_TEMPERATURE) or "")
+        if temperature:
+            if not isinstance(temperature, str):
+                raise ValueError(
+                    f"Zone {z}: the root-zone temperature probe is one sensor"
+                )
+            _entity(hass, temperature, {"sensor"}, "tank_temperature")
+            prior[ZONE_TEMPERATURE] = temperature
+        else:
+            prior.pop(ZONE_TEMPERATURE, None)
         for key, (low, high, integer) in SIZING.items():
             value = row.get(key, prior.get(key))
             if value is None:
@@ -547,6 +565,11 @@ def configuration_payload(data):
                     for kind in ("vwc", "ec")
                 },
                 **{k: zone[k] for k in SIZING if k in zone},
+                **(
+                    {ZONE_TEMPERATURE: zone[ZONE_TEMPERATURE]}
+                    if zone.get(ZONE_TEMPERATURE)
+                    else {}
+                ),
             }
         )
     return {
@@ -616,6 +639,7 @@ def setup_room(hass, entry):
                     key: cfg.get(key) or ("" if key.endswith("_primary") else [])
                     for key in sorted(PROBE_CHOICE)
                 },
+                ZONE_TEMPERATURE: cfg.get(ZONE_TEMPERATURE) or "",
                 **sizing,
                 # Sizing still at the generic value setup offers a new room, so not yet
                 # confirmed as this room's own: changing it to anything else clears it.
@@ -680,7 +704,14 @@ def read_setup(hass):
             }
             for s in hass.states.async_all()
             if s.entity_id.split(".")[0]
-            in {"sensor", "light", "binary_sensor", "input_datetime", *ACTUATOR_DOMAINS}
+            in {
+                "sensor",
+                "light",
+                "binary_sensor",
+                "input_datetime",
+                "camera",
+                *ACTUATOR_DOMAINS,
+            }
         ],
     }
 
@@ -815,6 +846,10 @@ HARDWARE_WORDS = {
     "tank_fill_entity": "tank fill",
     "tank_distance_sensor": "tank distance sensor",
     "tank_low_float": "tank low float",
+    "camera_entity": "camera",
+    "co2_sensor": "CO2 sensor",
+    "ppfd_sensor": "PPFD sensor",
+    "dli_sensor": "DLI sensor",
 }
 ZONE_WORDS = {
     "valve": "valve",
@@ -824,6 +859,7 @@ ZONE_WORDS = {
     "substrate_volume": "pot volume (L)",
     "drippers_per_plant": "drippers per plant",
     "dripper_flow_rate": "dripper flow (L/h)",
+    ZONE_TEMPERATURE: "root-zone temperature probe",
 }
 # homeassistant.const.EVENT_LOGBOOK_ENTRY: the event the logbook records a line from.
 LOGBOOK_ENTRY = "logbook_entry"

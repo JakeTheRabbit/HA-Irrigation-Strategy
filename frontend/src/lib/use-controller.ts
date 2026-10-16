@@ -1,3 +1,4 @@
+import { demoDisplay } from "./display";
 import type { DailyRanges, HistoryRequest, HistoryWindow, RunsDocument } from "./comparison-types";
 import { demoHistoryWindow } from "./comparison-demo";
 import type { TimelineRequest } from "./day-timeline";
@@ -91,6 +92,8 @@ export class ControllerStore {
     this.connection = demo ? "demo" : "connecting";
     const search =
       typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    // ?display=show_climate,today_tank_readout (or all): those display options on in the demo.
+    if (demo) this.states = demoDisplay(this.states, search?.get("display") ?? null);
     if (demo)
       this.operatorDemo = new OperatorDemo(
         () => this.states,
@@ -494,7 +497,8 @@ export class ControllerStore {
       action.startsWith("stock_") ||
       action.startsWith("calibration_") ||
       action.startsWith("dosing_") ||
-      action.startsWith("brain_");
+      action.startsWith("brain_") ||
+      action.startsWith("display_");
     const payload = scoped ? { ...data, room_id: roomId } : data;
     if (scoped && !roomId) throw new Error("Select an available room.");
     // What's new's record and a test push change nothing a refresh would show, and must neither
@@ -513,6 +517,7 @@ export class ControllerStore {
         "dosing_get",
         "notify_get",
         "notify_test",
+        "display_get",
       ].includes(action);
     if (mutation && this.writing) throw new Error("Another change is still being applied.");
     if (mutation) this.writing = true;

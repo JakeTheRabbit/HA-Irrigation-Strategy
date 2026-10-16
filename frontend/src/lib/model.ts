@@ -16,6 +16,7 @@ import { parseAutoSetpoints } from "./auto-setpoints";
 import { readWaiting } from "./waiting-for";
 import { PHASE_GROUPS, settingWords } from "./setting-words";
 import { growerWords } from "./words";
+import { roomDisplay } from "./display";
 import { numberLimits, registeredControl } from "./features";
 import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
 
@@ -834,6 +835,7 @@ export function buildRoom(states: States, room: Room): RoomView {
       entityId: predictSwitch?.entity_id ?? null,
       enabled: boolean(predictSwitch),
     },
+    display: roomDisplay(states, room.prefix),
   };
 }
 
@@ -1055,6 +1057,8 @@ export function validateChange(room: RoomView, states: States, change: Change): 
     room.roomActiveEntity,
     room.autoSetpoints.entityId,
     room.notifyPredictions.entityId,
+    // Settings › Display › Hardware panel: the integration checks again that an administrator set it.
+    `switch.${ROOT}${room.room.prefix}manual_hardware_enabled`,
     ...room.zones.flatMap((z) => [
       z.enabledEntity,
       `switch.${ROOT}${room.room.prefix}zone_${z.id}_manual_override`,

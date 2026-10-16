@@ -106,6 +106,21 @@ export function explorerSensors(room: RoomView, states: States): ExplorerSensor[
         });
     }
   const mapped = descriptor(states, room.room)?.attributes ?? {};
+  // Each zone's root-zone temperature probe (Equipment › Setup), in the zone's own group.
+  const roots = mapped.substrate_temperature_sensors;
+  for (const zone of room.zones) {
+    const id =
+      roots && typeof roots === "object" ? (roots as Record<string, unknown>)[String(zone.id)] : null;
+    if (typeof id === "string" && id)
+      add({
+        entityId: id,
+        label: `${zone.name} root-zone temperature`,
+        group: zone.name,
+        kind: "climate",
+        zone: zone.id,
+        unit: unitOf(states, id, "°C"),
+      });
+  }
   for (const [table, group, kind] of [
     [CLIMATE, "Room climate", "climate"],
     [FEED, "Feed and tank", "feed"],

@@ -14,7 +14,14 @@ import { dateForDay, localDate } from "./grow-plan";
 import { numeric } from "./model";
 import { demoStock, stockAttributes, stockLinks } from "./stock-demo";
 import { TANK_KEYS } from "./tank-level";
+import { DISPLAY_DEFAULTS } from "./display";
 
+/** The demo room camera's still image: a plain frame, no photo. */
+const DEMO_CAMERA =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="#2b2f33"/><g fill="#3d6b3a"><ellipse cx="120" cy="250" rx="70" ry="60"/><ellipse cx="250" cy="240" rx="80" ry="70"/><ellipse cx="390" cy="250" rx="75" ry="62"/><ellipse cx="520" cy="245" rx="72" ry="66"/></g><rect y="300" width="640" height="60" fill="#1d2023"/><text x="20" y="34" fill="#c8ccd0" font-family="sans-serif" font-size="20">Demo camera</text></svg>',
+  );
 export function isDemoLocation(location: Pick<Location, "hostname" | "search">): boolean {
   return (
     new URLSearchParams(location.search).has("demo") || location.hostname.endsWith(".github.io")
@@ -78,6 +85,15 @@ export function createDemo(now = Date.now()): States {
       temperature_sensor: `sensor.demo_${prefix}air_temperature`,
       humidity_sensor: `sensor.demo_${prefix}air_humidity`,
       vpd_sensor: `sensor.demo_${prefix}vpd`,
+      // Shown only when Settings › Display turns its panel on.
+      camera_entity: `camera.demo_${prefix}room`,
+      co2_sensor: `sensor.demo_${prefix}co2`,
+      ppfd_sensor: `sensor.demo_${prefix}ppfd`,
+      substrate_temperature_sensors: {
+        1: `sensor.demo_${prefix}root_temperature_1`,
+        2: `sensor.demo_${prefix}root_temperature_2`,
+        3: `sensor.demo_${prefix}root_temperature_3`,
+      },
       // Room A checks its feed water on the tank probes (the source-water gate); Room B maps
       // no feed-water probe, so its gate is off. Both have been saved in Rooms and setup.
       ...(index
@@ -109,6 +125,25 @@ export function createDemo(now = Date.now()): States {
       unit_of_measurement: "kPa",
       friendly_name: `${name} VPD`,
     });
+    put(`sensor.demo_${prefix}co2`, index ? 780 : 1150, {
+      unit_of_measurement: "ppm",
+      friendly_name: `${name} CO2`,
+    });
+    put(`sensor.demo_${prefix}ppfd`, index ? 760 : 840, {
+      unit_of_measurement: "µmol/m²/s",
+      friendly_name: `${name} PPFD`,
+    });
+    for (const zone of [1, 2, 3])
+      put(`sensor.demo_${prefix}root_temperature_${zone}`, (index ? 20.4 : 21.6) + zone * 0.3, {
+        unit_of_measurement: "°C",
+        friendly_name: `${name} zone ${zone} root-zone temperature`,
+      });
+    put(`camera.demo_${prefix}room`, "idle", {
+      friendly_name: `${name} camera`,
+      entity_picture: DEMO_CAMERA,
+    });
+    // The Hardware panel on the zone pages: off until an administrator sets it to on.
+    put(`switch.crop_steering_${prefix}manual_hardware_enabled`, "off");
     put(enable, "on");
     put(`switch.crop_steering_${prefix}room_active`, "on");
     // Room A demonstrates a running setpoint supervisor; Room B keeps the default (off).
@@ -126,6 +161,8 @@ export function createDemo(now = Date.now()): States {
     put(`select.crop_steering_${prefix}water_today_view`, "Zone total", {
       options: ["Zone total", "Per plant"],
     });
+    // What the dashboard shows in the room (Settings → Display): every option off until turned on.
+    put(`sensor.crop_steering_${prefix}display`, 0, { ...DISPLAY_DEFAULTS });
     put(`sensor.crop_steering_${prefix}ai_heartbeat`, "online", {
       enable_flag: enable,
       last_beat: new Date(now - 18_000).toISOString(),

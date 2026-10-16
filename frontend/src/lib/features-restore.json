@@ -738,5 +738,65 @@
     "group": "Alerts",
     "label": "Shots held alert (h)",
     "help": "A critical alert when a zone that asked for water is held this many hours; 0 = off (0-72)."
+  },
+  {
+    "id": "LF-65",
+    "entity": "setup hardware leaf_temperature_sensor",
+    "kind": "option",
+    "scope": "room",
+    "default": "",
+    "group": "Equipment",
+    "label": "Room leaf temperature",
+    "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
+  },
+  {
+    "id": "LF-65",
+    "entity": "setup zones[].leaf_temperature_sensor",
+    "kind": "option",
+    "scope": "zone",
+    "default": "",
+    "group": "Equipment",
+    "label": "Zone leaf temperature",
+    "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
+  },
+  {
+    "id": "LF-63",
+    "entity": "setup hardware camera_entity",
+    "kind": "option",
+    "scope": "room",
+    "default": "",
+    "group": "Equipment",
+    "label": "Room camera",
+    "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
+  },
+  {
+    "id": "LF-91",
+    "entity": "setup hardware co2_sensor",
+    "kind": "option",
+    "scope": "room",
+    "default": "",
+    "group": "Equipment",
+    "label": "Room CO2",
+    "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
+  },
+  {
+    "id": "LF-91",
+    "entity": "setup hardware ppfd_sensor",
+    "kind": "option",
+    "scope": "room",
+    "default": "",
+    "group": "Equipment",
+    "label": "Room PPFD",
+    "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
+  },
+  {
+    "id": "LF-91",
+    "entity": "setup hardware dli_sensor",
+    "kind": "option",
+    "scope": "room",
+    "default": "",
+    "group": "Equipment",
+    "label": "Room daily light integral",
+    "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
   }
 ]
