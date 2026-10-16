@@ -34,6 +34,10 @@ CHANGES = {
     # The controller app's grow-day summaries, and a backfill from statistics.
     "grow_day_record": {"room_id": ROOM, "days": []},
     "grow_days_backfill": {"room_id": ROOM, "start": "2026-01-01", "end": "2026-01-02"},
+    "history_connection_get": {"room_id": ROOM},
+    "history_connection_save": {"room_id": ROOM, "expected_revision": 0, "connection": {}},
+    "history_long": {"room_id": ROOM, "entity_ids": ["sensor.probe"],
+                     "start": "2026-01-01T00:00:00Z", "end": "2026-01-02T00:00:00Z"},
     "stock_save": {"room_id": ROOM, "expected_revision": 0, "tanks": []},
     "stock_refill": {"room_id": ROOM, "expected_revision": 0, "id": "bloom"},
     "stock_record_batch": {"room_id": ROOM, "expected_revision": 0},
