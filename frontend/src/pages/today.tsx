@@ -6,6 +6,7 @@ import { RoomOffBanner } from "@/components/room-controls";
 import { BrainCard } from "@/components/brain";
 import { GaugeRow, QualityChip, StatusLine } from "@/components/hmi";
 import { RunProgress } from "@/components/run-progress";
+import { PlantStressStrip } from "@/components/sensing";
 import {
   roomReference,
   zoneAttention,
@@ -243,6 +244,7 @@ export function Today({
       <TodayStatus controller={controller} day={day} now={now} navigate={navigate} />
       <RunProgress controller={controller} navigate={navigate} />
       <TankLine controller={controller} navigate={navigate} />
+      <PlantStressStrip controller={controller} />
       <section className="today-zones" aria-label="Zones">
         {cards.map((card) => (
           <ZoneCard
@@ -283,7 +285,7 @@ function TodayStatus({
   controller: Controller;
   day: GrowDay | null;
   now: number;
-  navigate: (page: Page) => void;
+  navigate: (page: Page, zone?: number) => void;
 }) {
   const [open, setOpen] = useState(false);
   const listId = useId();
@@ -399,25 +401,48 @@ function TodayStatus({
         </p>
       )}
       {critical.map((notice) => (
-        <NoticeLine key={notice.id} notice={notice} />
+        <NoticeLine key={notice.id} notice={notice} zones={room.zones} navigate={navigate} />
       ))}
       <ul className="today-alert-list" id={listId} hidden={!open}>
         {notices.map((notice) => (
           <li key={notice.id} data-severity={notice.severity}>
-            <NoticeLine notice={notice} plain />
+            <NoticeLine notice={notice} plain zones={room.zones} navigate={navigate} />
           </li>
         ))}
       </ul>
     </section>
   );
 }
-function NoticeLine({ notice, plain = false }: { notice: Notice; plain?: boolean }) {
+function NoticeLine({
+  notice,
+  plain = false,
+  zones,
+  navigate,
+}: {
+  notice: Notice;
+  plain?: boolean;
+  zones: Zone[];
+  navigate: (page: Page, zone?: number) => void;
+}) {
+  // Each zone the notice is about opens its page (a merged notice names them all).
+  const linked = (notice.zoneIds ?? []).flatMap((id) => zones.filter((zone) => zone.id === id));
   return (
     <p
       className={plain ? "today-notice" : "today-notice today-critical"}
       role={plain ? undefined : "alert"}
     >
       <strong>{notice.title}.</strong> {notice.detail}
+      {linked.map((zone) => (
+        <button
+          key={zone.id}
+          type="button"
+          className="inline-action"
+          data-notice-zone={zone.id}
+          onClick={() => navigate("zone", zone.id)}
+        >
+          {zone.name}
+        </button>
+      ))}
     </p>
   );
 }

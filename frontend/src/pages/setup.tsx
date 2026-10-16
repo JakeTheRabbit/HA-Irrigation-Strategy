@@ -221,6 +221,7 @@ const hardwareFields = [
   ["tank_temperature_sensor", "Tank temperature", "temperature"],
   ["tank_last_fill_sensor", "Last recorded tank fill", "timestamp"],
   ["tank_fill_entity", "Tank filling status", "binary"],
+  ["leaf_temperature_sensor", "Leaf temperature (plant stress card)", "temperature"],
 ] as const;
 export function Setup({
   controller,
@@ -792,6 +793,8 @@ export function Setup({
                 <div className="workspace-form-grid">
                   {hardwareFields
                     .filter(([key]) => plumbingUses(plumbing, key))
+                    // an older integration has no leaf sensor field: it would refuse one
+                    .filter(([key]) => key !== "leaf_temperature_sensor" || key in draft.hardware)
                     .map(([key, label, kind]) => (
                       <MappingPicker
                         key={key}
@@ -887,6 +890,15 @@ export function Setup({
                           disabled={busy}
                           onChange={(v) => editZone(zone.id, { ec_sensors: v })}
                         />
+                        {zone.leaf_temperature_sensor !== undefined && (
+                          <MappingPicker
+                            label={zone.name + " leaf temperature (optional)"}
+                            values={zone.leaf_temperature_sensor ? [zone.leaf_temperature_sensor] : []}
+                            candidates={candidates("temperature")}
+                            disabled={busy}
+                            onChange={(v) => editZone(zone.id, { leaf_temperature_sensor: v[0] || "" })}
+                          />
+                        )}
                       </div>
                       <div className="workspace-form-grid sizing-grid">
                         {(

@@ -9,6 +9,7 @@ import { ZoneDay } from "@/components/day-timeline";
 import { OverlayRows, useOverlays } from "@/components/overlay-row";
 import { Pill } from "@/components/mini-visuals";
 import { SensorContextCard, useSensorContext } from "@/components/sensor-context";
+import { PlantStressCard, ZoneGates, ZoneShots } from "@/components/sensing";
 import { rangeText, steeringOf } from "@/lib/day-chart";
 import {
   attachOutcomes,
@@ -135,6 +136,8 @@ export function ZonePage({
       <ZoneDay key={zone.id} controller={controller} zone={zone} />
       <HistoryExplorer key={`explorer-${zone.id}`} controller={controller} zone={zone} />
       <ZoneWhy key={`why-${zone.id}`} controller={controller} zone={zone} />
+      <ZoneGates key={`gates-${zone.id}`} controller={controller} zone={zone} />
+      <PlantStressCard key={`stress-${zone.id}`} controller={controller} zone={zone} />
       {/* The AI on this zone beside the controls; without it the controls take the width. */}
       <div className="zone-page-grid">
         <div className="zone-page-column">
@@ -150,6 +153,7 @@ export function ZonePage({
       <Collapsed key={`probes-${zone.id}`} title="Probes used and not used">
         {() => <ZoneProbes controller={controller} zone={zone} navigate={navigate} />}
       </Collapsed>
+      <ZoneShots key={`shots-${zone.id}`} controller={controller} zone={zone} />
       <RecordedBehaviour key={`recorded-${zone.id}`} controller={controller} zone={zone} />
     </div>
   );

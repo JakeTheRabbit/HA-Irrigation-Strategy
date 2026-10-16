@@ -89,6 +89,8 @@ export interface Notice {
   detail: string;
   severity: "warning" | "critical" | "info";
   zoneId?: number;
+  /** Every zone the notice is about: one, or the zones of a merged notice. */
+  zoneIds?: number[];
 }
 export interface RoomView {
   room: Room;
