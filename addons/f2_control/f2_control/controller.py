@@ -41,6 +41,7 @@ import dry_dim
 import brain_bridge
 import gate_report
 import log_words
+import phase_options
 import plan_adherence
 import runoff_balance
 import runtime_env
@@ -70,7 +71,7 @@ from crop_steering_engine import (
     zone_status_label,
     settled_reading,
 )
-from crop_steering_engine.core import SETTLED_VWC_MIN, p1_stall, p1_stall_rewater
+from crop_steering_engine.core import SETTLED_VWC_MIN, ec_flush_goal, p1_stall, p1_stall_rewater
 # What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
 # controller column of the one defaults table, pinned to the values installed controllers use.
 from crop_steering_engine.defaults import CONTROLLER_FALLBACKS as FALLBACK
@@ -720,7 +721,7 @@ BACKUP_RISE_PTS, BACKUP_WINDOW_MIN, BACKUP_GRACE_MIN, BACKUP_CLEAR_MIN = 3.0, 60
 # The room's substrate profile sets it (fc_shift_min); this is the generic profile's.
 FC_SHIFT_MIN = SUBSTRATE_PROFILES["generic"]["fc_shift_min"]
 # The most the follower moves any one setpoint in a grow-day, in points: a drifting probe or a flood can only drag the
-# ladder this far a day.
+# ladder this far a day. The fallback of the room's Max setpoint move per day (_step_limit).
 FC_STEP_MAX = 1.0
 FC_LADDER = ("field_capacity", "p1_target_vwc", "p2_vwc_threshold")  # what the follower moves
 # The Vmax advisory's P1 wet-up series is kept in state.json (per zone) with at most this many readings.
@@ -857,11 +858,12 @@ def next_text(conditions, at):
             f"P2 at {test(done, '%', 'VWC')}{shots}{ec}" + (f", or after {more(most, 'ramp shot')}" if most else "")
         )
         return " · ".join(parts)
-    topup, off = find("p2_topup"), find("lights_off")
-    if topup or off:
+    topup, off, timed = find("p2_topup"), find("lights_off"), find("p2_timed")
+    if topup or off or timed:
         # A held plan leaves the routine shots out: then only lights-off is left.
         dilute = find("p2_dilute")
         parts = [
+            f"timed shot {'at ' + when(timed) if when(timed) else 'due'}" if timed else None,
             f"shot when {test(topup, '%', 'VWC')}{reading(topup, '%')}" if topup else None,
             f"dilution if {test(dilute, '', 'pwEC')}{reading(dilute, '')}" if dilute else None,
             # By, not at: in its last three hours P2 moves early when the night is too short to dry.
@@ -1419,6 +1421,8 @@ class Controller:
             "p1_flat": 0,  # ...the ramp shots in a row under the target that did not give the rise P1 needs
             # this grow-day's stalled ramp (core.p1_stall): {"day", "at", "rewater"}, re-watering under what it reached
             "p1_stall": None,
+            # an EC flush fired and the zone has not reached its EC flush target yet (core: ZoneSnapshot.ec_flushing)
+            "ec_flushing": False,
             "vmax_wetup": [],  # this grow-day's P1 wet-up VWC readings, for the Vmax advisory (resets each P0)
             **zone_history.fresh(),
             **sensing.fresh(),  # the water-and-VPD record (sensing.py), kept only while its switch is on
@@ -1503,6 +1507,8 @@ class Controller:
         latch = d.get("max_run_latch")
         if isinstance(latch, dict) and type(latch.get("resets")) is int and isinstance(latch.get("since"), str):
             s["max_run_latch"] = {"since": latch["since"], "resets": latch["resets"]}
+        if isinstance(d.get("ec_flushing"), bool):  # absent before the EC flush target: False
+            s["ec_flushing"] = d["ec_flushing"]
         flat = d.get("p1_flat")  # absent before the P1 stall exit: 0, and None
         if type(flat) is int and 0 <= flat <= 100:
             s["p1_flat"] = flat
@@ -1913,6 +1919,7 @@ class Controller:
             "p1_expected_rise": s.get("p1_expected_rise"),
             "p1_flat": int(s.get("p1_flat") or 0),
             "p1_stall": s.get("p1_stall"),
+            "ec_flushing": bool(s.get("ec_flushing")),
             "shots": s.get("shots"),
             "daily_vol": s.get("daily_vol"),
             "water_history": s.get("water_history"),
@@ -2431,6 +2438,33 @@ class Controller:
                 FALLBACK[f"{'vegetative' if veg else 'generative'}_dryback_target"],
             ),
             p0_max_wait_min=self._zone_num(room, zone, "p0_maximum_wait_time", FALLBACK["p0_maximum_wait_time"]),
+            # Opt-in phase settings (phase_options). Optional: an integration older than them has none, and each
+            # fallback is the rule as it was.
+            p0_min_wait_min=self._zone_num(
+                room, zone, "p0_minimum_wait", FALLBACK["p0_minimum_wait"], optional=True
+            ),
+            p0_stall_exit=self._on(f"switch.crop_steering_{room.prefix}p0_stall_exit", False),
+            ec_flush_target=self._zone_num(room, zone, "ec_flush_target", FALLBACK["ec_flush_target"], optional=True),
+            # The zone's own P2 dilute ratio only behind the room's switch (never the room's p2_ec_high_threshold,
+            # editable and unread for months: reading it unasked would change watering on update).
+            p2_dilute_ratio=(
+                self._zone_num(room, zone, "p2_dilute_ratio", FALLBACK["p2_dilute_ratio"], optional=True)
+                if self._on(f"switch.crop_steering_{room.prefix}use_p2_ec_thresholds", False)
+                else FALLBACK["p2_dilute_ratio"]
+            ),
+            p2_mode=phase_options.p2_mode(ha_get(f"select.crop_steering_{room.prefix}zone_{zone}_p2_mode")[0]),
+            p2_timed_interval_min=self._zone_num(
+                room, zone, "p2_timed_interval_min", FALLBACK["p2_timed_interval_min"], optional=True
+            ),
+            p2_timed_shot_size=self._zone_num(
+                room, zone, "p2_timed_shot_size", FALLBACK["p2_timed_shot_size"], optional=True
+            ),
+            p2_timed_first_h=self._zone_num(
+                room, zone, "p2_timed_first_hours", FALLBACK["p2_timed_first_hours"], optional=True
+            ),
+            p2_end_h_before_off=self._zone_num(
+                room, zone, "p2_end_hours_before_off", FALLBACK["p2_end_hours_before_off"], optional=True
+            ),
             # Per zone only. Optional: an integration older than the setting leaves it at 0 (off), so
             # P0 waits for the dryback target as it always has, and nothing alerts.
             p0_additional_dryback=self._zone_num(
@@ -2654,6 +2688,7 @@ class Controller:
             # ...and the ramp shots before the last one that did not rise, unless the probe is in doubt (core.p1_stall)
             p1_flat_shots=int(st.get("p1_flat") or 0),
             p1_probe_suspect=self._p1_probe_suspect(room, zone, st, now) is not None,
+            ec_flushing=bool(st.get("ec_flushing")),
             ec_settled=ec_settled,
             # a held plan holds the steering; decide() then fires only the rescues (PLAN_HOLD_EXEMPT)
             steering_held=bool(strategy_block(getattr(room, "strategy_snapshot", None), zone)),
@@ -2806,7 +2841,13 @@ class Controller:
                     want.pop(suffix, None)
                 stall = auto_setpoints.stalled(current, want)
                 for suffix, value, _why in setpoint_supervisor.writes(current, want):
-                    if (self._auto_write(room, zone, suffix, current[suffix], value, learn, now)
+                    value = self._step_bounded(room, zone, suffix, current[suffix], value, now)
+                    if value is None:
+                        continue
+                    wrote = self._auto_write(room, zone, suffix, current[suffix], value, learn, now)
+                    if wrote:
+                        self._step_count(room, zone, suffix, current[suffix], value, now)
+                    if (wrote
                             and suffix in ("p2_shot_size", "p2_vwc_threshold") and brain_bridge.owns_setpoints(self)):
                         # the learner holds the judge's lever while the brain cannot act: not an edit by hand
                         brain_bridge.learner_wrote(self, room, zone, suffix, current[suffix], value, now)
@@ -3028,8 +3069,8 @@ class Controller:
             return False
         follow = st["fc_follow"]
         day = self._grow_day_start(room, now).isoformat()
-        if follow["day"] != day:
-            follow.update(day=day, used={})
+        limit = self._step_limit(room)
+        phase_options.step_left(follow, day, "field_capacity", limit)  # a new grow-day starts the ledger afresh
         used = follow["used"]
 
         def bounded(suffix, old, value):
@@ -3043,7 +3084,7 @@ class Controller:
                 hi = min(hi, float(attrs["max"]))
             except (KeyError, TypeError, ValueError):
                 pass
-            left = max(0.0, FC_STEP_MAX - used.get(suffix, 0.0))  # what is left of this grow-day's step
+            left = max(0.0, limit - used.get(suffix, 0.0))  # what is left of this grow-day's step
             return round(max(lo, old - left, min(hi, old + left, value)), 1)
 
         fc = bounded("field_capacity", p.field_capacity, seen)
@@ -3076,6 +3117,51 @@ class Controller:
         if wrote:
             self._save_state()
         return wrote
+
+    def _step_limit(self, room):
+        """The room's Max setpoint move per day, in VWC points (inf: no limit); FC_STEP_MAX when it cannot be read
+        (an integration older than the setting)."""
+        value = self._num_or_none(f"number.crop_steering_{room.prefix}setpoint_max_step_per_day")
+        return phase_options.step_limit(value, FC_STEP_MAX)
+
+    def _step_limit_all(self, room):
+        """True when the room's daily limit also holds the AI assistant's targets power and the learner (the select's
+        second option). A missing select, as on an older integration, is the follower only, as before."""
+        state = ha_get(f"select.crop_steering_{room.prefix}setpoint_step_limit_applies_to")[0]
+        return state == phase_options.STEP_SCOPE_ALL
+
+    def _step_allowance(self, room, zone, suffix, now):
+        """What is left of today's allowance for a ladder setpoint when the room's limit holds the learner and the AI
+        assistant too (the follower's ledger, shared), or None when it does not apply to `suffix` or to them."""
+        if suffix not in FC_LADDER or not self._step_limit_all(room):
+            return None
+        return phase_options.step_left(room.state[zone]["fc_follow"], self._grow_day_start(room, now).isoformat(),
+                                       suffix, self._step_limit(room))
+
+    def _step_bounded(self, room, zone, suffix, old, value, now):
+        """A learner write of a ladder setpoint inside what is left of today's allowance (_step_allowance); None when
+        nothing is left. Any other setpoint, or the limit holding the follower only, is returned as it came."""
+        left = None if old is None else self._step_allowance(room, zone, suffix, now)
+        if left is None:
+            return value
+        bounded = phase_options.clamp_step(float(old), float(value), left)
+        return None if abs(bounded - float(old)) < 0.05 else bounded
+
+    def _step_count(self, room, zone, suffix, old, value, now):
+        """A written ladder move, counted on today's ledger when the room's limit holds the learner and the AI too."""
+        if self._step_allowance(room, zone, suffix, now) is not None:
+            phase_options.step_used(room.state[zone]["fc_follow"], suffix, float(value) - float(old))
+
+    def _flush_episode(self, room, zone, st, snap, p, fire, reason):
+        """Latch or clear the zone's EC flush episode (core: ZoneSnapshot.ec_flushing) after this pass's decision."""
+        was = bool(st.get("ec_flushing"))
+        now_on = phase_options.flushing(was, p.ec_flush_target, getattr(reason, "kind", None) if fire else None,
+                                        snap.ec_settled, ec_flush_goal(snap, p))
+        if now_on != was:
+            st["ec_flushing"] = now_on
+            log(f"[{room.slug}] Z{zone} EC flush " + (f"to {ec_flush_goal(snap, p):.1f} started" if now_on
+                                                       else "episode ended"))
+            self._save_state()
 
     def _zone_bounded(self, room, zone, suffix, value):
         """`value` inside the engine's bounds for `suffix` and the zone number's own min and max (which Home
@@ -4742,6 +4828,8 @@ class Controller:
             st["p1_settled_before"], st["p1_expected_rise"], st["p1_flat"] = None, None, 0
         if new == "P0":
             st["p1_stall"] = None
+        if new in ("P0", "P3"):
+            st["ec_flushing"] = False  # an EC flush episode ends at lights-off and never carries into a new day
         if (was == "P1" and new == "P2" and snap is not None and p is not None and not snap.backed_up
                 and not snap.p1_probe_suspect and snap.vwc < min(p.p1_target, p.field_capacity)
                 and p1_stall(snap, p) >= 1):
@@ -6594,6 +6682,7 @@ class Controller:
                 # of firing a shot _act_zone could only refuse.
                 snap = snaps[zone] = dataclasses.replace(snap, daily_vol=max(snap.daily_vol, p.max_daily_volume))
                 new_phase, new_thr, fire, size, reason = decide(snap, p)
+            self._flush_episode(room, zone, st, snap, p, fire, reason)
             shown = snap  # what waiting_for reads: the snapshot, in the phase the zone is now in
             if new_phase != st["phase"]:
                 log(f"[{room.slug}] Z{zone} {st['phase']} -> {new_phase}: {log_words.transition(reason)}")

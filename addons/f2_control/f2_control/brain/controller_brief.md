@@ -54,6 +54,7 @@ not the offset steps. An armed plan owns its targets; drift raises CS-713.
 ### 4. The settings: each zone's own number for the setting, else the room's, else the controller's built-in fallback shown here (these are not the fresh-room defaults)
 
 - drippers_per_plant: 1
+- ec_flush_target: 0
 - ec_min_interval: 10
 - ec_target_gen_p0: 4
 - ec_target_gen_p1: 5
@@ -68,6 +69,7 @@ not the offset steps. An armed plan owns its targets; drift raises CS-713.
 - maximum_ec: 9
 - p0_additional_dryback: 0
 - p0_maximum_wait_time: 45 (range 5-240)
+- p0_minimum_wait: 0
 - p1_initial_shot_size: 2 (range 0.5-15)
 - p1_maximum_extra_shots: 3
 - p1_maximum_shots: 12 (range 1-40)
@@ -76,8 +78,13 @@ not the offset steps. An armed plan owns its targets; drift raises CS-713.
 - p1_shot_size_increment: 0.5 (range 0-5)
 - p1_target_vwc: 60 (range 20-100)
 - p1_time_between_shots: 15 (range 1-120)
+- p2_dilute_ratio: 1.2
+- p2_end_hours_before_off: 0
 - p2_shot_size: 5 (range 0.5-20)
 - p2_time_between_shots: 0
+- p2_timed_first_hours: 0
+- p2_timed_interval_min: 60
+- p2_timed_shot_size: 0
 - p2_vwc_threshold: 45 (range 10-100)
 - p3_emergency_shot_size: 2
 - p3_emergency_vwc_threshold: 40 (range 10-65)

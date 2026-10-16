@@ -15,7 +15,7 @@ from conftest import fixture, room_of
 from test_setup_entry import _install
 from test_upgrade_in_place import JEV_3_11_1, UPSTREAM_2_25_1, _upgrade
 
-SETTINGS = {"p1_rise_pts": (0.5, 0.1, 5), "p1_maximum_extra_shots": (3, 1, 10)}
+SETTINGS = {"p1_rise_pts": (0.5, 0.1, 5), "p1_maximum_extra_shots": (3, 1, 30)}
 
 
 def _numbers(hass, key, prefix=""):

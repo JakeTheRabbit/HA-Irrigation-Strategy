@@ -46,6 +46,7 @@ from brain import council
 from brain import plan_task as jev_plan
 from brain import powers as jev_powers
 from brain.setpoint_memory import SetpointMemory
+import phase_options
 
 ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel", "balance", "feed", "report", "why",
        "plan", "targets", "shotsize")
@@ -830,6 +831,8 @@ def advance(c, room, zone, snap, d, now, p=None):
     """Move the zone forward one phase as the AI assistant judged, with the bookkeeping the engine does itself (a ramp handed
     over while it stalls re-waters under what it reached: Controller._record_phase)."""
     st = room.state[zone]
+    if st["phase"] == "P0" and p is not None and snap.phase_minutes < getattr(p, "p0_min_wait_min", 0.0):
+        return snap  # the room's P0 minimum wait binds the AI assistant too: a person's floor is always respected
     was, st["phase"] = st["phase"], d.value
     c._record_phase(room, zone, st, was, d.value, now, f"the AI assistant's {d.judge} judge: {d.why}", snap, p)
     st["last_phase_change"] = now
@@ -1806,7 +1809,10 @@ def targets_view(c, room, zone, p, now):
     """What the targets judge may set tonight (ZoneContext.targets): the ladder, the rescue floor and the dryback
     target of the zone's steering mode."""
     db = targets_judge.VEG_DB if c._veg(room, zone) else targets_judge.GEN_DB
-    return _view(c, room, zone, p, now, "targets", (*targets_judge.LADDER_KEYS, db), "set_targets_from_achievable")
+    view = _view(c, room, zone, p, now, "targets", (*targets_judge.LADDER_KEYS, db), "set_targets_from_achievable")
+    if view is not None and hasattr(c, "_step_limit_all") and c._step_limit_all(room):  # the room's daily limit holds the AI too (opt-in)
+        view["daily_limit"] = c._step_limit(room)
+    return view
 
 
 def shots_view(c, room, zone, p, now):
@@ -1850,13 +1856,31 @@ def apply_values(c, room, zone, d, ctx, now):
     view = (ctx.targets if judge == "targets" else ctx.shots) or {}
     ai = _ai(c, room, zone)
     by = f"{AI_BY} ({'targets' if judge == 'targets' else 'shot sizes'})"
-    plan, clamped = {}, {}
+    plan, clamped, stepped = {}, {}, {}
     for k, asked in v["values"].items():
         lo, hi = c._number_range(room, zone, k)
         val = round(min(hi, max(lo, float(asked))), 2)
         if abs(val - float(asked)) > 1e-9:
             clamped[k] = float(asked)
-        plan[k] = (float(view["current"][k]), val)
+        cur = float(view["current"][k])
+        left = c._step_allowance(room, zone, k, now) if judge == "targets" and hasattr(c, "_step_allowance") else None
+        if left is not None and abs(val - cur) > left + 1e-9:  # the room's daily limit holds the AI too (opt-in)
+            stepped[k], val = val, phase_options.clamp_step(cur, val, left)
+        plan[k] = (cur, val)
+    if stepped:
+        # The ladder still holds after clamping (rescue + 3 <= threshold < peak target <= field capacity), else none
+        # of the ladder moves tonight.
+        tj = targets_judge
+        after = {k: plan[k][1] if k in plan else _zone_number(c, room, zone, k) for k in tj.LADDER_KEYS}
+        if None not in after.values() and not (after[tj.RESCUE] + 3.0 <= after[tj.THR] < after[tj.P1]
+                                                <= after[tj.FC]):
+            for k in (tj.FC, tj.P1, tj.THR):
+                if k in plan:
+                    plan[k] = (plan[k][0], plan[k][0])
+        for k, asked in stepped.items():
+            _power_note(c, room, zone, judge, "clamped by the daily limit",
+                        f"{k.replace('_', ' ')} {asked:g} -> {plan[k][1]:g}", "acted",
+                        "the room's Max setpoint move per day holds the AI assistant too")
     rising = plan.get(targets_judge.P1, (0.0, 0.0))[1] >= plan.get(targets_judge.P1, (0.0, 0.0))[0]
     ladder = [k for k in targets_judge.LADDER_KEYS if k in plan]
     order = (ladder if rising else ladder[::-1]) + [k for k in plan if k not in ladder]
@@ -1867,8 +1891,12 @@ def apply_values(c, room, zone, d, ctx, now):
             old, new = plan[k]
             reason = (v["reasons"].get(k) or "") + (f" (asked {clamped[k]:g}, clamped to its range)" if k in clamped
                                                     else "")
+            if k in stepped:
+                reason = (reason + " " if reason else "") + "(clamped by the daily limit)"
             if c._auto_write(room, zone, k, old, new, {}, now, by=by, reason=reason or None,
                              expected=v.get("expected") or None):
+                if judge == "targets" and hasattr(c, "_step_count"):
+                    c._step_count(room, zone, k, old, new, now)
                 wrote.append(k)
                 ai["written"][k] = new
                 ai["pending"] = [w for w in ai["pending"] if w.get("suffix") != k] + [_pending(k, old, new, by, now)]

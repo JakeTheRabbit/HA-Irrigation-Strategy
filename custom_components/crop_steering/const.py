@@ -202,3 +202,9 @@ DEFAULT_RECIPE = {
 SERVICE_SET_MANUAL_OVERRIDE = "set_manual_override"
 SERVICE_APPLY_RECIPE = "apply_recipe"
 SERVICE_SAVE_RECIPE = "save_recipe"
+
+# A zone's P2 mode (select zone_N_p2_mode): the first is the default, moisture-driven P2 as always.
+# The controller maps them to the engine's p2_mode moisture / timed / timed_guarded.
+P2_MODES = ["Moisture", "Timed", "Timed with guards"]
+# Which automatic writers the room's Max setpoint move per day holds; the first is the default.
+SETPOINT_STEP_SCOPES = ["Auto setpoints", "Auto setpoints and AI"]

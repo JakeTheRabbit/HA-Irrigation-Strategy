@@ -48,6 +48,132 @@
   ],
   "features": [
     {
+      "id": "record_grow_days",
+      "group": "history",
+      "label": "Record grow days",
+      "help": "Keep a daily summary at lights-on for grow comparisons. Off until enabled.",
+      "master": {
+        "domain": "switch",
+        "key": "record_grow_days",
+        "scope": "room",
+        "default": false
+      },
+      "settings": [],
+      "restore": "NEW-03"
+    },
+    {
+      "help": "Minimum minutes in P0; the low moisture bypass remains available.",
+      "settings": [
+        {
+          "key": "p0_minimum_wait",
+          "scope": "room+zone",
+          "default": 0.0,
+          "domain": "number"
+        },
+        {
+          "key": "p0_stall_exit",
+          "scope": "room",
+          "default": false,
+          "domain": "switch"
+        }
+      ],
+      "group": "phases",
+      "label": "Morning dryback minimum wait",
+      "id": "lf_09"
+    },
+    {
+      "help": "Limit automatic moisture setpoint movement in VWC points; zero removes the limit.",
+      "settings": [
+        {
+          "key": "setpoint_max_step_per_day",
+          "scope": "room",
+          "default": 1.0,
+          "domain": "number"
+        },
+        {
+          "key": "setpoint_step_limit_applies_to",
+          "scope": "room",
+          "default": "Auto setpoints",
+          "domain": "select"
+        }
+      ],
+      "group": "phases",
+      "label": "Max setpoint move per day",
+      "id": "lf_149"
+    },
+    {
+      "help": "Continue budgeted flush shots to this target, with a feed EC floor; zero disables.",
+      "settings": [
+        {
+          "key": "ec_flush_target",
+          "scope": "room+zone",
+          "default": 0.0,
+          "domain": "number"
+        }
+      ],
+      "group": "phases",
+      "label": "EC flush target",
+      "id": "lf_20"
+    },
+    {
+      "help": "Use each zone dilute ratio instead of the existing 1.2 ratio.",
+      "settings": [
+        {
+          "key": "p2_dilute_ratio",
+          "scope": "room+zone",
+          "default": 1.2,
+          "domain": "number"
+        },
+        {
+          "key": "use_p2_ec_thresholds",
+          "scope": "room",
+          "default": false,
+          "domain": "switch"
+        }
+      ],
+      "group": "phases",
+      "label": "Use zone P2 EC ratios",
+      "id": "lf_21"
+    },
+    {
+      "help": "Choose Timed with guards for scheduled shots with a moisture ceiling and floor rescue.",
+      "settings": [
+        {
+          "key": "p2_end_hours_before_off",
+          "scope": "room+zone",
+          "default": 0.0,
+          "domain": "number"
+        },
+        {
+          "key": "p2_mode",
+          "scope": "zone",
+          "default": "Moisture",
+          "domain": "select"
+        },
+        {
+          "key": "p2_timed_first_hours",
+          "scope": "room+zone",
+          "default": 0.0,
+          "domain": "number"
+        },
+        {
+          "key": "p2_timed_interval_min",
+          "scope": "room+zone",
+          "default": 60.0,
+          "domain": "number"
+        },
+        {
+          "key": "p2_timed_shot_size",
+          "scope": "room+zone",
+          "default": 0.0,
+          "domain": "number"
+        }
+      ],
+      "group": "phases",
+      "label": "P2 mode",
+      "id": "new_01"
+    },
+    {
       "id": "auto_setpoints",
       "group": "phases",
       "label": "Auto setpoints",
@@ -888,20 +1014,6 @@
         }
       ],
       "alsoOn": "equipment/probes"
-    },
-    {
-      "id": "record_grow_days",
-      "group": "history",
-      "label": "Record grow days",
-      "help": "Keep a daily summary at lights-on for grow comparisons. Off until enabled.",
-      "master": {
-        "domain": "switch",
-        "key": "record_grow_days",
-        "scope": "room",
-        "default": false
-      },
-      "settings": [],
-      "restore": "NEW-03"
     },
     {
       "id": "runoff_estimator",

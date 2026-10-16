@@ -47,6 +47,19 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="Max-run latch",
         icon="mdi:timer-lock",
     ),
+    # Opt-in, OFF: P0 starts the ramp early when its dryback is too slow to finish before the
+    # maximum wait.
+    SwitchEntityDescription(
+        key="p0_stall_exit",
+        name="P0 stall exit",
+        icon="mdi:timer-play",
+    ),
+    # Opt-in, OFF: P2 dilutes at each zone's own P2 dilute EC ratio. Off: the engine's 1.2, as always.
+    SwitchEntityDescription(
+        key="use_p2_ec_thresholds",
+        name="Use P2 EC ratios",
+        icon="mdi:arrow-up-bold",
+    ),
     SwitchEntityDescription(
         key="ec_stacking_enabled",
         name="EC stacking",

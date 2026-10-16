@@ -252,7 +252,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The size of the first ramp shot, as a percentage of the substrate volume. Each later ramp shot adds the ramp shot increase to the shot before it."
   },
   "p1_maximum_extra_shots": {
-    "guidance": "The default is 3. The controller uses values from 1 to 10. Extra shots count toward the daily water limit. P1 gives no extra shot while the zone does not drain (CS-310). The controller reads the zone value first, so the zone value overrides the room value for that zone only.",
+    "guidance": "The default is 3. The controller uses values from 1 to 30. Extra shots count toward the daily water limit and toward the maximum ramp shots: P1 ends at the maximum ramp shots first, so to give more extra shots, also increase the maximum ramp shots. P1 gives no extra shot while the zone does not drain (CS-310). The controller reads the zone value first, so the zone value overrides the room value for that zone only.",
     "impact": "Increase: P1 can give more extra shots to fill the substrate, with more runoff. Decrease: P1 ends sooner after it reaches the peak target.",
     "tooltip": "The highest number of extra shots that P1 gives after VWC reaches the peak target. At this number, the zone goes to P2."
   },
