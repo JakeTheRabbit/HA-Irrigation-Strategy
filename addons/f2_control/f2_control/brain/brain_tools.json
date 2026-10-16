@@ -467,7 +467,7 @@
     },
     {
       "name": "set_values",
-      "description": "Set settings yourself, for a question that asks for values (kind values: the owner has given you this power, or asks what you would set). Call it once for that question, and only with that question's own settings. Give only the settings you change, each with the number you want, your reason and nothing else; an empty list keeps every setting. Code writes the values as you give them, clamped only to each setting's own range, so you are trusted to follow the goal and the rules for the owner's powers in your doctrine. 'expected_outcome' is the result you expect tomorrow, which the next night's scorecard checks; 'confidence' (0 to 1) how well the evidence supports the change; 'rationale' at most two plain sentences for the grower's journal.",
+      "description": "Set settings yourself, for a question that asks for values (kind values: the owner has given you this power, or asks what you would set). Call it once for that question, and only with that question's own settings. Give only the settings you change, each with the number you want, your reason and nothing else; an empty list keeps every setting. Code writes the values as you give them, clamped to engine bounds inside each entity's range, with moisture ladder validation, so you are trusted to follow the goal and the rules for the owner's powers in your doctrine. 'expected_outcome' is the result you expect tomorrow, shown beside the next night's scorecard; 'confidence' (0 to 1) describes evidence quality and does not gate writes: omit uncertain settings; 'rationale' at most two plain sentences for the grower's journal.",
       "strict": true,
       "input_schema": {
         "type": "object",

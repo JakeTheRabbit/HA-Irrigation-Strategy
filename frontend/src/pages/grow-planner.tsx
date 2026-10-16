@@ -44,6 +44,7 @@ import {
   columnRange,
   dateForDay,
   growDay,
+  interpolate,
   localDate,
   parameterHelp,
   parameterLabels,
@@ -54,6 +55,8 @@ import {
   rangeBlock,
   replaceRange,
 } from "@/lib/grow-plan";
+import { PlannerDayCurve, ReferenceRows } from "@/components/planner-extras";
+import { withReference } from "@/lib/plan-reference";
 import "./grow-planner.css";
 
 const moves: Record<string, [number, number]> = {
@@ -877,6 +880,13 @@ export function GrowPlanner({
                       <span>Generative endpoint</span>
                     </div>
                   </div>
+                  {controller.room.display.options.planner_day_curve && profile && currentBlock && (
+                    <PlannerDayCurve
+                      controller={controller}
+                      zoneId={zoneId}
+                      parameters={interpolate(profile, currentBlock.bias, limits)}
+                    />
+                  )}
                 </section>
                 <section className="panel workspace-card">
                   <div className="workspace-section-heading">
@@ -1084,6 +1094,20 @@ export function GrowPlanner({
                     ))}
                   </div>
                 ))}
+                {controller.room.display.options.planner_reference_rows && profile && (
+                  <ReferenceRows
+                    profile={profile}
+                    disabled={disabled}
+                    onChange={(reference) =>
+                      setPlan({
+                        ...plan,
+                        profiles: plan.profiles.map((p) =>
+                          p.id === profile.id ? withReference(p, reference) : p,
+                        ),
+                      })
+                    }
+                  />
+                )}
                 <div className="workspace-message">
                   New live profiles start from current setpoints at both ends. Changing pot size
                   does not choose crop targets. Demo endpoints are illustrative.
