@@ -179,6 +179,39 @@
     { "id": "ai_power_set_targets_from_achievable", "group": "ai", "label": "AI: set targets from what a zone reaches", "help": "Sets a zone's targets from the values it really reaches.", "master": { "domain": "switch", "key": "ai_power_set_targets_from_achievable", "scope": "room", "default": false }, "settings": [], "alsoOn": "today/ai" },
     { "id": "ai_power_tune_shot_sizes", "group": "ai", "label": "AI: tune shot sizes", "help": "Changes the shot sizes inside their limits.", "master": { "domain": "switch", "key": "ai_power_tune_shot_sizes", "scope": "room", "default": false }, "settings": [], "alsoOn": "today/ai" },
     {
+      "id": "ph_auto_correct", "group": "feed", "label": "pH auto-correct",
+      "help": "Corrects a batch tank outside the feed pH band with a few small doses of the pump in the pH role. It locks and alerts if a dose does not work.",
+      "master": { "domain": "switch", "key": "ph_auto_correct", "scope": "room", "default": false },
+      "settings": [
+        { "domain": "number", "key": "ph_correct_dose_s", "scope": "room", "default": 5, "label": "Dose length" },
+        { "domain": "number", "key": "ph_correct_max_tries", "scope": "room", "default": 2, "label": "Doses a try" },
+        { "domain": "number", "key": "ph_correct_mix_min", "scope": "room", "default": 5, "label": "Mix after a dose" },
+        { "domain": "number", "key": "ph_correct_daily_max", "scope": "room", "default": 3, "label": "Doses a day" },
+        { "domain": "number", "key": "ph_correct_margin", "scope": "room", "default": 0.1, "label": "Stop inside the band" }
+      ],
+      "alsoOn": "equipment/dosing", "restore": "LF-165"
+    },
+    {
+      "id": "dry_dim", "group": "safety", "label": "Dim lights on dry substrate",
+      "help": "Dims a dimmable room light while a zone is dry with the lights on. Never off, and it restores the brightness it found.",
+      "master": { "domain": "switch", "key": "dry_dim", "scope": "room", "default": false },
+      "settings": [
+        { "domain": "number", "key": "dry_dim_floor_vwc", "scope": "room", "default": 15, "label": "Dim below VWC" },
+        { "domain": "number", "key": "dry_dim_level_pct", "scope": "room", "default": 50, "label": "Dim to" },
+        { "domain": "number", "key": "dry_dim_after_min", "scope": "room", "default": 10, "label": "Dim after" },
+        { "domain": "number", "key": "dry_dim_max_h", "scope": "room", "default": 4, "label": "Dim for at most" }
+      ],
+      "restore": "LF-165"
+    },
+    {
+      "id": "held_alert", "group": "alerts", "label": "Shots held alert",
+      "help": "A critical alert when a zone that asked for water is held this many hours. 0 is off.",
+      "settings": [
+        { "domain": "number", "key": "held_alert_hours", "scope": "room", "default": 0, "label": "Alert after" }
+      ],
+      "restore": "LF-165"
+    },
+    {
       "id": "notify_predictions", "group": "alerts", "label": "Predictions in notifications",
       "help": "The vitals notification says what each zone does next.",
       "master": { "domain": "switch", "key": "notify_predictions", "scope": "room", "default": true },

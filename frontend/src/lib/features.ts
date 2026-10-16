@@ -21,6 +21,8 @@ export interface Control {
   default: Value | null;
   /** The room's watering switch: the room's engine entity, which may be a helper. */
   engine?: boolean;
+  /** The control's name where the setting words have none. */
+  label?: string;
   /** Zone overrides exist only for zones set up with their own value. */
   zoneOptional?: boolean;
 }
@@ -33,6 +35,8 @@ export interface Feature {
   settings: Control[];
   /** The page where this control also lives. */
   alsoOn?: string;
+  /** The restore item (lost-features id) that brought the feature back. */
+  restore?: string;
 }
 export interface Group {
   id: string;

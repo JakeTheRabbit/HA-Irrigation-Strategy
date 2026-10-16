@@ -589,6 +589,18 @@ describe("the dosing setup", () => {
       "Silica is in the recipe twice.",
     ]);
   });
+  it("gives each pH role to at most one pump, reads a role and sends it", () => {
+    const next = draft();
+    expect(next.pumps.every((pump) => pump.ph_role == null)).toBe(true);
+    next.pumps[0].ph_role = "ph_up";
+    next.pumps[1].ph_role = "ph_up";
+    expect(setupErrors(next)).toEqual(["Only one pump can have the pH up role."]);
+    next.pumps[1].ph_role = "ph_down";
+    expect(setupErrors(next)).toEqual([]);
+    expect(setupPayload(next).pumps.slice(0, 2).map((pump) => pump.ph_role)).toEqual(["ph_up", "ph_down"]);
+    const read = parseConfig({ revision: 1, pumps: [{ id: "acid", name: "Acid", ph_role: "ph_down" }, { id: "b", ph_role: "bad" }] });
+    expect(read!.pumps.map((pump) => pump.ph_role)).toEqual(["ph_down", null]);
+  });
   it("links each pump to at most one of the room's stock tanks, and one tank to one pump", () => {
     const tanks = ["silica", "part_b", "part_a", "cleaner"];
     expect(setupErrors(draft(), tanks)).toEqual([]);

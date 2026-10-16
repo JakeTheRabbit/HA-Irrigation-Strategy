@@ -89,8 +89,14 @@ async def test_each_default_is_what_a_new_room_starts_at(hass):
         if c["domain"] == "number":
             # The one defaults table (generated/defaults.py) is the source; the wizard's answers
             # (sizing, lights) seed a new room's own values.
-            if ENTITY_DEFAULTS.get(c["key"]) is not None and ENTITY_DEFAULTS[c["key"]] != default:
-                wrong.append((c["key"], default, ENTITY_DEFAULTS[c["key"]]))
+            if ENTITY_DEFAULTS.get(c["key"]) is not None:
+                if ENTITY_DEFAULTS[c["key"]] != default:
+                    wrong.append((c["key"], default, ENTITY_DEFAULTS[c["key"]]))
+                continue
+            # A setting outside the table (the opt-in protective settings): the new room's value.
+            for entity_id in found.get(("number", c["key"]), []):
+                if float(hass.states.get(entity_id).state) != float(default):
+                    wrong.append((entity_id, default, hass.states.get(entity_id).state))
             continue
         key = c["key"] if c["scope"] != "zone" else f"zone_N_{c['key']}"
         for entity_id in found.get((c["domain"], key), []):

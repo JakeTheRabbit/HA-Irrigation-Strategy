@@ -36,6 +36,7 @@ type Staged = Record<string, Value>;
 function controlLabel(row: ControlRow): string {
   const key = row.control.key;
   return (
+    row.control.label ??
     settingWords(key)?.label ??
     key.replace(/_/g, " ").replace(/^./, (c) => c.toUpperCase())
   );
@@ -338,7 +339,7 @@ function ControlEditor({
   zoneName: (id: number | null) => string;
   onChange: (cell: Cell, value: Value) => void;
 }) {
-  const label = settingWords(row.control.key)?.label ?? row.control.key.replace(/_/g, " ");
+  const label = controlLabel(row);
   const cells = [row.room, ...row.zones].filter((c): c is Cell => c !== null);
   return (
     <fieldset className="features-control" disabled={readOnly}>
