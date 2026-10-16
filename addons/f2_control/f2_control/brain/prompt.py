@@ -88,12 +88,15 @@ def arc_table(rows, arc, pack=PACK):
     """The arc as a table, from the rows the judges use (doctrine.stage_rows)."""
     lines = [arc_citation(arc, pack) or f"Stage arc `{arc}`", "",
              "| stage | flower days | steering | peak | overnight dryback (points of true water content) | "
-             "pore EC (mS/cm) | runoff (% of water fed) | moves on when |", "|---|---|---|---|---|---|---|---|"]
+             "overnight dryback (% of peak, vendor) | pore EC (mS/cm) | runoff (% of water fed) | moves on when |",
+             "|---|---|---|---|---|---|---|---|---|"]
     for i, row in enumerate(rows):
         days = row.get("days")
         days = "" if not days else (f"the last {FINISH_DAYS} days" if i == len(rows) - 1 else _range(days))
         lines.append(f"| {row['stage']} | {days} | {row['steering']} | {row['peak']} | "
-                     f"{_range(row['dryback_points'])} | {_range(row['pore_ec_range'])} | {_range(row['runoff_pct'])} | "
+                     f"{_range(row['dryback_points'])} | "
+                     f"{_range(row['dryback_relative_vendor']) if row.get('dryback_relative_vendor') else 'unknown'} | "
+                     f"{_range(row['pore_ec_range'])} | {_range(row['runoff_pct'])} | "
                      f"{row['move_on_when']} |")
     return "\n".join(lines) + "\n"
 
@@ -103,10 +106,9 @@ def block_b(rows=(), arc=None, substrates=("generic",), pack=PACK):
              "Each room's evidence names its substrate and the arc in force. Use the table for that substrate; when "
              "the room says `generic`, use only relative figures (the zone's own peak, its own drybacks, its own EC "
              "history) and no absolute moisture band.\n",
-             "Stage-arc moisture figures are points of true water content; a probe can read far from true water "
-             "content until it is calibrated. The evidence's `stage` section already converts today's dryback band "
-             "into the engine's relative dryback for this zone's own peak. Use that converted figure, not the "
-             "table's raw points.\n"]
+             "Stage-arc points require calibrated true water content. For rockwool and coco the evidence's stage "
+             "section converts the band using the zone's peak; for generic it gives the vendor relative band. "
+             "Compare it with observed overnight dryback, never with the P0 dryback_target setting.\n"]
     if rows:
         parts.append(arc_table(rows, arc, pack))
     for sub in sorted({s for s in substrates if s in SUBSTRATES} or {"generic"}):
