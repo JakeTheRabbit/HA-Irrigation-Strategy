@@ -595,6 +595,12 @@ def hw_history(entity, since, **timeout):
 # (_blocked) and ends one in flight (_wait_shot): the same test, so the two can never disagree.
 ON_STATES = ("on", "true", "open", "1", "home")
 
+
+def hold_missing(entity):
+    """Why a hold that Home Assistant answers it does not have (404) holds the shots: what to do about it."""
+    return (f"Hold entity {entity} does not exist in Home Assistant. Remove it from the app's hold entities, "
+            "or create it.")
+
 # The most the room's Pump Prime Time and Main Line Lead Time may make a shot wait, in seconds: the
 # top of each setting.
 PUMP_PRIME_MAX_S, MAIN_LINE_LEAD_MAX_S = 20.0, 10.0
@@ -3168,9 +3174,12 @@ class Controller:
         # (self.hold_entities, empty by default) — an install without them never holds here.
         # One that can't be read (missing, unknown, unavailable) holds too, as an unreadable zone
         # switch does: whether its tank is being dosed or filled can't be known. A shot already
-        # running still ends only on a definite ON (_wait_shot).
+        # running still ends only on a definite ON (_wait_shot). One Home Assistant answers it does
+        # not have (404, a typo or a deleted helper) says so: no wait makes that one readable.
         for f in self.hold_entities:
             state = ha_get(f)[0]
+            if state is None and ha_get_status(f)[0] == 404:
+                return hold_missing(f)
             if state in (None, "unknown", "unavailable", ""):
                 return f"external hold {f} unreadable (reads neither on nor off)"
             if str(state).lower() in ON_STATES:
