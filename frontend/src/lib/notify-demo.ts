@@ -49,7 +49,7 @@ export const DEMO_KINDS: NotifyKind[] = [
     name: "Shots stopped",
     detail:
       "Something stopping the shots in a room or a zone, a room that has watered nothing for a while with the lights on, the tank it waters from at its minimum, due a refill or over its full mark, and a batch tank to refill.",
-    codes: [...codes(202, 208), "CS-602", "CS-609", "CS-209", "CS-210", "CS-316", ...codes(901, 906)],
+    codes: [...codes(202, 208), "CS-602", "CS-609", "CS-209", "CS-210", "CS-211", "CS-316", ...codes(901, 906)],
     events: [],
   },
   {
@@ -78,7 +78,7 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "dosing",
     name: "Dosing",
     detail: "A dose or a batch that did not end correctly, or a mix outside its EC or pH band.",
-    codes: [...codes(801, 806), "CS-808"],
+    codes: [...codes(801, 806), ...codes(808, 811)],
     events: [],
   },
   {

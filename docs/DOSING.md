@@ -17,7 +17,7 @@ pump name or recipe is assumed.
 | Layer | Owns | Never does |
 |---|---|---|
 | Integration | Each room's dosing configuration and its one pending request, in a revisioned store; the services to read, save and request; `sensor.crop_steering_<prefix>dosing_config` for the controller | Switch, press or set any hardware |
-| Controller app | Every action: doses, batches, stops, the irrigation hold during a batch and while dosing hardware does not read off, recovery after a restart, the mix check after a batch, alerts CS-801 to CS-808; `sensor.crop_steering_<prefix>dosing` with live status | Act on a dose or batch asked for more than 120 s before, or on a room whose configuration it cannot read; switch a dosing pump's power on |
+| Controller app | Every action: doses, batches, stops, the irrigation hold during a batch and while dosing hardware does not read off, recovery after a restart, the mix check after a batch, alerts CS-801 to CS-809; `sensor.crop_steering_<prefix>dosing` with live status | Act on a dose or batch asked for more than 120 s before, or on a room whose configuration it cannot read; switch a dosing pump's power on |
 | Dashboard | Equipment › Dosing: pumps, a dose form, the batch, the recipe, history, and the dosing setup | Write any hardware entity; everything goes through `dosing_request` |
 
 ## Configuration (integration store `crop_steering.dosing.<entry_id>`)
@@ -39,8 +39,10 @@ pump name or recipe is assumed.
       "max_ml": 2000,                  // 1..5000; a request above it is refused
       "restore_volume": true,          // put the volume number back after a single dose (firmware that
                                        // keeps its batch recipe in that number); default true
-      "stock_tank": "balance"          // the id of a stock tank in this room's stock store, or null
+      "stock_tank": "balance",         // the id of a stock tank in this room's stock store, or null
                                        // (Stock tanks, below)
+      "ph_role": "ph_up"               // only when set: "ph_up" | "ph_down", the pump pH auto-correct
+                                       // doses with (pH auto-correct, below); at most one pump per role
     }
   ],
   "batch": {
@@ -484,6 +486,84 @@ the level reads 5 points above `remind_pct`; the next low tank is then told at o
 reads nothing changes nothing. Setting `remind_pct` to 0 takes a reminder that is up down. Watering
 is never held by it.
 
+## pH auto-correct
+
+Opt-in per room: `switch.crop_steering_<prefix>ph_auto_correct`, OFF on a new room and on an updated
+one, so nothing changes until a person turns it on. It corrects the batch tank with the room's dosing
+machinery and never touches the source-water gate: the gate still holds watering on its own while the
+feed pH is outside `irrigation_ph_min` / `_max` or its probe is dead, exactly as before.
+
+What it needs: a pump with the pH role for the direction (`ph_role` "ph_up" for a tank under its band,
+"ph_down" over it; Equipment > Dosing, Dosing setup), the batch's `mix_pump` (a dose is never made into a
+tank that is not mixed), the room's feed pH probe (`feed_ph_sensor`, the probe the mix check and the
+source-water gate read) and a pH band. Its settings (`number.crop_steering_<prefix>ph_correct_<key>`):
+
+| Key | Default | Range | What it sets |
+|---|---|---|---|
+| `dose_s` | 5 | 1..30 s | one dose: seconds of the pump's calibrated flow, in whole mL, never above its `max_ml` |
+| `max_tries` | 2 | 1..3 | doses in one correction |
+| `mix_min` | 5 | 2..30 min | mixing after each dose before the tank is read again |
+| `daily_max` | 3 | 1..10 | doses in one day, all corrections together |
+| `margin` | 0.1 | 0..0.5 pH | how far inside the band a correction stops |
+
+- **When.** Once a minute, while no dose, batch or correction runs anywhere and nothing a dose left reads
+  on: the switch on, the room on and its kill switch on, no hardware fault latched, no other controller on
+  the room, `hold_entity` off and the mix pump off. The probe must read a number from 3 to 10, no older
+  than 20 minutes, never jumping by more than 1.0 between two reads, and off its band at every read for
+  5 minutes in a row; any other read starts the 5 minutes again.
+- **How.** As a batch holds and mixes (the Hold, Close and Mix steps above: the rooms held, `hold_entity`
+  on, the mix pump read back on and its power checked), then up to `max_tries` doses as One dose, each
+  followed by `mix_min` of mixing and a fresh read of the probe. It ends with the mix pump off and its
+  valves closed, read back, then `hold_entity` off. The status shows it as a `batch` named "pH correction",
+  and its history entry is `kind: "correct"` with the pH it read (`ph`).
+- **Stops.** At the band (`min + margin` going up, `max - margin` going down). Every other end locks it,
+  with **CS-809**: a dose that moves the pH by less than 0.05 (a probe or pump fault, not chemistry), a pH
+  past the other side of the band, a probe that can't be read after the mix, the doses not enough, a dose
+  that does not finish, the mix pump not starting (CS-805 too), a stop, or the watchdog. Locked, it doses
+  no more until a person switches it off (and on again), or the tank's `filled_at_entity` shows a new fill.
+  A restart in the middle is recovered as a batch's (CS-803): switched off, never resumed.
+- **Can't.** A tank that needs correcting while there is no pump with the role, no mix pump, an
+  uncalibrated pump or no doses left today raises CS-809 once a day for each reason, and doses nothing.
+- **Kept.** `dosing_state.json`'s room block gains `ph`: `{day, doses, latch, told}`. A file from before it
+  has none and loads with nothing counted and nothing locked. A dosing store from before roles loads with
+  no pump in a role, and a save from a page that does not send `ph_role` keeps each pump's stored role.
+
+## Light dimming on dry substrate
+
+Opt-in per room: `switch.crop_steering_<prefix>dry_dim`, OFF on a new room and an updated one. The
+controller's only light actuation, and only for the room's mapped `light_entity` when it is a `light.*`
+that reports a brightness: a room whose light is a switch is never dimmed (and never switched off).
+
+| Setting (`number.crop_steering_<prefix>dry_dim_<key>`) | Default | Range |
+|---|---|---|
+| `floor_vwc`: a zone under this counts as dry | 15 % | 1..60 |
+| `level_pct`: the brightness it dims to | 50 % | 30..90 (never below 30) |
+| `after_min`: dry this long, with the lights on, before it dims | 10 min | 1..120 |
+| `max_h`: the longest the room stays dimmed | 4 h | 0.5..12 |
+
+- **Counted zones**: enabled zones with a live fused reading this pass; a blind zone, and a probe reading
+  under 1 % (a dead probe looks like a dry pot), never count.
+- **Dims** when the switch, the room and its kill switch are on, the lights are on by schedule (and more than
+  5 minutes before lights-off) and by the light's own state, and a counted zone has read under the floor
+  for `after_min`: it records the light's brightness in `state.json` (the room's `_dim`) first, then sets
+  the level, reads it back, and says so (CS-810). It only ever dims: a light already at or under the level
+  is left. A light that does not read the level back is set back at once.
+- **Restores** the recorded brightness, read back, when every counted zone reads `floor + 3` for 10
+  minutes, when the switch, the room or its kill switch goes off, 5 minutes before the schedule's
+  lights-off (or at it), after `max_h` (with **CS-811**: a dimmed room is a fault too), and on the first pass
+  after a restart. It never switches a light on to restore it: a light that reads off is left, and a person
+  told. A light that does not come back raises CS-811 and is asked again each pass.
+- **One writer.** A light someone else changes while it is dimmed (another brightness, or off) is left to
+  them: the record is dropped and a person told (CS-810), never fought over.
+
+## Shots held for too long (CS-211)
+
+`number.crop_steering_<prefix>held_alert_hours`, 0 (off) by default, 0..72 h: a zone that has asked for
+water and been held, with no shot since, for that many hours raises **CS-211** (critical), again every
+30 minutes, and it clears at the zone's next shot. A hold a person set on purpose (the kill switch, a zone
+switch off, manual override) never counts. It only tells; the clock is kept in memory, so a restart starts
+it again.
+
 ## Alerts (controller, group CS-8xx "Dosing", and CS-906)
 
 | Code | Title | Watering |
@@ -496,6 +576,9 @@ is never held by it.
 | CS-806 | Dosing was stopped, or needs a check | held rooms water again once the hardware reads off; a dose's pump that does not read off holds its room |
 | CS-807 | A dose was not taken off its stock tank | carries on |
 | CS-808 | A batch's mix is off its band, or could not be checked | carries on; an automation's next batch is refused |
+| CS-809 | pH auto-correct did not correct the tank, or can't (critical) | carries on (the source-water gate holds on its own); pH auto-correct is locked after a failed correction |
+| CS-810 | The light was dimmed on dry substrate, set back, or handed back | carries on |
+| CS-811 | The light stayed dimmed for its longest time, or did not come back (critical) | carries on |
 | CS-906 | Batch tank low, refill it (Refill reminder, above) | carries on |
 
 Each event (a dose, a batch, a restart) raises its own notification, so a second one within half an

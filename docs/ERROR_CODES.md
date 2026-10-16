@@ -29,7 +29,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | CS-5xx | **Zone comparisons**: Advice from a comparison of the zones of a room, and a probe that the controller sets aside because of its unit. |
 | CS-6xx | **Repairs cards**: The integration makes these alerts in Settings → Repairs. |
 | CS-7xx | **AI assistant**: Decisions of the AI assistant about a zone (advice, or a probe that it sets aside). Also the status of the AI assistant (docs/AI_ASSISTANT.md). For example, its calls or its AI budget are almost used or used, or its key is refused. Other examples are a retired route and a judge on the stricter gate. |
-| CS-8xx | **Dosing**: Batch tank dosing: a dose or a batch that did not end correctly (docs/DOSING.md). |
+| CS-8xx | **Dosing**: Batch tank dosing: a dose or a batch that did not end correctly (docs/DOSING.md). Also pH auto-correct, and the light dimmed on dry substrate. |
 | CS-9xx | **Reservoir and feed**: The tank that a room gets water from (docs/USER_GUIDE.md, "Reservoir minimum"). It is at its minimum, its level cannot be read, or it needs a refill before the next shots. Or a fill stopped above the full mark. Also a batch tank that needs a refill (docs/DOSING.md). |
 
 ## All codes
@@ -50,6 +50,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-208](#cs-208) | Retired switch is off | Warning | Notification |
 | [CS-209](#cs-209) | No shots for some hours | Warning | Notification |
 | [CS-210](#cs-210) | Hold entity missing | Warning | Notification |
+| [CS-211](#cs-211) | Shots held for too long | Critical | Notification |
 | [CS-301](#cs-301) | Hardware fault latch | Critical | Notification |
 | [CS-302](#cs-302) | Pump command error | Warning | Notification |
 | [CS-303](#cs-303) | Main-line valve command error | Warning | Notification |
@@ -108,6 +109,9 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-806](#cs-806) | Stopped batch or dose | Warning | Notification |
 | [CS-807](#cs-807) | Stock draw not recorded | Warning | Notification |
 | [CS-808](#cs-808) | Batch mix outside band | Warning | Notification |
+| [CS-809](#cs-809) | Tank pH not corrected | Critical | Notification |
+| [CS-810](#cs-810) | Lights dimmed on dry substrate | Warning | Notification |
+| [CS-811](#cs-811) | Light dimmed too long | Critical | Notification |
 | [CS-901](#cs-901) | Tank at minimum level | Critical | Notification |
 | [CS-902](#cs-902) | Tank level not readable | Critical | Notification |
 | [CS-903](#cs-903) | Refill needed before next shots | Warning | Notification |
@@ -450,6 +454,30 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - Correct or remove the entity in the hold entities option of the controller app, and restart the app.
 - Or make the missing helper or switch with that entity ID.
 - If you removed the entity from the option, dismiss the alert.
+
+<a id="cs-211"></a>
+
+### CS-211: Shots held for too long
+
+*Critical · Notification*
+
+**What it means.** A zone asked for water, and a hold stopped every shot for longer than the hours that you set (Shots held alert, 0 = off). A hold that a person sets on purpose (the kill switch, a zone switch, manual override) does not count. The alert names the hold.
+
+**Effect on water.** The alert does not change the water. The zone gets no water until the hold clears. The alert comes again every 30 minutes, and clears at the next shot of the zone.
+
+**Probable causes**
+
+- The source-water gate holds the shots: the feed pH or feed EC is outside its band, or the feed probe is dead.
+- A hardware hold after a pump or valve fault (CS-301), a hold entity that is on, or a batch or a dose that holds the room.
+- A pump or valve that reads neither on nor off.
+
+**What to do**
+
+- CAUTION: Do not ignore this alert. The zone gets no water, and the substrate can dry out.
+- Read the hold in the alert, and remove it.
+- If the feed pH or EC is outside its band, correct the tank, or turn on pH auto-correct.
+- If you cannot remove the hold soon, water the zone by hand.
+- To change the hours, or to turn the alert off, set Shots held alert in the settings of the room.
 
 ## Pumps and valves (CS-3xx)
 
@@ -1801,6 +1829,75 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - Calibrate the feed probe, or connect it again.
 - Set the probe to report mS/cm or µS/cm, not ppm.
 - Make the next batch by hand.
+
+<a id="cs-809"></a>
+
+### CS-809: Tank pH not corrected
+
+*Critical · Notification*
+
+**What it means.** pH auto-correct is on, and the batch tank read outside the feed pH band of the room. A correction did not bring the tank into the band: a dose did not move the pH, the pH went past the other side of the band, the probe could not be read after the mix, the doses were not enough, or the correction stopped. Or the controller could not start a correction (for example no pump has the pH role, there is no mixing pump, or the doses of the day are used).
+
+**Effect on water.** The source-water gate holds the shots while the feed pH is outside its band. After a failed correction, pH auto-correct is locked for this tank: it doses no more until a person switches it off and on again, or the tank is filled again.
+
+**Probable causes**
+
+- The pH probe needs calibration, or it is dirty or offline.
+- The pH pump is empty, blocked, or not calibrated.
+- The pH adjuster is too weak or too strong for the dose size.
+- No dosing pump has the pH up or pH down role, or the tank has no mixing pump.
+
+**What to do**
+
+- WARNING: Wear gloves and eye protection when you touch the batch tank or a pH adjuster. pH adjusters can injure the skin and the eyes.
+- Measure the tank with a hand-held meter, and correct it by hand.
+- Calibrate or clean the pH probe.
+- Check the pH pump, its stock and its calibration.
+- Change the dose length or the number of doses in the pH auto-correct settings of the room.
+- Switch pH auto-correct off and on again to unlock it.
+
+<a id="cs-810"></a>
+
+### CS-810: Lights dimmed on dry substrate
+
+*Warning · Notification*
+
+**What it means.** Dimming on dry substrate is on. A zone read under the dry floor with the lights on, and the controller dimmed the light of the room. Or the controller set the light back, or another controller changed the light while it was dimmed, so the controller no longer dims or restores it.
+
+**Effect on water.** The alert does not change the water. A dimmed light slows the drying of the substrate. The controller never switches a light off or on, and never dims below 30%.
+
+**Probable causes**
+
+- A hold stops the shots of a zone, the tank is empty, or a dripper is blocked.
+- The dry floor is too high for the substrate.
+- Another automation or a person changed the light while it was dimmed.
+
+**What to do**
+
+- Find out why the zone is dry, and water it.
+- Check the brightness of the light.
+- Change the dry floor, the dim level or the delay in the settings of the room, or switch dimming off.
+
+<a id="cs-811"></a>
+
+### CS-811: Light dimmed too long
+
+*Critical · Notification*
+
+**What it means.** The light of the room stayed dimmed for the longest time that you set (4 h by default), and the controller set it back. Or the light did not come back to its brightness when the controller asked.
+
+**Effect on water.** The alert does not change the water. The zone that was dry is probably still dry.
+
+**Probable causes**
+
+- A hold stops the shots of a zone for a long time.
+- The light is offline, or does not accept a brightness.
+
+**What to do**
+
+- CAUTION: Do not ignore this alert. The substrate of the zone is dry.
+- Find out why the zone is dry, and water it by hand if needed.
+- Check the light, and set its brightness by hand.
 
 ## Reservoir and feed (CS-9xx)
 
