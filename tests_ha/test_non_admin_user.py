@@ -31,6 +31,9 @@ CHANGES = {
     "runs_save": {"room_id": ROOM, "expected_revision": 0, "record": {}},
     "runs_archive": {"room_id": ROOM, "expected_revision": 0, "id": "r", "archived": True},
     "runs_import": {"room_id": ROOM, "expected_revision": 0, "runs": []},
+    # The controller app's grow-day summaries, and a backfill from statistics.
+    "grow_day_record": {"room_id": ROOM, "days": []},
+    "grow_days_backfill": {"room_id": ROOM, "start": "2026-01-01", "end": "2026-01-02"},
     "stock_save": {"room_id": ROOM, "expected_revision": 0, "tanks": []},
     "stock_refill": {"room_id": ROOM, "expected_revision": 0, "id": "bloom"},
     "stock_record_batch": {"room_id": ROOM, "expected_revision": 0},
@@ -64,6 +67,7 @@ READS = {
     "strategy_get": {"room_id": ROOM},
     "strategy_preview": {"room_id": ROOM},
     "runs_get": {"room_id": ROOM},
+    "grow_days_get": {"room_id": ROOM},
     "setpoint_log_get": {"room_id": ROOM},
     "overlay_get": {"room_id": ROOM},
     "stock_get": {"room_id": ROOM},
