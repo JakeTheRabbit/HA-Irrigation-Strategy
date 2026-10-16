@@ -3862,6 +3862,22 @@ class Controller:
         self._alerted.pop(key, None)
         self._alert_codes.pop(key, None)
 
+    def _why_gates(self, room, pub):
+        """What stops this room being watered, for the AI assistant's why answers (jev_bridge.why_state): its kill
+        switch, each external hold (hold_entities) that reads on or cannot be read, and each zone's hold and decision
+        from this pass (pub: _blocked, as the shots saw it). Read only when a question is asked; bounded in size."""
+        def read(entity):
+            v, attrs, _ = ha_get(entity)
+            state = ("unreadable" if v in (None, "unknown", "unavailable", "")
+                     else "on" if str(v).lower() in ON_STATES else "off")
+            name = (attrs or {}).get("friendly_name") or entity.split(".")[-1].replace("_", " ")
+            return {"name": str(name)[:60], "state": state}
+        holds = [h for h in map(read, self.hold_entities[:10]) if h["state"] != "off"]
+        zones = {z: {"block": str(d["block"])[:160] if d.get("block") else None,
+                     "decision": str(d.get("reason") or "")[:120]}
+                 for z, d in sorted((pub or {}).items())}
+        return {"kill_switch": read(room_gate(room)), "holds_on": holds, "zones": zones}
+
     def _idle_why(self, room, pub):
         """Why nothing has been watered, as far as this pass can tell: watering switched off, a hold (_blocked), or
         nothing called for water."""
@@ -6167,7 +6183,7 @@ class Controller:
             except Exception as e:
                 log("brain panel error", room.slug, e)
         try:  # Ask why: the grower's questions, answered on the room's brain_answers sensor
-            jev_bridge.why_task(self, room, now, ha_get, ha_set)
+            jev_bridge.why_task(self, room, now, ha_get, ha_set, gates=lambda: self._why_gates(room, pub))
         except Exception as e:
             log("ask why error", room.slug, e)
         try:  # CS-209 only ever tells: it can never stop the room being watered
