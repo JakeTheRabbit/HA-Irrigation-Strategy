@@ -15,7 +15,7 @@ once each time the controller app starts, and CS-405 comes at the start. A dismi
 does not clear the hardware hold.
 
 Most alerts stay in Home Assistant until you dismiss them, also after their cause stops. The
-controller removes CS-201, CS-209, CS-308 and CS-309 itself. When you set *Room Active* of a room
+controller removes CS-201, CS-209, CS-210, CS-308 and CS-309 itself. When you set *Room Active* of a room
 to off, the controller removes the alerts of the room.
 When *Room Active* is off (no plants in the room), the room gives no alerts about water. The
 controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309).
@@ -49,6 +49,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-207](#cs-207) | Dry zone, all shots blocked | Critical | Notification |
 | [CS-208](#cs-208) | Retired switch is off | Warning | Notification |
 | [CS-209](#cs-209) | No shots for some hours | Warning | Notification |
+| [CS-210](#cs-210) | Hold entity missing | Warning | Notification |
 | [CS-301](#cs-301) | Hardware fault latch | Critical | Notification |
 | [CS-302](#cs-302) | Pump command error | Warning | Notification |
 | [CS-303](#cs-303) | Main-line valve command error | Warning | Notification |
@@ -422,6 +423,29 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - If no zone needs water, compare the VWC of each zone with its re-water point.
 - Make sure that each probe is in its cube.
 - To change the number of hours, go to Crop Steering → Settings & help → Notifications.
+
+<a id="cs-210"></a>
+
+### CS-210: Hold entity missing
+
+*Warning · Notification*
+
+**What it means.** The hold entities option of the controller app names one or more entities that Home Assistant does not have. The controller checks them when it starts, before it waters, also while the kill switch is off. The alert names each missing entity.
+
+**Effect on water.** No room gets shots while a hold entity is missing, the same as while a hold is on. The status of each held zone tells which entity is missing. The alert clears by itself when each entity exists.
+
+**Probable causes**
+
+- The entity ID in the option has a typo.
+- A person deleted or renamed the helper or switch that the option names.
+
+**What to do**
+
+- CAUTION: Do not leave the rooms in this hold for a long time. The substrate dries out and the plants can wilt.
+- Compare each entity that the alert names with the entities in Settings → Entities.
+- Correct or remove the entity in the hold entities option of the controller app, and restart the app.
+- Or make the missing helper or switch with that entity ID.
+- If you removed the entity from the option, dismiss the alert.
 
 ## Pumps and valves (CS-3xx)
 
