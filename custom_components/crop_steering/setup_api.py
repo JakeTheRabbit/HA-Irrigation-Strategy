@@ -782,7 +782,13 @@ def _labels_only(hass, entry, payload, data, old):
         "zones": room["zones"],
         "hardware": room["hardware"],
     }
-    return bare(data) == bare(prepare_setup(hass, baseline, old, entry.entry_id))
+    try:
+        unchanged = prepare_setup(hass, baseline, old, entry.entry_id)
+    except ValueError:
+        # An edit can repair stale mappings or invalid old plumbing. Such a save
+        # is not metadata-only; let the existing hardware safety path handle it.
+        return False
+    return bare(data) == bare(unchanged)
 
 
 async def save_setup(hass, payload):
