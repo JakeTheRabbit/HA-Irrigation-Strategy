@@ -114,6 +114,10 @@
       1.0,
       10.0
     ],
+    "p1_stall_shots": [
+      0.0,
+      10.0
+    ],
     "p0_additional_dryback": [
       0.0,
       40.0
