@@ -47,18 +47,18 @@
       "tokens_est_high": 2905
     },
     "sections/02-engine.md": {
-      "sha256": "a1f8c2dbad5670f7b3135163d50205d5acd2b3efb48cd773a278fad6440865ac",
-      "chars": 15923,
-      "words": 2667,
-      "tokens_est_low": 3981,
-      "tokens_est_high": 4825
+      "sha256": "f63ff3c106769aaa66164078f08b2db2dff167c6c1e10399d716264168b113fb",
+      "chars": 16080,
+      "words": 2691,
+      "tokens_est_low": 4020,
+      "tokens_est_high": 4873
     },
     "sections/03-decisions.md": {
-      "sha256": "99347728b7b18592360d80c318bd10ad58b422cda05b01a2f3f7caee8b01dba0",
-      "chars": 12143,
-      "words": 2057,
-      "tokens_est_low": 3036,
-      "tokens_est_high": 3680
+      "sha256": "ae93b001a6a29daa80f1f895993d6336e0801d89f8c0cbb6adcfb418bc809617",
+      "chars": 12097,
+      "words": 2049,
+      "tokens_est_low": 3024,
+      "tokens_est_high": 3666
     },
     "sections/04-symptoms.md": {
       "sha256": "4c369b17133f51632d725958f007bfda6601f83fca41aa4f1d0117e5354facc0",
@@ -98,47 +98,47 @@
   },
   "estimates": {
     "block_a": {
-      "chars": 81538,
-      "words": 13274,
-      "tokens_est_low": 20384,
-      "tokens_est_high": 24708
+      "chars": 81649,
+      "words": 13290,
+      "tokens_est_low": 20412,
+      "tokens_est_high": 24742
     },
     "block_a_plus_b": {
       "slab_default+generic": {
-        "chars": 84513,
-        "words": 13780,
-        "tokens_est_low": 21128,
-        "tokens_est_high": 25610
+        "chars": 84624,
+        "words": 13796,
+        "tokens_est_low": 21156,
+        "tokens_est_high": 25644
       },
       "slab_default+rockwool": {
-        "chars": 86267,
-        "words": 14048,
-        "tokens_est_low": 21567,
-        "tokens_est_high": 26142
+        "chars": 86378,
+        "words": 14064,
+        "tokens_est_low": 21594,
+        "tokens_est_high": 26175
       },
       "slab_default+coco": {
-        "chars": 86283,
-        "words": 14042,
-        "tokens_est_low": 21571,
-        "tokens_est_high": 26146
+        "chars": 86394,
+        "words": 14058,
+        "tokens_est_low": 21598,
+        "tokens_est_high": 26180
       },
       "rockwool_default+generic": {
-        "chars": 83974,
-        "words": 13692,
-        "tokens_est_low": 20994,
-        "tokens_est_high": 25447
+        "chars": 84085,
+        "words": 13708,
+        "tokens_est_low": 21021,
+        "tokens_est_high": 25480
       },
       "rockwool_default+rockwool": {
-        "chars": 85728,
-        "words": 13960,
-        "tokens_est_low": 21432,
-        "tokens_est_high": 25978
+        "chars": 85839,
+        "words": 13976,
+        "tokens_est_low": 21460,
+        "tokens_est_high": 26012
       },
       "rockwool_default+coco": {
-        "chars": 85744,
-        "words": 13954,
-        "tokens_est_low": 21436,
-        "tokens_est_high": 25983
+        "chars": 85855,
+        "words": 13970,
+        "tokens_est_low": 21464,
+        "tokens_est_high": 26017
       }
     }
   },

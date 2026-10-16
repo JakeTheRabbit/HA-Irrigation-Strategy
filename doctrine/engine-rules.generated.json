@@ -292,7 +292,7 @@
     },
     {
       "id": "CT-8",
-      "text": "With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller hands decide() an assumed feed EC of 3.0 mS/cm, not a measurement, for every dilutive test.",
+      "text": "With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller uses declared recipe EC when available, otherwise hands decide() an assumed feed EC of 3.0 mS/cm, not a measurement, for the dilution comparison. Recipe EC and fallback EC are not measurements.",
       "verified": true
     },
     {
@@ -364,7 +364,7 @@
     },
     {
       "id": "BR-8",
-      "text": "Each acting directive needs the room's power for it (one switch per power per room): advance by the ramp judge ramp_control, any other advance advance_phase, distrust set_probe_aside, ec_mode ec_mode, setpoint nudge_setpoints, catch_up plan_catch_up, targets set_targets_from_achievable, shot_size tune_shot_sizes. With the power off the envelope refuses it and the answer is advice; a missing switch is the power's default, on for the six that acted before the switches and off for the two new ones. With targets or shot_size on, the values set are admitted as given (only the question's own settings, only numbers) and written clamped to engine and entity bounds and checked by HA ladder validation; dry run still only reports.",
+      "text": "Each acting directive needs the room's power for it (one switch per power per room): advance by the ramp judge ramp_control, any other advance advance_phase, distrust set_probe_aside, ec_mode ec_mode, setpoint nudge_setpoints, catch_up plan_catch_up, targets set_targets_from_achievable, shot_size tune_shot_sizes. With the power off the envelope refuses it and the answer is advice; a missing switch is the power's default, on for the six that acted before the switches and off for the two new ones. With targets or shot_size on, the values set are admitted as given (only the question's own settings, only numbers) and written clamped to engine and entity bounds and checked by HA ladder validation; HA still validates the moisture ladder; dry run or paused AI changes only reports.",
       "verified": true
     }
   ],
