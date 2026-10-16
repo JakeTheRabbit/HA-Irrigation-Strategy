@@ -1,0 +1,167 @@
+/* Settings > Features: one row per feature, grouped; a drawer per feature for its settings. */
+.features-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.features-search {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 1 1 240px;
+}
+.features-group-select,
+.features-control select {
+  height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--background);
+  color: inherit;
+}
+.features-changed {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--text-sm);
+}
+.features-group {
+  margin-bottom: 14px;
+}
+.features-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 16px 4px;
+}
+.features-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+}
+.features-row:first-child {
+  border-top: 0;
+}
+.features-row[data-changed] .features-scope em {
+  font-style: normal;
+  font-weight: 600;
+}
+.features-name p {
+  margin: 2px 0 4px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.features-scope {
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted-foreground);
+}
+.features-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.features-switch {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 64px;
+}
+.features-switch input,
+.features-control input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+}
+.features-also {
+  font-size: var(--text-sm);
+}
+.features-zones-on {
+  font-size: var(--text-sm);
+}
+.features-apply {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card, var(--background));
+}
+.features-apply span {
+  margin-right: auto;
+}
+.features-empty {
+  color: var(--muted-foreground);
+}
+.features-sheet {
+  overflow-y: auto;
+}
+.features-sheet-body {
+  display: grid;
+  gap: 16px;
+  padding: 0 16px 24px;
+}
+.features-control {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 12px 12px;
+}
+.features-control legend {
+  display: flex;
+  flex-direction: column;
+  padding: 0 4px;
+  font-weight: 600;
+}
+.features-default {
+  font-weight: 400;
+  font-size: var(--text-xs, 0.75rem);
+  color: var(--muted-foreground);
+}
+.features-control table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.features-control th {
+  text-align: left;
+  font-weight: 400;
+  padding: 4px 8px 4px 0;
+}
+.features-control tr[data-changed] th {
+  font-weight: 600;
+}
+.features-number {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.features-number input {
+  max-width: 120px;
+}
+.features-app-link {
+  margin: 10px 16px 14px;
+  font-size: var(--text-sm);
+}
+@media (max-width: 720px) {
+  .features-list {
+    padding: 0 12px 4px;
+  }
+  .features-row {
+    flex-direction: column;
+  }
+  .features-actions {
+    justify-content: flex-start;
+  }
+  .features-apply {
+    flex-wrap: wrap;
+  }
+}
