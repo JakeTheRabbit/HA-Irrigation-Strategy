@@ -697,7 +697,7 @@ CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "C
 # every 30 minutes for as long as it lasts; any other warning after 15 minutes, then 1, 2 and 4 hours, then every
 # 8 hours; an info code once. Each episode starts the schedule again: an alert cleared (or not raised for
 # ALERT_EPISODE_GAP_S) and raised again, or raised under another code. Held in memory only: a restart pushes once.
-NOT_WATERING_CODES = frozenset({"CS-206", "CS-208", "CS-209", "CS-602"})
+NOT_WATERING_CODES = frozenset({"CS-206", "CS-208", "CS-209", "CS-210", "CS-602"})
 INFO_CODES = frozenset({"CS-205", "CS-305", "CS-403", "CS-501", "CS-702", "CS-705", "CS-711", "CS-712", "CS-906"})
 WARNING_REPUSH_MIN = (15, 60, 120, 240, 480)
 ALERT_EPISODE_GAP_S = 3600
@@ -1025,6 +1025,7 @@ class Controller:
         # they are an OPTION with an empty default — an install without them never holds on
         # them. Configure your own input_boolean/switch ids to enable.
         self.hold_entities = [e for e in (o.get("hold_entities") or []) if e]
+        self._holds_card = None  # CS-210's card (_check_holds): True up, False down, None maybe (a previous run's)
         self.feed_grace_min = float(o.get("feed_grace_min", 30))
         self.blind_fallback_min = float(o.get("blind_fallback_min", 90))
         # Optional (CS-311): the power sensor of the sump pump a room's tables drain to, one for every room or
@@ -6507,6 +6508,34 @@ class Controller:
         else:
             log(f"timezone: matches Home Assistant ({ha_tz})")
 
+    def _check_holds(self):
+        """Name every hold (hold_entities) that Home Assistant answers it does not have (404), from the start,
+        before anything is watered and whatever the kill switches say: each one holds every shot of every room
+        (_blocked). One CS-210 card names them all. run() calls this at start and then each loop until every
+        hold answered and exists, and the card is down (one a previous run left goes too); never with no hold
+        set up."""
+        answers = {entity: ha_get_status(entity)[0] for entity in self.hold_entities}
+        missing = [entity for entity, status in answers.items() if status == 404]
+        if missing:
+            one = len(missing) == 1
+            if self._alert(
+                "holds_missing",
+                "CS-210",
+                f"{'hold entity' if one else f'{len(missing)} hold entities'} not in Home Assistant, no shots",
+                f"The app's hold entities option names {'an entity' if one else 'entities'} that Home Assistant "
+                f"does not have. A hold that does not exist stops every shot in every room, as a hold that is on "
+                f"does. For {'it' if one else 'each one'}: remove it from the app's hold entities, or create it "
+                "in Home Assistant. This card goes once each one exists. If you remove them from the option "
+                "instead, dismiss this card."
+                f"\n\nNot in Home Assistant: {', '.join(missing)}",
+            ):
+                self._holds_card = True
+        elif None not in answers.values():  # every hold answered, and each one exists
+            if ha_call("persistent_notification", "dismiss", notification_id="f2_holds_missing"):
+                self._holds_card = False
+            self._alerted.pop("holds_missing", None)
+            self._alert_codes.pop("holds_missing", None)
+
     def run(self):
         log(
             f"{PRODUCT} {CONTROLLER_VERSION} starting | rooms",
@@ -6517,11 +6546,15 @@ class Controller:
         )
         log("token present:", bool(TOKEN), "| base:", SHOWN_BASE)
         self._log_timezone()
+        if self.hold_entities:
+            self._check_holds()
         self._start_dosing()
         while True:
             if _GATE.state is not None:
                 self._park_refused()
             try:
+                if self.hold_entities and self._holds_card is not False:
+                    self._check_holds()
                 self.loop_once(datetime.now())
             except Exception as e:
                 log("loop error", e)
