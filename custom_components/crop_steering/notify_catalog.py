@@ -21,8 +21,8 @@ KINDS = (
         "when the controller marks it critical.",
         # Every code whose severity is critical in docs/error-codes.json.
         "codes": _codes(
-            "CS-201 CS-202 CS-203 CS-204 CS-207 CS-301 CS-308 CS-310 CS-311 CS-402 "
-            "CS-601 CS-606 CS-801 CS-901 CS-902"
+            "CS-201 CS-202 CS-203 CS-204 CS-207 CS-211 CS-301 CS-308 CS-310 CS-311 "
+            "CS-402 CS-601 CS-606 CS-801 CS-809 CS-811 CS-901 CS-902"
         ),
         "events": (),
     },
@@ -59,11 +59,12 @@ KINDS = (
         "name": "Shots stopped",
         "detail": "Alerts when something stops the shots in a room or a zone. Also a "
         "controller that does not run, a second controller on the room, and a room "
-        "with no shots for some time. Also a tank at its minimum, due for a refill "
-        "or above its full mark, and a batch tank to refill.",
+        "with no shots for some time, and shots held for too long. Also a tank at "
+        "its minimum, due for a refill or above its full mark, and a batch tank to "
+        "refill.",
         "codes": _codes(
-            "CS-202 CS-203 CS-204 CS-205 CS-206 CS-207 CS-208 CS-209 CS-210 CS-602 CS-609 "
-            "CS-901 CS-902 CS-903 CS-904 CS-906"
+            "CS-202 CS-203 CS-204 CS-205 CS-206 CS-207 CS-208 CS-209 CS-210 CS-211 CS-602 "
+            "CS-609 CS-901 CS-902 CS-903 CS-904 CS-906"
         ),
         "events": (),
     },
@@ -96,8 +97,11 @@ KINDS = (
         "id": "dosing",
         "name": "Dosing",
         "detail": "Alerts for a dose or a batch that did not end correctly, and for "
-        "a batch with its EC or pH outside its band.",
-        "codes": _codes("CS-801 CS-802 CS-803 CS-804 CS-805 CS-806 CS-808"),
+        "a batch with its EC or pH outside its band. Also pH auto-correct, and the "
+        "light dimmed on dry substrate.",
+        "codes": _codes(
+            "CS-801 CS-802 CS-803 CS-804 CS-805 CS-806 CS-808 CS-809 CS-810 CS-811"
+        ),
         "events": (),
     },
     {

@@ -24,6 +24,7 @@ from .const import (
 )
 from .generated.defaults import ENTITY_DEFAULTS, SUBSTRATE_PROFILES
 from .ladder import LADDER, peak_above_field_capacity, refusal
+from .ph_and_dim import NUMBERS as PROTECTIVE_NUMBERS
 from .room import restored_state_is_ours, room_prefix, zone_device_name
 from .sizing import SIZING_KEYS, configured_sizing, prefer_setup_value
 
@@ -888,6 +889,26 @@ async def async_setup_entry(
                 ),
                 zone_num=zone_num,
                 default_value=entry.data.get(CONF_P0_ADDITIONAL_DRYBACK, 0.0),
+            )
+        )
+
+    # The room's opt-in protective settings (ph_and_dim.py): what pH auto-correct, dimming on dry
+    # substrate and the shots-held alert work to. Their switches start off; the hours start at 0, off.
+    for key, name, icon, low, high, step, unit, default in PROTECTIVE_NUMBERS:
+        numbers.append(
+            CropSteeringNumber(
+                entry,
+                NumberEntityDescription(
+                    key=key,
+                    name=name,
+                    icon=icon,
+                    native_min_value=low,
+                    native_max_value=high,
+                    native_step=step,
+                    native_unit_of_measurement=unit,
+                    mode="box",
+                ),
+                default_value=default,
             )
         )
 

@@ -72,6 +72,10 @@ RESERVED = {
         "the room not running its grow plan as written",
     ),
     "CS-808": ("feat/mix-check", "a batch's mix off its EC or pH band"),
+    "CS-211": ("feat/p6-dosing-ph-autocorrect", "a zone's shots held for too long"),
+    "CS-809": ("feat/p6-dosing-ph-autocorrect", "the batch tank's pH not corrected"),
+    "CS-810": ("feat/p6-dosing-ph-autocorrect", "the light dimmed on dry substrate"),
+    "CS-811": ("feat/p6-dosing-ph-autocorrect", "the light dimmed too long"),
     "CS-9xx": ("feat/reservoir-minimum", "reservoir and feed"),
 }
 
