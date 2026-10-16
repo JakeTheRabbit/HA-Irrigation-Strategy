@@ -127,7 +127,7 @@ async function inBothThemes(label, open) {
       await page.evaluate(() => document.documentElement.classList.contains("dark")),
       theme === "dark",
     );
-    // Colours transition (even at reduced motion); measure after two frames, not mid-change.
+    // Let the reopened view reach its next paint before measuring.
     await page.evaluate(
       () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
     );
@@ -2498,6 +2498,28 @@ try {
     for (const gone of ["ol.daily-routine", ".specialist-links", ".help-note"])
       assert.equal(await page.locator(gone).count(), 0, `no ${gone}`);
   });
+  await check("reduced motion: theme text changes without transient light colours", async () => {
+    await go("zone/1");
+    await expectVisible(page.locator(".zone-jev-what strong").first());
+    // Without a declared transition, CSS defaults transition-property to `all`. Giving every
+    // element even a tiny duration creates staggered inherited colour transitions during themes.
+    // Reduced motion must change the panel's text together with the root, in the same style flush.
+    for (const dark of [false, true, false]) {
+      const colours = await page.evaluate((value) => {
+        document.documentElement.classList.toggle("dark", value);
+        const probe = document.createElement("span");
+        probe.style.color = "var(--foreground)";
+        document.body.append(probe);
+        const palette = getComputedStyle(probe).color;
+        probe.remove();
+        return {
+          root: palette,
+          text: getComputedStyle(document.querySelector(".zone-jev-what strong")).color,
+        };
+      }, dark);
+      assert.equal(colours.text, colours.root, "theme text follows its root without a colour transition");
+    }
+  });
   await check("dark theme persists and remains accessible", async () => {
     await go("settings");
     await page.getByRole("button", { name: "Dark", exact: true }).click();
@@ -2685,6 +2707,27 @@ try {
     await axe("mobile about tip");
     await page.keyboard.press("Escape");
     assert.equal(await tip.count(), 0, "Escape closes the tip");
+    await noOverflow();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  });
+  await check("probe comparison: independent row pickers retain choices and fit a phone", async () => {
+    await page.goto(`${base}/dashboard.html?demo&room=f2#/zone/1?range=7d`, { waitUntil: "networkidle" });
+    const picker = page.locator("[data-probe-compare]").first();
+    await picker.waitFor();
+    const id = await picker.getAttribute("data-probe-compare");
+    const checkbox = page.locator(`[data-sensor="${id}"]`);
+    if (!(await checkbox.isChecked())) await checkbox.check();
+    await picker.selectOption("last");
+    await page.locator(`[data-probe-source="${id}"]`).waitFor();
+    assert.match(await page.locator(`[data-probe-source="${id}"]`).innerText(), /previous run/);
+    assert.equal(await page.locator("[data-probe-compare]").nth(1).inputValue(), "off");
+    await page.reload({ waitUntil: "networkidle" });
+    assert.equal(await page.locator(`[data-probe-compare="${id}"]`).inputValue(), "last");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.getByRole("button", { name: "Range and sensors" }).click();
+    await expectVisible(page.getByRole("dialog", { name: "Range and sensors" }));
+    await axe("per-probe compare picker, phone");
+    await page.keyboard.press("Escape");
     await noOverflow();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });

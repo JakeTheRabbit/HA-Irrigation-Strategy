@@ -2,9 +2,12 @@
 the union of every built judge's keys, in strict mode's shape (haiku-brain-design section 3, test_brain_tools)."""
 import json
 import pathlib
+from copy import deepcopy
+from types import SimpleNamespace
 
 import brain_bridge
-from brain import feed, plan_task, prompt
+import pytest
+from brain import client, feed, plan_task, prompt
 
 FILE = pathlib.Path(prompt.TOOLS)
 
@@ -51,7 +54,7 @@ def test_the_question_catalogue_matches_the_judges():
 
 def test_strict_tools_have_every_property_required_and_no_numeric_limits():
     for tool in prompt.load_tools():
-        assert tool["strict"] is True
+        assert tool.get("strict", False) is (tool["name"] != "answer_choice")
         for obj in _objects(tool["input_schema"]):
             assert obj["additionalProperties"] is False
             assert sorted(obj["required"]) == sorted(obj["properties"])
@@ -62,3 +65,25 @@ def test_strict_tools_have_every_property_required_and_no_numeric_limits():
 def test_the_request_sends_the_file_as_it_is():
     p = prompt.Prompt()
     assert p.request("claude-haiku-5-5", "e", "q", 2048)["tools"] == json.loads(FILE.read_text("utf-8"))["tools"]
+
+
+@pytest.mark.parametrize("change", [
+    {"snapshot_id": "old"},
+    {"question_id": "another"},
+    {"choice": "another"},
+    {"confidence": "0.8"},
+    {"confidence": 1.1},
+    {"probabilities": [{"key": "keep", "p": 0.7}, {"key": "other", "p": 0.3}]},
+    {"probabilities": [{"key": "keep", "p": 0.5}, {"key": "keep", "p": 0.5}]},
+    {"probabilities": [{"key": "keep", "p": 1.2}, {"key": "change", "p": -0.2}]},
+    {"probabilities": [{"key": "keep", "p": 0.2}, {"key": "change", "p": 0.2}]},
+    {"probabilities": [{"key": "keep", "p": 0.3}, {"key": "change", "p": 0.7}]},
+])
+def test_nonstrict_choice_answers_still_reject_invalid_votes(change):
+    lane = {"question": {"type": "choice", "criteria": {"keep": "Keep", "change": "Change"}}}
+    args = {"snapshot_id": "now", "question_id": "question", "choice": "keep", "confidence": 0.8,
+            "rationale": "The reading is steady.",
+            "probabilities": [{"key": "keep", "p": 0.7}, {"key": "change", "p": 0.3}]}
+    assert client.validate_answer(SimpleNamespace(name="answer_choice", input=args), "now", lane) is not None
+    invalid = {**deepcopy(args), **change}
+    assert client.validate_answer(SimpleNamespace(name="answer_choice", input=invalid), "now", lane) is None

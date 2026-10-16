@@ -320,3 +320,44 @@ def test_more_than_100_runs_and_old_ongoing_import_are_rejected():
         assert store.document["revision"] == 0
 
     asyncio.run(scenario())
+
+
+def test_probe_snapshot_is_additive_and_survives_old_record_edits_and_reload():
+    async def scenario():
+        store, _, put = fixture()
+        manager = store.hass.data["crop_steering"]["_strategy"][store.entry.entry_id]
+        manager._config = lambda: {
+            "zones": {
+                "1": {
+                    "name": "Bed one",
+                    "vwc_sensors": ["sensor.crop_steering_probe_a"],
+                }
+            }
+        }
+        put("probe_a", 50, "sensor", {"friendly_name": "Row A"})
+        await store.async_init()
+        saved = await store.mutate(
+            "runs_save", {"expected_revision": 0, "record": raw()}
+        )
+        run = saved["runs"][0]
+        assert run["zones"][0]["probes"] == [
+            {
+                "entity_id": "sensor.crop_steering_probe_a",
+                "row_label": "Row A",
+                "position": 0,
+                "kind": "vwc",
+            }
+        ]
+        edited = await store.mutate(
+            "runs_save",
+            {"expected_revision": 1, "record": raw(id=run["id"], name="Renamed")},
+        )
+        assert edited["runs"][0]["zones"][0]["probes"] == run["zones"][0]["probes"]
+        old = deepcopy(edited["runs"][0])
+        old["zones"][0].pop("probes")
+        assert "probes" not in normalize_record(old, store.room_id)["zones"][0]
+        seeded, _, _ = fixture(persisted={"revision": 2, "runs": [old]})
+        await seeded.async_init()
+        assert seeded.error is None and seeded.response()["runs"] == [old]
+
+    asyncio.run(scenario())

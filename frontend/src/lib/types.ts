@@ -169,6 +169,8 @@ export interface Controller {
   /** Each sensor's low and high per local date over a run: long-term statistics where Home
    * Assistant keeps them, else recorded history (Compare runs, by grow week). */
   dailyRanges: (request: HistoryRequest) => Promise<DailyRanges>;
+  /** Optional for older clients; uses existing Recorder permissions. */
+  sensorStatistics?: (request: HistoryRequest) => Promise<Record<string, { start: number | string; mean: number | null; min: number | null; max: number | null }[]>>;
   /** `signal` stops a long read between its day-sized requests. */
   history: (entityIds: string[], hours: number, signal?: AbortSignal) => Promise<Series[]>;
   /** One grow-day of recorder history for the selected room's day timeline. */

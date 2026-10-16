@@ -170,7 +170,7 @@ async function saveSetup(target = page) {
 }
 /** Mocked live Home Assistant with one room, so a check can read the exact setup_save payload.
  * `calls` records every service the page reached, which is how "never actuates" is proven. */
-async function liveSetup(run) {
+async function liveSetup(run, history = false) {
   const live = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const calls = [];
   const stamp = new Date().toISOString();
@@ -237,6 +237,9 @@ async function liveSetup(run) {
     const action = u.pathname.split("/").at(-1),
       data = req.postDataJSON();
     calls.push({ action, data });
+    if (history && action === "history_connection_get")
+      return reply({ service_response: { room_id: "room:room_b_", revision: 1,
+        connection: { source: "recorder" }, has_password: true, has_token: true } });
     if (action === "setup_read")
       return reply({
         service_response: {
@@ -268,7 +271,7 @@ async function liveSetup(run) {
     assert.deepEqual(
       // The dashboard asks once per visit whether there is anything new to show: not the helpers.
       [...new Set(calls.map((call) => call.action))].filter((a) => a !== "whats_new_get").sort(),
-      ["setup_read", "setup_save"],
+      history ? ["history_connection_get", "setup_read", "setup_save"] : ["setup_read", "setup_save"],
       "Sizing helpers must reach no service except reading and saving the setup",
     );
   } finally {
@@ -712,6 +715,28 @@ try {
       await page.locator(".tour").getByRole("button", { name: "End tour", exact: true }).click();
       await page.setViewportSize({ width: 1440, height: 1000 });
       await page.locator(".tour").waitFor({ state: "detached" });
+    },
+  );
+  await check(
+    "Optional long history reads settings only after the grower expands it",
+    async () => {
+      await liveSetup(async (lp, calls) => {
+        const history = lp.getByRole("group", { name: "Long history source" });
+        const summary = lp.locator("details[aria-label='Long history source'] > summary");
+        await visible(summary);
+        assert.equal(calls.filter(call => call.action === "history_connection_get").length, 0,
+          "Closed optional settings must send no history service");
+        await summary.click();
+        await visible(lp.getByRole("button", { name: "Save history source", exact: true }));
+        assert.equal(calls.filter(call => call.action === "history_connection_get").length, 1,
+          "Opening optional settings reads its redacted configuration once");
+        await summary.click();
+        assert.equal(await history.getAttribute("open"), null);
+        await lp.locator('#zone-1-substrate_volume').fill('7');
+        await saveSetup(lp);
+        assert.equal(calls.filter(call => call.action === "history_connection_get").length, 1,
+          "Saving unrelated sizing after closing must send no history service");
+      }, true);
     },
   );
   await check(
@@ -1564,3 +1589,4 @@ try {
     );
 }
 if (checks.some((c) => c.status === "fail")) process.exitCode = 1;
+
