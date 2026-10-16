@@ -506,6 +506,49 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement="W",
         mode="box",
     ),
+    # The runoff estimator's calibration (all neutral until set): the litres one sump run empties (a bucket test;
+    # 0 = unknown), or the pump's flow (0 = unknown) times its run time; how long after a shot runoff may reach
+    # the sump; and the power above which an AC or dehumidifier mapped by its power counts as running.
+    NumberEntityDescription(
+        key="sump_litres_per_run",
+        name="Sump litres per run",
+        icon="mdi:cup-water",
+        native_min_value=0,
+        native_max_value=500,
+        native_step=0.1,
+        native_unit_of_measurement="L",
+        mode="box",
+    ),
+    NumberEntityDescription(
+        key="sump_pump_flow_lpm",
+        name="Sump pump flow",
+        icon="mdi:pump",
+        native_min_value=0,
+        native_max_value=500,
+        native_step=0.1,
+        native_unit_of_measurement="L/min",
+        mode="box",
+    ),
+    NumberEntityDescription(
+        key="runoff_attribution_min",
+        name="Runoff reaches the sump within",
+        icon="mdi:timer-sand",
+        native_min_value=15,
+        native_max_value=240,
+        native_step=5,
+        native_unit_of_measurement="min",
+        mode="box",
+    ),
+    NumberEntityDescription(
+        key="hvac_run_power_w",
+        name="AC and dehumidifier run power",
+        icon="mdi:air-conditioner",
+        native_min_value=1,
+        native_max_value=10000,
+        native_step=1,
+        native_unit_of_measurement="W",
+        mode="box",
+    ),
 ]
 
 # Default values (shared by global + per-zone entities): the entity-default column of the one

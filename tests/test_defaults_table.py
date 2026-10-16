@@ -87,6 +87,11 @@ ENTITY_DEFAULTS_12C6D1A = {
     "pump_prime_time": 2.0,
     "main_line_lead_time": 1.0,
     "ec_min_interval": 10.0,
+    # added after it, the runoff estimator's calibration: 0 is unknown, as no estimate was made
+    "sump_litres_per_run": 0.0,
+    "sump_pump_flow_lpm": 0.0,
+    "runoff_attribution_min": 90.0,
+    "hvac_run_power_w": 50.0,
 }
 
 # The literal at each controller _zone_num call site at 12c6d1a, plus P3 Time Between Shots, the P1 rise

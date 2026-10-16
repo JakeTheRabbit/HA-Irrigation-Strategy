@@ -26,6 +26,7 @@ from .const import (
     RECIPE_PARAMS,
     SOFTWARE_VERSION,
     SET_PHASE_OPTIONS,
+    RUNOFF_ESTIMATOR_MODES,
     SUBSTRATES,
     WATER_TODAY_VIEWS,
 )
@@ -94,6 +95,13 @@ SELECT_DESCRIPTIONS = [
         name="Pause AI changes",
         icon="mdi:hand-back-left-off",
         options=NO_TOUCH_OPTIONS,
+    ),
+    # The runoff estimator from the sump's water balance: off until someone chooses.
+    SelectEntityDescription(
+        key="runoff_estimator",
+        name="Runoff estimator",
+        icon="mdi:water-sync",
+        options=RUNOFF_ESTIMATOR_MODES,
     ),
 ]
 

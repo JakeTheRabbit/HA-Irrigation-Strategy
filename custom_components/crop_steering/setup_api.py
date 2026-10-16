@@ -18,7 +18,7 @@ from .plumbing import (
     infer as infer_plumbing,
     problems as plumbing_problems,
 )
-from .room import room_gate
+from .room import HVAC_LISTS, room_gate
 from .sizing import prefer_setup_value
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,6 +74,18 @@ SENSOR_KINDS = {
     "tank_distance_sensor": "distance",
 }
 TANK_LEVEL_FIELDS = {"full_mm", "empty_mm", "float_low_state"}
+# What an AC or dehumidifier of the room may be mapped as, for the runoff estimator: a switch or state that reads on
+# while it runs, a climate or humidifier entity, or its power sensor (running above hvac_run_power_w). Read only.
+HVAC_DOMAINS = {
+    "switch",
+    "input_boolean",
+    "binary_sensor",
+    "climate",
+    "humidifier",
+    "fan",
+    "sensor",
+}
+HVAC_MAX = 12
 
 
 def effective(entry):
@@ -475,8 +487,27 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
         zones[str(z)] = prior
     hw = deepcopy(old.get("hardware", {}))
     incoming = payload.get("hardware", {})
-    if not isinstance(incoming, dict) or set(incoming) - set(HARDWARE_DOMAINS):
+    if not isinstance(incoming, dict) or set(incoming) - set(HARDWARE_DOMAINS) - set(
+        HVAC_LISTS
+    ):
         raise ValueError("Unknown hardware mapping field")
+    for key in HVAC_LISTS:
+        if key not in incoming:
+            continue
+        units = incoming.pop(key)
+        if (
+            not isinstance(units, list)
+            or len(units) > HVAC_MAX
+            or len(set(units)) != len(units)
+            or not all(isinstance(u, str) and u for u in units)
+        ):
+            raise ValueError(f"{key}: at most {HVAC_MAX} different entity ids")
+        for unit in units:
+            _entity(hass, unit, HVAC_DOMAINS)
+        if units:
+            hw[key] = units
+        else:
+            hw.pop(key, None)
     for key, value in incoming.items():
         if value:
             _entity(hass, value, HARDWARE_DOMAINS[key], SENSOR_KINDS.get(key))
@@ -638,7 +669,11 @@ def setup_room(hass, entry):
         "active_zone_ids": [z["id"] for z in zones if z["active"]],
         "zones": zones,
         "hardware": {
-            key: data.get("hardware", {}).get(key, "") for key in HARDWARE_DOMAINS
+            **{key: data.get("hardware", {}).get(key, "") for key in HARDWARE_DOMAINS},
+            # Each AC and dehumidifier mapped for the runoff estimator ([] when none).
+            **{
+                key: list(data.get("hardware", {}).get(key) or []) for key in HVAC_LISTS
+            },
         },
         # "" = never declared. `plumbing_inferred` is what the mapped switches imply, for a form
         # to PREFILL; it becomes a declaration only when the operator saves it.
@@ -850,6 +885,13 @@ def setup_changes(old, new):
         said.append(f"plumbing: {PLUMBING_LABELS.get(layout, layout or 'none')}")
     old_hw, new_hw = old.get("hardware") or {}, new.get("hardware") or {}
     for key, word in HARDWARE_WORDS.items():
+        was, now = _said(old_hw.get(key)), _said(new_hw.get(key))
+        if was != now:
+            said.append(f"{word} {was} → {now}")
+    for key, word in (
+        ("ac_entities", "ACs"),
+        ("dehumidifier_entities", "dehumidifiers"),
+    ):
         was, now = _said(old_hw.get(key)), _said(new_hw.get(key))
         if was != now:
             said.append(f"{word} {was} → {now}")

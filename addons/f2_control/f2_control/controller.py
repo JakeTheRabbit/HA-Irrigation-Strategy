@@ -40,6 +40,7 @@ import dosing_runner
 import brain_bridge
 import log_words
 import plan_adherence
+import runoff_balance
 import runtime_env
 from brain import client as jev_client
 import setpoint_supervisor
@@ -724,6 +725,12 @@ VMAX_SERIES_MAX = 40
 # Pump Run Threshold, or SUMP_RUN_W where the integration has no such setting (compared in W, whatever unit the
 # plug reports: _device_history).
 SUMP_SILENT_H, SUMP_CHECK_MIN, SUMP_RUN_W = 3.0, 5.0, 20.0
+# The runoff estimator (runoff_balance.py, select runoff_estimator, off by default): the sump's runs and each mapped AC
+# and dehumidifier's run time are read from Home Assistant's history every RUNOFF_CHECK_MIN (RUNOFF_FIRST_H back the
+# first time) and the balance refitted every RUNOFF_FIT_MIN. A unit mapped by its power counts as running above the
+# room's HVAC run power (HVAC_RUN_W where the integration has no such setting).
+RUNOFF_MODES = ("off", "shadow", "shown_alerts", "ai")
+RUNOFF_CHECK_MIN, RUNOFF_FIT_MIN, RUNOFF_FIRST_H, HVAC_RUN_W = 10.0, 30.0, 48.0, 50.0
 # CS-312: a zone whose last MAX_RUN_IN_A_ROW shots were all cut to the room's maximum shot length (CS-306 each) keeps
 # asking for more water than a shot may give, as a probe stuck dry does all day. With the room's max-run latch switch
 # ON the zone is latched until its Repairs card is fixed; OFF, or absent (an older integration), it is only reported.
@@ -732,6 +739,14 @@ MAX_RUN_IN_A_ROW = 3
 # made by hand, and this app's shipped `enable_flag` option (config.yaml). A room made by the wizard stops
 # on its own engine switch, named by its setup. Named here once; room_gate() is the rule.
 LEGACY_ENABLE_FLAG = "input_boolean.f2_control_enabled"
+
+
+def _epoch(stamp):
+    """An ISO time (with or without a UTC offset; naive is local) as epoch seconds, or None."""
+    try:
+        return datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError):
+        return None
 
 
 def _pct_or_none(value):
@@ -1550,6 +1565,7 @@ class Controller:
         # Plan adherence's own record (plan_adherence.load): absent on an older file, field by field otherwise.
         room._adherence = plan_adherence.load(block.get("_adherence") if isinstance(block, dict) else None)
         room.tank_drawdown = tank_level.load(block.get("_tank") if isinstance(block, dict) else None)
+        room._runoff = runoff_balance.load(block.get("_runoff") if isinstance(block, dict) else None)
         if isinstance(block, dict):
             room.strategy_required = bool(block.get("_strategy_required", False))
             try:
@@ -1738,6 +1754,9 @@ class Controller:
             room.substrate = self._substrate(attrs)  # read like the names: needs no adoption
             room.light_entity = str(attrs.get("light_entity") or "").strip()  # checked, never actuated
             room.tank = tank_level.mapping(attrs)  # read only, never actuated: needs no adoption
+            # each AC and dehumidifier the room maps, read only for the runoff estimator (runoff_balance.py)
+            room.hvac_units = [str(e) for key in ("ac_entities", "dehumidifier_entities")
+                               for e in (attrs.get(key) or []) if isinstance(e, str) and e]
             saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_setup")
             another_room = self._is_another_room(room, attrs, saved)
             revision = attrs.get("setup_revision", 0)
@@ -1922,6 +1941,11 @@ class Controller:
                 block["_room_active"] = room._room_active_known
             if room.tank_drawdown["base_pct"] is not None:  # only once a level has been read
                 block["_tank"] = room.tank_drawdown
+            runoff = getattr(room, "_runoff", None)
+            if runoff and runoff_balance.has_data(runoff):  # only once the estimator has recorded something
+                block["_runoff"] = runoff
+            else:
+                block.pop("_runoff", None)
             if getattr(room, "_off_since", None):
                 block["_room_off_since"] = room._off_since.isoformat()
             else:
@@ -3710,6 +3734,124 @@ class Controller:
             room=room,
         )
 
+    def _watch_runoff(self, room, now):
+        """The room's runoff estimate from its sump's water balance (runoff_balance.py), with the select
+        runoff_estimator not off and a sump power sensor mapped. Records the sump runs and each mapped AC and
+        dehumidifier's run time from history, closes each grow-day's sealed-room balance, refits, and publishes
+        sensor.crop_steering_<prefix>runoff_estimate_app. In shown_alerts and ai, a grow-day whose balance does not
+        close raises CS-314. Never waters, holds or moves a setting."""
+        mode = ha_get(f"select.crop_steering_{room.prefix}runoff_estimator")[0]
+        room._runoff_mode = mode if mode in RUNOFF_MODES else "off"
+        if room._runoff_mode == "off":
+            room._runoff_words = None
+            return
+        entity = self.sump_sensors.get(room.slug) or self.sump_sensors.get("*")
+        sensor = f"sensor.crop_steering_{room.prefix}runoff_estimate_app"
+        if not entity:
+            room._runoff_words = None
+            ha_set(sensor, "no_sump", {"why": "no sump power sensor mapped for this room (option sump_power_sensor)",
+                                       "friendly_name": "Runoff estimate (room-wide)", "engine": PRODUCT})
+            return
+        st, now_s = room._runoff, now.timestamp()
+        units = list(getattr(room, "hvac_units", None) or [])
+        if st["cursor"] is None or now_s - st["cursor"] >= RUNOFF_CHECK_MIN * 60:
+            since_s = (st["cursor"] - 600) if st["cursor"] else now_s - RUNOFF_FIRST_H * 3600
+            since = datetime.fromtimestamp(since_s, timezone.utc)
+            run_w = self._num(f"number.crop_steering_{room.prefix}sump_power_threshold_w", SUMP_RUN_W)
+            hvac_w = self._num(f"number.crop_steering_{room.prefix}hvac_run_power_w", HVAC_RUN_W)
+            rows = self._device_history(entity, "power", since)
+            if rows is not None:
+                st["runs"] = runoff_balance.merge(st["runs"], runoff_balance.spans(
+                    [(w, _epoch(t)) for w, t in rows], lambda w: w > run_w, now_s))
+            for unit in units:
+                st["on"][unit] = runoff_balance.merge(st["on"].get(unit, []),
+                                                      self._unit_spans(unit, since, hvac_w, now_s))
+            st["cursor"] = now_s
+            runoff_balance.prune(st, now_s)
+            day_start = self._grow_day_start(room, now)
+            closed = runoff_balance.day_tick(st, day_start.isoformat(), self._lights_on_s(room, day_start),
+                                             self._substrate_water(room))
+            self._save_state()
+            if closed is not None and room._runoff_mode in ("shown_alerts", "ai"):
+                self._runoff_closure_alert(room, closed)
+        fitted = getattr(room, "_runoff_fit", None)
+        if fitted is None or now_s - fitted[0] >= RUNOFF_FIT_MIN * 60:
+            fit = runoff_balance.fit(st, units, self._num(
+                f"number.crop_steering_{room.prefix}runoff_attribution_min", 90))
+            room._runoff_fit = fitted = (now_s, fit)
+        volume, source = self._sump_volume(room, st)
+        held = ["the sump pump has not run (CS-311)"] if f"sump_{room.slug}" in self._alerted else []
+        if getattr(room, "_backed_up", None):
+            held.append("a table is backing up (CS-310)")
+        state, attrs = runoff_balance.estimate(
+            st, units, volume=volume, volume_source=source, f=fitted[1], now_s=now_s,
+            today_start_s=self._lights_on_s(room, self._grow_day_start(room, now)), unresolvable="; ".join(held) or None)
+        shared = sorted(r.slug for r in self.rooms if r is not room and
+                        (self.sump_sensors.get(r.slug) or self.sump_sensors.get("*")) == entity)
+        if shared:
+            attrs["scope"] = f"per sump, shared with {', '.join(shared)}: not split by room"
+        room._runoff_words = runoff_balance.words(state, attrs) if room._runoff_mode == "ai" else None
+        ha_set(sensor, state, {**attrs, "mode": room._runoff_mode, "units": units, "sump_sensor": entity,
+                               "friendly_name": "Runoff estimate (room-wide)", "engine": PRODUCT})
+
+    @staticmethod
+    def _lights_on_s(room, day):
+        """The epoch seconds of grow-day `day`'s lights-on, on this machine's clock."""
+        return (datetime.combine(day, datetime.min.time()) + timedelta(hours=float(room.lights_on_hour))).timestamp()
+
+    def _unit_spans(self, unit, since, hvac_w, now_s):
+        """When an AC or dehumidifier ran since `since`: by its power above hvac_w for a sensor, else its state."""
+        domain = unit.split(".", 1)[0]
+        if domain == "sensor":
+            rows = self._device_history(unit, "power", since) or []
+            return runoff_balance.spans([(w, _epoch(t)) for w, t in rows], lambda w: w > hvac_w, now_s)
+        running = ("cool", "dry", "heat_cool", "auto") if domain == "climate" else ("on", "true", "open", "1")
+        rows = ha_history(unit, since) or []
+        return runoff_balance.spans([(str(v).lower(), _epoch(t)) for v, t in rows], lambda v: v in running, now_s)
+
+    def _substrate_water(self, room):
+        """Litres of water in the room's substrate now: each zone's last VWC x its substrate litres; None when a
+        zone has no reading."""
+        total = 0.0
+        for zone in room.zones:
+            vwc = room.state[zone].get("last_vwc")
+            if vwc is None:
+                return None
+            total += float(vwc) / 100.0 * self._substrate_l(room, zone)
+        return total
+
+    def _sump_volume(self, room, st):
+        """(litres per sump run, where from): the room's own number (a bucket test), else pump flow x the median
+        run time, else the sealed-room closure; (None, "unknown") without any."""
+        litres = self._num(f"number.crop_steering_{room.prefix}sump_litres_per_run", 0)
+        if litres and litres > 0:
+            return litres, "sump_litres_per_run"
+        flow = self._num(f"number.crop_steering_{room.prefix}sump_pump_flow_lpm", 0)
+        runs = sorted(e - s for s, e in st["runs"] if e > s)
+        if flow and flow > 0 and runs:
+            return flow * runs[len(runs) // 2] / 60.0, "pump flow x run time"
+        closure = runoff_balance.closure_volume(st)
+        return (closure, "sealed-room closure") if closure else (None, "unknown")
+
+    def _runoff_closure_alert(self, room, day):
+        """CS-314: a grow-day whose sump litres miss what a sealed room must give (fed - the substrate's change).
+        With the litres per run taken from the closure itself, only a day far from the median says anything."""
+        volume, source = self._sump_volume(room, room._runoff)
+        error = runoff_balance.closure_error_pct(day, volume)
+        if error is None or abs(error) <= runoff_balance.CLOSURE_ALERT_PCT:
+            return
+        want = runoff_balance.balance_litres(day)
+        self._alert(
+            f"runoff_closure_{room.slug}",
+            "CS-314",
+            "the sump water balance does not close",
+            f"On the grow-day {day['date'][:10]} the sump took about {day['runs'] * volume:.0f} L ({day['runs']} runs "
+            f"of {volume:.1f} L, {source}). A sealed room should have sent it {want:.0f} L: {day['fed_l']:.0f} L fed "
+            f"minus the change of water in the substrate. That is {error:+.0f}%. Possible causes are a leak, a sump "
+            "run the power plug did not report, a stuck float, or a wrong litres per run. Watering is not changed.",
+            room=room,
+        )
+
     def _tank_level(self, room):
         """The room's tank level (tank_level.py) -> (percent or None, low or None). The percent is None when no
         distance sensor is mapped, it has no reading, or the drawdown check says it is stuck. `low` is the
@@ -3964,7 +4106,10 @@ class Controller:
         zones = {z: {"block": str(d["block"])[:160] if d.get("block") else None,
                      "decision": str(d.get("reason") or "")[:120]}
                  for z, d in sorted((pub or {}).items())}
-        return {"kill_switch": read(room_gate(room)), "holds_on": holds, "zones": zones}
+        out = {"kill_switch": read(room_gate(room)), "holds_on": holds, "zones": zones}
+        if getattr(room, "_runoff_words", None):  # the runoff estimator set to ai: a room-wide hint, never a catch
+            out["runoff_estimate"] = room._runoff_words
+        return out
 
     def _idle_why(self, room, pub):
         """Why nothing has been watered, as far as this pass can tell: watering switched off, a hold (_blocked), or
@@ -4213,6 +4358,8 @@ class Controller:
         if room.tank.get("distance"):  # what the tank gave, for the level's drawdown check
             tank_level.drawn(room.tank_drawdown, delivered_l)
         self._save_state()
+        if room.__dict__.get("_runoff_mode", "off") != "off":
+            runoff_balance.add_shot(room._runoff, now.timestamp(), delivered_l)  # the sump balance's feed
         if getattr(self, "jev", None) is not None:
             try:  # the shot, for the AI assistant's Shot and Probe judges to read its answer later
                 brain_bridge.shot_counted(room, zone, delivered_l)
@@ -6306,6 +6453,10 @@ class Controller:
             self._watch_sump(room, now)
         except Exception as e:
             log("sump watch error", room.slug, e)
+        try:  # the runoff estimator only ever tells (CS-314): no water is given or held from it
+            self._watch_runoff(room, now)
+        except Exception as e:
+            log("runoff estimator error", room.slug, e)
         try:  # the tank level is read and published, and the plan-ahead refill asked for (CS-903)
             self._watch_tank(room)
         except Exception as e:

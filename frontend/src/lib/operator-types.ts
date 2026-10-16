@@ -134,7 +134,8 @@ export interface SetupRoom {
   num_zones: number;
   active_zone_ids: number[];
   zones: SetupZone[];
-  hardware: Record<string, string | number>;
+  /** Each mapping; ac_entities and dehumidifier_entities are lists (the runoff estimator's units). */
+  hardware: Record<string, string | number | string[]>;
   /** Declared plumbing layout; "" (or absent, from an older integration) when never declared. */
   plumbing?: string;
   /** What the SAVED switches imply: a prefill for a room that never declared, never stored. */

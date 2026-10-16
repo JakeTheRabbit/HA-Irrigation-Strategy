@@ -400,6 +400,8 @@ def brain_context(c, room, zone, snap, now):
                          + ("settled since the last shot" if settled else "not settled since the last shot")),
         "arc": getattr(c.jev, "arc", None), "arc_note": getattr(c.jev, "arc_note", None),
         "zones_hardware": zones_hardware(c, room, zone, now), "room_balance": room_balance(c, room, zone, now),
+        # the room's sump water-balance estimate, only with the runoff estimator set to ai (controller._watch_runoff)
+        **({"runoff_estimate": room._runoff_words} if getattr(room, "_runoff_words", None) else {}),
     }
 
 

@@ -673,3 +673,35 @@ def test_a_3_11_1_zone_loads_with_no_stalled_ramp_and_a_stall_round_trips(tmp_pa
             0,
             None,
         )
+
+
+def test_a_3_11_1_room_loads_with_no_runoff_record_and_one_round_trips(tmp_path):
+    """Before the runoff estimator (runoff_balance.py) a room kept no sump record: an old file loads it empty and
+    writes none back, a saved record survives a restart, and junk loads fresh."""
+    import runoff_balance
+
+    fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
+    seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": seed}), encoding="utf-8")
+    c = _make([1, 2], p)
+    c._load_state()
+    assert c.rooms[0]._runoff == runoff_balance.fresh()
+    c._save_state()
+    assert "_runoff" not in json.loads(p.read_text(encoding="utf-8"))["default"]
+    c.rooms[0]._runoff["runs"] = [[1.0, 61.0]]
+    c.rooms[0]._runoff["days"] = [{"date": "2026-10-16", "runs": 9, "fed_l": 180.0}]
+    c._save_state()
+    c2 = _make([1, 2], p)
+    c2._load_state()
+    assert c2.rooms[0]._runoff["runs"] == [[1.0, 61.0]]
+    assert c2.rooms[0]._runoff["days"] == [
+        {"date": "2026-10-16", "runs": 9, "fed_l": 180.0}
+    ]
+    p.write_text(
+        json.dumps({"default": {"_runoff": "junk", "1": {"phase": "P2"}}}),
+        encoding="utf-8",
+    )
+    c3 = _make([1], p)
+    c3._load_state()
+    assert c3.rooms[0]._runoff == runoff_balance.fresh()

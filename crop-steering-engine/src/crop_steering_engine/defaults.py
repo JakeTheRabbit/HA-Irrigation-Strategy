@@ -106,6 +106,13 @@ DEFAULTS = {
     # The sump pump's power above which it counts as running (W), for CS-311. The
     # controller falls back to its own SUMP_RUN_W, the same 20 W it always compared with.
     "sump_power_threshold_w": (20.0, None),
+    # The runoff estimator's calibration (the controller's sump water balance). 0 is unknown
+    # for the litres per run and the pump flow; the controller reads them with these
+    # defaults when the integration has none.
+    "sump_litres_per_run": (0.0, None),
+    "sump_pump_flow_lpm": (0.0, None),
+    "runoff_attribution_min": (90.0, None),
+    "hvac_run_power_w": (50.0, None),
 }
 
 ENTITY_DEFAULTS = {

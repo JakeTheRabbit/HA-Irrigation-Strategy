@@ -133,6 +133,7 @@
 - CS-311 No sump pump run: The power reading of the sump pump (sump_power_sensor) shows no run for 3 h by default (sump_silent_hours). Does: The alert does not change the water.
 - CS-312 Repeated maximum-length shots: The last 3 shots of a zone each needed more time than the maximum shot length of the room. Does: If the max-run latch switch of the room is on, the zone gets no more shots, rescue shots included, until you fix the Repairs card.
 - CS-313 Device type not supported: A zone valve, pump or main-line valve has a device type that the controller cannot open or close. Does: The zone gets no shots, and the controller sends no command to the device.
+- CS-314 Sump water balance does not close: With the runoff estimator at shown_alerts or ai, a grow-day whose sump litres (its runs times the litres per run) miss what a sealed room must send to the sump (the water fed minus the change of water in the substrate) by more than 30%. Does: The alert does not change the water.
 - CS-401 Setting outside controller range: The entity accepts a wider range than the controller uses, and the value is outside the range of the controller. Does: Water continues.
 - CS-402 Missing settings: The controller cannot read some settings by their entity IDs for 3 loops. Does: All shots wait for 3 loops.
 - CS-403 Lights hours from the integration: The controller now reads the lights-on and lights-off hours from the integration, not from its own options. Does: Water continues on the hours of the integration.

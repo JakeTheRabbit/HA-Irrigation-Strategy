@@ -24,6 +24,7 @@ import { Heading, Empty } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
 import { ControllerSettings } from "@/components/controller-settings";
 import { SetupWizard } from "@/components/setup-wizard";
+import { RunoffPanel } from "@/components/runoff";
 import { Pill } from "@/components/mini-visuals";
 import {
   CatchTestCalculator,
@@ -318,6 +319,11 @@ export function Setup({
         kind === "switch"
           ? // a zone valve, main line or pump: what the controller can open and close
             ["switch", "input_boolean", "valve"].includes(c.domain)
+          : kind === "hvac"
+            ? // an AC or dehumidifier: a state that reads on while it runs, or its power sensor
+              ["switch", "input_boolean", "binary_sensor", "climate", "humidifier", "fan", "sensor"].includes(
+                c.domain,
+              )
           : kind === "timestamp"
             ? ["sensor", "input_datetime"].includes(c.domain)
             : kind === "binary"
@@ -811,8 +817,31 @@ export function Setup({
                         }
                       />
                     ))}
+                  {(
+                    [
+                      ["ac_entities", "ACs (runoff estimator)"],
+                      ["dehumidifier_entities", "Dehumidifiers (runoff estimator)"],
+                    ] as const
+                  )
+                    // an older integration has no such lists: it would refuse them
+                    .filter(([key]) => Array.isArray(draft.hardware[key]))
+                    .map(([key, label]) => (
+                      <MappingPicker
+                        key={key}
+                        label={label}
+                        values={draft.hardware[key] as string[]}
+                        multiple
+                        candidates={candidates("hvac")}
+                        hint="Choose each unit's switch, state or power sensor"
+                        disabled={busy}
+                        onChange={(values) =>
+                          setDraft({ ...draft, hardware: { ...draft.hardware, [key]: values } })
+                        }
+                      />
+                    ))}
                 </div>
               </section>
+              <RunoffPanel controller={controller} />
               <section className="panel workspace-card">
                 <div className="workspace-section-heading">
                   <div>

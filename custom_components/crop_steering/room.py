@@ -120,6 +120,8 @@ def restored_state_is_ours(entry, last_state) -> bool:
         return True
 
 
+# The room's ACs and dehumidifiers a setup can map, each a list of entities (setup_api).
+HVAC_LISTS = ("ac_entities", "dehumidifier_entities")
 # The room climate sensors a setup can map (config_flow, hardware step).
 CLIMATE_SENSORS = ("temperature_sensor", "humidity_sensor", "vpd_sensor")
 
@@ -173,6 +175,9 @@ def build_engine_config(
     # The room's climate sensors, likewise only when mapped: read-only, for the dashboard's history
     # chart. The controller reads none of them.
     declared.update({k: hw[k] for k in CLIMATE_SENSORS if hw.get(k)})
+    # Each AC and dehumidifier the room maps, likewise only when mapped: read only, for the
+    # controller's runoff estimator (the sump water balance).
+    declared.update({k: list(hw[k]) for k in HVAC_LISTS if hw.get(k)})
     if setup.get("tank_level") and (
         hw.get("tank_distance_sensor") or hw.get("tank_low_float")
     ):

@@ -64,6 +64,7 @@ def test_the_table_is_the_contracts():
         "CS-311",
         "CS-312",
         "CS-313",
+        "CS-314",
         "CS-701",
         "CS-710",
     }
