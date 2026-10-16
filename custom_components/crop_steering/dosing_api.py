@@ -191,9 +191,25 @@ class DosingStore:
                     for key in ("name", *dosing.REMINDER)
                 }
                 batch = {**kept, **batch}
+            sent_pumps = data.get("pumps")
+            if isinstance(sent_pumps, list):
+                # A page from before pH roles sends pumps without one: each keeps its stored role.
+                roles = {
+                    p["id"]: p["ph_role"]
+                    for p in self.data["pumps"]
+                    if p.get("ph_role")
+                }
+                sent_pumps = [
+                    (
+                        {**pump, "ph_role": roles.get(pump.get("id"))}
+                        if isinstance(pump, dict) and "ph_role" not in pump
+                        else pump
+                    )
+                    for pump in sent_pumps
+                ]
             try:
                 pumps, batch = dosing.clean(
-                    data.get("pumps"),
+                    sent_pumps,
                     batch,
                     self._exists,
                     self._stock_tanks(),

@@ -22,6 +22,7 @@ import {
   canEdit,
   dosingError,
   newPumpId,
+  PH_ROLE_LABELS,
   setupChanges,
   setupDraft,
   setupErrors,
@@ -30,6 +31,7 @@ import {
   type DosingBatch,
   type DosingConfig,
   type DosingDocument,
+  type PhRole,
   type PumpDraft,
   type SetupDraft,
 } from "@/lib/dosing";
@@ -314,6 +316,29 @@ export function DosingSetup({
                 />
               ))}
               {stockPicker(pump)}
+              <div className="dosing-field">
+                <Label htmlFor={`${id}-${pump.key}-role`}>{FIELD_LABELS.ph_role}</Label>
+                <select
+                  id={`${id}-${pump.key}-role`}
+                  value={pump.ph_role ?? ""}
+                  aria-describedby={`${id}-${pump.key}-role-help`}
+                  onChange={(event) =>
+                    updatePump(pump.key, {
+                      ph_role: (event.target.value || null) as PhRole | null,
+                    })
+                  }
+                >
+                  <option value="">Not used</option>
+                  {(["ph_up", "ph_down"] as const).map((role) => (
+                    <option key={role} value={role}>
+                      {PH_ROLE_LABELS[role]}
+                    </option>
+                  ))}
+                </select>
+                <small id={`${id}-${pump.key}-role-help`} className="muted">
+                  The pump pH auto-correct doses with, when its switch is on.
+                </small>
+              </div>
               {pump.dosing_entity.startsWith("sensor.") && (
                 <div className="dosing-field">
                   <Label htmlFor={`${id}-${pump.key}-prefix`}>{FIELD_LABELS.dosing_prefix}</Label>
