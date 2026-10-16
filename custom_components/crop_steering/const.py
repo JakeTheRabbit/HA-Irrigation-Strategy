@@ -77,6 +77,25 @@ DRAINAGE_TYPES = ["unknown", "flood_table", "free_drain"]
 # A room's no-touch window: Off, or how long the AI assistant asks nothing and changes nothing there
 # (an operator sampling or visiting). The controller matches these words and sets Off when it ends.
 NO_TOUCH_OPTIONS = ["Off", "1 h", "Until lights-on", "24 h"]
+# What the AI assistant may do in a room: one switch per power, switch.crop_steering_<prefix>ai_power_<key>.
+# (key, friendly name, default). Each power that acted before the switches existed is ON, so a room
+# updated in place keeps what its AI assistant did; a new power is OFF until the owner turns it on.
+# With a power off its judge still runs and advises; the controller refuses to act on it. The
+# controller reads the same keys and defaults (jev/powers.py) and takes a missing switch as its default.
+AI_POWERS = (
+    ("advance_phase", "AI power: start the next phase early", True),
+    ("ramp_control", "AI power: end the morning ramp", True),
+    ("set_probe_aside", "AI power: set a probe aside", True),
+    ("ec_mode", "AI power: change the EC steer", True),
+    ("nudge_setpoints", "AI power: adjust maintenance watering", True),
+    ("plan_catch_up", "AI power: apply today's plan day", True),
+    (
+        "set_targets_from_achievable",
+        "AI power: set targets from what a zone reaches",
+        False,
+    ),
+    ("tune_shot_sizes", "AI power: tune shot sizes", False),
+)
 STEERING_MODES = ["Vegetative", "Generative"]
 # What the room grows in, published in its descriptor for the controller. "generic" (the default,
 # and what every upgraded room reads) changes nothing; the ids match the doctrine pack's substrates.

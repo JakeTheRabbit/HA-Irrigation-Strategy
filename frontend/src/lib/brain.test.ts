@@ -1,13 +1,16 @@
 import { describe, expect, it } from "vitest";
 import {
+  AI_POWERS,
   BRAIN_DEMO_STATES,
   brainView,
   confidenceWords,
   demoBrainEntity,
   keyWords,
   parseBrainPanel,
+  parsePowers,
   providerWords,
 } from "./brain";
+import { SETTING_COPY, UI_COPY } from "./ste-copy";
 import type { EntityState } from "./types";
 
 const sensor = (state: string, attributes: Record<string, unknown>): EntityState => ({
@@ -165,5 +168,71 @@ describe("the grow plan line", () => {
       null,
     );
     expect(parseBrainPanel(sensor("rules", {}))?.plan).toBe(null);
+  });
+});
+
+describe("what the AI assistant may do", () => {
+  const sw = (entity_id: string, state: string): EntityState => ({
+    entity_id,
+    state,
+    attributes: {},
+    last_updated: "2026-10-15T00:00:00Z",
+    last_changed: "2026-10-15T00:00:00Z",
+  });
+  const keys = [
+    "advance_phase",
+    "ramp_control",
+    "set_probe_aside",
+    "ec_mode",
+    "nudge_setpoints",
+    "plan_catch_up",
+    "set_targets_from_achievable",
+    "tune_shot_sizes",
+  ];
+  it("reads the 8 powers in the integration's order from the room's switches", () => {
+    const states = {
+      "switch.crop_steering_tent_ai_power_advance_phase": sw("x", "off"),
+      "switch.crop_steering_tent_ai_power_tune_shot_sizes": sw("x", "on"),
+      // Another room's switch is not this room's.
+      "switch.crop_steering_ai_power_ec_mode": sw("x", "off"),
+    };
+    const powers = parsePowers(states, "tent_");
+    expect(powers.map((p) => p.key)).toEqual(keys);
+    expect(powers[0]).toEqual({
+      key: "advance_phase",
+      label: "Start the next phase early",
+      entityId: "switch.crop_steering_tent_ai_power_advance_phase",
+      on: false,
+      default: true,
+      missing: false,
+    });
+    expect(powers[7]).toMatchObject({ on: true, default: false, missing: false });
+    // ec_mode's switch is missing in this room: its default, read-only.
+    expect(powers[3]).toMatchObject({
+      entityId: "switch.crop_steering_tent_ai_power_ec_mode",
+      on: true,
+      missing: true,
+    });
+  });
+  it("shows each default, read-only, for an integration without the switches or an unavailable one", () => {
+    const powers = parsePowers(
+      { "switch.crop_steering_ai_power_ramp_control": sw("x", "unavailable") },
+      "",
+    );
+    expect(powers.every((p) => p.missing)).toBe(true);
+    expect(powers.map((p) => p.on)).toEqual([true, true, true, true, true, true, false, false]);
+    expect(powers.map((p) => p.entityId)).toEqual(
+      keys.map((key) => `switch.crop_steering_ai_power_${key}`),
+    );
+  });
+  it("has one line of help for each power, and short plain labels with no entity ids", () => {
+    for (const power of AI_POWERS) {
+      const help = SETTING_COPY[`ai_power_${power.key}`]?.tooltip ?? "";
+      expect(help, power.key).not.toBe("");
+      expect(`${power.label} ${help}`, power.key).not.toMatch(/_|switch\.|sensor\./);
+    }
+    expect(UI_COPY["what the ai assistant may do"].tooltip).toBe(
+      "When a power is off, the AI assistant only advises. It does not change that part.",
+    );
   });
 });

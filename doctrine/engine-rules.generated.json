@@ -313,7 +313,7 @@
     },
     {
       "id": "CT-13",
-      "text": "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge holds it (with one running and able to act, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12; from the first loop the brain cannot act, in dry run, with its budget spent, paused, unavailable or its key refused, the learner writes the threshold again until a lights-on at which the brain can act). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.",
+      "text": "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge holds it (with one running and able to act, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12; from the first loop the brain cannot act, in dry run, with its budget spent, paused, unavailable or its key refused, the learner writes the threshold again until a lights-on at which the brain can act). With the room's set_targets_from_achievable power on and the brain able to act, neither the learner nor the follower of CT-12 writes field capacity, the P1 target or the threshold: the brain sets them (BR-8). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.",
       "verified": true
     },
     {
@@ -356,6 +356,11 @@
     {
       "id": "BR-7",
       "text": "Every answer key the decision catalogue names exists in the code's questions.",
+      "verified": true
+    },
+    {
+      "id": "BR-8",
+      "text": "Each acting directive needs the room's power for it (one switch per power per room): advance by the ramp judge ramp_control, any other advance advance_phase, distrust set_probe_aside, ec_mode ec_mode, setpoint nudge_setpoints, catch_up plan_catch_up, targets set_targets_from_achievable, shot_size tune_shot_sizes. With the power off the envelope refuses it and the answer is advice; a missing switch is the power's default, on for the six that acted before the switches and off for the two new ones. With targets or shot_size on, the values set are admitted as given (only the question's own settings, only numbers) and written clamped only to each setting's own range; dry run still only reports.",
       "verified": true
     }
   ],

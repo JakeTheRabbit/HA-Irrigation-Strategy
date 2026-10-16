@@ -1054,8 +1054,10 @@ export function validateChange(room: RoomView, states: States, change: Change): 
       `switch.${ROOT}${room.room.prefix}zone_${z.id}_manual_override`,
     ]),
   ]);
+  // What the AI assistant may do in the room (brain.ts AI_POWERS): one switch per power.
+  const aiPower = change.entityId.startsWith(`switch.${ROOT}${room.room.prefix}ai_power_`);
   if (
-    safeSwitches.has(change.entityId) &&
+    (safeSwitches.has(change.entityId) || aiPower) &&
     /^(switch|input_boolean)\./.test(change.entityId) &&
     boolean(entity) !== null &&
     typeof change.value === "boolean"

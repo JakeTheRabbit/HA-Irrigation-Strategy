@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { HEARTBEAT_STALE_MS, parseControllerTime } from "./controller-health";
 import { jevIds } from "./jev";
 import { roomStatus } from "./model";
-import type { Controller, EntityState } from "./types";
+import type { Controller, EntityState, States } from "./types";
 
 /** The AI assistant's panel, read from the room's brain sensor `sensor.crop_steering_<prefix>jev` (its id is
  * kept for upgraded installs). The controller publishes it on every provider, under rules too
@@ -210,6 +210,51 @@ export const BRAIN_JUDGES: Record<string, { title: string; may: string }> = {
   },
   alerts: { title: "Alert note", may: "Adds one line to an alert card" },
 };
+/** What the AI assistant may do in a room, in the integration's order (const.AI_POWERS): one switch each,
+ * `switch.crop_steering_<prefix>ai_power_<key>`. With a power off, the AI assistant only advises on it. */
+export const AI_POWERS = [
+  { key: "advance_phase", label: "Start the next phase early", default: true },
+  { key: "ramp_control", label: "End the morning ramp", default: true },
+  { key: "set_probe_aside", label: "Set a probe aside", default: true },
+  { key: "ec_mode", label: "Change the EC steer", default: true },
+  { key: "nudge_setpoints", label: "Adjust maintenance watering", default: true },
+  { key: "plan_catch_up", label: "Apply today's plan day", default: true },
+  {
+    key: "set_targets_from_achievable",
+    label: "Set targets from what a zone reaches",
+    default: false,
+  },
+  { key: "tune_shot_sizes", label: "Tune shot sizes", default: false },
+] as const;
+export type AiPowerKey = (typeof AI_POWERS)[number]["key"];
+export const aiPowerId = (prefix: string, key: string) =>
+  `switch.crop_steering_${prefix}ai_power_${key}`;
+export interface AiPower {
+  key: AiPowerKey;
+  label: string;
+  entityId: string;
+  /** The switch's state; the default while the switch is missing. */
+  on: boolean;
+  default: boolean;
+  /** No usable switch (an integration before the powers, or unavailable): shown at its default, read-only. */
+  missing: boolean;
+}
+/** The room's powers from their switches, the one source of truth; a missing switch reads as its default. */
+export function parsePowers(states: States, prefix: string): AiPower[] {
+  return AI_POWERS.map((power) => {
+    const entityId = aiPowerId(prefix, power.key);
+    const state = states[entityId]?.state;
+    const missing = state !== "on" && state !== "off";
+    return {
+      key: power.key,
+      label: power.label,
+      entityId,
+      on: missing ? power.default : state === "on",
+      default: power.default,
+      missing,
+    };
+  });
+}
 export const judgeTitle = (judge: string) =>
   BRAIN_JUDGES[judge]?.title ??
   (judge ? judge.charAt(0).toUpperCase() + judge.slice(1).replaceAll("_", " ") : "Judge");

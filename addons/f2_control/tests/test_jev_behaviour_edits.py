@@ -13,7 +13,7 @@ TOPICS = {  # each judge's with_doctrine(...) call, as written at its call site
     "channel": ("probe", "ramp"), "ramp": ("ramp", "probe", "ec"), "salt": ("ec", "closed_loop", "stage", "maintenance"),
     "setpoints": ("maintenance", "ec"), "shot": ("probe", "maintenance", "ramp"),
     "stage": ("stage", "ripening", "dryback", "ec", "closed_loop"), "zones": ("probe", "maintenance", "slab"),
-    "balance": ("maintenance", "slab"),
+    "balance": ("maintenance", "slab"), "targets": ("ramp", "dryback", "maintenance"), "shotsize": ("ramp", "maintenance"),
 }
 
 
@@ -29,7 +29,8 @@ def test_the_acting_judges_are_those_whose_answers_can_act():
     acting = set()
     for judge in jev_bridge.judges():
         src = open(sys.modules[type(judge).__module__].__file__, encoding="utf-8").read()
-        if any(f'directive(ctx, "{kind}"' in src for kind in ("advance", "distrust", "ec_mode", "setpoint")):
+        if any(f'directive(ctx, "{kind}"' in src for kind in ("advance", "distrust", "ec_mode", "setpoint")) or (
+                "directive(ctx, self.kind" in src and judge.kind in ("targets", "shot_size")):
             acting.add(judge.name)
     assert acting == set(jev_bridge.ACTING_JUDGES)
 
