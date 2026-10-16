@@ -20,6 +20,12 @@ waits for it to land (defer_exit), so the way out (exit) never overtakes it.
 A finished batch's tank is read MIX_SETTLE_S after its mix stops (_check_mixes): the room's feed EC and pH
 probes against its irrigation EC and pH bands. A reading off its band, or a probe that can't be read, raises
 CS-808, leaves the batch not marked good and refuses a batch an automation asks for, never watering.
+
+pH auto-correct (opt-in per room, _ph_tick): while the room's switch is on, the tank's pH probe is read once
+a minute; a tank that reads off its pH band, plausibly and steadily, for 5 minutes gets a correction (_run_correct):
+held and mixed as a batch is, then a few small doses through the pump with that pH role, each mixed and read again.
+It stops at the band, and on a dose that does not move the pH, an overshoot or a probe that can't be read, which
+also locks it (CS-809) until a person switches it off or the tank is filled again. The rules are ph_correct.py.
 """
 from __future__ import annotations
 
@@ -31,6 +37,8 @@ import threading
 import time
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
+
+import ph_correct
 
 POLL_S = 2.0  # each room's dosing_config is read this often
 READ_S = 1.0  # a dosing pump is read this often during a dose
@@ -69,6 +77,7 @@ REMIND_READS = 3
 REMIND_EVERY_S = 86400.0
 REMIND_CLEAR_PCT = 5.0
 _RUNNING = {"dose": "dosing", "batch": "making a batch"}  # handled_result until it ends
+_KIND = {"dose": "dose", "batch": "batch", "correct": "pH correction"}  # how a job is named to people
 _PUT_BACK = ("name", "volume_entity", "dosing_entity", "dosing_prefix", "power_entity")
 
 
@@ -214,7 +223,9 @@ class DosingRunner:
                 stuck = self._stuck.get(slug)
                 if stuck is not None:
                     return "dosing hardware still on: " + ", ".join(stuck["left"])
-                found = "making a batch"
+                job = self._job
+                correcting = job is not None and job.kind == "correct" and job.room.slug == slug
+                found = "correcting the batch tank's pH" if correcting else "making a batch"
         return found
 
     def step(self):
@@ -425,6 +436,7 @@ class DosingRunner:
         self._show(room, job.config if config is False and job is not None else config)
         if config and job is None:
             self._remind(room, config["batch"])
+            self._ph_tick(room, config)
 
     def _remind(self, room, batch):
         """The refill reminder (CS-906, docs/DOSING.md): nothing refills a batch tank by itself, so once its
@@ -520,7 +532,7 @@ class DosingRunner:
             return self._settle(room, config, request, "refused: another controller is driving this room")
         if busy is not None:
             where = "" if here else f" in room {busy.room.slug}"
-            return self._settle(room, config, request, f"refused: a {busy.kind} is running{where}")
+            return self._settle(room, config, request, f"refused: a {_KIND[busy.kind]} is running{where}")
         if stuck:
             return self._settle(room, config, request, f"refused: {_does(left)} not read off yet")
         if action not in ("dose", "batch"):
@@ -650,7 +662,7 @@ class DosingRunner:
         if job.kind == "dose":  # a single dose never records, or touches, a batch's hold
             fields.update(kind="dose", at=started, request=job.request["id"],
                           by=job.request.get("by"), off=self._dosing_hardware(job.config))
-        if not self._record(job, fields, merge=job.kind == "batch"):
+        if not self._record(job, fields, merge=job.kind != "dose"):
             job.dose = None
             return "refused: the dose could not be written to dosing_state.json"
         self._show(job.room, job.config)
@@ -1339,14 +1351,15 @@ class DosingRunner:
                      "until it reads off.")
         else:
             after = (" and released the hold" if hold else "") + ". The rooms that it held get water again."
+        what = _KIND[job.kind]
         self._alert(
-            job.room.slug, "CS-806", "a batch stopped",
-            f"The batch stopped in its {job.step} step: {reason}. The controller set the power of each "
+            job.room.slug, "CS-806", f"a {what} stopped",
+            f"The {what} stopped in its {job.step} step: {reason}. The controller set the power of each "
             f"dosing pump, the fill valve, the mix pump and the mix valves to off{after}"
             f" Dosed before the stop: {dosed}. Check the tank before the next batch.",
             _event(job.started_at),
         )
-        self._log(f"[{job.room.slug}] dosing: batch stopped in {job.step}: {reason}")
+        self._log(f"[{job.room.slug}] dosing: {what} stopped in {job.step}: {reason}")
         return stuck, hold_left
 
     def _check(self, job, catch=False):
@@ -1501,6 +1514,308 @@ class DosingRunner:
             return "the last batch's mix is not checked yet"
         return f"the last batch's mix check failed ({mix.get('why') or mix.get('verdict')}); make the next batch by hand"
 
+    # ------------------------------------------------------------------ pH auto-correct
+    def _ph_block(self, room):
+        """The room's pH auto-correct record in dosing_state.json (the caller holds the lock): the day and
+        the doses given on it, the latch, and the refusals told today. A file from before it has none."""
+        block = self._block(room)
+        ph = block.get("ph")
+        if not isinstance(ph, dict):
+            ph = block["ph"] = {}
+        ph.setdefault("day", None)
+        ph.setdefault("doses", 0)
+        ph.setdefault("latch", None)
+        if not isinstance(ph.get("told"), dict):
+            ph["told"] = {}
+        return ph
+
+    @staticmethod
+    def _ph_view(block):
+        """What the status shows of pH auto-correct: the doses today and the latch, or None before any."""
+        ph = block.get("ph")
+        if not isinstance(ph, dict):
+            return None
+        return {"day": ph.get("day"), "doses": ph.get("doses", 0), "latch": ph.get("latch")}
+
+    def _today(self):
+        return self._now().astimezone().date().isoformat()
+
+    def _ph_reading(self, probe):
+        """The tank's pH now, or None: no number, a unit the table refuses, or a reading older than
+        ph_correct.PROBE_MAX_AGE_S (or stamped in the future)."""
+        read = self._fetch(probe)
+        state, attributes = read[0], read[1] or {}
+        try:
+            number = float(state)
+        except (TypeError, ValueError):
+            return None
+        if not math.isfinite(number):
+            return None
+        stamp = _aware(read[2] if len(read) > 2 else None)
+        if stamp is None:
+            return None
+        age = (self._now() - stamp).total_seconds()
+        if age < -60 or age > ph_correct.PROBE_MAX_AGE_S:
+            return None
+        return self.c._canonical(probe, "ph", number, attributes.get("unit_of_measurement"),
+                                 keep_unknown=False)[0]
+
+    def _ph_settings(self, room):
+        px = room.prefix
+        return {key: ph_correct.setting(self.c._num_or_none(f"number.crop_steering_{px}ph_correct_{key}"), key)
+                for key in ph_correct.SETTINGS}
+
+    def _ph_fill(self, config):
+        """The tank's last fill stamp (filled_at_entity), which a latch is kept for: a new fill clears it."""
+        stamp = config["batch"].get("filled_at_entity")
+        return self._state(stamp, quick=True) if stamp else None
+
+    def _ph_tick(self, room, config):
+        """pH auto-correct (docs/DOSING.md), once a minute while nothing runs: with the room's switch on and
+        its kill switch on, a tank whose probe reads off the room's feed pH band, plausibly and steadily,
+        for ph_correct.STEADY_S gets a correction (_run_correct). It never acts while a dose, batch or
+        correction runs anywhere, while the room's dosing hardware does not read off, while the room has a
+        hardware fault latched or another controller drives it, or while it is locked after a failure."""
+        live, now = self._live_of(room), self._mono()
+        if live.get("ph_read") is not None and now - live["ph_read"] < ph_correct.READ_EVERY_S:
+            return
+        live["ph_read"] = now
+        watch = live.setdefault("ph_watch", ph_correct.Watch())
+        px = room.prefix
+        if self._state(f"switch.crop_steering_{px}ph_auto_correct", quick=True) != "on":
+            watch.reset()
+            self._ph_unlatch(room, "pH auto-correct was switched off")  # how a person clears the lock
+            return
+        with self._lock:
+            idle = self._job is None and room.slug not in self._stuck
+        if not idle or not self.c._dosing_may_act(room):
+            watch.reset()
+            return
+        probe = getattr(room, "feed_ph_sensor", "")
+        lo = self.c._num(f"number.crop_steering_{px}irrigation_ph_min", 0)
+        hi = self.c._num(f"number.crop_steering_{px}irrigation_ph_max", 0)
+        if not probe or (lo <= 0 and hi <= 0):
+            watch.reset()
+            return
+        ph = self._ph_reading(probe)
+        way = watch.read(ph, lo, hi, now)
+        if way is None:
+            return
+        fill = self._ph_fill(config)
+        with self._lock:
+            latch = deepcopy(self._ph_block(room)["latch"])
+        if latch:
+            if fill is None or _dead(fill) or fill == latch.get("fill"):
+                return  # locked until a person switches it off, or the tank is filled again
+            self._ph_unlatch(room, "the tank was filled again")
+        batch = config["batch"]
+        pump = next((p for p in config["pumps"] if p.get("ph_role") == ph_correct.ROLES[way]), None)
+        why = None
+        if pump is None:
+            why = f"no dosing pump has the pH {way} role (Equipment > Dosing, Dosing setup)"
+        elif not batch.get("mix_pump"):
+            why = "the batch tank has no mixing pump set up, and a dose is never made into a tank that is not mixed"
+        elif float(batch.get("mix_min_w") or 0) > 0 and not batch.get("mix_power_sensor"):
+            why = "the mixing pump has a minimum power but no power sensor to read it"
+        if why is None:
+            why = self._uncalibrated(pump, _profile(config))
+        if why is not None:
+            return self._ph_refuse(room, ph, lo, hi, why)
+        hold = batch.get("hold_entity")
+        if hold and str(self._state(hold)).strip().lower() != "off":
+            return  # something else is dosing, or the hold can't be read: wait
+        if self._hw_state(batch["mix_pump"]) != "off":
+            return  # the tank is being mixed or pumped already: wait
+        if self.c._hardware_fault_block(room) or self.c.duplicate_hold(room):
+            return
+        s = self._ph_settings(room)
+        with self._lock:
+            block = self._ph_block(room)
+            used = block["doses"] if block["day"] == self._today() else 0
+        left = int(s["daily_max"]) - used
+        if left <= 0:
+            return self._ph_refuse(room, ph, lo, hi, f"the {int(s['daily_max'])} doses a day it may give are used")
+        flow = self._device(pump["flow_entity"], "flow")[0]
+        ml = ph_correct.dose_ml(s["dose_s"], flow, float(pump.get("max_ml") or 0))
+        if ml <= 0:
+            return self._ph_refuse(room, ph, lo, hi, f"a {s['dose_s']:g} s dose of {pump['name']} is less than 1 mL")
+        tries = min(int(s["max_tries"]), left)
+        watch.reset()
+        self._log(f"[{room.slug}] dosing: tank pH {ph:g} is off its band ({lo:g} to {hi:g}): correcting with "
+                  f"{pump['name']}, {ml} mL at most {tries} times")
+        self._start(self._run_correct(room, config, pump, way, ph, ml, flow, tries, s, lo, hi, probe, fill))
+
+    def _ph_refuse(self, room, ph, lo, hi, why):
+        """The tank needs correcting and pH auto-correct can't: CS-809, once a day for each reason."""
+        today = self._today()
+        with self._lock:
+            told = self._ph_block(room)["told"]
+            if told.get(why) == today:
+                return
+            told.clear()
+            told[why] = today
+            self._write()
+        self._log(f"[{room.slug}] dosing: pH auto-correct can't correct the tank: {why}")
+        self._alert(room.slug, "CS-809", "pH auto-correct can't correct the batch tank",
+                    f"The batch tank reads pH {ph:g}, outside the feed pH band of the room ({_fmt(lo)} to "
+                    f"{_fmt(hi)}). pH auto-correct is on, but it did not dose: {why}. While the feed pH is "
+                    "outside its band, the source-water gate holds the shots of the room. Correct the tank by "
+                    "hand, or fix the reason. This alert comes again tomorrow while it lasts.",
+                    _event("ph_refused", today))
+
+    def _ph_unlatch(self, room, why):
+        with self._lock:
+            block = self._doc["rooms"].get(room.slug)
+            ph = block.get("ph") if isinstance(block, dict) else None
+            if not isinstance(ph, dict) or not ph.get("latch"):
+                return
+            ph["latch"] = None
+            self._write()
+        self._log(f"[{room.slug}] dosing: pH auto-correct unlocked: {why}")
+
+    def _ph_count(self, room):
+        """One dose pressed: it counts toward the day's doses whatever came of it."""
+        today = self._today()
+        with self._lock:
+            block = self._ph_block(room)
+            if block["day"] != today:
+                block["day"], block["doses"] = today, 0
+            block["doses"] += 1
+            self._write()
+
+    def _run_correct(self, room, config, pump, way, ph, ml, flow, tries, s, lo, hi, probe, fill):
+        """One correction, always settled: recorded before anything moves; the room held and its tank mixed
+        as a batch is (the hold, the close, the mix with its read-back and power check); then up to `tries`
+        doses of `ml` through `pump`, each mixed for mix_min and the tank read again (ph_correct.verdict).
+        Any end but reaching the band locks pH auto-correct (CS-809); every end switches the mix off and
+        releases the hold as a batch does, and what does not read off holds the rooms until it does."""
+        job = _Job(room, config, {"id": None, "by": None}, "correct")
+        job.pump = pump
+        batch = config["batch"]
+        held = self._held_rooms(room, batch)
+        job.started_at = self._now().isoformat()
+        record = {"kind": "correct", "at": job.started_at, "by": None, "off": self._dosing_hardware(config),
+                  "hold": batch.get("hold_entity"), "held": sorted(held), "doses": {}}
+        if not self._record(job, record, merge=True):
+            self._log(f"[{room.slug}] dosing: the pH correction could not be written to dosing_state.json")
+            return
+        with self._lock:
+            self._job = job
+            self._live_of(room)["batch"] = {
+                "step": "idle", "pump": None, "name": "pH correction", "started_at": job.started_at,
+                "step_started_at": None, "steps": [], "result": None, "ended_at": None}
+        stuck, hold_left, told, readings, outcome = [], [], True, [ph], None
+        try:
+            each = min(ml / flow * 1.25 + 20, job.profile["max_dose_s"] + 60) + s["mix_min"] * 60
+            job.deadline = (self._mono() + job.profile["hold_wait_s"] + job.profile["mix_power_s"]
+                            + tries * each + 600)
+            yield from self._hold(job, held)
+            self._close(job, held)
+            yield from self._mix(job)
+            before = ph
+            for _ in range(tries):
+                self._ph_allowed(job)
+                self._begin(job, "dose")
+                with self._lock:
+                    self._live_of(room)["batch"]["pump"] = pump["id"]
+                result = yield from self._dose(job, pump, ml)
+                with self._lock:
+                    self._live_of(room)["batch"]["pump"] = None
+                if not result.startswith("refused"):
+                    self._ph_count(room)
+                if result != "finished":
+                    self._check(job)
+                    raise _Ended(f"{pump['name']}: {result}")
+                self._done(job)
+                yield from self._pause(job, "postmix", s["mix_min"])
+                after = self._ph_reading(probe)
+                readings.append(after)
+                outcome = ph_correct.verdict(way, before, after, lo, hi, s["margin"])
+                if outcome != "again":
+                    break
+                before = after
+            if outcome == "again":
+                outcome = "not enough"
+            hold_left = self._ph_finish(job)
+            result = "finished: " + {"done": "the tank is inside its band",
+                                     "not enough": "the doses did not bring the tank into its band",
+                                     "no response": "a dose did not move the pH",
+                                     "overshot": "the pH went past the other side of its band",
+                                     "not read": "the probe could not be read after the mix"}[outcome]
+        except _Exit:
+            self._exit_off(job)
+            raise
+        except Exception as end:  # _Ended, or anything unforeseen: cleaned up as a batch is
+            if not isinstance(end, _Ended):
+                self._log(f"[{room.slug}] dosing: pH correction error", repr(end))
+            reason = str(end) if isinstance(end, _Ended) else f"an error in the controller ({end!r})"
+            result = f"stopped: {job.step}: {reason}"
+            try:
+                stuck, hold_left = self._ended(job, reason)
+            except Exception as e:
+                self._log(f"[{room.slug}] dosing: pH correction cleanup error", repr(e))
+                stuck, told = self._dosing_hardware(config), False
+        finally:
+            with self._lock:
+                self._job = None
+        with self._lock:
+            view = self._live_of(room)["batch"]
+            view.update(step="idle", pump=None, result=result, ended_at=self._now().isoformat())
+        left = bool(stuck or hold_left)
+        if left:
+            self._hold_stuck(room, stuck, batch.get("hold_entity"), held, "CS-806", "a pH correction stopped",
+                             f"A pH correction that started {job.started_at} ended ({result}).",
+                             "Check the tank before the next dose.", _event(job.started_at), alerted=told)
+        else:
+            with self._lock:
+                self._held.pop(room.slug, None)
+        shown = [None if v is None else round(v, 2) for v in readings]
+        entry = {"kind": "correct", "at": job.started_at, "ended_at": view["ended_at"], "result": result,
+                 "doses": dict(job.doses), "dosed": list(job.dosed), "by": None, "ph": shown}
+        with self._lock:
+            block = self._block(room)
+            if not left:
+                block["inflight"] = None
+            self._add_history(block, entry)
+            if outcome != "done":
+                self._ph_block(room)["latch"] = {"at": job.started_at, "why": result, "fill": fill}
+            self._write()
+        self._log(f"[{room.slug}] dosing: pH correction {result} (pH {shown})")
+        self._show(room, config)
+        if outcome != "done":
+            read = ", then ".join("not readable" if v is None else f"{v:g}" for v in shown)
+            self._alert(room.slug, "CS-809", "the batch tank's pH was not corrected",
+                        f"pH auto-correct started at pH {ph:g}, outside the feed pH band of the room "
+                        f"({_fmt(lo)} to {_fmt(hi)}), and dosed {pump['name']}. It stopped: {result}. The pH "
+                        f"read {read}. pH auto-correct is now locked for this tank: it doses no more until a "
+                        "person switches it off and on again, or the tank is filled again. While the feed pH is "
+                        "outside its band, the source-water gate holds the shots of the room. Check the probe, "
+                        "the pump and the tank, and correct the tank by hand.",
+                        _event("ph", job.started_at))
+        self._safely(self._send_draws)
+
+    def _ph_allowed(self, job):
+        """Before each dose of a correction: it ends when its switch, the room or the room's kill switch
+        went off since it started (no dose is made on its own while a person has stopped the room)."""
+        room = job.room
+        if self._state(f"switch.crop_steering_{room.prefix}ph_auto_correct") != "on":
+            raise _Ended("pH auto-correct was switched off")
+        if not self.c._dosing_may_act(room):
+            raise _Ended("the room or its kill switch was switched off")
+
+    def _ph_finish(self, job):
+        """The end of a correction: the mix pump off and its valves closed (read back), then the hold
+        released (read back) -> the hold when it does not read off."""
+        batch = job.config["batch"]
+        self._begin(job, "finish")
+        stuck = self._switch_off([batch.get("mix_pump"), *(batch.get("mix_valves") or [])])
+        if stuck:
+            raise _Ended(f"{', '.join(stuck)} did not read off")
+        hold = batch.get("hold_entity")
+        hold_left = self._switch_off([hold]) if hold else []
+        self._done(job)
+        return hold_left
+
     # ------------------------------------------------------------------ what does not read off
     def _hold_stuck(self, room, entities, hold, held, code, title, intro, advice, event, alerted):
         """What a dose or batch left not reading off: its rooms held, and _release_stuck switches it
@@ -1529,11 +1844,11 @@ class DosingRunner:
         record = dict(block["inflight"])
         kind = record.get("kind")
         off = [e for e in record.get("off") or [] if isinstance(e, str) and "." in e]
-        hold = record.get("hold") if kind == "batch" and isinstance(record.get("hold"), str) else None
+        hold = record.get("hold") if kind in ("batch", "correct") and isinstance(record.get("hold"), str) else None
         held = {s for s in record.get("held") or [] if isinstance(s, str)} | {slug}
         at = record.get("at")
-        if kind in ("dose", "batch"):
-            intro = (f"A {kind} that started {at} was still running when the controller stopped. It did "
+        if kind in ("dose", "batch", "correct"):
+            intro = (f"A {_KIND[kind]} that started {at} was still running when the controller stopped. It did "
                      "not finish, and the controller does not continue it. The controller set the power of "
                      "its dosing pumps, the fill valve, the mix pump and the mix valves to off"
                      + (". It releases the hold when they read off." if hold else "."))
@@ -1546,8 +1861,8 @@ class DosingRunner:
         self._held[slug] = held
         self._stuck[slug] = self._entry(off, hold, held, "CS-803", "a restart stopped a dose or batch",
                                         _event("restart", at), intro, advice, alerted=None,
-                                        announce=kind in ("dose", "batch"), sent=False)
-        if kind in ("dose", "batch") and not record.get("recovered"):
+                                        announce=kind in ("dose", "batch", "correct"), sent=False)
+        if kind in ("dose", "batch", "correct") and not record.get("recovered"):
             dosed = [d for d in record.get("dosed") or [] if isinstance(d, dict)]
             dose = record.get("dose")
             if isinstance(dose, dict) and not any(d.get("at") == dose.get("at") for d in dosed):
@@ -1792,7 +2107,7 @@ class DosingRunner:
                 "last": block["last"].get(pump["id"]),
             }
         state = ("unavailable" if not config else "idle" if job is None
-                 else "batch" if job.kind == "batch" else "dosing")
+                 else "batch" if job.kind in ("batch", "correct") else "dosing")
         return state, {
             "pumps": pumps,
             "batch": batch,
@@ -1801,6 +2116,7 @@ class DosingRunner:
             "history": block["history"],
             "mix": block.get("mix") if isinstance(block.get("mix"), dict) else None,
             "last_batch": block["last_batch"],
+            "ph_correct": self._ph_view(block),
             "friendly_name": "Dosing (controller)",
         }
 
