@@ -15,6 +15,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AskWhy } from "@/components/ask-why";
+import { DayLanes } from "@/components/day-lanes";
 import { Empty, Heading, time as clock } from "@/components/dashboard";
 import { JevTrouble, jevUsage } from "@/components/jev-status";
 import { Pill } from "@/components/mini-visuals";
@@ -110,6 +111,10 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
           </Button>
         }
       />
+      {room.display.options.show_equipment_lanes && (
+        <DayLanes controller={controller} mode="equipment" />
+      )}
+      {room.display.options.show_room_day_lanes && <DayLanes controller={controller} mode="zones" />}
       <div className="toolbar timeline-toolbar">
         <div className="search-field">
           <Search size={17} />

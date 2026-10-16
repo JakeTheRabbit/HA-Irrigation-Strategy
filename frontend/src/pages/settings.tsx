@@ -31,6 +31,7 @@ import { AllZonesSwitch, RoomPower } from "@/components/room-controls";
 import { SizingUnitPickers, useSizingUnits } from "@/components/zone-sizing";
 import { RunRecords } from "@/components/run-records";
 import { SensingSettings } from "@/components/sensing";
+import { DisplaySettings } from "@/components/display-settings";
 import type { ThemePreference, ThemeSource } from "@/lib/ha-theme";
 import { useWaterView, type WaterView } from "@/lib/water-view";
 import "./settings.css";
@@ -362,6 +363,16 @@ export function Settings({
               </p>
             </div>
           </div>
+        </section>
+        <section className="panel settings-section" id="display">
+          <div className="settings-label">
+            <h2>Display</h2>
+            <p>
+              Extra panels for {controller.room.room.name}. Each one is off until you set it to on.
+              Everyone who opens this room sees the same choice.
+            </p>
+          </div>
+          <DisplaySettings controller={controller} />
         </section>
         <section className="panel settings-section">
           <div className="settings-label">

@@ -1,0 +1,82 @@
+/* Settings › Display › Equipment / Room day lanes (History › Timeline). Grey frame; colour only for
+   what is on (ISA-101). */
+.day-lanes > p,
+.day-lanes-grid {
+  display: grid;
+  gap: 4px;
+  padding: 4px 20px 16px;
+}
+.day-lanes-row,
+.day-lanes-axis {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+}
+.day-lanes-label {
+  overflow: hidden;
+  font-size: var(--text-sm);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.day-lanes-track {
+  position: relative;
+  height: 18px;
+  border-radius: 3px;
+  background: var(--muted);
+}
+.day-lanes-axis .day-lanes-track {
+  height: 16px;
+  background: none;
+}
+.day-lanes-tick {
+  position: absolute;
+  transform: translateX(-50%);
+  color: var(--muted-foreground);
+  font-size: 12px;
+  white-space: nowrap;
+}
+.day-lanes-tick:first-child {
+  transform: none;
+}
+.day-lanes-tick:last-child {
+  transform: translateX(-100%);
+}
+.day-lanes-night {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--foreground) 6%, transparent);
+}
+.day-lanes-phase {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  opacity: 0.22;
+}
+.day-lanes-on {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 2px;
+  background: var(--primary-strong);
+}
+.day-lanes-shot {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  background: var(--primary-strong);
+}
+.day-lanes-now {
+  position: absolute;
+  top: -2px;
+  bottom: -2px;
+  width: 1px;
+  background: var(--foreground);
+}
+@media (max-width: 720px) {
+  .day-lanes-row,
+  .day-lanes-axis {
+    grid-template-columns: 80px minmax(0, 1fr);
+  }
+}

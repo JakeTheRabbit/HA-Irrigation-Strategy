@@ -23,6 +23,7 @@ import {
 import { Heading, Empty } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
 import { ControllerSettings } from "@/components/controller-settings";
+import { HistoryConnection } from "@/components/history-connection";
 import { SetupWizard } from "@/components/setup-wizard";
 import { Pill } from "@/components/mini-visuals";
 import {
@@ -222,6 +223,11 @@ const hardwareFields = [
   ["tank_last_fill_sensor", "Last recorded tank fill", "timestamp"],
   ["tank_fill_entity", "Tank filling status", "binary"],
   ["leaf_temperature_sensor", "Leaf temperature (plant stress card)", "temperature"],
+  // Shown on the dashboard only (Settings › Display); the controller reads none of them.
+  ["camera_entity", "Room camera (display)", "camera"],
+  ["co2_sensor", "CO2 (display)", "co2"],
+  ["ppfd_sensor", "PPFD (display)", "ppfd"],
+  ["dli_sensor", "Daily light integral (display)", "dli"],
 ] as const;
 export function Setup({
   controller,
@@ -325,7 +331,9 @@ export function Setup({
               ? ["switch", "binary_sensor"].includes(c.domain)
               : kind === "light"
                 ? ["light", "switch"].includes(c.domain)
-                : c.domain === "sensor",
+                : kind === "camera"
+                  ? c.domain === "camera"
+                  : c.domain === "sensor",
       )
       .sort((a, b) => {
         const preferred = (c: SetupCandidate) =>
@@ -338,7 +346,19 @@ export function Setup({
                 ? /\bph\b/i.test(c.name)
                   ? 2
                   : 0
-                : 0;
+                : kind === "temperature"
+                  ? /°[CF]/.test(c.unit)
+                    ? 2
+                    : 0
+                  : kind === "co2"
+                    ? /ppm/i.test(c.unit)
+                      ? 2
+                      : 0
+                    : (kind === "ppfd" || kind === "dli")
+                      ? /mol/i.test(c.unit)
+                        ? 2
+                        : 0
+                      : 0;
         return preferred(b) - preferred(a) || a.name.localeCompare(b.name);
       });
   }
@@ -856,6 +876,14 @@ export function Setup({
                             disabled={busy}
                             onChange={(e) => editZone(zone.id, { name: e.target.value })}
                           />
+                          <Input
+                            aria-label={"Zone " + zone.id + " cultivar"}
+                            placeholder="Cultivar (optional)"
+                            maxLength={40}
+                            value={zone.cultivar ?? ""}
+                            disabled={busy}
+                            onChange={(e) => editZone(zone.id, { cultivar: e.target.value })}
+                          />
                         </div>
                         <Button
                           variant="ghost"
@@ -899,6 +927,19 @@ export function Setup({
                             onChange={(v) => editZone(zone.id, { leaf_temperature_sensor: v[0] || "" })}
                           />
                         )}
+                        <MappingPicker
+                          label={zone.name + " root-zone temperature (display)"}
+                          values={
+                            zone.substrate_temperature_sensor
+                              ? [zone.substrate_temperature_sensor]
+                              : []
+                          }
+                          candidates={candidates("temperature")}
+                          disabled={busy}
+                          onChange={(v) =>
+                            editZone(zone.id, { substrate_temperature_sensor: v[0] || "" })
+                          }
+                        />
                       </div>
                       <div className="workspace-form-grid sizing-grid">
                         {(
@@ -1029,7 +1070,7 @@ export function Setup({
         </>
       )}
       {tab === "rooms" && controller.roomId && (
-        <ControllerSettings controller={controller} onDirtyChange={setSettingsDirty} />
+        <><ControllerSettings controller={controller} onDirtyChange={setSettingsDirty} /><HistoryConnection controller={controller} /></>
       )}
       <Dialog
         open={!!review}

@@ -59,6 +59,14 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="Predictions in notifications",
         icon="mdi:crystal-ball",
     ),
+    # OFF until an administrator sets it to on: the zone page then shows each zone's Test shot and
+    # the state of the room's mapped valves, pump and lights (read-only). A test shot still runs
+    # through the controller's full shot sequence; this switch opens nothing itself.
+    SwitchEntityDescription(
+        key="manual_hardware_enabled",
+        name="Hardware panel on zone pages",
+        icon="mdi:valve",
+    ),
     # Opt-in, OFF on new and updated rooms. ON: the controller sends each zone's grow-day summary to the
     # room's grow-day store at lights-on (grow_day_store.py), so grows stay comparable after the recorder
     # purges its readings. It only records: it never changes watering.
@@ -384,6 +392,14 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
 
     async def async_turn_on(self, **kwargs: Any) -> None:
         """Turn on directly; a manual hold stays on until explicitly cleared."""
+        if self.entity_description.key == "manual_hardware_enabled":
+            from .admin import async_require_admin
+
+            context = self._context
+            if context is not None:
+                await async_require_admin(
+                    self.hass, context_call(context), self.entity_id
+                )
         self._cancel_override_timer()
         self._override_deadline = None
         self._attr_is_on = True
@@ -400,3 +416,14 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
     def available(self) -> bool:
         """Return if switch is available."""
         return True
+
+
+def context_call(context):
+    """A stand-in for a service call carrying `context`, for async_require_admin."""
+
+    class _Call:
+        pass
+
+    call = _Call()
+    call.context = context
+    return call
