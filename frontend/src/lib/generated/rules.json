@@ -64,7 +64,7 @@
    "id": "ACT-03",
    "topic": "decisions",
    "priority": 1,
-   "text": "Ending the ramp (ramp): hand over (slab_full, ec_is_feed_front or real_salt) when the last shots no longer lift the retained moisture, or spike and fall straight back, with moisture at or near the ceiling. High pore EC in the first 45 minutes after a shot, with feed below it, is the feed front passing; genuinely high salt also hands over, because maintenance runoff is what removes it. Keep ramping while shots still lift moisture that stays; answer probe_lagging when the last shot has not shown yet. The engine's own rise rule also ends P1, but when the curve already shows full, handing over is right, not redundant. Code admits it only near the ceiling with the minimum ramp shots in (BR-2).",
+   "text": "End P1 when retained moisture no longer rises. The envelope requires minimum ramp shots and either moisture within 3 points of the ceiling or a below-target stall on a trusted probe with drainage not backed up. The engine itself ends P1 on its settled-rise rule, consecutive stall rule, extra-shot cap, budget at target or maximum shots. Pore EC is not an exit gate. A stalled day's re-water point follows the stalled reading minus its learned P2 band.",
    "evidence": "product-rule",
    "params": [
     "p1_target",
@@ -104,7 +104,7 @@
    "id": "ACT-07",
    "topic": "decisions",
    "priority": 1,
-   "text": "Tomorrow's maintenance notch (setpoints): pick one of smaller shots, bigger shots, later re-water, sooner re-water, or keep. Bigger shots drain more and bring pore EC down; smaller shots drain less and let it climb; a later re-water dries the zone further between shots and sends it into the night drier (a larger overnight dryback); a sooner re-water does the opposite. Code moves the zone's own number one 0.5 notch, at most once a grow-day, inside a band around the last value of that number the brain did not write (BR-5). That centre is not always the grower's: this question is asked only with Auto Setpoints on, the learner shifts the threshold with field capacity (CT-12), and any value the brain did not write becomes the band's new centre, so the band moves with the learner and the evidence's 'your value' may be the learner's. A notch is a step from wherever the zone now stands. A rescue shot soon after a change puts the value from before it back and pauses the zone's notches (BR-6). Keep when the zone is on course, and do not answer a learner move or an over_saturated label (CT-14) with a notch.",
+   "text": "Tomorrow's maintenance notch (setpoints): pick one of smaller shots, bigger shots, later re-water, sooner re-water, or keep. Bigger shots drain more and bring pore EC down; smaller shots drain less and let it climb; a later re-water dries the zone further between shots and sends it into the night drier (a larger overnight dryback); a sooner re-water does the opposite. Code moves the zone's own number one 0.5 notch, at most once a grow-day, inside a band around the last value of that number the brain did not write (BR-5). That centre is not always the grower's: this question is asked only with Auto Setpoints on, the learner shifts the threshold with field capacity (CT-12), and any value the brain did not write becomes the band's new centre, so the band moves with the learner and the evidence's 'your value' may be the learner's. A notch is a step from wherever the zone now stands. A rescue shot soon after a change puts the value from before it back and pauses the zone's notches (BR-6). Keep when the zone is on course, and do not answer a learner move or an over_saturated label (CT-14) with a notch. Per setting, the notch budget is at most 0.5 per 24 h and 1.0 per 7 days, with 36 h rest after a refusal or failed move.",
    "evidence": "product-rule",
    "params": [
     "p2_shot_size",
@@ -115,7 +115,7 @@
    "id": "ACT-08",
    "topic": "decisions",
    "priority": 1,
-   "text": "Every other question advises: whether a shot landed, whether an overnight fall is drying or the probe, why a zone's water differs from its siblings', how the zone sits against its stage arc, and the room report and why answers. They never move water. Name what the evidence shows; a setting the brain cannot move (dryback target, P0 wait, EC targets, P1 target and field capacity unless the targets power is on, rescue floor, maximum EC, daily budget and floor, EC stacking, the feed) is a recommendation for a person, worded as one. With Auto Setpoints on, code moves field capacity and the P1 target toward the zone's own peaks, at most a point a grow-day, and never moves the rescue floor (CT-12): a value typed into those two is moved from, not kept, so the recommendation names the cause (probe, delivery, ramp) or turning the switch off, and a field capacity that code has walked down with falling peaks is raised for a person as a suspected probe fault (PRB-14).",
+   "text": "Every other question advises: whether a shot landed, whether an overnight fall is drying or the probe, why a zone's water differs from its siblings', how the zone sits against its stage arc, and the room report and why answers. They never move water. Name what the evidence shows; a setting the brain cannot move (P0 wait, EC targets, maximum EC, daily budget and floor, EC stacking and feed; ladder and dryback only with targets power; first ramp shot only with shot-size power; maximum EC, daily budget and floor, EC stacking, the feed) is a recommendation for a person, worded as one. With Auto Setpoints on, code moves field capacity and the P1 target toward the zone's own peaks, at most a point a grow-day, and never moves the rescue floor (CT-12): a value typed into those two is moved from, not kept, so the recommendation names the cause (probe, delivery, ramp) or turning the switch off, and a field capacity that code has walked down with falling peaks is raised for a person as a suspected probe fault (PRB-14).",
    "evidence": "product-rule",
    "params": []
   },
@@ -139,7 +139,7 @@
    "id": "ACT-11",
    "topic": "decisions",
    "priority": 1,
-   "text": "Setting the targets yourself (targets, set_values): give only the settings you change, each with its number and reason, the result you expect tomorrow and your confidence; none keeps them all. With the room's set_targets_from_achievable power on, code writes them as given, clamped only to each setting's own range; nothing else of code's stops a value, so follow the goal and the rules for the owner's powers (POW-01 to POW-10) yourself. Off, your values are shown as advice.",
+   "text": "For a targets values question, propose only settings you are sure should change. With set_targets_from_achievable on, lasting writes are clamped to engine and entity bounds and validated against the moisture ladder. Dry run or paused AI changes stops them. Off means advice. Confidence alone does not prevent a values write. Give the expected result for comparison with tomorrow's evidence.",
    "evidence": "product-rule",
    "params": [
     "p1_target",
@@ -161,7 +161,7 @@
    "id": "POW-01",
    "topic": "powers",
    "priority": 1,
-   "text": "The owner's powers: a power switched on hands you that setting outright. Code writes your values as given, clamped only to each setting's own range, and keeps none of its usual limits for it (no step limit, no band, no budget). You are trusted to obey the goal and the rules below; break them and the zone pays, not the code.",
+   "text": "Only set_targets_from_achievable and tune_shot_sizes write values, both off by default. Other powers admit bounded directives. Values are clamped to engine bounds intersected with the entity range. HA refuses rescue + 3 > re-water or re-water >= peak. Writes use the zone's own numbers and persist, not expiring overlays. With the targets power on, the Auto Setpoints follower leaves field capacity, P1 target and re-water to the brain. Dry run or paused AI changes prevents action; omit uncertain values because confidence does not gate a values write.",
    "evidence": "product-rule",
    "params": []
   },
@@ -169,7 +169,7 @@
    "id": "POW-02",
    "topic": "powers",
    "priority": 1,
-   "text": "The goal, scored each night per zone and grow-day: P0 reaches the stage's target dryback, (peak - VWC) / peak x 100, by the time the ramp should start, not much more and not much less.",
+   "text": "P0's nightly score compares yesterday's peak with today's reading before the first shot, as relative dryback, against dryback_target. The engine's P0 exit instead uses the drop since lights-on, comparing p0_additional_dryback when positive, otherwise dryback_target. Distinguish the overnight score from the morning exit before changing a target.",
    "evidence": "product-rule",
    "params": []
   },
@@ -193,7 +193,7 @@
    "id": "POW-05",
    "topic": "powers",
    "priority": 1,
-   "text": "The goal for P3 and the room: the overnight dryback is what the stage wants and no rescue shot is needed; the room's zones behave alike, with a water per plant that suits the stage.",
+   "text": "P3's goal is no watering overnight and a stage-appropriate observed overnight dryback, with zone water per plant near the room's usual level. The scorecard counts all night shots, including optional P3 hold shots, as misses; a hold shot is not proof the rescue floor was crossed.",
    "evidence": "product-rule",
    "params": []
   },
@@ -269,7 +269,7 @@
    "id": "RMP-04",
    "topic": "ramp",
    "priority": 1,
-   "text": "Near full, each shot's lasting rise shrinks. The engine ends P1 when a shot at or above the ceiling raises the day's peak by less than half a point, or at the maximum shot count. There is no time-based exit, and pore EC does not hold P1 open: P2 dilution corrects it. The ramp call may still hand over sooner when the curve already shows the slab full (ACT-03).",
+   "text": "At the ceiling, P1 ends on insufficient settled rise, its extra-shot cap, or a spent daily budget. Below the ceiling, consecutive ramp shots without the required rise end it as stalled after minimum shots and the interval, unless the probe is suspect or drainage backs up. The needed rise is p1_rise_pts or 30% of expected shot gain, whichever is larger. The maximum shot count always ends P1. Pore EC does not hold it open; a blocked ramp waits rather than timing out.",
    "evidence": "product-rule",
    "params": [
     "p1_target",
@@ -282,7 +282,7 @@
    "id": "RMP-05",
    "topic": "ramp",
    "priority": 1,
-   "text": "The full mark (field capacity) belongs to this zone: learn it from about five agreeing waterings and expect it to shrink as roots fill the substrate. Judge 'full' against the zone's own recent peaks. With Auto Setpoints on, code sets field capacity to the highest reading of this grow-day or the one before instead (CT-12), so it is only as good as the probe and the zone reads at or over it at every rising peak.",
+   "text": "The full mark (field capacity) belongs to this zone: learn it from about five agreeing waterings and expect it to shrink as roots fill the substrate. Judge 'full' against the zone's own recent peaks. With Auto Setpoints on, code sets field capacity to the highest reading of this grow-day or the one before instead (CT-12), so it is only as good as the probe and the zone reads at or over it at every rising peak. These follower statements apply only with Auto Setpoints on and the targets power off; with that power on the follower stands aside, and the brain must never follow a drifting probe peak.",
    "evidence": "grower-practice",
    "params": [
     "field_capacity",
@@ -311,7 +311,7 @@
    "id": "RMP-08",
    "topic": "ramp",
    "priority": 2,
-   "text": "Let plants transpire for roughly 30 minutes to 2 hours after lights-on before the first shot. The extra fall after lights-on (vendor guidance: about 1-5% of the peak, relative) is planned, not a missed shot. It is the drop P0's dryback_target is compared with: a target near it lets P0 end on the plants' own drinking, while a larger one leaves P0 to its timeout, the bypass (VWC already at the P2 threshold) or the dawn call.",
+   "text": "Let plants transpire for roughly 30 minutes to 2 hours after lights-on before the first shot. The extra fall after lights-on (vendor guidance: about 1-5% of the peak, relative) is planned, not a missed shot. It is the drop P0's dryback_target is compared with: a target near it lets P0 end on the plants' own drinking, while a larger one leaves P0 to its timeout, the bypass (VWC already at the P2 threshold) or the dawn call. The positive p0_additional_dryback setting selects this morning drop without changing the overnight dryback target.",
    "evidence": "vendor",
    "params": [
     "dryback_target",
@@ -346,7 +346,7 @@
    "id": "DRY-02",
    "topic": "dryback",
    "priority": 1,
-   "text": "Units and meaning: relative dryback = points / peak x 100 (a 15-point fall from a 60 peak is 25% relative). The engine's dryback_target is relative and is compared in two places only: P0 ends once the drop since lights-on reaches it (the controller restarts the peak at the lights-on reading), and in the last 3 hours before lights-off P2 hands over early when reaching it from the day's peak, at the current drying rate, needs between the hours left to lights-on and 12 hours. It does not set the overnight dryback, and a large value (the integration's defaults are 40-50) leaves P0 to its timeout and switches the predictive P3 off. Arc and substrate dryback bands describe the overnight dryback: compare them with the zone's observed overnight dryback as code converts it, and never treat them as values for dryback_target. Point bands (true water content) and relative bands (vendor) are not interchangeable; use the converted figures code supplies.",
+   "text": "Dryback points and relative dryback are different units: relative = (peak - VWC) / peak x 100. P0 compares the drop since lights-on with p0_additional_dryback when positive, otherwise dryback_target. Predictive P3 uses the overnight target, measured from the day's peak. With P3 dryback hold on, budgeted hold shots maintain peak x (1 - overnight target / 100); without it the target does not command night watering. Fresh rooms use separate morning and overnight defaults; old rooms keep their values.",
    "evidence": "product-rule",
    "params": [
     "dryback_target"
@@ -364,7 +364,7 @@
    "id": "DRY-04",
    "topic": "dryback",
    "priority": 1,
-   "text": "The rescue floor is a safety limit, not a steering target. Establish the crop's minimum moisture before using any dryback target; no dryback may cross it. In rockwool, below about 25-30% true water content the fibre stops rewetting from the dripper and only a hand-soak recovers it. The engine's P3 emergency floor is this limit. With Auto Setpoints on, code never moves it (CT-12): it stays the operator's.",
+   "text": "The rescue floor is a safety limit, not a steering target. Establish the crop and substrate's safe minimum before deeper dryback. Very dry rockwool may rewet unevenly; do not assume one universal VWC floor applies to every product or calibration. Auto Setpoints never moves the rescue floor. Only the operator, or the targets power under POW-09, may change it, never to hide a fault.",
    "evidence": "grower-practice",
    "params": [
     "p3_emergency_floor"
@@ -416,7 +416,7 @@
    "id": "DRY-10",
    "topic": "dryback",
    "priority": 2,
-   "text": "A zone whose P0 ends on its timeout is not stuck: whenever dryback_target is larger than the morning drop, P0 waits for its timeout (or the bypass) unless the dawn call starts the ramp sooner (ACT-02). Changing dryback_target or the P0 wait is the grower's setting.",
+   "text": "A zone whose P0 ends on its timeout is not stuck: whenever the P0 target (p0_additional_dryback when positive, otherwise dryback_target) is larger than the morning drop, P0 waits for its timeout (or the bypass) unless the dawn call starts the ramp sooner (ACT-02). Changing the P0 target (p0_additional_dryback when positive, otherwise dryback_target) or the P0 wait is the grower's setting. With the targets power on, authorised target changes follow POW-01.",
    "evidence": "product-rule",
    "params": [
     "dryback_target",
@@ -427,7 +427,7 @@
    "id": "DRY-11",
    "topic": "dryback",
    "priority": 1,
-   "text": "In this software the overnight dryback is set by when the day's watering stops and how wet P2 leaves the zone at that point. The brain's levers are the dusk call (end P2 in the last 3 hours, only for a zone steered generative, never within 3 points of the rescue floor) and the re-water threshold notch. The engine's own predictive P3 cannot pass with a dark period of 12 hours or more, nor when reaching dryback_target would take more than 12 hours, so P2 then waters until lights-off.",
+   "text": "In this software the overnight dryback is set by when the day's watering stops and how wet P2 leaves the zone at that point. The brain's levers are the dusk call (end P2 in the last 3 hours, only for a zone steered generative, never within 3 points of the rescue floor) and the re-water threshold notch. The engine's own predictive P3 cannot pass with a dark period of 12 hours or more, nor when reaching dryback_target would take more than 12 hours, so P2 then waters until lights-off. Optional P3 hold waters to the overnight target inside the budget; the targets power can change its target under POW-01.",
    "evidence": "product-rule",
    "params": [
     "p2_threshold"
@@ -469,7 +469,7 @@
    "id": "MNT-05",
    "topic": "maintenance",
    "priority": 2,
-   "text": "The minimum daily volume is a safety floor that does not wait for a low reading (only the anti-drown ceiling and the p2_min_interval_min gap after the last shot hold it back), not a target. It exists only where the install configured it: the integration has no setting for it (it is a per-plant helper made by hand, times the plant count), so a fresh install runs without it, and the controller switches it off for a zone whose table is backing up.",
+   "text": "The configured min_daily_ml_per_plant number times plant_count / 1000 gives the daily volume floor. Its default is zero, off. An old manually created helper can be read in its place. It runs inside the daily cap and anti-drown ceiling, after the shot interval, and is disabled while drainage backs up. It is a safety floor, not a feeding target.",
    "evidence": "grower-practice",
    "params": [
     "min_daily_volume"
@@ -540,7 +540,7 @@
    "id": "EC-05",
    "topic": "ec",
    "priority": 2,
-   "text": "Where the daily peak sits sets the runoff: aim it above field capacity (but below saturation) to drive drainage, at or under field capacity to hold drainage back. A peak above saturation is unreachable. With Auto Setpoints on, field capacity is the zone's own peak (CT-12), so judge this by the runoff, not by the field capacity number.",
+   "text": "Where the daily peak sits sets the runoff: aim it above field capacity (but below saturation) to drive drainage, at or under field capacity to hold drainage back. A peak above saturation is unreachable. With Auto Setpoints on, field capacity is the zone's own peak (CT-12), so judge this by the runoff, not by the field capacity number. These follower statements apply only with Auto Setpoints on and the targets power off; with that power on the follower stands aside, and the brain must never follow a drifting probe peak.",
    "evidence": "vendor",
    "params": [
     "p1_target",
@@ -625,7 +625,7 @@
    "id": "EC-15",
    "topic": "ec",
    "priority": 1,
-   "text": "Engine mechanics: with EC stacking on, every 30 minutes in P2 the controller shifts the P2 threshold toward +1 point when settled EC is over 110% of the P2 target (water sooner) or -1 point when under 90% (dry further), within +/-20% of the base threshold; an optional PID does the same job. With stacking off there is no threshold shift. Either way, P2 fires a dilute shot when EC exceeds 1.2x target (feed dilutive, interval passed), and ec_adjust scales every ramp and top-up shot by EC. To change the operating EC, move the EC target (a person's setting), not the threshold.",
+   "text": "Engine mechanics: with EC stacking on, every 30 minutes in P2 the controller shifts the P2 threshold toward +1 point when settled EC is over 110% of the P2 target (water sooner) or -1 point when under 90% (dry further), within +/-20% of the base threshold; an optional PID does the same job. With stacking off there is no threshold shift. Either way, P2 fires a dilute shot when EC exceeds 1.2x target (feed dilutive, interval passed), and ec_adjust scales every ramp and top-up shot by EC. To change the operating EC, move the EC target (a person's setting), not the threshold. The salt power can hold the offset or halve it every 30 minutes instead of stepping.",
    "evidence": "product-rule",
    "params": [
     "ec_target_p2",
@@ -751,7 +751,7 @@
    "id": "PRB-14",
    "topic": "probe",
    "priority": 1,
-   "text": "With Auto Setpoints on, a zone's targets follow its probe: field capacity and the P1 target move toward its highest counted readings, and the re-water threshold with field capacity, each at most a point a grow-day; a zone whose probe is set aside is not followed, and the rescue floor never moves (CT-12). A probe drifting low (daily peaks falling over several grow-days with shots, climate and siblings unchanged) drags those three down a point a day; one drifting high ratchets them up and the zone runs wetter. Nothing in code catches this and the brain cannot move field capacity: name it as suspected probe drift for a person, with the moves the evidence shows, answer the probe question from the shots (ACT-06), and never chase it with a notch.",
+   "text": "With Auto Setpoints on, a zone's targets follow its probe: field capacity and the P1 target move toward its highest counted readings, and the re-water threshold with field capacity, each at most a point a grow-day; a zone whose probe is set aside is not followed, and the rescue floor never moves (CT-12). A probe drifting low (daily peaks falling over several grow-days with shots, climate and siblings unchanged) drags those three down a point a day; one drifting high ratchets them up and the zone runs wetter. Nothing in code catches this and the brain cannot move field capacity: name it as suspected probe drift for a person, with the moves the evidence shows, answer the probe question from the shots (ACT-06), and never chase it with a notch. These follower statements apply only with Auto Setpoints on and the targets power off; with that power on the follower stands aside, and the brain must never follow a drifting probe peak.",
    "evidence": "product-rule",
    "params": []
   },
@@ -1047,7 +1047,7 @@
    "id": "FEED-01",
    "topic": "feed",
    "priority": 1,
-   "text": "The source-water gate has two halves, feed EC and feed pH, and each runs only when its feed sensor is configured and its band is set. The feed sensors default to empty, so neither half runs on a fresh install; the pH band ships set, the EC band does not. A running half holds every shot while the feed is out of band, and holds once its probe has been dead past the grace window (correct, fail-closed). External holds (dosing, fill, flush) apply only where the install configured them. Without a live or recent feed EC reading, nothing checks the feed's strength and the engine's dilutive test (feed EC below pore EC) uses an assumed feed EC of 3.0, not a measurement: treat the feed as unchecked and any dilutive judgement, flush or block as unverified, and say so rather than acting on it. A feed EC figure in the evidence may be that assumed 3.0, not a reading, unless the evidence marks it measured. A held zone with rising pore EC is waiting on the feed, not mistuned.",
+   "text": "Read feed EC from a live or recent mapped sensor. Without that measurement, the dilution comparison uses declared recipe EC where available, otherwise the fallback 3.0 mS/cm. These are assumptions, not measurements: mark the feed unchecked and do not claim a measured feed strength.",
    "evidence": "product-rule",
    "params": []
   },
@@ -1175,7 +1175,7 @@
    "id": "BRN-02",
    "topic": "contract",
    "priority": 1,
-   "text": "The model selects within a finite action set that code generates and may explain its choice; it never invents setpoints, edits an approved plan or recipe, or bypasses a gate. An independent validator still decides whether the pick executes.",
+   "text": "The model chooses among code-generated directives, or proposes values only under the two owner's powers (POW-01). It never edits an approved plan or recipe or bypasses a gate. Code validates whether a proposed action executes.",
    "evidence": "product-rule",
    "params": []
   },
@@ -1191,7 +1191,7 @@
    "id": "BRN-04",
    "topic": "contract",
    "priority": 2,
-   "text": "Approved plan revisions are immutable. The brain's phase calls, EC steer modes and probe set-asides are directives that expire on their own, and so is a setpoint notch: it is written to the zone's own number as an overlay that goes back to the operator's own value at the lights-on that ends the grow-day it is for. The rescue-shot revert (BR-6), a person's edit, Keep or Undo, or an Auto Setpoints move ends it sooner. Judge from the value the zone holds now, as the evidence shows it.",
+   "text": "Approved plan revisions are immutable. The brain's phase calls, EC steer modes and probe set-asides are directives that expire on their own, and so is a setpoint notch: it is written to the zone's own number as an overlay that goes back to the operator's own value at the lights-on that ends the grow-day it is for. The rescue-shot revert (BR-6), a person's edit, Keep or Undo, or an Auto Setpoints move ends it sooner. Judge from the value the zone holds now, as the evidence shows it. Owner-power values are lasting writes, not overlays.",
    "evidence": "product-rule",
    "params": []
   },
@@ -1385,14 +1385,12 @@
    "note": "ec_target_veg_p0..p2 | ec_target_gen_p0..p2"
   },
   "p3_emergency_floor": {
-   "settings": [
-    "p3_emergency_vwc_threshold"
-   ],
+   "settings": [],
    "bounds": [
     10.0,
     65.0
    ],
-   "note": "p3_emergency_vwc_threshold (the rescue floor; with Auto Setpoints on, shifted with field capacity, down as well as up, and lowered to stay 3 points under the threshold)"
+   "note": "p3_emergency_vwc_threshold; Auto Setpoints never moves it; only the operator or authorised targets power"
   },
   "p3_emergency_shot": {
    "settings": [
@@ -1420,7 +1418,7 @@
     0.0,
     500.0
    ],
-   "note": "no integration setting: a per-zone helper the install creates by hand (min_daily_ml_per_plant) x the zone's plant_count / 1000. Absent on a fresh install, so the floor is 0 (off); the controller also sets it to 0 for a zone whose table is backing up"
+   "note": "min_daily_ml_per_plant x plant_count / 1000, default zero off; legacy helper accepted; zero while drainage backs up"
   },
   "field_capacity": {
    "settings": [
@@ -1465,7 +1463,7 @@
     50.0,
     100.0
    ],
-   "note": "an optional per-zone number min_floor_drown_ceiling the install creates by hand (the integration creates none); default 90"
+   "note": "optional min_floor_drown_ceiling, fallback field_capacity + 5 within 50-100"
   },
   "p2_min_interval_min": {
    "settings": [],
@@ -1473,7 +1471,7 @@
     1.0,
     120.0
    ],
-   "note": "fixed 10 min (no setting)"
+   "note": "ec_min_interval, minutes between EC-correction shots, default 10"
   },
   "min_floor_finish_h": {
    "settings": [],
