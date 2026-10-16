@@ -32,7 +32,6 @@ OPTIONS: dict[str, dict] = {
     "show_climate": {"default": False},
     "show_substrate_temp": {"default": False},
     "zone_day_deltas": {"default": False},
-    "show_hardware": {"default": False},
     # History
     "show_equipment_lanes": {"default": False},
     "show_room_day_lanes": {"default": False},
