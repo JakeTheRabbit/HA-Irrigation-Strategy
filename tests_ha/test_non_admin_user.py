@@ -56,6 +56,10 @@ CHANGES = {
     "notify": {"key": "k", "title": "t", "message": "m"},
     # An ask spends the room's AI budget.
     "brain_ask": {"room_id": ROOM, "question": "why?"},
+    "brain_prompt_save": {"room_id": ROOM, "expected_revision": 0, "config": {}},
+    "brain_prompt_rollback": {"room_id": ROOM, "expected_revision": 0, "revision": 0},
+    "brain_prompt_rebuild": {"room_id": ROOM, "expected_revision": 0},
+    "brain_prompt_publish": {"room_id": ROOM, "expected_revision": 0, "live": {}},
     # What the dashboard shows in the room, for everyone who opens it.
     "display_save": {"room_id": ROOM, "expected_revision": 0, "options": {"show_climate": True}},
     "save_recipe": {"recipe": {}},
@@ -73,6 +77,7 @@ CHANGES = {
 READS = {
     "harvests_get": {"room_id": ROOM},
     "strategy_get": {"room_id": ROOM},
+    "brain_prompt_get": {"room_id": ROOM},
     "strategy_preview": {"room_id": ROOM},
     "runs_get": {"room_id": ROOM},
     "grow_days_get": {"room_id": ROOM},

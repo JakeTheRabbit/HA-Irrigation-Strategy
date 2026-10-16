@@ -1,0 +1,10 @@
+[
+  {"id":"AI-INSTRUCTIONS","entity":"brain_prompt.config.notes","kind":"option","scope":"room","default":"","group":"AI assistant","label":"House notes","help":"Administrator context in block C; empty preserves the existing prompt."},
+  {"id":"AI-INSTRUCTIONS","entity":"brain_prompt.config.profile","kind":"option","scope":"room","default":"{}","group":"AI assistant","label":"Grow context","help":"Optional structured room facts; does not change live substrate, stage, targets or sizing."},
+  {"id":"AI-CACHE","entity":"brain_prompt.config.cache.ttl","kind":"option","scope":"room","default":"1h","group":"AI assistant","label":"System cache TTL","help":"5 minutes or 1 hour; evidence remains at 5 minutes."},
+  {"id":"AI-CACHE","entity":"brain_prompt.config.cache.A","kind":"option","scope":"room","default":"true","group":"AI assistant","label":"Block A breakpoint","help":"Later breakpoints can also cache A because caching covers the cumulative prefix."},
+  {"id":"AI-CACHE","entity":"brain_prompt.config.cache.B","kind":"option","scope":"room","default":"true","group":"AI assistant","label":"Block B breakpoint","help":"Cache the cumulative prefix through the stage and substrate tables."},
+  {"id":"AI-CACHE","entity":"brain_prompt.config.cache.C","kind":"option","scope":"room","default":"true","group":"AI assistant","label":"Block C breakpoint","help":"Only present when room notes or structured context are set."},
+  {"id":"AI-CACHE","entity":"brain_prompt.config.cache.evidence","kind":"option","scope":"room","default":"true","group":"AI assistant","label":"Evidence breakpoint","help":"Keep the existing 5-minute evidence breakpoint; off removes it from future requests."}
+]
+

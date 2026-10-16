@@ -62,102 +62,6 @@
       "restore": "NEW-03"
     },
     {
-      "help": "Alert when rescue shots fail to raise moisture; never holds watering.",
-      "settings": [
-        {
-          "key": "rescue_miss_action",
-          "scope": "room",
-          "default": "Off",
-          "domain": "select"
-        },
-        {
-          "key": "rescue_miss_count",
-          "scope": "room",
-          "default": 4.0,
-          "domain": "number"
-        }
-      ],
-      "group": "safety",
-      "label": "Rescue misses",
-      "id": "lf_10"
-    },
-    {
-      "help": "Allow P3 emergency and watchdog rescues past a dead feed probe; bad readings and other interlocks still hold.",
-      "settings": [
-        {
-          "key": "rescue_past_dead_feed_probe",
-          "scope": "room",
-          "default": false,
-          "domain": "switch"
-        }
-      ],
-      "group": "safety",
-      "label": "Rescues past dead feed probe",
-      "id": "lf_11"
-    },
-    {
-      "help": "Choose Close for each shot to close and verify the waste valve before the pump primes.",
-      "settings": [
-        {
-          "key": "waste_valve_rule",
-          "scope": "room",
-          "default": "Off",
-          "domain": "select"
-        }
-      ],
-      "group": "safety",
-      "label": "Waste valve rule",
-      "id": "lf_114"
-    },
-    {
-      "help": "Test Shot seconds; maximum duration and daily budget still apply.",
-      "settings": [
-        {
-          "key": "manual_shot_seconds",
-          "scope": "zone",
-          "default": 10.0,
-          "domain": "number"
-        }
-      ],
-      "group": "safety",
-      "label": "Manual shot length",
-      "id": "lf_13"
-    },
-    {
-      "help": "Capacity in litres enables the estimate when no tank level sensor is mapped; zero disables.",
-      "settings": [
-        {
-          "key": "tank_estimate_low_pct",
-          "scope": "room",
-          "default": 20.0,
-          "domain": "number"
-        },
-        {
-          "key": "tank_size_l",
-          "scope": "room",
-          "default": 0.0,
-          "domain": "number"
-        }
-      ],
-      "group": "safety",
-      "label": "Tank size for estimate",
-      "id": "lf_51"
-    },
-    {
-      "help": "Alert after 60 seconds above this power with all valves shut and no active hold or batch.",
-      "settings": [
-        {
-          "key": "pump_deadhead_watts",
-          "scope": "room",
-          "default": 20.0,
-          "domain": "number"
-        }
-      ],
-      "group": "safety",
-      "label": "Pump dead-head power",
-      "id": "lf_70"
-    },
-    {
       "id": "auto_setpoints",
       "group": "phases",
       "label": "Auto setpoints",
@@ -998,6 +902,102 @@
         }
       ],
       "alsoOn": "equipment/probes"
+    },
+    {
+      "help": "Alert when rescue shots fail to raise moisture; never holds watering.",
+      "settings": [
+        {
+          "key": "rescue_miss_action",
+          "scope": "room",
+          "default": "Off",
+          "domain": "select"
+        },
+        {
+          "key": "rescue_miss_count",
+          "scope": "room",
+          "default": 4.0,
+          "domain": "number"
+        }
+      ],
+      "group": "safety",
+      "label": "Rescue misses",
+      "id": "lf_10"
+    },
+    {
+      "help": "Allow P3 emergency and watchdog rescues past a dead feed probe; bad readings and other interlocks still hold.",
+      "settings": [
+        {
+          "key": "rescue_past_dead_feed_probe",
+          "scope": "room",
+          "default": false,
+          "domain": "switch"
+        }
+      ],
+      "group": "safety",
+      "label": "Rescues past dead feed probe",
+      "id": "lf_11"
+    },
+    {
+      "help": "Choose Close for each shot to close and verify the waste valve before the pump primes.",
+      "settings": [
+        {
+          "key": "waste_valve_rule",
+          "scope": "room",
+          "default": "Off",
+          "domain": "select"
+        }
+      ],
+      "group": "safety",
+      "label": "Waste valve rule",
+      "id": "lf_114"
+    },
+    {
+      "help": "Test Shot seconds; maximum duration and daily budget still apply.",
+      "settings": [
+        {
+          "key": "manual_shot_seconds",
+          "scope": "zone",
+          "default": 10.0,
+          "domain": "number"
+        }
+      ],
+      "group": "safety",
+      "label": "Manual shot length",
+      "id": "lf_13"
+    },
+    {
+      "help": "Capacity in litres enables the estimate when no tank level sensor is mapped; zero disables.",
+      "settings": [
+        {
+          "key": "tank_estimate_low_pct",
+          "scope": "room",
+          "default": 20.0,
+          "domain": "number"
+        },
+        {
+          "key": "tank_size_l",
+          "scope": "room",
+          "default": 0.0,
+          "domain": "number"
+        }
+      ],
+      "group": "safety",
+      "label": "Tank size for estimate",
+      "id": "lf_51"
+    },
+    {
+      "help": "Alert after 60 seconds above this power with all valves shut and no active hold or batch.",
+      "settings": [
+        {
+          "key": "pump_deadhead_watts",
+          "scope": "room",
+          "default": 20.0,
+          "domain": "number"
+        }
+      ],
+      "group": "safety",
+      "label": "Pump dead-head power",
+      "id": "lf_70"
     },
     {
       "help": "Minimum minutes in P0; the low moisture bypass remains available.",

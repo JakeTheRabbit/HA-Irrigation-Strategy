@@ -1472,3 +1472,106 @@ history_long:
       required: true
       selector:
         text:
+
+brain_prompt_get:
+  name: Read AI instructions
+  description: Read saved room context, history and the controller's published prompt snapshot.
+  fields:
+    room_id:
+      name: Room
+      description: Canonical room id, such as room:tent_.
+      required: true
+      selector:
+        text:
+brain_prompt_save:
+  name: Save AI instructions
+  description: Administrator-only revisioned context and cache preferences; never changes shipped doctrine or safety rules.
+  fields:
+    room_id:
+      name: Room
+      description: Canonical room id.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: Last revision read by the editor.
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    config:
+      name: Configuration
+      description: Notes, structured profile and cache preferences.
+      required: true
+      selector:
+        object:
+brain_prompt_rollback:
+  name: Restore saved AI instructions
+  description: Administrator-only restore of a previous revision as a new version.
+  fields:
+    room_id:
+      name: Room
+      description: Canonical room id.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: Current revision.
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    revision:
+      name: Revision to restore
+      description: Previous revision in the room history.
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+brain_prompt_rebuild:
+  name: Rebuild local AI prompt
+  description: Administrator-only request for local regeneration next controller pass; never purges a provider cache or makes a paid call.
+  fields:
+    room_id:
+      name: Room
+      description: Canonical room id.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: Current revision.
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+brain_prompt_publish:
+  name: Publish controller AI prompt
+  description: Controller-only administrator publication of the actual built prompt snapshot with verified block hashes.
+  fields:
+    room_id:
+      name: Room
+      description: Canonical room id.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: Configuration revision used to build the prompt.
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    live:
+      name: Built prompt
+      description: Controller-built A/B/C text, SHA-256 hashes and source paths.
+      required: true
+      selector:
+        object:
