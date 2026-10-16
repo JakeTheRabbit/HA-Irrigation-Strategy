@@ -856,7 +856,12 @@ function demoJev(
   put(`sensor.crop_steering_${prefix}zone_3_jev`, "watching", {
     judges: {
       shot: judge("landed", 0.93, null, "no action"),
-      setpoints: judge("smaller_shots", 0.7, "setpoint p2_shot_size 4", "inside the AI assistant's range"),
+      setpoints: judge(
+        "smaller_shots",
+        0.7,
+        "setpoint p2_shot_size 4",
+        "inside the AI assistant's range",
+      ),
     },
     setpoints: setpoints(3),
     friendly_name: "Zone 3 AI assistant",
@@ -1505,10 +1510,12 @@ export function demoWaterRecord(
   const samples: Record<string, CounterSample[]> = {};
   for (const entityId of request.entityIds) {
     const match = entityId.match(
-      /^sensor\.crop_steering_(.*?)zone_(\d+)_daily_water_(?:app|usage)$/,
+      /^sensor\.crop_steering_(.*?)zone_(\d+)_(daily_water_(?:app|usage)|irrigation_count_app|irrigations_today)$/,
     );
     if (!match || !states[entityId]) continue;
-    const [, prefix, zone] = match;
+    const [, prefix, zone, counter] = match;
+    // The shot counter: a ramp of about six shots, and maintenance shots that grow with the plants.
+    const shots = !counter.startsWith("daily_water");
     const hour = (key: string, fallback: number) =>
       numeric(states[`number.crop_steering_${prefix}lights_${key}_hour`]) ?? fallback;
     const on = hour("on", 8);
@@ -1528,15 +1535,23 @@ export function demoWaterRecord(
         const total =
           age < 1
             ? 0
-            : grow.scale *
-              Math.min(
-                38,
-                16 +
-                  0.9 * age +
-                  1.6 * Number(zone) +
-                  (prefix ? 2 : 0) +
-                  2.5 * Math.sin(1.7 * age + Number(zone)),
-              );
+            : shots
+              ? Math.round(
+                  Math.min(
+                    18,
+                    7 + 0.22 * age + 1.5 * Math.sin(0.9 * age + Number(zone) + 3 * grow.scale),
+                  ) *
+                    (0.5 + 0.5 * grow.scale),
+                )
+              : grow.scale *
+                Math.min(
+                  38,
+                  16 +
+                    0.9 * age +
+                    1.6 * Number(zone) +
+                    (prefix ? 2 : 0) +
+                    2.5 * Math.sin(1.7 * age + Number(zone)),
+                );
         // One reading at the end of each hour; a daylight-saving grow-day has 23 or 25 of them.
         const from = lightsOn(day);
         for (let time = from + 3_600_000 - 1; time < lightsOn(addDays(day, 1)); time += 3_600_000) {
@@ -1545,7 +1560,10 @@ export function demoWaterRecord(
             Math.max(0, ((time + 1 - from) / 3_600_000 - 1) / (photoperiod - 3)),
           );
           if (time >= request.start && time <= request.end)
-            list.push({ time, value: Math.round(total * share * 100) / 100 });
+            list.push({
+              time,
+              value: shots ? Math.round(total * share) : Math.round(total * share * 100) / 100,
+            });
         }
       }
     samples[entityId] = list;

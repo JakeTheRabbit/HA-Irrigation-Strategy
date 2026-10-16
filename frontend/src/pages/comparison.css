@@ -243,3 +243,84 @@
     min-height: 180px;
   }
 }
+/* By grow week, charted: one hue per run, a blue and amber pair that colour-vision deficiency keeps
+   apart, each 3:1 against the card in its theme. Text never wears them. */
+.run-weeks {
+  --rw-run-0: #0277bd;
+  --rw-run-1: #a35f00;
+  --rw-run-2: #7b4fc9;
+  --rw-run-3: #00796b;
+}
+.dark .run-weeks {
+  --rw-run-0: #29b6f6;
+  --rw-run-1: #f0a83c;
+  --rw-run-2: #b39ddb;
+  --rw-run-3: #4db6ac;
+}
+.rw-charts {
+  display: grid;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+.rw-chart-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+}
+.rw-chart-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+.rw-chart-key i {
+  width: 0.9rem;
+  height: 0.55rem;
+  border-radius: 2px;
+}
+.rw-chart-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+.rw-chart {
+  min-width: 0;
+  margin: 0;
+  padding: 0.7rem 0.8rem 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+}
+.rw-chart h3 {
+  font-size: var(--text-sm);
+}
+.rw-chart figcaption p,
+.rw-chart-empty {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.rw-chart-empty {
+  padding: 2rem 0;
+  text-align: center;
+}
+.rw-chart-scroll {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border-radius: 0.4rem;
+}
+.rw-chart-scroll:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.rw-chart-plot {
+  height: 190px;
+  font-size: var(--text-xs);
+}
+@media (max-width: 760px) {
+  .rw-chart-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .rw-chart {
+    padding: 0.6rem 0.5rem 0.4rem;
+  }
+}
