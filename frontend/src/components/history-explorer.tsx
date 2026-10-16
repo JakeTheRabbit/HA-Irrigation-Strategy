@@ -6,6 +6,7 @@ import {
   ComposedChart,
   Line,
   ReferenceArea,
+  ReferenceDot,
   ResponsiveContainer,
   Scatter,
   Tooltip,
@@ -22,10 +23,12 @@ import {
 } from "@/components/ui/sheet";
 import { InfoTip } from "@/components/info-tip";
 import type { RunRecord, RunsDocument } from "@/lib/comparison-types";
-import { phaseBands, valveShots, type TimelineRow } from "@/lib/day-timeline";
+import { growDay, phaseBands, valveShots, type TimelineRow } from "@/lib/day-timeline";
 import {
   alignGrid,
   chunks,
+  DRYBACK_MARKER_DAYS,
+  drybackMarkers,
   EXPLORER_COPY,
   explorerSensors,
   pickRuns,
@@ -77,7 +80,7 @@ interface Loaded {
 /** Recorded history of `ids` over `span` on a grid of `step`, a day at a time, two at a time. A
  * sensor ticked later is read alone; a new range reads everything again. `raw` keeps the rows of
  * a few event entities (valves, phase) as they are. */
-function useGrids(
+export function useGrids(
   controller: Controller,
   ids: string[],
   raw: string[],
@@ -309,6 +312,21 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
         })
       : [];
   const units = [...new Set(visible.map((sensor) => sensor.unit))];
+  // Settings-free overlay (URL dryback=1, off by default): each grow day's peak and the low after
+  // it on this zone's VWC, labelled as the controller measures dryback, on ranges of 14 d at most.
+  const vwcIndex = visible.findIndex((sensor) => sensor.entityId === zone.vwc.entityId);
+  const markers =
+    choice.dryback && span && grid && vwcIndex >= 0 && span.end - span.start <= DRYBACK_MARKER_DAYS * 86_400_000
+      ? (() => {
+          const first = growDay(hour("on"), hour("off"), span.start, timeZone)?.start;
+          if (first === undefined) return [];
+          const starts: number[] = [];
+          for (let t = first; t < span.end; t += 86_400_000) starts.push(t);
+          const times = Array.from({ length: grid.length }, (_, i) => grid.timeAt(i));
+          const values = times.map((_, i) => data[i]?.[`s${vwcIndex}`] ?? null);
+          return drybackMarkers(times, values, starts);
+        })()
+      : [];
   const hasPrevious = data.some((row) =>
     Object.keys(row).some((key) => key[0] === "p" && row[key] !== null),
   );
@@ -523,6 +541,34 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
                               className="history-explorer-previous"
                             />
                           ))}
+                        {markers.flatMap((marker) => [
+                          <ReferenceDot
+                            key={`peak-${marker.peak.t}`}
+                            x={marker.peak.t}
+                            y={marker.peak.value}
+                            yAxisId={`axis-${units.indexOf("%")}`}
+                            r={3}
+                            fill="var(--muted-foreground)"
+                            stroke="none"
+                            className="history-explorer-dryback"
+                          />,
+                          <ReferenceDot
+                            key={`low-${marker.low.t}`}
+                            x={marker.low.t}
+                            y={marker.low.value}
+                            yAxisId={`axis-${units.indexOf("%")}`}
+                            r={3}
+                            fill="var(--surface)"
+                            stroke="var(--muted-foreground)"
+                            className="history-explorer-dryback"
+                            label={{
+                              value: `${marker.percent.toFixed(1)}% of peak`,
+                              position: "bottom",
+                              fill: "var(--muted-foreground)",
+                              fontSize: 12,
+                            }}
+                          />,
+                        ])}
                         {shots.length > 0 && (
                           <Scatter
                             data={shots}
@@ -704,6 +750,16 @@ function Controls({
             onChange={(event) => setChoice({ phases: event.target.checked })}
           />
           Phase bands
+        </label>
+        <label className="history-explorer-check">
+          <input
+            type="checkbox"
+            checked={choice.dryback}
+            onChange={(event) => setChoice({ dryback: event.target.checked })}
+            data-dryback-toggle
+          />
+          Dryback (% of peak)
+          <InfoTip label={EXPLORER_COPY.dryback.label} copy={EXPLORER_COPY.dryback.copy} />
         </label>
       </fieldset>
       <fieldset className="history-explorer-sensors">

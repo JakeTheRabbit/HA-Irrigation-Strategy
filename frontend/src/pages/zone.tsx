@@ -137,7 +137,7 @@ export function ZonePage({
       <ZoneDay key={zone.id} controller={controller} zone={zone} />
       {(display.show_climate || display.show_substrate_temp) && (
         <div className="zone-extras-row">
-          {display.show_climate && <ClimatePanel controller={controller} />}
+          {display.show_climate && <ClimatePanel controller={controller} zone={zone.id} />}
           {display.show_substrate_temp && <RootZonePanel controller={controller} zone={zone} />}
         </div>
       )}

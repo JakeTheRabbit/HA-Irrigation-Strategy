@@ -137,6 +137,42 @@ def validate_relationships(values):
         raise ValueError("Phase EC target exceeds maximum EC")
 
 
+# Climate and feed bands a profile may carry for reference only (the planner's reference rows,
+# Settings > Display). Nothing reads them but the dashboard: not the controller, not a snapshot.
+REFERENCE_BANDS = {
+    "temp_day": (-20, 130),
+    "temp_night": (-20, 130),
+    "humidity": (0, 100),
+    "vpd": (0, 5),
+    "co2": (0, 5000),
+    "ppfd": (0, 3000),
+    "dli": (0, 100),
+    "feed_ph": (0, 14),
+}
+
+
+def reference_bands(value):
+    """PURE. The whole, in-range bands of a profile's reference; a half-typed or unknown one is
+    dropped, never the plan. Empty when there are none."""
+    out = {}
+    for key, (low, high) in REFERENCE_BANDS.items():
+        band = value.get(key) if isinstance(value, dict) else None
+        if (
+            isinstance(band, (list, tuple))
+            and len(band) == 2
+            and all(
+                not isinstance(x, bool)
+                and isinstance(x, (int, float))
+                and math.isfinite(x)
+                and low <= x <= high
+                for x in band
+            )
+            and band[0] <= band[1]
+        ):
+            out[key] = [band[0], band[1]]
+    return out
+
+
 def normalize_plan(plan, zone_ids, catalog):
     """Validate all assignments against this room's actual readable number bounds."""
     if not isinstance(plan, dict) or plan.get("schema_version") != SCHEMA_VERSION:
@@ -180,6 +216,10 @@ def normalize_plan(plan, zone_ids, catalog):
             "vegetative": copy.deepcopy(veg),
             "generative": copy.deepcopy(gen),
         }
+        # Only when it has a band: a plan without reference rows is stored as before.
+        reference = reference_bands(profile.get("reference"))
+        if reference:
+            normalized["reference"] = reference
         normalized_profiles.append(normalized)
         by_id[pid] = normalized
     normalized_zones, seen = [], set()
