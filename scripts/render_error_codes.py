@@ -35,7 +35,7 @@ def render(catalog):
         "does not clear the hardware hold.",
         "",
         "Most alerts stay in Home Assistant until you dismiss them, also after their cause stops. The",
-        "controller removes CS-201, CS-209, CS-308 and CS-309 itself. When you set *Room Active* of a room",
+        "controller removes CS-201, CS-209, CS-210, CS-308 and CS-309 itself. When you set *Room Active* of a room",
         "to off, the controller removes the alerts of the room.",
         "When *Room Active* is off (no plants in the room), the room gives no alerts about water. The",
         "controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309).",

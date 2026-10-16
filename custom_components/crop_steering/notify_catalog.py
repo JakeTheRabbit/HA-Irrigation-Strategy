@@ -61,7 +61,7 @@ KINDS = (
         "with no shots for some time. Also a tank at its minimum, due for a refill "
         "or above its full mark, and a batch tank to refill.",
         "codes": _codes(
-            "CS-202 CS-203 CS-204 CS-205 CS-206 CS-207 CS-208 CS-209 CS-602 CS-609 "
+            "CS-202 CS-203 CS-204 CS-205 CS-206 CS-207 CS-208 CS-209 CS-210 CS-602 CS-609 "
             "CS-901 CS-902 CS-903 CS-904 CS-906"
         ),
         "events": (),

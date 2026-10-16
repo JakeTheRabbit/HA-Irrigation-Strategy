@@ -51,6 +51,7 @@ SHIPPED = {
 # (tests/test_notify_catalog.py). A new code nobody reserved fails until its reservation is added.
 # CS-701 to CS-707 are the brain's today and are never reused.
 RESERVED = {
+    "CS-210": ("fix/missing-hold-entity", "a hold entity Home Assistant does not have"),
     "CS-312": ("feat/max-run-latch", "a pump or valve on past its longest allowed run"),
     "CS-313": ("feat/actuator-domains", "an actuator the controller cannot switch"),
     "CS-502": ("feat/probe-fusion-guarded", "a zone's probes disagree"),
