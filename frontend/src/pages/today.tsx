@@ -304,6 +304,7 @@ function TodayStatus({
     (notice) => notice.severity === "critical" && notice.zoneId === undefined,
   );
   const watering = room.engine.enabled;
+  const tank = room.display.options.today_tank_readout ? tankReadout(controller) : null;
   return (
     <section className="today-head" aria-labelledby="today-title">
       <div className="today-title">
@@ -350,6 +351,11 @@ function TodayStatus({
             {phases.length === 1
               ? `${phases[0]} ${PHASE_NAMES[phases[0]].toLowerCase()}`
               : phases.join(" and ")}
+          </span>
+        )}
+        {tank && (
+          <span className="today-fact muted" data-today-tank="readout">
+            {tank}
           </span>
         )}
         {notices.length > 0 && (
@@ -420,6 +426,19 @@ function NoticeLine({ notice, plain = false }: { notice: Notice; plain?: boolean
       <strong>{notice.title}.</strong> {notice.detail}
     </p>
   );
+}
+
+/** Settings › Display › Tank readout: the feed tank's level, EC and pH as one grey fact of the
+ * room's line, also while all is well (a value out of range still gets the tank line below). Null
+ * when the room has none of them mapped and reading. */
+function tankReadout(controller: Controller): string | null {
+  const tank = tankTelemetry(controller.states, controller.room.room);
+  const parts = [
+    tank.level.value !== null && `${number(tank.level.value, 0)}%`,
+    tank.ec.value !== null && `EC ${number(tank.ec.value, 2)}`,
+    tank.ph.value !== null && `pH ${number(tank.ph.value, 1)}`,
+  ].filter(Boolean);
+  return parts.length ? `Tank ${parts.join(" · ")}` : null;
 }
 
 /** The feed and stock tanks, only when something is low or out of range: one line. */

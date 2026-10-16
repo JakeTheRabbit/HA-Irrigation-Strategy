@@ -16,6 +16,7 @@ import { parseAutoSetpoints } from "./auto-setpoints";
 import { readWaiting } from "./waiting-for";
 import { PHASE_GROUPS, settingWords } from "./setting-words";
 import { growerWords } from "./words";
+import { roomDisplay } from "./display";
 import { numberLimits, registeredControl } from "./features";
 import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
 
@@ -834,6 +835,7 @@ export function buildRoom(states: States, room: Room): RoomView {
       entityId: predictSwitch?.entity_id ?? null,
       enabled: boolean(predictSwitch),
     },
+    display: roomDisplay(states, room.prefix),
   };
 }
 

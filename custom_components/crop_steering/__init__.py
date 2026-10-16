@@ -181,6 +181,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the dosing store
         _LOGGER.warning("Dosing unavailable: %s", err)
 
+    # What the dashboard shows in the room (Settings > Display): every option off until turned on.
+    try:
+        from .display import async_setup_display
+
+        await async_setup_display(hass, entry)
+    except (
+        Exception
+    ) as err:  # pragma: no cover - never block setup on the display options
+        _LOGGER.warning("Display options unavailable: %s", err)
+
     # Tests from the dashboard: a zone's test shot.
     from .selftest import async_setup_selftest
 
@@ -392,6 +402,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .dosing_api import async_unload_dosing
 
     await async_unload_dosing(hass, entry)
+    from .display import async_unload_display
+
+    await async_unload_display(hass, entry)
     from .brain_api import async_unload_brain
 
     await async_unload_brain(hass, entry)

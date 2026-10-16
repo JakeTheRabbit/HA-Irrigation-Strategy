@@ -51,6 +51,8 @@ CHANGES = {
     "notify": {"key": "k", "title": "t", "message": "m"},
     # An ask spends the room's AI budget.
     "brain_ask": {"room_id": ROOM, "question": "why?"},
+    # What the dashboard shows in the room, for everyone who opens it.
+    "display_save": {"room_id": ROOM, "expected_revision": 0, "options": {"show_climate": True}},
     "save_recipe": {"recipe": {}},
     "apply_recipe": {},
     "set_manual_override": {"zone": 1},
@@ -73,6 +75,7 @@ READS = {
     "stock_get": {"room_id": ROOM},
     "calibration_get": {"room_id": ROOM},
     "dosing_get": {"room_id": ROOM},
+    "display_get": {"room_id": ROOM},
     "notify_get": {},
     "whats_new_get": {},
 }

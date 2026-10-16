@@ -14,6 +14,7 @@ import { dateForDay, localDate } from "./grow-plan";
 import { numeric } from "./model";
 import { demoStock, stockAttributes, stockLinks } from "./stock-demo";
 import { TANK_KEYS } from "./tank-level";
+import { DISPLAY_DEFAULTS } from "./display";
 
 export function isDemoLocation(location: Pick<Location, "hostname" | "search">): boolean {
   return (
@@ -126,6 +127,8 @@ export function createDemo(now = Date.now()): States {
     put(`select.crop_steering_${prefix}water_today_view`, "Zone total", {
       options: ["Zone total", "Per plant"],
     });
+    // What the dashboard shows in the room (Settings → Display): every option off until turned on.
+    put(`sensor.crop_steering_${prefix}display`, 0, { ...DISPLAY_DEFAULTS });
     put(`sensor.crop_steering_${prefix}ai_heartbeat`, "online", {
       enable_flag: enable,
       last_beat: new Date(now - 18_000).toISOString(),
