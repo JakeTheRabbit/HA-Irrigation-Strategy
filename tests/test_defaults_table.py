@@ -92,6 +92,8 @@ ENTITY_DEFAULTS_12C6D1A = {
     "sump_pump_flow_lpm": 0.0,
     "runoff_attribution_min": 90.0,
     "hvac_run_power_w": 50.0,
+    "cwsi_lower_baseline": 0.0,  # added after it: both 0 is off (the plant-stress card's CWSI)
+    "cwsi_upper_baseline": 0.0,
 }
 
 # The literal at each controller _zone_num call site at 12c6d1a, plus P3 Time Between Shots, the P1 rise

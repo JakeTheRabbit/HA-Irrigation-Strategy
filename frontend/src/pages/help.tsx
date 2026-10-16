@@ -3,6 +3,7 @@ import { ChevronRight, Search } from "lucide-react";
 import { Heading } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
 import { WhatsNewButton } from "@/components/whats-new";
+import { RulesPanel } from "@/components/sensing";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -77,6 +78,7 @@ export function Help({ controller }: { controller: Controller }) {
         }
       />
       <ErrorCodes />
+      <RulesPanel controller={controller} />
       <section className="panel" aria-labelledby="glossary-title">
         <div className="panel-heading">
           <div>

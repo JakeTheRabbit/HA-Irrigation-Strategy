@@ -550,6 +550,29 @@ NUMBER_DESCRIPTIONS = [
         native_unit_of_measurement="W",
         mode="box",
     ),
+    # The plant-stress card's CWSI baselines: the leaf-minus-air temperature of a well-watered canopy
+    # (lower) and of one that has stopped transpiring (upper), the grower's own. CWSI shows only when
+    # upper is above lower; both 0 (the default) is off. Display only.
+    NumberEntityDescription(
+        key="cwsi_lower_baseline",
+        name="CWSI lower baseline",
+        icon="mdi:thermometer-minus",
+        native_min_value=-15,
+        native_max_value=15,
+        native_step=0.1,
+        native_unit_of_measurement="°C",
+        mode="box",
+    ),
+    NumberEntityDescription(
+        key="cwsi_upper_baseline",
+        name="CWSI upper baseline",
+        icon="mdi:thermometer-plus",
+        native_min_value=-15,
+        native_max_value=15,
+        native_step=0.1,
+        native_unit_of_measurement="°C",
+        mode="box",
+    ),
 ]
 
 # Default values (shared by global + per-zone entities): the entity-default column of the one

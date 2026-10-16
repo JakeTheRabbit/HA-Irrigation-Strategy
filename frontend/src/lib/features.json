@@ -977,6 +977,95 @@
         }
       ],
       "restore": "LF-34"
+    },
+    {
+      "id": "water_vpd_insight",
+      "group": "display",
+      "label": "Water vs VPD",
+      "help": "Keep per grow-day water, quiet dryback rate and VPD records and show how each zone's drying answers VPD (History > Water use); read only.",
+      "settings": [
+        {
+          "domain": "switch",
+          "key": "water_vpd_insight",
+          "scope": "room",
+          "default": false
+        }
+      ],
+      "restore": "LF-28"
+    },
+    {
+      "id": "plant_stress_card",
+      "group": "display",
+      "label": "Plant stress card",
+      "help": "Leaf minus air temperature and leaf VPD on Today and the zone page, where a leaf temperature sensor is mapped in setup (room or zone).",
+      "settings": [
+        {
+          "domain": "switch",
+          "key": "plant_stress_card",
+          "scope": "room",
+          "default": false
+        }
+      ],
+      "restore": "LF-65"
+    },
+    {
+      "id": "cwsi_lower_baseline",
+      "group": "display",
+      "label": "CWSI lower baseline",
+      "help": "Leaf minus air (deg C) of a well-watered canopy, your own; CWSI shows only when the upper baseline is above it.",
+      "settings": [
+        {
+          "domain": "number",
+          "key": "cwsi_lower_baseline",
+          "scope": "room",
+          "default": 0.0
+        }
+      ],
+      "restore": "LF-65"
+    },
+    {
+      "id": "cwsi_upper_baseline",
+      "group": "display",
+      "label": "CWSI upper baseline",
+      "help": "Leaf minus air (deg C) of a canopy that has stopped transpiring, your own; both 0 keeps CWSI off.",
+      "settings": [
+        {
+          "domain": "number",
+          "key": "cwsi_upper_baseline",
+          "scope": "room",
+          "default": 0.0
+        }
+      ],
+      "restore": "LF-65"
+    },
+    {
+      "id": "shot_check",
+      "group": "display",
+      "label": "Shot check",
+      "help": "off | table (last shots and whether the water landed, zone page) | table_and_alert (also CS-701 from code while the AI assistant is off).",
+      "settings": [
+        {
+          "domain": "select",
+          "key": "shot_check",
+          "scope": "room",
+          "default": "off"
+        }
+      ],
+      "restore": "LF-85"
+    },
+    {
+      "id": "manual_hardware_enabled",
+      "group": "display",
+      "label": "Manual hardware controls",
+      "help": "Show operator hardware controls on zone pages. Off until enabled.",
+      "master": {
+        "domain": "switch",
+        "key": "manual_hardware_enabled",
+        "scope": "room",
+        "default": false
+      },
+      "settings": [],
+      "restore": "LF-69"
     }
   ],
   "internal": [

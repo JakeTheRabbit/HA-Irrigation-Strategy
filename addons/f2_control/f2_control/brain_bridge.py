@@ -414,6 +414,7 @@ def zone_context(c, room, zone, snap, p, now, lights_on):
         flower_day=fday, flower_days=fdays, stage=stage_intent(fday, fdays, getattr(c.jev, "arc_rows", STAGE_ROWS)),
         brain=brain_context(c, room, zone, snap, now) if haiku(c) else None,
         steering="vegetative" if c._veg(room, zone) else "generative",
+        cultivar=getattr(room, "zone_cultivars", {}).get(zone),
         room=room.slug, prefix=room.prefix, zone=zone, title=c._zone_title(room, zone), now=now,
         phase=st["phase"], snap=snap, params=p, history=_hist(room, zone), lights_on=lights_on,
         hours_to_on=c._hours_to(now, room.lights_on_hour), hours_to_off=c._hours_to(now, room.lights_off_hour),

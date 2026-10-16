@@ -27,6 +27,7 @@ from .const import (
     SOFTWARE_VERSION,
     SET_PHASE_OPTIONS,
     RUNOFF_ESTIMATOR_MODES,
+    SHOT_CHECK_MODES,
     SUBSTRATES,
     WATER_TODAY_VIEWS,
 )
@@ -102,6 +103,13 @@ SELECT_DESCRIPTIONS = [
         name="Runoff estimator",
         icon="mdi:water-sync",
         options=RUNOFF_ESTIMATOR_MODES,
+    ),
+    # The controller's shot check: off until someone chooses (the AI shot judge alone, as before).
+    SelectEntityDescription(
+        key="shot_check",
+        name="Shot check",
+        icon="mdi:water-check",
+        options=SHOT_CHECK_MODES,
     ),
 ]
 

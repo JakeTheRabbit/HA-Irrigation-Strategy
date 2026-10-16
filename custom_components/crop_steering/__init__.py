@@ -181,6 +181,16 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the dosing store
         _LOGGER.warning("Dosing unavailable: %s", err)
 
+    # What the dashboard shows in the room (Settings > Display): every option off until turned on.
+    try:
+        from .display import async_setup_display
+
+        await async_setup_display(hass, entry)
+    except (
+        Exception
+    ) as err:  # pragma: no cover - never block setup on the display options
+        _LOGGER.warning("Display options unavailable: %s", err)
+
     # Tests from the dashboard: a zone's test shot.
     from .selftest import async_setup_selftest
 
@@ -221,9 +231,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .grow_day_store import async_setup_grow_days
 
     await async_setup_grow_days(hass, entry)
+    from .long_history import async_setup_long_history
+
+    await async_setup_long_history(hass, entry)
     from .setpoint_log import async_setup_setpoint_log
 
     await async_setup_setpoint_log(hass, entry)
+    from .harvest_store import async_setup_harvests
+
+    await async_setup_harvests(hass, entry)
     from .overlays import async_setup_overlays
 
     await async_setup_overlays(hass, entry)
@@ -377,9 +393,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .grow_day_store import async_unload_grow_days
 
     await async_unload_grow_days(hass, entry)
+    from .long_history import async_unload_long_history
+
+    await async_unload_long_history(hass, entry)
     from .setpoint_log import async_unload_setpoint_log
 
     await async_unload_setpoint_log(hass, entry)
+    from .harvest_store import async_unload_harvests
+
+    await async_unload_harvests(hass, entry)
     from .overlays import async_unload_overlays
 
     await async_unload_overlays(hass, entry)
@@ -392,6 +414,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .dosing_api import async_unload_dosing
 
     await async_unload_dosing(hass, entry)
+    from .display import async_unload_display
+
+    await async_unload_display(hass, entry)
     from .brain_api import async_unload_brain
 
     await async_unload_brain(hass, entry)

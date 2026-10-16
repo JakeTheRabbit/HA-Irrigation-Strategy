@@ -113,6 +113,10 @@ DEFAULTS = {
     "sump_pump_flow_lpm": (0.0, None),
     "runoff_attribution_min": (90.0, None),
     "hvac_run_power_w": (50.0, None),
+    # The plant-stress card's CWSI baselines (leaf minus air, deg C), the grower's own. Both 0 is
+    # off; the controller does not read them.
+    "cwsi_lower_baseline": (0.0, None),
+    "cwsi_upper_baseline": (0.0, None),
 }
 
 ENTITY_DEFAULTS = {

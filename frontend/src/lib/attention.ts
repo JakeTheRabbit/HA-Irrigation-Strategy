@@ -157,7 +157,7 @@ export function zoneAttention(input: AttentionInput): Map<number, AttentionReaso
     // The zone's own open notices; its sensor notice says what the probe rule already said.
     for (const notice of notices)
       if (
-        notice.zoneId === zone.id &&
+        (notice.zoneId === zone.id || !!notice.zoneIds?.includes(zone.id)) &&
         notice.severity !== "info" &&
         !(notice.id.endsWith("-sensors") && (zone.vwcIssue || zone.ecIssue))
       )

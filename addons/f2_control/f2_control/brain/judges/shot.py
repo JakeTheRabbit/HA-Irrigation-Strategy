@@ -53,6 +53,7 @@ class _Zone:
     misses: list = field(default_factory=list)  # the last firm "not reaching" shots in a row, oldest first
     verdicts: object = None  # the answer last decided (the brain hands it back on every pass while fresh)
     directive: object = None  # what was decided for it
+    labels: list = field(default_factory=list)  # (shot start, answer label) of the last shots judged, for the shot table
 
 
 def _pct(v):
@@ -165,6 +166,7 @@ class ShotJudge(Judge):
             return None  # an answer with no shot on record
         z.judged = sh.start
         v = verdicts.get("landing")
+        z.labels = (z.labels + [(sh.start, None if v is None else v.label)])[-8:]
         if v is not None and v.firm(0.6) and v.label == "not_reaching_zone":
             z.misses = (z.misses + [sh])[-2:]
         else:
