@@ -32,7 +32,11 @@ export type OperatorAction =
   | "notify_test"
   | "whats_new_get"
   | "whats_new_seen"
-  | "brain_ask";
+  | "brain_ask"
+  | "brain_prompt_get"
+  | "brain_prompt_save"
+  | "brain_prompt_rollback"
+  | "brain_prompt_rebuild";
 
 export interface ParameterLimit {
   value: number | null;

@@ -22,9 +22,11 @@ import { inferPlumbing, plumbingErrors } from "./plumbing";
 import type { Overlay } from "./overlays";
 import { DEMO_WHATS_NEW } from "./whats-new-demo";
 import { compareVersions } from "./whats-new";
+import { InstructionsDemo } from "./brain-instructions";
 
 const clone = <T>(value: T): T => structuredClone(value);
 export class OperatorDemo {
+  private instructions = new InstructionsDemo();
   private runDemo?: RunDemo;
   /** From the start: the tanks drew what the demo's dosing history dosed before it began. */
   private stockDemo: StockDemo;
@@ -430,6 +432,7 @@ export class OperatorDemo {
     }
     if (action === "setpoint_log_get")
       return { schema_version: 1, room_id: data.room_id, changes: [], error: null } as T;
+    if (action.startsWith("brain_prompt_")) return this.instructions.call(action, data) as T;
     if (action.startsWith("overlay_")) return this.overlay(action, data) as T;
     if (action === "brain_ask")
       // The demo has no AI assistant: the question is taken and never answered.

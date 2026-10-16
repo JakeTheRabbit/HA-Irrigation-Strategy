@@ -410,7 +410,7 @@ export default function App() {
                 onDirtyChange={setWorkspaceDirty}
               />
             )}
-            {page === "settings/ai" && <AiSettings key={pageKey} controller={controller} />}
+            {page === "settings/ai" && <AiSettings key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />}
             {page === "help" && <Help controller={controller} />}
           </div>
         </main>

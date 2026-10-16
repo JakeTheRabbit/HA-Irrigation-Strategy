@@ -11,6 +11,7 @@
     { "id": "app", "label": "Controller app", "help": "Options of the controller app. Change them in the app's Configuration tab. They apply when the app restarts." }
   ],
   "features": [
+{"id":"record_grow_days","group":"history","label":"Record grow days","help":"Save daily summaries at lights-on for comparisons beyond Recorder retention.","master":{"domain":"switch","key":"record_grow_days","scope":"room","default":false},"settings":[]},
     {
       "id": "auto_setpoints", "group": "phases", "label": "Auto setpoints",
       "help": "Moves the P1 target and the P2 re-water point to what each zone reaches, and stops the P2 shots in the afternoon for today's dryback.",
