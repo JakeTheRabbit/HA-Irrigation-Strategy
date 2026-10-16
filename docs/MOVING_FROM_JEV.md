@@ -5,9 +5,8 @@ repository (the Jev edition, up to 3.11.1). That line stops at 3.11.1 and carrie
 `HA-Irrigation-Strategy`. A room on the Jev edition keeps running as it is; this page is how to bring it
 across once, without losing its phase, counters, learned values, dosing record or brain.
 
-**When.** Move a production room only to a stable release of this repository that is **3.12.3 or later**.
-The 3.x releases before it were test candidates that were never made stable, and moving to an older
-release would put an older controller on top of a 3.11 state file. A staging room may follow `#testing`.
+**When.** Move a production room only to a stable release **3.12.0 or later** of this repository.
+An older release puts an older controller on top of a 3.11 state file. A staging room can follow `#testing`.
 
 ## Why it is a move and not an update
 
