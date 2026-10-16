@@ -76,8 +76,13 @@ def stage_block(ctx):
     peak = getattr(ctx.snap, "peak_vwc", None)
     rel = (f", which is about {dlo / peak * 100:.0f}-{dhi / peak * 100:.0f} % of this zone's peak"
            if peak and peak > 0 else "")
+    dryback = f"{dlo:g}-{dhi:g} points{rel}"
+    if (brain.get("zone_config") or {}).get("substrate", "generic") == "generic":
+        vendor = st.get("dryback_relative_vendor")
+        dryback = (f"{vendor[0]:g}-{vendor[1]:g}% of peak (vendor starting band)" if vendor else
+                   "unknown for an uncalibrated generic substrate; compare the zone's repeated observations")
     elo, ehi = st["pore_ec_range"]
     rlo, rhi = st["runoff_pct"]
     return (f"flower day {ctx.flower_day} of about {ctx.flower_days}: {st['stage']} (days {lo}-{hi}) on the {arc} "
-            f"arc; the arc steers {st['steering']} here, with an overnight dryback of {dlo:g}-{dhi:g} points{rel}; "
+            f"arc; the arc steers {st['steering']} here, with an overnight dryback of {dryback}; "
             f"pore EC {elo:g}-{ehi:g}; runoff {rlo:g}-{rhi:g} %; the stage moves on when {st['move_on_when']}.{mode}")
