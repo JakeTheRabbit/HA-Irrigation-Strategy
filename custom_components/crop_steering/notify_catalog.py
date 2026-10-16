@@ -21,8 +21,8 @@ KINDS = (
         "when the controller marks it critical.",
         # Every code whose severity is critical in docs/error-codes.json.
         "codes": _codes(
-            "CS-201 CS-202 CS-203 CS-204 CS-207 CS-301 CS-308 CS-310 CS-311 CS-402 "
-            "CS-601 CS-606 CS-801 CS-901 CS-902"
+            "CS-201 CS-202 CS-203 CS-204 CS-207 CS-301 CS-308 CS-310 CS-311 CS-315 "
+            "CS-402 CS-601 CS-606 CS-801 CS-901 CS-902"
         ),
         "events": (),
     },
@@ -33,10 +33,12 @@ KINDS = (
         "hold, or a shot that the controller cut. Also a zone at its longest shot, "
         "and water that does not reach a zone or goes past its substrate. Also a "
         "table that does not drain. Also a sump pump that stopped, and a pump or "
-        "valve that the controller cannot switch.",
+        "valve that the controller cannot switch. Also rescue shots that do not raise "
+        "the moisture, a waste valve that is not closed, and a pump that runs with "
+        "every valve shut.",
         "codes": _codes(
             "CS-301 CS-302 CS-303 CS-304 CS-305 CS-306 CS-307 CS-308 CS-309 CS-310 CS-311 "
-            "CS-312 CS-313 CS-701 CS-710"
+            "CS-312 CS-313 CS-315 CS-316 CS-317 CS-701 CS-710"
         ),
         "events": (),
     },
@@ -59,10 +61,11 @@ KINDS = (
         "detail": "Alerts when something stops the shots in a room or a zone. Also a "
         "controller that does not run, a second controller on the room, and a room "
         "with no shots for some time. Also a tank at its minimum, due for a refill "
-        "or above its full mark, and a batch tank to refill.",
+        "or above its full mark, and a batch tank to refill. Also a waste valve that "
+        "holds the shots, and a low estimated tank level.",
         "codes": _codes(
-            "CS-202 CS-203 CS-204 CS-205 CS-206 CS-207 CS-208 CS-209 CS-210 CS-602 CS-609 "
-            "CS-901 CS-902 CS-903 CS-904 CS-906"
+            "CS-202 CS-203 CS-204 CS-205 CS-206 CS-207 CS-208 CS-209 CS-210 CS-316 CS-602 "
+            "CS-609 CS-901 CS-902 CS-903 CS-904 CS-905 CS-906"
         ),
         "events": (),
     },

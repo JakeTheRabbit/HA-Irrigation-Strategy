@@ -1133,6 +1133,25 @@ test_shot:
           min: 1
           max: 99
           mode: box
+stop_all:
+  name: Stop all
+  description: >-
+    Stops all water in one room at once. It does the same as the Stop all button of the room. It sets
+    the kill switch of the room to off, then sets the pump, the main-line valve, the waste valve and
+    every zone valve of the room to off, and reads each one back. It works when the controller app is
+    stopped. It never switches anything on. Any user can call it. A device that does not read off
+    within 10 s gives a notification (CS-308). CAUTION: A pump that the room shares with another room
+    or with the batch tank also stops. To water again, set the kill switch to on.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. The integration refuses an unknown ID. Example: `room:f1_` for a named room, or
+        `room:` for the default room.
+      required: true
+      selector:
+        text:
 whats_new_get:
   name: Read what's new
   description: >-
