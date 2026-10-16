@@ -86,10 +86,12 @@ def report(c, room, zone, reason=None):
             break
     add(_gate("external_holds", "No external hold", held,
               "" if c.hold_entities else "none configured"))
+    add(_gate("waste", "Waste valve policy satisfied", _waste(room, m),
+              "" if getattr(room, "waste", "") else "no waste valve mapped"))
     add(_gate("settings", "Settings loaded", c._settings_hold(room, zone)))
     add(_gate("tank", "Tank above its minimum", _tank(room), "" if room.tank else "no tank level mapped"))
-    add(_gate("feed_ec", "Source-water EC", _feed_ec(c, room, m), "" if room.feed_ec_sensor else "no feed EC probe"))
-    add(_gate("feed_ph", "Source-water pH", _feed_ph(c, room, m), "" if room.feed_ph_sensor else "no feed pH probe"))
+    add(_gate("feed_ec", "Source-water EC", _feed_ec(c, room, m, reason), "" if room.feed_ec_sensor else "no feed EC probe"))
+    add(_gate("feed_ph", "Source-water pH", _feed_ph(c, room, m, reason), "" if room.feed_ph_sensor else "no feed pH probe"))
     offline = [e for e in (hw.get("pump"), hw.get("mainline"), hw["valves"].get(zone))
                if e and str(m.hw_get(e)[0]).lower() not in ("on", "off")]
     add(_gate("online", "Feed path online",
@@ -112,7 +114,40 @@ def _tank(room):
     return None
 
 
-def _feed_ec(c, room, m):
+def _waste(room, m):
+    """Admission's waste-policy decision without alerts, dismissal or policy-memory writes."""
+    waste = getattr(room, "waste", "")
+    if not waste:
+        return None
+    entity = f"select.crop_steering_{room.prefix}waste_valve_rule"
+    rule = m.ha_get(entity)[0]
+    if rule == "Off":
+        return None
+    if rule not in (m.WASTE_CHECK, m.WASTE_CLOSE):
+        if rule is None and m.ha_get_status(entity)[0] == 404 and not getattr(room, "_waste_rule_known", None):
+            return None  # confirmed absent on a legacy integration, never seen before
+        return "waste valve rule unreadable (no shot until its policy can be confirmed)"
+    state = str(m.hw_get(waste)[0]).lower()
+    driveable = waste.split(".", 1)[0] in m.ACTUATORS
+    if rule == m.WASTE_CLOSE:
+        if not driveable:
+            return f"waste valve {waste} can't be switched by the controller"
+        if state in ("on", "off"):
+            return None  # closing and verified readback happen before priming, after admission
+    elif state == "off":
+        return None
+    return (f"waste valve {waste} reads {state}" if state in ("on", "off")
+            else f"waste valve {waste} offline (reads neither on nor off)")
+
+
+def _rescue_past_dead_probe(c, room, m, reason):
+    """The explicit rescue-only exception; do not call admission's logging helper."""
+    kinds = getattr(getattr(m, "safety_ops", None), "RESCUE_KINDS", ())
+    return (getattr(reason, "kind", None) in kinds
+            and c._on(f"switch.crop_steering_{room.prefix}rescue_past_dead_feed_probe", False))
+
+
+def _feed_ec(c, room, m, reason=None):
     if not room.feed_ec_sensor:
         return None
     lo = c._num(f"number.crop_steering_{room.prefix}irrigation_ec_min", 0)
@@ -122,7 +157,8 @@ def _feed_ec(c, room, m):
     feed = c._read_feed_ec(room)
     if feed is None:
         last = room._feed_last_good_time.timestamp() if room._feed_last_good_time else None
-        if not m.feed_grace_ok(datetime.now().timestamp(), last, c.feed_grace_min):
+        if (not m.feed_grace_ok(datetime.now().timestamp(), last, c.feed_grace_min)
+                and not _rescue_past_dead_probe(c, room, m, reason)):
             return f"source-water EC dead >{c.feed_grace_min:.0f}min — holding (fail-closed)"
         return None
     if (lo > 0 and feed < lo) or (hi > 0 and feed > hi):
@@ -130,7 +166,7 @@ def _feed_ec(c, room, m):
     return None
 
 
-def _feed_ph(c, room, m):
+def _feed_ph(c, room, m, reason=None):
     if not room.feed_ph_sensor:
         return None
     lo = c._num(f"number.crop_steering_{room.prefix}irrigation_ph_min", 0)
@@ -140,7 +176,8 @@ def _feed_ph(c, room, m):
     ph = c._read_feed_ph(room)
     if ph is None:
         last = room._feed_ph_last_good_time.timestamp() if room._feed_ph_last_good_time else None
-        if not m.feed_grace_ok(datetime.now().timestamp(), last, c.feed_grace_min):
+        if (not m.feed_grace_ok(datetime.now().timestamp(), last, c.feed_grace_min)
+                and not _rescue_past_dead_probe(c, room, m, reason)):
             return f"source-water pH probe dead >{c.feed_grace_min:.0f}min — holding (fail-closed)"
         return None
     if (lo > 0 and ph < lo) or (hi > 0 and ph > hi):

@@ -84,3 +84,59 @@ def test_the_gate_list_rides_on_the_waiting_for_sensor():
     c.loop_once(datetime(2026, 9, 23, 12, 0))
     attrs = fake.sets["sensor.crop_steering_zone_1_waiting_for_app"][1]
     assert attrs["gates"] and attrs["gates"][0]["key"] == "setup"
+
+
+@pytest.mark.parametrize("policy,valve,remembered", [
+    ("Off", "on", None), ("Check closed", "on", None), ("Check closed", "off", None),
+    ("Close for each shot", "on", None), ("unavailable", "off", None),
+    ("invalid", "off", None), (None, "off", "Close for each shot"),
+    (None, "off", "Off"), (None, "off", None),
+    ("Check closed", "unavailable", None), ("Close for each shot", "unknown", None),
+])
+def test_waste_gate_matches_admission_without_remembering_or_alerting(policy, valve, remembered):
+    c, fake, room = _room()
+    room.waste = "switch.waste"
+    room._waste_rule_known = remembered
+    fake.set_state(room.waste, valve)
+    if policy is not None:
+        fake.set_state("select.crop_steering_waste_valve_rule", policy)
+    saved = []
+    c._save_state = lambda: saved.append(True)
+    calls = list(fake.calls)
+    gates = gate_report.report(c, room, 1)
+    assert room._waste_rule_known == remembered and saved == [] and fake.calls == calls
+    assert gate_report.first_hold(gates) == c._blocked(room, 1)
+    keys = [g["key"] for g in gates]
+    assert keys.index("external_holds") < keys.index("waste") < keys.index("settings")
+
+
+def test_an_unsupported_waste_actuator_is_reported_as_the_same_hold():
+    c, fake, room = _room()
+    room.waste = "light.waste"
+    fake.set_state(room.waste, "on")
+    fake.set_state("select.crop_steering_waste_valve_rule", "Close for each shot")
+    held = gate_report.first_hold(gate_report.report(c, room, 1))
+    assert held == c._blocked(room, 1) == "waste valve light.waste can't be switched by the controller"
+
+
+@pytest.mark.parametrize("kind,bypass,reading", [
+    ("p3_emergency", "on", "unavailable"), ("watchdog", "on", "unavailable"),
+    ("p2_topup", "on", "unavailable"), ("p3_emergency", "off", "unavailable"),
+    ("p3_emergency", "on", "7.4"),
+])
+@pytest.mark.parametrize("half", ["ec", "ph"])
+def test_dead_feed_gate_matches_the_shots_rescue_only_exception(kind, bypass, reading, half):
+    import controller
+    c, fake, room = _room()
+    probe = f"sensor.feed_{half}"
+    setattr(room, f"feed_{half}_sensor", probe)
+    fake.set_state(probe, reading, {"unit_of_measurement": "pH" if half == "ph" else "mS/cm"})
+    lo, hi = (5.5, 6.5) if half == "ph" else (2.0, 4.0)
+    fake.set_state(f"number.crop_steering_irrigation_{half}_min", str(lo))
+    fake.set_state(f"number.crop_steering_irrigation_{half}_max", str(hi))
+    fake.set_state("switch.crop_steering_rescue_past_dead_feed_probe", bypass)
+    reason = controller.Reason("shot", kind)
+    gates = gate_report.report(c, room, 1, reason)
+    assert gate_report.first_hold(gates) == c._blocked(room, 1, reason)
+    fake.set_state(KILL, "off")
+    assert gate_report.first_hold(gate_report.report(c, room, 1, reason)) == c._blocked(room, 1, reason)
