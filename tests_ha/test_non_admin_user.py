@@ -1,5 +1,5 @@
 """A real signed-in Home Assistant user who is not an administrator can look, but not change; the
-one exception is stopping a room's dosing, which only switches things off.
+exceptions are stopping a room's dosing and Stop all, which only switch things off.
 
 The sidebar console is open to every login and calls the room services with that login; the stub
 suite (tests/test_admin_only.py) has the reason and the whole matrix. Here every call goes through
@@ -56,6 +56,10 @@ CHANGES = {
     "notify": {"key": "k", "title": "t", "message": "m"},
     # An ask spends the room's AI budget.
     "brain_ask": {"room_id": ROOM, "question": "why?"},
+    "brain_prompt_save": {"room_id": ROOM, "expected_revision": 0, "config": {}},
+    "brain_prompt_rollback": {"room_id": ROOM, "expected_revision": 0, "revision": 0},
+    "brain_prompt_rebuild": {"room_id": ROOM, "expected_revision": 0},
+    "brain_prompt_publish": {"room_id": ROOM, "expected_revision": 0, "live": {}},
     # What the dashboard shows in the room, for everyone who opens it.
     "display_save": {"room_id": ROOM, "expected_revision": 0, "options": {"show_climate": True}},
     "save_recipe": {"recipe": {}},
@@ -73,6 +77,7 @@ CHANGES = {
 READS = {
     "harvests_get": {"room_id": ROOM},
     "strategy_get": {"room_id": ROOM},
+    "brain_prompt_get": {"room_id": ROOM},
     "strategy_preview": {"room_id": ROOM},
     "runs_get": {"room_id": ROOM},
     "grow_days_get": {"room_id": ROOM},
@@ -94,6 +99,9 @@ PER_USER = {
     "notify_save": {"expected_revision": 0, "recipients": [{"service": "notify.someone_elses"}]},
     "notify_test": {"service": "notify.someone_elses"},
 }
+# Stop all only switches things off (the kill switch, then the room's pumps and valves): whoever may look at a
+# room may stop it, as anyone may stop its dosing.
+STOPS = {"stop_all": {"room_id": ROOM}}
 EVENTS = ("crop_steering_manual_override",)
 
 
@@ -121,7 +129,7 @@ async def test_an_ordinary_user_can_look_and_changes_nothing(hass):
     assert hass.data[frontend.DATA_PANELS]["crop-steering"].require_admin is False  # still shown
     # Every service the integration registers is one or the other: nothing new slips through.
     assert set(hass.services.async_services()[DOMAIN]) == (
-        set(CHANGES) | set(READS) | set(NOTICES) | set(PER_USER)
+        set(CHANGES) | set(READS) | set(NOTICES) | set(PER_USER) | set(STOPS)
     )
     fired = []
     for event in EVENTS:
@@ -160,6 +168,16 @@ async def test_an_ordinary_user_may_stop_dosing(hass):
     await hass.async_block_till_done()
     stored = hass.states.get("sensor.crop_steering_tent_dosing_config").attributes["request"]
     assert stored == answer["request"]
+
+
+async def test_an_ordinary_user_may_stop_all(hass):
+    """Stop all switches the room's kill switch off and nothing on: a staff phone may press it."""
+    await _install(hass)
+    staff = await _staff(hass)
+    kill = "switch.crop_steering_tent_engine_enabled"
+    await hass.services.async_call("switch", "turn_on", {"entity_id": kill}, blocking=True)
+    answer = await _call(hass, staff, "stop_all", STOPS["stop_all"])
+    assert answer["kill_switch"] == [kill] and hass.states.get(kill).state == "off"
 
 
 @pytest.mark.parametrize("who", ["administrator", "no user"])

@@ -24,6 +24,7 @@ import { jevAnswer, jevResult, readJev } from "@/lib/jev";
 import { SETTING_COPY, UI_COPY } from "@/lib/ste-copy";
 import type { Controller } from "@/lib/types";
 import "./brain.css";
+import { BrainInstructions } from "./brain-instructions";
 
 type Navigate = (page: Page, zone?: number) => void;
 
@@ -435,9 +436,8 @@ function WhereTheKeyGoes() {
   );
 }
 
-/** Settings › AI assistant: read-only. Provider, key, model, budget and mode are set in the controller's own
- * options, the one place they live. */
-export function AiSettings({ controller }: { controller: Controller }) {
+/** Provider credentials stay in controller options; room context has a reviewed administrator editor. */
+export function AiSettings({ controller, onDirtyChange }: { controller: Controller; onDirtyChange?: (dirty: boolean) => void }) {
   const { panel } = useBrain(controller);
   const row = (title: string, body: ReactNode, detail?: string) => (
     <section className="panel settings-section">
@@ -452,6 +452,7 @@ export function AiSettings({ controller }: { controller: Controller }) {
     <>
       <Heading title="AI assistant" />
       <div className="settings-stack brain-settings">
+        <BrainInstructions controller={controller} onDirtyChange={onDirtyChange} />
         {row("Provider", <p className="brain-line">{providerWords(panel)}</p>)}
         {row(
           "Anthropic key",
@@ -478,8 +479,9 @@ export function AiSettings({ controller }: { controller: Controller }) {
           "Privacy",
           <p className="brain-line">
             What is sent: each zone's readings and settings, the day's stage, and the room and zone
-            names you typed. What is never sent: your key (it stays in the controller), entity ids,
-            Home Assistant tokens or personal data.
+            names you typed, plus any saved room context and house notes. Automatically collected
+            evidence excludes entity ids and credentials. Keep credentials and personal information
+            out of notes; they are sent as entered to the AI provider.
           </p>,
         )}
       </div>

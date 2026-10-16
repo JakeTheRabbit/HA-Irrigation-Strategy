@@ -1237,7 +1237,8 @@ nav button.nav-separated {
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
-    transition-duration: 0.01ms !important;
+    /* Zero avoids creating implicit `all` transitions on otherwise static elements. */
+    transition-duration: 0s !important;
   }
 }
 

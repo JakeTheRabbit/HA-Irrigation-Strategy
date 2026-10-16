@@ -1,5 +1,5 @@
 {
-  "$comment": "The Claude brain's tools (brain_provider: claude_haiku), sent unchanged on every call by brain/client.py call_anthropic(). Tools render first in the cached prompt prefix, so this file must stay byte-stable: an edit rewrites every install's prompt cache once. The tool set is the same on every call, never built per judge: the schema carries the sorted union of every built judge's answer keys, and call_anthropic() checks each answer against its own question's keys. tests/test_brain_tools.py fails when a judge's key is missing from the enum or the enum lists a key no judge offers. Strict mode supports no minimum, maximum or maxLength, so ranges are checked in code. Every property is required and additionalProperties is false on every object.",
+  "$comment": "The Claude brain's tools (brain_provider: claude_haiku), sent unchanged on every call by brain/client.py call_anthropic(). Tools render first in the cached prompt prefix, so this file must stay byte-stable: an edit rewrites every install's prompt cache once. The tool set is the same on every call, never built per judge: the schema carries the sorted union of every built judge's answer keys, and call_anthropic() checks each answer against its own question's keys. tests/test_brain_tools.py fails when a judge's key is missing from the enum or the enum lists a key no judge offers. Strict mode supports no minimum, maximum or maxLength, so ranges are checked in code. Every property is required and additionalProperties is false on every object. answer_choice alone is non-strict: its broad repeated answer-key enum can exceed the provider grammar compilation limit. All votes still pass client.validate_answer; setting changes through set_values remain strict.",
   "schema_version": "crop-steering-brain-tools/1",
   "choice_keys_by_question": {
     "dawn.dawn_call": [
@@ -135,7 +135,7 @@
     {
       "name": "answer_choice",
       "description": "Answer one multiple-choice question from this request. Call it once per choice question in the request, and only for question ids the request lists. 'choice' must be one of the allowed keys listed under that question (other keys in this enum belong to other questions and are refused by code). Give a probability for every allowed key of that question: honest chances that sum to 1, with 'choice' the most likely. 'confidence' (0 to 1) is how well the evidence supports any answer at all: low when readings are missing, stale or contradictory. 'rationale' is at most two plain sentences for the grower's journal, naming the deciding fact; no entity ids, no numbers that are not in the evidence.",
-      "strict": true,
+      "strict": false,
       "input_schema": {
         "type": "object",
         "properties": {

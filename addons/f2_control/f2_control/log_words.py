@@ -112,6 +112,14 @@ _TRANSITIONS = [
     ),
     (r"P0 dryback done (\S+)%", lambda m: f"the morning dryback reached {m[1]}%"),
     (r"P0 timeout (\S+)min", lambda m: f"the latest first shot came, {m[1]} min into P0"),
+    (
+        r"P0 stalled: dryback (\S+) pts/h too slow to finish",
+        lambda m: f"the morning dryback ({m[1]} points an hour) is too slow to finish before the latest first shot",
+    ),
+    (
+        r"timed P2 end (\S+)h<=(\S+)h to lights-off",
+        lambda m: f"P2 ends {m[2]} h before lights-off, as set",
+    ),
     (r"P1 max shots (\S+)/(\S+)", lambda m: f"all {m[2]} ramp shots are in"),
     (
         r"P1 full: the last shot raised the peak (\S+) \(< (\S+)\)",
@@ -157,8 +165,15 @@ _SHOTS = {
     ),
     "p2_dilute": (
         "dilution shot",
-        r"P2 dilute EC (\S+)",
-        lambda m: f"EC {m[1]} more than 1.2 times the P2 EC target",
+        r"P2 (?:dilute EC (\S+)|flush to EC target (\S+)>(\S+))",
+        lambda m: f"EC {m[1]} more than the dilute ratio times the P2 EC target"
+        if m[1]
+        else f"EC {m[2]} still over the {m[3]} flush target",
+    ),
+    "p2_timed": (
+        "timed shot",
+        r"P2 timed shot every (\S+)min \((\S+)min since the last\)",
+        lambda m: f"timed P2: one shot every {m[1]} min, {m[2]} min since the last",
     ),
     "p2_rescue": (
         "rescue flush",
@@ -227,6 +242,10 @@ _HOLDS = [
     (
         r"BLOCK daily-cap (\S+)/(\S+)L \(budget; emergencies exempt\)",
         lambda m: f"the daily water limit is spent ({m[1]} of {m[2]} L); rescue shots still run",
+    ),
+    (
+        r"SKIP timed P2 shot: VWC (\S+)>=(\S+) \(ceiling\)",
+        lambda m: f"timed P2 shot skipped: VWC {m[1]}% at or over its {m[2]}% ceiling",
     ),
     (
         r"probe unreadable (\S+) min: waiting (\S+) min before watering without it",

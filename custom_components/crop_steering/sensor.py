@@ -248,6 +248,7 @@ async def async_setup_entry(
     sensors.append(CropSteeringStockSensor(entry))
     sensors.append(CropSteeringDosingConfigSensor(entry))
     sensors.append(CropSteeringBrainQuestionsSensor(entry))
+    sensors.append(CropSteeringBrainPromptConfigSensor(entry))
     sensors.append(CropSteeringDisplaySensor(entry))
 
     async_add_entities(sensors)
@@ -516,6 +517,46 @@ class CropSteeringBrainQuestionsSensor(SensorEntity):
         from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
         from .brain_api import SIGNAL
+
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, f"{SIGNAL}_{self._entry.entry_id}", self.async_write_ha_state
+            )
+        )
+
+
+class CropSteeringBrainPromptConfigSensor(CropSteeringBrainQuestionsSensor):
+    """The revisioned context the controller reads; text stays out of Recorder."""
+
+    _unrecorded_attributes = frozenset({"config"})
+
+    def __init__(self, entry):
+        super().__init__(entry)
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_brain_prompt_config"
+        self._attr_name = "AI instructions configuration"
+        self._attr_object_id = f"{DOMAIN}_{self._prefix}brain_prompt_config"
+        self.entity_id = f"sensor.{self._attr_object_id}"
+
+    def _manager(self):
+        return (
+            self.hass.data.get(DOMAIN, {})
+            .get("_brain_prompt", {})
+            .get(self._entry.entry_id)
+        )
+
+    @property
+    def native_value(self):
+        manager = self._manager()
+        return manager.revision if manager else None
+
+    @property
+    def extra_state_attributes(self):
+        manager = self._manager()
+        return {"config": manager.config, "rebuild": manager.rebuild} if manager else {}
+
+    async def async_added_to_hass(self):
+        from homeassistant.helpers.dispatcher import async_dispatcher_connect
+        from .brain_prompt_api import SIGNAL
 
         self.async_on_remove(
             async_dispatcher_connect(

@@ -256,6 +256,7 @@ class Meter:
         self.window_start, self.opened_by = now, by
         self.spent, self.calls, self.warned, self.spent_said = 0.0, 0, False, False
         self.tokens = {"uncached": 0, "cache_read": 0, "cache_write": 0, "output": 0}
+        self.cache_savings = 0.0  # no-cache equivalent less actual cost, at this controller's model tariff
 
     def _state(self, now):
         if now - self.window_start >= self.WINDOW_MAX_H * 3600.0:
@@ -290,9 +291,12 @@ class Meter:
         """Count one billed response -> its cost in US$."""
         uncached, w5m, w1h, read, out = tokens(usage)
         spent = cost(usage, model or self.model)
+        no_cache = cost({"input_tokens": uncached + w5m + w1h + read, "output_tokens": out}, model or self.model)
         with self._lock:
             self._state(self.clock())
             self.spent += spent
+            if self.cache_savings is not None:
+                self.cache_savings += no_cache - spent
             self.calls += 1
             for k, v in (("uncached", uncached), ("cache_write", w5m + w1h), ("cache_read", read), ("output", out)):
                 self.tokens[k] += v
@@ -367,6 +371,7 @@ class Meter:
                     "budget_usd": self.budget, "calls": self.calls, "uncached_tokens": self.tokens["uncached"],
                     "cached_tokens": self.tokens["cache_read"], "cache_write_tokens": self.tokens["cache_write"],
                     "output_tokens": self.tokens["output"], "paused_until": self.paused_until,
+                    "cache_savings_estimate_usd": round(self.cache_savings, 8) if self.cache_savings is not None else None,
                     "warned": self.warned, "spent_said": self.spent_said, "refusal_runs": dict(self.runs),
                     "declined": sorted(self.declined), "state": state, "model": self.model}
 
@@ -383,6 +388,11 @@ class Meter:
             self._open(start, str(saved.get("opened_by") or "start"))
             self.spent = float(saved.get("cost_usd") or 0.0)
             self.calls = int(saved.get("calls") or 0)
+            try:
+                savings = float(saved.get("cache_savings_estimate_usd"))
+                self.cache_savings = savings if abs(savings) < float("inf") else None
+            except (TypeError, ValueError):
+                self.cache_savings = None  # old usage files: unknown until next window
             self.tokens = {"uncached": int(saved.get("uncached_tokens") or 0),
                            "cache_read": int(saved.get("cached_tokens") or 0),
                            "cache_write": int(saved.get("cache_write_tokens") or 0),
@@ -581,7 +591,10 @@ def call_anthropic(account, token, state, questions, gateway=None, timeout=20.0,
             if meter is not None and not meter.can_spend():
                 errors.append(BUDGET)
                 break
-            request = prompt.request(model, evidence, prompt.questions(snap_id, i, lane), prompt.max_tokens(lane))
+            args = (model, evidence, prompt.questions(snap_id, i, lane), prompt.max_tokens(lane))
+            room = state["_brain"].get("room")
+            request = (prompt.request(*args, room=room) if room in getattr(prompt, "contexts", {})
+                       else prompt.request(*args))
             try:
                 msg = client.messages.create(**request, timeout=min(timeout, LANE_TIMEOUT_S))
             except Exception as e:  # noqa: BLE001 - classify() maps every SDK error to a key-free string

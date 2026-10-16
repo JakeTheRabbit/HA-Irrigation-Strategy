@@ -315,11 +315,13 @@ def engine_facts(doc, paths):
     if None not in (veg_dt, gen_dt, p0_wait):
         lo = min(veg_dt, gen_dt)
         probes.append((
-            "PH-11", f"At the integration's default dryback_target ({gen_dt:g} % generative, {veg_dt:g} % vegetative) a morning drop of a few percent never ends P0: it waits for p0_max_wait_min (default {p0_wait:g} min), the bypass or a brain start.",
+            "PH-11", f"With p0_additional_dryback at 0 and the integration's default dryback_target ({gen_dt:g} % generative, {veg_dt:g} % vegetative), a morning drop of a few percent does not end P0: it waits for p0_max_wait_min (default {p0_wait:g} min), the bypass or a brain start. A positive p0_additional_dryback replaces that target; a 3% setting can therefore end P0 after a 3% morning drop, once any configured minimum wait has passed.",
             phase({"dryback_target": lo, "p0_max_wait_min": p0_wait}, phase="P0", vwc=55, peak_vwc=58, dryback_pct=5,
                   phase_minutes=p0_wait - 1) == "P0"
             and phase({"dryback_target": lo, "p0_max_wait_min": p0_wait}, phase="P0", vwc=55, peak_vwc=58,
-                      dryback_pct=5, phase_minutes=p0_wait) == "P1"))
+                      dryback_pct=5, phase_minutes=p0_wait) == "P1"
+            and phase({"dryback_target": lo, "p0_additional_dryback": 3, "p0_max_wait_min": p0_wait},
+                      phase="P0", vwc=55, peak_vwc=58, dryback_pct=3, phase_minutes=1) == "P1"))
     else:
         probes.append(("PH-11", "integration dryback defaults not found", False))
 
@@ -373,7 +375,7 @@ def engine_facts(doc, paths):
         ("CT-11", "dryback_target is read from vegetative_dryback_target or generative_dryback_target by the zone's steering mode; the integration's p0_dryback_drop_percent setting is not read by the controller.",
          "_dryback_target\"" in ctrl and "{'vegetative' if veg else 'generative'}_dryback_target" in ctrl
          and "p0_dryback_drop" not in ctrl and '"p0_dryback_drop_percent"' in nums),
-        ("CT-12", f"Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity follows the zone's highest counted reading of this grow-day or the one before, and the P1 target the highest reading of the grow-day before (no higher than field capacity); when field capacity moves by {shift if shift is not None else 0:g} point or more, the P2 re-water threshold moves by the same points, down as well as up. Each of the three moves at most {step if step is not None else 0:g} point a grow-day, counted from where it stood, so a drifting probe or a flood drags the ladder no further than that a day and an edit by hand is moved from, never undone; all within the engine's bounds and each number's own min and max. The readings counted are the trusted ones outside a day the table backed up (CS-310), and a zone without a usable probe is not followed. The rescue floor (the P3 emergency threshold) is the operator's and never moves. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity): then field capacity alone moves if that is valid (CT-13 says when the learner writes the threshold itself).",
+        ("CT-12", f"Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity follows the zone's highest counted reading of this grow-day or the one before, and the P1 target the highest reading of the grow-day before (no higher than field capacity); when field capacity moves by {shift if shift is not None else 0:g} point or more, the P2 re-water threshold moves by the same points, down as well as up. Each of the three moves at most the room's Max setpoint move per day (default, and the fallback when it cannot be read, {step if step is not None else 0:g} point; 0 = no limit) a grow-day, counted from where it stood, and the room may make that limit hold the learner and the AI assistant's targets power too, on one shared ledger; so a drifting probe or a flood drags the ladder no further than that a day and an edit by hand is moved from, never undone; all within the engine's bounds and each number's own min and max. The readings counted are the trusted ones outside a day the table backed up (CS-310), and a zone without a usable probe is not followed. The rescue floor (the P3 emergency threshold) is the operator's and never moves. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity): then field capacity alone moves if that is valid (CT-13 says when the learner writes the threshold itself).",
          shift == 1.0 and step == 1.0 and 'if not self._on(f"' in follow and '{room.prefix}auto_setpoints", False):' in follow
          and 'getattr(room, "strategy_required", False)' in follow
          and 'return max((st.get("fc_follow") or {}).get("peak") or 0.0, prev), prev' in ctrl and "if prev is None or prev <= 0.0:" in ctrl
@@ -381,7 +383,9 @@ def engine_facts(doc, paths):
          and 'target = bounded("p1_target_vwc", p.p1_target, min(yday, fc))' in follow
          and 'new_thr = bounded("p2_vwc_threshold", thr, thr + delta) if abs(delta) >= _profile(room)["fc_shift_min"] else thr' in follow
          and "rescue = p.p3_emergency_floor" in follow and "if rescue + 3.0 <= new_thr < target <= fc:" in follow
-         and "left = max(0.0, FC_STEP_MAX - used.get(suffix, 0.0))" in follow and blind_follow is None
+         and "left = max(0.0, limit - used.get(suffix, 0.0))" in follow and "limit = self._step_limit(room)" in follow
+         and "return phase_options.step_limit(value, FC_STEP_MAX)" in ctrl and "def _step_allowance(" in ctrl
+         and blind_follow is None
          and 'if ha_get(entity)[0] in (None, "unknown", "unavailable", ""):' in ctrl),
         ("CT-13", "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge holds it (with one running and able to act, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12; from the first loop the brain cannot act, in dry run, with its budget spent, paused, unavailable or its key refused, the learner writes the threshold again until a lights-on at which the brain can act). With the room's set_targets_from_achievable power on and the brain able to act, neither the learner nor the follower of CT-12 writes field capacity, the P1 target or the threshold: the brain sets them (BR-8). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.",
          'want = auto_setpoints.wanted(learn, current, snap.vwc, st["phase"], ctx, others=judged)' in ctrl

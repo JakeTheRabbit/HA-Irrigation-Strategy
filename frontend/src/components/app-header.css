@@ -142,6 +142,14 @@
 .safety-switch[data-safety="watering"][data-state="off"] .safety-switch-dot {
   background: var(--destructive);
 }
+/* Stop all: always red, always there; it only ever stops. */
+.safety-switch[data-safety="stop-all"] {
+  border-color: color-mix(in srgb, var(--destructive) 55%, var(--border));
+  color: var(--destructive);
+}
+.safety-switch[data-safety="stop-all"] > svg {
+  color: var(--destructive);
+}
 /* The controller is not reporting: one band across the page, under the header. */
 .stale-banner {
   display: flex;

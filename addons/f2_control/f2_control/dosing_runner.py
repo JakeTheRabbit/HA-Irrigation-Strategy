@@ -1219,6 +1219,12 @@ class DosingRunner:
         if stuck:
             raise _Ended(f"{valve} did not read off after filling")
         self._done(job)
+        filled_hook = getattr(self.c, "_tank_estimate_filled", None)  # the estimated tank level counts again
+        if filled_hook is not None:
+            try:
+                filled_hook(job.room)
+            except Exception as e:
+                self._log("dosing: the estimated tank level could not be reset", job.room.slug, e)
 
     def _over(self, job):
         """The overfill guard (Controller._tank_over): the room's mapped tank level reads over its full mark, so the
@@ -1582,9 +1588,11 @@ class DosingRunner:
         live["ph_read"] = now
         watch = live.setdefault("ph_watch", ph_correct.Watch())
         px = room.prefix
-        if self._state(f"switch.crop_steering_{px}ph_auto_correct", quick=True) != "on":
+        enabled = self._state(f"switch.crop_steering_{px}ph_auto_correct", quick=True)
+        if enabled != "on":
             watch.reset()
-            self._ph_unlatch(room, "pH auto-correct was switched off")  # how a person clears the lock
+            if enabled == "off":  # only a definite operator reset clears a fault; an unreadable switch cannot
+                self._ph_unlatch(room, "pH auto-correct was switched off")
             return
         with self._lock:
             idle = self._job is None and room.slug not in self._stuck

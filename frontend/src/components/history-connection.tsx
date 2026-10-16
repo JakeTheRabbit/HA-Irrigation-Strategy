@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import type { Controller } from "@/lib/types";
@@ -25,18 +25,25 @@ export function HistoryConnection({ controller }: { controller: Controller }) {
   const [draft, setDraft] = useState<Record<string, string | boolean>>({});
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
+  const [expanded, setExpanded] = useState<string | null>(null);
+  const currentRoom = useRef({ id: controller.roomId, generation: 0 });
+  if (currentRoom.current.id !== controller.roomId) {
+    currentRoom.current = { id: controller.roomId, generation: currentRoom.current.generation + 1 };
+  }
+  const open = expanded === controller.roomId;
   useEffect(() => {
     let active = true;
-    setSettings(null); setDraft({}); setMessage("");
-    if (!controller.demo) controller.operator<Settings>("history_connection_get").then(value => {
+    setSettings(null); setDraft({}); setMessage(""); setBusy(false);
+    if (open && !controller.demo) controller.operator<Settings>("history_connection_get").then(value => {
       if (active) { setSettings(value); setDraft(value.connection); }
-    }).catch(() => { /* Older integrations do not provide optional long history. */ });
+    }).catch(error => { if (active) setMessage(errorText(error)); });
     return () => { active = false; };
-  }, [controller.roomId, controller.operator, controller.demo]);
-  if (!settings) return null;
+  }, [controller.roomId, controller.operator, controller.demo, open]);
+  if (controller.demo) return null;
   const update = (key: string, value: string | boolean) => setDraft(old => ({ ...old, [key]: value }));
   const save = async () => {
-    const room = controller.roomId;
+    if (!settings) return;
+    const generation = currentRoom.current.generation;
     setBusy(true); setMessage("");
     try {
       const payload = { ...draft };
@@ -45,15 +52,19 @@ export function HistoryConnection({ controller }: { controller: Controller }) {
       const result = await controller.operator<Settings>("history_connection_save", {
         expected_revision: settings.revision, connection: payload,
       });
-      if (controller.roomId !== room) return;
+      if (currentRoom.current.generation !== generation) return;
       setSettings(result); setDraft(result.connection);
       setMessage("Saved. InfluxDB is read-only; the connection was tested before enabling it.");
-    } catch (error) { setMessage(errorText(error)); }
-    finally { setBusy(false); }
+    } catch (error) { if (currentRoom.current.generation === generation) setMessage(errorText(error)); }
+    finally { if (currentRoom.current.generation === generation) setBusy(false); }
   };
-  return <section className="panel" aria-label="Long history source">
-    <h2>Long history</h2>
+  return <details className="panel" aria-label="Long history source" open={open}
+    onToggle={event => setExpanded(event.currentTarget.open ? controller.roomId : null)}>
+    <summary>Long history</summary>
+    {open && <>
     <p className="small muted">Recorder stays the default. Optional InfluxDB history uses read-only queries of this room's mapped sensors, capped at 1000 points per sensor. Keep a read-only account or token.</p>
+    {!settings && !message && <p role="status">Loading history settings…</p>}
+    {settings && <>
     <label>History source <select value={String(draft.source)} disabled={busy} onChange={e => update("source", e.target.value)}>
       <option value="recorder">Home Assistant Recorder</option><option value="influxdb">InfluxDB</option>
     </select></label>
@@ -69,6 +80,8 @@ export function HistoryConnection({ controller }: { controller: Controller }) {
       <label><input type="checkbox" checked={draft.full_entity_id === true} disabled={busy} onChange={e => update("full_entity_id", e.target.checked)} /> Entity tag includes sensor. prefix</label>
     </>}
     <Button disabled={busy} onClick={save}>{busy ? "Testing connection…" : "Save history source"}</Button>
+    </>}
     {message && <p role="status">{message}</p>}
-  </section>;
+    </>}
+  </details>;
 }
