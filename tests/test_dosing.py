@@ -480,3 +480,29 @@ def test_a_recipe_may_be_named_and_a_setup_from_before_names_has_none():
     assert clean(batch=batch(name="x" * 40))[1]["name"] == "x" * 40
     with pytest.raises(dosing.DosingError, match="at most 40 characters"):
         clean(batch=batch(name="x" * 41))
+
+
+def test_a_pump_ph_role_is_stored_only_when_set_and_one_pump_per_role():
+    """pH auto-correct (docs/DOSING.md): a pump's ph_role is ph_up, ph_down or none; a setup saved before
+    roles (or with none) reads back with no key at all, so an older store is unchanged.
+    """
+    pumps, _ = clean()
+    assert "ph_role" not in pumps[0]
+    pumps, _ = clean([pump(ph_role="ph_up")])
+    assert pumps[0]["ph_role"] == "ph_up"
+    for none in (None, "", "none"):
+        assert "ph_role" not in clean([pump(ph_role=none)])[0][0]
+    with pytest.raises(dosing.DosingError, match="pH role"):
+        clean([pump(ph_role="acid")])
+    second = pump(
+        id="acid",
+        name="Acid",
+        volume_entity="number.doser_balance_volume",
+        power_entity="switch.acid_power",
+        ph_role="ph_up",
+    )
+    with pytest.raises(dosing.DosingError, match="two pumps have the ph up role"):
+        clean([pump(ph_role="ph_up"), second], exists=None)
+    second["ph_role"] = "ph_down"
+    pumps, _ = clean([pump(ph_role="ph_up"), second], exists=None)
+    assert [p.get("ph_role") for p in pumps] == ["ph_up", "ph_down"]
