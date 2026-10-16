@@ -88,7 +88,7 @@ ENTITY_DEFAULTS_12C6D1A = {
     "main_line_lead_time": 1.0,
     "ec_min_interval": 10.0,
     # added after it, each off (or the engine's own value) so nothing waters differently on update
-    "p0_minimum_wait_time": 0.0,
+    "p0_minimum_wait": 0.0,
     "ec_flush_target": 0.0,
     "p2_dilute_ratio": 1.2,
     "p2_timed_interval_min": 60.0,
@@ -137,7 +137,7 @@ CONTROLLER_FALLBACKS_12C6D1A = {
     "p0_additional_dryback": 0,  # added after it: off, as P0 always was
     "ec_min_interval": 10.0,
     # added after it, each off (or the engine's own value) so nothing waters differently on update
-    "p0_minimum_wait_time": 0.0,
+    "p0_minimum_wait": 0.0,
     "ec_flush_target": 0.0,
     "p2_dilute_ratio": 1.2,  # the engine's literal dilute ratio, read only behind its opt-in switch
     "p2_timed_interval_min": 60.0,

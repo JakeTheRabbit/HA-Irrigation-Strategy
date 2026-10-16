@@ -63,7 +63,7 @@ DEFAULTS = {
     "p0_additional_dryback": (None, 0),
     "p0_dryback_drop_percent": (15.0, None),
     # Opt-in: minutes nothing but the bypass ends P0. 0 = off, as P0 always was.
-    "p0_minimum_wait_time": (0.0, 0.0),
+    "p0_minimum_wait": (0.0, 0.0),
     # P1
     "p1_target_vwc": (65.0, 60),
     "p1_initial_shot_size": (2.0, 2),
