@@ -146,8 +146,6 @@ def test_a_field_nothing_reads_does_not_promise_that_something_will():
     promised = {
         "waste_switch": ("forced closed", "closed during a shot"),
         "notification_service": ("where alerts go",),
-        "humidity_sensor": ("analytics",),
-        "vpd_sensor": (),
     }
     strings = _strings()
     for key, claims in promised.items():
@@ -161,6 +159,14 @@ def test_a_field_nothing_reads_does_not_promise_that_something_will():
                 assert (
                     claim not in tooltip
                 ), f"{flow}.{step}.{key} still claims '{claim}'"
+    # The room climate sensors are read now (the engine descriptor, for the dashboard's history
+    # chart) and by nothing else: their tooltips say both.
+    for key in ("temperature_sensor", "humidity_sensor", "vpd_sensor"):
+        assert _runtime_consumers(key) == ["room.py"], key
+        for flow, step in (("config", "hardware"), ("options", "edit_zones_map")):
+            tooltip = strings[flow]["step"][step]["data_description"][key]
+            assert "history chart" in tooltip and "controller does not use" in tooltip
+            assert "analytics" not in tooltip.lower()
     waste = strings["config"]["step"]["hardware"]["data_description"]["waste_switch"]
     assert "does NOT operate" in waste
     # The grow light is read now (the engine descriptor; the controller checks it against the hours): its tooltip

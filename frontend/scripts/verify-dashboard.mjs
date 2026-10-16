@@ -710,7 +710,7 @@ try {
       (await pillTones(".zone-page-title .pill")).find(([text]) => text.startsWith("Valve")),
       ["Valve closed", "neutral"],
     );
-    // Targets, probes and the 7-day history stay closed until asked for; the 24 h chart is gone.
+    // Targets and probes stay closed until asked for; the 24 h chart is gone.
     assert.equal(await page.locator(".zone-targets, .zone-probes").count(), 0);
     assert.equal(await page.getByRole("group", { name: "History range" }).count(), 0);
     // The AI on this zone: what it may move and within what range, and its latest decisions.
@@ -748,13 +748,6 @@ try {
     await review.waitFor({ state: "hidden" });
     await expectVisible(controls.getByRole("button", { name: "Enable zone scheduling" }));
     await expectVisible(page.locator(".zone-page-title").getByText("Scheduling paused"));
-    // History: the last week, on request.
-    await page.getByText("7-day history", { exact: true }).click();
-    const range = page.getByRole("group", { name: "History range" });
-    assert.equal(
-      await range.getByRole("button", { name: "7 days" }).getAttribute("aria-pressed"),
-      "true",
-    );
     // The switcher moves between zones; Edit in Plan opens this zone's targets.
     await page
       .getByRole("navigation", { name: "Zones" })
@@ -2475,6 +2468,111 @@ try {
     await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
     await page.goForward();
     await expectVisible(page.getByRole("heading", { name: "Probes", exact: true }));
+  });
+  await check("zone history explorer: range, any sensor, previous run, 390px", async () => {
+    await go("zone/1");
+    const explorer = page.locator("[data-history-explorer]");
+    await expectVisible(explorer);
+    const loads = async () => Number(await explorer.getAttribute("data-explorer-loads"));
+    const loaded = async (after) =>
+      page.waitForFunction(
+        (count) =>
+          Number(document.querySelector("[data-history-explorer]")?.dataset.explorerLoads) > count,
+        after,
+        { timeout: 20_000 },
+      );
+    await loaded(0);
+    // The zone's own VWC and EC by default, over the grow-day from lights-on (10:00).
+    assert.equal(await explorer.getAttribute("data-explorer-series"), "2");
+    const lines = explorer.locator(
+      ".recharts-line:not(.history-explorer-previous) path.recharts-curve",
+    );
+    assert.equal(await lines.count(), 2);
+    assert.equal(
+      Number(await explorer.getAttribute("data-range-start")),
+      new Date(2026, 8, 28, 10, 0).getTime(),
+    );
+    // A range change reads the recorder again for the new range, and the address keeps it.
+    const before = await loads();
+    await explorer.getByRole("button", { name: "7 d", exact: true }).click();
+    await loaded(before);
+    assert.equal(
+      Number(await explorer.getAttribute("data-range-start")),
+      DEMO_DAY.getTime() - 7 * 86_400_000,
+    );
+    assert.match(page.url(), /#\/zone\/1\?.*range=7d/);
+    // Any sensor of the room: ticking one adds its series, on an axis of its own unit.
+    const more = await loads();
+    await explorer.locator('[data-sensor="sensor.demo_vpd"]').check();
+    await explorer.locator('[data-sensor="sensor.demo_air_humidity"]').check();
+    await loaded(more);
+    assert.equal(await explorer.getAttribute("data-explorer-series"), "4");
+    await page.waitForFunction(
+      () =>
+        document.querySelectorAll(
+          "[data-history-explorer] .recharts-line:not(.history-explorer-previous) path.recharts-curve",
+        ).length === 4,
+    );
+    assert.match(await explorer.locator(".history-explorer-legend").innerText(), /VPD/);
+    // "All VWC" ticks every moisture reading of the room.
+    await explorer.getByRole("button", { name: "All VWC" }).click();
+    assert.equal(
+      await explorer.getByRole("button", { name: "All VWC" }).getAttribute("aria-pressed"),
+      "true",
+    );
+    await explorer.getByRole("button", { name: "All VWC" }).click();
+    // The previous run at the same grow days: days 8 to 15 of this run (it began 14 days ago at
+    // lights-on), so the same days of the previous run, which began 112 days ago.
+    await explorer.locator("[data-compare-toggle]").check();
+    const legend = explorer.locator("[data-previous-legend]");
+    await expectVisible(legend);
+    assert.match(await legend.innerText(), /^Run Demo • previous run — Room A, days 8–15$/);
+    assert.equal(await explorer.getAttribute("data-compare-days"), "8-15");
+    const day8 = new Date(2026, 8, 28 - 112 + 7, 16, 0).getTime();
+    assert.ok(
+      Math.abs(Number(await explorer.getAttribute("data-compare-start")) - day8) < 60_000,
+      "the previous run starts at the same hour after lights-on of its grow day 8",
+    );
+    await page.waitForFunction(
+      () =>
+        [
+          ...document.querySelectorAll(
+            "[data-history-explorer] .history-explorer-previous path.recharts-curve",
+          ),
+        ].some((path) => (path.getAttribute("d") || "").length > 20),
+      null,
+      { timeout: 20_000 },
+    );
+    assert.equal(await explorer.locator("[data-compare-note]").count(), 0);
+    // The choice is in the address: a reload, light and dark, keeps it.
+    await inBothThemes("zone history explorer", async () => {
+      await expectVisible(page.locator("[data-previous-legend]"));
+    });
+    await page.evaluate(() => localStorage.setItem("irrigation-theme", "dark"));
+    await page.reload({ waitUntil: "networkidle" });
+    await expectVisible(page.locator("[data-previous-legend]"));
+    await page.locator("[data-history-explorer]").scrollIntoViewIfNeeded();
+    await page
+      .locator("[data-history-explorer]")
+      .screenshot({ path: path.join(out, "history-explorer-1440-dark.png") });
+    // A phone: the controls in a sheet, the chart scrolls sideways inside its panel.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.reload({ waitUntil: "networkidle" });
+    await expectVisible(page.locator("[data-previous-legend]"));
+    await noOverflow();
+    await page.getByRole("button", { name: "Range and sensors" }).click();
+    const sheet = page.getByRole("dialog", { name: "Range and sensors" });
+    await expectVisible(sheet);
+    assert.equal(await sheet.locator('[data-sensor="sensor.demo_vpd"]').isChecked(), true);
+    await axe("zone history explorer sheet, phone, dark");
+    await page.keyboard.press("Escape");
+    await noOverflow();
+    await page.locator("[data-history-explorer]").scrollIntoViewIfNeeded();
+    await page
+      .locator("[data-history-explorer]")
+      .screenshot({ path: path.join(out, "history-explorer-390-dark.png") });
+    await page.evaluate(() => localStorage.setItem("irrigation-theme", "light"));
+    await page.setViewportSize({ width: 1440, height: 1000 });
   });
   await check("mobile navigation and every page fit 390px", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
