@@ -1,4 +1,4 @@
-"""The AI assistant's powers (docs/JEV.md, "Powers"): one switch per power per room says what the AI assistant may
+"""The AI assistant's powers (docs/AI_ASSISTANT.md, "Powers"): one switch per power per room says what the AI assistant may
 change. Off, its judge still runs and advises, and the envelope refuses to act; a missing switch is the power's
 default, so an install from before the switches does what it did. Two new powers, off until the owner turns them on:
 the AI assistant sets a zone's targets, and its shot sizes, itself; code writes its values as given, clamped only to

@@ -1,4 +1,4 @@
-"""The AI assistant's powers, in a real Home Assistant with the real controller (docs/JEV.md, "Powers").
+"""The AI assistant's powers, in a real Home Assistant with the real controller (docs/AI_ASSISTANT.md, "Powers").
 
 One switch per power per room says what the AI assistant may change. A new room gets them at their defaults; a room
 updated in place from 3.11.1 (the newest seeded snapshot, tests_ha/fixtures/entry_3_11_1_pumped_room.json; 3.12.1

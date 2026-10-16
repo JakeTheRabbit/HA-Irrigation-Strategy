@@ -23,16 +23,16 @@ The options of the AI assistant:
 - `anthropic_daily_budget_usd`: the AI budget, the maximum money that the AI assistant can spend from one lights-on to the next (default US$1.00). When it spends this amount, the controller raises CS-708 and uses its own rules until the next lights-on. A call that timed out or lost its connection can still cost money, so the controller counts a high estimate for it.
 - `brain_dry_run`: the AI assistant judges, and the log shows what it would do, but it changes nothing.
 - A daily report: 3 h after lights-off, the AI assistant writes a report of the grow-day that ended, in plain words. The report gives the water, the VWC and the pore EC of each zone, what changed, and what to examine the next day. It is on `sensor.crop_steering_<prefix>brain_report`. The report is one call each grow-day, from the AI budget. It only advises.
-- `stage_arc`: the stage arc for flower that the AI assistant uses after you set `jev_flower_start` (`slab_default`).
+- `stage_arc`: the stage arc for flower that the AI assistant uses after you set `ai_flower_start` (`slab_default`).
 - In a room with a `feed_ec_sensor`, the feed task examines the feed one time each grow-day, 1 h after lights-on. It can propose a change on a CS-711 card. It never changes the feed or the dosing: a person decides.
 - When the AI assistant fails, the controller runs exactly as on rules, and the Auto setpoints learner continues. Examples are no key, a refused key, no answer from Anthropic, a refused question and an AI budget that is spent. The AI assistant panel on the dashboard shows the reason.
 - The AI assistant sends readings and settings to Anthropic, and the room and zone names that you typed. It never sends an entity ID, a key or personal data. On 32-bit ARM (armv7), the AI assistant is not available: the controller uses rules and shows that.
 
-`brain_provider` has the default `auto`. With `auto`, an install that already uses a retired Jev route keeps that route, and all other installs use rules. `auto` never selects Claude. `rules` always means rules.
+`brain_provider` has the default `auto`. With `auto`, an install that used the removed first AI route moves to Claude when it has an Anthropic key, and uses rules when it does not. All other installs use rules. `rules` always means rules.
 
 ### Judges
 
-A judge is one question that the AI assistant answers about one decision of the controller. The controller examines each answer against hard limits first. A judge never switches equipment and never stops a safety action, and no shot waits for a judge. `jev_judges` sets which judges and tasks the AI assistant asks: `all` (default), or a list of names with a comma between each name. The controller ignores a name that it does not know.
+A judge is one question that the AI assistant answers about one decision of the controller. The controller examines each answer against hard limits first. A judge never switches equipment and never stops a safety action, and no shot waits for a judge. `ai_judges` sets which judges and tasks the AI assistant asks: `all` (default), or a list of names with a comma between each name. The controller ignores a name that it does not know. An old `jev_judges` list, written for the first AI route, is read as `all`. To stop one action, turn off its switch in the AI powers list of the room.
 
 - `dawn`: in P0, has the morning dryback gone far enough to start the ramp? It can only start the ramp (P1) sooner.
 - `ramp`: in P1, is the ramp complete? It can only start maintenance (P2) sooner, after the minimum ramp shots.
@@ -43,32 +43,33 @@ A judge is one question that the AI assistant answers about one decision of the 
 - `shot`: did the water of a shot get to the zone? It only advises. When two shots in a row did not get to the zone, it raises CS-701.
 - `zones`: why does one zone get a different quantity of water from the other zones? It only advises, with CS-702.
 - `channel`: does the water go past the substrate or the probe, or do the plants drink less? It only advises, with CS-710, and it never adds water.
-- `stage`: does this zone follow the stage arc for today's day of flower? It only advises, with CS-705. It works only with a flower start in `jev_flower_start`.
+- `stage`: does this zone follow the stage arc for today's day of flower? It only advises, with CS-705. It works only with a flower start in `ai_flower_start`.
 - `setpoints`: what one change to the maintenance shots of the zone is best for tomorrow? It can move the maintenance shot size or the re-water point by one notch each grow-day. It acts only while the Auto setpoints switch of the room is on and no grow plan controls the room. A rescue shot within 30 h after a change puts the old value back.
 - `balance`: late in P2, must this zone move toward the water for each plant of the room? It only advises the setpoints judge of that night.
 - `feed`: must the feed of the room change? It only advises a person, with CS-711.
 - `report`: the daily report above.
 - `why`: the answers to the "why" questions that you ask on the dashboard.
+- `targets` and `shotsize`: once a night, the targets and the shot sizes of the zone. They act only with their switches in the AI powers list on (both off by default); off, they advise.
 - `plan`: what does the most important difference between the grow plan and the room mean? It selects the suggestion that the dashboard shows. The controller raises CS-713 for the difference.
 
-`balance`, `feed`, `report`, `why` and `plan` work only with `claude_haiku`. The same Auto setpoints switch also lets the learner of the controller move the peak target and the field capacity of each zone toward the highest VWC that the zone gets. Each of the two moves 1 point or less each grow-day. The judges never move these two values.
+The same Auto setpoints switch also lets the learner of the controller move the peak target and the field capacity of each zone toward the highest VWC that the zone gets. Each of the two moves 1 point or less each grow-day. The judges never move these two values.
 
-### Retired Jev routes
+### Tuning options
 
-Jev is the retired AI model of the AI assistant. An install that has a Jev route keeps it (`brain_provider: auto` or `jev_legacy`). These routes get no new features, and the controller shows a CS-712 card one time for each release. A new install uses the AI assistant above.
-
-- `typesafe_api_key`: a TypeSafe API key (`apikey_...`). The controller tries it first when it is set.
-- `cf_account_id` and `cf_api_token`, with `cf_gateway_id` (optional): Jev through Cloudflare Workers AI. With a TypeSafe key, Cloudflare is the second route. Without a TypeSafe key, these options start Jev only in two cases. One is an install that used Jev before (a `jev_` file in the data folder of the controller). The other is `brain_provider: jev_legacy`. The token needs the **Workers AI** permission: dash.cloudflare.com, My Profile, API Tokens, Create Token, Workers AI template.
-- `jev_enabled`: off makes the controller use rules, also when a key is set.
-- `jev_daily_calls`: the maximum number of calls in one day, for all rooms together (5000). `jev_budget_warn_pct` raises CS-706 at 80% of it.
-- `jev_retries`, `jev_reask_max`, `jev_unsure_below`, `jev_strict_after` and `jev_strict_prob` set these values:
-  - The number of tries for each route (3).
+- `ai_daily_calls`: the maximum number of calls in one day, for all rooms together (5000). `ai_budget_warn_pct` raises CS-706 at 80% of it, or of the AI budget.
+- `ai_reask_max`, `ai_unsure_below`, `ai_strict_after` and `ai_strict_prob` set these values:
   - How many times the AI assistant asks again when an answer is unsure (2, below 0.7).
   - When a judge goes on the stricter gate (after 3 bad calls in a row). On that gate, an answer needs 0.8 and the same sure call two times in a row.
-- `jev_flower_start`: the first day of 12/12 for each room, as a date or an input_datetime. Give one value for all rooms, or `room=value` pairs. The judges then know the stage of flower.
-- `jev_flower_days`: the length of flower of the cultivar (56).
+- `ai_flower_start`: the first day of 12/12 for each room, as a date or an input_datetime. Give one value for all rooms, or `room=value` pairs. The judges then know the stage of flower.
+- `ai_flower_days`: the length of flower of the cultivar (56).
 
-Restart the controller after a change to these options. The dashboard shows each decision: on **Today**, on the page of each zone, and on **History › Timeline**. The [README](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy#readme) gives a plain-words description. [JEV.md](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/JEV.md) gives each judge and each limit.
+Before the first AI route was removed, these options started with `jev_`. An old options file loads unchanged: the controller reads each old name while the new option has its default.
+
+### The removed first AI route
+
+The first AI route (through Cloudflare or TypeSafe) is removed. An install that used it loads with no change: `brain_provider: jev_legacy`, or `auto` where that route ran, moves to Claude when `anthropic_api_key` has a key, with every judge, and uses rules when it does not. The controller shows a CS-712 card one time for each release. `cf_account_id`, `cf_api_token`, `cf_gateway_id` and `typesafe_api_key` are not used; you can remove them. `jev_enabled` off keeps such an install on rules.
+
+Restart the controller after a change to these options. The dashboard shows each decision: on **Today**, on the page of each zone, and on **History › Timeline**. The [README](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy#readme) gives a plain-words description. [AI_ASSISTANT.md](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/AI_ASSISTANT.md) gives each judge and each limit.
 
 ## Plans and operation
 

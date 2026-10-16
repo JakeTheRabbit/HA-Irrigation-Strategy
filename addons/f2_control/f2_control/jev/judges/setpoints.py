@@ -1,4 +1,4 @@
-"""Tomorrow's maintenance watering, one notch at a time: the Setpoints judge (docs/JEV.md).
+"""Tomorrow's maintenance watering, one notch at a time: the Setpoints judge (docs/AI_ASSISTANT.md).
 
 Asked once a grow-day, early in the night, when the day's water, shots and pore EC are complete. Jev chooses one
 change to the zone's P2 maintenance watering for tomorrow, or none. Code turns the choice into one notch on one of

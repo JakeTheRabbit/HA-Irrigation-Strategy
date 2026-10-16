@@ -1,5 +1,5 @@
 """The Jev edition inside the real controller: Jev off or failing changes nothing; Jev's admitted
-directives move the zone, and everything it judged is published (docs/JEV.md, properties 2, 3 and 7)."""
+directives move the zone, and everything it judged is published (docs/AI_ASSISTANT.md, properties 2, 3 and 7)."""
 import functools
 from datetime import datetime, timedelta
 

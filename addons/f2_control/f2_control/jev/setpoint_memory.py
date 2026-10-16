@@ -1,4 +1,4 @@
-"""What the Setpoints judge remembers per zone, in /data/jev_setpoints.json (docs/JEV.md).
+"""What the Setpoints judge remembers per zone, in /data/jev_setpoints.json (docs/AI_ASSISTANT.md).
 
 - `home`: the operator's own value of each setting Jev may move, the centre of its band. It is the value first
   seen, and it follows the operator: any value Jev did not write becomes the new home.

@@ -497,7 +497,7 @@ def tick(c, room, zone, snap, p, now, lights_on):
     return out
 
 
-# ---------- the Setpoints judge's side (docs/JEV.md) ----------
+# ---------- the Setpoints judge's side (docs/AI_ASSISTANT.md) ----------
 def owns_setpoints(c):
     """True when Jev's Setpoints judge runs: it then owns each zone's P2 shot size and re-water threshold."""
     brain = getattr(c, "jev", None)
@@ -1671,7 +1671,7 @@ def why_task(c, room, now, ha_get, ha_set, gates=None):
             "daily_limit": WHY_PER_DAY, "friendly_name": "AI assistant answers", "engine": PRODUCT})
 
 
-# ---------- the AI assistant's powers (docs/JEV.md, "Powers") ----------
+# ---------- the AI assistant's powers (docs/AI_ASSISTANT.md, "Powers") ----------
 def room_powers(c, room, now=None):
     """{power: on} for the room, read from its switches once a pass (a missing switch is the power's default);
     `now` None reads this pass's, once read."""

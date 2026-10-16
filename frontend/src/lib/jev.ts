@@ -396,7 +396,7 @@ export function parseBrainAnswers(entity: EntityState | undefined): {
   };
 }
 
-/** Workers AI input at $0.042 per million tokens; output is free (docs/JEV.md). The legacy route only: the Claude
+/** Workers AI input at $0.042 per million tokens; output is free (docs/AI_ASSISTANT.md). The legacy route only: the Claude
  * brain publishes what it spent (`cost_usd_today`), which wins. */
 export const JEV_USD_PER_MILLION = 0.042;
 export function jevCost(tokens: number | null, costUsd: number | null = null): string | null {

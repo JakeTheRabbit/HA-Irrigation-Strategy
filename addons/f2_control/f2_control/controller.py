@@ -4036,7 +4036,7 @@ class Controller:
         return room is not None and room.slug in slugs
 
     def _jev_alert(self, room, zone, judge, alert):
-        """An alert one of Jev's judges, or Jev's runtime, raised (docs/JEV.md). Only these codes exist: a judge can
+        """An alert one of Jev's judges, or Jev's runtime, raised (docs/AI_ASSISTANT.md). Only these codes exist: a judge can
         never raise anything the error-code list does not explain. `zone` None is a room-wide alert."""
         key = f"jev_{judge}_{room.slug}" + ("" if zone is None else f"_z{zone}")
         code, title, message = alert.get("code"), alert.get("title", ""), alert.get("message", "")
@@ -6022,7 +6022,7 @@ class Controller:
             distrusted = room.__dict__.setdefault("_jev_distrusted", {})
             distrusted.pop(zone, None)
             if snap is not None and getattr(self, "jev", None) is not None:
-                try:  # Jev's judges (docs/JEV.md): whatever goes wrong here, the base engine decides
+                try:  # Jev's judges (docs/AI_ASSISTANT.md): whatever goes wrong here, the base engine decides
                     jev_dirs = jev_bridge.tick(self, room, zone, snap, p, now, lights_on)
                     if "distrust" in jev_dirs:
                         distrusted[zone] = jev_dirs["distrust"].why  # the zone takes the dead-probe path
