@@ -9,6 +9,28 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.14.0] - 2026-10-16
+
+Pair: **controller 3.14.0**. #154, #160 and #162. Released by the owner's decision without a staging soak (approved rehearsal).
+
+### 🌱 In plain English
+
+**Read this first. It changes what the AI assistant is asked on rooms that update:**
+
+- **The AI assistant is now Claude only, and it is asked every question by default, including the P1 ramp.** A judge list copied from the old assistant is read as "all", and the log says once which judges that adds. The first AI route (Cloudflare / TypeSafe) is gone: a room that used it moves to Claude when it has an Anthropic key, and runs on its rules when it has none. The powers checklist is still where you turn each power on or off.
+
+What else you get:
+
+- **History explorer on the zone page.** Pick a date range (today, the grow-day, 3, 7 or 14 days, this run, or your own), tick any sensor in the room, see the phases and shots, and lay the previous run over it for the same days of the run.
+- **Clearer cards.** The daily plan, zone cards and Today show one status line, four gauges and one advisory, with the previous grow-day, a short key and the reference dryback band. The longer explanations sit under "How this is worked out". A reading of 1% or less is shown as a probe gap, not as a dry zone.
+- "Jev" now reads "AI assistant" everywhere you see it. Entity ids do not change.
+
+### 🔧 Technical notes
+
+- #162: `jev/` -> `brain/`, `jev_bridge` -> `brain_bridge`; new option `ai_judges` (default `all`), `jev_judges` read as a fallback while `ai_judges` is the default, and a list that names only judges from the move is read as all; `jev_*` tuning options renamed `ai_*` with the old value used while the new one is at its default; Cloudflare/TypeSafe transports removed (old keys accepted, unused); CS-712 "First AI route removed" card once per release; docs/AI_ASSISTANT.md (docs/JEV.md is a stub). Old installs 2.25.1 to 3.11.1 proven in tests_ha.
+- #160: zone page History explorer (range in the URL, per-unit axes, day-by-day history downsampled to about 720 points per sensor, previous run aligned by grow day and lights-on); the room descriptor publishes mapped room temperature, humidity and VPD sensors when mapped.
+- #154: HMI cards (status line, gauges, one advisory chip with Apply to draft, projection table); VWC <= 1% is a probe gap, left out of lines, peak, dryback and statistics.
+
 ## [3.13.0] - 2026-10-16
 
 Pair: **controller 3.13.0**. Everything in 3.12.2 (which was tagged but never promoted) plus #156, #157, #158 and #159. Released by the owner's decision without a staging soak (approved rehearsal).

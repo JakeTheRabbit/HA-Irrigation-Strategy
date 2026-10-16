@@ -1,3 +1,7 @@
+# 3.14.0
+
+Pair with integration 3.14.0. **C2.** #162: the AI assistant is Claude only and asks every judge by default (ramp included); `ai_judges` replaces `jev_judges` (read as a fallback), `jev_*` tuning options become `ai_*`, the Cloudflare/TypeSafe route is removed with old keys still accepted; package `jev/` is now `brain/`. No state-file change.
+
 # 3.13.0
 
 Pair with integration 3.13.0. **C2.** #158: P1 ends when the ramp stalls under its target (two non-rising shots), with a day-scoped re-water under the stalled peak; state gains `p1_flat`/`p1_stall` (optional keys, an old file loads unchanged). #156: AI assistant powers per room, with the AI setting targets and shot sizes itself when ticked; goal scorecard, rules and controller brief in the cached prompt. Includes 3.12.2.

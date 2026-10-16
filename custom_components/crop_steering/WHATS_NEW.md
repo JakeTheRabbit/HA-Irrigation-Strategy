@@ -19,6 +19,13 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.14.0 - 2026-10-16
+
+- **The AI assistant now answers every question by default, including when to end the morning ramp**.
+- Explore any sensor in the room over any dates on the zone page, and lay the last run over it.
+- The plan and zone cards are easier to read at a glance, with yesterday's numbers still there.
+- Bug fixes and improvements.
+
 ## 3.13.0 - 2026-10-16
 
 - **A zone whose ramp stops raising the moisture now moves on to P2 instead of watering for hours**.
