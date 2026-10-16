@@ -907,7 +907,7 @@
       "id": "record_grow_days",
       "group": "history",
       "label": "Record grow days",
-      "help": "Keep daily summaries at lights-on. Off until enabled.",
+      "help": "Keep a daily summary at lights-on for grow comparisons. Off until enabled.",
       "master": {
         "domain": "switch",
         "key": "record_grow_days",
