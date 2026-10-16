@@ -8,6 +8,8 @@
  * a zone key is written without its `zone_N_` part and has scope "zone" or "room+zone".
  */
 import registry from "./features.json";
+import restored from "./features-restore.json";
+import type { Page } from "./routes";
 import type { EntityState, States } from "./types";
 
 export type Domain = "switch" | "select" | "number";
@@ -199,4 +201,42 @@ export function numberLimits(
   )
     return null;
   return { min: Number(min), max: Number(max), step: Number(step) };
+}
+
+
+/** Restored settings that live in a setup form, display store or history overlay, rather than an
+ * HA switch/number/select. Their links open the existing controls; no pretend entity is written. */
+export interface Placement {
+  id: string;
+  entity: string;
+  label: string;
+  help: string;
+  group: string;
+  page: Page;
+  location: string;
+}
+export const RESTORED_MANIFEST = restored;
+const PLACEMENT_PAGES: Record<string, { group: string; page: Page; location: string }> = {
+  "LF-05": { group: "display", page: "zone", location: "Zone page" },
+  "LF-97": { group: "display", page: "help", location: "Help > Rules" },
+  "LF-124": { group: "display", page: "today", location: "Today" },
+  "LF-169": { group: "safety", page: "zone", location: "Zone page" },
+  "LF-34": { group: "equipment", page: "equipment/setup", location: "Equipment > Setup" },
+  "LF-54": { group: "equipment", page: "equipment/setup", location: "Equipment > Setup" },
+  "LF-87": { group: "history", page: "equipment/setup", location: "Equipment > Setup" },
+  "LF-86": { group: "history", page: "history/timeline", location: "History > Timeline > Overlays" },
+  "LF-165": { group: "feed", page: "equipment/dosing", location: "Equipment > Dosing > Dosing setup" },
+};
+export const PLACEMENTS: Placement[] = restored.flatMap((row) => {
+  // Entity controls are in the main registry. App options already have their own section below it.
+  if (/^(switch|number|select)\.crop_steering_/.test(row.entity) || row.scope === "app") return [];
+  const target = row.entity.includes("display (attribute ")
+    ? { group: "display", page: "settings" as Page, location: "Settings > Display" }
+    : PLACEMENT_PAGES[row.id];
+  return target ? [{ id: row.id, entity: row.entity, label: row.label, help: row.help, ...target }] : [];
+});
+export function placementsFor(group: string, query: string): Placement[] {
+  const q = query.trim().toLowerCase();
+  return PLACEMENTS.filter((row) => (group === "all" || row.group === group) &&
+    (!q || `${row.label} ${row.help} ${row.location}`.toLowerCase().includes(q)));
 }
