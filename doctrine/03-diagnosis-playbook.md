@@ -18,8 +18,8 @@ Doctrine 0.1.0. The decisions the brain is asked, materiality, symptom to lever.
 | zones | why_different | lights on, when a zone's water per plant is far from the room's | none -> advice: an alert with the likely cause | recipe_difference, plants_drinking_less, plants_drinking_more, probe_wet_spot, probe_dry_spot, delivery_fault, water_not_landing, insufficient_evidence | never moves water (ACT-08) |
 | stage | arc | P2, once a grow-day, when the day of flower is known | none -> advice: a card saying what is off against the selected stage arc | on_arc, dryback_too_shallow, dryback_too_deep, ec_below_band, ec_above_band, move_on_signs, insufficient_evidence | never moves water (ACT-08) |
 | plan | cause | room task, Claude Haiku only: 30 minutes after lights-on when code found a drift from the grower's plan it may ask about, on a new kind of drift once it has lasted 10 minutes, again every 6 hours while it lasts, at most 4 times a photoperiod | none -> advice: picks which of code's suggestions the plan line on the panel shows; the CS-713 card is code's | deliberate_change, plan_out_of_date, reading_holds_plan, settings_disagree, no_effect_today, insufficient_evidence | never moves water, writes a setting or arms, edits or disarms a plan (ACT-10) |
-| targets | targets | P3, once a grow-day in the first 3 hours after lights-off, Claude route only, while the zone has its own ladder numbers | none -> with the room's set_targets_from_achievable power on, code writes the values you set (field capacity, P1 target, re-water point, rescue floor, the steering mode's dryback target) as given, clamped only to each setting's own range; off, they are advice | - | none of code's own beyond the power, dry run and each setting's own range: you are trusted to follow the goal and rules for the owner's powers (POW-*); every change is logged with your reason and expected result and scored the next night (ACT-11) |
-| shotsize | shot_sizes | P3, once a grow-day in the first 3 hours after lights-off, Claude route only, while the zone has its own shot size numbers | none -> with the room's tune_shot_sizes power on, code writes the shot sizes you set (first ramp shot, maintenance shot) as given, clamped only to each setting's own range; off, they are advice | - | none of code's own beyond the power, dry run and each setting's own range: you are trusted to follow the goal and rules for the owner's powers (POW-*) (ACT-12) |
+| targets | targets | P3, once a grow-day in the first 3 hours after lights-off, Claude route only, while the zone has its own ladder numbers | none -> With the matching room power on, values are lasting zone-number writes clamped to engine bounds within entity bounds, subject to HA ladder validation. Off means advice. | - | Power on, not dry run, not paused, allowed numeric keys, finite values, code/entity ranges and ladder validation. Confidence does not block a values write; omit uncertain settings. (ACT-11) |
+| shotsize | shot_sizes | P3, once a grow-day in the first 3 hours after lights-off, Claude route only, while the zone has its own shot size numbers | none -> With the matching room power on, values are lasting zone-number writes clamped to engine bounds within entity bounds, subject to HA ladder validation. Off means advice. | - | Power on, not dry run, not paused, allowed numeric keys, finite values, code/entity ranges and ladder validation. Confidence does not block a values write; omit uncertain settings. (ACT-12) |
 
 ## When a signal is worth acting on
 
@@ -152,7 +152,7 @@ Rule out first: Has pore EC ever been near the target on this feed? Do the EC re
 
 ## Engine parameter -> integration setting
 
-Engine parameter (ZoneParams) -> the integration setting it is read from. Setting keys are product keys, not site entity ids. Mode-split settings resolve by the zone's steering mode (vegetative or generative). The brain moves only p2_shot_size and the base p2_vwc_threshold, one notch a grow-day (ACT-07). With the room's Auto Setpoints switch on (opt-in, and always on when a notch is asked) code also writes field_capacity and p1_target_vwc from the zone's own highest readings and shifts p2_vwc_threshold and p3_emergency_vwc_threshold with field capacity (CT-12, CT-13). Every other row is the grower's setting, and the brain's view of any row it does not notch is advice.
+Engine parameters map to integration settings. Only bounded notches act by default. Target and shot-size powers add lasting zone-number writes within code bounds. Auto Setpoints follows field capacity and P1 peak and shifts re-water with field capacity, never rescue; it stands aside with targets power on.
 
 | engine | setting |
 |---|---|
@@ -167,14 +167,14 @@ Engine parameter (ZoneParams) -> the integration setting it is read from. Settin
 | dryback_target | vegetative_dryback_target | generative_dryback_target (relative %; compared with P0's drop since lights-on and in the predictive P3 test, never with the overnight dryback; the integration's separate p0_dryback_drop_percent is not read by the controller) |
 | p0_max_wait_min | p0_maximum_wait_time (min) |
 | ec_target_p0/p1/p2 | ec_target_veg_p0..p2 | ec_target_gen_p0..p2 |
-| p3_emergency_floor | p3_emergency_vwc_threshold (the rescue floor; with Auto Setpoints on, shifted with field capacity, down as well as up, and lowered to stay 3 points under the threshold) |
+| p3_emergency_floor | p3_emergency_vwc_threshold; Auto Setpoints never moves it; only the operator or authorised targets power |
 | p3_emergency_shot | p3_emergency_shot_size |
 | max_daily_volume | max_daily_volume (L per zone per grow-day) |
-| min_daily_volume | no integration setting: a per-zone helper the install creates by hand (min_daily_ml_per_plant) x the zone's plant_count / 1000. Absent on a fresh install, so the floor is 0 (off); the controller also sets it to 0 for a zone whose table is backing up |
+| min_daily_volume | min_daily_ml_per_plant x plant_count / 1000, default zero off; legacy helper accepted; zero while drainage backs up |
 | field_capacity | field_capacity (with Auto Setpoints on, set by code to the zone's highest reading of this grow-day or the one before) |
 | max_ec | maximum_ec |
 | stacking_on | ec_stacking_enabled (room switch) |
 | watchdog_hours | watchdog_hours |
-| drown_ceiling | an optional per-zone number min_floor_drown_ceiling the install creates by hand (the integration creates none); default 90 |
-| p2_min_interval_min | fixed 10 min (no setting) |
+| drown_ceiling | optional min_floor_drown_ceiling, fallback field_capacity + 5 within 50-100 |
+| p2_min_interval_min | ec_min_interval, minutes between EC-correction shots, default 10 |
 | min_floor_finish_h | fixed 3 h (no setting) |

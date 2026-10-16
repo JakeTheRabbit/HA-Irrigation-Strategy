@@ -48,19 +48,23 @@ PHASE_MACHINE = """\
 - Lights-off forces any zone not in P3 to P3. P3 -> P0 at lights-on (or on a new grow-day when a light edge was
   missed); a zone in P1 or P2 on a new grow-day also restarts at P0 with its own budget.
 - P0 -> P1 when the first of these holds: moisture at or under the re-water point (p2_vwc_threshold); the dryback
-  reaches its target (vegetative_dryback_target or generative_dryback_target by the zone's steering mode, plus
-  p0_additional_dryback); P0 has lasted p0_maximum_wait_time minutes. Dryback is relative to the peak:
+  reaches p0_additional_dryback when positive, otherwise vegetative_dryback_target or generative_dryback_target
+  by steering mode; P0 has lasted p0_maximum_wait_time minutes. The additional setting REPLACES the target,
+  it is not added. Dryback is relative to the peak since lights-on:
   (peak - VWC) / peak x 100.
 - P1 (the ramp): shots of p1_initial_shot_size, growing by p1_shot_size_increment, every p1_time_between_shots
   minutes, until moisture reaches min(p1_target_vwc, field_capacity); then one more shot, and P1 hands over to P2
   when a shot no longer raises the zone's highest reading by p1_rise_pts (the rise rule), after
   p1_maximum_extra_shots extra shots, at p1_maximum_shots, or at the target with the daily budget spent. P1 has no
-  time exit: a gated zone waits in P1 and resumes.
+  time exit: a gated zone waits in P1 and resumes. Below target, after the minimum shots and shot interval,
+  {stall} consecutive shots without the required settled rise also end P1, provided the probe is trusted and
+  drainage is not backed up. The day's re-water point then follows the stalled reading minus its P2 band.
 - P2 (maintenance): a shot of p2_shot_size when moisture falls under the re-water point (with the EC steer's offset
   baked in, clamped between rescue + 3 and the ramp ceiling - 1), at most every p2_time_between_shots minutes. P2 ->
   P3 early only when a dryback started now would end by lights-on (predictive P3), otherwise at lights-off.
 - P3 (night): only a rescue shot of p3_emergency_shot_size when moisture falls under the rescue floor
-  (p3_emergency_vwc_threshold), at most every p3_time_between_shots minutes.
+  (p3_emergency_vwc_threshold), at most every p3_time_between_shots minutes. With P3 dryback hold enabled,
+  budgeted hold shots can also keep moisture at the overnight target; they are not daily-cap exempt.
 - A probe that stops reading (stale, flat, out of range) makes the zone blind after {blind} minutes: it copies a
   healthy sibling's shots or, with none, gets a timed shot every blind_fallback_min minutes inside its daily cap. When
   the probe reads again the zone resumes from its own reading in the phase it is in.
@@ -73,14 +77,21 @@ PHASE_MACHINE = """\
   and the lights-on watchdog (watchdog_hours) still fire.
 
 ### 3. Gates and safety layers, in order, each fail-closed
-1. The room's kill switch (engine switch) and any hold entity: off or unreadable, no valve opens.
-2. The source-water gate: feed pH and EC inside their bands, a dead probe holds the shot.
-3. Hardware sequencing: pump prime (pump_prime_time), main line (main_line_lead_time), zone valve, then the reverse;
-   valve close is read back, and a failed read-back stops the pump and aborts the shot.
-4. The max-run latch: shots that keep running into the room's longest shot latch the zone (CS-312).
-5. The duplicate-controller lease: another controller's heartbeat holds the room for {dup} s.
-6. The EC step rule: in P2 the EC steer moves the re-water offset by steps, at most once per ec_min_interval minutes.
-7. Plan adherence: an armed grow plan owns the room's targets; drift from it raises CS-713.
+1. The duplicate-controller lease holds the whole room for {dup} s before per-zone gates run.
+2. Setup pending, archived room, or room off; dosing hold; plan hold (only its named safety exemptions pass).
+3. Hardware fault latch (CS-301), then max-run latch (CS-312). After {max_run} consecutive shots cut to the
+   maximum duration, max-run latches only with its switch enabled (off by default); otherwise it reports.
+   A latched zone gets no shots, including rescues.
+4. Missing valve mapping, incompatible plumbing, or an actuator that cannot be driven.
+5. Room kill switch off or unreadable; a retired switch off; zone switch off or unreadable; manual override.
+6. External hold entities: ON or unreadable holds. OFF releases a hold. Then settings hold and tank hold.
+7. Source-water EC gate, then pH gate, when mapped and configured. Dead probes hold after their grace period.
+8. An offline pump, mainline or zone valve: no actuation until every mapped device is readable.
+Hardware sequencing after admission: pump prime (pump_prime_time), main line (main_line_lead_time), zone valve,
+then shutdown in reverse. Read-back failure stops the pump and aborts the shot.
+EC steering runs in P2 only with ec_stacking_enabled on: every 30 minutes the offset steps toward +1, -1 or zero,
+clamped to +/-20% of re-water. The salt power can hold or halve it. ec_min_interval spaces EC-correction shots,
+not the offset steps. An armed plan owns its targets; drift raises CS-713.
 """
 
 
@@ -102,7 +113,7 @@ def writable():
 
 def render(codes):
     """The brief, from the code and the error-code table `codes` ([{code, title, meaning, watering}, ...])."""
-    from crop_steering_engine.core import CAP_EXEMPT, PHASES
+    from crop_steering_engine.core import CAP_EXEMPT, PHASES, P1_STALL_SHOTS
 
     import setpoint_supervisor  # beside the controller
 
@@ -112,9 +123,11 @@ def render(codes):
 
     blind, dup = controller.BLIND_GRACE_MIN, controller.DUPLICATE_HOLD_S
     out = [PHASE_MACHINE.format(phases=" -> ".join(PHASES), blind=blind, dup=dup,
-                                exempt=", ".join(sorted(CAP_EXEMPT)))]
+                                stall=P1_STALL_SHOTS,
+                                max_run=controller.MAX_RUN_IN_A_ROW,
+                                exempt=", ".join(sorted(k for k, enabled in CAP_EXEMPT.items() if enabled)))]
     out += ["### 4. The settings: each zone's own number for the setting, else the room's, else the controller's "
-            "built-in value shown here", ""]
+            "built-in fallback shown here (these are not the fresh-room defaults)", ""]
     out += [f"- {k}: {v:g}" + (f" (range {lo:g}-{hi:g})" if (b := setpoint_supervisor.BOUNDS.get(k)) and
                                 (lo := b[0]) is not None and (hi := b[1]) is not None else "")
             for k, v in _settings().items()]
@@ -130,8 +143,11 @@ def render(codes):
     out += [f"- {k} (default {'on' if d else 'off'}): {w}" for k, d, w in powers.POWERS]
     out += ["- Off: the judge still asks and its answer is advice in the decision log. On: it acts through the "
             "envelope; set_targets_from_achievable and tune_shot_sizes write the values set as given, clamped only to "
-            "each setting's range. Dry run (brain_dry_run): every acting answer is journalled 'would act', nothing is "
-            "written.", "", "### 7. Error codes: what each means, and what the controller does", ""]
+            "the intersection of engine bounds and the entity range. HA refuses rescue + 3 > re-water or "
+            "re-water >= peak. Power writes are lasting, not expiring overlays; the targets power stops the "
+            "Auto Setpoints follower. Values questions are read once and confidence does not gate writes: "
+            "omit uncertain values. Dry run or paused AI changes: nothing acts.", "",
+            "### 7. Error codes: what each means, and what the controller does", ""]
     for c in codes:
         meaning = _first(c.get("meaning"))
         does = _first(c.get("watering"))
@@ -140,10 +156,8 @@ def render(codes):
 
 
 def _first(text):
-    """The first sentence of `text`."""
-    text = " ".join(str(text or "").split())
-    i = text.find(". ")
-    return text if i < 0 else text[: i + 1]
+    """Keep the complete meaning and response, normalised to one line."""
+    return " ".join(str(text or "").split())
 
 
 def load_codes(path=CODES):
