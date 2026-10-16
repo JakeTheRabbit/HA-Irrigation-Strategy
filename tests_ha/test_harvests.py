@@ -36,7 +36,8 @@ async def test_harvest_persists_across_reload_and_run_edits(hass, hass_admin_use
     assert await hass.config_entries.async_reload(entry.entry_id)
     await hass.async_block_till_done()
     assert await call(hass, hass_admin_user, "harvests_get") == doc
-    user = MockUser(name="Reader", group_ids=[GROUP_ID_USER]).add_to_hass(hass)
+    group = await hass.auth.async_get_group(GROUP_ID_USER)
+    user = MockUser(name="Reader", groups=[group]).add_to_hass(hass)
     assert await call(hass, user, "harvests_get") == doc
     with pytest.raises(HomeAssistantError, match="administrator"):
         await call(hass, user, "runs_set_harvest", expected_revision=1,
