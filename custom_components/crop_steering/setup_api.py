@@ -760,7 +760,7 @@ def _choice_only(payload, old):
     )
 
 
-def _labels_only(data, old):
+def _labels_only(hass, entry, payload, data, old):
     """The saved setup differs from the stored one in zone names and cultivars only: labels, which the controller
     reads as display text and never adopts (it needs no new setup revision, and the room keeps watering).
     """
@@ -773,7 +773,16 @@ def _labels_only(data, old):
                 zone.pop("cultivar", None)
         return setup
 
-    return bare(data) == bare(old)
+    # The editor includes derived sizing and empty mapping defaults. Compare
+    # against an unchanged editor round-trip, rather than the legacy encoding.
+    room = setup_room(hass, entry)
+    baseline = {
+        "room_name": room["room_name"],
+        "active": room["active"],
+        "zones": room["zones"],
+        "hardware": room["hardware"],
+    }
+    return bare(data) == bare(prepare_setup(hass, baseline, old, entry.entry_id))
 
 
 async def save_setup(hass, payload):
@@ -783,7 +792,7 @@ async def save_setup(hass, payload):
     # Choosing which probes count and which leads, and nothing else, can be done while watering. It
     # keeps the setup revision: a new one is a setup the controller takes on only with the engine
     # switched off, and the room would stop watering until someone did.
-    choice = _choice_only(payload, old) or _labels_only(data, old)
+    choice = _choice_only(payload, old) or _labels_only(hass, entry, payload, data, old)
     blockers = [] if choice else safety_blockers(hass, entry, data)
     if blockers:
         raise ValueError("; ".join(blockers))
