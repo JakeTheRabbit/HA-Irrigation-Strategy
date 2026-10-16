@@ -38,9 +38,12 @@ import auto_setpoints
 import curve_tracker
 import dosing_runner
 import brain_bridge
+import gate_report
 import log_words
 import plan_adherence
 import runtime_env
+import sensing
+import shot_audit
 from brain import client as jev_client
 import setpoint_supervisor
 import tank_level
@@ -1399,6 +1402,7 @@ class Controller:
             "p1_stall": None,
             "vmax_wetup": [],  # this grow-day's P1 wet-up VWC readings, for the Vmax advisory (resets each P0)
             **zone_history.fresh(),
+            **sensing.fresh(),  # the water-and-VPD record (sensing.py), kept only while its switch is on
         }
 
     def _apply_saved_zone(self, fresh, d):
@@ -1518,6 +1522,7 @@ class Controller:
                                if isinstance(v, (int, float)) and not isinstance(v, bool)
                                and math.isfinite(v) and 0.0 <= v <= 100.0][-VMAX_SERIES_MAX:]
         s.update(zone_history.restore(d))
+        s.update(sensing.restore(d))
         return s
 
     def _read_state_file(self):
@@ -1738,6 +1743,9 @@ class Controller:
             room.substrate = self._substrate(attrs)  # read like the names: needs no adoption
             room.light_entity = str(attrs.get("light_entity") or "").strip()  # checked, never actuated
             room.tank = tank_level.mapping(attrs)  # read only, never actuated: needs no adoption
+            # the room's climate sensors, read only for the water-and-VPD record (sensing.py)
+            room.climate = {k: str(attrs.get(k) or "").strip() for k in ("vpd_sensor", "temperature_sensor",
+                                                                         "humidity_sensor")}
             saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_setup")
             another_room = self._is_another_room(room, attrs, saved)
             revision = attrs.get("setup_revision", 0)
@@ -1894,6 +1902,8 @@ class Controller:
             "night_hist": s.get("night_hist") or [],
             "night": s.get("night"),
             "vmax_wetup": list(s.get("vmax_wetup") or []),
+            "water_vpd": s.get("water_vpd"),
+            "day_hist": s.get("day_hist") or [],
         }
 
     def _save_state(self):
@@ -3133,7 +3143,7 @@ class Controller:
         )
 
     @staticmethod
-    def _publish_waiting_for(room, zone, snap, p, now):
+    def _publish_waiting_for(room, zone, snap, p, now, gates=None):
         """What would move the zone next (crop_steering_engine.waiting_for), for the dashboard's zone
         card and grow-day line. No snapshot (no probe, or the room is off): an empty list, so an old
         one never lingers. A wait's clock time is `at` plus its in_min."""
@@ -3148,6 +3158,8 @@ class Controller:
             {
                 "conditions": conditions,
                 "at": now.astimezone().isoformat(timespec="seconds"),
+                # every pre-shot gate with pass or hold (gate_report.py), for the zone page's list
+                **({"gates": gates} if gates is not None else {}),
                 "friendly_name": f"Zone {zone} waiting for (controller)",
                 "engine": PRODUCT,
             },
@@ -4213,6 +4225,8 @@ class Controller:
         if room.tank.get("distance"):  # what the tank gave, for the level's drawdown check
             tank_level.drawn(room.tank_drawdown, delivered_l)
         self._save_state()
+        if room.__dict__.get("_shot_check", "off") != "off":
+            shot_audit.counted(room, zone, delivered_l)  # the shot table's record (shot_audit.py)
         if getattr(self, "jev", None) is not None:
             try:  # the shot, for the AI assistant's Shot and Probe judges to read its answer later
                 brain_bridge.shot_counted(room, zone, delivered_l)
@@ -5982,6 +5996,7 @@ class Controller:
         if was is False:
             self._room_switched_on(room)
         room._retired_off = self._carry_retired_switches(room)
+        self._sensing_options(room)
         self._load_strategy_snapshot(room, now)
         # Only a newly computed batch can clear a prior preflight invalidation.
         room._strategy_batch_invalid = False
@@ -6038,6 +6053,7 @@ class Controller:
                 continue
             room._blind_since.pop(zone, None)
             snaps[zone] = snap
+            self._sensing_tick(room, zone, snap, lights_on, now)
             if st["phase"] == "P1" and snap.vwc >= min(p.p1_target, p.field_capacity):
                 st["p1_reached"] = True  # the P1 rule (core.decide): the target has been read this P1
             try:  # CS-310: never pour the daily minimum, or an EC flush, into a table that isn't draining
@@ -6098,7 +6114,7 @@ class Controller:
                     **({"peak_vwc": snap.vwc} if new_phase == "P0" else {}),
                     **({"shot_count": 0} if new_phase == "P1" else {}),
                 )
-            self._publish_waiting_for(room, zone, shown, p, now)
+            self._publish_waiting_for(room, zone, shown, p, now, gates=self._gates(room, zone, reason))
             # The EC steer runs on ec_smooth, which only settled readings feed (see _settled_ec).
             if (snap.ec is not None and snap.ec_smooth is not None and p.stacking_on
                     and st["phase"] == "P2" and p.ec_target_p2 > 0):
@@ -6134,7 +6150,7 @@ class Controller:
                 log("auto setpoints error", room.slug, zone, e)
         for zone, p in blind:
             st = room.state[zone]
-            self._publish_waiting_for(room, zone, None, p, now)  # no probe: nothing to compare
+            self._publish_waiting_for(room, zone, None, p, now, gates=self._gates(room, zone))  # no probe: nothing to compare
             # A dead probe must NOT freeze the daily cycle: still honour the time-based
             # phase forces (lights-off -> P3, P3 -> P0 at the new photoperiod). Only the
             # VWC-driven transitions are paused while blind.
@@ -6229,6 +6245,8 @@ class Controller:
                      else strategy_block(getattr(room, "strategy_snapshot", None), zone))
             if fire and not block and getattr(self, "jev", None) is not None and getattr(reason, "kind", None) != "test_shot":
                 brain_bridge.shot_started(room, zone, snaps.get(zone), getattr(reason, "kind", None))
+            if fire and not block and room.__dict__.get("_shot_check", "off") != "off":
+                shot_audit.started(room, zone, snaps.get(zone), getattr(reason, "kind", None))
             acted = self._act_zone(
                 room,
                 zone,
@@ -6266,6 +6284,8 @@ class Controller:
                 "p": params[zone],
                 "vmax": room._vmax.get(zone),
                 "next_h": next_h,
+                # the zone's live dryback (sensing.dryback): the numbers decide() used this pass
+                "dryback": (snap.peak_vwc, snap.vwc, snap.dryback_rate, snap.minutes_since_shot) if snap else None,
             }
         for z, why in cross_zone_outliers(snaps):
             self._alert(
@@ -6312,6 +6332,93 @@ class Controller:
             log("tank level error", room.slug, e)
         room._was_lights_on = lights_on
         return pub
+
+    # ---------- read-only sensing: dryback, water and VPD, the shot table, the gate list ----------
+    def _sensing_options(self, room):
+        """This pass's choices for the read-only sensing (each off on a room that never chose): the Shot check
+        select and the Water vs VPD switch, and with the switch on, the room's VPD now."""
+        mode = ha_get(f"select.crop_steering_{room.prefix}shot_check")[0]
+        room._shot_check = mode if mode in shot_audit.MODES else "off"
+        room._water_vpd_on = self._on(f"switch.crop_steering_{room.prefix}water_vpd_insight", False)
+        room._vpd_now = self._room_vpd(room) if room._water_vpd_on else None
+
+    def _room_vpd(self, room):
+        """The room's air VPD in kPa: its mapped VPD sensor, else worked out from its temperature and humidity
+        sensors; None without them."""
+        climate = getattr(room, "climate", None) or {}
+        if climate.get("vpd_sensor"):
+            v = sensing.number(ha_get(climate["vpd_sensor"])[0])
+            return v if v is not None and 0 <= v <= 6 else None
+        if climate.get("temperature_sensor") and climate.get("humidity_sensor"):
+            t = self._read_sensor(climate["temperature_sensor"], "temperature", max_age_min=60)
+            return sensing.vpd_from(t, sensing.number(ha_get(climate["humidity_sensor"])[0]))
+        return None
+
+    def _sensing_tick(self, room, zone, snap, lights_on, now):
+        """A reading for the shot table, and the water-and-VPD record's sample. Never stops a zone being watered."""
+        try:
+            if room.__dict__.get("_shot_check", "off") != "off":
+                shot_audit.reading(room, zone, now, snap.vwc, snap.ec)
+            if room.__dict__.get("_water_vpd_on"):
+                st = room.state[zone]
+                closed = sensing.sample(st, day=self._grow_day_start(room, now).isoformat(), ts=now.timestamp(),
+                                        lights_on=lights_on, rate=snap.dryback_rate,
+                                        minutes_since_shot=snap.minutes_since_shot, vpd=room._vpd_now)
+                if closed is not None:
+                    litres = next((i["litres"] for i in st.get("water_history") or []
+                                   if i.get("grow_day") == closed["date"]), None)
+                    sensing.keep(st, closed, litres, self._zone_num(room, zone, "plant_count", FALLBACK["plant_count"]))
+                    self._save_state()
+        except Exception as e:
+            log("sensing error", room.slug, zone, e)
+
+    def _gates(self, room, zone, reason=None):
+        """Every pre-shot gate of the zone with pass or hold (gate_report.py), or None when it cannot be read."""
+        try:
+            return gate_report.report(self, room, zone, reason)
+        except Exception as e:
+            log("gate report error", room.slug, zone, e)
+            return None
+
+    def _publish_sensing(self, room, zone, d, now):
+        """The zone's dryback sensor, and with their toggles on, its water-vs-VPD answer and its shot table."""
+        px = room.prefix
+        try:
+            state, attrs = sensing.dryback(*(d.get("dryback") or (None, None, None, None)))
+            ha_set(f"sensor.crop_steering_{px}zone_{zone}_dryback_app", state,
+                   {**attrs, "note": sensing.DRYBACK_NOTE, "friendly_name": f"Zone {zone} dryback",
+                    "engine": PRODUCT})
+            if room.__dict__.get("_water_vpd_on"):
+                st = room.state[zone]
+                fit = sensing.fit(st.get("day_hist") or [])
+                ha_set(f"sensor.crop_steering_{px}zone_{zone}_water_response_app",
+                       "unknown" if fit["slope"] is None else fit["slope"],
+                       {"unit_of_measurement": "points/h per kPa", "n_days": fit["n"], "r": fit["r"],
+                        "vpd_spread_kpa": fit["spread"], "days": st.get("day_hist") or [], "words": fit["words"],
+                        "vpd_now_kpa": room._vpd_now, "friendly_name": f"Zone {zone} dryback vs VPD",
+                        "engine": PRODUCT})
+            mode = room.__dict__.get("_shot_check", "off")
+            if mode != "off":
+                jev = getattr(self, "jev", None)
+                rows = shot_audit.table(room, zone, now, self._substrate_l(room, zone), d["p"].field_capacity,
+                                        ai=shot_audit.ai_labels(jev, room.slug, zone) if jev is not None else ())
+                ha_set(f"sensor.crop_steering_{px}zone_{zone}_shot_log_app", rows[0]["verdict"] if rows else "none",
+                       {"shots": rows, "mode": mode, "ai_on": jev is not None,
+                        "note": "Kept in memory: after a restart the table fills again with the next shots.",
+                        "friendly_name": f"Zone {zone} last shots", "engine": PRODUCT})
+                # Rules-mode CS-701: only with the AI assistant off, under the AI judge's own alert key, so one
+                # fault never gives two notices.
+                if mode == "table_and_alert" and jev is None and shot_audit.no_sign_in_a_row(room, zone, rows):
+                    a, b = [r for r in rows if r["counted"] and r["verdict"] == "no_sign"][:2][::-1]
+                    self._alert(
+                        f"jev_shot_{room.slug}_z{zone}", "CS-701", "water does not reach this zone",
+                        f"The last two shots on {self._zone_title(room, zone)} at {a['start'][11:16]} and "
+                        f"{b['start'][11:16]} gave {a['litres']:.1f} L and {b['litres']:.1f} L, and neither the "
+                        "VWC nor the pore EC moved (the controller's shot check). Check the valve, the drippers and "
+                        "the line of the zone. The shots continue as usual.",
+                        room=room, zone=zone)
+        except Exception as e:
+            log("sensing publish error", room.slug, zone, e)
 
     def _publish_status(self, room, pub, now):
         if not pub:
@@ -6373,6 +6480,7 @@ class Controller:
                             "engine": PRODUCT,
                         },
                     )
+                self._publish_sensing(room, zone, d, now)
                 ls = room.state[zone].get("last_shot")
                 if ls is not None:
                     ha_set(
