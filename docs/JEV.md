@@ -155,7 +155,7 @@ The code of the controller admits or refuses each answer. The AI assistant canno
 - **Morning start:** only after half the dryback target or a quarter of the maximum wait. Never while the probe has not moved for 30 min.
 - **Ramp hand-over:** only after the minimum ramp shots, and only with VWC within 3 points of the peak target (or of field capacity, when it is lower).
 - **Day end:** only in the last 3 h before lights-off, only for a zone with generative steering, and only with VWC at least 3 points above the rescue floor.
-- **Probes:** the code sets a probe aside only after two agreeing answers in sequence and evidence from the code. The evidence is two shots with no increase while another zone increased, or a flat reading with water going in.
+- **Probes:** the code sets a probe aside only after two answers in sequence that agree, and evidence from the code. The evidence is two shots with no increase while another zone increased, or a flat reading while water goes in.
 - **Setpoints:** see the next section.
 
 ## Who writes which setpoint
