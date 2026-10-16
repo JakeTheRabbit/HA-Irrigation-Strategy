@@ -161,6 +161,28 @@ def test_with_nothing_to_compare_the_state_is_restored_never_thrown_away():
     )  # naive against aware
 
 
+def test_the_climate_sensors_are_in_the_descriptor_only_when_mapped():
+    """Read-only, for the dashboard's history chart: a room without them publishes the descriptor it
+    always did, and the controller's setup fingerprint never reads them."""
+    before = room.build_engine_config("veg_", "veg", 2, _ZONES, _HW)
+    blank = room.build_engine_config(
+        "veg_", "veg", 2, _ZONES, {**_HW, **{k: "" for k in room.CLIMATE_SENSORS}}
+    )
+    assert blank == before
+    mapped = room.build_engine_config(
+        "veg_",
+        "veg",
+        2,
+        _ZONES,
+        {**_HW, "temperature_sensor": "sensor.veg_air", "vpd_sensor": "sensor.veg_vpd"},
+    )
+    assert mapped == {
+        **before,
+        "temperature_sensor": "sensor.veg_air",
+        "vpd_sensor": "sensor.veg_vpd",
+    }
+
+
 def test_the_light_entity_is_in_the_descriptor_only_when_mapped():
     """A room without a grow light mapped publishes the descriptor it always did, key for key and value for value,
     so the controller's saved setup fingerprint still matches and an update needs no disarm cycle.

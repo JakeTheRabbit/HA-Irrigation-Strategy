@@ -120,6 +120,10 @@ def restored_state_is_ours(entry, last_state) -> bool:
         return True
 
 
+# The room climate sensors a setup can map (config_flow, hardware step).
+CLIMATE_SENSORS = ("temperature_sensor", "humidity_sensor", "vpd_sensor")
+
+
 def build_engine_config(
     prefix,
     slug,
@@ -166,6 +170,9 @@ def build_engine_config(
     declared.update(
         {"light_entity": hw["light_entity"]} if hw.get("light_entity") else {}
     )
+    # The room's climate sensors, likewise only when mapped: read-only, for the dashboard's history
+    # chart. The controller reads none of them.
+    declared.update({k: hw[k] for k in CLIMATE_SENSORS if hw.get(k)})
     if setup.get("tank_level") and (
         hw.get("tank_distance_sensor") or hw.get("tank_low_float")
     ):
