@@ -35,6 +35,7 @@ def test_the_probe_judge_sends_words_not_its_entity_id():
 
 def test_the_stage_block_carries_what_stage_today_said_from_the_installs_arc():
     ctx = _ctx("stage")
+    ctx.brain = {**(ctx.brain or {}), "zone_config": {"substrate": "rockwool"}}
     stage = enrich(ctx, StageJudge(), StageJudge().evidence(ctx))["_brain"]["stage"]
     row = doctrine.STAGE_ARC[1]
     assert stage.startswith("flower day 10 of about 56: flower setting (stretch) (days 1-21)")

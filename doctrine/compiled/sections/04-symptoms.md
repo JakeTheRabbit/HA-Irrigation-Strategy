@@ -16,7 +16,7 @@ Symptom entries carry no evidence class of their own: they are product-rule, dra
 - EC steer chasing a target it cannot reach, or a jumpy EC reading. First rule out: Has pore EC ever been near the target on this feed? Do the EC readings move with the moisture? Levers: ACTS EC steer decay (via salt: target_unreachable, probe_suspect); ADVISES ec_target_p2.
 
 ## Engine parameter -> setting
-Engine parameter (ZoneParams) -> the integration setting it is read from. Setting keys are product keys, not site entity ids. Mode-split settings resolve by the zone's steering mode (vegetative or generative). The brain moves only p2_shot_size and the base p2_vwc_threshold, one notch a grow-day (ACT-07). With the room's Auto Setpoints switch on (opt-in, and always on when a notch is asked) code also writes field_capacity and p1_target_vwc from the zone's own highest readings and shifts p2_vwc_threshold and p3_emergency_vwc_threshold with field capacity (CT-12, CT-13). Every other row is the grower's setting, and the brain's view of any row it does not notch is advice.
+Engine parameters map to integration settings. Only bounded notches act by default. Target and shot-size powers add lasting zone-number writes within code bounds. Auto Setpoints follows field capacity and P1 peak and shifts re-water with field capacity, never rescue; it stands aside with targets power on.
 - p1_target: p1_target_vwc (with Auto Setpoints on, set by code to the zone's highest reading of the grow-day before)
 - p2_threshold: p2_vwc_threshold (with Auto Setpoints on, shifted with field capacity), plus the controller's EC offset whenever pore EC is known (the offset moves only while EC stacking is on, and keeps applying after stacking is switched off until the lights-on reset) (clamped to rescue floor + 3 .. min(p1_target, field_capacity) - 1)
 - p2_shot_size: p2_shot_size (% of substrate)
@@ -28,14 +28,14 @@ Engine parameter (ZoneParams) -> the integration setting it is read from. Settin
 - dryback_target: vegetative_dryback_target | generative_dryback_target (relative %; compared with P0's drop since lights-on and in the predictive P3 test, never with the overnight dryback; the integration's separate p0_dryback_drop_percent is not read by the controller)
 - p0_max_wait_min: p0_maximum_wait_time (min)
 - ec_target_p0/p1/p2: ec_target_veg_p0..p2 | ec_target_gen_p0..p2
-- p3_emergency_floor: p3_emergency_vwc_threshold (the rescue floor; with Auto Setpoints on, shifted with field capacity, down as well as up, and lowered to stay 3 points under the threshold)
+- p3_emergency_floor: p3_emergency_vwc_threshold; Auto Setpoints never moves it; only the operator or authorised targets power
 - p3_emergency_shot: p3_emergency_shot_size
 - max_daily_volume: max_daily_volume (L per zone per grow-day)
-- min_daily_volume: no integration setting: a per-zone helper the install creates by hand (min_daily_ml_per_plant) x the zone's plant_count / 1000. Absent on a fresh install, so the floor is 0 (off); the controller also sets it to 0 for a zone whose table is backing up
+- min_daily_volume: min_daily_ml_per_plant x plant_count / 1000, default zero off; legacy helper accepted; zero while drainage backs up
 - field_capacity: field_capacity (with Auto Setpoints on, set by code to the zone's highest reading of this grow-day or the one before)
 - max_ec: maximum_ec
 - stacking_on: ec_stacking_enabled (room switch)
 - watchdog_hours: watchdog_hours
-- drown_ceiling: an optional per-zone number min_floor_drown_ceiling the install creates by hand (the integration creates none); default 90
-- p2_min_interval_min: fixed 10 min (no setting)
+- drown_ceiling: optional min_floor_drown_ceiling, fallback field_capacity + 5 within 50-100
+- p2_min_interval_min: ec_min_interval, minutes between EC-correction shots, default 10
 - min_floor_finish_h: fixed 3 h (no setting)

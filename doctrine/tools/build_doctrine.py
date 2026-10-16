@@ -246,10 +246,10 @@ def engine_facts(doc, paths):
          phase(phase="P3", lights_just_on=True) == "P0" and phase(phase="P3", new_grow_day=True) == "P0"),
         ("PH-3", "A zone still in P1 or P2 when a new grow-day begins resets to P0 with fresh counters and budget.",
          phase(phase="P2", new_grow_day=True) == "P0" and phase(phase="P1", new_grow_day=True) == "P0"),
-        ("PH-4", "P0 ends at the first of: VWC at or below the P2 threshold (bypass), relative dryback at or above dryback_target, or p0_max_wait_min elapsed.",
+        ("PH-4", "P0 ends on VWC at or below re-water, the drop since lights-on at p0_additional_dryback when positive (otherwise dryback_target), or its maximum wait. A positive additional setting replaces the target; it is not summed.",
          phase(phase="P0", vwc=45) == "P1" and phase(phase="P0", vwc=50, dryback_pct=20) == "P1"
          and phase(phase="P0", vwc=50, phase_minutes=45) == "P1" and phase(phase="P0", vwc=50) == "P0"),
-        ("PH-5", f"P1 ends at p1_max_shots, or once the zone has read at or above min(p1_target, field_capacity), at least p1_min_shots have landed, one extra shot has fired, the shot interval has passed and that shot raised the day's peak by less than {core.P1_RISE_PTS:g} points.",
+        ("PH-5", "P1 ends on maximum shots, a trusted below-target stall after minimum shots and the interval, the extra-shot cap at target, budget spent at target, or the settled-rise test after an extra shot. The needed rise is p1_rise_pts or 30% of learned expected gain, whichever is greater. A stalled day re-waters below its achieved reading.",
          phase(phase="P1", vwc=50, shot_count=12) == "P2"
          and phase(phase="P1", vwc=60, peak_vwc=61, p1_reached=True, p1_extra_shots=1, p1_peak_before_shot=60.8, shot_count=4) == "P2"
          and phase(phase="P1", vwc=60, peak_vwc=62, p1_reached=True, p1_extra_shots=1, p1_peak_before_shot=60.8, shot_count=4) == "P1"),
@@ -259,7 +259,7 @@ def engine_facts(doc, paths):
         ("PH-7", "Predictive P3: in the last 3 h before lights-off (after 10 min uptime, VWC at or above the rescue floor), P2 hands over early when the points still needed to reach dryback_target from the day's peak, at the measured drying rate (0.1 points/h if unknown), would take at least the hours left until lights-on (and no more than 12 h).",
          phase(phase="P2", vwc=58, peak_vwc=60, hours_to_lights_off=2, hours_to_lights_on=10, dryback_rate=1.0) == "P3"
          and phase(phase="P2", vwc=50, peak_vwc=60, hours_to_lights_off=2, hours_to_lights_on=10, dryback_rate=1.0) == "P2"),
-        ("PH-8", "dryback_target changes nothing else: in P1, in P2 more than 3 h before lights-off and in P3, the same readings give the same phase and the same shot whatever its value. It never sets the overnight dryback.",
+        ("PH-8", "With P3 hold off, dryback_target changes no routine shot in P1, daytime P2 or P3. With P3 hold on, budgeted hold shots maintain the overnight target from the day peak.",
          all(same_for_any_target(s) for s in (
              {"phase": "P1", "vwc": 50}, {"phase": "P2", "vwc": 44}, {"phase": "P2", "vwc": 55, "ec": 7.5},
              {"phase": "P3", "lights_on": False, "vwc": 39}, {"phase": "P3", "lights_on": False, "vwc": 50},
@@ -292,7 +292,7 @@ def engine_facts(doc, paths):
         ("IR-6", "P2, first match wins: rescue flush at pore EC >= max_ec - 1 (dilutive, under field_capacity - 2, interval ok; 1.5x shot, cap-exempt); dilute at EC > 1.2x the P2 target (dilutive, interval ok; 1.5x shot, inside the budget); top-up when VWC < the P2 threshold (shot scaled by ec_adjust).",
          run({"ec": 8.2, "vwc": 50})[4].kind == "p2_rescue" and run({"ec": 7.5, "vwc": 50})[4].kind == "p2_dilute"
          and run({"ec": 6.0, "vwc": 44})[4].kind == "p2_topup" and not run({"ec": 6.0, "vwc": 50})[2]),
-        ("IR-7", "P3 is emergency-only: a p3_emergency_shot when VWC falls below p3_emergency_floor (the rescue floor). Cap-exempt.",
+        ("IR-7", "P3 fires rescue below the rescue floor after p3_time_between_shots; rescue is cap-exempt. With P3 dryback hold enabled, budgeted hold shots also maintain the overnight target and obey a held plan.",
          run({"phase": "P3", "lights_on": False, "vwc": 39})[4].kind == "p3_emergency" and not run({"phase": "P3", "lights_on": False, "vwc": 41})[2]),
         ("IR-8", "Watchdog: with lights on and outside P0, a zone with no water for watchdog_hours that sits under its P2 threshold gets a p2_shot_size shot, even over the daily budget. A probe reading at or above the threshold silences it.",
          run({"vwc": 44, "minutes_since_shot": 200, "daily_vol": 500}, {"max_daily_volume": 150})[4].kind == "watchdog"
@@ -301,9 +301,9 @@ def engine_facts(doc, paths):
          run({"vwc": 55, "daily_vol": 0, "hours_since_lights_on": 6, "hours_to_lights_off": 6}, {"min_daily_volume": 20})[4].kind == "min_daily"
          and not run({"vwc": 91, "daily_vol": 0, "hours_since_lights_on": 6, "hours_to_lights_off": 6}, {"min_daily_volume": 20})[2]
          and not run({"vwc": 55, "daily_vol": 0, "hours_since_lights_on": 6, "hours_to_lights_off": 6})[2]),
-        ("IR-10", "Daily budget: once daily_vol reaches max_daily_volume, non-exempt shots (top-up, dilute, P0 flush, floor) are blocked; flush_high_ec, p1_ramp, p1_extra, p2_rescue, p3_emergency and watchdog are exempt.",
+        ("IR-10", f"Daily-cap exemptions are generated from CAP_EXEMPT: exempt shots: {', '.join(sorted(k for k, enabled in core.CAP_EXEMPT.items() if enabled))}; budgeted shots: {', '.join(sorted(k for k, enabled in core.CAP_EXEMPT.items() if not enabled))}. P1 extra shots and P3 hold are budgeted.",
          run({"vwc": 44, "daily_vol": 150, "minutes_since_shot": 20})[4].kind == "block_daily_cap"),
-        ("IR-11", "While steering is held (a grow plan held, stale or missing) only the water-safety shots run: the P3 emergency, the watchdog and the minimum floor. Phases still move.",
+        ("IR-11", "While steering is held, only its permitted water-safety shots can run. The anti-lockout flush waits too; maximum-EC blocks and holds still apply. Phases still move.",
          not run({"vwc": 44, "minutes_since_shot": 20, "steering_held": True})[2]
          and run({"vwc": 44, "minutes_since_shot": 200, "steering_held": True})[4].kind == "watchdog"),
         ("IR-12", "When a settled pore-EC reading is supplied, every EC rule uses it instead of the raw reading.",
@@ -361,7 +361,7 @@ def engine_facts(doc, paths):
          'o.get("feed_grace_min", 30)' in ctrl and "holding (fail-closed)" in ctrl
          and "if room.feed_ec_sensor:" in ctrl and "if room.feed_ph_sensor:" in ctrl and "if lo > 0 or hi > 0:" in ctrl),
         ("CT-7", "SIGTERM closes whatever is in flight, saves state and exits.", "signal.SIGTERM" in ctrl),
-        ("CT-8", f"With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller hands decide() an assumed feed EC of {core.ZoneSnapshot.__dataclass_fields__['feed_ec'].default:.1f} mS/cm, not a measurement, for every dilutive test.",
+        ("CT-8", f"With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller uses declared recipe EC when available, otherwise hands decide() an assumed feed EC of {core.ZoneSnapshot.__dataclass_fields__['feed_ec'].default:.1f} mS/cm, not a measurement, for the dilution comparison. Recipe EC and fallback EC are not measurements.",
          "feed_ec=(feed_ec if feed_ec is not None else 3.0)" in ctrl and core.ZoneSnapshot.__dataclass_fields__["feed_ec"].default == 3.0),
         ("CT-9", "The minimum daily floor is each zone's Min Daily Water Per Plant setting (min_daily_ml_per_plant, mL per plant per grow-day; an integration older than the setting has only the hand-made helper of the same name, read in its place) times the zone's plant count, defaulting to 0: a fresh install runs with the floor off. Its VWC ceiling is field capacity plus a margin, inside 50-100.",
          re.search(r'"min_daily_ml_per_plant",\s*self\._num\(f"[^"]*zone_\{zone\}_min_daily_ml_per_plant", 0\.0\)', ctrl) is not None
@@ -513,7 +513,7 @@ def brain_facts(doc, paths, core, base_p, base_s, ctrl):
          advice and "judge_levers" in bridge
          and not ok("catch_up", {"day": "2026-01-01", "zones": {}}, SimpleNamespace(now=now, snap=None, params=None))
          and "def _admit_catch_up(" in (brain / "envelope.py").read_text(encoding="utf-8")),
-        ("BR-2", "advance moves only to the next phase, with the lights on and a usable probe. P0 -> P1 needs the drop since lights-on at half of dryback_target or a quarter of p0_max_wait_min gone, and is refused while the probe reading has not moved for 30 min. P1 -> P2 needs max(1, p1_min_shots) ramp shots and VWC within 3 points of min(p1_target, field_capacity). P2 -> P3 needs at most 3 h to lights-off, a zone steered generative (for any other zone the answer is advice), and VWC at least 3 points above the rescue floor.",
+        ("BR-2", "Phase advance only moves forward. P0 start needs half its morning target (p0_additional_dryback when positive, otherwise dryback_target) or a quarter of maximum wait, on a moving probe. P1 hand-over needs minimum shots and either moisture within 3 points of ceiling or a trusted stalled ramp with drainage not backed up. P2 hand-over needs generative mode, the last 3 hours and moisture at least 3 points over rescue.",
          dawn and ramp and dusk),
         ("BR-3", "distrust needs two agreeing answers in a row plus code's own confirmation; a set-aside zone takes the blind path (CT-5).",
          distrust and 'distrusted[zone] = jev_dirs["distrust"].why' in ctrl and "snap = None" in ctrl),
@@ -522,7 +522,7 @@ def brain_facts(doc, paths, core, base_p, base_s, ctrl):
          and 'st["ec_offset"] = round(float(st.get("ec_offset", 0.0)) * 0.5, 2)' in ctrl
          and "(now - les).total_seconds() >= 1800" in ctrl
          and all(f'"{k}": "{m}"' in judge_src["salt"] for k, m in salt_modes.items())),
-        ("BR-5", "setpoint moves one 0.5 notch, at most once per zone per grow-day, only with the room's Auto Setpoints switch on (so the learner of CT-12 and CT-13 is always running when a notch is possible) and no grow plan owning the room, never while paused, inside a band around the last value of that number the brain did not write: p2_shot_size within 1 and never under 3; p2_vwc_threshold from 2 under to 1 over, at least the rescue floor + 4 and at most min(p1_target, field_capacity) - 2. Any value the brain did not write becomes the band's new centre (the evidence calls it 'your value'), except the learner's own writes while it holds the two numbers (CT-13), which leave the centre where it was; a field-capacity shift then moves the centre with it. When the levers come back, the threshold is put inside the band, never where it would break the ladder. These two numbers are the only ones the brain writes (judge_levers).",
+        ("BR-5", "setpoint moves one 0.5 notch, at most once per zone per grow-day, only with the room's Auto Setpoints switch on (so the learner of CT-12 and CT-13 is always running when a notch is possible) and no grow plan owning the room, never while paused, inside a band around the last value of that number the brain did not write: p2_shot_size within 1 and never under 3; p2_vwc_threshold from 2 under to 1 over, at least the rescue floor + 4 and at most min(p1_target, field_capacity) - 2. Any value the brain did not write becomes the band's new centre (the evidence calls it 'your value'), except the learner's own writes while it holds the two numbers (CT-13), which leave the centre where it was; a field-capacity shift then moves the centre with it. When the levers come back, the threshold is put inside the band, never where it would break the ladder. These are the bounded notch settings; targets and shot_size powers write additional values within engine and entity bounds. The notch budget is 0.5 per 24 h, 1.0 per 7 days, with a 36 h rest after a refused or unsuccessful move.",
          setpoint and 'SHOT, THRESHOLD = "p2_shot_size", "p2_vwc_threshold"' in sp_src and "STEP = 0.5" in sp_src
          and "SHOT_FLOOR = 3.0" in sp_src and "return max(SHOT_FLOOR, home - 1.0), home + 1.0" in sp_src
          and "lo = max(home - 2.0, params.p3_emergency_floor + 4.0)" in sp_src
@@ -541,7 +541,7 @@ def brain_facts(doc, paths, core, base_p, base_s, ctrl):
          and 'float(last["to"]), float(last["from"])' in bridge and "frozen_until" not in ctrl),
         ("BR-7", "Every answer key the decision catalogue names exists in the code's questions.",
          all(keys_in_code(d) for d in doc["decisions"])),
-        ("BR-8", "Each acting directive needs the room's power for it (one switch per power per room): advance by the ramp judge ramp_control, any other advance advance_phase, distrust set_probe_aside, ec_mode ec_mode, setpoint nudge_setpoints, catch_up plan_catch_up, targets set_targets_from_achievable, shot_size tune_shot_sizes. With the power off the envelope refuses it and the answer is advice; a missing switch is the power's default, on for the six that acted before the switches and off for the two new ones. With targets or shot_size on, the values set are admitted as given (only the question's own settings, only numbers) and written clamped only to each setting's own range; dry run still only reports.",
+        ("BR-8", "Each acting directive needs the room's power for it (one switch per power per room): advance by the ramp judge ramp_control, any other advance advance_phase, distrust set_probe_aside, ec_mode ec_mode, setpoint nudge_setpoints, catch_up plan_catch_up, targets set_targets_from_achievable, shot_size tune_shot_sizes. With the power off the envelope refuses it and the answer is advice; a missing switch is the power's default, on for the six that acted before the switches and off for the two new ones. With targets or shot_size on, the values set are admitted as given (only the question's own settings, only numbers) and written clamped to engine and entity bounds and checked by HA ladder validation; HA still validates the moisture ladder; dry run or paused AI changes only reports.",
          not ok("ec_mode", "hold", ctx("P2", powers={"ec_mode": False}))
          and ok("ec_mode", "hold", ctx("P2", powers={}))
          and not ok("advance", "P2", ctx("P1", {"shot_count": 1, "vwc": 57}, powers={"ramp_control": False}),
