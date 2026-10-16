@@ -112,7 +112,9 @@ The judges `balance`, `feed`, `report`, `why` and `plan` work only with `claude_
 
 With `jev_judges` set to `all` (the default) or empty, all the judges and all the tasks run. With a list, only the names in the list run. The controller ignores a name that it does not know.
 
-An options file from an older install can have a list of names. That list does not have the judges and the tasks that came later: `why`, `feed`, `report`, `plan`, `channel` and `balance`. Those judges and tasks do not run until you add them.
+An options file from an older install can have a list of names. That list does not have the judges and the tasks that came later: `why`, `feed`, `report`, `plan`, `channel` and `balance`. A very old list also does not have `stage` and `setpoints`. Those judges and tasks do not run until you add them.
+
+A very old list can also name `alerts`, a retired judge. The controller ignores that name. One time after each start, the log then names the newer judges that the list does not have, and tells you to set `jev_judges` to `all`.
 
 1. Open the Configuration of the controller.
 2. Set `jev_judges` to `all`.
