@@ -45,7 +45,8 @@ def brain_meta(ctx, judge):
             "numbers": numbers.zone_numbers(ctx), "zone_config": numbers.zone_config(ctx),
             "interlocks": b.get("interlocks") or "not known", "data_quality": b.get("data_quality") or "not known",
             "stage": numbers.stage_block(ctx),
-            "siblings": {str(z): v for z, v in sorted((ctx.siblings or {}).items())}}
+            "siblings": {str(z): v for z, v in sorted((ctx.siblings or {}).items())},
+            **({"runoff_estimate": b["runoff_estimate"]} if b.get("runoff_estimate") else {})}
 
 
 def enrich(ctx, judge, ev):

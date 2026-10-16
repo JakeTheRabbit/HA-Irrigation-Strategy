@@ -159,12 +159,13 @@ def test_a_field_nothing_reads_does_not_promise_that_something_will():
                     claim not in tooltip
                 ), f"{flow}.{step}.{key} still claims '{claim}'"
     # The room climate sensors are read now (the engine descriptor, for the dashboard's history
-    # chart) and by nothing else: their tooltips say both.
+    # chart, and the controller's opt-in water-and-VPD record) and never water: their tooltips say so.
     for key in ("temperature_sensor", "humidity_sensor", "vpd_sensor"):
-        assert _runtime_consumers(key) == ["room.py"], key
+        assert _runtime_consumers(key) == ["controller.py", "room.py"], key
         for flow, step in (("config", "hardware"), ("options", "edit_zones_map")):
             tooltip = strings[flow]["step"][step]["data_description"][key]
-            assert "history chart" in tooltip and "controller does not use" in tooltip
+            assert "history chart" in tooltip and "never waters from" in tooltip
+            assert "Water vs VPD" in tooltip
             assert "analytics" not in tooltip.lower()
     # The waste valve is read now (the engine descriptor), and only under the room's waste valve rule, which is
     # Off until chosen: its tooltip says so, and never that it is closed whatever the rule.

@@ -19,6 +19,9 @@ export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
     { page: "history/timeline", label: "Timeline" },
     { page: "history/water", label: "Water use" },
     { page: "history/compare", label: "Compare runs" },
+    { page: "history/grows", label: "Grows" },
+    // Settings › Display › Dryback drivers: hidden while that is off.
+    { page: "history/drivers", label: "Dryback drivers" },
   ],
   equipment: [
     { page: "equipment/probes", label: "Probes" },
@@ -47,9 +50,12 @@ export function PageTabs({
   page,
   navigate,
   badges = {},
+  hidden = [],
 }: {
   page: Page;
   navigate: (page: Page) => void;
+  /** Tabs of pages the room's display options leave out. */
+  hidden?: Page[];
   /** A count beside a tab: unsaved changes waiting on it. */
   badges?: Partial<Record<Page, number>>;
 }) {
@@ -58,7 +64,7 @@ export function PageTabs({
   if (!tabs) return null;
   return (
     <nav className="page-tabs" aria-label={`${SECTION_LABELS[section]} views`}>
-      {tabs.map((tab) => (
+      {tabs.filter((tab) => !hidden.includes(tab.page)).map((tab) => (
         <button
           type="button"
           key={tab.page}

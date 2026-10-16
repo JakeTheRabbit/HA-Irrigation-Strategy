@@ -1307,3 +1307,168 @@ grow_days_backfill:
       required: true
       selector:
         text:
+
+display_get:
+  name: Read display options
+  description: >-
+    Returns the display options of the room: which extra panels the dashboard shows. Every option
+    is off until an administrator turns it on. Changes nothing. It has no administrator check. Use
+    it to read the revision before you save.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. A different ID reads a different room. The integration refuses an unknown ID.
+        Example: `room:f1_` for a named room, or `room:` for the default room.
+      required: true
+      selector:
+        text:
+
+display_save:
+  name: Save display options
+  description: >-
+    Turns display options of the room on or off. The options only select which panels the
+    dashboard shows. They do not change watering, a setpoint or hardware. Everyone who opens the
+    room sees the result. When a signed-in user calls it, that user must be a Home Assistant
+    administrator. An automation can call it without this check. Give the revision that you read
+    with display_get. The integration refuses the save when the options changed after you read them.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. Example: `room:f1_`.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that display_get returned. Example: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    options:
+      name: Options
+      description: >-
+        The options to change, each with its new value. A switch option takes true or false.
+        today_zone_layout takes "cards" or "table". Example: {"show_climate": true}.
+      required: true
+      selector:
+        object:
+harvests_get:
+  name: Read harvests
+  description: >-
+    Returns the harvest of each run of the room that has one: the harvest date, the wet and dry
+    weight of the room and of each zone, plants harvested, canopy area, plant entries, the quality
+    grade, notes and lab results. Changes nothing. It has no administrator check.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. Example: `room:f1_`.
+      required: true
+      selector:
+        text:
+
+runs_set_harvest:
+  name: Save the harvest of a run
+  description: >-
+    Saves, replaces or removes the harvest of one run. Every field of the harvest is optional.
+    Changes no setting and no watering. When a signed-in user calls it, that user must be a Home
+    Assistant administrator. Read the revision with `harvests_get` first.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. Example: `room:f1_`.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that `harvests_get` returned. When the stored revision is different, the
+        integration refuses the call and changes nothing. Minimum: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    run_id:
+      name: Run ID
+      description: The ID of the run. Get it from `runs_get`.
+      required: true
+      selector:
+        text:
+    harvest:
+      name: Harvest
+      description: >-
+        The harvest: harvest_date (YYYY-MM-DD); room and zones ({"1": {...}}) each with wet_weight_g,
+        dry_weight_g, plants_harvested and canopy_m2; plants (label, zone, wet_g, dry_g; at most 500);
+        quality (up to 40 characters); notes (up to 500); lab (thc_pct, terpenes as name and number,
+        at most 20). Empty (null) removes the harvest.
+      required: true
+      selector:
+        object:
+history_connection_get:
+  name: Read long history connection
+  description: Returns the room history source and connection fields with secrets removed. Requires a signed-in administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: Canonical room ID.
+      required: true
+      selector:
+        text:
+history_connection_save:
+  name: Save long history connection
+  description: Tests and saves an optional read-only InfluxDB connection. Recorder is the default. Requires a signed-in administrator.
+  fields:
+    room_id:
+      name: Room ID
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      required: true
+      selector:
+        number:
+          min: 0
+          mode: box
+    connection:
+      name: Connection
+      required: true
+      selector:
+        object:
+history_long:
+  name: Read long history
+  description: Reads at most four mapped sensors, 1000 downsampled points each and 366 days from InfluxDB. Requires a signed-in administrator. Never writes to InfluxDB.
+  fields:
+    room_id:
+      name: Room ID
+      required: true
+      selector:
+        text:
+    entity_ids:
+      name: Sensor entities
+      required: true
+      selector:
+        object:
+    start:
+      name: Start timestamp
+      required: true
+      selector:
+        text:
+    end:
+      name: End timestamp
+      required: true
+      selector:
+        text:

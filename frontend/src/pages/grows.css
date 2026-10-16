@@ -1,0 +1,136 @@
+/* History › Grows: one hue per grow, six at most, each 3:1 against the card in its theme. Text never wears them. */
+.grows {
+  --grow-0: #0277bd;
+  --grow-1: #a35f00;
+  --grow-2: #7b4fc9;
+  --grow-3: #00796b;
+  --grow-4: #c2185b;
+  --grow-5: #5d6d00;
+  display: grid;
+  gap: 0.9rem;
+  min-width: 0;
+}
+.dark .grows {
+  --grow-0: #29b6f6;
+  --grow-1: #f0a83c;
+  --grow-2: #b39ddb;
+  --grow-3: #4db6ac;
+  --grow-4: #f48fb1;
+  --grow-5: #c0ca33;
+}
+.grows-notice {
+  color: var(--destructive);
+}
+.grows-record {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.grows-pick {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+.grows-pick fieldset {
+  display: grid;
+  gap: 0.35rem;
+  min-width: 0;
+  flex: 1 1 20rem;
+}
+.grows-check {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: baseline;
+}
+.grows-scope {
+  display: grid;
+  gap: 0.25rem;
+}
+.grows-scope select {
+  background: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.35rem 0.5rem;
+}
+.grows-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1rem;
+  font-size: var(--text-sm);
+}
+.grows-legend i {
+  display: inline-block;
+  width: 14px;
+  height: 4px;
+  border-radius: 2px;
+  margin-right: 0.35rem;
+  vertical-align: middle;
+}
+.grows-charts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 22rem), 1fr));
+  gap: 0.6rem;
+}
+.grows-chart {
+  margin: 0;
+  display: grid;
+  gap: 0.3rem;
+  min-width: 0;
+}
+.grows-chart figcaption {
+  display: grid;
+}
+.grows-table-wrap {
+  overflow-x: auto;
+}
+.grows-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  white-space: nowrap;
+}
+.grows-table th,
+.grows-table td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: middle;
+}
+.grows-scatters {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr));
+  gap: 0.6rem;
+}
+.grows-scatter {
+  margin: 0;
+  min-width: 0;
+}
+.grows-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 10rem), 1fr));
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+.grows-field {
+  display: grid;
+  gap: 0.2rem;
+}
+.grows-notes textarea {
+  min-height: 4.5rem;
+  background: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.5rem;
+}
+.grows-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.6rem;
+}

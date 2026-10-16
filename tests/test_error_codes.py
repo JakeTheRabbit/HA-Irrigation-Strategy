@@ -57,6 +57,7 @@ RESERVED = {
     "CS-315": ("feat/p2-safety-ops", "rescue shots that do not raise the moisture"),
     "CS-316": ("feat/p2-safety-ops", "a waste valve that is not closed for a shot"),
     "CS-317": ("feat/p2-safety-ops", "a pump that runs with every valve shut"),
+    "CS-314": ("feat/p3-runoff-balance", "the sump water balance does not close"),
     "CS-502": ("feat/probe-fusion-guarded", "a zone's probes disagree"),
     "CS-503": ("fix/probe-unit-table", "a probe set aside for its unit"),
     "CS-504": ("feat/ec-type-per-probe", "bulk and pore EC mixed in one zone"),
@@ -268,7 +269,7 @@ def test_the_guard_catches_a_second_definition_and_an_unreserved_code():
     with pytest.raises(AssertionError, match=r"defined twice: \['a'\]"):
         _strict_json('{"issues": {"a": {}, "a": {}}}')
     assert _bundled_codes('codes:[{code:`CS-101`},{"code":"CS-101"}]') == {"CS-101": 2}
-    assert _unreserved(["CS-105", "CS-314", "CS-609", "CS-901", "CS-207"]) == {
+    assert _unreserved(["CS-105", "CS-319", "CS-609", "CS-901", "CS-207"]) == {
         "CS-105",
-        "CS-314",
+        "CS-319",
     }

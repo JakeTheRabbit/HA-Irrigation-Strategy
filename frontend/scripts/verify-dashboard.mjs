@@ -501,6 +501,42 @@ try {
     await noOverflow();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
+  await check("today: every display option on still fits a laptop and two phone screens", async () => {
+    // Settings › Display: each option turned on at once (the demo's ?display=all).
+    const open = async () => {
+      await page.goto(`${base}/dashboard.html?demo&room=f2&display=all#/today`, {
+        waitUntil: "networkidle",
+      });
+      // Table mode hides the desktop cards. Phones retain those cards instead of the table.
+      const ready = page.viewportSize().width > 720
+        ? "[data-today-table] tbody tr"
+        : ".today-zones .today-spark";
+      await page.locator(ready).first().waitFor();
+    };
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await open();
+    await page
+      .waitForFunction(() => document.documentElement.scrollHeight <= innerHeight, null, {
+        timeout: 3_000,
+      })
+      .catch(() => {});
+    const laptop = await page.evaluate(() => document.documentElement.scrollHeight);
+    assert.ok(laptop <= 900, `Today with every option on is ${laptop}px tall in a 900px window`);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await open();
+    const strip = page.locator("[data-run-progress]");
+    await strip.waitFor();
+    await page
+      .waitForFunction(() => document.documentElement.scrollHeight <= 2 * innerHeight, null, {
+        timeout: 3_000,
+      })
+      .catch(() => {});
+    const phone = await page.evaluate(() => document.documentElement.scrollHeight);
+    const run = await strip.evaluate((el) => el.getBoundingClientRect().height + 16);
+    assert.ok(phone - run <= 2 * 844, `Today with every option on is ${phone}px tall on a phone`);
+    await noOverflow();
+    await page.setViewportSize({ width: 1440, height: 1000 });
+  });
   await check(
     "today: the run strip shows the day, the phases, the grow plan and the feed recipe",
     async () => {

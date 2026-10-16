@@ -4,11 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Empty, number, ReviewDialog, time as clock, type Page } from "@/components/dashboard";
 import { BrainOnZone } from "@/components/brain";
 import { HistoryExplorer } from "@/components/history-explorer";
+import { OnThisDay } from "@/components/on-this-day";
+import { CameraCard, ClimatePanel, HardwarePanel, RootZonePanel } from "@/components/zone-extras";
 import { UiTip } from "@/components/info-tip";
 import { ZoneDay } from "@/components/day-timeline";
 import { OverlayRows, useOverlays } from "@/components/overlay-row";
 import { Pill } from "@/components/mini-visuals";
 import { SensorContextCard, useSensorContext } from "@/components/sensor-context";
+import { PlantStressCard, ZoneGates, ZoneShots } from "@/components/sensing";
 import { rangeText, steeringOf } from "@/lib/day-chart";
 import {
   attachOutcomes,
@@ -74,6 +77,7 @@ export function ZonePage({
       </>
     );
   const { states, room } = controller;
+  const display = room.display.options;
   const steering = steeringOf(
     states[`select.crop_steering_${room.room.prefix}zone_${zone.id}_steering_mode`]?.state,
     readJev(states, room.room.prefix).room?.stage?.steering,
@@ -106,6 +110,7 @@ export function ZonePage({
       </div>
       <div className="zone-page-title">
         <h1>{zone.name}</h1>
+        {zone.cultivar && <span className="zone-cultivar">{zone.cultivar}</span>}
         {/^P[0-3]$/.test(zone.phase) ? (
           <span className="pill" data-phase={zone.phase}>
             {zone.phase} · {PHASE_NAMES[zone.phase]}
@@ -133,15 +138,32 @@ export function ZonePage({
         )}
       </div>
       <ZoneDay key={zone.id} controller={controller} zone={zone} />
+      {(display.show_climate || display.show_substrate_temp) && (
+        <div className="zone-extras-row">
+          {display.show_climate && <ClimatePanel controller={controller} zone={zone.id} />}
+          {display.show_substrate_temp && <RootZonePanel controller={controller} zone={zone} />}
+        </div>
+      )}
       <HistoryExplorer key={`explorer-${zone.id}`} controller={controller} zone={zone} />
+      <OnThisDay key={`on-this-day-${zone.id}`} controller={controller} zone={zone} />
       <ZoneWhy key={`why-${zone.id}`} controller={controller} zone={zone} />
+      <ZoneGates key={`gates-${zone.id}`} controller={controller} zone={zone} />
+      <PlantStressCard key={`stress-${zone.id}`} controller={controller} zone={zone} />
       {/* The AI on this zone beside the controls; without it the controls take the width. */}
       <div className="zone-page-grid">
         <div className="zone-page-column">
           <BrainOnZone controller={controller} zone={zone.id} navigate={navigate} />
+          {display.show_camera && (
+            <div className="zone-page-stack">
+              <CameraCard controller={controller} />
+            </div>
+          )}
           {jev && <JevOnZone controller={controller} zone={zone} navigate={navigate} />}
         </div>
-        <ZoneControls key={zone.id} controller={controller} zone={zone} />
+        <div className="zone-page-stack">
+          <ZoneControls key={zone.id} controller={controller} zone={zone} />
+          <HardwarePanel controller={controller} zone={zone} />
+        </div>
       </div>
       {/* The rest on request: the day chart above already shows today. */}
       <Collapsed key={`targets-${zone.id}`} title="Targets (read only)">
@@ -150,6 +172,7 @@ export function ZonePage({
       <Collapsed key={`probes-${zone.id}`} title="Probes used and not used">
         {() => <ZoneProbes controller={controller} zone={zone} navigate={navigate} />}
       </Collapsed>
+      <ZoneShots key={`shots-${zone.id}`} controller={controller} zone={zone} />
       <RecordedBehaviour key={`recorded-${zone.id}`} controller={controller} zone={zone} />
     </div>
   );

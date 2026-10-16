@@ -66,11 +66,10 @@ BASE_SENSOR_DESCRIPTIONS = [
         name="Current phase",
         icon="mdi:water-circle",
     ),
-    # dryback_percentage is OWNED BY THE ENGINE (the add-on set_state from
-    # _update_dryback_entities — computed per-zone from peak vs current VWC). It was a
-    # coordinator-backed descriptor here whose native_value was always None, so it
-    # perpetually re-asserted `unknown` and clobbered the engine's publish. Removed so
-    # the engine owns it (same pattern as the fused_vwc/fused_ec sensors).
+    # No dryback sensor here: the controller publishes each zone's live dryback as
+    # sensor.crop_steering_<prefix>zone_N_dryback_app (relative % of the peak, with the drop in
+    # VWC points in its attributes). A descriptor here whose value was always None kept writing
+    # `unknown` over the old engine's value, so it was removed.
     # Critical Template Calculations - Ported from packages
     SensorEntityDescription(
         key="p1_shot_duration_seconds",
@@ -249,6 +248,7 @@ async def async_setup_entry(
     sensors.append(CropSteeringStockSensor(entry))
     sensors.append(CropSteeringDosingConfigSensor(entry))
     sensors.append(CropSteeringBrainQuestionsSensor(entry))
+    sensors.append(CropSteeringDisplaySensor(entry))
 
     async_add_entities(sensors)
 
@@ -516,6 +516,59 @@ class CropSteeringBrainQuestionsSensor(SensorEntity):
         from homeassistant.helpers.dispatcher import async_dispatcher_connect
 
         from .brain_api import SIGNAL
+
+        self.async_on_remove(
+            async_dispatcher_connect(
+                self.hass, f"{SIGNAL}_{self._entry.entry_id}", self.async_write_ha_state
+            )
+        )
+
+
+class CropSteeringDisplaySensor(SensorEntity):
+    """What the dashboard shows in the room (Settings > Display, display.py). State: the options'
+    revision; attributes: every option with its value, off where none is saved."""
+
+    _attr_should_poll = False
+    _attr_icon = "mdi:monitor-dashboard"
+
+    def __init__(self, entry):
+        self._entry = entry
+        self._prefix = room_prefix(entry)
+        self._attr_unique_id = f"{DOMAIN}_{entry.entry_id}_display"
+        self._attr_name = "Display options"
+        self._attr_object_id = f"{DOMAIN}_{self._prefix}display"
+        # Home Assistant ignores _attr_object_id; the dashboard finds the options by THIS id.
+        self.entity_id = f"sensor.{self._attr_object_id}"
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, self._entry.entry_id)},
+            name="Crop Steering System",
+            manufacturer="Home Assistant Community",
+            model="Professional Irrigation Controller",
+            sw_version=SOFTWARE_VERSION,
+        )
+
+    def _manager(self):
+        return (
+            self.hass.data.get(DOMAIN, {}).get("_display", {}).get(self._entry.entry_id)
+        )
+
+    @property
+    def native_value(self) -> Any:
+        manager = self._manager()
+        return manager.sensor()[0] if manager is not None else None
+
+    @property
+    def extra_state_attributes(self) -> dict:
+        manager = self._manager()
+        return manager.sensor()[1] if manager is not None else {}
+
+    async def async_added_to_hass(self) -> None:
+        from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
+        from .display import SIGNAL
 
         self.async_on_remove(
             async_dispatcher_connect(

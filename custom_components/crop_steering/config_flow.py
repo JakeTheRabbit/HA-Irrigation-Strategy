@@ -215,6 +215,7 @@ def _hardware_schema(
     _ent("temperature_sensor", _sensor_one())
     _ent("humidity_sensor", _sensor_one())
     _ent("vpd_sensor", _sensor_one())
+    _ent("leaf_temperature_sensor", _sensor_one())
     _ent("water_level_sensor", _sensor_one())
     _ent("tank_temperature_sensor", _sensor_one())
     _ent("tank_ec_sensor", _sensor_one())
@@ -282,6 +283,7 @@ def _build_hardware(data: dict) -> dict:
         "temperature_sensor": data.get("temperature_sensor", ""),
         "humidity_sensor": data.get("humidity_sensor", ""),
         "vpd_sensor": data.get("vpd_sensor", ""),
+        "leaf_temperature_sensor": data.get("leaf_temperature_sensor", ""),
         "water_level_sensor": data.get("water_level_sensor", ""),
         "tank_temperature_sensor": data.get("tank_temperature_sensor", ""),
         "tank_ec_sensor": data.get("tank_ec_sensor", ""),

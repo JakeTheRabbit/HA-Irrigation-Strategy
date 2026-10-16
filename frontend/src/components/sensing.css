@@ -1,0 +1,119 @@
+/* Read-only sensing: the gate list, the shot table, the plant-stress card, the rules. */
+.sensing-gate-list {
+  list-style: none;
+  margin: 0;
+  padding: 0.5rem 1rem 0.75rem;
+  display: grid;
+  gap: 0.25rem;
+}
+.sensing-gate-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+.sensing-gate-list li[data-state="hold"] {
+  color: var(--destructive, #c62828);
+  font-weight: 600;
+}
+.sensing-gate-label {
+  min-width: 14rem;
+}
+.sensing-pad {
+  padding: 0.5rem 1rem;
+}
+.sensing-scroll {
+  overflow-x: auto;
+  padding: 0 1rem 0.75rem;
+}
+.sensing-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  font-variant-numeric: tabular-nums;
+}
+.sensing-table th,
+.sensing-table td {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  border-bottom: 1px solid var(--border, #ddd);
+  white-space: nowrap;
+}
+.sensing-table tr[data-verdict="no_sign"] td {
+  color: var(--destructive, #c62828);
+}
+.sensing-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  margin: 0;
+}
+.sensing-facts dt {
+  font-size: 0.8rem;
+  color: var(--muted-foreground, #666);
+}
+.sensing-facts dd {
+  margin: 0;
+  font-size: 1.1rem;
+  font-variant-numeric: tabular-nums;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.sensing-strip {
+  margin-top: 0;
+}
+.sensing-vpd-list,
+.sensing-rules {
+  margin: 0;
+  padding: 0 1rem 0.75rem 2rem;
+  display: grid;
+  gap: 0.4rem;
+}
+.sensing-topic summary {
+  cursor: pointer;
+  padding: 0.4rem 0;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.sensing-rule-id {
+  font-family: var(--font-mono, monospace);
+  font-size: 0.8rem;
+}
+.sensing-values {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  margin-top: 0.15rem;
+}
+.sensing-values [data-outside] {
+  color: var(--destructive, #c62828);
+  font-weight: 600;
+}
+.sensing-flagged {
+  margin-bottom: 0.75rem;
+}
+.sensing-settings {
+  display: grid;
+  gap: 1rem;
+}
+.sensing-toggle {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+}
+.sensing-toggle span {
+  display: grid;
+}
+.sensing-baselines {
+  display: grid;
+  gap: 0.4rem;
+  max-width: 22rem;
+}
+.sensing-baselines label {
+  display: grid;
+  grid-template-columns: 1fr 7rem;
+  align-items: center;
+  gap: 0.5rem;
+}

@@ -54,6 +54,7 @@ not the offset steps. An armed plan owns its targets; drift raises CS-713.
 ### 4. The settings: each zone's own number for the setting, else the room's, else the controller's built-in fallback shown here (these are not the fresh-room defaults)
 
 - drippers_per_plant: 1
+- ec_flush_target: 0
 - ec_min_interval: 10
 - ec_target_gen_p0: 4
 - ec_target_gen_p1: 5
@@ -68,6 +69,7 @@ not the offset steps. An armed plan owns its targets; drift raises CS-713.
 - maximum_ec: 9
 - p0_additional_dryback: 0
 - p0_maximum_wait_time: 45 (range 5-240)
+- p0_minimum_wait: 0
 - p1_initial_shot_size: 2 (range 0.5-15)
 - p1_maximum_extra_shots: 3
 - p1_maximum_shots: 12 (range 1-40)
@@ -76,8 +78,13 @@ not the offset steps. An armed plan owns its targets; drift raises CS-713.
 - p1_shot_size_increment: 0.5 (range 0-5)
 - p1_target_vwc: 60 (range 20-100)
 - p1_time_between_shots: 15 (range 1-120)
+- p2_dilute_ratio: 1.2
+- p2_end_hours_before_off: 0
 - p2_shot_size: 5 (range 0.5-20)
 - p2_time_between_shots: 0
+- p2_timed_first_hours: 0
+- p2_timed_interval_min: 60
+- p2_timed_shot_size: 0
 - p2_vwc_threshold: 45 (range 10-100)
 - p3_emergency_shot_size: 2
 - p3_emergency_vwc_threshold: 40 (range 10-65)
@@ -145,6 +152,7 @@ not the offset steps. An armed plan owns its targets; drift raises CS-713.
 - CS-311 No sump pump run: The power reading of the sump pump (sump_power_sensor) shows no run for 3 h by default (sump_silent_hours). A run is a reading above the Sump Pump Run Threshold, 20 W by default. Without the pump, runoff fills the sump and flows back into the tables. Does: The alert does not change the water. It comes again each 30 min until the next pump run. If the VWC of a zone then increases with no water, CS-310 follows.
 - CS-312 Repeated maximum-length shots: The last 3 shots of a zone each needed more time than the maximum shot length of the room. The controller cut each shot (CS-306). This often shows a probe that reads dry, or a wrong substrate volume or dripper flow. Does: If the max-run latch switch of the room is on, the zone gets no more shots, rescue shots included, until you fix the Repairs card. If the latch switch is off, the card only reports. It clears after the next shot that the controller does not cut.
 - CS-313 Device type not supported: A zone valve, pump or main-line valve has a device type that the controller cannot open or close. The controller can use a switch, an input_boolean or a valve. The setup does not accept other types, so a person mapped this device by hand. Does: The zone gets no shots, and the controller sends no command to the device. Other zones continue.
+- CS-314 Sump water balance does not close: With the runoff estimator at shown_alerts or ai, a grow-day whose sump litres (its runs times the litres per run) miss what a sealed room must send to the sump (the water fed minus the change of water in the substrate) by more than 30%. In a sealed room the water the plants transpire comes back as AC and dehumidifier condensate, so the two agree on a normal day. Does: The alert does not change the water. The runoff estimate is a room-wide hint and never waters or holds a zone.
 - CS-315 Rescue shots not absorbed: Rescue shots of a zone (P3 emergency or watchdog shots) did not raise its moisture, several in a row. Each rescue is judged 15 min after it, or at the next rescue if that comes first: it counts as a miss when the moisture rose less than 0.5 points. The alert comes at the number of misses that the room setting Rescue misses before alert gives (4 by default). The check runs only while the room select Rescue shots not absorbed is set to Alert. Does: The alert does not change the water. The rescue shots continue. The alert clears at the next rescue that raises the moisture.
 - CS-316 Waste valve not closed: The room has a waste valve mapped and its waste valve rule is set. With Check closed, the waste valve does not read off. With Close for each shot, the controller set it to off before a shot and it did not read off, or the controller cannot switch or read it. An open waste valve sends the feed to waste while the controller counts it as given. Does: No shot starts in the room until the waste valve reads off. A shot that is running stops when the waste valve opens (CS-307).
 - CS-317 Pump runs with every valve shut: The feed pump of the room (option pump_power_sensor) uses more power than the room setting Pump dead-head power, for 1 min, while every zone valve of the room reads off, and no shot, hold or batch uses the pump. A pump that runs against shut valves (dead-head) heats up and can be damaged. Does: The alert does not change the water. The controller does not switch the pump off. The alert clears when the pump stops or a valve opens.

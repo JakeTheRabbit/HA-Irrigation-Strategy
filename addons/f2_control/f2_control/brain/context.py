@@ -168,6 +168,7 @@ class ZoneContext:
     flower_days: int = 56  # the cultivar's flowering length
     stage: dict | None = None  # doctrine.stage_intent(flower_day): the stage arc's row for today
     steering: str | None = None  # the operator's steering mode for the zone: "vegetative" or "generative"
+    cultivar: str | None = None  # the zone's cultivar label, when the operator gave one (display text only)
     # What the Setpoints judge may move tonight (brain_bridge.setpoint_view): {"enabled", "current", "home", "bands",
     # "changed_today", "frozen", "day", "last_words"}; None when the room has no setpoint memory.
     setpoints: dict | None = None

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   APP_OPTIONS,
+  PLACEMENTS,
+  RESTORED_MANIFEST,
+  placementsFor,
   FEATURES,
   GROUPS,
   controlsOf,
@@ -140,5 +143,22 @@ describe("writes allowed from the Features page", () => {
     expect(
       validateChange(roomOf(states), states, { entityId: "switch.pump", value: true }),
     ).toMatch(/hardware/);
+  });
+});
+
+
+describe("restored settings outside entity controls", () => {
+  it("finds each room display preference through the Display settings link", () => {
+    const options = RESTORED_MANIFEST.filter((row) => row.entity.includes("display (attribute "));
+    expect(options).toHaveLength(11);
+    for (const option of options)
+      expect(PLACEMENTS.find((row) => row.entity === option.entity)?.page).toBe("settings");
+  });
+  it("keeps setup and overlays discoverable without making them entity writes", () => {
+    expect(placementsFor("all", "camera").map((row) => row.location)).toContain("Settings > Display");
+    expect(placementsFor("history", "dryback markers")[0]?.page).toBe("history/timeline");
+    expect(placementsFor("equipment", "ACs")[0]?.page).toBe("equipment/setup");
+    expect(PLACEMENTS.some((row) => /^(switch|number|select)\.crop_steering_/.test(row.entity))).toBe(false);
+    expect(placementsFor("feed", "pH role")[0]?.page).toBe("equipment/dosing");
   });
 });

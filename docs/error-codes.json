@@ -606,6 +606,28 @@
       ]
     },
     {
+      "code": "CS-314",
+      "title": "Sump water balance does not close",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "With the runoff estimator at shown_alerts or ai, a grow-day whose sump litres (its runs times the litres per run) miss what a sealed room must send to the sump (the water fed minus the change of water in the substrate) by more than 30%. In a sealed room the water the plants transpire comes back as AC and dehumidifier condensate, so the two agree on a normal day.",
+      "watering": "The alert does not change the water. The runoff estimate is a room-wide hint and never waters or holds a zone.",
+      "causes": [
+        "A leak: water leaves the room another way than the sump.",
+        "The power plug of the sump pump missed a run, or reports too slowly to see each run.",
+        "The float of the sump is stuck, so the pump runs at the wrong level.",
+        "The litres per run (a bucket test, or the pump flow) are wrong.",
+        "The room is not sealed: air is exchanged with outside, so condensate leaves with it."
+      ],
+      "fixes": [
+        "Look for water on the floor and at the drains of the tables.",
+        "Check that the power plug of the sump pump reports often enough to see each run (every 30 s or less).",
+        "Check the float of the sump.",
+        "Measure the litres of one sump run with a bucket and set Sump litres per run.",
+        "Set the runoff estimator to shadow if the room is not sealed."
+      ]
+    },
+    {
       "code": "CS-315",
       "title": "Rescue shots not absorbed",
       "source": "notification",
