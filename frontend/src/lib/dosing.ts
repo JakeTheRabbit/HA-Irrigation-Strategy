@@ -28,7 +28,12 @@ export interface DosingPump {
   /** The id of the room's stock tank this pump doses from, or null: the integration draws what the
    * pump runs off it, whoever starts the dose. */
   stock_tank: string | null;
+  /** The pump's pH role for pH auto-correct (docs/DOSING.md): one pump per role in a room. Absent from
+   * an integration from before it. */
+  ph_role?: PhRole | null;
 }
+export type PhRole = "ph_up" | "ph_down";
+export const PH_ROLE_LABELS: Record<PhRole, string> = { ph_up: "pH up", ph_down: "pH down" };
 export interface RecipeLine {
   pump: string;
   ml: number;
@@ -184,6 +189,7 @@ function parsePump(value: unknown): DosingPump | null {
     max_ml: count(raw.max_ml) ?? 0,
     restore_volume: raw.restore_volume !== false,
     stock_tank: text(raw.stock_tank)?.trim() ?? null,
+    ph_role: raw.ph_role === "ph_up" || raw.ph_role === "ph_down" ? raw.ph_role : null,
   };
 }
 function parseBatch(value: unknown): DosingBatch {
@@ -854,6 +860,7 @@ export const blankPump = (key: string): PumpDraft => ({
   max_ml: 2000,
   restore_volume: true,
   stock_tank: null,
+  ph_role: null,
 });
 export function setupDraft(config: DosingConfig | null): SetupDraft {
   const batch = config?.batch ?? parseBatch({ premix_min: 2, postmix_min: 5 });
@@ -927,6 +934,9 @@ export function setupErrors(draft: SetupDraft, tanks: readonly string[] | null =
       drawn.set(pump.stock_tank, label);
     }
   }
+  for (const role of ["ph_up", "ph_down"] as const)
+    if (pumps.filter((pump) => pump.ph_role === role).length > 1)
+      errors.push(`Only one pump can have the ${PH_ROLE_LABELS[role]} role.`);
   const optional = [
     "fill_valve",
     "full_entity",
@@ -992,6 +1002,7 @@ export const FIELD_LABELS: Record<string, string> = {
   max_ml: "Largest dose (mL)",
   restore_volume: "Put the dose volume back",
   stock_tank: "Stock tank",
+  ph_role: "pH auto-correct",
   fill_valve: "Fill valve",
   full_entity: "Full float",
   full_state: "Full when the float reads",
@@ -1038,6 +1049,8 @@ export function setupChanges(
     for (const field of [...PUMP_FIELDS, "dosing_prefix", "max_ml", "restore_volume"] as const)
       add(`${pump.name} · ${FIELD_LABELS[field]}`, was[field], pump[field]);
     add(`${pump.name} · ${FIELD_LABELS.stock_tank}`, tank(was.stock_tank), tank(pump.stock_tank));
+    const role = (value?: PhRole | null) => (value ? PH_ROLE_LABELS[value] : null);
+    add(`${pump.name} · ${FIELD_LABELS.ph_role}`, role(was.ph_role), role(pump.ph_role));
   }
   const name = (pumps: DosingPump[], id: string) =>
     pumps.find((pump) => pump.id === id)?.name ?? id;
