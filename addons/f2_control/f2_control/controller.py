@@ -2662,6 +2662,16 @@ class Controller:
         # are its own (jev_bridge) and this learner writes the rest. Writing nothing at all under the judge left
         # nobody on the P1 target: zone 2 sat at 29.5 under a probe reading 44 % and never ramped (4 Oct 2026).
         judged = jev_bridge.judge_levers(self, room)
+        # With the room's set_targets_from_achievable power on and the brain able to act, the AI assistant sets the
+        # peak target, field capacity, re-water threshold and rescue floor itself: the learner's ladder (and the
+        # follower of the highest readings) steps aside for them, and comes back when the power is off.
+        owned = jev_bridge.targets_owned(self, room)
+        if owned != room.__dict__.setdefault("_targets_owned", {}).get(zone, False):
+            room._targets_owned[zone] = owned
+            log(f"[{room.slug}] Z{zone} " + ("the AI assistant sets the peak target, field capacity and re-water "
+                                            "threshold itself (the owner's power): the learner's ladder steps aside"
+                                            if owned else "the learner's ladder is back on the peak target, field "
+                                            "capacity and re-water threshold"))
         writes = enabled and not planned
         stall = None
         note = stop = None  # today's plan: what the dryback gets, and when maintenance shots stop for it
@@ -2695,7 +2705,9 @@ class Controller:
             today = None if "p2_vwc_threshold" in judged else auto_setpoints.day_plan(learn, current, ctx)
             if today:
                 note, stop = today[1].note, curve_tracker.clock(today[1].p2_stop_h)
-            if self._follow_fc(room, zone, p, now):
+            if owned:
+                pass  # the AI assistant owns the ladder (jev_bridge.targets_owned): the learner writes none of it
+            elif self._follow_fc(room, zone, p, now):
                 pass  # the setpoints moved with the zone's highest readings; the learner acts on the next pass
             else:
                 want = auto_setpoints.wanted(learn, current, snap.vwc, st["phase"], ctx, others=judged)
@@ -2714,6 +2726,9 @@ class Controller:
         who["p1_target_vwc"] = "the zone's highest reading of the grow-day before"
         who["field_capacity"] = "the zone's highest reading of this grow-day or the one before"
         who.update(dict.fromkeys(judged, "Jev's Setpoints judge, one notch a night"))
+        if owned:  # the owner's power: the AI assistant sets the ladder and the rescue floor itself
+            who.update(dict.fromkeys(("p1_target_vwc", "field_capacity", "p2_vwc_threshold",
+                                      "p3_emergency_vwc_threshold"), "the AI assistant, with the owner's power"))
         number = f"number.crop_steering_{room.prefix}zone_{zone}_"
         attrs.update(
             # the hourly P2 check is retired: its keys stay for one release, for dashboards that read them; its saved
@@ -2857,8 +2872,25 @@ class Controller:
             pass
         return round(max(lo, min(hi, value)), 1)
 
-    def _auto_write(self, room, zone, suffix, old, value, learn, now, by="auto"):
-        """Write one per-zone number -> False when it was not written (no such number, or Home Assistant refused)."""
+    def _number_range(self, room, zone, suffix):
+        """(lowest, highest) a zone's own number takes: the engine's bounds for it, inside the entity's own min and
+        max (Home Assistant refuses a write outside them). The only limit on an AI assistant power's values."""
+        lo, hi = setpoint_supervisor.BOUNDS.get(suffix, (float("-inf"), float("inf")))
+        attrs = ha_get(f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}")[1] or {}
+        try:
+            lo = max(lo, float(attrs["min"]))
+        except (KeyError, TypeError, ValueError):
+            pass
+        try:
+            hi = min(hi, float(attrs["max"]))
+        except (KeyError, TypeError, ValueError):
+            pass
+        return float(lo), float(hi)
+
+    def _auto_write(self, room, zone, suffix, old, value, learn, now, by="auto", reason=None, expected=None):
+        """Write one per-zone number -> False when it was not written (no such number, or Home Assistant refused).
+        `reason` and `expected`: why, and the result expected, for the room's setpoint change log (an AI assistant
+        power's write names both)."""
         entity = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
         if ha_get(entity)[0] in (None, "unknown", "unavailable", ""):
             return False  # no per-zone number on this install: room-level values are the operator's, never ours
@@ -2868,9 +2900,14 @@ class Controller:
             return True  # HA has not reflected the last write yet: do not spam it
         # Home Assistant sees only this app's token: name the writer first, for the room's setpoint
         # change log (the integration's setpoint_log.py). The brain's put-back is the safety writer.
-        who = "safety" if by.endswith("(put back)") else "brain" if by.startswith("Jev") else "learner"
+        who = ("safety" if by.endswith("(put back)") else "brain" if by.startswith(("Jev", "AI assistant"))
+               else "learner")
         claim = {"entity_id": entity, "value": value, "who": who}
-        if who == "brain":
+        if reason:
+            claim["reason"] = str(reason)[:200]
+        if expected:
+            claim["expected"] = str(expected)[:200]
+        if by.startswith("Jev") and who == "brain":
             # An AI change is an overlay that goes back by itself (the integration's overlays.py): at the
             # lights-on that ends the grow-day it is for. A night move (P3) is for the next grow-day.
             local = now.astimezone().replace(tzinfo=None) if now.tzinfo else now

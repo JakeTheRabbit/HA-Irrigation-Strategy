@@ -11,6 +11,7 @@ pass.
 from __future__ import annotations
 
 import json
+import math
 import queue
 import re
 import threading
@@ -555,6 +556,8 @@ def validate_answer(block, snap_id, lane):
     if not isinstance(variant, dict) or not _unit(conf):
         return None
     why = _clean(args.get("rationale") or "")
+    if variant.get("type") == "values" or name == "set_values":
+        return _values(qid, variant, name, args, float(conf), why)
     if variant.get("type") == "noul" and name == "answer_yes_no":
         p = args.get("p_yes")
         return (qid, {"type": "noul", "noul": float(p), "confidence": float(conf), "rationale": why}) if _unit(p) else None
@@ -574,6 +577,22 @@ def validate_answer(block, snap_id, lane):
         return None  # an answer that contradicts its own probabilities is not a vote
     return qid, {"type": "choice", "choice": choice, "probabilities": probs, "confidence": float(conf),
                  "rationale": why}
+
+
+def _values(qid, variant, name, args, conf, why):
+    """(question id, the settings set) for a set_values call, or None: only that question's own settings, each a
+    finite number with its reason; an empty list keeps every setting. The values are not limited here: the owner's
+    power hands them to code as they are (code clamps each to its own range only)."""
+    if variant.get("type") != "values" or name != "set_values" or not isinstance(args.get("values"), list):
+        return None
+    keys, got = set(variant.get("criteria") or {}), {}
+    for item in args["values"]:
+        k, v = (item.get("key"), item.get("value")) if isinstance(item, dict) else (None, None)
+        if k not in keys or k in got or not isinstance(v, (int, float)) or isinstance(v, bool) or not math.isfinite(v):
+            return None
+        got[k] = {"value": float(v), "reason": _clean(item.get("reason") or "")}
+    return qid, {"type": "values", "values": got, "expected": _clean(args.get("expected_outcome") or ""),
+                 "confidence": conf, "rationale": why}
 
 
 def _report(qid, args):
@@ -675,6 +694,10 @@ def call_anthropic(account, token, state, questions, gateway=None, timeout=20.0,
                     meter.answered(judge)
             else:
                 errors.append(BAD_OUTPUT)
+        if billed:  # the cached system prompt at work: cache reads should climb from the second call on
+            log(f"[brain] {judge}: cache read {usage['cache_read_input_tokens']} tokens, written "
+                f"{usage['cache_creation_input_tokens']}, uncached {usage['uncached_input_tokens']}"
+                + (f"; read today {meter.tokens['cache_read']}" if meter is not None else ""))
         if answers:
             return answers, usage, None
         if billed:
