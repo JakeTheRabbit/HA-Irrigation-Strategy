@@ -1,3 +1,7 @@
+# 3.15.0
+
+Pair with integration 3.15.0. **C3.** Restored opt-in phase, safety, sensing, runoff estimate and dosing controls; additive state migration; persisted waste policy fails closed when unreadable; pH dosing faults survive unknown enable readings. Includes revised generated AI instructions, revisioned room context and cache controls, and the answer-choice schema mitigation while set_values stays strict. New features retain neutral defaults. Approved rehearsal release; no plumbing soak claimed.
+
 # 3.14.0
 
 Pair with integration 3.14.0. **C2.** #162: the AI assistant is Claude only and asks every judge by default (ramp included); `ai_judges` replaces `jev_judges` (read as a fallback), `jev_*` tuning options become `ai_*`, the Cloudflare/TypeSafe route is removed with old keys still accepted; package `jev/` is now `brain/`. No state-file change.
