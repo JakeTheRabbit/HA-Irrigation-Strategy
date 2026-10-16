@@ -26,6 +26,13 @@ P1_RISE_PTS = 0.5
 P1_RISE_GAIN_FRACTION = 0.3
 # Extra shots P1 may give once it has read its target: the fallback of p1_maximum_extra_shots.
 P1_MAX_EXTRA_SHOTS = 3
+# Ramp shots in a row, under the P1 target, that may each raise the settled reading by less than the rise P1 needs
+# (p1_rise) before P1 ends as stalled: the fallback of ZoneParams.p1_stall_shots. A slab that cannot reach its target
+# otherwise ramps on, with growing shots, to the maximum shots and then re-waters at a point it never reaches.
+P1_STALL_SHOTS = 2
+# Points under the stalled peak the re-water point sits for the rest of that grow-day while the zone's gain is not
+# learned (the auto setpoints' DEFAULT_BAND_PTS).
+P1_STALL_BAND_PTS = 1.5
 # Minutes of readings a settled moisture reading is the median of (settled_reading).
 SETTLED_VWC_MIN = 10.0
 # P0 flushes when pore EC is over this multiple of the P0 EC target, with a shot this size (% of substrate).
@@ -117,6 +124,10 @@ class ZoneParams:
     #                                  rescue of a night still goes at once. 0 = off. None: as before (no gap).
     p1_rise_pts: float = P1_RISE_PTS  # an extra P1 shot that raises the reading less than this ends P1
     p1_max_extra_shots: int = P1_MAX_EXTRA_SHOTS  # extra P1 shots after the target is read; at this many P1 ends
+    p1_stall_shots: int = P1_STALL_SHOTS  # ramp shots in a row under the target without the rise P1 needs; at this
+    #                                       many P1 ends as stalled (p1_stall). 0 = off: the ramp runs to max shots.
+    p1_stall_band: float = P1_STALL_BAND_PTS  # the zone's usual P2 drop: after a stall the day re-waters this far
+    #                                           under what the zone reached (p1_stall_rewater)
     p0_additional_dryback: float = 0.0  # P0 ends once VWC is this % below the highest reading since lights-on,
     #                                     the small extra dryback before the first shot. 0 = off: P0 waits for
     #                                     dryback_target, as before.
@@ -176,6 +187,10 @@ class ZoneSnapshot:
     #                                              not on the raw peak, so one noisy reading cannot earn a shot
     p1_expected_rise: float | None = None  # what the last P1 shot should have lifted the reading by, from the zone's
     #                                        learned gain; None = not learned, and the rise is judged on p1_rise_pts
+    p1_flat_shots: int = 0  # the ramp shots in a row BEFORE the last one that did not give the rise P1 needs (the
+    #                         caller counts them; p1_stall adds the last one)
+    p1_probe_suspect: bool = False  # the caller doubts this probe today (water bypassing it, CS-710, or a flat
+    #                                 reading): a ramp that does not rise is then not read as a stalled slab
 
 
 def settled_reading(readings):
@@ -200,6 +215,24 @@ def p1_rise(s: ZoneSnapshot, p: ZoneParams):
     if s.p1_expected_rise is not None and math.isfinite(s.p1_expected_rise) and s.p1_expected_rise > 0:
         need = max(need, P1_RISE_GAIN_FRACTION * s.p1_expected_rise)
     return rise, need
+
+
+def p1_stall(s: ZoneSnapshot, p: ZoneParams) -> int:
+    """PURE. How many P1 ramp shots in a row, the last one included, raised the settled reading by less than the rise
+    P1 needs (p1_rise): the caller's count of the earlier ones plus the last. 0 when the last one gave the rise, or
+    either settled reading is missing (the raw peak says nothing under the target)."""
+    if s.vwc_settled is None or s.p1_settled_before_shot is None:
+        return 0
+    rise, need = p1_rise(s, p)
+    return max(0, int(s.p1_flat_shots)) + 1 if rise < need else 0
+
+
+def p1_stall_rewater(stalled_at: float, p2_threshold: float, band: float) -> float:
+    """PURE. The re-water point for the rest of a grow-day whose P1 stalled at `stalled_at`: `band` (the zone's
+    usual P2 drop) under what the zone reached, never over the set point. Not floored at the rescue level: a zone
+    that stalled under it would otherwise be topped up every pass at a point it cannot reach."""
+    band = band if band is not None and math.isfinite(band) and band > 0 else P1_STALL_BAND_PTS
+    return round(max(0.0, min(p2_threshold, stalled_at - band)), 1)
 
 
 def p0_dryback(p: ZoneParams) -> float:
@@ -308,12 +341,20 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
         # other way out. Pore EC no longer holds P1 open: P2's dilute shots correct it.
         # The rise is measured on settled readings when the caller has them (p1_rise), the extra shots stop at
         # p1_max_extra_shots, and they come out of the daily budget: a spent budget at the target ends P1.
+        # Under the target, p1_stall_shots ramp shots in a row without the rise P1 needs end it as stalled: the slab
+        # takes no more today. Never while the probe is in doubt (backed up, bypassed, flat): the ramp then runs on.
         p1_ceiling = min(p.p1_target, p.field_capacity)
         reached = s.p1_reached or s.vwc >= p1_ceiling
         rise, need = p1_rise(s, p)
         waited = s.minutes_since_shot >= p.p1_time_between_min
         if s.shot_count >= p.p1_max_shots:
             phase, treason = "P2", f"P1 max shots {s.shot_count}/{p.p1_max_shots}"
+        elif (not reached and p.p1_stall_shots > 0 and waited and not s.backed_up and not s.p1_probe_suspect
+              and s.shot_count >= p.p1_min_shots and p1_stall(s, p) >= p.p1_stall_shots):
+            at = max(s.vwc_settled, s.p1_settled_before_shot)
+            phase, treason = "P2", f"P1 stalled at {at:.1f}%: {p1_stall(s, p)} shots did not raise moisture"
+            # This tick already re-waters under what the zone reached; the caller holds it for the grow-day.
+            p2_thr = p1_stall_rewater(at, p2_thr, p.p1_stall_band)
         elif reached and s.p1_extra_shots >= p.p1_max_extra_shots and waited:
             phase, treason = "P2", f"P1 extra shots {s.p1_extra_shots}/{p.p1_max_extra_shots}"
         elif reached and s.daily_vol >= p.max_daily_volume:
@@ -642,7 +683,7 @@ _PARAM_BOUNDS = {
     "p0_max_wait_min": (5.0, 240.0), "p3_emergency_shot": (0.5, 15.0),
     "max_daily_volume": (10.0, 2000.0), "min_daily_volume": (0.0, 500.0),
     "drown_ceiling": (50.0, 100.0), "min_floor_finish_h": (0.0, 12.0),
-    "p1_rise_pts": (0.1, 5.0), "p1_max_extra_shots": (1.0, 10.0),
+    "p1_rise_pts": (0.1, 5.0), "p1_max_extra_shots": (1.0, 10.0), "p1_stall_shots": (0.0, 10.0),
     "p0_additional_dryback": (0.0, 40.0),
     "p2_time_between_min": (0.0, 120.0),
     "p2_min_interval_min": (1.0, 120.0),
@@ -656,7 +697,7 @@ def validate_params(p):
         v = getattr(p, name)
         if v < lo or v > hi:
             nv = max(lo, min(hi, v))
-            if name in ("p1_max_shots", "p1_max_extra_shots"):
+            if name in ("p1_max_shots", "p1_max_extra_shots", "p1_stall_shots"):
                 nv = int(nv)
             fixes[name] = nv
             warns.append(f"{name}={v:g} out of [{lo:g},{hi:g}] -> clamped to {nv:g}")

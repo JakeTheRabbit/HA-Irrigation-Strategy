@@ -437,6 +437,22 @@ function demoDosing(
     batch,
     request: null,
     updated_at: at(24 * 6),
+    // The feed schedule's pick today (Room B has none, so its batch recipe has no name either).
+    ...(prefix
+      ? {}
+      : {
+          feed: {
+            recipe: "Bloom",
+            recipe_id: "bloom",
+            ec: 2.4,
+            week: 3,
+            weeks: 12,
+            // Week 3 began today: the schedule started 14 days ago.
+            start: at(24 * 14).slice(0, 10),
+            held_until: null,
+            source: "schedule",
+          },
+        }),
   });
   // The last batch, and before it the one earlier (Room B stopped one by hand while it mixed);
   // since, a dose by hand in each room.

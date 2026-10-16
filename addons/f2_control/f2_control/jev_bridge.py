@@ -813,11 +813,12 @@ def guard_setpoints(c, room, zone, now):
              room=room, zone=zone)
 
 
-def advance(c, room, zone, snap, d, now):
-    """Move the zone forward one phase as Jev judged, with the bookkeeping the engine does itself."""
+def advance(c, room, zone, snap, d, now, p=None):
+    """Move the zone forward one phase as Jev judged, with the bookkeeping the engine does itself (a ramp handed
+    over while it stalls re-waters under what it reached: Controller._record_phase)."""
     st = room.state[zone]
     was, st["phase"] = st["phase"], d.value
-    c._record_phase(room, zone, st, was, d.value, now, f"Jev's {d.judge} judge: {d.why}")
+    c._record_phase(room, zone, st, was, d.value, now, f"Jev's {d.judge} judge: {d.why}", snap, p)
     st["last_phase_change"] = now
     if d.value == "P1":
         st["shots"] = 0
@@ -1556,6 +1557,17 @@ def why_facts(gates, zone=None):
     return " ".join(out)
 
 
+def _stalls_words(c, room, now):
+    """Each zone whose ramp ended stalled this grow-day, in words (Controller._record_phase), or "none"."""
+    out = {}
+    for z in room.zones:
+        s = c._p1_stall_today(room, room.state[z], now)
+        if s:
+            out[z] = (f"P1 ended stalled at {s['at']:.1f}%: the ramp shots did not raise moisture, so the zone "
+                      f"re-waters at {s['rewater']:g}% until the next lights-on")
+    return out or "none"
+
+
 def why_state(c, room, question, now, gates=None):
     """The evidence for one why question: the grower's words (sent as operator text), the room's decision record,
     each zone's phase and today's stage, what stops the room being watered (gates: the kill switch, the holds that
@@ -1567,6 +1579,7 @@ def why_state(c, room, question, now, gates=None):
     return {"question": question["question"], "zone_asked_about": question.get("zone") or "the whole room",
             "decisions": decisions or "no decisions recorded yet", "local_time": f"{now:%H:%M}",
             "phases": {z: room.state[z].get("phase") for z in room.zones}, "stage_today": stage_info(c, room, now),
+            "ramps_stalled_today": _stalls_words(c, room, now),
             **({"kill_switch": gates["kill_switch"], "holds_on": gates["holds_on"] or "none",
                 "zones": gates["zones"]} if gates else {}),
             "_brain": {"room": room.slug, "zone": "room", "judge": "why", "asked": now.isoformat(timespec="minutes"),

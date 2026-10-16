@@ -625,3 +625,51 @@ def test_each_wrong_field_of_the_record_starts_fresh_and_a_later_field_is_kept(
     written = json.loads(p.read_text(encoding="utf-8"))["default"]["_adherence"]
     assert written["from_a_later_release"] == {"kept": True}
     assert written["alerted"] == {"plan_saved_not_armed_default_r3": today}
+
+
+def test_a_3_11_1_zone_loads_with_no_stalled_ramp_and_a_stall_round_trips(tmp_path):
+    """Before the P1 stall exit a zone kept no count of flat ramp shots and no stalled day: an old file loads
+    them as 0 and None, a saved stall survives a restart, and junk in either loads fresh.
+    """
+    fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
+    seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": seed}), encoding="utf-8")
+    c = _make([1, 2], p)
+    c._load_state()
+    for zone in (1, 2):
+        assert (
+            c.rooms[0].state[zone]["p1_flat"],
+            c.rooms[0].state[zone]["p1_stall"],
+        ) == (0, None)
+    st = c.rooms[0].state[1]
+    st["p1_flat"], st["p1_stall"] = 1, {
+        "day": "2026-10-16",
+        "at": 25.2,
+        "rewater": 23.7,
+    }
+    c._save_state()
+    c2 = _make([1, 2], p)
+    c2._load_state()
+    assert (c2.rooms[0].state[1]["p1_flat"], c2.rooms[0].state[1]["p1_stall"]) == (
+        1,
+        {"day": "2026-10-16", "at": 25.2, "rewater": 23.7},
+    )
+    for flat, stall in (
+        (-1, {"day": 5}),
+        ("2", {"day": "2026-10-16", "at": "x", "rewater": 1}),
+        (True, {"day": "2026-10-16", "at": 250.0, "rewater": 23.7}),
+        (None, "junk"),
+    ):
+        p.write_text(
+            json.dumps(
+                {"default": {"1": {"phase": "P2", "p1_flat": flat, "p1_stall": stall}}}
+            ),
+            encoding="utf-8",
+        )
+        c3 = _make([1], p)
+        c3._load_state()
+        assert (c3.rooms[0].state[1]["p1_flat"], c3.rooms[0].state[1]["p1_stall"]) == (
+            0,
+            None,
+        )
