@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addDays } from "./comparison";
 import type { DailyReading } from "./comparison-types";
-import { biggestDifferences, runWeeks, type RunWeek } from "./run-weeks";
+import { biggestDifferences, chartRows, chartSummary, runWeeks, type RunWeek } from "./run-weeks";
 
 const day = (date: string, min: number, max: number): DailyReading => ({
   date,
@@ -98,6 +98,8 @@ describe("where two runs differ most", () => {
     moisture: null,
     poreEc: null,
     water: null,
+    shots: null,
+    dryback: null,
     recorded: 7,
     days: 7,
     ...figures,
@@ -128,5 +130,103 @@ describe("where two runs differ most", () => {
     expect(biggestDifferences(now, then, 1)).toHaveLength(1);
     expect(biggestDifferences(now, [])).toEqual([]);
     expect(biggestDifferences(now.slice(2), then)).toEqual([]);
+  });
+});
+
+describe("shots and dryback by grow week", () => {
+  const start = "2026-08-24";
+  const weeks = runWeeks({
+    start,
+    last: "2026-09-08",
+    today: "2026-09-08",
+    vwc: days(start, 7, 50, 62.5),
+    ec: [],
+    water: new Map(),
+    shots: new Map([
+      ["2026-08-24", 8],
+      ["2026-08-25", 11],
+      ["2026-09-08", 3],
+    ]),
+    plants: 36,
+  });
+  it("averages shots over recorded grow-days, today's unfinished one left out", () => {
+    expect(weeks[0].shots).toBeCloseTo(9.5);
+    expect(weeks[1].shots).toBeNull();
+    expect(weeks[2].shots).toBeNull();
+  });
+  it("takes dryback as the typical day's drop from peak to trough, a share of the peak", () => {
+    // Median low 50.3, median high 62.5: (62.5 - 50.3) / 62.5.
+    expect(weeks[0].dryback).toBeCloseTo(((62.5 - 50.3) / 62.5) * 100);
+    expect(weeks[1].dryback).toBeNull();
+  });
+  it("has no shots without a shot counter, never zero", () => {
+    expect(
+      runWeeks({
+        start,
+        last: start,
+        today: "2026-09-08",
+        vwc: [],
+        ec: [],
+        water: new Map(),
+        plants: 1,
+      })[0].shots,
+    ).toBeNull();
+  });
+});
+
+describe("the Compare runs charts", () => {
+  const week = (number: number, figures: Partial<RunWeek>): RunWeek => ({
+    week: number,
+    first: "",
+    last: "",
+    current: false,
+    moisture: null,
+    poreEc: null,
+    water: null,
+    shots: null,
+    dryback: null,
+    recorded: 7,
+    days: 7,
+    ...figures,
+  });
+  const mine = [
+    week(1, { moisture: [50, 62], poreEc: [3.9, 4.6], water: 0.5, shots: 9, dryback: 19.4 }),
+    week(2, { moisture: [48, 63], dryback: 23.8 }),
+  ];
+  const theirs = [
+    week(1, { moisture: [52, 61], water: 0.45, shots: 8, dryback: 14.8 }),
+    week(2, {}),
+    week(3, { moisture: [47, 60], dryback: 21.7 }),
+  ];
+  it("lines up each run's weeks, every week either run reached, gaps as null", () => {
+    const rows = chartRows([mine, theirs]);
+    expect(rows.map((row) => row.label)).toEqual(["W1", "W2", "W3"]);
+    expect(rows[0]).toMatchObject({
+      r0_peak: 62,
+      r0_trough: 50,
+      r0_ecHigh: 4.6,
+      r0_ecLow: 3.9,
+      r0_water: 0.5,
+      r0_shots: 9,
+      r0_dryback: 19.4,
+      r1_peak: 61,
+      r1_ecHigh: null,
+      r1_shots: 8,
+    });
+    expect(rows[1].r1_peak).toBeNull();
+    expect(rows[2]).toMatchObject({ r0_peak: null, r0_dryback: null, r1_dryback: 21.7 });
+    expect(chartRows([])).toEqual([]);
+  });
+  it("says in words what each chart shows, and when a run has no record", () => {
+    const runs = [
+      { name: "This run", weeks: mine },
+      { name: "Last run", weeks: theirs },
+    ];
+    expect(chartSummary("Dryback", runs, "dryback", " %", 0)).toBe(
+      "Dryback by grow week. This run: 2 weeks recorded, 19 to 24 %, 24 % in week 2. Last run: 2 weeks recorded, 15 to 22 %, 22 % in week 3.",
+    );
+    expect(chartSummary("Pore EC", runs, "ecHigh", "", 1)).toBe(
+      "Pore EC by grow week. This run: 1 week recorded, 4.6 to 4.6, 4.6 in week 1. Last run: no record.",
+    );
   });
 });

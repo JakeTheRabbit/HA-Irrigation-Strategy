@@ -517,4 +517,21 @@ describe("demo water record", () => {
       if (day >= start) (expect(litres).toBeGreaterThan(8), expect(litres).toBeLessThanOrEqual(38));
       else expect(litres).toBe(0);
   });
+  it("counts whole shots a grow-day on the shot counter, for Compare runs", () => {
+    const now = Date.now();
+    const id = "sensor.crop_steering_zone_1_irrigation_count_app";
+    const record = demoWaterRecord(
+      createDemo(now),
+      { entityIds: [id], start: now - 30 * 86_400_000, end: now },
+      now,
+    );
+    const local = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const days = growDayTotals(record[id], 10, local);
+    const start = dateForDay(localDate(new Date(now)), -13);
+    expect(record[id].every((sample) => Number.isInteger(sample.value))).toBe(true);
+    const grown = [...days].filter(([day]) => day >= start).map(([, shots]) => shots);
+    expect(grown.length).toBeGreaterThan(5);
+    for (const shots of grown)
+      (expect(shots).toBeGreaterThanOrEqual(5), expect(shots).toBeLessThanOrEqual(18));
+  });
 });
