@@ -133,6 +133,9 @@
 - CS-311 No sump pump run: The power reading of the sump pump (sump_power_sensor) shows no run for 3 h by default (sump_silent_hours). Does: The alert does not change the water.
 - CS-312 Repeated maximum-length shots: The last 3 shots of a zone each needed more time than the maximum shot length of the room. Does: If the max-run latch switch of the room is on, the zone gets no more shots, rescue shots included, until you fix the Repairs card.
 - CS-313 Device type not supported: A zone valve, pump or main-line valve has a device type that the controller cannot open or close. Does: The zone gets no shots, and the controller sends no command to the device.
+- CS-315 Rescue shots not absorbed: Rescue shots of a zone (P3 emergency or watchdog shots) did not raise its moisture, several in a row. Does: The alert does not change the water.
+- CS-316 Waste valve not closed: The room has a waste valve mapped and its waste valve rule is set. Does: No shot starts in the room until the waste valve reads off.
+- CS-317 Pump runs with every valve shut: The feed pump of the room (option pump_power_sensor) uses more power than the room setting Pump dead-head power, for 1 min, while every zone valve of the room reads off, and no shot, hold or batch uses the pump. Does: The alert does not change the water.
 - CS-401 Setting outside controller range: The entity accepts a wider range than the controller uses, and the value is outside the range of the controller. Does: Water continues.
 - CS-402 Missing settings: The controller cannot read some settings by their entity IDs for 3 loops. Does: All shots wait for 3 loops.
 - CS-403 Lights hours from the integration: The controller now reads the lights-on and lights-off hours from the integration, not from its own options. Does: Water continues on the hours of the integration.
@@ -179,4 +182,5 @@
 - CS-902 Tank level not readable: The tank level of this room gives no usable reading, or the distance sensor seems stuck. Does: The controller holds each zone of the room until the level reads again, or until a stuck sensor moves.
 - CS-903 Refill needed before next shots: One more set of shots, the last shot of each zone, takes the tank to its 8% minimum or below. Does: Water continues.
 - CS-904 Tank above full mark: The tank level reads 102% or more of its full distance. Does: Water continues.
+- CS-905 Estimated tank level low: The room has no tank level sensor, and a Tank size (estimate) above 0. Does: The alert does not change the water.
 - CS-906 Batch tank low: The batch tank of the room read at or below its refill reminder level (remind_pct) 3 times, 1 min apart. Does: Water continues as usual.

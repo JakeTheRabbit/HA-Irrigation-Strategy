@@ -673,3 +673,64 @@ def test_a_3_11_1_zone_loads_with_no_stalled_ramp_and_a_stall_round_trips(tmp_pa
             0,
             None,
         )
+
+
+def test_an_old_file_loads_without_rescue_keys_or_a_tank_estimate_and_both_round_trip(
+    tmp_path,
+):
+    """3.14.0 files have no rescue_misses / rescue_check per zone and no _tank_estimate block: they load
+    fresh (no misses, nothing to judge, no fill seen), and once written they come back as written.
+    """
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"default": {"1": {"phase": "P2", "peak": 40.0}}}), encoding="utf-8"
+    )
+    c = _make([1], p)
+    c._load_state()
+    room = c.rooms[0]
+    st = room.state[1]
+    assert (st["rescue_misses"], st["rescue_check"]) == (0, None)
+    assert room.tank_estimate == {"filled_at": None, "used_l": 0.0}
+    st["rescue_misses"], st["rescue_check"] = 2, {
+        "before": 31.5,
+        "at": "2026-10-17T03:00:00",
+    }
+    room.tank_estimate = {"filled_at": "2026-10-17T01:00:00+00:00", "used_l": 12.5}
+    c._save_state()
+    c2 = _make([1], p)
+    c2._load_state()
+    assert c2.rooms[0].state[1]["rescue_misses"] == 2
+    assert c2.rooms[0].state[1]["rescue_check"] == {
+        "before": 31.5,
+        "at": "2026-10-17T03:00:00",
+    }
+    assert c2.rooms[0].tank_estimate == {
+        "filled_at": "2026-10-17T01:00:00+00:00",
+        "used_l": 12.5,
+    }
+    for misses, check, estimate in (
+        (-1, {"at": 5}, "junk"),
+        ("2", {"before": "x", "at": "t"}, {"used_l": "x"}),
+    ):
+        p.write_text(
+            json.dumps(
+                {
+                    "default": {
+                        "1": {
+                            "phase": "P2",
+                            "rescue_misses": misses,
+                            "rescue_check": check,
+                        },
+                        "_tank_estimate": estimate,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        c3 = _make([1], p)
+        c3._load_state()
+        assert (
+            c3.rooms[0].state[1]["rescue_misses"],
+            c3.rooms[0].state[1]["rescue_check"],
+        ) == (0, None)
+        assert c3.rooms[0].tank_estimate == {"filled_at": None, "used_l": 0.0}

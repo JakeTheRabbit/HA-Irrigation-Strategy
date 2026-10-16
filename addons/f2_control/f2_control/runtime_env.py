@@ -483,6 +483,7 @@ OPTION_TYPES = {
     "feed_ph_sensor": "str?",
     "sump_power_sensor": "str?",
     "sump_silent_hours": "float?",
+    "pump_power_sensor": "str?",
     "hold_entities": "[str]",
     "substrate_l": "float",
     "flow_lps": "float",
