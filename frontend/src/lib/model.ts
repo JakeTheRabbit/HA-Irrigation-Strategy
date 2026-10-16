@@ -716,6 +716,7 @@ export function buildRoom(states: States, room: Room): RoomView {
           : `${list} ${one ? "needs" : "need"} attention`,
       detail,
       severity: kind === "sensors" ? "warning" : "critical",
+      zoneIds: group.map((zone) => zone.id),
       ...(one ? { zoneId: one.id } : {}),
     };
   });

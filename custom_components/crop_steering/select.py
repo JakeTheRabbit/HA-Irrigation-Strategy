@@ -26,6 +26,7 @@ from .const import (
     RECIPE_PARAMS,
     SOFTWARE_VERSION,
     SET_PHASE_OPTIONS,
+    SHOT_CHECK_MODES,
     SUBSTRATES,
     WATER_TODAY_VIEWS,
 )
@@ -94,6 +95,13 @@ SELECT_DESCRIPTIONS = [
         name="Pause AI changes",
         icon="mdi:hand-back-left-off",
         options=NO_TOUCH_OPTIONS,
+    ),
+    # The controller's shot check: off until someone chooses (the AI shot judge alone, as before).
+    SelectEntityDescription(
+        key="shot_check",
+        name="Shot check",
+        icon="mdi:water-check",
+        options=SHOT_CHECK_MODES,
     ),
 ]
 

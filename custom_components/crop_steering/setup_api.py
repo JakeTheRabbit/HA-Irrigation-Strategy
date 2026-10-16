@@ -36,6 +36,7 @@ HARDWARE_DOMAINS = {
     "temperature_sensor": {"sensor"},
     "humidity_sensor": {"sensor"},
     "vpd_sensor": {"sensor"},
+    "leaf_temperature_sensor": {"sensor"},
     "water_level_sensor": {"sensor"},
     "tank_temperature_sensor": {"sensor"},
     "tank_ec_sensor": {"sensor"},
@@ -429,6 +430,17 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
                 )
             allocated[valve] = entry_id or "new room"
         prior["zone_switch"] = valve
+        # Optional, display only: the zone's own leaf temperature sensor (the plant-stress card).
+        leaf = row.get(
+            "leaf_temperature_sensor", prior.get("leaf_temperature_sensor", "")
+        )
+        if not isinstance(leaf, str):
+            raise ValueError(f"Zone {z}: the leaf temperature sensor is one entity id")
+        if leaf:
+            _entity(hass, leaf, {"sensor"})
+            prior["leaf_temperature_sensor"] = leaf
+        else:
+            prior.pop("leaf_temperature_sensor", None)
         for kind in ("vwc", "ec"):
             sensors = row.get(
                 f"{kind}_sensors",
@@ -647,6 +659,7 @@ def setup_room(hass, entry):
                 "cultivar": cfg.get("cultivar", ""),
                 "active": cfg.get("active", True),
                 "valve": cfg.get("zone_switch", ""),
+                "leaf_temperature_sensor": cfg.get("leaf_temperature_sensor", ""),
                 **{
                     f"{kind}_sensors": cfg.get(f"{kind}_sensors")
                     or [cfg[k] for k in (f"{kind}_front", f"{kind}_back") if cfg.get(k)]
@@ -886,6 +899,7 @@ HARDWARE_WORDS = {
     "temperature_sensor": "temperature sensor",
     "humidity_sensor": "humidity sensor",
     "vpd_sensor": "VPD sensor",
+    "leaf_temperature_sensor": "leaf temperature sensor",
     "water_level_sensor": "tank level sensor",
     "tank_temperature_sensor": "tank temperature sensor",
     "tank_ec_sensor": "tank EC sensor",
@@ -907,6 +921,7 @@ ZONE_WORDS = {
     "substrate_volume": "pot volume (L)",
     "drippers_per_plant": "drippers per plant",
     "dripper_flow_rate": "dripper flow (L/h)",
+    "leaf_temperature_sensor": "leaf temperature sensor",
     ZONE_TEMPERATURE: "root-zone temperature probe",
 }
 # homeassistant.const.EVENT_LOGBOOK_ENTRY: the event the logbook records a line from.

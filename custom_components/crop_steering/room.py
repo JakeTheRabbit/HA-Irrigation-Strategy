@@ -120,8 +120,14 @@ def restored_state_is_ours(entry, last_state) -> bool:
         return True
 
 
-# The room climate sensors a setup can map (config_flow, hardware step).
-CLIMATE_SENSORS = ("temperature_sensor", "humidity_sensor", "vpd_sensor")
+# The room climate sensors a setup can map (config_flow, hardware step). The leaf temperature
+# (an IR canopy sensor) is for the dashboard's plant-stress card only.
+CLIMATE_SENSORS = (
+    "temperature_sensor",
+    "humidity_sensor",
+    "vpd_sensor",
+    "leaf_temperature_sensor",
+)
 # What only the dashboard shows (Settings > Display), set up on its Setup page.
 DISPLAY_SENSORS = ("camera_entity", "co2_sensor", "ppfd_sensor", "dli_sensor")
 
@@ -175,6 +181,14 @@ def build_engine_config(
     # The room's climate sensors, likewise only when mapped: read-only, for the dashboard's history
     # chart. The controller reads none of them.
     declared.update({k: hw[k] for k in CLIMATE_SENSORS if hw.get(k)})
+    # A zone's own leaf temperature sensor, likewise only when one is mapped (display only).
+    leaf = {
+        str(z): (zones.get(str(z)) or zones.get(z) or {}).get("leaf_temperature_sensor")
+        for z in range(1, int(num_zones) + 1)
+    }
+    leaf = {z: e for z, e in leaf.items() if e}
+    if leaf:
+        declared["zone_leaf_sensors"] = leaf
     # Likewise the camera, CO2 and PPFD, and each zone's root-zone temperature probe.
     declared.update({k: hw[k] for k in DISPLAY_SENSORS if hw.get(k)})
     root_zone = {

@@ -30,6 +30,7 @@ import { errorText } from "@/lib/utils";
 import { AllZonesSwitch, RoomPower } from "@/components/room-controls";
 import { SizingUnitPickers, useSizingUnits } from "@/components/zone-sizing";
 import { RunRecords } from "@/components/run-records";
+import { SensingSettings } from "@/components/sensing";
 import { DisplaySettings } from "@/components/display-settings";
 import type { ThemePreference, ThemeSource } from "@/lib/ha-theme";
 import { useWaterView, type WaterView } from "@/lib/water-view";
@@ -424,6 +425,7 @@ export function Settings({
             </p>
           </div>
         </section>
+        <SensingSettings controller={controller} />
         <section className="panel settings-section">
           <div className="settings-label">
             <h2>Units</h2>

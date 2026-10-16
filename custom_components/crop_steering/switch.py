@@ -91,6 +91,20 @@ BASE_SWITCH_DESCRIPTIONS = [
         icon="mdi:auto-mode",
         entity_registry_visible_default=False,
     ),
+    # Opt-in, OFF on new and updated rooms. ON: the controller keeps each zone's grow-day records of
+    # litres, quiet dryback rate and VPD, and publishes how its drying answers VPD (read only).
+    SwitchEntityDescription(
+        key="water_vpd_insight",
+        name="Water vs VPD",
+        icon="mdi:chart-scatter-plot",
+    ),
+    # Opt-in, OFF. ON shows the plant-stress card (leaf minus air temperature, leaf VPD) where a
+    # leaf temperature sensor is mapped. Display only.
+    SwitchEntityDescription(
+        key="plant_stress_card",
+        name="Plant stress card",
+        icon="mdi:leaf",
+    ),
     # Opt-in, OFF on new and updated rooms: pH auto-correct of the batch tank and dimming the
     # lights on dry substrate (ph_and_dim.py, docs/DOSING.md).
     *(

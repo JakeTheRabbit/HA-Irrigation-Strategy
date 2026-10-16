@@ -130,6 +130,9 @@ export interface SetupZone {
   substrate_volume?: number;
   drippers_per_plant?: number;
   dripper_flow_rate?: number;
+  /** The zone's own leaf temperature sensor for the plant-stress card ("" none); absent from an older
+   * integration. Display only. */
+  leaf_temperature_sensor?: string;
   /** Mapped probes that do not count towards the zone's reading, and the primary one ("" none):
    * the Probes page's choice. Absent from an older integration. */
   vwc_unused?: string[];

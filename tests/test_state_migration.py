@@ -673,3 +673,45 @@ def test_a_3_11_1_zone_loads_with_no_stalled_ramp_and_a_stall_round_trips(tmp_pa
             0,
             None,
         )
+
+
+def test_a_3_11_1_zone_loads_with_no_water_vpd_record_and_one_round_trips(tmp_path):
+    """Before the water-and-VPD record (sensing.py) a zone kept no day records: an old file loads them empty, a
+    saved record survives a restart, and junk in either loads fresh."""
+    fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
+    seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": seed}), encoding="utf-8")
+    c = _make([1, 2], p)
+    c._load_state()
+    for zone in (1, 2):
+        st = c.rooms[0].state[zone]
+        assert (st["water_vpd"], st["day_hist"]) == (None, [])
+    st = c.rooms[0].state[1]
+    st["water_vpd"] = {
+        "day": "2026-10-16",
+        "rates": [0.8],
+        "vpd": [2.4, 2],
+        "last": 5.0,
+    }
+    st["day_hist"] = [
+        {"date": "2026-10-15", "rate": 0.7, "vpd": 1.1, "samples": 9, "litres": 4.5}
+    ]
+    c._save_state()
+    c2 = _make([1, 2], p)
+    c2._load_state()
+    st2 = c2.rooms[0].state[1]
+    assert st2["water_vpd"] == st["water_vpd"]
+    assert st2["day_hist"] == st["day_hist"]
+    p.write_text(
+        json.dumps(
+            {"default": {"1": {"phase": "P2", "water_vpd": "junk", "day_hist": [5]}}}
+        ),
+        encoding="utf-8",
+    )
+    c3 = _make([1], p)
+    c3._load_state()
+    assert (
+        c3.rooms[0].state[1]["water_vpd"],
+        c3.rooms[0].state[1]["day_hist"],
+    ) == (None, [])
