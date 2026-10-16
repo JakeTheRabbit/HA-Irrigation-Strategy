@@ -1,0 +1,300 @@
+{
+  "groups": [
+    { "id": "phases", "label": "Watering phases", "help": "How each phase waters: when it starts, the shot sizes and the time between shots." },
+    { "id": "safety", "label": "Safety and holds", "help": "The switches that stop or hold watering, and the limits on each shot and each day." },
+    { "id": "feed", "label": "Dosing and feed", "help": "The EC steer, the EC targets and the source-water gate." },
+    { "id": "ai", "label": "AI assistant", "help": "What the AI assistant may change in this room." },
+    { "id": "alerts", "label": "Alerts", "help": "What the notifications say." },
+    { "id": "display", "label": "Display panels", "help": "How the dashboard shows the room. These change no watering." },
+    { "id": "history", "label": "History and data", "help": "What the room records." },
+    { "id": "equipment", "label": "Equipment and sizing", "help": "The room's hardware, substrate and probes." },
+    { "id": "app", "label": "Controller app", "help": "Options of the controller app. Change them in the app's Configuration tab. They apply when the app restarts." }
+  ],
+  "features": [
+    {
+      "id": "auto_setpoints", "group": "phases", "label": "Auto setpoints",
+      "help": "Moves the P1 target and the P2 re-water point to what each zone reaches, and stops the P2 shots in the afternoon for today's dryback.",
+      "master": { "domain": "switch", "key": "auto_setpoints", "scope": "room", "default": false },
+      "settings": [], "alsoOn": "plan/targets"
+    },
+    {
+      "id": "steering_mode", "group": "phases", "label": "Steering mode",
+      "help": "Vegetative or generative steer. It selects the dryback target and the EC targets.",
+      "settings": [{ "domain": "select", "key": "steering_mode", "scope": "room+zone", "default": "Vegetative" }],
+      "alsoOn": "plan/targets"
+    },
+    {
+      "id": "stage", "group": "phases", "label": "Growth stage",
+      "help": "The stage of the crop.",
+      "settings": [{ "domain": "select", "key": "growth_stage", "scope": "room", "default": "Vegetative" }],
+      "alsoOn": "plan/schedule"
+    },
+    {
+      "id": "p0", "group": "phases", "label": "P0 morning dryback",
+      "help": "After lights-on, the zone waits for a drop from its peak, or for the maximum wait, before the ramp starts.",
+      "settings": [
+        { "domain": "number", "key": "vegetative_dryback_target", "scope": "room+zone", "default": 35.0 },
+        { "domain": "number", "key": "generative_dryback_target", "scope": "room+zone", "default": 45.0 },
+        { "domain": "number", "key": "p0_dryback_drop_percent", "scope": "room+zone", "default": 15.0 },
+        { "domain": "number", "key": "p0_maximum_wait_time", "scope": "room+zone", "default": 120.0 },
+        { "domain": "number", "key": "p0_additional_dryback", "scope": "zone", "default": 0.0 }
+      ],
+      "alsoOn": "plan/targets"
+    },
+    {
+      "id": "p1", "group": "phases", "label": "P1 ramp",
+      "help": "Shots that grow in size until the zone reaches its P1 target.",
+      "settings": [
+        { "domain": "number", "key": "p1_target_vwc", "scope": "room+zone", "default": 65.0 },
+        { "domain": "number", "key": "p1_initial_shot_size", "scope": "room+zone", "default": 2.0 },
+        { "domain": "number", "key": "p1_shot_size_increment", "scope": "room+zone", "default": 0.5 },
+        { "domain": "number", "key": "p1_time_between_shots", "scope": "room+zone", "default": 15.0 },
+        { "domain": "number", "key": "p1_minimum_shots", "scope": "room+zone", "default": 3.0 },
+        { "domain": "number", "key": "p1_maximum_shots", "scope": "room+zone", "default": 6.0 },
+        { "domain": "number", "key": "p1_rise_pts", "scope": "room+zone", "default": 0.5 },
+        { "domain": "number", "key": "p1_maximum_extra_shots", "scope": "room+zone", "default": 3.0 }
+      ],
+      "alsoOn": "plan/targets"
+    },
+    {
+      "id": "p2", "group": "phases", "label": "P2 maintenance",
+      "help": "A shot when the zone drops below its re-water point. A time between shots of 0 is off.",
+      "settings": [
+        { "domain": "number", "key": "p2_vwc_threshold", "scope": "room+zone", "default": 60.0 },
+        { "domain": "number", "key": "p2_shot_size", "scope": "room+zone", "default": 5.0 },
+        { "domain": "number", "key": "p2_time_between_shots", "scope": "room+zone", "default": 0.0 }
+      ],
+      "alsoOn": "plan/targets"
+    },
+    {
+      "id": "p3", "group": "phases", "label": "P3 night rescue",
+      "help": "Before lights-off and at night, a shot only when the zone drops below its rescue floor.",
+      "settings": [
+        { "domain": "number", "key": "p3_emergency_vwc_threshold", "scope": "room+zone", "default": 40.0 },
+        { "domain": "number", "key": "p3_emergency_shot_size", "scope": "room+zone", "default": 2.0 },
+        { "domain": "number", "key": "p3_time_between_shots", "scope": "room+zone", "default": 10.0 }
+      ],
+      "alsoOn": "plan/targets"
+    },
+    {
+      "id": "p3_dryback_hold", "group": "phases", "label": "P3 dryback hold",
+      "help": "Holds the zone's night rescue shots so the zone dries back overnight.",
+      "master": { "domain": "switch", "key": "p3_dryback_hold", "scope": "zone", "default": false },
+      "settings": []
+    },
+    {
+      "id": "engine", "group": "safety", "label": "Watering (kill switch)",
+      "help": "Off: the controller fires no shot in this room.",
+      "master": { "domain": "switch", "key": "engine_enabled", "scope": "room", "default": null, "engine": true },
+      "settings": [], "alsoOn": "settings"
+    },
+    {
+      "id": "room_active", "group": "safety", "label": "Room on",
+      "help": "Off: the room is empty or resting. The controller waters nothing and sends no room alerts.",
+      "master": { "domain": "switch", "key": "room_active", "scope": "room", "default": null },
+      "settings": [], "alsoOn": "settings"
+    },
+    {
+      "id": "zone_enabled", "group": "safety", "label": "Zone on",
+      "help": "Off: the controller fires no shot in that zone.",
+      "master": { "domain": "switch", "key": "enabled", "scope": "zone", "default": null },
+      "settings": [], "alsoOn": "settings"
+    },
+    {
+      "id": "manual_override", "group": "safety", "label": "Zone hold (manual override)",
+      "help": "On: the controller holds the zone and fires no automatic shot until the hold ends.",
+      "master": { "domain": "switch", "key": "manual_override", "scope": "zone", "default": null },
+      "settings": [], "alsoOn": "zone"
+    },
+    {
+      "id": "max_run_latch", "group": "safety", "label": "Max-run latch",
+      "help": "On: a shot that runs to its time limit holds the zone until a person resets it in Settings > Repairs.",
+      "master": { "domain": "switch", "key": "max_run_latch", "scope": "room", "default": true },
+      "settings": [{ "domain": "number", "key": "max_shot_duration", "scope": "room", "default": 900 }]
+    },
+    {
+      "id": "daily_limits", "group": "safety", "label": "Daily water limits",
+      "help": "The most water a zone gets in a grow-day, and the least each plant gets. A minimum of 0 is off.",
+      "settings": [
+        { "domain": "number", "key": "max_daily_volume", "scope": "zone", "default": 20.0 },
+        { "domain": "number", "key": "min_daily_ml_per_plant", "scope": "zone", "default": 0.0 }
+      ]
+    },
+    {
+      "id": "zone_limits", "group": "safety", "label": "Zone limits",
+      "help": "Field capacity, the maximum EC and the watchdog hours of each zone.",
+      "settings": [
+        { "domain": "number", "key": "field_capacity", "scope": "room+zone", "default": 70.0 },
+        { "domain": "number", "key": "maximum_ec", "scope": "room+zone", "default": 9.0 },
+        { "domain": "number", "key": "watchdog_hours", "scope": "room+zone", "default": 3.0 }
+      ]
+    },
+    {
+      "id": "ec_stacking", "group": "feed", "label": "EC stacking",
+      "help": "On: P2 shots let the EC rise toward its target instead of washing it down.",
+      "master": { "domain": "switch", "key": "ec_stacking_enabled", "scope": "room", "default": false },
+      "settings": [
+        { "domain": "number", "key": "p2_ec_high_threshold", "scope": "room", "default": 1.2 },
+        { "domain": "number", "key": "p2_ec_low_threshold", "scope": "room", "default": 0.8 },
+        { "domain": "number", "key": "ec_min_interval", "scope": "room+zone", "default": 10.0 }
+      ]
+    },
+    {
+      "id": "ec_targets", "group": "feed", "label": "EC targets",
+      "help": "The EC each phase steers to, for each steering mode.",
+      "settings": [
+        { "domain": "number", "key": "ec_target_veg_p0", "scope": "room+zone", "default": 3.0 },
+        { "domain": "number", "key": "ec_target_veg_p1", "scope": "room+zone", "default": 3.0 },
+        { "domain": "number", "key": "ec_target_veg_p2", "scope": "room+zone", "default": 3.2 },
+        { "domain": "number", "key": "ec_target_veg_p3", "scope": "room", "default": 3.0 },
+        { "domain": "number", "key": "ec_target_gen_p0", "scope": "room+zone", "default": 4.0 },
+        { "domain": "number", "key": "ec_target_gen_p1", "scope": "room+zone", "default": 5.0 },
+        { "domain": "number", "key": "ec_target_gen_p2", "scope": "room+zone", "default": 6.0 },
+        { "domain": "number", "key": "ec_target_gen_p3", "scope": "room", "default": 4.5 }
+      ],
+      "alsoOn": "plan/targets"
+    },
+    {
+      "id": "source_gate", "group": "feed", "label": "Source-water gate",
+      "help": "No shot while the feed pH or EC is outside its band. An EC band of 0 to 0 is off.",
+      "settings": [
+        { "domain": "number", "key": "irrigation_ph_min", "scope": "room", "default": 5.5 },
+        { "domain": "number", "key": "irrigation_ph_max", "scope": "room", "default": 6.5 },
+        { "domain": "number", "key": "irrigation_ec_min", "scope": "room", "default": 0.0 },
+        { "domain": "number", "key": "irrigation_ec_max", "scope": "room", "default": 0.0 }
+      ],
+      "alsoOn": "equipment/feed"
+    },
+    {
+      "id": "ai_no_touch", "group": "ai", "label": "Pause AI changes",
+      "help": "A period in which the AI assistant asks nothing and changes nothing in the room.",
+      "settings": [{ "domain": "select", "key": "ai_no_touch", "scope": "room", "default": "Off" }]
+    },
+    { "id": "ai_power_advance_phase", "group": "ai", "label": "AI: start the next phase early", "help": "Starts the morning ramp or the night dryback early.", "master": { "domain": "switch", "key": "ai_power_advance_phase", "scope": "room", "default": true }, "settings": [], "alsoOn": "today/ai" },
+    { "id": "ai_power_ramp_control", "group": "ai", "label": "AI: end the morning ramp", "help": "Ends the morning ramp when the slab is full.", "master": { "domain": "switch", "key": "ai_power_ramp_control", "scope": "room", "default": true }, "settings": [], "alsoOn": "today/ai" },
+    { "id": "ai_power_set_probe_aside", "group": "ai", "label": "AI: set a probe aside", "help": "Sets aside a probe that does not follow the substrate.", "master": { "domain": "switch", "key": "ai_power_set_probe_aside", "scope": "room", "default": true }, "settings": [], "alsoOn": "today/ai" },
+    { "id": "ai_power_ec_mode", "group": "ai", "label": "AI: change the EC steer", "help": "Selects steer, hold or decay for the EC in maintenance.", "master": { "domain": "switch", "key": "ai_power_ec_mode", "scope": "room", "default": true }, "settings": [], "alsoOn": "today/ai" },
+    { "id": "ai_power_nudge_setpoints", "group": "ai", "label": "AI: adjust maintenance watering", "help": "Moves the P2 shot size or re-water point by one small step a night.", "master": { "domain": "switch", "key": "ai_power_nudge_setpoints", "scope": "room", "default": true }, "settings": [], "alsoOn": "today/ai" },
+    { "id": "ai_power_plan_catch_up", "group": "ai", "label": "AI: apply today's plan day", "help": "Applies today's plan values when a stale probe holds the plan.", "master": { "domain": "switch", "key": "ai_power_plan_catch_up", "scope": "room", "default": true }, "settings": [], "alsoOn": "today/ai" },
+    { "id": "ai_power_set_targets_from_achievable", "group": "ai", "label": "AI: set targets from what a zone reaches", "help": "Sets a zone's targets from the values it really reaches.", "master": { "domain": "switch", "key": "ai_power_set_targets_from_achievable", "scope": "room", "default": false }, "settings": [], "alsoOn": "today/ai" },
+    { "id": "ai_power_tune_shot_sizes", "group": "ai", "label": "AI: tune shot sizes", "help": "Changes the shot sizes inside their limits.", "master": { "domain": "switch", "key": "ai_power_tune_shot_sizes", "scope": "room", "default": false }, "settings": [], "alsoOn": "today/ai" },
+    {
+      "id": "ph_auto_correct", "group": "feed", "label": "pH auto-correct",
+      "help": "Corrects a batch tank outside the feed pH band with a few small doses of the pump in the pH role. It locks and alerts if a dose does not work.",
+      "master": { "domain": "switch", "key": "ph_auto_correct", "scope": "room", "default": false },
+      "settings": [
+        { "domain": "number", "key": "ph_correct_dose_s", "scope": "room", "default": 5, "label": "Dose length" },
+        { "domain": "number", "key": "ph_correct_max_tries", "scope": "room", "default": 2, "label": "Doses a try" },
+        { "domain": "number", "key": "ph_correct_mix_min", "scope": "room", "default": 5, "label": "Mix after a dose" },
+        { "domain": "number", "key": "ph_correct_daily_max", "scope": "room", "default": 3, "label": "Doses a day" },
+        { "domain": "number", "key": "ph_correct_margin", "scope": "room", "default": 0.1, "label": "Stop inside the band" }
+      ],
+      "alsoOn": "equipment/dosing", "restore": "LF-165"
+    },
+    {
+      "id": "dry_dim", "group": "safety", "label": "Dim lights on dry substrate",
+      "help": "Dims a dimmable room light while a zone is dry with the lights on. Never off, and it restores the brightness it found.",
+      "master": { "domain": "switch", "key": "dry_dim", "scope": "room", "default": false },
+      "settings": [
+        { "domain": "number", "key": "dry_dim_floor_vwc", "scope": "room", "default": 15, "label": "Dim below VWC" },
+        { "domain": "number", "key": "dry_dim_level_pct", "scope": "room", "default": 50, "label": "Dim to" },
+        { "domain": "number", "key": "dry_dim_after_min", "scope": "room", "default": 10, "label": "Dim after" },
+        { "domain": "number", "key": "dry_dim_max_h", "scope": "room", "default": 4, "label": "Dim for at most" }
+      ],
+      "restore": "LF-165"
+    },
+    {
+      "id": "held_alert", "group": "alerts", "label": "Shots held alert",
+      "help": "A critical alert when a zone that asked for water is held this many hours. 0 is off.",
+      "settings": [
+        { "domain": "number", "key": "held_alert_hours", "scope": "room", "default": 0, "label": "Alert after" }
+      ],
+      "restore": "LF-165"
+    },
+    {
+      "id": "notify_predictions", "group": "alerts", "label": "Predictions in notifications",
+      "help": "The vitals notification says what each zone does next.",
+      "master": { "domain": "switch", "key": "notify_predictions", "scope": "room", "default": true },
+      "settings": [], "alsoOn": "settings/notifications"
+    },
+    {
+      "id": "water_today_view", "group": "display", "label": "Water today shown as",
+      "help": "Each zone's total, or what each plant got.",
+      "settings": [{ "domain": "select", "key": "water_today_view", "scope": "room", "default": "Zone total" }],
+      "alsoOn": "today"
+    },
+    {
+      "id": "timing", "group": "equipment", "label": "Pump and line timing",
+      "help": "The pump prime time and the main-line lead time before each shot.",
+      "settings": [
+        { "domain": "number", "key": "pump_prime_time", "scope": "room", "default": 2.0 },
+        { "domain": "number", "key": "main_line_lead_time", "scope": "room", "default": 1.0 }
+      ],
+      "alsoOn": "equipment/setup"
+    },
+    {
+      "id": "sizing", "group": "equipment", "label": "Zone sizing",
+      "help": "Plants, substrate litres and drippers. Shot length comes from these.",
+      "settings": [
+        { "domain": "number", "key": "plant_count", "scope": "zone", "default": 4 },
+        { "domain": "number", "key": "substrate_volume", "scope": "room+zone", "default": 10.0, "zoneOptional": true },
+        { "domain": "number", "key": "dripper_flow_rate", "scope": "room+zone", "default": 1.2, "zoneOptional": true },
+        { "domain": "number", "key": "drippers_per_plant", "scope": "room+zone", "default": 2, "zoneOptional": true }
+      ],
+      "alsoOn": "equipment/setup"
+    },
+    {
+      "id": "photoperiod", "group": "equipment", "label": "Lights schedule",
+      "help": "The lights-on and lights-off hours. The grow-day starts at lights-on.",
+      "settings": [
+        { "domain": "number", "key": "lights_on_hour", "scope": "room", "default": 12 },
+        { "domain": "number", "key": "lights_off_hour", "scope": "room", "default": 0 }
+      ],
+      "alsoOn": "equipment/setup"
+    },
+    {
+      "id": "substrate", "group": "equipment", "label": "Substrate and drainage",
+      "help": "What the room grows in, and how its runoff leaves it.",
+      "settings": [
+        { "domain": "select", "key": "substrate", "scope": "room", "default": "generic" },
+        { "domain": "select", "key": "drainage", "scope": "room", "default": "unknown" },
+        { "domain": "number", "key": "sump_power_threshold_w", "scope": "room", "default": 20.0 }
+      ]
+    },
+    {
+      "id": "probe_methods", "group": "equipment", "label": "Readings from probes",
+      "help": "How a zone's probes become its moisture and EC readings.",
+      "settings": [
+        { "domain": "select", "key": "vwc_method", "scope": "zone", "default": "Median" },
+        { "domain": "select", "key": "ec_method", "scope": "zone", "default": "Median" }
+      ],
+      "alsoOn": "equipment/probes"
+    }
+  ],
+  "internal": [
+    { "domain": "switch", "key": "system_enabled", "why": "Retired, hidden; kept for old controllers." },
+    { "domain": "switch", "key": "auto_irrigation_enabled", "why": "Retired, hidden; kept for old controllers." },
+    { "domain": "select", "key": "irrigation_phase", "why": "Status, written by the controller." },
+    { "domain": "select", "key": "recipe_stage", "why": "Applies a recipe row to many setpoints: only through the recipe library on Plan > Schedule." },
+    { "domain": "select", "key": "zone_N_set_phase", "why": "A one-time action on the zone page, not a setting." },
+    { "domain": "select", "key": "ec_type_*", "why": "One per EC probe, set on Equipment > Probes." }
+  ],
+  "options": [
+    { "key": "brain_provider", "label": "AI provider", "default": "auto" },
+    { "key": "brain_dry_run", "label": "AI dry run (propose only)", "default": "false" },
+    { "key": "ai_judges", "label": "AI judges that run", "default": "all" },
+    { "key": "anthropic_daily_budget_usd", "label": "AI daily budget (USD)", "default": "1.0" },
+    { "key": "ai_daily_calls", "label": "AI calls a day", "default": "5000" },
+    { "key": "ai_budget_warn_pct", "label": "AI budget warning (%)", "default": "80" },
+    { "key": "anthropic_model", "label": "AI model", "default": "claude-haiku-5-5" },
+    { "key": "anthropic_api_key", "label": "AI key", "default": "empty", "secret": true },
+    { "key": "hold_entities", "label": "Hold entities", "default": "none" },
+    { "key": "feed_ec_sensor", "label": "Feed EC sensor", "default": "none" },
+    { "key": "feed_ph_sensor", "label": "Feed pH sensor", "default": "none" },
+    { "key": "sump_power_sensor", "label": "Sump power sensor", "default": "none" },
+    { "key": "notify_service", "label": "Notification service", "default": "none" },
+    { "key": "notify_min", "label": "Vitals interval (min)", "default": "30" },
+    { "key": "stage_arc", "label": "Stage arc", "default": "slab_default" },
+    { "key": "loop_seconds", "label": "Loop interval (s)", "default": "60" }
+  ]
+}
