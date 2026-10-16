@@ -1,15 +1,9 @@
 import { useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  HistoryChart,
-  number,
-  ReviewDialog,
-  time as clock,
-  type Page,
-} from "@/components/dashboard";
+import { Empty, number, ReviewDialog, time as clock, type Page } from "@/components/dashboard";
 import { BrainOnZone } from "@/components/brain";
+import { HistoryExplorer } from "@/components/history-explorer";
 import { UiTip } from "@/components/info-tip";
 import { ZoneDay } from "@/components/day-timeline";
 import { OverlayRows, useOverlays } from "@/components/overlay-row";
@@ -139,6 +133,7 @@ export function ZonePage({
         )}
       </div>
       <ZoneDay key={zone.id} controller={controller} zone={zone} />
+      <HistoryExplorer key={`explorer-${zone.id}`} controller={controller} zone={zone} />
       <ZoneWhy key={`why-${zone.id}`} controller={controller} zone={zone} />
       {/* The AI on this zone beside the controls; without it the controls take the width. */}
       <div className="zone-page-grid">
@@ -154,16 +149,6 @@ export function ZonePage({
       </Collapsed>
       <Collapsed key={`probes-${zone.id}`} title="Probes used and not used">
         {() => <ZoneProbes controller={controller} zone={zone} navigate={navigate} />}
-      </Collapsed>
-      <Collapsed key={`history-${zone.id}`} title="7-day history">
-        {() => (
-          <HistoryChart
-            controller={controller}
-            zones={[zone]}
-            title="History"
-            ranges={[{ hours: 168, label: "7 days" }]}
-          />
-        )}
       </Collapsed>
       <RecordedBehaviour key={`recorded-${zone.id}`} controller={controller} zone={zone} />
     </div>
