@@ -123,7 +123,7 @@ def restored_state_is_ours(entry, last_state) -> bool:
 # The room climate sensors a setup can map (config_flow, hardware step).
 CLIMATE_SENSORS = ("temperature_sensor", "humidity_sensor", "vpd_sensor")
 # What only the dashboard shows (Settings > Display), set up on its Setup page.
-DISPLAY_SENSORS = ("camera_entity", "co2_sensor", "ppfd_sensor")
+DISPLAY_SENSORS = ("camera_entity", "co2_sensor", "ppfd_sensor", "dli_sensor")
 
 
 def build_engine_config(

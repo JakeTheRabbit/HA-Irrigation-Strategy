@@ -18,6 +18,7 @@ NEW_KEYS = {
     "camera_entity",
     "co2_sensor",
     "ppfd_sensor",
+    "dli_sensor",
     "substrate_temperature_sensors",
 }
 
@@ -38,6 +39,7 @@ async def test_a_room_maps_camera_co2_ppfd_and_a_root_zone_probe(hass, hass_admi
     hass.states.async_set("camera.tent", "idle")
     hass.states.async_set("sensor.tent_co2", "800", {"unit_of_measurement": "ppm"})
     hass.states.async_set("sensor.tent_ppfd", "900", {"unit_of_measurement": "µmol/m²/s"})
+    hass.states.async_set("sensor.tent_dli", "24.5", {"unit_of_measurement": "mol/m²/day"})
     hass.states.async_set("sensor.slab_1_temp", "21.5", {"unit_of_measurement": "°C"})
     assert not NEW_KEYS & set(hass.states.get(DESCRIPTOR).attributes)
     read = await _call(hass, hass_admin_user, "setup_read", {})
@@ -53,6 +55,7 @@ async def test_a_room_maps_camera_co2_ppfd_and_a_root_zone_probe(hass, hass_admi
         "camera_entity": "camera.tent",
         "co2_sensor": "sensor.tent_co2",
         "ppfd_sensor": "sensor.tent_ppfd",
+        "dli_sensor": "sensor.tent_dli",
     }
     await _call(
         hass,
@@ -72,6 +75,7 @@ async def test_a_room_maps_camera_co2_ppfd_and_a_root_zone_probe(hass, hass_admi
     assert descriptor["camera_entity"] == "camera.tent"
     assert descriptor["co2_sensor"] == "sensor.tent_co2"
     assert descriptor["ppfd_sensor"] == "sensor.tent_ppfd"
+    assert descriptor["dli_sensor"] == "sensor.tent_dli"
     assert descriptor["substrate_temperature_sensors"] == {"1": "sensor.slab_1_temp"}
     again = (await _call(hass, hass_admin_user, "setup_read", {}))["rooms"][0]
     assert again["zones"][0]["substrate_temperature_sensor"] == "sensor.slab_1_temp"
@@ -135,3 +139,18 @@ async def test_the_hardware_panel_is_off_and_only_an_administrator_turns_it_on(
         context=Context(user_id=staff.id),
     )
     assert hass.states.get(PANEL).state == "off"
+
+
+async def test_an_untouched_old_setup_save_keeps_dli_unmapped(hass, hass_admin_user):
+    await _upgrade(hass, "entry_3_11_1_pumped_room.json")
+    room = (await _call(hass, hass_admin_user, "setup_read", {}))["rooms"][0]
+    assert not room["hardware"].get("dli_sensor")
+    await _call(hass, hass_admin_user, "setup_save", {
+        "entry_id": room["entry_id"], "expected_revision": room["revision"],
+        "room_name": room["room_name"], "active": room["active"],
+        "zones": room["zones"], "hardware": room["hardware"],
+    })
+    await hass.async_block_till_done()
+    assert "dli_sensor" not in hass.states.get(OLD_DESCRIPTOR).attributes
+    again = (await _call(hass, hass_admin_user, "setup_read", {}))["rooms"][0]
+    assert not again["hardware"].get("dli_sensor")

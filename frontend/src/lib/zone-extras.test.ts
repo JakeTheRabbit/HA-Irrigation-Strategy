@@ -53,3 +53,12 @@ describe("zone page extras", () => {
     ]);
   });
 });
+
+
+it("shows DLI only from the room's optional mapped sensor and preserves its reported unit", () => {
+  expect(climateReadings(put({}), room).some((r) => r.key === "dli")).toBe(false);
+  const states = put({ dli_sensor: "sensor.daily_light" }, sensor("sensor.daily_light", "24.5", "mol/m²/day"));
+  expect(climateReadings(states, room, { dli: [20, 30] })).toContainEqual({
+    key: "dli", label: "DLI", value: 24.5, unit: "mol/m²/day", digits: 1, band: [20, 30],
+  });
+});

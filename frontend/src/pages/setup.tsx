@@ -225,6 +225,7 @@ const hardwareFields = [
   ["camera_entity", "Room camera (display)", "camera"],
   ["co2_sensor", "CO2 (display)", "co2"],
   ["ppfd_sensor", "PPFD (display)", "ppfd"],
+  ["dli_sensor", "Daily light integral (display)", "dli"],
 ] as const;
 export function Setup({
   controller,
@@ -351,7 +352,7 @@ export function Setup({
                     ? /ppm/i.test(c.unit)
                       ? 2
                       : 0
-                    : kind === "ppfd"
+                    : (kind === "ppfd" || kind === "dli")
                       ? /mol/i.test(c.unit)
                         ? 2
                         : 0

@@ -14,7 +14,7 @@ export function dewPoint(celsius: number | null, rh: number | null): number | nu
 }
 
 export interface ClimateReading {
-  key: "temperature" | "humidity" | "vpd" | "dew_point";
+  key: "temperature" | "humidity" | "vpd" | "dew_point" | "dli";
   label: string;
   value: number | null;
   unit: string;
@@ -38,7 +38,8 @@ export function climateReadings(
     typeof mapped[key] === "string" && mapped[key] ? states[String(mapped[key])] : undefined;
   const air = entity("temperature_sensor"),
     humidity = entity("humidity_sensor"),
-    vpd = entity("vpd_sensor");
+    vpd = entity("vpd_sensor"),
+    dli = entity("dli_sensor");
   const unit = String(air?.attributes.unit_of_measurement || "°C");
   const list: ClimateReading[] = [];
   const add = (reading: Omit<ClimateReading, "band">) =>
@@ -56,6 +57,7 @@ export function climateReadings(
       digits: 1,
     });
   }
+  if (dli) add({ key: "dli", label: "DLI", value: numeric(dli), unit: String(dli.attributes.unit_of_measurement || ""), digits: 1 });
   return list;
 }
 

@@ -50,6 +50,7 @@ HARDWARE_DOMAINS = {
     "camera_entity": {"camera"},
     "co2_sensor": {"sensor"},
     "ppfd_sensor": {"sensor"},
+    "dli_sensor": {"sensor"},
 }
 SIZING = {
     "plant_count": (1, 1000, True),
@@ -848,6 +849,7 @@ HARDWARE_WORDS = {
     "camera_entity": "camera",
     "co2_sensor": "CO2 sensor",
     "ppfd_sensor": "PPFD sensor",
+    "dli_sensor": "DLI sensor",
 }
 ZONE_WORDS = {
     "valve": "valve",
