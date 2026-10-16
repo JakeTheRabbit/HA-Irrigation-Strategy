@@ -82,3 +82,29 @@ describe("VWC against its phase", () => {
     });
   });
 });
+
+describe("a reference band and named levels", () => {
+  it("keeps the stage's reference dryback beside the target, quietly", () => {
+    const model = gauge({
+      label: "Last night’s dryback",
+      value: 12,
+      target: 8,
+      reference: [10, 15],
+      unit: "%",
+      points: "%",
+      tolerance: 3,
+    });
+    expect(model.reference).toEqual([10, 15]);
+    expect(gaugeSpeech(model)).toBe(
+      "Last night’s dryback 12%, target 8%, 4% over, reference 10% to 15%",
+    );
+  });
+  it("draws the rescue floor, the re-water point and the peak on the VWC bar", () => {
+    const model = vwcGauge({ value: 56, phase: "P3", rewater: 61, peak: 64, rescue: 35 });
+    expect(model.marks.map((mark) => `${mark.label} ${mark.value}`)).toEqual([
+      "Rescue floor 35",
+      "Re-water 61",
+      "Peak 64",
+    ]);
+  });
+});

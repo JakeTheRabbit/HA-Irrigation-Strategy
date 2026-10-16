@@ -198,6 +198,22 @@ try {
     assert.equal(await chip.count(), 1);
     assert.equal(await chip.getAttribute("data-planning-advice"), "p2");
     assert.match(await chip.innerText(), /late in P2\. Raise the re-water point to [\d.]+%\./);
+    // Kept from the earlier card: the previous grow-day's peak and low, one key for the chart, and
+    // the stage's reference dryback as a muted band.
+    assert.match(
+      await graph.locator("[data-planning-previous]").innerText(),
+      /^Previous grow-day: peak [\d.]+% at \d\d:\d\d · low [\d.]+% at \d\d:\d\d$/,
+    );
+    assert.equal(await graph.getByRole("group", { name: "Chart key" }).count(), 1);
+    assert.match(
+      await graph.getByRole("group", { name: "Chart key" }).innerText(),
+      /Recorded[\s\S]*Target[\s\S]*Shot[\s\S]*Re-water[\s\S]*Reference dryback[\s\S]*Probe gap/,
+    );
+    assert.ok((await graph.locator('[data-planning-line="reference-dryback"]').count()) > 0);
+    assert.match(
+      await graph.locator('[data-gauge="dryback"]').getAttribute("aria-label"),
+      /, reference [\d.]+% to [\d.]+%$/,
+    );
     // The projection is a table: one row per phase.
     assert.deepEqual(await graph.locator(".planning-projection tbody th").allInnerTexts(), [
       "P0 Morning dryback",

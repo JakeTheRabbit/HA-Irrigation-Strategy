@@ -50,7 +50,16 @@ export function QualityChip({ children, ...rest }: HTMLAttributes<HTMLSpanElemen
 }
 
 /** One analog indicator: the value, a bar with its target or band, and the deviation. */
-export function Gauge({ model, id }: { model: GaugeModel; id?: string }) {
+export function Gauge({
+  model,
+  id,
+  marksKey = true,
+}: {
+  model: GaugeModel;
+  id?: string;
+  /** Show the key of the marked levels under the bar (else the row shows it). */
+  marksKey?: boolean;
+}) {
   const span = model.max - model.min || 1;
   const at = (value: number) =>
     `${Math.min(100, Math.max(0, ((value - model.min) / span) * 100))}%`;
@@ -83,6 +92,23 @@ export function Gauge({ model, id }: { model: GaugeModel; id?: string }) {
         {model.value !== null && (
           <span className="hmi-gauge-fill" style={{ width: at(model.value) }} />
         )}
+        {model.reference && (
+          <span
+            className="hmi-gauge-reference"
+            style={{
+              left: at(model.reference[0]),
+              width: `calc(${at(model.reference[1])} - ${at(model.reference[0])})`,
+            }}
+          />
+        )}
+        {model.marks.map((mark) => (
+          <span
+            key={mark.key}
+            className="hmi-gauge-mark"
+            data-mark={mark.key}
+            style={{ left: at(mark.value) }}
+          />
+        ))}
         {model.target !== null && !model.band && (
           <span className="hmi-gauge-target" style={{ left: at(model.target) }} />
         )}
@@ -94,30 +120,51 @@ export function Gauge({ model, id }: { model: GaugeModel; id?: string }) {
             : model.target !== null
               ? `target ${unit(model.target)}`
               : ""}
+          {model.reference &&
+            ` · ref ${fix(model.reference[0], 0)}–${fix(model.reference[1], 0)}${model.unit}`}
         </span>
         <span className="hmi-gauge-words">{model.words}</span>
       </div>
+      {marksKey && <MarksKey model={model} />}
     </div>
   );
 }
 
-/** Up to four gauges in a row; two by two on a phone. */
+function MarksKey({ model }: { model: GaugeModel }) {
+  if (!model.marks.length) return null;
+  return (
+    <p className="hmi-gauge-marks">
+      {model.marks.map((mark) => (
+        <span key={mark.key} data-mark={mark.key}>
+          {mark.label} {fix(mark.value, model.digits)}
+        </span>
+      ))}
+    </p>
+  );
+}
+
+/** Up to four gauges in a row; two by two on a phone. With `marksBelow`, the key of the marked
+ * levels is one line under the whole row instead of under a narrow gauge. */
 export function GaugeRow({
   gauges,
   label,
   className = "",
+  marksBelow = false,
 }: {
   gauges: { id: string; model: GaugeModel }[];
   label: string;
   className?: string;
+  marksBelow?: boolean;
 }) {
+  const marked = gauges.find((item) => item.model.marks.length);
   return (
     <div className={`hmi-gauges-box ${className}`} role="group" aria-label={label}>
       <div className="hmi-gauges">
         {gauges.slice(0, 4).map((item) => (
-          <Gauge key={item.id} id={item.id} model={item.model} />
+          <Gauge key={item.id} id={item.id} model={item.model} marksKey={!marksBelow} />
         ))}
       </div>
+      {marksBelow && marked && <MarksKey model={marked.model} />}
     </div>
   );
 }

@@ -98,6 +98,33 @@
   background: color-mix(in srgb, var(--foreground) 12%, transparent);
   border-inline: 2px solid var(--foreground);
 }
+/* A reference, not a limit: hatched and quiet. */
+.hmi-gauge-reference {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: repeating-linear-gradient(
+    90deg,
+    color-mix(in srgb, var(--foreground) 30%, transparent) 0 2px,
+    transparent 2px 4px
+  );
+}
+.hmi-gauge-mark {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--muted-foreground);
+}
+.hmi-gauge-marks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  margin: 1px 0 0;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
 .hmi-gauge-target {
   position: absolute;
   top: -1px;

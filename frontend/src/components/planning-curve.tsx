@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { UiTip } from "@/components/info-tip";
 import { CheckChip, GaugeRow, QualityChip, StatusLine } from "@/components/hmi";
 import { gauge, probeGaps, valueAt, PROBE_GAP_VWC } from "@/lib/hmi";
+import { referenceDryback } from "@/lib/day-chart";
 import {
   buildPlanningCurve,
   dryRates,
@@ -49,6 +50,8 @@ export interface PlanningCurveProps {
   phase?: string | null;
   /** The pore EC band of the growth stage, when there is one. */
   ecBand?: [number, number] | null;
+  /** The stage's reference overnight dryback, in VWC points, when there is one. */
+  drybackPoints?: [number, number] | null;
 }
 const trim = (value: number | null | undefined, digits = 1) =>
   typeof value === "number" && Number.isFinite(value) ? String(Number(value.toFixed(digits))) : "—";
@@ -72,7 +75,7 @@ const editors = [
 ].map((editor) => ({ ...editor, label: settingWords(editor.key)?.label ?? editor.key }));
 /** Chart geometry: phase names over the plot, the clock under it, then one row of shot ticks. */
 const TOP = 26,
-  HEIGHT = 190,
+  HEIGHT = 172,
   CLOCK_Y = TOP + HEIGHT + 17,
   SHOT_Y = CLOCK_Y + 10,
   SVG_HEIGHT = SHOT_Y + 14;
@@ -91,6 +94,7 @@ export function PlanningCurve({
   zoneName,
   phase,
   ecBand,
+  drybackPoints,
 }: PlanningCurveProps) {
   const limits =
     bounds ??
@@ -159,6 +163,19 @@ export function PlanningCurve({
   const drybackVwc = projection ? projection.drybackVwc : plan.morningDrybackVwc;
   const drybackPeak = projection ? projection.peak : plan.drybackReference;
   const previousDay = vwcRecorded.previous[0] ?? [];
+  // The previous grow-day's peak and low, from its usable readings: a quiet line under the gauges.
+  const previous =
+    previousDay.length > 1
+      ? {
+          peak: previousDay.reduce((a, b) => (b.value > a.value ? b : a)),
+          low: previousDay.reduce((a, b) => (b.value < a.value ? b : a)),
+        }
+      : null;
+  // The stage's reference dryback as VWC levels under the peak, drawn as a muted band overnight.
+  const referenceBand: [number, number] | null =
+    drybackPoints && drybackPeak
+      ? [drybackPeak - drybackPoints[1], drybackPeak - drybackPoints[0]]
+      : null;
   const plotted = (model: PlanningModel | null, projected: PlanningProjection | null) =>
     model
       ? [
@@ -173,6 +190,7 @@ export function PlanningCurve({
       ...plotted(plan, projection),
       ...plotted(saved, savedProjection),
       drybackVwc ?? NaN,
+      ...(referenceBand ?? []),
       ...vwcRecorded.today.map((point) => point.value),
       ...(showEarlier ? previousDay.map((point) => point.value) : []),
     ]);
@@ -345,6 +363,7 @@ export function PlanningCurve({
             value:
               todayPeak && nowVwc ? ((todayPeak - nowVwc.value) / todayPeak) * 100 : null,
             target: parameters.dryback_target,
+            reference: referenceDryback(drybackPoints, todayPeak),
             unit: "%",
             points: "%",
             tolerance: 3,
@@ -473,6 +492,12 @@ export function PlanningCurve({
             </QualityChip>
           )}
         </StatusLine>
+        {previous && (
+          <p className="planning-previous" data-planning-previous>
+            Previous grow-day: peak {trim(previous.peak.value)}% at {at(previous.peak.hour)} · low{" "}
+            {trim(previous.low.value)}% at {at(previous.low.hour)}
+          </p>
+        )}
         {gauges.length > 0 && (
           <GaugeRow className="planning-recorded" gauges={gauges} label="Recorded VWC and EC against the plan" />
         )}
@@ -496,6 +521,22 @@ export function PlanningCurve({
           <i className="key-shot" aria-hidden="true" />
           Shot
         </span>
+        <span>
+          <i className="key-limit" aria-hidden="true" />
+          Re-water, dryback, rescue
+        </span>
+        {referenceBand && (
+          <span>
+            <i className="key-reference" aria-hidden="true" />
+            Reference dryback
+          </span>
+        )}
+        {gaps.length > 0 && (
+          <span>
+            <i className="key-gap" aria-hidden="true" />
+            Probe gap
+          </span>
+        )}
         <span className="planning-legend-toggles">
           {previousDay.length > 1 && (
             <button
@@ -748,6 +789,26 @@ export function PlanningCurve({
                   )}
                 </g>
               )}
+              {referenceBand &&
+                [
+                  [p3.start, 24],
+                  [0, plan.phases[0].end],
+                ].map(([from, to]) => (
+                  <rect
+                    key={from}
+                    data-planning-line="reference-dryback"
+                    x={x(from)}
+                    y={y(referenceBand[1])}
+                    width={Math.max(0, x(to) - x(from))}
+                    height={Math.max(1, y(referenceBand[0]) - y(referenceBand[1]))}
+                    fill="var(--muted-foreground)"
+                    fillOpacity={0.14}
+                  >
+                    <title>
+                      {`Reference dryback for the stage: ${trim(drybackPoints![0])}–${trim(drybackPoints![1])} points under the ${trim(drybackPeak)}% peak (${trim(referenceBand[0])}–${trim(referenceBand[1])}% VWC)`}
+                    </title>
+                  </rect>
+                ))}
               {drybackVwc !== null &&
                 [
                   [p3.start, 24],

@@ -48,6 +48,10 @@ export interface GaugeModel {
   max: number;
   /** Why there is no value, when there is none. */
   quality?: string;
+  /** A muted reference band beside the target (for example the stage's reference dryback). */
+  reference: [number, number] | null;
+  /** Named levels drawn as ticks on the bar, with a quiet key under it. */
+  marks: { key: string; label: string; value: number }[];
 }
 const fix = (value: number, digits: number) => String(Number(value.toFixed(digits)));
 const amount = (value: number, digits: number, points: string) =>
@@ -69,6 +73,8 @@ export function gauge(options: {
   underIsNormal?: boolean;
   quality?: string;
   scale?: [number, number];
+  reference?: [number, number] | null;
+  marks?: { key: string; label: string; value: number | null }[];
 }): GaugeModel {
   const digits = options.digits ?? 1;
   const target = finite(options.target) ? options.target : null;
@@ -78,7 +84,18 @@ export function gauge(options: {
       : null;
   const value = finite(options.value) ? options.value : null;
   const points = options.points ?? "points";
-  const known = [value, target, ...(band ?? [])].filter(finite);
+  const reference =
+    options.reference && options.reference.every(Number.isFinite) ? options.reference : null;
+  const marks = (options.marks ?? []).filter(
+    (mark): mark is { key: string; label: string; value: number } => finite(mark.value),
+  );
+  const known = [
+    value,
+    target,
+    ...(band ?? []),
+    ...(reference ?? []),
+    ...marks.map((mark) => mark.value),
+  ].filter(finite);
   const lo = known.length ? Math.min(...known) : 0;
   const hi = known.length ? Math.max(...known) : 100;
   const pad = Math.max((hi - lo) * 0.25, hi * 0.05, 0.5);
@@ -93,6 +110,8 @@ export function gauge(options: {
     min,
     max,
     quality: options.quality,
+    reference,
+    marks,
   };
   if (value === null)
     return { ...base, deviation: null, state: "no-data", words: options.quality ?? "no reading" };
@@ -135,7 +154,17 @@ export function vwcGauge(options: {
   quality?: string;
 }): GaugeModel {
   const { phase, rewater, peak, rescue } = options;
-  const base = { label: "VWC now", value: options.value, unit: "%", quality: options.quality };
+  const base = {
+    label: "VWC now",
+    value: options.value,
+    unit: "%",
+    quality: options.quality,
+    marks: [
+      { key: "rescue", label: "Rescue floor", value: rescue },
+      { key: "rewater", label: "Re-water", value: rewater },
+      { key: "peak", label: "Peak", value: peak },
+    ],
+  };
   if (phase === "P1" && finite(peak))
     return gauge({ ...base, target: peak, tolerance: 3, underIsNormal: true });
   if (phase === "P2" && finite(rewater) && finite(peak) && peak > rewater)
@@ -152,6 +181,8 @@ export function gaugeSpeech(model: GaugeModel): string {
   if (model.band) parts.push(`band ${unit(model.band[0])} to ${unit(model.band[1])}`);
   else if (model.target !== null) parts.push(`target ${unit(model.target)}`);
   if (model.value !== null && (model.band || model.target !== null)) parts.push(model.words);
+  if (model.reference)
+    parts.push(`reference ${unit(model.reference[0])} to ${unit(model.reference[1])}`);
   return parts.join(", ");
 }
 

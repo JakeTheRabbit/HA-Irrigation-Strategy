@@ -619,6 +619,7 @@ export function Strategy({
             zoneName={sensorZone?.name}
             phase={sensorZone?.phase}
             ecBand={readJev(states, room.room.prefix).room?.stage?.poreEc ?? null}
+            drybackPoints={readJev(states, room.room.prefix).room?.stage?.drybackPoints ?? null}
             parameters={preview.draft.parameters}
             lightsOn={preview.draft.lightsOn}
             lightsOff={preview.draft.lightsOff}

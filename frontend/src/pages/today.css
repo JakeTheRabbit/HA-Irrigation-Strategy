@@ -193,7 +193,7 @@
   position: relative;
   display: grid;
   align-content: start;
-  gap: 10px;
+  gap: 7px;
   min-width: 0;
   padding: 15px 18px 14px;
   border: 1px solid color-mix(in srgb, var(--border) 75%, transparent);
@@ -275,7 +275,7 @@
   display: block;
   width: 100%;
   min-width: 0;
-  height: 36px;
+  height: 28px;
   overflow: visible;
 }
 .today-spark path {
@@ -301,8 +301,8 @@
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 5px 14px;
-  margin: 2px 0 0;
-  padding-top: 10px;
+  margin: 0;
+  padding-top: 7px;
   border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   font-size: var(--text-sm);
   line-height: 1.45;

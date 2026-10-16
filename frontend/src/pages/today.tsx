@@ -627,6 +627,7 @@ function ZoneCard({
         className="moisture-bar today-gauges"
         gauges={gauges}
         label={`${zone.name} VWC and pore EC`}
+        marksBelow
       />
       <dl className="today-zone-facts">
         <div>

@@ -454,6 +454,11 @@ try {
         await card.locator('[data-gauge="pore-ec"]').getAttribute("aria-label"),
         /^Pore EC [\d.]+, band 3\.5 to 6, /,
       );
+      // The levels the bar marks keep their key: rescue floor, re-water point and peak.
+      assert.match(
+        await card.locator(".hmi-gauge-marks").innerText(),
+        /^Rescue floor [\d.]+\s+Re-water [\d.]+\s+Peak [\d.]+$/,
+      );
       const facts = await card.locator(".today-zone-facts").innerText();
       assert.match(facts, /Water\s+[\d.]+ (mL|L)\/plant · (≈ the room|[\d.]+× the room)/);
       assert.match(facts, /Last shot\s+\S/);
@@ -620,7 +625,10 @@ try {
       const speech = (id) => day.locator(`[data-gauge="${id}"]`).getAttribute("aria-label");
       assert.match(await speech("vwc"), /^VWC now [\d.]+%, /);
       assert.match(await speech("peak"), /^Peak today [\d.]+%, target [\d.]+%, /);
-      assert.match(await speech("dryback"), /dryback (no reading|[\d.]+%), target [\d.]+%/);
+      assert.match(
+        await speech("dryback"),
+        /dryback (no reading|[\d.]+%), target [\d.]+%.*, reference [\d.]+% to [\d.]+%$/,
+      );
       assert.match(await speech("pore-ec"), /^Pore EC 2\.8, band 3\.5 to 6, 0\.7 mS\/cm under$/);
       assert.equal(await day.locator('[data-gauge="pore-ec"]').getAttribute("data-state"), "abnormal");
       const numbers = await day.locator(".zone-numbers").innerText();
