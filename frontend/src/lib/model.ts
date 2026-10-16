@@ -500,6 +500,7 @@ export function buildRoom(states: States, room: Room): RoomView {
     ? configuredIds.filter((id) => (config!.attributes.active_zone_ids as unknown[]).includes(id))
     : configuredIds;
   const names = config?.attributes.zone_names as Record<string, unknown> | undefined;
+  const cultivars = config?.attributes.zone_cultivars as Record<string, unknown> | undefined;
   const valves = config?.attributes.valves;
   const activeSwitch = room.id ? states[roomActiveId(room)] : undefined;
   const roomActive = !room.id || roomIsActive(states, room);
@@ -567,6 +568,10 @@ export function buildRoom(states: States, room: Room): RoomView {
     return {
       id,
       name: typeof names?.[id] === "string" ? String(names[id]) : "Zone " + id,
+      cultivar:
+        typeof cultivars?.[id] === "string" && String(cultivars[id]).trim()
+          ? String(cultivars[id]).trim()
+          : null,
       enabledEntity: enabled?.entity_id || null,
       enabled: boolean(enabled),
       setPhaseEntity: setPhase?.entity_id || null,

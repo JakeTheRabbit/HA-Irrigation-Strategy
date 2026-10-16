@@ -601,6 +601,7 @@ function ZoneCard({
             }}
           >
             {zone.name}
+            {zone.cultivar && <span className="zone-cultivar">{zone.cultivar}</span>}
             <ChevronRight size={17} aria-hidden="true" className="today-zone-go" />
           </a>
         </h2>

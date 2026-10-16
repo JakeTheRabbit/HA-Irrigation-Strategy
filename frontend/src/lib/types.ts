@@ -47,6 +47,8 @@ export interface Choice {
 export interface Zone {
   id: number;
   name: string;
+  /** The cultivar label the operator gave the zone in setup; null or absent for none. */
+  cultivar?: string | null;
   enabledEntity: string | null;
   enabled: boolean | null;
   /** The zone's Set Phase select: the controller moves the zone to a phase picked there, once.

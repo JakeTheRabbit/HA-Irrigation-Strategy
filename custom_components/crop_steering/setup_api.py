@@ -224,6 +224,16 @@ def _name(value):
     return value.strip()
 
 
+def _cultivar(value):
+    """A zone's cultivar label: free text of up to 40 characters, "" for none. A label only: nothing reads it to
+    decide anything."""
+    if value is None:
+        return ""
+    if not isinstance(value, str) or len(value.strip()) > 40:
+        raise ValueError("A cultivar must contain at most 40 characters")
+    return value.strip()
+
+
 def _entity(hass, eid, domains, kind=None):
     if domains is ACTUATOR_DOMAINS and isinstance(eid, str) and "." in eid:
         domain = eid.split(".")[0]
@@ -390,6 +400,11 @@ def prepare_setup(hass, payload, old=None, entry_id=None):
             name=_name(row.get("name") or prior.get("name") or f"Zone {z}"),
             active=enabled,
         )
+        cultivar = _cultivar(row.get("cultivar", prior.get("cultivar")))
+        if cultivar:
+            prior["cultivar"] = cultivar
+        else:
+            prior.pop("cultivar", None)
         valve = row.get("valve", prior.get("zone_switch", ""))
         if valve:
             _entity(hass, valve, ACTUATOR_DOMAINS)
@@ -535,6 +550,7 @@ def configuration_payload(data):
             {
                 "id": int(key),
                 "name": zone.get("name", f"Zone {key}"),
+                "cultivar": zone.get("cultivar", ""),
                 "active": zone.get("active", True),
                 "valve": zone.get("zone_switch", ""),
                 **{
@@ -605,6 +621,7 @@ def setup_room(hass, entry):
             {
                 "id": z,
                 "name": cfg.get("name", f"Zone {z}"),
+                "cultivar": cfg.get("cultivar", ""),
                 "active": cfg.get("active", True),
                 "valve": cfg.get("zone_switch", ""),
                 **{
@@ -743,6 +760,22 @@ def _choice_only(payload, old):
     )
 
 
+def _labels_only(data, old):
+    """The saved setup differs from the stored one in zone names and cultivars only: labels, which the controller
+    reads as display text and never adopts (it needs no new setup revision, and the room keeps watering).
+    """
+
+    def bare(setup):
+        setup = deepcopy(setup)
+        for zone in (setup.get("zones") or {}).values():
+            if isinstance(zone, dict):
+                zone.pop("name", None)
+                zone.pop("cultivar", None)
+        return setup
+
+    return bare(data) == bare(old)
+
+
 async def save_setup(hass, payload):
     entry = _selected(hass, payload)
     old = effective(entry)
@@ -750,7 +783,7 @@ async def save_setup(hass, payload):
     # Choosing which probes count and which leads, and nothing else, can be done while watering. It
     # keeps the setup revision: a new one is a setup the controller takes on only with the engine
     # switched off, and the room would stop watering until someone did.
-    choice = _choice_only(payload, old)
+    choice = _choice_only(payload, old) or _labels_only(data, old)
     blockers = [] if choice else safety_blockers(hass, entry, data)
     if blockers:
         raise ValueError("; ".join(blockers))

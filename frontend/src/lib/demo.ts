@@ -61,6 +61,7 @@ export function createDemo(now = Date.now()): States {
       prefix,
       slug: index === 0 ? "" : "room_b",
       num_zones: 3,
+      ...(index === 0 ? { zone_cultivars: { 1: "Gelato 41", 2: "Blue Dream" } } : {}),
       friendly_name: `${name} engine config`,
       enable_flag: enable,
       pump: `switch.demo_${prefix}pump`,

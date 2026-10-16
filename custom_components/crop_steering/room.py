@@ -193,7 +193,15 @@ def build_engine_config(
     # reads it with "generic" as the default and adopts it with no disarm cycle: it is not one of
     # the keys the setup fingerprint reads.
     grown_in = {"substrate": substrate} if substrate else {}
+    # A cultivar label per zone, display only; only a room with one publishes the key, so a room without
+    # labels publishes the descriptor it always did.
+    cultivars = {
+        str(z): label
+        for z in range(1, int(num_zones) + 1)
+        if (label := (zones.get(str(z)) or zones.get(z) or {}).get("cultivar"))
+    }
     return {
+        **({"zone_cultivars": cultivars} if cultivars else {}),
         **declared,
         **versions,
         **which,
