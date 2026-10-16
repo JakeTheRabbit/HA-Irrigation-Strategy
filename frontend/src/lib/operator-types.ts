@@ -1,4 +1,7 @@
 export type OperatorAction =
+  | "history_connection_get"
+  | "history_connection_save"
+  | "history_long"
   | "runs_get"
   | "runs_save"
   | "runs_archive"
@@ -18,6 +21,7 @@ export type OperatorAction =
   | "setup_remove"
   | "setup_commission"
   | "test_shot"
+  | "stop_all"
   | "stock_get"
   | "stock_save"
   | "stock_refill"
@@ -36,7 +40,13 @@ export type OperatorAction =
   | "brain_prompt_get"
   | "brain_prompt_save"
   | "brain_prompt_rollback"
-  | "brain_prompt_rebuild";
+  | "brain_prompt_rebuild"
+  | "grow_days_get"
+  | "grow_days_backfill"
+  | "harvests_get"
+  | "runs_set_harvest"
+  | "display_get"
+  | "display_save";
 
 export interface ParameterLimit {
   value: number | null;
@@ -51,6 +61,8 @@ export interface SteeringProfile {
   name: string;
   vegetative: Record<string, number>;
   generative: Record<string, number>;
+  /** Climate and feed bands for reference only (lib/plan-reference.ts); absent when none. */
+  reference?: Partial<Record<string, [number, number]>>;
 }
 export interface ScheduleBlock {
   start_day: number;
@@ -113,6 +125,8 @@ export interface StrategyDocument {
 export interface SetupZone {
   id: number;
   name: string;
+  /** A free-text cultivar label, "" for none. A label only. Absent from an older integration. */
+  cultivar?: string;
   active: boolean;
   valve: string;
   vwc_sensors: string[];
@@ -121,12 +135,18 @@ export interface SetupZone {
   substrate_volume?: number;
   drippers_per_plant?: number;
   dripper_flow_rate?: number;
+  /** The zone's own leaf temperature sensor for the plant-stress card ("" none); absent from an older
+   * integration. Display only. */
+  leaf_temperature_sensor?: string;
   /** Mapped probes that do not count towards the zone's reading, and the primary one ("" none):
    * the Probes page's choice. Absent from an older integration. */
   vwc_unused?: string[];
   vwc_primary?: string;
   ec_unused?: string[];
   ec_primary?: string;
+  /** The zone's root-zone temperature probe, for the dashboard only ("" none). Absent from an
+   * older integration. */
+  substrate_temperature_sensor?: string;
 }
 export interface SetupRoom {
   entry_id: string;
@@ -138,7 +158,8 @@ export interface SetupRoom {
   num_zones: number;
   active_zone_ids: number[];
   zones: SetupZone[];
-  hardware: Record<string, string | number>;
+  /** Each mapping; ac_entities and dehumidifier_entities are lists (the runoff estimator's units). */
+  hardware: Record<string, string | number | string[]>;
   /** Declared plumbing layout; "" (or absent, from an older integration) when never declared. */
   plumbing?: string;
   /** What the SAVED switches imply: a prefill for a room that never declared, never stored. */

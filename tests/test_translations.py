@@ -144,7 +144,6 @@ def test_a_field_nothing_reads_does_not_promise_that_something_will():
     who reads 'forced closed during a shot' will plumb a recirculating system around it.
     """
     promised = {
-        "waste_switch": ("forced closed", "closed during a shot"),
         "notification_service": ("where alerts go",),
     }
     strings = _strings()
@@ -160,15 +159,22 @@ def test_a_field_nothing_reads_does_not_promise_that_something_will():
                     claim not in tooltip
                 ), f"{flow}.{step}.{key} still claims '{claim}'"
     # The room climate sensors are read now (the engine descriptor, for the dashboard's history
-    # chart) and by nothing else: their tooltips say both.
+    # chart, and the controller's opt-in water-and-VPD record) and never water: their tooltips say so.
     for key in ("temperature_sensor", "humidity_sensor", "vpd_sensor"):
-        assert _runtime_consumers(key) == ["room.py"], key
+        assert _runtime_consumers(key) == ["controller.py", "room.py"], key
         for flow, step in (("config", "hardware"), ("options", "edit_zones_map")):
             tooltip = strings[flow]["step"][step]["data_description"][key]
-            assert "history chart" in tooltip and "controller does not use" in tooltip
+            assert "history chart" in tooltip and "never waters from" in tooltip
+            assert "Water vs VPD" in tooltip
             assert "analytics" not in tooltip.lower()
-    waste = strings["config"]["step"]["hardware"]["data_description"]["waste_switch"]
-    assert "does NOT operate" in waste
+    # The waste valve is read now (the engine descriptor), and only under the room's waste valve rule, which is
+    # Off until chosen: its tooltip says so, and never that it is closed whatever the rule.
+    assert _runtime_consumers("waste_switch") == ["room.py", "safety_ops.py"]
+    for flow, step in (("config", "hardware"), ("options", "edit_zones_map")):
+        waste = strings[flow]["step"][step]["data_description"]["waste_switch"]
+        assert "By default the controller does not operate this valve" in waste
+        assert "Close for each shot" in waste and "never opens it" in waste
+        assert "forced closed" not in waste.lower()
     # The grow light is read now (the engine descriptor; the controller checks it against the hours): its tooltip
     # says that, and that day and night still come from the hours.
     for flow, step in (("config", "hardware"), ("options", "edit_zones_map")):

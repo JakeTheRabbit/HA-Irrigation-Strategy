@@ -53,6 +53,15 @@ def plant_number(value):
     return int(result)
 
 
+def cultivar(value):
+    """A run zone's cultivar label: None for none (and for every run saved before it existed)."""
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None
+    if not isinstance(value, str) or len(value.strip()) > 40:
+        raise ValueError("A cultivar must contain at most 40 characters")
+    return value.strip()
+
+
 def normalize_record(raw, room_id):
     if not isinstance(raw, dict) or raw.get("room_id") != room_id:
         raise ValueError("Run belongs to another room")
@@ -103,6 +112,7 @@ def normalize_record(raw, room_id):
             {
                 "zone_id": zid,
                 "name": bounded_text(zone.get("name"), "Zone name"),
+                "cultivar": cultivar(zone.get("cultivar")),
                 **sensors,
                 "plant_count": (
                     None
@@ -308,6 +318,7 @@ class RunStore:
                 {
                     "zone_id": zid,
                     "name": entry_zone.get("name") or f"Zone {zid}",
+                    "cultivar": cultivar(entry_zone.get("cultivar")),
                     **sensors,
                     "plant_count": plant_count,
                     "parameters": params,
@@ -372,6 +383,15 @@ class RunStore:
                         start_date=raw["start_date"],
                         end_date=raw.get("end_date") or None,
                     )
+                    # A zone's cultivar can be corrected later; nothing else of the reference changes.
+                    labels = {
+                        z.get("zone_id"): z["cultivar"]
+                        for z in raw.get("zones") or []
+                        if isinstance(z, dict) and "cultivar" in z
+                    }
+                    for zone in existing["zones"]:
+                        if zone["zone_id"] in labels:
+                            zone["cultivar"] = cultivar(labels[zone["zone_id"]])
                 else:
                     values.append(self.capture(raw))
             elif action == "runs_archive":

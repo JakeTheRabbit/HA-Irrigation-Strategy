@@ -1,3 +1,4 @@
+import { demoDisplay } from "./display";
 import type { DailyRanges, HistoryRequest, HistoryWindow, RunsDocument } from "./comparison-types";
 import { demoHistoryWindow } from "./comparison-demo";
 import type { TimelineRequest } from "./day-timeline";
@@ -91,6 +92,8 @@ export class ControllerStore {
     this.connection = demo ? "demo" : "connecting";
     const search =
       typeof window !== "undefined" ? new URLSearchParams(window.location.search) : null;
+    // ?display=show_climate,today_tank_readout (or all): those display options on in the demo.
+    if (demo) this.states = demoDisplay(this.states, search?.get("display") ?? null);
     if (demo)
       this.operatorDemo = new OperatorDemo(
         () => this.states,
@@ -494,7 +497,11 @@ export class ControllerStore {
       action.startsWith("stock_") ||
       action.startsWith("calibration_") ||
       action.startsWith("dosing_") ||
-      action.startsWith("brain_");
+      action.startsWith("brain_") ||
+      action.startsWith("grow_days_") ||
+      action.startsWith("harvests_") ||
+      action.startsWith("display_") ||
+      action.startsWith("history_");
     const payload = scoped ? { ...data, room_id: roomId } : data;
     if (scoped && !roomId) throw new Error("Select an available room.");
     // What's new's record and a test push change nothing a refresh would show, and must neither
@@ -513,6 +520,11 @@ export class ControllerStore {
         "dosing_get",
         "notify_get",
         "notify_test",
+        "history_connection_get",
+        "history_long",
+        "grow_days_get",
+        "harvests_get",
+        "display_get",
       ].includes(action);
     if (mutation && this.writing) throw new Error("Another change is still being applied.");
     if (mutation) this.writing = true;
@@ -526,7 +538,8 @@ export class ControllerStore {
         throw new Error(
           "Room or connection changed; response is unconfirmed. Reload before retrying.",
         );
-      if (action.startsWith("runs_")) {
+      // A harvest is kept beside the run records, not in them (runs_set_harvest answers the harvests).
+      if (action.startsWith("runs_") && action !== "runs_set_harvest") {
         const document = result as RunsDocument;
         if (
           document.room_id !== roomId ||
@@ -581,7 +594,7 @@ export class ControllerStore {
       const args = { ...request, signal: abort.signal };
       const result = this.demo
         ? await demoHistoryWindow(args)
-        : await this.client!.historyWindow(args);
+        : await this.client!.historyWindow(args, roomId);
       if (generation !== this.generation || roomId !== this.roomId || abort.signal.aborted)
         throw new Error("Room or range changed; history request cancelled.");
       return result;
@@ -677,6 +690,11 @@ export class ControllerStore {
       ...room.zones.flatMap((zone) => (zone.valveEntity ? [zone.valveEntity] : [])),
       // The tank and pump its descriptor maps, charted on Equipment › Tank & feed.
       ...Object.values(TANK_KEYS).flatMap((key) => {
+        const id = mapped?.[key];
+        return typeof id === "string" && id ? [id] : [];
+      }),
+      // The main line and the lights: History › Timeline's equipment lanes (Settings › Display).
+      ...(["mainline", "light_entity"] as const).flatMap((key) => {
         const id = mapped?.[key];
         return typeof id === "string" && id ? [id] : [];
       }),

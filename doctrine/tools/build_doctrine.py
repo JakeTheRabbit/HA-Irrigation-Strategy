@@ -65,7 +65,8 @@ def resolve_paths(a):
     p = {"core": repo / "crop-steering-engine/src/crop_steering_engine/core.py", "controller": ctrls[0],
          "jev": pkg / "brain" / "doctrine.py", "brain": pkg / "brain", "bridge": pkg / "brain_bridge.py",
          "auto": pkg / "auto_setpoints.py", "numbers": repo / "custom_components/crop_steering/number.py",
-         "controller_copy": pkg / "doctrine", "dashboard_arcs": repo / "frontend/src/lib/generated/arcs.json"}
+         "controller_copy": pkg / "doctrine", "dashboard_arcs": repo / "frontend/src/lib/generated/arcs.json",
+         "dashboard_rules": repo / "frontend/src/lib/generated/rules.json"}
     for k in p:
         v = getattr(a, k)
         if v:
@@ -372,7 +373,7 @@ def engine_facts(doc, paths):
         ("CT-11", "dryback_target is read from vegetative_dryback_target or generative_dryback_target by the zone's steering mode; the integration's p0_dryback_drop_percent setting is not read by the controller.",
          "_dryback_target\"" in ctrl and "{'vegetative' if veg else 'generative'}_dryback_target" in ctrl
          and "p0_dryback_drop" not in ctrl and '"p0_dryback_drop_percent"' in nums),
-        ("CT-12", f"Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity follows the zone's highest counted reading of this grow-day or the one before, and the P1 target the highest reading of the grow-day before (no higher than field capacity); when field capacity moves by {shift if shift is not None else 0:g} point or more, the P2 re-water threshold moves by the same points, down as well as up. Each of the three moves at most {step if step is not None else 0:g} point a grow-day, counted from where it stood, so a drifting probe or a flood drags the ladder no further than that a day and an edit by hand is moved from, never undone; all within the engine's bounds and each number's own min and max. The readings counted are the trusted ones outside a day the table backed up (CS-310), and a zone without a usable probe is not followed. The rescue floor (the P3 emergency threshold) is the operator's and never moves. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity): then field capacity alone moves if that is valid (CT-13 says when the learner writes the threshold itself).",
+        ("CT-12", f"Auto Setpoints is an opt-in room switch (the controller reads a missing one as off) that lets the controller rewrite a zone's own per-zone targets, never while a grow plan owns the room. With it on, every loop: field capacity follows the zone's highest counted reading of this grow-day or the one before, and the P1 target the highest reading of the grow-day before (no higher than field capacity); when field capacity moves by {shift if shift is not None else 0:g} point or more, the P2 re-water threshold moves by the same points, down as well as up. Each of the three moves at most the room's Max setpoint move per day (default, and the fallback when it cannot be read, {step if step is not None else 0:g} point; 0 = no limit) a grow-day, counted from where it stood, and the room may make that limit hold the learner and the AI assistant's targets power too, on one shared ledger; so a drifting probe or a flood drags the ladder no further than that a day and an edit by hand is moved from, never undone; all within the engine's bounds and each number's own min and max. The readings counted are the trusted ones outside a day the table backed up (CS-310), and a zone without a usable probe is not followed. The rescue floor (the P3 emergency threshold) is the operator's and never moves. Nothing is written until a lights-on has kept the day before's peak, nor anything that would leave the ladder inverted (rescue floor + 3 <= threshold < P1 target <= field capacity): then field capacity alone moves if that is valid (CT-13 says when the learner writes the threshold itself).",
          shift == 1.0 and step == 1.0 and 'if not self._on(f"' in follow and '{room.prefix}auto_setpoints", False):' in follow
          and 'getattr(room, "strategy_required", False)' in follow
          and 'return max((st.get("fc_follow") or {}).get("peak") or 0.0, prev), prev' in ctrl and "if prev is None or prev <= 0.0:" in ctrl
@@ -380,7 +381,9 @@ def engine_facts(doc, paths):
          and 'target = bounded("p1_target_vwc", p.p1_target, min(yday, fc))' in follow
          and 'new_thr = bounded("p2_vwc_threshold", thr, thr + delta) if abs(delta) >= _profile(room)["fc_shift_min"] else thr' in follow
          and "rescue = p.p3_emergency_floor" in follow and "if rescue + 3.0 <= new_thr < target <= fc:" in follow
-         and "left = max(0.0, FC_STEP_MAX - used.get(suffix, 0.0))" in follow and blind_follow is None
+         and "left = max(0.0, limit - used.get(suffix, 0.0))" in follow and "limit = self._step_limit(room)" in follow
+         and "return phase_options.step_limit(value, FC_STEP_MAX)" in ctrl and "def _step_allowance(" in ctrl
+         and blind_follow is None
          and 'if ha_get(entity)[0] in (None, "unknown", "unavailable", ""):' in ctrl),
         ("CT-13", "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge holds it (with one running and able to act, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12; from the first loop the brain cannot act, in dry run, with its budget spent, paused, unavailable or its key refused, the learner writes the threshold again until a lights-on at which the brain can act). With the room's set_targets_from_achievable power on and the brain able to act, neither the learner nor the follower of CT-12 writes field capacity, the P1 target or the threshold: the brain sets them (BR-8). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.",
          'want = auto_setpoints.wanted(learn, current, snap.vwc, st["phase"], ctx, others=judged)' in ctrl
@@ -794,6 +797,46 @@ def dashboard_arcs(doc):
                      for k in arc_keys(doc)}}
 
 
+def setting_keys(text):
+    """The integration setting keys a param_map row names: the words before its first " (", split on " | ", with
+    "name_p0..p2" spelled out; [] when the row names no setting (fixed, or a helper made by hand)."""
+    head = text.split(" (", 1)[0]
+    keys = []
+    for part in head.split(" | "):
+        part = part.strip()
+        m = re.fullmatch(r"([a-z0-9_]+_p)(\d)\.\.p(\d)", part)
+        if m:
+            keys += [f"{m[1]}{i}" for i in range(int(m[2]), int(m[3]) + 1)]
+        elif re.fullmatch(r"[a-z][a-z0-9_]*", part) and "_" in part:
+            keys.append(part)
+    return keys
+
+
+def dashboard_rules(doc, facts):
+    """The trimmed rules the dashboard's Help > Rules tab reads: each rule's id, topic, text and evidence, the engine
+    params it names, and per param the setting keys it is read from and the engine's bounds for it."""
+    rows = {}
+    for key, text in doc["param_map"].items():
+        if key.startswith("_"):
+            continue
+        settings = setting_keys(text)
+        names = [key]
+        if "/" in key:  # ec_target_p0/p1/p2
+            stem = key.split("/")[0].rsplit("_", 1)[0]
+            names = [f"{stem}_{p}" for p in key[len(stem) + 1:].split("/")]
+        for name in names:
+            phase = name.rsplit("_", 1)[-1] if "/" in key else None
+            own = [k for k in settings if phase is None or k.endswith(phase)]
+            bounds = facts["param_bounds"].get(name)
+            rows[name] = {"settings": own, "bounds": list(bounds) if bounds else None, "note": text}
+    return {
+        "doctrine_version": doc["doctrine_version"],
+        "rules": [{"id": r["id"], "topic": r["topic"], "priority": r["priority"], "text": r["text"],
+                   "evidence": r["evidence"], "params": r.get("params", [])} for r in doc["rules"]],
+        "params": rows,
+    }
+
+
 def estimate_tokens(text):
     # No tokenizer offline: bracket with two common English heuristics for Claude-family tokenizers.
     return {"chars": len(text), "words": len(text.split()), "tokens_est_low": round(len(text) / 4.0),
@@ -836,6 +879,7 @@ def main():
         ap.add_argument(f"--{k}")
     ap.add_argument("--controller-copy", dest="controller_copy", help="the controller's copy of compiled/")
     ap.add_argument("--dashboard-arcs", dest="dashboard_arcs", help="the dashboard's copy of the stage arcs (JSON)")
+    ap.add_argument("--dashboard-rules", dest="dashboard_rules", help="the dashboard's trimmed rules (JSON)")
     ap.add_argument("--private-denylist", default=os.environ.get("DOCTRINE_PRIVATE_DENYLIST"))
     ap.add_argument("--private-skip", metavar="REASON", help="only where no secret exists (a fork pull request, a "
                     "contributor's machine): skip the private list, and say so")
@@ -935,6 +979,18 @@ def main():
         print(f"dashboard arcs: {'checked' if a.check else 'written'} ({board})")
     else:
         print("dashboard arcs: no dashboard source, skipped")
+    rules_file = Path(paths["dashboard_rules"])
+    if rules_file.parent.parent.is_dir():
+        text = json.dumps(dashboard_rules(doc, facts), indent=1, ensure_ascii=False) + "\n"
+        if a.check:
+            if not rules_file.exists() or rules_file.read_bytes() != text.encode("utf-8"):
+                problems.append(f"dashboard rules differ: {rules_file} (run tools/build_doctrine.py)")
+        else:
+            rules_file.parent.mkdir(exist_ok=True)
+            rules_file.write_text(text, encoding="utf-8", newline="\n")
+        print(f"dashboard rules: {'checked' if a.check else 'written'} ({rules_file})")
+    else:
+        print("dashboard rules: no dashboard source, skipped")
 
     # Report only, never written to a generated file: which code this run was checked against.
     checked = {k: sha(paths[k])[:12] for k in ("core", "controller", "bridge", "auto", "numbers")}

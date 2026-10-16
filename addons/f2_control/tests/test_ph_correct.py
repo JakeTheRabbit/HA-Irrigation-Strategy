@@ -181,6 +181,31 @@ def test_a_dose_that_does_not_move_the_ph_stops_alerts_and_locks(build):
     assert presses(r) == ["button.balance_start"] * 2
 
 
+@pytest.mark.parametrize("state", ["unknown", "unavailable", None])
+def test_an_unreadable_switch_keeps_the_fault_locked_after_recovery(build, state):
+    r = build()
+    r.moves = [0.02]
+    minutes(r, 7)
+    latch = ph_block(r)["latch"]
+    assert latch is not None
+    if state is None:
+        del r.fake.states[SWITCH]
+    else:
+        r.set(SWITCH, state)
+    minutes(r, 2)
+    assert ph_block(r)["latch"] == latch
+    r.set(SWITCH, "on")
+    minutes(r, 10)
+    assert presses(r) == ["button.balance_start"]
+    assert ph_block(r)["latch"] == latch
+    r.set(SWITCH, "off")
+    minutes(r, 2)
+    assert ph_block(r)["latch"] is None
+    r.set(SWITCH, "on")
+    minutes(r, 7)
+    assert presses(r) == ["button.balance_start"] * 2
+
+
 def test_a_new_fill_unlocks_it(build):
     r = build()
     r.moves = [0.02]

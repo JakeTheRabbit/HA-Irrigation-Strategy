@@ -1,0 +1,1 @@
+[{"id":"LF-87","entity":"history_connection.source","kind":"option","scope":"room","default":"recorder","group":"History and records","label":"Long history source","help":"Use a tested read-only InfluxDB connection for room history; Recorder remains the default."}]

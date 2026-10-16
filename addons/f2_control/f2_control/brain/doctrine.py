@@ -111,8 +111,8 @@ RULES = {
              "maintenance shots once the controller and the probe are verified.", ROCKWOOL),
         Rule("Change one irrigation variable at a time and watch its effect over a full light-dark cycle before "
              "changing another.", SLAB),
-        Rule("Runoff must be caught at representative plants or slabs in each zone, never inferred from how long "
-             "the pump ran.", SLAB),
+        Rule("Runoff is measured by a catch at representative plants or slabs in each zone; an estimate from the "
+             "sump pump's runs is a room-wide hint with an error band, never a catch.", SLAB),
         Rule("Slabs that behave unevenly across a room point to dripper flow or placement: flush and check the "
              "lines and match the dripper count to the slab.", ROCKWOOL),
     ],

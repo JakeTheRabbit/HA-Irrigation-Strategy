@@ -9,7 +9,14 @@ import type { RunRecord, RunsDocument } from "@/lib/comparison-types";
 import type { Controller } from "@/lib/types";
 import "./run-records.css";
 
-type Form = { id?: string; name: string; start_date: string; end_date: string };
+type Form = {
+  id?: string;
+  name: string;
+  start_date: string;
+  end_date: string;
+  /** Editing a run: each zone's cultivar label, which can be corrected later. */
+  zones?: { zone_id: number; name: string; cultivar: string }[];
+};
 const errorText = (error: unknown) =>
   error instanceof Error ? error.message : "Run records request failed.";
 
@@ -239,6 +246,25 @@ export function RunRecords({
               onChange={(event) => setForm({ ...form, end_date: event.target.value })}
             />
           </div>
+          {form.zones?.map((zone, index) => (
+            <div className="run-records-field" key={zone.zone_id}>
+              <label htmlFor={`run-record-cultivar-${zone.zone_id}`}>{zone.name} · cultivar</label>
+              <Input
+                id={`run-record-cultivar-${zone.zone_id}`}
+                aria-label={`${zone.name} cultivar`}
+                maxLength={40}
+                value={zone.cultivar}
+                onChange={(event) =>
+                  setForm({
+                    ...form,
+                    zones: form.zones!.map((z, i) =>
+                      i === index ? { ...z, cultivar: event.target.value } : z,
+                    ),
+                  })
+                }
+              />
+            </div>
+          ))}
           <p className="small run-records-wide">
             {form.id
               ? "Changing the name or dates preserves the original reference, sensors, plants and lights schedule."
@@ -294,7 +320,8 @@ export function RunRecords({
                 <summary>Registered zones and probes</summary>
                 {run.zones.map((zone) => (
                   <p className="small" key={zone.zone_id}>
-                    {zone.name} · plants at registration: {zone.plant_count ?? "unknown"} · VWC{" "}
+                    {zone.name}
+                    {zone.cultivar ? ` (${zone.cultivar})` : ""} · plants at registration: {zone.plant_count ?? "unknown"} · VWC{" "}
                     {zone.vwc_sensor || "unavailable"} · EC {zone.ec_sensor || "unavailable"}
                   </p>
                 ))}
@@ -310,6 +337,11 @@ export function RunRecords({
                     name: run.name,
                     start_date: run.start_date,
                     end_date: run.end_date || "",
+                    zones: run.zones.map((zone) => ({
+                      zone_id: zone.zone_id,
+                      name: zone.name,
+                      cultivar: zone.cultivar ?? "",
+                    })),
                   });
                   setFormError(null);
                 }}

@@ -26,6 +26,10 @@ from .const import (
     RECIPE_PARAMS,
     SOFTWARE_VERSION,
     SET_PHASE_OPTIONS,
+    SETPOINT_STEP_SCOPES,
+    P2_MODES,
+    RUNOFF_ESTIMATOR_MODES,
+    SHOT_CHECK_MODES,
     SUBSTRATES,
     WATER_TODAY_VIEWS,
 )
@@ -89,11 +93,33 @@ SELECT_DESCRIPTIONS = [
     # The room's no-touch window: while it runs the AI assistant asks nothing and changes nothing
     # in the room, and the rules carry on. `since` says when it was chosen; the controller sets it
     # back to Off once the hour, the day or the night is over. Off until someone chooses.
+    # Which automatic writers the room's Max setpoint move per day holds: the Auto setpoints follower
+    # only (the default, as before), or the AI assistant's targets power and the learner as well.
+    SelectEntityDescription(
+        key="setpoint_step_limit_applies_to",
+        name="Max setpoint move applies to",
+        icon="mdi:stairs",
+        options=SETPOINT_STEP_SCOPES,
+    ),
     SelectEntityDescription(
         key="ai_no_touch",
         name="Pause AI changes",
         icon="mdi:hand-back-left-off",
         options=NO_TOUCH_OPTIONS,
+    ),
+    # The runoff estimator from the sump's water balance: off until someone chooses.
+    SelectEntityDescription(
+        key="runoff_estimator",
+        name="Runoff estimator",
+        icon="mdi:water-sync",
+        options=RUNOFF_ESTIMATOR_MODES,
+    ),
+    # The controller's shot check: off until someone chooses (the AI shot judge alone, as before).
+    SelectEntityDescription(
+        key="shot_check",
+        name="Shot check",
+        icon="mdi:water-check",
+        options=SHOT_CHECK_MODES,
     ),
 ]
 
@@ -108,6 +134,11 @@ async def async_setup_entry(
 
     # Add main select entities
     for description in SELECT_DESCRIPTIONS:
+        selects.append(CropSteeringSelect(entry, description))
+    # Safety and operations (safety_ops.py): each starts at Off, as the room was.
+    from .safety_ops import SELECTS
+
+    for description in SELECTS:
         selects.append(CropSteeringSelect(entry, description))
 
     # Get number of zones from config
@@ -128,6 +159,21 @@ async def async_setup_entry(
                     name=f"Crop Steering Zone {zone_num} Steering mode",
                     options=["Vegetative", "Generative"],
                     icon="mdi:steering",
+                ),
+                zone_num=zone_num,
+            )
+        )
+
+        # How the zone waters in P2: on moisture (the default, as always), on a timer, or on a timer
+        # that skips a slot at its ceiling and keeps the moisture top-up as a floor rescue.
+        selects.append(
+            CropSteeringSelect(
+                entry,
+                SelectEntityDescription(
+                    key=f"zone_{zone_num}_p2_mode",
+                    name=f"Zone {zone_num} P2 mode",
+                    options=P2_MODES,
+                    icon="mdi:timer-cog",
                 ),
                 zone_num=zone_num,
             )

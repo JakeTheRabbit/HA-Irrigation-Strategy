@@ -1,0 +1,92 @@
+[
+  {
+    "entity": "select.crop_steering_<prefix>rescue_miss_action",
+    "id": "LF-10",
+    "group": "Safety and operations",
+    "label": "Rescue misses",
+    "kind": "select",
+    "default": "Off",
+    "help": "Alert when rescue shots fail to raise moisture; never holds watering.",
+    "scope": "room"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>rescue_miss_count",
+    "id": "LF-10",
+    "group": "Safety and operations",
+    "label": "Rescue misses before alert",
+    "kind": "number",
+    "default": "4",
+    "help": "Consecutive settled rescue shots without a moisture rise before the alert.",
+    "scope": "room"
+  },
+  {
+    "entity": "switch.crop_steering_<prefix>rescue_past_dead_feed_probe",
+    "id": "LF-11",
+    "group": "Safety and operations",
+    "label": "Rescues past dead feed probe",
+    "kind": "switch",
+    "default": "off",
+    "help": "Allow P3 emergency and watchdog rescues past a dead feed probe; bad readings and other interlocks still hold.",
+    "scope": "room"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_manual_shot_seconds",
+    "id": "LF-13",
+    "group": "Safety and operations",
+    "label": "Manual shot length",
+    "kind": "number",
+    "default": "10",
+    "help": "Test Shot seconds; maximum duration and daily budget still apply.",
+    "scope": "zone"
+  },
+  {
+    "entity": "select.crop_steering_<prefix>waste_valve_rule",
+    "id": "LF-114",
+    "group": "Safety and operations",
+    "label": "Waste valve rule",
+    "kind": "select",
+    "default": "Off",
+    "help": "Choose Close for each shot to close and verify the waste valve before the pump primes.",
+    "scope": "room"
+  },
+  {
+    "entity": "pump_power_sensor",
+    "id": "LF-70",
+    "group": "Safety and operations",
+    "label": "Pump power sensor",
+    "kind": "option",
+    "default": "",
+    "help": "Optional room=sensor power mapping enables the dead-head alert; never stops the pump.",
+    "scope": "app"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>pump_deadhead_watts",
+    "id": "LF-70",
+    "group": "Safety and operations",
+    "label": "Pump dead-head power",
+    "kind": "number",
+    "default": "20",
+    "help": "Alert after 60 seconds above this power with all valves shut and no active hold or batch.",
+    "scope": "room"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>tank_size_l",
+    "id": "LF-51",
+    "group": "Safety and operations",
+    "label": "Tank size for estimate",
+    "kind": "number",
+    "default": "0",
+    "help": "Capacity in litres enables the estimate when no tank level sensor is mapped; zero disables.",
+    "scope": "room"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>tank_estimate_low_pct",
+    "id": "LF-51",
+    "group": "Safety and operations",
+    "label": "Estimated tank low alert",
+    "kind": "number",
+    "default": "20",
+    "help": "Estimated percentage at which to alert; the estimate never holds shots.",
+    "scope": "room"
+  }
+]
