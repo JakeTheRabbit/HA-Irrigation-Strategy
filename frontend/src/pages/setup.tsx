@@ -23,6 +23,7 @@ import {
 import { Heading, Empty } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
 import { ControllerSettings } from "@/components/controller-settings";
+import { HistoryConnection } from "@/components/history-connection";
 import { SetupWizard } from "@/components/setup-wizard";
 import { Pill } from "@/components/mini-visuals";
 import {
@@ -1017,7 +1018,7 @@ export function Setup({
         </>
       )}
       {tab === "rooms" && controller.roomId && (
-        <ControllerSettings controller={controller} onDirtyChange={setSettingsDirty} />
+        <><ControllerSettings controller={controller} onDirtyChange={setSettingsDirty} /><HistoryConnection controller={controller} /></>
       )}
       <Dialog
         open={!!review}

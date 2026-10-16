@@ -1,4 +1,6 @@
 import { loadHistoryWindow } from "./comparison-history";
+import { summarize } from "./comparison";
+import type { HistoryWindow } from "./comparison-types";
 import type { HistoryRequest } from "./comparison-types";
 import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
@@ -213,6 +215,9 @@ export class HaClient {
       "whats_new_get",
       "whats_new_seen",
       "brain_ask",
+      "history_connection_get",
+      "history_connection_save",
+      "history_long",
     ];
     if (!allowed.includes(action)) throw new Error("Unsupported workspace action.");
     // Keep and Undo answer nothing: asking them for a response is refused.
@@ -251,11 +256,32 @@ export class HaClient {
       action,
     });
   }
-  async historyWindow(request: HistoryRequest) {
-    return loadHistoryWindow(
+  async historyWindow(request: HistoryRequest, roomId?: string): Promise<HistoryWindow> {
+    let warning = "";
+    if (roomId) {
+      let source = "recorder";
+      try {
+        const settings = await this.operator<{ connection: { source: string } }>("history_connection_get", { room_id: roomId });
+        source = settings.connection.source;
+      } catch { /* Old integrations and non-admin users keep Recorder. */ }
+      if (source === "influxdb") {
+        try {
+          const result = await this.operator<HistoryWindow>("history_long", { room_id: roomId,
+            entity_ids: request.entityIds, start: request.start, end: request.end });
+          if (!result.series.some(series => series.points.length)) throw new Error("No InfluxDB points");
+          return { ...result, series: result.series.map(series => ({ ...series, daily: summarize(series.points, request.timeZone) })) };
+        } catch {
+          if (request.signal?.aborted) throw new DOMException("History cancelled", "AbortError");
+          warning = "InfluxDB unavailable or empty; showing Home Assistant Recorder history.";
+        }
+      }
+    }
+    const result = await loadHistoryWindow(
       (path, signal) => this.request("GET", path, undefined, undefined, signal),
       request,
     );
+    if (warning) result.warnings.unshift(warning);
+    return result;
   }
   /** One grow-day of history for the day timeline, in requests short enough for any URL limit. */
   async timeline(request: TimelineRequest): Promise<TimelineRows> {

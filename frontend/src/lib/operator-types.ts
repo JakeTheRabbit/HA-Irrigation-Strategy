@@ -1,4 +1,7 @@
 export type OperatorAction =
+  | "history_connection_get"
+  | "history_connection_save"
+  | "history_long"
   | "runs_get"
   | "runs_save"
   | "runs_archive"

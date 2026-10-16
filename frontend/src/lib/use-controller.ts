@@ -495,8 +495,9 @@ export class ControllerStore {
       action.startsWith("calibration_") ||
       action.startsWith("dosing_") ||
       action.startsWith("brain_");
-    const payload = scoped ? { ...data, room_id: roomId } : data;
-    if (scoped && !roomId) throw new Error("Select an available room.");
+    const historyScoped = action.startsWith("history_");
+    const payload = scoped || historyScoped ? { ...data, room_id: roomId } : data;
+    if ((scoped || historyScoped) && !roomId) throw new Error("Select an available room.");
     // What's new's record and a test push change nothing a refresh would show, and must neither
     // wait on nor hold up a change being applied.
     const mutation =
@@ -513,6 +514,8 @@ export class ControllerStore {
         "dosing_get",
         "notify_get",
         "notify_test",
+        "history_connection_get",
+        "history_long",
       ].includes(action);
     if (mutation && this.writing) throw new Error("Another change is still being applied.");
     if (mutation) this.writing = true;
@@ -581,7 +584,7 @@ export class ControllerStore {
       const args = { ...request, signal: abort.signal };
       const result = this.demo
         ? await demoHistoryWindow(args)
-        : await this.client!.historyWindow(args);
+        : await this.client!.historyWindow(args, roomId);
       if (generation !== this.generation || roomId !== this.roomId || abort.signal.aborted)
         throw new Error("Room or range changed; history request cancelled.");
       return result;
