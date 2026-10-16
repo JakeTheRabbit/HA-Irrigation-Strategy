@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, number, time as clock, type Page } from "@/components/dashboard";
 import { RoomOffBanner } from "@/components/room-controls";
 import { BrainCard } from "@/components/brain";
+import { RunProgress } from "@/components/run-progress";
 import {
   roomReference,
   zoneAttention,
@@ -233,6 +234,7 @@ export function Today({
   return (
     <div className="today" data-today>
       <TodayStatus controller={controller} day={day} now={now} navigate={navigate} />
+      <RunProgress controller={controller} navigate={navigate} />
       <TankLine controller={controller} navigate={navigate} />
       <section className="today-zones" aria-label="Zones">
         {cards.map((card) => (

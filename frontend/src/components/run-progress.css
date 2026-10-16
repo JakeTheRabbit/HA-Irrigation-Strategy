@@ -1,0 +1,172 @@
+/* Today › the run strip. Greys only: the days done fill darker, today is a dark marker, and colour
+   is kept for a run past its last day. */
+.run-progress {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 14px 20px 16px;
+}
+.run-progress [tabindex="0"]:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.run-progress-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px 20px;
+}
+.run-progress-head h2 {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.run-progress-numbers,
+.run-progress-recipes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 20px;
+  margin: 0;
+}
+.run-progress-numbers > div,
+.run-progress-recipes > div {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+}
+.run-progress dt {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 550;
+}
+.run-progress dd {
+  margin: 0;
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+.run-progress dd small {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.run-progress-numbers [data-tone="warn"] dd {
+  color: color-mix(in srgb, var(--warning) 60%, var(--foreground));
+}
+.run-progress-recipes dd {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-bar-wrap {
+  display: grid;
+  gap: 4px;
+}
+.run-bar {
+  position: relative;
+  height: 14px;
+  overflow: hidden;
+  border-radius: 4px;
+  background: var(--muted);
+}
+.run-bar-phase {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-right: 2px solid var(--surface);
+  background: color-mix(in srgb, var(--muted-foreground) 14%, var(--muted));
+}
+.run-bar-phase:nth-child(even) {
+  background: color-mix(in srgb, var(--muted-foreground) 24%, var(--muted));
+}
+.run-bar-done {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  background: color-mix(in srgb, var(--muted-foreground) 62%, transparent);
+}
+.run-bar-today {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 3px;
+  margin-left: -1px;
+  background: var(--foreground);
+}
+[data-run-progress="past"] .run-bar-done {
+  background: color-mix(in srgb, var(--warning) 70%, var(--muted));
+}
+
+.run-phases {
+  position: relative;
+  height: 18px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.run-phases li {
+  position: absolute;
+  top: 0;
+  overflow: hidden;
+  padding: 0 4px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 18px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.run-phases li[aria-current] {
+  color: var(--foreground);
+  font-weight: 650;
+}
+.run-phase-short {
+  display: none;
+}
+/* A phase too narrow for a label keeps it for a screen reader, and the tooltip names it. */
+.run-phases li[data-narrow] .run-phase-full {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+/* Narrow screens: the short label shows, the full one stays for a screen reader. */
+@media (max-width: 640px) {
+  .run-progress {
+    gap: 8px;
+    padding: 12px 16px;
+  }
+  .run-phase-full {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .run-phases li:not([data-narrow]) .run-phase-short {
+    display: inline;
+  }
+}
+
+.run-progress-empty {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.run-progress-tip {
+  max-width: 280px;
+}
