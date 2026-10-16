@@ -75,6 +75,9 @@ export function createDemo(now = Date.now()): States {
       tank_temperature_sensor: `sensor.demo_${prefix}tank_temperature`,
       tank_last_fill_sensor: `sensor.demo_${prefix}tank_last_fill`,
       tank_fill_entity: `binary_sensor.demo_${prefix}tank_filling`,
+      temperature_sensor: `sensor.demo_${prefix}air_temperature`,
+      humidity_sensor: `sensor.demo_${prefix}air_humidity`,
+      vpd_sensor: `sensor.demo_${prefix}vpd`,
       // Room A checks its feed water on the tank probes (the source-water gate); Room B maps
       // no feed-water probe, so its gate is off. Both have been saved in Rooms and setup.
       ...(index
@@ -94,6 +97,18 @@ export function createDemo(now = Date.now()): States {
       { device_class: "timestamp" },
     );
     put(`binary_sensor.demo_${prefix}tank_filling`, "off");
+    put(`sensor.demo_${prefix}air_temperature`, index ? 25.1 : 26.4, {
+      unit_of_measurement: "°C",
+      friendly_name: `${name} air temperature`,
+    });
+    put(`sensor.demo_${prefix}air_humidity`, index ? 62 : 58, {
+      unit_of_measurement: "%",
+      friendly_name: `${name} humidity`,
+    });
+    put(`sensor.demo_${prefix}vpd`, index ? 1.21 : 1.42, {
+      unit_of_measurement: "kPa",
+      friendly_name: `${name} VPD`,
+    });
     put(enable, "on");
     put(`switch.crop_steering_${prefix}room_active`, "on");
     // Room A demonstrates a running setpoint supervisor; Room B keeps the default (off).
@@ -1216,6 +1231,44 @@ function dropout(lightsOn: number, now: number): [number, number] | null {
   const end = Math.max(start.getTime() + 4.5 * 3_600_000 + 20 * 60_000, now - 3 * 3_600_000);
   return [end - 20 * 60_000, end];
 }
+/** Plausible room climate: warmer and drier while the lights are on, a little different each day.
+ * Ends at the live reading. */
+function climateHistory(
+  states: States,
+  match: RegExpMatchArray,
+  base: number,
+  hours: number,
+  now: number,
+) {
+  const [, prefix, kind] = match;
+  const hourSetting = (key: string, fallback: number) =>
+    numeric(states[`number.crop_steering_${prefix}lights_${key}_hour`]) ?? fallback;
+  const on = hourSetting("on", 8),
+    off = hourSetting("off", 20);
+  const photoperiod = (off - on + 24) % 24 || 12;
+  const raw = (time: number) => {
+    const date = new Date(time);
+    const hour = (date.getHours() + date.getMinutes() / 60 - on + 24) % 24;
+    const lit = Math.max(0, Math.min(1, hour / 0.75, (photoperiod - hour) / 0.75));
+    const day = Math.floor(time / 86_400_000);
+    const wobble = Math.sin(day * 1.3) + 0.3 * Math.sin(time / 2_700_000);
+    return kind === "air_temperature"
+      ? 21 + 5 * lit + 0.6 * wobble
+      : kind === "air_humidity"
+        ? 68 - 9 * lit + 1.5 * wobble
+        : 0.6 + 0.75 * lit + 0.05 * wobble;
+  };
+  const step = (hours <= 72 ? 10 : 30) * 60_000;
+  const count = Math.floor((hours * 3_600_000) / step);
+  const offset = base - raw(now);
+  return Array.from({ length: count + 1 }, (_, index) => {
+    const time = now - (count - index) * step;
+    return {
+      time: new Date(time).toISOString(),
+      value: Number((offset + raw(time)).toFixed(kind === "vpd" ? 2 : 1)),
+    };
+  });
+}
 /** Plausible batch-tank chemistry: each refill (the recorded last fill, and every three days
  * before it) starts a fresh mix, a step down. Then EC creeps up steadily as water evaporates, and
  * pH climbs, fastest in the first day. Each batch mixes a little differently; EC follows the
@@ -1529,6 +1582,22 @@ export function demoDay(states: States, request: TimelineRequest, now = Date.now
       for (const [id, list] of Object.entries(demoTank(states, config, request.start, end, now)))
         put(id, list);
   }
+  // The other sensors the history explorer offers: each probe, the climate, the tank's chemistry.
+  for (const id of wanted)
+    if (
+      /^sensor\.demo_.*(?:_(?:front|back)_(?:vwc|ec)|tank_(?:ec|ph)|air_temperature|air_humidity|vpd)$/.test(
+        id,
+      )
+    ) {
+      const recorded = demoHistory(states, [id], (now - request.start) / 3_600_000 + 1, now);
+      const points = (recorded[0]?.points ?? []).map((point) => ({
+        state: String(point.value),
+        time: Date.parse(point.time),
+      }));
+      // From the reading held at the start of the day.
+      const first = Math.max(0, points.findIndex((point) => point.time >= request.start) - 1);
+      put(id, points.slice(first));
+    }
   return rows;
 }
 /** Recorded water for the Water use panel, as the hourly statistics of each zone's water-today
@@ -1635,6 +1704,21 @@ export function demoHistory(
           entityId,
           label: String(state.attributes.friendly_name || entityId),
           points: cycleHistory(states, probe, base, hours, now),
+        };
+      // Room A's own probes, front and back of each zone's row, on their zone's day.
+      const own = entityId.match(/^sensor\.demo_()z\d+_(?:front|back)_(vwc|ec)$/);
+      if (own && base !== null)
+        return {
+          entityId,
+          label: String(state.attributes.friendly_name || entityId),
+          points: cycleHistory(states, own, base, hours, now),
+        };
+      const air = entityId.match(/^sensor\.demo_(.*?)(air_temperature|air_humidity|vpd)$/);
+      if (air && base !== null)
+        return {
+          entityId,
+          label: String(state.attributes.friendly_name || entityId),
+          points: climateHistory(states, air, base, hours, now),
         };
       const tank = entityId.match(/^sensor\.demo_(.*?)tank_(ec|ph)$/);
       if (tank && base !== null)
