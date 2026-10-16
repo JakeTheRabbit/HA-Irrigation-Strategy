@@ -64,7 +64,7 @@ from crop_steering_engine import (
     zone_status_label,
     settled_reading,
 )
-from crop_steering_engine.core import SETTLED_VWC_MIN
+from crop_steering_engine.core import SETTLED_VWC_MIN, p1_stall, p1_stall_rewater
 # What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
 # controller column of the one defaults table, pinned to the values installed controllers use.
 from crop_steering_engine.defaults import CONTROLLER_FALLBACKS as FALLBACK
@@ -1396,6 +1396,9 @@ class Controller:
             "max_run_latch": None,  # ...and, once latched, {"since", "resets"} (_count_capped)
             "p1_settled_before": None,  # ...its settled reading right before its last P1 shot (core.settled_reading)
             "p1_expected_rise": None,  # ...and what that shot should lift it by, from the learned gain
+            "p1_flat": 0,  # ...the ramp shots in a row under the target that did not give the rise P1 needs
+            # this grow-day's stalled ramp (core.p1_stall): {"day", "at", "rewater"}, re-watering under what it reached
+            "p1_stall": None,
             "vmax_wetup": [],  # this grow-day's P1 wet-up VWC readings, for the Vmax advisory (resets each P0)
             **zone_history.fresh(),
         }
@@ -1478,6 +1481,17 @@ class Controller:
         latch = d.get("max_run_latch")
         if isinstance(latch, dict) and type(latch.get("resets")) is int and isinstance(latch.get("since"), str):
             s["max_run_latch"] = {"since": latch["since"], "resets": latch["resets"]}
+        flat = d.get("p1_flat")  # absent before the P1 stall exit: 0, and None
+        if type(flat) is int and 0 <= flat <= 100:
+            s["p1_flat"] = flat
+        stall = d.get("p1_stall")
+        try:
+            if isinstance(stall, dict) and isinstance(stall.get("day"), str):
+                at, rewater = float(stall["at"]), float(stall["rewater"])
+                if all(math.isfinite(v) and 0.0 < v <= 100.0 for v in (at, rewater)):
+                    s["p1_stall"] = {"day": stall["day"], "at": at, "rewater": rewater}
+        except (KeyError, TypeError, ValueError):
+            pass
         for key in ("p1_settled_before", "p1_expected_rise"):  # absent before the settled P1 rise: None
             try:
                 value = float(d.get(key))
@@ -1862,6 +1876,8 @@ class Controller:
             "max_run_latch": s.get("max_run_latch"),
             "p1_settled_before": s.get("p1_settled_before"),
             "p1_expected_rise": s.get("p1_expected_rise"),
+            "p1_flat": int(s.get("p1_flat") or 0),
+            "p1_stall": s.get("p1_stall"),
             "shots": s.get("shots"),
             "daily_vol": s.get("daily_vol"),
             "water_history": s.get("water_history"),
@@ -2343,6 +2359,7 @@ class Controller:
         p2_thr = base + (float(room.state[zone].get("ec_offset", 0.0)) if ec_known else 0.0)
         p2_thr = max(efloor + 3.0, min(min(p1t, fc) - 1.0, p2_thr))
         prof = _profile(room)
+        learn = room.state[zone].get("learn")
         raw = ZoneParams(
             p1_target=p1t,
             p2_threshold=p2_thr,
@@ -2356,6 +2373,9 @@ class Controller:
             p1_max_extra_shots=int(self._zone_num(
                 room, zone, "p1_maximum_extra_shots", FALLBACK["p1_maximum_extra_shots"], optional=True)),
             p1_time_between_min=self._zone_num(room, zone, "p1_time_between_shots", FALLBACK["p1_time_between_shots"]),
+            # after a stalled ramp the day re-waters the zone's usual P2 drop under what it reached
+            p1_stall_band=auto_setpoints.p2_band(learn if isinstance(learn, dict) else {},
+                                                 self._zone_num(room, zone, "p2_shot_size", FALLBACK["p2_shot_size"])),
             dryback_target=self._zone_num(
                 room,
                 zone,
@@ -2583,6 +2603,9 @@ class Controller:
             vwc_settled=self._settled_vwc(st),
             p1_settled_before_shot=st.get("p1_settled_before"),
             p1_expected_rise=st.get("p1_expected_rise"),
+            # ...and the ramp shots before the last one that did not rise, unless the probe is in doubt (core.p1_stall)
+            p1_flat_shots=int(st.get("p1_flat") or 0),
+            p1_probe_suspect=self._p1_probe_suspect(room, zone, st, now) is not None,
             ec_settled=ec_settled,
             # a held plan holds the steering; decide() then fires only the rescues (PLAN_HOLD_EXEMPT)
             steering_held=bool(strategy_block(getattr(room, "strategy_snapshot", None), zone)),
@@ -2599,6 +2622,26 @@ class Controller:
         start = win[-1][0] - timedelta(minutes=SETTLED_VWC_MIN)
         last = st.get("last_shot")
         return settled_reading([v for t, v in win if t > start and not (isinstance(last, datetime) and t <= last)])
+
+    def _p1_probe_suspect(self, room, zone, st, now):
+        """Why this zone's probe is in doubt for the P1 stall exit (core.p1_stall), or None: water bypassing it
+        (CS-710 raised for the zone in the last 6 h), or a reading that has not moved at all since the last shot.
+        A table not draining (CS-310) the engine sees itself (ZoneSnapshot.backed_up)."""
+        raised = getattr(self, "_alerted", {}).get(f"jev_channel_{room.slug}_z{zone}")
+        if isinstance(raised, datetime) and (now - raised).total_seconds() < 6 * 3600:
+            return "water may bypass the substrate or the probe (CS-710)"
+        last = st.get("last_shot")
+        since = [v for t, v in st.get("win") or [] if isinstance(last, datetime) and t > last]
+        if len(since) >= 5 and max(since) == min(since):
+            return f"the reading has not moved since the last shot ({since[0]:g})"
+        return None
+
+    def _p1_stall_today(self, room, st, now):
+        """This grow-day's stalled ramp ({"day", "at", "rewater"}), or None: one from another grow-day is over."""
+        stall = st.get("p1_stall")
+        if isinstance(stall, dict) and stall.get("day") == self._grow_day_start(room, now).isoformat():
+            return stall
+        return None
 
     def _settled_ec(self, st, ec, now, settle_min=EC_SETTLE_MIN):
         """The pore EC the engine's EC rules act on (ZoneSnapshot.ec_settled).
@@ -4119,6 +4162,9 @@ class Controller:
             except Exception as e:  # a record is never worth a delivered shot the counters miss
                 log("zone history error", room.slug, zone, e)
             if st.get("phase") == "P1":  # the P1 rule (core.decide): did this shot raise the peak?
+                # the ramp shots in a row before this one that did not rise, as this pass's decision counted them
+                flat = room.__dict__.get("_p1_stall_now", {}).get(zone, 0)
+                st["p1_flat"] = 0 if st.get("p1_reached") else int(flat)
                 st["p1_peak_before"] = st.get("peak")
                 st["p1_settled_before"] = self._settled_vwc(st)
                 gain = st["learn"].get("gain")
@@ -4138,12 +4184,28 @@ class Controller:
             except Exception as e:
                 log("jev shot record error", room.slug, zone, e)
 
-    def _record_phase(self, room, zone, st, was, new, now, how):
+    def _record_phase(self, room, zone, st, was, new, now, how, snap=None, p=None):
         """Keep the zone's history on a phase change by anyone (the engine, a Jev judge, the operator's Set Phase):
-        P1 handing over to P2 is the day's plateau. A history error never stops the phase change."""
+        P1 handing over to P2 is the day's plateau. A history error never stops the phase change.
+        With the pass's snapshot and params, a ramp handed over while it stalls under its target (core.p1_stall)
+        re-waters under what it reached for the rest of the grow-day."""
         if new == "P1":  # the P1 rule (core.decide) starts again
             st["p1_reached"], st["p1_peak_before"], st["p1_extra"] = False, None, 0
-            st["p1_settled_before"], st["p1_expected_rise"] = None, None
+            st["p1_settled_before"], st["p1_expected_rise"], st["p1_flat"] = None, None, 0
+        if new == "P0":
+            st["p1_stall"] = None
+        if (was == "P1" and new == "P2" and snap is not None and p is not None and not snap.backed_up
+                and not snap.p1_probe_suspect and snap.vwc < min(p.p1_target, p.field_capacity)
+                and p1_stall(snap, p) >= 1):
+            at = max(snap.vwc_settled, snap.p1_settled_before_shot)
+            rewater = p1_stall_rewater(at, p.p2_threshold, p.p1_stall_band)
+            st["p1_stall"] = {"day": self._grow_day_start(room, now).isoformat(), "at": round(at, 2),
+                              "rewater": rewater}
+            words = (f"P1 stalled at {at:.1f}% ({p1_stall(snap, p)} shots did not raise moisture): re-water "
+                     f"{rewater:g}% for the rest of the grow-day, not {p.p2_threshold:g}%")
+            log(f"[{room.slug}] Z{zone} {words}")
+            tag = "" if room.prefix == "" else f"{room.slug} "
+            self._activity.insert(0, f"{now.strftime('%H:%M')} {tag}Z{zone} {words}"[:120])
         try:
             entry = zone_history.phase_changed(st, was, new, day=self._grow_day_start(room, now).isoformat(), how=how)
             if entry is not None:
@@ -5931,7 +5993,7 @@ class Controller:
                         distrusted[zone] = jev_dirs["distrust"].why  # the zone takes the dead-probe path
                         snap = None
                     elif "advance" in jev_dirs:
-                        snap = jev_bridge.advance(self, room, zone, snap, jev_dirs["advance"], now)
+                        snap = jev_bridge.advance(self, room, zone, snap, jev_dirs["advance"], now, p)
                 except Exception as e:
                     log("jev error", room.slug, zone, e)
                     jev_dirs = {}
@@ -5949,6 +6011,11 @@ class Controller:
                     snap = snaps[zone] = dataclasses.replace(snap, backed_up=True)
             except Exception as e:
                 log("backup watch error", room.slug, zone, e)
+            # the P1 stall exit (core.p1_stall): this pass's count, for the shot it may fire, and the day's re-water
+            room.__dict__.setdefault("_p1_stall_now", {})[zone] = p1_stall(snap, p) if st["phase"] == "P1" else 0
+            stall = self._p1_stall_today(room, st, now)
+            if stall is not None and st["phase"] in ("P2", "P3") and stall["rewater"] < p.p2_threshold:
+                p = params[zone] = dataclasses.replace(p, p2_threshold=stall["rewater"])
             self._count_peak(st, snap)
             if snap.ec is None:
                 self._alert(
@@ -5976,7 +6043,7 @@ class Controller:
                 log(f"[{room.slug}] Z{zone} {st['phase']} -> {new_phase}: {log_words.transition(reason)}")
                 # decide()'s reason leads with why the phase moved ("lights-off -> P3 | ..."): the push says it.
                 self._notify_event("phase", room, zone, st["phase"], new_phase, str(reason).split(" | ")[0])
-                self._record_phase(room, zone, st, st["phase"], new_phase, now, str(reason).split(" | ")[0])
+                self._record_phase(room, zone, st, st["phase"], new_phase, now, str(reason).split(" | ")[0], snap, p)
                 if new_phase == "P0":
                     self._keep_day_peak(st)  # the grow-day ending: tomorrow's P1 target (_vwc_maxima)
                     st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, snap.vwc
