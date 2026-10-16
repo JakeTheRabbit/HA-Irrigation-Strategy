@@ -1,3 +1,4 @@
+import { liveSensorStatistics } from "./live";
 import { demoDisplay } from "./display";
 import type { DailyRanges, HistoryRequest, HistoryWindow, RunsDocument } from "./comparison-types";
 import { demoHistoryWindow } from "./comparison-demo";
@@ -150,6 +151,7 @@ export class ControllerStore {
       history: this.history,
       historyWindow: this.historyWindow,
       dailyRanges: this.dailyRanges,
+      sensorStatistics: this.sensorStatistics,
       timeline: this.timeline,
       waterRecord: this.waterRecord,
       operator: this.operator,
@@ -567,7 +569,7 @@ export class ControllerStore {
       if (registered?.generation === generation)
         for (const run of registered.document.runs)
           for (const zone of run.zones)
-            for (const id of [zone.vwc_sensor, zone.ec_sensor]) if (id) allowed.add(id);
+            for (const id of [zone.vwc_sensor, zone.ec_sensor, ...(zone.probes ?? []).map((p) => p.entity_id)]) if (id) allowed.add(id);
       if (entityIds.some((id) => !allowed.has(id)))
         throw new Error("History is limited to this room's current or registered run sensors.");
     };
@@ -606,6 +608,18 @@ export class ControllerStore {
   /** Each sensor's low and high per local date over a run (Compare runs, by grow week): Home
    * Assistant's daily long-term statistics over its websocket inside Home Assistant, kept
    * indefinitely; standalone, and for a sensor without statistics, its recorded history. */
+  sensorStatistics = async (request: HistoryRequest) => {
+    const start = Date.parse(request.start), end = Date.parse(request.end);
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start || end - start > 180 * 86400000 || request.entityIds.length > 32)
+      throw new Error("Hourly statistics require a bounded range and at most 32 sensors.");
+    await this.checkRunSensors(request.entityIds);
+    const generation = this.generation, roomId = this.roomId;
+    if (!this.live?.sendMessagePromise || this.demo) return {};
+    const result = await liveSensorStatistics(this.live, request);
+    if (request.signal?.aborted || generation !== this.generation || roomId !== this.roomId)
+      throw new Error("Room or range changed; hourly statistics cancelled.");
+    return result;
+  };
   dailyRanges = async (request: HistoryRequest): Promise<DailyRanges> => {
     const generation = this.generation,
       roomId = this.roomId;

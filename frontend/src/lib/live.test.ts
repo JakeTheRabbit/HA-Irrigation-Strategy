@@ -4,6 +4,7 @@ import {
   compressedRows,
   liveHistory,
   liveStatistics,
+  liveSensorStatistics,
   watchedEntities,
   whileVisible,
   type EntityUpdate,
@@ -739,4 +740,13 @@ describe("recorded history after the first load", () => {
     // No new readings: the window stays as loaded.
     expect(mergeSeries(held, [], at(0))[0].points).toEqual(held[0].points);
   });
+});
+
+
+it("requests hourly mean/min/max through the existing Recorder websocket without privileged operations", async () => {
+  const sendMessagePromise = vi.fn(async () => ({ "sensor.probe": [{ start: 1000, mean: 45, min: 40, max: 50 }] }));
+  const request = { entityIds: ["sensor.probe"], start: "2026-09-01T00:00:00Z", end: "2026-09-02T00:00:00Z", timeZone: "UTC" };
+  expect(await liveSensorStatistics({ sendMessagePromise } as never, request)).toHaveProperty("sensor.probe");
+  expect(sendMessagePromise).toHaveBeenCalledExactlyOnceWith({ type: "recorder/statistics_during_period", start_time: request.start,
+    end_time: request.end, statistic_ids: request.entityIds, period: "hour", types: ["mean", "min", "max"] });
 });

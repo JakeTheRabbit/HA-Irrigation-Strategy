@@ -62,6 +62,37 @@ def cultivar(value):
     return value.strip()
 
 
+def normalize_probes(raw):
+    """Additive row snapshots; missing on older records. Ignore malformed optional rows on read."""
+    result = []
+    for probe in raw if isinstance(raw, list) else []:
+        if not isinstance(probe, dict) or len(result) >= 32:
+            continue
+        entity = probe.get("entity_id")
+        if (
+            not isinstance(entity, str)
+            or len(entity) > 200
+            or not re.fullmatch(r"sensor\.[a-z0-9_]+", entity)
+        ):
+            continue
+        if any(p["entity_id"] == entity for p in result):
+            continue
+        position = probe.get("position")
+        result.append(
+            {
+                "entity_id": entity,
+                "row_label": str(probe.get("row_label") or "")[:80],
+                "position": (
+                    position if type(position) is int and 0 <= position < 32 else None
+                ),
+                "kind": (
+                    probe.get("kind") if probe.get("kind") in ("vwc", "ec") else None
+                ),
+            }
+        )
+    return result
+
+
 def normalize_record(raw, room_id):
     if not isinstance(raw, dict) or raw.get("room_id") != room_id:
         raise ValueError("Run belongs to another room")
@@ -114,6 +145,11 @@ def normalize_record(raw, room_id):
                 "name": bounded_text(zone.get("name"), "Zone name"),
                 "cultivar": cultivar(zone.get("cultivar")),
                 **sensors,
+                **(
+                    {"probes": normalize_probes(zone["probes"])}
+                    if "probes" in zone
+                    else {}
+                ),
                 "plant_count": (
                     None
                     if zone.get("plant_count") is None
@@ -314,11 +350,29 @@ class RunStore:
                     plant_count = plant_number(plant_count)
             except (ValueError, TypeError):
                 plant_count = None
+            probes = []
+            for metric in ("vwc", "ec"):
+                for position, entity in enumerate(
+                    entry_zone.get(metric + "_sensors") or []
+                ):
+                    state = self.hass.states.get(entity)
+                    attrs = state.attributes if state else {}
+                    probes.append(
+                        {
+                            "entity_id": entity,
+                            "position": position,
+                            "kind": metric,
+                            "row_label": attrs.get("row_label")
+                            or attrs.get("friendly_name")
+                            or "",
+                        }
+                    )
             zones.append(
                 {
                     "zone_id": zid,
                     "name": entry_zone.get("name") or f"Zone {zid}",
                     "cultivar": cultivar(entry_zone.get("cultivar")),
+                    "probes": normalize_probes(probes),
                     **sensors,
                     "plant_count": plant_count,
                     "parameters": params,
@@ -354,6 +408,48 @@ class RunStore:
             },
             self.room_id,
         )
+
+    async def refresh_probes(self, days):
+        """Append row identities observed in summaries to open runs, without changing captured targets."""
+        async with self._lock:
+            if self.error:
+                return
+            values = deepcopy(self.document["runs"])
+            for run in values:
+                if run.get("end_date") or run.get("archived"):
+                    continue
+                for day in days:
+                    if (
+                        not isinstance(day, dict)
+                        or str(day.get("date", "")) < run["start_date"]
+                    ):
+                        continue
+                    zone = next(
+                        (z for z in run["zones"] if z["zone_id"] == day.get("zone")),
+                        None,
+                    )
+                    if zone is None:
+                        continue
+                    probes = zone.get("probes") or []
+                    additions = normalize_probes(
+                        [
+                            {
+                                "entity_id": p.get("entity_id"),
+                                "kind": p.get("kind"),
+                                "row_label": p.get("name"),
+                                "position": p.get("position"),
+                            }
+                            for p in day.get("probes") or []
+                            if isinstance(p, dict)
+                        ]
+                    )
+                    merged = normalize_probes(probes + additions)
+                    if merged:
+                        zone["probes"] = merged
+            if values != self.document["runs"]:
+                updated = {"revision": self.document["revision"] + 1, "runs": values}
+                await self._store.async_save(updated)
+                self.document = updated
 
     async def mutate(self, action, data):
         async with self._lock:

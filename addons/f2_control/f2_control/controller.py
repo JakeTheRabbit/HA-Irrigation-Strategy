@@ -3026,7 +3026,7 @@ class Controller:
                         value = float(probe.get("state"))
                     except (TypeError, ValueError):
                         value = None
-                    rows.append((kind, pid, pa.get("friendly_name"), pa.get("unit_of_measurement"), value, pid in used))
+                    rows.append((kind, pid, pa.get("row_label") or pa.get("friendly_name"), pa.get("unit_of_measurement"), value, pid in used))
             if rows:
                 day_summary.probes(room.state[zone], day=day, now=now, readings=rows)
 
