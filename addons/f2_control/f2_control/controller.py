@@ -6294,6 +6294,11 @@ class Controller:
     def _loop_room(self, room, now):
         """One room's full control pass: snapshot -> decide -> act -> build the publish dict.
         Reads/writes only this room's prefixed entities + its own state."""
+        try:
+            import prompt_runtime
+            prompt_runtime.sync(self, room, ha_get, ha_call)
+        except Exception as err:
+            log("AI instructions synchronization unavailable", room.slug, type(err).__name__)
         if getattr(room, "setup_active", True) is False:
             self._idle_reset(room, now)
             return {}

@@ -1120,6 +1120,7 @@ def panel(c, room, now):
                    tokens_today={"uncached": unc, "cache_read": read, "cache_write": write,
                                  "output": snap["output_tokens"]},
                    cache_hit_ratio=round(read / (read + write + unc), 3) if read + write + unc else None,
+                   cache_savings_estimate_usd=snap.get("cache_savings_estimate_usd"),
                    declined=snap["declined"])
     return out
 
