@@ -13,7 +13,7 @@ const HOUR = 3_600_000;
 /** The longest range the explorer reads: one request per day, two at a time. */
 export const MAX_RANGE_DAYS = 180;
 
-export type Unit = "%" | "mS/cm" | "°C" | "°F" | "kPa" | "pH";
+export type Unit = "%" | "mS/cm" | "°C" | "°F" | "kPa" | "pH" | "ppm" | "µmol/m²/s";
 export type SensorKind = "vwc" | "ec" | "climate" | "feed";
 export interface ExplorerSensor {
   /** Stable for the URL: the entity id. */
@@ -48,6 +48,9 @@ const CLIMATE: [string, string, Unit][] = [
   ["temperature_sensor", "Air temperature", "°C"],
   ["humidity_sensor", "Humidity", "%"],
   ["vpd_sensor", "VPD", "kPa"],
+  // Mapped on Equipment › Setup for the dashboard only.
+  ["co2_sensor", "CO2", "ppm"],
+  ["ppfd_sensor", "PPFD", "µmol/m²/s"],
 ];
 const FEED: [string, string, Unit][] = [
   ["feed_ec_sensor", "Feed EC", "mS/cm"],
@@ -106,6 +109,21 @@ export function explorerSensors(room: RoomView, states: States): ExplorerSensor[
         });
     }
   const mapped = descriptor(states, room.room)?.attributes ?? {};
+  // Each zone's root-zone temperature probe (Equipment › Setup), in the zone's own group.
+  const roots = mapped.substrate_temperature_sensors;
+  for (const zone of room.zones) {
+    const id =
+      roots && typeof roots === "object" ? (roots as Record<string, unknown>)[String(zone.id)] : null;
+    if (typeof id === "string" && id)
+      add({
+        entityId: id,
+        label: `${zone.name} root-zone temperature`,
+        group: zone.name,
+        kind: "climate",
+        zone: zone.id,
+        unit: unitOf(states, id, "°C"),
+      });
+  }
   for (const [table, group, kind] of [
     [CLIMATE, "Room climate", "climate"],
     [FEED, "Feed and tank", "feed"],
@@ -121,13 +139,14 @@ export function explorerSensors(room: RoomView, states: States): ExplorerSensor[
   }));
 }
 
-export type Preset = "today" | "growday" | "3d" | "7d" | "14d" | "run" | "custom";
+export type Preset = "today" | "growday" | "3d" | "7d" | "14d" | "30d" | "run" | "custom";
 export const PRESETS: { id: Exclude<Preset, "custom">; label: string }[] = [
   { id: "today", label: "Today" },
   { id: "growday", label: "Grow-day" },
   { id: "3d", label: "3 d" },
   { id: "7d", label: "7 d" },
   { id: "14d", label: "14 d" },
+  { id: "30d", label: "30 d" },
   { id: "run", label: "This run" },
 ];
 export interface Choice {
@@ -140,6 +159,8 @@ export interface Choice {
   compare: boolean;
   shots: boolean;
   phases: boolean;
+  /** Each grow day's peak and the low after it, on the zone's VWC (ranges of 14 d at most). */
+  dryback: boolean;
 }
 export const DEFAULT_CHOICE: Choice = {
   preset: "growday",
@@ -149,6 +170,7 @@ export const DEFAULT_CHOICE: Choice = {
   compare: false,
   shots: true,
   phases: true,
+  dryback: false,
 };
 
 /** The explorer's choice from the query of the page's hash (`#/zone/1?range=7d&s=...`). */
@@ -173,6 +195,7 @@ export function readChoice(hash: string): Choice {
     compare: query.get("compare") === "1",
     shots: query.get("shots") !== "0",
     phases: query.get("phases") !== "0",
+    dryback: query.get("dryback") === "1",
   };
 }
 
@@ -180,7 +203,8 @@ export function readChoice(hash: string): Choice {
 export function writeChoice(hash: string, choice: Choice): string {
   const [path, rest = ""] = hash.split("?");
   const query = new URLSearchParams(rest);
-  for (const key of ["range", "from", "to", "s", "compare", "shots", "phases"]) query.delete(key);
+  for (const key of ["range", "from", "to", "s", "compare", "shots", "phases", "dryback"])
+    query.delete(key);
   query.set("range", choice.preset);
   if (choice.preset === "custom" && choice.from !== null && choice.to !== null) {
     query.set("from", new Date(choice.from).toISOString());
@@ -190,6 +214,7 @@ export function writeChoice(hash: string, choice: Choice): string {
   if (choice.compare) query.set("compare", "1");
   if (!choice.shots) query.set("shots", "0");
   if (!choice.phases) query.set("phases", "0");
+  if (choice.dryback) query.set("dryback", "1");
   return `${path}?${query.toString().replaceAll("%2C", ",")}`;
 }
 
@@ -311,6 +336,8 @@ export function resolveRange(
       return back(7);
     case "14d":
       return back(14);
+    case "30d":
+      return back(30);
     case "run":
       return context.run ? capped({ start: runDayStart(context.run, 1), end: now }) : back(14);
     case "custom": {
@@ -433,6 +460,8 @@ export const UNIT_DIGITS: Record<Unit, number> = {
   "°F": 1,
   kPa: 2,
   pH: 2,
+  ppm: 0,
+  "µmol/m²/s": 0,
 };
 
 /** The explorer's help, in Simplified Technical English (ASD-STE100). */
@@ -463,6 +492,15 @@ export const EXPLORER_COPY = {
         "The chart shows day N of the previous run at the same position as day N of this run.",
     } satisfies SteCopy,
   },
+  dryback: {
+    label: "Dryback markers",
+    copy: {
+      tooltip:
+        "This marks the peak VWC of each grow day and the lowest VWC after it, on the VWC of this zone. The label is the dryback as the controller calculates it: the drop as a percent of the peak.",
+      impact: "The chart shows the markers only for a range of 14 days or less.",
+      guidance: "Select the VWC of this zone to see the markers.",
+    } satisfies SteCopy,
+  },
   sensors: {
     label: "Sensors",
     copy: {
@@ -471,3 +509,46 @@ export const EXPLORER_COPY = {
     } satisfies SteCopy,
   },
 } as const;
+
+/** The longest range the dryback markers are drawn on: past it they are noise. */
+export const DRYBACK_MARKER_DAYS = 14;
+export interface DrybackMarker {
+  /** The grow day's highest reading, and the lowest after it before the next lights-on. */
+  peak: { t: number; value: number };
+  low: { t: number; value: number };
+  /** As the controller measures dryback: (peak − low) / peak × 100, percent of the peak. */
+  percent: number;
+}
+/** Per grow day (from each lights-on, `starts`), the zone's peak VWC and the low after it, from the
+ * explorer's grid of values (`times[i]` the time of `values[i]`). A day with under two readings, or
+ * whose low is not under its peak, has none. */
+export function drybackMarkers(
+  times: readonly number[],
+  values: readonly (number | null)[],
+  starts: readonly number[],
+): DrybackMarker[] {
+  const markers: DrybackMarker[] = [];
+  starts.forEach((start, index) => {
+    const end = starts[index + 1] ?? Infinity;
+    let peak: { t: number; value: number } | null = null;
+    let at = -1;
+    for (let i = 0; i < times.length; i++) {
+      const value = values[i];
+      if (times[i] < start || times[i] >= end || value === null) continue;
+      if (!peak || value > peak.value) {
+        peak = { t: times[i], value };
+        at = i;
+      }
+    }
+    if (!peak || peak.value <= 0) return;
+    let low: { t: number; value: number } | null = null;
+    for (let i = at + 1; i < times.length && times[i] < end; i++) {
+      const value = values[i];
+      // A reading of 0 or less is a probe gap, not a dry slab.
+      if (value !== null && value > 0 && (!low || value < low.value)) low = { t: times[i], value };
+    }
+    if (!low || low.value >= peak.value) return;
+    markers.push({ peak, low, percent: ((peak.value - low.value) / peak.value) * 100 });
+  });
+  return markers;
+}

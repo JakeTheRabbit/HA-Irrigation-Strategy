@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, number, ReviewDialog, time as clock, type Page } from "@/components/dashboard";
 import { BrainOnZone } from "@/components/brain";
 import { HistoryExplorer } from "@/components/history-explorer";
+import { CameraCard, ClimatePanel, HardwarePanel, RootZonePanel } from "@/components/zone-extras";
 import { UiTip } from "@/components/info-tip";
 import { ZoneDay } from "@/components/day-timeline";
 import { OverlayRows, useOverlays } from "@/components/overlay-row";
@@ -74,6 +75,7 @@ export function ZonePage({
       </>
     );
   const { states, room } = controller;
+  const display = room.display.options;
   const steering = steeringOf(
     states[`select.crop_steering_${room.room.prefix}zone_${zone.id}_steering_mode`]?.state,
     readJev(states, room.room.prefix).room?.stage?.steering,
@@ -134,15 +136,29 @@ export function ZonePage({
         )}
       </div>
       <ZoneDay key={zone.id} controller={controller} zone={zone} />
+      {(display.show_climate || display.show_substrate_temp) && (
+        <div className="zone-extras-row">
+          {display.show_climate && <ClimatePanel controller={controller} zone={zone.id} />}
+          {display.show_substrate_temp && <RootZonePanel controller={controller} zone={zone} />}
+        </div>
+      )}
       <HistoryExplorer key={`explorer-${zone.id}`} controller={controller} zone={zone} />
       <ZoneWhy key={`why-${zone.id}`} controller={controller} zone={zone} />
       {/* The AI on this zone beside the controls; without it the controls take the width. */}
       <div className="zone-page-grid">
         <div className="zone-page-column">
           <BrainOnZone controller={controller} zone={zone.id} navigate={navigate} />
+          {display.show_camera && (
+            <div className="zone-page-stack">
+              <CameraCard controller={controller} />
+            </div>
+          )}
           {jev && <JevOnZone controller={controller} zone={zone} navigate={navigate} />}
         </div>
-        <ZoneControls key={zone.id} controller={controller} zone={zone} />
+        <div className="zone-page-stack">
+          <ZoneControls key={zone.id} controller={controller} zone={zone} />
+          <HardwarePanel controller={controller} zone={zone} />
+        </div>
       </div>
       {/* The rest on request: the day chart above already shows today. */}
       <Collapsed key={`targets-${zone.id}`} title="Targets (read only)">

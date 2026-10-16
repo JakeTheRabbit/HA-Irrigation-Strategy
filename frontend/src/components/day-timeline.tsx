@@ -1,3 +1,4 @@
+import { dayDeltas } from "@/lib/day-deltas";
 import {
   useEffect,
   useRef,
@@ -409,8 +410,66 @@ export function ZoneDay({ controller, zone }: { controller: Controller; zone: Zo
         ) : (
           <DayChart lane={lane} day={day} now={now} compare={compare} />
         )}
+        {lane && day && compare !== "none" && room.display.options.zone_day_deltas && (
+          <DayDeltaChips controller={controller} zone={zone} lane={lane} day={day} now={now} compare={compare} />
+        )}
       </section>
     </div>
+  );
+}
+
+/** Settings › Display › Day deltas: today against the day it is compared with, as up to three
+ * chips under the chart. */
+function DayDeltaChips({
+  controller,
+  zone,
+  lane,
+  day,
+  now,
+  compare,
+}: {
+  controller: Controller;
+  zone: Zone;
+  lane: Lane;
+  day: GrowDay;
+  now: number;
+  compare: Compare;
+}) {
+  const compared =
+    compare === "typical"
+      ? lane.past.length >= 3
+        ? lane.past
+        : []
+      : lane.yesterday
+        ? [lane.yesterday]
+        : [];
+  const target =
+    buildSetpointPreview(controller.room, controller.states, zone.id, {}).saved.parameters
+      .p1_target_vwc ?? null;
+  const chips = dayDeltas({
+    points: lane.points,
+    shots: lane.shots,
+    start: day.start,
+    now,
+    compared,
+    against: compare === "typical" ? "the typical day" : "yesterday",
+    vwc: zone.vwc.value,
+    target,
+  });
+  if (!chips.length) return null;
+  return (
+    <p className="zone-day-deltas" data-day-deltas>
+      {chips.map((chip) => (
+        <span
+          key={chip.key}
+          className="hmi-chip"
+          data-delta={chip.key}
+          data-abnormal={chip.abnormal ? "" : undefined}
+        >
+          {chip.text}
+        </span>
+      ))}
+    </p>
   );
 }
 

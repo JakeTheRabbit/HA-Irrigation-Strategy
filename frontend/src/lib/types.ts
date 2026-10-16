@@ -1,3 +1,4 @@
+import type { RoomDisplay } from "./display";
 import type { DailyRanges, HistoryRequest, HistoryWindow } from "./comparison-types";
 import type { TimelineRequest, TimelineRows } from "./day-timeline";
 import type { OperatorAction } from "./operator-types";
@@ -114,6 +115,8 @@ export interface RoomView {
   /** Whether the controller's vitals notification says what each zone does next, from the room's
    * switch (entityId null: an integration without it, and the controller then includes them). */
   notifyPredictions: { entityId: string | null; enabled: boolean | null };
+  /** What the dashboard shows in this room (Settings › Display); every option off without a store. */
+  display: RoomDisplay;
 }
 /** One line per room: is it watering, and if not, why not and what to do. */
 export interface RoomStatus {
