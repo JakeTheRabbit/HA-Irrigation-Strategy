@@ -191,6 +191,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         from .brain_api import async_setup_brain
 
         await async_setup_brain(hass, entry)
+        from .brain_prompt_api import async_setup_brain_prompt
+
+        await async_setup_brain_prompt(hass, entry)
     except Exception as err:  # pragma: no cover - never block setup on the questions
         _LOGGER.warning("Ask why unavailable: %s", err)
 
@@ -395,6 +398,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .brain_api import async_unload_brain
 
     await async_unload_brain(hass, entry)
+    from .brain_prompt_api import async_unload_brain_prompt
+
+    await async_unload_brain_prompt(hass, entry)
     from .notify_api import async_unload_notify
 
     await async_unload_notify(hass, entry)
