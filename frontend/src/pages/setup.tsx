@@ -221,6 +221,10 @@ const hardwareFields = [
   ["tank_temperature_sensor", "Tank temperature", "temperature"],
   ["tank_last_fill_sensor", "Last recorded tank fill", "timestamp"],
   ["tank_fill_entity", "Tank filling status", "binary"],
+  // Shown on the dashboard only (Settings › Display); the controller reads none of them.
+  ["camera_entity", "Room camera (display)", "camera"],
+  ["co2_sensor", "CO2 (display)", "co2"],
+  ["ppfd_sensor", "PPFD (display)", "ppfd"],
 ] as const;
 export function Setup({
   controller,
@@ -324,7 +328,9 @@ export function Setup({
               ? ["switch", "binary_sensor"].includes(c.domain)
               : kind === "light"
                 ? ["light", "switch"].includes(c.domain)
-                : c.domain === "sensor",
+                : kind === "camera"
+                  ? c.domain === "camera"
+                  : c.domain === "sensor",
       )
       .sort((a, b) => {
         const preferred = (c: SetupCandidate) =>
@@ -337,7 +343,19 @@ export function Setup({
                 ? /\bph\b/i.test(c.name)
                   ? 2
                   : 0
-                : 0;
+                : kind === "temperature"
+                  ? /°[CF]/.test(c.unit)
+                    ? 2
+                    : 0
+                  : kind === "co2"
+                    ? /ppm/i.test(c.unit)
+                      ? 2
+                      : 0
+                    : kind === "ppfd"
+                      ? /mol/i.test(c.unit)
+                        ? 2
+                        : 0
+                      : 0;
         return preferred(b) - preferred(a) || a.name.localeCompare(b.name);
       });
   }
@@ -886,6 +904,19 @@ export function Setup({
                           candidates={candidates("ec")}
                           disabled={busy}
                           onChange={(v) => editZone(zone.id, { ec_sensors: v })}
+                        />
+                        <MappingPicker
+                          label={zone.name + " root-zone temperature (display)"}
+                          values={
+                            zone.substrate_temperature_sensor
+                              ? [zone.substrate_temperature_sensor]
+                              : []
+                          }
+                          candidates={candidates("temperature")}
+                          disabled={busy}
+                          onChange={(v) =>
+                            editZone(zone.id, { substrate_temperature_sensor: v[0] || "" })
+                          }
                         />
                       </div>
                       <div className="workspace-form-grid sizing-grid">

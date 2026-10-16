@@ -1051,6 +1051,8 @@ export function validateChange(room: RoomView, states: States, change: Change): 
     room.roomActiveEntity,
     room.autoSetpoints.entityId,
     room.notifyPredictions.entityId,
+    // Settings › Display › Hardware panel: the integration checks again that an administrator set it.
+    `switch.${ROOT}${room.room.prefix}manual_hardware_enabled`,
     ...room.zones.flatMap((z) => [
       z.enabledEntity,
       `switch.${ROOT}${room.room.prefix}zone_${z.id}_manual_override`,
