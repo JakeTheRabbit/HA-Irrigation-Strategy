@@ -74,6 +74,10 @@ WATER_TODAY_VIEWS = ["Zone total", "Per plant"]
 # room drains freely, and matches "free_drain" by this id. Unknown, the first, is every room that has
 # not said, which is watched as before.
 DRAINAGE_TYPES = ["unknown", "flood_table", "free_drain"]
+# The runoff estimator (the controller's sump water balance): off, shadow (published only), shown_alerts (also
+# CS-314 when a grow-day's balance does not close), ai (also in the AI assistant's evidence). Each includes the ones
+# before it; none waters from the estimate.
+RUNOFF_ESTIMATOR_MODES = ["off", "shadow", "shown_alerts", "ai"]
 # The shot check (the controller's code-only shot table): off (the AI shot judge only), the table on
 # the zone page, or the table plus CS-701 from code when the AI assistant is off.
 SHOT_CHECK_MODES = ["off", "table", "table_and_alert"]

@@ -453,7 +453,7 @@
    "id": "MNT-03",
    "topic": "maintenance",
    "priority": 1,
-   "text": "Runoff at field capacity is the salt flush and the EC dipstick: about 10-20% of water fed in general, or 8-16% for vegetative and 1-7% for generative steering by vendor guidance. Catch it at representative plants; never infer it from pump run time.",
+   "text": "Runoff at field capacity is the salt flush and the EC dipstick: about 10-20% of water fed in general, or 8-16% for vegetative and 1-7% for generative steering by vendor guidance. Catch it at representative plants; an estimate from the sump pump's runs is a room-wide hint with an error band, never a catch.",
    "evidence": "vendor",
    "params": []
   },

@@ -23,6 +23,8 @@ either gets it once.
 
 | Id | Checkbox | What it covers |
 |---|---|---|
+| `emergency` | Emergencies | Every alert whose severity is critical in docs/error-codes.json (CS-201 to 204, 207, 301, 308, 310, 311, 402, 601, 606, 801, 901, 902) |
+| `hardware` | Hardware lockouts | CS-301 to CS-309 (a pump or valve that did not do what it was told, a hardware hold, a shot cut), CS-310 (moisture rising with no water: a table not draining), CS-311 (the sump pump has not run), CS-312 (a zone that keeps hitting its longest allowed shot), CS-313 (a valve or pump the controller can't switch), CS-314 (the sump water balance does not close), CS-701 (water isn't reaching a zone) and CS-710 (water may be bypassing the substrate or the probe) |
 | `emergency` | Emergencies | Every alert whose severity is critical in docs/error-codes.json (CS-201 to 204, 207, 211, 301, 308, 310, 311, 402, 601, 606, 801, 809, 811, 901, 902) |
 | `hardware` | Hardware lockouts | CS-301 to CS-309 (a pump or valve that did not do what it was told, a hardware hold, a shot cut), CS-310 (moisture rising with no water: a table not draining), CS-311 (the sump pump has not run), CS-312 (a zone that keeps hitting its longest allowed shot), CS-313 (a valve or pump the controller can't switch), CS-701 (water isn't reaching a zone) and CS-710 (water may be bypassing the substrate or the probe) |
 | `sensors` | Sensors and drift | CS-101 to CS-104, CS-502 (a zone's probes disagree), CS-503 (a moisture probe set aside for its unit), CS-504 (a zone steering on bulk EC: no pore EC probe reporting), CS-505 (a zone's primary probe is offline), CS-603, CS-604, CS-703, CS-704 |

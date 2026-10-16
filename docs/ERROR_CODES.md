@@ -64,6 +64,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-311](#cs-311) | No sump pump run | Critical | Notification |
 | [CS-312](#cs-312) | Repeated maximum-length shots | Warning | Repairs card |
 | [CS-313](#cs-313) | Device type not supported | Warning | Notification |
+| [CS-314](#cs-314) | Sump water balance does not close | Warning | Notification |
 | [CS-401](#cs-401) | Setting outside controller range | Warning | Notification |
 | [CS-402](#cs-402) | Missing settings | Critical | Notification |
 | [CS-403](#cs-403) | Lights hours from the integration | Information | Notification |
@@ -789,6 +790,32 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - In Crop Steering → Rooms and setup, map a switch, an input_boolean or a valve in its place.
 - If the hardware exists only as a different device type, make a template switch for it in Home Assistant.
 - Map the template switch. The zone gets water again from the next loop.
+
+<a id="cs-314"></a>
+
+### CS-314: Sump water balance does not close
+
+*Warning · Notification*
+
+**What it means.** With the runoff estimator at shown_alerts or ai, a grow-day whose sump litres (its runs times the litres per run) miss what a sealed room must send to the sump (the water fed minus the change of water in the substrate) by more than 30%. In a sealed room the water the plants transpire comes back as AC and dehumidifier condensate, so the two agree on a normal day.
+
+**Effect on water.** The alert does not change the water. The runoff estimate is a room-wide hint and never waters or holds a zone.
+
+**Probable causes**
+
+- A leak: water leaves the room another way than the sump.
+- The power plug of the sump pump missed a run, or reports too slowly to see each run.
+- The float of the sump is stuck, so the pump runs at the wrong level.
+- The litres per run (a bucket test, or the pump flow) are wrong.
+- The room is not sealed: air is exchanged with outside, so condensate leaves with it.
+
+**What to do**
+
+- Look for water on the floor and at the drains of the tables.
+- Check that the power plug of the sump pump reports often enough to see each run (every 30 s or less).
+- Check the float of the sump.
+- Measure the litres of one sump run with a bucket and set Sump litres per run.
+- Set the runoff estimator to shadow if the room is not sealed.
 
 ## Settings (CS-4xx)
 
