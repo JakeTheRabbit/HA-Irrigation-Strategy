@@ -42,6 +42,10 @@ export async function demoHistoryWindow(request: HistoryRequest) {
         // Stable per-entity variation makes rooms, zones and previous dates distinct.
         // A short synthetic unavailable interval also demonstrates honest chart gaps.
         const hour = time / 3_600_000;
+        const day = Math.floor(hour / 24);
+        // The day's swing changes from week to week, as a crop is steered wetter or drier, so the
+        // weekly dryback and pore EC charts have something to compare.
+        const swing = 1 + 0.3 * Math.sin(day / 8.5 + 2 * seed);
         const gap = Math.floor(hour / 24) % 9 === seed % 9 && hour % 24 >= 3 && hour % 24 < 3.75;
         rows.push({
           entity_id,
@@ -51,9 +55,9 @@ export async function demoHistoryWindow(request: HistoryRequest) {
             : String(
                 (ec ? 3.2 : 55) +
                   seed * (ec ? 0.025 : 0.25) +
-                  (ec ? 0.7 : 7) * Math.sin(hour / 3.8 + seed) +
+                  (ec ? 0.7 : 7) * swing * Math.sin(hour / 3.8 + seed) +
                   // A slow drift over the weeks, so two runs differ by grow week.
-                  (ec ? 0.35 : 3) * Math.sin(Math.floor(hour / 24) / 6.5 + seed),
+                  (ec ? 0.35 : 3) * Math.sin(day / 6.5 + seed),
               ),
         });
       }
