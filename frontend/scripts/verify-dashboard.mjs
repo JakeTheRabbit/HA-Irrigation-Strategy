@@ -507,7 +507,11 @@ try {
       await page.goto(`${base}/dashboard.html?demo&room=f2&display=all#/today`, {
         waitUntil: "networkidle",
       });
-      await page.locator(".today-spark").first().waitFor();
+      // Table mode hides the desktop cards. Phones retain those cards instead of the table.
+      const ready = page.viewportSize().width > 720
+        ? "[data-today-table] tbody tr"
+        : ".today-zones .today-spark";
+      await page.locator(ready).first().waitFor();
     };
     await page.setViewportSize({ width: 1440, height: 900 });
     await open();
