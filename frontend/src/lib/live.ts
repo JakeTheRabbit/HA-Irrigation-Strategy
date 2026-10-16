@@ -315,3 +315,17 @@ export function whileVisible(
     off.forEach((stop) => stop());
   };
 }
+
+
+/** Read-only hourly min/max/mean; the caller enforces room/run sensor scope and bounded spans. */
+export async function liveSensorStatistics(connection: LiveConnection, request: HistoryRequest) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      connection.sendMessagePromise!({ type: "recorder/statistics_during_period",
+        start_time: request.start, end_time: request.end, statistic_ids: request.entityIds,
+        period: "hour", types: ["mean", "min", "max"] }),
+      new Promise((_, reject) => { timer = setTimeout(() => reject(new Error("Hourly statistics timed out.")), 60_000); }),
+    ]) as Record<string, { start: number | string; mean: number | null; min: number | null; max: number | null }[]>;
+  } finally { clearTimeout(timer); }
+}

@@ -1,4 +1,12 @@
+export interface ProbeSnapshot {
+  entity_id: string;
+  row_label: string;
+  position: number | null;
+  kind: "vwc" | "ec" | null;
+}
 export interface RunZone {
+  /** Absent on old records; row identity survives a sensor replacement. */
+  probes?: ProbeSnapshot[];
   zone_id: number;
   name: string;
   /** The zone's cultivar label when the run was registered (or corrected since); absent or null for none. */

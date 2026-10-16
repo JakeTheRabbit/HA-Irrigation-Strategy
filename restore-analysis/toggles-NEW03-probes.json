@@ -1,0 +1,12 @@
+[
+  {
+    "id": "NEW-03",
+    "entity": "explorer URL pc (per-sensor compare choice)",
+    "kind": "display",
+    "scope": "dashboard",
+    "default": "off",
+    "group": "History",
+    "label": "Per-probe grow comparison",
+    "help": "Select Off, Last grow or a recorded grow independently for each substrate sensor row. Historical row matching never changes sensor mappings or watering."
+  }
+]

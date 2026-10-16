@@ -383,7 +383,20 @@ async def async_setup_grow_days(hass, entry):
         try:
             target = resolve_days(hass, call.data["room_id"])
             if call.service == "grow_day_record":
-                return await target.record(call.data["days"])
+                response = await target.record(call.data["days"])
+                runs = (
+                    hass.data.get(DOMAIN, {})
+                    .get("_runs", {})
+                    .get(target.entry.entry_id)
+                )
+                if runs is not None:
+                    try:
+                        await runs.refresh_probes(call.data["days"])
+                    except OSError:
+                        _LOGGER.warning(
+                            "Grow-day readings saved; optional run probe snapshots could not be refreshed"
+                        )
+                return response
             if call.service == "grow_days_backfill":
                 added = await target.backfill(call.data["start"], call.data["end"])
                 return {

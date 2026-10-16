@@ -1,6 +1,8 @@
+import { useProbeComparisons } from "@/lib/probe-history";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle, SlidersHorizontal } from "lucide-react";
 import {
+  Area,
   Brush,
   CartesianGrid,
   ComposedChart,
@@ -46,9 +48,8 @@ import {
   type Span,
   type Unit,
 } from "@/lib/history-explorer";
-import { dateInZone } from "@/lib/comparison";
 import { numeric } from "@/lib/model";
-import { dayOfRun, type GrowDay, type GrowDaysDocument } from "@/lib/grows";
+import type { GrowDay } from "@/lib/grows";
 import type { Controller, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import "./history-explorer.css";
@@ -242,45 +243,10 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
     choice.compare && span && run && previous
       ? previousWindow(run, previous, span.start, span.end, now)
       : null;
-  const previousIds = new Map<string, string>();
-  for (const sensor of visible) {
-    let id = sensor.entityId;
-    const recorded = previous?.zones.find((item) => item.zone_id === sensor.zone);
-    if (recorded && id === room.zones.find((z) => z.id === sensor.zone)?.vwc.entityId)
-      id = recorded.vwc_sensor ?? id;
-    if (recorded && id === room.zones.find((z) => z.id === sensor.zone)?.ec.entityId)
-      id = recorded.ec_sensor ?? id;
-    // Only what the room still has can be read.
-    if (sensors.some((item) => item.entityId === id)) previousIds.set(sensor.entityId, id);
-  }
-  const before = useGrids(
-    controller,
-    [...previousIds.values()],
-    [],
-    connected && previousSpan ? { start: previousSpan.start, end: previousSpan.end } : null,
-    step,
-  );
-  // Past the recorder's retention, the picked grow's daily summaries stand in: each grow day's mean.
-  const summaries = useGrowDays(
-    controller,
-    choice.compare && previous && previousSpan ? previous : null,
-    previousSpan,
-  );
-  const summaryFor = (sensor: ExplorerSensor, day: number): number | null => {
-    if (!previous) return null;
-    const row = summaries.find(
-      (d) => d.zone === sensor.zone && dayOfRun(previous, d.date) === day,
-    );
-    if (!row) return null;
-    const zone = room.zones.find((z) => z.id === sensor.zone);
-    if (sensor.entityId === zone?.vwc.entityId) return row.vwc?.mean ?? null;
-    if (sensor.entityId === zone?.ec.entityId) return row.ec?.mean ?? null;
-    // A probe: its own entity id, else the same name (a probe replaced under a new id).
-    const probe =
-      row.probes?.find((p) => p.entity_id === sensor.entityId) ??
-      row.probes?.find((p) => p.name && p.name === sensor.label);
-    return probe?.mean ?? null;
-  };
+  const comparisons = useProbeComparisons(controller, visible, sensors, choice, run, last, runs ?? [], span, step);
+  const before = { busy: comparisons.busy ? { done: comparisons.rows.size, total: visible.length } : null, error: "", loads: comparisons.rows, values: new Map() };
+  const summaries: GrowDay[] = [];
+  const comparing = choice.compare || Object.values(choice.probeCompare ?? {}).some((id) => id !== "off");
   const grid = span ? new SeriesGrid(span.start, span.end, step) : null;
   const data = useMemo(() => {
     if (!grid || !span) return [];
@@ -293,19 +259,12 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
     visible.forEach((sensor, index) => {
       const values = recorded.values.get(sensor.entityId);
       if (values) values.forEach((value, at) => (rows[at][`s${index}`] = value));
-      const id = previousIds.get(sensor.entityId);
-      const old = id && previousSpan && run && previous ? before.values.get(id) : undefined;
-      if (old && previousSpan && run && previous) {
-        const from = new SeriesGrid(previousSpan.start, previousSpan.end, step);
-        alignGrid(old, { grid: from, run: previous }, { ...grid, run }).forEach(
-          (value, at) => (rows[at][`p${index}`] = value),
-        );
-      }
-      if (summaries.length && run && rows.every((row) => row[`p${index}`] == null))
-        rows.forEach((row) => {
-          const day = Math.floor(runDayAt(run, row.t as number));
-          row[`p${index}`] = summaryFor(sensor, day);
-        });
+      const overlay = comparisons.rows.get(sensor.entityId);
+      if (overlay) overlay.values.forEach((value, at) => {
+        rows[at][`p${index}`] = value;
+        rows[at][`pl${index}`] = overlay.low[at];
+        rows[at][`ph${index}`] = overlay.high[at];
+      });
     });
     return rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -313,10 +272,10 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
     // The loaded maps fill in place: their load counts say when.
     recorded.values,
     recorded.loads,
-    before.values,
-    before.loads,
+    comparisons.rows,
     summaries,
     previousSpan?.start,
+    comparing,
     run?.id,
     previous?.id,
     visible.map((s) => s.entityId).join(),
@@ -376,6 +335,7 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
       runName={run?.name ?? null}
       hasPrevious={!!previous}
       others={others}
+      matches={comparisons.rows}
     />
   );
   const compareNote = !choice.compare
@@ -445,15 +405,23 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
                 visible={visible}
                 units={units}
                 previous={
-                  choice.compare && hasPrevious && previous && previousSpan
-                    ? `Run ${previous.name}, days ${previousSpan.firstDay}–${previousSpan.lastDay}${
-                        !before.values.size && summaries.length ? " (daily summary mean)" : ""
-                      }`
+                  comparing && hasPrevious && Object.keys(choice.probeCompare ?? {}).length
+                    ? "Probe comparisons — grows and sources listed below"
+                    : choice.compare && hasPrevious && previous && previousSpan
+                    ? `Run ${previous.name}, days ${previousSpan.firstDay}–${previousSpan.lastDay}`
                     : null
                 }
                 shots={shots.length > 0}
                 phases={bands.length > 0}
               />
+              {comparisons.rows.size > 0 && (
+                <ul className="history-explorer-sources" aria-label="Compared probe sources">
+                  {[...comparisons.rows].map(([id, overlay]) => <li key={id} data-probe-source={id}>
+                    {sensors.find((sensor) => sensor.entityId === id)?.label}: {overlay.grow.name} — {overlay.error || overlay.sources.join("; ")}
+                    {overlay.sources.some((source) => source !== "recorded history") && " (min/max band)"}
+                  </li>)}
+                </ul>
+              )}
               {compareNote && (
                 <p className="history-explorer-note" role="status" data-compare-note>
                   {compareNote}
@@ -541,7 +509,7 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
                             <ExplorerTooltip
                               row={props.active ? (props.payload?.[0]?.payload as Row) : undefined}
                               visible={visible}
-                              compare={choice.compare && hasPrevious}
+                              compare={comparing && hasPrevious}
                               bands={bands}
                               timeZone={timeZone}
                             />
@@ -561,7 +529,7 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
                             isAnimationActive={false}
                           />
                         ))}
-                        {choice.compare &&
+                        {comparing &&
                           visible.map((sensor, index) => (
                             <Line
                               key={`previous-${sensor.entityId}`}
@@ -579,6 +547,11 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
                               className="history-explorer-previous"
                             />
                           ))}
+                        {comparing && visible.map((sensor, index) => (
+                          <Area key={`band-${sensor.entityId}`} dataKey={(row: Row) => row[`pl${index}`] == null || row[`ph${index}`] == null ? null : [row[`pl${index}`], row[`ph${index}`]]}
+                            yAxisId={`axis-${units.indexOf(sensor.unit)}`} stroke="none" fill={sensor.color} fillOpacity={0.12}
+                            connectNulls={false} isAnimationActive={false} name={`${sensor.label} historical min/max`} />
+                        ))}
                         {markers.flatMap((marker) => [
                           <ReferenceDot
                             key={`peak-${marker.peak.t}`}
@@ -652,28 +625,6 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
 
 type Row = Record<string, number | null>;
 
-/** The daily summaries of `run` over `span`, for the compare line past the recorder's retention. */
-function useGrowDays(controller: Controller, run: RunRecord | null, span: Span | null): GrowDay[] {
-  const [days, setDays] = useState<GrowDay[]>([]);
-  const start = run && span ? dateInZone(span.start, run.time_zone) : "",
-    end = run && span ? dateInZone(span.end, run.time_zone) : "";
-  useEffect(() => {
-    if (!start) {
-      setDays([]);
-      return;
-    }
-    let cancelled = false;
-    controller
-      .operator<GrowDaysDocument>("grow_days_get", { start, end })
-      .then((doc) => !cancelled && setDays(doc.days))
-      .catch(() => !cancelled && setDays([]));
-    return () => {
-      cancelled = true;
-    };
-  }, [controller.operator, start, end]);
-  return days;
-}
-
 function Controls({
   choice,
   setChoice,
@@ -683,6 +634,7 @@ function Controls({
   runName,
   hasPrevious,
   others = [],
+  matches,
 }: {
   choice: Choice;
   setChoice: (next: Partial<Choice>) => void;
@@ -693,6 +645,7 @@ function Controls({
   hasPrevious: boolean;
   /** The grows that can be compared with (every run but this one). */
   others?: RunRecord[];
+  matches: ReturnType<typeof useProbeComparisons>["rows"];
 }) {
   const [from, setFrom] = useState(() => localInput(choice.from ?? span?.start ?? Date.now()));
   const [to, setTo] = useState(() => localInput(choice.to ?? span?.end ?? Date.now()));
@@ -878,17 +831,36 @@ function Controls({
             {sensors
               .filter((sensor) => sensor.group === group)
               .map((sensor) => (
-                <label className="history-explorer-check" key={sensor.entityId}>
-                  <input
-                    type="checkbox"
-                    checked={ticked.includes(sensor.entityId)}
-                    onChange={(event) => toggle([sensor.entityId], event.target.checked)}
-                    data-sensor={sensor.entityId}
-                  />
-                  <i style={{ background: sensor.color }} aria-hidden="true" />
-                  <span>{sensor.label}</span>
-                  <span className="muted">{sensor.unit}</span>
-                </label>
+                <div key={sensor.entityId} className="history-explorer-probe-row">
+                  <label className="history-explorer-check">
+                    <input type="checkbox" checked={ticked.includes(sensor.entityId)}
+                      onChange={(event) => toggle([sensor.entityId], event.target.checked)} data-sensor={sensor.entityId} />
+                    <i style={{ background: sensor.color }} aria-hidden="true" /><span>{sensor.label}</span>
+                    <span className="muted">{sensor.unit}</span>
+                  </label>
+                  {(sensor.kind === "vwc" || sensor.kind === "ec") && (
+                    <label className="history-explorer-probe-compare">
+                      Compare with
+                      <select aria-label={`Compare ${sensor.label} with grow`} data-probe-compare={sensor.entityId}
+                        value={choice.probeCompare?.[sensor.entityId] ?? (choice.compare ? choice.compareRun ? `run:${choice.compareRun}` : "last" : "off")}
+                        onChange={(event) => setChoice({ probeCompare: { ...choice.probeCompare, [sensor.entityId]: event.target.value } })}>
+                        <option value="off">Off</option><option value="last" disabled={!hasPrevious}>Last grow</option>
+                        {others.map((grow) => <option key={grow.id} value={`run:${grow.id}`}>{grow.name}</option>)}
+                      </select>
+                    </label>
+                  )}
+                  {(matches.get(sensor.entityId)?.match.entityId === null || !!choice.probeMatch?.[sensor.entityId]) && !!matches.get(sensor.entityId)?.match.candidates.length && (
+                    <label className="history-explorer-probe-compare">Historical probe
+                      <select aria-label={`Historical probe for ${sensor.label}`} value={choice.probeMatch?.[sensor.entityId] ?? ""}
+                        onChange={(event) => setChoice({ probeMatch: { ...choice.probeMatch, [sensor.entityId]: event.target.value } })}>
+                        <option value="">Choose the matching row</option>
+                        {matches.get(sensor.entityId)!.match.candidates.map((probe) => <option key={probe.entity_id} value={probe.entity_id}>
+                          {probe.row_label || probe.entity_id} {probe.position === null ? "" : `(position ${probe.position + 1})`}
+                        </option>)}
+                      </select>
+                    </label>
+                  )}
+                </div>
               ))}
           </div>
         ))}

@@ -156,6 +156,10 @@ export interface Choice {
   to: number | null;
   /** The ticked sensors' entity ids; null: the zone's own VWC and EC. */
   sensors: string[] | null;
+  /** Sensor row -> off | last | recorded run ID. Missing preserves the old global overlay. */
+  probeCompare?: Record<string, string>;
+  /** Sensor row -> explicitly selected historical entity, when row matching is ambiguous. */
+  probeMatch?: Record<string, string>;
   compare: boolean;
   /** The grow compared with: a run's id; null for the last grow before this one. */
   compareRun: string | null;
@@ -195,6 +199,8 @@ export function readChoice(hash: string): Choice {
     to: custom ? to : null,
     sensors:
       sensors === null ? null : sensors.split(",").filter((id) => /^[a-z_]+\.[a-z0-9_]+$/.test(id)),
+    ...(query.has("pc") ? { probeCompare: readProbeChoice(query.get("pc")) } : {}),
+    ...(query.has("pm") ? { probeMatch: readProbeChoice(query.get("pm")) } : {}),
     compare: query.get("compare") === "1",
     compareRun: /^[a-zA-Z0-9_-]{1,64}$/.test(query.get("vs") ?? "") ? query.get("vs") : null,
     shots: query.get("shots") !== "0",
@@ -207,7 +213,7 @@ export function readChoice(hash: string): Choice {
 export function writeChoice(hash: string, choice: Choice): string {
   const [path, rest = ""] = hash.split("?");
   const query = new URLSearchParams(rest);
-  for (const key of ["range", "from", "to", "s", "compare", "vs", "shots", "phases", "dryback"])
+  for (const key of ["range", "from", "to", "s", "compare", "vs", "shots", "phases", "dryback", "pc", "pm"])
     query.delete(key);
   query.set("range", choice.preset);
   if (choice.preset === "custom" && choice.from !== null && choice.to !== null) {
@@ -215,6 +221,8 @@ export function writeChoice(hash: string, choice: Choice): string {
     query.set("to", new Date(choice.to).toISOString());
   }
   if (choice.sensors) query.set("s", choice.sensors.join(","));
+  if (Object.keys(choice.probeCompare ?? {}).length) query.set("pc", JSON.stringify(choice.probeCompare));
+  if (Object.keys(choice.probeMatch ?? {}).length) query.set("pm", JSON.stringify(choice.probeMatch));
   if (choice.compare) query.set("compare", "1");
   if (choice.compare && choice.compareRun) query.set("vs", choice.compareRun);
   if (!choice.shots) query.set("shots", "0");
@@ -556,4 +564,14 @@ export function drybackMarkers(
     markers.push({ peak, low, percent: ((peak.value - low.value) / peak.value) * 100 });
   });
   return markers;
+}
+
+
+function readProbeChoice(text: string | null): Record<string, string> {
+  try {
+    const value = JSON.parse(text ?? "{}");
+    if (!value || Array.isArray(value) || typeof value !== "object") return {};
+    return Object.fromEntries(Object.entries(value).slice(0, 32).filter(([key, val]) =>
+      /^sensor\.[a-z0-9_]+$/.test(key) && typeof val === "string" && val.length <= 200)) as Record<string, string>;
+  } catch { return {}; }
 }
