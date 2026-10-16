@@ -16,7 +16,7 @@ const FIELDS = [
   ["org", "Organisation (2.x)"], ["username", "Username (1.x)"],
   ["password", "Password (1.x)"], ["token", "Read-only token (2.x)"],
   ["measurement", "Measurement (blank uses each sensor's unit)"],
-  ["field", "Value field"], ["tag", "Entity tag"],
+  ["field", "Value field"], ["tag", "Entity tag"], ["domain_tag", "Domain tag (blank if the archive has none)"],
 ];
 
 /** Credentials are write-only; the browser never receives saved secrets. */

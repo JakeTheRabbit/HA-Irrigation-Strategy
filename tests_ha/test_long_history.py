@@ -45,14 +45,28 @@ async def test_old_install_loads_disabled(hass, hass_admin_user):
     assert doc["connection"]["source"] == "recorder" and doc["revision"] == 0
 
 
+async def test_corrupt_optional_archive_does_not_block_room_setup(hass, hass_admin_user, hass_storage):
+    from conftest import fixture
+
+    key = "crop_steering.history_connection." + fixture(JEV_3_11_1)["entry_id"]
+    hass_storage[key] = {"version": 1, "minor_version": 1, "key": key,
+                         "data": {"revision": 3, "connection": ["corrupted"]}}
+    await _upgrade(hass, JEV_3_11_1)
+    doc = await call(hass, hass_admin_user, "history_connection_get", room="room:")
+    assert doc["connection"]["source"] == "recorder" and doc["revision"] == 0
+
+
 def test_query_inputs_escaped_and_capped():
     cfg = connection({"source": "influxdb", "url": "https://influx.example", "measurement": "x\"; DROP DATABASE secret"})
     first, last, seconds = window("2025-01-01T00:00:00Z", "2025-12-31T00:00:00Z")
     query = queries(cfg, "sensor.probe", cfg["measurement"], first, last, seconds)
     assert 'FROM "x\\"; DROP DATABASE secret"' in query
     assert "LIMIT 1000" in query and seconds >= 30000
+    assert '"domain"=\'sensor\'' in query
     with pytest.raises(ValueError):
         window("2020-01-01T00:00:00Z", "2026-01-01T00:00:00Z")
+    with pytest.raises(ValueError):
+        window("2025-01-01T00:00:00Z", "2026-01-03T00:00:00Z")
     with pytest.raises(ValueError):
         connection({"source": "influxdb", "url": "https://user:password@influx.example"})
 

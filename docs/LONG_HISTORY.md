@@ -9,7 +9,9 @@ accepted the query; it does not prove that the intended probe is archived.
 Version 1 uses the InfluxQL `/query` endpoint and a database, with optional
 username/password. Version 2 uses Flux `/api/v2/query`, a bucket, organisation
 and token. The defaults match Home Assistant's unit measurement, `value` field
-and `entity_id` tag without its `sensor.` domain. A fixed measurement and custom
+and `entity_id` tag without its `sensor.` domain, scoped by the `domain` tag to
+`sensor`. Clear the domain tag only for an archive schema that does not use it.
+A fixed measurement and custom
 field/tag can be entered; tick the full entity ID option when the tag includes
 the domain. An explicit measurement is needed when a sensor has no unit and
 the archive does not use its entity ID as the measurement.

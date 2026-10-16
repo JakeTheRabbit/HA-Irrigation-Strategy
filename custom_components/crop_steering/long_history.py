@@ -27,6 +27,8 @@ MAX_BYTES = 2_000_000
 
 def connection(raw, previous=None):
     """Validate identifiers; query text and arbitrary query endpoints are never accepted."""
+    if not isinstance(raw, dict):
+        raise ValueError("History connection must be an object")
     previous = previous or {}
     result = {
         key: raw.get(key, previous.get(key, default))
@@ -43,6 +45,7 @@ def connection(raw, previous=None):
             "measurement": "",
             "field": "value",
             "tag": "entity_id",
+            "domain_tag": "domain",
             "full_entity_id": False,
         }.items()
     }
@@ -96,7 +99,7 @@ def window(start, end):
             raise ValueError
         first, last = first.astimezone(timezone.utc), last.astimezone(timezone.utc)
         span = (last - first).total_seconds()
-        if not 0 < span <= 367 * 86400 or last > datetime.now(timezone.utc):
+        if not 0 < span <= 366 * 86400 or last > datetime.now(timezone.utc):
             raise ValueError
         return first, last, max(1, math.ceil(span / (MAX_POINTS - 1)))
     except (ValueError, TypeError, AttributeError):
@@ -111,19 +114,23 @@ def quote(value, mark='"'):
 
 def queries(config, entity, measurement, first, last, seconds):
     tag_value = entity if config["full_entity_id"] else entity.split(".", 1)[1]
+    domain_tag = config.get("domain_tag", "domain")
     if config["version"] == "1":
         field = quote(config["field"])
         return (
             f"SELECT mean({field}) AS mean,min({field}) AS min,max({field}) AS max FROM {quote(measurement)} "
             f"WHERE {quote(config['tag'])}={quote(tag_value, chr(39))} "
-            f"AND time >= {quote(first.isoformat(), chr(39))} AND time < {quote(last.isoformat(), chr(39))} "
+            + (f"AND {quote(domain_tag)}='sensor' " if domain_tag else "")
+            + f"AND time >= {quote(first.isoformat(), chr(39))} AND time < {quote(last.isoformat(), chr(39))} "
             f"GROUP BY time({seconds}s) fill(none) LIMIT {MAX_POINTS}"
         )
     # JSON string escaping is also Flux string escaping. No operator input is query syntax.
     q = json.dumps
     base = (
         f"from(bucket: {q(config['bucket'])}) |> range(start: time(v: {q(first.isoformat())}), stop: time(v: {q(last.isoformat())})) "
-        f"|> filter(fn: (r) => r._measurement == {q(measurement)} and r._field == {q(config['field'])} and r[{q(config['tag'])}] == {q(tag_value)}) "
+        f"|> filter(fn: (r) => r._measurement == {q(measurement)} and r._field == {q(config['field'])} and r[{q(config['tag'])}] == {q(tag_value)}"
+        + (f' and r[{q(domain_tag)}] == "sensor"' if domain_tag else "")
+        + ") "
     )
     return "\n".join(
         base
@@ -318,7 +325,7 @@ async def async_setup_long_history(hass, entry):
         try:
             manager.config = connection(stored.get("connection", {}))
             manager.revision = max(0, int(stored.get("revision", 0)))
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             pass  # Corrupt optional configuration cannot stop irrigation or old installations.
     hass.data.setdefault(DOMAIN, {}).setdefault("_long_history", {})[
         entry.entry_id
