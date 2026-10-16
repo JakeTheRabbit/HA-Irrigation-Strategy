@@ -115,6 +115,7 @@ export function createDemo(now = Date.now()): States {
     put(`switch.crop_steering_${prefix}auto_setpoints`, index ? "off" : "on");
     // The vitals notification says what each zone does next (Settings → Notifications) until switched off.
     put(`switch.crop_steering_${prefix}notify_predictions`, "on");
+    put(`switch.crop_steering_${prefix}record_grow_days`, "on");
     // What the AI assistant may do: Room A has a switch per power at its default; Room B models an
     // integration from before the powers (each shows its default, read-only).
     if (!index)

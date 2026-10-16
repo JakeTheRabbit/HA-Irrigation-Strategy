@@ -221,6 +221,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .setpoint_log import async_setup_setpoint_log
 
     await async_setup_setpoint_log(hass, entry)
+    from .harvest_store import async_setup_harvests
+
+    await async_setup_harvests(hass, entry)
     from .overlays import async_setup_overlays
 
     await async_setup_overlays(hass, entry)
@@ -374,6 +377,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .setpoint_log import async_unload_setpoint_log
 
     await async_unload_setpoint_log(hass, entry)
+    from .harvest_store import async_unload_harvests
+
+    await async_unload_harvests(hass, entry)
     from .overlays import async_unload_overlays
 
     await async_unload_overlays(hass, entry)

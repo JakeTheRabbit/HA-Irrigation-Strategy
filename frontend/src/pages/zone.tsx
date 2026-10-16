@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Empty, number, ReviewDialog, time as clock, type Page } from "@/components/dashboard";
 import { BrainOnZone } from "@/components/brain";
 import { HistoryExplorer } from "@/components/history-explorer";
+import { OnThisDay } from "@/components/on-this-day";
 import { UiTip } from "@/components/info-tip";
 import { ZoneDay } from "@/components/day-timeline";
 import { OverlayRows, useOverlays } from "@/components/overlay-row";
@@ -134,6 +135,7 @@ export function ZonePage({
       </div>
       <ZoneDay key={zone.id} controller={controller} zone={zone} />
       <HistoryExplorer key={`explorer-${zone.id}`} controller={controller} zone={zone} />
+      <OnThisDay key={`on-this-day-${zone.id}`} controller={controller} zone={zone} />
       <ZoneWhy key={`why-${zone.id}`} controller={controller} zone={zone} />
       {/* The AI on this zone beside the controls; without it the controls take the width. */}
       <div className="zone-page-grid">

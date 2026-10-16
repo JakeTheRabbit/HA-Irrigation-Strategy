@@ -494,7 +494,9 @@ export class ControllerStore {
       action.startsWith("stock_") ||
       action.startsWith("calibration_") ||
       action.startsWith("dosing_") ||
-      action.startsWith("brain_");
+      action.startsWith("brain_") ||
+      action.startsWith("grow_days_") ||
+      action.startsWith("harvests_");
     const payload = scoped ? { ...data, room_id: roomId } : data;
     if (scoped && !roomId) throw new Error("Select an available room.");
     // What's new's record and a test push change nothing a refresh would show, and must neither
@@ -513,6 +515,8 @@ export class ControllerStore {
         "dosing_get",
         "notify_get",
         "notify_test",
+        "grow_days_get",
+        "harvests_get",
       ].includes(action);
     if (mutation && this.writing) throw new Error("Another change is still being applied.");
     if (mutation) this.writing = true;
@@ -526,7 +530,8 @@ export class ControllerStore {
         throw new Error(
           "Room or connection changed; response is unconfirmed. Reload before retrying.",
         );
-      if (action.startsWith("runs_")) {
+      // A harvest is kept beside the run records, not in them (runs_set_harvest answers the harvests).
+      if (action.startsWith("runs_") && action !== "runs_set_harvest") {
         const document = result as RunsDocument;
         if (
           document.room_id !== roomId ||

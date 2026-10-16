@@ -32,7 +32,11 @@ export type OperatorAction =
   | "notify_test"
   | "whats_new_get"
   | "whats_new_seen"
-  | "brain_ask";
+  | "brain_ask"
+  | "grow_days_get"
+  | "grow_days_backfill"
+  | "harvests_get"
+  | "runs_set_harvest";
 
 export interface ParameterLimit {
   value: number | null;

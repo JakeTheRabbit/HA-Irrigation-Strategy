@@ -55,6 +55,7 @@ import { Help } from "@/pages/help";
 import { GrowPlanner } from "@/pages/grow-planner";
 import { Setup } from "@/pages/setup";
 import { Comparison } from "@/pages/comparison";
+import { Grows } from "@/pages/grows";
 import { StockTanks } from "@/pages/stock";
 import { Reservoir } from "@/pages/reservoir";
 import { Dosing } from "@/pages/dosing";
@@ -372,6 +373,7 @@ export default function App() {
             {page === "history/compare" && (
               <Comparison key={pageKey} controller={controller} navigate={navigate} />
             )}
+            {page === "history/grows" && <Grows key={pageKey} controller={controller} />}
             {page === "equipment/probes" && (
               <Probes key={pageKey} controller={controller} navigate={navigate} />
             )}
