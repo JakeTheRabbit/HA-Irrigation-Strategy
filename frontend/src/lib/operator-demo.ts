@@ -387,6 +387,14 @@ export class OperatorDemo {
     return undefined;
   }
   async call<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
+    if (action === "stop_all") {
+      // The demo's room: its kill switch off, as the integration's Stop all does first.
+      const prefix = String(data.room_id).replace(/^room:/, "");
+      const id = "switch.crop_steering_" + prefix + "engine_enabled";
+      const states = this.getStates();
+      if (states[id]) this.updateStates({ ...states, [id]: { ...states[id], state: "off" } });
+      return { kill_switch: states[id] ? [id] : [], switched_off: [], refused: [], still_on: [] } as T;
+    }
     if (action === "test_shot") {
       // The demo's controller answers at once: the button records the press, the shot runs.
       const prefix = String(data.room_id).replace(/^room:/, "");
