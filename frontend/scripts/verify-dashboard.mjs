@@ -2711,6 +2711,11 @@ try {
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
   await check("probe comparison: independent row pickers retain choices and fit a phone", async () => {
+    await page.goto(`${base}/dashboard.html?demo&room=f2#/settings/features`, { waitUntil: "networkidle" });
+    const catalogueRow = page.locator(".features-row").filter({ hasText: "Per-probe grow comparison" });
+    await expectVisible(catalogueRow);
+    assert.equal(await catalogueRow.getByRole("link").getAttribute("href"), "#/zone");
+    await axe("per-probe compare catalogue");
     await page.goto(`${base}/dashboard.html?demo&room=f2#/zone/1?range=7d`, { waitUntil: "networkidle" });
     const picker = page.locator("[data-probe-compare]").first();
     await picker.waitFor();

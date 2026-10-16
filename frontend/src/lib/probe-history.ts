@@ -79,7 +79,7 @@ export function useProbeComparisons(controller: Controller, sensors: ExplorerSen
         kind: sensor.kind === "vwc" || sensor.kind === "ec" ? sensor.kind : null,
       };
       const fused = sensor.entityId === liveZone?.vwc.entityId ? zone?.vwc_sensor : sensor.entityId === liveZone?.ec.entityId ? zone?.ec_sensor : null;
-      const match: ProbeMatch = fused ? { entityId: fused, candidates: [] } : zone?.probes?.length
+      const match: ProbeMatch = fused ? { entityId: fused, candidates: [] } : (sensor.kind === "vwc" || sensor.kind === "ec") && zone?.probes?.length
         ? matchProbe(snapshot, zone.probes, choice.probeMatch?.[sensor.entityId])
         : { entityId: sensor.entityId, candidates: [] };
       const grid = new SeriesGrid(window.start, window.end, step);
