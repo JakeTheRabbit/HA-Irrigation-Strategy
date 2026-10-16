@@ -106,6 +106,10 @@ DEFAULTS = {
     # The sump pump's power above which it counts as running (W), for CS-311. The
     # controller falls back to its own SUMP_RUN_W, the same 20 W it always compared with.
     "sump_power_threshold_w": (20.0, None),
+    # The plant-stress card's CWSI baselines (leaf minus air, deg C), the grower's own. Both 0 is
+    # off; the controller does not read them.
+    "cwsi_lower_baseline": (0.0, None),
+    "cwsi_upper_baseline": (0.0, None),
 }
 
 ENTITY_DEFAULTS = {

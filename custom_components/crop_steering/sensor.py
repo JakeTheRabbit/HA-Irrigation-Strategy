@@ -66,11 +66,10 @@ BASE_SENSOR_DESCRIPTIONS = [
         name="Current phase",
         icon="mdi:water-circle",
     ),
-    # dryback_percentage is OWNED BY THE ENGINE (the add-on set_state from
-    # _update_dryback_entities — computed per-zone from peak vs current VWC). It was a
-    # coordinator-backed descriptor here whose native_value was always None, so it
-    # perpetually re-asserted `unknown` and clobbered the engine's publish. Removed so
-    # the engine owns it (same pattern as the fused_vwc/fused_ec sensors).
+    # No dryback sensor here: the controller publishes each zone's live dryback as
+    # sensor.crop_steering_<prefix>zone_N_dryback_app (relative % of the peak, with the drop in
+    # VWC points in its attributes). A descriptor here whose value was always None kept writing
+    # `unknown` over the old engine's value, so it was removed.
     # Critical Template Calculations - Ported from packages
     SensorEntityDescription(
         key="p1_shot_duration_seconds",
