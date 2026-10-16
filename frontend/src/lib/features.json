@@ -890,6 +890,20 @@
       "alsoOn": "equipment/probes"
     },
     {
+      "id": "manual_hardware_enabled",
+      "group": "display",
+      "label": "Manual hardware controls",
+      "help": "Show operator hardware controls on zone pages. Off until enabled.",
+      "master": {
+        "domain": "switch",
+        "key": "manual_hardware_enabled",
+        "scope": "room",
+        "default": false
+      },
+      "settings": [],
+      "restore": "LF-69"
+    },
+    {
       "id": "record_grow_days",
       "group": "history",
       "label": "Record grow days",

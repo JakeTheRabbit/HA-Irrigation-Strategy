@@ -23,6 +23,7 @@ import { inferPlumbing, plumbingErrors } from "./plumbing";
 import type { Overlay } from "./overlays";
 import { DEMO_WHATS_NEW } from "./whats-new-demo";
 import { compareVersions } from "./whats-new";
+import { DISPLAY_DEFAULTS, displayEntityId, readDisplay, type DisplayOptions } from "./display";
 
 const clone = <T>(value: T): T => structuredClone(value);
 export class OperatorDemo {
@@ -388,6 +389,39 @@ export class OperatorDemo {
       });
     return undefined;
   }
+  /** The room's display options, kept on its display sensor as the integration does. */
+  private display(action: string, data: Record<string, unknown>) {
+    const states = this.getStates();
+    const prefix = String(data.room_id).replace(/^room:/, "");
+    const id = displayEntityId(prefix);
+    const current = readDisplay(states[id]);
+    if (!states[id]) throw new Error("Room is unknown or ambiguous");
+    const response = (revision: number, options: DisplayOptions) => ({
+      schema_version: 1,
+      room_id: data.room_id,
+      revision,
+      options,
+      defaults: { ...DISPLAY_DEFAULTS },
+      error: null,
+    });
+    if (action === "display_get") return response(current.revision, current.options);
+    if (data.expected_revision !== current.revision)
+      throw new Error("Display options changed elsewhere. Reload before saving.");
+    const changes = (data.options ?? {}) as Record<string, unknown>;
+    for (const [key, value] of Object.entries(changes)) {
+      if (!(key in DISPLAY_DEFAULTS)) throw new Error(`Unknown display option: ${key}`);
+      const choice = key === "today_zone_layout";
+      if (choice ? value !== "cards" && value !== "table" : typeof value !== "boolean")
+        throw new Error(`${key}: invalid value`);
+    }
+    const options = { ...current.options, ...changes } as DisplayOptions;
+    const revision = current.revision + 1;
+    this.updateStates({
+      ...states,
+      [id]: { ...states[id], state: String(revision), attributes: { ...options } },
+    });
+    return response(revision, options);
+  }
   async call<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
     if (action === "test_shot") {
       // The demo's controller answers at once: the button records the press, the shot runs.
@@ -433,6 +467,8 @@ export class OperatorDemo {
     if (action === "setpoint_log_get")
       return { schema_version: 1, room_id: data.room_id, changes: [], error: null } as T;
     if (action.startsWith("overlay_")) return this.overlay(action, data) as T;
+    if (action === "display_get" || action === "display_save")
+      return this.display(action, data) as T;
     if (action === "brain_ask")
       // The demo has no AI assistant: the question is taken and never answered.
       return {

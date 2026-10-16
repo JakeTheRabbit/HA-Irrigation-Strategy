@@ -1,6 +1,8 @@
 export interface RunZone {
   zone_id: number;
   name: string;
+  /** The zone's cultivar label when the run was registered (or corrected since); absent or null for none. */
+  cultivar?: string | null;
   vwc_sensor: string | null;
   ec_sensor: string | null;
   plant_count: number | null;

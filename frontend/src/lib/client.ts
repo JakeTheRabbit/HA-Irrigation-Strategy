@@ -217,6 +217,8 @@ export class HaClient {
       "grow_days_backfill",
       "harvests_get",
       "runs_set_harvest",
+      "display_get",
+      "display_save",
     ];
     if (!allowed.includes(action)) throw new Error("Unsupported workspace action.");
     // Keep and Undo answer nothing: asking them for a response is refused.

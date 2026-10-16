@@ -57,6 +57,7 @@ import { GrowPlanner } from "@/pages/grow-planner";
 import { Setup } from "@/pages/setup";
 import { Comparison } from "@/pages/comparison";
 import { Grows } from "@/pages/grows";
+import { DrybackDrivers } from "@/pages/drivers";
 import { StockTanks } from "@/pages/stock";
 import { Reservoir } from "@/pages/reservoir";
 import { Dosing } from "@/pages/dosing";
@@ -335,6 +336,9 @@ export default function App() {
               page={page}
               navigate={(next) => navigate(next)}
               badges={{ "plan/targets": Object.keys(drafts).length }}
+              hidden={
+                controller.room.display.options.show_dryback_drivers ? [] : ["history/drivers"]
+              }
             />
             {page === "today" && (
               <Today key={pageKey} controller={controller} navigate={navigate} />
@@ -371,6 +375,9 @@ export default function App() {
               <Timeline key={`${pageKey}:${focusZone}`} controller={controller} zone={focusZone} />
             )}
             {page === "history/water" && <WaterUsePage key={pageKey} controller={controller} />}
+            {page === "history/drivers" && (
+              <DrybackDrivers key={pageKey} controller={controller} />
+            )}
             {page === "history/compare" && (
               <Comparison key={pageKey} controller={controller} navigate={navigate} />
             )}
