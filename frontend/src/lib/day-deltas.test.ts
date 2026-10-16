@@ -8,10 +8,10 @@ const day = { start: START - 24 * H, lightsOff: START - 6 * H, end: START };
 const yesterday: DayTrace = {
   day: day as DayTrace["day"],
   points: [
-    { hour: 0, value: 25 },
-    { hour: 1, value: 27 },
-    { hour: 2, value: 29 },
-    { hour: 3, value: 30 },
+    { time: day.start + 0 * H, hour: 0, value: 25 },
+    { time: day.start + 1 * H, hour: 1, value: 27 },
+    { time: day.start + 2 * H, hour: 2, value: 29 },
+    { time: day.start + 3 * H, hour: 3, value: 30 },
   ],
   shots: [{ start: day.start + 0.5 * H, end: day.start + 0.5 * H + 100_000, open: false, phase: "P1", reason: null }],
 };

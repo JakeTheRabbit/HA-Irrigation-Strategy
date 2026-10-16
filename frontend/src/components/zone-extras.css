@@ -4,9 +4,16 @@
   align-items: center;
   gap: 6px;
 }
+.zone-extra > :not(.panel-heading) {
+  margin-right: 20px;
+  margin-left: 20px;
+}
+.zone-extra > :last-child {
+  margin-bottom: 16px;
+}
 .zone-camera img {
   display: block;
-  width: 100%;
+  width: calc(100% - 40px);
   max-height: 260px;
   object-fit: contain;
   border-radius: 6px;

@@ -59,7 +59,7 @@ export function RootZonePanel({ controller, zone }: { controller: Controller; zo
         gauges={[
           {
             id: "root-temperature",
-            model: gauge({ label: "Root-zone temperature", value: numeric(entity), unit }),
+            model: gauge({ label: "Temperature", value: numeric(entity), unit }),
           },
         ]}
       />

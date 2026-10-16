@@ -50,7 +50,7 @@ export function dayDeltas({
     target === null
       ? null
       : reachedHour(
-          points.map((p) => ({ hour: (p.time - start) / 3_600_000, value: p.value })),
+          points.map((p) => ({ time: p.time, hour: (p.time - start) / 3_600_000, value: p.value })),
           target,
         );
   if (today !== null && them.reached !== null) {
