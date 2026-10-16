@@ -152,6 +152,8 @@ export function HardwarePanel({ controller, zone }: { controller: Controller; zo
   const devices = mappedDevices(controller.states, controller.room.room, zone.id);
   const connected = ["live", "demo"].includes(controller.connection);
   const copy = UI_COPY["test shot"];
+  const requestedSeconds = Number(controller.states[`number.crop_steering_${controller.room.room.prefix}zone_${zone.id}_manual_shot_seconds`]?.state);
+  const shotSeconds = Number.isFinite(requestedSeconds) && requestedSeconds > 0 ? requestedSeconds : 10;
   return (
     <section className="panel zone-extra" aria-labelledby="zone-hardware-title" data-zone-hardware>
       <div className="panel-heading">
@@ -197,7 +199,7 @@ export function HardwarePanel({ controller, zone }: { controller: Controller; zo
             change: { entityId: `button.crop_steering_${controller.room.room.prefix}zone_${zone.id}_test_shot`, value: true },
             label: `${zone.name} test shot`,
             before: "No shot",
-            after: "10 s shot",
+            after: `${shotSeconds} s shot (subject to controller limits)`,
           },
         ]}
         note={copy.tooltip}
