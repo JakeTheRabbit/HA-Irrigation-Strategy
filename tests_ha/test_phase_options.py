@@ -17,7 +17,7 @@ from test_setup_entry import _install
 from test_upgrade_in_place import JEV_3_11_1, UPSTREAM_2_25_1, _upgrade
 
 ZONE_NUMBERS = {  # key: (value it starts at, min, max)
-    "p0_minimum_wait_time": (0, 0, 240),
+    "p0_minimum_wait": (0, 0, 240),
     "ec_flush_target": (0, 0, 9),
     "p2_timed_interval_min": (60, 5, 720),
     "p2_timed_shot_size": (0, 0, 20),
@@ -107,7 +107,7 @@ async def test_an_updated_room_is_read_by_the_controller_as_before(hass, control
 async def test_set_by_the_operator_they_reach_the_engine(hass, controller_for):
     await _install(hass)
     z = "number.crop_steering_tent_zone_1_"
-    for key, value in (("p0_minimum_wait_time", 30), ("ec_flush_target", 4.5), ("p2_timed_interval_min", 45),
+    for key, value in (("p0_minimum_wait", 30), ("ec_flush_target", 4.5), ("p2_timed_interval_min", 45),
                        ("p2_end_hours_before_off", 2), ("p2_dilute_ratio", 1.5)):
         await hass.services.async_call("number", "set_value", {"entity_id": z + key, "value": value}, blocking=True)
     await hass.services.async_call("select", "select_option", {
@@ -143,3 +143,13 @@ async def test_a_controller_updated_ahead_of_a_3_11_1_integration_decides_as_bef
     assert c._step_limit(room) == 1.0 and c._step_limit_all(room) is False
     missing = {e for e in c._defaulted_this_loop if any(k in e for k in ZONE_NUMBERS)}
     assert missing == set()
+
+
+def test_no_new_setting_reuses_a_retired_key():
+    """A retired key is removed from the registry at every setup, and an old install may still hold its stale
+    value: a new setting under such a key would be dropped and resurrected each start."""
+    from custom_components.crop_steering import _RETIRED
+
+    retired = set().union(*_RETIRED.values())
+    keys = {*ZONE_NUMBERS, *(f"zone_{k}" for k in ZONE_NUMBERS), *ROOM_SWITCHES, STEP, SCOPE, "zone_p2_mode"}
+    assert keys & retired == set()

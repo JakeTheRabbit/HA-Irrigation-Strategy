@@ -191,7 +191,7 @@ NUMBER_DESCRIPTIONS = [
     ),
     # Opt-in: minutes after lights-on that nothing but the bypass ends P0. 0 (the default) is off.
     NumberEntityDescription(
-        key="p0_minimum_wait_time",
+        key="p0_minimum_wait",
         name="Morning dryback minimum wait",
         icon="mdi:timer-sand",
         native_min_value=0.0,
@@ -633,7 +633,7 @@ PER_ZONE_STEERING_KEYS = [
     "generative_dryback_target",
     "p0_maximum_wait_time",
     "p0_dryback_drop_percent",
-    "p0_minimum_wait_time",
+    "p0_minimum_wait",
     "p1_target_vwc",
     "p1_initial_shot_size",
     "p1_shot_size_increment",

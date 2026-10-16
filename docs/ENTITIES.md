@@ -30,7 +30,7 @@ entities scale with your zone count, `N` = 1…zones).
 | Entity | Range | Default | Unit | What it does |
 |---|---|---|---|---|
 | `p0_dryback_drop_percent` | 2-40 | 15 | % | An old setting that stays for older rooms and recipes. The controller does not read this setting. The P0 dryback comes from the P0 extra dryback of each zone (`zone_N_p0_additional_dryback`, section 2). |
-| `p0_minimum_wait_time` | 0-240 | 0 | min | Morning dryback minimum wait (default 0, off). Nothing but the re-water bypass ends P0 before this time after lights-on: not the dryback target, the stall exit, the maximum wait or the AI assistant. |
+| `p0_minimum_wait` | 0-240 | 0 | min | Morning dryback minimum wait (default 0, off). Nothing but the re-water bypass ends P0 before this time after lights-on: not the dryback target, the stall exit, the maximum wait or the AI assistant. |
 | `p0_maximum_wait_time` | 30-600 | 120 | min | The longest time that the morning dryback (P0) lasts after lights-on. At this time, the zone goes to P1, also when the dryback is not complete. |
 
 ### P1: ramp
@@ -118,7 +118,7 @@ for that zone. (3 zones × 27 = 81 entities on a 3-zone system.)
 `p1_minimum_shots`, `p1_maximum_shots`, `p1_rise_pts`, `p1_maximum_extra_shots`, `p1_target_vwc`,
 `p1_time_between_shots`,
 `p2_vwc_threshold`, `p2_shot_size`, `p2_time_between_shots`, `ec_min_interval`, `p3_emergency_vwc_threshold`,
-`p0_minimum_wait_time`, `ec_flush_target`, `p2_dilute_ratio`, `p2_timed_interval_min`, `p2_timed_shot_size`,
+`p0_minimum_wait`, `ec_flush_target`, `p2_dilute_ratio`, `p2_timed_interval_min`, `p2_timed_shot_size`,
 `p2_timed_first_hours`, `p2_end_hours_before_off`,
 `p3_emergency_shot_size`, `p3_time_between_shots`, `vegetative_dryback_target`, `generative_dryback_target`,
 `ec_target_veg_p0` to `_p2`, `ec_target_gen_p0` to `_p2`, `field_capacity`,
