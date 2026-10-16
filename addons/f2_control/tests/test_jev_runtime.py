@@ -89,6 +89,35 @@ def test_p1_hands_over_only_near_the_ceiling_with_the_minimum_shots():
     assert not admit(_d("advance", "P2", few), few)[0]
 
 
+def test_a_stalled_ramp_far_under_the_ceiling_may_hand_over_on_a_probe_code_trusts():
+    p = K.params(p1_target=45.0, field_capacity=50.0, p1_min_shots=2)
+    flat = dict(phase="P1", vwc=25.1, shot_count=4, vwc_settled=25.1, p1_settled_before_shot=25.2)
+    stalled = K.ctx("P1", s=K.snap(**flat), p=p)
+    ok, why = admit(_d("advance", "P2", stalled), stalled)
+    assert ok and "stalled" in why
+    rising = K.ctx("P1", s=K.snap(**dict(flat, vwc_settled=27.0, vwc=27.0)), p=p)
+    bypass = K.ctx("P1", s=K.snap(**flat, p1_probe_suspect=True), p=p)
+    backed = K.ctx("P1", s=K.snap(**flat, backed_up=True), p=p)
+    for c in (rising, bypass, backed):
+        assert not admit(_d("advance", "P2", c), c)[0]
+
+
+def test_the_ramp_judge_is_asked_at_once_about_a_ramp_shot_that_did_not_rise():
+    from jev.judges.ramp import stalling
+
+    p = K.params(p1_target=45.0, field_capacity=50.0)
+    s = K.snap(phase="P1", vwc=25.1, shot_count=4, minutes_since_shot=16.0, vwc_settled=25.1,
+               p1_settled_before_shot=25.2, p1_flat_shots=1)
+    c = K.ctx("P1", s=s, p=p)
+    judge = RampJudge()
+    assert stalling(c)
+    assert judge.due(c, c.now - timedelta(minutes=20))  # asked before this shot: asked again now
+    assert not judge.due(c, c.now - timedelta(minutes=5))  # already asked about this shot
+    assert "ramp_stall" in judge.evidence(c)
+    assert not stalling(K.ctx("P1", s=K.snap(phase="P1", vwc=25.1, shot_count=4, vwc_settled=25.1,
+                                             p1_settled_before_shot=25.2, p1_probe_suspect=True), p=p))
+
+
 def test_p3_early_only_in_the_last_three_hours_and_above_the_floor():
     early = K.ctx("P2", s=K.snap(hours_to_lights_off=5.0, vwc=34.0), steering="generative")
     close = K.ctx("P2", s=K.snap(hours_to_lights_off=2.0, vwc=27.0), p=K.params(p3_emergency_floor=25.0),

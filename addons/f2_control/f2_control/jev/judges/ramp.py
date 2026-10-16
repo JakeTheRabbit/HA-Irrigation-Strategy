@@ -6,6 +6,10 @@ probe lifts pore EC 30-65 %, the EC gate never passes, and "flush" shots burn th
 person looking at the curve knows when the slab is full and the EC is just the feed going by. So does this
 judge.
 """
+from datetime import timedelta
+
+from crop_steering_engine.core import p1_rise, p1_stall
+
 from ..context import response, trend, words_response, words_trend
 from ..doctrine import doctrine
 from .base import Judge, choice, common, with_doctrine
@@ -35,6 +39,15 @@ QUESTIONS = with_doctrine({
 }, doctrine("ramp", "probe", "ec", limit=4))
 
 
+def stalling(ctx):
+    """True when the zone's last ramp shot under its ceiling did not give the rise P1 needs (core.p1_stall) and code
+    does not doubt the probe."""
+    s, p = ctx.snap, ctx.params
+    if s is None or s.vwc >= min(p.p1_target, p.field_capacity) or s.backed_up or s.p1_probe_suspect:
+        return False
+    return p.p1_stall_shots > 0 and p1_stall(s, p) >= 1
+
+
 class RampJudge(Judge):
     name = "ramp"
     phases = ("P1",)
@@ -44,9 +57,13 @@ class RampJudge(Judge):
     questions = QUESTIONS
 
     def due(self, ctx, last_asked):
+        s = ctx.snap
+        if ctx.phase in self.phases and s is not None and s.minutes_since_shot >= 10.0 and stalling(ctx):
+            # A ramp shot that did not rise: asked once about it, whatever the cadence. Hand over now, or let the
+            # engine give the one more shot after which it ends P1 itself (core.p1_stall).
+            return last_asked is None or ctx.now - last_asked >= timedelta(minutes=s.minutes_since_shot)
         if not super().due(ctx, last_asked):
             return False
-        s = ctx.snap
         return s.shot_count >= 1 and s.minutes_since_shot >= 10.0  # a shot to judge, past its spike
 
     def evidence(self, ctx):
@@ -68,6 +85,12 @@ class RampJudge(Judge):
                                        f"(the base engine waits for {p.ec_target_p1 * 1.15:.2f} or less)"),
             "pore_ec_last_hour": words_trend(trend(ctx.history, ctx.now, 60, index=2), "mS/cm", "pore EC"),
         })
+        if stalling(ctx):
+            rise, need = p1_rise(s, p)
+            e["ramp_stall"] = (f"the last {p1_stall(s, p)} ramp shot(s) in a row raised the settled moisture by less "
+                               f"than {need:.2f} points (the last one {rise:+.2f}), {ceiling - s.vwc:.1f} points under "
+                               f"the ceiling; code ends the ramp after {p.p1_stall_shots} such shots: hand over now, "
+                               "or let it give one more")
         if ctx.feed_ec is not None and ec is not None:
             e["feed_vs_pore_ec"] = ("feed is lower than pore EC, so water through the slab lowers it"
                                     if ctx.feed_ec < ec else "feed is not lower than pore EC")

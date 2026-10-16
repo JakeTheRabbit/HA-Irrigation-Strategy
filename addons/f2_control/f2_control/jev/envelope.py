@@ -11,6 +11,7 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 
 from crop_steering_engine import p0_dryback
+from crop_steering_engine.core import p1_stall
 
 ORDER = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
 NEXT = {"P0": "P1", "P1": "P2", "P2": "P3"}
@@ -80,6 +81,10 @@ def admit(d: Directive, ctx, confirmed=0, evidence_ok=False):
                 return False, f"only {snap.shot_count} ramp shots in (minimum {max(1, p.p1_min_shots)})"
             ceiling = _p1_ceiling(p)
             if snap.vwc < ceiling - 3.0:
+                # Far under the ceiling only a stalled ramp may hand over: the last ramp shot did not give the rise
+                # P1 needs (core.p1_stall), on a probe code does not doubt. The engine ends it a shot later anyway.
+                if p1_stall(snap, p) >= 1 and not snap.backed_up and not snap.p1_probe_suspect:
+                    return True, f"ramp stalled at {snap.vwc:.1f}, under the ramp ceiling {ceiling:.1f}"
                 return False, f"VWC {snap.vwc:.1f} more than 3 points under the ramp ceiling {ceiling:.1f}"
             return True, "ramp near its ceiling with the minimum shots in"
         if target == "P3":
