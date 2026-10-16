@@ -165,3 +165,41 @@
     grid-template-columns: 3.5em minmax(0, 1fr);
   }
 }
+/* What the AI assistant may do: a checkbox per power, its one line of help under it. */
+.brain-powers {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.brain-powers li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.brain-powers label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.brain-powers input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  flex: none;
+  accent-color: var(--primary-strong);
+}
+.brain-powers input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+.brain-powers p {
+  margin: 0 0 0 26px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
