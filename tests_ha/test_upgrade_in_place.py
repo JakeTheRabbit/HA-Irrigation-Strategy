@@ -269,6 +269,7 @@ async def test_a_3_8_0_state_file_loads_with_its_history_empty_and_nothing_moves
         assert (written.pop("capped_in_a_row"), written.pop("max_run_latch")) == (0, None)
         assert written.pop("vmax_wetup") == []
         assert (written.pop("p1_flat"), written.pop("p1_stall")) == (0, None)  # no stalled ramp: saved empty
+        assert written.pop("ec_flushing") is False  # no EC flush episode: saved off
         old = {k: v for k, v in seed["default"][zone].items() if k not in PID_TERMS}
         assert written.pop("fc_follow") == {"peak": old["peak"], "day": None, "used": {}}
         assert learn == old.pop("learn")
