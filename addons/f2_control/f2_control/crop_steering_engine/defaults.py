@@ -62,6 +62,8 @@ DEFAULTS = {
     # (off), so the entity column does not apply; the controller falls back to 0, off.
     "p0_additional_dryback": (None, 0),
     "p0_dryback_drop_percent": (15.0, None),
+    # Opt-in: minutes nothing but the bypass ends P0. 0 = off, as P0 always was.
+    "p0_minimum_wait_time": (0.0, 0.0),
     # P1
     "p1_target_vwc": (65.0, 60),
     "p1_initial_shot_size": (2.0, 2),
@@ -79,8 +81,24 @@ DEFAULTS = {
     # Minutes from the last shot before a P2 top-up may go: 0 is off, as top-ups always went.
     "p2_time_between_shots": (0.0, 0.0),
     "ec_min_interval": (10.0, 10.0),
+    # Opt-in: once an EC flush fires, dilute shots go on until pore EC is at or under this. 0 = off.
+    "ec_flush_target": (0.0, 0.0),
+    # Timed P2 (the zone's P2 mode select): minutes between timed shots, their size (% of substrate,
+    # 0 = the maintenance shot size) and the hours after lights-on before the first. Read only in a timed mode.
+    "p2_timed_interval_min": (60.0, 60.0),
+    "p2_timed_shot_size": (0.0, 0.0),
+    "p2_timed_first_hours": (0.0, 0.0),
+    # Opt-in: P1/P2 hand over to P3 this many hours before lights-off. 0 = off.
+    "p2_end_hours_before_off": (0.0, 0.0),
     "p2_ec_high_threshold": (1.2, None),
+    # The P2 dilute trigger, pore EC / the P2 EC target. The controller reads it only while the room's
+    # "use P2 EC ratios" switch is on; off, and as its fallback, the engine's own 1.2. A setting of its
+    # own: the old per-zone copies of p2_ec_high_threshold were retired, and their stale values stay so.
+    "p2_dilute_ratio": (1.2, 1.2),
     "p2_ec_low_threshold": (0.8, None),
+    # Room: the most the automatic writers move field capacity, the peak target or the re-water point in
+    # a grow-day, in VWC points; 0 = no limit. The controller falls back to its own FC_STEP_MAX (1).
+    "setpoint_max_step_per_day": (1.0, None),
     # P3
     "p3_emergency_vwc_threshold": (40.0, 40),
     "p3_emergency_shot_size": (2.0, 2),
