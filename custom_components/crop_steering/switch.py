@@ -17,6 +17,7 @@ from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 
 from .const import AI_POWERS, DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
+from .ph_and_dim import SWITCHES as PROTECTIVE_SWITCHES
 from .room import restored_state_is_ours, room_prefix
 
 _LOGGER = logging.getLogger(__name__)
@@ -81,6 +82,12 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="Auto irrigation enabled (retired)",
         icon="mdi:auto-mode",
         entity_registry_visible_default=False,
+    ),
+    # Opt-in, OFF on new and updated rooms: pH auto-correct of the batch tank and dimming the
+    # lights on dry substrate (ph_and_dim.py, docs/DOSING.md).
+    *(
+        SwitchEntityDescription(key=key, name=name, icon=icon)
+        for key, name, icon in PROTECTIVE_SWITCHES
     ),
     # What the AI assistant may do in this room (const.AI_POWERS), one switch each.
     *(
