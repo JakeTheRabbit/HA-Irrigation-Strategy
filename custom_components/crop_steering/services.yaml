@@ -1197,6 +1197,98 @@ brain_ask:
           min: 1
           max: 24
           mode: box
+
+grow_day_record:
+  name: Record grow-day summaries
+  description: >-
+    Stores one summary for each zone and grow-day in the grow-day store of the room. The controller
+    app sends them at lights-on while the Record grow days switch of the room is on. A summary for a
+    zone and a date that is already stored replaces it. Changes no setting and no watering. When a
+    signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. The integration refuses an unknown ID. Example: `room:f1_`.
+      required: true
+      selector:
+        text:
+    days:
+      name: Summaries
+      description: >-
+        A list of grow-day summaries, each with at least a date (YYYY-MM-DD) and a zone (1 to 24). At
+        most 336 in one call.
+      required: true
+      selector:
+        object:
+
+grow_days_get:
+  name: Read grow-day summaries
+  description: >-
+    Returns the grow-day summaries of the room, oldest first. Changes nothing. It has no administrator
+    check.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. Example: `room:f1_`.
+      required: true
+      selector:
+        text:
+    start:
+      name: First grow-day
+      description: The first grow-day to return, YYYY-MM-DD. Left out, from the oldest.
+      required: false
+      selector:
+        text:
+    end:
+      name: Last grow-day
+      description: The last grow-day to return, YYYY-MM-DD. Left out, to the newest.
+      required: false
+      selector:
+        text:
+    zone:
+      name: Zone
+      description: Only this zone. Left out, every zone.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 24
+          mode: box
+
+grow_days_backfill:
+  name: Fill grow-days from statistics
+  description: >-
+    Adds a summary for each zone and grow-day from the start to the end date that has none, from the
+    long-term statistics of Home Assistant: the lowest, highest and mean moisture and EC of the zone,
+    and its water. These summaries are marked as backfilled. The dryback, the shots and the readings of
+    each probe cannot be filled. A recorded summary is never replaced. When a signed-in user calls it,
+    that user must be a Home Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix for a
+        named room. Example: `room:f1_`.
+      required: true
+      selector:
+        text:
+    start:
+      name: First grow-day
+      description: The first grow-day to fill, YYYY-MM-DD.
+      required: true
+      selector:
+        text:
+    end:
+      name: Last grow-day
+      description: The last grow-day to fill, YYYY-MM-DD. At most 401 grow-days after the first.
+      required: true
+      selector:
+        text:
+
 display_get:
   name: Read display options
   description: >-
@@ -1213,6 +1305,7 @@ display_get:
       required: true
       selector:
         text:
+
 display_save:
   name: Save display options
   description: >-
