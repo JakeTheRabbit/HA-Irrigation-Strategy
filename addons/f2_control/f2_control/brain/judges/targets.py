@@ -162,6 +162,10 @@ class TargetsJudge(Judge):
         e["settings_now"] = {k: f"{cur:g}" for k, cur in (v.get("current") or {}).items()}
         if v.get("plan"):
             e["grow_plan"] = v["plan"]
+        if v.get("daily_limit") is not None and math.isfinite(v["daily_limit"]):
+            e["daily_limit"] = (f"field capacity, the peak target and the re-water point each move at most "
+                                f"{v['daily_limit']:g} points a grow-day, whoever moves them; a bigger change is "
+                                "clamped to it")
         e["your_power"] = ("on: code writes what you set, clamped only to each setting's own range" if v.get("power")
                            else "off: what you set is shown to the owner as advice and not written")
         return e

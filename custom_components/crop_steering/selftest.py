@@ -10,7 +10,7 @@ from __future__ import annotations
 from .admin import async_require_admin
 from .const import DOMAIN
 
-SERVICES = ("test_shot",)
+SERVICES = ("test_shot", "stop_all")
 
 
 def shot_button(room_id, zone) -> str:
@@ -56,6 +56,10 @@ async def async_setup_selftest(hass):
         ),
         supports_response=SupportsResponse.ONLY,
     )
+    # The room's Stop all (safety_ops.py): it switches the room off, so it works with the controller stopped.
+    from .safety_ops import async_setup_stop_all
+
+    await async_setup_stop_all(hass)
 
 
 async def async_unload_selftest(hass):

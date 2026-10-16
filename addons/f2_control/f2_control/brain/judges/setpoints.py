@@ -26,7 +26,7 @@ from .zones import water_vs_room
 SHOT, THRESHOLD = "p2_shot_size", "p2_vwc_threshold"
 STEP = 0.5
 SHOT_FLOOR = 3.0  # percent of the substrate: below it the engine's EC scaling makes machine-gun shots
-MAINTENANCE = ("p2_topup", "p2_dilute", "p2_rescue")
+MAINTENANCE = ("p2_topup", "p2_timed", "p2_dilute", "p2_rescue")
 LESS_WATER = ("smaller_shots", "later_rewater")
 MORE_WATER = ("bigger_shots", "sooner_rewater")
 

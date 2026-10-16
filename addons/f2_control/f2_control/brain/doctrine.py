@@ -111,8 +111,8 @@ RULES = {
              "maintenance shots once the controller and the probe are verified.", ROCKWOOL),
         Rule("Change one irrigation variable at a time and watch its effect over a full light-dark cycle before "
              "changing another.", SLAB),
-        Rule("Runoff must be caught at representative plants or slabs in each zone, never inferred from how long "
-             "the pump ran.", SLAB),
+        Rule("Runoff is measured by a catch at representative plants or slabs in each zone; an estimate from the "
+             "sump pump's runs is a room-wide hint with an error band, never a catch.", SLAB),
         Rule("Slabs that behave unevenly across a room point to dripper flow or placement: flush and check the "
              "lines and match the dripper count to the slab.", ROCKWOOL),
     ],
@@ -451,6 +451,8 @@ def _read_arc(arc, pack):
             "last": days.startswith("last"), "steering": cell["steering"], "peak": cell.get("peak") or "",
             "dryback": f"{dry[0]:g}-{dry[1]:g} points of true water content"
                        + (f" ({cell['notes']})" if cell.get("notes") else ""), "dryback_points": dry,
+            "dryback_relative_vendor": (_pair(cell["dryback_relative_vendor"], f"{name}'s relative dryback")
+                                         if cell.get("dryback_relative_vendor") else None),
             "pore_ec": f"root-zone EC {ec[0]:g}-{ec[1]:g}", "pore_ec_range": ec,
             "runoff": f"{runoff[0]:g}-{runoff[1]:g} % of the water fed", "runoff_pct": runoff,
             "move_on_when": cell["move_on_when"], "source": cite})

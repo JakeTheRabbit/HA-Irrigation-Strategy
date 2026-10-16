@@ -120,8 +120,18 @@ def restored_state_is_ours(entry, last_state) -> bool:
         return True
 
 
-# The room climate sensors a setup can map (config_flow, hardware step).
-CLIMATE_SENSORS = ("temperature_sensor", "humidity_sensor", "vpd_sensor")
+# The room's ACs and dehumidifiers a setup can map, each a list of entities (setup_api).
+HVAC_LISTS = ("ac_entities", "dehumidifier_entities")
+# The room climate sensors a setup can map (config_flow, hardware step). The leaf temperature
+# (an IR canopy sensor) is for the dashboard's plant-stress card only.
+CLIMATE_SENSORS = (
+    "temperature_sensor",
+    "humidity_sensor",
+    "vpd_sensor",
+    "leaf_temperature_sensor",
+)
+# What only the dashboard shows (Settings > Display), set up on its Setup page.
+DISPLAY_SENSORS = ("camera_entity", "co2_sensor", "ppfd_sensor", "dli_sensor")
 
 
 def build_engine_config(
@@ -166,6 +176,9 @@ def build_engine_config(
     declared.update(
         {k: hw[k] for k in ("tank_distance_sensor", "tank_low_float") if hw.get(k)}
     )
+    # The room's waste valve, likewise only when mapped: the controller only ever switches it off, and only
+    # under the room's waste valve rule (select waste_valve_rule, Off until chosen).
+    declared.update({"waste": hw["waste_switch"]} if hw.get("waste_switch") else {})
     # The room's light, likewise only when mapped: the controller checks it against the lights hours.
     declared.update(
         {"light_entity": hw["light_entity"]} if hw.get("light_entity") else {}
@@ -173,6 +186,28 @@ def build_engine_config(
     # The room's climate sensors, likewise only when mapped: read-only, for the dashboard's history
     # chart. The controller reads none of them.
     declared.update({k: hw[k] for k in CLIMATE_SENSORS if hw.get(k)})
+    # Each AC and dehumidifier the room maps, likewise only when mapped: read only, for the
+    # controller's runoff estimator (the sump water balance).
+    declared.update({k: list(hw[k]) for k in HVAC_LISTS if hw.get(k)})
+    # A zone's own leaf temperature sensor, likewise only when one is mapped (display only).
+    leaf = {
+        str(z): (zones.get(str(z)) or zones.get(z) or {}).get("leaf_temperature_sensor")
+        for z in range(1, int(num_zones) + 1)
+    }
+    leaf = {z: e for z, e in leaf.items() if e}
+    if leaf:
+        declared["zone_leaf_sensors"] = leaf
+    # Likewise the camera, CO2 and PPFD, and each zone's root-zone temperature probe.
+    declared.update({k: hw[k] for k in DISPLAY_SENSORS if hw.get(k)})
+    root_zone = {
+        str(z): (zones.get(str(z)) or zones.get(z) or {}).get(
+            "substrate_temperature_sensor"
+        )
+        for z in range(1, int(num_zones) + 1)
+    }
+    root_zone = {z: eid for z, eid in root_zone.items() if eid}
+    if root_zone:
+        declared["substrate_temperature_sensors"] = root_zone
     if setup.get("tank_level") and (
         hw.get("tank_distance_sensor") or hw.get("tank_low_float")
     ):
@@ -193,7 +228,15 @@ def build_engine_config(
     # reads it with "generic" as the default and adopts it with no disarm cycle: it is not one of
     # the keys the setup fingerprint reads.
     grown_in = {"substrate": substrate} if substrate else {}
+    # A cultivar label per zone, display only; only a room with one publishes the key, so a room without
+    # labels publishes the descriptor it always did.
+    cultivars = {
+        str(z): label
+        for z in range(1, int(num_zones) + 1)
+        if (label := (zones.get(str(z)) or zones.get(z) or {}).get("cultivar"))
+    }
     return {
+        **({"zone_cultivars": cultivars} if cultivars else {}),
         **declared,
         **versions,
         **which,

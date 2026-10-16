@@ -6,6 +6,7 @@ import {
   ComposedChart,
   Line,
   ReferenceArea,
+  ReferenceDot,
   ResponsiveContainer,
   Scatter,
   Tooltip,
@@ -22,10 +23,12 @@ import {
 } from "@/components/ui/sheet";
 import { InfoTip } from "@/components/info-tip";
 import type { RunRecord, RunsDocument } from "@/lib/comparison-types";
-import { phaseBands, valveShots, type TimelineRow } from "@/lib/day-timeline";
+import { growDay, phaseBands, valveShots, type TimelineRow } from "@/lib/day-timeline";
 import {
   alignGrid,
   chunks,
+  DRYBACK_MARKER_DAYS,
+  drybackMarkers,
   EXPLORER_COPY,
   explorerSensors,
   pickRuns,
@@ -33,6 +36,7 @@ import {
   previousWindow,
   readChoice,
   resolveRange,
+  runDayAt,
   SeriesGrid,
   stepFor,
   UNIT_DIGITS,
@@ -42,7 +46,9 @@ import {
   type Span,
   type Unit,
 } from "@/lib/history-explorer";
+import { dateInZone } from "@/lib/comparison";
 import { numeric } from "@/lib/model";
+import { dayOfRun, type GrowDay, type GrowDaysDocument } from "@/lib/grows";
 import type { Controller, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import "./history-explorer.css";
@@ -77,7 +83,7 @@ interface Loaded {
 /** Recorded history of `ids` over `span` on a grid of `step`, a day at a time, two at a time. A
  * sensor ticked later is read alone; a new range reads everything again. `raw` keeps the rows of
  * a few event entities (valves, phase) as they are. */
-function useGrids(
+export function useGrids(
   controller: Controller,
   ids: string[],
   raw: string[],
@@ -203,7 +209,12 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
     sensors.some((sensor) => sensor.entityId === id),
   );
   const visible = sensors.filter((sensor) => ticked.includes(sensor.entityId));
-  const { current: run, previous } = pickRuns(runs ?? []);
+  const { current: run, previous: last } = pickRuns(runs ?? []);
+  // The grow compared with: the one picked, else the last one before this grow.
+  const previous =
+    (choice.compareRun && (runs ?? []).find((r) => r.id === choice.compareRun && r.id !== run?.id)) ||
+    last;
+  const others = (runs ?? []).filter((r) => !r.archived && r.id !== run?.id);
   const prefix = room.room.prefix;
   const hour = (key: string) => numeric(states[`number.crop_steering_${prefix}lights_${key}_hour`]);
   const span = resolveRange(choice, {
@@ -249,6 +260,27 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
     connected && previousSpan ? { start: previousSpan.start, end: previousSpan.end } : null,
     step,
   );
+  // Past the recorder's retention, the picked grow's daily summaries stand in: each grow day's mean.
+  const summaries = useGrowDays(
+    controller,
+    choice.compare && previous && previousSpan ? previous : null,
+    previousSpan,
+  );
+  const summaryFor = (sensor: ExplorerSensor, day: number): number | null => {
+    if (!previous) return null;
+    const row = summaries.find(
+      (d) => d.zone === sensor.zone && dayOfRun(previous, d.date) === day,
+    );
+    if (!row) return null;
+    const zone = room.zones.find((z) => z.id === sensor.zone);
+    if (sensor.entityId === zone?.vwc.entityId) return row.vwc?.mean ?? null;
+    if (sensor.entityId === zone?.ec.entityId) return row.ec?.mean ?? null;
+    // A probe: its own entity id, else the same name (a probe replaced under a new id).
+    const probe =
+      row.probes?.find((p) => p.entity_id === sensor.entityId) ??
+      row.probes?.find((p) => p.name && p.name === sensor.label);
+    return probe?.mean ?? null;
+  };
   const grid = span ? new SeriesGrid(span.start, span.end, step) : null;
   const data = useMemo(() => {
     if (!grid || !span) return [];
@@ -269,6 +301,11 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
           (value, at) => (rows[at][`p${index}`] = value),
         );
       }
+      if (summaries.length && run && rows.every((row) => row[`p${index}`] == null))
+        rows.forEach((row) => {
+          const day = Math.floor(runDayAt(run, row.t as number));
+          row[`p${index}`] = summaryFor(sensor, day);
+        });
     });
     return rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -278,6 +315,7 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
     recorded.loads,
     before.values,
     before.loads,
+    summaries,
     previousSpan?.start,
     run?.id,
     previous?.id,
@@ -309,6 +347,21 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
         })
       : [];
   const units = [...new Set(visible.map((sensor) => sensor.unit))];
+  // Settings-free overlay (URL dryback=1, off by default): each grow day's peak and the low after
+  // it on this zone's VWC, labelled as the controller measures dryback, on ranges of 14 d at most.
+  const vwcIndex = visible.findIndex((sensor) => sensor.entityId === zone.vwc.entityId);
+  const markers =
+    choice.dryback && span && grid && vwcIndex >= 0 && span.end - span.start <= DRYBACK_MARKER_DAYS * 86_400_000
+      ? (() => {
+          const first = growDay(hour("on"), hour("off"), span.start, timeZone)?.start;
+          if (first === undefined) return [];
+          const starts: number[] = [];
+          for (let t = first; t < span.end; t += 86_400_000) starts.push(t);
+          const times = Array.from({ length: grid.length }, (_, i) => grid.timeAt(i));
+          const values = times.map((_, i) => data[i]?.[`s${vwcIndex}`] ?? null);
+          return drybackMarkers(times, values, starts);
+        })()
+      : [];
   const hasPrevious = data.some((row) =>
     Object.keys(row).some((key) => key[0] === "p" && row[key] !== null),
   );
@@ -322,6 +375,7 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
       span={span}
       runName={run?.name ?? null}
       hasPrevious={!!previous}
+      others={others}
     />
   );
   const compareNote = !choice.compare
@@ -392,7 +446,9 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
                 units={units}
                 previous={
                   choice.compare && hasPrevious && previous && previousSpan
-                    ? `Run ${previous.name}, days ${previousSpan.firstDay}–${previousSpan.lastDay}`
+                    ? `Run ${previous.name}, days ${previousSpan.firstDay}–${previousSpan.lastDay}${
+                        !before.values.size && summaries.length ? " (daily summary mean)" : ""
+                      }`
                     : null
                 }
                 shots={shots.length > 0}
@@ -523,6 +579,34 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
                               className="history-explorer-previous"
                             />
                           ))}
+                        {markers.flatMap((marker) => [
+                          <ReferenceDot
+                            key={`peak-${marker.peak.t}`}
+                            x={marker.peak.t}
+                            y={marker.peak.value}
+                            yAxisId={`axis-${units.indexOf("%")}`}
+                            r={3}
+                            fill="var(--muted-foreground)"
+                            stroke="none"
+                            className="history-explorer-dryback"
+                          />,
+                          <ReferenceDot
+                            key={`low-${marker.low.t}`}
+                            x={marker.low.t}
+                            y={marker.low.value}
+                            yAxisId={`axis-${units.indexOf("%")}`}
+                            r={3}
+                            fill="var(--surface)"
+                            stroke="var(--muted-foreground)"
+                            className="history-explorer-dryback"
+                            label={{
+                              value: `${marker.percent.toFixed(1)}% of peak`,
+                              position: "bottom",
+                              fill: "var(--muted-foreground)",
+                              fontSize: 12,
+                            }}
+                          />,
+                        ])}
                         {shots.length > 0 && (
                           <Scatter
                             data={shots}
@@ -568,6 +652,28 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
 
 type Row = Record<string, number | null>;
 
+/** The daily summaries of `run` over `span`, for the compare line past the recorder's retention. */
+function useGrowDays(controller: Controller, run: RunRecord | null, span: Span | null): GrowDay[] {
+  const [days, setDays] = useState<GrowDay[]>([]);
+  const start = run && span ? dateInZone(span.start, run.time_zone) : "",
+    end = run && span ? dateInZone(span.end, run.time_zone) : "";
+  useEffect(() => {
+    if (!start) {
+      setDays([]);
+      return;
+    }
+    let cancelled = false;
+    controller
+      .operator<GrowDaysDocument>("grow_days_get", { start, end })
+      .then((doc) => !cancelled && setDays(doc.days))
+      .catch(() => !cancelled && setDays([]));
+    return () => {
+      cancelled = true;
+    };
+  }, [controller.operator, start, end]);
+  return days;
+}
+
 function Controls({
   choice,
   setChoice,
@@ -576,6 +682,7 @@ function Controls({
   span,
   runName,
   hasPrevious,
+  others = [],
 }: {
   choice: Choice;
   setChoice: (next: Partial<Choice>) => void;
@@ -584,6 +691,8 @@ function Controls({
   span: Span | null;
   runName: string | null;
   hasPrevious: boolean;
+  /** The grows that can be compared with (every run but this one). */
+  others?: RunRecord[];
 }) {
   const [from, setFrom] = useState(() => localInput(choice.from ?? span?.start ?? Date.now()));
   const [to, setTo] = useState(() => localInput(choice.to ?? span?.end ?? Date.now()));
@@ -688,6 +797,24 @@ function Controls({
           Compare with previous run
           <InfoTip label={EXPLORER_COPY.compare.label} copy={EXPLORER_COPY.compare.copy} />
         </label>
+        {choice.compare && others.length > 0 && (
+          <label className="history-explorer-check">
+            Grow
+            <select
+              aria-label="Grow to compare with"
+              value={choice.compareRun ?? ""}
+              onChange={(event) => setChoice({ compareRun: event.target.value || null })}
+              data-compare-grow
+            >
+              <option value="">Last grow</option>
+              {others.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {!hasPrevious && choice.compare && <span className="muted small">No previous run</span>}
         <label className="history-explorer-check">
           <input
@@ -704,6 +831,16 @@ function Controls({
             onChange={(event) => setChoice({ phases: event.target.checked })}
           />
           Phase bands
+        </label>
+        <label className="history-explorer-check">
+          <input
+            type="checkbox"
+            checked={choice.dryback}
+            onChange={(event) => setChoice({ dryback: event.target.checked })}
+            data-dryback-toggle
+          />
+          Dryback (% of peak)
+          <InfoTip label={EXPLORER_COPY.dryback.label} copy={EXPLORER_COPY.dryback.copy} />
         </label>
       </fieldset>
       <fieldset className="history-explorer-sensors">

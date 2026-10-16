@@ -1,0 +1,25 @@
+.on-this-day-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.on-this-day-table th,
+.on-this-day-table td {
+  padding: 0.3rem 0.4rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+.on-this-day-delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--muted-foreground);
+}
+.on-this-day select {
+  background: var(--background);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 0.2rem 0.4rem;
+  max-width: 14rem;
+}
