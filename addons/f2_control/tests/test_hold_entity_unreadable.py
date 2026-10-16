@@ -19,6 +19,8 @@ pytestmark = pytest.mark.usefixtures("settings_built_in")
 KILL = "input_boolean.kill"
 HOLD = "input_boolean.tank_dosing"
 UNREADABLE = f"external hold {HOLD} unreadable (reads neither on nor off)"
+MISSING = (f"Hold entity {HOLD} does not exist in Home Assistant. Remove it from the app's hold entities, "
+           "or create it.")
 
 
 class _Clock(datetime):
@@ -64,10 +66,27 @@ def _unreadable(fake, how):
         fake.set_state(HOLD, how)
 
 
-@pytest.mark.parametrize("how", ["unavailable", "unknown", "missing"])
+@pytest.mark.parametrize("how", ["unavailable", "unknown"])
 def test_a_hold_that_cannot_be_read_holds_and_names_the_entity(how):
     c, fake, room = _room()
     _unreadable(fake, how)
+    assert c._blocked(room, 1) == UNREADABLE
+
+
+def test_a_hold_home_assistant_does_not_have_holds_and_says_what_to_do():
+    """A 404 (a typo in the option, a helper deleted) is not a blip to wait out: the hold says so."""
+    c, fake, room = _room()
+    _unreadable(fake, "missing")
+    assert c._blocked(room, 1) == MISSING
+    fake.set_state(HOLD, "off")  # created
+    assert c._blocked(room, 1) is None
+
+
+def test_a_hold_nothing_answered_for_stays_unreadable(monkeypatch):
+    """No answer at all (Home Assistant restarting) is not a 404: the old words, still held."""
+    c, fake, room = _room()
+    _unreadable(fake, "missing")
+    monkeypatch.setattr(controller, "ha_get_status", lambda entity, timeout=8: (None, controller.HAState()))
     assert c._blocked(room, 1) == UNREADABLE
 
 
