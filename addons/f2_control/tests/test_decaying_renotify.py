@@ -1,4 +1,4 @@
-"""A standing alert's phone push decays by the severity of its code (docs/error-codes.json), Jev or not.
+"""A standing alert's phone push decays by the severity of its code (docs/error-codes.json), the AI assistant or not.
 
 Every raise is still a card. The push: a critical code, or a warning that means a zone is not being watered,
 every 30 minutes for as long as it lasts; any other warning after 15 minutes, then 1, 2 and 4 hours, then
@@ -76,6 +76,6 @@ def test_a_held_repeat_is_still_a_card_and_goes_to_no_phone():
 
 def test_jev_has_no_say_in_the_push():
     c, fake = _setup(recipients=0, notify_service=OPTION)
-    c.jev = object()  # whatever Jev is, the alert does not ask it
+    c.jev = object()  # whatever the AI assistant is, the alert does not ask it
     assert c._alert("k", "CS-207", "drying out", "m", room=c.rooms[0], zone=1)
     assert len(_option(fake)) == 1

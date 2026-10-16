@@ -1,4 +1,4 @@
-"""Setting a zone's targets itself: the targets judge, and the shot size judge beside it (docs/JEV.md, "Powers").
+"""Setting a zone's targets itself: the targets judge, and the shot size judge beside it (docs/AI_ASSISTANT.md, "Powers").
 
 Asked once a grow-day, in the first 3 h after lights-off, on the Claude route. Code shows the zone's scorecard (how each
 of the last few grow-days did against the goal of each phase), the AI assistant's own earlier changes with what

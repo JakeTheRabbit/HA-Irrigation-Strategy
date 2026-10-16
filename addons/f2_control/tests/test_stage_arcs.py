@@ -1,16 +1,16 @@
-"""Stage arcs (jev.doctrine.stage_rows / stage_intent): the default arc is the one the judges always had, every arc
+"""Stage arcs (brain.doctrine.stage_rows / stage_intent): the default arc is the one the judges always had, every arc
 the stage_arc option offers passes the check and runs every judge, and an arc the judges could not read is refused
 with a reason instead of breaking them (haiku-brain-design sections 2 and 7, test_stage_arcs)."""
 import json
 import pathlib
 
-import jev_bridge
+import brain_bridge
 import jev_kit as K
 import pytest
 import yaml
-from jev import doctrine, prompt
-from jev.doctrine import FINISH_DAYS, STAGE_ARC, ArcInvalid, stage_intent, stage_rows
-from jev.judges.base import common
+from brain import doctrine, prompt
+from brain.doctrine import FINISH_DAYS, STAGE_ARC, ArcInvalid, stage_intent, stage_rows
+from brain.judges.base import common
 
 ADDON = pathlib.Path(__file__).parents[1]
 RELEASED = ("slab_default",)  # every stage_arc value a released config.yaml has offered: never removed
@@ -77,7 +77,7 @@ def test_every_judge_runs_on_every_flower_day_of_every_offered_arc(arc):
     for days in (42, 56, 63, 84):
         for day in range(0, days + 8):
             st = stage_intent(day, days, rows)
-            for judge in jev_bridge.judges():
+            for judge in brain_bridge.judges():
                 ctx = K.ctx(judge.phases[0], flower_day=day, flower_days=days, stage=st, steering="generative")
                 common(ctx)
                 if judge.due(ctx, None):

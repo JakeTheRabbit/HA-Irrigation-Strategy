@@ -28,7 +28,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | CS-4xx | **Settings**: A setting is missing or out of range, or the controller reads it from a new source. |
 | CS-5xx | **Zone comparisons**: Advice from a comparison of the zones of a room, and a probe that the controller sets aside because of its unit. |
 | CS-6xx | **Repairs cards**: The integration makes these alerts in Settings → Repairs. |
-| CS-7xx | **AI assistant**: Decisions of the AI assistant about a zone (advice, or a probe that it sets aside). Also the status of the AI assistant (docs/JEV.md). For example, its calls or its AI budget are almost used or used, or its key is refused. Other examples are a retired route and a judge on the stricter gate. |
+| CS-7xx | **AI assistant**: Decisions of the AI assistant about a zone (advice, or a probe that it sets aside). Also the status of the AI assistant (docs/AI_ASSISTANT.md). For example, its calls or its AI budget are almost used or used, or its key is refused. Other examples are a retired route and a judge on the stricter gate. |
 | CS-8xx | **Dosing**: Batch tank dosing: a dose or a batch that did not end correctly (docs/DOSING.md). |
 | CS-9xx | **Reservoir and feed**: The tank that a room gets water from (docs/USER_GUIDE.md, "Reservoir minimum"). It is at its minimum, its level cannot be read, or it needs a refill before the next shots. Or a fill stopped above the full mark. Also a batch tank that needs a refill (docs/DOSING.md). |
 
@@ -95,7 +95,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-709](#cs-709) | AI assistant not available | Warning | Notification |
 | [CS-710](#cs-710) | Possible water bypass | Warning | Notification |
 | [CS-711](#cs-711) | AI feed change proposal | Information | Notification |
-| [CS-712](#cs-712) | Jev route retired | Information | Notification |
+| [CS-712](#cs-712) | First AI route removed | Information | Notification |
 | [CS-713](#cs-713) | Room differs from grow plan | Warning | Notification |
 | [CS-801](#cs-801) | Dosing pump overrun | Critical | Notification |
 | [CS-802](#cs-802) | Dose not confirmed | Warning | Notification |
@@ -1334,7 +1334,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 - Compare the settings of the zone with the stage arc.
 - If the growth stage has changed, change the settings.
-- Check that jev_flower_start has the correct flip date.
+- Check that ai_flower_start has the correct flip date.
 
 <a id="cs-706"></a>
 
@@ -1354,7 +1354,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 **What to do**
 
-- Increase jev_daily_calls in the options of the controller.
+- Increase ai_daily_calls in the options of the controller.
 - Restart the controller.
 - Read reasks_today and errors_today on the AI assistant sensor to find what used the calls.
 
@@ -1473,22 +1473,22 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 <a id="cs-712"></a>
 
-### CS-712: Jev route retired
+### CS-712: First AI route removed
 
 *Information · Notification*
 
-**What it means.** This installation has settings for the Jev route of the AI assistant. These routes are retired. A room on them continues to work, but gets no new features.
+**What it means.** The options of the controller still name the first AI route of the AI assistant, or keep its Cloudflare or TypeSafe settings. This release removed that route. An installation that used it now uses Claude when it has an Anthropic API key, with every judge, and the rules of the controller when it has none.
 
-**Effect on water.** The water does not change. The engine rules water the room, or the Jev route where it still runs.
+**Effect on water.** The water does not change. Claude judges the decisions inside the same safety limits, or the engine rules water the room.
 
 **Probable causes**
 
-- The installation was upgraded from a release that used the Jev routes.
+- The installation was upgraded from a release that used the first AI route.
 
 **What to do**
 
-- To use the AI assistant, set brain_provider to claude_haiku and add an API key.
-- To keep the old route, set brain_provider to jev_legacy.
+- To use the AI assistant, set brain_provider to claude_haiku and add an Anthropic API key.
+- Remove the old Cloudflare and TypeSafe options. The controller does not use them.
 - To stop the AI assistant, set brain_provider to rules.
 
 <a id="cs-713"></a>

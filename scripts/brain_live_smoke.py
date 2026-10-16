@@ -1,11 +1,9 @@
 """Ask the real brain every judge's questions on realistic zone situations, and check its answers.
 
     ANTHROPIC_API_KEY=<sk-ant-...> python scripts/brain_live_smoke.py      (Claude, brain_provider claude_haiku)
-    JEV_TYPESAFE_KEY=<apikey_...> python scripts/brain_live_smoke.py       (the retired TypeSafe route)
-    JEV_CF_ACCOUNT=<account id> JEV_CF_TOKEN=<Workers AI token> python scripts/brain_live_smoke.py
 
 A developer's tool, run by hand with a person's own key (and in the staging soak before a release): it calls
-api.anthropic.com, or the retired routes, and nothing in the app runs it. Each scenario builds a zone context the
+api.anthropic.com, and nothing in the app runs it. Each scenario builds a zone context the
 way the controller does, runs the judge's own evidence (through the enrichment hook on Claude) and questions,
 combines the two council phrasings, and prints the verdict next to what an experienced grower would expect. On
 Claude it also prints the prompt's cached size (count_tokens) and each call's cache reads, which prove the prefix
@@ -23,24 +21,23 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path[:0] = [str(ROOT / "addons/f2_control/f2_control"), str(ROOT / "addons/f2_control/tests")]
 
 import jev_kit as K  # noqa: E402
-from jev import council  # noqa: E402
-from jev.client import (DEFAULT_MODEL, Asker, Meter, Route, Routes, call_anthropic,  # noqa: E402
-                        call_typesafe, make_client)
-from jev.context import Shot, ZoneHistory  # noqa: E402
-from jev.doctrine import STAGE_ARC, stage_intent  # noqa: E402
-from jev.enrich import enrich  # noqa: E402
-from jev.envelope import admit  # noqa: E402
-from jev.prompt import Prompt  # noqa: E402
-from jev.judges.dawn import DawnJudge  # noqa: E402
-from jev.judges.dusk import DuskJudge  # noqa: E402
-from jev.judges.night import NightJudge  # noqa: E402
-from jev.judges.probe import ProbeJudge  # noqa: E402
-from jev.judges.ramp import RampJudge  # noqa: E402
-from jev.judges.salt import SaltJudge  # noqa: E402
-from jev.judges.setpoints import SHOT, THRESHOLD, SetpointsJudge, band  # noqa: E402
-from jev.judges.shot import ShotJudge  # noqa: E402
-from jev.judges.stage import StageJudge  # noqa: E402
-from jev.judges.zones import ZonesJudge  # noqa: E402
+from brain import council  # noqa: E402
+from brain.client import DEFAULT_MODEL, Asker, Meter, Route, Routes, call_anthropic, make_client  # noqa: E402
+from brain.context import Shot, ZoneHistory  # noqa: E402
+from brain.doctrine import STAGE_ARC, stage_intent  # noqa: E402
+from brain.enrich import enrich  # noqa: E402
+from brain.envelope import admit  # noqa: E402
+from brain.prompt import Prompt  # noqa: E402
+from brain.judges.dawn import DawnJudge  # noqa: E402
+from brain.judges.dusk import DuskJudge  # noqa: E402
+from brain.judges.night import NightJudge  # noqa: E402
+from brain.judges.probe import ProbeJudge  # noqa: E402
+from brain.judges.ramp import RampJudge  # noqa: E402
+from brain.judges.salt import SaltJudge  # noqa: E402
+from brain.judges.setpoints import SHOT, THRESHOLD, SetpointsJudge, band  # noqa: E402
+from brain.judges.shot import ShotJudge  # noqa: E402
+from brain.judges.stage import StageJudge  # noqa: E402
+from brain.judges.zones import ZonesJudge  # noqa: E402
 
 
 def ramp_feed_front():
@@ -232,7 +229,7 @@ SCENARIOS = [
 
 
 def claude(key):
-    """The Claude route exactly as jev_bridge.build() makes it, with a Meter and the cached prompt."""
+    """The Claude route exactly as brain_bridge.build() makes it, with a Meter and the cached prompt."""
     model = os.environ.get("ANTHROPIC_MODEL") or DEFAULT_MODEL
     prompt, meter, client = Prompt(STAGE_ARC, "slab_default"), Meter(5.0, model), make_client(key)
     if client is None:
@@ -246,18 +243,9 @@ def claude(key):
 
 
 def main():
-    key = os.environ.get("JEV_TYPESAFE_KEY")
-    account, token = os.environ.get("JEV_CF_ACCOUNT"), os.environ.get("JEV_CF_TOKEN")
-    meter = None
-    if os.environ.get("ANTHROPIC_API_KEY"):
-        asker, meter = claude(os.environ["ANTHROPIC_API_KEY"])
-    elif key:
-        asker = Asker("typesafe", key, None, threaded=False, timeout=60,
-                      transport=Routes([Route("TypeSafe", call_typesafe, "typesafe", key)]))
-    elif account and token:
-        asker = Asker(account, token, os.environ.get("JEV_CF_GATEWAY") or None, threaded=False, timeout=60)
-    else:
-        sys.exit("set ANTHROPIC_API_KEY, or JEV_TYPESAFE_KEY, or JEV_CF_ACCOUNT and JEV_CF_TOKEN")
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        sys.exit("set ANTHROPIC_API_KEY")
+    asker, meter = claude(os.environ["ANTHROPIC_API_KEY"])
     good = 0
     for title, judge, build, question, expect in SCENARIOS:
         ctx = build()
@@ -276,7 +264,7 @@ def main():
         v = council.combine(ans.answers, question)
         d = judge.decide({q: council.combine(ans.answers, q) for q in judge.questions}, ctx)
         admitted, why = admit(d, ctx, confirmed=2, evidence_ok=True) if d is not None else (False, "no directive")
-        if expect == "no early stop":  # judged on what code lets happen, not on Jev's label
+        if expect == "no early stop":  # judged on what code lets happen, not on the AI assistant's label
             ok = not (admitted and d.kind == "advance")
         elif expect == "steering flagged":
             ok = d is not None and d.kind == "alert" and "steering, but the stage calls for" in d.value["message"]

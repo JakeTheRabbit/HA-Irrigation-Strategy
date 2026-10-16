@@ -1,4 +1,4 @@
-"""The plan task (jev/plan_task.py, jev_bridge.plan_task): under the Claude brain only, what a drift from the grower's
+"""The plan task (brain/plan_task.py, brain_bridge.plan_task): under the Claude brain only, what a drift from the grower's
 plan means. Its answer picks one of the drift's code-written suggestions and nothing else; it is asked only when due,
 with the kill switch on, no no-touch window and fresh readings, at most four times a photoperiod, and an unsure
 answer is looked at once more."""
@@ -8,13 +8,13 @@ from types import SimpleNamespace
 
 import pytest
 
-import jev_bridge
+import brain_bridge
 import jev_kit as K
 import plan_adherence as A
-from jev import plan_task as P
-from jev.client import Asker
-from jev.journal import Journal
-from jev.ledger import Ledger
+from brain import plan_task as P
+from brain.client import Asker
+from brain.journal import Journal
+from brain.ledger import Ledger
 from test_plan_adherence import NOW, view
 
 EDITED = {"number.crop_steering_zone_1_p2_shot_size": 6.0, "number.crop_steering_zone_2_p2_shot_size": 5.0}
@@ -32,7 +32,7 @@ class Rig:
         asker = Asker("anthropic", "key", transport=self.transport, threaded=False, clock=lambda: self.clock)
         status = SimpleNamespace(provider="claude_haiku" if haiku else "jev_legacy")
         self.jev = SimpleNamespace(asker=asker, status=status, journal=Journal(None), ledger=Ledger(None),
-                                   plan=P.PlanTask(asker, jev_bridge.plan_meta))
+                                   plan=P.PlanTask(asker, brain_bridge.plan_meta))
         self.kill, self.no_touch = kill, None
         self.room = SimpleNamespace(slug="default", prefix="", enable_flag="input_boolean.kill",
                                     _adherence=A.fresh(), hardware_fault=None, strategy_snapshot={})
@@ -45,12 +45,12 @@ class Rig:
 
     def run(self, v, adh=None):
         drifts = A.detect(v, adh if adh is not None else self.adh)
-        return jev_bridge.plan_task(self, self.room, v.now, v, drifts)
+        return brain_bridge.plan_task(self, self.room, v.now, v, drifts)
 
 
 @pytest.fixture(autouse=True)
 def healthy(monkeypatch):
-    monkeypatch.setattr(jev_bridge, "room_health", lambda c, room, now: ("ok", None))
+    monkeypatch.setattr(brain_bridge, "room_health", lambda c, room, now: ("ok", None))
 
 
 def _edited_rig(*answers, **kw):
@@ -114,7 +114,7 @@ def test_nothing_is_asked_when_the_brain_may_not(why, monkeypatch):
     if why == "no_touch":
         rig.no_touch = NOW + timedelta(hours=1)
     if why == "health":
-        monkeypatch.setattr(jev_bridge, "room_health", lambda c, room, now: ("impaired", "stale"))
+        monkeypatch.setattr(brain_bridge, "room_health", lambda c, room, now: ("impaired", "stale"))
     for minutes in (0, 11, 30):
         rig.run(view(natives=EDITED, now=NOW + timedelta(minutes=minutes)))
     assert rig.transport.calls == []

@@ -105,7 +105,7 @@ async def test_jevs_own_alerts_reach_the_phone_that_ticks_jev(
     hass, hass_admin_user, controller_for, monkeypatch
 ):
     """CS-706 (most of the day's calls used) and CS-707 (a zone on the stricter gate) are in the
-    jev kind: the phone that ticks Jev gets both, the tablet that ticks only emergencies and
+    jev kind: the phone that ticks the AI assistant gets both, the tablet that ticks only emergencies and
     hardware gets neither."""
     await _install(hass)
     staff = await _staff(hass)
@@ -132,13 +132,13 @@ async def test_jevs_own_alerts_reach_the_phone_that_ticks_jev(
         room,
         1,
         "ramp",
-        {"code": "CS-707", "title": "Jev is on the stricter gate", "message": "Bad run."},
+        {"code": "CS-707", "title": "the AI assistant is on the stricter gate", "message": "Bad run."},
     )
     c._jev_alert(
         room,
         None,
         "budget",
-        {"code": "CS-706", "title": "Jev has used most of today's calls", "message": "4000."},
+        {"code": "CS-706", "title": "the AI assistant has used most of today's calls", "message": "4000."},
     )
     strict, budget = _asked(fake)
     assert (strict["code"], strict["key"], budget["code"], budget["key"]) == (
@@ -195,8 +195,8 @@ async def test_the_channel_judges_alert_reaches_the_phone_that_ticks_hardware(
 async def test_the_ai_assistants_cards_reach_the_phone_that_ticks_jev(
     hass, hass_admin_user, controller_for, monkeypatch
 ):
-    """CS-708 (its budget spent), CS-709 (its key refused) and CS-712 (a retired route, raised by
-    the rules panel with no brain built) are in the jev kind: the phone that ticks Jev gets them."""
+    """CS-708 (its budget spent), CS-709 (its key refused) and CS-712 (the removed first route, raised by
+    the rules panel with no brain built) are in the jev kind: the phone that ticks the AI assistant gets them."""
     await _install(hass)
     staff = await _staff(hass)
     received, doc = await _set_up(hass, hass_admin_user, staff)
@@ -211,7 +211,7 @@ async def test_the_ai_assistants_cards_reach_the_phone_that_ticks_jev(
     await hass.async_block_till_done()
     c, fake, _clock = controller_for({"notify_service": "notify/mobile_app_old_phone"})
     import controller
-    import jev_bridge
+    import brain_bridge
 
     def answered(domain, service, data, timeout=12):
         fake.calls.append((domain, service, dict(data)))
@@ -221,10 +221,10 @@ async def test_the_ai_assistants_cards_reach_the_phone_that_ticks_jev(
     room = c.rooms[0]
     for code, label in (("CS-708", "spent"), ("CS-709", "brain")):
         assert c._jev_alert(room, None, label, {"code": code, "title": "t", "message": f"{code} words."})
-    c.brain_status = jev_bridge.BrainStatus(
-        "rules", "rules", "Rules.", notice="cloudflare_route_retired"
+    c.brain_status = brain_bridge.BrainStatus(
+        "rules", "rules", "Rules.", notice="legacy_route_removed"
     )
-    jev_bridge.publish_rules(c, room, controller.datetime.now(), controller.ha_set)
+    brain_bridge.publish_rules(c, room, controller.datetime.now(), controller.ha_set)
     asked = _asked(fake)
     assert [(a["code"], a["key"]) for a in asked] == [
         ("CS-708", "jev_spent_default"),
@@ -236,14 +236,14 @@ async def test_the_ai_assistants_cards_reach_the_phone_that_ticks_jev(
             DOMAIN, "notify", one, blocking=True, return_response=True
         )
         assert answer == {"sent_to": [STAFF_PHONE], "error": None}
-    assert received[STAFF_PHONE][-1]["message"].startswith("The controller does not use your Cloudflare settings")
+    assert received[STAFF_PHONE][-1]["message"].startswith("The first AI route of the AI assistant was removed")
 
 
 async def test_the_feed_proposal_reaches_the_phone_that_ticks_jev(
     hass, hass_admin_user, controller_for, monkeypatch
 ):
     """CS-711 (the AI assistant proposes a feed change) is in the jev kind: the phone that ticks
-    Jev gets it, the tablet that ticks only emergencies and hardware does not."""
+    The AI assistant gets it, the tablet that ticks only emergencies and hardware does not."""
     await _install(hass)
     staff = await _staff(hass)
     received, doc = await _set_up(hass, hass_admin_user, staff)

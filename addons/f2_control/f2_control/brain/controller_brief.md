@@ -165,7 +165,7 @@
 - CS-709 AI assistant not available: The AI service refused the API key, does not know the selected model, or refused some requests in sequence. Does: Water continues on the engine rules.
 - CS-710 Possible water bypass: Shots on this zone make the probe increase and then fall back quickly. Does: Water continues as usual.
 - CS-711 AI feed change proposal: In a room with a feed EC sensor, the AI assistant examines the feed once each grow-day, 1 h after lights-on. Does: The water and the dose do not change.
-- CS-712 Jev route retired: This installation has settings for the Jev route of the AI assistant. Does: The water does not change.
+- CS-712 First AI route removed: The options of the controller still name the first AI route of the AI assistant, or keep its Cloudflare or TypeSafe settings. Does: The water does not change.
 - CS-713 Room differs from grow plan: The controller compared the grow plan with what the room does, and found a difference. Does: Water continues on the targets in force, and the card only reports.
 - CS-801 Dosing pump overrun: A dose ran past its deadline. Does: The batch tank can contain more nutrient than requested.
 - CS-802 Dose not confirmed: The controller started a dose but could not confirm it. Does: For a dose that is not confirmed, the controller does not know the volume, and does not subtract it from the stock tank.

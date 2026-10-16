@@ -1,7 +1,7 @@
 """The product's name in what a user reads, on old installs, with every machine id kept.
 
 An upgraded 2.25.1 room (tests_ha/fixtures/entry_2_25_1_pumped_room.json) and an upgraded 3.11.1 room
-with Jev on (entry_3_11_1_pumped_room.json): the controller's first pass publishes the same entities
+with the AI assistant on (entry_3_11_1_pumped_room.json): the controller's first pass publishes the same entities
 with every attribute name the old code published (recorded below from the 3.11.1 controller on these
 fixtures), `sensor.f2_control_vitals` and the `f2_vitals` notification among them, and no value says
 "f2-control": the `engine` attribute names the Crop Steering Controller.

@@ -1,4 +1,4 @@
-"""The AI assistant's powers, in a real Home Assistant with the real controller (docs/JEV.md, "Powers").
+"""The AI assistant's powers, in a real Home Assistant with the real controller (docs/AI_ASSISTANT.md, "Powers").
 
 One switch per power per room says what the AI assistant may change. A new room gets them at their defaults; a room
 updated in place from 3.11.1 (the newest seeded snapshot, tests_ha/fixtures/entry_3_11_1_pumped_room.json; 3.12.1
@@ -56,13 +56,13 @@ async def test_a_room_updated_in_place_gets_defaults_that_do_what_it_did_and_not
 
 async def _brain(hass, controller_for, monkeypatch, *, power_on=True, off=()):
     import brain_kit
-    import jev_bridge
-    from jev import client as jc
-    from jev.client import Asker
+    import brain_bridge
+    from brain import client as jc
+    from brain.client import Asker
 
     # The Claude brain with a stand-in SDK and no background worker: nothing here reaches the network.
     monkeypatch.setattr(jc, "anthropic", brain_kit.FakeSDK(brain_kit.FakeClient()))
-    monkeypatch.setattr(jev_bridge, "Asker", functools.partial(Asker, threaded=False))
+    monkeypatch.setattr(brain_bridge, "Asker", functools.partial(Asker, threaded=False))
     seed = fixture(JEV_3_11_1)
     await _upgrade(hass, JEV_3_11_1, registry_ids=seed["registry"])
     if power_on:
@@ -81,14 +81,14 @@ async def _brain(hass, controller_for, monkeypatch, *, power_on=True, off=()):
 
 
 async def test_toggling_a_power_off_stops_it_acting(hass, controller_for, monkeypatch):
-    import jev_bridge
-    from jev.envelope import Directive, admit
+    import brain_bridge
+    from brain.envelope import Directive, admit
 
     c, _fake, room = await _brain(hass, controller_for, monkeypatch, power_on=False, off=("ramp_control",))
     now = datetime(2026, 10, 10, 12, 0)
-    powers = jev_bridge.room_powers(c, room, now)
+    powers = brain_bridge.room_powers(c, room, now)
     assert powers["ramp_control"] is False and powers["advance_phase"] is True
-    assert not jev_bridge.targets_owned(c, room)  # the targets power is off by default
+    assert not brain_bridge.targets_owned(c, room)  # the targets power is off by default
     d = Directive("ramp", "advance", "P2", "slab_full", now + timedelta(minutes=30))
     ok, why = admit(d, SimpleNamespace(now=now, powers=powers, snap=None, params=None))
     assert not ok and why.endswith("advice only")
@@ -112,16 +112,16 @@ def _value(hass, suffix):
 
 
 async def _night_move(hass, c, fake, room, now, values, expected):
-    import jev_bridge
+    import brain_bridge
     import jev_kit as K
-    from jev import council
-    from jev.envelope import admit
-    from jev.judges.targets import TargetsJudge
+    from brain import council
+    from brain.envelope import admit
+    from brain.judges.targets import TargetsJudge
 
     p = c._snapshot(room, 1, now, False, False)[1]
     room.state[1]["phase"] = "P3"
-    view = jev_bridge.targets_view(c, room, 1, p, now)
-    ctx = K.ctx("P3", now=now, lights_on=False, targets=view, powers=jev_bridge.room_powers(c, room, now))
+    view = brain_bridge.targets_view(c, room, 1, p, now)
+    ctx = K.ctx("P3", now=now, lights_on=False, targets=view, powers=brain_bridge.room_powers(c, room, now))
     answer = {"type": "values", "values": {k: {"value": v, "reason": f"the scorecard: {k}"} for k, v in values.items()},
               "expected": expected, "confidence": 0.8}
     d = TargetsJudge().decide({"targets": council.combine({"targets__v0": answer}, "targets")}, ctx)
@@ -129,7 +129,7 @@ async def _night_move(hass, c, fake, room, now, values, expected):
     assert ok, why
     fake.events.clear()
     fake.calls.clear()
-    jev_bridge.apply_values(c, room, 1, d, ctx, now)
+    brain_bridge.apply_values(c, room, 1, d, ctx, now)
     await _replay(hass, fake)
     return d
 
@@ -140,10 +140,10 @@ async def _log(hass):
 
 
 async def test_the_targets_power_writes_the_ais_values_through_the_real_numbers(hass, controller_for, monkeypatch):
-    import jev_bridge
+    import brain_bridge
 
     c, fake, room = await _brain(hass, controller_for, monkeypatch)
-    assert jev_bridge.targets_owned(c, room)
+    assert brain_bridge.targets_owned(c, room)
     keys = ("field_capacity", "p1_target_vwc", "p2_vwc_threshold", "p3_emergency_vwc_threshold")
     before = {s: _value(hass, s) for s in keys}
 

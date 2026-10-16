@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 
 import pytest
 
-from jev.envelope import Directive, admit
-from jev.plan_task import PlanContext
+from brain.envelope import Directive, admit
+from brain.plan_task import PlanContext
 
 NOW = datetime(2026, 10, 1, 9, 0)  # lights 06:00-18:00
 DAY16 = {"dryback_target": 18.0, "ec_target_p0": 3.0, "ec_target_p1": 3.5, "ec_target_p2": 4.0, "p1_target_vwc": 60.0,

@@ -63,7 +63,7 @@ def resolve_paths(a):
         sys.exit(f"expected exactly one addons/*/*/controller.py under {repo}, found {len(ctrls)}")
     pkg = ctrls[0].parent
     p = {"core": repo / "crop-steering-engine/src/crop_steering_engine/core.py", "controller": ctrls[0],
-         "jev": pkg / "jev" / "doctrine.py", "brain": pkg / "jev", "bridge": pkg / "jev_bridge.py",
+         "jev": pkg / "brain" / "doctrine.py", "brain": pkg / "brain", "bridge": pkg / "brain_bridge.py",
          "auto": pkg / "auto_setpoints.py", "numbers": repo / "custom_components/crop_steering/number.py",
          "controller_copy": pkg / "doctrine", "dashboard_arcs": repo / "frontend/src/lib/generated/arcs.json"}
     for k in p:
@@ -385,12 +385,12 @@ def engine_facts(doc, paths):
         ("CT-13", "With Auto Setpoints on and field capacity unmoved on that loop, the controller's learner also writes the re-water threshold when no brain Setpoints judge holds it (with one running and able to act, the P2 shot size and threshold are the judge's, apart from the field-capacity shift in CT-12; from the first loop the brain cannot act, in dry run, with its budget spent, paused, unavailable or its key refused, the learner writes the threshold again until a lights-on at which the brain can act). With the room's set_targets_from_achievable power on and the brain able to act, neither the learner nor the follower of CT-12 writes field capacity, the P1 target or the threshold: the brain sets them (BR-8). Neither ever writes the rescue floor (the P3 emergency threshold): that is the operator's.",
          'want = auto_setpoints.wanted(learn, current, snap.vwc, st["phase"], ctx, others=judged)' in ctrl
          and "elif self._follow_fc(room, zone, p, now):" in ctrl and "writes = enabled and not planned" in ctrl
-         and "owned = jev_bridge.targets_owned(self, room)" in ctrl
+         and "owned = brain_bridge.targets_owned(self, room)" in ctrl
          and 'if "p2_vwc_threshold" in others:' in auto
          and 'MANAGED = ("p1_target_vwc", "field_capacity", "p2_vwc_threshold")' in auto
          and "return (SHOT, THRESHOLD) if _acting_latch(c, room) else ()" in bridge
          and "elif held[room.slug] and not can_act(c):" in bridge
-         and "judged = jev_bridge.judge_levers(self, room)" in ctrl),
+         and "judged = brain_bridge.judge_levers(self, room)" in ctrl),
         ("CT-14", f"So with Auto Setpoints on, field capacity sits at the zone's own followed peak (moved at most {step if step is not None else 0:g} point a grow-day): the safety label (zone_safety_status) reads over_saturated whenever the zone reaches that field capacity, and approaching_saturation within 5 points of it. Under the switch those labels say where the zone sits against its own peak, not that it is over-watered.",
          core.zone_safety_status(60.0, 5.0, 60.0, 9.0) == "over_saturated"
          and core.zone_safety_status(55.5, 5.0, 60.0, 9.0) == "approaching_saturation"

@@ -18,7 +18,7 @@ import plan_adherence as A
 from strategy_runtime import merge_bridge
 from test_blind_grace import _Clock, clock  # noqa: F401
 from test_plan_task import EDITED, Rig, _choice  # noqa: F401
-import jev_bridge
+import brain_bridge
 from test_plan_watch import DAY16, DAY17, _plan_cards, _publish_plan, _writes, make_room
 
 pytestmark = pytest.mark.usefixtures("settings_built_in")
@@ -31,7 +31,7 @@ def room(monkeypatch):
 
 @pytest.fixture(autouse=True)
 def healthy(monkeypatch):
-    monkeypatch.setattr(jev_bridge, "room_health", lambda c, room, now: ("ok", None))
+    monkeypatch.setattr(brain_bridge, "room_health", lambda c, room, now: ("ok", None))
 
 
 def _snap(revision=7, zones=None):

@@ -3,8 +3,8 @@
 Asked once a grow-day in the last two hours before lights-off, only while the zone's water per plant today is
 outside 85-115 % of the room's median zone (zones.water_vs_room) and the zones judge has not named a hardware cause
 for it today. It advises only and has no directive: its answer is kept and handed to tonight's setpoints judge for
-the same zone as `room_balance` (jev_bridge.brain_context, jev.enrich), so the setpoints judge stays the one writer
-of the zone's shot size and re-water threshold. Built only under brain_provider claude_haiku (jev_bridge.build).
+the same zone as `room_balance` (brain_bridge.brain_context, brain.enrich), so the setpoints judge stays the one writer
+of the zone's shot size and re-water threshold. Built only under brain_provider claude_haiku (brain_bridge.build).
 """
 from datetime import timedelta
 

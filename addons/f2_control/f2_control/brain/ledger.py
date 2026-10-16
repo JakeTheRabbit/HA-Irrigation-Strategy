@@ -1,4 +1,4 @@
-"""Every verdict Jev acted on, what code did, and how it turned out, and each setpoint move code refused
+"""Every verdict the AI assistant acted on, what code did, and how it turned out, and each setpoint move code refused
 (action "refused": it starts the notch budget's cool-down, envelope.notch_budget).
 
 Entries go to a JSON-lines file in /data (it survives restarts and Rebuilds, like state.json). An entry

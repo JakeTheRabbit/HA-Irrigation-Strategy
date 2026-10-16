@@ -1,16 +1,16 @@
-"""The Claude brain's tools (jev/brain_tools.json): one stable set for every call, whose answer-key enum is exactly
+"""The Claude brain's tools (brain/brain_tools.json): one stable set for every call, whose answer-key enum is exactly
 the union of every built judge's keys, in strict mode's shape (haiku-brain-design section 3, test_brain_tools)."""
 import json
 import pathlib
 
-import jev_bridge
-from jev import feed, plan_task, prompt
+import brain_bridge
+from brain import feed, plan_task, prompt
 
 FILE = pathlib.Path(prompt.TOOLS)
 
 
 def _questions():
-    found = {f"{j.name}.{q}": vs for j in jev_bridge.judges() for q, vs in j.questions.items()}
+    found = {f"{j.name}.{q}": vs for j in brain_bridge.judges() for q, vs in j.questions.items()}
     found.update({f"feed.{q}": vs for q, vs in feed.QUESTIONS.items()})
     found.update({f"plan.{q}": vs for q, vs in {**plan_task.QUESTIONS, **plan_task.KEEP}.items()})
     return found

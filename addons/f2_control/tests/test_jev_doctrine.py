@@ -1,8 +1,8 @@
-"""The doctrine library: the owner's GrowLabs wiki as one-sentence rules the judges write into Jev's questions."""
+"""The doctrine library: the owner's GrowLabs wiki as one-sentence rules the judges write into the AI assistant's questions."""
 import re
 
 import pytest
-from jev.doctrine import ALT_STAGE_ARC, ATHENA, RULES, SOURCES, STAGE_ARC, Rule, doctrine, stage_intent
+from brain.doctrine import ALT_STAGE_ARC, ATHENA, RULES, SOURCES, STAGE_ARC, Rule, doctrine, stage_intent
 
 TOPICS = ("ramp", "dryback", "maintenance", "ec", "probe", "stage", "ripening", "closed_loop", "slab")
 ALL = [(t, i, r) for t, rules in RULES.items() for i, r in enumerate(rules)]

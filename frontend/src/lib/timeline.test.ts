@@ -122,7 +122,7 @@ describe("the merged timeline", () => {
   ];
   const merged = mergeTimeline(feed, [stray, outcome, quiet, decision, alert], now);
 
-  it("is one list, newest first, the controller's records and Jev's side by side", () => {
+  it("is one list, newest first, the controller's records and the AI assistant's side by side", () => {
     expect(merged.map((item) => item.time)).toEqual(
       [...merged.map((item) => item.time)].sort((a, b) => b! - a!),
     );
@@ -150,7 +150,7 @@ describe("the merged timeline", () => {
     expect(timelineText(row)).toBe("AI assistant · Pore EC: after “hold the EC steer”");
     expect(timelineResult(row)).toBe("Didn’t work");
   });
-  it("sorts each row into water, phase, setpoints, alerts, Jev or a note", () => {
+  it("sorts each row into water, phase, setpoints, alerts, the AI assistant or a note", () => {
     expect(merged.map((item) => item.kind)).toEqual([
       "water",
       "jev",
@@ -169,12 +169,12 @@ describe("the merged timeline", () => {
     expect(eventKind(event("x", "10:00", "P2 shot size 4 -> 5 %", "info"))).toBe("setpoint");
     expect(jevKind(jev({ judge: "dawn", action: "CS-701: push", result: "acted" }))).toBe("alert");
   });
-  it("shows Jev's actions by default and every decision on request", () => {
+  it("shows the AI assistant's actions by default and every decision on request", () => {
     expect(filterTimeline(merged, NO_FILTER).some((item) => item.jev === quiet)).toBe(false);
     expect(
       filterTimeline(merged, { ...NO_FILTER, allJev: true }).some((item) => item.jev === quiet),
     ).toBe(true);
-    // A refusal is Jev asking; it shows with the actions.
+    // A refusal is the AI assistant asking; it shows with the actions.
     const refused = mergeTimeline(
       [],
       [
@@ -201,7 +201,7 @@ describe("the merged timeline", () => {
     // Code's why is searched too.
     expect(zones({ query: "stage's arc" })).toEqual(["jev:4:2026-09-27T15:01:00:alerts"]);
   });
-  it("exports as CSV with the local time, the row in words and Jev's result", () => {
+  it("exports as CSV with the local time, the row in words and the AI assistant's result", () => {
     const csv = timelineCsv(merged, "Room A").split("\r\n");
     expect(csv[0]).toBe('"Timestamp","Room","Zone","Type","Message","Result"');
     expect(csv).toContain(
@@ -218,7 +218,7 @@ describe("the merged timeline", () => {
 });
 
 describe("a setpoint the grower changed", () => {
-  it("is the grower's, noted by Jev, not Jev acting", () => {
+  it("is the grower's, noted by the AI assistant, not the AI assistant acting", () => {
     const entry = jev({
       t: stamp(28, 15, 13),
       zone: 2,
@@ -238,7 +238,7 @@ describe("a setpoint the grower changed", () => {
   });
 });
 
-describe("Jev's actions", () => {
+describe("the AI assistant's actions", () => {
   it("are what did something or tried to, and how it turned out", () => {
     const entries = ["acted", "no action", "advice", "refused", "worked", "waiting", "?"].map(
       (result, index) => jev({ t: stamp(27, 10 + index), zone: 1, judge: "salt", result }, index),
@@ -267,7 +267,7 @@ describe("the Timeline page", () => {
     vi.setSystemTime(noon);
   });
   afterEach(() => vi.useRealTimers());
-  it("lists the demo room's records and Jev's actions, a tick or cross on a checked decision", () => {
+  it("lists the demo room's records and the AI assistant's actions, a tick or cross on a checked decision", () => {
     const states = createDemo(noon);
     const html = renderToStaticMarkup(
       createElement(Timeline, { controller: controller(states, "") }),
@@ -286,7 +286,7 @@ describe("the Timeline page", () => {
     expect(html).toContain("<h2>Today</h2>");
     expect(html).toContain("<h2>Yesterday</h2>");
   });
-  it("shows a room without Jev its controller records, without Jev's controls", () => {
+  it("shows a room without the AI assistant its controller records, without the AI assistant's controls", () => {
     const states = createDemo(noon);
     const html = renderToStaticMarkup(
       createElement(Timeline, { controller: controller(states, "room_b_") }),

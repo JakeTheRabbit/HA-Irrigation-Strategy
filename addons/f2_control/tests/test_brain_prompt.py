@@ -1,14 +1,14 @@
-"""The Claude brain's prompt (jev/prompt.py): byte-stable cached blocks, an evidence block with no entity id, no key
+"""The Claude brain's prompt (brain/prompt.py): byte-stable cached blocks, an evidence block with no entity id, no key
 and no one site's wording, and a request with nothing a current model refuses (haiku-brain-design sections 7, 9)."""
 import pathlib
 import re
 
 import brain_kit as B
 import pytest
-from jev import council, doctrine, prompt
-from jev.client import split_lanes
-from jev.enrich import enrich
-from jev.scrub import HA_DOMAINS
+from brain import council, doctrine, prompt
+from brain.client import split_lanes
+from brain.enrich import enrich
+from brain.scrub import HA_DOMAINS
 
 REPO = pathlib.Path(__file__).resolve().parents[3]
 CREDENTIALS = ("anthropic_api_key", "typesafe_api_key", "cf_api_token", "cf_account_id", "cf_gateway_id")
@@ -98,3 +98,11 @@ def test_the_start_line_names_hashes_never_the_text():
     line = prompt.Prompt().describe()
     assert re.fullmatch(r"brain: prompt A=[0-9a-f]{8} B=[0-9a-f]{8}, about \d+\.\dk tokens", line)
 
+
+
+def test_the_cached_prompt_describes_every_judge_and_task_and_no_retired_one():
+    import brain_bridge
+
+    a = prompt.Prompt(doctrine.STAGE_ARC, "slab_default").a
+    assert [name for name in brain_bridge.ALL if f"\n| {name} " not in a] == []
+    assert "\n| alerts |" not in a and "Jev" not in a

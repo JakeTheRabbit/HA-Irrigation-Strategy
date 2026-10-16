@@ -1,6 +1,6 @@
-"""Crop-steering doctrine for Jev: the GrowLabs wiki and Athena's handbook, restated as rules a judge can quote.
+"""Crop-steering doctrine for the AI assistant: the GrowLabs wiki and Athena's handbook, restated as rules a judge can quote.
 
-Jev answers typed questions about the facts it is given, but it knows no crop-steering doctrine and does no
+The AI assistant answers typed questions about the facts it is given, but it knows no crop-steering doctrine and does no
 arithmetic, so every judge writes the doctrine into its question. This module keeps that doctrine in one
 place: the GrowLabs wiki pages, then Athena's Grow Guide Handbook (SOURCES), each point restated as one
 plain sentence tagged with where it comes from. A judge appends doctrine("ramp", "probe") to a question's
@@ -36,7 +36,7 @@ SOURCES = [TEROS, LOOP, STAGES, ROCKWOOL, LAW, SLAB, RIPEN]
 
 @dataclass(frozen=True)
 class Rule:
-    text: str  # one plain sentence Jev can apply to the facts it is given
+    text: str  # one plain sentence the AI assistant can apply to the facts it is given
     source: str  # the wiki page it restates
 
 
@@ -285,7 +285,7 @@ RULES = {
 
 
 # Athena's Grow Guide Handbook (metric), Precision Irrigation Strategy, pages 33-41: added on 28 Sep
-# 2026 as more doctrine for Jev. Its rules follow the wiki's in each topic (the wiki's pages lead, so
+# 2026 as more doctrine for the AI assistant. Its rules follow the wiki's in each topic (the wiki's pages lead, so
 # doctrine(..., limit=n) keeps them first), and where they differ the chosen stage arc wins (the last dryback rule).
 ATHENA = "Athena Grow Guide Handbook (metric), Precision Irrigation Strategy, pp. 33-41"
 SOURCES.append(ATHENA)

@@ -85,7 +85,7 @@ Developers build the dashboard using `npm ci --prefix frontend` then `npm run bu
 
 ## Upgrading an existing installation
 
-Update an existing controller in place from this repository. The old `JakeTheRabbit/f2-control` mirror no longer receives releases; a controller installed from it moves once, as described in [Moving a controller installed from f2-control](#moving-a-controller-installed-from-f2-control). A room on the Jev edition (the `HA-Crop-Steering-Jev` repository) also moves once: see [Moving a room from the Jev edition](MOVING_FROM_JEV.md). Never run two controllers against one room: each app has its own identity and runtime data, and both would drive the same pump and valves. A controller that sees another controller's heartbeat on its room holds that room, watering and dosing nothing in it (CS-609), but a controller from before that check never holds, so stopping the other one first stays the rule.
+Update an existing controller in place from this repository. The old `JakeTheRabbit/f2-control` mirror no longer receives releases; a controller installed from it moves once, as described in [Moving a controller installed from f2-control](#moving-a-controller-installed-from-f2-control). A room on the first AI edition (the `HA-Crop-Steering-Jev` repository) also moves once: see [Moving a room from the first AI edition](MOVING_FROM_JEV.md). Never run two controllers against one room: each app has its own identity and runtime data, and both would drive the same pump and valves. A controller that sees another controller's heartbeat on its room holds that room, watering and dosing nothing in it (CS-609), but a controller from before that check never holds, so stopping the other one first stays the rule.
 
 1. Back up HA, the controller's persistent data and existing setpoints. Export grow plans if available. Record which engines are enabled.
 2. Turn the affected engines off and wait for the pump, mainline and valves to be OFF. Stop the existing controller while replacing software.
@@ -117,7 +117,7 @@ If Repairs reports the kill switch missing (CS-601), the card names the switch t
 The controller used to be mirrored to `JakeTheRabbit/f2-control`. That mirror is retired; this repository is the only source. Supervisor names an app after the repository it came from (`4d457e60_f2_control` from the mirror, `6db5faba_f2_control` from here), so the move is a one-time reinstall that carries the runtime state across:
 
 1. Add this repository to the app store and install **Crop Steering Controller** from it. Do not start it, and turn its **Start on boot** off for now: it is on by default, and a host restart before step 6 would otherwise start both apps.
-2. Copy the old app's Configuration into the new app: every option, including the Cloudflare fields.
+2. Copy the old app's Configuration into the new app: every option.
 3. Turn every engine kill switch off and wait until the pump, mainline and valves read OFF.
 4. Stop the old app and turn off its Start on boot and Watchdog.
 5. Copy `state.json` from the old app's data folder to the new one. It holds each zone's phase, today's counters, the accepted setup revision and what Auto Setpoints has learned; without it the controller starts learning again and waits for setup to be accepted. On HA OS, from an SSH terminal with Docker access: `docker run --rm -v /mnt/data/supervisor/apps/data:/d alpine cp -p /d/4d457e60_f2_control/state.json /d/6db5faba_f2_control/state.json` (older Supervisor versions use `addons/data`).
@@ -154,12 +154,13 @@ controller's own limits, and every failure runs the engine exactly as on rules. 
 moisture reading is stale or missing, nothing is asked for that room until the probes report again. The AI
 assistant tile on the dashboard says which brain runs and why.
 
-### Retired Jev routes
+### The removed first AI route
 
-The TypeSafe and Cloudflare routes of the Jev app are retired. An install moved from it keeps them working with
-`brain_provider` at `auto` (where the Jev brain has run) or `jev_legacy`, and gets a CS-712 card once a release.
-They are not offered to new installs. To move on, set `brain_provider: claude_haiku` and an Anthropic key; to
-turn the brain off and keep the old settings saved, set `brain_provider: rules`.
+The first AI route (through Cloudflare or TypeSafe) is removed. An install that used it loads with no option
+changed: `brain_provider: jev_legacy`, or `auto` where that route ran, moves to Claude with every judge when
+`anthropic_api_key` has a key, and uses rules when it does not. It gets a CS-712 card once a release, and the
+old Cloudflare and TypeSafe options are not used. To move on, set `brain_provider: claude_haiku` and an
+Anthropic key; to turn the brain off, set `brain_provider: rules`.
 
 ## Optional LLM / MCP connection
 

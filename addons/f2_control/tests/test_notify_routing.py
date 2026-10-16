@@ -3,11 +3,11 @@
 Every alert is a card first, exactly as before, and its severity decides whether a repeat pushes at all
 (test_decaying_renotify.py). The push itself: with a phone set up in the integration
 (sensor.crop_steering_notify_config), it is handed to crop_steering.notify and nothing is pushed here; with none, or when that call fails, it goes to the notify_service
-option as it always has. Never both, and never lost to the router. Phase changes and the settings Jev moves go to
+option as it always has. Never both, and never lost to the router. Phase changes and the settings the AI assistant moves go to
 the phones that ask for them, never to the option. And CS-209: a room with its lights on and a zone in P1 or P2
 that has watered nothing for a while.
 """
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -223,7 +223,7 @@ def test_what_the_controller_makes_of_the_integrations_setup(attrs, expected):
     assert c._notify_config() == expected
 
 
-# ------------------------------------------------------------------ phase changes and Jev's settings
+# ------------------------------------------------------------------ phase changes and the AI assistant's settings
 def test_a_phase_change_goes_to_the_phones_that_ask_and_never_to_the_option(router):
     c, fake = _setup()
     routed = router()
@@ -281,18 +281,17 @@ def test_a_rooms_events_go_as_one_push_per_kind_within_the_loops_time(router, mo
     assert len(routed.calls) == 3
 
 
-def test_jev_moving_a_zone_on_is_a_phase_change_like_any_other(jev_with, router):  # noqa: F811
+def test_the_ai_assistant_moving_a_zone_on_is_a_phase_change_like_any_other(jev_with, router):  # noqa: F811
     answers = K.both("ramp_state", K.choice_answer("ec_is_feed_front", {"ec_is_feed_front": 0.8, "real_salt": 0.2}))
     c, fake = jev_with(answers)
     fake.set_state(CONFIG, "1", {"recipients": 1, "idle_hours": 3})
-    fake.set_state("input_boolean.kill", "off")  # no shot to wait for: the move is Jev's either way
     routed = router()
-    _p1_zone(c)
+    _p1_zone(c)["last_shot"] = JEV_NOW - timedelta(minutes=12)  # the ramp judge is due, no ramp shot is
     c.loop_once(JEV_NOW)
     assert c.rooms[0].state[1]["phase"] == "P2"
     [event] = [d for d in routed.sent if d.get("event") == "phase"]
     assert event["title"] == "Zone 1: P1 → P2"
-    assert event["message"].startswith("Jev's ramp judge: ramp done: ec_is_feed_front")
+    assert event["message"].startswith("the AI assistant's ramp judge: ramp done: ec_is_feed_front")
 
 
 @pytest.mark.parametrize("recipients", [0, None])

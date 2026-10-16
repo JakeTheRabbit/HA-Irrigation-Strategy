@@ -21,7 +21,7 @@ export function jevUsage(jev: JevRoom | null, short = false): string {
     .join(" · ");
 }
 
-/** Jev not answering, or a judge failing: said once. With `lastError`, also the day's last error
+/** The AI assistant not answering, or a judge failing: said once. With `lastError`, also the day's last error
  * when nothing is wrong now. */
 export function JevTrouble({
   jev,

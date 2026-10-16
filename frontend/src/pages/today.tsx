@@ -123,7 +123,7 @@ interface Card {
 }
 
 /** Today: is the room OK, which zone needs a person and why, where each zone is in its day and what
- * comes next, and what Jev changed. Everything else is one tap deeper. */
+ * comes next, and what the AI assistant changed. Everything else is one tap deeper. */
 export function Today({
   controller,
   navigate,
@@ -726,7 +726,7 @@ function ZoneCard({
   );
 }
 
-/** What Jev changed today: only what moved something, newest first, three at most. */
+/** What the AI assistant changed today: only what moved something, newest first, three at most. */
 function JevToday({
   controller,
   entries,

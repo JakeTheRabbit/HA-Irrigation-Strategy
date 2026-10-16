@@ -213,6 +213,6 @@ class PlanContext:
     no_touch: bool = False
     cooldown_until: datetime | None = None
     bridge_day: str | None = None
-    powers: dict | None = None  # the room's AI powers (jev.powers): catch-up needs plan_catch_up
+    powers: dict | None = None  # the room's AI powers (brain.powers): catch-up needs plan_catch_up
     snap: object = None  # what admit() reads of a zone context: a room has none
     params: object = None

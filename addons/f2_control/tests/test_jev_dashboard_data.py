@@ -1,19 +1,19 @@
-"""What the controller publishes for the simplified dashboard: outcomes tied to their decision in words, Jev's
+"""What the controller publishes for the simplified dashboard: outcomes tied to their decision in words, the AI assistant's
 setpoint ranges per zone, a call count that survives restarts, and no Pore EC question while stacking is off."""
 import json
 from datetime import timedelta
 from types import SimpleNamespace
 
-import jev_bridge
+import brain_bridge
 import jev_kit as K
-from jev.brain import Brain
-from jev.client import Asker
-from jev.journal import Journal, label_words
-from jev.judges.ramp import RampJudge
-from jev.judges.salt import SaltJudge
-from jev.judges.setpoints import SetpointsJudge
-from jev.ledger import Ledger
-from jev.setpoint_memory import SetpointMemory
+from brain.brain import Brain
+from brain.client import Asker
+from brain.journal import Journal, label_words
+from brain.judges.ramp import RampJudge
+from brain.judges.salt import SaltJudge
+from brain.judges.setpoints import SetpointsJudge
+from brain.ledger import Ledger
+from brain.setpoint_memory import SetpointMemory
 
 
 def test_the_pore_ec_judge_is_not_asked_while_ec_stacking_is_off():
@@ -50,12 +50,12 @@ def test_the_days_call_count_survives_a_restart(tmp_path):
     today = K.NOW.date().isoformat()
     brain = SimpleNamespace(usage_path=path, asker=Asker("a", "t", threaded=False, clock=lambda: K.NOW.timestamp()))
     brain.asker.stats.update(day=today, calls=13, input_tokens=35582, errors=1, last_error="timeout")
-    jev_bridge.save_usage(brain)
+    brain_bridge.save_usage(brain)
     again = Asker("a", "t", threaded=False, clock=lambda: K.NOW.timestamp())
-    jev_bridge.restore_usage(again, path)
+    brain_bridge.restore_usage(again, path)
     assert (again.stats["calls"], again.stats["input_tokens"], again.stats["errors"]) == (13, 35582, 1)
     tomorrow = Asker("a", "t", threaded=False, clock=lambda: (K.NOW + timedelta(days=1)).timestamp())
-    jev_bridge.restore_usage(tomorrow, path)
+    brain_bridge.restore_usage(tomorrow, path)
     assert tomorrow.stats["calls"] == 0  # yesterday's count is not today's
     with open(path, encoding="utf-8") as fh:
         assert json.load(fh)["day"] == today
@@ -75,7 +75,7 @@ def test_each_zone_publishes_jevs_setpoint_range(tmp_path):
     room = SimpleNamespace(slug="default", prefix="", zones={1: {}}, state={1: {"ec_offset": 0.0}},
                            strategy_required=False, _jev_params={1: p})
     out = {}
-    jev_bridge.publish(c, room, K.NOW, lambda eid, state, attrs: out.__setitem__(eid, attrs))
+    brain_bridge.publish(c, room, K.NOW, lambda eid, state, attrs: out.__setitem__(eid, attrs))
     sp = out["sensor.crop_steering_zone_1_jev"]["setpoints"]
     assert sp["managed"] is True and sp["home"] == {"p2_shot_size": 5.0, "p2_vwc_threshold": 30.5}
     assert sp["current"] == {"p2_shot_size": 4.5, "p2_vwc_threshold": 30.5}

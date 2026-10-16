@@ -1,6 +1,6 @@
-"""Tomorrow's maintenance watering, one notch at a time: the Setpoints judge (docs/JEV.md).
+"""Tomorrow's maintenance watering, one notch at a time: the Setpoints judge (docs/AI_ASSISTANT.md).
 
-Asked once a grow-day, early in the night, when the day's water, shots and pore EC are complete. Jev chooses one
+Asked once a grow-day, early in the night, when the day's water, shots and pore EC are complete. The AI assistant chooses one
 change to the zone's P2 maintenance watering for tomorrow, or none. Code turns the choice into one notch on one of
 the zone's own numbers, inside a band around the operator's own value:
 
@@ -11,7 +11,7 @@ the zone's own numbers, inside a band around the operator's own value:
 Why this shape (observed on a production room, 26 Sep 2026): the old learner walked zone 1's shot from 3 % to 1 %
 one step a day (30-second shots every 96 seconds) and ratcheted zone 3's targets to 74.5 in four days. A band
 anchored on the operator's value can't ratchet, the floor stops machine-gun shots, the operator's own edits move the
-band (jev_bridge), and a rescue shot after a change puts the old value back and pauses the zone for two days.
+band (brain_bridge), and a rescue shot after a change puts the old value back and pauses the zone for two days.
 Nothing moves unless the room's Auto setpoints switch is on.
 """
 from __future__ import annotations

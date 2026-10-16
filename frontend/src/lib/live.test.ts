@@ -151,7 +151,7 @@ describe("watched entities", () => {
       "sensor.crop_steering_zone_2_status",
       "sensor.crop_steering_room_b_ai_heartbeat",
       "sensor.crop_steering_room_b_zone_1_last_irrigation_app",
-      // Jev's sensors: a log first posted after the page opened still updates live.
+      // The AI assistant's sensors: a log first posted after the page opened still updates live.
       "sensor.crop_steering_jev",
       "sensor.crop_steering_jev_log",
       "sensor.crop_steering_zone_2_jev",
@@ -367,8 +367,8 @@ describe("inside Home Assistant", () => {
     await vi.advanceTimersByTimeAsync(250);
     expect(store.getSnapshot().states[VWC].state).toBe("61.5");
   });
-  it("shows a Jev log first posted after the page opened, and each decision after it", async () => {
-    // Room B's controller has not posted its log yet (an older controller, or Jev just switched on).
+  it("shows a AI assistant log first posted after the page opened, and each decision after it", async () => {
+    // Room B's controller has not posted its log yet (an older controller, or the AI assistant just switched on).
     const LOG = "sensor.crop_steering_room_b_jev_log";
     const { home, store } = await started();
     const [, message] = home.connection.subscribeMessage.mock.calls[0] as unknown as [

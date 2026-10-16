@@ -57,7 +57,7 @@ export type Drafts = Record<
   }
 >;
 
-/** Plan › Targets: a zone's targets as one compact table by phase, each with Jev's range where Jev
+/** Plan › Targets: a zone's targets as one compact table by phase, each with the AI assistant's range where the AI assistant
  * manages it, and the day they make beside it while you edit. Nothing is written until reviewed. */
 export function Strategy({
   controller,
@@ -254,7 +254,7 @@ export function Strategy({
       setFileError(e instanceof Error ? e.message : String(e));
     }
   }
-  /** One setting as a row, with Jev's range and the probe's hints. */
+  /** One setting as a row, with the AI assistant's range and the probe's hints. */
   const row = (setting: Setting, label: string, unit: string, other?: string | null) => {
     const param = setpointParam(setting.entityId, prefix);
     return (

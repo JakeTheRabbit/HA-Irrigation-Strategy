@@ -314,7 +314,7 @@ export function createDemo(now = Date.now()): States {
     put(`sensor.crop_steering_${prefix}activity_log`, "Demo activity", {
       events: events.sort((a, b) => b.timestamp.localeCompare(a.timestamp)),
     });
-    // Room A runs Jev; Room B is a room without it.
+    // Room A runs the AI assistant; Room B is a room without it.
     if (!index) demoJev(put, prefix, now);
     demoDosing(put, prefix, name, now);
     // The integration's stock sensor: a tank per pump, each drawn by its pump.
@@ -577,7 +577,7 @@ const localStamp = (time: number) => {
     two = (value: number) => String(value).padStart(2, "0");
   return `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}T${two(date.getHours())}:${two(date.getMinutes())}:${two(date.getSeconds())}`;
 };
-/** A day of Jev's decisions for a room with lights 10:00-22:00 in flower bulk (vegetative): hours
+/** A day of the AI assistant's decisions for a room with lights 10:00-22:00 in flower bulk (vegetative): hours
  * after lights-on, zone, judge, answer, how sure, both phrasings, what it asked for, what code did,
  * code's why, and for an outcome the hour of the decision it checks (its answer is then that
  * decision's action, in words). */
@@ -737,7 +737,7 @@ const JEV_DAY: [
     "acted",
     "inside the AI assistant's range 3.5–5.5%",
   ],
-  // Zone 2's re-water point set by hand (demoDay records it): Jev only notes it. Today only (22).
+  // Zone 2's re-water point set by hand (demoDay records it): the AI assistant only notes it. Today only (22).
   [
     5.22,
     2,
@@ -750,7 +750,7 @@ const JEV_DAY: [
     "your value is the new centre of the AI assistant's range",
   ],
 ];
-/** The controller's Jev sensors for a demo room: its usage and stage (flower day 37, the bulk), the
+/** The controller's AI assistant sensors for a demo room: its usage and stage (flower day 37, the bulk), the
  * decision log over today and yesterday, and what each judge last said about each zone. */
 function demoJev(
   put: (id: string, state: string | number, attributes?: Record<string, unknown>) => void,
