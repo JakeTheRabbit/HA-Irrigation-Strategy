@@ -1571,6 +1571,8 @@ class Controller:
         room._adherence = plan_adherence.load(block.get("_adherence") if isinstance(block, dict) else None)
         room.tank_drawdown = tank_level.load(block.get("_tank") if isinstance(block, dict) else None)
         room.tank_estimate = safety_ops.tank_load(block.get("_tank_estimate") if isinstance(block, dict) else None)
+        remembered = block.get("_waste_rule") if isinstance(block, dict) else None
+        room._waste_rule_known = remembered if remembered in ("Off", WASTE_CHECK, WASTE_CLOSE) else None
         # A dim the controller did not finish (dry_dim.py): absent on an older file. Restored on the first pass.
         room._dim = dry_dim.load(block.get("_dim") if isinstance(block, dict) else None)
         room._dimmer = dry_dim.Dimmer(restarted=room._dim is not None)
@@ -1950,6 +1952,9 @@ class Controller:
                 block.pop("_shot_inflight", None)
             if hasattr(room, "_room_active_known"):
                 block["_room_active"] = room._room_active_known
+            waste_rule = getattr(room, "_waste_rule_known", None)
+            if waste_rule in ("Off", WASTE_CHECK, WASTE_CLOSE):
+                block["_waste_rule"] = waste_rule
             if room.tank_drawdown["base_pct"] is not None:  # only once a level has been read
                 block["_tank"] = room.tank_drawdown
             estimate = getattr(room, "tank_estimate", None) or {}
@@ -3508,11 +3513,18 @@ class Controller:
 
     def _waste_rule(self, room):
         """The room's waste-valve rule: Off (the controller never reads it, as before), WASTE_CHECK or WASTE_CLOSE.
-        A room with no waste valve mapped, or a select that can't be read, is Off."""
+        No mapped waste valve or a confirmed absent legacy select keeps the old Off behavior. A transient
+        unreadable/invalid policy is a hold, never permission to ignore an enabled interlock."""
         if not getattr(room, "waste", ""):
             return "Off"
-        state = ha_get(f"select.crop_steering_{room.prefix}waste_valve_rule")[0]
-        return state if state in (WASTE_CHECK, WASTE_CLOSE) else "Off"
+        entity = f"select.crop_steering_{room.prefix}waste_valve_rule"
+        state = ha_get(entity)[0]
+        if state in ("Off", WASTE_CHECK, WASTE_CLOSE):
+            room._waste_rule_known = state
+            return state
+        if state is None and ha_get_status(entity)[0] == 404 and not getattr(room, "_waste_rule_known", None):
+            return "Off"
+        return "Unreadable"
 
     def _waste_hold(self, room):
         """Why the waste valve holds the room's shots, else None (CS-316). Check closed: it must read OFF. Close for
@@ -3530,6 +3542,8 @@ class Controller:
             return None
         why = (f"waste valve {waste} reads {state}" if state in ("on", "off")
                else f"waste valve {waste} offline (reads neither on nor off)")
+        if rule == "Unreadable":
+            why = "waste valve rule unreadable (no shot until its policy can be confirmed)"
         if rule == WASTE_CLOSE and waste.split(".", 1)[0] not in ACTUATORS:
             why = f"waste valve {waste} can't be switched by the controller"
         self._alert(
@@ -3549,8 +3563,11 @@ class Controller:
     def _close_waste(self, room, zone):
         """Close for each shot: switch the waste valve OFF before anything opens, read back. False (and CS-316) when
         it will not read OFF: the shot does not start. Never opened again by the controller."""
-        if self._waste_rule(room) != WASTE_CLOSE:
+        rule = self._waste_rule(room)
+        if rule == "Off":
             return True
+        if rule != WASTE_CLOSE:
+            return self._waste_hold(room) is None if rule == WASTE_CHECK else False
         waste = room.waste
         if hw_get(waste)[0] == "off":
             return True

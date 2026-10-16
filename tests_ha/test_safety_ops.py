@@ -200,6 +200,48 @@ async def test_the_waste_valve_rule_holds_or_closes_and_off_changes_nothing(hass
     assert room.hardware_fault is None
 
 
+@pytest.mark.parametrize("policy", ["Check closed", "Close for each shot"])
+@pytest.mark.parametrize("lost", ["unknown", "unavailable", None])
+async def test_an_unreadable_waste_policy_never_opens_the_feed(hass, controller_for, policy, lost):
+    await _pumped_room(hass)
+    c, fake, _clock = controller_for({"enable_flag": KILL})
+    room = room_of(c, NEW)
+    _arm(fake)
+    rule = "select.crop_steering_tent_waste_valve_rule"
+    fake.set_state(rule, policy)
+    assert c._waste_rule(room) == policy
+    fake.states[rule] = (lost, {})
+    fake.set_state(WASTE, "on")
+    assert "rule unreadable" in c._blocked(room, 1)
+    fake.calls.clear()
+    assert c._close_waste(room, 1) is False
+    c._execute_shot(room, 1, 10, 5, flow_lps=0.05)
+    assert not [call for call in fake.calls if call[2].get("entity_id") in (PUMP, VALVE)]
+
+
+async def test_the_waste_policy_is_remembered_across_restart_but_old_missing_entities_stay_off(
+    hass, controller_for, monkeypatch
+):
+    import controller
+
+    await _pumped_room(hass)
+    c, fake, _clock = controller_for({"enable_flag": KILL})
+    room = room_of(c, NEW)
+    rule = "select.crop_steering_tent_waste_valve_rule"
+    monkeypatch.setattr(controller, "ha_get_status", lambda entity: (404, None))
+    fake.states[rule] = (None, {})
+    assert c._waste_rule(room) == "Off"  # confirmed absent, never configured on an older install
+    fake.set_state(rule, "Close for each shot")
+    assert c._waste_rule(room) == "Close for each shot"
+    c._save_state()
+    restarted, new_fake, _clock = controller_for({"enable_flag": KILL})
+    new_room = room_of(restarted, NEW)
+    assert new_room._waste_rule_known == "Close for each shot"
+    monkeypatch.setattr(controller, "ha_get_status", lambda entity: (404, None))
+    new_fake.states[rule] = (None, {})
+    assert restarted._waste_rule(new_room) == "Unreadable"
+
+
 async def test_a_rescue_passes_a_dead_feed_probe_only_when_switched_on(hass, controller_for):
     import controller
 
