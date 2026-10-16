@@ -96,6 +96,13 @@ ENTITY_DEFAULTS_12C6D1A = {
     "p2_timed_first_hours": 0.0,
     "p2_end_hours_before_off": 0.0,
     "setpoint_max_step_per_day": 1.0,  # the controller's FC_STEP_MAX
+    # added after it, the runoff estimator's calibration: 0 is unknown, as no estimate was made
+    "sump_litres_per_run": 0.0,
+    "sump_pump_flow_lpm": 0.0,
+    "runoff_attribution_min": 90.0,
+    "hvac_run_power_w": 50.0,
+    "cwsi_lower_baseline": 0.0,  # added after it: both 0 is off (the plant-stress card's CWSI)
+    "cwsi_upper_baseline": 0.0,
 }
 
 # The literal at each controller _zone_num call site at 12c6d1a, plus P3 Time Between Shots, the P1 rise

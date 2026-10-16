@@ -401,6 +401,8 @@ def brain_context(c, room, zone, snap, now):
                          + ("settled since the last shot" if settled else "not settled since the last shot")),
         "arc": getattr(c.jev, "arc", None), "arc_note": getattr(c.jev, "arc_note", None),
         "zones_hardware": zones_hardware(c, room, zone, now), "room_balance": room_balance(c, room, zone, now),
+        # the room's sump water-balance estimate, only with the runoff estimator set to ai (controller._watch_runoff)
+        **({"runoff_estimate": room._runoff_words} if getattr(room, "_runoff_words", None) else {}),
     }
 
 
@@ -413,6 +415,7 @@ def zone_context(c, room, zone, snap, p, now, lights_on):
         flower_day=fday, flower_days=fdays, stage=stage_intent(fday, fdays, getattr(c.jev, "arc_rows", STAGE_ROWS)),
         brain=brain_context(c, room, zone, snap, now) if haiku(c) else None,
         steering="vegetative" if c._veg(room, zone) else "generative",
+        cultivar=getattr(room, "zone_cultivars", {}).get(zone),
         room=room.slug, prefix=room.prefix, zone=zone, title=c._zone_title(room, zone), now=now,
         phase=st["phase"], snap=snap, params=p, history=_hist(room, zone), lights_on=lights_on,
         hours_to_on=c._hours_to(now, room.lights_on_hour), hours_to_off=c._hours_to(now, room.lights_off_hour),

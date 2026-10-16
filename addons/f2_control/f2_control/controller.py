@@ -39,10 +39,14 @@ import curve_tracker
 import dosing_runner
 import dry_dim
 import brain_bridge
+import gate_report
 import log_words
 import phase_options
 import plan_adherence
+import runoff_balance
 import runtime_env
+import sensing
+import shot_audit
 from brain import client as jev_client
 import setpoint_supervisor
 import tank_level
@@ -729,6 +733,12 @@ VMAX_SERIES_MAX = 40
 # Pump Run Threshold, or SUMP_RUN_W where the integration has no such setting (compared in W, whatever unit the
 # plug reports: _device_history).
 SUMP_SILENT_H, SUMP_CHECK_MIN, SUMP_RUN_W = 3.0, 5.0, 20.0
+# The runoff estimator (runoff_balance.py, select runoff_estimator, off by default): the sump's runs and each mapped AC
+# and dehumidifier's run time are read from Home Assistant's history every RUNOFF_CHECK_MIN (RUNOFF_FIRST_H back the
+# first time) and the balance refitted every RUNOFF_FIT_MIN. A unit mapped by its power counts as running above the
+# room's HVAC run power (HVAC_RUN_W where the integration has no such setting).
+RUNOFF_MODES = ("off", "shadow", "shown_alerts", "ai")
+RUNOFF_CHECK_MIN, RUNOFF_FIT_MIN, RUNOFF_FIRST_H, HVAC_RUN_W = 10.0, 30.0, 48.0, 50.0
 # CS-312: a zone whose last MAX_RUN_IN_A_ROW shots were all cut to the room's maximum shot length (CS-306 each) keeps
 # asking for more water than a shot may give, as a probe stuck dry does all day. With the room's max-run latch switch
 # ON the zone is latched until its Repairs card is fixed; OFF, or absent (an older integration), it is only reported.
@@ -737,6 +747,14 @@ MAX_RUN_IN_A_ROW = 3
 # made by hand, and this app's shipped `enable_flag` option (config.yaml). A room made by the wizard stops
 # on its own engine switch, named by its setup. Named here once; room_gate() is the rule.
 LEGACY_ENABLE_FLAG = "input_boolean.f2_control_enabled"
+
+
+def _epoch(stamp):
+    """An ISO time (with or without a UTC offset; naive is local) as epoch seconds, or None."""
+    try:
+        return datetime.fromisoformat(str(stamp).replace("Z", "+00:00")).timestamp()
+    except (TypeError, ValueError):
+        return None
 
 
 def _pct_or_none(value):
@@ -1407,6 +1425,7 @@ class Controller:
             "ec_flushing": False,
             "vmax_wetup": [],  # this grow-day's P1 wet-up VWC readings, for the Vmax advisory (resets each P0)
             **zone_history.fresh(),
+            **sensing.fresh(),  # the water-and-VPD record (sensing.py), kept only while its switch is on
             **day_summary.fresh(),  # the grow-day summary being measured, and those not yet sent (day_summary)
         }
 
@@ -1529,6 +1548,7 @@ class Controller:
                                if isinstance(v, (int, float)) and not isinstance(v, bool)
                                and math.isfinite(v) and 0.0 <= v <= 100.0][-VMAX_SERIES_MAX:]
         s.update(zone_history.restore(d))
+        s.update(sensing.restore(d))
         s.update(day_summary.restore(d))
         return s
 
@@ -1562,6 +1582,7 @@ class Controller:
         # Plan adherence's own record (plan_adherence.load): absent on an older file, field by field otherwise.
         room._adherence = plan_adherence.load(block.get("_adherence") if isinstance(block, dict) else None)
         room.tank_drawdown = tank_level.load(block.get("_tank") if isinstance(block, dict) else None)
+        room._runoff = runoff_balance.load(block.get("_runoff") if isinstance(block, dict) else None)
         # A dim the controller did not finish (dry_dim.py): absent on an older file. Restored on the first pass.
         room._dim = dry_dim.load(block.get("_dim") if isinstance(block, dict) else None)
         room._dimmer = dry_dim.Dimmer(restarted=room._dim is not None)
@@ -1749,10 +1770,17 @@ class Controller:
             if not attrs:
                 continue
             room.zone_names = self._zone_names(attrs)  # display only; a rename needs no adoption
+            room.zone_cultivars = self._zone_cultivars(attrs)  # a label, read like the names: never decides anything
             room.room_name = self._room_name(attrs)
             room.substrate = self._substrate(attrs)  # read like the names: needs no adoption
             room.light_entity = str(attrs.get("light_entity") or "").strip()  # checked, never actuated
             room.tank = tank_level.mapping(attrs)  # read only, never actuated: needs no adoption
+            # each AC and dehumidifier the room maps, read only for the runoff estimator (runoff_balance.py)
+            room.hvac_units = [str(e) for key in ("ac_entities", "dehumidifier_entities")
+                               for e in (attrs.get(key) or []) if isinstance(e, str) and e]
+            # the room's climate sensors, read only for the water-and-VPD record (sensing.py)
+            room.climate = {k: str(attrs.get(k) or "").strip() for k in ("vpd_sensor", "temperature_sensor",
+                                                                         "humidity_sensor")}
             saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_setup")
             another_room = self._is_another_room(room, attrs, saved)
             revision = attrs.get("setup_revision", 0)
@@ -1910,6 +1938,8 @@ class Controller:
             "night_hist": s.get("night_hist") or [],
             "night": s.get("night"),
             "vmax_wetup": list(s.get("vmax_wetup") or []),
+            "water_vpd": s.get("water_vpd"),
+            "day_hist": s.get("day_hist") or [],
             "day_acc": s.get("day_acc"),
             "day_out": s.get("day_out") or [],
         }
@@ -1940,6 +1970,11 @@ class Controller:
                 block["_room_active"] = room._room_active_known
             if room.tank_drawdown["base_pct"] is not None:  # only once a level has been read
                 block["_tank"] = room.tank_drawdown
+            runoff = getattr(room, "_runoff", None)
+            if runoff and runoff_balance.has_data(runoff):  # only once the estimator has recorded something
+                block["_runoff"] = runoff
+            else:
+                block.pop("_runoff", None)
             if getattr(room, "_dim", None):
                 block["_dim"] = room._dim
             else:
@@ -3363,7 +3398,7 @@ class Controller:
         )
 
     @staticmethod
-    def _publish_waiting_for(room, zone, snap, p, now):
+    def _publish_waiting_for(room, zone, snap, p, now, gates=None):
         """What would move the zone next (crop_steering_engine.waiting_for), for the dashboard's zone
         card and grow-day line. No snapshot (no probe, or the room is off): an empty list, so an old
         one never lingers. A wait's clock time is `at` plus its in_min."""
@@ -3378,6 +3413,8 @@ class Controller:
             {
                 "conditions": conditions,
                 "at": now.astimezone().isoformat(timespec="seconds"),
+                # every pre-shot gate with pass or hold (gate_report.py), for the zone page's list
+                **({"gates": gates} if gates is not None else {}),
                 "friendly_name": f"Zone {zone} waiting for (controller)",
                 "engine": PRODUCT,
             },
@@ -3568,6 +3605,21 @@ class Controller:
                 continue
             if isinstance(name, str) and name.strip() and name.strip() != f"Zone {zone}":
                 found[zone] = name.strip()[:40]
+        return found
+
+    @staticmethod
+    def _zone_cultivars(attrs):
+        """The cultivar label of each zone that has one ({2: "Gelato"}), from the room's descriptor. An older
+        integration publishes none."""
+        labels = (attrs or {}).get("zone_cultivars")
+        found = {}
+        for key, label in (labels.items() if isinstance(labels, dict) else ()):
+            try:
+                zone = int(key)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(label, str) and label.strip():
+                found[zone] = label.strip()[:40]
         return found
 
     @staticmethod
@@ -3942,6 +3994,124 @@ class Controller:
             room=room,
         )
 
+    def _watch_runoff(self, room, now):
+        """The room's runoff estimate from its sump's water balance (runoff_balance.py), with the select
+        runoff_estimator not off and a sump power sensor mapped. Records the sump runs and each mapped AC and
+        dehumidifier's run time from history, closes each grow-day's sealed-room balance, refits, and publishes
+        sensor.crop_steering_<prefix>runoff_estimate_app. In shown_alerts and ai, a grow-day whose balance does not
+        close raises CS-314. Never waters, holds or moves a setting."""
+        mode = ha_get(f"select.crop_steering_{room.prefix}runoff_estimator")[0]
+        room._runoff_mode = mode if mode in RUNOFF_MODES else "off"
+        if room._runoff_mode == "off":
+            room._runoff_words = None
+            return
+        entity = self.sump_sensors.get(room.slug) or self.sump_sensors.get("*")
+        sensor = f"sensor.crop_steering_{room.prefix}runoff_estimate_app"
+        if not entity:
+            room._runoff_words = None
+            ha_set(sensor, "no_sump", {"why": "no sump power sensor mapped for this room (option sump_power_sensor)",
+                                       "friendly_name": "Runoff estimate (room-wide)", "engine": PRODUCT})
+            return
+        st, now_s = room._runoff, now.timestamp()
+        units = list(getattr(room, "hvac_units", None) or [])
+        if st["cursor"] is None or now_s - st["cursor"] >= RUNOFF_CHECK_MIN * 60:
+            since_s = (st["cursor"] - 600) if st["cursor"] else now_s - RUNOFF_FIRST_H * 3600
+            since = datetime.fromtimestamp(since_s, timezone.utc)
+            run_w = self._num(f"number.crop_steering_{room.prefix}sump_power_threshold_w", SUMP_RUN_W)
+            hvac_w = self._num(f"number.crop_steering_{room.prefix}hvac_run_power_w", HVAC_RUN_W)
+            rows = self._device_history(entity, "power", since)
+            if rows is not None:
+                st["runs"] = runoff_balance.merge(st["runs"], runoff_balance.spans(
+                    [(w, _epoch(t)) for w, t in rows], lambda w: w > run_w, now_s))
+            for unit in units:
+                st["on"][unit] = runoff_balance.merge(st["on"].get(unit, []),
+                                                      self._unit_spans(unit, since, hvac_w, now_s))
+            st["cursor"] = now_s
+            runoff_balance.prune(st, now_s)
+            day_start = self._grow_day_start(room, now)
+            closed = runoff_balance.day_tick(st, day_start.isoformat(), self._lights_on_s(room, day_start),
+                                             self._substrate_water(room))
+            self._save_state()
+            if closed is not None and room._runoff_mode in ("shown_alerts", "ai"):
+                self._runoff_closure_alert(room, closed)
+        fitted = getattr(room, "_runoff_fit", None)
+        if fitted is None or now_s - fitted[0] >= RUNOFF_FIT_MIN * 60:
+            fit = runoff_balance.fit(st, units, self._num(
+                f"number.crop_steering_{room.prefix}runoff_attribution_min", 90))
+            room._runoff_fit = fitted = (now_s, fit)
+        volume, source = self._sump_volume(room, st)
+        held = ["the sump pump has not run (CS-311)"] if f"sump_{room.slug}" in self._alerted else []
+        if getattr(room, "_backed_up", None):
+            held.append("a table is backing up (CS-310)")
+        state, attrs = runoff_balance.estimate(
+            st, units, volume=volume, volume_source=source, f=fitted[1], now_s=now_s,
+            today_start_s=self._lights_on_s(room, self._grow_day_start(room, now)), unresolvable="; ".join(held) or None)
+        shared = sorted(r.slug for r in self.rooms if r is not room and
+                        (self.sump_sensors.get(r.slug) or self.sump_sensors.get("*")) == entity)
+        if shared:
+            attrs["scope"] = f"per sump, shared with {', '.join(shared)}: not split by room"
+        room._runoff_words = runoff_balance.words(state, attrs) if room._runoff_mode == "ai" else None
+        ha_set(sensor, state, {**attrs, "mode": room._runoff_mode, "units": units, "sump_sensor": entity,
+                               "friendly_name": "Runoff estimate (room-wide)", "engine": PRODUCT})
+
+    @staticmethod
+    def _lights_on_s(room, day):
+        """The epoch seconds of grow-day `day`'s lights-on, on this machine's clock."""
+        return (datetime.combine(day, datetime.min.time()) + timedelta(hours=float(room.lights_on_hour))).timestamp()
+
+    def _unit_spans(self, unit, since, hvac_w, now_s):
+        """When an AC or dehumidifier ran since `since`: by its power above hvac_w for a sensor, else its state."""
+        domain = unit.split(".", 1)[0]
+        if domain == "sensor":
+            rows = self._device_history(unit, "power", since) or []
+            return runoff_balance.spans([(w, _epoch(t)) for w, t in rows], lambda w: w > hvac_w, now_s)
+        running = ("cool", "dry", "heat_cool", "auto") if domain == "climate" else ("on", "true", "open", "1")
+        rows = ha_history(unit, since) or []
+        return runoff_balance.spans([(str(v).lower(), _epoch(t)) for v, t in rows], lambda v: v in running, now_s)
+
+    def _substrate_water(self, room):
+        """Litres of water in the room's substrate now: each zone's last VWC x its substrate litres; None when a
+        zone has no reading."""
+        total = 0.0
+        for zone in room.zones:
+            vwc = room.state[zone].get("last_vwc")
+            if vwc is None:
+                return None
+            total += float(vwc) / 100.0 * self._substrate_l(room, zone)
+        return total
+
+    def _sump_volume(self, room, st):
+        """(litres per sump run, where from): the room's own number (a bucket test), else pump flow x the median
+        run time, else the sealed-room closure; (None, "unknown") without any."""
+        litres = self._num(f"number.crop_steering_{room.prefix}sump_litres_per_run", 0)
+        if litres and litres > 0:
+            return litres, "sump_litres_per_run"
+        flow = self._num(f"number.crop_steering_{room.prefix}sump_pump_flow_lpm", 0)
+        runs = sorted(e - s for s, e in st["runs"] if e > s)
+        if flow and flow > 0 and runs:
+            return flow * runs[len(runs) // 2] / 60.0, "pump flow x run time"
+        closure = runoff_balance.closure_volume(st)
+        return (closure, "sealed-room closure") if closure else (None, "unknown")
+
+    def _runoff_closure_alert(self, room, day):
+        """CS-314: a grow-day whose sump litres miss what a sealed room must give (fed - the substrate's change).
+        With the litres per run taken from the closure itself, only a day far from the median says anything."""
+        volume, source = self._sump_volume(room, room._runoff)
+        error = runoff_balance.closure_error_pct(day, volume)
+        if error is None or abs(error) <= runoff_balance.CLOSURE_ALERT_PCT:
+            return
+        want = runoff_balance.balance_litres(day)
+        self._alert(
+            f"runoff_closure_{room.slug}",
+            "CS-314",
+            "the sump water balance does not close",
+            f"On the grow-day {day['date'][:10]} the sump took about {day['runs'] * volume:.0f} L ({day['runs']} runs "
+            f"of {volume:.1f} L, {source}). A sealed room should have sent it {want:.0f} L: {day['fed_l']:.0f} L fed "
+            f"minus the change of water in the substrate. That is {error:+.0f}%. Possible causes are a leak, a sump "
+            "run the power plug did not report, a stuck float, or a wrong litres per run. Watering is not changed.",
+            room=room,
+        )
+
     def _tank_level(self, room):
         """The room's tank level (tank_level.py) -> (percent or None, low or None). The percent is None when no
         distance sensor is mapped, it has no reading, or the drawdown check says it is stuck. `low` is the
@@ -4196,7 +4366,10 @@ class Controller:
         zones = {z: {"block": str(d["block"])[:160] if d.get("block") else None,
                      "decision": str(d.get("reason") or "")[:120]}
                  for z, d in sorted((pub or {}).items())}
-        return {"kill_switch": read(room_gate(room)), "holds_on": holds, "zones": zones}
+        out = {"kill_switch": read(room_gate(room)), "holds_on": holds, "zones": zones}
+        if getattr(room, "_runoff_words", None):  # the runoff estimator set to ai: a room-wide hint, never a catch
+            out["runoff_estimate"] = room._runoff_words
+        return out
 
     def _idle_why(self, room, pub):
         """Why nothing has been watered, as far as this pass can tell: watering switched off, a hold (_blocked), or
@@ -4635,6 +4808,10 @@ class Controller:
         if room.tank.get("distance"):  # what the tank gave, for the level's drawdown check
             tank_level.drawn(room.tank_drawdown, delivered_l)
         self._save_state()
+        if room.__dict__.get("_runoff_mode", "off") != "off":
+            runoff_balance.add_shot(room._runoff, now.timestamp(), delivered_l)  # the sump balance's feed
+        if room.__dict__.get("_shot_check", "off") != "off":
+            shot_audit.counted(room, zone, delivered_l)  # the shot table's record (shot_audit.py)
         if getattr(self, "jev", None) is not None:
             try:  # the shot, for the AI assistant's Shot and Probe judges to read its answer later
                 brain_bridge.shot_counted(room, zone, delivered_l)
@@ -6411,6 +6588,7 @@ class Controller:
         if was is False:
             self._room_switched_on(room)
         room._retired_off = self._carry_retired_switches(room)
+        self._sensing_options(room)
         self._load_strategy_snapshot(room, now)
         # Only a newly computed batch can clear a prior preflight invalidation.
         room._strategy_batch_invalid = False
@@ -6468,6 +6646,7 @@ class Controller:
                 continue
             room._blind_since.pop(zone, None)
             snaps[zone] = snap
+            self._sensing_tick(room, zone, snap, lights_on, now)
             if st["phase"] == "P1" and snap.vwc >= min(p.p1_target, p.field_capacity):
                 st["p1_reached"] = True  # the P1 rule (core.decide): the target has been read this P1
             try:  # CS-310: never pour the daily minimum, or an EC flush, into a table that isn't draining
@@ -6530,7 +6709,7 @@ class Controller:
                     **({"peak_vwc": snap.vwc} if new_phase == "P0" else {}),
                     **({"shot_count": 0} if new_phase == "P1" else {}),
                 )
-            self._publish_waiting_for(room, zone, shown, p, now)
+            self._publish_waiting_for(room, zone, shown, p, now, gates=self._gates(room, zone, reason))
             # The EC steer runs on ec_smooth, which only settled readings feed (see _settled_ec).
             if (snap.ec is not None and snap.ec_smooth is not None and p.stacking_on
                     and st["phase"] == "P2" and p.ec_target_p2 > 0):
@@ -6566,7 +6745,7 @@ class Controller:
                 log("auto setpoints error", room.slug, zone, e)
         for zone, p in blind:
             st = room.state[zone]
-            self._publish_waiting_for(room, zone, None, p, now)  # no probe: nothing to compare
+            self._publish_waiting_for(room, zone, None, p, now, gates=self._gates(room, zone))  # no probe: nothing to compare
             # A dead probe must NOT freeze the daily cycle: still honour the time-based
             # phase forces (lights-off -> P3, P3 -> P0 at the new photoperiod). Only the
             # VWC-driven transitions are paused while blind.
@@ -6661,6 +6840,8 @@ class Controller:
                      else strategy_block(getattr(room, "strategy_snapshot", None), zone))
             if fire and not block and getattr(self, "jev", None) is not None and getattr(reason, "kind", None) != "test_shot":
                 brain_bridge.shot_started(room, zone, snaps.get(zone), getattr(reason, "kind", None))
+            if fire and not block and room.__dict__.get("_shot_check", "off") != "off":
+                shot_audit.started(room, zone, snaps.get(zone), getattr(reason, "kind", None))
             fed_before = room.state[zone]["daily_vol"]
             acted = self._act_zone(
                 room,
@@ -6700,6 +6881,8 @@ class Controller:
                 "p": params[zone],
                 "vmax": room._vmax.get(zone),
                 "next_h": next_h,
+                # the zone's live dryback (sensing.dryback): the numbers decide() used this pass
+                "dryback": (snap.peak_vwc, snap.vwc, snap.dryback_rate, snap.minutes_since_shot) if snap else None,
             }
         for z, why in cross_zone_outliers(snaps):
             self._alert(
@@ -6740,6 +6923,10 @@ class Controller:
             self._watch_sump(room, now)
         except Exception as e:
             log("sump watch error", room.slug, e)
+        try:  # the runoff estimator only ever tells (CS-314): no water is given or held from it
+            self._watch_runoff(room, now)
+        except Exception as e:
+            log("runoff estimator error", room.slug, e)
         try:  # CS-211 only ever tells, too
             self._watch_held(room, now, pub)
         except Exception as e:
@@ -6755,6 +6942,93 @@ class Controller:
         self._send_grow_days(room, now)
         room._was_lights_on = lights_on
         return pub
+
+    # ---------- read-only sensing: dryback, water and VPD, the shot table, the gate list ----------
+    def _sensing_options(self, room):
+        """This pass's choices for the read-only sensing (each off on a room that never chose): the Shot check
+        select and the Water vs VPD switch, and with the switch on, the room's VPD now."""
+        mode = ha_get(f"select.crop_steering_{room.prefix}shot_check")[0]
+        room._shot_check = mode if mode in shot_audit.MODES else "off"
+        room._water_vpd_on = self._on(f"switch.crop_steering_{room.prefix}water_vpd_insight", False)
+        room._vpd_now = self._room_vpd(room) if room._water_vpd_on else None
+
+    def _room_vpd(self, room):
+        """The room's air VPD in kPa: its mapped VPD sensor, else worked out from its temperature and humidity
+        sensors; None without them."""
+        climate = getattr(room, "climate", None) or {}
+        if climate.get("vpd_sensor"):
+            v = sensing.number(ha_get(climate["vpd_sensor"])[0])
+            return v if v is not None and 0 <= v <= 6 else None
+        if climate.get("temperature_sensor") and climate.get("humidity_sensor"):
+            t = self._read_sensor(climate["temperature_sensor"], "temperature", max_age_min=60)
+            return sensing.vpd_from(t, sensing.number(ha_get(climate["humidity_sensor"])[0]))
+        return None
+
+    def _sensing_tick(self, room, zone, snap, lights_on, now):
+        """A reading for the shot table, and the water-and-VPD record's sample. Never stops a zone being watered."""
+        try:
+            if room.__dict__.get("_shot_check", "off") != "off":
+                shot_audit.reading(room, zone, now, snap.vwc, snap.ec)
+            if room.__dict__.get("_water_vpd_on"):
+                st = room.state[zone]
+                closed = sensing.sample(st, day=self._grow_day_start(room, now).isoformat(), ts=now.timestamp(),
+                                        lights_on=lights_on, rate=snap.dryback_rate,
+                                        minutes_since_shot=snap.minutes_since_shot, vpd=room._vpd_now)
+                if closed is not None:
+                    litres = next((i["litres"] for i in st.get("water_history") or []
+                                   if i.get("grow_day") == closed["date"]), None)
+                    sensing.keep(st, closed, litres, self._zone_num(room, zone, "plant_count", FALLBACK["plant_count"]))
+                    self._save_state()
+        except Exception as e:
+            log("sensing error", room.slug, zone, e)
+
+    def _gates(self, room, zone, reason=None):
+        """Every pre-shot gate of the zone with pass or hold (gate_report.py), or None when it cannot be read."""
+        try:
+            return gate_report.report(self, room, zone, reason)
+        except Exception as e:
+            log("gate report error", room.slug, zone, e)
+            return None
+
+    def _publish_sensing(self, room, zone, d, now):
+        """The zone's dryback sensor, and with their toggles on, its water-vs-VPD answer and its shot table."""
+        px = room.prefix
+        try:
+            state, attrs = sensing.dryback(*(d.get("dryback") or (None, None, None, None)))
+            ha_set(f"sensor.crop_steering_{px}zone_{zone}_dryback_app", state,
+                   {**attrs, "note": sensing.DRYBACK_NOTE, "friendly_name": f"Zone {zone} dryback",
+                    "engine": PRODUCT})
+            if room.__dict__.get("_water_vpd_on"):
+                st = room.state[zone]
+                fit = sensing.fit(st.get("day_hist") or [])
+                ha_set(f"sensor.crop_steering_{px}zone_{zone}_water_response_app",
+                       "unknown" if fit["slope"] is None else fit["slope"],
+                       {"unit_of_measurement": "points/h per kPa", "n_days": fit["n"], "r": fit["r"],
+                        "vpd_spread_kpa": fit["spread"], "days": st.get("day_hist") or [], "words": fit["words"],
+                        "vpd_now_kpa": room._vpd_now, "friendly_name": f"Zone {zone} dryback vs VPD",
+                        "engine": PRODUCT})
+            mode = room.__dict__.get("_shot_check", "off")
+            if mode != "off":
+                jev = getattr(self, "jev", None)
+                rows = shot_audit.table(room, zone, now, self._substrate_l(room, zone), d["p"].field_capacity,
+                                        ai=shot_audit.ai_labels(jev, room.slug, zone) if jev is not None else ())
+                ha_set(f"sensor.crop_steering_{px}zone_{zone}_shot_log_app", rows[0]["verdict"] if rows else "none",
+                       {"shots": rows, "mode": mode, "ai_on": jev is not None,
+                        "note": "Kept in memory: after a restart the table fills again with the next shots.",
+                        "friendly_name": f"Zone {zone} last shots", "engine": PRODUCT})
+                # Rules-mode CS-701: only with the AI assistant off, under the AI judge's own alert key, so one
+                # fault never gives two notices.
+                if mode == "table_and_alert" and jev is None and shot_audit.no_sign_in_a_row(room, zone, rows):
+                    a, b = [r for r in rows if r["counted"] and r["verdict"] == "no_sign"][:2][::-1]
+                    self._alert(
+                        f"jev_shot_{room.slug}_z{zone}", "CS-701", "water does not reach this zone",
+                        f"The last two shots on {self._zone_title(room, zone)} at {a['start'][11:16]} and "
+                        f"{b['start'][11:16]} gave {a['litres']:.1f} L and {b['litres']:.1f} L, and neither the "
+                        "VWC nor the pore EC moved (the controller's shot check). Check the valve, the drippers and "
+                        "the line of the zone. The shots continue as usual.",
+                        room=room, zone=zone)
+        except Exception as e:
+            log("sensing publish error", room.slug, zone, e)
 
     def _publish_status(self, room, pub, now):
         if not pub:
@@ -6816,6 +7090,7 @@ class Controller:
                             "engine": PRODUCT,
                         },
                     )
+                self._publish_sensing(room, zone, d, now)
                 ls = room.state[zone].get("last_shot")
                 if ls is not None:
                     ha_set(

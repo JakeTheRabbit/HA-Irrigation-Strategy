@@ -28,6 +28,8 @@ from .const import (
     SET_PHASE_OPTIONS,
     SETPOINT_STEP_SCOPES,
     P2_MODES,
+    RUNOFF_ESTIMATOR_MODES,
+    SHOT_CHECK_MODES,
     SUBSTRATES,
     WATER_TODAY_VIEWS,
 )
@@ -104,6 +106,20 @@ SELECT_DESCRIPTIONS = [
         name="Pause AI changes",
         icon="mdi:hand-back-left-off",
         options=NO_TOUCH_OPTIONS,
+    ),
+    # The runoff estimator from the sump's water balance: off until someone chooses.
+    SelectEntityDescription(
+        key="runoff_estimator",
+        name="Runoff estimator",
+        icon="mdi:water-sync",
+        options=RUNOFF_ESTIMATOR_MODES,
+    ),
+    # The controller's shot check: off until someone chooses (the AI shot judge alone, as before).
+    SelectEntityDescription(
+        key="shot_check",
+        name="Shot check",
+        icon="mdi:water-check",
+        options=SHOT_CHECK_MODES,
     ),
 ]
 

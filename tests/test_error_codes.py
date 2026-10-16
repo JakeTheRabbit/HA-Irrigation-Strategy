@@ -54,6 +54,7 @@ RESERVED = {
     "CS-210": ("fix/missing-hold-entity", "a hold entity Home Assistant does not have"),
     "CS-312": ("feat/max-run-latch", "a pump or valve on past its longest allowed run"),
     "CS-313": ("feat/actuator-domains", "an actuator the controller cannot switch"),
+    "CS-314": ("feat/p3-runoff-balance", "the sump water balance does not close"),
     "CS-502": ("feat/probe-fusion-guarded", "a zone's probes disagree"),
     "CS-503": ("fix/probe-unit-table", "a probe set aside for its unit"),
     "CS-504": ("feat/ec-type-per-probe", "bulk and pore EC mixed in one zone"),
@@ -265,7 +266,7 @@ def test_the_guard_catches_a_second_definition_and_an_unreserved_code():
     with pytest.raises(AssertionError, match=r"defined twice: \['a'\]"):
         _strict_json('{"issues": {"a": {}, "a": {}}}')
     assert _bundled_codes('codes:[{code:`CS-101`},{"code":"CS-101"}]') == {"CS-101": 2}
-    assert _unreserved(["CS-105", "CS-314", "CS-609", "CS-901", "CS-207"]) == {
+    assert _unreserved(["CS-105", "CS-319", "CS-609", "CS-901", "CS-207"]) == {
         "CS-105",
-        "CS-314",
+        "CS-319",
     }

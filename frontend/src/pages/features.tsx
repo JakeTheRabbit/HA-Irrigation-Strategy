@@ -15,6 +15,7 @@ import { SETTING_COPY } from "@/lib/ste-copy";
 import { settingWords } from "@/lib/setting-words";
 import {
   APP_OPTIONS,
+  placementsFor,
   GROUPS,
   featureRows,
   isDefault,
@@ -75,6 +76,7 @@ export function Features({ controller }: { controller: Controller }) {
       (!changedOnly || r.changed) &&
       matches(r, query),
   );
+  const placements = changedOnly ? [] : placementsFor(group, query);
   const zoneName = (id: number | null) =>
     id === null ? "Room" : (room.zones.find((z) => z.id === id)?.name ?? `Zone ${id}`);
   const stage = (entityId: string, value: Value, current: Value | null) =>
@@ -190,7 +192,26 @@ export function Features({ controller }: { controller: Controller }) {
       {(group === "all" || group === "app") && !changedOnly && (
         <AppOptions query={query} />
       )}
-      {!visible.length && group !== "app" && (
+      {placements.length > 0 && (
+        <section className="panel features-group" aria-labelledby="features-other-settings">
+          <div className="panel-heading">
+            <h2 id="features-other-settings">Other settings and views</h2>
+            <p>Display choices, setup mappings and read-only views have their controls on these pages.</p>
+          </div>
+          <ul className="features-list">
+            {placements.map((row) => (
+              <li className="features-row" key={`${row.id}:${row.entity}`}>
+                <div className="features-name">
+                  <strong>{row.label}</strong>
+                  <p>{row.help}</p>
+                </div>
+                <a className="features-also" href={`#/${row.page}`}>{row.location}</a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+      {!visible.length && !placements.length && group !== "app" && (
         <p className="features-empty">No feature matches.</p>
       )}
       {items.length > 0 && (

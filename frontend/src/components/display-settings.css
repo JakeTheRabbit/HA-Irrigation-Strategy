@@ -1,0 +1,31 @@
+.display-settings {
+  display: grid;
+  gap: 14px;
+}
+.display-group {
+  display: grid;
+  gap: 8px;
+}
+.display-group > h3 {
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+.display-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+.theme-options.display-options {
+  flex-wrap: nowrap;
+  gap: 8px;
+}
+.theme-options.display-options button,
+.theme-options.display-options button:first-child {
+  flex: 0 0 auto;
+  grid-column: auto;
+  min-width: 92px;
+  padding: 8px 12px;
+}

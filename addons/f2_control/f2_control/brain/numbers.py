@@ -62,6 +62,8 @@ def stage_block(ctx):
     brain = getattr(ctx, "brain", None) or {}
     arc = brain.get("arc") or "the install's"
     mode = f" The grower's steering mode for this zone: {ctx.steering}." if ctx.steering else ""
+    if getattr(ctx, "cultivar", None):
+        mode += f" The cultivar in this zone, as the grower labels it: {ctx.cultivar}."
     if brain.get("arc_note"):
         return f"unknown: {brain['arc_note']}{mode}"
     if ctx.flower_day is None:

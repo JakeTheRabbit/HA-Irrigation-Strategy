@@ -65,7 +65,8 @@ def resolve_paths(a):
     p = {"core": repo / "crop-steering-engine/src/crop_steering_engine/core.py", "controller": ctrls[0],
          "jev": pkg / "brain" / "doctrine.py", "brain": pkg / "brain", "bridge": pkg / "brain_bridge.py",
          "auto": pkg / "auto_setpoints.py", "numbers": repo / "custom_components/crop_steering/number.py",
-         "controller_copy": pkg / "doctrine", "dashboard_arcs": repo / "frontend/src/lib/generated/arcs.json"}
+         "controller_copy": pkg / "doctrine", "dashboard_arcs": repo / "frontend/src/lib/generated/arcs.json",
+         "dashboard_rules": repo / "frontend/src/lib/generated/rules.json"}
     for k in p:
         v = getattr(a, k)
         if v:
@@ -796,6 +797,46 @@ def dashboard_arcs(doc):
                      for k in arc_keys(doc)}}
 
 
+def setting_keys(text):
+    """The integration setting keys a param_map row names: the words before its first " (", split on " | ", with
+    "name_p0..p2" spelled out; [] when the row names no setting (fixed, or a helper made by hand)."""
+    head = text.split(" (", 1)[0]
+    keys = []
+    for part in head.split(" | "):
+        part = part.strip()
+        m = re.fullmatch(r"([a-z0-9_]+_p)(\d)\.\.p(\d)", part)
+        if m:
+            keys += [f"{m[1]}{i}" for i in range(int(m[2]), int(m[3]) + 1)]
+        elif re.fullmatch(r"[a-z][a-z0-9_]*", part) and "_" in part:
+            keys.append(part)
+    return keys
+
+
+def dashboard_rules(doc, facts):
+    """The trimmed rules the dashboard's Help > Rules tab reads: each rule's id, topic, text and evidence, the engine
+    params it names, and per param the setting keys it is read from and the engine's bounds for it."""
+    rows = {}
+    for key, text in doc["param_map"].items():
+        if key.startswith("_"):
+            continue
+        settings = setting_keys(text)
+        names = [key]
+        if "/" in key:  # ec_target_p0/p1/p2
+            stem = key.split("/")[0].rsplit("_", 1)[0]
+            names = [f"{stem}_{p}" for p in key[len(stem) + 1:].split("/")]
+        for name in names:
+            phase = name.rsplit("_", 1)[-1] if "/" in key else None
+            own = [k for k in settings if phase is None or k.endswith(phase)]
+            bounds = facts["param_bounds"].get(name)
+            rows[name] = {"settings": own, "bounds": list(bounds) if bounds else None, "note": text}
+    return {
+        "doctrine_version": doc["doctrine_version"],
+        "rules": [{"id": r["id"], "topic": r["topic"], "priority": r["priority"], "text": r["text"],
+                   "evidence": r["evidence"], "params": r.get("params", [])} for r in doc["rules"]],
+        "params": rows,
+    }
+
+
 def estimate_tokens(text):
     # No tokenizer offline: bracket with two common English heuristics for Claude-family tokenizers.
     return {"chars": len(text), "words": len(text.split()), "tokens_est_low": round(len(text) / 4.0),
@@ -838,6 +879,7 @@ def main():
         ap.add_argument(f"--{k}")
     ap.add_argument("--controller-copy", dest="controller_copy", help="the controller's copy of compiled/")
     ap.add_argument("--dashboard-arcs", dest="dashboard_arcs", help="the dashboard's copy of the stage arcs (JSON)")
+    ap.add_argument("--dashboard-rules", dest="dashboard_rules", help="the dashboard's trimmed rules (JSON)")
     ap.add_argument("--private-denylist", default=os.environ.get("DOCTRINE_PRIVATE_DENYLIST"))
     ap.add_argument("--private-skip", metavar="REASON", help="only where no secret exists (a fork pull request, a "
                     "contributor's machine): skip the private list, and say so")
@@ -937,6 +979,18 @@ def main():
         print(f"dashboard arcs: {'checked' if a.check else 'written'} ({board})")
     else:
         print("dashboard arcs: no dashboard source, skipped")
+    rules_file = Path(paths["dashboard_rules"])
+    if rules_file.parent.parent.is_dir():
+        text = json.dumps(dashboard_rules(doc, facts), indent=1, ensure_ascii=False) + "\n"
+        if a.check:
+            if not rules_file.exists() or rules_file.read_bytes() != text.encode("utf-8"):
+                problems.append(f"dashboard rules differ: {rules_file} (run tools/build_doctrine.py)")
+        else:
+            rules_file.parent.mkdir(exist_ok=True)
+            rules_file.write_text(text, encoding="utf-8", newline="\n")
+        print(f"dashboard rules: {'checked' if a.check else 'written'} ({rules_file})")
+    else:
+        print("dashboard rules: no dashboard source, skipped")
 
     # Report only, never written to a generated file: which code this run was checked against.
     checked = {k: sha(paths[k])[:12] for k in ("core", "controller", "bridge", "auto", "numbers")}

@@ -33,10 +33,11 @@ KINDS = (
         "hold, or a shot that the controller cut. Also a zone at its longest shot, "
         "and water that does not reach a zone or goes past its substrate. Also a "
         "table that does not drain. Also a sump pump that stopped, and a pump or "
-        "valve that the controller cannot switch.",
+        "valve that the controller cannot switch, and a sump water balance that "
+        "does not close.",
         "codes": _codes(
             "CS-301 CS-302 CS-303 CS-304 CS-305 CS-306 CS-307 CS-308 CS-309 CS-310 CS-311 "
-            "CS-312 CS-313 CS-701 CS-710"
+            "CS-312 CS-313 CS-314 CS-701 CS-710"
         ),
         "events": (),
     },

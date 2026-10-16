@@ -1,0 +1,812 @@
+[
+  {
+    "entity": "select.crop_steering_<prefix>zone_<zone>_p2_mode",
+    "label": "P2 mode",
+    "scope": "zone",
+    "kind": "select",
+    "default": "Moisture",
+    "help": "Choose Timed with guards for scheduled shots with a moisture ceiling and floor rescue.",
+    "group": "Phase logic",
+    "id": "NEW-01"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p2_timed_interval_min",
+    "label": "Timed P2 interval",
+    "scope": "zone",
+    "kind": "number",
+    "default": "60",
+    "help": "Minutes between timed shots; only used by a timed P2 mode.",
+    "group": "Phase logic",
+    "id": "NEW-01"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p2_timed_shot_size",
+    "label": "Timed P2 shot size",
+    "scope": "zone",
+    "kind": "number",
+    "default": "0",
+    "help": "Percent of substrate; zero uses the maintenance shot size.",
+    "group": "Phase logic",
+    "id": "NEW-01"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p2_timed_first_hours",
+    "label": "Timed P2 first shot",
+    "scope": "zone",
+    "kind": "number",
+    "default": "0",
+    "help": "Hours after lights-on before scheduled P2 shots can begin.",
+    "group": "Phase logic",
+    "id": "NEW-01"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p2_end_hours_before_off",
+    "label": "P2 ends before lights-off",
+    "scope": "zone",
+    "kind": "number",
+    "default": "0",
+    "help": "Hours before lights-off to enter P3; zero keeps predictive P3.",
+    "group": "Phase logic",
+    "id": "NEW-01"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p0_minimum_wait",
+    "label": "Morning dryback minimum wait",
+    "scope": "zone",
+    "kind": "number",
+    "default": "0",
+    "help": "Minimum minutes in P0; the low moisture bypass remains available.",
+    "group": "Phase logic",
+    "id": "LF-09"
+  },
+  {
+    "entity": "switch.crop_steering_<prefix>p0_stall_exit",
+    "label": "P0 stall exit",
+    "scope": "room",
+    "kind": "switch",
+    "default": "off",
+    "help": "Start P1 when reliable dryback is too slow to finish within the maximum wait.",
+    "group": "Phase logic",
+    "id": "LF-09"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_ec_flush_target",
+    "label": "EC flush target",
+    "scope": "zone",
+    "kind": "number",
+    "default": "0",
+    "help": "Continue budgeted flush shots to this target, with a feed EC floor; zero disables.",
+    "group": "Phase logic",
+    "id": "LF-20"
+  },
+  {
+    "entity": "switch.crop_steering_<prefix>use_p2_ec_thresholds",
+    "label": "Use zone P2 EC ratios",
+    "scope": "room",
+    "kind": "switch",
+    "default": "off",
+    "help": "Use each zone dilute ratio instead of the existing 1.2 ratio.",
+    "group": "Phase logic",
+    "id": "LF-21"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p2_dilute_ratio",
+    "label": "P2 dilute EC ratio",
+    "scope": "zone",
+    "kind": "number",
+    "default": "1.2",
+    "help": "Dilute above this multiple of the P2 EC target when zone ratios are enabled.",
+    "group": "Phase logic",
+    "id": "LF-21"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>setpoint_max_step_per_day",
+    "label": "Max setpoint move per day",
+    "scope": "room",
+    "kind": "number",
+    "default": "1",
+    "help": "Limit automatic moisture setpoint movement in VWC points; zero removes the limit.",
+    "group": "Phase logic",
+    "id": "LF-149"
+  },
+  {
+    "entity": "select.crop_steering_<prefix>setpoint_step_limit_applies_to",
+    "label": "Setpoint step limit applies to",
+    "scope": "room",
+    "kind": "select",
+    "default": "Auto setpoints",
+    "help": "Choose whether the limit also applies to the AI and the learner.",
+    "group": "Phase logic",
+    "id": "LF-149"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_p1_maximum_extra_shots",
+    "label": "Maximum extra ramp shots",
+    "scope": "zone",
+    "kind": "number",
+    "default": "3",
+    "help": "Choose 1 to 30 extra ramp shots; also raise Maximum ramp shots and retain the daily cap.",
+    "group": "Phase logic",
+    "id": "LF-155"
+  },
+  {
+    "label": "Timed P2 interval (room default)",
+    "group": "Phase logic",
+    "id": "NEW-01",
+    "help": "Minutes between timed shots; only used by a timed P2 mode.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p2_timed_interval_min",
+    "scope": "room",
+    "default": "60"
+  },
+  {
+    "label": "Timed P2 shot size (room default)",
+    "group": "Phase logic",
+    "id": "NEW-01",
+    "help": "Percent of substrate; zero uses the maintenance shot size.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p2_timed_shot_size",
+    "scope": "room",
+    "default": "0"
+  },
+  {
+    "label": "Timed P2 first shot (room default)",
+    "group": "Phase logic",
+    "id": "NEW-01",
+    "help": "Hours after lights-on before scheduled P2 shots can begin.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p2_timed_first_hours",
+    "scope": "room",
+    "default": "0"
+  },
+  {
+    "label": "P2 ends before lights-off (room default)",
+    "group": "Phase logic",
+    "id": "NEW-01",
+    "help": "Hours before lights-off to enter P3; zero keeps predictive P3.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p2_end_hours_before_off",
+    "scope": "room",
+    "default": "0"
+  },
+  {
+    "label": "Morning dryback minimum wait (room default)",
+    "group": "Phase logic",
+    "id": "LF-09",
+    "help": "Minimum minutes in P0; the low moisture bypass remains available.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p0_minimum_wait",
+    "scope": "room",
+    "default": "0"
+  },
+  {
+    "label": "EC flush target (room default)",
+    "group": "Phase logic",
+    "id": "LF-20",
+    "help": "Continue budgeted flush shots to this target, with a feed EC floor; zero disables.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>ec_flush_target",
+    "scope": "room",
+    "default": "0"
+  },
+  {
+    "label": "P2 dilute EC ratio (room default)",
+    "group": "Phase logic",
+    "id": "LF-21",
+    "help": "Dilute above this multiple of the P2 EC target when zone ratios are enabled.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p2_dilute_ratio",
+    "scope": "room",
+    "default": "1.2"
+  },
+  {
+    "label": "Maximum extra ramp shots (room default)",
+    "group": "Phase logic",
+    "id": "LF-155",
+    "help": "Choose 1 to 30 extra ramp shots; also raise Maximum ramp shots and retain the daily cap.",
+    "kind": "number",
+    "entity": "number.crop_steering_<prefix>p1_maximum_extra_shots",
+    "scope": "room",
+    "default": "3"
+  },
+  {
+    "entity": "select.crop_steering_<prefix>rescue_miss_action",
+    "id": "LF-10",
+    "group": "Safety and operations",
+    "label": "Rescue misses",
+    "kind": "select",
+    "default": "Off",
+    "help": "Alert when rescue shots fail to raise moisture; never holds watering.",
+    "scope": "room"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>rescue_miss_count",
+    "id": "LF-10",
+    "group": "Safety and operations",
+    "label": "Rescue misses before alert",
+    "kind": "number",
+    "default": "4",
+    "help": "Consecutive settled rescue shots without a moisture rise before the alert.",
+    "scope": "room"
+  },
+  {
+    "entity": "switch.crop_steering_<prefix>rescue_past_dead_feed_probe",
+    "id": "LF-11",
+    "group": "Safety and operations",
+    "label": "Rescues past dead feed probe",
+    "kind": "switch",
+    "default": "off",
+    "help": "Allow P3 emergency and watchdog rescues past a dead feed probe; bad readings and other interlocks still hold.",
+    "scope": "room"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>zone_<zone>_manual_shot_seconds",
+    "id": "LF-13",
+    "group": "Safety and operations",
+    "label": "Manual shot length",
+    "kind": "number",
+    "default": "10",
+    "help": "Test Shot seconds; maximum duration and daily budget still apply.",
+    "scope": "zone"
+  },
+  {
+    "entity": "select.crop_steering_<prefix>waste_valve_rule",
+    "id": "LF-114",
+    "group": "Safety and operations",
+    "label": "Waste valve rule",
+    "kind": "select",
+    "default": "Off",
+    "help": "Choose Close for each shot to close and verify the waste valve before the pump primes.",
+    "scope": "room"
+  },
+  {
+    "entity": "pump_power_sensor",
+    "id": "LF-70",
+    "group": "Safety and operations",
+    "label": "Pump power sensor",
+    "kind": "option",
+    "default": "",
+    "help": "Optional room=sensor power mapping enables the dead-head alert; never stops the pump.",
+    "scope": "app"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>pump_deadhead_watts",
+    "id": "LF-70",
+    "group": "Safety and operations",
+    "label": "Pump dead-head power",
+    "kind": "number",
+    "default": "20",
+    "help": "Alert after 60 seconds above this power with all valves shut and no active hold or batch.",
+    "scope": "room"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>tank_size_l",
+    "id": "LF-51",
+    "group": "Safety and operations",
+    "label": "Tank size for estimate",
+    "kind": "number",
+    "default": "0",
+    "help": "Capacity in litres enables the estimate when no tank level sensor is mapped; zero disables.",
+    "scope": "room"
+  },
+  {
+    "entity": "number.crop_steering_<prefix>tank_estimate_low_pct",
+    "id": "LF-51",
+    "group": "Safety and operations",
+    "label": "Estimated tank low alert",
+    "kind": "number",
+    "default": "20",
+    "help": "Estimated percentage at which to alert; the estimate never holds shots.",
+    "scope": "room"
+  },
+  {
+    "id": "LF-05",
+    "entity": "sensor.crop_steering_<prefix>zone_N_dryback_app",
+    "kind": "display",
+    "scope": "zone",
+    "default": "published",
+    "group": "Sensing",
+    "label": "Live dryback",
+    "help": "Read-only: each zone's relative dryback from its peak, with the drop in VWC points beside it; always on, changes nothing."
+  },
+  {
+    "id": "LF-28",
+    "entity": "switch.crop_steering_<prefix>water_vpd_insight",
+    "kind": "switch",
+    "scope": "room",
+    "default": "off",
+    "group": "Sensing",
+    "label": "Water vs VPD",
+    "help": "Keep per grow-day water, quiet dryback rate and VPD records and show how each zone's drying answers VPD (History > Water use); read only."
+  },
+  {
+    "id": "LF-65",
+    "entity": "switch.crop_steering_<prefix>plant_stress_card",
+    "kind": "switch",
+    "scope": "room",
+    "default": "off",
+    "group": "Sensing",
+    "label": "Plant stress card",
+    "help": "Leaf minus air temperature and leaf VPD on Today and the zone page, where a leaf temperature sensor is mapped in setup (room or zone)."
+  },
+  {
+    "id": "LF-65",
+    "entity": "number.crop_steering_<prefix>cwsi_lower_baseline",
+    "kind": "number",
+    "scope": "room",
+    "default": "0",
+    "group": "Sensing",
+    "label": "CWSI lower baseline",
+    "help": "Leaf minus air (deg C) of a well-watered canopy, your own; CWSI shows only when the upper baseline is above it."
+  },
+  {
+    "id": "LF-65",
+    "entity": "number.crop_steering_<prefix>cwsi_upper_baseline",
+    "kind": "number",
+    "scope": "room",
+    "default": "0",
+    "group": "Sensing",
+    "label": "CWSI upper baseline",
+    "help": "Leaf minus air (deg C) of a canopy that has stopped transpiring, your own; both 0 keeps CWSI off."
+  },
+  {
+    "id": "LF-85",
+    "entity": "select.crop_steering_<prefix>shot_check",
+    "kind": "select",
+    "scope": "room",
+    "default": "off",
+    "group": "Sensing",
+    "label": "Shot check",
+    "help": "off | table (last shots and whether the water landed, zone page) | table_and_alert (also CS-701 from code while the AI assistant is off)."
+  },
+  {
+    "id": "LF-97",
+    "entity": "none (Help > Rules)",
+    "kind": "display",
+    "scope": "dashboard",
+    "default": "visible",
+    "group": "Sensing",
+    "label": "Rules",
+    "help": "Read-only: the doctrine rules with the room's live settings and a bounds-only double-check list."
+  },
+  {
+    "id": "LF-124",
+    "entity": "none",
+    "kind": "display",
+    "scope": "dashboard",
+    "default": "on",
+    "group": "Sensing",
+    "label": "Zone links on notices",
+    "help": "Each notice names its zones as links, and a merged notice flags every zone it covers; display fix, always on."
+  },
+  {
+    "id": "LF-169",
+    "entity": "sensor.crop_steering_<prefix>zone_N_waiting_for_app (attribute gates)",
+    "kind": "display",
+    "scope": "zone",
+    "default": "published",
+    "group": "Sensing",
+    "label": "Before the next shot",
+    "help": "Read-only list of every pre-shot gate with pass or hold on the zone page; the gates themselves can never be switched off."
+  },
+  {
+    "id": "LF-34",
+    "entity": "select.crop_steering_<prefix>runoff_estimator",
+    "kind": "select",
+    "scope": "room",
+    "default": "off",
+    "group": "Sensing",
+    "label": "Runoff estimator",
+    "help": "off | shadow (publish the room-wide sump water-balance estimate) | shown_alerts (also CS-314 when a grow-day's sealed-room balance does not close) | ai (also a hint to the AI assistant); never waters."
+  },
+  {
+    "id": "LF-34",
+    "entity": "number.crop_steering_<prefix>sump_litres_per_run",
+    "kind": "number",
+    "scope": "room",
+    "default": "0",
+    "group": "Sensing",
+    "label": "Sump litres per run",
+    "help": "Litres one sump run empties (bucket test); 0 = unknown, then pump flow x run time, else the sealed-room closure."
+  },
+  {
+    "id": "LF-34",
+    "entity": "number.crop_steering_<prefix>sump_pump_flow_lpm",
+    "kind": "number",
+    "scope": "room",
+    "default": "0",
+    "group": "Sensing",
+    "label": "Sump pump flow",
+    "help": "L/min, used with the run time when the litres per run are 0; 0 = unknown."
+  },
+  {
+    "id": "LF-34",
+    "entity": "number.crop_steering_<prefix>runoff_attribution_min",
+    "kind": "number",
+    "scope": "room",
+    "default": "90",
+    "group": "Sensing",
+    "label": "Runoff reaches the sump within",
+    "help": "Longest shot-to-sump delay tried (min); the estimator learns the best one."
+  },
+  {
+    "id": "LF-34",
+    "entity": "number.crop_steering_<prefix>hvac_run_power_w",
+    "kind": "number",
+    "scope": "room",
+    "default": "50",
+    "group": "Sensing",
+    "label": "AC and dehumidifier run power",
+    "help": "An AC or dehumidifier mapped by its power sensor counts as running above this (W)."
+  },
+  {
+    "id": "LF-34",
+    "entity": "setup hardware ac_entities / dehumidifier_entities",
+    "kind": "option",
+    "scope": "room",
+    "default": "[]",
+    "group": "Sensing",
+    "label": "ACs and dehumidifiers",
+    "help": "Each unit's switch, state or power sensor, mapped in Equipment > Setup for the runoff estimator; read only."
+  },
+  {
+    "id": "LF-129",
+    "entity": "sensor.crop_steering_<prefix>display (attribute today_tank_readout)",
+    "kind": "display",
+    "scope": "room",
+    "default": "false",
+    "group": "Dashboard",
+    "label": "Tank readout",
+    "help": "Optional room display preference; changes no watering."
+  },
+  {
+    "id": "LF-138",
+    "entity": "sensor.crop_steering_<prefix>display (attribute today_zone_layout)",
+    "kind": "display",
+    "scope": "room",
+    "default": "cards",
+    "group": "Dashboard",
+    "label": "Zones as",
+    "help": "Optional room display preference; changes no watering."
+  },
+  {
+    "id": "LF-66",
+    "entity": "sensor.crop_steering_<prefix>display (attribute show_climate)",
+    "kind": "display",
+    "scope": "room",
+    "default": "false",
+    "group": "Dashboard",
+    "label": "Room climate",
+    "help": "Optional room display preference; changes no watering."
+  },
+  {
+    "id": "LF-84",
+    "entity": "sensor.crop_steering_<prefix>display (attribute show_substrate_temp)",
+    "kind": "display",
+    "scope": "room",
+    "default": "false",
+    "group": "Dashboard",
+    "label": "Root-zone temperature",
+    "help": "Optional room display preference; changes no watering."
+  },
+  {
+    "id": "LF-142",
+    "entity": "sensor.crop_steering_<prefix>display (attribute zone_day_deltas)",
+    "kind": "display",
+    "scope": "room",
+    "default": "false",
+    "group": "Dashboard",
+    "label": "Today against yesterday",
+    "help": "Optional room display preference; changes no watering."
+  },
+  {
+    "id": "LF-63",
+    "entity": "sensor.crop_steering_<prefix>display (attribute show_camera)",
+    "kind": "display",
+    "scope": "room",
+    "default": "false",
+    "group": "Dashboard",
+    "label": "Room camera",
+    "help": "Optional room display preference; changes no watering."
+  },
+  {
+    "id": "LF-83",
+    "entity": "sensor.crop_steering_<prefix>display (attribute show_equipment_lanes)",
+    "kind": "display",
+    "scope": "room",
+    "default": "false",
+    "group": "Dashboard",
+    "label": "Equipment lanes",
+    "help": "Optional room display preference; changes no watering."
+  },
+  {
+    "id": "LF-143",
+    "entity": "sensor.crop_steering_<prefix>display (attribute show_room_day_lanes)",
+    "kind": "display",
+    "scope": "room",
+    "default": "false",
+    "group": "Dashboard",
+    "label": "Zone lanes",
+    "help": "Optional room display preference; changes no watering."
+  },
+  {
+    "id": "LF-82",
+    "entity": "sensor.crop_steering_<prefix>display (attribute show_dryback_drivers)",
+    "kind": "display",
+    "scope": "room",
+    "default": "false",
+    "group": "Dashboard",
+    "label": "Dryback drivers",
+    "help": "Optional room display preference; changes no watering."
+  },
+  {
+    "id": "LF-91",
+    "entity": "sensor.crop_steering_<prefix>display (attribute planner_reference_rows)",
+    "kind": "display",
+    "scope": "room",
+    "default": "false",
+    "group": "Dashboard",
+    "label": "Reference rows",
+    "help": "Optional room display preference; changes no watering."
+  },
+  {
+    "id": "LF-144",
+    "entity": "sensor.crop_steering_<prefix>display (attribute planner_day_curve)",
+    "kind": "display",
+    "scope": "room",
+    "default": "false",
+    "group": "Dashboard",
+    "label": "Day curve in the planner",
+    "help": "Optional room display preference; changes no watering."
+  },
+  {
+    "id": "LF-69",
+    "entity": "switch.crop_steering_<prefix>manual_hardware_enabled",
+    "kind": "switch",
+    "scope": "room",
+    "default": "off",
+    "group": "Dashboard",
+    "label": "Test shot and device states",
+    "help": "Opt-in zone panel: reviewed controller test shot and read-only mapped device states."
+  },
+  {
+    "id": "LF-86",
+    "entity": "explorer URL dryback=1",
+    "kind": "display",
+    "scope": "dashboard",
+    "default": "off",
+    "group": "Dashboard",
+    "label": "Dryback markers",
+    "help": "Optional relative percent-of-peak markers on short moisture history windows; a 30-day preset is always available."
+  },
+  {
+    "id": "LF-54",
+    "entity": "zone.cultivar",
+    "kind": "display",
+    "scope": "zone",
+    "default": "empty",
+    "group": "History and records",
+    "label": "Cultivar",
+    "help": "Optional cultivar label entered in room setup and copied into each grow record."
+  },
+  {
+    "id": "LF-87",
+    "entity": "history_connection.source",
+    "kind": "option",
+    "scope": "room",
+    "default": "recorder",
+    "group": "History and records",
+    "label": "Long history source",
+    "help": "Use a tested read-only InfluxDB connection for room history; Recorder remains the default."
+  },
+  {
+    "id": "NEW-03",
+    "entity": "switch.crop_steering_<prefix>record_grow_days",
+    "kind": "switch",
+    "scope": "room",
+    "default": "off",
+    "group": "History and records",
+    "label": "Record grow days",
+    "help": "Record one summary per grow-day at lights-on; never changes watering."
+  },
+  {
+    "id": "LF-165",
+    "entity": "switch.crop_steering_<prefix>ph_auto_correct",
+    "kind": "switch",
+    "scope": "room",
+    "default": "off",
+    "group": "Dosing",
+    "label": "pH auto-correct",
+    "help": "Corrects a batch tank that reads outside the feed pH band with a few small doses of the pump in the pH role; locks and alerts if a dose does not work."
+  },
+  {
+    "id": "LF-165",
+    "entity": "dosing_config pumps[].ph_role",
+    "kind": "select",
+    "scope": "room",
+    "default": "none",
+    "group": "Dosing",
+    "label": "Pump pH role",
+    "help": "Which dosing pump raises (pH up) or lowers (pH down) the tank pH; set per pump in Equipment > Dosing > Dosing setup."
+  },
+  {
+    "id": "LF-165",
+    "entity": "number.crop_steering_<prefix>ph_correct_dose_s",
+    "kind": "number",
+    "scope": "room",
+    "default": "5",
+    "group": "Dosing",
+    "label": "pH dose length (s)",
+    "help": "One correction dose, in seconds of the pump's calibrated flow (1-30)."
+  },
+  {
+    "id": "LF-165",
+    "entity": "number.crop_steering_<prefix>ph_correct_max_tries",
+    "kind": "number",
+    "scope": "room",
+    "default": "2",
+    "group": "Dosing",
+    "label": "pH doses a try",
+    "help": "The most doses in one correction (1-3)."
+  },
+  {
+    "id": "LF-165",
+    "entity": "number.crop_steering_<prefix>ph_correct_mix_min",
+    "kind": "number",
+    "scope": "room",
+    "default": "5",
+    "group": "Dosing",
+    "label": "pH mix after a dose (min)",
+    "help": "Mixing after each dose before the tank is read again (2-30)."
+  },
+  {
+    "id": "LF-165",
+    "entity": "number.crop_steering_<prefix>ph_correct_daily_max",
+    "kind": "number",
+    "scope": "room",
+    "default": "3",
+    "group": "Dosing",
+    "label": "pH doses a day",
+    "help": "The most correction doses in one day (1-10)."
+  },
+  {
+    "id": "LF-165",
+    "entity": "number.crop_steering_<prefix>ph_correct_margin",
+    "kind": "number",
+    "scope": "room",
+    "default": "0.1",
+    "group": "Dosing",
+    "label": "pH stop inside the band",
+    "help": "How far inside the feed pH band a correction stops (0-0.5)."
+  },
+  {
+    "id": "LF-165",
+    "entity": "switch.crop_steering_<prefix>dry_dim",
+    "kind": "switch",
+    "scope": "room",
+    "default": "off",
+    "group": "Lights",
+    "label": "Dim lights on dry substrate",
+    "help": "Dims a dimmable room light while a zone is dry with the lights on; never off, and restores the brightness it found."
+  },
+  {
+    "id": "LF-165",
+    "entity": "number.crop_steering_<prefix>dry_dim_floor_vwc",
+    "kind": "number",
+    "scope": "room",
+    "default": "15",
+    "group": "Lights",
+    "label": "Dim below VWC (%)",
+    "help": "A zone under this VWC counts as dry (1-60)."
+  },
+  {
+    "id": "LF-165",
+    "entity": "number.crop_steering_<prefix>dry_dim_level_pct",
+    "kind": "number",
+    "scope": "room",
+    "default": "50",
+    "group": "Lights",
+    "label": "Dim to (%)",
+    "help": "The brightness the light is dimmed to, never below 30 (30-90)."
+  },
+  {
+    "id": "LF-165",
+    "entity": "number.crop_steering_<prefix>dry_dim_after_min",
+    "kind": "number",
+    "scope": "room",
+    "default": "10",
+    "group": "Lights",
+    "label": "Dim after (min)",
+    "help": "How long a zone stays dry with the lights on before dimming (1-120)."
+  },
+  {
+    "id": "LF-165",
+    "entity": "number.crop_steering_<prefix>dry_dim_max_h",
+    "kind": "number",
+    "scope": "room",
+    "default": "4",
+    "group": "Lights",
+    "label": "Dim for at most (h)",
+    "help": "The longest the light stays dimmed before it is restored with a critical alert (0.5-12)."
+  },
+  {
+    "id": "LF-165",
+    "entity": "number.crop_steering_<prefix>held_alert_hours",
+    "kind": "number",
+    "scope": "room",
+    "default": "0",
+    "group": "Alerts",
+    "label": "Shots held alert (h)",
+    "help": "A critical alert when a zone that asked for water is held this many hours; 0 = off (0-72)."
+  },
+  {
+    "id": "LF-65",
+    "entity": "setup hardware leaf_temperature_sensor",
+    "kind": "option",
+    "scope": "room",
+    "default": "",
+    "group": "Equipment",
+    "label": "Room leaf temperature",
+    "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
+  },
+  {
+    "id": "LF-65",
+    "entity": "setup zones[].leaf_temperature_sensor",
+    "kind": "option",
+    "scope": "zone",
+    "default": "",
+    "group": "Equipment",
+    "label": "Zone leaf temperature",
+    "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
+  },
+  {
+    "id": "LF-63",
+    "entity": "setup hardware camera_entity",
+    "kind": "option",
+    "scope": "room",
+    "default": "",
+    "group": "Equipment",
+    "label": "Room camera",
+    "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
+  },
+  {
+    "id": "LF-91",
+    "entity": "setup hardware co2_sensor",
+    "kind": "option",
+    "scope": "room",
+    "default": "",
+    "group": "Equipment",
+    "label": "Room CO2",
+    "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
+  },
+  {
+    "id": "LF-91",
+    "entity": "setup hardware ppfd_sensor",
+    "kind": "option",
+    "scope": "room",
+    "default": "",
+    "group": "Equipment",
+    "label": "Room PPFD",
+    "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
+  },
+  {
+    "id": "LF-91",
+    "entity": "setup hardware dli_sensor",
+    "kind": "option",
+    "scope": "room",
+    "default": "",
+    "group": "Equipment",
+    "label": "Room daily light integral",
+    "help": "Optional sensor mapping in Equipment > Setup; empty on existing and new rooms, read only."
+  },
+  {
+    "id": "AI-INSTRUCTIONS",
+    "entity": "none (Settings > AI assistant > Instructions)",
+    "kind": "display",
+    "scope": "dashboard",
+    "default": "visible",
+    "group": "AI assistant",
+    "label": "AI instructions",
+    "help": "Review the instructions and editable context used by the AI assistant."
+  }
+]

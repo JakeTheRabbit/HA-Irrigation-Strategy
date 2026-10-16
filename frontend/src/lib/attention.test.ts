@@ -179,6 +179,19 @@ describe("the zone's own notices", () => {
     ]);
     expect(flags.has(2)).toBe(false);
   });
+  it("reach every zone of a merged notice", () => {
+    const merged: Notice = {
+      id: "zones-1-2-status",
+      title: "Zone 1 and Zone 2 need attention",
+      detail: "",
+      severity: "critical",
+      zoneIds: [1, 2],
+    };
+    const flags = run([zone(1), zone(2), zone(3)], { notices: [merged] });
+    expect(flags.get(1)?.[0].rule).toBe("alert");
+    expect(flags.get(2)?.[0].rule).toBe("alert");
+    expect(flags.has(3)).toBe(false);
+  });
   it("leave a sensor notice to the probe rule that says the same", () => {
     const flags = run([zone(1, { vwc: null, vwcIssue: "not reporting" })], {
       notices: [notice("zone-1-sensors", "warning", 1)],
