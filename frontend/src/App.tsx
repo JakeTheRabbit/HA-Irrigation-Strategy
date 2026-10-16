@@ -50,6 +50,7 @@ import { Strategy, type Drafts } from "@/pages/strategy";
 import { Timeline } from "@/pages/timeline";
 import { Probes } from "@/pages/probes";
 import { Settings } from "@/pages/settings";
+import { Features } from "@/pages/features";
 import { Notifications } from "@/pages/notifications";
 import { Help } from "@/pages/help";
 import { GrowPlanner } from "@/pages/grow-planner";
@@ -403,6 +404,7 @@ export default function App() {
                 onDirtyChange={setWorkspaceDirty}
               />
             )}
+            {page === "settings/features" && <Features key={pageKey} controller={controller} />}
             {page === "settings/notifications" && (
               <Notifications
                 key={pageKey}

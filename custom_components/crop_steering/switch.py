@@ -59,6 +59,14 @@ BASE_SWITCH_DESCRIPTIONS = [
         name="Predictions in notifications",
         icon="mdi:crystal-ball",
     ),
+    # Opt-in, OFF on new and updated rooms. ON: the controller sends each zone's grow-day summary to the
+    # room's grow-day store at lights-on (grow_day_store.py), so grows stay comparable after the recorder
+    # purges its readings. It only records: it never changes watering.
+    SwitchEntityDescription(
+        key="record_grow_days",
+        name="Record grow days",
+        icon="mdi:calendar-text",
+    ),
     # Retired: the room's engine switch ("Watering" on the dashboard) is the one switch that stops
     # watering. A controller from 2.24.0 or before still stops every shot while one of these reads
     # off, and treats a missing one as off, so they stay, hidden, until no such controller is left;
