@@ -9,6 +9,31 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.13.0] - 2026-10-16
+
+Pair: **controller 3.13.0**. Everything in 3.12.2 (which was tagged but never promoted) plus #156, #157, #158 and #159. Released by the owner's decision without a staging soak (approved rehearsal).
+
+### 🌱 In plain English
+
+**Read these first. They change when water flows on rooms that update:**
+
+- **P1 now ends when the ramp stalls under its target.** If two ramp shots in a row do not raise the moisture, the zone moves to P2, and for the rest of that grow-day its re-water point sits just under what the zone reached, so P2 does not keep chasing a level the slab cannot hold. A probe in doubt (water bypass, a table that does not drain, a reading that does not move) keeps the old behaviour. With the AI assistant on, it is asked first and may hand over one shot sooner.
+- **The AI assistant has powers you can tick, per room.** The six it already used stay on. Two new ones are off until you turn them on: "Set targets from what's achievable" (it sets field capacity, peak, re-water, rescue floor and dryback target itself, limited only by each setting's own range) and "Tune shot sizes". Every value it writes is read back and logged with its reason and the result it expects.
+
+What else you get:
+
+- **The AI assistant knows the goal and the rules.** Each night it gets a scorecard per zone for the last five grow-days and its own earlier changes with what followed, and its cached prompt carries the rules and a description of how the controller works, built from the code.
+- **A run progress strip at the top of Today:** day X of N, days done and left, harvest date, the grow plan and stage, and the feed recipe with this week's EC, on a bar split into the plan's phases.
+- **Compare runs has charts** for each grow week (from 3.12.2), a missing hold switch is named (CS-210), and the AI's "why" names the kill switch and holds.
+
+### 🔧 Technical notes
+
+- #158: engine P1 below-target stall exit (`p1_stall_shots`, default 2; rise judged by `p1_rise` on settled readings); controller state gains `p1_flat` and `p1_stall` (old state loads as 0/None); day-scoped re-water via `auto_setpoints.p2_band`; envelope allows a stall hand-over below the ceiling; ramp judge asked at the first non-rising shot.
+- #156: per-room `switch.crop_steering_<prefix>ai_power_<key>` (missing switch = its default); `set_targets_from_achievable` and `tune_shot_sizes` on the Claude route only, values clamped only to each entity's range and logged; goal scorecard, rules POW-01..10 and `jev.controller_brief` in the cached system block; cache reads logged.
+- #157: dashboard run progress strip from `runs_get`, `strategy_get`, the AI stage and the dosing feed attribute; no integration change.
+- #159: a push to testing no longer cancels the previous Validate run.
+- 3.12.2 content: #149, #150, #151, #152, #153.
+
 ## [3.12.2] - 2026-10-16
 
 Pair: **controller 3.12.2**. Five changes, #149 to #153. Released by the owner's decision without a staging soak (approved rehearsal).
