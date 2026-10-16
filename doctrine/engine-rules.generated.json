@@ -179,12 +179,12 @@
     },
     {
       "id": "PH-4",
-      "text": "P0 ends at the first of: VWC at or below the P2 threshold (bypass), relative dryback at or above dryback_target, or p0_max_wait_min elapsed.",
+      "text": "P0 ends on VWC at or below re-water, the drop since lights-on at p0_additional_dryback when positive (otherwise dryback_target), or its maximum wait. A positive additional setting replaces the target; it is not summed.",
       "verified": true
     },
     {
       "id": "PH-5",
-      "text": "P1 ends at p1_max_shots, or once the zone has read at or above min(p1_target, field_capacity), at least p1_min_shots have landed, one extra shot has fired, the shot interval has passed and that shot raised the day's peak by less than 0.5 points.",
+      "text": "P1 ends on maximum shots, a trusted below-target stall after minimum shots and the interval, the extra-shot cap at target, budget spent at target, or the settled-rise test after an extra shot. The needed rise is p1_rise_pts or 30% of learned expected gain, whichever is greater. A stalled day re-waters below its achieved reading.",
       "verified": true
     },
     {
@@ -199,7 +199,7 @@
     },
     {
       "id": "PH-8",
-      "text": "dryback_target changes nothing else: in P1, in P2 more than 3 h before lights-off and in P3, the same readings give the same phase and the same shot whatever its value. It never sets the overnight dryback.",
+      "text": "With P3 hold off, dryback_target changes no routine shot in P1, daytime P2 or P3. With P3 hold on, budgeted hold shots maintain the overnight target from the day peak.",
       "verified": true
     },
     {
@@ -244,7 +244,7 @@
     },
     {
       "id": "IR-7",
-      "text": "P3 is emergency-only: a p3_emergency_shot when VWC falls below p3_emergency_floor (the rescue floor). Cap-exempt.",
+      "text": "P3 fires rescue below the rescue floor after p3_time_between_shots; rescue is cap-exempt. With P3 dryback hold enabled, budgeted hold shots also maintain the overnight target and obey a held plan.",
       "verified": true
     },
     {
@@ -259,12 +259,12 @@
     },
     {
       "id": "IR-10",
-      "text": "Daily budget: once daily_vol reaches max_daily_volume, non-exempt shots (top-up, dilute, P0 flush, floor) are blocked; flush_high_ec, p1_ramp, p1_extra, p2_rescue, p3_emergency and watchdog are exempt.",
+      "text": "Daily-cap exemptions are generated from CAP_EXEMPT: exempt shots: flush_high_ec, p1_ramp, p2_rescue, p3_emergency, watchdog; budgeted shots: min_daily, p0_ec_flush, p1_extra, p1_flush, p2_dilute, p2_timed, p2_topup, p3_hold. P1 extra shots and P3 hold are budgeted.",
       "verified": true
     },
     {
       "id": "IR-11",
-      "text": "While steering is held (a grow plan held, stale or missing) only the water-safety shots run: the P3 emergency, the watchdog and the minimum floor. Phases still move.",
+      "text": "While steering is held, only its permitted water-safety shots can run. The anti-lockout flush waits too; maximum-EC blocks and holds still apply. Phases still move.",
       "verified": true
     },
     {
@@ -321,7 +321,7 @@
     },
     {
       "id": "CT-8",
-      "text": "With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller hands decide() an assumed feed EC of 3.0 mS/cm, not a measurement, for every dilutive test.",
+      "text": "With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller uses declared recipe EC when available, otherwise hands decide() an assumed feed EC of 3.0 mS/cm, not a measurement, for the dilution comparison. Recipe EC and fallback EC are not measurements.",
       "verified": true
     },
     {
@@ -363,7 +363,7 @@
     },
     {
       "id": "BR-2",
-      "text": "advance moves only to the next phase, with the lights on and a usable probe. P0 -> P1 needs the drop since lights-on at half of dryback_target or a quarter of p0_max_wait_min gone, and is refused while the probe reading has not moved for 30 min. P1 -> P2 needs max(1, p1_min_shots) ramp shots and VWC within 3 points of min(p1_target, field_capacity). P2 -> P3 needs at most 3 h to lights-off, a zone steered generative (for any other zone the answer is advice), and VWC at least 3 points above the rescue floor.",
+      "text": "Phase advance only moves forward. P0 start needs half its morning target (p0_additional_dryback when positive, otherwise dryback_target) or a quarter of maximum wait, on a moving probe. P1 hand-over needs minimum shots and either moisture within 3 points of ceiling or a trusted stalled ramp with drainage not backed up. P2 hand-over needs generative mode, the last 3 hours and moisture at least 3 points over rescue.",
       "verified": true
     },
     {
@@ -378,7 +378,7 @@
     },
     {
       "id": "BR-5",
-      "text": "setpoint moves one 0.5 notch, at most once per zone per grow-day, only with the room's Auto Setpoints switch on (so the learner of CT-12 and CT-13 is always running when a notch is possible) and no grow plan owning the room, never while paused, inside a band around the last value of that number the brain did not write: p2_shot_size within 1 and never under 3; p2_vwc_threshold from 2 under to 1 over, at least the rescue floor + 4 and at most min(p1_target, field_capacity) - 2. Any value the brain did not write becomes the band's new centre (the evidence calls it 'your value'), except the learner's own writes while it holds the two numbers (CT-13), which leave the centre where it was; a field-capacity shift then moves the centre with it. When the levers come back, the threshold is put inside the band, never where it would break the ladder. These two numbers are the only ones the brain writes (judge_levers).",
+      "text": "setpoint moves one 0.5 notch, at most once per zone per grow-day, only with the room's Auto Setpoints switch on (so the learner of CT-12 and CT-13 is always running when a notch is possible) and no grow plan owning the room, never while paused, inside a band around the last value of that number the brain did not write: p2_shot_size within 1 and never under 3; p2_vwc_threshold from 2 under to 1 over, at least the rescue floor + 4 and at most min(p1_target, field_capacity) - 2. Any value the brain did not write becomes the band's new centre (the evidence calls it 'your value'), except the learner's own writes while it holds the two numbers (CT-13), which leave the centre where it was; a field-capacity shift then moves the centre with it. When the levers come back, the threshold is put inside the band, never where it would break the ladder. These are the bounded notch settings; targets and shot_size powers write additional values within engine and entity bounds. The notch budget is 0.5 per 24 h, 1.0 per 7 days, with a 36 h rest after a refused or unsuccessful move.",
       "verified": true
     },
     {
@@ -393,7 +393,7 @@
     },
     {
       "id": "BR-8",
-      "text": "Each acting directive needs the room's power for it (one switch per power per room): advance by the ramp judge ramp_control, any other advance advance_phase, distrust set_probe_aside, ec_mode ec_mode, setpoint nudge_setpoints, catch_up plan_catch_up, targets set_targets_from_achievable, shot_size tune_shot_sizes. With the power off the envelope refuses it and the answer is advice; a missing switch is the power's default, on for the six that acted before the switches and off for the two new ones. With targets or shot_size on, the values set are admitted as given (only the question's own settings, only numbers) and written clamped only to each setting's own range; dry run still only reports.",
+      "text": "Each acting directive needs the room's power for it (one switch per power per room): advance by the ramp judge ramp_control, any other advance advance_phase, distrust set_probe_aside, ec_mode ec_mode, setpoint nudge_setpoints, catch_up plan_catch_up, targets set_targets_from_achievable, shot_size tune_shot_sizes. With the power off the envelope refuses it and the answer is advice; a missing switch is the power's default, on for the six that acted before the switches and off for the two new ones. With targets or shot_size on, the values set are admitted as given (only the question's own settings, only numbers) and written clamped to engine and entity bounds and checked by HA ladder validation; HA still validates the moisture ladder; dry run or paused AI changes only reports.",
       "verified": true
     }
   ],
