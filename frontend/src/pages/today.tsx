@@ -225,6 +225,8 @@ export function Today({
     rescues,
     format: { clock, number: (value, digits = 1) => number(value, digits), perPlant },
   });
+  // Settings › Display › Zones as: one table on a laptop; a phone keeps the cards.
+  const table = room.display.options.today_zone_layout === "table";
   if (!controller.roomId || !room.zones.length)
     return (
       <>
@@ -243,7 +245,14 @@ export function Today({
       <TodayStatus controller={controller} day={day} now={now} navigate={navigate} />
       <RunProgress controller={controller} navigate={navigate} />
       <TankLine controller={controller} navigate={navigate} />
-      <section className="today-zones" aria-label="Zones">
+      {table && (
+        <ZoneTable
+          cards={cards}
+          attention={attention}
+          open={(id) => navigate("zone", id)}
+        />
+      )}
+      <section className={table ? "today-zones is-phone-only" : "today-zones"} aria-label="Zones">
         {cards.map((card) => (
           <ZoneCard
             key={card.zone.id}
@@ -697,6 +706,88 @@ function ZoneCard({
         </div>
       </dl>
     </article>
+  );
+}
+
+/** Settings › Display › Zones as › Table: the zones side by side, a row each, from the same facts as
+ * the cards. The dryback is the controller's: (peak − VWC) / peak, the peak being today's highest
+ * reading since lights-on. A row opens its zone. */
+function ZoneTable({
+  cards,
+  attention,
+  open,
+}: {
+  cards: Card[];
+  attention: Map<number, AttentionReason[]>;
+  open: (zone: number) => void;
+}) {
+  return (
+    <section className="panel today-zone-table" aria-label="Zones" data-today-table>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Zone</th>
+            <th scope="col">Phase</th>
+            <th scope="col">VWC</th>
+            <th scope="col">Pore EC</th>
+            <th scope="col">Dryback</th>
+            <th scope="col">Water</th>
+            <th scope="col">Shots</th>
+            <th scope="col">Next</th>
+          </tr>
+        </thead>
+        <tbody>
+          {cards.map((card) => {
+            const { zone, water } = card;
+            const reasons = attention.get(zone.id) ?? [];
+            const peak = card.readings.length
+              ? Math.max(...card.readings.map((point) => point.value))
+              : null;
+            const dryback =
+              peak && zone.vwc.value !== null ? ((peak - zone.vwc.value) / peak) * 100 : null;
+            return (
+              <tr
+                key={zone.id}
+                data-zone={zone.id}
+                data-attention={reasons[0]?.level}
+                onClick={() => open(zone.id)}
+              >
+                <th scope="row">
+                  <a
+                    href={`#/zone/${zone.id}`}
+                    onClick={(event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      open(zone.id);
+                    }}
+                  >
+                    {zone.name}
+                  </a>
+                  {reasons.length > 0 && (
+                    <span className="hmi-chip" data-abnormal="" title={reasons[0].text}>
+                      check
+                    </span>
+                  )}
+                </th>
+                <td>{/^P[0-3]$/.test(zone.phase) ? zone.phase : "—"}</td>
+                <td>{zone.vwc.value === null ? "—" : `${number(zone.vwc.value)}%`}</td>
+                <td>{zone.ec.value === null ? "—" : number(zone.ec.value, 2)}</td>
+                <td>{dryback === null ? "—" : `${number(Math.max(0, dryback))}% of peak`}</td>
+                <td>
+                  {water.mlPerPlant !== null
+                    ? `${perPlant(water.mlPerPlant)}/plant`
+                    : water.zoneL !== null
+                      ? `${number(water.zoneL)} L`
+                      : "—"}
+                </td>
+                <td>{zone.shots.value === null ? "—" : number(zone.shots.value, 0)}</td>
+                <td className="today-table-next">{nextWords(zone, card.stopped, card.rescue)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </section>
   );
 }
 

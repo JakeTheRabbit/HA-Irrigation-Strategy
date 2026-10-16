@@ -437,3 +437,51 @@
     display: none;
   }
 }
+/* Settings › Display › Zones as › Table: a laptop shows the table; a phone keeps the cards. */
+.today-zone-table {
+  overflow-x: auto;
+  padding: 4px 0;
+}
+.today-zone-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+}
+.today-zone-table th,
+.today-zone-table td {
+  padding: 7px 12px;
+  text-align: left;
+  white-space: nowrap;
+}
+.today-zone-table thead th {
+  color: var(--muted-foreground);
+  font-weight: 500;
+  border-bottom: 1px solid var(--border);
+}
+.today-zone-table tbody tr {
+  cursor: pointer;
+  border-bottom: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+}
+.today-zone-table tbody tr:hover {
+  background: var(--muted);
+}
+.today-zone-table tbody th a {
+  color: var(--foreground);
+  font-weight: 600;
+  margin-right: 8px;
+}
+.today-zone-table .today-table-next {
+  white-space: normal;
+  color: var(--muted-foreground);
+}
+@media (min-width: 721px) {
+  .today-zones.is-phone-only {
+    display: none;
+  }
+}
+@media (max-width: 720px) {
+  .today-zone-table {
+    display: none;
+  }
+}

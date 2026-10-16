@@ -472,3 +472,10 @@
     white-space: normal;
   }
 }
+/* Settings › Display › Day deltas: grey chips under the day chart, coloured only when far off. */
+.zone-day-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+}
