@@ -872,6 +872,14 @@ export function Setup({
                             disabled={busy}
                             onChange={(e) => editZone(zone.id, { name: e.target.value })}
                           />
+                          <Input
+                            aria-label={"Zone " + zone.id + " cultivar"}
+                            placeholder="Cultivar (optional)"
+                            maxLength={40}
+                            value={zone.cultivar ?? ""}
+                            disabled={busy}
+                            onChange={(e) => editZone(zone.id, { cultivar: e.target.value })}
+                          />
                         </div>
                         <Button
                           variant="ghost"

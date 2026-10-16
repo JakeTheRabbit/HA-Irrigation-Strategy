@@ -430,6 +430,21 @@
     padding: 4px 14px 14px;
   }
 }
+
+/* A zone's cultivar label (setup), beside its name; nothing when the zone has none. */
+.today-zone-link .zone-cultivar {
+  margin-left: 0.4em;
+  font-size: var(--text-sm);
+  font-weight: 400;
+  color: var(--muted-foreground);
+  display: inline-block;
+  max-width: 14ch;
+  vertical-align: bottom;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Settings › Display › Tank readout: a laptop's room line has room for it; a phone's has not
    (Today keeps to two phone screens), and Equipment › Feed shows the tank there. */
 @media (max-width: 640px) {

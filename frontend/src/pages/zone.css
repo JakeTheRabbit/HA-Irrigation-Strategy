@@ -426,3 +426,9 @@
     justify-self: start;
   }
 }
+
+/* The zone's cultivar label (setup), beside its name. */
+.zone-page-title .zone-cultivar {
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}

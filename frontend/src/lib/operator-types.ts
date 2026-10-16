@@ -113,6 +113,8 @@ export interface StrategyDocument {
 export interface SetupZone {
   id: number;
   name: string;
+  /** A free-text cultivar label, "" for none. A label only. Absent from an older integration. */
+  cultivar?: string;
   active: boolean;
   valve: string;
   vwc_sensors: string[];

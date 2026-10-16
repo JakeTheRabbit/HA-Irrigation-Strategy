@@ -1743,6 +1743,7 @@ class Controller:
             if not attrs:
                 continue
             room.zone_names = self._zone_names(attrs)  # display only; a rename needs no adoption
+            room.zone_cultivars = self._zone_cultivars(attrs)  # a label, read like the names: never decides anything
             room.room_name = self._room_name(attrs)
             room.substrate = self._substrate(attrs)  # read like the names: needs no adoption
             room.light_entity = str(attrs.get("light_entity") or "").strip()  # checked, never actuated
@@ -3482,6 +3483,21 @@ class Controller:
                 continue
             if isinstance(name, str) and name.strip() and name.strip() != f"Zone {zone}":
                 found[zone] = name.strip()[:40]
+        return found
+
+    @staticmethod
+    def _zone_cultivars(attrs):
+        """The cultivar label of each zone that has one ({2: "Gelato"}), from the room's descriptor. An older
+        integration publishes none."""
+        labels = (attrs or {}).get("zone_cultivars")
+        found = {}
+        for key, label in (labels.items() if isinstance(labels, dict) else ()):
+            try:
+                zone = int(key)
+            except (TypeError, ValueError):
+                continue
+            if isinstance(label, str) and label.strip():
+                found[zone] = label.strip()[:40]
         return found
 
     @staticmethod

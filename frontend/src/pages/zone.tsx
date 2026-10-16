@@ -108,6 +108,7 @@ export function ZonePage({
       </div>
       <div className="zone-page-title">
         <h1>{zone.name}</h1>
+        {zone.cultivar && <span className="zone-cultivar">{zone.cultivar}</span>}
         {/^P[0-3]$/.test(zone.phase) ? (
           <span className="pill" data-phase={zone.phase}>
             {zone.phase} · {PHASE_NAMES[zone.phase]}
