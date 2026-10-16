@@ -19,6 +19,14 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.13.0 - 2026-10-16
+
+- **A zone whose ramp stops raising the moisture now moves on to P2 instead of watering for hours**.
+- You can tick what the AI assistant may do in each room, including setting targets from what a zone can reach.
+- Today shows how far through the run each room is, with the grow plan and the feed recipe.
+- Compare runs shows charts for each grow week.
+- Bug fixes and improvements.
+
 ## 3.12.2 - 2026-10-16
 
 - Compare runs now shows charts for each grow week, with both runs on top of each other.

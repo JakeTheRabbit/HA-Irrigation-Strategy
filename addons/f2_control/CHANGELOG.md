@@ -1,3 +1,7 @@
+# 3.13.0
+
+Pair with integration 3.13.0. **C2.** #158: P1 ends when the ramp stalls under its target (two non-rising shots), with a day-scoped re-water under the stalled peak; state gains `p1_flat`/`p1_stall` (optional keys, an old file loads unchanged). #156: AI assistant powers per room, with the AI setting targets and shot sizes itself when ticked; goal scorecard, rules and controller brief in the cached prompt. Includes 3.12.2.
+
 # 3.12.2
 
 Pair with integration 3.12.2. **C3.** #149: a missing hold entity is named at start and in the block message (CS-210), still fail-closed. #151: the why-evidence names the kill switch and holds. #150: one log line when a copied `jev_judges` leaves out newer judges. No state-file change.
