@@ -17,5 +17,5 @@
   "iot_class": "calculated",
   "issue_tracker": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/issues",
   "requirements": [],
-  "version": "3.12.2"
+  "version": "3.13.0"
 }
