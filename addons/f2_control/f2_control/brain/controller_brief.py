@@ -111,9 +111,137 @@ def writable():
             "tune_shot_sizes": list(SHOT_QUESTIONS["shot_sizes"][0]["criteria"])}
 
 
+def restored_modes(core, shell):
+    """Optional rules only when their runtime capability exists in the built image.
+
+    This generator can land before the restoration packs. An older engine/controller emits no
+    instructions for modes it cannot run; the final merged-source rebuild adds the supported rules.
+    Neutral defaults leave the phase machine and interlocks described above in force.
+    """
+    fields = getattr(core.ZoneParams, "__dataclass_fields__", {})
+    cls = shell.Controller
+    out = []
+    if "p0_min_wait_min" in fields:
+        out.append(
+            "- P0 minimum wait (p0_minimum_wait, default 0/off): before that many minutes in P0, "
+            "normal dryback completion, stall exit, timeout and an AI dawn advance do not start P1. "
+            "The engine's low-moisture bypass still starts P1 when VWC is at or below p2_vwc_threshold. "
+            "The minimum is clamped to the maximum wait; it never prevents safety checks or an EC flush."
+        )
+    if "p0_stall_exit" in fields:
+        out.append(
+            "- P0 stall exit (p0_stall_exit switch, default off): after "
+            f"{core.P0_STALL_AFTER_MIN:g} minutes in P0, a dryback below {core.P0_STALL_RATE_FLOOR:g} "
+            "VWC points/hour, or projected to miss the maximum wait, can start P1. The minimum wait "
+            "still applies. Never classify a backed-up table or a suspect/flat/bypassed probe as "
+            "a stalled dryback; no positive peak means no stall verdict."
+        )
+    if "p2_mode" in fields:
+        out.append(
+            "- P2 mode (zone p2_mode select, default Moisture): Moisture retains the normal top-up rule. "
+            "Timed uses p2_timed_interval_min since the last delivered shot and waits until "
+            "p2_timed_first_hours after lights-on; p2_timed_shot_size 0 uses p2_shot_size. Timed with "
+            "guards keeps the moisture-triggered top-up as a floor rescue and skips a timer slot "
+            "at or above min(p1_target_vwc, field_capacity - 2). The floor rescue is a budgeted "
+            "p2_topup, not a daily-cap exemption. Plain Timed has no moisture top-up; both modes "
+            "retain EC correction priority, the daily cap and every hardware/feed interlock."
+        )
+    if "p2_end_h_before_off" in fields:
+        out.append(
+            "- Timed P2 end (p2_end_hours_before_off, default 0/off): a positive value replaces "
+            "predictive P3 and sends a zone in P1 or P2 to P3 that many hours before lights-off, "
+            "independent of moisture. Lights-off still forces P3 and its emergency floor remains "
+            "available; a zero value retains predictive P3."
+        )
+    if "ec_flush_target" in fields:
+        out.append(
+            "- EC flush target (ec_flush_target, default 0/off): a fired EC correction can latch "
+            "a flush episode. In P2 it continues with budgeted p2_dilute shots toward the settled "
+            f"pore EC target, never below feed EC + {core.EC_FLUSH_FEED_MARGIN:g} mS/cm. Continuation "
+            "requires dilutive feed, drainage, VWC below field capacity - 2 and the EC correction "
+            "settling/minimum interval. The episode clears at its goal, when switched off, at "
+            "lights-off or a new grow-day; existing high-EC rescue triggers keep their own rules."
+        )
+    if "p2_dilute_ratio" in fields:
+        out.append(
+            "- Zone P2 dilute ratios apply only with the room's use_p2_ec_thresholds switch on "
+            f"(default off). Otherwise the dilute trigger remains {core.P2_DILUTE_RATIO:g} times "
+            "the P2 EC target. Changing the ratio changes when dilution triggers; it does not "
+            "bypass the correction interval, drainage, feed or budget checks."
+        )
+    extra_bounds = getattr(core, "_PARAM_BOUNDS", {}).get("p1_max_extra_shots", (1, 10))
+    if extra_bounds[1] > 10:
+        out.append(
+            f"- Maximum extra ramp shots accepts {extra_bounds[0]:g}-{extra_bounds[1]:g}. Extra shots "
+            "still count inside p1_maximum_shots and the daily cap. Increasing the extra-shot "
+            "setting alone cannot extend a ramp already stopped by its maximum total shots."
+        )
+    if hasattr(cls, "_step_limit_all"):
+        out.append(
+            "- Max setpoint move per day (setpoint_max_step_per_day, default 1 VWC point) limits "
+            "the highest-reading follower by default. With setpoint_step_limit_applies_to set "
+            "to Auto setpoints and AI, the same per-grow-day ledger also clips learner and AI "
+            "target moves for field capacity, P1 peak and P2 re-water; exhausted allowance "
+            "prevents further movement. The ladder must still validate after clipping. This "
+            "does not limit shot-size writes or move the rescue floor. Zero removes this "
+            "movement limit, not any watering interlock or daily water cap."
+        )
+    if hasattr(cls, "_rescue_past_dead_probe"):
+        out.append(
+            "- Rescues past a dead feed probe (rescue_past_dead_feed_probe, default off): only "
+            "p3_emergency and watchdog shots can pass the dead EC/pH probe gate while this "
+            "switch reads ON. A routine shot or an out-of-band reading still holds. This "
+            "never skips the kill switch, dosing/external holds, plan rules, tank minimum, "
+            "hardware faults, max-run latch or the shot kind's normal daily-cap policy."
+        )
+    if hasattr(cls, "_waste_rule"):
+        out.append(
+            "- Waste valve rule (waste_valve_rule, default Off): no mapped valve or a confirmed "
+            "absent legacy policy keeps the old Off behavior. Check closed requires the waste "
+            "valve to read OFF before a shot. Close for each shot closes it before the pump "
+            "primes and verifies readback; a refused/unverified close starts no shot. An "
+            "unreadable or invalid policy holds rather than silently disabling the interlock; "
+            "a disappeared previously seen policy also holds. Under an enabled policy a "
+            "waste valve seen ON during delivery aborts the shot. The controller never opens it."
+        )
+    if hasattr(cls, "_watch_rescues"):
+        out.append(
+            "- Rescue misses (rescue_miss_action, default Off): Alert counts rescue shots whose "
+            "settled moisture fails to rise and tells the grower after rescue_miss_count "
+            "consecutive misses. This is hardware/probe evidence, never permission to abandon "
+            "or hold watering; a subsequent moisture rise clears the miss run."
+        )
+    if hasattr(cls, "_watch_tank_estimate"):
+        out.append(
+            "- Estimated tank level (tank_size_l, default 0/off): only without a mapped level "
+            "sensor, count shot litres from the last confirmed/manual fill. Configured flow "
+            "is not measured delivery. Low-estimate alerts never drive the reservoir hold."
+        )
+    if hasattr(cls, "_watch_runoff"):
+        out.append(
+            "- Sump water balance (runoff_estimator, default off): model runoff and condensate "
+            "from sump cycles, feed history, mapped AC/dehumidifier runtime and substrate-water "
+            "change. Use the sealed-room daily closure only when its water-balance assumptions "
+            "hold. Output is a room-wide or shared-sump estimate with fit/error evidence, "
+            "not a measured zone catch and not measured transpiration. A shared sump cannot "
+            "be attributed to an individual room or zone without separable evidence. Learning "
+            "or unresolvable output is unknown, not zero. Only ai mode adds the estimate as a "
+            "hint to AI evidence; shown/shown_alerts do not. Closure/fit warnings do not water, "
+            "hold or move settings. A recommendation still needs repeated zone evidence and "
+            "the normal enabled power/envelope; this estimate grants no authority to act."
+        )
+    if not out:
+        return []
+    return ["", "### 3a. Restored optional modes and evidence", "",
+            "The phase and gate descriptions above are the default behavior. These supported "
+            "options change it only when explicitly enabled; when the evidence omits a setting, "
+            "do not assume it is on.", *out, ""]
+
+
 def render(codes):
     """The brief, from the code and the error-code table `codes` ([{code, title, meaning, watering}, ...])."""
     from crop_steering_engine.core import CAP_EXEMPT, PHASES, P1_STALL_SHOTS
+    from crop_steering_engine import core
 
     import setpoint_supervisor  # beside the controller
 
@@ -126,6 +254,7 @@ def render(codes):
                                 stall=P1_STALL_SHOTS,
                                 max_run=controller.MAX_RUN_IN_A_ROW,
                                 exempt=", ".join(sorted(k for k, enabled in CAP_EXEMPT.items() if enabled)))]
+    out += restored_modes(core, controller)
     out += ["### 4. The settings: each zone's own number for the setting, else the room's, else the controller's "
             "built-in fallback shown here (these are not the fresh-room defaults)", ""]
     out += [f"- {k}: {v:g}" + (f" (range {lo:g}-{hi:g})" if (b := setpoint_supervisor.BOUNDS.get(k)) and
