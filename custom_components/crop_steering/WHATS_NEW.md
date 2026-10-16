@@ -19,6 +19,14 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.15.0 - 2026-10-17
+
+- **Choose phase, safety, sensing, dosing and display options together in Features**.
+- Choose room and probe panels, compare grows, and keep cultivar and harvest records.
+- Read the AI instructions, review room context changes and choose how long instructions are cached.
+- Unreadable waste rules hold watering, and a missing pH enable reading keeps a dosing fault latched.
+- Bug fixes and improvements.
+
 ## 3.14.0 - 2026-10-16
 
 - **The AI assistant now answers every question by default, including when to end the morning ramp**.

@@ -9,6 +9,28 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.15.0] - 2026-10-17
+
+Pair: **controller 3.15.0**. Restored controls, operating history and editable AI context. Promoted under the owner's approved rehearsal instruction; no real-plumbing soak is claimed.
+
+### 🌱 In plain English
+
+**Read this first. Unreadable waste-rule settings now hold irrigation instead of silently turning the rule off. A pH dosing fault stays latched through an unavailable enable switch; only a confirmed switch-off clears it.**
+
+- **Choose the controls you need in Features.** Phase timing, safety, sensing, dosing and display settings have one searchable catalogue. New optional modes keep the existing behavior until selected.
+- **See more of the room.** Choose cards or a table, camera and light readings, probe panels, plant-stress indicators and history overlays. Extra readings require mapped sensors.
+- **Keep a record of each grow.** Save cultivar labels, grow-day summaries, harvest weight and the operating history. An optional Influx connection extends sensor history; Recorder remains the default.
+- **Read the instructions the AI actually receives.** Review its shipped instructions, add room context, see the saved revision, and choose instruction cache durations. Estimated cache savings are labelled as estimates.
+- **Use optional runoff and dosing checks.** Shared-sump runoff is a water-balance estimate, not a measured figure for each zone. Corrected AI tool schemas avoid one cause of rejected requests; all answers remain checked before use.
+
+### 🔧 Technical notes
+
+- Restored phase/safety packs #170/#164, sensing/runoff #167/#177, dosing #168; neutral defaults, additive state migration and fail-closed readback retained. Last known waste policy persists across restart; only a truly absent legacy setting defaults Off. pH enable unknown/unavailable no longer clears the fault latch (#179).
+- Features registry and grow-day summary #165/#166/#172, Display settings and zone/history panels #169/#173/#174, feature metadata and optional DLI mapping #181. Sensor mappings are display-only unless explicitly described by a control feature.
+- Per-zone cultivar labels #175, grow/harvest records #176, optional admin-only InfluxQL/Flux connection and bounded long-history reads #178 with Recorder fallback. No live Influx credentials or physical runoff calibration are included.
+- Prompt contract corrections #171 and capability-conditioned restored-mode brief #182. AI Instructions #180 publishes the exact live block hashes and revisioned room context, with reviewed save/rollback/readback and room cache TTL controls. Substrate and stage remain existing room settings; shipped doctrine replacement is not included.
+- Provider schema mitigation #183 stops strict grammar compilation for answer_choice alone. Four other tools, including set_values, remain strict; local vote and setpoint validation is unchanged.
+
 ## [3.14.0] - 2026-10-16
 
 Pair: **controller 3.14.0**. #154, #160 and #162. Released by the owner's decision without a staging soak (approved rehearsal).
