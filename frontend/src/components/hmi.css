@@ -1,0 +1,168 @@
+/* High-performance HMI parts. Grey by default; colour only where a value is not normal. */
+.hmi-status {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin: 0;
+  font-size: var(--text-sm);
+  color: var(--muted-foreground);
+}
+.hmi-status-name {
+  color: var(--foreground);
+  font-weight: 600;
+}
+.hmi-status-part::before {
+  content: "·";
+  margin-right: 8px;
+}
+.hmi-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 1px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 500;
+  line-height: 18px;
+  white-space: nowrap;
+}
+.hmi-chip[data-abnormal] {
+  border-color: color-mix(in srgb, var(--warning) 45%, transparent);
+  background: var(--warning-bg);
+  color: var(--warning);
+}
+.hmi-quality {
+  border-style: dashed;
+  background: transparent;
+}
+
+/* Four across where there is room; two by two in a narrow card or on a phone. */
+.hmi-gauges-box {
+  container-type: inline-size;
+}
+.hmi-gauges {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 16px;
+}
+.hmi-gauge {
+  min-width: 0;
+}
+.hmi-gauge-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.hmi-gauge-label {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hmi-gauge-value {
+  font-size: var(--text-lg);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--foreground);
+}
+.hmi-gauge-value .unit {
+  font-size: var(--text-xs);
+  font-weight: 400;
+  margin-left: 1px;
+  color: var(--muted-foreground);
+}
+.hmi-gauge-track {
+  position: relative;
+  height: 8px;
+  margin: 4px 0 3px;
+  border-radius: 4px;
+  background: var(--muted);
+  box-shadow: inset 0 0 0 1px var(--border);
+  overflow: hidden;
+}
+.hmi-gauge-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: color-mix(in srgb, var(--muted-foreground) 55%, transparent);
+}
+.hmi-gauge-band {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: color-mix(in srgb, var(--foreground) 12%, transparent);
+  border-inline: 2px solid var(--foreground);
+}
+.hmi-gauge-target {
+  position: absolute;
+  top: -1px;
+  bottom: -1px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--foreground);
+}
+.hmi-gauge-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.hmi-gauge[data-state="abnormal"] .hmi-gauge-fill {
+  background: var(--warning);
+}
+.hmi-gauge[data-state="abnormal"] .hmi-gauge-words {
+  color: var(--warning);
+  font-weight: 600;
+}
+.hmi-gauge[data-state="no-data"] .hmi-gauge-value {
+  color: var(--muted-foreground);
+}
+.hmi-gauge[data-state="no-data"] .hmi-gauge-track {
+  background: repeating-linear-gradient(
+    -45deg,
+    transparent 0 4px,
+    color-mix(in srgb, var(--muted-foreground) 25%, transparent) 4px 6px
+  );
+}
+.hmi-gauge[data-state="no-data"] .hmi-gauge-words {
+  font-style: italic;
+}
+
+.hmi-check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  padding: 8px 12px;
+  border: 1px solid color-mix(in srgb, var(--warning) 40%, var(--border));
+  border-radius: 8px;
+  background: var(--warning-bg);
+  font-size: var(--text-sm);
+  color: var(--foreground);
+}
+.hmi-check > svg {
+  flex-shrink: 0;
+  color: var(--warning);
+}
+.hmi-check-label {
+  font-weight: 600;
+  color: var(--warning);
+}
+.hmi-check-text {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+
+@container (max-width: 640px) {
+  .hmi-gauges {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

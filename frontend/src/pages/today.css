@@ -271,35 +271,16 @@
 .today-flag-more {
   font-weight: 500;
 }
-.today-moisture {
-  display: flex;
-  align-items: flex-end;
-  gap: 14px;
-}
-.today-vwc {
-  margin: 0;
-  line-height: 1;
-  white-space: nowrap;
-}
-.today-vwc strong {
-  font-size: 34px;
-  font-weight: 600;
-  letter-spacing: -0.8px;
-  font-variant-numeric: tabular-nums;
-}
-.today-vwc .unit {
-  font-size: 16px;
-  margin-left: 2px;
-}
 .today-spark {
-  flex: 1;
+  display: block;
+  width: 100%;
   min-width: 0;
-  height: 40px;
+  height: 36px;
   overflow: visible;
 }
 .today-spark path {
   fill: none;
-  stroke: var(--primary);
+  stroke: var(--foreground);
   stroke-width: 1.8;
   stroke-linejoin: round;
   stroke-linecap: round;
@@ -310,73 +291,11 @@
 .today-spark-empty {
   display: block;
 }
-.moisture-bar {
-  display: grid;
-  gap: 5px;
-}
-.moisture-track {
-  position: relative;
-  height: 8px;
-  margin: 4px 0 2px;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--foreground) 9%, var(--surface));
-}
-/* The maintenance band: from the re-water point up to the peak target. */
-.moisture-band {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--primary) 30%, var(--surface));
-}
-.moisture-mark {
-  position: absolute;
-  top: -4px;
-  bottom: -4px;
-  width: 2px;
-  margin-left: -1px;
-  border-radius: 1px;
-  background: var(--muted-foreground);
-}
-.moisture-mark[data-mark="rescue"],
-.moisture-legend [data-mark="rescue"]::before {
-  background: var(--destructive);
-}
-.moisture-mark[data-mark="rewater"],
-.moisture-legend [data-mark="rewater"]::before {
-  background: var(--warning);
-}
-.moisture-mark[data-mark="peak"],
-.moisture-legend [data-mark="peak"]::before {
-  background: var(--primary-strong);
-}
-.moisture-now {
-  position: absolute;
-  top: 50%;
-  width: 13px;
-  height: 13px;
-  margin: -6.5px 0 0 -6.5px;
-  border: 2px solid var(--surface);
-  border-radius: 50%;
-  background: var(--foreground);
-}
-.moisture-legend {
-  display: flex;
+.today-zone-head {
   flex-wrap: wrap;
-  gap: 2px 14px;
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  line-height: 1.4;
 }
-.moisture-legend span::before {
-  content: "";
-  display: inline-block;
-  width: 2px;
-  height: 10px;
-  margin-right: 5px;
-  border-radius: 1px;
-  vertical-align: -1px;
+.today-zone-head h2 {
+  white-space: nowrap;
 }
 .today-zone-facts {
   display: grid;
@@ -404,19 +323,6 @@
   color: var(--destructive);
   font-weight: 550;
 }
-.today-chip {
-  display: inline-block;
-  margin-left: 8px;
-  padding: 0 8px;
-  border-radius: 999px;
-  background: var(--warning-bg);
-  color: var(--warning);
-  font-size: var(--text-xs);
-  font-weight: 600;
-  line-height: 18px;
-  white-space: nowrap;
-}
-
 /* What Jev changed today. */
 .today-jev {
   margin-bottom: 0;
@@ -494,9 +400,6 @@
   }
   .today-zone {
     padding: 13px 14px 12px;
-  }
-  .today-vwc strong {
-    font-size: 30px;
   }
   .today-jev .panel-heading {
     padding: 12px 14px 4px;

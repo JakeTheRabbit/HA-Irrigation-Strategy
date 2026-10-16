@@ -165,11 +165,17 @@ try {
     const graph = shot.locator(".planning-curve");
     await graph.locator('[data-planning-line="recorded-vwc"]').waitFor();
     assert.ok(await graph.locator('[data-planning-line="recorded-vwc-previous"]').count());
+    // Pore EC is behind its toggle: drawn, but not shown until asked for.
     assert.ok(await graph.locator('[data-planning-line="recorded-ec"]').count());
-    assert.match(
-      await graph.locator(".planning-recorded").innerText(),
-      /Now[\s\S]*Peak · this grow-day[\s\S]*Trough · this grow-day/,
-    );
+    assert.equal(await graph.locator("[data-planning-ec]").isVisible(), false);
+    await graph.getByRole("button", { name: "EC", exact: true }).click();
+    assert.equal(await graph.locator("[data-planning-ec]").isVisible(), true);
+    await graph.getByRole("button", { name: "EC", exact: true }).click();
+    // Four gauges, each a value against its target or band, for a screen reader too.
+    const gauges = graph.locator(".planning-recorded [data-gauge]");
+    assert.equal(await gauges.count(), 4);
+    for (const label of await gauges.evaluateAll((all) => all.map((g) => g.ariaLabel)))
+      assert.match(label, /^(VWC now|Peak today|Dryback so far|Pore EC) \S+, (target|band) /);
     // every phase is drawn the way it runs: all six demo ramp shots, and the P2 top-ups
     assert.equal(await graph.locator('[data-planning-shot="P1"]').count(), 6);
     assert.ok((await graph.locator('[data-planning-shot="P2"]').count()) > 1);
@@ -178,6 +184,27 @@ try {
       /Projected day[\s\S]*measured from this zone/,
     );
     assert.doesNotMatch(await graph.innerText(), /NaN|undefined/);
+    // The demo's probe gap is a muted flag, not a 0 % low: it is out of the line and the peak.
+    const flag = graph.locator("[data-hmi-status] [data-probe-gap]");
+    await flag.waitFor();
+    assert.match(await flag.innerText(), /^Probe gap \d\d:\d\d/);
+    assert.ok((await graph.locator("svg [data-probe-gap]").count()) > 0);
+    assert.doesNotMatch(
+      await graph.locator('[data-gauge="peak"]').getAttribute("aria-label"),
+      /^Peak today 0%/,
+    );
+    // At most one advisory, under the chart; its fix goes into the draft only.
+    const chip = graph.locator(".hmi-check");
+    assert.equal(await chip.count(), 1);
+    assert.equal(await chip.getAttribute("data-planning-advice"), "p2");
+    assert.match(await chip.innerText(), /late in P2\. Raise the re-water point to [\d.]+%\./);
+    // The projection is a table: one row per phase.
+    assert.deepEqual(await graph.locator(".planning-projection tbody th").allInnerTexts(), [
+      "P0 Morning dryback",
+      "P1 Ramp",
+      "P2 Maintenance",
+      "P3 Overnight dryback",
+    ]);
     await graph.scrollIntoViewIfNeeded();
     await graph.screenshot({
       path: fileURLToPath(new URL("../../img/plan-graph.png", import.meta.url)),
@@ -196,6 +223,104 @@ try {
     });
     await pinned.close();
   });
+  await check(
+    "Daily plan card fits 1440x900, its one advisory fills the draft, and a phone has no overflow",
+    async () => {
+      const pinned = await browser.newContext({
+        viewport: { width: 1440, height: 900 },
+        colorScheme: "light",
+      });
+      await pinned.route("**/*", isolate);
+      const shot = await pinned.newPage();
+      shot.on("pageerror", (e) => errors.push(e.message));
+      await shot.clock.setFixedTime(new Date(2026, 8, 20, 9, 0, 0));
+      await shot.goto(`${origin}/dashboard.html?demo=1#/plan/targets`, {
+        waitUntil: "networkidle",
+      });
+      const graph = shot.locator(".planning-curve");
+      await graph.locator('[data-planning-line="recorded-vwc"]').waitFor();
+      const box = await graph.boundingBox();
+      assert.ok(box.height <= 900, `The plan card is ${Math.round(box.height)}px tall`);
+      // Status, four gauges with targets, the chart, one chip and the table, in that order.
+      const order = await graph.evaluate((card) =>
+        ["[data-hmi-status]", ".planning-recorded", ".planning-svg-wrap svg", ".hmi-check", ".planning-projection"].map(
+          (selector) => card.querySelector(selector)?.getBoundingClientRect().top ?? -1,
+        ),
+      );
+      assert.ok(
+        order.every((top, index) => top >= 0 && (!index || top > order[index - 1])),
+        `${order}`,
+      );
+      assert.equal(await graph.locator(".planning-projection tbody tr").count(), 4);
+      for (const id of ["vwc-now", "peak", "dryback", "pore-ec"])
+        assert.match(
+          await graph.locator(`[data-gauge="${id}"]`).getAttribute("aria-label"),
+          /, (target|band) /,
+        );
+      // Grey when normal: the target line is neutral until the draft differs from the controller.
+      const target = graph.locator('[data-planning-line="vwc"]');
+      assert.equal(await target.getAttribute("data-planning-draft"), null);
+      assert.equal(await target.getAttribute("stroke-dasharray"), "6 4");
+      // The chip's action fills the draft only: the field changes, the line turns to the draft
+      // colour, the review is still needed, and the advisory goes.
+      const rewater = shot.locator('[id="setting-number.crop_steering_zone_1_p2_vwc_threshold"]');
+      const before = await rewater.inputValue();
+      await graph.getByRole("button", { name: "Apply to draft", exact: true }).click();
+      assert.notEqual(await rewater.inputValue(), before);
+      assert.equal(await target.getAttribute("data-planning-draft"), "");
+      assert.equal(await graph.locator(".hmi-check").count(), 0);
+      await shot.getByRole("button", { name: "Review changes", exact: true }).waitFor();
+      await shot.getByRole("button", { name: "Discard draft", exact: true }).click();
+      assert.equal(await rewater.inputValue(), before);
+      for (const theme of ["light", "dark"]) {
+        await shot.evaluate((value) => localStorage.setItem("irrigation-theme", value), theme);
+        await shot.reload({ waitUntil: "networkidle" });
+        await graph.locator('[data-planning-line="recorded-vwc"]').waitFor();
+        await shot.evaluate(
+          () => new Promise((done) => requestAnimationFrame(() => requestAnimationFrame(done))),
+        );
+        const result = await new AxeBuilder({ page: shot })
+          .include(".planning-curve")
+          .withTags(["wcag2a", "wcag2aa", "wcag21aa"])
+          .analyze();
+        accessibility.push({ name: `plan card, ${theme}`, violations: result.violations });
+        assert.deepEqual(
+          result.violations.map((v) => v.id),
+          [],
+          `plan card, ${theme}`,
+        );
+      }
+      // A phone: the gauges two by two, the chart the full width, the table scrolls on its own.
+      await shot.setViewportSize({ width: 390, height: 844 });
+      await shot.reload({ waitUntil: "networkidle" });
+      await graph.locator('[data-planning-line="recorded-vwc"]').waitFor();
+      await shot
+        .waitForFunction(() => document.documentElement.scrollWidth <= innerWidth + 1, null, {
+          timeout: 2_000,
+        })
+        .catch(() => {});
+      assert.equal(
+        await shot.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+        true,
+        "Document overflow at 390 px",
+      );
+      const lefts = await graph
+        .locator(".planning-recorded [data-gauge]")
+        .evaluateAll((all) => [
+          ...new Set(all.map((g) => Math.round(g.getBoundingClientRect().left))),
+        ]);
+      assert.equal(lefts.length, 2, `gauge columns at 390 px: ${lefts}`);
+      assert.equal(
+        await graph
+          .locator(".planning-projection tbody th")
+          .first()
+          .evaluate((cell) => getComputedStyle(cell).position),
+        "sticky",
+      );
+      await shot.evaluate(() => localStorage.setItem("irrigation-theme", "light"));
+      await pinned.close();
+    },
+  );
   await check("Room off stands the room down and says so", async () => {
     await fresh("settings");
     await page.getByRole("button", { name: "Switch room off…", exact: true }).click();
@@ -218,7 +343,7 @@ try {
     const target = field("p1_target_vwc");
     // The VWC axis scales to what is plotted, so compare what each line plots, not its pixels.
     const before = await line("vwc").getAttribute("data-planning-values");
-    await target.fill("70");
+    await target.fill("66");
     assert.notEqual(await line("vwc").getAttribute("data-planning-values"), before);
     assert.equal(await line("baseline-vwc").getAttribute("data-planning-values"), before);
     await target.fill("999");

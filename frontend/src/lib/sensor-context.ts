@@ -86,7 +86,9 @@ export function sensorStats(
   series: Pick<Series, "points"> | undefined,
   options: WindowOptions,
 ): SensorStats | null {
-  const points = windowPoints(series, options);
+  // A substrate probe never reads 0 VWC or 0 pore EC: such a reading is a probe gap (a dropout), and
+  // it is not a peak, a low point or part of a typical day.
+  const points = windowPoints(series, options).filter((point) => point.value > 0);
   if (!points.length) return null;
   const { hours, now, timeZone, live } = options;
   const start = now - hours * 3_600_000;

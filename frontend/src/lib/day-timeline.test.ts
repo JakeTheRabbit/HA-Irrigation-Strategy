@@ -700,7 +700,7 @@ describe("the demo's day", () => {
       now,
     );
     expect(changes.map(({ entityId, from, to }) => [entityId, from, to])).toEqual([
-      ["number.crop_steering_zone_1_p1_target_vwc", 66, 64],
+      ["number.crop_steering_zone_1_p1_target_vwc", 72, 70],
       ["number.crop_steering_irrigation_ec_max", 3.4, 3.5],
     ]);
     expect(Math.abs(changes[1].time - hold.end)).toBeLessThan(60_000);

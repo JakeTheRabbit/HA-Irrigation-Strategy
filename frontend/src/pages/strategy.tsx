@@ -18,7 +18,7 @@ import { AutoSetpointsControl, AutoZoneChip } from "@/components/room-controls";
 import { SettingRow } from "@/components/setting-row";
 import { UiTip } from "@/components/info-tip";
 import { managedBy } from "@/lib/auto-setpoints";
-import { jevIds, parseJevSetpoints } from "@/lib/jev";
+import { jevIds, parseJevSetpoints, readJev } from "@/lib/jev";
 import { setpointParam } from "@/lib/sensor-context";
 import { settingWords } from "@/lib/setting-words";
 import {
@@ -616,6 +616,9 @@ export function Strategy({
           <PlanningCurve
             recorded={recorded}
             retention={sensorZone?.auto?.gain}
+            zoneName={sensorZone?.name}
+            phase={sensorZone?.phase}
+            ecBand={readJev(states, room.room.prefix).room?.stage?.poreEc ?? null}
             parameters={preview.draft.parameters}
             lightsOn={preview.draft.lightsOn}
             lightsOff={preview.draft.lightsOff}
@@ -636,12 +639,6 @@ export function Strategy({
                 : undefined
             }
           />
-          <p className="setpoint-preview-note">
-            Blue and pink are your targets for the whole day; the dark lines are what this zone’s
-            probe recorded, today and on earlier days. Nothing is forecast. The P3 boundary is shown
-            at lights-off; the engine may stop earlier on measured dryback. P2 can also adjust for
-            EC and safety limits.
-          </p>
           {preview.notes.map((item) => (
             <p className="setpoint-preview-note" key={item}>
               {item}
