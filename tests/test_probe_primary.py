@@ -67,9 +67,9 @@ def test_a_probe_choice_alone_is_saved_while_the_room_waters():
     assert (zone["vwc_primary"], zone["vwc_unused"]) == ("sensor.vwc2", ["sensor.vwc"])
     # No new setup revision: the controller has nothing to take on, so the room keeps watering.
     assert entry.data["setup_revision"] == revision
-    # Anything else in the same save still needs the room off.
+    # Anything else in the same save still needs the room off (a zone's name is a label, which does not).
     with pytest.raises(ValueError, match="OFF"):
-        asyncio.run(api.save_setup(hass, _choose(hass, name="Back")))
+        asyncio.run(api.save_setup(hass, _choose(hass, substrate_volume=7.0)))
     # Clearing the choice leaves the zone as it was before anyone chose.
     asyncio.run(api.save_setup(hass, _choose(hass, vwc_primary="", vwc_unused=[])))
     assert not set(entry.data["zones"]["2"]) & api.PROBE_CHOICE

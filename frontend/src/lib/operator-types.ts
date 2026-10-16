@@ -35,7 +35,13 @@ export type OperatorAction =
   | "notify_test"
   | "whats_new_get"
   | "whats_new_seen"
-  | "brain_ask";
+  | "brain_ask"
+  | "grow_days_get"
+  | "grow_days_backfill"
+  | "harvests_get"
+  | "runs_set_harvest"
+  | "display_get"
+  | "display_save";
 
 export interface ParameterLimit {
   value: number | null;
@@ -50,6 +56,8 @@ export interface SteeringProfile {
   name: string;
   vegetative: Record<string, number>;
   generative: Record<string, number>;
+  /** Climate and feed bands for reference only (lib/plan-reference.ts); absent when none. */
+  reference?: Partial<Record<string, [number, number]>>;
 }
 export interface ScheduleBlock {
   start_day: number;
@@ -112,6 +120,8 @@ export interface StrategyDocument {
 export interface SetupZone {
   id: number;
   name: string;
+  /** A free-text cultivar label, "" for none. A label only. Absent from an older integration. */
+  cultivar?: string;
   active: boolean;
   valve: string;
   vwc_sensors: string[];
@@ -126,6 +136,9 @@ export interface SetupZone {
   vwc_primary?: string;
   ec_unused?: string[];
   ec_primary?: string;
+  /** The zone's root-zone temperature probe, for the dashboard only ("" none). Absent from an
+   * older integration. */
+  substrate_temperature_sensor?: string;
 }
 export interface SetupRoom {
   entry_id: string;

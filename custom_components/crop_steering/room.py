@@ -122,6 +122,8 @@ def restored_state_is_ours(entry, last_state) -> bool:
 
 # The room climate sensors a setup can map (config_flow, hardware step).
 CLIMATE_SENSORS = ("temperature_sensor", "humidity_sensor", "vpd_sensor")
+# What only the dashboard shows (Settings > Display), set up on its Setup page.
+DISPLAY_SENSORS = ("camera_entity", "co2_sensor", "ppfd_sensor", "dli_sensor")
 
 
 def build_engine_config(
@@ -173,6 +175,17 @@ def build_engine_config(
     # The room's climate sensors, likewise only when mapped: read-only, for the dashboard's history
     # chart. The controller reads none of them.
     declared.update({k: hw[k] for k in CLIMATE_SENSORS if hw.get(k)})
+    # Likewise the camera, CO2 and PPFD, and each zone's root-zone temperature probe.
+    declared.update({k: hw[k] for k in DISPLAY_SENSORS if hw.get(k)})
+    root_zone = {
+        str(z): (zones.get(str(z)) or zones.get(z) or {}).get(
+            "substrate_temperature_sensor"
+        )
+        for z in range(1, int(num_zones) + 1)
+    }
+    root_zone = {z: eid for z, eid in root_zone.items() if eid}
+    if root_zone:
+        declared["substrate_temperature_sensors"] = root_zone
     if setup.get("tank_level") and (
         hw.get("tank_distance_sensor") or hw.get("tank_low_float")
     ):
@@ -193,7 +206,15 @@ def build_engine_config(
     # reads it with "generic" as the default and adopts it with no disarm cycle: it is not one of
     # the keys the setup fingerprint reads.
     grown_in = {"substrate": substrate} if substrate else {}
+    # A cultivar label per zone, display only; only a room with one publishes the key, so a room without
+    # labels publishes the descriptor it always did.
+    cultivars = {
+        str(z): label
+        for z in range(1, int(num_zones) + 1)
+        if (label := (zones.get(str(z)) or zones.get(z) or {}).get("cultivar"))
+    }
     return {
+        **({"zone_cultivars": cultivars} if cultivars else {}),
         **declared,
         **versions,
         **which,

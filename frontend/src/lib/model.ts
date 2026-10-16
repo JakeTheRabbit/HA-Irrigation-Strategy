@@ -16,6 +16,7 @@ import { parseAutoSetpoints } from "./auto-setpoints";
 import { readWaiting } from "./waiting-for";
 import { PHASE_GROUPS, settingWords } from "./setting-words";
 import { growerWords } from "./words";
+import { roomDisplay } from "./display";
 import { numberLimits, registeredControl } from "./features";
 import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
 
@@ -501,6 +502,7 @@ export function buildRoom(states: States, room: Room): RoomView {
     ? configuredIds.filter((id) => (config!.attributes.active_zone_ids as unknown[]).includes(id))
     : configuredIds;
   const names = config?.attributes.zone_names as Record<string, unknown> | undefined;
+  const cultivars = config?.attributes.zone_cultivars as Record<string, unknown> | undefined;
   const valves = config?.attributes.valves;
   const activeSwitch = room.id ? states[roomActiveId(room)] : undefined;
   const roomActive = !room.id || roomIsActive(states, room);
@@ -568,6 +570,10 @@ export function buildRoom(states: States, room: Room): RoomView {
     return {
       id,
       name: typeof names?.[id] === "string" ? String(names[id]) : "Zone " + id,
+      cultivar:
+        typeof cultivars?.[id] === "string" && String(cultivars[id]).trim()
+          ? String(cultivars[id]).trim()
+          : null,
       enabledEntity: enabled?.entity_id || null,
       enabled: boolean(enabled),
       setPhaseEntity: setPhase?.entity_id || null,
@@ -834,6 +840,7 @@ export function buildRoom(states: States, room: Room): RoomView {
       entityId: predictSwitch?.entity_id ?? null,
       enabled: boolean(predictSwitch),
     },
+    display: roomDisplay(states, room.prefix),
   };
 }
 
@@ -1055,6 +1062,8 @@ export function validateChange(room: RoomView, states: States, change: Change): 
     room.roomActiveEntity,
     room.autoSetpoints.entityId,
     room.notifyPredictions.entityId,
+    // Settings › Display › Hardware panel: the integration checks again that an administrator set it.
+    `switch.${ROOT}${room.room.prefix}manual_hardware_enabled`,
     ...room.zones.flatMap((z) => [
       z.enabledEntity,
       `switch.${ROOT}${room.room.prefix}zone_${z.id}_manual_override`,

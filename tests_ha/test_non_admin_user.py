@@ -25,6 +25,7 @@ REFUSED = "requires an authenticated Home Assistant administrator"
 # Every service that changes something, with data its schema accepts: what refuses it must be the
 # administrator check, not validation.
 CHANGES = {
+    "runs_set_harvest": {"room_id": ROOM, "expected_revision": 0, "run_id": "r", "harvest": None},
     "strategy_save": {"room_id": ROOM, "expected_revision": 0, "plan": {}},
     "strategy_activate": {"room_id": ROOM, "expected_revision": 0},
     "strategy_disarm": {"room_id": ROOM},
@@ -55,6 +56,8 @@ CHANGES = {
     "notify": {"key": "k", "title": "t", "message": "m"},
     # An ask spends the room's AI budget.
     "brain_ask": {"room_id": ROOM, "question": "why?"},
+    # What the dashboard shows in the room, for everyone who opens it.
+    "display_save": {"room_id": ROOM, "expected_revision": 0, "options": {"show_climate": True}},
     "save_recipe": {"recipe": {}},
     "apply_recipe": {},
     "set_manual_override": {"zone": 1},
@@ -68,6 +71,7 @@ CHANGES = {
     "overlay_undo": {"room_id": ROOM, "entity_id": "number.crop_steering_zone_1_p2_shot_size"},
 }
 READS = {
+    "harvests_get": {"room_id": ROOM},
     "strategy_get": {"room_id": ROOM},
     "strategy_preview": {"room_id": ROOM},
     "runs_get": {"room_id": ROOM},
@@ -77,6 +81,7 @@ READS = {
     "stock_get": {"room_id": ROOM},
     "calibration_get": {"room_id": ROOM},
     "dosing_get": {"room_id": ROOM},
+    "display_get": {"room_id": ROOM},
     "notify_get": {},
     "whats_new_get": {},
 }
