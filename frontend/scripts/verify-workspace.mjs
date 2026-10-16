@@ -1445,7 +1445,7 @@ try {
         assert.equal(await lp.locator(".today-stopped").count(), 0, "the band, not a second line");
         assert.equal(await lp.locator(".data-age").innerText(), "Updated 14 min ago");
         // The fixture has no room switch: watering is the one switch, in words.
-        assert.deepEqual(await lp.locator(".safety-switch-text").allInnerTexts(), ["Watering off"]);
+        assert.deepEqual(await lp.locator(".safety-switch-text").allInnerTexts(), ["Watering off", "Stop all"]);
         assert.ok(
           await lp.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
           "The stale band and the header fit 390 px",

@@ -1031,6 +1031,19 @@ async def async_setup_entry(
             )
         )
 
+    # Safety and operations settings (safety_ops.py): each starts at what keeps the room as it was.
+    from .safety_ops import ROOM_NUMBERS, zone_numbers
+
+    for description, value in ROOM_NUMBERS:
+        numbers.append(CropSteeringNumber(entry, description, default_value=value))
+    for zone_num in range(1, num_zones + 1):
+        for description, value in zone_numbers(zone_num):
+            numbers.append(
+                CropSteeringNumber(
+                    entry, description, zone_num=zone_num, default_value=value
+                )
+            )
+
     # Each number reads its siblings for a limit that follows the zone's size (bounds.py).
     room = {number.entity_description.key: number for number in numbers}
     for number in numbers:

@@ -62,116 +62,100 @@
       "restore": "NEW-03"
     },
     {
-      "help": "Minimum minutes in P0; the low moisture bypass remains available.",
+      "help": "Alert when rescue shots fail to raise moisture; never holds watering.",
       "settings": [
         {
-          "key": "p0_minimum_wait",
-          "scope": "room+zone",
-          "default": 0.0,
-          "domain": "number"
+          "key": "rescue_miss_action",
+          "scope": "room",
+          "default": "Off",
+          "domain": "select"
         },
         {
-          "key": "p0_stall_exit",
+          "key": "rescue_miss_count",
+          "scope": "room",
+          "default": 4.0,
+          "domain": "number"
+        }
+      ],
+      "group": "safety",
+      "label": "Rescue misses",
+      "id": "lf_10"
+    },
+    {
+      "help": "Allow P3 emergency and watchdog rescues past a dead feed probe; bad readings and other interlocks still hold.",
+      "settings": [
+        {
+          "key": "rescue_past_dead_feed_probe",
           "scope": "room",
           "default": false,
           "domain": "switch"
         }
       ],
-      "group": "phases",
-      "label": "Morning dryback minimum wait",
-      "id": "lf_09"
+      "group": "safety",
+      "label": "Rescues past dead feed probe",
+      "id": "lf_11"
     },
     {
-      "help": "Limit automatic moisture setpoint movement in VWC points; zero removes the limit.",
+      "help": "Choose Close for each shot to close and verify the waste valve before the pump primes.",
       "settings": [
         {
-          "key": "setpoint_max_step_per_day",
+          "key": "waste_valve_rule",
           "scope": "room",
-          "default": 1.0,
-          "domain": "number"
-        },
-        {
-          "key": "setpoint_step_limit_applies_to",
-          "scope": "room",
-          "default": "Auto setpoints",
+          "default": "Off",
           "domain": "select"
         }
       ],
-      "group": "phases",
-      "label": "Max setpoint move per day",
-      "id": "lf_149"
+      "group": "safety",
+      "label": "Waste valve rule",
+      "id": "lf_114"
     },
     {
-      "help": "Continue budgeted flush shots to this target, with a feed EC floor; zero disables.",
+      "help": "Test Shot seconds; maximum duration and daily budget still apply.",
       "settings": [
         {
-          "key": "ec_flush_target",
-          "scope": "room+zone",
-          "default": 0.0,
-          "domain": "number"
-        }
-      ],
-      "group": "phases",
-      "label": "EC flush target",
-      "id": "lf_20"
-    },
-    {
-      "help": "Use each zone dilute ratio instead of the existing 1.2 ratio.",
-      "settings": [
-        {
-          "key": "p2_dilute_ratio",
-          "scope": "room+zone",
-          "default": 1.2,
-          "domain": "number"
-        },
-        {
-          "key": "use_p2_ec_thresholds",
-          "scope": "room",
-          "default": false,
-          "domain": "switch"
-        }
-      ],
-      "group": "phases",
-      "label": "Use zone P2 EC ratios",
-      "id": "lf_21"
-    },
-    {
-      "help": "Choose Timed with guards for scheduled shots with a moisture ceiling and floor rescue.",
-      "settings": [
-        {
-          "key": "p2_end_hours_before_off",
-          "scope": "room+zone",
-          "default": 0.0,
-          "domain": "number"
-        },
-        {
-          "key": "p2_mode",
+          "key": "manual_shot_seconds",
           "scope": "zone",
-          "default": "Moisture",
-          "domain": "select"
-        },
+          "default": 10.0,
+          "domain": "number"
+        }
+      ],
+      "group": "safety",
+      "label": "Manual shot length",
+      "id": "lf_13"
+    },
+    {
+      "help": "Capacity in litres enables the estimate when no tank level sensor is mapped; zero disables.",
+      "settings": [
         {
-          "key": "p2_timed_first_hours",
-          "scope": "room+zone",
-          "default": 0.0,
+          "key": "tank_estimate_low_pct",
+          "scope": "room",
+          "default": 20.0,
           "domain": "number"
         },
         {
-          "key": "p2_timed_interval_min",
-          "scope": "room+zone",
-          "default": 60.0,
-          "domain": "number"
-        },
-        {
-          "key": "p2_timed_shot_size",
-          "scope": "room+zone",
+          "key": "tank_size_l",
+          "scope": "room",
           "default": 0.0,
           "domain": "number"
         }
       ],
-      "group": "phases",
-      "label": "P2 mode",
-      "id": "new_01"
+      "group": "safety",
+      "label": "Tank size for estimate",
+      "id": "lf_51"
+    },
+    {
+      "help": "Alert after 60 seconds above this power with all valves shut and no active hold or batch.",
+      "settings": [
+        {
+          "key": "pump_deadhead_watts",
+          "scope": "room",
+          "default": 20.0,
+          "domain": "number"
+        }
+      ],
+      "group": "safety",
+      "label": "Pump dead-head power",
+      "id": "lf_70"
     },
     {
       "id": "auto_setpoints",
@@ -1014,6 +998,118 @@
         }
       ],
       "alsoOn": "equipment/probes"
+    },
+    {
+      "help": "Minimum minutes in P0; the low moisture bypass remains available.",
+      "settings": [
+        {
+          "key": "p0_minimum_wait",
+          "scope": "room+zone",
+          "default": 0.0,
+          "domain": "number"
+        },
+        {
+          "key": "p0_stall_exit",
+          "scope": "room",
+          "default": false,
+          "domain": "switch"
+        }
+      ],
+      "group": "phases",
+      "label": "Morning dryback minimum wait",
+      "id": "lf_09"
+    },
+    {
+      "help": "Limit automatic moisture setpoint movement in VWC points; zero removes the limit.",
+      "settings": [
+        {
+          "key": "setpoint_max_step_per_day",
+          "scope": "room",
+          "default": 1.0,
+          "domain": "number"
+        },
+        {
+          "key": "setpoint_step_limit_applies_to",
+          "scope": "room",
+          "default": "Auto setpoints",
+          "domain": "select"
+        }
+      ],
+      "group": "phases",
+      "label": "Max setpoint move per day",
+      "id": "lf_149"
+    },
+    {
+      "help": "Continue budgeted flush shots to this target, with a feed EC floor; zero disables.",
+      "settings": [
+        {
+          "key": "ec_flush_target",
+          "scope": "room+zone",
+          "default": 0.0,
+          "domain": "number"
+        }
+      ],
+      "group": "phases",
+      "label": "EC flush target",
+      "id": "lf_20"
+    },
+    {
+      "help": "Use each zone dilute ratio instead of the existing 1.2 ratio.",
+      "settings": [
+        {
+          "key": "p2_dilute_ratio",
+          "scope": "room+zone",
+          "default": 1.2,
+          "domain": "number"
+        },
+        {
+          "key": "use_p2_ec_thresholds",
+          "scope": "room",
+          "default": false,
+          "domain": "switch"
+        }
+      ],
+      "group": "phases",
+      "label": "Use zone P2 EC ratios",
+      "id": "lf_21"
+    },
+    {
+      "help": "Choose Timed with guards for scheduled shots with a moisture ceiling and floor rescue.",
+      "settings": [
+        {
+          "key": "p2_end_hours_before_off",
+          "scope": "room+zone",
+          "default": 0.0,
+          "domain": "number"
+        },
+        {
+          "key": "p2_mode",
+          "scope": "zone",
+          "default": "Moisture",
+          "domain": "select"
+        },
+        {
+          "key": "p2_timed_first_hours",
+          "scope": "room+zone",
+          "default": 0.0,
+          "domain": "number"
+        },
+        {
+          "key": "p2_timed_interval_min",
+          "scope": "room+zone",
+          "default": 60.0,
+          "domain": "number"
+        },
+        {
+          "key": "p2_timed_shot_size",
+          "scope": "room+zone",
+          "default": 0.0,
+          "domain": "number"
+        }
+      ],
+      "group": "phases",
+      "label": "P2 mode",
+      "id": "new_01"
     },
     {
       "id": "runoff_estimator",

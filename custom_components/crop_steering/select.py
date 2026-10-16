@@ -135,6 +135,11 @@ async def async_setup_entry(
     # Add main select entities
     for description in SELECT_DESCRIPTIONS:
         selects.append(CropSteeringSelect(entry, description))
+    # Safety and operations (safety_ops.py): each starts at Off, as the room was.
+    from .safety_ops import SELECTS
+
+    for description in SELECTS:
+        selects.append(CropSteeringSelect(entry, description))
 
     # Get number of zones from config
     config_data = hass.data[DOMAIN][entry.entry_id]

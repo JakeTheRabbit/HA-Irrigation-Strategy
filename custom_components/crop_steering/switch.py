@@ -185,6 +185,11 @@ async def async_setup_entry(
     # Add base switches
     for description in BASE_SWITCH_DESCRIPTIONS:
         switches.append(CropSteeringSwitch(entry, description))
+    # Safety and operations (safety_ops.py): off, as the room was.
+    from .safety_ops import SWITCHES
+
+    for description in SWITCHES:
+        switches.append(CropSteeringSwitch(entry, description))
 
     # Named rooms and new default rooms receive an engine switch, initially OFF.
     # Legacy default entries retain their existing helper unless explicitly migrated.

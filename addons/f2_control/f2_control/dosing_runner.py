@@ -1219,6 +1219,12 @@ class DosingRunner:
         if stuck:
             raise _Ended(f"{valve} did not read off after filling")
         self._done(job)
+        filled_hook = getattr(self.c, "_tank_estimate_filled", None)  # the estimated tank level counts again
+        if filled_hook is not None:
+            try:
+                filled_hook(job.room)
+            except Exception as e:
+                self._log("dosing: the estimated tank level could not be reset", job.room.slug, e)
 
     def _over(self, job):
         """The overfill guard (Controller._tank_over): the room's mapped tank level reads over its full mark, so the

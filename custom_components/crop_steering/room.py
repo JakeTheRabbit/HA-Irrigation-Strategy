@@ -176,6 +176,9 @@ def build_engine_config(
     declared.update(
         {k: hw[k] for k in ("tank_distance_sensor", "tank_low_float") if hw.get(k)}
     )
+    # The room's waste valve, likewise only when mapped: the controller only ever switches it off, and only
+    # under the room's waste valve rule (select waste_valve_rule, Off until chosen).
+    declared.update({"waste": hw["waste_switch"]} if hw.get("waste_switch") else {})
     # The room's light, likewise only when mapped: the controller checks it against the lights hours.
     declared.update(
         {"light_entity": hw["light_entity"]} if hw.get("light_entity") else {}

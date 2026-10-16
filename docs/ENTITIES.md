@@ -208,7 +208,18 @@ for that zone. (3 zones × 27 = 81 entities on a 3-zone system.)
 ### Per-zone buttons (`button.crop_steering_zone_N_*`)
 | Entity | What it does |
 |---|---|
-| `zone_N_test_shot` | Asks the controller for a 10 s test shot in the zone, to check the water delivery. The controller acts at its next pass, within a minute, on a press less than 10 min old. The test shot goes through each check of a normal shot, but a held grow plan does not stop it. The `crop_steering.test_shot` service presses it by room ID. |
+| `zone_N_test_shot` | Asks the controller for a test shot in the zone, to check the water delivery: 10 s, or the zone's `zone_N_manual_shot_seconds`. The controller acts at its next pass, within a minute, on a press less than 10 min old. The test shot goes through each check of a normal shot, but a held grow plan does not stop it. The `crop_steering.test_shot` service presses it by room ID. |
+
+### Safety and operations (each starts at what the room did before)
+| Entity | Default | What it does |
+|---|---|---|
+| `button.crop_steering_stop_all` | - | Stop all. Sets the kill switch to off, then the pump, the main-line valve, the waste valve and every zone valve of the room to off, and reads each back. Works with the controller app stopped. Never switches anything on. A device that stays on raises CS-308. The `crop_steering.stop_all` service does the same by room ID. |
+| `number.crop_steering_zone_N_manual_shot_seconds` | 10 s | How long the zone's Test Shot waters (5-3600 s). Still cut to `max_shot_duration` and to the day's water budget left. |
+| `select.crop_steering_waste_valve_rule` | Off | Off: the controller does not read the mapped waste valve. Check closed: no shot starts while it reads open (CS-316). Close for each shot: the controller switches it off and reads it back before each shot, and the shot does not start if it stays open. It never opens it. |
+| `switch.crop_steering_rescue_past_dead_feed_probe` | off | On: while the feed EC or pH probe is dead, a P3 emergency or watchdog rescue still passes the source-water gate. Routine shots still hold, an out-of-band feed reading still holds every shot, and every other hold applies. |
+| `select.crop_steering_rescue_miss_action`, `number.crop_steering_rescue_miss_count` | Off, 4 | Alert: CS-315 after this many rescue shots in a row that did not raise the moisture. It never stops water. |
+| `number.crop_steering_pump_deadhead_watts` | 20 W | With the controller app's `pump_power_sensor` option: CS-317 when the pump draws more than this for 1 min with every zone valve off and no shot, hold or batch. Alert only. |
+| `number.crop_steering_tank_size_l`, `number.crop_steering_tank_estimate_low_pct`, `button.crop_steering_tank_filled` | 0 (off), 20 % | With no tank level sensor mapped: the tank level estimated from the shots' water since Tank filled (or a batch that filled it), on `sensor.crop_steering_tank_level` with `source: estimate`. CS-905 at or below the low %. It never holds a shot. |
 
 ---
 
