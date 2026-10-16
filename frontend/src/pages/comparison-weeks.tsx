@@ -6,6 +6,7 @@ import { counterIds } from "@/components/water-use";
 import { addDays, dateInZone, midnight } from "@/lib/comparison";
 import type { DailyRanges, RunRecord } from "@/lib/comparison-types";
 import { biggestDifferences, NOTICE, runWeeks, type RunWeek } from "@/lib/run-weeks";
+import { RunWeekCharts } from "./comparison-week-charts";
 import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import { waterParameters } from "@/lib/water-delivery";
@@ -64,22 +65,33 @@ async function loadRun(
       notes.push(`${run.name}: moisture and pore EC could not load: ${errorText(error)}`);
     }
   let water = new Map<string, number>();
+  let shots: Map<string, number> | undefined;
   const counters = live ? counterIds(controller, live) : [];
+  const shotCounter =
+    live?.shots.entityId && controller.states[live.shots.entityId] ? live.shots.entityId : null;
   const lightsOn =
     run.lights.on ??
     controller.room.settings.find((field) => field.entityId.endsWith("_lights_on_hour"))?.value ??
     null;
   if (counters.length && lightsOn !== null)
     try {
-      const record = await controller.waterRecord({ entityIds: counters, start: start - DAY, end });
+      const record = await controller.waterRecord({
+        entityIds: shotCounter ? [...counters, shotCounter] : counters,
+        start: start - DAY,
+        end,
+      });
       water = mergeDays(
         ...counters.map((id) => growDayTotals(record.samples[id] ?? [], lightsOn, run.time_zone)),
       );
+      if (shotCounter)
+        shots = growDayTotals(record.samples[shotCounter] ?? [], lightsOn, run.time_zone);
     } catch (error) {
       notes.push(`${run.name}: water could not load: ${errorText(error)}`);
     }
   else
     notes.push(`${run.name}: this zone has no water counter or lights-on hour to count water by.`);
+  if (counters.length && !shotCounter)
+    notes.push(`${run.name}: this zone has no shot counter, so no shots a day.`);
   const plants =
     registered?.plant_count ?? (live ? waterParameters(controller, zoneId).plant_count : null);
   if (!plants) notes.push(`${run.name}: no plant count, so no water per plant.`);
@@ -94,6 +106,7 @@ async function loadRun(
       vwc: daily(vwc),
       ec: daily(ec),
       water,
+      shots,
       plants: plants ?? null,
     }),
     notes,
@@ -135,8 +148,9 @@ function Figure({
   );
 }
 
-/** Compare runs' main view: this run against a chosen one by grow week (moisture, pore EC and water
- * per plant a day), and the few weeks where they differ most. */
+/** Compare runs' main view: this run against a chosen one by grow week (moisture and its dryback,
+ * pore EC, water per plant and shots a day), charted and in a table, and the few weeks where they
+ * differ most. */
 export function RunWeeks({
   controller,
   current,
@@ -239,6 +253,12 @@ export function RunWeeks({
               )}
             </div>
           )}
+          <RunWeekCharts
+            runs={[data.mine, ...(data.theirs ? [data.theirs] : [])].map(({ run, weeks }) => ({
+              name: run.name,
+              weeks,
+            }))}
+          />
           <div className="table-scroll" tabIndex={0} role="region" aria-label="Runs by grow week">
             <table className="data-table rw-table">
               <thead>
@@ -247,6 +267,8 @@ export function RunWeeks({
                   <th scope="col">Moisture, low–high</th>
                   <th scope="col">Pore EC, low–high</th>
                   <th scope="col">Water per plant a day</th>
+                  <th scope="col">Dryback</th>
+                  <th scope="col">Shots a day</th>
                 </tr>
               </thead>
               <tbody>
@@ -288,6 +310,18 @@ export function RunWeeks({
                         unit=" L"
                         compared={compared}
                       />
+                      <Figure
+                        mine={mine?.dryback == null ? null : number(mine.dryback, 0)}
+                        theirs={theirs?.dryback == null ? null : number(theirs.dryback, 0)}
+                        unit=" %"
+                        compared={compared}
+                      />
+                      <Figure
+                        mine={mine?.shots == null ? null : number(mine.shots, 1)}
+                        theirs={theirs?.shots == null ? null : number(theirs.shots, 1)}
+                        unit=""
+                        compared={compared}
+                      />
                     </tr>
                   );
                 })}
@@ -296,8 +330,9 @@ export function RunWeeks({
           </div>
           <p className="small">
             Weeks count seven days from each run’s start date. A dash is a week with no record,
-            never a zero. Water per plant averages the week’s recorded grow-days, today’s unfinished
-            one left out. Where the figures come from is under Data quality.
+            never a zero. Water per plant and shots a day average the week’s recorded grow-days,
+            today’s unfinished one left out. Dryback is the typical day’s drop from its peak to its
+            trough, as a percentage of the peak. Where the figures come from is under Data quality.
           </p>
         </>
       )}

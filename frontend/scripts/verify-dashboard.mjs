@@ -1053,6 +1053,69 @@ try {
       const differences = page.locator(".rw-differences li");
       assert.ok((await differences.count()) > 0 && (await differences.count()) <= 3);
       assert.match(await differences.first().innerText(), /^Week \d+: /);
+      // Charted by grow week: both runs on each measure's chart, with data, at desktop and phone width.
+      const charts = page.locator(".rw-charts [data-rw-chart]");
+      const plotted = async () => {
+        assert.deepEqual(
+          await charts.evaluateAll((figures) => figures.map((figure) => figure.dataset.rwChart)),
+          ["moisture", "dryback", "pore-ec", "water", "shots"],
+        );
+        for (const id of ["moisture", "pore-ec", "water", "shots"]) {
+          const chart = page.locator(`[data-rw-chart="${id}"]`);
+          await expectVisible(chart.locator(".recharts-line-curve").first());
+          const lines = await chart
+            .locator(".recharts-line-curve")
+            .evaluateAll(
+              (paths) => paths.filter((path) => /\d/.test(path.getAttribute("d") || "")).length,
+            );
+          // Two runs: a peak and a trough line each for moisture and pore EC, one line each otherwise.
+          assert.equal(
+            lines,
+            ["moisture", "pore-ec"].includes(id) ? 4 : 2,
+            `${id} plots both runs`,
+          );
+          assert.match(
+            await chart.locator('[role="img"]').getAttribute("aria-label"),
+            /by grow week\. Demo • current run[^:]*: \d+ weeks? recorded.* Demo • previous run[^:]*: \d+ weeks recorded/,
+          );
+        }
+        const bars = page.locator('[data-rw-chart="dryback"] .recharts-bar-rectangle path');
+        await expectVisible(bars.first());
+        assert.ok((await bars.count()) >= 4, "dryback bars for both runs");
+        for (const figure of await charts.all()) {
+          const box = await figure.boundingBox();
+          assert.ok(box && box.width > 200 && box.height > 150, "each chart has room to read");
+          const plot = await figure.locator(".rw-chart-plot").boundingBox();
+          assert.ok(plot && plot.height >= 150, "each plot is drawn");
+        }
+        assert.equal(
+          await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
+          true,
+          "the page itself never scrolls sideways",
+        );
+      };
+      await plotted();
+      await page
+        .locator(".rw-charts")
+        .screenshot({ path: path.join(out, "compare-runs-charts-1440.png") });
+      await page.setViewportSize({ width: 390, height: 844 });
+      await plotted();
+      // Stacked, one chart per row.
+      const [first, second] = await charts.evaluateAll((figures) =>
+        figures.slice(0, 2).map((figure) => figure.getBoundingClientRect().top),
+      );
+      assert.ok(second > first, "the charts stack at phone width");
+      // A chart is a keyboard stop that scrolls sideways when its weeks need more room.
+      await page.locator('[data-rw-chart="moisture"] .rw-chart-scroll').focus();
+      assert.equal(
+        await page.evaluate(() => document.activeElement?.getAttribute("aria-label")),
+        "Moisture chart",
+      );
+      await page
+        .locator(".rw-charts")
+        .screenshot({ path: path.join(out, "compare-runs-charts-390.png") });
+      await axe("compare runs charts, phone", ".rw-charts");
+      await page.setViewportSize({ width: 1440, height: 1000 });
       // The daily ranges are collapsed; the full-resolution overlay is behind the view toggle.
       assert.equal(
         await page.locator('details.comparison-more[data-section="quality"]').getAttribute("open"),
@@ -1097,9 +1160,7 @@ try {
         ["current normal", "previous muted"],
       );
       assert.equal(new Set(cells.map(([, width]) => width)).size, 1, "one scale width for all");
-      await expectVisible(
-        page.getByRole("heading", { name: "Source of the weekly figures" }),
-      );
+      await expectVisible(page.getByRole("heading", { name: "Source of the weekly figures" }));
       await axe("compare runs, all open");
       await axeDark("compare runs", ".comparison-page");
       // The run records themselves are kept in Settings.
@@ -1138,7 +1199,9 @@ try {
         /Probes\s+11 of 12 OK[\s\S]*Controller\s+Reporting[\s\S]*AI assistant\s+On/,
       );
       // The controller's own sensors: collapsed, then as the Sensors page had them.
-      const internals = page.locator("details.probes-more", { hasText: "All sensors of this room" });
+      const internals = page.locator("details.probes-more", {
+        hasText: "All sensors of this room",
+      });
       assert.equal(await internals.getAttribute("open"), null);
       await internals.locator("summary").click();
       const trends = "[data-sensor-trend] .sparkline";
@@ -1973,7 +2036,9 @@ try {
         assert.equal(await box(`${name}: Emergencies`).isDisabled(), true, `${name} is read-only`);
         assert.equal(await box(`${name}: High priority for emergencies`).isDisabled(), true);
         assert.equal(
-          await page.getByRole("button", { name: `Send a test to ${name}`, exact: true }).isDisabled(),
+          await page
+            .getByRole("button", { name: `Send a test to ${name}`, exact: true })
+            .isDisabled(),
           true,
         );
       }
