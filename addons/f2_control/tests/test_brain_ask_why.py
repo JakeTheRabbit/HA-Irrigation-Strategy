@@ -153,3 +153,84 @@ def test_the_transport_validates_answer_why():
 def test_the_why_question_is_framed_without_keys():
     text = Prompt.questions("s", 0, {"why": dict(jev_bridge.WHY)})
     assert '<question id="why" kind="why">' in text and "<allowed>" not in text
+
+
+HOLD, OTHER = "input_boolean.tank_dosing", "input_boolean.manual_fill"
+
+
+def _gates(c, pub=None):
+    room = c.rooms[0]
+    return lambda: c._why_gates(room, pub)
+
+
+def test_the_gates_name_the_kill_switch_the_holds_on_and_each_zones_block():
+    c, fake = _build({"num_zones": 1, "enable_flag": KILL, "hold_entities": [HOLD, OTHER, "input_boolean.flush"]},
+                     states={**_states(), KILL: ("off", {"friendly_name": "Room enabled"}),
+                             HOLD: ("on", {"friendly_name": "Tank dosing"}), OTHER: ("off", {}),
+                             "input_boolean.flush": ("unavailable", {})})
+    g = c._why_gates(c.rooms[0], {1: {"block": "external hold (tank_dosing)", "reason": "P2 top-up due"}})
+    assert g["kill_switch"] == {"name": "Room enabled", "state": "off"}
+    assert g["holds_on"] == [{"name": "Tank dosing", "state": "on"}, {"name": "flush", "state": "unreadable"}]
+    assert g["zones"] == {1: {"block": "external hold (tank_dosing)", "decision": "P2 top-up due"}}
+    fake.set_state(KILL, "on")
+    fake.set_state(HOLD, "off")
+    fake.set_state("input_boolean.flush", "off")
+    g = c._why_gates(c.rooms[0], None)
+    assert g["kill_switch"]["state"] == "on" and g["holds_on"] == [] and g["zones"] == {}
+    fake.set_state(KILL, "unknown")
+    assert c._why_gates(c.rooms[0], None)["kill_switch"]["state"] == "unreadable"
+
+
+def test_the_why_evidence_carries_the_kill_switch_and_the_holds_on(claude):
+    c, fake = claude(hold_entities=[HOLD])
+    fake.set_state(KILL, "off", {"friendly_name": "Room enabled"})
+    fake.set_state(HOLD, "on", {"friendly_name": "Tank dosing"})
+    ask(fake, "Why is zone 1 not watering?")
+    jev_bridge.why_task(c, c.rooms[0], NOW, fake.ha_get, fake.ha_set,
+                        gates=_gates(c, {1: {"block": "external hold (tank_dosing)", "reason": "P2 top-up due"}}))
+    [sent] = c._client.requests
+    evidence, questions = (part["text"] for part in sent["messages"][0]["content"])
+    assert "kill_switch:" in evidence and "Room enabled" in evidence and "off" in evidence
+    assert "holds_on:" in evidence and "Tank dosing" in evidence
+    assert "external hold (tank_dosing)" in evidence and "P2 top-up due" in evidence
+    assert HOLD not in evidence and KILL not in evidence  # names, never entity ids
+    assert "kill switch" in questions and "Name the kill switch or the hold" in questions
+
+
+def test_without_gates_the_why_evidence_is_as_before(claude):
+    c, fake = claude()
+    ask(fake, "why?")
+    run(c, fake)
+    evidence = c._client.requests[0]["messages"][0]["content"][0]["text"]
+    assert "kill_switch:" not in evidence and "holds_on:" not in evidence
+
+
+def test_under_rules_the_answer_says_the_kill_switch_is_off():
+    c, fake = _build({"num_zones": 1, "enable_flag": KILL},
+                     states={**_states(), KILL: ("off", {"friendly_name": "Room enabled"})})
+    ask(fake, "Why is zone 1 not watering?")
+    jev_bridge.why_task(c, c.rooms[0], NOW, fake.ha_get, fake.ha_set, gates=_gates(c))
+    [a] = fake.sets[ANSWERS][1]["answers"]
+    assert "The kill switch of this room (Room enabled) is off, so no zone is watered." in a["answer"]
+    assert a["cannot_answer"] is False and "kill_switch" in a["grounded_in"]
+
+
+def test_under_rules_the_answer_names_the_hold_that_is_on_and_the_zones_block():
+    c, fake = _build({"num_zones": 1, "enable_flag": KILL, "hold_entities": [HOLD, OTHER]},
+                     states={**_states(), HOLD: ("on", {"friendly_name": "Tank dosing"}), OTHER: ("off", {})})
+    ask(fake, "Why is zone 1 not watering?")
+    jev_bridge.why_task(c, c.rooms[0], NOW, fake.ha_get, fake.ha_set,
+                        gates=_gates(c, {1: {"block": "external hold (tank_dosing)", "reason": "P2 top-up due"}}))
+    [a] = fake.sets[ANSWERS][1]["answers"]
+    assert "The hold Tank dosing is on, which stops every shot." in a["answer"]
+    assert "Zone 1 is held: external hold (tank_dosing)." in a["answer"]
+    assert "kill switch" not in a["answer"] and "manual fill" not in a["answer"]
+
+
+def test_the_controller_pass_hands_its_gates_to_the_rules_answer():
+    c, fake = _build({"num_zones": 1, "enable_flag": KILL},
+                     states={**_states(), KILL: ("off", {"friendly_name": "Room enabled"})})
+    ask(fake, "Why is zone 1 not watering?")
+    c.loop_once(NOW)
+    [a] = fake.sets[ANSWERS][1]["answers"]
+    assert "kill switch of this room (Room enabled) is off" in a["answer"]

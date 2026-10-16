@@ -72,7 +72,11 @@ WHY_FRESH_H = 1.0  # a question first seen older than this (the controller was a
 WHY = {"type": "why", "instructions": (
     "The grower asks why the controller or the AI assistant did something, or did not. Their question is the "
     "`question` in operator_text, and `zone_asked_about` says which zone it is about. Answer from this snapshot's "
-    "`decisions` (the assistant's decision record for the room, newest first) and its other facts only.")}
+    "`decisions` (the assistant's decision record for the room, newest first) and its other facts only. "
+    "`kill_switch` is the room's kill switch: when it is not on, no zone of the room is watered. `holds_on` lists "
+    "each external hold that is on or cannot be read: each one stops every shot. `zones` gives each zone's hold "
+    "(`block`) and decision from the controller's last pass. Name the kill switch or the hold when it is the "
+    "reason.")}
 
 
 def judges():
@@ -1491,9 +1495,33 @@ def _asked_at(question):
     return at if at.tzinfo is not None else at.astimezone()
 
 
-def why_state(c, room, question, now):
+def why_facts(gates, zone=None):
+    """The plain words a rules answer can give from the controller's gates (Controller._why_gates): a kill switch
+    that is not on, each hold that is on or cannot be read, and the hold the zone asked about met. "" when none."""
+    if not gates:
+        return ""
+    out = []
+    ks = gates.get("kill_switch") or {}
+    if ks.get("state") in ("off", "unreadable"):
+        out.append(f"The kill switch of this room ({ks.get('name')}) is "
+                   + ("off" if ks["state"] == "off" else "unreadable") + ", so no zone is watered.")
+    for h in gates.get("holds_on") or []:
+        out.append(f"The hold {h.get('name')} " + ("is on" if h.get("state") == "on" else "cannot be read")
+                   + ", which stops every shot.")
+    try:
+        z = int(zone)
+    except (TypeError, ValueError):
+        z = None
+    block = ((gates.get("zones") or {}).get(z) or {}).get("block")
+    if block:
+        out.append(f"Zone {z} is held: {block}.")
+    return " ".join(out)
+
+
+def why_state(c, room, question, now, gates=None):
     """The evidence for one why question: the grower's words (sent as operator text), the room's decision record,
-    each zone's phase and today's stage, with the "_brain" key the Claude route needs."""
+    each zone's phase and today's stage, what stops the room being watered (gates: the kill switch, the holds that
+    are on, each zone's hold this pass), with the "_brain" key the Claude route needs."""
     journal = getattr(c.jev, "journal", None)
     keep = ("t", "zone", "judge", "title", "kind", "verdict", "p", "agreed", "action", "result", "reason", "why")
     decisions = [{k: e[k] for k in keep if e.get(k) is not None}
@@ -1501,17 +1529,21 @@ def why_state(c, room, question, now):
     return {"question": question["question"], "zone_asked_about": question.get("zone") or "the whole room",
             "decisions": decisions or "no decisions recorded yet", "local_time": f"{now:%H:%M}",
             "phases": {z: room.state[z].get("phase") for z in room.zones}, "stage_today": stage_info(c, room, now),
+            **({"kill_switch": gates["kill_switch"], "holds_on": gates["holds_on"] or "none",
+                "zones": gates["zones"]} if gates else {}),
             "_brain": {"room": room.slug, "zone": "room", "judge": "why", "asked": now.isoformat(timespec="minutes"),
                        "siblings": room.__dict__.get("_jev_sib") or {},
                        "interlocks": "a question, not a decision: nothing is changed by the answer",
                        "data_quality": "the decision record as the controller keeps it"}}
 
 
-def why_task(c, room, now, ha_get, ha_set):
+def why_task(c, room, now, ha_get, ha_set, gates=None):
     """Ask why (haiku-brain-design section 5): each question the integration keeps for this room
     (sensor..._brain_questions) is asked of the brain once, at most WHY_PER_DAY a day, and answered on
     sensor..._brain_answers (the last WHY_KEEP, by the question's id). Under any brain but Claude Haiku, a question
-    the brain cannot ask, and one it could not answer, are answered with why not. Never changes a setting."""
+    the brain cannot ask, and one it could not answer, are answered with why not; under rules the answer also says
+    what stops the room being watered (why_facts), when something does. `gates` is the controller's
+    Controller._why_gates for this pass, called only when a question needs it. Never changes a setting."""
     brain = getattr(c, "jev", None)
     book = c.__dict__.setdefault("_why", {}).setdefault(room.slug, {"answers": None, "day": None, "asked": 0,
                                                                       "sent": set()})
@@ -1539,8 +1571,10 @@ def why_task(c, room, now, ha_get, ha_set):
         q = {**q, "question": str(q.get("question") or "")[:300]}
         if not on:
             status = getattr(brain, "status", None) if brain is not None else getattr(c, "brain_status", None)
+            facts = why_facts(gates() if gates is not None else None, q.get("zone"))
             answer(q, "Only the Claude Haiku brain answers questions. This room: "
-                   + getattr(status, "words", "Rules."), True)
+                   + getattr(status, "words", "Rules.") + (" " + facts if facts else ""), not facts,
+                   ("kill_switch", "holds_on", "zones") if facts else ())
             continue
         key = f"why:{room.slug}:{q['id']}"
         if q["id"] not in book["sent"]:
@@ -1552,7 +1586,8 @@ def why_task(c, room, now, ha_get, ha_set):
                 answer(q, f"Not asked: this room has asked its {WHY_PER_DAY} questions today.", True)
                 continue
             meter = getattr(brain.asker, "meter", None)
-            if not brain.asker.submit(key, why_state(c, room, q, now), {"why": dict(WHY)}):
+            if not brain.asker.submit(key, why_state(c, room, q, now, gates() if gates is not None else None),
+                                      {"why": dict(WHY)}):
                 answer(q, "Not asked: " + _STATE_WORDS.get(meter.state() if meter is not None else None,
                                                            "the AI assistant cannot ask now."), True)
                 continue
