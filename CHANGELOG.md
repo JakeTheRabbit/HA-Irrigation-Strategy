@@ -9,6 +9,27 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.12.2] - 2026-10-16
+
+Pair: **controller 3.12.2**. Five changes, #149 to #153. Released by the owner's decision without a staging soak (approved rehearsal).
+
+### 🌱 In plain English
+
+- **Compare runs now has charts.** For each grow week the two runs sit on top of each other: moisture peak and trough, dryback, pore EC, water per plant and shots a day.
+- **A hold switch that does not exist now says so by name.** The room still stops watering (fail-closed), and the controller names every missing hold entity at start and on a repairs card (CS-210), so you can fix the list.
+- **The AI assistant's "why" answers now name the kill switch and the holds** when they are the reason a zone did not water.
+- **If you copied an old judges list, the controller tells you once** which newer judges it leaves out, and suggests "all".
+- The docs describe the current AI assistant and the move to 3.12.0 or later.
+
+### 🔧 Technical notes
+
+- #152: Compare runs charts per grow week (VWC peak/trough, dryback from daily peak and trough, pore EC high/low, water per plant per day, shots per day from the shots-today counter), all from Home Assistant history; Dryback and Shots a day also become table columns. Stacks at 390 px; axe clean in light and dark.
+- #149: a hold entity missing from Home Assistant is named in the shot block message, a start-up warning and a repairs card (CS-210), proven in tests_ha. Behaviour stays fail-closed.
+- #151: the why-evidence includes the kill switch and every hold entity with its state.
+- #150: one log line when `jev_judges` omits newer judges; "all" already selects every judge.
+- #153: docs/JEV.md describes the current assistant (TypeSafe and Cloudflare marked deprecated); MOVING_FROM_JEV says 3.12.0.
+- No state-file or option change; an old install loads unchanged.
+
 ## [3.12.1] - 2026-10-16
 
 Pair: **controller 3.12.1**. One change, #147. Released by the owner's decision without a staging soak (approved rehearsal).

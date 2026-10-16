@@ -33,7 +33,10 @@ def test_the_enum_is_exactly_every_judges_keys_sorted():
     choice = tools["answer_choice"]["input_schema"]["properties"]
     assert choice["choice"]["enum"] == sorted(keys)
     assert choice["probabilities"]["items"]["properties"]["key"]["enum"] == sorted(keys)
-    assert list(tools) == ["answer_choice", "answer_yes_no", "write_report", "answer_why"]
+    assert list(tools) == ["answer_choice", "answer_yes_no", "write_report", "answer_why", "set_values"]
+    values = {k for vs in _questions().values() for v in vs if v["type"] == "values" for k in v["criteria"]}
+    key = tools["set_values"]["input_schema"]["properties"]["values"]["items"]["properties"]["key"]
+    assert key["enum"] == sorted(values)
 
 
 def test_the_question_catalogue_matches_the_judges():
@@ -42,6 +45,8 @@ def test_the_question_catalogue_matches_the_judges():
     assert data["choice_keys_by_question"] == {q: list(vs[0]["criteria"]) for q, vs in qs.items()
                                                if vs[0]["type"] == "choice"}
     assert data["yes_no_questions"] == [q for q, vs in qs.items() if vs[0]["type"] == "noul"]
+    assert data["values_keys_by_question"] == {q: list(vs[0]["criteria"]) for q, vs in qs.items()
+                                               if vs[0]["type"] == "values"}
 
 
 def test_strict_tools_have_every_property_required_and_no_numeric_limits():

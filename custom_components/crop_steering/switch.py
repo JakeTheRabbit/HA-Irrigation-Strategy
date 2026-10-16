@@ -16,7 +16,7 @@ from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.restore_state import RestoreEntity
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
+from .const import AI_POWERS, DOMAIN, CONF_NUM_ZONES, SOFTWARE_VERSION
 from .room import restored_state_is_ours, room_prefix
 
 _LOGGER = logging.getLogger(__name__)
@@ -74,7 +74,15 @@ BASE_SWITCH_DESCRIPTIONS = [
         icon="mdi:auto-mode",
         entity_registry_visible_default=False,
     ),
+    # What the AI assistant may do in this room (const.AI_POWERS), one switch each.
+    *(
+        SwitchEntityDescription(key=f"ai_power_{key}", name=name, icon="mdi:robot")
+        for key, name, _default in AI_POWERS
+    ),
 ]
+
+# A power's switch starts at its default: ON for what the AI assistant already did, OFF for new powers.
+AI_POWER_DEFAULTS = {f"ai_power_{key}": default for key, _name, default in AI_POWERS}
 
 
 def create_zone_switch_descriptions(num_zones: int) -> list[SwitchEntityDescription]:
@@ -198,6 +206,8 @@ class CropSteeringSwitch(SwitchEntity, RestoreEntity):
             self._attr_is_on = True  # Zones enabled by default
         elif description.key == "max_run_latch":
             self._attr_is_on = (entry.data or {}).get("max_run_latch") is True
+        elif description.key in AI_POWER_DEFAULTS:
+            self._attr_is_on = AI_POWER_DEFAULTS[description.key]
         else:
             self._attr_is_on = False
         # Max-run latch only: how many times Settings -> Repairs has reset it. The controller

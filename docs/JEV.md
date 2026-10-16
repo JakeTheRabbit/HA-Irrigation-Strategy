@@ -160,6 +160,41 @@ The code of the controller admits or refuses each answer. The AI assistant canno
 - **Probes:** the code sets a probe aside only after two answers in sequence that agree, and evidence from the code. The evidence is two shots with no increase while another zone increased, or a flat reading while water goes in.
 - **Setpoints:** see the next section.
 
+## Powers
+
+The owner ticks what the AI assistant may do in each room: one switch per power,
+`switch.crop_steering_<prefix>ai_power_<key>`, shown as a checklist on the dashboard's AI assistant page. With a power
+off, its judge still asks and its answer is advice in the decision log; the envelope refuses to act on it. A missing
+switch (an integration from before the powers) reads as its default, so a room updated in place does what it did.
+
+| Power | Default | What it lets the AI assistant do |
+|---|---|---|
+| `advance_phase` | on | start the morning ramp or the night dryback early (dawn, dusk) |
+| `ramp_control` | on | end the morning ramp (ramp) |
+| `set_probe_aside` | on | set a probe aside (probe) |
+| `ec_mode` | on | choose the EC steer's mode (salt) |
+| `nudge_setpoints` | on | one notch on the maintenance shot size or re-water point (setpoints, its band and notch budget unchanged) |
+| `plan_catch_up` | on | apply today's plan day while a stale probe holds it (plan) |
+| `set_targets_from_achievable` | off | set a zone's field capacity, peak target, re-water point, rescue floor and dryback target itself (targets) |
+| `tune_shot_sizes` | off | set a zone's ramp and maintenance shot sizes itself (shotsize) |
+
+The last two are the owner's full authority. Once a night, in the first 3 h after lights-off (Claude route), the
+targets and shot size judges are shown the zone's scorecard (each of the last 5 grow-days against the goal of each
+phase, hit or missed and by how much), the AI assistant's own earlier changes with the result it expected and what
+followed, and each setting's value and range; they answer with `set_values`: the values they want, each with its
+reason, the expected result and a confidence. With the power on, code writes them as given, clamped only to each
+setting's own range (a clamp is logged), the ladder from the top when the peak rises and from the bottom when it
+falls, read back, and named in the room's setpoint change log with the reason and the expected result. No other
+limit of code's applies: the doctrine's goal and rules for the owner's powers (POW-01 to POW-10) are in the cached
+system prompt, and the AI assistant is trusted to follow them. While `set_targets_from_achievable` is on and the brain
+can act, the Auto setpoints learner and the follower of the highest readings leave the ladder alone. Dry run still
+only reports. The watering safety (daily cap, kill switch, valve read-back, feed gate, max-run latch) is unchanged.
+
+The cached system prompt also carries "How this controller works" (`jev/controller_brief.md`), generated from the code
+by `python -m jev.controller_brief --write`: the phase machine, shot sizing, the gates in order, every setting, what
+each AI-writable setting moves downstream, the powers and every error code. A test fails when the code has a phase,
+setting, power or error code the brief lacks, or when the brief is not a fresh render.
+
 ## Who writes which setpoint
 
 With the **Auto setpoints** switch of a room on and no armed grow plan, each setpoint of a zone has one automatic writer. With the switch off, or with an armed grow plan, neither writer changes a setpoint.

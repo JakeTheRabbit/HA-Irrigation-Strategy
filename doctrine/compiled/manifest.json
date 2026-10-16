@@ -40,25 +40,25 @@
       "tokens_est_high": 521
     },
     "sections/01-role-and-hard-rules.md": {
-      "sha256": "0b35eb36a77a8df0a5168e9a9323858ea2eaa56f1bb2f24e62d0d67bb30f1457",
-      "chars": 8838,
-      "words": 1521,
-      "tokens_est_low": 2210,
-      "tokens_est_high": 2678
+      "sha256": "24c24ebe84fde88bee138c41b3351bbcdca8a2b796ec452907532e8917b5a8e6",
+      "chars": 9343,
+      "words": 1606,
+      "tokens_est_low": 2336,
+      "tokens_est_high": 2831
     },
     "sections/02-engine.md": {
-      "sha256": "0992d4e9d4a9473574ec7ba56b65539a904522f7ff2fb726cae2d775059a09cc",
-      "chars": 14611,
-      "words": 2483,
-      "tokens_est_low": 3653,
-      "tokens_est_high": 4428
+      "sha256": "a3556592499d8b2a8b00b209647470453ec44c84deb10081f6312cdafa676b66",
+      "chars": 15526,
+      "words": 2625,
+      "tokens_est_low": 3882,
+      "tokens_est_high": 4705
     },
     "sections/03-decisions.md": {
-      "sha256": "f78ed59f29da987e201a5067949853ff53fc8f0bb360874f2893b6e72b169dfc",
-      "chars": 10697,
-      "words": 1822,
-      "tokens_est_low": 2674,
-      "tokens_est_high": 3242
+      "sha256": "19787d570b1f3cc0abf2aa6b1e2fe8272f75b27be8abb7454d30babe8272888e",
+      "chars": 12353,
+      "words": 2091,
+      "tokens_est_low": 3088,
+      "tokens_est_high": 3743
     },
     "sections/04-symptoms.md": {
       "sha256": "edb3ed8286d1e65b1678e1e18058f2dc1e0289f872e0e4e2c5d64d7a18082b4f",
@@ -68,11 +68,11 @@
       "tokens_est_high": 2425
     },
     "sections/05-doctrine.md": {
-      "sha256": "6e62139f688ba3f79ba7354cd668b55a8cf77bf35b3bfb09a744caab67d5fa54",
-      "chars": 33267,
-      "words": 5354,
-      "tokens_est_low": 8317,
-      "tokens_est_high": 10081
+      "sha256": "c6c305aaa718e862653750d25109536a6266f297995750a6621ae0a7ab711e62",
+      "chars": 36015,
+      "words": 5826,
+      "tokens_est_low": 9004,
+      "tokens_est_high": 10914
     },
     "substrates/coco.md": {
       "sha256": "66bae098fdcff5875d44051359c76bf889b48c392126d472049c74fd7c5d651a",
@@ -98,60 +98,60 @@
   },
   "estimates": {
     "block_a": {
-      "chars": 75415,
-      "words": 12376,
-      "tokens_est_low": 18854,
-      "tokens_est_high": 22853
+      "chars": 81239,
+      "words": 13344,
+      "tokens_est_low": 20310,
+      "tokens_est_high": 24618
     },
     "block_a_plus_b": {
       "slab_default+generic": {
-        "chars": 78444,
-        "words": 12892,
-        "tokens_est_low": 19611,
-        "tokens_est_high": 23771
+        "chars": 84268,
+        "words": 13860,
+        "tokens_est_low": 21067,
+        "tokens_est_high": 25536
       },
       "slab_default+rockwool": {
-        "chars": 80144,
-        "words": 13150,
-        "tokens_est_low": 20036,
-        "tokens_est_high": 24286
+        "chars": 85968,
+        "words": 14118,
+        "tokens_est_low": 21492,
+        "tokens_est_high": 26051
       },
       "slab_default+coco": {
-        "chars": 80160,
-        "words": 13144,
-        "tokens_est_low": 20040,
-        "tokens_est_high": 24291
+        "chars": 85984,
+        "words": 14112,
+        "tokens_est_low": 21496,
+        "tokens_est_high": 26056
       },
       "rockwool_default+generic": {
-        "chars": 77905,
-        "words": 12804,
-        "tokens_est_low": 19476,
-        "tokens_est_high": 23608
+        "chars": 83729,
+        "words": 13772,
+        "tokens_est_low": 20932,
+        "tokens_est_high": 25372
       },
       "rockwool_default+rockwool": {
-        "chars": 79605,
-        "words": 13062,
-        "tokens_est_low": 19901,
-        "tokens_est_high": 24123
+        "chars": 85429,
+        "words": 14030,
+        "tokens_est_low": 21357,
+        "tokens_est_high": 25888
       },
       "rockwool_default+coco": {
-        "chars": 79621,
-        "words": 13056,
-        "tokens_est_low": 19905,
-        "tokens_est_high": 24128
+        "chars": 85445,
+        "words": 14024,
+        "tokens_est_low": 21361,
+        "tokens_est_high": 25892
       }
     }
   },
   "rule_counts": {
     "hard_rules": 11,
-    "rules": 136,
+    "rules": 148,
     "by_evidence": {
       "research": 21,
       "vendor": 20,
       "grower-practice": 64,
-      "product-rule": 42
+      "product-rule": 54
     },
     "jev_rules_audited": 123,
-    "statements_verified": 46
+    "statements_verified": 47
   }
 }

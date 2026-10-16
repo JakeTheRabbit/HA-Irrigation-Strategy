@@ -13,6 +13,8 @@ from datetime import datetime, timedelta
 from crop_steering_engine import p0_dryback
 from crop_steering_engine.core import p1_stall
 
+from . import powers as pw
+
 ORDER = {"P0": 0, "P1": 1, "P2": 2, "P3": 3}
 NEXT = {"P0": "P1", "P1": "P2", "P2": "P3"}
 FLAT_MIN = 30.0  # a probe reading unchanged this long can't show a dryback: the P0 timer decides
@@ -28,8 +30,8 @@ MOVE_REFUSALS = ("not a setting", "one notch at a time", "is outside its range")
 @dataclass(frozen=True)
 class Directive:
     judge: str
-    kind: str  # "advance" | "distrust" | "ec_mode" | "setpoint" | "alert" | "push" | "catch_up"
-    value: object  # the phase to go to, an EC mode, a setpoint move dict, an alert dict, True/False for a push
+    kind: str  # "advance" | "distrust" | "ec_mode" | "setpoint" | "targets" | "shot_size" | "alert" | "push" | "catch_up"
+    value: object  # the phase to go to, an EC mode, a move dict, an alert dict, True/False for a push
     why: str
     expires: datetime
 
@@ -57,6 +59,9 @@ def admit(d: Directive, ctx, confirmed=0, evidence_ok=False):
     agreeing verdicts in a row stand behind it; `evidence_ok` is the judge's own code-checked evidence."""
     if ctx.now > d.expires:
         return False, "expired"
+    power = pw.power_of(d)
+    if not pw.allowed(getattr(ctx, "powers", None), power):
+        return False, f"the owner has not given the AI assistant the power to {pw.WORDS[power]}: advice only"
     snap, p = ctx.snap, ctx.params
     if d.kind == "advance":
         target = d.value
@@ -113,6 +118,10 @@ def admit(d: Directive, ctx, confirmed=0, evidence_ok=False):
         return True, "the EC steer stays inside its own clamp"
     if d.kind == "setpoint":
         return _admit_setpoint(d, ctx)
+    if d.kind == "targets":
+        return _admit_targets(d, ctx)
+    if d.kind == "shot_size":
+        return _admit_shot_size(d, ctx)
     if d.kind in ("alert", "push"):
         return True, "alerts never move water"
     if d.kind == "catch_up":
@@ -238,3 +247,28 @@ def cools_down(why):
     """True when a refused setpoint move starts the cool-down: the move itself was wrong, not its timing (the
     switch, a pause, today's change, the budget) and not an edit by hand made while Jev was asked."""
     return any(r in why for r in MOVE_REFUSALS)
+
+
+
+def _admit_values(d, ctx, attr):
+    """The values the AI assistant set with the owner's power (targets, shot_size): admitted as given, only its own
+    settings and only numbers. No limit applies here: the owner's power hands them to code, which clamps each only to
+    the setting's own range (jev_bridge.apply_values). The power itself, and dry run, are checked before."""
+    view = getattr(ctx, attr, None) or {}
+    vals = (d.value or {}).get("values") if isinstance(d.value, dict) else None
+    if not view.get("current") or not isinstance(vals, dict) or not vals:
+        return False, "nothing to set on this zone"
+    if set(vals) - set(view["current"]):
+        return False, "only this question's own settings may be set"
+    if not all(isinstance(x, (int, float)) and not isinstance(x, bool) and x == x and abs(x) != float("inf")
+               for x in vals.values()):
+        return False, "a value is not a number"
+    return True, "the owner's power: written as given, inside each setting's own range"
+
+
+def _admit_targets(d, ctx):
+    return _admit_values(d, ctx, "targets")
+
+
+def _admit_shot_size(d, ctx):
+    return _admit_values(d, ctx, "shots")

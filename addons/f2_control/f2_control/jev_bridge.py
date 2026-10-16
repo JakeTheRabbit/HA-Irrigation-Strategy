@@ -35,6 +35,8 @@ from jev.judges.salt import SaltJudge
 from jev.judges.setpoints import CHOICES, MOVES, SHOT, THRESHOLD, SetpointsJudge
 from jev.judges.setpoints import band as setpoint_band
 from jev.judges.shot import ShotJudge
+from jev.judges import targets as targets_judge
+from jev.judges.targets import ShotSizeJudge, TargetsJudge
 from jev.judges.stage import StageJudge
 from jev.judges.zones import ZonesJudge
 from jev.envelope import Directive, admit
@@ -42,10 +44,14 @@ from jev.journal import Journal
 from jev.ledger import Ledger
 from jev import council
 from jev import plan_task as jev_plan
+from jev import powers as jev_powers
 from jev.setpoint_memory import SetpointMemory
 
 ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel", "balance", "feed", "report", "why",
-       "plan")
+       "plan", "targets", "shotsize")
+# The judges behind the two powers that came with the power switches: asked whatever jev_judges lists, because their
+# power switches (off until the owner turns them on) decide whether they act; off, they advise.
+POWER_JUDGES = ("targets", "shotsize")
 RETIRED = "alerts"  # the alert-urgency judge the decaying re-notify replaced: a copied old jev_judges still names it
 # The judges that came after it: an explicit list that still names it was written before them.
 SINCE_RETIRED = ("stage", "setpoints", "channel", "balance", "feed", "report", "why", "plan")
@@ -64,7 +70,14 @@ REPORT_AFTER_H = 3.0  # hours after lights-off: the setpoints judge has had its 
 REPORT_QUESTION = {"report": {"type": "report", "instructions": "Write the report for the grow-day that just ended "
                                                                 "with write_report."}}
 # The judges whose answers can act (the rest advise); empty on the panel while the brain cannot act.
-ACTING_JUDGES = ("dawn", "ramp", "salt", "dusk", "probe", "setpoints")
+ACTING_JUDGES = ("dawn", "ramp", "salt", "dusk", "probe", "setpoints", "targets", "shotsize")
+# Each acting judge's power (jev.powers): with it off the judge only advises.
+JUDGE_POWER = {"dawn": "advance_phase", "dusk": "advance_phase", "ramp": "ramp_control", "salt": "ec_mode",
+               "probe": "set_probe_aside", "setpoints": "nudge_setpoints", "targets": "set_targets_from_achievable",
+               "shotsize": "tune_shot_sizes"}
+AI_BY = "AI assistant"  # the writer the setpoint change log names for a power's write (who: brain, no overlay)
+DAYS_KEEP = 7  # grow-days of each zone's scorecard kept for the targets and shot size judges
+CHANGES_KEEP = 10  # the AI assistant's own changes kept per zone, with what it expected
 FRIENDLY = "AI assistant"
 WHY_PER_DAY = 20  # the questions a room may ask the brain a day; each is counted against the budget too
 WHY_KEEP = 5  # the answers published, as the integration keeps the questions
@@ -81,7 +94,8 @@ WHY = {"type": "why", "instructions": (
 
 def judges():
     return [DawnJudge(), RampJudge(), SaltJudge(), DuskJudge(), ProbeJudge(), ShotJudge(), NightJudge(),
-            ZonesJudge(), StageJudge(), SetpointsJudge(), ChannelJudge(), BalanceJudge()]
+            ZonesJudge(), StageJudge(), SetpointsJudge(), ChannelJudge(), BalanceJudge(), TargetsJudge(),
+            ShotSizeJudge()]
 
 
 def routes(options, cf):
@@ -200,9 +214,12 @@ def build(options, cf, state_path, log, status=None):
     wanted = str(options.get("jev_judges") or "all").replace(" ", "")
     allowed = set(ALL) if wanted in ("", "all") else set(wanted.split(",")) & set(ALL)
     _say_retired(wanted, allowed, log)
+    if status.provider == "claude_haiku":
+        allowed |= set(POWER_JUDGES)  # their power switches decide whether they act
     haiku = status.provider == "claude_haiku"
     if not haiku:
         allowed.discard("balance")  # its answer reaches the setpoints judge only through the Claude route's evidence
+        allowed -= set(POWER_JUDGES)  # set_values is a Claude tool: no legacy route can answer them
     arc = str(options.get("stage_arc") or DEFAULT_ARC).strip()
     try:
         rows, arc_note = stage_rows(arc), None
@@ -396,6 +413,9 @@ def zone_context(c, room, zone, snap, p, now, lights_on):
         channel=channel_words(c.jev, room.slug, zone, now),
         # read only in the night, where the Setpoints judge runs: an edit by hand is caught before it is asked
         setpoints=setpoint_view(c, room, zone, p, now) if st["phase"] == "P3" else None,
+        powers=room_powers(c, room, now),
+        targets=targets_view(c, room, zone, p, now) if st["phase"] == "P3" else None,
+        shots=shots_view(c, room, zone, p, now) if st["phase"] == "P3" else None,
     )
 
 
@@ -432,11 +452,15 @@ def tick(c, room, zone, snap, p, now, lights_on):
     -> {kind: Directive} for the controller's pass (advance, distrust, ec_mode)."""
     _hist(room, zone).add_reading(now, snap.vwc, snap.ec)
     readback(c, room, zone, now)
+    ai_readback(c, room, zone, now)
     guard_setpoints(c, room, zone, now)
     levers = judge_levers(c, room)
     _handover(c, room, zone, p, now, levers)
-    if c._no_touch_until(room, now) is not None:
-        return {}  # the room's no-touch window: nothing is asked and nothing acts until it ends; the rules carry on
+    # The room's no-touch window: nothing is asked and nothing acts until it ends, the rules carry on; the owner's
+    # target powers alone are not held by it (they set tomorrow's settings at night, not today's watering).
+    only = set(POWER_JUDGES) if c._no_touch_until(room, now) is not None else None
+    if only and not any(j.name in only for j in getattr(c.jev, "judges", ())):
+        return {}
     if haiku(c):
         if not c._on(room.enable_flag, False):
             return {}  # the kill switch is off: the engine decides alone, and nothing is asked (it costs money)
@@ -445,7 +469,7 @@ def tick(c, room, zone, snap, p, now, lights_on):
         c.jev.prompt.use(getattr(r, "substrate", "generic") for r in getattr(c, "rooms", [room]))
     ctx = zone_context(c, room, zone, snap, p, now, lights_on)
     out = {}
-    for d, _why in c.jev.tick(ctx):
+    for d, _why in (c.jev.tick(ctx, allowed=only) if only else c.jev.tick(ctx)):
         if d.kind == "alert":
             c._jev_alert(room, zone, d.judge, d.value)
         elif d.kind == "setpoint":
@@ -454,8 +478,12 @@ def tick(c, room, zone, snap, p, now, lights_on):
             else:
                 _note(c, room, zone, "would act", d.value.get("words", ""), "no action",
                       "the Auto setpoints learner holds this number today")
+        elif d.kind in ("targets", "shot_size"):
+            apply_values(c, room, zone, d, ctx, now)
         else:
             out[d.kind] = d
+    if "distrust" in out and getattr(c.jev, "setpoints", None) is not None:  # today's peak is then not trusted
+        _ai(c, room, zone)["distrusted_day"] = c._grow_day_start(room, now).isoformat()
     return out
 
 
@@ -485,12 +513,18 @@ def judge_levers(c, room=None):
         return ()
     if room is None:
         return (SHOT, THRESHOLD)
+    return (SHOT, THRESHOLD) if _acting_latch(c, room) else ()
+
+
+def _acting_latch(c, room):
+    """Whether the brain holds its numbers in `room` this grow-day: at start whenever it can act, off on the first pass
+    it cannot, back only at a lights-on at which it can (lights_on)."""
     held = c.jev.__dict__.setdefault("levers_held", {})
     if room.slug not in held:
         held[room.slug] = can_act(c)  # at start: with the judge whenever the brain can act then
     elif held[room.slug] and not can_act(c):
         held[room.slug] = False
-    return (SHOT, THRESHOLD) if held[room.slug] else ()
+    return held[room.slug]
 
 
 def _handover(c, room, zone, p, now, levers):
@@ -1036,6 +1070,7 @@ def panel(c, room, now):
     elif not getattr(brain, "_fallback_since", None):
         brain._fallback_since = now.isoformat(timespec="seconds")
     built = sorted(j.name for j in brain.judges)
+    powers = room_powers(c, room, now)
     no_touch = c._no_touch_until(room, now)
     out = {"provider": status.provider, "model": status.model, "mode": "dry_run" if brain.dry_run else "acting",
            "state": state, "state_words": words, "notice": status.notice, "key_set": status.key_set,
@@ -1043,12 +1078,14 @@ def panel(c, room, now):
            "no_touch_until": no_touch.isoformat(timespec="minutes") if no_touch else None,
            "stage_arc": {"id": getattr(brain, "arc", DEFAULT_ARC), "in_force": bool(getattr(brain, "arc_rows", STAGE_ROWS)),
                          "words": getattr(brain, "arc_note", None)},
-           "judges_acting": [j for j in built if j in ACTING_JUDGES and health == "ok"] if acting else [],
+           "judges_acting": [j for j in built if j in ACTING_JUDGES and health == "ok"
+                             and jev_powers.allowed(powers, JUDGE_POWER.get(j))] if acting else [],
            "judges_advising": [j for j in built if j not in ACTING_JUDGES]
            + (["feed"] if getattr(brain, "feed", None) else [])
            + (["report"] if getattr(brain, "report", False) else [])
            + (["why"] if getattr(brain, "why", False) else [])
-           + (["plan"] if getattr(brain, "plan", None) else [])}
+           + (["plan"] if getattr(brain, "plan", None) else []),
+           **powers_published(c, room, now)}
     if haiku(c):
         out["room_health"] = health
     entries = brain.journal.recent(room.slug, 1) if getattr(brain, "journal", None) is not None else []
@@ -1221,7 +1258,8 @@ def _plan_context(c, room, now, view):
         busy=bool(getattr(c, "_busy", False) or getattr(room, "shot_inflight", None)),
         room_hold=None if hold == "none" else hold, health=room_health(c, room, now)[0],
         no_touch=c._no_touch_until(room, now) is not None,
-        cooldown_until=datetime.fromisoformat(cool) if cool else None, bridge_day=adh.get("bridge_day"))
+        cooldown_until=datetime.fromisoformat(cool) if cool else None, bridge_day=adh.get("bridge_day"),
+        powers=room_powers(c, room, now))
 
 
 def _plan_catch_up(c, room, now, view, rec):
@@ -1465,7 +1503,7 @@ def publish_rules(c, room, now, ha_set):
         "provider": "rules", "state": status.state, "state_words": status.words, "key_set": status.key_set,
         "model": None, "mode": None, "fallback_since": status.since, "deprecated_route": status.deprecated_route,
         "notice": status.notice, "judges_acting": [], "stage": None, "plan": room.__dict__.get("_plan_panel"),
-        "friendly_name": FRIENDLY, "engine": PRODUCT})
+        **powers_published(c, room, now), "friendly_name": FRIENDLY, "engine": PRODUCT})
     for zone in room.zones:
         ha_set(f"sensor.crop_steering_{room.prefix}zone_{zone}_jev", "rules",
                {"judges": {}, "strict": [], "provider": "rules", "friendly_name": f"Zone {zone} AI assistant",
@@ -1483,7 +1521,7 @@ def lights_on(c, room, now):
     meter = getattr(brain.asker, "meter", None)
     if meter is not None:
         meter.lights_on(now.timestamp())
-    if owns_setpoints(c) and can_act(c):
+    if (owns_setpoints(c) or _judge(brain, "targets") is not None) and can_act(c):
         brain.__dict__.setdefault("levers_held", {})[room.slug] = True
 
 
@@ -1618,3 +1656,258 @@ def why_task(c, room, now, ha_get, ha_set, gates=None):
     ha_set(out_id, "asking" if pending else ("answered" if book["answers"] else "none"),
            {"answers": book["answers"], "pending": pending, "asked_today": book["asked"],
             "daily_limit": WHY_PER_DAY, "friendly_name": "AI assistant answers", "engine": PRODUCT})
+
+
+# ---------- the AI assistant's powers (docs/JEV.md, "Powers") ----------
+def room_powers(c, room, now=None):
+    """{power: on} for the room, read from its switches once a pass (a missing switch is the power's default);
+    `now` None reads this pass's, once read."""
+    held = room.__dict__.get("_ai_powers")
+    if held and (held[0] == now or now is None):
+        return held[1]
+    on = getattr(c, "_on", None)
+    out = jev_powers.read(on, room.prefix) if on is not None else dict(jev_powers.DEFAULTS)
+    room._ai_powers = (now, out)
+    return out
+
+
+def powers_published(c, room, now):
+    """The brain sensor's `powers` (each power, on or off, and its default) and `powers_active` (those on)."""
+    rows = jev_powers.published(room_powers(c, room, now))
+    return {"powers": rows, "powers_active": [r["key"] for r in rows if r["on"]]}
+
+
+def _ai(c, room, zone):
+    """The powers' memory for a zone, in jev_setpoints.json beside the Setpoints judge's (jev.setpoint_memory)."""
+    rec = c.jev.setpoints.zone(room.slug, zone)
+    ai = rec.get("ai") if isinstance(rec.get("ai"), dict) else None
+    if ai is None:
+        ai = rec["ai"] = {}
+    for k, v in (("written", {}), ("pending", []), ("days", []), ("changes", [])):
+        if not isinstance(ai.get(k), type(v)):
+            ai[k] = v
+    return ai
+
+
+def _owned(c, room, judge, power):
+    brain = getattr(c, "jev", None)
+    if brain is None or _judge(brain, judge) is None:
+        return False
+    return jev_powers.allowed(room_powers(c, room), power) and bool(_acting_latch(c, room))
+
+
+def targets_owned(c, room):
+    """True when the AI assistant sets the room's ladder itself: the targets judge runs, the room's
+    set_targets_from_achievable power is on and the brain can act. The Auto setpoints learner and the follower of the
+    highest readings then write none of field capacity, the P1 target and the re-water threshold
+    (controller._auto_tick); with the power off, they do as before."""
+    return _owned(c, room, "targets", "set_targets_from_achievable")
+
+
+def shots_owned(c, room):
+    """True when the AI assistant sets the room's shot sizes itself (tune_shot_sizes on, the brain able to act)."""
+    return _owned(c, room, "shotsize", "tune_shot_sizes")
+
+
+def _day_start(c, room, now):
+    day0 = c._grow_day_start(room, now)
+    day0 = day0 if isinstance(day0, datetime) else datetime.combine(day0, datetime.min.time())
+    return day0 + timedelta(hours=room.lights_on_hour)
+
+
+def _for_day(items, day):
+    return next((e for e in reversed(items or []) if isinstance(e, dict) and str(e.get("date")) == day), None)
+
+
+def record_day(c, room, zone, p, now):
+    """Once a grow-day, at night: the zone's scorecard for the grow-day that is ending, against each phase's goal.
+    P0: the dryback at the ramp's start (zone_history's morning record) against the dryback target; P1: the highest
+    trusted reading against the peak target, and the ramp's shots; P2: the settled pore EC against the stage's band;
+    P3: rescue shots the night before; uniformity: water per plant against the room's typical zone. A day is trusted
+    only with a trusted peak (no blind or set-aside probe, no CS-310 day) and a ramp that responded."""
+    ai = _ai(c, room, zone)
+    day = c._grow_day_start(room, now).isoformat()
+    if ai.get("day_recorded") == day:
+        return
+    st = room.state[zone]
+    learn = st.get("learn") if isinstance(st.get("learn"), dict) else {}
+    counted = (st.get("fc_follow") or {}).get("peak")
+    why = ("moisture rose from below (CS-310)" if counted is None else "no trusted reading" if not counted
+           else "the probe was set aside" if ai.get("distrusted_day") == day
+           else "the ramp did not respond as a ramp should" if learn.get("outcome") == "suspect" else None)
+    night = _for_day(st.get("night_hist"), day) or {}
+    plateau = _for_day(st.get("plateau_hist"), day) or {}
+    target_db = float(getattr(p, "dryback_target", 0.0) or 0.0)
+    actual_db = night.get("dryback_pct")
+    top = round(float(counted), 2) if counted else plateau.get("value")
+    stage = stage_info(c, room, now) if getattr(c, "jev", None) is not None else None
+    band = (stage or {}).get("pore_ec") or None
+    ec = st.get("ec_settled")
+    sib = room.__dict__.get("_jev_sib") or {}
+    lpp = sorted(v["litres_per_plant"] for v in sib.values() if v.get("litres_per_plant"))
+    mine = (sib.get(zone) or {}).get("litres_per_plant")
+    typical = lpp[len(lpp) // 2] if lpp else None
+    ratio = round(mine / typical, 2) if mine and typical else None
+    entry = {
+        "day": day, "trusted": why is None, "why": why,
+        "p0": {"target": target_db, "actual": None if actual_db is None else round(float(actual_db), 1),
+               "hit": None if actual_db is None or not target_db
+               else abs(float(actual_db) - target_db) <= max(2.0, 0.2 * target_db)},
+        "p1": {"target": round(float(p.p1_target), 2), "top": top, "shots": plateau.get("shots"),
+               "hit": None if not top else float(top) >= float(p.p1_target) - 0.5},
+        "p2": {"ec": None if ec is None else round(float(ec), 2), "band": list(band) if band else None,
+               "hit": None if ec is None or not band else band[0] <= float(ec) <= band[1]},
+        "p3": {"rescues": night.get("night_shots"),
+               "hit": None if night.get("night_shots") is None else not night["night_shots"]},
+        "uniformity": {"ratio": ratio, "hit": None if ratio is None else 0.85 <= ratio <= 1.15},
+    }
+    ai["days"] = ([d for d in ai["days"] if isinstance(d, dict) and d.get("day") != day] + [entry])[-DAYS_KEEP:]
+    ai["day_recorded"] = day
+    c.jev.setpoints.save()
+
+
+def _view(c, room, zone, p, now, judge, keys, power):
+    """What a values judge may set on the zone tonight: each setting's value now and its own range, the scorecard,
+    the AI assistant's earlier changes, the grow plan's intent and whether its power is on."""
+    brain = getattr(c, "jev", None)
+    if brain is None or _judge(brain, judge) is None or getattr(brain, "setpoints", None) is None:
+        return None
+    record_day(c, room, zone, p, now)
+    ai = _ai(c, room, zone)
+    current = {k: v for k in keys if (v := _zone_number(c, room, zone, k)) is not None}
+    if not current:
+        return None  # no per-zone numbers on this install: room-level values are the operator's, never ours
+    day = c._grow_day_start(room, now).isoformat()
+    plan = ("a grow plan owns this room's targets: follow the plan's values for today's stage"
+            if getattr(room, "strategy_required", False) else None)
+    return {"current": current, "limits": {k: c._number_range(room, zone, k) for k in current},
+            "days": list(ai["days"]), "changes": [x for x in ai["changes"] if x.get("judge") == judge],
+            "plan": plan, "power": jev_powers.allowed(room_powers(c, room, now), power),
+            "changed_today": ai.get(f"changed_{judge}") == day, "day": day}
+
+
+def targets_view(c, room, zone, p, now):
+    """What the targets judge may set tonight (ZoneContext.targets): the ladder, the rescue floor and the dryback
+    target of the zone's steering mode."""
+    db = targets_judge.VEG_DB if c._veg(room, zone) else targets_judge.GEN_DB
+    return _view(c, room, zone, p, now, "targets", (*targets_judge.LADDER_KEYS, db), "set_targets_from_achievable")
+
+
+def shots_view(c, room, zone, p, now):
+    """What the shot size judge may set tonight (ZoneContext.shots), with the zone's learned shot response."""
+    view = _view(c, room, zone, p, now, "shotsize", (targets_judge.P1S, targets_judge.P2S), "tune_shot_sizes")
+    if view is not None:
+        learn = room.state[zone].get("learn") if isinstance(room.state[zone].get("learn"), dict) else {}
+        view["gain"] = learn.get("gain")
+    return view
+
+
+def _power_note(c, room, zone, judge, verdict, action, result, reason):
+    journal = getattr(c.jev, "journal", None)
+    if journal is not None:
+        journal.add({"t": datetime.now().isoformat(timespec="seconds"), "room": room.slug, "zone": zone,
+                     "judge": judge, "title": {"targets": "Targets", "shotsize": "Shot size"}.get(judge, judge),
+                     "kind": "decision", "verdict": verdict, "p": None, "agreed": None, "action": action[:80],
+                     "result": result, "reason": reason[:120]})
+
+
+def _tell_setpoints(c, room, zone, suffix, old, value, now):
+    """A power moved one of the Setpoints judge's two numbers: its range moves with it (as with field capacity), so
+    the move is not taken for an edit by hand."""
+    mem = getattr(c.jev, "setpoints", None)
+    if mem is None or not owns_setpoints(c) or suffix not in (SHOT, THRESHOLD):
+        return
+    rec = mem.zone(room.slug, zone)
+    if suffix in rec["home"]:
+        rec["home"][suffix] = round(float(rec["home"][suffix]) + value - old, 2)
+    _written(mem, rec, suffix, old, value, now)
+
+
+def apply_values(c, room, zone, d, ctx, now):
+    """Write the values the AI assistant set, as given: each clamped only to its own range (the clamp is logged), the
+    ladder written from the top when the peak rises and from the bottom when it falls, so Home Assistant's own order
+    check takes each write; a write it refuses is tried again after the others, and one it refuses still is logged.
+    Each write names its reason and the expected result in the room's setpoint change log, is read back, and the
+    change is announced once."""
+    v = d.value
+    judge = d.judge
+    view = (ctx.targets if judge == "targets" else ctx.shots) or {}
+    ai = _ai(c, room, zone)
+    by = f"{AI_BY} ({'targets' if judge == 'targets' else 'shot sizes'})"
+    plan, clamped = {}, {}
+    for k, asked in v["values"].items():
+        lo, hi = c._number_range(room, zone, k)
+        val = round(min(hi, max(lo, float(asked))), 2)
+        if abs(val - float(asked)) > 1e-9:
+            clamped[k] = float(asked)
+        plan[k] = (float(view["current"][k]), val)
+    rising = plan.get(targets_judge.P1, (0.0, 0.0))[1] >= plan.get(targets_judge.P1, (0.0, 0.0))[0]
+    ladder = [k for k in targets_judge.LADDER_KEYS if k in plan]
+    order = (ladder if rising else ladder[::-1]) + [k for k in plan if k not in ladder]
+    todo, wrote = [k for k in order if abs(plan[k][1] - plan[k][0]) >= 0.005], []
+    while todo:
+        left = []
+        for k in todo:
+            old, new = plan[k]
+            reason = (v["reasons"].get(k) or "") + (f" (asked {clamped[k]:g}, clamped to its range)" if k in clamped
+                                                    else "")
+            if c._auto_write(room, zone, k, old, new, {}, now, by=by, reason=reason or None,
+                             expected=v.get("expected") or None):
+                wrote.append(k)
+                ai["written"][k] = new
+                ai["pending"] = [w for w in ai["pending"] if w.get("suffix") != k] + [_pending(k, old, new, by, now)]
+                _tell_setpoints(c, room, zone, k, old, new, now)
+            else:
+                left.append(k)
+        if len(left) == len(todo):
+            for k in left:
+                _power_note(c, room, zone, judge, "write refused", f"{k.replace('_', ' ')} {plan[k][0]:g} -> "
+                            f"{plan[k][1]:g}", "failed", "Home Assistant did not take it")
+            break
+        todo = left
+    for k, asked in clamped.items():
+        _power_note(c, room, zone, judge, "clamped", f"{k.replace('_', ' ')} {asked:g} -> {plan[k][1]:g}", "acted",
+                    "outside the setting's own range: written at its edge")
+    if wrote:
+        ai["changes"] = (ai["changes"] + [{
+            "judge": judge, "day": view.get("day"), "at": now.isoformat(timespec="seconds"),
+            "values": {k: list(plan[k]) for k in wrote}, "reasons": {k: v["reasons"].get(k) for k in wrote},
+            "expected": v.get("expected"), "confidence": v.get("confidence"), "clamped": clamped}])[-CHANGES_KEEP:]
+        ai[f"changed_{judge}"] = view.get("day")
+        words = ", ".join(f"{k.replace('_', ' ')} {plan[k][0]:g} -> {plan[k][1]:g}" for k in wrote)
+        c._notify_event("jev_setpoint", room, zone, words,
+                        f"The AI assistant set this itself, with the power the owner gave it. Expected: "
+                        f"{v.get('expected') or 'not said'}.")
+    c.jev.setpoints.save()
+
+
+def ai_readback(c, room, zone, now):
+    """Read back every write a power made (SF-25): landed, it is done; still the old value at its time, it is sent
+    again with a doubling wait, RETRIES times, then recorded as failed."""
+    mem = getattr(getattr(c, "jev", None), "setpoints", None)
+    if mem is None:
+        return
+    ai = _ai(c, room, zone)
+    if not ai["pending"]:
+        return
+    keep = []
+    for w in ai["pending"]:
+        cur = _zone_number(c, room, zone, w["suffix"])
+        frm, to = float(w["from"]), float(w["to"])
+        if cur is not None and abs(cur - frm) > 0.005:
+            continue  # landed, or set by hand since: nothing left to send
+        if now < datetime.fromisoformat(w["next"]):
+            keep.append(w)
+            continue
+        if w["tries"] < RETRIES:
+            w["tries"] += 1
+            w["next"] = (now + timedelta(seconds=PENDING_S * 2 ** w["tries"])).isoformat(timespec="seconds")
+            c._auto_write(room, zone, w["suffix"], frm, to, {}, now, by=w["by"])
+            keep.append(w)
+            continue
+        ai["written"][w["suffix"]] = frm
+        judge = "shotsize" if w["suffix"] in (targets_judge.P1S, targets_judge.P2S) else "targets"
+        _power_note(c, room, zone, judge, "write failed", f"{w['suffix'].replace('_', ' ')} {frm:g} -> {to:g}",
+                    "failed", f"Home Assistant still shows {frm:g} after {w['tries'] + 1} tries")
+    ai["pending"] = keep
+    mem.save()

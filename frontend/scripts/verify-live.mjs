@@ -77,6 +77,20 @@ for (const prefix of ["", "room_b_"]) {
     ...(prefix ? { controller_version: "0.16.1" } : {}),
   });
   put(flag, "on");
+  // What the AI assistant may do: Room B's integration has a switch per power at its default; the
+  // default room's is from before the powers.
+  if (prefix)
+    for (const [key, on] of [
+      ["advance_phase", "on"],
+      ["ramp_control", "on"],
+      ["set_probe_aside", "on"],
+      ["ec_mode", "on"],
+      ["nudge_setpoints", "on"],
+      ["plan_catch_up", "on"],
+      ["set_targets_from_achievable", "off"],
+      ["tune_shot_sizes", "off"],
+    ])
+      put(`switch.crop_steering_${prefix}ai_power_${key}`, on);
   put(`sensor.crop_steering_${prefix}activity_log`, "active", {
     feed: `12:30 ${prefix ? "room_b " : ""}Z1 P1 -> P2`,
   });
@@ -627,6 +641,82 @@ try {
     assert.equal(await page.locator("#desktop-room").inputValue(), "");
     assert.equal(await page.locator('input[type="number"]').count(), 0);
   });
+  await check(
+    "AI assistant powers: a checkbox per switch, switch.turn_off/turn_on, a refusal inline, 1440 and 390",
+    async () => {
+      const labels = [
+        "Start the next phase early",
+        "End the morning ramp",
+        "Set a probe aside",
+        "Change the EC steer",
+        "Adjust maintenance watering",
+        "Apply today's plan day",
+        "Set targets from what a zone reaches",
+        "Tune shot sizes",
+      ];
+      const id = (key) => `switch.crop_steering_room_b_ai_power_${key}`;
+      const box = (key) => page.locator(`[data-brain-powers] [data-power="${key}"] input`);
+      const settled = (key, checked) =>
+        page.waitForFunction(
+          ([selector, want]) => {
+            const input = document.querySelector(selector);
+            return input && input.checked === want && !input.disabled;
+          },
+          [`[data-brain-powers] [data-power="${key}"] input`, checked],
+        );
+      for (const width of [1440, 390]) {
+        await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
+        await page.goto(`${base}/dashboard.html?room=room_b#/today/ai`, {
+          waitUntil: "networkidle",
+        });
+        await connected();
+        const powers = page.locator("[data-brain-powers]");
+        await visible(powers);
+        assert.equal(await powers.getByRole("checkbox").count(), 8);
+        for (const label of labels)
+          await visible(powers.getByRole("checkbox", { name: label, exact: true }));
+        assert.equal(
+          await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+          true,
+          `no horizontal scroll at ${width}`,
+        );
+        await page.screenshot({ path: path.join(out, `live-ai-powers-${width}.png`), fullPage: true });
+      }
+      // On by default: unticking it switches it off in Home Assistant, and the box follows the readback.
+      let before = calls.length;
+      await box("advance_phase").click();
+      await settled("advance_phase", false);
+      assert.deepEqual(calls.slice(before), [
+        { path: "/api/services/switch/turn_off", entity_id: id("advance_phase") },
+      ]);
+      // Off by default: ticking it switches it on.
+      before = calls.length;
+      await box("tune_shot_sizes").click();
+      await settled("tune_shot_sizes", true);
+      assert.deepEqual(calls.slice(before), [
+        { path: "/api/services/switch/turn_on", entity_id: id("tune_shot_sizes") },
+      ]);
+      // Home Assistant refuses: the reason shows inline, and the box stays at the switch's real state.
+      failWrite = id("ec_mode");
+      await box("ec_mode").click();
+      await visible(page.locator("[data-brain-powers] [role=alert]").getByText("Fixture refused write"));
+      await settled("ec_mode", true);
+      assert.equal(states[id("ec_mode")].state, "on");
+      failWrite = "";
+      // A room whose integration has no power switches shows each default, read-only, and writes nothing.
+      before = calls.length;
+      await page.setViewportSize({ width: 1440, height: 1000 });
+      await page.locator("#desktop-room").selectOption("room:");
+      await visible(page.locator("[data-brain-powers] [data-missing]").first());
+      const old = page.locator("[data-brain-powers]");
+      await visible(old);
+      assert.equal(await old.getByRole("checkbox").count(), 8);
+      assert.equal(await old.locator("input:disabled").count(), 8);
+      assert.equal(await box("advance_phase").isChecked(), true);
+      assert.equal(await box("tune_shot_sizes").isChecked(), false);
+      assert.equal(calls.length, before);
+    },
+  );
   assert.deepEqual(errors, []);
   console.log(`PASS ${checks.length} mocked HA workflow groups.`);
 } catch (error) {

@@ -24,7 +24,7 @@ def expand(questions):
 @dataclass
 class Verdict:
     name: str
-    kind: str  # "choice" | "noul" | "score"
+    kind: str  # "choice" | "noul" | "score" | "values"
     label: object  # the choice key, True/False, or the rounded score level
     prob: float  # averaged probability of that label (for a score: its level's probability)
     confidence: float  # the lowest confidence any variant reported
@@ -34,6 +34,8 @@ class Verdict:
     probabilities: dict = field(default_factory=dict)
     labels: list = field(default_factory=list)  # each phrasing's own answer
     notes: list = field(default_factory=list)  # each phrasing's rationale (the Claude brain's; legacy answers have none)
+    values: dict = field(default_factory=dict)  # a values answer: {setting: {"value", "reason"}}
+    expected: str = ""  # a values answer: the result it expects tomorrow
 
     def firm(self, min_prob=0.6):
         """Both phrasings agree and the averaged probability of the answer is at least `min_prob`."""
@@ -64,6 +66,13 @@ def combine(answers, name):
         return None
     notes = [str(v["rationale"]) for v in vs if v.get("rationale")]
     kind = vs[0].get("type") or ("noul" if "noul" in vs[0] else "choice" if "choice" in vs[0] else "score")
+    if kind == "values":  # one reading (a single lane): the settings the brain set, or none to keep them
+        v = vs[0]
+        got = v.get("values") if isinstance(v.get("values"), dict) else {}
+        conf = float(v.get("confidence") or 0.0)
+        return Verdict(name, "values", "set" if got else "keep", round(conf, 3), round(conf, 3), True, 1,
+                       labels=["set" if got else "keep"], notes=notes, values=dict(got),
+                       expected=str(v.get("expected") or ""))
     try:
         if kind == "noul":
             ps = [float(v["noul"]) for v in vs]
