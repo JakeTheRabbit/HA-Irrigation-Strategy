@@ -4,6 +4,8 @@ from copy import deepcopy
 from unittest.mock import AsyncMock
 
 import pytest
+from aiohttp import connector
+from aiohttp.resolver import ThreadedResolver
 from homeassistant.core import Context
 from homeassistant.exceptions import HomeAssistantError
 from test_setup_entry import _install
@@ -52,7 +54,12 @@ async def test_watering_blocks_setup_with_actionable_validation_and_preserves_se
         )
     assert (entry.data, entry.options) == before
     assert hass.states.get(ENGINE).state == "on"
-    client = await hass_ws_client(hass)
+    # This client only connects to the fixture's numeric loopback address. Avoid
+    # creating pycares' process-long shutdown thread for an unused DNS resolver:
+    # the oldest HA pytest plugin correctly rejects it as a leaked test thread.
+    with monkeypatch.context() as transport:
+        transport.setattr(connector, "DefaultResolver", ThreadedResolver)
+        client = await hass_ws_client(hass)
     await client.send_json_auto_id(
         {
             "type": "call_service",
