@@ -1,7 +1,7 @@
 # Troubleshooting
 
 A notification or Repairs card that ends with a code such as **CS-101**: look the code up in
-[Error codes](ERROR_CODES.md) (the same list is in the dashboard under **Help & tools → Error codes**)
+[Error codes](ERROR_CODES.md) (the same list is in the dashboard under **Settings & help → Help → Error codes**)
 for what it means, what happens to watering meanwhile, the likely causes and what to do.
 
 | Symptom                                            | Check and action                                                                                                                                                                                                                                                                                                                                                                        |
