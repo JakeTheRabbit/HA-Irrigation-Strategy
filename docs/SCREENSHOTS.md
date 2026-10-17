@@ -2,9 +2,13 @@
 
 [Open the interactive demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1).
 
-Captured on 15 October 2026 from the compiled application with isolated demo data and inherited Home Assistant dark-theme variables. These are current UI examples, not photographs or live facility readings.
+Captured on 18 October 2026 from `www/dashboard.html?demo=1`, with isolated sample data, a fixed 15:50 local clock and the light theme. These are current UI examples, not photographs or live facility readings.
 
-## Overview
+## Overview: all zones
+
+![All rooms and zones grouped by room](../img/all-zones.png)
+
+## Overview: selected room
 
 ![Overview](../img/operator-dashboard.png)
 
@@ -18,7 +22,7 @@ Captured on 15 October 2026 from the compiled application with isolated demo dat
 
 ## Tank level and watering
 
-![The tank's level over 7 days with each zone's shots, the pump's runs, the tank filling and each recorded fill](../img/tank-level.png)
+![The tank's level over 24 hours with each zone's shots, the pump's runs, the tank filling and each recorded fill](../img/tank-level.png)
 
 ## Water use per zone
 
@@ -28,19 +32,19 @@ Captured on 15 October 2026 from the compiled application with isolated demo dat
 
 ![Nutrient stock tanks with their levels, low marks and batches left](../img/stock-tanks.png)
 
-## Irrigation plan: Schedule and combined VWC/EC curve
+## Irrigation: Calendar and combined VWC/EC curve
 
 ![Zone planning and steering controls](../img/grow-plan.png)
 
-## Irrigation plan: Today, with the recorded zone and the projected day
+## Irrigation: Current day, recorded evidence and projected day
 
 ![Targets, recorded VWC/EC and the projected P0-P3 day on one graph](../img/plan-graph.png)
 
-## Recorded sensor history beside the setpoints
+## History: recorded sensor explorer
 
-![24 h / 72 h / 7 d probe history with setpoint lines, peaks and troughs](../img/sensor-history.png)
+![History explorer with recorded VWC and pore EC, range selection and previous-run overlays](../img/sensor-history.png)
 
-## Irrigation plan: Today beside the plan graph
+## Irrigation: Current day beside the plan graph
 
 ![Saved and draft targets with the review bar](../img/manual-setpoints.png)
 
@@ -64,4 +68,6 @@ Captured on 15 October 2026 from the compiled application with isolated demo dat
 
 ![Mobile room overview](../img/mobile-overview.png)
 
-Reproduce these captures by building the frontend and running the browser checks in `frontend/scripts/` (`verify-workspace.mjs`, `verify-steering-visuals.mjs`, `verify-dashboard.mjs`, `verify-tank-status.mjs` and `verify-recipe-library.mjs`); each writes its screenshots into `img/`. The README's tour (`img/jev-*.png`) comes from `capture-readme.mjs`.
+Reproduce every published screenshot with `node frontend/scripts/capture-readme.mjs` after building the frontend. The script reads only the checked-out compiled demo, blocks external and Home Assistant API requests, and fails on browser runtime errors. It writes all 26 screenshots to `img/` and records their route, selector, viewport and source SHA-256 in [the screenshot manifest](../img/screenshots.json). The logo is a brand asset and is not a dashboard capture.
+
+The stable filenames are shared by README, this gallery and the website. Copy the images from this publication set when refreshing the website. Never use screenshots from `output/ha-ui-deploy`, real Home Assistant sessions or private facility data. Browser verification scripts also create test evidence and may overwrite individual images; run the publication capture last, after verification, to publish one consistent set.

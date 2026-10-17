@@ -1,15 +1,15 @@
-/** The README's tour screenshots (img/jev-*.png), captured from the compiled dashboard's isolated
- * demo at a fixed clock, so a change to the demo or its words can be recaptured with one command:
- * build the frontend, then run `node frontend/scripts/capture-readme.mjs`. Nothing leaves the page. */
+/** Publication images from the checked-out compiled demo only. Build, then run this file.
+ * No live URL override or Home Assistant credential is accepted. */
+import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { readFile } from "node:fs/promises";
+import { readFile, writeFile } from "node:fs/promises";
+import { createHash } from "node:crypto";
+import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
-
-const html = await readFile(new URL("../../www/dashboard.html", import.meta.url));
-const img = (name) =>
-  new URL(`../../img/${name}`, import.meta.url).pathname.replace(/^\/([A-Za-z]:)/, "$1");
+const source = new URL("../../www/dashboard.html", import.meta.url);
+const html = await readFile(source);
 const server = createServer((req, res) => {
-  res.writeHead(200, { "Content-Type": "text/html" });
+  res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   res.end(html);
 });
 await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
@@ -18,52 +18,138 @@ const browser = await chromium.launch({
   headless: true,
   ...(process.platform === "win32" ? { channel: "chrome" } : {}),
 });
-
-/** A page on the demo at 3:50 PM, mid-day in Room A, in the light theme. */
-async function open(viewport, deviceScaleFactor) {
-  const page = await browser.newPage({ viewport, deviceScaleFactor, colorScheme: "light" });
-  await page.clock.setFixedTime(new Date(2026, 8, 28, 15, 50, 0));
-  await page.route("**/*", (route) =>
-    route.request().url().startsWith(origin) ? route.continue() : route.abort(),
-  );
-  return page;
-}
-const go = async (page, route) => {
+const forbidden = [],
+  errors = [],
+  captures = [];
+const context = await browser.newContext({
+  viewport: { width: 1440, height: 1000 },
+  deviceScaleFactor: 1,
+  colorScheme: "light",
+  reducedMotion: "reduce",
+});
+await context.route("**/*", (route) => {
+  const u = new URL(route.request().url());
+  if (u.origin !== origin || u.pathname.startsWith("/api/")) {
+    forbidden.push(u.origin + u.pathname);
+    return route.abort();
+  }
+  return route.continue();
+});
+const page = await context.newPage();
+page.setDefaultTimeout(15000);
+page.on("pageerror", (e) => errors.push(e.message));
+await page.clock.setFixedTime(new Date(2026, 9, 18, 15, 50));
+async function go(route) {
   await page.goto(`${origin}/dashboard.html?demo=1#/${route}`, { waitUntil: "networkidle" });
   await page.locator("main").waitFor();
-};
-
+  await page.evaluate(() => document.fonts.ready);
+}
+async function shot(name, selector) {
+  await page.evaluate(() => {
+    document.activeElement?.blur();
+    window.scrollTo(0, 0);
+  });
+  const target = selector ? page.locator(selector).first() : page;
+  if (selector) await target.waitFor({ state: "visible" });
+  await target.screenshot({
+    path: fileURLToPath(new URL(`../../img/${name}.png`, import.meta.url)),
+    ...(selector ? {} : { fullPage: name === "all-zones" }),
+  });
+  captures.push({
+    file: `img/${name}.png`,
+    route: new URL(page.url()).hash,
+    viewport: page.viewportSize(),
+    selector: selector ?? (name === "all-zones" ? "full page" : "viewport"),
+  });
+}
 try {
-  const page = await open({ width: 1440, height: 680 }, 1.5);
-  await go(page, "today");
-  await page.locator("[data-jev-today]").waitFor();
-  await page.screenshot({ path: img("jev-today.png") });
-
-  await go(page, "zone/1");
-  const day = page.locator("[data-day-timeline]");
-  await day.locator('[data-layer="yesterday"]').waitFor();
-  await day.screenshot({ path: img("jev-zone-day.png") });
-  await page.locator("[data-zone-jev]").screenshot({ path: img("jev-zone-panel.png") });
-
-  await go(page, "plan/targets");
-  await page.locator(".targets-panel").screenshot({ path: img("jev-plan-targets.png") });
-  await go(page, "plan/schedule");
-  await page.locator(".grow-stages").screenshot({ path: img("jev-stages.png") });
-
-  await go(page, "history/timeline");
+  await go("all-zones");
+  await shot("all-zones");
+  await go("today");
+  await shot("operator-dashboard");
+  await shot("jev-today");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await shot("mobile-overview");
+  await shot("jev-today-phone");
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await go("zone/1");
+  await shot("jev-zone-day", "[data-day-timeline]");
+  await shot("jev-zone-panel", "[data-zone-why]");
+  await go("plan/targets");
+  await shot("irrigation-workspace");
+  await shot("manual-setpoints");
+  await shot("plan-graph", ".planning-curve");
+  await shot("jev-plan-targets", ".targets-panel");
+  await go("plan/schedule");
+  await shot("grow-plan");
+  await page.locator("details.irrigation-stage-guide > summary").click();
+  await shot("jev-stages", ".grow-stages:visible");
+  const advanced = page.locator("details.plan-advanced");
+  if ((await advanced.getAttribute("open")) === null)
+    await advanced.locator(":scope > summary").click();
+  await page.getByRole("tab", { name: "Recipes", exact: true }).click();
+  const library = page.locator(".recipe-library");
+  if ((await library.getAttribute("open")) === null)
+    await library.locator("summary").first().click();
+  await shot("recipe-library", ".recipe-library");
+  await go("history/timeline");
+  await shot("sensor-history", ".history-explorer");
   const types = page.getByRole("group", { name: "Record type" });
   await types.getByRole("button", { name: "AI assistant", exact: true }).click();
-  await page.locator(".timeline-panel").screenshot({ path: img("jev-history.png") });
+  await shot("jev-history", ".timeline-panel");
   await types.getByRole("button", { name: "Setpoints", exact: true }).click();
-  await page.locator(".timeline-panel").screenshot({ path: img("jev-history-setpoints.png") });
-
-  await go(page, "equipment/probes");
-  await page.locator(".probes-status").screenshot({ path: img("jev-equipment.png") });
-
-  const phone = await open({ width: 390, height: 844 }, 2);
-  await go(phone, "today");
-  await phone.screenshot({ path: img("jev-today-phone.png") });
-  console.log("Captured the README's 9 demo screenshots into img/.");
+  await shot("jev-history-setpoints", ".timeline-panel");
+  await go("history/water");
+  await shot("water-use");
+  await go("history/compare");
+  await shot("run-comparison");
+  await go("equipment/probes");
+  await shot("jev-equipment", ".probes-status");
+  await go("equipment/stock");
+  await shot("stock-tanks");
+  await go("equipment/setup");
+  await shot("rooms-setup");
+  await go("equipment/feed");
+  await shot("tank-status", "[data-tank-status]");
+  await page.locator("[data-tank-level-chart] .tank-level-svg").waitFor();
+  await shot("tank-level", "[data-tank-level-chart]");
+  await page
+    .locator("[data-tank-status]")
+    .getByRole("button", { name: "History", exact: true })
+    .click();
+  await page.getByRole("dialog", { name: "Tank EC and pH" }).waitFor();
+  await shot("tank-history", '[role="dialog"]');
+  await go("equipment/setup");
+  await page.getByRole("button", { name: "Switch room off…", exact: true }).click();
+  await page.getByRole("button", { name: /^Apply 1 change/ }).click();
+  await page.getByRole("button", { name: "Switch room on…", exact: true }).waitFor();
+  await page.evaluate(() => {
+    location.hash = "#/today";
+  });
+  await page.locator(".room-off-banner").waitFor();
+  await shot("room-off");
+  assert.deepEqual(
+    forbidden,
+    [],
+    "publication capture must not request external or HA API resources",
+  );
+  assert.deepEqual(errors, [], "no browser runtime errors");
+  await writeFile(
+    new URL("../../img/screenshots.json", import.meta.url),
+    JSON.stringify(
+      {
+        source: "www/dashboard.html?demo=1",
+        sourceSha256: createHash("sha256").update(html).digest("hex"),
+        fixedLocalTime: "2026-10-18T15:50:00",
+        captures,
+      },
+      null,
+      2,
+    ) + "\n",
+  );
+  console.log(
+    `Captured ${captures.length} publication images from the isolated compiled demo; no external/API requests or runtime errors.`,
+  );
 } finally {
   await browser.close();
   server.close();

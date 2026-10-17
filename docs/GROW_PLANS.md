@@ -10,7 +10,7 @@ A more vegetative irrigation approach generally keeps water more available; gene
 
 ## Build a grow
 
-1. Select the room, then **Irrigation plan → Schedule**. Set each zone's grow start date.
+1. Select the room, then **Irrigation → Calendar**. Set each zone's grow start date.
 2. Open **Endpoint profiles**. Review both endpoint columns; duplicate a profile when a zone needs different bounds. A shared profile affects every schedule block referencing it.
 3. In **Schedule & curve**, select a zone row and week. Set its profile and steering slider. Switch to **Days** for exceptions. Editing a range splits existing blocks and preserves surrounding days.
 4. Review the combined planning curve and hydraulic estimates below. The same selected date, zone and interpolated parameters drive both the curve and preview.
@@ -55,7 +55,7 @@ are skipped.
 - **EC axis:** root-zone conductivity in mS/cm. P0/P1/P2 references are distinct from the supply tank's feed EC. There is no independent scheduled P3 EC target: overnight, the dashed EC line interpolates from the last daytime reference to the next morning's. It is not a predicted salt response.
 - **Morning dryback:** relative to the peak. Formula: (peak − current VWC) / peak × 100. A peak of 60% and a dryback target of 10% gives a 54% VWC reference, a drop of six percentage points.
 - **Phase windows:** show configured wait/shot timing where supplied. Approximate layout windows are explained beneath the chart when a parameter is missing. Actual phase transitions depend on sensor conditions.
-- **The day, phase by phase:** the VWC line is drawn the way the controller runs the day. P0 keeps drying after lights-on, P1 climbs one step per shot, P2 fires a shot each time VWC falls to its threshold, and P3 dries down overnight to the next lights-on. Shot timing comes from a dry-down rate: the zone's own measured rate on **Today**, a stated nominal rate (2 points an hour with lights on, 1 with lights off) where no zone history is available, as on **Schedule**. The P3 emergency floor stays a separate line. If a P2 threshold sits far under the P1 target, few or no P2 shots project, and the graph says why and names the threshold that would give them.
+- **The day, phase by phase:** the VWC line is drawn the way the controller runs the day. P0 keeps drying after lights-on, P1 climbs one step per shot, P2 fires a shot each time VWC falls to its threshold, and P3 dries down overnight to the next lights-on. Shot timing comes from a dry-down rate: the zone's own measured rate on **Overview › Selected room**, a stated nominal rate (2 points an hour with lights on, 1 with lights off) where no zone history is available, as on **Calendar**. The P3 emergency floor stays a separate line. If a P2 threshold sits far under the P1 target, few or no P2 shots project, and the graph says why and names the threshold that would give them.
 - **Shot size on the graph:** each riser assumes the whole shot is retained unless the zone has a learned gain; drainage and actual substrate response can differ. Hover a riser for its time and size.
 
 Change a slider, profile value or supported graph handle and the preview updates immediately. Graph handles edit the selected profile's endpoints as explained in the UI; check shared profile references. Editing the graph does not directly write irrigation hardware.
@@ -64,9 +64,9 @@ This is a projection from setpoints and a dry-down rate. It does not predict upt
 
 ## See changes while editing manual setpoints
 
-Open **Irrigation plan → Today** and select a zone. The daily graph stays beside the phase controls on a wide screen. The saved reference and draft are shown separately: changing the P3 emergency floor moves its line immediately, while the saved line remains for comparison. Changing a mode uses that mode's dryback and EC values. A shared room value is used only when the controller has no zone-specific value.
+Open **Irrigation → Current day** and select a zone. The daily graph stays beside the phase controls on a wide screen. The saved reference and draft are shown separately: changing the P3 emergency floor moves its line immediately, while the saved line remains for comparison. Changing a mode uses that mode's dryback and EC values. A shared room value is used only when the controller has no zone-specific value.
 
-Graph edits and form edits share one draft. Invalid fields remain visibly invalid; they do not become zero or silently fall back to a different room. Review and apply still controls when values reach Home Assistant. When a schedule owns the room, Today shows its effective targets read-only and hides manual fallback inputs. Use Schedule to edit dated targets.
+Graph edits and form edits share one draft. Invalid fields remain visibly invalid; they do not become zero or silently fall back to a different room. Review and apply still controls when values reach Home Assistant. When a schedule owns the room, Current day shows its effective targets read-only and hides manual fallback inputs. Use Calendar to edit dated targets.
 
 ## Compare a run with targets or a previous run
 

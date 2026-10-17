@@ -1239,7 +1239,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 **What to do**
 
 - CAUTION: Do not leave the plan in this hold for many days. The zones get only safety shots, and the crop steering stops.
-- Open Plan › Schedule in the Crop Steering sidebar.
+- Open Irrigation › Calendar in the Crop Steering sidebar.
 - Read the reason.
 - Correct the cause.
 - If the error stays, disarm the plan and arm it again.

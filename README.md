@@ -19,7 +19,7 @@ You can also use the AI assistant. The AI assistant is optional and uses Claude 
 
 This software operates real pumps and valves on live plants. It operates them when nobody is in the room.
 
-> **WARNING:** Do not use the software as an emergency stop. Use the physical shutdown procedure of your installation. The "Watering" switch and the "Room" switch do not isolate the electrical power.
+> **WARNING:** Do not use the software as an emergency stop. Use the physical shutdown procedure of your installation. The "Watering" switch and the "Room in use" control do not isolate the electrical power.
 
 > **WARNING:** Isolate the electrical power before you do work on a pump, a valve or the wiring. Water and mains power near each other can cause an electric shock.
 
@@ -185,7 +185,7 @@ A Home Assistant administrator does the setup in **Equipment › Setup**. Pair t
 11. Make sure that the kill switch and the equipment of the room are off.
 12. Select **Review configuration**, then **Save configuration**.
 13. Wait for **Mapping acknowledged**. A saved setup and an accepted setup are different states.
-14. Examine **Today** and **Equipment › Probes**.
+14. Examine **Overview › Selected room** and **Equipment › Probes**.
 15. Set the lights-on and lights-off hours of the room.
 16. Examine the water limits, the shot sizes and the rescue floor of each zone.
 17. Set the "Watering" switch in the top bar to on.
@@ -201,8 +201,8 @@ The dashboard is the **Crop Steering** page in the Home Assistant sidebar. It ha
 Do these steps each day:
 
 1. Open **Overview › All zones** to see every configured room and zone together. Paused rooms remain visible. Select a zone to open its room and detail page.
-2. Read what the AI assistant changed today.
-3. Open each flagged zone from its card. Read its numbers, its day chart and its **Controls**.
+2. Open each flagged zone from its card. Read its numbers, its day chart and **Why / next action**.
+3. Use **History › Timeline** for controller and AI changes.
 4. Change targets only in **Irrigation › Current day**, through the review.
 5. Examine the readback after each change.
 6. Once each day, or after a change, examine **Equipment › Probes** and **Stock tanks**.
@@ -213,14 +213,14 @@ Do these steps each day:
 
 Choose **Settings & help › Settings › Display › Default view** to open another workspace by default. The preference is saved in this browser. Bookmarks and notification links take precedence; choosing a default never redirects an explicit page link. **Overview › Selected room** opens Today for the selected room.
 
-### Today
+### Selected room
 
-**Today** answers one question: is the room correct, and does a zone need you?
+**Overview › Selected room** answers one question: is the room correct, and does a zone need you?
 
 - **The room line** shows the "Watering" switch, the stage and the day of flower, and the steering mode. It also shows the pore EC range of the stage, the lights-off time, the phases of the zones and the alerts.
 - **The card of each zone** shows the VWC now and a line of the day. A bar shows the VWC against the rescue floor, the re-water point and the peak target. The card also shows the pore EC, the water for each plant against the room, the last shot and the next event.
 - A card has a coloured edge and a warning line only when the zone needs you.
-- **Changes of the AI assistant today** shows the last three changes. **History** has the rest.
+- **History › Timeline** holds controller and AI changes; **Why / next action** explains the selected zone.
 
 ### The page of a zone
 
@@ -250,7 +250,7 @@ Current-day targets and future schedules share one workspace, one zone selector 
 
 **Irrigation › Current day** shows all the targets of a zone, phase by phase. All edits stay in a local draft. A review shows the old and the new values before the dashboard writes them. When Auto setpoints is on, a chip shows the range that the AI assistant can use.
 
-**Irrigation › Calendar** shows **This flower by stage**: the stage arc for each zone. The highlighted row is the stage of today. A grow plan can change the targets of each zone week by week or day by day. You save a plan as a draft, then you arm it. An armed plan starts at the next lights-on. The arm action does not set the kill switch to on.
+**Irrigation › Calendar** includes an expandable **Stage guide** showing **This flower by stage**: the stage arc for each zone. The highlighted row is the stage of today. A grow plan can change the targets of each zone week by week or day by day. You save a plan as a draft, then you arm it. An armed plan starts at the next lights-on. The arm action does not set the kill switch to on.
 
 ### History
 

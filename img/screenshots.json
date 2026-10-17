@@ -1,0 +1,241 @@
+{
+  "source": "www/dashboard.html?demo=1",
+  "sourceSha256": "09b97f56bb4fc2cf86c36a64e94c7ee22dbb2587b04b7057b5be0842fc547e1d",
+  "fixedLocalTime": "2026-10-18T15:50:00",
+  "captures": [
+    {
+      "file": "img/all-zones.png",
+      "route": "#/all-zones",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "full page"
+    },
+    {
+      "file": "img/operator-dashboard.png",
+      "route": "#/today",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "viewport"
+    },
+    {
+      "file": "img/jev-today.png",
+      "route": "#/today",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "viewport"
+    },
+    {
+      "file": "img/mobile-overview.png",
+      "route": "#/today",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "selector": "viewport"
+    },
+    {
+      "file": "img/jev-today-phone.png",
+      "route": "#/today",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "selector": "viewport"
+    },
+    {
+      "file": "img/jev-zone-day.png",
+      "route": "#/zone/1",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "[data-day-timeline]"
+    },
+    {
+      "file": "img/jev-zone-panel.png",
+      "route": "#/zone/1",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "[data-zone-why]"
+    },
+    {
+      "file": "img/irrigation-workspace.png",
+      "route": "#/plan/targets",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "viewport"
+    },
+    {
+      "file": "img/manual-setpoints.png",
+      "route": "#/plan/targets",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "viewport"
+    },
+    {
+      "file": "img/plan-graph.png",
+      "route": "#/plan/targets",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": ".planning-curve"
+    },
+    {
+      "file": "img/jev-plan-targets.png",
+      "route": "#/plan/targets",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": ".targets-panel"
+    },
+    {
+      "file": "img/grow-plan.png",
+      "route": "#/plan/schedule",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "viewport"
+    },
+    {
+      "file": "img/jev-stages.png",
+      "route": "#/plan/schedule",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": ".grow-stages:visible"
+    },
+    {
+      "file": "img/recipe-library.png",
+      "route": "#/plan/schedule",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": ".recipe-library"
+    },
+    {
+      "file": "img/sensor-history.png",
+      "route": "#/history/timeline",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": ".history-explorer"
+    },
+    {
+      "file": "img/jev-history.png",
+      "route": "#/history/timeline",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": ".timeline-panel"
+    },
+    {
+      "file": "img/jev-history-setpoints.png",
+      "route": "#/history/timeline",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": ".timeline-panel"
+    },
+    {
+      "file": "img/water-use.png",
+      "route": "#/history/water",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "viewport"
+    },
+    {
+      "file": "img/run-comparison.png",
+      "route": "#/history/compare",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "viewport"
+    },
+    {
+      "file": "img/jev-equipment.png",
+      "route": "#/equipment/probes",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": ".probes-status"
+    },
+    {
+      "file": "img/stock-tanks.png",
+      "route": "#/equipment/stock",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "viewport"
+    },
+    {
+      "file": "img/rooms-setup.png",
+      "route": "#/equipment/setup",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "viewport"
+    },
+    {
+      "file": "img/tank-status.png",
+      "route": "#/equipment/feed",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "[data-tank-status]"
+    },
+    {
+      "file": "img/tank-level.png",
+      "route": "#/equipment/feed",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "[data-tank-level-chart]"
+    },
+    {
+      "file": "img/tank-history.png",
+      "route": "#/equipment/feed",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "[role=\"dialog\"]"
+    },
+    {
+      "file": "img/room-off.png",
+      "route": "#/today",
+      "viewport": {
+        "width": 1440,
+        "height": 1000
+      },
+      "selector": "viewport"
+    }
+  ]
+}
