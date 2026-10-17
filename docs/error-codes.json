@@ -1,5 +1,5 @@
 {
-  "about": "Each alert from the Crop Steering controller app, and each Crop Steering card in Settings → Repairs, ends with a code, for example CS-101. The regular status summary of the controller has no code. This file is the only list of the codes. The page docs/ERROR_CODES.md and the Help & tools page of the dashboard come from this file. The test tests/test_error_codes.py keeps the file and the code in agreement.",
+  "about": "Each alert from the Crop Steering controller app, and each Crop Steering card in Settings → Repairs, ends with a code, for example CS-101. The regular status summary of the controller has no code. This file is the only list of the codes. The page docs/ERROR_CODES.md and the Settings & help → Help page of the dashboard come from this file. The test tests/test_error_codes.py keeps the file and the code in agreement.",
   "groups": [
     {
       "prefix": "CS-1",
@@ -278,7 +278,7 @@
         "CAUTION: Do not leave the room in this hold for a long time. The substrate dries out and the plants can wilt.",
         "In Settings → Entities, show the hidden entities.",
         "Set the retired switch that the alert names to on.",
-        "In Crop Steering → Settings, set \"Watering\" to on.",
+        "In Crop Steering, use Watering in the header to review switching it on.",
         "Change each automation that sets a retired switch to off.",
         "Make it set the kill switch of the room to off instead."
       ]
@@ -962,7 +962,7 @@
       ],
       "fixes": [
         "CAUTION: Do not leave the plan in this hold for many days. The zones get only safety shots, and the crop steering stops.",
-        "Open Plan › Schedule in the Crop Steering sidebar.",
+        "Open Irrigation › Calendar in the Crop Steering sidebar.",
         "Read the reason.",
         "Correct the cause.",
         "If the error stays, disarm the plan and arm it again."
