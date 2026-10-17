@@ -6,7 +6,7 @@ Each alert from the Crop Steering controller app, and each Crop Steering card in
 **Settings → Repairs**, ends with a code, for example **CS-101**. The regular status summary of
 the controller has no code. Find the code below. It tells you what the alert means, what occurs
 to the water, the probable causes and what to do. The same list is in the Crop Steering sidebar
-under **Help & tools → Error codes**.
+under **Settings & help → Help → Error codes**.
 
 A critical alert, or a warning about a zone that gets no water, comes again each 30 min while its
 cause continues. Other warnings come again after 15 min, then less frequently. An information
@@ -403,7 +403,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - CAUTION: Do not leave the room in this hold for a long time. The substrate dries out and the plants can wilt.
 - In Settings → Entities, show the hidden entities.
 - Set the retired switch that the alert names to on.
-- In Crop Steering → Settings, set "Watering" to on.
+- In Crop Steering, use Watering in the header to review switching it on.
 - Change each automation that sets a retired switch to off.
 - Make it set the kill switch of the room to off instead.
 
@@ -1239,7 +1239,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 **What to do**
 
 - CAUTION: Do not leave the plan in this hold for many days. The zones get only safety shots, and the crop steering stops.
-- Open Plan › Schedule in the Crop Steering sidebar.
+- Open Irrigation › Calendar in the Crop Steering sidebar.
 - Read the reason.
 - Correct the cause.
 - If the error stays, disarm the plan and arm it again.

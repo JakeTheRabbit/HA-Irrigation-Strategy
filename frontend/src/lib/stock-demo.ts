@@ -227,16 +227,27 @@ export class StockDemo {
       throw new Error("Stock tanks changed elsewhere. Reload before saving.");
     const now = new Date().toISOString();
     if (action === "stock_save") {
-      const drafts = data.tanks as StockTankDraft[];
+      const known = new Map(doc.tanks.map((t) => [t.id, t]));
+      // Match stock.clean_tanks: omitted measurements keep the latest recorded level.
+      const drafts = (data.tanks as StockTankDraft[]).map((draft) => ({
+        ...draft,
+        level_l:
+          draft.level_l ??
+          (draft.id ? known.get(draft.id)?.level_l : undefined) ??
+          draft.capacity_l,
+      }));
       const errors = draftErrors(drafts, doc.max_tanks);
       if (errors.length) throw new Error(errors.join(" "));
-      const known = new Map(doc.tanks.map((t) => [t.id, t]));
       const taken = new Set(drafts.flatMap((d) => (d.id && known.has(d.id) ? [d.id] : [])));
       doc.tanks = drafts.map((draft) => {
         const old = draft.id ? known.get(draft.id) : undefined;
         let id = old?.id;
         if (!id) {
-          const base = draft.name.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") || "stock";
+          const base =
+            draft.name
+              .toLowerCase()
+              .replace(/[^a-z0-9]+/g, "_")
+              .replace(/^_|_$/g, "") || "stock";
           id = base;
           for (let n = 2; taken.has(id); n++) id = `${base}_${n}`;
           taken.add(id);
@@ -271,7 +282,10 @@ export class StockDemo {
         tank.level_l = Math.round(Math.max(0, before - tank.dose_ml / 1000) * 1e4) / 1e4;
         draw[tank.id] = Math.round((before - tank.level_l) * 1e4) / 10;
       }
-      doc.history = [{ at: now, source: "manual" as const, draw_ml: draw }, ...doc.history].slice(0, 30);
+      doc.history = [{ at: now, source: "manual" as const, draw_ml: draw }, ...doc.history].slice(
+        0,
+        30,
+      );
     } else throw new Error("Unsupported demo action.");
     return this.finish(doc);
   }

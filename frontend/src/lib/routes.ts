@@ -3,6 +3,7 @@
  * and lands where that page's content lives now. */
 
 export type Page =
+  | "all-zones"
   | "today"
   | "zone"
   | "today/ai"
@@ -31,6 +32,7 @@ export interface Route {
 }
 
 export const PAGES: readonly Page[] = [
+  "all-zones",
   "today",
   "zone",
   "today/ai",
@@ -58,7 +60,8 @@ export type Section = "today" | "plan" | "history" | "equipment" | "settings";
 /** The menu entry a page belongs to: a zone and the AI assistant are reached from Today, Help sits with
  * Settings. */
 export function sectionOf(page: Page): Section {
-  if (page === "today" || page === "zone" || page === "today/ai") return "today";
+  if (page === "all-zones" || page === "today" || page === "zone" || page === "today/ai")
+    return "today";
   if (page === "settings" || page === "help") return "settings";
   return page.split("/")[0] as Section;
 }
@@ -66,7 +69,7 @@ export function sectionOf(page: Page): Section {
 /** Each old page's new home. */
 export const LEGACY_PAGES: Readonly<Record<string, Page>> = {
   overview: "today",
-  zones: "today",
+  zones: "all-zones",
   strategy: "plan/targets",
   "grow-plan": "plan/schedule",
   compare: "history/compare",
@@ -84,7 +87,7 @@ export const LEGACY_PAGES: Readonly<Record<string, Page>> = {
 export const LEGACY_VIEWS: Readonly<Record<string, Page>> = {
   dashboard: "today",
   overview: "today",
-  zones: "today",
+  zones: "all-zones",
   tune: "plan/targets",
   strategy: "plan/targets",
   timeline: "plan/schedule",
@@ -111,11 +114,19 @@ const SECTION_PAGES: Readonly<Record<string, Page>> = {
 };
 
 export function routeHash(route: Route): string {
-  return route.page === "zone" && route.zone ? `#/zone/${route.zone}` : `#/${route.page}`;
+  if (route.page === "zone" && route.zone) return `#/zone/${route.zone}`;
+  return (
+    `#/${route.page}` +
+    (route.zone && ["plan/targets", "plan/schedule", "history/timeline"].includes(route.page)
+      ? `?zone=${route.zone}`
+      : "")
+  );
 }
 
 export const sameRoute = (a: Route, b: Route) =>
-  a.page === b.page && (a.page !== "zone" || (a.zone ?? null) === (b.zone ?? null));
+  a.page === b.page &&
+  (!["zone", "plan/targets", "plan/schedule", "history/timeline"].includes(a.page) ||
+    (a.zone ?? null) === (b.zone ?? null));
 
 /**
  * The page an address opens. `canonical` is false when the address is an old or short form of it:
@@ -137,8 +148,17 @@ export function parseRoute(hash: string, search = ""): { route: Route; canonical
       canonical: parts.length === 1 || (parts.length === 2 && valid && String(zone) === parts[1]),
     };
   }
-  if ((PAGES as readonly string[]).includes(path))
-    return { route: { page: path as Page }, canonical: true };
+  if ((PAGES as readonly string[]).includes(path)) {
+    const zone = Number(new URLSearchParams(hash.split("?")[1] ?? "").get("zone"));
+    const focused =
+      ["plan/targets", "plan/schedule", "history/timeline"].includes(path) &&
+      Number.isSafeInteger(zone) &&
+      zone > 0;
+    return {
+      route: focused ? { page: path as Page, zone } : { page: path as Page },
+      canonical: true,
+    };
+  }
   const page = SECTION_PAGES[path] ?? LEGACY_PAGES[path] ?? "today";
   return { route: { page }, canonical: false };
 }

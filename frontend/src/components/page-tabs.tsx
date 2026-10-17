@@ -4,16 +4,20 @@ import "./page-tabs.css";
 /** The menu's five entries and the pages under each: one row of tabs above a page that has more
  * than one view. */
 export const SECTION_LABELS: Record<Section, string> = {
-  today: "Today",
-  plan: "Plan",
+  today: "Overview",
+  plan: "Irrigation",
   history: "History",
   equipment: "Equipment",
   settings: "Settings & help",
 };
 export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
+  today: [
+    { page: "all-zones", label: "All zones" },
+    { page: "today", label: "Selected room" },
+  ],
   plan: [
-    { page: "plan/targets", label: "Targets" },
-    { page: "plan/schedule", label: "Schedule" },
+    { page: "plan/targets", label: "Current day" },
+    { page: "plan/schedule", label: "Calendar" },
   ],
   history: [
     { page: "history/timeline", label: "Timeline" },
@@ -32,7 +36,7 @@ export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
   ],
   settings: [
     { page: "settings", label: "Settings" },
-    { page: "settings/features", label: "Features" },
+    { page: "settings/features", label: "Capabilities" },
     { page: "settings/notifications", label: "Notifications" },
     { page: "settings/ai", label: "AI assistant" },
     { page: "help", label: "Help" },
@@ -40,6 +44,7 @@ export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
 };
 /** A page's own name, for its tab and the window title. */
 export function pageLabel(page: Page): string {
+  if (page === "all-zones") return "All zones";
   if (page === "today") return "Today";
   if (page === "zone") return "Zone";
   if (page === "today/ai") return "AI assistant";
@@ -64,17 +69,19 @@ export function PageTabs({
   if (!tabs) return null;
   return (
     <nav className="page-tabs" aria-label={`${SECTION_LABELS[section]} views`}>
-      {tabs.filter((tab) => !hidden.includes(tab.page)).map((tab) => (
-        <button
-          type="button"
-          key={tab.page}
-          aria-current={tab.page === page ? "page" : undefined}
-          onClick={() => navigate(tab.page)}
-        >
-          {tab.label}
-          {!!badges[tab.page] && <i className="page-tab-count">{badges[tab.page]}</i>}
-        </button>
-      ))}
+      {tabs
+        .filter((tab) => !hidden.includes(tab.page))
+        .map((tab) => (
+          <button
+            type="button"
+            key={tab.page}
+            aria-current={tab.page === page ? "page" : undefined}
+            onClick={() => navigate(tab.page)}
+          >
+            {tab.label}
+            {!!badges[tab.page] && <i className="page-tab-count">{badges[tab.page]}</i>}
+          </button>
+        ))}
     </nav>
   );
 }

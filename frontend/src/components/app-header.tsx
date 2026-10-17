@@ -131,6 +131,12 @@ export function AppHeader({
         >
           <RefreshCw size={17} className={refreshing ? "spin" : ""} />
         </Button>
+        <span
+          className="header-safety-scope"
+          title="Watering and stop controls apply only to this selected room"
+        >
+          {controller.room.room.name}
+        </span>
         <SafetySwitches controller={controller} />
       </div>
     </header>

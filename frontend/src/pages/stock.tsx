@@ -1,3 +1,4 @@
+import { stockConfigurationPayload } from "@/lib/stock";
 import { useEffect, useId, useState } from "react";
 import { FlaskConical, Pencil, Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -344,7 +345,17 @@ function Editor({
                 />
               </div>
               {numeric(index, "capacity_l", "Capacity", "L")}
-              {numeric(index, "level_l", "Level now", "L")}
+              {draft.id ? (
+                <div>
+                  <span className="small muted">Current level</span>
+                  <p>{number(draft.level_l, 2)} L</p>
+                  <p className="small muted">
+                    Snapshot when opened. Set a measured level or record a refill on the tank card.
+                  </p>
+                </div>
+              ) : (
+                numeric(index, "level_l", "Initial level", "L")
+              )}
               {numeric(index, "dose_ml", "Per batch", "mL")}
               {numeric(index, "low_l", "Low mark", "L")}
               <div className="stock-editor-entity">
@@ -615,7 +626,8 @@ export function StockTanks({
           max={doc.max_tanks}
           onClose={() => setEditing(null)}
           onSave={async (drafts) => {
-            if (await act("stock_save", { tanks: drafts })) setEditing(null);
+            if (await act("stock_save", { tanks: stockConfigurationPayload(drafts) }))
+              setEditing(null);
           }}
         />
       )}

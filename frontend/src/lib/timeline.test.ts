@@ -2,6 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { Timeline } from "@/pages/timeline";
+import { ZonePage } from "@/pages/zone";
 import { createDemo } from "./demo";
 import { parseJevEntry, type JevEntry } from "./jev";
 import { buildRoom, discoverRooms } from "./model";
@@ -279,7 +280,13 @@ describe("the Timeline page", () => {
       noon,
     ).length;
     expect(rows).toBeGreaterThan(merged);
-    for (const text of ["All AI assistant decisions", "Refused", "Advice", "calls today", "input tokens"])
+    for (const text of [
+      "All AI assistant decisions",
+      "Refused",
+      "Advice",
+      "calls today",
+      "input tokens",
+    ])
       expect(html).toContain(text);
     expect(html).toMatch(/class="timeline-outcome" data-worked="(true|false)"/);
     // Days are headed: the demo's journal reaches back to yesterday.
@@ -294,6 +301,29 @@ describe("the Timeline page", () => {
     expect(html).toContain('class="timeline-row"');
     expect(html).not.toContain("All AI assistant decisions");
     expect(html).not.toContain('data-source="jev"');
+  });
+  it("keeps one operational chart on Zone and moves long-term evidence into History for that zone", () => {
+    const states = createDemo(noon);
+    const control = {
+      ...controller(states, ""),
+      roomId: "test-room",
+      timeZone: "Pacific/Auckland",
+    };
+    const zone = control.room.zones[2];
+    const detail = renderToStaticMarkup(
+      createElement(ZonePage, { controller: control, zoneId: zone.id, navigate: () => undefined }),
+    );
+    expect(detail.match(/data-day-timeline=/g)).toHaveLength(1);
+    expect(detail.match(/data-zone-why=/g)).toHaveLength(1);
+    expect(detail).not.toContain("data-history-explorer");
+    expect(detail).not.toContain("Recorded behaviour against targets");
+    expect(detail).not.toContain("data-brain-zone");
+    const history = renderToStaticMarkup(
+      createElement(Timeline, { controller: control, zone: zone.id }),
+    );
+    expect(history.match(/data-history-explorer=/g)).toHaveLength(1);
+    expect(history).toContain(`Recorded evidence · ${zone.name}`);
+    expect(history).toContain("Recorded behaviour against targets");
   });
   it("opens on one zone when asked", () => {
     const states = createDemo(noon);

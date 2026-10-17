@@ -65,6 +65,11 @@ async function fresh(route) {
   await page.goto(target.toString(), { waitUntil: "networkidle" });
 }
 async function navigate(label, target = page) {
+  if (label === "Today") {
+    await target.evaluate(() => (location.hash = "#/today"));
+    return;
+  }
+  label = label === "Plan" ? "Irrigation" : label;
   await target
     .locator(".desktop-sidebar")
     .getByRole("button", { name: label, exact: true })
@@ -78,7 +83,7 @@ async function navigateTo(section, view, target = page) {
     .getByRole("button", { name: view, exact: true })
     .click();
 }
-/** Plan › Schedule keeps the steering balance, endpoint profiles and recipes one tap down. */
+/** Irrigation › Calendar keeps the steering balance, endpoint profiles and recipes together. */
 async function openPlanner(tab = "Steering balance", target = page) {
   const advanced = target.locator("details.plan-advanced");
   await visible(advanced);
@@ -90,7 +95,11 @@ async function openPlanner(tab = "Steering balance", target = page) {
   if (tab === "Steering balance") await visible(target.locator("#steering-balance"));
 }
 async function navigateSchedule(target = page) {
-  await navigateTo("Plan", "Schedule", target);
+  await navigate("Irrigation", target);
+  await target
+    .getByRole("navigation", { name: "Irrigation views" })
+    .getByRole("button", { name: /^Calendar/ })
+    .click();
   await openPlanner("Steering balance", target);
 }
 async function exported() {
@@ -154,8 +163,10 @@ async function check(name, run) {
   }
 }
 async function pause() {
-  await navigate("Settings & help");
-  const pause = page.getByRole("button", { name: "Switch watering off…", exact: true });
+  const pause = page.getByRole("button", {
+    name: "Watering on: switch watering off…",
+    exact: true,
+  });
   if (await pause.count()) {
     await pause.click();
     await page.getByRole("button", { name: /Apply \d+ change/ }).click();
@@ -170,7 +181,7 @@ async function saveSetup(target = page) {
 }
 /** Mocked live Home Assistant with one room, so a check can read the exact setup_save payload.
  * `calls` records every service the page reached, which is how "never actuates" is proven. */
-async function liveSetup(run, history = false) {
+async function liveSetup(run, history = false, blockers = []) {
   const live = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const calls = [];
   const stamp = new Date().toISOString();
@@ -215,7 +226,7 @@ async function liveSetup(run, history = false) {
       },
     ],
     hardware: {},
-    safety: { ready: true, blockers: [] },
+    safety: { ready: blockers.length === 0, blockers },
   };
   await live.addInitScript(() =>
     localStorage.setItem("hassTokens", JSON.stringify({ access_token: "sizing-fixture-token" })),
@@ -238,8 +249,15 @@ async function liveSetup(run, history = false) {
       data = req.postDataJSON();
     calls.push({ action, data });
     if (history && action === "history_connection_get")
-      return reply({ service_response: { room_id: "room:room_b_", revision: 1,
-        connection: { source: "recorder" }, has_password: true, has_token: true } });
+      return reply({
+        service_response: {
+          room_id: "room:room_b_",
+          revision: 1,
+          connection: { source: "recorder" },
+          has_password: true,
+          has_token: true,
+        },
+      });
     if (action === "setup_read")
       return reply({
         service_response: {
@@ -251,6 +269,7 @@ async function liveSetup(run, history = false) {
         },
       });
     if (action === "setup_save") {
+      if (blockers.length) return reply({ message: blockers.join("; ") }, 500);
       Object.assign(room, { zones: data.zones, revision: room.revision + 1 });
       return reply({ changed_states: [], service_response: room });
     }
@@ -271,7 +290,9 @@ async function liveSetup(run, history = false) {
     assert.deepEqual(
       // The dashboard asks once per visit whether there is anything new to show: not the helpers.
       [...new Set(calls.map((call) => call.action))].filter((a) => a !== "whats_new_get").sort(),
-      history ? ["history_connection_get", "setup_read", "setup_save"] : ["setup_read", "setup_save"],
+      history
+        ? ["history_connection_get", "setup_read", "setup_save"]
+        : ["setup_read", "setup_save"],
       "Sizing helpers must reach no service except reading and saving the setup",
     );
   } finally {
@@ -280,6 +301,31 @@ async function liveSetup(run, history = false) {
 }
 const savedZone = (calls) => calls.findLast((call) => call.action === "setup_save").data.zones[0];
 try {
+  await check(
+    "A setup refusal names the watering blocker and retains the draft for retry",
+    async () => {
+      const reason =
+        "input_boolean.f2_control_enabled must read OFF before changing setup (it is ON: turn it off, then submit again)";
+      await liveSetup(
+        async (lp, calls) => {
+          await lp.locator("#room-name").fill("My edited room");
+          await lp.getByRole("button", { name: "Review configuration", exact: true }).click();
+          const dialog = lp.getByRole("dialog");
+          await visible(
+            dialog.getByText("Equipment and sizing changes need watering off", { exact: true }),
+          );
+          await dialog.getByRole("button", { name: "Save configuration", exact: true }).click();
+          await visible(dialog.getByRole("alert"));
+          assert.equal(await dialog.getByRole("alert").innerText(), reason);
+          assert.equal(calls.filter((c) => c.action === "setup_save").length, 1);
+          await dialog.getByRole("button", { name: "Back to editing", exact: true }).click();
+          assert.equal(await lp.locator("#room-name").inputValue(), "My edited room");
+        },
+        false,
+        [reason],
+      );
+    },
+  );
   await check(
     "Planning slider changes both the VWC and the EC setpoints; exact day and week edits preserve neighboring days and other zones",
     async () => {
@@ -418,12 +464,18 @@ try {
       await openPlanner();
       await setBalance(83);
       await page
-        .getByRole("navigation", { name: "Plan views" })
-        .getByRole("button", { name: "Targets", exact: true })
+        .getByRole("navigation", { name: "Irrigation views" })
+        .getByRole("button", { name: /^Current day/ })
         .click();
-      await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
-      await page.getByRole("button", { name: "Keep editing" }).click();
-      assert.equal(new URL(page.url()).hash, "#/plan/schedule");
+      assert.equal(
+        await page.getByRole("dialog").count(),
+        0,
+        "Views of one workspace preserve its draft without discarding",
+      );
+      await page
+        .getByRole("navigation", { name: "Irrigation views" })
+        .getByRole("button", { name: /^Calendar/ })
+        .click();
       assert.equal(await page.locator("#steering-balance").inputValue(), "83");
       await navigate("Today");
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
@@ -433,15 +485,21 @@ try {
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(new URL(page.url()).hash, "#/plan/schedule");
-      await page.locator("#desktop-room").selectOption({ label: "Room B" });
+      await page.locator('.room-chip[data-room="room:room_b_"]').click();
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
-      assert.equal(await page.locator("#desktop-room").inputValue(), "room:");
+      assert.equal(
+        await page.locator('.room-chip[data-room="room:"]').getAttribute("aria-pressed"),
+        "true",
+      );
       await navigate("Today");
       await page.getByRole("button", { name: "Discard and continue" }).click();
       await visible(page.getByRole("heading", { level: 1, name: / today$/ }));
       await navigateSchedule();
       assert.notEqual(await page.locator("#steering-balance").inputValue(), "83");
+      // Use a clean history entry: prior refused hash changes restore their own entries.
+      await fresh("today");
+      await navigateSchedule();
       await setBalance(81);
       await page.goBack();
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
@@ -517,7 +575,7 @@ try {
       await fresh("setup");
       await visible(page.locator("#room-name"));
       await page.locator("#room-name").fill("Must be discarded");
-      await page.locator("#desktop-room").selectOption({ label: "Room B" });
+      await page.locator('.room-chip[data-room="room:room_b_"]').click();
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Discard and continue" }).click();
       assert.equal(await page.locator("#room-name").inputValue(), "Room B");
@@ -627,9 +685,7 @@ try {
       const id = await page.locator("#setup-room").inputValue();
       assert.ok(id);
       await page.getByRole("button", { name: "Archive room", exact: true }).click();
-      await page
-        .getByRole("textbox", { name: "Type the room name" })
-        .fill("Verification room");
+      await page.getByRole("textbox", { name: "Type the room name" }).fill("Verification room");
       await page
         .getByRole("dialog")
         .getByRole("button", { name: "Archive room", exact: true })
@@ -717,28 +773,34 @@ try {
       await page.locator(".tour").waitFor({ state: "detached" });
     },
   );
-  await check(
-    "Optional long history reads settings only after the grower expands it",
-    async () => {
-      await liveSetup(async (lp, calls) => {
-        const history = lp.getByRole("group", { name: "Long history source" });
-        const summary = lp.locator("details[aria-label='Long history source'] > summary");
-        await visible(summary);
-        assert.equal(calls.filter(call => call.action === "history_connection_get").length, 0,
-          "Closed optional settings must send no history service");
-        await summary.click();
-        await visible(lp.getByRole("button", { name: "Save history source", exact: true }));
-        assert.equal(calls.filter(call => call.action === "history_connection_get").length, 1,
-          "Opening optional settings reads its redacted configuration once");
-        await summary.click();
-        assert.equal(await history.getAttribute("open"), null);
-        await lp.locator('#zone-1-substrate_volume').fill('7');
-        await saveSetup(lp);
-        assert.equal(calls.filter(call => call.action === "history_connection_get").length, 1,
-          "Saving unrelated sizing after closing must send no history service");
-      }, true);
-    },
-  );
+  await check("Optional long history reads settings only after the grower expands it", async () => {
+    await liveSetup(async (lp, calls) => {
+      const history = lp.getByRole("group", { name: "Long history source" });
+      const summary = lp.locator("details[aria-label='Long history source'] > summary");
+      await visible(summary);
+      assert.equal(
+        calls.filter((call) => call.action === "history_connection_get").length,
+        0,
+        "Closed optional settings must send no history service",
+      );
+      await summary.click();
+      await visible(lp.getByRole("button", { name: "Save history source", exact: true }));
+      assert.equal(
+        calls.filter((call) => call.action === "history_connection_get").length,
+        1,
+        "Opening optional settings reads its redacted configuration once",
+      );
+      await summary.click();
+      assert.equal(await history.getAttribute("open"), null);
+      await lp.locator("#zone-1-substrate_volume").fill("7");
+      await saveSetup(lp);
+      assert.equal(
+        calls.filter((call) => call.action === "history_connection_get").length,
+        1,
+        "Saving unrelated sizing after closing must send no history service",
+      );
+    }, true);
+  });
   await check(
     "Sizing units: gallons and GPH are typed and shown, litres and L/h are saved, and the choice is remembered",
     async () => {
@@ -878,7 +940,11 @@ try {
       await page.locator("#zone-1-substrate_volume").fill("6.5");
       assert.equal(await preset.inputValue(), "custom", "Typing a volume is a custom entry");
       await page.locator("#zone-1-substrate_volume").fill("20");
-      assert.equal(await preset.inputValue(), "custom", "A typed volume is never named as a preset, even when it matches one");
+      assert.equal(
+        await preset.inputValue(),
+        "custom",
+        "A typed volume is never named as a preset, even when it matches one",
+      );
       await liveSetup(async (lp, calls) => {
         await lp.locator("#zone-1-substrate-preset").selectOption("pot-5gal");
         assert.equal(await lp.locator("#zone-1-substrate_volume").inputValue(), "18.9");
@@ -1001,28 +1067,45 @@ try {
             state,
             `${state}: the switcher shows the state`,
           );
-          // What the AI assistant may do shows under every state: the powers are settings.
+          // Today explains current permissions; the canonical editor lives in Settings.
           const powers = page.locator("[data-brain-powers]");
-          assert.equal(await powers.getByRole("checkbox").count(), 8, `${state}: 8 powers`);
+          assert.equal(
+            await powers.getByRole("checkbox").count(),
+            0,
+            `${state}: contextual permissions are read only`,
+          );
+          assert.equal(
+            await powers.locator("li").count(),
+            8,
+            `${state}: all eight permissions remain visible`,
+          );
           for (const label of ["Start the next phase early", "Tune shot sizes"])
-            await visible(powers.getByRole("checkbox", { name: label, exact: true }));
+            await visible(powers.getByText(label, { exact: true }));
+          await visible(powers.getByRole("link", { name: "Manage permissions" }));
           await noOverflow();
           await axe(`brain-${state}-${width}`);
-          await page.screenshot({ path: out + `workspace-brain-${state}-${width}.png`, fullPage: true });
+          await page.screenshot({
+            path: out + `workspace-brain-${state}-${width}.png`,
+            fullPage: true,
+          });
         }
       }
       // The switcher moves the header chip with the page, with no reload.
       await page.getByLabel("Sample AI state", { exact: true }).selectOption("budget");
       await visible(page.locator(".brain-chip").getByText("AI paused: budget"));
-      // A power off by default is ticked on through the demo's switch.
-      const tune = page
+      // The same permission now has one reviewed editor in Settings.
+      await page
         .locator("[data-brain-powers]")
-        .getByRole("checkbox", { name: "Tune shot sizes", exact: true });
+        .getByRole("link", { name: "Manage permissions" })
+        .click();
+      const tune = page.getByRole("switch", { name: /Tune shot sizes/i });
       assert.equal(await tune.isChecked(), false);
       await tune.click();
-      await page.waitForFunction(
-        () => document.querySelector('[data-power="tune_shot_sizes"] input')?.checked === true,
-      );
+      assert.equal(await tune.isChecked(), true, "Permission change is staged locally");
+      await page.getByRole("button", { name: "Review changes", exact: true }).click();
+      await page.getByRole("button", { name: /^Apply 1 change/ }).click();
+      await page.getByRole("dialog").waitFor({ state: "hidden" });
+      assert.equal(await tune.isChecked(), true, "Reviewed permission reads back enabled");
       await page.setViewportSize({ width: 1440, height: 1000 });
     },
   );
@@ -1362,7 +1445,7 @@ try {
           );
         const writesBeforeToday = structuredClone(mutations());
         await navigate("Plan", lp);
-        await visible(lp.getByRole("heading", { name: "Targets", exact: true }));
+        await visible(lp.getByRole("heading", { name: "Irrigation", exact: true }));
         await visible(lp.getByText("Armed grow plan · read only", { exact: true }));
         await visible(lp.getByRole("link", { name: "Open schedule", exact: true }));
         const activeTargets = lp.locator(".targets-panel");
@@ -1375,7 +1458,10 @@ try {
             .locator("strong");
         assert.equal((await scheduled("P2", "Re-water point").innerText()).trim(), "77");
         assert.match((await scheduled("P2", "EC target").innerText()).trim(), /^4\.20?$/);
-        assert.equal(await lp.locator('input[id^="setting-"], select[id^="choice-"]').count(), 0);
+        assert.equal(
+          await lp.locator('input[id^="setting-"]:visible, select[id^="choice-"]:visible').count(),
+          0,
+        );
         assert.equal(
           await lp.getByRole("button", { name: "Review changes", exact: true }).isDisabled(),
           true,
@@ -1401,7 +1487,10 @@ try {
           ),
           "An expired schedule shows no target values",
         );
-        assert.equal(await lp.locator('input[id^="setting-"], select[id^="choice-"]').count(), 0);
+        assert.equal(
+          await lp.locator('input[id^="setting-"]:visible, select[id^="choice-"]:visible').count(),
+          0,
+        );
         assert.deepEqual(
           mutations(),
           writesBeforeToday,
@@ -1445,7 +1534,10 @@ try {
         assert.equal(await lp.locator(".today-stopped").count(), 0, "the band, not a second line");
         assert.equal(await lp.locator(".data-age").innerText(), "Updated 14 min ago");
         // The fixture has no room switch: watering is the one switch, in words.
-        assert.deepEqual(await lp.locator(".safety-switch-text").allInnerTexts(), ["Watering off", "Stop all"]);
+        assert.deepEqual(await lp.locator(".safety-switch-text").allInnerTexts(), [
+          "Watering off",
+          "Stop all",
+        ]);
         assert.ok(
           await lp.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
           "The stale band and the header fit 390 px",
@@ -1517,8 +1609,8 @@ try {
           path: fileURLToPath(new URL("../../img/operator-dashboard.png", import.meta.url)),
         });
         await navigateSchedule(frame);
-        // The flower by stage leads the schedule; the balance grid is under Advanced.
-        const panel = frame.locator(".grow-stages");
+        // Capture the unified calendar and its shared planning canvas.
+        const panel = frame.locator(".irrigation-workspace");
         await tp.evaluate(() => (document.querySelector("iframe").style.height = "3000px"));
         await panel.screenshot({
           path: fileURLToPath(new URL("../../img/grow-plan.png", import.meta.url)),
@@ -1589,4 +1681,3 @@ try {
     );
 }
 if (checks.some((c) => c.status === "fail")) process.exitCode = 1;
-

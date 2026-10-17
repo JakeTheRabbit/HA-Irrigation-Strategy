@@ -2,6 +2,22 @@ import { describe, expect, it } from "vitest";
 import { dayWord, errorText } from "./utils";
 
 describe("errorText", () => {
+  it("shows the REST response body from an inherited Home Assistant session", () => {
+    const reason = "input_boolean.f2_control_enabled must read OFF before changing setup";
+    expect(errorText({ message: "Response error: 500", body: { message: reason } })).toBe(reason);
+    expect(
+      errorText(
+        Object.assign(new Error("Response error: 400"), {
+          body: { message: reason },
+        }),
+      ),
+    ).toBe(reason);
+  });
+  it("keeps the original error when the response body has no usable message", () => {
+    for (const body of [null, "server failed", { message: "" }, { message: 500 }]) {
+      expect(errorText({ message: "Response error: 500", body })).toBe("Response error: 500");
+    }
+  });
   it("uses the message of real errors", () => {
     expect(errorText(new Error("Plan revision changed"))).toBe("Plan revision changed");
     expect(errorText(new TypeError("bad input"))).toBe("bad input");

@@ -14,10 +14,14 @@ export function PlannerDayCurve({
   controller,
   zoneId,
   parameters,
+  onChange,
+  showEc = false,
 }: {
   controller: Controller;
   zoneId: number;
   parameters: Record<string, number>;
+  onChange?: (key: string, value: number) => void;
+  showEc?: boolean;
 }) {
   const prefix = controller.room.room.prefix;
   const on = numeric(controller.states[`number.crop_steering_${prefix}lights_on_hour`]);
@@ -30,7 +34,13 @@ export function PlannerDayCurve({
         lightsOn={on}
         lightsOff={off}
         showEditors={false}
-        description="The curve of the preview day, read only. Change it with the profile and the steering balance."
+        initialShowEc={showEc}
+        onChange={onChange}
+        description={
+          onChange
+            ? "Schedule planning reference. Dragging a target changes both endpoints of the selected profile; review and save before arming."
+            : "Schedule planning reference. Change it with the profile and the steering balance."
+        }
       />
       <WaterDelivery controller={controller} zoneId={zoneId} parameters={parameters} />
     </div>
@@ -68,7 +78,10 @@ export function ReferenceRows({
         <div className="profile-grid planner-reference-row" key={row.key}>
           <div>
             <strong>{row.label}</strong>
-            <p className="muted small">Drives nothing. {row.unit === "°" ? "In the unit of the room's sensor." : `Unit: ${row.unit}.`}</p>
+            <p className="muted small">
+              Drives nothing.{" "}
+              {row.unit === "°" ? "In the unit of the room's sensor." : `Unit: ${row.unit}.`}
+            </p>
           </div>
           {([0, 1] as const).map((index) => (
             <div key={index}>
@@ -82,7 +95,9 @@ export function ReferenceRows({
                 max={row.max}
                 step={row.step}
                 disabled={disabled}
-                value={Number.isFinite(reference[row.key]?.[index]) ? reference[row.key]![index] : ""}
+                value={
+                  Number.isFinite(reference[row.key]?.[index]) ? reference[row.key]![index] : ""
+                }
                 onChange={(event) => set(row.key, index, event.target.value)}
               />
             </div>

@@ -316,7 +316,11 @@ function group(key: string) {
   if (key === "field_capacity") return "Substrate";
   if (/substrate|plant_count|dripper/.test(key)) return "Hardware sizing";
   if (/light.*hour/.test(key)) return "Schedule";
-  if (/max_|maximum_shot_duration|maximum_ec|watchdog|irrigation_(ec|ph)|drown|sump|min_daily/.test(key))
+  if (
+    /max_|maximum_shot_duration|maximum_ec|watchdog|irrigation_(ec|ph)|drown|sump|min_daily/.test(
+      key,
+    )
+  )
     return "Safety";
   return "General";
 }
@@ -940,8 +944,7 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
     return say(
       "stopped",
       "Not watering",
-      `Home Assistant's “${name}” switch (${id}) is off, and nothing is watered in this room while it is. Switch it back on in Home Assistant, then switch watering on in Settings if it is off.`,
-      { label: "Open Settings", route: "settings" },
+      `Home Assistant's “${name}” switch (${id}) is off, and nothing is watered in this room while it is. Switch it back on in Home Assistant, then use Watering in the header if it is off.`,
     );
   }
   // The room's engine switch (the "watering" switch here): off, or unreadable, stops every shot.
@@ -952,8 +955,7 @@ export function roomStatus(states: States, room: Room, now = Date.now()): RoomSt
     return say(
       "stopped",
       "Not watering",
-      "The kill switch (Watering) of this room is off, so the controller opens no valve. It continues to read the probes and to follow the phases. A new room starts with the kill switch at off, so no water flows before you examine its hardware.",
-      { label: "Switch it on in Settings", route: "settings" },
+      "The kill switch (Watering) of this room is off, so the controller opens no valve. It continues to read the probes and to follow the phases. A new room starts with the kill switch at off, so no water flows before you examine its hardware. Use Watering in the header to review switching it on.",
     );
   if (engine !== "on")
     return say(

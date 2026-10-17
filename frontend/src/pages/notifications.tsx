@@ -1,3 +1,5 @@
+import { NotificationPredictions } from "@/components/notification-predictions";
+import { CanonicalControls } from "@/components/canonical-controls";
 import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState } from "react";
 import {
   AlertTriangle,
@@ -343,10 +345,11 @@ export function Notifications({
     if (revision !== undefined && live !== null && live !== revision) setReads((n) => n + 1);
   }, [live, revision]);
   const dirty = !!draft;
+  const [policyDirty, setPolicyDirty] = useState(false);
   useLayoutEffect(() => {
-    onDirtyChange(dirty);
+    onDirtyChange(dirty || policyDirty);
     return () => onDirtyChange(false);
-  }, [dirty, onDirtyChange]);
+  }, [dirty, policyDirty, onDirtyChange]);
 
   if (!doc)
     return (
@@ -539,6 +542,12 @@ export function Notifications({
   return (
     <div className="notify-page">
       <Heading title="Notifications" action={shown.recipients.length > 0 && addButton} />
+      <NotificationPredictions controller={controller} />
+      <CanonicalControls
+        controller={controller}
+        owner="notifications"
+        onDirtyChange={setPolicyDirty}
+      />
       {notice && (
         <p className="success-text notify-notice" role="status" tabIndex={-1} ref={noticeRef}>
           <Check size={16} />
@@ -841,9 +850,9 @@ export function Notifications({
           )}
           {uncovered.length > 0 && (
             <p className="notice-inline">
-              No phone covers emergencies for {uncovered.map((room) => room.name).join(" or ")}: they
-              will go to every phone that gets emergencies, or to the controller app's notify_service
-              option when none does.
+              No phone covers emergencies for {uncovered.map((room) => room.name).join(" or ")}:
+              they will go to every phone that gets emergencies, or to the controller app's
+              notify_service option when none does.
             </p>
           )}
           {saveError && (

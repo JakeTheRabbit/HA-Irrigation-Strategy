@@ -163,14 +163,13 @@ export function WateringPower({ controller }: { controller: Controller }) {
 /** The selected room's two safety switches, in the header of every page: its watering and the
  * room itself, each through the same confirmation as in Settings. On a phone, icons with a dot. */
 export function SafetySwitches({ controller }: { controller: Controller }) {
-  const [review, setReview] = useState<"watering" | "room" | "stop" | null>(null);
+  const [review, setReview] = useState<"watering" | "stop" | null>(null);
   const { room } = controller;
   if (!controller.roomId) return null;
   const watering = room.engine.enabled;
   const wateringState = watering === true ? "on" : watering === false ? "off" : "unknown";
   const wateringWords =
     watering === true ? "Watering on" : watering === false ? "Watering off" : "Watering unknown";
-  const on = room.roomActive;
   return (
     <div className="safety-switches" role="group" aria-label={`${room.room.name} safety switches`}>
       <button
@@ -201,26 +200,6 @@ export function SafetySwitches({ controller }: { controller: Controller }) {
         <span className="safety-switch-dot" aria-hidden="true" />
         <span className="safety-switch-text">{wateringWords}</span>
       </button>
-      {room.roomActiveEntity && (
-        <button
-          type="button"
-          className="safety-switch"
-          data-safety="room"
-          data-state={on ? "on" : "off"}
-          aria-label={`${on ? "Room on" : "Room off"}: ${on ? "switch room off…" : "switch room on…"}`}
-          title={
-            on
-              ? "Set the room to off when no plants are in it: no shots and no alerts."
-              : "No plants in the room: no shots and no alerts. Set it to on for the next crop."
-          }
-          disabled={!writable(controller, room.roomActiveEntity)}
-          onClick={() => setReview("room")}
-        >
-          <Power size={15} aria-hidden="true" />
-          <span className="safety-switch-dot" aria-hidden="true" />
-          <span className="safety-switch-text">{on ? "Room on" : "Room off"}</span>
-        </button>
-      )}
       <button
         type="button"
         className="safety-switch"
@@ -264,11 +243,6 @@ export function SafetySwitches({ controller }: { controller: Controller }) {
         controller={controller}
         open={review === "watering"}
         onOpenChange={(open) => setReview(open ? "watering" : null)}
-      />
-      <RoomDialog
-        controller={controller}
-        open={review === "room"}
-        onOpenChange={(open) => setReview(open ? "room" : null)}
       />
     </div>
   );
@@ -335,7 +309,7 @@ export function RoomOffBanner({ controller }: { controller: Controller }) {
           the controller does not water this room or send alerts for it.
         </p>
       </div>
-      <RoomPower controller={controller} showStatus={false} />
+      <a href="#/equipment/setup?feature=room_active">Manage room in use</a>
     </div>
   );
 }

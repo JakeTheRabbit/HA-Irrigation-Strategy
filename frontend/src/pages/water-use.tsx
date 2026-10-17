@@ -1,5 +1,4 @@
 import { Empty, Heading } from "@/components/dashboard";
-import { DailyWaterSummary } from "@/components/water-delivery";
 import { WaterUsePanel } from "@/components/water-use";
 import { WaterVpdCard } from "@/components/sensing";
 import type { Controller } from "@/lib/types";
@@ -14,7 +13,6 @@ export function WaterUsePage({ controller }: { controller: Controller }) {
       {zones.length ? (
         <>
           <WaterUsePanel controller={controller} zones={zones} title="Litres by zone" />
-          <DailyWaterSummary controller={controller} zones={zones} />
           <WaterVpdCard controller={controller} />
         </>
       ) : (

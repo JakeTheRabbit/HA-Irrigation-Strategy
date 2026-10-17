@@ -75,7 +75,8 @@ export const DISPLAY_ROWS: DisplayRow[] = [
         "Shows the zones on Today as cards, or as one table with a row for each zone: phase, VWC, EC, dryback, water, shots and the next action.",
       impact:
         "Cards: each zone has a card, as before. Table: a laptop shows one table. A phone always shows the cards.",
-      guidance: "A table is easier to read in a room with many zones. Select a row to open its zone.",
+      guidance:
+        "A table is easier to read in a room with many zones. Select a row to open its zone.",
     },
   },
   {
@@ -85,7 +86,8 @@ export const DISPLAY_ROWS: DisplayRow[] = [
     copy: {
       tooltip:
         "Shows the air temperature, humidity, VPD and dew point of the room on each zone page, in grey.",
-      impact: "Off: the zone page does not show them. The history chart shows the climate either way.",
+      impact:
+        "Off: the zone page does not show them. The history chart shows the climate either way.",
       guidance:
         "The room must have climate sensors in Equipment › Setup. A value shows in colour only when it is outside the band of the grow plan.",
     },
@@ -145,8 +147,10 @@ export const DISPLAY_ROWS: DisplayRow[] = [
     copy: {
       tooltip:
         "Shows a row for each mapped device on History › Timeline: the lights, tank fill, pump, main line and each zone valve, on or off through the grow day.",
-      impact: "Off: no lanes. On: the timeline reads one grow day of these devices from Home Assistant.",
-      guidance: "A pump that ran with no valve open shows as a pump bar with no valve bar under it.",
+      impact:
+        "Off: no lanes. On: the timeline reads one grow day of these devices from Home Assistant.",
+      guidance:
+        "A pump that ran with no valve open shows as a pump bar with no valve bar under it.",
     },
   },
   {
@@ -176,7 +180,7 @@ export const DISPLAY_ROWS: DisplayRow[] = [
     label: "Reference rows",
     copy: {
       tooltip:
-        "Adds rows under the endpoints of a profile in Plan › Schedule: bands for air temperature, humidity, VPD, CO2, PPFD, DLI and feed pH.",
+        "Adds rows under the endpoints of a profile in Irrigation › Calendar: bands for air temperature, humidity, VPD, CO2, PPFD, DLI and feed pH.",
       impact:
         "The rows drive nothing. The controller does not get them. The room climate on a zone page shows a value in colour when it is outside the band of today.",
     },
@@ -187,8 +191,9 @@ export const DISPLAY_ROWS: DisplayRow[] = [
     label: "Day curve in the planner",
     copy: {
       tooltip:
-        "Shows the curve and the water of the preview day in Plan › Schedule, read only.",
-      impact: "Off: no curve. To change the curve of today with the mouse, use Plan › Targets.",
+        "Shows the curve and the water of the preview day in Irrigation › Calendar, read only.",
+      impact:
+        "Off: no curve. To change the curve of today with the mouse, use Irrigation › Current day.",
     },
   },
 ];

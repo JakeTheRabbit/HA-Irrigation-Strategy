@@ -1,3 +1,4 @@
+import { positiveCount, waterParameters } from "@/lib/water-delivery";
 import { useEffect, useId, useMemo, useState, type ReactNode } from "react";
 import { CircleHelp, LoaderCircle } from "lucide-react";
 import {
@@ -140,7 +141,10 @@ export function WaterUsePanel({
     };
   }, [controller.roomId, connected, key, today, retry]);
   // Today's value is the live counter; the record supplies every grow-day before it.
-  const live = series.flatMap((item) => item.ids.map((id) => controller.states[id]?.state));
+  const live = series.flatMap((item) => [
+    waterParameters(controller, item.zone.id).plant_count,
+    ...item.ids.map((id) => controller.states[id]?.state),
+  ]);
   const rows = useMemo(() => {
     if (!loaded || !today || lightsOn === undefined || lightsOn === null) return null;
     const now = Date.now();
@@ -164,7 +168,13 @@ export function WaterUsePanel({
     );
     return zoneDays.map(({ zone, days }) => {
       const start = resolveStart(loaded.plan, zone.id, today, inferred);
-      return { zone, days, start, use: zoneWaterUse(days, today, start) };
+      return {
+        zone,
+        days,
+        start,
+        plants: waterParameters(controller, zone.id).plant_count,
+        use: zoneWaterUse(days, today, start),
+      };
     });
   }, [loaded, today, lightsOn, timeZone, key, live.join("|")]);
   if (!zones.length) return null;
@@ -250,6 +260,7 @@ type Row = {
   days: Map<string, number>;
   start: GrowStart | null;
   use: ZoneWaterUse;
+  plants: number | null;
 };
 function WaterUseBody({
   rows,
@@ -299,7 +310,8 @@ function WaterUseBody({
                   <UiTip copyKey="zone" />
                 </span>
               </th>
-              <th scope="col">Today</th>
+              <th scope="col">Today · zone total</th>
+              <th scope="col">Today · average per plant</th>
               <th scope="col">
                 <span className="wu-th">
                   This week
@@ -326,7 +338,7 @@ function WaterUseBody({
             </tr>
           </thead>
           <tbody>
-            {rows.map(({ zone, use }) => (
+            {rows.map(({ zone, use, plants }) => (
               <tr key={zone.id}>
                 <td data-label="Zone" className="wu-zone">
                   <span>
@@ -338,6 +350,20 @@ function WaterUseBody({
                   label="Today"
                   value={litres(use.today.litres)}
                   notes={[`${dates(use.today.day, use.today.day, today)} from ${clock(lightsOn)}`]}
+                />
+                <Figure
+                  label="Today · average per plant"
+                  value={
+                    use.today.litres !== null && positiveCount(plants)
+                      ? `${number((use.today.litres * 1000) / plants!, 1)} mL`
+                      : "Unavailable"
+                  }
+                  notes={[
+                    positiveCount(plants)
+                      ? `÷ ${number(plants, 0)} current configured plants`
+                      : "No valid plant count",
+                    "Uniform distribution assumed",
+                  ]}
                 />
                 <Figure
                   label="This week"
@@ -399,8 +425,10 @@ function WaterUseBody({
             : source === "history"
               ? `From Home Assistant’s recorded history, which reaches back only to ${firstRecorded ? dates(firstRecorded, firstRecorded, today) : "today"} here; inside Home Assistant this panel reads its long-term statistics instead.`
               : "Demo data."}{" "}
-          The controller’s recorded delivery; a grow-day with no record adds nothing and is flagged
-          as not recorded.
+          Controller-recorded delivery estimates, not measured plant uptake. Today’s per-plant
+          average uses the current plant count; changing it changes today’s average. Historical zone
+          totals are retained without applying today’s count to old days. A grow-day with no record
+          adds nothing and is flagged as not recorded.
         </p>
       </div>
       {weeks > 0 && (

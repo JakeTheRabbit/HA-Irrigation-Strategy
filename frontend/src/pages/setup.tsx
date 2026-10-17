@@ -1,3 +1,6 @@
+import { sizingChangedSince } from "@/lib/setup-sizing";
+import { CanonicalControls } from "@/components/canonical-controls";
+import { AllZonesSwitch, RoomPower } from "@/components/room-controls";
 import { useLayoutEffect, useEffect, useState } from "react";
 import {
   Check,
@@ -249,12 +252,13 @@ export function Setup({
   const [tab, setTab] = useState<"rooms" | "install">("rooms");
   const units = useSizingUnits();
   const [settingsDirty, setSettingsDirty] = useState(false);
+  const [equipmentDirty, setEquipmentDirty] = useState(false);
   const dirty = !!draft && (isNew || JSON.stringify(draft) !== JSON.stringify(original));
   const connected = ["live", "demo"].includes(controller.connection);
   useLayoutEffect(() => {
-    onDirtyChange(dirty || settingsDirty);
+    onDirtyChange(dirty || settingsDirty || equipmentDirty);
     return () => onDirtyChange(false);
-  }, [dirty, settingsDirty, onDirtyChange]);
+  }, [dirty, settingsDirty, equipmentDirty, onDirtyChange]);
   function selectRoom(room: SetupRoom | undefined) {
     setIsNew(false);
     setOriginal(room ? structuredClone(room) : null);
@@ -328,18 +332,24 @@ export function Setup({
             ["switch", "input_boolean", "valve"].includes(c.domain)
           : kind === "hvac"
             ? // an AC or dehumidifier: a state that reads on while it runs, or its power sensor
-              ["switch", "input_boolean", "binary_sensor", "climate", "humidifier", "fan", "sensor"].includes(
-                c.domain,
-              )
-          : kind === "timestamp"
-            ? ["sensor", "input_datetime"].includes(c.domain)
-            : kind === "binary"
-              ? ["switch", "binary_sensor"].includes(c.domain)
-              : kind === "light"
-                ? ["light", "switch"].includes(c.domain)
-                : kind === "camera"
-                  ? c.domain === "camera"
-                  : c.domain === "sensor",
+              [
+                "switch",
+                "input_boolean",
+                "binary_sensor",
+                "climate",
+                "humidifier",
+                "fan",
+                "sensor",
+              ].includes(c.domain)
+            : kind === "timestamp"
+              ? ["sensor", "input_datetime"].includes(c.domain)
+              : kind === "binary"
+                ? ["switch", "binary_sensor"].includes(c.domain)
+                : kind === "light"
+                  ? ["light", "switch"].includes(c.domain)
+                  : kind === "camera"
+                    ? c.domain === "camera"
+                    : c.domain === "sensor",
       )
       .sort((a, b) => {
         const preferred = (c: SetupCandidate) =>
@@ -360,7 +370,7 @@ export function Setup({
                     ? /ppm/i.test(c.unit)
                       ? 2
                       : 0
-                    : (kind === "ppfd" || kind === "dli")
+                    : kind === "ppfd" || kind === "dli"
                       ? /mol/i.test(c.unit)
                         ? 2
                         : 0
@@ -416,6 +426,15 @@ export function Setup({
     setBusy(true);
     setError("");
     try {
+      if (!isNew && review === "save" && original) {
+        const fresh = await controller.operator<SetupDocument>("setup_read");
+        const current = fresh.rooms.find((r) => r.entry_id === original.entry_id);
+        if (!current) throw new Error("This room was removed. Your draft is retained.");
+        if (sizingChangedSince(original, current))
+          throw new Error(
+            "Live zone sizing changed since this draft opened. Your draft is retained; reload the room configuration before reviewing again.",
+          );
+      }
       const result = await controller.operator<{ entry_id: string }>(
         review === "remove" ? "setup_remove" : isNew ? "setup_create" : "setup_save",
         review === "remove"
@@ -546,7 +565,7 @@ export function Setup({
             <p>
               Use Rooms and setup to select valves and probes, enter pot/dripper measurements,
               confirm the controller acknowledges the mapping, then review your grow plan. Switch
-              watering on deliberately in Settings.
+              watering on deliberately using Watering in the header for that room.
             </p>
             <Button
               variant="outline"
@@ -746,9 +765,23 @@ export function Setup({
                       Mapping writes are checked again on the server. Switch watering off and verify
                       the mapped hardware is off before saving.
                     </p>
-                    <Button asChild variant="outline">
-                      <a href="#/settings">Watering settings</a>
-                    </Button>
+                    {draft.prefix === controller.room.room.prefix ? (
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          document
+                            .querySelector<HTMLButtonElement>('[data-safety="watering"]')
+                            ?.focus()
+                        }
+                      >
+                        Find this room’s watering control
+                      </Button>
+                    ) : (
+                      <p>
+                        The header controls {controller.room.room.name}, not this setup draft. Pause
+                        the affected room in Home Assistant before retrying; your draft stays here.
+                      </p>
+                    )}
                   </div>
                 )}
               </section>
@@ -950,10 +983,14 @@ export function Setup({
                         {zone.leaf_temperature_sensor !== undefined && (
                           <MappingPicker
                             label={zone.name + " leaf temperature (optional)"}
-                            values={zone.leaf_temperature_sensor ? [zone.leaf_temperature_sensor] : []}
+                            values={
+                              zone.leaf_temperature_sensor ? [zone.leaf_temperature_sensor] : []
+                            }
                             candidates={candidates("temperature")}
                             disabled={busy}
-                            onChange={(v) => editZone(zone.id, { leaf_temperature_sensor: v[0] || "" })}
+                            onChange={(v) =>
+                              editZone(zone.id, { leaf_temperature_sensor: v[0] || "" })
+                            }
                           />
                         )}
                         <MappingPicker
@@ -1099,7 +1136,21 @@ export function Setup({
         </>
       )}
       {tab === "rooms" && controller.roomId && (
-        <><ControllerSettings controller={controller} onDirtyChange={setSettingsDirty} /><HistoryConnection controller={controller} /></>
+        <>
+          <section className="panel workspace-card" id="config-room_active">
+            <h2>Room in use</h2>
+            <RoomPower controller={controller} />
+            <h3>All zone switches</h3>
+            <AllZonesSwitch controller={controller} />
+          </section>
+          <ControllerSettings controller={controller} onDirtyChange={setSettingsDirty} />
+          <CanonicalControls
+            controller={controller}
+            owner="equipment"
+            onDirtyChange={setEquipmentDirty}
+          />
+          <HistoryConnection controller={controller} />
+        </>
       )}
       <Dialog
         open={!!review}
@@ -1120,6 +1171,22 @@ export function Setup({
                 : "Only the selected room configuration is changed. Watering is not switched on and no valve is actuated."}
             </DialogDescription>
           </DialogHeader>
+          {!isNew && draft && !draft.safety.ready && (
+            <div className="workspace-message" role="note">
+              <strong>Equipment and sizing changes need watering off</strong>
+              <p>
+                Switch watering off for the affected rooms and wait for their equipment to stop
+                before saving these changes.
+              </p>
+              {draft.safety.blockers.map((blocker) => (
+                <p key={blocker}>{blocker}</p>
+              ))}
+              <p>
+                Zone names and probe choices can still be saved while watering. Home Assistant
+                checks the actual change again when you save.
+              </p>
+            </div>
+          )}
           {review === "remove" ? (
             <div>
               <span className="label-with-tip">

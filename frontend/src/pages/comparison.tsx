@@ -32,7 +32,7 @@ function liveZone(controller: Controller, id: number): RunZone | null {
 
 /** History › Compare runs: is this crop tracking the last good one, and where did it differ, week
  * by week? A toggle swaps that for both runs overlaid on one full-resolution chart; the record's
- * quality is one tap down and the run records themselves are kept in Settings. */
+ * quality is one tap down and the run records themselves are kept in History, Grows. */
 export function Comparison({
   controller,
   navigate,
@@ -259,7 +259,7 @@ export function Comparison({
     ...(reference === "current" ? preview?.issues || [] : []),
   ];
   const openRecords = () => {
-    navigate("settings");
+    navigate("history/grows");
     setTimeout(() => window.document.getElementById("run-records")?.scrollIntoView(), 0);
   };
   const zoneName =
@@ -310,7 +310,8 @@ export function Comparison({
               label="Compare with"
               copy={{
                 tooltip: "A past run that the page shows next to this run.",
-                impact: "The charts and the tables show the two runs side by side. It changes no setting.",
+                impact:
+                  "The charts and the tables show the two runs side by side. It changes no setting.",
                 guidance: "Select a run first. Select No comparison run to show one run only.",
               }}
             />

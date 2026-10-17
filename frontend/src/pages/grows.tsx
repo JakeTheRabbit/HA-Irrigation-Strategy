@@ -1,4 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { CanonicalControls } from "@/components/canonical-controls";
+import { RunRecords } from "@/components/run-records";
+import { useEffect, useLayoutEffect, useMemo, useState } from "react";
 import {
   CartesianGrid,
   LabelList,
@@ -46,22 +48,80 @@ interface Metric {
   id: string;
   title: string;
   detail: string;
-  keys: { key: "vwcPeak" | "vwcTrough" | "p0Dryback" | "nightRate" | "ecMean" | "litresPerPlant" | "shots"; dashed?: boolean }[];
+  keys: {
+    key:
+      "vwcPeak" | "vwcTrough" | "p0Dryback" | "nightRate" | "ecMean" | "litresPerPlant" | "shots";
+    dashed?: boolean;
+  }[];
   unit: string;
   digits: number;
 }
 const METRICS: Metric[] = [
-  { id: "vwc", title: "Moisture", detail: "Each grow day’s peak (solid) and trough (dashed), %.", keys: [{ key: "vwcPeak" }, { key: "vwcTrough", dashed: true }], unit: " %", digits: 1 },
-  { id: "p0", title: "Morning dryback", detail: "From the P1 plateau to where the night landed, % of the plateau.", keys: [{ key: "p0Dryback" }], unit: " %", digits: 1 },
-  { id: "night", title: "Night drying", detail: "Points of VWC an hour, from lights-off to the first shot.", keys: [{ key: "nightRate" }], unit: " pts/h", digits: 2 },
-  { id: "ec", title: "Pore EC", detail: "The grow day’s mean, mS/cm.", keys: [{ key: "ecMean" }], unit: "", digits: 2 },
-  { id: "water", title: "Water per plant", detail: "Litres a plant each grow day.", keys: [{ key: "litresPerPlant" }], unit: " L", digits: 2 },
-  { id: "shots", title: "Shots", detail: "Shots each grow day.", keys: [{ key: "shots" }], unit: "", digits: 1 },
+  {
+    id: "vwc",
+    title: "Moisture",
+    detail: "Each grow day’s peak (solid) and trough (dashed), %.",
+    keys: [{ key: "vwcPeak" }, { key: "vwcTrough", dashed: true }],
+    unit: " %",
+    digits: 1,
+  },
+  {
+    id: "p0",
+    title: "Morning dryback",
+    detail: "From the P1 plateau to where the night landed, % of the plateau.",
+    keys: [{ key: "p0Dryback" }],
+    unit: " %",
+    digits: 1,
+  },
+  {
+    id: "night",
+    title: "Night drying",
+    detail: "Points of VWC an hour, from lights-off to the first shot.",
+    keys: [{ key: "nightRate" }],
+    unit: " pts/h",
+    digits: 2,
+  },
+  {
+    id: "ec",
+    title: "Pore EC",
+    detail: "The grow day’s mean, mS/cm.",
+    keys: [{ key: "ecMean" }],
+    unit: "",
+    digits: 2,
+  },
+  {
+    id: "water",
+    title: "Water per plant",
+    detail: "Litres a plant each grow day.",
+    keys: [{ key: "litresPerPlant" }],
+    unit: " L",
+    digits: 2,
+  },
+  {
+    id: "shots",
+    title: "Shots",
+    detail: "Shots each grow day.",
+    keys: [{ key: "shots" }],
+    unit: "",
+    digits: 1,
+  },
 ];
 
 /** History › Grows: up to six grows side by side by grow day, from the room's grow-day summaries, with each
  * grow's statistics and its yield. Read-only: nothing here changes watering. */
-export function Grows({ controller }: { controller: Controller }) {
+export function Grows({
+  controller,
+  onDirtyChange,
+}: {
+  controller: Controller;
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
+  const [recordsDirty, setRecordsDirty] = useState(false);
+  const [recordingDirty, setRecordingDirty] = useState(false);
+  useLayoutEffect(() => {
+    onDirtyChange?.(recordsDirty || recordingDirty);
+    return () => onDirtyChange?.(false);
+  }, [recordsDirty, recordingDirty, onDirtyChange]);
   const [runs, setRuns] = useState<RunsDocument | null>(null);
   const [days, setDays] = useState<GrowDaysDocument | null>(null);
   const [harvests, setHarvests] = useState<HarvestsDocument | null>(null);
@@ -97,10 +157,14 @@ export function Grows({ controller }: { controller: Controller }) {
     .map((id) => open.find((r) => r.id === id))
     .filter((r): r is RunRecord => !!r);
   const rows = days?.days ?? [];
-  const recordSwitch = `switch.crop_steering_${controller.room.room.prefix}record_grow_days`;
-  const recording = controller.states[recordSwitch]?.state;
+
   const series = useMemo(
-    () => chosen.map((run) => ({ run, points: growPoints(run, rows, scope), stats: growStats(run, rows, scope) })),
+    () =>
+      chosen.map((run) => ({
+        run,
+        points: growPoints(run, rows, scope),
+        stats: growStats(run, rows, scope),
+      })),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [chosen.map((r) => r.id).join(), rows, scope],
   );
@@ -114,17 +178,6 @@ export function Grows({ controller }: { controller: Controller }) {
     });
     return row;
   });
-  async function startRecording() {
-    setBusy("record");
-    try {
-      const result = await controller.write([{ entityId: recordSwitch, value: true }]);
-      if (result.failed.length) setError(result.failed.map((f) => f.reason).join(" "));
-    } catch (e) {
-      setError(errorText(e));
-    } finally {
-      setBusy("");
-    }
-  }
   async function backfill(run: RunRecord) {
     setBusy(run.id);
     setError("");
@@ -153,8 +206,9 @@ export function Grows({ controller }: { controller: Controller }) {
         <div>
           <h1>Grows</h1>
           <p className="muted small">
-            Grows side by side by grow day, from the summary the controller records at each lights-on. Read-only:
-            nothing here changes watering.
+            Grows side by side by grow day, from the summary the controller records at each
+            lights-on. Summary recording and run records are managed here; they do not change
+            watering.
           </p>
         </div>
       </header>
@@ -163,24 +217,18 @@ export function Grows({ controller }: { controller: Controller }) {
           {error}
         </p>
       )}
-      {recording !== "on" && (
-        <section className="panel grows-record" data-record-prompt>
-          <div>
-            <h2>Start recording daily summaries</h2>
-            <p className="small muted">
-              The controller writes one summary for each zone and probe at every lights-on while Record grow days is
-              on. A grow-day that is not recorded cannot be compared later.
-            </p>
-          </div>
-          <Button disabled={busy === "record" || !controller.states[recordSwitch]} onClick={() => void startRecording()}>
-            {controller.states[recordSwitch] ? "Start recording" : "Update the integration first"}
-          </Button>
-        </section>
-      )}
+      <RunRecords controller={controller} onDirtyChange={setRecordsDirty} />
+      <CanonicalControls
+        controller={controller}
+        owner="history"
+        onDirtyChange={setRecordingDirty}
+      />
       <section className="panel grows-pick">
         <fieldset>
           <legend>Grows (2 to {MAX_GROWS})</legend>
-          {!open.length && <p className="small muted">No runs yet. Record runs in Settings › Run records.</p>}
+          {!open.length && (
+            <p className="small muted">No runs yet. Add a run in Run records above.</p>
+          )}
           {open.map((run) => {
             const on = chosen.some((r) => r.id === run.id);
             return (
@@ -190,7 +238,11 @@ export function Grows({ controller }: { controller: Controller }) {
                   checked={on}
                   disabled={!on && chosen.length >= MAX_GROWS}
                   onChange={() =>
-                    setPicked(on ? chosen.filter((r) => r.id !== run.id).map((r) => r.id) : [...chosen.map((r) => r.id), run.id])
+                    setPicked(
+                      on
+                        ? chosen.filter((r) => r.id !== run.id).map((r) => r.id)
+                        : [...chosen.map((r) => r.id), run.id],
+                    )
                   }
                 />
                 {run.name}
@@ -239,14 +291,27 @@ export function Grows({ controller }: { controller: Controller }) {
                   <span className="muted small">{metric.detail}</span>
                 </figcaption>
                 <ResponsiveContainer width="100%" height={170}>
-                  <LineChart data={chartRows} margin={{ top: 6, right: 8, bottom: 0, left: 0 }} accessibilityLayer={false}>
+                  <LineChart
+                    data={chartRows}
+                    margin={{ top: 6, right: 8, bottom: 0, left: 0 }}
+                    accessibilityLayer={false}
+                  >
                     <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="var(--border)" />
                     <XAxis dataKey="day" {...axis} interval="preserveStartEnd" minTickGap={12} />
-                    <YAxis {...axis} width={40} domain={["auto", "auto"]} tickFormatter={(v) => number(Number(v), metric.digits)} />
+                    <YAxis
+                      {...axis}
+                      width={40}
+                      domain={["auto", "auto"]}
+                      tickFormatter={(v) => number(Number(v), metric.digits)}
+                    />
                     <Tooltip
                       contentStyle={tooltipStyle}
                       labelFormatter={(label) => `Grow day ${label}`}
-                      formatter={(value) => [value === null || value === undefined ? "—" : `${number(Number(value), metric.digits)}${metric.unit}`]}
+                      formatter={(value) => [
+                        value === null || value === undefined
+                          ? "—"
+                          : `${number(Number(value), metric.digits)}${metric.unit}`,
+                      ]}
                     />
                     {series.flatMap((s, g) =>
                       metric.keys.map(({ key, dashed }) => (
@@ -310,12 +375,14 @@ export function Grows({ controller }: { controller: Controller }) {
                     <td>{number(stats.litresPerPlant, 1)}</td>
                     <td>
                       {number(stats.dailyLitresPerPlant, 2)}
-                      {stats.dailyLitresSpread !== null && ` ± ${number(stats.dailyLitresSpread, 2)}`}
+                      {stats.dailyLitresSpread !== null &&
+                        ` ± ${number(stats.dailyLitresSpread, 2)}`}
                     </td>
                     <td>{number(stats.p0Dryback, 1)} %</td>
                     <td>{number(stats.nightRate, 2)} pts/h</td>
                     <td>
-                      {number(stats.ecMin, 1)}–{number(stats.ecMax, 1)} ({number(stats.ecMedian, 1)})
+                      {number(stats.ecMin, 1)}–{number(stats.ecMax, 1)} ({number(stats.ecMedian, 1)}
+                      )
                     </td>
                     <td>
                       {number(stats.vwcPeakMedian, 1)} / {number(stats.vwcTroughMedian, 1)}
@@ -329,11 +396,26 @@ export function Grows({ controller }: { controller: Controller }) {
                     </td>
                     <td className="small">
                       {Object.entries(stats.modes)
-                        .map(([mode, n]) => `${mode} ${Math.round((n / Math.max(1, Object.values(stats.modes).reduce((a, b) => a + b, 0))) * 100)} %`)
+                        .map(
+                          ([mode, n]) =>
+                            `${mode} ${Math.round(
+                              (n /
+                                Math.max(
+                                  1,
+                                  Object.values(stats.modes).reduce((a, b) => a + b, 0),
+                                )) *
+                                100,
+                            )} %`,
+                        )
                         .join(", ") || "—"}
                     </td>
                     <td>
-                      <Button variant="ghost" size="sm" disabled={!!busy} onClick={() => void backfill(run)}>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={!!busy}
+                        onClick={() => void backfill(run)}
+                      >
                         {busy === run.id ? "Filling…" : "Fill from statistics"}
                       </Button>
                     </td>
@@ -348,8 +430,8 @@ export function Grows({ controller }: { controller: Controller }) {
         <section className="panel grows-yield">
           <h2>Yield against water and steering</h2>
           <p className="small muted">
-            Grams are dry weight. g/L divides it by the litres fed over the grow. Yields differ by cultivar, plant
-            count, season and much else: these figures show what happened, not why.
+            Grams are dry weight. g/L divides it by the litres fed over the grow. Yields differ by
+            cultivar, plant count, season and much else: these figures show what happened, not why.
           </p>
           <div className="grows-table-wrap">
             <table className="grows-table" data-yield-table>
@@ -402,25 +484,41 @@ export function Grows({ controller }: { controller: Controller }) {
           </div>
           {yields.filter((y) => y.figures.dryG !== null).length < TREND_MIN_GROWS && (
             <p className="small muted" data-record-not-trend>
-              Fewer than {TREND_MIN_GROWS} grows with a yield: this is a record, not a trend. No fit line is drawn.
+              Fewer than {TREND_MIN_GROWS} grows with a yield: this is a record, not a trend. No fit
+              line is drawn.
             </p>
           )}
           <div className="grows-scatters">
             <YieldScatter
               title="g/plant against L/plant"
-              points={yields.map((y, g) => ({ name: y.run.name, g, x: y.stats.litresPerPlant, y: y.figures.gramsPerPlant }))}
+              points={yields.map((y, g) => ({
+                name: y.run.name,
+                g,
+                x: y.stats.litresPerPlant,
+                y: y.figures.gramsPerPlant,
+              }))}
               xUnit="L/plant"
               yUnit="g/plant"
             />
             <YieldScatter
               title="g/plant against P0 dryback"
-              points={yields.map((y, g) => ({ name: y.run.name, g, x: y.stats.p0Dryback, y: y.figures.gramsPerPlant }))}
+              points={yields.map((y, g) => ({
+                name: y.run.name,
+                g,
+                x: y.stats.p0Dryback,
+                y: y.figures.gramsPerPlant,
+              }))}
               xUnit="% dryback"
               yUnit="g/plant"
             />
             <YieldScatter
               title="g/L against EC median"
-              points={yields.map((y, g) => ({ name: y.run.name, g, x: y.stats.ecMedian, y: y.figures.gramsPerLitre }))}
+              points={yields.map((y, g) => ({
+                name: y.run.name,
+                g,
+                x: y.stats.ecMedian,
+                y: y.figures.gramsPerLitre,
+              }))}
               xUnit="mS/cm"
               yUnit="g/L"
             />
@@ -460,14 +558,42 @@ function YieldScatter({
       <figcaption className="small">{title}</figcaption>
       {data.length ? (
         <ResponsiveContainer width="100%" height={180}>
-          <ScatterChart margin={{ top: 10, right: 16, bottom: 4, left: 0 }} accessibilityLayer={false}>
+          <ScatterChart
+            margin={{ top: 10, right: 16, bottom: 4, left: 0 }}
+            accessibilityLayer={false}
+          >
             <CartesianGrid strokeDasharray="3 5" stroke="var(--border)" />
-            <XAxis type="number" dataKey="x" name={xUnit} {...axis} domain={["auto", "auto"]} unit={` ${xUnit}`} />
-            <YAxis type="number" dataKey="y" name={yUnit} {...axis} width={44} domain={["auto", "auto"]} />
+            <XAxis
+              type="number"
+              dataKey="x"
+              name={xUnit}
+              {...axis}
+              domain={["auto", "auto"]}
+              unit={` ${xUnit}`}
+            />
+            <YAxis
+              type="number"
+              dataKey="y"
+              name={yUnit}
+              {...axis}
+              width={44}
+              domain={["auto", "auto"]}
+            />
             <Tooltip contentStyle={tooltipStyle} cursor={{ stroke: "var(--border)" }} />
             {data.map((p) => (
-              <Scatter key={p.g} name={p.name} data={[p]} fill={colour(p.g)} isAnimationActive={false}>
-                <LabelList dataKey="name" position="top" fill="var(--muted-foreground)" fontSize={12} />
+              <Scatter
+                key={p.g}
+                name={p.name}
+                data={[p]}
+                fill={colour(p.g)}
+                isAnimationActive={false}
+              >
+                <LabelList
+                  dataKey="name"
+                  position="top"
+                  fill="var(--muted-foreground)"
+                  fontSize={12}
+                />
               </Scatter>
             ))}
           </ScatterChart>
@@ -515,7 +641,8 @@ function HarvestForm({
     };
     for (const [key] of WEIGHT_FIELDS) {
       out[`room.${key}`] = toText(harvest?.room?.[key]);
-      for (const zone of run.zones) out[`${zone.zone_id}.${key}`] = toText(harvest?.zones[String(zone.zone_id)]?.[key]);
+      for (const zone of run.zones)
+        out[`${zone.zone_id}.${key}`] = toText(harvest?.zones[String(zone.zone_id)]?.[key]);
     }
     return out;
   });
@@ -542,7 +669,9 @@ function HarvestForm({
           : {
               harvest_date: draft.harvest_date || null,
               room: weights("room"),
-              zones: Object.fromEntries(run.zones.map((zone) => [String(zone.zone_id), weights(String(zone.zone_id))])),
+              zones: Object.fromEntries(
+                run.zones.map((zone) => [String(zone.zone_id), weights(String(zone.zone_id))]),
+              ),
               plants: harvest?.plants ?? [],
               quality: draft.quality || null,
               notes: draft.notes || null,
@@ -559,13 +688,20 @@ function HarvestForm({
   const field = (key: string, label: string, props: Record<string, unknown> = {}) => (
     <label className="grows-field">
       <span className="small">{label}</span>
-      <Input aria-label={label} value={draft[key] ?? ""} onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} {...props} />
+      <Input
+        aria-label={label}
+        value={draft[key] ?? ""}
+        onChange={(e) => setDraft({ ...draft, [key]: e.target.value })}
+        {...props}
+      />
     </label>
   );
   return (
     <section className="panel grows-harvest" aria-label={`Harvest of ${run.name}`}>
       <h2>Harvest · {run.name}</h2>
-      <p className="small muted">Every field is optional. Grams per plant, per m² and per litre are worked out from these.</p>
+      <p className="small muted">
+        Every field is optional. Grams per plant, per m² and per litre are worked out from these.
+      </p>
       <div className="grows-form">
         {field("harvest_date", "Harvest date", { type: "date" })}
         {field("quality", "Quality grade", { maxLength: 40 })}
@@ -574,19 +710,27 @@ function HarvestForm({
       </div>
       <h3 className="small">Room</h3>
       <div className="grows-form">
-        {WEIGHT_FIELDS.map(([key, label]) => field(`room.${key}`, `Room ${label}`, { inputMode: "decimal" }))}
+        {WEIGHT_FIELDS.map(([key, label]) =>
+          field(`room.${key}`, `Room ${label}`, { inputMode: "decimal" }),
+        )}
       </div>
       {run.zones.map((zone) => (
         <div key={zone.zone_id}>
           <h3 className="small">{zone.name}</h3>
           <div className="grows-form">
-            {WEIGHT_FIELDS.map(([key, label]) => field(`${zone.zone_id}.${key}`, `${zone.name} ${label}`, { inputMode: "decimal" }))}
+            {WEIGHT_FIELDS.map(([key, label]) =>
+              field(`${zone.zone_id}.${key}`, `${zone.name} ${label}`, { inputMode: "decimal" }),
+            )}
           </div>
         </div>
       ))}
       <label className="grows-field grows-notes">
         <span className="small">Notes</span>
-        <textarea maxLength={500} value={draft.notes} onChange={(e) => setDraft({ ...draft, notes: e.target.value })} />
+        <textarea
+          maxLength={500}
+          value={draft.notes}
+          onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
+        />
       </label>
       {error && (
         <p role="alert" className="grows-notice">

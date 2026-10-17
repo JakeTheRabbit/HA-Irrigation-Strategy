@@ -14,6 +14,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { HistoryExplorer } from "@/components/history-explorer";
+import { OnThisDay } from "@/components/on-this-day";
+import { RecordedBehaviour } from "@/components/recorded-behaviour";
 import { AskWhy } from "@/components/ask-why";
 import { DayLanes } from "@/components/day-lanes";
 import { Empty, Heading, time as clock } from "@/components/dashboard";
@@ -56,8 +59,28 @@ const TYPES: { type: TimelineType; label: string }[] = [
 
 /** History › Timeline: what watered, when and why; phase changes; setpoint changes, the grower's and
  * The AI assistant's; alerts; and the AI assistant's decisions with how they turned out. One list, newest first. */
-export function Timeline({ controller, zone }: { controller: Controller; zone?: number }) {
+export function Timeline({
+  controller,
+  zone,
+  onZoneChange,
+}: {
+  controller: Controller;
+  zone?: number;
+  onZoneChange?: (zone: number | undefined) => void;
+}) {
   const [filter, setFilter] = useState<TimelineFilter>({ ...NO_FILTER, zone: zone ?? "all" });
+  useEffect(
+    () =>
+      setFilter((current) => ({
+        ...current,
+        zone: zone ?? (current.zone === "room" ? "room" : "all"),
+      })),
+    [zone, controller.roomId],
+  );
+  const selectedZone =
+    controller.room.zones.find((item) => item.id === filter.zone) ??
+    controller.room.zones.find((item) => item.id === zone) ??
+    controller.room.zones[0];
   const [changes, setChanges] = useState<SetpointLogDocument | null>(null);
   const { room, states } = controller;
   // Who changed which setting: the integration's change log. An older integration has none.
@@ -103,7 +126,7 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
   return (
     <>
       <Heading
-        title="Timeline"
+        title="History"
         action={
           <Button variant="outline" disabled={!shown.length} onClick={exportCsv}>
             <Download size={16} />
@@ -114,7 +137,9 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
       {room.display.options.show_equipment_lanes && (
         <DayLanes controller={controller} mode="equipment" />
       )}
-      {room.display.options.show_room_day_lanes && <DayLanes controller={controller} mode="zones" />}
+      {room.display.options.show_room_day_lanes && (
+        <DayLanes controller={controller} mode="zones" />
+      )}
       <div className="toolbar timeline-toolbar">
         <div className="search-field">
           <Search size={17} />
@@ -131,6 +156,7 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
           onChange={(event) => {
             const value = event.target.value;
             set({ zone: value === "all" || value === "room" ? value : Number(value) });
+            onZoneChange?.(value === "all" || value === "room" ? undefined : Number(value));
           }}
         >
           <option value="all">All zones and the room</option>
@@ -178,7 +204,33 @@ export function Timeline({ controller, zone }: { controller: Controller; zone?: 
           <JevTrouble jev={jev.room} />
         </div>
       )}
-      <AskWhy controller={controller} zone={zone} />
+      {selectedZone && (
+        <section aria-label="Recorded zone evidence">
+          <p className="muted small">
+            Recorded evidence · {selectedZone.name}. Select a zone above to keep charts and events
+            together.
+          </p>
+          <HistoryExplorer
+            key={`${controller.roomId}-${selectedZone.id}`}
+            controller={controller}
+            zone={selectedZone}
+          />
+          <RecordedBehaviour
+            key={`targets-${controller.roomId}-${selectedZone.id}`}
+            controller={controller}
+            zone={selectedZone}
+          />
+          <OnThisDay
+            key={`on-this-day-${controller.roomId}-${selectedZone.id}`}
+            controller={controller}
+            zone={selectedZone}
+          />
+        </section>
+      )}
+      <AskWhy
+        controller={controller}
+        zone={typeof filter.zone === "number" ? filter.zone : undefined}
+      />
       <section className="panel timeline-panel" aria-label="Timeline records">
         {!shown.length ? (
           <Empty

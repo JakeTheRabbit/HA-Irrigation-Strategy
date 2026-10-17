@@ -647,9 +647,10 @@ describe("what a room's timeline reads", () => {
 
 describe("the demo's day", () => {
   // Seven hours after Room A's demo lights-on, in whatever time zone the test runs.
-  const now = new Date(2026, 8, 23, 17, 0).getTime();
-  const states = createDemo(now);
+  const clock = () => new Date(2026, 8, 23, 17, 0).getTime();
   const load = (prefix: string) => {
+    const now = clock();
+    const states = createDemo(now);
     const room = buildRoom(
       states,
       discoverRooms(states).find((item) => item.prefix === prefix)!,
@@ -660,10 +661,10 @@ describe("the demo's day", () => {
     const day = growDay(hour("on"), hour("off"), now)!;
     const rows = demoDay(states, { ...read, start: day.start, end: now }, now);
     const decisions = rows[read.attributeIds[0]];
-    return { read, day, rows, decisions };
+    return { read, day, rows, decisions, now, states };
   };
   it("is a whole plausible day that ends now, recorded only for what was asked", () => {
-    const { read, day, rows, decisions } = load("");
+    const { read, day, rows, decisions, now, states } = load("");
     expect(Object.keys(rows).sort()).toEqual([...read.entityIds, ...read.attributeIds].sort());
     expect(
       Object.values(rows)
@@ -689,7 +690,7 @@ describe("the demo's day", () => {
     }
   });
   it("shows a hold, the change that ended it, and a supervisor's setpoint move", () => {
-    const { day, rows, decisions } = load("");
+    const { day, rows, decisions, now } = load("");
     const [hold] = zoneBlocks(decisions, 2, day.start, now);
     expect(hold).toMatchObject({ kind: "hold", open: false });
     expect(hold.text).toMatch(/^source-water EC/);

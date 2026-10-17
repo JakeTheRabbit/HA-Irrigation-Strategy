@@ -14,6 +14,15 @@ export function dayWord(at: number, now: number): string {
 /** Readable text for anything a catch block can receive. Home Assistant rejects
  * service calls with plain objects, which String() renders as "[object Object]". */
 export function errorText(e: unknown): string {
+  // hass.callApi rejects with HttpError: its message is only "Response error: 400/500".
+  // The response body carries the service's explanation, including setup safety blockers.
+  if (e && typeof e === "object") {
+    const body = (e as { body?: unknown }).body;
+    if (body && typeof body === "object") {
+      const message = (body as { message?: unknown }).message;
+      if (typeof message === "string" && message.trim()) return message;
+    }
+  }
   if (e instanceof Error) return e.message;
   if (e === null || e === undefined) return "Unknown error";
   if (typeof e === "string") return e;
