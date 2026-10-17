@@ -11,6 +11,7 @@ import { viewerTimeZone } from "./comparison";
 export interface HassSession {
   callApi: <T>(method: string, path: string, data?: unknown) => Promise<T>;
   callService: (domain: string, service: string, data: Record<string, unknown>) => Promise<unknown>;
+  callWS?: <T>(message: Record<string, unknown>) => Promise<T>;
   /** Home Assistant's own websocket (`hass.connection`); see live.ts. */
   connection?: unknown;
   /** The signed-in user (`hass.user`). */
@@ -114,7 +115,7 @@ export class HaClient {
     method: string,
     path: string,
     data?: unknown,
-    service?: { domain: string; action: string },
+    service?: { domain: string; action: string; response?: boolean },
     externalSignal?: AbortSignal,
   ): Promise<T> {
     if (externalSignal?.aborted) throw new DOMException("History request cancelled.", "AbortError");
@@ -141,7 +142,12 @@ export class HaClient {
     });
     try {
       const operation = this.session
-        ? service
+        ? service?.response && this.session.callWS
+          ? this.session.callWS<{ response?: unknown }>({
+              type: "call_service", domain: service.domain, service: service.action,
+              service_data: data, return_response: true,
+            }).then((result) => ({ service_response: result?.response }))
+          : service
           ? this.session.callService(
               service.domain,
               service.action,
@@ -236,10 +242,12 @@ export class HaClient {
       await this.service("crop_steering", action, data);
       return undefined as T;
     }
+    // HA's native websocket keeps service validation messages that REST can reduce to HTTP 500.
     const response = await this.request<{ service_response?: T }>(
       "POST",
       "services/crop_steering/" + action + "?return_response",
       data,
+      this.session?.callWS ? { domain: "crop_steering", action, response: true } : undefined,
     );
     if (!response || response.service_response === undefined)
       throw new Error(

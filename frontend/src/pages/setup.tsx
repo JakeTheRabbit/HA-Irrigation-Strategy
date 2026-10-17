@@ -1120,6 +1120,20 @@ export function Setup({
                 : "Only the selected room configuration is changed. Watering is not switched on and no valve is actuated."}
             </DialogDescription>
           </DialogHeader>
+          {!isNew && draft && !draft.safety.ready && (
+            <div className="workspace-message" role="note">
+              <strong>Equipment and sizing changes need watering off</strong>
+              <p>
+                Switch watering off for the affected rooms and wait for their equipment to stop
+                before saving these changes.
+              </p>
+              {draft.safety.blockers.map((blocker) => <p key={blocker}>{blocker}</p>)}
+              <p>
+                Zone names and probe choices can still be saved while watering. Home Assistant
+                checks the actual change again when you save.
+              </p>
+            </div>
+          )}
           {review === "remove" ? (
             <div>
               <span className="label-with-tip">

@@ -170,7 +170,7 @@ async function saveSetup(target = page) {
 }
 /** Mocked live Home Assistant with one room, so a check can read the exact setup_save payload.
  * `calls` records every service the page reached, which is how "never actuates" is proven. */
-async function liveSetup(run, history = false) {
+async function liveSetup(run, history = false, blockers = []) {
   const live = await browser.newContext({ viewport: { width: 1440, height: 1000 } });
   const calls = [];
   const stamp = new Date().toISOString();
@@ -215,7 +215,7 @@ async function liveSetup(run, history = false) {
       },
     ],
     hardware: {},
-    safety: { ready: true, blockers: [] },
+    safety: { ready: blockers.length === 0, blockers },
   };
   await live.addInitScript(() =>
     localStorage.setItem("hassTokens", JSON.stringify({ access_token: "sizing-fixture-token" })),
@@ -251,6 +251,7 @@ async function liveSetup(run, history = false) {
         },
       });
     if (action === "setup_save") {
+      if (blockers.length) return reply({ message: blockers.join("; ") }, 500);
       Object.assign(room, { zones: data.zones, revision: room.revision + 1 });
       return reply({ changed_states: [], service_response: room });
     }
@@ -280,6 +281,21 @@ async function liveSetup(run, history = false) {
 }
 const savedZone = (calls) => calls.findLast((call) => call.action === "setup_save").data.zones[0];
 try {
+  await check("A setup refusal names the watering blocker and retains the draft for retry", async () => {
+    const reason = "input_boolean.f2_control_enabled must read OFF before changing setup (it is ON: turn it off, then submit again)";
+    await liveSetup(async (lp, calls) => {
+      await lp.locator("#room-name").fill("My edited room");
+      await lp.getByRole("button", { name: "Review configuration", exact: true }).click();
+      const dialog = lp.getByRole("dialog");
+      await visible(dialog.getByText("Equipment and sizing changes need watering off", { exact: true }));
+      await dialog.getByRole("button", { name: "Save configuration", exact: true }).click();
+      await visible(dialog.getByRole("alert"));
+      assert.equal(await dialog.getByRole("alert").innerText(), reason);
+      assert.equal(calls.filter((c) => c.action === "setup_save").length, 1);
+      await dialog.getByRole("button", { name: "Back to editing", exact: true }).click();
+      assert.equal(await lp.locator("#room-name").inputValue(), "My edited room");
+    }, false, [reason]);
+  });
   await check(
     "Planning slider changes both the VWC and the EC setpoints; exact day and week edits preserve neighboring days and other zones",
     async () => {

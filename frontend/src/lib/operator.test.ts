@@ -7,13 +7,52 @@ import type { OperatorAction } from "./operator-types";
 
 afterEach(() => vi.restoreAllMocks());
 describe("workspace response transport", () => {
+  it("preserves native HA validation errors and never retries a rejected write over REST", async () => {
+    const reason = "input_boolean.f2_control_enabled must read OFF before changing setup";
+    const failure = { code: "home_assistant_error", message: reason };
+    const callWS = vi.fn().mockRejectedValue(failure),
+      callApi = vi.fn(),
+      callService = vi.fn();
+    const client = new HaClient("http://ha.test", "", { callWS, callApi, callService });
+    await expect(client.operator("setup_save", { entry_id: "f2" })).rejects.toEqual(failure);
+    expect(callWS).toHaveBeenCalledWith({
+      type: "call_service",
+      domain: "crop_steering",
+      service: "setup_save",
+      service_data: { entry_id: "f2" },
+      return_response: true,
+    });
+    expect(callApi).not.toHaveBeenCalled();
+    expect(callService).not.toHaveBeenCalled();
+  });
+  it("reads successful native response services", async () => {
+    const callWS = vi.fn().mockResolvedValue({ context: {}, response: { revision: 7 } });
+    const client = new HaClient("http://ha.test", "", {
+      callWS,
+      callApi: vi.fn(),
+      callService: vi.fn(),
+    });
+    expect(await client.operator("setup_save", {})).toEqual({ revision: 7 });
+  });
+  it("keeps the native response request bounded by the client timeout", async () => {
+    const callWS = vi.fn().mockReturnValue(new Promise(() => {}));
+    const client = new HaClient(
+      "http://ha.test",
+      "",
+      { callWS, callApi: vi.fn(), callService: vi.fn() },
+      10,
+    );
+    await expect(client.operator("setup_save", {})).rejects.toThrow("timed out");
+  });
   it("uses response-bearing REST even inside an inherited HA session", async () => {
     const callApi = vi
       .fn()
       .mockResolvedValue({ changed_states: [], service_response: { revision: 3 } });
     const callService = vi.fn();
     const client = new HaClient("http://ha.test", "", { callApi, callService } as HassSession);
-    expect(await client.operator("strategy_get", { room_id: "room:room_b_" })).toEqual({ revision: 3 });
+    expect(await client.operator("strategy_get", { room_id: "room:room_b_" })).toEqual({
+      revision: 3,
+    });
     expect(callApi).toHaveBeenCalledWith(
       "POST",
       "services/crop_steering/strategy_get?return_response",
