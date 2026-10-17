@@ -23,7 +23,7 @@ import { inferPlumbing, plumbingErrors } from "./plumbing";
 import type { Overlay } from "./overlays";
 import { DEMO_WHATS_NEW } from "./whats-new-demo";
 import { compareVersions } from "./whats-new";
-import { InstructionsDemo } from "./brain-instructions"
+import { InstructionsDemo } from "./brain-instructions";
 import { DISPLAY_DEFAULTS, displayEntityId, readDisplay, type DisplayOptions } from "./display";
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -119,7 +119,7 @@ export class OperatorDemo {
         blockers:
           states[flag]?.state === "off"
             ? []
-            : ["Set the kill switch of this room to off in Settings before you change the mapping."],
+            : ["Use Watering in the header to pause this room before you change the mapping."],
       };
     }
     const candidates = Object.values(states).map((e) => ({
@@ -431,7 +431,12 @@ export class OperatorDemo {
       const id = "switch.crop_steering_" + prefix + "engine_enabled";
       const states = this.getStates();
       if (states[id]) this.updateStates({ ...states, [id]: { ...states[id], state: "off" } });
-      return { kill_switch: states[id] ? [id] : [], switched_off: [], refused: [], still_on: [] } as T;
+      return {
+        kill_switch: states[id] ? [id] : [],
+        switched_off: [],
+        refused: [],
+        still_on: [],
+      } as T;
     }
     if (action === "test_shot") {
       // The demo's controller answers at once: the button records the press, the shot runs.

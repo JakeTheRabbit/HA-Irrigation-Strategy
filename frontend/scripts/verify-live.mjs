@@ -184,16 +184,25 @@ const visible = (locator) => locator.waitFor({ state: "visible", timeout: 10000 
 /** The header says the dashboard reads Home Assistant live (not the demo, not offline). */
 const connected = (target = page) =>
   visible(target.locator('header.topbar[data-connection="live"]'));
-const menu = (name) =>
-  page
+const menu = async (name) => {
+  await page
     .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name, exact: true })
+    .getByRole("button", { name: name === "Today" ? "Overview" : name, exact: true })
     .click();
+  if (name === "Today")
+    await page
+      .getByRole("navigation", { name: "Overview views" })
+      .getByRole("button", { name: "Selected room", exact: true })
+      .click();
+};
 async function check(name, run) {
   await run();
   checks.push(name);
   console.log("PASS " + name);
 }
+const roomChip = (id) => page.locator(`header.topbar [data-room="${id}"]`);
+const selectedRoom = () =>
+  page.locator("header.topbar [data-room][aria-pressed=true]").getAttribute("data-room");
 const field = (key) =>
   page.locator(`input[id="setting-number.crop_steering_room_b_zone_1_${key}"]`);
 try {
@@ -202,7 +211,7 @@ try {
       waitUntil: "networkidle",
     });
     await connected();
-    assert.equal(await page.locator("#desktop-room").inputValue(), "room:room_b_");
+    assert.equal(await selectedRoom(), "room:room_b_");
     assert.equal(await page.locator(".demo-pill").count(), 0);
     await visible(field("p1_target_vwc"));
   });
@@ -214,10 +223,10 @@ try {
       assert.match(await versions.innerText(), /Integration\s+2\.19\.1/);
       assert.match(await versions.innerText(), /Controller\s+0\.16\.1/);
       // An older pair reports nothing: say so, never show a number this page made up.
-      await page.locator("#desktop-room").selectOption("room:");
+      await roomChip("room:").click();
       await visible(versions.getByText("not reported").first());
       assert.equal((await versions.innerText()).match(/not reported/g).length, 2);
-      await page.locator("#desktop-room").selectOption("room:room_b_");
+      await roomChip("room:room_b_").click();
       await visible(versions.getByText("2.19.1"));
     },
   );
@@ -227,7 +236,7 @@ try {
       // Seen on a real phone: the drawer was screen-high, the menu taller, and it would not scroll.
       const phone = await context.newPage();
       try {
-        await phone.setViewportSize({ width: 390, height: 640 });
+        await phone.setViewportSize({ width: 390, height: 400 });
         await phone.goto(`${base}/dashboard.html?room=room_b#/today`, { waitUntil: "networkidle" });
         await phone.getByRole("button", { name: "Open navigation", exact: true }).click();
         const drawer = phone.locator(".mobile-sidebar");
@@ -241,11 +250,13 @@ try {
         const versions = drawer.locator(".sidebar-versions");
         await versions.scrollIntoViewIfNeeded();
         const box = await versions.boundingBox();
-        assert.ok(box && box.y >= 0 && box.y + box.height <= 640, "versions must be reachable");
+        assert.ok(box && box.y >= 0 && box.y + box.height <= 400, "versions must be reachable");
         assert.match(await versions.innerText(), /Controller\s+0\.16\.1/);
         assert.ok((await drawer.evaluate((el) => el.scrollTop)) > 0, "it really scrolled");
         // and the first item is still reachable on the way back
-        await drawer.getByRole("button", { name: "Today" }).scrollIntoViewIfNeeded();
+        await drawer
+          .getByRole("button", { name: "Overview", exact: true })
+          .scrollIntoViewIfNeeded();
       } finally {
         await phone.close();
       }
@@ -263,7 +274,7 @@ try {
     },
   );
   await check(
-    "an open dropdown can be read on a dark Home Assistant theme (targets, timeline, zone, compare)",
+    "an open dropdown can be read on a dark Home Assistant theme (targets, timeline, capability directory, compare)",
     async () => {
       // Home Assistant's input fill is a translucent rgba of the text colour. The browser cannot
       // paint an option list with it and fell back to white under light text.
@@ -277,7 +288,12 @@ try {
           const [r, g, b] = colour.match(/[\d.]+/g).map(Number);
           return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
         };
-        for (const route of ["plan/targets", "history/timeline", "zone/1", "history/compare"]) {
+        for (const route of [
+          "plan/targets",
+          "history/timeline",
+          "settings/features",
+          "history/compare",
+        ]) {
           await themed.goto(`${base}/dashboard.html?room=room_b#/${route}`, {
             waitUntil: "networkidle",
           });
@@ -407,7 +423,9 @@ try {
       );
       assert.match(await page.locator(".probes-status").innerText(), /Probes\s+2 of 4 OK/);
       // The controller's own sensors, one tap down: stale is amber, reporting green, down red.
-      const internals = page.locator("details.probes-more", { hasText: "All sensors of this room" });
+      const internals = page.locator("details.probes-more", {
+        hasText: "All sensors of this room",
+      });
       await internals.locator("summary").click();
       const row = internals.locator(".sensors-table tr").filter({ hasText: probe });
       await visible(row.getByText("Stale or unverified", { exact: true }));
@@ -473,7 +491,9 @@ try {
       // The controller's sensors, once opened: one request for every numeric one. A later re-read may
       // repeat a request; it is never one request per row.
       history.length = 0;
-      const internals = page.locator("details.probes-more", { hasText: "All sensors of this room" });
+      const internals = page.locator("details.probes-more", {
+        hasText: "All sensors of this room",
+      });
       if ((await internals.getAttribute("open")) === null)
         await internals.locator("summary").click();
       await page.waitForFunction(() => document.querySelectorAll(".sensors-table tr").length > 1);
@@ -506,7 +526,7 @@ try {
           .locator("[data-tank-status]")
           .getByText("Disconnected · last received", { exact: true }),
       );
-      await menu("Plan");
+      await menu("Irrigation");
       assert.equal(await field("p1_target_vwc").isDisabled(), true);
       assert.equal(await page.locator(".demo-pill").count(), 0);
       await page.screenshot({
@@ -522,7 +542,7 @@ try {
     await menu("Today");
     await visible(page.getByRole("heading", { name: "No zones found", exact: true }));
     await visible(page.getByRole("heading", { level: 1, name: "Today", exact: true }));
-    assert.equal(await page.locator("#desktop-room").isDisabled(), true);
+    assert.equal(await page.locator("header.topbar [data-room]").count(), 0);
     // A zone's old address finds no zone either, and says so.
     await page.evaluate(() => (location.hash = "#/zone/1"));
     await visible(page.getByRole("heading", { name: "No zones found", exact: true }));
@@ -554,7 +574,7 @@ try {
         unit_of_measurement: "%",
       });
       await page.goto(`${base}/dashboard.html?room=f2#/strategy`, { waitUntil: "networkidle" });
-      assert.equal(await page.locator("#desktop-room").inputValue(), "room:f2_");
+      assert.equal(await selectedRoom(), "room:f2_");
       await visible(
         page.locator('input[id="setting-number.crop_steering_f2_zone_1_p2_vwc_threshold"]'),
       );
@@ -577,9 +597,9 @@ try {
         "Unsupported legacy query must stay in the safe dashboard",
       );
       await page.goto(`${base}/dashboard.html?room=f2#/help`, { waitUntil: "networkidle" });
-      await page.locator("#desktop-room").selectOption("room:");
+      await roomChip("room:").click();
       await visible(page.getByRole("heading", { name: "Help", exact: true }));
-      assert.equal(await page.locator("#desktop-room").inputValue(), "room:");
+      assert.equal(await selectedRoom(), "room:");
       assert.equal(new URL(page.url()).hash, "#/help");
     },
   );
@@ -592,7 +612,7 @@ try {
       await page.goto(`${base}/f2-classic.html${query}`, { waitUntil: "networkidle" });
 
       await connected();
-      assert.equal(await page.locator("#desktop-room").inputValue(), expected);
+      assert.equal(await selectedRoom(), expected);
       assert.equal(new URL(page.url()).searchParams.get("room"), expected);
     }
     // An old ?room=f1 link still opens the dashboard on the room with prefix f1_.
@@ -638,11 +658,32 @@ try {
     await page.goto(`${base}/dashboard.html?room=missing-room#/strategy`, {
       waitUntil: "networkidle",
     });
-    assert.equal(await page.locator("#desktop-room").inputValue(), "");
+    assert.equal(await page.locator("header.topbar [data-room][aria-pressed=true]").count(), 0);
     assert.equal(await page.locator('input[type="number"]').count(), 0);
   });
   await check(
-    "AI assistant powers: a checkbox per switch, switch.turn_off/turn_on, a refusal inline, 1440 and 390",
+    "capability directory is read-only and links to the target owner without writes",
+    async () => {
+      const before = calls.length;
+      await page.goto(`${base}/dashboard.html?room=room_b#/settings/features`, {
+        waitUntil: "networkidle",
+      });
+      await visible(page.getByRole("heading", { name: "Capabilities", exact: true }));
+      assert.equal(
+        await page.locator("main input[type=number], main input[role=switch]").count(),
+        0,
+      );
+      const targetLink = page
+        .locator('[data-feature="p1"]')
+        .getByRole("link", { name: "Open Irrigation" });
+      assert.match(await targetLink.getAttribute("href"), /plan\/targets\?feature=p1$/);
+      await page.getByRole("searchbox", { name: "Search features" }).fill("p1_target_vwc");
+      assert.equal(await page.locator("[data-feature]").count(), 1);
+      assert.equal(calls.length, before, "searching and browsing never writes settings");
+    },
+  );
+  await check(
+    "AI permissions: reviewed owner, read-only Today summary, refusal preserves draft, 1440 and 390",
     async () => {
       const labels = [
         "Start the next phase early",
@@ -655,65 +696,91 @@ try {
         "Tune shot sizes",
       ];
       const id = (key) => `switch.crop_steering_room_b_ai_power_${key}`;
-      const box = (key) => page.locator(`[data-brain-powers] [data-power="${key}"] input`);
-      const settled = (key, checked) =>
-        page.waitForFunction(
-          ([selector, want]) => {
-            const input = document.querySelector(selector);
-            return input && input.checked === want && !input.disabled;
-          },
-          [`[data-brain-powers] [data-power="${key}"] input`, checked],
-        );
+      const box = (key) => page.locator(`#config-ai_power_${key}`).getByRole("switch");
+      async function applyReview() {
+        await page.getByRole("button", { name: "Review changes", exact: true }).click();
+        await page
+          .getByRole("dialog")
+          .getByRole("button", { name: "Apply 1 change", exact: true })
+          .click();
+      }
       for (const width of [1440, 390]) {
         await page.setViewportSize({ width, height: width === 390 ? 844 : 1000 });
-        await page.goto(`${base}/dashboard.html?room=room_b#/today/ai`, {
+        await page.goto(`${base}/dashboard.html?room=room_b#/settings/ai`, {
           waitUntil: "networkidle",
         });
         await connected();
-        const powers = page.locator("[data-brain-powers]");
-        await visible(powers);
-        assert.equal(await powers.getByRole("checkbox").count(), 8);
+        const powers = page.locator('[id^="config-ai_power_"]');
+        await visible(powers.first());
+        assert.equal(await powers.getByRole("switch").count(), 8);
         for (const label of labels)
-          await visible(powers.getByRole("checkbox", { name: label, exact: true }));
+          await visible(powers.getByRole("heading", { name: new RegExp(label, "i") }));
+        for (const toggle of await powers.getByRole("switch").all())
+          assert.ok(
+            (await toggle.getAttribute("aria-label"))?.endsWith("Room default"),
+            "permission has an accessible room-scoped label",
+          );
         assert.equal(
           await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
           true,
           `no horizontal scroll at ${width}`,
         );
-        await page.screenshot({ path: path.join(out, `live-ai-powers-${width}.png`), fullPage: true });
+        await page.screenshot({
+          path: path.join(out, `live-ai-powers-${width}.png`),
+          fullPage: true,
+        });
       }
-      // On by default: unticking it switches it off in Home Assistant, and the box follows the readback.
       let before = calls.length;
       await box("advance_phase").click();
-      await settled("advance_phase", false);
+      assert.equal(calls.length, before, "permission changes stay draft until reviewed");
+      await applyReview();
+      await page.getByRole("dialog").waitFor({ state: "hidden" });
+      assert.equal(await box("advance_phase").isChecked(), false);
       assert.deepEqual(calls.slice(before), [
         { path: "/api/services/switch/turn_off", entity_id: id("advance_phase") },
       ]);
-      // Off by default: ticking it switches it on.
       before = calls.length;
       await box("tune_shot_sizes").click();
-      await settled("tune_shot_sizes", true);
+      await applyReview();
+      await page.getByRole("dialog").waitFor({ state: "hidden" });
+      assert.equal(await box("tune_shot_sizes").isChecked(), true);
       assert.deepEqual(calls.slice(before), [
         { path: "/api/services/switch/turn_on", entity_id: id("tune_shot_sizes") },
       ]);
-      // Home Assistant refuses: the reason shows inline, and the box stays at the switch's real state.
       failWrite = id("ec_mode");
       await box("ec_mode").click();
-      await visible(page.locator("[data-brain-powers] [role=alert]").getByText("Fixture refused write"));
-      await settled("ec_mode", true);
+      await applyReview();
+      await visible(page.getByRole("dialog").getByText(/Fixture refused write/));
       assert.equal(states[id("ec_mode")].state, "on");
+      await page.getByRole("button", { name: "Back to editing" }).click();
+      assert.equal(
+        await box("ec_mode").isChecked(),
+        false,
+        "failed permission draft remains available",
+      );
+      await page.getByRole("button", { name: "Discard draft", exact: true }).click();
+      assert.equal(await box("ec_mode").isChecked(), true);
       failWrite = "";
-      // A room whose integration has no power switches shows each default, read-only, and writes nothing.
       before = calls.length;
+      await page.goto(`${base}/dashboard.html?room=room_b#/today/ai`, { waitUntil: "networkidle" });
+      assert.equal(
+        await page.locator("[data-brain-powers] input").count(),
+        0,
+        "Today AI only summarizes permissions",
+      );
+      await visible(page.getByRole("link", { name: "Manage permissions" }));
       await page.setViewportSize({ width: 1440, height: 1000 });
-      await page.locator("#desktop-room").selectOption("room:");
-      await visible(page.locator("[data-brain-powers] [data-missing]").first());
+      await roomChip("room:").click();
       const old = page.locator("[data-brain-powers]");
       await visible(old);
-      assert.equal(await old.getByRole("checkbox").count(), 8);
-      assert.equal(await old.locator("input:disabled").count(), 8);
-      assert.equal(await box("advance_phase").isChecked(), true);
-      assert.equal(await box("tune_shot_sizes").isChecked(), false);
+      assert.equal(await old.locator("input").count(), 0);
+      assert.match(await old.innerText(), /Unavailable/);
+      await page.getByRole("link", { name: "Manage permissions" }).click();
+      assert.equal(
+        await page.locator('[id^="config-ai_power_"] input').count(),
+        0,
+        "missing entities have no pretend editor",
+      );
       assert.equal(calls.length, before);
     },
   );

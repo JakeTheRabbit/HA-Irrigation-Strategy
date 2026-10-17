@@ -92,7 +92,7 @@ export function RunProgress({
       <section className="panel run-progress" aria-labelledby={titleId} data-run-progress="none">
         <p className="run-progress-empty">
           <span id={titleId}>No run is active in this room. {stageSummary}</span>
-          <Button size="sm" variant="outline" onClick={() => navigate("settings")}>
+          <Button size="sm" variant="outline" onClick={() => navigate("history/grows")}>
             Add a run
           </Button>
         </p>
@@ -158,7 +158,7 @@ export function RunProgress({
             text={
               view.end && view.endFrom
                 ? `The last day of the run is ${dateText(view.end)}. ${END_FROM[view.endFrom]}`
-                : "No end date is set. Set it in Settings, Run records, or in a grow plan."
+                : "No end date is set. Set it in History, Grows, Run records, or in a grow plan."
             }
           >
             <div tabIndex={0} data-run-figure="end" data-tone={past ? "warn" : undefined}>

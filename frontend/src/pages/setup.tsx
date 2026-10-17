@@ -565,7 +565,7 @@ export function Setup({
             <p>
               Use Rooms and setup to select valves and probes, enter pot/dripper measurements,
               confirm the controller acknowledges the mapping, then review your grow plan. Switch
-              watering on deliberately in Settings.
+              watering on deliberately using Watering in the header for that room.
             </p>
             <Button
               variant="outline"
@@ -765,9 +765,23 @@ export function Setup({
                       Mapping writes are checked again on the server. Switch watering off and verify
                       the mapped hardware is off before saving.
                     </p>
-                    <Button asChild variant="outline">
-                      <a href="#/settings">Watering settings</a>
-                    </Button>
+                    {draft.prefix === controller.room.room.prefix ? (
+                      <Button
+                        variant="outline"
+                        onClick={() =>
+                          document
+                            .querySelector<HTMLButtonElement>('[data-safety="watering"]')
+                            ?.focus()
+                        }
+                      >
+                        Find this room’s watering control
+                      </Button>
+                    ) : (
+                      <p>
+                        The header controls {controller.room.room.name}, not this setup draft. Pause
+                        the affected room in Home Assistant before retrying; your draft stays here.
+                      </p>
+                    )}
                   </div>
                 )}
               </section>

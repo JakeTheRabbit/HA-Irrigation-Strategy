@@ -13,7 +13,7 @@ Crop Steering controls the water of a grow room from Home Assistant. The control
 
 You can also use the AI assistant. The AI assistant is optional and uses Claude Haiku with your own Anthropic API key. The controller asks it a question when a decision needs a grower's judgement. The dashboard shows each answer, the action of the controller, and the result.
 
-[Safety first](#safety-first) · [New to crop steering?](#new-to-crop-steering) · [Install](#install) · [First-run setup](#first-run-setup) · [Daily use](#daily-use) · [The AI assistant](#the-ai-assistant) · [Upgrade](#upgrade) · [Troubleshooting](#troubleshooting) · [Documents](#documents)
+[Try the released demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Safety first](#safety-first) · [New to crop steering?](#new-to-crop-steering) · [Install](#install) · [First-run setup](#first-run-setup) · [Daily use](#daily-use) · [The AI assistant](#the-ai-assistant) · [Upgrade](#upgrade) · [Troubleshooting](#troubleshooting) · [Documents](#documents)
 
 ## Safety first
 
@@ -196,7 +196,7 @@ The setup checks the entity types, the units, duplicate valves and revision conf
 
 ## Daily use
 
-The dashboard is the **Crop Steering** page in the Home Assistant sidebar. It has five menu items: **Today**, **Plan**, **History**, **Equipment** and **Settings & help**. Each zone also has its own page. The screenshots come from the demo of the dashboard, with sample data.
+The dashboard is the **Crop Steering** page in the Home Assistant sidebar. It has five menu items: **Overview**, **Irrigation**, **History**, **Equipment** and **Settings & help**. Each zone also has its own page. The screenshots come from the demo of the dashboard, with sample data.
 
 Do these steps each day:
 

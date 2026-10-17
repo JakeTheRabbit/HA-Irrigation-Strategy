@@ -391,7 +391,11 @@ function TodayStatus({
           <span>
             <strong>{status.text}.</strong> {status.detail}{" "}
             {status.action && (
-              <button type="button" className="inline-action" onClick={() => navigate("settings")}>
+              <button
+                type="button"
+                className="inline-action"
+                onClick={() => navigate(status.action!.route as Page)}
+              >
                 {status.action.label}
               </button>
             )}

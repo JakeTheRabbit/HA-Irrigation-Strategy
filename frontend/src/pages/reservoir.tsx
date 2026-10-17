@@ -25,6 +25,11 @@ export function Reservoir({
   const litres = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 1 });
   return (
     <>
+      <div className="page-heading">
+        <div>
+          <h1>Tank and feed</h1>
+        </div>
+      </div>
       <TankStatus controller={controller} onConfigure={configure} />
       <section
         className="panel reservoir-guard"

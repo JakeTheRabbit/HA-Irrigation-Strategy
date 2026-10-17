@@ -45,7 +45,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "Sets the ramp and maintenance shot sizes of each zone. When on, the AI assistant sets these targets itself. No limits apply other than each setting's own range."
   },
   "auto_irrigation_enabled": {
-    "guidance": "Do not set this switch to off. Use the kill switch to stop the water of the room. If alert CS-208 shows, set this switch to on. Then set the kill switch to on in Settings, Watering.",
+    "guidance": "Do not set this switch to off. Use the kill switch to stop the water of the room. If alert CS-208 shows, set this switch to on. Then set the kill switch to on using Watering in the header.",
     "impact": "On: no effect on a current controller. Off: a current controller sets the kill switch of the room to off and raises alert CS-208. A controller of version 2.24.0 or older holds every shot while this switch is off or missing.",
     "tooltip": "A retired switch that the integration keeps hidden. The kill switch is the one switch that stops the water of the room."
   },
@@ -134,7 +134,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "caution": "CAUTION: Do not keep the kill switch at off while plants grow in the room. The plants get no water, not even a rescue shot.",
     "guidance": "Set the kill switch to on after the setup of the room is complete and a test shot works. Set it to off to stop all water in the room immediately. An older default room uses the helper that its setup names, not this switch.",
     "impact": "On: the controller waters the room by its rules. Off: the controller starts no shot in the room, rescue shots and test shots included. Off: a shot that runs stops within a few seconds. The kill switch does not disconnect the electrical power.",
-    "tooltip": "The kill switch of the room. The dashboard shows it as Watering in Settings. The integration creates it as off.",
+    "tooltip": "The kill switch of the room. The dashboard shows it as Watering in the header. The integration creates it as off.",
     "warning": "WARNING: Isolate the electrical power before you work on a pump, a valve or the wiring. The kill switch stops the controller only and does not isolate the power."
   },
   "field_capacity": {
@@ -388,7 +388,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The power above which the sump pump counts as on. If the sump pump draws no power above this value for the hours set in the controller app, the controller sends a CS-311 alert."
   },
   "system_enabled": {
-    "guidance": "Do not set this switch to off. Use the kill switch to stop the water of the room. If alert CS-208 shows, set this switch to on. Then set the kill switch to on in Settings, Watering.",
+    "guidance": "Do not set this switch to off. Use the kill switch to stop the water of the room. If alert CS-208 shows, set this switch to on. Then set the kill switch to on using Watering in the header.",
     "impact": "On: no effect on a current controller. Off: a current controller sets the kill switch of the room to off and raises alert CS-208. A controller of version 2.24.0 or older holds every shot while this switch is off or missing.",
     "tooltip": "A retired switch that the integration keeps hidden. The kill switch is the one switch that stops the water of the room."
   },
@@ -619,7 +619,7 @@ export const UI_COPY = {
     "warning": "WARNING: Do not touch the nutrient concentrates or the acids without gloves and eye protection. These chemicals can cause injury to the skin and the eyes."
   },
   "map, verify and start": {
-    "guidance": "Make sure that the controller accepts the mapping. Set Watering to on in Settings only after you examine the hardware.",
+    "guidance": "Make sure that the controller accepts the mapping. Set Watering to on in the header only after you examine the hardware.",
     "label": "Map, verify and start",
     "tooltip": "Select the valves and the probes, and type the pot and dripper values. Then review your grow plan."
   },
@@ -738,9 +738,9 @@ export const UI_COPY = {
   },
   "record a run": {
     "guidance": "Record the real start date of the run. A run record cannot get back history that the Recorder deleted.",
-    "impact": "Opens the Settings page at the run records. It does not change data.",
+    "impact": "Opens History, Grows at the run records. It does not change data.",
     "label": "Record a run",
-    "tooltip": "Opens the run records in Settings, where you can record a run with its start date."
+    "tooltip": "Opens the run records in History, Grows, where you can record a run with its start date."
   },
   "recorded history could not load": {
     "guidance": "Select \"Retry history\". If the problem continues, examine the connection to Home Assistant.",
@@ -860,9 +860,9 @@ export const UI_COPY = {
     "tooltip": "The name of the run. The maximum length is 80 characters."
   },
   "run records": {
-    "impact": "Opens the Settings page at the run records. It does not change data.",
+    "impact": "Opens History, Grows at the run records. It does not change data.",
     "label": "Run records",
-    "tooltip": "Opens the run records in Settings."
+    "tooltip": "Opens the run records in History, Grows."
   },
   "run time · seconds": {
     "label": "Run time · s",

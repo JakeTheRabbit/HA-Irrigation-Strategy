@@ -182,11 +182,9 @@ export function resetChanges(row: FeatureRow): { entityId: string; value: Value 
 export function matches(row: FeatureRow, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  return [
-    row.feature.label,
-    row.feature.help,
-    ...controlsOf(row.feature).map((c) => c.key),
-  ].some((text) => text.toLowerCase().includes(q));
+  return [row.feature.label, row.feature.help, ...controlsOf(row.feature).map((c) => c.key)].some(
+    (text) => text.toLowerCase().includes(q),
+  );
 }
 
 /** A number's limits from its entity, for a registered number the room's Targets do not list. */
@@ -203,7 +201,6 @@ export function numberLimits(
   return { min: Number(min), max: Number(max), step: Number(step) };
 }
 
-
 /** Restored settings that live in a setup form, display store or history overlay, rather than an
  * HA switch/number/select. Their links open the existing controls; no pretend entity is written. */
 export interface Placement {
@@ -217,7 +214,11 @@ export interface Placement {
 }
 export const RESTORED_MANIFEST = restored;
 const PLACEMENT_PAGES: Record<string, { group: string; page: Page; location: string }> = {
-  "AI-INSTRUCTIONS": { group: "ai", page: "settings/ai", location: "Settings > AI assistant > Instructions" },
+  "AI-INSTRUCTIONS": {
+    group: "ai",
+    page: "settings/ai",
+    location: "Settings > AI assistant > Instructions",
+  },
   "LF-05": { group: "display", page: "zone", location: "Zone page" },
   "LF-97": { group: "display", page: "help", location: "Help > Rules" },
   "LF-124": { group: "display", page: "today", location: "Today" },
@@ -227,10 +228,22 @@ const PLACEMENT_PAGES: Record<string, { group: string; page: Page; location: str
   "LF-91": { group: "equipment", page: "equipment/setup", location: "Equipment > Setup" },
   "LF-34": { group: "equipment", page: "equipment/setup", location: "Equipment > Setup" },
   "LF-54": { group: "equipment", page: "equipment/setup", location: "Equipment > Setup" },
-  "NEW-03": { group: "history", page: "zone", location: "Zone page > History explorer" },
+  "NEW-03": {
+    group: "history",
+    page: "history/timeline",
+    location: "History > Timeline > Sensor history",
+  },
   "LF-87": { group: "history", page: "equipment/setup", location: "Equipment > Setup" },
-  "LF-86": { group: "history", page: "history/timeline", location: "History > Timeline > Overlays" },
-  "LF-165": { group: "feed", page: "equipment/dosing", location: "Equipment > Dosing > Dosing setup" },
+  "LF-86": {
+    group: "history",
+    page: "history/timeline",
+    location: "History > Timeline > Overlays",
+  },
+  "LF-165": {
+    group: "feed",
+    page: "equipment/dosing",
+    location: "Equipment > Dosing > Dosing setup",
+  },
 };
 export const PLACEMENTS: Placement[] = restored.flatMap((row) => {
   // Entity controls are in the main registry. App options already have their own section below it.
@@ -238,10 +251,15 @@ export const PLACEMENTS: Placement[] = restored.flatMap((row) => {
   const target = row.entity.includes("display (attribute ")
     ? { group: "display", page: "settings" as Page, location: "Settings > Display" }
     : PLACEMENT_PAGES[row.id];
-  return target ? [{ id: row.id, entity: row.entity, label: row.label, help: row.help, ...target }] : [];
+  return target
+    ? [{ id: row.id, entity: row.entity, label: row.label, help: row.help, ...target }]
+    : [];
 });
 export function placementsFor(group: string, query: string): Placement[] {
   const q = query.trim().toLowerCase();
-  return PLACEMENTS.filter((row) => (group === "all" || row.group === group) &&
-    (!q || `${row.label} ${row.help} ${row.location}`.toLowerCase().includes(q)));
+  return PLACEMENTS.filter(
+    (row) =>
+      (group === "all" || row.group === group) &&
+      (!q || `${row.label} ${row.help} ${row.location}`.toLowerCase().includes(q)),
+  );
 }

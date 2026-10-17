@@ -485,7 +485,17 @@ export function GrowPlanner({
         aria-label="Import grow plan"
         onChange={(e) => void importPlan(e.target.files?.[0])}
       />
-      {!embedded && <GrowByStage controller={controller} />}
+      {embedded ? (
+        <details className="irrigation-stage-guide">
+          <summary>Stage guide for this run</summary>
+          <p className="muted">
+            Reference only. The planning canvas shows the selected schedule’s targets.
+          </p>
+          <GrowByStage controller={controller} />
+        </details>
+      ) : (
+        <GrowByStage controller={controller} />
+      )}
       {error && (
         <div className="workspace-message error" role="alert">
           {error}

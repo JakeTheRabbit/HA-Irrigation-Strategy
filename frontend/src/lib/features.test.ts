@@ -80,13 +80,20 @@ describe("the feature registry", () => {
     expect(registeredControl("tent_", "switch.pump")).toBeNull();
     // A zone-only switch has no room entity, and a room-only number no zone entity.
     expect(registeredControl("tent_", "switch.crop_steering_tent_p3_dryback_hold")).toBeNull();
-    expect(registeredControl("tent_", "number.crop_steering_tent_zone_1_pump_prime_time")).toBeNull();
+    expect(
+      registeredControl("tent_", "number.crop_steering_tent_zone_1_pump_prime_time"),
+    ).toBeNull();
   });
 });
 
 describe("the Features page rows", () => {
   it("marks what differs from its default and resets only that", () => {
-    const rows = featureRows(fixture(), "tent_", [1, 2], "switch.crop_steering_tent_engine_enabled");
+    const rows = featureRows(
+      fixture(),
+      "tent_",
+      [1, 2],
+      "switch.crop_steering_tent_engine_enabled",
+    );
     const p3 = rows.find((r) => r.feature.id === "p3")!;
     expect(p3.changed).toBe(true);
     expect(resetChanges(p3)).toEqual([
@@ -120,10 +127,16 @@ describe("writes allowed from the Features page", () => {
       }),
     ).toBeNull();
     expect(
-      validateChange(room, states, { entityId: "select.crop_steering_tent_ai_no_touch", value: "1 h" }),
+      validateChange(room, states, {
+        entityId: "select.crop_steering_tent_ai_no_touch",
+        value: "1 h",
+      }),
     ).toBeNull();
     expect(
-      validateChange(room, states, { entityId: "select.crop_steering_tent_ai_no_touch", value: "2 h" }),
+      validateChange(room, states, {
+        entityId: "select.crop_steering_tent_ai_no_touch",
+        value: "2 h",
+      }),
     ).not.toBeNull();
     expect(
       validateChange(room, states, {
@@ -146,7 +159,6 @@ describe("writes allowed from the Features page", () => {
   });
 });
 
-
 describe("restored settings outside entity controls", () => {
   it("finds each room display preference through the Display settings link", () => {
     const options = RESTORED_MANIFEST.filter((row) => row.entity.includes("display (attribute "));
@@ -155,11 +167,15 @@ describe("restored settings outside entity controls", () => {
       expect(PLACEMENTS.find((row) => row.entity === option.entity)?.page).toBe("settings");
   });
   it("keeps setup and overlays discoverable without making them entity writes", () => {
-    expect(placementsFor("all", "camera").map((row) => row.location)).toContain("Settings > Display");
+    expect(placementsFor("all", "camera").map((row) => row.location)).toContain(
+      "Settings > Display",
+    );
     expect(placementsFor("history", "dryback markers")[0]?.page).toBe("history/timeline");
-    expect(placementsFor("history", "Per-probe grow comparison")[0]?.page).toBe("zone");
+    expect(placementsFor("history", "Per-probe grow comparison")[0]?.page).toBe("history/timeline");
     expect(placementsFor("equipment", "ACs")[0]?.page).toBe("equipment/setup");
-    expect(PLACEMENTS.some((row) => /^(switch|number|select)\.crop_steering_/.test(row.entity))).toBe(false);
+    expect(
+      PLACEMENTS.some((row) => /^(switch|number|select)\.crop_steering_/.test(row.entity)),
+    ).toBe(false);
     expect(placementsFor("feed", "pH role")[0]?.page).toBe("equipment/dosing");
   });
 });

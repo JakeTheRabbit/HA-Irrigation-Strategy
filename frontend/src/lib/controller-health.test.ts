@@ -379,7 +379,7 @@ describe("room status line", () => {
           friendly_name: "Crop Steering System Enabled",
         }),
       ],
-      /^Home Assistant's “Crop Steering System Enabled” switch \(switch\.crop_steering_system_enabled\) is off, and nothing is watered in this room while it is\. Switch it back on in Home Assistant, then switch watering on in Settings if it is off\.$/,
+      /^Home Assistant's “Crop Steering System Enabled” switch \(switch\.crop_steering_system_enabled\) is off, and nothing is watered in this room while it is\. Switch it back on in Home Assistant, then use Watering in the header if it is off\.$/,
     ],
     [
       "Home Assistant's Auto Irrigation Enabled is off",
@@ -427,14 +427,12 @@ describe("room status line", () => {
     expect(line).toMatchObject({ tone: "stopped", text: "Not watering" });
     expect(line.detail).toMatch(detail);
   });
-  it("names an off retired switch before the watering switch, and links to Settings for both", () => {
+  it("names an off retired switch first and directs watering changes to the header", () => {
     const off = status(fixture([entity("input_boolean.f2_control_enabled", "off")]));
-    expect(off.action).toEqual({ label: "Switch it on in Settings", route: "settings" });
+    expect(off.action).toBeUndefined();
+    expect(off.detail).toContain("Watering in the header");
     const systemOff = [entity("switch.crop_steering_system_enabled", "off")];
-    expect(status(fixture(systemOff)).action).toEqual({
-      label: "Open Settings",
-      route: "settings",
-    });
+    expect(status(fixture(systemOff)).action).toBeUndefined();
     // The controller keeps watering switched off while System Enabled is: switching watering on
     // first would not last, so the line names System Enabled.
     const both = status(fixture([entity("input_boolean.f2_control_enabled", "off"), ...systemOff]));

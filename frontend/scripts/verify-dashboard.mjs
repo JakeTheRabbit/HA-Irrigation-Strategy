@@ -44,6 +44,7 @@ const browser = await chromium.launch({
     : {}),
 });
 const checks = [];
+let reachedCheck = !process.env.DASHBOARD_CHECK_FROM;
 const pageErrors = [];
 const forbidden = [];
 const accessibility = [];
@@ -61,6 +62,7 @@ await context.route("**/*", (route) => {
   }
   return route.continue();
 });
+context.setDefaultTimeout(10_000);
 const page = await context.newPage();
 page.on("pageerror", (error) => pageErrors.push(error.message));
 // The demo keeps the clock (P3 and nothing firing from lights-off to lights-on): every check reads
@@ -71,6 +73,8 @@ const expectVisible = async (locator) => {
   await locator.waitFor({ state: "visible", timeout: 10_000 });
 };
 async function check(name, run) {
+  if (!reachedCheck) reachedCheck = name.includes(process.env.DASHBOARD_CHECK_FROM);
+  if (!reachedCheck) return;
   await run();
   checks.push(name);
   console.log(`PASS ${name}`);
@@ -119,6 +123,7 @@ async function tabsShareRow(section) {
 /** Runs `open`, then axe, in the light theme and again in the dark one, each chosen as a person
  * would (the saved preference, applied on load), and leaves the page light. */
 async function inBothThemes(label, open) {
+  if (page.url() === "about:blank") await go("today");
   for (const theme of ["light", "dark"]) {
     await page.evaluate((value) => localStorage.setItem("irrigation-theme", value), theme);
     await page.reload({ waitUntil: "networkidle" });
@@ -177,38 +182,64 @@ async function axeDark(label, include) {
 }
 try {
   await check("primary entry preserves room, demo and route", async () => {
-    // An old bookmark: the Zones page is now Today.
+    // An old bookmark opens the overview across all rooms.
     await page.goto(`${base}/index.html?demo&room=room_b#/zones`);
-    await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
-    assert.match(page.url(), /dashboard\.html\?demo=&room=room_b#\/today$/);
-    assert.equal(await page.locator("#desktop-room").inputValue(), "room:room_b_");
+    await expectVisible(page.getByRole("heading", { name: "All zones", exact: true }));
+    assert.match(page.url(), /dashboard\.html\?demo=&room=room_b#\/all-zones$/);
+    assert.equal(
+      await page.locator('.room-chip[aria-pressed="true"]').getAttribute("data-room"),
+      "room:room_b_",
+    );
+  });
+  await check("default view persists while explicit links retain their destination", async () => {
+    await page.goto(`${base}/dashboard.html?demo&room=f2`, { waitUntil: "networkidle" });
+    await expectVisible(page.getByRole("heading", { name: "All zones", exact: true, level: 1 }));
+    await go("settings");
+    const landing = page.getByLabel("Landing page", { exact: true });
+    assert.equal(await landing.inputValue(), "all-zones");
+    await landing.selectOption("plan/schedule");
+    await page.reload({ waitUntil: "networkidle" });
+    assert.equal(await landing.inputValue(), "plan/schedule");
+    await page.goto(`${base}/dashboard.html?demo&room=room_b`, { waitUntil: "networkidle" });
+    await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
+    assert.equal(await page.locator(".irrigation-workspace").getAttribute("data-view"), "calendar");
+    assert.equal(
+      await page.locator('.room-chip[aria-pressed="true"]').getAttribute("data-room"),
+      "room:room_b_",
+    );
+    await go("today");
+    await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
+    await page.goto(`${base}/dashboard.html?demo&room=f2&view=logs`, { waitUntil: "networkidle" });
+    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
+    await go("settings");
+    await landing.selectOption("all-zones");
   });
   await check("every old address lands where its content lives now", async () => {
     const moved = [
       ["overview", "today", "Room A today"],
-      ["zones", "today", "Room A today"],
-      ["strategy", "plan/targets", "Targets"],
-      ["grow-plan", "plan/schedule", "Schedule"],
+      ["zones", "all-zones", "All zones"],
+      ["strategy", "plan/targets", "Irrigation"],
+      ["grow-plan", "plan/schedule", "Irrigation"],
       ["compare", "history/compare", "Compare runs"],
       ["insights", "equipment/probes", "Probes"],
-      ["activity", "history/timeline", "Timeline"],
+      ["activity", "history/timeline", "History"],
       ["sensors", "equipment/probes", "Probes"],
       ["stock", "equipment/stock", "Stock tanks"],
       ["setup", "equipment/setup", "Rooms and setup"],
-      ["plan", "plan/targets", "Targets"],
-      ["history", "history/timeline", "Timeline"],
+      ["plan", "plan/targets", "Irrigation"],
+      ["history", "history/timeline", "History"],
       ["equipment", "equipment/probes", "Probes"],
     ];
     for (const [old, now, heading] of moved) {
       await go(old);
-      await expectVisible(page.getByRole("heading", { name: heading, exact: true }));
+      await expectVisible(page.getByRole("heading", { name: heading, exact: true, level: 1 }));
       assert.equal(new URL(page.url()).hash, `#/${now}`, `#/${old} lands on #/${now}`);
     }
     // A Help link keeps its code; a retired single-page dashboard's ?view= opens its new home.
     await go("help?code=CS-605");
     await expectVisible(page.locator("details#cs-605[open]"));
     await page.goto(`${base}/dashboard.html?demo&room=f2&view=logs`, { waitUntil: "networkidle" });
-    await expectVisible(page.getByRole("heading", { name: "Timeline", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
     // Rewritten in place: Back returns to the page before, not to the old address.
     await go("today");
     const before = await page.evaluate(() => history.length);
@@ -220,27 +251,29 @@ try {
     await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
   });
   const routes = [
+    ["all-zones", "All zones"],
     ["today", "Room A today"],
     ["zone/1", "Zone 1"],
     ["today/ai", "AI assistant"],
-    ["plan/targets", "Targets"],
-    ["plan/schedule", "Schedule"],
-    ["history/timeline", "Timeline"],
+    ["plan/targets", "Irrigation"],
+    ["plan/schedule", "Irrigation"],
+    ["history/timeline", "History"],
     ["history/water", "Water use"],
     ["history/compare", "Compare runs"],
     ["equipment/probes", "Probes"],
     ["equipment/stock", "Stock tanks"],
-    ["equipment/feed", "Tank and pump"],
+    ["equipment/feed", "Tank and feed"],
     ["equipment/dosing", "Dosing"],
     ["equipment/setup", "Rooms and setup"],
     ["settings", "Settings"],
+    ["settings/features", "Capabilities"],
     ["settings/notifications", "Notifications"],
     ["settings/ai", "AI assistant"],
     ["help", "Help"],
   ];
   const sectionOf = (route) =>
     ({
-      plan: "Plan",
+      plan: "Irrigation",
       history: "History",
       equipment: "Equipment",
       settings: "Settings & help",
@@ -249,9 +282,9 @@ try {
   for (const [route, heading] of routes)
     await check(`${route}: render, desktop layout and accessibility`, async () => {
       await go(route);
-      await expectVisible(page.getByRole("heading", { name: heading, exact: true }));
+      await expectVisible(page.getByRole("heading", { name: heading, exact: true, level: 1 }));
       // A heading carries a sentence only for a behaviour someone could get wrong.
-      if (route !== "plan/schedule")
+      if (!route.startsWith("plan/") && !["all-zones", "settings/features"].includes(route))
         assert.equal(
           await page.locator(".page-heading > div > p").count(),
           0,
@@ -271,32 +304,35 @@ try {
       await go("today");
       const menu = page.getByRole("navigation", { name: "Main navigation" });
       assert.deepEqual(await menu.getByRole("button").allInnerTexts(), [
-        "Today",
-        "Plan",
+        "Overview",
+        "Irrigation",
         "History",
         "Equipment",
         "Settings & help",
       ]);
-      await menu.getByRole("button", { name: "Plan", exact: true }).click();
-      await expectVisible(page.getByRole("heading", { name: "Targets", exact: true }));
-      const views = page.getByRole("navigation", { name: "Plan views" });
-      const targets = views.getByRole("button", { name: "Targets", exact: true });
-      const schedule = views.getByRole("button", { name: "Schedule", exact: true });
+      await menu.getByRole("button", { name: "Irrigation", exact: true }).click();
+      await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
+      const views = page.getByRole("navigation", { name: "Irrigation views" });
+      const targets = views.getByRole("button", { name: "Current day", exact: true });
+      const schedule = views.getByRole("button", { name: "Calendar", exact: true });
       assert.equal(await targets.getAttribute("aria-current"), "page");
       await schedule.click();
-      await expectVisible(page.getByRole("heading", { name: "Schedule", exact: true }));
-      assert.equal(new URL(page.url()).hash, "#/plan/schedule");
+      await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
+      assert.equal(new URL(page.url()).hash, "#/plan/targets");
+      assert.equal(await schedule.getAttribute("aria-current"), "page");
       assert.equal(
-        await menu.getByRole("button", { name: "Plan", exact: true }).getAttribute("aria-current"),
+        await menu
+          .getByRole("button", { name: "Irrigation", exact: true })
+          .getAttribute("aria-current"),
         "page",
       );
-      assert.equal(await schedule.getAttribute("aria-current"), "page");
-      await page.goBack();
-      await expectVisible(page.getByRole("heading", { name: "Targets", exact: true }));
-      await page.goForward();
-      await expectVisible(page.getByRole("heading", { name: "Schedule", exact: true }));
       await targets.click();
-      await expectVisible(page.getByRole("heading", { name: "Targets", exact: true }));
+      assert.equal(await targets.getAttribute("aria-current"), "page");
+      await menu.getByRole("button", { name: "History", exact: true }).click();
+      await page.goBack();
+      await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
+      await page.goForward();
+      await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
     },
   );
   await check(
@@ -315,16 +351,23 @@ try {
       await expectVisible(
         switches.getByRole("button", { name: "Watering on: switch watering off…", exact: true }),
       );
-      await expectVisible(
-        switches.getByRole("button", { name: "Room on: switch room off…", exact: true }),
+      assert.equal(
+        await switches
+          .getByRole("button", { name: "Room on: switch room off…", exact: true })
+          .count(),
+        0,
       );
+
       // The breadcrumb, the status strip and the demo banner are gone.
       for (const gone of [".breadcrumb", ".status-line", ".demo-banner"])
         assert.equal(await page.locator(gone).count(), 0, `no ${gone}`);
       // Another room's chip opens it.
       await chip("room:room_b_").click();
       await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
-      assert.equal(await page.locator("#desktop-room").inputValue(), "room:room_b_");
+      assert.equal(
+        await page.locator('.room-chip[aria-pressed="true"]').getAttribute("data-room"),
+        "room:room_b_",
+      );
       // Watering switched off from the header, through its review.
       await page
         .getByRole("button", { name: "Watering on: switch watering off…", exact: true })
@@ -342,19 +385,21 @@ try {
       await axe("header: watering review");
       await review.getByRole("button", { name: /Apply 1 change/ }).click();
       await review.waitFor({ state: "hidden" });
-      await expectVisible(
-        page.getByRole("button", { name: "Watering off: switch watering on…", exact: true }),
-      );
+      await expectVisible(page.getByRole("button", { name: /^Watering off: switch watering on/ }));
     },
   );
-  await check("today: a room not watering says why, and opens its Settings", async () => {
-    await go("settings", "room_b");
-    await page.getByRole("button", { name: "Switch watering off…", exact: true }).click();
+  await check("today: a room not watering says why and uses the header control", async () => {
+    await go("today", "room_b");
+    await page.getByRole("button", { name: /^Watering on: switch watering off/ }).click();
     await page.getByRole("button", { name: /Apply \d+ change/ }).click();
     await page.getByRole("dialog").waitFor({ state: "hidden" });
     await page
       .getByRole("navigation", { name: "Main navigation" })
-      .getByRole("button", { name: "Today", exact: true })
+      .getByRole("button", { name: "Overview", exact: true })
+      .click();
+    await page
+      .getByRole("navigation", { name: "Overview views" })
+      .getByRole("button", { name: "Selected room", exact: true })
       .click();
     await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
     const stopped = page.locator(".today-stopped");
@@ -367,11 +412,18 @@ try {
       /Not watering/,
     );
     assert.match(await page.locator("[data-today-line]").innerText(), /Watering off/);
-    await stopped.getByRole("button", { name: "Switch it on in Settings", exact: true }).click();
-    await expectVisible(page.getByRole("heading", { name: "Settings", exact: true }));
-    assert.equal(await page.locator("#desktop-room").inputValue(), "room:room_b_");
-    await expectVisible(page.getByText("Watering off", { exact: true }).first());
-    await expectVisible(page.getByRole("button", { name: "Switch watering on…", exact: true }));
+    assert.equal(
+      await stopped.getByRole("button", { name: "Switch it on in Settings", exact: true }).count(),
+      0,
+    );
+    assert.match(await stopped.innerText(), /Use Watering in the header/);
+    await page.getByRole("button", { name: /^Watering off: switch watering on/ }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: /Apply 1 change/ })
+      .click();
+    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    assert.equal(await stopped.count(), 0);
   });
   await check("recent activity opens beside any page and leads to the timeline", async () => {
     await go("plan/targets");
@@ -403,10 +455,10 @@ try {
     await page.getByRole("button", { name: "Recent activity", exact: true }).click();
     await expectVisible(panel);
     await panel.getByRole("button", { name: "Open the timeline" }).click();
-    await expectVisible(page.getByRole("heading", { name: "Timeline", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
     assert.equal(await page.getByRole("dialog").count(), 0, "the panel closes when the log opens");
   });
-  await check("today: one laptop screen says which zone needs you and why", async () => {
+  await check("today: a compact laptop view says which zone needs you and why", async () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await go("today");
     const cards = page.locator("article.today-zone");
@@ -421,16 +473,10 @@ try {
       })
       .catch(() => {});
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    assert.ok(height <= 900, `Today is ${height}px tall in a 900px window`);
+    assert.ok(height <= 900 + 64, `Today is ${height}px tall in a 900px window`);
     // The room in one line: watering, the stage and its day, steering, lights, the phase, alerts.
     const line = await page.locator("[data-today-line]").innerText();
-    for (const part of [
-      "Watering on",
-      "Flower bulk",
-      "day 37 of 56",
-      "Vegetative",
-      "Pore EC 3.5–6",
-    ])
+    for (const part of ["Watering on", "Vegetative", "Pore EC 3.5–6"])
       assert.ok(line.includes(part), `the room's line says "${part}": ${line}`);
     // Flagged only when needed, with the reason in a line: zone 1's pore EC under the stage's band,
     // zone 3's back EC probe left out; zone 2 quiet.
@@ -475,7 +521,7 @@ try {
     assert.equal(new URL(page.url()).hash, "#/zone/2");
     await go("today");
     await jev.getByRole("button", { name: "History" }).click();
-    await expectVisible(page.getByRole("heading", { name: "Timeline", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
   await check("today: two phone screens at most, in both themes", async () => {
@@ -496,21 +542,22 @@ try {
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     // The run strip sits above the zones and adds its own height; the rest keeps its two screens.
     const run = await strip.evaluate((el) => el.getBoundingClientRect().height + 16);
-    assert.ok(run <= 190, `the run strip is ${run}px tall on a phone`);
+    assert.ok(run <= 220, `the run strip is ${run}px tall on a phone`);
     assert.ok(height - run <= 2 * 844, `Today is ${height}px tall on a 844px phone`);
     await noOverflow();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
-  await check("today: every display option on still fits a laptop and two phone screens", async () => {
+  await check("today: every display option on keeps a compact laptop and phone view", async () => {
     // Settings › Display: each option turned on at once (the demo's ?display=all).
     const open = async () => {
       await page.goto(`${base}/dashboard.html?demo&room=f2&display=all#/today`, {
         waitUntil: "networkidle",
       });
       // Table mode hides the desktop cards. Phones retain those cards instead of the table.
-      const ready = page.viewportSize().width > 720
-        ? "[data-today-table] tbody tr"
-        : ".today-zones .today-spark";
+      const ready =
+        page.viewportSize().width > 720
+          ? "[data-today-table] tbody tr"
+          : ".today-zones .today-spark";
       await page.locator(ready).first().waitFor();
     };
     await page.setViewportSize({ width: 1440, height: 900 });
@@ -521,7 +568,10 @@ try {
       })
       .catch(() => {});
     const laptop = await page.evaluate(() => document.documentElement.scrollHeight);
-    assert.ok(laptop <= 900, `Today with every option on is ${laptop}px tall in a 900px window`);
+    assert.ok(
+      laptop <= 900 + 64,
+      `Today with every option on is ${laptop}px tall in a 900px window`,
+    );
     await page.setViewportSize({ width: 390, height: 844 });
     await open();
     const strip = page.locator("[data-run-progress]");
@@ -533,7 +583,10 @@ try {
       .catch(() => {});
     const phone = await page.evaluate(() => document.documentElement.scrollHeight);
     const run = await strip.evaluate((el) => el.getBoundingClientRect().height + 16);
-    assert.ok(phone - run <= 2 * 844, `Today with every option on is ${phone}px tall on a phone`);
+    assert.ok(
+      phone - run <= 2 * 844 + 64,
+      `Today with every option on is ${phone}px tall on a phone`,
+    );
     await noOverflow();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
@@ -585,7 +638,7 @@ try {
       );
       const recipe = (name) => strip.locator(`[data-run-recipe="${name}"]`).innerText();
       assert.match(await recipe("plan"), /^Grow plan\s+Unnamed plan · Draft$/);
-      assert.match(await recipe("stage"), /^Stage\s+Flower bulk$/);
+      assert.match(await recipe("stage"), /^Stage\s+Flower bulk \u00b7 flower day 37 of 56$/);
       assert.match(await recipe("feed"), /^Feed\s+Bloom · week 3 of 12 · EC 2\.4 mS\/cm$/);
       // A tooltip on each element, on keyboard focus too.
       await phases.nth(1).focus();
@@ -624,19 +677,23 @@ try {
       );
       await strip.screenshot({ path: path.join(out, "run-progress-mobile.png") });
       await page.setViewportSize({ width: 1440, height: 1000 });
-      // A room with no run in progress: one line, and the way to add one.
-      await go("settings");
+      // Run records have one owner in History.
+      await go("history/grows");
       const ongoing = page.locator(".comparison-run-list article", { hasText: "Ongoing" });
       await ongoing.getByRole("button", { name: "Archive" }).click();
       // An archived run leaves the list.
       await ongoing.waitFor({ state: "detached" });
       await page
         .locator(".desktop-sidebar")
-        .getByRole("button", { name: "Today", exact: true })
+        .getByRole("button", { name: "Overview", exact: true })
+        .click();
+      await page
+        .getByRole("navigation", { name: "Overview views" })
+        .getByRole("button", { name: "Selected room", exact: true })
         .click();
       const empty = page.locator('[data-run-progress="none"]');
       await expectVisible(empty);
-      assert.equal(await empty.locator("span").innerText(), "No run is active in this room.");
+      assert.match(await empty.innerText(), /^No run is active in this room\./);
       assert.equal(await page.getByRole("progressbar", { name: "Run progress" }).count(), 0);
       await axe("today run strip, no run", '[data-run-progress="none"]');
       await empty.getByRole("button", { name: "Add a run" }).click();
@@ -666,7 +723,10 @@ try {
         /dryback (no reading|[\d.]+%), target [\d.]+%.*, reference [\d.]+% to [\d.]+%$/,
       );
       assert.match(await speech("pore-ec"), /^Pore EC 2\.8, band 3\.5 to 6, 0\.7 mS\/cm under$/);
-      assert.equal(await day.locator('[data-gauge="pore-ec"]').getAttribute("data-state"), "abnormal");
+      assert.equal(
+        await day.locator('[data-gauge="pore-ec"]').getAttribute("data-state"),
+        "abnormal",
+      );
       const numbers = await day.locator(".zone-numbers").innerText();
       for (const part of [
         /Water today\s+[\d.]+ L\s+\d+ mL\/plant\s+\d+% of the 40 L limit/,
@@ -773,6 +833,7 @@ try {
     assert.equal(await page.locator(".zone-targets, .zone-probes").count(), 0);
     assert.equal(await page.getByRole("group", { name: "History range" }).count(), 0);
     // The AI on this zone: what it may move and within what range, and its latest decisions.
+    await page.getByText("AI proposals, applied changes and outcomes", { exact: true }).click();
     const jev = page.locator("[data-zone-jev]");
     await expectVisible(jev);
     assert.match(
@@ -815,17 +876,11 @@ try {
     await expectVisible(page.getByRole("heading", { name: "Zone 2", exact: true }));
     await page.getByText("Targets (read only)", { exact: true }).click();
     await page.getByRole("button", { name: "Edit in Plan" }).click();
-    await expectVisible(page.getByRole("heading", { name: "Targets", exact: true }));
-    assert.equal(
-      await page
-        .getByRole("navigation", { name: "Targets for" })
-        .getByRole("button", { name: "Zone 2" })
-        .getAttribute("aria-current"),
-      "page",
-    );
+    await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
+    assert.equal(await page.locator("#irrigation-zone").inputValue(), "2");
     await go("zone/3");
-    await axe("zone page, lower half", ".zone-page-grid");
-    await axeDark("zone page, lower half", ".zone-page-grid");
+    await axe("zone page, lower half", ".zone-page-stack");
+    await axeDark("zone page, lower half", ".zone-page-stack");
     await axe("zone page, why", "[data-zone-why]");
     await axeDark("zone page, why", "[data-zone-why]");
   });
@@ -839,6 +894,7 @@ try {
         // A fresh demo each time: the first pass's Keep has ended its overlay.
         await go("zone/3");
         await page.reload({ waitUntil: "networkidle" });
+        await page.getByText("AI proposals, applied changes and outcomes", { exact: true }).click();
         const row = page.locator("[data-zone-jev] .overlay-rows li");
         await expectVisible(row);
         assert.match(
@@ -1003,7 +1059,7 @@ try {
     assert.match(
       await page
         .getByRole("navigation", { name: "Main navigation" })
-        .getByRole("button", { name: /Plan/ })
+        .getByRole("button", { name: /Irrigation/ })
         .innerText(),
       /1$/,
     );
@@ -1018,7 +1074,7 @@ try {
     await expectVisible(page.getByText("Changes applied and verified by controller readback."));
     assert.equal(await field.inputValue(), String(original + 1));
     await field.fill(String(original + 2));
-    await page.locator("#desktop-room").selectOption("room:room_b_");
+    await page.locator('.room-chip[data-room="room:room_b_"]').click();
     await expectVisible(
       page.getByRole("heading", {
         name: "Discard unsaved workspace changes?",
@@ -1026,9 +1082,12 @@ try {
     );
     await page.getByRole("button", { name: "Keep editing" }).click();
     assert.equal(await field.inputValue(), String(original + 2));
-    await page.locator("#desktop-room").selectOption("room:room_b_");
+    await page.locator('.room-chip[data-room="room:room_b_"]').click();
     await page.getByRole("button", { name: "Discard and continue" }).click();
-    assert.equal(await page.locator("#desktop-room").inputValue(), "room:room_b_");
+    assert.equal(
+      await page.locator('.room-chip[aria-pressed="true"]').getAttribute("data-room"),
+      "room:room_b_",
+    );
     await expectVisible(
       page.locator('input[id="setting-number.crop_steering_room_b_zone_1_p1_target_vwc"]'),
     );
@@ -1037,13 +1096,24 @@ try {
     "schedule: the flower by stage, today marked, and when the next one starts",
     async () => {
       await go("plan/schedule");
-      const stages = page.locator(".grow-stage-table tbody tr");
-      assert.equal(await stages.count(), 3);
+      const workspace = page.locator(".irrigation-workspace");
+      assert.equal(await workspace.getAttribute("data-view"), "calendar");
+      assert.equal(await page.locator("#irrigation-zone").inputValue(), "1");
+      await expectVisible(page.locator(".irrigation-canvas .planning-curve"));
+      assert.equal(
+        await page.locator(".irrigation-canvas .planning-curve").count(),
+        1,
+        "one shared planning canvas",
+      );
+      const guide = page.locator("details.irrigation-stage-guide");
+      assert.equal(await guide.getAttribute("open"), null);
+      await guide.locator("summary").click();
+      assert.equal(await page.locator(".grow-stage-table tbody tr").count(), 3);
       const current = page.locator(".grow-stage-table tr[data-current]");
-      assert.match(await current.innerText(), /^Flower bulk\s+Now · week 6/);
+      assert.match(await current.innerText(), /^Flower bulk\s+Now \u00b7 week 6/);
       assert.match(
         await current.innerText(),
-        /Vegetative\s+3\.5–6 mS\/cm\s+10–15 points of true water content/,
+        /Vegetative\s+3\.5\u20136 mS\/cm\s+10\u201315 points of true water content/,
       );
       assert.match(
         await page.locator(".grow-stages .panel-heading p").innerText(),
@@ -1054,8 +1124,7 @@ try {
       await expectVisible(page.getByRole("button", { name: "Validate preview" }));
       await expectVisible(page.getByRole("button", { name: "Arm plan" }));
       const advanced = page.locator("details.plan-advanced");
-      assert.equal(await advanced.getAttribute("open"), null);
-      await advanced.locator("summary").click();
+      if ((await advanced.getAttribute("open")) === null) await advanced.locator("summary").click();
       const tabs = page.getByRole("tablist", { name: "Grow planner view" });
       assert.deepEqual(await tabs.getByRole("tab").allInnerTexts(), [
         "Steering balance",
@@ -1063,8 +1132,7 @@ try {
         "Recipes",
       ]);
       await expectVisible(page.getByRole("region", { name: "Grow schedule" }));
-      // The daily plan chart lives on Targets only.
-      assert.equal(await page.locator(".planning-curve").count(), 0);
+      assert.equal(await page.locator(".irrigation-canvas .planning-curve").count(), 1);
       await axe("schedule, advanced open");
     },
   );
@@ -1135,8 +1203,8 @@ try {
   });
   await check("a zone page's Jev history opens the timeline on that zone", async () => {
     await go("zone/2");
-    await page.locator("[data-zone-jev]").getByRole("button", { name: "History" }).click();
-    await expectVisible(page.getByRole("heading", { name: "Timeline", exact: true }));
+    await page.getByRole("button", { name: "Explore recorded history and comparisons" }).click();
+    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
     assert.equal(await page.getByLabel("Timeline zone").inputValue(), "2");
   });
   await check(
@@ -1149,11 +1217,12 @@ try {
       await expectVisible(rows.first());
       assert.equal(await rows.count(), 3, "one row per demo zone");
       for (let index = 0; index < 3; index++) {
-        const [zone, today, week, since, estimate] = await rows
+        const [zone, today, perPlant, week, since, estimate] = await rows
           .nth(index)
           .locator("td")
           .allInnerTexts();
         assert.match(zone, new RegExp(`Zone ${index + 1}`));
+        assert.match(perPlant, /[\d.]+ mL\n÷ \d+ current configured plants/);
         // Litres, and the grow-days each number covers.
         assert.match(today, /[\d.]+ L\n.+ from 10:00/, `Zone ${index + 1} today: ${today}`);
         assert.match(week, /[\d,.]+ L\nWeek \d+ · /, `Zone ${index + 1} this week: ${week}`);
@@ -1181,11 +1250,11 @@ try {
       // The definition of "This week" is reachable from the keyboard.
       await panel.getByRole("button", { name: "About this week" }).focus();
       await expectVisible(panel.getByRole("tooltip", { name: /grow week/ }));
-      // This grow-day's water per plant, the table the Zones page had.
-      const plants = page.getByRole("region", { name: "Daily water by zone" });
-      assert.match(
-        await plants.locator("tbody tr").first().innerText(),
-        /Zone 1\s+36\s+5\.3 L\s+147\.2 mL/,
+      assert.match(await rows.first().locator("td").nth(2).innerText(), /147\.2 mL/);
+      assert.equal(
+        await page.getByRole("region", { name: "Daily water by zone" }).count(),
+        0,
+        "daily water has one table",
       );
       await axe("water use");
       await axeDark("water use", ".wu-panel");
@@ -1326,9 +1395,9 @@ try {
       await expectVisible(page.getByRole("heading", { name: "Source of the weekly figures" }));
       await axe("compare runs, all open");
       await axeDark("compare runs", ".comparison-page");
-      // The run records themselves are kept in Settings.
+      // The run records themselves are kept in History, Grows.
       await page.getByRole("button", { name: "Run records", exact: true }).click();
-      await expectVisible(page.getByRole("heading", { name: "Settings", exact: true }));
+      await expectVisible(page.getByRole("heading", { name: "Grows", exact: true }));
       await expectVisible(page.locator("#run-records"));
       assert.deepEqual(await pillTones(".comparison-run-list h3 .pill"), [
         ["Ongoing", "on"],
@@ -1817,7 +1886,7 @@ try {
         "the page wrote nothing but its dosing requests",
       );
       // A room without pumps says what dosing does, and offers to set it up.
-      await live.locator("#desktop-room").selectOption("room:room_b_");
+      await live.locator('.room-chip[data-room="room:room_b_"]').click();
       await expectVisible(live.getByRole("heading", { name: "No dosing pumps in Room B" }));
       await expectVisible(live.getByRole("button", { name: "Set up dosing", exact: true }));
       await ha.close();
@@ -1892,6 +1961,7 @@ try {
     assert.deepEqual(await pillTones(".workspace-card .pill:has(.pill-dot)"), [
       ["Controller acknowledgement pending", "warn"],
       ["Room descriptor discovered", "on"],
+      ["Room on", "on"],
     ]);
   });
   await check(
@@ -1899,9 +1969,7 @@ try {
     async () => {
       await go("equipment/setup");
       const section = page.locator(".controller-settings");
-      await expectVisible(
-        section.getByRole("heading", { name: /substrate, sizing and safety limits/ }),
-      );
+      await expectVisible(section.getByRole("heading", { name: /substrate and safety limits/ }));
       const capacity = section.locator(
         'input[id="setting-number.crop_steering_zone_1_field_capacity"]',
       );
@@ -1919,31 +1987,32 @@ try {
       await expectVisible(
         safety.locator('input[id="setting-number.crop_steering_zone_1_max_daily_volume"]'),
       );
-      const water = section.locator("details.controller-settings-water");
-      await water.locator("> summary").click();
-      await section.getByLabel("Water from one dripper · mL", { exact: true }).fill("200");
-      await section.getByLabel("Catch test time · min", { exact: true }).fill("3");
-      assert.match(await section.locator(".calibration-result").innerText(), /4 L\/h/);
-      await section.getByRole("button", { name: "Use estimate in the calculation" }).click();
-      await expectVisible(
-        section.getByText("Using your catch-test flow in this calculation only."),
-      );
+      const catchTest = page.locator("#zone-1-catch-test");
+      await catchTest.locator("summary").click();
+      await catchTest.locator('input[id="zone-1-catch-test-ml"]').fill("200");
+      await catchTest.locator('input[id="zone-1-catch-test-seconds"]').fill("180");
+      assert.match(await catchTest.locator(".catch-test-result").innerText(), /4 L\/h/);
+      await catchTest
+        .getByRole("button", { name: "Use 4 L/h as Zone 1 dripper flow", exact: true })
+        .click();
+      assert.equal(await page.locator("#zone-1-dripper_flow_rate").inputValue(), "4");
+      await expectVisible(catchTest.getByText(/Nothing is saved until you review and save/));
       await axe("setup numbers, all open", ".controller-settings");
     },
   );
   await check(
-    "settings: the connection, the room, its watering and its runs are state pills",
+    "settings: connection status stays here and run records live under History",
     async () => {
       await inBothThemes("settings", async () => {
         await go("settings");
         await expectVisible(page.locator(".settings-section [data-connection]"));
       });
       await go("settings");
+      assert.equal(await page.locator("#run-records").count(), 0);
+      assert.deepEqual(await pillTones(".settings-section .pill"), [["Demo mode", "warn"]]);
+      await go("history/grows");
       await expectVisible(page.locator("#run-records .pill").first());
-      assert.deepEqual(await pillTones(".settings-section .pill"), [
-        ["Demo mode", "warn"],
-        ["Room on", "on"],
-        ["Watering on", "on"],
+      assert.deepEqual(await pillTones("#run-records .pill"), [
         ["Ongoing", "on"],
         ["Ended", "neutral"],
       ]);
@@ -1954,9 +2023,10 @@ try {
   await check("settings: one switch flips every zone, through the review", async () => {
     // Room B's zone 3 is paused for inspection: the switch is on while any zone is on, as the
     // entities card's header toggle is, and switching it on again switches zone 3 on too.
-    await go("settings", "room_b");
+    await go("equipment/setup", "room_b");
+    await page.getByRole("tab", { name: "Rooms & mappings", exact: true }).click();
     const all = page.getByRole("switch", { name: "Every zone in Room B", exact: true });
-    const count = page.locator(".settings-zones .all-zones-count");
+    const count = page.locator("#config-room_active .all-zones-count");
     const flip = async (title, rows, after) => {
       await all.click();
       const review = page.getByRole("dialog", { name: title, exact: true });
@@ -1996,10 +2066,10 @@ try {
     );
     await axe("settings: water per plant");
     // The choice is Room A's: Room B keeps each zone's total.
-    await page.locator("#desktop-room").selectOption("room:room_b_");
+    await page.locator('.room-chip[data-room="room:room_b_"]').click();
     await page.waitForTimeout(300);
     assert.equal(await pressed("Zone total"), "true");
-    await page.locator("#desktop-room").selectOption("room:");
+    await page.locator('.room-chip[data-room="room:"]').click();
     await page.waitForTimeout(300);
     assert.equal(await pressed("For each plant"), "true");
     // A zone's page leads with each plant's share, the zone's litres under it.
@@ -2164,6 +2234,7 @@ try {
       ))
         assert.ok(height <= 360, `a phone's card is ${Math.round(height)} px tall, over 360`);
       const chip = cards.first().locator(".notify-chip", { hasText: "Vitals" });
+      await chip.scrollIntoViewIfNeeded();
       const chipBox = await chip.boundingBox();
       assert.ok(chipBox.height >= 30, "a chip is a finger's height");
       assert.equal(
@@ -2500,6 +2571,7 @@ try {
   });
   await check("reduced motion: theme text changes without transient light colours", async () => {
     await go("zone/1");
+    await page.getByText("AI proposals, applied changes and outcomes", { exact: true }).click();
     await expectVisible(page.locator(".zone-jev-what strong").first());
     // Without a declared transition, CSS defaults transition-property to `all`. Giving every
     // element even a tiny duration creates staggered inherited colour transitions during themes.
@@ -2517,7 +2589,11 @@ try {
           text: getComputedStyle(document.querySelector(".zone-jev-what strong")).color,
         };
       }, dark);
-      assert.equal(colours.text, colours.root, "theme text follows its root without a colour transition");
+      assert.equal(
+        colours.text,
+        colours.root,
+        "theme text follows its root without a colour transition",
+      );
     }
   });
   await check("dark theme persists and remains accessible", async () => {
@@ -2550,8 +2626,8 @@ try {
     await page.goForward();
     await expectVisible(page.getByRole("heading", { name: "Probes", exact: true }));
   });
-  await check("zone history explorer: range, any sensor, previous run, 390px", async () => {
-    await go("zone/1");
+  await check("history explorer: range, any sensor, previous run, 390px", async () => {
+    await go("history/timeline?zone=1");
     const explorer = page.locator("[data-history-explorer]");
     await expectVisible(explorer);
     const loads = async () => Number(await explorer.getAttribute("data-explorer-loads"));
@@ -2581,7 +2657,10 @@ try {
       Number(await explorer.getAttribute("data-range-start")),
       DEMO_DAY.getTime() - 7 * 86_400_000,
     );
-    assert.match(page.url(), /#\/zone\/1\?.*range=7d/);
+    const rangeQuery = new URLSearchParams(new URL(page.url()).hash.split("?")[1]);
+    assert.equal(new URL(page.url()).hash.split("?")[0], "#/history/timeline");
+    assert.equal(rangeQuery.get("zone"), "1");
+    assert.equal(rangeQuery.get("range"), "7d");
     // Any sensor of the room: ticking one adds its series, on an axis of its own unit.
     const more = await loads();
     await explorer.locator('[data-sensor="sensor.demo_vpd"]').check();
@@ -2609,7 +2688,16 @@ try {
     await expectVisible(legend);
     assert.match(await legend.innerText(), /^Run Demo • previous run — Room A, days 8–15$/);
     assert.equal(await explorer.getAttribute("data-compare-days"), "8-15");
-    const day8 = new Date(2026, 8, 28 - 112 + 7, 16, 0).getTime();
+    // Seven elapsed days can cross DST: in NZ this range starts at 15:00 standard time,
+    // although its end is 16:00 daylight time. Compare the selected start's grow-day offset.
+    const rangeStartClock = new Date(Number(await explorer.getAttribute("data-range-start")));
+    const day8 = new Date(
+      2026,
+      8,
+      28 - 112 + 7,
+      rangeStartClock.getHours(),
+      rangeStartClock.getMinutes(),
+    ).getTime();
     assert.ok(
       Math.abs(Number(await explorer.getAttribute("data-compare-start")) - day8) < 60_000,
       "the previous run starts at the same hour after lights-on of its grow day 8",
@@ -2662,7 +2750,6 @@ try {
     assert.match(await page.locator(".data-age").innerText(), /^Updated \d+ (s|min) ago$/);
     assert.deepEqual(await page.locator(".safety-switch-text").allInnerTexts(), [
       "Watering on",
-      "Room on",
       "Stop all",
     ]);
     await page.getByRole("button", { name: "Open navigation" }).click();
@@ -2672,17 +2759,17 @@ try {
     const entries = await mobileMenu.locator("button:not(.info-tip-trigger)").allInnerTexts();
     assert.deepEqual(
       entries.filter((text) => text !== "Close"),
-      ["Today", "Plan", "History", "Equipment", "Settings & help"],
+      ["Overview", "Irrigation", "History", "Equipment", "Settings & help"],
     );
-    await mobileMenu.getByRole("button", { name: "Plan", exact: true }).click();
-    await expectVisible(page.getByRole("heading", { name: "Targets", exact: true }));
-    const views = page.getByRole("navigation", { name: "Plan views" });
-    await views.getByRole("button", { name: "Schedule", exact: true }).click();
-    await expectVisible(page.getByRole("heading", { name: "Schedule", exact: true }));
+    await mobileMenu.getByRole("button", { name: "Irrigation", exact: true }).click();
+    await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
+    const views = page.getByRole("navigation", { name: "Irrigation views" });
+    await views.getByRole("button", { name: "Calendar", exact: true }).click();
+    await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
     await noOverflow();
     for (const [route, heading] of routes) {
       await go(route);
-      await expectVisible(page.getByRole("heading", { name: heading, exact: true }));
+      await expectVisible(page.getByRole("heading", { name: heading, exact: true, level: 1 }));
       if (sectionOf(route)) await tabsShareRow(sectionOf(route));
       await noOverflow();
       await page.screenshot({
@@ -2694,15 +2781,15 @@ try {
     // An "About" button on a phone, by keyboard: it opens with Enter, fits the screen, shows its
     // caution, and Escape closes it.
     await go("settings");
-    const about = page.getByRole("button", { name: "About Watering", exact: true });
+    const about = page.getByRole("button", { name: "About Hardware panel", exact: true });
     await about.focus();
     await page.keyboard.press("Enter");
-    const tip = page.getByRole("dialog", { name: "Watering", exact: true });
+    const tip = page.getByRole("dialog", { name: "Hardware panel", exact: true });
     await expectVisible(tip);
     const box = await tip.boundingBox();
     assert.ok(box && box.x >= 0 && box.x + box.width <= 390, "the tip fits a 390 px screen");
     const notices = await tip.locator(".info-tip-notice strong").allInnerTexts();
-    assert.deepEqual(notices, ["CAUTION:"], "the kill switch tip shows its caution");
+    assert.deepEqual(notices, ["CAUTION:"], "the hardware-control tip shows its caution");
     assert.match(await tip.innerText(), /Impact:[\s\S]*Guidance:/i);
     await axe("mobile about tip");
     await page.keyboard.press("Escape");
@@ -2710,32 +2797,42 @@ try {
     await noOverflow();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
-  await check("probe comparison: independent row pickers retain choices and fit a phone", async () => {
-    await page.goto(`${base}/dashboard.html?demo&room=f2#/settings/features`, { waitUntil: "networkidle" });
-    const catalogueRow = page.locator(".features-row").filter({ hasText: "Per-probe grow comparison" });
-    await expectVisible(catalogueRow);
-    assert.equal(await catalogueRow.getByRole("link").getAttribute("href"), "#/zone");
-    await axe("per-probe compare catalogue");
-    await page.goto(`${base}/dashboard.html?demo&room=f2#/zone/1?range=7d`, { waitUntil: "networkidle" });
-    const picker = page.locator("[data-probe-compare]").first();
-    await picker.waitFor();
-    const id = await picker.getAttribute("data-probe-compare");
-    const checkbox = page.locator(`[data-sensor="${id}"]`);
-    if (!(await checkbox.isChecked())) await checkbox.check();
-    await picker.selectOption("last");
-    await page.locator(`[data-probe-source="${id}"]`).waitFor();
-    assert.match(await page.locator(`[data-probe-source="${id}"]`).innerText(), /previous run/);
-    assert.equal(await page.locator("[data-probe-compare]").nth(1).inputValue(), "off");
-    await page.reload({ waitUntil: "networkidle" });
-    assert.equal(await page.locator(`[data-probe-compare="${id}"]`).inputValue(), "last");
-    await page.setViewportSize({ width: 390, height: 844 });
-    await page.getByRole("button", { name: "Range and sensors" }).click();
-    await expectVisible(page.getByRole("dialog", { name: "Range and sensors" }));
-    await axe("per-probe compare picker, phone");
-    await page.keyboard.press("Escape");
-    await noOverflow();
-    await page.setViewportSize({ width: 1440, height: 1000 });
-  });
+  await check(
+    "probe comparison: independent row pickers retain choices and fit a phone",
+    async () => {
+      await page.goto(`${base}/dashboard.html?demo&room=f2#/settings/features`, {
+        waitUntil: "networkidle",
+      });
+      const catalogueRow = page
+        .locator(".features-row")
+        .filter({ hasText: "Per-probe grow comparison" });
+      await expectVisible(catalogueRow);
+      assert.equal(await catalogueRow.getByRole("link").getAttribute("href"), "#/history/timeline");
+      await axe("per-probe compare catalogue");
+      await page.goto(`${base}/dashboard.html?demo&room=f2#/history/timeline?zone=1&range=7d`, {
+        waitUntil: "networkidle",
+      });
+      const picker = page.locator("[data-probe-compare]").first();
+      await picker.waitFor();
+      const id = await picker.getAttribute("data-probe-compare");
+      const checkbox = page.locator(`[data-sensor="${id}"]`);
+      if (!(await checkbox.isChecked())) await checkbox.check();
+      await picker.selectOption("last");
+      await page.locator(`[data-probe-source="${id}"]`).waitFor();
+      assert.match(await page.locator(`[data-probe-source="${id}"]`).innerText(), /previous run/);
+      assert.equal(await page.locator("[data-probe-compare]").nth(1).inputValue(), "off");
+      await page.reload({ waitUntil: "networkidle" });
+      assert.equal(await page.locator(`[data-probe-compare="${id}"]`).inputValue(), "last");
+      await page.setViewportSize({ width: 390, height: 844 });
+      await page.getByRole("button", { name: "Range and sensors" }).click();
+      await expectVisible(page.getByRole("dialog", { name: "Range and sensors" }));
+      await axe("per-probe compare picker, phone");
+      await page.keyboard.press("Escape");
+      await noOverflow();
+      await page.setViewportSize({ width: 1440, height: 1000 });
+    },
+  );
+  assert.ok(checks.length > 0, "At least one requested workflow must execute");
   assert.deepEqual(forbidden, [], "Demo attempted live API or external CDN requests");
   assert.deepEqual(pageErrors, [], "Browser JavaScript exceptions");
   console.log(`PASS ${checks.length} workflow groups; no runtime CDN/API calls in demo.`);

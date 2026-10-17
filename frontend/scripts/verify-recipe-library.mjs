@@ -42,8 +42,12 @@ const page = await context.newPage();
 page.setDefaultTimeout(10000);
 page.on("pageerror", (error) => errors.push(error.message));
 const library = () => page.locator("[data-recipe-library]");
-/** Plan › Schedule keeps the steering balance, endpoint profiles and recipes one tap down. */
+/** Irrigation › Calendar keeps the steering balance, endpoint profiles and recipes together. */
 async function openTab(name) {
+  await page
+    .getByRole("navigation", { name: "Irrigation views" })
+    .getByRole("button", { name: /^Calendar/ })
+    .click();
   const advanced = page.locator("details.plan-advanced");
   await advanced.waitFor();
   if ((await advanced.getAttribute("open")) === null) await advanced.locator("> summary").click();
@@ -86,9 +90,9 @@ async function axe(name) {
   );
 }
 try {
-  // An old address: the grow planner is Plan › Schedule now.
+  // An old address opens the unified Irrigation calendar.
   await page.goto(origin + "/dashboard.html?demo=1#/grow-plan", { waitUntil: "networkidle" });
-  await page.getByRole("heading", { name: "Schedule", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
   await openTab("Recipes");
   await library().waitFor();
   await check(
@@ -165,12 +169,12 @@ try {
     const exported = await downloadPlan(
       page.getByRole("button", { name: "Export recipe My saved plan", exact: true }),
     );
-    await page.locator("#desktop-room").selectOption("room:room_b_");
-    await page.getByRole("heading", { name: "Schedule", exact: true }).waitFor();
+    await page.locator('.room-chip[data-room="room:room_b_"]').click();
+    await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
     await openLibrary();
     assert.equal(await library().locator(".recipe-list li").count(), 2);
-    await page.locator("#desktop-room").selectOption("room:");
-    await page.getByRole("heading", { name: "Schedule", exact: true }).waitFor();
+    await page.locator('.room-chip[data-room="room:"]').click();
+    await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
     await openLibrary();
     await page.getByRole("button", { name: "Remove recipe My saved plan", exact: true }).click();
     await page.getByRole("dialog").getByRole("button", { name: "Cancel", exact: true }).click();
@@ -224,10 +228,7 @@ try {
           ?.selectedOptions?.[0]?.textContent?.includes("Demo • current run"),
       );
       assert.match(
-        await page
-          .getByLabel("Past run", { exact: true })
-          .locator("option:checked")
-          .innerText(),
+        await page.getByLabel("Past run", { exact: true }).locator("option:checked").innerText(),
         /Demo • previous run/,
       );
       for (const period of ["day", "week", "month", "run"]) {
@@ -286,7 +287,7 @@ try {
       await page.evaluate(() => {
         window.location.hash = "#/grow-plan";
       });
-      await page.getByRole("heading", { name: "Schedule", exact: true }).waitFor();
+      await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
       await openLibrary();
       assert.equal(await library().locator(".recipe-list li").count(), 3);
     },

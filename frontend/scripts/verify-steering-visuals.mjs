@@ -96,16 +96,15 @@ try {
   await check(
     "P3 floor follows numeric edits; saved baseline and room values remain unchanged",
     async () => {
-      // An old address: the targets are Plan › Targets, every phase in one table.
+      // An old address opens Irrigation current-day targets, every phase in one table.
       await fresh("strategy");
-      await page.getByRole("heading", { name: "Targets", exact: true }).waitFor();
+      await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
       const floor = field("p3_emergency_vwc_threshold");
       // Each zone's axis scales to its own recorded data, so zones are compared by value and a
       // zone's draft line only against that same zone's saved line, never by pixels across zones.
-      const zoneTab = (n) =>
-        page
-          .getByRole("navigation", { name: "Targets for" })
-          .getByRole("button", { name: new RegExp("Zone " + n) });
+      const zoneTab = (n) => ({
+        click: () => page.locator("#irrigation-zone").selectOption(String(n)),
+      });
       const otherFloor = page.locator(
         '[id="setting-number.crop_steering_zone_2_p3_emergency_vwc_threshold"]',
       );
@@ -165,11 +164,11 @@ try {
     const graph = shot.locator(".planning-curve");
     await graph.locator('[data-planning-line="recorded-vwc"]').waitFor();
     assert.ok(await graph.locator('[data-planning-line="recorded-vwc-previous"]').count());
-    // Pore EC is behind its toggle: drawn, but not shown until asked for.
+    // VWC and pore EC start together; the EC toggle still hides and restores its layer.
     assert.ok(await graph.locator('[data-planning-line="recorded-ec"]').count());
-    assert.equal(await graph.locator("[data-planning-ec]").isVisible(), false);
-    await graph.getByRole("button", { name: "EC", exact: true }).click();
     assert.equal(await graph.locator("[data-planning-ec]").isVisible(), true);
+    await graph.getByRole("button", { name: "EC", exact: true }).click();
+    assert.equal(await graph.locator("[data-planning-ec]").isVisible(), false);
     await graph.getByRole("button", { name: "EC", exact: true }).click();
     // Four gauges, each a value against its target or band, for a screen reader too.
     const gauges = graph.locator(".planning-recorded [data-gauge]");
@@ -227,12 +226,11 @@ try {
     });
     // What the probes recorded over days, against the targets: on the zone's page, on request.
     await shot.evaluate(() => (location.hash = "#/zone/1"));
-    await shot.locator("details.zone-recorded > summary").click();
-    const history = shot
-      .locator("section")
-      .filter({ has: shot.getByRole("heading", { name: "Recorded probe behaviour" }) })
-      .first();
-    await history.locator(".sensor-chart").first().waitFor();
+    await shot
+      .getByRole("button", { name: "Explore recorded history and comparisons", exact: true })
+      .click();
+    const history = shot.locator(".history-explorer");
+    await history.locator('[aria-label^="History chart:"]').first().waitFor();
     await history.scrollIntoViewIfNeeded();
     await history.screenshot({
       path: fileURLToPath(new URL("../../img/sensor-history.png", import.meta.url)),
@@ -259,9 +257,13 @@ try {
       assert.ok(box.height <= 900, `The plan card is ${Math.round(box.height)}px tall`);
       // Status, four gauges with targets, the chart, one chip and the table, in that order.
       const order = await graph.evaluate((card) =>
-        ["[data-hmi-status]", ".planning-recorded", ".planning-svg-wrap svg", ".hmi-check", ".planning-projection"].map(
-          (selector) => card.querySelector(selector)?.getBoundingClientRect().top ?? -1,
-        ),
+        [
+          "[data-hmi-status]",
+          ".planning-recorded",
+          ".planning-svg-wrap svg",
+          ".hmi-check",
+          ".planning-projection",
+        ].map((selector) => card.querySelector(selector)?.getBoundingClientRect().top ?? -1),
       );
       assert.ok(
         order.every((top, index) => top >= 0 && (!index || top > order[index - 1])),
@@ -338,7 +340,7 @@ try {
     },
   );
   await check("Room off stands the room down and says so", async () => {
-    await fresh("settings");
+    await fresh("equipment/setup");
     await page.getByRole("button", { name: "Switch room off…", exact: true }).click();
     await page.getByRole("button", { name: /^Apply 1 change/ }).click();
     await page.getByRole("button", { name: "Switch room on…", exact: true }).waitFor();
@@ -427,9 +429,8 @@ try {
   await check(
     "Runtime estimates show all-plant zone litres and per-plant water separately",
     async () => {
-      // What a shot delivers is set up with the drippers: Equipment › Setup, Water & calibration.
-      await fresh("equipment/setup");
-      await page.locator("details.controller-settings-water > summary").click();
+      // The calendar reference shows the runtime estimate using the configured drippers.
+      await fresh("plan/schedule");
       const water = page.getByRole("region", { name: "Zone 1 water delivery" });
       // A labelled section is exposed as a region by the accessibility tree.
       await water.getByLabel("Example valve-open time · s", { exact: true }).fill("120");
@@ -442,7 +443,7 @@ try {
       assert.match(await water.innerText(), /216/);
       // Water per plant today, zone by zone: History › Water use.
       await fresh("history/water");
-      const summary = page.locator(".wd-daily");
+      const summary = page.locator(".wu-table");
       const row = summary.getByRole("row").filter({ hasText: "Zone 1" });
       assert.match(await row.innerText(), /5\.3(?:0)? L/);
       assert.match(await row.innerText(), /147\.2 mL/);
@@ -451,8 +452,8 @@ try {
   await check(
     "Register, compare and archive runs with bounded dates and room isolation",
     async () => {
-      // Run records are kept in Settings; History › Compare runs lines them up.
-      await fresh("settings");
+      // Run records live in History › Grows; History › Compare runs lines them up.
+      await fresh("history/grows");
       const records = page.locator("#run-records");
       await records.waitFor();
       const dateAgo = (days) => new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
@@ -468,7 +469,7 @@ try {
       await page.getByLabel("Run name", { exact: true }).fill("Unsaved run draft");
       await page
         .locator(".desktop-sidebar")
-        .getByRole("button", { name: "Today", exact: true })
+        .getByRole("button", { name: "Overview", exact: true })
         .click();
       await page.getByRole("heading", { name: "Discard unsaved workspace changes?" }).waitFor();
       await page.getByRole("button", { name: "Keep editing", exact: true }).click();
@@ -534,7 +535,7 @@ try {
         path: fileURLToPath(new URL("../../img/run-comparison.png", import.meta.url)),
         fullPage: true,
       });
-      // Archived and restored in Settings; each room keeps its own records.
+      // Archived and restored in History › Grows; each room keeps its own records.
       await page.getByRole("button", { name: "Run records", exact: true }).click();
       await records.waitFor();
       const past = page
@@ -548,7 +549,7 @@ try {
         .filter({ hasText: "Previous room run" })
         .getByRole("button", { name: "Restore", exact: true })
         .click();
-      await page.locator("#desktop-room").selectOption("room:room_b_");
+      await page.locator('.room-chip[data-room="room:room_b_"]').click();
       await page.waitForFunction(
         () => document.querySelectorAll(".comparison-run-list article").length >= 2,
       );

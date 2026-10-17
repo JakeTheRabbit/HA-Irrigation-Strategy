@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { Heading, type Page } from "@/components/dashboard";
 import type { Controller } from "@/lib/types";
@@ -40,7 +40,7 @@ export function Irrigation({
         : (controller.room.zones[0]?.id ?? current),
     );
   }, [controller.room.zones]);
-  useEffect(() => {
+  useLayoutEffect(() => {
     onDirtyChange(scheduleDirty || canonicalDirty);
     return () => onDirtyChange(false);
   }, [scheduleDirty, canonicalDirty, onDirtyChange]);
