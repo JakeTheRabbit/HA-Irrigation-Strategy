@@ -2,7 +2,7 @@
 
 The dashboard's **What's new** window shows these to the first person who opens the dashboard after
 an update: every release since the last one it showed there, newest first, at most five. A new
-installation has nothing to catch up on and shows none. **Help & tools → What's new** opens it
+installation has nothing to catch up on and shows none. **Settings & help → Help → What's new** opens it
 again at any time.
 
 Every release adds its section at the top, in its release pull request. Write it for growers, not
