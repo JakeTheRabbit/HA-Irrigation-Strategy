@@ -19,6 +19,14 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.16.0 - 2026-10-18
+
+- See every room and zone together, with moisture, water delivery and feed supply at a glance.
+- Choose the page that opens when you enter Crop Steering.
+- Adjust today's targets and future grow days in one Irrigation workspace, with the graph beside the controls.
+- Find setup, history and AI settings in their own workspaces, with clearer help and refreshed guides.
+- Bug fixes and improvements.
+
 ## 3.15.0 - 2026-10-17
 
 - **Choose phase, safety, sensing, dosing and display options together in Features**.

@@ -9,6 +9,26 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.16.0] - 2026-10-18
+
+Pair: **controller 3.16.0**. **C1: dashboard and operator guidance.** Controller and integration runtime behavior are unchanged. Published at the owner's request after the live UI rehearsal; no full photoperiod or physical water-delivery soak is claimed.
+
+### 🌱 In plain English
+
+- **See every room together.** All zones is the landing page, with moisture, pore EC, last irrigation, water totals and each room's feed supply. Choose another starting page in Settings > Display.
+- **Plan and adjust irrigation in one workspace.** Current day and Calendar share the combined moisture/EC canvas. On a desktop, the graph stays beside the target controls.
+- **Find each setting in one place.** Equipment owns room and zone setup, History owns recorded evidence and grow records, and Capabilities points to each setting's editor.
+- **Keep your work while you navigate.** Draft warnings protect unsaved target and setup edits; refused setup saves explain what must be resolved.
+- **Use the updated guides and demo.** The README, public demo, tutorials and screenshots follow the new navigation. Water delivery remains labelled by source and average per plant is not measured uptake.
+
+### 🔧 Technical notes
+
+- Browser-local landing preference; explicit bookmarks and legacy links retain precedence. All-room landing reads the existing controller snapshot and never issues actuator commands.
+- Canonical configuration ownership, read-only capability directory, hydraulic conflict checks and stock level preservation; existing backend validation, revision and actuation guards retained.
+- Irrigation retains current-day and schedule ownership, one visible planning canvas, pending drafts and shared zone focus. A collapsed stage guide preserves the full-grow reference.
+- Existing settings, entity IDs, room mappings, controller algorithms and persisted state format are unchanged. Both package versions advance together; rebuild the controller to retain its packaged dashboard update.
+- Setup validation test uses a loopback-only resolver to avoid a process-long pycares thread in the oldest supported Home Assistant test harness. No production resolver or controller changes.
+
 ## [3.15.0] - 2026-10-17
 
 Pair: **controller 3.15.0**. Restored controls, operating history and editable AI context. Promoted under the owner's approved rehearsal instruction; no real-plumbing soak is claimed.

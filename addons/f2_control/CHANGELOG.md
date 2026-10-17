@@ -1,3 +1,7 @@
+# 3.16.0
+
+Pair with integration 3.16.0. **C1.** Updated dashboard package: all-room All zones landing, browser starting-page preference, consolidated Irrigation workspace and canonical settings ownership. Controller, engine, state and physical safeguards are unchanged. Published after an owner-requested UI rehearsal; no full photoperiod or physical plumbing soak is claimed. Rebuild/update both halves for matching packaged assets.
+
 # 3.15.0
 
 Pair with integration 3.15.0. **C3.** Restored opt-in phase, safety, sensing, runoff estimate and dosing controls; additive state migration; persisted waste policy fails closed when unreadable; pH dosing faults survive unknown enable readings. Includes revised generated AI instructions, revisioned room context and cache controls, and the answer-choice schema mitigation while set_values stays strict. New features retain neutral defaults. Approved rehearsal release; no plumbing soak claimed.
