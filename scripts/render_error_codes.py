@@ -3,7 +3,7 @@
 
     python scripts/render_error_codes.py
 
-The dashboard's Help & tools page reads the same JSON, and tests/test_error_codes.py fails when the
+The dashboard's Settings & help > Help page reads the same JSON, and tests/test_error_codes.py fails when the
 committed page is not what this writes, so the two cannot drift. Edit the JSON, never the page.
 """
 import json
@@ -26,7 +26,7 @@ def render(catalog):
         "**Settings → Repairs**, ends with a code, for example **CS-101**. The regular status summary of",
         "the controller has no code. Find the code below. It tells you what the alert means, what occurs",
         "to the water, the probable causes and what to do. The same list is in the Crop Steering sidebar",
-        "under **Help & tools → Error codes**.",
+        "under **Settings & help → Help → Error codes**.",
         "",
         "A critical alert, or a warning about a zone that gets no water, comes again each 30 min while its",
         "cause continues. Other warnings come again after 15 min, then less frequently. An information",
