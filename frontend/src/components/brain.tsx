@@ -1,4 +1,5 @@
-import { useId, useState, type ReactNode } from "react";
+import { CanonicalControls } from "@/components/canonical-controls";
+import { useId, useState, useLayoutEffect, type ReactNode } from "react";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Heading, time as clock, type Page } from "@/components/dashboard";
@@ -21,7 +22,7 @@ import {
   type BrainView,
 } from "@/lib/brain";
 import { jevAnswer, jevResult, readJev } from "@/lib/jev";
-import { SETTING_COPY, UI_COPY } from "@/lib/ste-copy";
+import { SETTING_COPY } from "@/lib/ste-copy";
 import type { Controller } from "@/lib/types";
 import "./brain.css";
 import { BrainInstructions } from "./brain-instructions";
@@ -70,7 +71,15 @@ function decisionLine(panel: BrainPanel, names: Map<number, string>): string | n
 }
 
 /** Today's AI assistant card: its state, today's spend in one line, and its last decision in one line. */
-export function BrainCard({ controller, navigate }: { controller: Controller; navigate: Navigate }) {
+export function BrainCard({
+  controller,
+  navigate,
+  showLastDecision = true,
+}: {
+  controller: Controller;
+  navigate: Navigate;
+  showLastDecision?: boolean;
+}) {
   const { panel, view } = useBrain(controller);
   const names = new Map(controller.room.zones.map((zone) => [zone.id, zone.name]));
   const budget = panel && budgetLine(panel);
@@ -87,7 +96,7 @@ export function BrainCard({ controller, navigate }: { controller: Controller; na
         <Status view={view} />
         {panel?.plan && <p className="brain-line">{panel.plan.headline}</p>}
         {budget && <p className="brain-line">{budget}</p>}
-        {last && <p className="brain-line">Last decision: {last}</p>}
+        {showLastDecision && last && <p className="brain-line">Last decision: {last}</p>}
       </div>
     </section>
   );
@@ -164,60 +173,24 @@ function MayDo({ panel }: { panel: BrainPanel | null }) {
 /** What the AI assistant may do in the room: a checkbox per power switch. Home Assistant decides who may switch
  * one; a refused or failed write shows inline and the box stays at the switch's real state. */
 function AiPowers({ controller }: { controller: Controller }) {
-  const [busy, setBusy] = useState<string | null>(null);
-  const [error, setError] = useState("");
   const powers = parsePowers(controller.states, controller.room.room.prefix);
-  const locked = controller.admin === false;
-  const connected = ["live", "demo"].includes(controller.connection);
-  const copy = UI_COPY["what the ai assistant may do"];
-  async function toggle(entityId: string, on: boolean) {
-    setBusy(entityId);
-    setError("");
-    try {
-      const result = await controller.write([{ entityId, value: on }]);
-      if (result.failed.length) setError(result.failed.map((f) => f.reason).join(" "));
-    } finally {
-      setBusy(null);
-    }
-  }
   return (
-    <section className="panel" aria-labelledby="brain-powers-title" data-brain-powers>
+    <section className="panel" data-brain-powers>
       <div className="panel-heading">
-        <h2 id="brain-powers-title">
-          {copy.label} <UiTip copyKey="what the ai assistant may do" />
-        </h2>
+        <h2>Permitted AI actions</h2>
+        <a href="#/settings/ai">Manage permissions</a>
       </div>
-      <div className="brain-body">
-        <p className="brain-line">{copy.tooltip}</p>
-        {locked && <p className="brain-line">{copy.guidance}</p>}
-        <ul className="brain-powers">
-          {powers.map((power) => (
-            <li key={power.key} data-power={power.key} data-missing={power.missing || undefined}>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={power.on}
-                  disabled={power.missing || locked || !connected || busy !== null}
-                  title={locked ? "Needs a Home Assistant administrator" : undefined}
-                  onChange={(event) => void toggle(power.entityId, event.target.checked)}
-                />
-                <span>{power.label}</span>
-              </label>
-              <p>{SETTING_COPY[`ai_power_${power.key}`]?.tooltip}</p>
-            </li>
-          ))}
-        </ul>
-        {powers.some((power) => power.missing) && (
-          <p className="brain-line">
-            Update the integration to change these. Until then, each power keeps its default.
-          </p>
-        )}
-        {error && (
-          <p className="jev-trouble" role="alert">
-            {error}
-          </p>
-        )}
-      </div>
+      <ul className="brain-powers">
+        {powers.map((power) => (
+          <li key={power.key}>
+            <strong>{power.label}</strong>
+            <span>
+              {power.missing ? " · Unavailable" : power.on ? " · Allowed" : " · Disabled"}
+            </span>
+            <p>{SETTING_COPY[`ai_power_${power.key}`]?.tooltip}</p>
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -244,7 +217,13 @@ function DemoSwitcher({ demo }: { demo: BrainDemoState }) {
 }
 
 /** The AI assistant page: its state, budget, last decision, what it may do and its latest decisions. */
-export function BrainPage({ controller, navigate }: { controller: Controller; navigate: Navigate }) {
+export function BrainPage({
+  controller,
+  navigate,
+}: {
+  controller: Controller;
+  navigate: Navigate;
+}) {
   const { panel, view, demo } = useBrain(controller);
   const { room, states } = controller;
   const names = new Map(room.zones.map((zone) => [zone.id, zone.name]));
@@ -437,7 +416,19 @@ function WhereTheKeyGoes() {
 }
 
 /** Provider credentials stay in controller options; room context has a reviewed administrator editor. */
-export function AiSettings({ controller, onDirtyChange }: { controller: Controller; onDirtyChange?: (dirty: boolean) => void }) {
+export function AiSettings({
+  controller,
+  onDirtyChange,
+}: {
+  controller: Controller;
+  onDirtyChange?: (dirty: boolean) => void;
+}) {
+  const [instructionsDirty, setInstructionsDirty] = useState(false);
+  const [permissionsDirty, setPermissionsDirty] = useState(false);
+  useLayoutEffect(() => {
+    onDirtyChange?.(instructionsDirty || permissionsDirty);
+    return () => onDirtyChange?.(false);
+  }, [instructionsDirty, permissionsDirty, onDirtyChange]);
   const { panel } = useBrain(controller);
   const row = (title: string, body: ReactNode, detail?: string) => (
     <section className="panel settings-section">
@@ -452,7 +443,8 @@ export function AiSettings({ controller, onDirtyChange }: { controller: Controll
     <>
       <Heading title="AI assistant" />
       <div className="settings-stack brain-settings">
-        <BrainInstructions controller={controller} onDirtyChange={onDirtyChange} />
+        <BrainInstructions controller={controller} onDirtyChange={setInstructionsDirty} />
+        <CanonicalControls controller={controller} owner="ai" onDirtyChange={setPermissionsDirty} />
         {row("Provider", <p className="brain-line">{providerWords(panel)}</p>)}
         {row(
           "Anthropic key",

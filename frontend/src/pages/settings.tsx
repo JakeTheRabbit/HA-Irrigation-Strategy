@@ -1,15 +1,5 @@
 import { useState } from "react";
-import {
-  Check,
-  Droplets,
-  EyeOff,
-  LoaderCircle,
-  Moon,
-  Sprout,
-  Sun,
-  Monitor,
-  Telescope,
-} from "lucide-react";
+import { Check, Droplets, LoaderCircle, Moon, Sprout, Sun, Monitor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,16 +11,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Heading, ReviewDialog, Status } from "@/components/dashboard";
+import { Heading } from "@/components/dashboard";
 import { UiTip } from "@/components/info-tip";
-import { UI_COPY } from "@/lib/ste-copy";
 import { Pill, type PillTone } from "@/components/mini-visuals";
 import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
-import { AllZonesSwitch, RoomPower } from "@/components/room-controls";
 import { SizingUnitPickers, useSizingUnits } from "@/components/zone-sizing";
-import { RunRecords } from "@/components/run-records";
-import { SensingSettings } from "@/components/sensing";
+import { LandingPreference } from "@/components/landing-preference";
 import { DisplaySettings } from "@/components/display-settings";
 import type { ThemePreference, ThemeSource } from "@/lib/ha-theme";
 import { useWaterView, type WaterView } from "@/lib/water-view";
@@ -49,7 +36,6 @@ export function Settings({
   theme,
   setTheme,
   themeSource,
-  onDirtyChange,
 }: {
   controller: Controller;
   theme: ThemePreference;
@@ -73,28 +59,11 @@ export function Settings({
       setWaterBusy(false);
     }
   }
-  const predictions = controller.room.notifyPredictions;
-  const [predictBusy, setPredictBusy] = useState(false);
-  const [predictError, setPredictError] = useState("");
-  async function choosePredictions(include: boolean) {
-    if (!predictions.entityId || predictions.enabled === include) return;
-    setPredictBusy(true);
-    setPredictError("");
-    try {
-      const result = await controller.write([{ entityId: predictions.entityId, value: include }]);
-      if (result.failed.length) setPredictError(result.failed.map((f) => f.reason).join(" "));
-    } catch (error) {
-      setPredictError(errorText(error));
-    } finally {
-      setPredictBusy(false);
-    }
-  }
   const [base, setBase] = useState("");
   const [token, setToken] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [connected, setConnected] = useState(false);
-  const [review, setReview] = useState(false);
   const [resetDemo, setResetDemo] = useState(false);
   async function connect(event: React.FormEvent) {
     event.preventDefault();
@@ -198,93 +167,7 @@ export function Settings({
             </div>
           </form>
         </section>
-        {controller.room.roomActiveEntity && (
-          <section className="panel settings-section">
-            <div className="settings-label">
-              <h2>
-                Room on or off <UiTip copyKey="room on / off" />
-              </h2>
-              <p>
-                Set {controller.room.room.name} to off when no plants are in it. Set it to on again
-                for the next crop.
-              </p>
-            </div>
-            <div>
-              <RoomPower controller={controller} />
-              <p className="small muted mt-3">
-                Off: the controller does not water this room and sends no alerts for it. A shot that
-                runs stops within a few seconds. On within one day: the room continues from where it
-                stopped. On after more than one day: the counters and the phase data reset. This is
-                not an emergency stop.
-              </p>
-            </div>
-          </section>
-        )}
-        <section className="panel settings-section">
-          <div className="settings-label">
-            <h2>
-              Watering <UiTip copyKey="watering" />
-            </h2>
-            <p>
-              Lets the controller water {controller.room.room.name}. This is the kill switch of the
-              room
-              {controller.room.engine.entityId ? ` (${controller.room.engine.entityId})` : ""}.
-            </p>
-          </div>
-          <div>
-            <div className="split-row">
-              <Status
-                enabled={controller.room.engine.enabled}
-                label={
-                  controller.room.engine.enabled === true
-                    ? "Watering on"
-                    : controller.room.engine.enabled === false
-                      ? "Watering off"
-                      : undefined
-                }
-              />
-              <Button
-                variant="outline"
-                disabled={
-                  !controller.room.engine.entityId ||
-                  controller.room.engine.enabled === null ||
-                  !["live", "demo"].includes(controller.connection)
-                }
-                onClick={() => setReview(true)}
-              >
-                {controller.room.engine.enabled ? "Switch watering off…" : "Switch watering on…"}
-              </Button>
-            </div>
-            <p className="small muted mt-3">
-              Off: the controller opens no valve in this room, and a shot that runs stops within a
-              few seconds. The controller continues to read the probes and to follow the phases. A
-              new room starts with the kill switch at off, so no water flows before you examine its
-              hardware. This is not an emergency stop.
-            </p>
-            {controller.room.zones.length > 0 && (
-              <div className="settings-zones">
-                <h3>All zone switches</h3>
-                <AllZonesSwitch controller={controller} />
-                <p className="small muted">
-                  Pause or start all the zones of {controller.room.room.name} at one time. The
-                  dashboard shows a review first. Each zone also has its own switch on its page.
-                </p>
-              </div>
-            )}
-          </div>
-        </section>
-        <section className="panel settings-section">
-          <div className="settings-label">
-            <h2>
-              Run records <UiTip copyKey="run records" />
-            </h2>
-            <p>
-              Each crop in {controller.room.room.name}, from its start date: what History › Compare
-              runs lines up by grow week.
-            </p>
-          </div>
-          <RunRecords controller={controller} onDirtyChange={onDirtyChange} />
-        </section>
+
         <section className="panel settings-section">
           <div className="settings-label">
             <h2>Appearance</h2>
@@ -372,60 +255,12 @@ export function Settings({
               Everyone who opens this room sees the same choice.
             </p>
           </div>
-          <DisplaySettings controller={controller} />
-        </section>
-        <section className="panel settings-section">
-          <div className="settings-label">
-            <h2>Notifications</h2>
-            <p>The controller&rsquo;s vitals report, for {controller.room.room.name}.</p>
-          </div>
           <div>
-            <div className="label-with-tip">
-              <h3 id="predictions-label">Next action of each zone</h3>
-              <UiTip copyKey="include what each zone does next" />
-            </div>
-            <div
-              className="theme-options water-view-options"
-              role="group"
-              aria-labelledby="predictions-label"
-            >
-              {(
-                [
-                  { value: true, label: "Included", icon: Telescope },
-                  { value: false, label: "Not included", icon: EyeOff },
-                ] as const
-              ).map((option) => (
-                <button
-                  key={option.label}
-                  className={predictions.enabled === option.value ? "chosen" : ""}
-                  aria-pressed={predictions.enabled === option.value}
-                  disabled={
-                    !predictions.entityId ||
-                    predictions.enabled === null ||
-                    predictBusy ||
-                    !["live", "demo"].includes(controller.connection)
-                  }
-                  onClick={() => void choosePredictions(option.value)}
-                >
-                  <option.icon size={20} />
-                  <span>{option.label}</span>
-                  {predictions.enabled === option.value && <Check size={16} />}
-                </button>
-              ))}
-            </div>
-            {predictError && (
-              <p className="small error-text" role="alert">
-                {predictError}
-              </p>
-            )}
-            <p className="small muted mt-3">
-              {predictions.entityId
-                ? "Under each zone, what the controller will do next, as the zone’s Next: line says it: for example “shot when VWC < 61% (now 58%) · P3 by 22:00”. Which phones get the report is ticked under Notifications (Vitals)."
-                : "This needs the updated Crop Steering integration. Until then the controller includes them."}
-            </p>
+            <LandingPreference />
+            <DisplaySettings controller={controller} />
           </div>
         </section>
-        <SensingSettings controller={controller} />
+
         <section className="panel settings-section">
           <div className="settings-label">
             <h2>Units</h2>
@@ -479,30 +314,6 @@ export function Settings({
           </DialogContent>
         </Dialog>
       )}
-      <ReviewDialog
-        open={review}
-        onOpenChange={setReview}
-        controller={controller}
-        title="Review the kill switch"
-        items={
-          controller.room.engine.entityId
-            ? [
-                {
-                  change: {
-                    entityId: controller.room.engine.entityId,
-                    value: !controller.room.engine.enabled,
-                  },
-                  label: `${controller.room.room.name} watering`,
-                  before: controller.room.engine.enabled ? "On" : "Off",
-                  after: controller.room.engine.enabled ? "Off" : "On",
-                },
-              ]
-            : []
-        }
-        note={UI_COPY["review watering"].impact}
-        warning={UI_COPY["review watering"].warning}
-        caution={UI_COPY["review watering"].caution}
-      />
     </>
   );
 }

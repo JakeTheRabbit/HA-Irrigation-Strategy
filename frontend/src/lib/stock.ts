@@ -99,3 +99,12 @@ export function draftErrors(drafts: StockTankDraft[], max = 12): string[] {
   }
   return errors;
 }
+
+/** Inventory measurements belong to the operational card; configuration never resends a cached level. */
+export function stockConfigurationPayload(tanks: StockTankDraft[]) {
+  return tanks.map((tank) => {
+    if (!tank.id) return { ...tank };
+    const { level_l: _measuredLevel, ...configuration } = tank;
+    return configuration;
+  });
+}

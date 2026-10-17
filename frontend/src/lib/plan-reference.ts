@@ -1,11 +1,25 @@
 import type { SteeringProfile } from "./operator-types";
 
-/** Plan › Schedule reference rows (Settings › Display): climate and feed bands a grower writes beside
+/** Irrigation › Calendar reference rows (Settings › Display): climate and feed bands a grower writes beside
  * a profile's irrigation endpoints. They drive nothing: the controller never gets them. The zone
  * page's climate gauges colour a value outside today's band. Stored in the plan, in the profile. */
 export const REFERENCE_ROWS = [
-  { key: "temp_day", label: "Air temperature, lights on", unit: "°", min: -20, max: 130, step: 0.1 },
-  { key: "temp_night", label: "Air temperature, lights off", unit: "°", min: -20, max: 130, step: 0.1 },
+  {
+    key: "temp_day",
+    label: "Air temperature, lights on",
+    unit: "°",
+    min: -20,
+    max: 130,
+    step: 0.1,
+  },
+  {
+    key: "temp_night",
+    label: "Air temperature, lights off",
+    unit: "°",
+    min: -20,
+    max: 130,
+    step: 0.1,
+  },
   { key: "humidity", label: "Humidity", unit: "%", min: 0, max: 100, step: 1 },
   { key: "vpd", label: "VPD", unit: "kPa", min: 0, max: 5, step: 0.01 },
   { key: "co2", label: "CO2", unit: "ppm", min: 0, max: 5000, step: 10 },

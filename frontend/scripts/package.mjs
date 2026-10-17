@@ -35,6 +35,9 @@ const routes = {
   "SYSTEM_GUIDE.html": "help",
 };
 function redirect(filename, route) {
+  const landing = ["index.html", "home.html", "overview.html", "crop_steering.html"].includes(
+    filename,
+  );
   const classic = filename === "f2-classic.html" || filename === "crop_steering_tune.html";
   return (
     '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Crop Steering</title></head><body><p>Opening Crop Steering…</p><noscript><a href="./dashboard.html">Open dashboard</a> · JavaScript is required.</noscript><script>\n' +
@@ -42,9 +45,11 @@ function redirect(filename, route) {
     (classic
       ? 'const room=query.get("room");if(!room||!room.startsWith("room:"))query.set("room",room==="f1"?"room:f1_":"room:");\n'
       : "") +
-    'const view=query.get("view");query.delete("view");const route=legacyViews[view]||' +
+    'const view=query.get("view");query.delete("view");const route=legacyViews[view]||view||' +
     JSON.stringify(route) +
-    ';location.replace("./dashboard.html"+(query.size?"?"+query.toString():"")+(location.hash||"#/"+route));\n' +
+    ';location.replace("./dashboard.html"+(query.size?"?"+query.toString():"")+(location.hash||' +
+    (landing ? '(view ? "#/"+route : "")' : '"#/"+route') +
+    "));\n" +
     "</script></body></html>\n"
   );
 }

@@ -7,7 +7,7 @@
 
 **Crop Steering waters a grow room automatically from Home Assistant. An optional AI assistant gives a second opinion on the decisions that need judgement.**
 
-![Today in the Crop Steering sidebar: the room status, a card for each zone, and the changes of the AI assistant today](img/jev-today.png)
+![All zones across both demo rooms, grouped by room with current VWC, pore EC, water delivery and feed supply](img/all-zones.png)
 
 Crop Steering controls the water of a grow room from Home Assistant. The controller measures the water and the salt in each group of plants. It decides when the plants need water and how much water they need. Then it operates your pump and your valves. These fixed decisions are the rules of the controller.
 
@@ -200,12 +200,18 @@ The dashboard is the **Crop Steering** page in the Home Assistant sidebar. It ha
 
 Do these steps each day:
 
-1. Open **Today**. A room with shots in progress and no flagged card needs nothing.
+1. Open **Overview › All zones** to see every configured room and zone together. Paused rooms remain visible. Select a zone to open its room and detail page.
 2. Read what the AI assistant changed today.
 3. Open each flagged zone from its card. Read its numbers, its day chart and its **Controls**.
-4. Change targets only in **Plan › Targets**, through the review.
+4. Change targets only in **Irrigation › Current day**, through the review.
 5. Examine the readback after each change.
 6. Once each day, or after a change, examine **Equipment › Probes** and **Stock tanks**.
+
+### Landing page and room overview
+
+**All zones** is the default landing page. It shows each room separately, with current phase, VWC, pore EC, last irrigation, zone litres and average litres per plant. The feed strip opens that room’s detailed tank view. The watering and stop controls in the header apply only to the selected room, whose name appears beside them.
+
+Choose **Settings & help › Settings › Display › Default view** to open another workspace by default. The preference is saved in this browser. Bookmarks and notification links take precedence; choosing a default never redirects an explicit page link. **Overview › Selected room** opens Today for the selected room.
 
 ### Today
 
@@ -234,17 +240,21 @@ Select the card of a zone to open its page. The chart shows the grow-day of the 
 | The grey line | Yesterday. **Compare with** changes it to a typical day. |
 | P0 to P3 | The start time of each phase. |
 
-The panel next to the chart shows what the AI assistant can change on the zone, and its limits. Each row shows the time, the question, the answer, the confidence and the requested action. **Acted** means that the controller did the action. A tick or a cross shows the later check of the result.
+The **Why / next action** panel combines the controller’s reason, shot conditions and the AI explanation. Expand its details for proposals, permitted ranges, applied changes and later outcomes. Full historical traces and previous-run comparisons are in **History › Timeline**, reached with the selected zone intact.
 
-### Plan
+### Irrigation
 
-**Plan › Targets** shows all the targets of a zone, phase by phase. All edits stay in a local draft. A review shows the old and the new values before the dashboard writes them. When Auto setpoints is on, a chip shows the range that the AI assistant can use.
+Current-day targets and future schedules share one workspace, one zone selector and one continuous VWC/EC planning canvas. Switch between **Current day** and **Calendar** without discarding drafts. Current-day editing is locked when an armed schedule owns the targets. Planned curves, recorded evidence and previous-run comparisons stay labelled separately.
 
-**Plan › Schedule** shows **This flower by stage**: the stage arc for each zone. The highlighted row is the stage of today. A grow plan can change the targets of each zone week by week or day by day. You save a plan as a draft, then you arm it. An armed plan starts at the next lights-on. The arm action does not set the kill switch to on.
+![The consolidated Irrigation workspace and combined VWC/EC planning canvas](img/irrigation-workspace.png)
+
+**Irrigation › Current day** shows all the targets of a zone, phase by phase. All edits stay in a local draft. A review shows the old and the new values before the dashboard writes them. When Auto setpoints is on, a chip shows the range that the AI assistant can use.
+
+**Irrigation › Calendar** shows **This flower by stage**: the stage arc for each zone. The highlighted row is the stage of today. A grow plan can change the targets of each zone week by week or day by day. You save a plan as a draft, then you arm it. An armed plan starts at the next lights-on. The arm action does not set the kill switch to on.
 
 ### History
 
-**History › Timeline** shows the records of the controller and the decisions of the AI assistant, newest first.
+**History › Timeline** owns the full sensor-history explorer, previous-run comparisons and controller/AI event records. A shared zone selector keeps the selected zone consistent across these views.
 
 - **Acted**: the controller did what the AI assistant asked.
 - **Refused**: the envelope refused the action. An orange line gives the reason.
@@ -265,8 +275,10 @@ The panel next to the chart shows what the AI assistant can change on the zone, 
 
 ### Settings & help
 
-- **Room**: set it to off when the room is empty. With the room off, the controller does not water the room and sends no alerts for it.
-- **Watering**: the kill switch of the room ("Engine Enabled" in Home Assistant). With it off, the controller opens no valve in the room. A shot in progress stops in some seconds. The controller continues to read the probes and follow the phases.
+- **Default view, units and display**: choose browser landing and display preferences here.
+- **Capabilities**: search the current values and follow a link to the one workspace that edits each setting. It is a directory, not another set of switches.
+- **Room in use** now lives in **Equipment › Setup**. Set it off when the room is empty; this also suppresses room alerts. It differs from pausing watering.
+- **Watering** stays in the header: the kill switch of the selected room ("Engine Enabled" in Home Assistant). With it off, the controller opens no valve in the room. A shot in progress stops in some seconds. The controller continues to read the probes and follow the phases.
 - **Notifications**: select which phone gets which kind of alert. Send a test to each phone.
 - **Help**: each alert code (for example, CS-101). Help tells what the code means, its effect on the shots, the causes and the fixes.
 
@@ -365,7 +377,7 @@ Code keeps control of all physical actions. An answer from the AI assistant is o
 
 ### The AI assistant and your setpoints
 
-- **Auto setpoints is off until you set it to on.** Use **Turn auto on…** in **Plan › Targets**. There is one switch for each room.
+- **Auto setpoints is off until you set it to on.** Use **Turn auto on…** in **Irrigation › Current day**. There is one switch for each room.
 - **One time each night**, in the first three hours after lights-off, the Setpoints judge selects one answer. The answers are smaller shots, bigger shots, a later re-water, a sooner re-water, or no change.
 - **One small step**: the P2 shot size changes by 0.5%, or the re-water point changes by 0.5 points. A zone gets a maximum of one change each night.
 - **A range around your value**: the shot size stays within 1% of your value and never goes below 3%. The re-water point stays between 2 points below and 1 point above your value. It also stays 4 points above the rescue floor and 2 points below the peak target.
@@ -377,8 +389,8 @@ Code keeps control of all physical actions. An answer from the AI assistant is o
 
 | To do this | Do this |
 | --- | --- |
-| Stop setpoint changes | Use **Turn auto off…** in **Plan › Targets**. The values stay until you change them. |
-| Change a value that the AI assistant controls | Type your value in **Plan › Targets**. It becomes the new centre of the range. |
+| Stop setpoint changes | Use **Turn auto off…** in **Irrigation › Current day**. The values stay until you change them. |
+| Change a value that the AI assistant controls | Type your value in **Irrigation › Current day**. It becomes the new centre of the range. |
 | Stop one action | Turn off its switch in the AI powers list of the room. To stop a judge that has no power, list the other judges in the app option `ai_judges`. |
 | Pause the AI assistant in one room | Set **Pause AI Changes** to 1 h, until lights-on, or 24 h. The rules continue. |
 | Stop the AI assistant | Set `brain_provider` to `rules`, then restart the app. |

@@ -12,7 +12,7 @@ import {
 describe("the old menu's addresses land on each page's new home", () => {
   it.each([
     ["#/overview", "today"],
-    ["#/zones", "today"],
+    ["#/zones", "all-zones"],
     ["#/strategy", "plan/targets"],
     ["#/grow-plan", "plan/schedule"],
     ["#/compare", "history/compare"],
@@ -135,4 +135,15 @@ describe("the menu", () => {
     expect(sameRoute({ page: "zone", zone: 1 }, { page: "zone", zone: 1 })).toBe(true);
     expect(sameRoute({ page: "today" }, { page: "today", zone: 4 })).toBe(true);
   });
+});
+
+describe("zone context survives reload", () => {
+  it.each(["plan/targets", "plan/schedule", "history/timeline"] as const)(
+    "keeps selected zone on %s",
+    (page) => {
+      const route = { page, zone: 2 };
+      expect(parseRoute(routeHash(route)).route).toEqual(route);
+      expect(sameRoute(route, { page, zone: 1 })).toBe(false);
+    },
+  );
 });

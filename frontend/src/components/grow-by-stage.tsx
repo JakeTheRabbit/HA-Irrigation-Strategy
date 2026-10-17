@@ -7,7 +7,7 @@ import "./grow-by-stage.css";
 
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 
-/** Plan › Schedule's first answer: what each stage of this flower asks for, where today is, and
+/** Irrigation › Calendar's first answer: what each stage of this flower asks for, where today is, and
  * what changes next and when. The arc is the one the controller's AI assistant steers by; today's flower day
  * is the one it reports. */
 export function GrowByStage({ controller }: { controller: Controller }) {

@@ -1,0 +1,139 @@
+.irrigation-context {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.irrigation-context label {
+  font-weight: 600;
+}
+.irrigation-context select {
+  min-height: 40px;
+  padding: 6px 10px;
+  background: var(--surface);
+  color: var(--foreground);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-width: 100%;
+}
+.irrigation-source {
+  padding: 12px 16px;
+  background: var(--muted);
+  border-radius: 8px;
+  font-size: var(--text-sm);
+}
+.irrigation-canvas {
+  margin-bottom: 18px;
+}
+.irrigation-canvas > .setpoint-preview {
+  position: static;
+  max-height: none;
+  width: 100%;
+}
+.irrigation-canvas .planner-day-curve {
+  margin-top: 0;
+}
+.irrigation-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0;
+}
+.irrigation-editor-actions > p {
+  flex: 1 1 260px;
+}
+.irrigation-workspace .targets-grid {
+  grid-template-columns: minmax(0, 1fr);
+}
+.irrigation-workspace [hidden] {
+  display: none !important;
+}
+@media (max-width: 600px) {
+  .irrigation-context .zone-switcher {
+    width: 100%;
+  }
+  .irrigation-context select {
+    flex: 1;
+  }
+}
+
+/* Keep the response beside its controls while editing a current-day target. */
+@media (min-width: 1150px) {
+  .irrigation-workspace[data-view="current"] .irrigation-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1.25fr) minmax(390px, 1fr);
+    align-items: start;
+    gap: 18px;
+  }
+  .irrigation-workspace[data-view="current"] .irrigation-canvas {
+    position: sticky;
+    top: 90px;
+    max-height: calc(100dvh - 110px);
+    overflow: auto;
+    scrollbar-gutter: stable;
+  }
+  .irrigation-workspace[data-view="current"] .irrigation-editor-actions {
+    margin-top: 0;
+  }
+}
+/* The editor beside the canvas has a narrower column than the standalone targets page. */
+@media (min-width: 1150px) {
+  .irrigation-workspace[data-view="current"] .targets-table {
+    table-layout: fixed;
+  }
+  .irrigation-workspace[data-view="current"]
+    .targets-table
+    tr:not(.targets-phase):not(.targets-note)
+    > th:first-child {
+    width: 40%;
+    overflow-wrap: normal;
+  }
+  .irrigation-workspace[data-view="current"] .targets-input {
+    width: 32%;
+    white-space: normal;
+  }
+  .irrigation-workspace[data-view="current"] .targets-input input {
+    width: 76px;
+    max-width: 100%;
+  }
+  .irrigation-workspace[data-view="current"] .targets-unit {
+    min-width: 0;
+    margin-left: 4px;
+  }
+  .irrigation-workspace[data-view="current"] .targets-other {
+    width: 18%;
+    white-space: normal;
+  }
+  .irrigation-workspace[data-view="current"] .targets-chip {
+    width: 10%;
+    white-space: normal;
+  }
+  .irrigation-workspace[data-view="current"] .targets-chip .auto-badge {
+    white-space: normal;
+    max-width: 100%;
+    margin-left: 0;
+  }
+}
+@media (min-width: 1150px) {
+  .irrigation-workspace[data-view="current"] .targets-table thead th:first-child {
+    width: 40%;
+  }
+  .irrigation-workspace[data-view="current"] .targets-table thead th:nth-child(2) {
+    width: 32%;
+  }
+  .irrigation-workspace[data-view="current"] .targets-table thead th:nth-child(3) {
+    width: 18%;
+  }
+  .irrigation-workspace[data-view="current"] .targets-table thead th:nth-child(4) {
+    width: 10%;
+  }
+}
+@media (min-width: 1150px) {
+  .irrigation-workspace[data-view="current"] .targets-table td.targets-chip {
+    padding-left: 2px;
+    padding-right: 6px;
+  }
+}

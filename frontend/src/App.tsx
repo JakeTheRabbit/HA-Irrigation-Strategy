@@ -28,10 +28,9 @@ import { useController } from "@/lib/use-controller";
 import { useHaTheme } from "@/lib/ha-theme";
 import { useHaShell } from "@/lib/ha-shell";
 import { errorText } from "@/lib/utils";
-import { roomIsActive, runningVersions } from "@/lib/model";
+import { runningVersions } from "@/lib/model";
 import {
   canonicalHash,
-  parseRoute,
   routeHash,
   sameRoute,
   sectionOf,
@@ -45,15 +44,17 @@ import { WaterViewProvider } from "@/lib/water-view";
 import { WhatsNewOnUpdate } from "@/components/whats-new";
 import { Tour } from "@/components/tour";
 import { ZonePage } from "@/pages/zone";
+import { AllZones } from "@/pages/all-zones";
+import { initialRoute, readLandingView } from "@/lib/landing-view";
 import { Today } from "@/pages/today";
-import { Strategy, type Drafts } from "@/pages/strategy";
+import { type Drafts } from "@/pages/strategy";
+import { Irrigation } from "@/pages/irrigation";
 import { Timeline } from "@/pages/timeline";
 import { Probes } from "@/pages/probes";
 import { Settings } from "@/pages/settings";
 import { Features } from "@/pages/features";
 import { Notifications } from "@/pages/notifications";
 import { Help } from "@/pages/help";
-import { GrowPlanner } from "@/pages/grow-planner";
 import { Setup } from "@/pages/setup";
 import { Comparison } from "@/pages/comparison";
 import { Grows } from "@/pages/grows";
@@ -65,7 +66,7 @@ import { WaterUsePage } from "@/pages/water-use";
 import { AiSettings, BrainPage } from "@/components/brain";
 
 const navigation = [
-  { page: "today", label: SECTION_LABELS.today, icon: House },
+  { page: "all-zones", label: SECTION_LABELS.today, icon: House },
   { page: "plan/targets", label: SECTION_LABELS.plan, icon: CalendarRange },
   { page: "history/timeline", label: SECTION_LABELS.history, icon: History },
   { page: "equipment/probes", label: SECTION_LABELS.equipment, icon: Wrench },
@@ -77,7 +78,7 @@ const navigation = [
 function readRoute(): Route {
   const next = canonicalHash(window.location.hash, window.location.search);
   if (next !== null) window.history.replaceState(null, "", next);
-  return parseRoute(window.location.hash, window.location.search).route;
+  return initialRoute(window.location.hash, window.location.search, readLandingView());
 }
 
 export default function App() {
@@ -86,7 +87,7 @@ export default function App() {
   const [mobile, setMobile] = useState(false);
   const [drafts, setDrafts] = useState<Drafts>({});
   /** The zone Plan › Targets starts on, or the one History › Timeline shows. */
-  const [focusZone, setFocusZone] = useState<number | undefined>();
+  const [focusZone, setFocusZone] = useState<number | undefined>(() => route.zone ?? undefined);
   const [workspaceDirty, setWorkspaceDirty] = useState(false);
   const [pending, setPending] = useState<(() => void) | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -105,8 +106,15 @@ export default function App() {
   /** Opens a page. `zone` opens that zone's page, picks the zone Plan › Targets starts on, or the
    * zone History › Timeline shows. */
   function navigate(next: Page, zone?: number) {
-    const target: Route = next === "zone" ? { page: "zone", zone: zone ?? null } : { page: next };
-    const focused = next === "plan/targets" || next === "history/timeline";
+    const target: Route =
+      next === "zone"
+        ? { page: "zone", zone: zone ?? null }
+        : zone !== undefined &&
+            (next === "plan/targets" || next === "plan/schedule" || next === "history/timeline")
+          ? { page: next, zone }
+          : { page: next };
+    const focused =
+      next === "plan/targets" || next === "plan/schedule" || next === "history/timeline";
     if (sameRoute(target, route) && (!focused || zone === undefined)) {
       setMobile(false);
       return;
@@ -127,11 +135,12 @@ export default function App() {
         window.history.replaceState(null, "", routeHash(routeRef.current));
         setPending(() => () => {
           setRoute(next);
+          setFocusZone(next.zone ?? undefined);
           window.history.pushState(null, "", routeHash(next));
         });
       } else {
         setRoute(next);
-        setFocusZone(undefined);
+        setFocusZone(next.zone ?? undefined);
       }
     };
     window.addEventListener("hashchange", hashChange);
@@ -176,16 +185,29 @@ export default function App() {
       setMobile(false);
     });
   }
+  function openRoomPage(id: string, next: Page, zone?: number) {
+    confirmNavigation(() => {
+      const target: Route = next === "zone" ? { page: next, zone: zone ?? null } : { page: next };
+      setDrafts({});
+      setWorkspaceDirty(false);
+      setFocusZone(zone);
+      controller.changeRoom(id);
+      setRoute(target);
+      window.history.pushState(null, "", routeHash(target));
+      setMobile(false);
+      window.scrollTo({ top: 0 });
+    });
+  }
   const versions = runningVersions(controller.states, controller.room.room);
   const section = sectionOf(page);
   const sidebar = (variant: string) => (
     <>
       <a
-        href="#/today"
+        href="#/all-zones"
         className="brand"
         onClick={(event) => {
           event.preventDefault();
-          navigate("today");
+          navigate("all-zones");
         }}
       >
         <span className="brand-mark">
@@ -195,30 +217,6 @@ export default function App() {
           Crop Steering<small>Irrigation control</small>
         </span>
       </a>
-      <div className="room-selector">
-        <span className="label-with-tip">
-          <label htmlFor={variant + "-room"}>Room</label>
-          <UiTip copyKey="room" />
-        </span>
-        <select
-          id={variant + "-room"}
-          value={controller.roomId}
-          disabled={!controller.rooms.length}
-          onChange={(event) => selectRoom(event.target.value)}
-        >
-          {!controller.roomId && (
-            <option value="" disabled>
-              {controller.rooms.length ? "Room unavailable - choose a room" : "No room discovered"}
-            </option>
-          )}
-          {controller.rooms.map((room) => (
-            <option key={room.id} value={room.id}>
-              {room.name}
-              {roomIsActive(controller.states, room) ? "" : " · off"}
-            </option>
-          ))}
-        </select>
-      </div>
       <nav aria-label="Main navigation">
         {navigation.map((item) => (
           <button
@@ -332,14 +330,17 @@ export default function App() {
                 )}
               </div>
             )}
-            <PageTabs
-              page={page}
-              navigate={(next) => navigate(next)}
-              badges={{ "plan/targets": Object.keys(drafts).length }}
-              hidden={
-                controller.room.display.options.show_dryback_drivers ? [] : ["history/drivers"]
-              }
-            />
+            {section !== "plan" && (
+              <PageTabs
+                page={page}
+                navigate={(next) => navigate(next)}
+                badges={{ "plan/targets": Object.keys(drafts).length }}
+                hidden={
+                  controller.room.display.options.show_dryback_drivers ? [] : ["history/drivers"]
+                }
+              />
+            )}
+            {page === "all-zones" && <AllZones controller={controller} open={openRoomPage} />}
             {page === "today" && (
               <Today key={pageKey} controller={controller} navigate={navigate} />
             )}
@@ -348,42 +349,62 @@ export default function App() {
                 key={pageKey}
                 controller={controller}
                 zoneId={route.zone ?? null}
+                onDirtyChange={setWorkspaceDirty}
                 navigate={navigate}
               />
             )}
             {page === "today/ai" && (
               <BrainPage key={pageKey} controller={controller} navigate={navigate} />
             )}
-            {page === "plan/targets" && (
-              <Strategy
-                key={pageKey}
+            {(page === "plan/targets" || page === "plan/schedule") && (
+              <Irrigation
+                key={controller.roomId}
                 controller={controller}
                 drafts={drafts}
                 setDrafts={setDrafts}
-                selectedZone={focusZone}
+                onDirtyChange={setWorkspaceDirty}
+                zoneId={focusZone}
+                initialView={page === "plan/schedule" ? "calendar" : "current"}
                 navigate={navigate}
               />
             )}
-            {page === "plan/schedule" && (
-              <GrowPlanner
+            {page === "history/timeline" && (
+              <Timeline
                 key={pageKey}
                 controller={controller}
-                onDirtyChange={setWorkspaceDirty}
+                zone={focusZone}
+                onZoneChange={(zone) => {
+                  setFocusZone(zone);
+                  const query = new URLSearchParams(window.location.hash.split("?")[1] ?? "");
+                  if (zone) query.set("zone", String(zone));
+                  else query.delete("zone");
+                  const target: Route = zone
+                    ? { page: "history/timeline", zone }
+                    : { page: "history/timeline" };
+                  setRoute(target);
+                  window.history.replaceState(
+                    null,
+                    "",
+                    "#/history/timeline" + (query.size ? "?" + query.toString() : ""),
+                  );
+                }}
               />
             )}
-            {page === "history/timeline" && (
-              <Timeline key={`${pageKey}:${focusZone}`} controller={controller} zone={focusZone} />
-            )}
             {page === "history/water" && <WaterUsePage key={pageKey} controller={controller} />}
-            {page === "history/drivers" && (
-              <DrybackDrivers key={pageKey} controller={controller} />
-            )}
+            {page === "history/drivers" && <DrybackDrivers key={pageKey} controller={controller} />}
             {page === "history/compare" && (
               <Comparison key={pageKey} controller={controller} navigate={navigate} />
             )}
-            {page === "history/grows" && <Grows key={pageKey} controller={controller} />}
+            {page === "history/grows" && (
+              <Grows key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
+            )}
             {page === "equipment/probes" && (
-              <Probes key={pageKey} controller={controller} navigate={navigate} />
+              <Probes
+                key={pageKey}
+                controller={controller}
+                navigate={navigate}
+                onDirtyChange={setWorkspaceDirty}
+              />
             )}
             {page === "equipment/stock" && (
               <StockTanks key={pageKey} controller={controller} navigate={navigate} />
@@ -419,7 +440,9 @@ export default function App() {
                 onDirtyChange={setWorkspaceDirty}
               />
             )}
-            {page === "settings/ai" && <AiSettings key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />}
+            {page === "settings/ai" && (
+              <AiSettings key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
+            )}
             {page === "help" && <Help controller={controller} />}
           </div>
         </main>

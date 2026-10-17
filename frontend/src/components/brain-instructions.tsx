@@ -216,8 +216,9 @@ export function BrainInstructions({
               <summary>Grow context</summary>
               <p>
                 Substrate selected: <strong>{value("select", "substrate")}</strong>. Growth stage:{" "}
-                <strong>{value("select", "growth_stage")}</strong>. Change those in Features; notes
-                below provide context and never change those settings.
+                <strong>{value("select", "growth_stage")}</strong>. Change substrate in Equipment
+                and growth stage in Irrigation; notes below provide context and never change those
+                settings.
               </p>
               {PROFILE_FIELDS.map((key) => (
                 <div key={key}>

@@ -1,3 +1,4 @@
+import { CanonicalControls } from "@/components/canonical-controls";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   ArrowRight,
@@ -429,6 +430,12 @@ export function Dosing({
   navigate: (page: Page) => void;
   onDirtyChange: (dirty: boolean) => void;
 }) {
+  const [setupDirty, setSetupDirty] = useState(false);
+  const [permissionsDirty, setPermissionsDirty] = useState(false);
+  useEffect(() => {
+    onDirtyChange(setupDirty || permissionsDirty);
+    return () => onDirtyChange(false);
+  }, [setupDirty, permissionsDirty, onDirtyChange]);
   const { room, states } = controller;
   const prefix = room.room.prefix;
   const formId = useId();
@@ -700,6 +707,11 @@ export function Dosing({
             </Button>
           )
         }
+      />
+      <CanonicalControls
+        controller={controller}
+        owner="dosing"
+        onDirtyChange={setPermissionsDirty}
       />
       {loadError && !config && (
         <Empty
@@ -1151,7 +1163,7 @@ export function Dosing({
             draft={draft}
             setDraft={setDraft}
             onSaved={(saved) => setDoc(saved)}
-            onDirtyChange={onDirtyChange}
+            onDirtyChange={setSetupDirty}
           />
         </details>
       )}

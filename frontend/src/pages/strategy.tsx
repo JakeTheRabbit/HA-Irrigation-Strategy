@@ -1,14 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight, Check, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  Empty,
-  Heading,
-  ReviewDialog,
-  number,
-  type Page,
-  type ReviewItem,
-} from "@/components/dashboard";
+import { Empty, ReviewDialog, number, type Page, type ReviewItem } from "@/components/dashboard";
+import { WorkspaceHeading } from "@/components/irrigation-workspace";
+import { CanonicalControls } from "@/components/canonical-controls";
+import type { ReactNode } from "react";
 import type { Choice, Controller, Setting } from "@/lib/types";
 import { PlanningCurve } from "@/components/planning-curve";
 import { buildSetpointPreview, validateSetpoint } from "@/lib/setpoint-preview";
@@ -65,11 +61,19 @@ export function Strategy({
   setDrafts,
   selectedZone,
   navigate,
+  embedded = false,
+  active = true,
+  renderCurve,
+  onCanonicalDirtyChange,
 }: {
   controller: Controller;
   drafts: Drafts;
   setDrafts: React.Dispatch<React.SetStateAction<Drafts>>;
-  selectedZone?: number;
+  selectedZone?: number | "room";
+  embedded?: boolean;
+  active?: boolean;
+  renderCurve?: (curve: ReactNode) => ReactNode;
+  onCanonicalDirtyChange?: (dirty: boolean) => void;
   navigate: (page: Page) => void;
 }) {
   const { room, states } = controller;
@@ -86,6 +90,7 @@ export function Strategy({
   const fileRef = useRef<HTMLInputElement>(null);
   useEffect(() => {
     if (selectedZone !== undefined) setZoneId(String(selectedZone));
+    if (typeof selectedZone === "number") setRoomPreviewZone(selectedZone);
   }, [selectedZone]);
   const planEngaged = room.strategy.engaged;
   const connected = ["live", "demo"].includes(controller.connection);
@@ -150,7 +155,7 @@ export function Strategy({
   // Recorded probe behaviour for the zone being previewed: the dark lines on the day, and the
   // hints under a field being edited.
   const sensorZone = room.zones.find((z) => z.id === previewZoneId);
-  const sensor = useSensorContext(controller, sensorZone, connected);
+  const sensor = useSensorContext(controller, sensorZone, connected && active);
   // The plan graph redraws on every drag step, so the recorder dump is thinned once per load.
   const recorded = useMemo(
     () => ({
@@ -281,10 +286,99 @@ export function Strategy({
     const words = param ? settingWords(param) : undefined;
     return row(setting, words?.label ?? setting.label, setting.unit);
   };
+  const curve = (
+    <aside
+      className={`setpoint-preview ${expanded ? "is-expanded" : ""}`}
+      aria-label="Setpoint preview"
+    >
+      <div className="setpoint-preview-context">
+        <div>
+          <strong>
+            {room.room.name} · {room.zones.find((z) => z.id === previewZoneId)?.name ?? "No zone"}
+          </strong>
+          <span>
+            {preview.readOnly
+              ? "Armed grow plan · read only"
+              : `${preview.draft.mode ?? "Mode unavailable"} · local draft`}
+          </span>
+        </div>
+        <Button
+          variant="outline"
+          size="sm"
+          className="setpoint-expand"
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+        >
+          {expanded ? "Compact preview" : "Expand preview"}
+        </Button>
+      </div>
+      {zoneId === "room" && (
+        <div className="setpoint-preview-zone">
+          <span className="label-with-tip">
+            <label htmlFor="setpoint-preview-zone">Preview room changes in</label>
+            <UiTip copyKey="preview room changes in" />
+          </span>
+          <select
+            id="setpoint-preview-zone"
+            value={previewZoneId ?? ""}
+            onChange={(event) => setRoomPreviewZone(Number(event.target.value))}
+          >
+            {room.zones.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
+          <p>Zone-specific values take precedence over room defaults.</p>
+        </div>
+      )}
+      <PlanningCurve
+        initialShowEc={embedded}
+        recorded={recorded}
+        retention={sensorZone?.auto?.gain}
+        zoneName={sensorZone?.name}
+        phase={sensorZone?.phase}
+        ecBand={readJev(states, room.room.prefix).room?.stage?.poreEc ?? null}
+        drybackPoints={readJev(states, room.room.prefix).room?.stage?.drybackPoints ?? null}
+        parameters={preview.draft.parameters}
+        lightsOn={preview.draft.lightsOn}
+        lightsOff={preview.draft.lightsOff}
+        baseline={preview.readOnly ? undefined : preview.saved}
+        bounds={preview.bounds}
+        showEditors={false}
+        description={
+          preview.readOnly
+            ? "Today’s targets from the armed grow plan. Open Schedule to change the plan."
+            : "Drag a target, or type it in the table. Nothing is written until you review and apply."
+        }
+        onChange={
+          canEdit
+            ? (key, value) => {
+                const setting = preview.fields[key];
+                if (setting) edit(setting, String(value));
+              }
+            : undefined
+        }
+      />
+      {preview.notes.map((item) => (
+        <p className="setpoint-preview-note" key={item}>
+          {item}
+        </p>
+      ))}
+      {preview.issues.length > 0 && (
+        <div className="workspace-message" role="status">
+          {preview.issues.map((issue) => (
+            <p key={issue}>{issue}</p>
+          ))}
+        </div>
+      )}
+    </aside>
+  );
   return (
     <>
-      <Heading
-        title="Targets"
+      <WorkspaceHeading
+        embedded={embedded}
+        title="Current day"
         action={
           <div className="heading-actions">
             <AutoSetpointsControl controller={controller} jevManaged={jevManaged} />
@@ -380,29 +474,31 @@ export function Strategy({
           ))}
         </ol>
       )}
-      <nav className="zone-switcher targets-zones" aria-label="Targets for">
-        {room.zones.map((item) => {
-          const count = Object.values(drafts).filter((d) => d.zone === item.name).length;
-          return (
-            <button
-              type="button"
-              key={item.id}
-              aria-current={zoneId === String(item.id) ? "page" : undefined}
-              onClick={() => setZoneId(String(item.id))}
-            >
-              {item.name}
-              {count > 0 && <i className="nav-draft-count">{count}</i>}
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          aria-current={zoneId === "room" ? "page" : undefined}
-          onClick={() => setZoneId("room")}
-        >
-          Room
-        </button>
-      </nav>
+      {!embedded && (
+        <nav className="zone-switcher targets-zones" aria-label="Targets for">
+          {room.zones.map((item) => {
+            const count = Object.values(drafts).filter((d) => d.zone === item.name).length;
+            return (
+              <button
+                type="button"
+                key={item.id}
+                aria-current={zoneId === String(item.id) ? "page" : undefined}
+                onClick={() => setZoneId(String(item.id))}
+              >
+                {item.name}
+                {count > 0 && <i className="nav-draft-count">{count}</i>}
+              </button>
+            );
+          })}
+          <button
+            type="button"
+            aria-current={zoneId === "room" ? "page" : undefined}
+            onClick={() => setZoneId("room")}
+          >
+            Room
+          </button>
+        </nav>
+      )}
       {saved && (
         <div className="success-banner" role="status">
           <Check size={18} />
@@ -567,93 +663,13 @@ export function Strategy({
             </Button>
           </p>
         </section>
-        <aside
-          className={`setpoint-preview ${expanded ? "is-expanded" : ""}`}
-          aria-label="Setpoint preview"
-        >
-          <div className="setpoint-preview-context">
-            <div>
-              <strong>
-                {room.room.name} ·{" "}
-                {room.zones.find((z) => z.id === previewZoneId)?.name ?? "No zone"}
-              </strong>
-              <span>
-                {preview.readOnly
-                  ? "Armed grow plan · read only"
-                  : `${preview.draft.mode ?? "Mode unavailable"} · local draft`}
-              </span>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              className="setpoint-expand"
-              onClick={() => setExpanded(!expanded)}
-              aria-expanded={expanded}
-            >
-              {expanded ? "Compact preview" : "Expand preview"}
-            </Button>
-          </div>
-          {zoneId === "room" && (
-            <div className="setpoint-preview-zone">
-              <span className="label-with-tip">
-                <label htmlFor="setpoint-preview-zone">Preview room changes in</label>
-                <UiTip copyKey="preview room changes in" />
-              </span>
-              <select
-                id="setpoint-preview-zone"
-                value={previewZoneId ?? ""}
-                onChange={(event) => setRoomPreviewZone(Number(event.target.value))}
-              >
-                {room.zones.map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
-              </select>
-              <p>Zone-specific values take precedence over room defaults.</p>
-            </div>
-          )}
-          <PlanningCurve
-            recorded={recorded}
-            retention={sensorZone?.auto?.gain}
-            zoneName={sensorZone?.name}
-            phase={sensorZone?.phase}
-            ecBand={readJev(states, room.room.prefix).room?.stage?.poreEc ?? null}
-            drybackPoints={readJev(states, room.room.prefix).room?.stage?.drybackPoints ?? null}
-            parameters={preview.draft.parameters}
-            lightsOn={preview.draft.lightsOn}
-            lightsOff={preview.draft.lightsOff}
-            baseline={preview.readOnly ? undefined : preview.saved}
-            bounds={preview.bounds}
-            showEditors={false}
-            description={
-              preview.readOnly
-                ? "Today’s targets from the armed grow plan. Open Schedule to change the plan."
-                : "Drag a target, or type it in the table. Nothing is written until you review and apply."
-            }
-            onChange={
-              canEdit
-                ? (key, value) => {
-                    const setting = preview.fields[key];
-                    if (setting) edit(setting, String(value));
-                  }
-                : undefined
-            }
-          />
-          {preview.notes.map((item) => (
-            <p className="setpoint-preview-note" key={item}>
-              {item}
-            </p>
-          ))}
-          {preview.issues.length > 0 && (
-            <div className="workspace-message" role="status">
-              {preview.issues.map((issue) => (
-                <p key={issue}>{issue}</p>
-              ))}
-            </div>
-          )}
-        </aside>
+        {renderCurve ? renderCurve(curve) : curve}
       </div>
+      <CanonicalControls
+        controller={controller}
+        owner="irrigation"
+        onDirtyChange={onCanonicalDirtyChange}
+      />
       {Object.keys(drafts).length > 0 && (
         <div className="draft-bar" role="status">
           <div>

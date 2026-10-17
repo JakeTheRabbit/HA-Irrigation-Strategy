@@ -166,11 +166,13 @@ export function useGrids(
   };
 }
 
-/** The zone page's history explorer: a range, any sensor of the room, the zone's phases and the
+/** History’s recorded zone explorer: a range, any sensor of the room, the zone's phases and the
  * room's shots, and the previous run at the same grow days. */
 export function HistoryExplorer({ controller, zone }: { controller: Controller; zone: Zone }) {
   const { room, states, timeZone } = controller;
-  const [choice, setChoiceState] = useState<Choice>(() => readChoice(window.location.hash));
+  const [choice, setChoiceState] = useState<Choice>(() =>
+    readChoice(typeof window === "undefined" ? "" : window.location.hash),
+  );
   const [now, setNow] = useState(() => Date.now());
   const [runs, setRuns] = useState<RunRecord[] | null>(null);
   const [sheet, setSheet] = useState(false);
@@ -213,7 +215,8 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
   const { current: run, previous: last } = pickRuns(runs ?? []);
   // The grow compared with: the one picked, else the last one before this grow.
   const previous =
-    (choice.compareRun && (runs ?? []).find((r) => r.id === choice.compareRun && r.id !== run?.id)) ||
+    (choice.compareRun &&
+      (runs ?? []).find((r) => r.id === choice.compareRun && r.id !== run?.id)) ||
     last;
   const others = (runs ?? []).filter((r) => !r.archived && r.id !== run?.id);
   const prefix = room.room.prefix;
@@ -243,10 +246,26 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
     choice.compare && span && run && previous
       ? previousWindow(run, previous, span.start, span.end, now)
       : null;
-  const comparisons = useProbeComparisons(controller, visible, sensors, choice, run, last, runs ?? [], span, step);
-  const before = { busy: comparisons.busy ? { done: comparisons.rows.size, total: visible.length } : null, error: "", loads: comparisons.rows, values: new Map() };
+  const comparisons = useProbeComparisons(
+    controller,
+    visible,
+    sensors,
+    choice,
+    run,
+    last,
+    runs ?? [],
+    span,
+    step,
+  );
+  const before = {
+    busy: comparisons.busy ? { done: comparisons.rows.size, total: visible.length } : null,
+    error: "",
+    loads: comparisons.rows,
+    values: new Map(),
+  };
   const summaries: GrowDay[] = [];
-  const comparing = choice.compare || Object.values(choice.probeCompare ?? {}).some((id) => id !== "off");
+  const comparing =
+    choice.compare || Object.values(choice.probeCompare ?? {}).some((id) => id !== "off");
   const grid = span ? new SeriesGrid(span.start, span.end, step) : null;
   const data = useMemo(() => {
     if (!grid || !span) return [];
@@ -260,11 +279,12 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
       const values = recorded.values.get(sensor.entityId);
       if (values) values.forEach((value, at) => (rows[at][`s${index}`] = value));
       const overlay = comparisons.rows.get(sensor.entityId);
-      if (overlay) overlay.values.forEach((value, at) => {
-        rows[at][`p${index}`] = value;
-        rows[at][`pl${index}`] = overlay.low[at];
-        rows[at][`ph${index}`] = overlay.high[at];
-      });
+      if (overlay)
+        overlay.values.forEach((value, at) => {
+          rows[at][`p${index}`] = value;
+          rows[at][`pl${index}`] = overlay.low[at];
+          rows[at][`ph${index}`] = overlay.high[at];
+        });
     });
     return rows;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -310,7 +330,11 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
   // it on this zone's VWC, labelled as the controller measures dryback, on ranges of 14 d at most.
   const vwcIndex = visible.findIndex((sensor) => sensor.entityId === zone.vwc.entityId);
   const markers =
-    choice.dryback && span && grid && vwcIndex >= 0 && span.end - span.start <= DRYBACK_MARKER_DAYS * 86_400_000
+    choice.dryback &&
+    span &&
+    grid &&
+    vwcIndex >= 0 &&
+    span.end - span.start <= DRYBACK_MARKER_DAYS * 86_400_000
       ? (() => {
           const first = growDay(hour("on"), hour("off"), span.start, timeZone)?.start;
           if (first === undefined) return [];
@@ -408,18 +432,22 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
                   comparing && hasPrevious && Object.keys(choice.probeCompare ?? {}).length
                     ? "Probe comparisons — grows and sources listed below"
                     : choice.compare && hasPrevious && previous && previousSpan
-                    ? `Run ${previous.name}, days ${previousSpan.firstDay}–${previousSpan.lastDay}`
-                    : null
+                      ? `Run ${previous.name}, days ${previousSpan.firstDay}–${previousSpan.lastDay}`
+                      : null
                 }
                 shots={shots.length > 0}
                 phases={bands.length > 0}
               />
               {comparisons.rows.size > 0 && (
                 <ul className="history-explorer-sources" aria-label="Compared probe sources">
-                  {[...comparisons.rows].map(([id, overlay]) => <li key={id} data-probe-source={id}>
-                    {sensors.find((sensor) => sensor.entityId === id)?.label}: {overlay.grow.name} — {overlay.error || overlay.sources.join("; ")}
-                    {overlay.sources.some((source) => source !== "recorded history") && " (min/max band)"}
-                  </li>)}
+                  {[...comparisons.rows].map(([id, overlay]) => (
+                    <li key={id} data-probe-source={id}>
+                      {sensors.find((sensor) => sensor.entityId === id)?.label}: {overlay.grow.name}{" "}
+                      — {overlay.error || overlay.sources.join("; ")}
+                      {overlay.sources.some((source) => source !== "recorded history") &&
+                        " (min/max band)"}
+                    </li>
+                  ))}
                 </ul>
               )}
               {compareNote && (
@@ -547,11 +575,24 @@ export function HistoryExplorer({ controller, zone }: { controller: Controller; 
                               className="history-explorer-previous"
                             />
                           ))}
-                        {comparing && visible.map((sensor, index) => (
-                          <Area key={`band-${sensor.entityId}`} dataKey={(row: Row) => row[`pl${index}`] == null || row[`ph${index}`] == null ? null : [row[`pl${index}`], row[`ph${index}`]]}
-                            yAxisId={`axis-${units.indexOf(sensor.unit)}`} stroke="none" fill={sensor.color} fillOpacity={0.12}
-                            connectNulls={false} isAnimationActive={false} name={`${sensor.label} historical min/max`} />
-                        ))}
+                        {comparing &&
+                          visible.map((sensor, index) => (
+                            <Area
+                              key={`band-${sensor.entityId}`}
+                              dataKey={(row: Row) =>
+                                row[`pl${index}`] == null || row[`ph${index}`] == null
+                                  ? null
+                                  : [row[`pl${index}`], row[`ph${index}`]]
+                              }
+                              yAxisId={`axis-${units.indexOf(sensor.unit)}`}
+                              stroke="none"
+                              fill={sensor.color}
+                              fillOpacity={0.12}
+                              connectNulls={false}
+                              isAnimationActive={false}
+                              name={`${sensor.label} historical min/max`}
+                            />
+                          ))}
                         {markers.flatMap((marker) => [
                           <ReferenceDot
                             key={`peak-${marker.peak.t}`}
@@ -833,33 +874,78 @@ function Controls({
               .map((sensor) => (
                 <div key={sensor.entityId} className="history-explorer-probe-row">
                   <label className="history-explorer-check">
-                    <input type="checkbox" checked={ticked.includes(sensor.entityId)}
-                      onChange={(event) => toggle([sensor.entityId], event.target.checked)} data-sensor={sensor.entityId} />
-                    <i style={{ background: sensor.color }} aria-hidden="true" /><span>{sensor.label}</span>
+                    <input
+                      type="checkbox"
+                      checked={ticked.includes(sensor.entityId)}
+                      onChange={(event) => toggle([sensor.entityId], event.target.checked)}
+                      data-sensor={sensor.entityId}
+                    />
+                    <i style={{ background: sensor.color }} aria-hidden="true" />
+                    <span>{sensor.label}</span>
                     <span className="muted">{sensor.unit}</span>
                   </label>
                   {(sensor.kind === "vwc" || sensor.kind === "ec") && (
                     <label className="history-explorer-probe-compare">
                       Compare with
-                      <select aria-label={`Compare ${sensor.label} with grow`} data-probe-compare={sensor.entityId}
-                        value={choice.probeCompare?.[sensor.entityId] ?? (choice.compare ? choice.compareRun ? `run:${choice.compareRun}` : "last" : "off")}
-                        onChange={(event) => setChoice({ probeCompare: { ...choice.probeCompare, [sensor.entityId]: event.target.value } })}>
-                        <option value="off">Off</option><option value="last" disabled={!hasPrevious}>Last grow</option>
-                        {others.map((grow) => <option key={grow.id} value={`run:${grow.id}`}>{grow.name}</option>)}
+                      <select
+                        aria-label={`Compare ${sensor.label} with grow`}
+                        data-probe-compare={sensor.entityId}
+                        value={
+                          choice.probeCompare?.[sensor.entityId] ??
+                          (choice.compare
+                            ? choice.compareRun
+                              ? `run:${choice.compareRun}`
+                              : "last"
+                            : "off")
+                        }
+                        onChange={(event) =>
+                          setChoice({
+                            probeCompare: {
+                              ...choice.probeCompare,
+                              [sensor.entityId]: event.target.value,
+                            },
+                          })
+                        }
+                      >
+                        <option value="off">Off</option>
+                        <option value="last" disabled={!hasPrevious}>
+                          Last grow
+                        </option>
+                        {others.map((grow) => (
+                          <option key={grow.id} value={`run:${grow.id}`}>
+                            {grow.name}
+                          </option>
+                        ))}
                       </select>
                     </label>
                   )}
-                  {(matches.get(sensor.entityId)?.match.entityId === null || !!choice.probeMatch?.[sensor.entityId]) && !!matches.get(sensor.entityId)?.match.candidates.length && (
-                    <label className="history-explorer-probe-compare">Historical probe
-                      <select aria-label={`Historical probe for ${sensor.label}`} value={choice.probeMatch?.[sensor.entityId] ?? ""}
-                        onChange={(event) => setChoice({ probeMatch: { ...choice.probeMatch, [sensor.entityId]: event.target.value } })}>
-                        <option value="">Choose the matching row</option>
-                        {matches.get(sensor.entityId)!.match.candidates.map((probe) => <option key={probe.entity_id} value={probe.entity_id}>
-                          {probe.row_label || probe.entity_id} {probe.position === null ? "" : `(position ${probe.position + 1})`}
-                        </option>)}
-                      </select>
-                    </label>
-                  )}
+                  {(matches.get(sensor.entityId)?.match.entityId === null ||
+                    !!choice.probeMatch?.[sensor.entityId]) &&
+                    !!matches.get(sensor.entityId)?.match.candidates.length && (
+                      <label className="history-explorer-probe-compare">
+                        Historical probe
+                        <select
+                          aria-label={`Historical probe for ${sensor.label}`}
+                          value={choice.probeMatch?.[sensor.entityId] ?? ""}
+                          onChange={(event) =>
+                            setChoice({
+                              probeMatch: {
+                                ...choice.probeMatch,
+                                [sensor.entityId]: event.target.value,
+                              },
+                            })
+                          }
+                        >
+                          <option value="">Choose the matching row</option>
+                          {matches.get(sensor.entityId)!.match.candidates.map((probe) => (
+                            <option key={probe.entity_id} value={probe.entity_id}>
+                              {probe.row_label || probe.entity_id}{" "}
+                              {probe.position === null ? "" : `(position ${probe.position + 1})`}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
                 </div>
               ))}
           </div>

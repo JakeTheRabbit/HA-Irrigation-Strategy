@@ -1,4 +1,4 @@
-import { useLayoutEffect, useEffect, useRef, useState } from "react";
+import { useLayoutEffect, useEffect, useRef, useState, type ReactNode } from "react";
 import { flushSync } from "react-dom";
 import {
   CalendarRange,
@@ -23,7 +23,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Heading, Empty, number } from "@/components/dashboard";
+import { WorkspaceHeading } from "@/components/irrigation-workspace";
+import { Empty, number } from "@/components/dashboard";
 import { GrowByStage } from "@/components/grow-by-stage";
 import { PlanCellContext } from "@/components/plan-cell-context";
 import { RecipeLibrary } from "@/components/recipe-library";
@@ -69,17 +70,30 @@ const moves: Record<string, [number, number]> = {
 export function GrowPlanner({
   controller,
   onDirtyChange,
+  selectedZone,
+  onZoneChange,
+  embedded = false,
+  active = true,
+  renderCurve,
 }: {
   controller: Controller;
   onDirtyChange: (dirty: boolean) => void;
+  selectedZone?: number;
+  onZoneChange?: (zoneId: number) => void;
+  embedded?: boolean;
+  active?: boolean;
+  renderCurve?: (curve: ReactNode) => ReactNode;
 }) {
   const [document, setDocument] = useState<StrategyDocument | null>(null);
   const [plan, setPlan] = useState<GrowPlan | null>(null);
-  const [zoneId, setZoneId] = useState(controller.room.zones[0]?.id || 1);
+  const [zoneId, setZoneId] = useState(selectedZone ?? controller.room.zones[0]?.id ?? 1);
+  useEffect(() => {
+    if (selectedZone !== undefined) setZoneId(selectedZone);
+  }, [selectedZone]);
   const [day, setDay] = useState(1);
   const [granularity, setGranularity] = useState<"week" | "day">("week");
   const [tab, setTab] = useState<"calendar" | "profiles" | "recipes">("calendar");
-  const [advanced, setAdvanced] = useState(false);
+  const [advanced, setAdvanced] = useState(embedded);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
@@ -96,13 +110,16 @@ export function GrowPlanner({
     onDirtyChange(dirty || libraryDirty);
     return () => onDirtyChange(false);
   }, [dirty, libraryDirty, onDirtyChange]);
+  const loadVersion = useRef(0);
   async function load() {
     if (!controller.roomId) return;
+    const version = ++loadVersion.current;
     setBusy(true);
     setError("");
     setNotice("");
     try {
       const value = await controller.operator<StrategyDocument>("strategy_get");
+      if (version !== loadVersion.current) return;
       if (!value.plan || !value.catalog)
         throw new Error("Update the integration to use grow plans.");
       setDocument(value);
@@ -113,18 +130,22 @@ export function GrowPlanner({
         setDay(Math.max(1, Math.min(366, growDay(first.start_date, localDate()))));
       }
     } catch (e) {
-      setError(errorText(e));
+      if (version === loadVersion.current) setError(errorText(e));
     } finally {
-      setBusy(false);
+      if (version === loadVersion.current) setBusy(false);
     }
   }
   useEffect(() => {
-    if (!document && ["live", "demo"].includes(controller.connection)) void load();
-  }, [controller.roomId, controller.connection]);
+    if (active && !document && ["live", "demo"].includes(controller.connection)) void load();
+    if (!active) setBusy(false);
+    return () => {
+      ++loadVersion.current;
+    };
+  }, [controller.roomId, controller.connection, active]);
   const statusContext = useRef({ document, dirty, busy, review });
   statusContext.current = { document, dirty, busy, review };
   useEffect(() => {
-    if (!document || dirty || !["live", "demo"].includes(controller.connection)) return;
+    if (!active || !document || dirty || !["live", "demo"].includes(controller.connection)) return;
     let cancelled = false,
       reading = false;
     const refreshStatus = async () => {
@@ -159,7 +180,7 @@ export function GrowPlanner({
       cancelled = true;
       window.clearInterval(timer);
     };
-  }, [controller.roomId, controller.connection, Boolean(document), dirty]);
+  }, [controller.roomId, controller.connection, Boolean(document), dirty, active]);
   const zonePlan = plan?.zones.find((z) => z.zone_id === zoneId);
   const currentBlock = blockForDay(zonePlan, day);
   const profile =
@@ -199,14 +220,14 @@ export function GrowPlanner({
   const typedBalance = cell?.text.trim() ? parseBalance(cell.text) : null;
   const typed = typedBalance && "value" in typedBalance ? typedBalance.value : null;
   const cellError = typedBalance && "error" in typedBalance ? typedBalance.error : "";
-  const selectedZone = controller.room.zones.find((z) => z.id === zoneId);
+  const liveZone = controller.room.zones.find((z) => z.id === zoneId);
   // Recorded probe behaviour for the endpoints tab: the chart, and the field-capacity suggestion.
   const sensor = useSensorContext(
     controller,
-    selectedZone,
+    liveZone,
     connected && advanced && tab === "profiles",
   );
-  const learnedPeak = selectedZone?.auto?.learnedPeak ?? null;
+  const learnedPeak = liveZone?.auto?.learnedPeak ?? null;
   const capacitySuggestion = fieldCapacitySuggestion(learnedPeak, sensor.vwc.stats, sensor.hours);
   const capacityDraft =
     capacitySuggestion && limits.field_capacity
@@ -214,6 +235,7 @@ export function GrowPlanner({
       : null;
   function setZone(next: number) {
     setZoneId(next);
+    onZoneChange?.(next);
     setPreview(null);
   }
   function updateBlock(patch: Partial<ScheduleBlock>) {
@@ -248,7 +270,7 @@ export function GrowPlanner({
     if (!cell) return;
     if (cellError)
       setRejected(
-        `${selectedZone?.name || "Zone " + zoneId}, ${granularity === "week" ? "week " + (selectedColumn + 1) : "day " + day}: “${cell.text.trim()}” was not applied. ${cellError}`,
+        `${liveZone?.name || "Zone " + zoneId}, ${granularity === "week" ? "week " + (selectedColumn + 1) : "day " + day}: “${cell.text.trim()}” was not applied. ${cellError}`,
       );
     else if (typed !== null) applyBalance(typed);
     setCell(null);
@@ -389,8 +411,8 @@ export function GrowPlanner({
   if (!controller.roomId)
     return (
       <>
-        <Heading title="Schedule" />
-        <GrowByStage controller={controller} />
+        <WorkspaceHeading title="Calendar" embedded={embedded} />
+        {!embedded && <GrowByStage controller={controller} />}
         <Empty
           title="Add or select a room"
           detail="Room and zone configuration comes first."
@@ -404,8 +426,9 @@ export function GrowPlanner({
     );
   return (
     <>
-      <Heading
-        title="Schedule"
+      <WorkspaceHeading
+        embedded={embedded}
+        title="Calendar"
         description="Saving a grow plan does not start it: armed, it sets each zone's targets from the next lights-on."
         action={
           <div className="workspace-actions">
@@ -425,6 +448,35 @@ export function GrowPlanner({
           </div>
         }
       />
+      {renderCurve &&
+        renderCurve(
+          profile && currentBlock ? (
+            <section className="setpoint-preview" aria-label="Calendar planning reference">
+              <div className="setpoint-preview-context">
+                <strong>
+                  {liveZone?.name} · grow day {day}
+                  {zonePlan ? ` · ${dateForDay(zonePlan.start_date, day)}` : ""}
+                </strong>
+              </div>
+              <p className="muted small">
+                {dirty ? "Unsaved schedule draft" : "Saved schedule"} · planning reference. Saving
+                and arming are separate actions. Chart changes update both endpoints of the selected
+                profile.
+              </p>
+              <PlannerDayCurve
+                controller={controller}
+                zoneId={zoneId}
+                parameters={interpolate(profile, currentBlock.bias, limits)}
+                onChange={disabled ? undefined : curveEdit}
+                showEc
+              />
+            </section>
+          ) : (
+            <p className="workspace-message">
+              Select a scheduled day and profile to preview its targets.
+            </p>
+          ),
+        )}
       <input
         ref={importRef}
         type="file"
@@ -433,7 +485,7 @@ export function GrowPlanner({
         aria-label="Import grow plan"
         onChange={(e) => void importPlan(e.target.files?.[0])}
       />
-      <GrowByStage controller={controller} />
+      {!embedded && <GrowByStage controller={controller} />}
       {error && (
         <div className="workspace-message error" role="alert">
           {error}
@@ -599,7 +651,7 @@ export function GrowPlanner({
             open={advanced}
             onToggle={(event) => setAdvanced((event.currentTarget as HTMLDetailsElement).open)}
           >
-            <summary>Advanced plan settings</summary>
+            <summary>{embedded ? "Calendar & profiles" : "Advanced plan settings"}</summary>
             <div className="workspace-tabs" role="tablist" aria-label="Grow planner view">
               <button
                 role="tab"
@@ -773,9 +825,9 @@ export function GrowPlanner({
                   {zonePlan && selectedColumn < columns && (
                     <PlanCellContext
                       zone={zonePlan}
-                      name={selectedZone?.name || "Zone " + zoneId}
-                      live={selectedZone}
-                      livePlants={selectedZone ? zonePlants(controller, selectedZone.id) : null}
+                      name={liveZone?.name || "Zone " + zoneId}
+                      live={liveZone}
+                      livePlants={liveZone ? zonePlants(controller, liveZone.id) : null}
                       profile={profile}
                       limits={limits}
                       granularity={granularity}
@@ -790,7 +842,7 @@ export function GrowPlanner({
                   <div className="workspace-section-heading">
                     <div>
                       <h2>
-                        {selectedZone?.name || "Zone " + zoneId} ·{" "}
+                        {liveZone?.name || "Zone " + zoneId} ·{" "}
                         {granularity === "week" ? "days " + firstDay + "–" + lastDay : "day " + day}
                       </h2>
                       <p className="muted">
@@ -880,13 +932,16 @@ export function GrowPlanner({
                       <span>Generative endpoint</span>
                     </div>
                   </div>
-                  {controller.room.display.options.planner_day_curve && profile && currentBlock && (
-                    <PlannerDayCurve
-                      controller={controller}
-                      zoneId={zoneId}
-                      parameters={interpolate(profile, currentBlock.bias, limits)}
-                    />
-                  )}
+                  {!renderCurve &&
+                    controller.room.display.options.planner_day_curve &&
+                    profile &&
+                    currentBlock && (
+                      <PlannerDayCurve
+                        controller={controller}
+                        zoneId={zoneId}
+                        parameters={interpolate(profile, currentBlock.bias, limits)}
+                      />
+                    )}
                 </section>
                 <section className="panel workspace-card">
                   <div className="workspace-section-heading">
@@ -1055,7 +1110,7 @@ export function GrowPlanner({
                       {key === "field_capacity" && capacitySuggestion && (
                         <FieldSuggestionLine
                           suggestion={capacitySuggestion}
-                          zoneName={selectedZone?.name}
+                          zoneName={liveZone?.name}
                           draftValue={capacityDraft}
                           unit={limit.unit}
                           action="for both endpoints"

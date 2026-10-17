@@ -33,6 +33,7 @@ export interface PlanningCurveProps {
   bounds?: PlanningBounds;
   baseline?: { parameters: Record<string, number>; lightsOn: number; lightsOff: number };
   showEditors?: boolean;
+  initialShowEc?: boolean;
   selectedPhase?: PlanningPhaseId;
   description?: string;
   /** Recorded probe readings for this zone, drawn under the targets on the same axes, cut into
@@ -87,6 +88,7 @@ export function PlanningCurve({
   bounds,
   baseline,
   showEditors = true,
+  initialShowEc = false,
   selectedPhase,
   description,
   recorded,
@@ -104,7 +106,7 @@ export function PlanningCurve({
   const id = useId();
   const container = useRef<HTMLDivElement>(null);
   const [width, setWidth] = useState(800);
-  const [showEc, setShowEc] = useState(false);
+  const [showEc, setShowEc] = useState(initialShowEc);
   const [showEarlier, setShowEarlier] = useState(true);
   const dragging = useRef<string | null>(null);
   // The axis follows what is plotted; it must not move under the pointer mid-drag.
@@ -153,7 +155,9 @@ export function PlanningCurve({
   const ecRecorded = fold(recorded?.ec);
   const ecToday = probeGaps(ecRecorded.today, 0).clean;
   const hasRecorded = vwcRecorded.today.length + vwcRecorded.previous.length > 0;
-  const nowHour = recorded ? (fold([{ time: recorded.now, value: 1 }]).today[0]?.hour ?? null) : null;
+  const nowHour = recorded
+    ? (fold([{ time: recorded.now, value: 1 }]).today[0]?.hour ?? null)
+    : null;
   // The day drawn the way the engine runs it, timed by this zone's own measured dryback.
   const rates = dryRates([vwcRecorded.today, ...vwcRecorded.previous], plan.photoperiod);
   const projection = projectDay(plan, parameters, { rates, retention });
@@ -304,7 +308,9 @@ export function PlanningCurve({
       .map((point, index) => {
         const broken =
           index > 0 &&
-          todaySplit.gaps.some((gap) => gap.start > points[index - 1].time && gap.start < point.time);
+          todaySplit.gaps.some(
+            (gap) => gap.start > points[index - 1].time && gap.start < point.time,
+          );
         return `${index && !broken ? "L" : "M"}${x(point.hour)},${scale(point.value)}`;
       })
       .join(" ");
@@ -331,7 +337,8 @@ export function PlanningCurve({
     ? Math.max(...vwcRecorded.today.map((point) => point.value))
     : null;
   const p1Done = nowHour !== null && nowHour >= p1.end;
-  const ecTarget = phaseNow && phaseNow !== "P3" ? parameters[`ec_target_${phaseNow.toLowerCase()}`] : NaN;
+  const ecTarget =
+    phaseNow && phaseNow !== "P3" ? parameters[`ec_target_${phaseNow.toLowerCase()}`] : NaN;
   const gauges = hasRecorded
     ? [
         {
@@ -360,8 +367,7 @@ export function PlanningCurve({
           id: "dryback",
           model: gauge({
             label: "Dryback so far",
-            value:
-              todayPeak && nowVwc ? ((todayPeak - nowVwc.value) / todayPeak) * 100 : null,
+            value: todayPeak && nowVwc ? ((todayPeak - nowVwc.value) / todayPeak) * 100 : null,
             target: parameters.dryback_target,
             reference: referenceDryback(drybackPoints, todayPeak),
             unit: "%",
@@ -499,7 +505,11 @@ export function PlanningCurve({
           </p>
         )}
         {gauges.length > 0 && (
-          <GaugeRow className="planning-recorded" gauges={gauges} label="Recorded VWC and EC against the plan" />
+          <GaugeRow
+            className="planning-recorded"
+            gauges={gauges}
+            label="Recorded VWC and EC against the plan"
+          />
         )}
       </div>
       <div className="planning-legend" role="group" aria-label="Chart key">
@@ -995,8 +1005,7 @@ export function PlanningCurve({
           data-planning-advice={check.kind}
           text={check.text}
           action={
-            check.apply &&
-            canApply(check.kind === "p2" ? "p2_vwc_threshold" : "dryback_target")
+            check.apply && canApply(check.kind === "p2" ? "p2_vwc_threshold" : "dryback_target")
               ? { label: "Apply to draft", run: check.apply }
               : null
           }
@@ -1098,15 +1107,15 @@ export function PlanningCurve({
             )}
           </li>
           <li>
-            Dashed EC connects configured phase anchors through the night; it does not predict EC
-            or salt concentration. Use the EC button to show it.
+            Dashed EC connects configured phase anchors through the night; it does not predict EC or
+            salt concentration. Use the EC button to show it.
           </li>
           {projection && (
             <li>
               Dryback rate: {projection.rates.day} points/h with the lights on (
-              {projection.measured.day ? "measured" : "nominal"}),{" "}
-              {projection.rates.night} points/h with the lights off (
-              {projection.measured.night ? "measured" : "nominal"}). Each shot keeps{" "}
+              {projection.measured.day ? "measured" : "nominal"}), {projection.rates.night} points/h
+              with the lights off ({projection.measured.night ? "measured" : "nominal"}). Each shot
+              keeps{" "}
               {retention && retention > 0
                 ? `${trim(projection.retention, 2)} points per 1% (the learned gain of this zone)`
                 : "all of its water, which is the most it can keep"}
@@ -1116,9 +1125,9 @@ export function PlanningCurve({
           )}
           {advice && (
             <li data-planning-advice="p2-text">
-              The controller gives a maintenance shot only when VWC falls below the re-water
-              point. From {trim(advice.pointsToThreshold + parameters.p2_vwc_threshold)}% at the
-              start of P2 that is {trim(advice.pointsToThreshold)} points, about{" "}
+              The controller gives a maintenance shot only when VWC falls below the re-water point.
+              From {trim(advice.pointsToThreshold + parameters.p2_vwc_threshold)}% at the start of
+              P2 that is {trim(advice.pointsToThreshold)} points, about{" "}
               {trim(advice.hoursToThreshold)} hours at this rate. At{" "}
               {trim(advice.suggestedThreshold)}% the shots repeat about every{" "}
               {trim(advice.repeatHours)} hours; a smaller P2 shot gives smaller steps.
@@ -1142,8 +1151,8 @@ export function PlanningCurve({
           )}
           {baseline && (
             <li>
-              The saved line and the draft line are aligned to lights-on; the times follow the
-              draft schedule.
+              The saved line and the draft line are aligned to lights-on; the times follow the draft
+              schedule.
             </li>
           )}
           {plan.notes.map((note) => (

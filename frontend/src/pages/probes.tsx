@@ -1,3 +1,4 @@
+import { CanonicalControls } from "@/components/canonical-controls";
 import { useEffect, useState } from "react";
 import { ArrowRight, Search } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -37,9 +38,11 @@ const asId = (value: unknown) =>
 export function Probes({
   controller,
   navigate,
+  onDirtyChange,
 }: {
   controller: Controller;
   navigate: (page: Page) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const { room, states } = controller;
   const now = Date.now();
@@ -68,6 +71,7 @@ export function Probes({
   return (
     <>
       <Heading title="Probes" action={<UiTip copyKey="probes" />} />
+      <CanonicalControls controller={controller} owner="probes" onDirtyChange={onDirtyChange} />
       <section className="panel probes-status" aria-label="Controller and AI assistant">
         <div>
           <span className="eyebrow">Probes</span>
@@ -168,9 +172,7 @@ export function Probes({
                             ? "shut"
                             : "unknown"}
                       </Pill>
-                      {zone.enabled === false && (
-                        <Status enabled={false} label="Zone paused" />
-                      )}
+                      {zone.enabled === false && <Status enabled={false} label="Zone paused" />}
                     </th>
                   </tr>
                   {probes
@@ -427,9 +429,11 @@ function ProbePicker({ controller, probes }: { controller: Controller; probes: P
 function RoomMap({
   controller,
   navigate,
+  onDirtyChange,
 }: {
   controller: Controller;
   navigate: (page: Page) => void;
+  onDirtyChange?: (dirty: boolean) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [setup, setSetup] = useState<SetupRoom | null>(null),

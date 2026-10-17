@@ -244,7 +244,7 @@ const DRYBACK_WORDS: SettingWords = {
 // under "In practice" the common grower guidance, in this dashboard's own words.
 const AUTO = "The controller adjusts this zone’s value itself. Auto setpoints is off by default.";
 const EC_STAGES =
-  "Substrate EC is steered by growth stage: Plan › Schedule lists each stage’s pore EC band.";
+  "Substrate EC is steered by growth stage: Irrigation › Calendar lists each stage’s pore EC band.";
 const DETAILS: Record<string, SettingDetail> = {
   p0_maximum_wait_time: {
     what: "How long after lights-on the first shot can wait: the plants start drinking before the day’s watering does.",

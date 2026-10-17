@@ -54,7 +54,7 @@ const glossary = [
   ],
   [
     "Runoff",
-    "The water that drains out of the slab, as a share of the water fed: it carries salt out. More runoff steers vegetative and less generative; Plan › Schedule lists each stage’s range.",
+    "The water that drains out of the slab, as a share of the water fed: it carries salt out. More runoff steers vegetative and less generative; Irrigation › Calendar lists each stage’s range.",
   ],
 ];
 

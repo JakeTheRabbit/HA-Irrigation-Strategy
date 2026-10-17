@@ -68,8 +68,22 @@ export function RunProgress({
       live = false;
     };
   }, [roomId, operator]);
+  const stage = readJev(states, room.room.prefix).room?.stage ?? null;
+  const stageSummary = stage ? (
+    <span>
+      {stage.name.charAt(0).toUpperCase() + stage.name.slice(1)}
+      {stage.day !== null
+        ? ` · flower day ${stage.day}${stage.days !== null ? ` of ${stage.days}` : ""}`
+        : ""}
+    </span>
+  ) : null;
   // Nothing until this room's runs are read; nothing at all from an integration without runs.
-  if (!loaded || loaded.roomId !== roomId || !loaded.runs) return null;
+  if (!loaded || loaded.roomId !== roomId || !loaded.runs)
+    return stageSummary ? (
+      <section className="panel run-progress" aria-label="Room growing context">
+        {stageSummary}
+      </section>
+    ) : null;
   const timeZone = loaded.runs.time_zone || controller.timeZone || "UTC";
   const today = dateInZone(Date.now(), timeZone);
   const run = currentRun(loaded.runs.runs, today);
@@ -77,14 +91,13 @@ export function RunProgress({
     return (
       <section className="panel run-progress" aria-labelledby={titleId} data-run-progress="none">
         <p className="run-progress-empty">
-          <span id={titleId}>No run is active in this room.</span>
+          <span id={titleId}>No run is active in this room. {stageSummary}</span>
           <Button size="sm" variant="outline" onClick={() => navigate("settings")}>
             Add a run
           </Button>
         </p>
       </section>
     );
-  const stage = readJev(states, room.room.prefix).room?.stage ?? null;
   const view = runProgress({
     run,
     today,
@@ -218,7 +231,10 @@ export function RunProgress({
         >
           <div tabIndex={0} data-run-recipe="stage">
             <dt>Stage</dt>
-            <dd>{stageName ? stageName.charAt(0).toUpperCase() + stageName.slice(1) : "–"}</dd>
+            <dd>
+              {stageSummary ??
+                (stageName ? stageName.charAt(0).toUpperCase() + stageName.slice(1) : "–")}
+            </dd>
           </div>
         </Tip>
         <Tip

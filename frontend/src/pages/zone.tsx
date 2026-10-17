@@ -1,16 +1,14 @@
 import { useState, type ReactNode } from "react";
 import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
+import { CanonicalControls } from "@/components/canonical-controls";
 import { Button } from "@/components/ui/button";
 import { Empty, number, ReviewDialog, time as clock, type Page } from "@/components/dashboard";
-import { BrainOnZone } from "@/components/brain";
-import { HistoryExplorer } from "@/components/history-explorer";
-import { OnThisDay } from "@/components/on-this-day";
+import { useBrain } from "@/lib/brain";
 import { CameraCard, ClimatePanel, HardwarePanel, RootZonePanel } from "@/components/zone-extras";
 import { UiTip } from "@/components/info-tip";
 import { ZoneDay } from "@/components/day-timeline";
 import { OverlayRows, useOverlays } from "@/components/overlay-row";
 import { Pill } from "@/components/mini-visuals";
-import { SensorContextCard, useSensorContext } from "@/components/sensor-context";
 import { PlantStressCard, ZoneGates, ZoneShots } from "@/components/sensing";
 import { rangeText, steeringOf } from "@/lib/day-chart";
 import {
@@ -27,7 +25,6 @@ import {
   readJev,
   type JevSetpoints,
 } from "@/lib/jev";
-import { referenceLines } from "@/lib/sensor-context";
 import { zoneOverlays } from "@/lib/overlays";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { jevChip, TARGET_GROUPS } from "@/lib/targets";
@@ -53,9 +50,11 @@ export function ZonePage({
   controller,
   zoneId,
   navigate,
+  onDirtyChange,
 }: {
   controller: Controller;
   zoneId: number | null;
+  onDirtyChange?: (dirty: boolean) => void;
   navigate: (page: Page, zone?: number) => void;
 }) {
   const zones = controller.room.zones;
@@ -82,11 +81,6 @@ export function ZonePage({
     states[`select.crop_steering_${room.room.prefix}zone_${zone.id}_steering_mode`]?.state,
     readJev(states, room.room.prefix).room?.stage?.steering,
   );
-  // The AI assistant on this zone shows while the room runs the AI assistant (its journal, or its word on this zone).
-  const jev =
-    !!readJev(states, room.room.prefix).room?.on ||
-    !!readJev(states, room.room.prefix).log?.entries.some((entry) => entry.zone === zone.id) ||
-    !!parseJevZone(states[jevIds(room.room.prefix).zone(zone.id)]);
   return (
     <div className="zone-page" data-zone-page={zone.id}>
       <div className="zone-page-bar">
@@ -144,24 +138,27 @@ export function ZonePage({
           {display.show_substrate_temp && <RootZonePanel controller={controller} zone={zone} />}
         </div>
       )}
-      <HistoryExplorer key={`explorer-${zone.id}`} controller={controller} zone={zone} />
-      <OnThisDay key={`on-this-day-${zone.id}`} controller={controller} zone={zone} />
-      <ZoneWhy key={`why-${zone.id}`} controller={controller} zone={zone} />
-      <ZoneGates key={`gates-${zone.id}`} controller={controller} zone={zone} />
+      <Button variant="outline" onClick={() => navigate("history/timeline", zone.id)}>
+        Explore recorded history and comparisons <ArrowRight size={15} aria-hidden="true" />
+      </Button>
+      <ZoneWhy key={`why-${zone.id}`} controller={controller} zone={zone} navigate={navigate} />
       <PlantStressCard key={`stress-${zone.id}`} controller={controller} zone={zone} />
-      {/* The AI on this zone beside the controls; without it the controls take the width. */}
-      <div className="zone-page-grid">
-        <div className="zone-page-column">
-          <BrainOnZone controller={controller} zone={zone.id} navigate={navigate} />
-          {display.show_camera && (
-            <div className="zone-page-stack">
-              <CameraCard controller={controller} />
-            </div>
-          )}
-          {jev && <JevOnZone controller={controller} zone={zone} navigate={navigate} />}
-        </div>
+      {/* Hardware controls and optional camera retain their separate operational roles. */}
+      <div className={display.show_camera ? "zone-page-grid" : "zone-page-stack"}>
+        {display.show_camera && (
+          <div className="zone-page-column">
+            <CameraCard controller={controller} />
+          </div>
+        )}
         <div className="zone-page-stack">
           <ZoneControls key={zone.id} controller={controller} zone={zone} />
+          <CanonicalControls
+            key={`zone-config-${zone.id}`}
+            controller={controller}
+            owner="zone"
+            zoneId={zone.id}
+            onDirtyChange={onDirtyChange}
+          />
           <HardwarePanel controller={controller} zone={zone} />
         </div>
       </div>
@@ -173,7 +170,6 @@ export function ZonePage({
         {() => <ZoneProbes controller={controller} zone={zone} navigate={navigate} />}
       </Collapsed>
       <ZoneShots key={`shots-${zone.id}`} controller={controller} zone={zone} />
-      <RecordedBehaviour key={`recorded-${zone.id}`} controller={controller} zone={zone} />
     </div>
   );
 }
@@ -181,7 +177,16 @@ export function ZonePage({
 /** Why this zone is doing what it is doing: the controller's reason from its decision record and what
  * it waits for next; with the AI on, the AI's read and a "Why?" that asks it. On rules, the
  * controller's reason only. */
-function ZoneWhy({ controller, zone }: { controller: Controller; zone: Zone }) {
+function ZoneWhy({
+  controller,
+  zone,
+  navigate,
+}: {
+  controller: Controller;
+  zone: Zone;
+  navigate: (page: Page, zone?: number) => void;
+}) {
+  const { panel: brainPanel, view: brainView } = useBrain(controller);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const { states, room } = controller;
@@ -218,7 +223,7 @@ function ZoneWhy({ controller, zone }: { controller: Controller; zone: Zone }) {
     <section className="panel zone-why-panel" aria-labelledby="zone-why-title" data-zone-why>
       <div className="panel-heading">
         <div>
-          <h2 id="zone-why-title">Reason for this action</h2>
+          <h2 id="zone-why-title">Why / next action</h2>
           <p>{on ? "The controller’s reason, then the AI’s read" : "The controller’s reason"}</p>
         </div>
         {answers && (
@@ -247,6 +252,13 @@ function ZoneWhy({ controller, zone }: { controller: Controller; zone: Zone }) {
             <span>The controller waits for</span> {waiting}
           </p>
         )}
+        <p className="muted small">{brainView.headline}</p>
+        {!sensor && brainPanel?.lastDecision?.zone === zone.id && (
+          <p className="zone-ai-read">
+            Latest AI proposal: {brainPanel.lastDecision.answer || "No answer"}.{" "}
+            {brainPanel.lastDecision.why}
+          </p>
+        )}
         {read && (
           <p className="zone-ai-read">
             <span>AI’s read · {read.title}</span> {read.why}
@@ -269,6 +281,14 @@ function ZoneWhy({ controller, zone }: { controller: Controller; zone: Zone }) {
             {answer.answer}
           </p>
         )}
+        <details className="zone-more">
+          <summary>All next-shot conditions</summary>
+          <ZoneGates controller={controller} zone={zone} />
+        </details>
+        <details className="zone-more">
+          <summary>AI proposals, applied changes and outcomes</summary>
+          <JevOnZone controller={controller} zone={zone} navigate={navigate} />
+        </details>
       </div>
     </section>
   );
@@ -313,7 +333,7 @@ function JevOnZone({
   const recent = rest.filter((entry) => entry.zone === zone.id).slice(0, 6);
   const now = Date.now();
   return (
-    <section className="panel zone-jev" aria-labelledby="zone-jev-title" data-zone-jev>
+    <div className="zone-jev" aria-labelledby="zone-jev-title" data-zone-jev>
       <div className="panel-heading">
         <div>
           <h2 id="zone-jev-title">AI assistant on this zone</h2>
@@ -389,7 +409,7 @@ function JevOnZone({
           <p className="muted small">No decisions on this zone yet.</p>
         )}
       </div>
-    </section>
+    </div>
   );
 }
 
@@ -675,34 +695,5 @@ function ZoneControls({ controller, zone }: { controller: Controller; zone: Zone
         />
       )}
     </section>
-  );
-}
-
-/** What the probes recorded over days, against the zone's targets: opened on request. */
-function RecordedBehaviour({ controller, zone }: { controller: Controller; zone: Zone }) {
-  const [open, setOpen] = useState(false);
-  const connected = ["live", "demo"].includes(controller.connection);
-  const sensor = useSensorContext(controller, zone, open && connected);
-  const preview = buildSetpointPreview(controller.room, controller.states, zone.id, {});
-  return (
-    <details
-      className="zone-recorded"
-      open={open}
-      onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
-    >
-      <summary>Recorded behaviour against targets</summary>
-      {open && (
-        <SensorContextCard
-          context={sensor}
-          lines={referenceLines({
-            draft: preview.saved.parameters,
-            typicalDailyPeak: sensor.vwc.stats?.typicalDailyPeak ?? null,
-            learnedPeak: zone.auto?.learnedPeak ?? null,
-          })}
-          subtitle="what the probes read, with the zone’s targets drawn over it"
-          disabledNote="Recorded history loads while Home Assistant is connected."
-        />
-      )}
-    </details>
   );
 }
