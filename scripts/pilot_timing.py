@@ -15,29 +15,48 @@ def plan(lessons, cues, records):
     for lesson in lessons:
         for slide in lesson["slides"]:
             for index, text in enumerate(slide["narration"].split("\n\n")):
-                expected.append({"id": f'{slide["id"]}-p{index+1:02}',
-                                 "lesson": lesson["id"], "scene": slide["id"],
-                                 "paragraph": index, "text": text})
+                expected.append(
+                    {
+                        "id": f'{slide["id"]}-p{index+1:02}',
+                        "lesson": lesson["id"],
+                        "scene": slide["id"],
+                        "paragraph": index,
+                        "text": text,
+                    }
+                )
     pictures = _index(cues, "picture")
     voices = _index(records, "voice")
     ids = {x["id"] for x in expected}
     if set(pictures) != ids or set(voices) != ids:
-        raise ValueError("paragraph coverage differs between source, pictures and voices")
+        raise ValueError(
+            "paragraph coverage differs between source, pictures and voices"
+        )
     result, offsets = [], {}
     for source in expected:
         key = source["id"]
         for item in (pictures[key], voices[key]):
             if any(item.get(k) != v for k, v in source.items()):
-                raise ValueError(f'source mismatch: {key}')
+                raise ValueError(f"source mismatch: {key}")
         record = voices[key]
         frames = record["frames"]
-        if (not isinstance(frames, int) or frames <= 0
-                or abs(record["duration"] - frames/24) > .001):
-            raise ValueError(f'invalid frame duration: {key}')
+        if (
+            not isinstance(frames, int)
+            or frames <= 0
+            or abs(record["duration"] - frames / 24) > 0.001
+        ):
+            raise ValueError(f"invalid frame duration: {key}")
         start = offsets.get(source["lesson"], 0)
         end = start + frames
-        result.append({**pictures[key], "start_frame": start, "end_frame": end,
-                       "frames": frames, "start": start/24, "end": end/24,
-                       "duration": frames/24})
+        result.append(
+            {
+                **pictures[key],
+                "start_frame": start,
+                "end_frame": end,
+                "frames": frames,
+                "start": start / 24,
+                "end": end / 24,
+                "duration": frames / 24,
+            }
+        )
         offsets[source["lesson"]] = end
     return result
