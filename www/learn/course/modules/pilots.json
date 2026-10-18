@@ -1,0 +1,986 @@
+[
+  {
+    "id": "A1",
+    "module": "A",
+    "title": "Before the buttons: water, roots and air",
+    "summary": "Start with the pot: roots need access to water and oxygen. A sensor describes only a small part of the root zone.",
+    "outcomes": [
+      "Identify solids, water and air in the substrate.",
+      "Explain why more water is not always better.",
+      "State one limit of a local sensor reading."
+    ],
+    "prerequisites": [],
+    "route": "everyone",
+    "slides": [
+      {
+        "id": "A1-01",
+        "title": "The question",
+        "body": [
+          "Before the buttons",
+          "Before you use the dashboard, identify the conditions inside the pot."
+        ],
+        "narration": "Before you use the dashboard, identify the conditions inside the pot.\n\nWhat do the roots need?",
+        "visual": {
+          "type": "root-zone",
+          "title": "The question",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "A1-02",
+        "title": "Inside the root zone",
+        "body": [
+          "Solids · water · air",
+          "The pot contains solid material, water, and air."
+        ],
+        "narration": "The pot contains solid material, water, and air. The solid material around the roots is the substrate. Coco and stone wool are examples of substrates.\n\nThere are spaces between the solid parts. These spaces contain water or air. Roots need water and oxygen.\n\nMore water does not always improve conditions for the roots. The substrate must hold water and let excess water drain. Air must also return to some of the spaces.",
+        "visual": {
+          "type": "root-zone",
+          "title": "Inside the root zone",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "A1-03",
+        "title": "Watch water arrive and drain",
+        "body": [
+          "Some stays. Some drains.",
+          "Look at the spare container."
+        ],
+        "narration": "Look at the spare container. Water enters the substrate. Some water stays in the substrate. Other water drains into the tray.\n\nThe amount of water then decreases. The plant uses some water. Evaporation and drainage also remove water.\n\nA decrease in water content does not show only the water that the plant used.",
+        "visual": {
+          "type": "root-zone",
+          "title": "Watch water arrive and drain",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "A1-04",
+        "title": "Pause before adding water",
+        "body": [
+          "More water — or check first?",
+          "This pot stays very wet."
+        ],
+        "narration": "This pot stays very wet. The leaves look unhealthy. Does this mean that you must add more water?\n\nChoose one answer. Add more water immediately. Or do a check to find the cause first.\n\nDo a check first.\n\nDifferent problems can cause similar symptoms. The graph gives useful information. It does not identify every problem in the roots.",
+        "visual": {
+          "type": "root-zone",
+          "title": "Pause before adding water",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "A1-05",
+        "title": "What steering and sensing can do",
+        "body": [
+          "Measure · check · observe",
+          "Crop steering means control of conditions to influence crop growth."
+        ],
+        "narration": "Crop steering means control of conditions to influence crop growth. These lessons explain irrigation. Irrigation supplies water to the crop.\n\nThe important irrigation settings control the time and quantity of each water delivery. The interval between deliveries is also important. Light, temperature, and humidity change the demand for water.\n\nLater lessons explain vegetative steering and generative steering. These are directions of crop management. They do not guarantee a specific yield. Maximum drying is not the objective. The roots must continue to function correctly.\n\nA sensor measures conditions at a specific location. One sensor does not measure every pot. A satisfactory reading does not prove that every dripper is clear.\n\nUse sensor readings with equipment checks and crop observations.\n\nThe demo lets you learn the software without operation of a real pump. You do not need all the equipment to use the demo. For a new irrigation system, start with one zone.\n\nPoint to the solid material in the drawing. Point to the water. Point to the air. Give one example of information that the sensor cannot supply.\n\nThe next lesson explains volumetric water content, or VWC.",
+        "visual": {
+          "type": "root-zone",
+          "title": "What steering and sensing can do",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      }
+    ],
+    "practice": {
+      "kind": "teach-back",
+      "prompt": "Draw an unplanted pot. Label solids, water and air. Explain why one local moisture reading cannot prove that every plant has the same conditions.",
+      "hints": [
+        "Think about the spaces between solid parts.",
+        "Where is the sensing part installed?"
+      ],
+      "success": "Pore spaces contain water or air. Roots need oxygen as well as water. A local probe cannot establish every container’s condition."
+    },
+    "quiz": [
+      {
+        "id": "A1-q1",
+        "prompt": "What must roots have access to?",
+        "options": [
+          {
+            "text": "As much water as possible.",
+            "correct": false,
+            "feedback": "More water can reduce air-filled space; it is not automatically an improvement."
+          },
+          {
+            "text": "Water and oxygen.",
+            "correct": true,
+            "feedback": "Both matter. Drainage and the return of air also matter."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "A1-q2",
+        "prompt": "What is substrate?",
+        "options": [
+          {
+            "text": "Only the nutrient solution.",
+            "correct": false,
+            "feedback": "The solution is water and dissolved material, not the whole substrate."
+          },
+          {
+            "text": "The growing material around the roots.",
+            "correct": true,
+            "feedback": "Coco and stone wool are examples of substrates."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "A1-q3",
+        "prompt": "A local probe shows one plausible reading. What is established?",
+        "options": [
+          {
+            "text": "The entire zone has healthy roots.",
+            "correct": false,
+            "feedback": "One sample cannot prove whole-zone health."
+          },
+          {
+            "text": "A reported value at that sensing location.",
+            "correct": true,
+            "feedback": "Other locations, freshness, calibration and physical conditions still need checking."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "A1-q4",
+        "prompt": "What does crop steering guarantee?",
+        "options": [
+          {
+            "text": "A specific yield if the recipe is followed.",
+            "correct": false,
+            "feedback": "A recipe does not prove the environment, water delivery or plant response."
+          },
+          {
+            "text": "No guaranteed crop outcome from a slider or recipe.",
+            "correct": true,
+            "feedback": "It manages conditions; suitability and outcomes need evidence."
+          }
+        ],
+        "safetyCritical": false
+      }
+    ],
+    "practicalTask": {
+      "instructions": [
+        "Draw an unplanted pot. Label solids, water and air. Explain why one local moisture reading cannot prove that every plant has the same conditions.",
+        "Explain your reasoning to another person or record a short teach-back."
+      ],
+      "requiresLocalSupervision": false,
+      "proof": "explain"
+    },
+    "sources": [
+      {
+        "title": "Course evidence and production notes",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "METER: soil volumetric water content",
+        "url": "https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/",
+        "accessed": "2026-10-19"
+      }
+    ],
+    "video": {
+      "src": "media/pilots/A1.mp4",
+      "captions": "media/pilots/A1.vtt",
+      "voice": "Saved custom voice: Scarjo"
+    }
+  },
+  {
+    "id": "A2",
+    "module": "A",
+    "title": "VWC: what does 60% actually mean?",
+    "summary": "Use equal volumes to understand volumetric water content, then separate VWC from plant-available water.",
+    "outcomes": [
+      "Explain VWC as water volume divided by total measured sample volume.",
+      "Interpret 60% VWC without treating it as usable-water percentage.",
+      "Name the solids and air within the remaining volume."
+    ],
+    "prerequisites": [
+      "A1"
+    ],
+    "route": "everyone",
+    "slides": [
+      {
+        "id": "A2-01",
+        "title": "Recall before the reveal",
+        "body": [
+          "Name the three parts",
+          "The previous lesson showed three parts inside the pot."
+        ],
+        "narration": "The previous lesson showed three parts inside the pot.\n\nName these parts before the answer appears.",
+        "visual": {
+          "type": "fraction",
+          "title": "Recall before the reveal",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "A2-02",
+        "title": "Six out of ten",
+        "body": [
+          "60% VWC = 6 / 10 by volume",
+          "The three parts are solid material, water, and air."
+        ],
+        "narration": "The three parts are solid material, water, and air.\n\nVWC means volumetric water content. It is the volume of water divided by the total volume of the sample. The result is usually a percentage.\n\nThe drawing divides a sample into ten equal volumes. Water occupies six of these volumes. Six divided by ten is zero point six. Multiply this result by one hundred to get sixty percent.\n\nThis example has sixty percent VWC. The blocks explain the volume ratio. In a real substrate, water occupies spaces between solid parts. It does not form the separate blocks in this drawing.",
+        "visual": {
+          "type": "fraction",
+          "title": "Six out of ten",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "A2-03",
+        "title": "Put litres beside the fraction",
+        "body": [
+          "3 L ÷ 5 L × 100 = 60%",
+          "This example uses a representative sample with a total volume of five liters."
+        ],
+        "narration": "This example uses a representative sample with a total volume of five liters. Its VWC is sixty percent. Five multiplied by zero point six is three. Thus, the sample contains three liters of water.\n\nThis calculation explains the amount of water already in the sample. It is not an instruction to add three liters to a five-liter pot.",
+        "visual": {
+          "type": "fraction",
+          "title": "Put litres beside the fraction",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "A2-04",
+        "title": "The probe sees a region",
+        "body": [
+          "Local reading ≠ entire zone",
+          "Sixty percent of the total volume is water."
+        ],
+        "narration": "Sixty percent of the total volume is water. Is all the remaining forty percent air?\n\nNo. The remaining volume includes solid material and air. VWC alone does not give the complete air volume.\n\nSixty percent VWC does not mean that sixty percent of the water available to the plant remains. Some water stays more tightly attached to the substrate. Different substrates hold water differently. VWC alone does not show the time until the plant needs water.\n\nLook at the probe location. The probe measures a local region. Its installation, contact, calibration, and location affect the reading.\n\nA probe near one dripper might not represent a dry pot at the end of a row. Later lessons explain how to select locations that represent the zone.",
+        "visual": {
+          "type": "sensor-check",
+          "title": "The probe sees a region",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "A2-05",
+        "title": "Teach it back",
+        "body": [
+          "What does 60% mean?",
+          "The sensor now shows forty percent VWC."
+        ],
+        "narration": "The sensor now shows forty percent VWC. Does this reading always mean that the substrate is too dry?\n\nNo. The reading alone is not sufficient. You also need information about the substrate, validated reference values, crop, and conditions. One VWC target is not correct for every system.\n\nDo not select a target yet. Complete this sentence. Sixty percent VWC means what?\n\nApproximately sixty percent of the measured sample volume is water. This is one correct answer.\n\nThe reading does not give the exact water volume available to the plant. One sensor does not prove that all pots have the same conditions.\n\nUse these limits when you assess advice about VWC.\n\nThe next lesson explains why a full pot does not mean one hundred percent VWC.",
+        "visual": {
+          "type": "fraction",
+          "title": "Teach it back",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      }
+    ],
+    "practice": {
+      "kind": "calculation",
+      "prompt": "Imagine ten equal total substrate volumes. Four contain water. What is VWC? What else may occupy the remaining six?",
+      "hints": [
+        "Water volume ÷ total sample volume × 100.",
+        "Recall solids and pore spaces from A1."
+      ],
+      "success": "40% VWC. The remainder includes solids and air; it is not automatically 60% air or 60% usable water."
+    },
+    "quiz": [
+      {
+        "id": "A2-q1",
+        "prompt": "Three of ten equal sample volumes contain water. What is VWC?",
+        "options": [
+          {
+            "text": "70%.",
+            "correct": false,
+            "feedback": "70% is the remainder, not the water fraction."
+          },
+          {
+            "text": "30%.",
+            "correct": true,
+            "feedback": "3 ÷ 10 × 100 = 30%."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "A2-q2",
+        "prompt": "Does 60% VWC mean 60% of usable water remains?",
+        "options": [
+          {
+            "text": "Yes, it is a fuel gauge for the plant.",
+            "correct": false,
+            "feedback": "That interpretation confuses measured water content with plant-available water."
+          },
+          {
+            "text": "No. It describes water volume in the measured sample.",
+            "correct": true,
+            "feedback": "Plant availability depends on more than that volume fraction."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "A2-q3",
+        "prompt": "At 60% VWC, is the remaining 40% all air?",
+        "options": [
+          {
+            "text": "Yes. Water and air are the only components.",
+            "correct": false,
+            "feedback": "Recall the solid growing material introduced in A1."
+          },
+          {
+            "text": "No. The remainder also includes solid material.",
+            "correct": true,
+            "feedback": "Total substrate volume includes solids, water and air."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "A2-q4",
+        "prompt": "How do you interpret a changing VWC line?",
+        "options": [
+          {
+            "text": "Treat the change as litres consumed by all plants.",
+            "correct": false,
+            "feedback": "A local volume fraction is not a zone water meter or uptake measurement."
+          },
+          {
+            "text": "Check the identified probe, units, time and context.",
+            "correct": true,
+            "feedback": "The line describes sampled water content; evidence still matters."
+          }
+        ],
+        "safetyCritical": false
+      }
+    ],
+    "practicalTask": {
+      "instructions": [
+        "Imagine ten equal total substrate volumes. Four contain water. What is VWC? What else may occupy the remaining six?",
+        "Explain your reasoning to another person or record a short teach-back."
+      ],
+      "requiresLocalSupervision": false,
+      "proof": "explain"
+    },
+    "sources": [
+      {
+        "title": "Course evidence and production notes",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "METER: soil volumetric water content",
+        "url": "https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/",
+        "accessed": "2026-10-19"
+      }
+    ],
+    "video": {
+      "src": "media/pilots/A2.mp4",
+      "captions": "media/pilots/A2.vtt",
+      "voice": "Saved custom voice: Scarjo"
+    }
+  },
+  {
+    "id": "A3",
+    "module": "A",
+    "title": "When is a pot full? Capacity versus saturation",
+    "summary": "Separate saturation, a documented drained container condition, and the program’s configured field-capacity reference.",
+    "outcomes": [
+      "Distinguish saturation from drained container capacity.",
+      "Explain why the app reference is not a physical capacity measurement.",
+      "Describe conditions that must be documented during a capacity check."
+    ],
+    "prerequisites": [
+      "A1",
+      "A2"
+    ],
+    "route": "everyone",
+    "slides": [
+      {
+        "id": "A3-01",
+        "title": "What does full mean?",
+        "body": [
+          "Full of what?",
+          "A grower asks for a full pot."
+        ],
+        "narration": "A grower asks for a full pot. What does full mean?\n\nVWC is water volume divided by total sample volume. The total sample volume also includes solid material. A correctly irrigated pot does not need a reading of one hundred percent VWC.",
+        "visual": {
+          "type": "capacity",
+          "title": "What does full mean?",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "A3-02",
+        "title": "Saturation is a physical state",
+        "body": [
+          "Pores full of water",
+          "Saturation is one physical condition."
+        ],
+        "narration": "Saturation is one physical condition. At saturation, water fills the pore spaces. Pore spaces are the spaces between solid parts of the substrate. The solid material remains present.\n\nContinuous saturation around the roots is not the objective.",
+        "visual": {
+          "type": "capacity",
+          "title": "Saturation is a physical state",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "A3-03",
+        "title": "Observe drainage",
+        "body": [
+          "Define and repeat your method",
+          "Water drains from the spare pot into the tray."
+        ],
+        "narration": "Water drains from the spare pot into the tray. After a specified drainage procedure, some water remains in the substrate. Some spaces contain air again.\n\nThe retained water quantity depends on the substrate and container conditions. Container height is one of these conditions. Container capacity describes the retained water under specified container and drainage conditions.\n\nGrowers sometimes call their reference value field capacity. The program also uses this term. Field capacity originally describes a condition in field soil. A pot or substrate block has different physical conditions.\n\nIdentify the drainage method that applies to the reference value.\n\nOne drainage time is not correct for all pots. Use a documented method suitable for the substrate and system. Record the container type. Record the substrate type. Record the initial condition. Record the drainage interval.\n\nRecord the probe installation. Do the procedure again. If the results change, find the cause before you use the reference value.\n\nContainer weight and visible drainage give additional information during the procedure. A suitable sensor gives another measurement. These measurements do not correct poor probe contact or a location that does not represent the zone.",
+        "visual": {
+          "type": "capacity",
+          "title": "Observe drainage",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "A3-04",
+        "title": "Physical state or entered setting?",
+        "body": [
+          "A reference needs evidence",
+          "The dashboard contains a reference setting."
+        ],
+        "narration": "The dashboard contains a reference setting. A person entered this value into the program. The displayed value does not prove that the measurement procedure was correct.\n\nKeep a measured physical condition separate from a software setting.",
+        "visual": {
+          "type": "capacity",
+          "title": "Physical state or entered setting?",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "A3-05",
+        "title": "An example is not your target",
+        "body": [
+          "Example only — not a recipe",
+          "The example reference value is sixty percent."
+        ],
+        "narration": "The example reference value is sixty percent. Must your substrate use the same reference value?\n\nNo. Sixty percent is only the example value. Your reference value needs measurement evidence for your substrate and container. The measurement method must also be suitable.\n\nThe highest sensor reading is not automatically the correct reference value. A temporary peak does not prove correct calibration. Poor contact or an incorrect reading does not establish a reference value.\n\nThere are three cards in this exercise. The first card is saturation. The second card is drained container capacity. The third card is the reference setting in the program.\n\nIdentify the cards that describe physical conditions. Identify the card that describes a software setting.\n\nSaturation and drained container capacity describe physical conditions. The configured reference is a software setting. A useful setting represents a suitable measured condition. A value without measurement evidence is not sufficient.\n\nThe next lesson explains dryback. Dryback is a decrease in substrate water content between irrigation events. A decrease of fifteen percentage points is different from fifteen percent relative dryback.",
+        "visual": {
+          "type": "capacity",
+          "title": "An example is not your target",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      }
+    ],
+    "practice": {
+      "kind": "comparison",
+      "prompt": "Label three cards: all pore spaces filled with water; water retained after a specified drainage procedure; a number entered in the app. Which card proves a measured container condition?",
+      "hints": [
+        "A setting is not a measurement.",
+        "Document medium, container, probe and drainage method."
+      ],
+      "success": "The cards describe saturation, a drained container condition and a configured reference. Only a suitably documented measurement supports the actual container condition."
+    },
+    "quiz": [
+      {
+        "id": "A3-q1",
+        "prompt": "What does saturation describe?",
+        "options": [
+          {
+            "text": "Every probe must display 100% VWC.",
+            "correct": false,
+            "feedback": "Solids remain part of total sample volume, and measurement methods have limits."
+          },
+          {
+            "text": "Water fills the pore spaces.",
+            "correct": true,
+            "feedback": "It is a physical condition, distinct from the drained state."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "A3-q2",
+        "prompt": "What establishes a useful drained reference?",
+        "options": [
+          {
+            "text": "The highest number ever seen on the graph.",
+            "correct": false,
+            "feedback": "A peak can reflect different conditions or faulty evidence."
+          },
+          {
+            "text": "A documented, repeatable check under specified conditions.",
+            "correct": true,
+            "feedback": "Record the substrate, container, probe, procedure and drainage conditions."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "A3-q3",
+        "prompt": "The app field-capacity value is set to 60%. What is proven?",
+        "options": [
+          {
+            "text": "Every container holds 60% after drainage.",
+            "correct": false,
+            "feedback": "Different containers, media, probes and procedures can produce different measurements."
+          },
+          {
+            "text": "Only that the reference is configured to 60%.",
+            "correct": true,
+            "feedback": "A configuration value alone does not establish physical container capacity."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "A3-q4",
+        "prompt": "Can a demonstration pot define every live zone’s target?",
+        "options": [
+          {
+            "text": "Yes, if the picture looks similar.",
+            "correct": false,
+            "feedback": "Appearance alone does not establish comparable substrate and drainage conditions."
+          },
+          {
+            "text": "No. Suitability requires local evidence.",
+            "correct": true,
+            "feedback": "The spare-pot demonstration teaches concepts, not a universal recipe."
+          }
+        ],
+        "safetyCritical": false
+      }
+    ],
+    "practicalTask": {
+      "instructions": [
+        "Label three cards: all pore spaces filled with water; water retained after a specified drainage procedure; a number entered in the app. Which card proves a measured container condition?",
+        "Explain your reasoning to another person or record a short teach-back."
+      ],
+      "requiresLocalSupervision": false,
+      "proof": "explain"
+    },
+    "sources": [
+      {
+        "title": "Course evidence and production notes",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "METER: soil volumetric water content",
+        "url": "https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/",
+        "accessed": "2026-10-19"
+      }
+    ],
+    "video": {
+      "src": "media/pilots/A3.mp4",
+      "captions": "media/pilots/A3.vtt",
+      "voice": "Saved custom voice: Scarjo"
+    }
+  },
+  {
+    "id": "B1",
+    "module": "B",
+    "title": "Read water and EC on the same graph",
+    "summary": "Read both axes, find day and night, and keep recorded evidence separate from a planning reference.",
+    "outcomes": [
+      "Locate time, VWC and EC axes on a combined chart.",
+      "Identify shots, the night period and missing or stale evidence.",
+      "Explain why a draft reference can move while recorded data remain unchanged."
+    ],
+    "prerequisites": [
+      "A4",
+      "A5",
+      "A6"
+    ],
+    "route": "everyone",
+    "slides": [
+      {
+        "id": "B1-01",
+        "title": "Start with time",
+        "body": [
+          "Time moves to the right",
+          "This graph shows water content and EC over time."
+        ],
+        "narration": "This graph shows water content and EC over time. We will examine one part at a time.\n\nTime is on the bottom axis. Later times are farther to the right. The shaded area shows the night period in this example. Night shading does not mean that the sensor stopped measurement.",
+        "visual": {
+          "type": "combined-graph",
+          "title": "Start with time",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "B1-02",
+        "title": "Add water content",
+        "body": [
+          "VWC uses the left axis (%)",
+          "The first line shows VWC."
+        ],
+        "narration": "The first line shows VWC. Read this line against the percentage scale on the left.\n\nThis point shows sixty percent VWC at the indicated time. The solid line connects the example observations.\n\nIn a live system, do a check of the reading age. Identify gaps in the readings.",
+        "visual": {
+          "type": "combined-graph",
+          "title": "Add water content",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "B1-03",
+        "title": "Add EC and a second scale",
+        "body": [
+          "EC uses the right axis (mS/cm)",
+          "EC means electrical conductivity."
+        ],
+        "narration": "EC means electrical conductivity. The EC line uses the scale on the right. The unit is millisiemens per centimeter.\n\nIdentify the EC measurement assigned to the graph.\n\nFeed EC, bulk substrate EC, and pore-water EC describe different measurements. These names are not interchangeable.\n\nThe VWC line and EC line cross on the screen. Does this mean that the measured values are equal?\n\nNo. VWC and EC have different units and scales. Each line shows how its measurement changes with time.\n\nDo not subtract a VWC value from an EC value.",
+        "visual": {
+          "type": "combined-graph",
+          "title": "Add EC and a second scale",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "B1-04",
+        "title": "Events, observations and references",
+        "body": [
+          "Observed ≠ reference",
+          "The markers show irrigation events."
+        ],
+        "narration": "The markers show irrigation events. Water content can increase after water reaches the probe. Water content then decreases between events.\n\nEC also changes. The EC line does not need to be the opposite shape of the VWC line. Water delivery, mixing, drainage, temperature, measurement method, and crop conditions affect the readings. One line does not prove the cause of a change.\n\nThe graph also shows a planning reference. The program draws this reference from the selected settings. A measured line shows observations. A planning reference shows the behavior illustrated by the software. These lines need different labels, even when their positions are the same.",
+        "visual": {
+          "type": "combined-graph",
+          "title": "Events, observations and references",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "B1-05",
+        "title": "Continue into night; move a threshold",
+        "body": [
+          "Draft floor moves; observations stay",
+          "The planning reference continues through the night to the next morning."
+        ],
+        "narration": "The planning reference continues through the night to the next morning. An unexplained break makes the reference difficult to read. A continuous line does not prove a correct prediction of the crop response.\n\nThe overnight EC reference connects the last daytime reference to the next morning reference. This connection is not a separately scheduled P3 EC target. It does not calculate or prove the behavior of salts overnight.\n\nNow watch this demo edit. We increase the P3 emergency VWC threshold in the local draft. The draft threshold changes from thirty-five percent to thirty-nine percent. The saved threshold remains visible for comparison. The measured example readings remain the same.",
+        "visual": {
+          "type": "combined-graph",
+          "title": "Continue into night; move a threshold",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "B1-06",
+        "title": "Explain what changed",
+        "body": [
+          "A draft, not a guaranteed shot",
+          "Which item changed?"
+        ],
+        "narration": "Which item changed? The previous water content? The local draft of a threshold? Or a guaranteed irrigation event?\n\nThe local draft of the threshold changed. Review and application of the settings are separate actions. The controller uses its conditions and protection rules to decide if irrigation occurs. The emergency threshold is not a normal overnight target.\n\nPoint to the time axis. Point to the VWC scale. Point to the EC scale. Identify one irrigation marker. Identify one planning reference. Find the reading age.\n\nThe next lesson explains the irrigation phases from P0 to P3.",
+        "visual": {
+          "type": "combined-graph",
+          "title": "Explain what changed",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      }
+    ],
+    "practice": {
+      "kind": "threshold",
+      "prompt": "Open the practice graph. Move the example emergency VWC threshold from 35% to 39%. Which line changes? Can this edit change yesterday’s recorded moisture?",
+      "hints": [
+        "A proposal and a measurement are different evidence types.",
+        "The emergency threshold is protective, not a routine overnight goal."
+      ],
+      "success": "The draft threshold moves. The fixed synthetic actual trace does not move. A reference edit cannot rewrite measured history."
+    },
+    "quiz": [
+      {
+        "id": "B1-q1",
+        "prompt": "Which axis belongs to VWC on the teaching chart?",
+        "options": [
+          {
+            "text": "The right EC axis because both lines overlap.",
+            "correct": false,
+            "feedback": "Line crossings do not make their units equivalent."
+          },
+          {
+            "text": "The left axis, in percent.",
+            "correct": true,
+            "feedback": "The EC line has its own right-hand conductivity axis."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "B1-q2",
+        "prompt": "A draft threshold moves. What happens to recorded history?",
+        "options": [
+          {
+            "text": "The recorded VWC curve moves to match.",
+            "correct": false,
+            "feedback": "Changing a target cannot rewrite sensor measurements."
+          },
+          {
+            "text": "It stays unchanged.",
+            "correct": true,
+            "feedback": "A draft is a proposed setting; recorded evidence is separate."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "B1-q3",
+        "prompt": "A smooth flat trace has an old timestamp. What next?",
+        "options": [
+          {
+            "text": "Assume the crop is perfectly stable.",
+            "correct": false,
+            "feedback": "Appearance is not proof that readings are current."
+          },
+          {
+            "text": "Investigate freshness and identity before acting on it.",
+            "correct": true,
+            "feedback": "A convincing line can still be stale."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "B1-q4",
+        "prompt": "What does the overnight EC planning connection prove?",
+        "options": [
+          {
+            "text": "That the program actively holds a scheduled P3 EC target.",
+            "correct": false,
+            "feedback": "The illustrative line is not proof of an independent EC control loop."
+          },
+          {
+            "text": "Only a reference connection between illustrated endpoints.",
+            "correct": true,
+            "feedback": "There is no independent scheduled P3 EC target or guaranteed EC forecast."
+          }
+        ],
+        "safetyCritical": false
+      }
+    ],
+    "practicalTask": {
+      "instructions": [
+        "Open the practice graph. Move the example emergency VWC threshold from 35% to 39%. Which line changes? Can this edit change yesterday’s recorded moisture?",
+        "Explain your reasoning to another person or record a short teach-back."
+      ],
+      "requiresLocalSupervision": false,
+      "proof": "explain"
+    },
+    "sources": [
+      {
+        "title": "Course evidence and production notes",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "METER: soil volumetric water content",
+        "url": "https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/",
+        "accessed": "2026-10-19"
+      }
+    ],
+    "video": {
+      "src": "media/pilots/B1.mp4",
+      "captions": "media/pilots/B1.vtt",
+      "voice": "Saved custom voice: Scarjo"
+    }
+  },
+  {
+    "id": "C1",
+    "module": "C",
+    "title": "What you need: the smallest useful system",
+    "summary": "Plan equipment by function: host, measurement, water path, control and independent physical protection.",
+    "outcomes": [
+      "Trace the intended water path before choosing products.",
+      "Distinguish host, probe, bridge, entity and actuator.",
+      "Identify a suitable physical stop and a supervised commissioning handover."
+    ],
+    "prerequisites": [
+      "B4"
+    ],
+    "route": "everyone",
+    "slides": [
+      {
+        "id": "C1-01",
+        "title": "Five functions, not a shopping spree",
+        "body": [
+          "Host · measure · deliver · control · prove",
+          "Start with one zone."
+        ],
+        "narration": "Start with one zone.\n\nThe system needs five functions. A computer runs the program. A sensor measures water content. The irrigation equipment supplies water. Control equipment operates the water delivery. Protection equipment and verification procedures help prevent incorrect operation.",
+        "visual": {
+          "type": "equipment",
+          "title": "Five functions, not a shopping spree",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "C1-02",
+        "title": "Host and measurement paths",
+        "body": [
+          "Choose one host; verify the probe",
+          "The host is the computer that runs the software."
+        ],
+        "narration": "The host is the computer that runs the software. One option is a supported Raspberry Pi installation. Another option is a supported dedicated Intel NUC or other x86-64 computer. You need only one host option.\n\nUse the correct power supply. Use suitable storage. Connect the host to a reliable network.\n\nThe two host lessons explain alternative installations. You do not need both installations.\n\nHome Assistant connects the devices. It gives their readings and controls names called entities. Crop Steering uses these entities. The Crop Steering integration and the separate Controller app are both necessary parts of the installation. A dashboard alone does not control irrigation.\n\nThe next function is measurement. Use a compatible moisture probe at a location that represents the zone. Do a check of the exact sensor model. Do a check of the interface. Do a check of the units. Make sure that the sensor is suitable for the substrate.\n\nSome probes need a separate bridge. Matching wire colors do not prove compatibility. One working probe does not prove equal water delivery to all pots.\n\nRoot-zone EC supplies additional information. Identify whether the sensor measures bulk substrate EC or pore-water EC. Tank feed EC is a different measurement.\n\nDo not rename tank feed EC as root-zone EC.\n\nAir temperature and humidity give additional information about water demand.",
+        "visual": {
+          "type": "host",
+          "title": "Host and measurement paths",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "C1-03",
+        "title": "Draw the actual water path",
+        "body": [
+          "A pump is conditional",
+          "The next function is water delivery."
+        ],
+        "narration": "The next function is water delivery. A suitable pressurized supply can supply a zone valve without an additional pump. A reservoir system needs a pump if the supply cannot provide the necessary water pressure.\n\nIf the system needs a pump, include the pump in the design. Include its necessary protection equipment.\n\nFiltration, pressure regulation, drainage, and backflow or siphon protection must suit the installed equipment. The design must also meet applicable local requirements.",
+        "visual": {
+          "type": "water-path",
+          "title": "Draw the actual water path",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "C1-04",
+        "title": "Safe control and proof",
+        "body": [
+          "Measure delivery. Prove stopping.",
+          "The next function is safe control."
+        ],
+        "narration": "The next function is safe control. The control hardware must have suitable ratings and a correct installation. A pump has a starting load as well as an operating load. A large power rating on a household smart plug does not prove suitability.\n\nUse an appropriately qualified installer for electrical work. Do not do mains electrical work as part of this course.\n\nOnly one controller must control each physical pump or valve. An old irrigation system must not also operate that output.\n\nResolve shared control before you enable the new controller.\n\nThe final function is verification and protection. The system needs an accessible physical shutdown and suitable independent protection. Test water must have a safe collection location. A software OFF command is not an emergency isolator.\n\nUse collection cups and a stopwatch to measure water delivery. Make sure that water physically stops after the stop command.\n\nA changed dashboard icon does not prove that the water stopped.",
+        "visual": {
+          "type": "controls",
+          "title": "Safe control and proof",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "C1-05",
+        "title": "Essentials, conditional, later",
+        "body": [
+          "Build one proven zone first",
+          "Tank level, feed EC, pH, and tank temperature give useful operating information."
+        ],
+        "narration": "Tank level, feed EC, pH, and tank temperature give useful operating information. Additional probes and a verified flow meter supply more information later. Automated dosing, thermal cameras, and artificial intelligence are not necessary for the first working zone.",
+        "visual": {
+          "type": "equipment",
+          "title": "Essentials, conditional, later",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      },
+      {
+        "id": "C1-06",
+        "title": "Your own layout",
+        "body": [
+          "Sketch · label · check",
+          "Draw the water path."
+        ],
+        "narration": "Draw the water path. Label the water supply. Label the pump, if installed. Label the zone valve. Label the drippers. Label the drainage path.\n\nDraw the probe separately. Draw the controller separately. Identify the physical shutdown. Identify the controller for each output.\n\nCircle each item that you cannot identify.\n\nUse the equipment sheet to do a check of exact models before purchase. Select one host lesson. The options are the Raspberry Pi lesson and the x86-64 lesson.\n\nAfter host installation, both options use the same setup procedure. Install one zone first. Assign its sensors and outputs. Verify its operation before you add more zones.",
+        "visual": {
+          "type": "equipment",
+          "title": "Your own layout",
+          "caption": "Concept illustration. Any numerical settings are teaching examples."
+        }
+      }
+    ],
+    "practice": {
+      "kind": "equipment",
+      "prompt": "On paper, trace your proposed water path. Mark the host, measurement path, controlled outlet and physical shutdown. Identify which parts need an installer’s confirmation. Do not operate live outputs.",
+      "hints": [
+        "A pressurised supply and a pumped reservoir are alternatives.",
+        "Check sensor/controller compatibility before buying."
+      ],
+      "success": "The diagram identifies every function and the actual installation’s physical stop. Product compatibility and physical commissioning require local evidence."
+    },
+    "quiz": [
+      {
+        "id": "C1-q1",
+        "prompt": "Must you buy both a Pi host and an x86 host?",
+        "options": [
+          {
+            "text": "Yes. One measures and the other controls.",
+            "correct": false,
+            "feedback": "The course does not require two alternative computers."
+          },
+          {
+            "text": "No. They are alternative supported host routes.",
+            "correct": true,
+            "feedback": "Choose one appropriate dedicated HAOS host path."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "C1-q2",
+        "prompt": "Does a substrate probe necessarily connect directly to HA?",
+        "options": [
+          {
+            "text": "Yes. Every moisture probe is a native HA device.",
+            "correct": false,
+            "feedback": "Interfaces, protocols, power and software support differ."
+          },
+          {
+            "text": "No. Some probes require a compatible bridge or interface.",
+            "correct": true,
+            "feedback": "Check the whole measurement path, not only the probe connector."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "C1-q3",
+        "prompt": "Does Watering OFF physically isolate a pump?",
+        "options": [
+          {
+            "text": "Yes. It is safe to work on wiring after clicking OFF.",
+            "correct": false,
+            "feedback": "Software OFF is not electrical isolation and may not control independent equipment."
+          },
+          {
+            "text": "No. Use the installation’s appropriate physical shutdown or isolation procedure.",
+            "correct": true,
+            "feedback": "Software blocks Controller shots; it does not isolate power or independent controls."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "C1-q4",
+        "prompt": "What proves commissioning is complete?",
+        "options": [
+          {
+            "text": "A green demo dashboard.",
+            "correct": false,
+            "feedback": "Synthetic demo data cannot establish real outlet identity or stopping."
+          },
+          {
+            "text": "A supervised physical check of intended delivery, stopping and protections.",
+            "correct": true,
+            "feedback": "A quiz and a plausible dashboard cannot prove hardware behaviour."
+          }
+        ],
+        "safetyCritical": true
+      }
+    ],
+    "practicalTask": {
+      "instructions": [
+        "On paper, trace your proposed water path. Mark the host, measurement path, controlled outlet and physical shutdown. Identify which parts need an installer’s confirmation. Do not operate live outputs.",
+        "Explain your reasoning to another person or record a short teach-back."
+      ],
+      "requiresLocalSupervision": true,
+      "proof": "explain"
+    },
+    "sources": [
+      {
+        "title": "Course evidence and production notes",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "METER: soil volumetric water content",
+        "url": "https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/",
+        "accessed": "2026-10-19"
+      }
+    ],
+    "video": {
+      "src": "media/pilots/C1.mp4",
+      "captions": "media/pilots/C1.vtt",
+      "voice": "Saved custom voice: Scarjo"
+    }
+  }
+]
