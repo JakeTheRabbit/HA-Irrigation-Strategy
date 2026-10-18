@@ -1,6 +1,6 @@
 # Crop Steering Academy
 
-The [R3 rebuild record](training/crop-steering-from-zero/COURSE-REBUILD-2026-10-19-R3.md) tracks the current rewrite, media build and publication checks. The [R2 pilot repair](training/crop-steering-from-zero/PILOT-REPAIR-2026-10-19.md) and [original delivery record](training/crop-steering-from-zero/DELIVERY-2026-10-19.md) are historical records; they do not establish that R3 is published.
+The [R3 rebuild record](training/crop-steering-from-zero/COURSE-REBUILD-2026-10-19-R3.md) tracks the current rewrite, media build and publication checks. The [R2 pilot repair](training/crop-steering-from-zero/PILOT-REPAIR-2026-10-19.md) and [original delivery record](training/crop-steering-from-zero/DELIVERY-2026-10-19.md) are historical records of earlier editions.
 
 [Open the academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Try the isolated software demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Course plan and workbook](training/crop-steering-from-zero/README.md)
 

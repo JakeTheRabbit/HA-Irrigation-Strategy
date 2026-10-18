@@ -1,6 +1,6 @@
 # Course plan: Crop Steering from Zero
 
-This is the R3 teaching sequence. The [rebuild record](COURSE-REBUILD-2026-10-19-R3.md) separates authored content from pending media verification and publication. Current narration belongs in the [editable lesson modules](../../../www/learn/course/modules/) and [generated transcript](../../../www/learn/course/all-lesson-transcripts.txt); archived pilot scripts are not a second source of truth.
+This is the R3 teaching sequence. The [rebuild record](COURSE-REBUILD-2026-10-19-R3.md) records the completed media checks and public deployment. Current narration belongs in the [editable lesson modules](../../../www/learn/course/modules/) and [generated transcript](../../../www/learn/course/all-lesson-transcripts.txt); archived pilot scripts are not a second source of truth.
 
 ## The promise
 
