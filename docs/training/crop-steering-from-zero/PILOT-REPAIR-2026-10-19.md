@@ -39,3 +39,11 @@ python -m unittest discover -s tests -p test_pilot_timing.py
 ```
 
 The animation reads word anchors from the new take; do not reuse another voice's timing. The renderer also supports read-only `--check-existing`. The media builder can partition independent work with `--lessons A1 A2`. Review actual finished frames at the paragraph boundaries before replacing the versioned public bundle. Update its checksum pin, compile the catalogue, verify every media binding and deploy through the website publication workflow. This publication does not release irrigation software or change Home Assistant.
+
+## Public delivery verification
+
+[Website deployment succeeded](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/actions/runs/39166119327) from the existing `gh-pages` publication branch. All five public MP4s matched the revised manifest hashes byte for byte. Playback, seeking, native dimensions and all 404 pilot caption cues loaded successfully. The website caption-position regression check passed against the public lesson.
+
+The complete local browser run passed all 131 playable items, 24 lesson routes, 320–1440px layouts, progress controls and six accessibility scans with no reported A/AA violations or browser page errors. Public A1 and B1 frames were sampled again at their real playback positions. The released dashboard bytes retain SHA-256 `1914a9180d3051636f560d00074de48213df134edb34b5ed6e806161884d220c`.
+
+The source remains proposed in PR #190 targeting `testing`. Website publication does not merge that proposal or promote irrigation software. Human listening and learner outcome trials remain unperformed.
