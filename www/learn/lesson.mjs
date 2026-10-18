@@ -1,4 +1,4 @@
-import { createVisual } from "./visuals.mjs";
+import { createVisual } from "./visuals.mjs?v=20261019r3";
 import { gradeQuiz } from "./practice.mjs";
 
 // Styling hooks: lesson-player/header/section/slide, slide-heading/navigation/counter,
@@ -36,6 +36,8 @@ function disclosure(title, content, className = "") {
  */
 export function renderLesson({
   lesson,
+  catalogue = [],
+  recommended = [],
   progress,
   onSave = () => {},
   onNavigate = () => {},
@@ -93,7 +95,7 @@ export function renderLesson({
   const navigateLink = (text, target) => {
     const a = el("a", "button", text);
     a.href =
-      target === "course" || target === "practice"
+      target === "course" || target === "practice" || target === "watch"
         ? `#/${target}`
         : `#/lesson/${encodeURIComponent(target)}`;
     a.addEventListener("click", (event) => {
@@ -111,6 +113,43 @@ export function renderLesson({
       onNavigate(target);
     });
     return a;
+  };
+  const lessonNavigation = (position) => {
+    const nav = el("nav", "lesson-navigation panel");
+    nav.setAttribute("aria-label", `${position} lesson navigation`);
+    const all = catalogue.length ? catalogue : [lesson];
+    const onRoute = recommended.some(item => item.id === lesson.id);
+    const sequence = onRoute ? recommended : all;
+    const at = sequence.findIndex(item => item.id === lesson.id);
+    nav.append(el("p", "muted lesson-sequence", onRoute ? "Continue along your recommended route" : "Continue in course order"));
+    const adjacent = el("div", "lesson-adjacent");
+    for (const [offset, label] of [[-1, "Previous lesson"], [1, "Next lesson"]]) {
+      const target = sequence[at + offset];
+      if (target) adjacent.append(navigateLink(`${label}: ${target.id} · ${target.title}`, target.id));
+      else {
+        const disabled = el("button", "", label);
+        disabled.type = "button";
+        disabled.disabled = true;
+        adjacent.append(disabled);
+      }
+    }
+    const label = el("label", "lesson-jump", "Jump to any lesson ");
+    const select = el("select");
+    select.setAttribute("aria-label", `${position}: jump to any lesson`);
+    all.forEach(item => {
+      const option = el("option", "", `${item.id} · ${item.title}`);
+      option.value = item.id;
+      select.append(option);
+    });
+    select.value = lesson.id;
+    select.addEventListener("change", () => {
+      stopCurrentMedia();
+      root.querySelectorAll("video").forEach(video => video.pause());
+      onNavigate(select.value);
+    });
+    label.append(select);
+    nav.append(adjacent, label, navigateLink("Watch the grouped videos", "watch"));
+    return nav;
   };
   const header = el("header", "lesson-header");
   header.append(
@@ -219,19 +258,19 @@ export function renderLesson({
     ),
     outcomes,
   );
-  root.append(header, saveStatus);
+  root.append(header, lessonNavigation("Top"), saveStatus);
 
   if (lesson.video?.src) {
     const source = resource(lesson.video.src);
     if (source) {
       const area = el("section", "lesson-media panel");
-      area.append(el("h2", "", "Watch the pilot lesson"));
+      area.append(el("h2", "", "Watch this lesson"));
       const video = el("video");
       video.controls = true;
       video.preload = "metadata";
       video.playsInline = true;
       video.src = source;
-      video.setAttribute("aria-label", `${lesson.title}: pilot video`);
+      video.setAttribute("aria-label", `${lesson.title}: lesson video`);
       const captionSource = resource(
         lesson.video.captions?.src || lesson.video.captions || "",
       );
@@ -278,14 +317,65 @@ export function renderLesson({
           "The video could not load. Continue with the lesson slides and text below.";
       });
       video.addEventListener("play", () => currentMedia?.pause());
+      const chapters = (lesson.video.chapters || []).filter(chapter =>
+        Number.isFinite(chapter.start) && chapter.start >= 0);
+      const chapterControls = el("nav", "video-chapters");
+      chapterControls.setAttribute("aria-label", "Video sections");
+      if (chapters.length) {
+        const previousSection = el("button", "", "Previous section");
+        const nextSection = el("button", "", "Next section");
+        previousSection.type = nextSection.type = "button";
+        const sectionLabel = el("label", "chapter-jump", "Choose video section ");
+        const sectionSelect = el("select");
+        sectionSelect.setAttribute("aria-label", "Choose video section");
+        chapters.forEach((chapter, i) => {
+          const option = el("option", "", `${i + 1}. ${chapter.title}`);
+          option.value = String(i);
+          sectionSelect.append(option);
+        });
+        let currentSection = 0;
+        let pendingSeek = null;
+        const syncSection = () => {
+          currentSection = Math.max(0, chapters.findLastIndex(chapter => video.currentTime >= chapter.start));
+          sectionSelect.value = String(currentSection);
+          previousSection.disabled = currentSection === 0;
+          nextSection.disabled = currentSection === chapters.length - 1;
+        };
+        const seekSection = value => {
+          const at = Math.max(0, Math.min(value, chapters.length - 1));
+          pendingSeek = chapters[at].start;
+          if (video.readyState >= 1) {
+            video.currentTime = pendingSeek;
+            pendingSeek = null;
+          }
+          currentSection = at;
+          sectionSelect.value = String(at);
+          previousSection.disabled = at === 0;
+          nextSection.disabled = at === chapters.length - 1;
+        };
+        video.addEventListener("loadedmetadata", () => {
+          if (pendingSeek !== null) {
+            video.currentTime = pendingSeek;
+            pendingSeek = null;
+          }
+        });
+        video.addEventListener("timeupdate", syncSection);
+        previousSection.addEventListener("click", () => seekSection(currentSection - 1));
+        nextSection.addEventListener("click", () => seekSection(currentSection + 1));
+        sectionSelect.addEventListener("change", () => seekSection(Number(sectionSelect.value)));
+        sectionLabel.append(sectionSelect);
+        chapterControls.append(previousSection, sectionLabel, nextSection);
+        syncSection();
+      }
       area.append(
         video,
         captionArea,
+        chapterControls,
         unavailable,
         el(
           "p",
           "muted",
-          "Synthetic narration. This pilot is a teaching aid; it does not prove a physical installation is safe.",
+          "Synthetic narration. Watching a lesson does not complete its knowledge check or practical task.",
         ),
       );
       root.append(area);
@@ -623,6 +713,6 @@ export function renderLesson({
     sources.append(items);
     root.append(sources);
   }
-  root.append(navigateLink("Back to course", "course"));
+  root.append(lessonNavigation("Bottom"));
   return root;
 }

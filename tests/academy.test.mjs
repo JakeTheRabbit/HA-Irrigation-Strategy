@@ -32,10 +32,10 @@ test("published catalogue preserves the complete course, alternative hosts and b
   assert.equal(routeLessons(course.lessons, "operator").length, 17);
   assert.equal(routeLessons(course.lessons, "builder-pi").length, 23);
   assert.equal(routeLessons(course.lessons, "builder-x86").length, 23);
-  assert.equal(course.lessons.filter((l) => l.video).length, 5);
+  assert.equal(course.lessons.filter((l) => l.video).length, 24);
   assert.equal(
-    course.lessons.filter((l) => !l.video).flatMap((l) => l.slides).length,
-    126,
+    course.lessons.flatMap((l) => l.slides).length,
+    153,
   );
   for (const lesson of course.lessons) {
     assert.ok(lesson.sources.length > 0);

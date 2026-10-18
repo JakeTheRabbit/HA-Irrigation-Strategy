@@ -112,6 +112,10 @@ const DEFAULTS = {
     "Six volumes out of ten",
     "Illustration: six of ten equal total substrate volumes contain water. VWC is not percent plant-available water; the remainder includes solids and air.",
   ],
+  sponge: [
+    "The sponge, the pot and the Post-it",
+    "A conceptual sponge analogy: water fills spaces at saturation; after excess water drains, water remains and air returns. An app reference describes a checked condition and cannot add water. The 600 mL in a 1 L total substrate sample calculation is an example, not a target.",
+  ],
   capacity: [
     "Three different ideas",
     "Saturation, drained container capacity and a configured program reference are separate ideas. A program setting is not a physical capacity measurement.",
@@ -220,9 +224,41 @@ function process(nodes, { y = 145, height = 174, colors = [] } = {}) {
     .join("");
 }
 
-function render(type, values, labels, quantity) {
+function spongeDiagram(focus, labels) {
+  const shape = (x, y, wet) => {
+    let result = rect(x, y, 280, 150, "#efd081", "#9d7527", 22);
+    [[45,40],[115,29],[190,46],[240,32],[75,104],[155,100],[230,110]].forEach(([a,b],i) => {
+      result += `<ellipse cx="${x+a}" cy="${y+b}" rx="18" ry="17" fill="${wet || i%2===0 ? '#81c9ee' : '#fff'}" stroke="${wet || i%2===0 ? BLUE : MUTED}" stroke-width="2"/>`;
+    });
+    if (wet) [70,145,220].forEach(a => { result += `<path d="M ${x+a} ${y+158} q -10 15 0 22 q 10 -7 0 -22" fill="#81c9ee" stroke="${BLUE}" stroke-width="2"/>`; });
+    return result;
+  };
+  if (focus === "recall") return text(480,185,"?",{size:70,anchor:"middle",weight:700}) + text(480,270,"Reference: 60% → 70%",{size:32,anchor:"middle"}) + text(480,339,"What happens to the water?",{size:30,anchor:"middle",width:45});
+  if (focus === "reference") return shape(85,155,false) + text(225,365,"Same physical sponge",{anchor:"middle",size:25}) + rect(538,134,330,170,"#fff1a9","#c5a343",3) + text(703,178,"REFERENCE NOTE",{anchor:"middle",size:24}) + text(703,246,"60% → 70%",{anchor:"middle",size:38,weight:700}) + text(703,365,"Water stays the same",{anchor:"middle",size:25}) + note("Editing the app reference cannot add or remove water.");
+  if (focus === "volume") return rect(80,137,300,180,"#eeddbb",INK,10) + text(230,190,"Total substrate sample",{anchor:"middle",size:25,width:25}) + text(230,260,"1 L = 1000 mL",{anchor:"middle",size:29,weight:700}) + text(660,176,"600 mL water",{anchor:"middle",size:30,color:BLUE}) + text(660,237,"600 ÷ 1000 × 100",{anchor:"middle",size:30}) + text(660,300,"= 60% VWC",{anchor:"middle",size:36,color:BLUE,weight:700}) + note("Illustrative calculation. Your own container needs a suitable check.");
+  if (focus === "comparison" || focus === "transfer") return shape(80,145,true) + shape(590,145,false) + arrow(395,217,550,217,BLUE) + text(220,369,labels[0] || "Soaked and dripping",{anchor:"middle",size:25,width:29}) + text(730,369,labels[1] || "Wet after drainage",{anchor:"middle",size:25,width:29}) + note("Let excess water drip without squeezing. The sponge still holds water.",453);
+  const wet = focus === "wet";
+  return shape(90,144,wet) + text(230,375,wet ? "Dripping over the sink" : "Wet after drainage",{anchor:"middle",size:25,width:28}) + text(540,185,labels[0] || (wet ? "Water fills the spaces" : "Water remains"),{size:27,width:25}) + text(540,282,labels[1] || (wet ? "Solid material stays" : "Air returns to some spaces"),{size:27,width:25}) + note("A conceptual analogy; test your own substrate and container.");
+}
+
+function render(type, values, labels, quantity, focus) {
   let svg = "";
+  // Lesson-specific cue cards avoid injecting unrelated default calculations.
+  if (type === "lesson-cues") {
+    const cues = labels.slice(0, 4);
+    const count = Math.max(1, cues.length);
+    const height = (330 - (count - 1) * 15) / count;
+    return cues.map((cue, i) => {
+      const y = 112 + i * (height + 15);
+      return rect(48, y, 864, height, "#eef5f8", "#b8cbd5", 14)
+        + circle(81, y + height / 2, 17, "#d2e7f2", BLUE)
+        + text(81, y + height / 2 + 7, i + 1, {size: 20, anchor: "middle", color: BLUE, weight: 750})
+        + text(118, y + Math.min(39, height / 2 + 8), cue, {size: 25, width: 61, gap: 30});
+    }).join("");
+  }
+
   switch (type) {
+    case "sponge": return spongeDiagram(focus || "comparison", labels);
     case "root-zone": {
       svg += rect(86, 118, 360, 246, "#e9f2f7", INK, 10);
       for (const [x, y, r] of [
@@ -1010,7 +1046,7 @@ export function createVisual(
   const values = Array.isArray(data.values) ? data.values : [];
   const quantity =
     typeof data.quantity === "string" ? data.quantity.trim() : "";
-  let description = defaults[1];
+  let description = type === "lesson-cues" ? "Read the lesson-specific steps and examples." : defaults[1];
   if (type === "fraction") {
     const part = finite(values[0], 6),
       total = finite(values[1], 10);
@@ -1040,7 +1076,7 @@ export function createVisual(
   const customCaption =
     typeof data.caption === "string" ? data.caption.trim() : "";
   const fullDescription = [
-    description,
+    typeof data.asset === "string" && data.alt ? data.alt : description,
     labels.length ? `Lesson cues: ${labels.join("; ")}.` : "",
     customCaption,
   ]
@@ -1050,9 +1086,21 @@ export function createVisual(
   const figure = document.createElement("figure");
   figure.className = "teaching-visual";
   figure.dataset.visualType = type;
+  // Asset paths are deliberately restricted to local teaching illustrations.
+  if (typeof data.asset === "string" && /^assets\/(?:diagrams|screens)\/[a-zA-Z0-9_./-]+\.(?:png|jpe?g|webp)$/.test(data.asset) && !data.asset.includes("..")) {
+    const img = document.createElement("img");
+    img.src = data.asset;
+    img.alt = typeof data.alt === "string" && data.alt.trim() ? data.alt : fullDescription;
+    Object.assign(img.style, {display: "block", width: "100%", height: "auto", maxWidth: "960px", borderRadius: "14px"});
+    const caption = document.createElement("figcaption");
+    caption.textContent = fullDescription;
+    figure.dataset.visualMode = "asset";
+    figure.append(img, caption);
+    return figure;
+  }
   // Long lesson titles remain fully available in SVG title and the text caption.
   const heading = lines(title, 48).slice(0, 2).join(" ");
-  figure.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" role="img" aria-labelledby="${id}-title" aria-describedby="${id}-desc" style="display:block;width:100%;height:auto;max-width:960px;background:#fbfcfd;border-radius:14px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"><title id="${id}-title">${escape(title)}</title><desc id="${id}-desc">${escape(fullDescription)}</desc>${rect(1, 1, 958, 518, "#fbfcfd", "#c7d4dc", 14)}${text(48, 51, heading, { size: 30, weight: 750, width: 48, gap: 34 })}${render(type, values, labels, quantity)}</svg>`;
+  figure.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 520" role="img" aria-labelledby="${id}-title" aria-describedby="${id}-desc" style="display:block;width:100%;height:auto;max-width:960px;background:#fbfcfd;border-radius:14px;font-family:system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif"><title id="${id}-title">${escape(title)}</title><desc id="${id}-desc">${escape(fullDescription)}</desc>${rect(1, 1, 958, 518, "#fbfcfd", "#c7d4dc", 14)}${text(48, 51, heading, { size: 30, weight: 750, width: 48, gap: 34 })}${render(type, values, labels, quantity, data.focus)}</svg>`;
   const caption = document.createElement("figcaption");
   caption.textContent = fullDescription;
   figure.append(caption);
