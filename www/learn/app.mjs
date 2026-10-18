@@ -279,7 +279,7 @@ function productionNotes() {
     ),
     link(
       "Read the course guide, production notes and sources",
-      "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/ACADEMY.md",
+      "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/ACADEMY.md",
       "text-link",
     ),
     link(
@@ -687,7 +687,7 @@ function showError(error) {
     button("Try again", () => location.reload()),
     link(
       "Read the course workbook",
-      "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/tree/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero",
+      "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/tree/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero",
     ),
   );
   main.replaceChildren(panel);
