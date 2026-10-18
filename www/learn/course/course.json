@@ -2,7 +2,7 @@
   "schema": 1,
   "title": "Crop Steering Academy",
   "description": "Learn the root zone, understand a watering day, and practise each control before live operation.",
-  "edition": "2026-10-19",
+  "edition": "2026-10-19-r2",
   "lessons": [
     {
       "id": "A1",
@@ -178,7 +178,7 @@
       "sources": [
         {
           "title": "Course evidence and production notes",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
           "accessed": "2026-10-19"
         },
         {
@@ -188,9 +188,9 @@
         }
       ],
       "video": {
-        "src": "media/pilots/A1.mp4",
-        "captions": "media/pilots/A1.vtt",
-        "voice": "Saved custom voice: Scarjo"
+        "src": "media/pilots/A1.mp4?v=20261019r2",
+        "captions": "media/pilots/A1.vtt?v=20261019r2",
+        "voice": "Kokoro af_heart · paragraph-matched edition"
       }
     },
     {
@@ -369,7 +369,7 @@
       "sources": [
         {
           "title": "Course evidence and production notes",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
           "accessed": "2026-10-19"
         },
         {
@@ -379,9 +379,9 @@
         }
       ],
       "video": {
-        "src": "media/pilots/A2.mp4",
-        "captions": "media/pilots/A2.vtt",
-        "voice": "Saved custom voice: Scarjo"
+        "src": "media/pilots/A2.mp4?v=20261019r2",
+        "captions": "media/pilots/A2.vtt?v=20261019r2",
+        "voice": "Kokoro af_heart · paragraph-matched edition"
       }
     },
     {
@@ -561,7 +561,7 @@
       "sources": [
         {
           "title": "Course evidence and production notes",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
           "accessed": "2026-10-19"
         },
         {
@@ -571,9 +571,9 @@
         }
       ],
       "video": {
-        "src": "media/pilots/A3.mp4",
-        "captions": "media/pilots/A3.vtt",
-        "voice": "Saved custom voice: Scarjo"
+        "src": "media/pilots/A3.mp4?v=20261019r2",
+        "captions": "media/pilots/A3.vtt?v=20261019r2",
+        "voice": "Kokoro af_heart · paragraph-matched edition"
       }
     },
     {
@@ -877,7 +877,7 @@
         },
         {
           "title": "Crop Steering: training/crop-steering-from-zero/WORKBOOK.md",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/WORKBOOK.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/WORKBOOK.md",
           "accessed": "2026-10-19"
         }
       ]
@@ -1176,7 +1176,7 @@
         },
         {
           "title": "Crop Steering: training/crop-steering-from-zero/WORKBOOK.md",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/WORKBOOK.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/WORKBOOK.md",
           "accessed": "2026-10-19"
         }
       ]
@@ -1474,7 +1474,7 @@
         },
         {
           "title": "Crop Steering: training/crop-steering-from-zero/WORKBOOK.md",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/WORKBOOK.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/WORKBOOK.md",
           "accessed": "2026-10-19"
         }
       ]
@@ -1671,7 +1671,7 @@
       "sources": [
         {
           "title": "Course evidence and production notes",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
           "accessed": "2026-10-19"
         },
         {
@@ -1681,9 +1681,9 @@
         }
       ],
       "video": {
-        "src": "media/pilots/B1.mp4",
-        "captions": "media/pilots/B1.vtt",
-        "voice": "Saved custom voice: Scarjo"
+        "src": "media/pilots/B1.mp4?v=20261019r2",
+        "captions": "media/pilots/B1.vtt?v=20261019r2",
+        "voice": "Kokoro af_heart · paragraph-matched edition"
       }
     },
     {
@@ -2596,7 +2596,7 @@
         },
         {
           "title": "Crop Steering: training/crop-steering-from-zero/WORKBOOK.md",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/WORKBOOK.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/WORKBOOK.md",
           "accessed": "2026-10-19"
         }
       ]
@@ -2791,7 +2791,7 @@
       "sources": [
         {
           "title": "Course evidence and production notes",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md",
           "accessed": "2026-10-19"
         },
         {
@@ -2801,9 +2801,9 @@
         }
       ],
       "video": {
-        "src": "media/pilots/C1.mp4",
-        "captions": "media/pilots/C1.vtt",
-        "voice": "Saved custom voice: Scarjo"
+        "src": "media/pilots/C1.mp4?v=20261019r2",
+        "captions": "media/pilots/C1.vtt?v=20261019r2",
+        "voice": "Kokoro af_heart · paragraph-matched edition"
       }
     },
     {
@@ -3057,7 +3057,7 @@
         },
         {
           "title": "One-zone equipment and staged commissioning guide",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
           "accessed": "2026-10-19"
         }
       ]
@@ -3311,7 +3311,7 @@
         },
         {
           "title": "One-zone equipment and staged commissioning guide",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
           "accessed": "2026-10-19"
         }
       ]
@@ -3568,7 +3568,7 @@
         },
         {
           "title": "One-zone equipment and commissioning guide",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
           "accessed": "2026-10-19"
         },
         {
@@ -3826,7 +3826,7 @@
       "sources": [
         {
           "title": "One-zone equipment and commissioning guide",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
           "accessed": "2026-10-19"
         },
         {
@@ -4094,7 +4094,7 @@
         },
         {
           "title": "One-zone equipment and commissioning guide",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
           "accessed": "2026-10-19"
         }
       ]
@@ -4358,7 +4358,7 @@
         },
         {
           "title": "One-zone equipment and staged commissioning guide",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
           "accessed": "2026-10-19"
         }
       ]
@@ -4621,7 +4621,7 @@
       "sources": [
         {
           "title": "One-zone equipment and staged commissioning guide",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
           "accessed": "2026-10-19"
         },
         {
@@ -6128,7 +6128,7 @@
         },
         {
           "title": "Workbook: three failure scenarios",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/WORKBOOK.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/WORKBOOK.md",
           "accessed": "2026-10-19"
         }
       ]
@@ -6412,7 +6412,7 @@
       "sources": [
         {
           "title": "Workbook: daily record, handover and delayed recall",
-          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/WORKBOOK.md",
+          "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/WORKBOOK.md",
           "accessed": "2026-10-19"
         },
         {
@@ -6589,7 +6589,7 @@
     }
   ],
   "disclosures": {
-    "narration": "Five pilot videos use the saved Scarjo custom voice; 19 new slide lessons use locally generated Kokoro af_heart speech.",
+    "narration": "All lessons use locally generated Kokoro af_heart speech. Five rebuilt 480p pilot videos use 108 paragraph-matched visual cards.",
     "language": "Written using ASD-STE100 principles. Not certified or represented as full formal conformance.",
     "evidence": "Research-informed instructional design; no learner outcome trial has been conducted.",
     "progress": "Local browser knowledge-practice record, not certification, verified identity or proof of safe hardware."

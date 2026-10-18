@@ -1,0 +1,1442 @@
+[
+  {
+    "id": "A2-01-p01",
+    "lesson": "A2",
+    "scene": "A2-01",
+    "paragraph": 0,
+    "text": "The previous lesson showed three parts inside the pot.",
+    "title": "Recall the root zone",
+    "visual": {
+      "type": "question",
+      "labels": [
+        "Three parts inside the pot",
+        "What do you remember?"
+      ]
+    }
+  },
+  {
+    "id": "A2-01-p02",
+    "lesson": "A2",
+    "scene": "A2-01",
+    "paragraph": 1,
+    "text": "Name these parts before the answer appears.",
+    "title": "Name the three parts",
+    "visual": {
+      "type": "recall",
+      "labels": [
+        "Pause",
+        "Name all three",
+        "Then continue"
+      ]
+    }
+  },
+  {
+    "id": "A2-02-p01",
+    "lesson": "A2",
+    "scene": "A2-02",
+    "paragraph": 0,
+    "text": "The three parts are solid material, water, and air.",
+    "title": "Solids, water and air",
+    "visual": {
+      "type": "root-zone",
+      "labels": [
+        "Solid material",
+        "Water",
+        "Air"
+      ]
+    }
+  },
+  {
+    "id": "A2-02-p02",
+    "lesson": "A2",
+    "scene": "A2-02",
+    "paragraph": 1,
+    "text": "VWC means volumetric water content. It is the volume of water divided by the total volume of the sample. The result is usually a percentage.",
+    "title": "What VWC measures",
+    "visual": {
+      "type": "fraction",
+      "labels": [
+        "Water volume",
+        "Total sample volume",
+        "Water ÷ total × 100"
+      ],
+      "focus": "meaning",
+      "values": [
+        6,
+        10
+      ]
+    }
+  },
+  {
+    "id": "A2-02-p03",
+    "lesson": "A2",
+    "scene": "A2-02",
+    "paragraph": 2,
+    "text": "The drawing divides a sample into ten equal volumes. Water occupies six of these volumes. Six divided by ten is zero point six. Multiply this result by one hundred to get sixty percent.",
+    "title": "Six out of ten",
+    "visual": {
+      "type": "fraction",
+      "labels": [
+        "6 water volumes",
+        "10 total equal volumes",
+        "6 ÷ 10 × 100 = 60%"
+      ],
+      "focus": "water",
+      "values": [
+        6,
+        10
+      ]
+    }
+  },
+  {
+    "id": "A2-02-p04",
+    "lesson": "A2",
+    "scene": "A2-02",
+    "paragraph": 3,
+    "text": "This example has sixty percent VWC. The blocks explain the volume ratio. In a real substrate, water occupies spaces between solid parts. It does not form the separate blocks in this drawing.",
+    "title": "A ratio, not separate blocks",
+    "visual": {
+      "type": "fraction",
+      "labels": [
+        "60% water by volume",
+        "Water fills pore spaces",
+        "Blocks illustrate the ratio"
+      ],
+      "focus": "meaning",
+      "values": [
+        6,
+        10
+      ]
+    }
+  },
+  {
+    "id": "A2-03-p01",
+    "lesson": "A2",
+    "scene": "A2-03",
+    "paragraph": 0,
+    "text": "This example uses a representative sample with a total volume of five liters. Its VWC is sixty percent. Five multiplied by zero point six is three. Thus, the sample contains three liters of water.",
+    "title": "Water already in the sample",
+    "visual": {
+      "type": "fraction",
+      "labels": [
+        "3 L of water",
+        "5 L total sample",
+        "3 ÷ 5 × 100 = 60%"
+      ],
+      "focus": "water",
+      "values": [
+        3,
+        5
+      ]
+    }
+  },
+  {
+    "id": "A2-03-p02",
+    "lesson": "A2",
+    "scene": "A2-03",
+    "paragraph": 1,
+    "text": "This calculation explains the amount of water already in the sample. It is not an instruction to add three liters to a five-liter pot.",
+    "title": "Existing water, not an added dose",
+    "visual": {
+      "type": "comparison",
+      "labels": [
+        "3 L already present",
+        "Not a 3 L irrigation instruction"
+      ]
+    }
+  },
+  {
+    "id": "A2-04-p01",
+    "lesson": "A2",
+    "scene": "A2-04",
+    "paragraph": 0,
+    "text": "Sixty percent of the total volume is water. Is all the remaining forty percent air?",
+    "title": "What is in the other 40%?",
+    "visual": {
+      "type": "fraction",
+      "labels": [
+        "60% water",
+        "40% remainder",
+        "Is the remainder all air?"
+      ],
+      "focus": "remainder",
+      "values": [
+        6,
+        10
+      ]
+    }
+  },
+  {
+    "id": "A2-04-p02",
+    "lesson": "A2",
+    "scene": "A2-04",
+    "paragraph": 1,
+    "text": "No. The remaining volume includes solid material and air. VWC alone does not give the complete air volume.",
+    "title": "The remainder includes solids",
+    "visual": {
+      "type": "fraction",
+      "labels": [
+        "60% water",
+        "40% solids + air",
+        "VWC does not give air volume"
+      ],
+      "focus": "remainder",
+      "values": [
+        6,
+        10
+      ]
+    }
+  },
+  {
+    "id": "A2-04-p03",
+    "lesson": "A2",
+    "scene": "A2-04",
+    "paragraph": 2,
+    "text": "Sixty percent VWC does not mean that sixty percent of the water available to the plant remains. Some water stays more tightly attached to the substrate. Different substrates hold water differently. VWC alone does not show the time until the plant needs water.",
+    "title": "VWC is not usable-water percent",
+    "visual": {
+      "type": "comparison",
+      "labels": [
+        "Water content by volume",
+        "Plant availability needs context",
+        "No countdown from VWC alone"
+      ]
+    }
+  },
+  {
+    "id": "A2-04-p04",
+    "lesson": "A2",
+    "scene": "A2-04",
+    "paragraph": 3,
+    "text": "Look at the probe location. The probe measures a local region. Its installation, contact, calibration, and location affect the reading.",
+    "title": "The probe samples one region",
+    "visual": {
+      "type": "sensor",
+      "labels": [
+        "Local sensing region",
+        "Other pots still need checking",
+        "Contact · calibration · location"
+      ]
+    }
+  },
+  {
+    "id": "A2-04-p05",
+    "lesson": "A2",
+    "scene": "A2-04",
+    "paragraph": 4,
+    "text": "A probe near one dripper might not represent a dry pot at the end of a row. Later lessons explain how to select locations that represent the zone.",
+    "title": "Check beyond the nearest dripper",
+    "visual": {
+      "type": "sensor",
+      "labels": [
+        "Probe near one dripper",
+        "A distant pot may be dry",
+        "Select representative locations"
+      ]
+    }
+  },
+  {
+    "id": "A2-05-p01",
+    "lesson": "A2",
+    "scene": "A2-05",
+    "paragraph": 0,
+    "text": "The sensor now shows forty percent VWC. Does this reading always mean that the substrate is too dry?",
+    "title": "Does 40% always mean too dry?",
+    "visual": {
+      "type": "question",
+      "labels": [
+        "40% VWC",
+        "Enough information to decide?"
+      ]
+    }
+  },
+  {
+    "id": "A2-05-p02",
+    "lesson": "A2",
+    "scene": "A2-05",
+    "paragraph": 1,
+    "text": "No. The reading alone is not sufficient. You also need information about the substrate, validated reference values, crop, and conditions. One VWC target is not correct for every system.",
+    "title": "A target needs local evidence",
+    "visual": {
+      "type": "evidence",
+      "labels": [
+        "Substrate + validated references",
+        "Crop + current conditions",
+        "No universal VWC target"
+      ]
+    }
+  },
+  {
+    "id": "A2-05-p03",
+    "lesson": "A2",
+    "scene": "A2-05",
+    "paragraph": 2,
+    "text": "Do not select a target yet. Complete this sentence. Sixty percent VWC means what?",
+    "title": "Explain 60% VWC",
+    "visual": {
+      "type": "recall",
+      "labels": [
+        "60% VWC means…",
+        "Answer before continuing"
+      ]
+    }
+  },
+  {
+    "id": "A2-05-p04",
+    "lesson": "A2",
+    "scene": "A2-05",
+    "paragraph": 3,
+    "text": "Approximately sixty percent of the measured sample volume is water. This is one correct answer.",
+    "title": "60% of measured sample volume",
+    "visual": {
+      "type": "fraction",
+      "labels": [
+        "60% water by volume",
+        "Measured sample",
+        "6 ÷ 10 × 100 = 60%"
+      ],
+      "focus": "meaning",
+      "values": [
+        6,
+        10
+      ]
+    }
+  },
+  {
+    "id": "A2-05-p05",
+    "lesson": "A2",
+    "scene": "A2-05",
+    "paragraph": 4,
+    "text": "The reading does not give the exact water volume available to the plant. One sensor does not prove that all pots have the same conditions.",
+    "title": "Know what the reading cannot prove",
+    "visual": {
+      "type": "comparison",
+      "labels": [
+        "Not exact plant-available water",
+        "Not every pot in the zone"
+      ]
+    }
+  },
+  {
+    "id": "A2-05-p06",
+    "lesson": "A2",
+    "scene": "A2-05",
+    "paragraph": 5,
+    "text": "Use these limits when you assess advice about VWC.",
+    "title": "Check the meaning of VWC advice",
+    "visual": {
+      "type": "check",
+      "labels": [
+        "What does the number measure?",
+        "What context supports it?"
+      ]
+    }
+  },
+  {
+    "id": "A2-05-p07",
+    "lesson": "A2",
+    "scene": "A2-05",
+    "paragraph": 6,
+    "text": "The next lesson explains why a full pot does not mean one hundred percent VWC.",
+    "title": "Next: when is a pot full?",
+    "visual": {
+      "type": "next",
+      "labels": [
+        "Saturation",
+        "Drained container capacity",
+        "Configured reference"
+      ]
+    }
+  },
+  {
+    "id": "A3-01-p01",
+    "lesson": "A3",
+    "scene": "A3-01",
+    "paragraph": 0,
+    "text": "A grower asks for a full pot. What does full mean?",
+    "title": "A full pot: full of what?",
+    "visual": {
+      "type": "question",
+      "labels": [
+        "Water?",
+        "Pore spaces?",
+        "A software reference?"
+      ]
+    }
+  },
+  {
+    "id": "A3-01-p02",
+    "lesson": "A3",
+    "scene": "A3-01",
+    "paragraph": 1,
+    "text": "VWC is water volume divided by total sample volume. The total sample volume also includes solid material. A correctly irrigated pot does not need a reading of one hundred percent VWC.",
+    "title": "Solids remain part of the volume",
+    "visual": {
+      "type": "root-zone",
+      "labels": [
+        "Solid material remains",
+        "Water in pore spaces",
+        "Air can remain"
+      ]
+    }
+  },
+  {
+    "id": "A3-02-p01",
+    "lesson": "A3",
+    "scene": "A3-02",
+    "paragraph": 0,
+    "text": "Saturation is one physical condition. At saturation, water fills the pore spaces. Pore spaces are the spaces between solid parts of the substrate. The solid material remains present.",
+    "title": "At saturation: pores fill with water",
+    "visual": {
+      "type": "capacity",
+      "labels": [
+        "Water fills pore spaces",
+        "Solid material remains"
+      ],
+      "focus": "saturated"
+    }
+  },
+  {
+    "id": "A3-02-p02",
+    "lesson": "A3",
+    "scene": "A3-02",
+    "paragraph": 1,
+    "text": "Continuous saturation around the roots is not the objective.",
+    "title": "Continuous saturation is not the aim",
+    "visual": {
+      "type": "question",
+      "labels": [
+        "Roots need oxygen",
+        "Check drainage and air return"
+      ]
+    }
+  },
+  {
+    "id": "A3-03-p01",
+    "lesson": "A3",
+    "scene": "A3-03",
+    "paragraph": 0,
+    "text": "Water drains from the spare pot into the tray. After a specified drainage procedure, some water remains in the substrate. Some spaces contain air again.",
+    "title": "After a defined drainage procedure",
+    "visual": {
+      "type": "drainage",
+      "labels": [
+        "Water supplied",
+        "Water retained + air returns",
+        "Water drains to tray"
+      ]
+    }
+  },
+  {
+    "id": "A3-03-p02",
+    "lesson": "A3",
+    "scene": "A3-03",
+    "paragraph": 1,
+    "text": "The retained water quantity depends on the substrate and container conditions. Container height is one of these conditions. Container capacity describes the retained water under specified container and drainage conditions.",
+    "title": "Capacity depends on conditions",
+    "visual": {
+      "type": "capacity",
+      "labels": [
+        "Substrate properties",
+        "Container height and shape",
+        "Specified drainage procedure"
+      ],
+      "focus": "conditions"
+    }
+  },
+  {
+    "id": "A3-03-p03",
+    "lesson": "A3",
+    "scene": "A3-03",
+    "paragraph": 2,
+    "text": "Growers sometimes call their reference value field capacity. The program also uses this term. Field capacity originally describes a condition in field soil. A pot or substrate block has different physical conditions.",
+    "title": "Field soil and containers differ",
+    "visual": {
+      "type": "comparison",
+      "labels": [
+        "Field capacity: field-soil term",
+        "Containers: different conditions",
+        "Check what the reference means"
+      ]
+    }
+  },
+  {
+    "id": "A3-03-p04",
+    "lesson": "A3",
+    "scene": "A3-03",
+    "paragraph": 3,
+    "text": "Identify the drainage method that applies to the reference value.",
+    "title": "Identify the drainage method",
+    "visual": {
+      "type": "check",
+      "labels": [
+        "Which method was used?",
+        "Does it suit this system?"
+      ]
+    }
+  },
+  {
+    "id": "A3-03-p05",
+    "lesson": "A3",
+    "scene": "A3-03",
+    "paragraph": 4,
+    "text": "One drainage time is not correct for all pots. Use a documented method suitable for the substrate and system. Record the container type. Record the substrate type. Record the initial condition. Record the drainage interval.",
+    "title": "Document the capacity procedure",
+    "visual": {
+      "type": "process",
+      "labels": [
+        "Container + substrate",
+        "Initial condition",
+        "Drainage interval"
+      ]
+    }
+  },
+  {
+    "id": "A3-03-p06",
+    "lesson": "A3",
+    "scene": "A3-03",
+    "paragraph": 5,
+    "text": "Record the probe installation. Do the procedure again. If the results change, find the cause before you use the reference value.",
+    "title": "Repeat and investigate variation",
+    "visual": {
+      "type": "process",
+      "labels": [
+        "Record probe installation",
+        "Repeat the procedure",
+        "Find causes of changed results"
+      ],
+      "focus": "flow"
+    }
+  },
+  {
+    "id": "A3-03-p07",
+    "lesson": "A3",
+    "scene": "A3-03",
+    "paragraph": 6,
+    "text": "Container weight and visible drainage give additional information during the procedure. A suitable sensor gives another measurement. These measurements do not correct poor probe contact or a location that does not represent the zone.",
+    "title": "Use several observations",
+    "visual": {
+      "type": "evidence",
+      "labels": [
+        "Container weight + drainage",
+        "Suitable sensor measurement",
+        "Check contact + location"
+      ]
+    }
+  },
+  {
+    "id": "A3-04-p01",
+    "lesson": "A3",
+    "scene": "A3-04",
+    "paragraph": 0,
+    "text": "The dashboard contains a reference setting. A person entered this value into the program. The displayed value does not prove that the measurement procedure was correct.",
+    "title": "An entered value needs evidence",
+    "visual": {
+      "type": "comparison",
+      "labels": [
+        "Person enters a reference",
+        "Procedure evidence still needed"
+      ]
+    }
+  },
+  {
+    "id": "A3-04-p02",
+    "lesson": "A3",
+    "scene": "A3-04",
+    "paragraph": 1,
+    "text": "Keep a measured physical condition separate from a software setting.",
+    "title": "Physical condition and software setting",
+    "visual": {
+      "type": "comparison",
+      "labels": [
+        "Measured physical condition",
+        "Configured software reference"
+      ]
+    }
+  },
+  {
+    "id": "A3-05-p01",
+    "lesson": "A3",
+    "scene": "A3-05",
+    "paragraph": 0,
+    "text": "The example reference value is sixty percent. Must your substrate use the same reference value?",
+    "title": "Must your reference be 60%?",
+    "visual": {
+      "type": "question",
+      "labels": [
+        "Example reference: 60%",
+        "Use it for every substrate?"
+      ]
+    }
+  },
+  {
+    "id": "A3-05-p02",
+    "lesson": "A3",
+    "scene": "A3-05",
+    "paragraph": 1,
+    "text": "No. Sixty percent is only the example value. Your reference value needs measurement evidence for your substrate and container. The measurement method must also be suitable.",
+    "title": "Measure your own reference",
+    "visual": {
+      "type": "evidence",
+      "labels": [
+        "60% is a teaching example",
+        "Evidence for substrate + container",
+        "Suitable measurement method"
+      ]
+    }
+  },
+  {
+    "id": "A3-05-p03",
+    "lesson": "A3",
+    "scene": "A3-05",
+    "paragraph": 2,
+    "text": "The highest sensor reading is not automatically the correct reference value. A temporary peak does not prove correct calibration. Poor contact or an incorrect reading does not establish a reference value.",
+    "title": "A peak does not establish capacity",
+    "visual": {
+      "type": "evidence",
+      "labels": [
+        "Highest reading ≠ proven reference",
+        "Check calibration",
+        "Check contact + plausibility"
+      ]
+    }
+  },
+  {
+    "id": "A3-05-p04",
+    "lesson": "A3",
+    "scene": "A3-05",
+    "paragraph": 3,
+    "text": "There are three cards in this exercise. The first card is saturation. The second card is drained container capacity. The third card is the reference setting in the program.",
+    "title": "Sort the three cards",
+    "visual": {
+      "type": "capacity",
+      "labels": [
+        "Saturation",
+        "Drained container capacity",
+        "Configured app reference"
+      ],
+      "focus": "sort"
+    }
+  },
+  {
+    "id": "A3-05-p05",
+    "lesson": "A3",
+    "scene": "A3-05",
+    "paragraph": 4,
+    "text": "Identify the cards that describe physical conditions. Identify the card that describes a software setting.",
+    "title": "Physical condition or setting?",
+    "visual": {
+      "type": "recall",
+      "labels": [
+        "Saturation",
+        "Drained container capacity",
+        "Configured app reference"
+      ]
+    }
+  },
+  {
+    "id": "A3-05-p06",
+    "lesson": "A3",
+    "scene": "A3-05",
+    "paragraph": 5,
+    "text": "Saturation and drained container capacity describe physical conditions. The configured reference is a software setting. A useful setting represents a suitable measured condition. A value without measurement evidence is not sufficient.",
+    "title": "Two conditions; one setting",
+    "visual": {
+      "type": "comparison",
+      "labels": [
+        "Physical: saturation + capacity",
+        "Software: configured reference",
+        "Link settings to measured evidence"
+      ]
+    }
+  },
+  {
+    "id": "A3-05-p07",
+    "lesson": "A3",
+    "scene": "A3-05",
+    "paragraph": 6,
+    "text": "The next lesson explains dryback. Dryback is a decrease in substrate water content between irrigation events. A decrease of fifteen percentage points is different from fifteen percent relative dryback.",
+    "title": "Next: dryback and its units",
+    "visual": {
+      "type": "next",
+      "labels": [
+        "Water content decreases",
+        "15 percentage points",
+        "Different from 15% relative"
+      ]
+    }
+  },
+  {
+    "id": "B1-01-p01",
+    "lesson": "B1",
+    "scene": "B1-01",
+    "paragraph": 0,
+    "text": "This graph shows water content and EC over time. We will examine one part at a time.",
+    "title": "Two measurements over time",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "Blue: synthetic VWC",
+        "Orange: synthetic EC"
+      ],
+      "focus": "all"
+    }
+  },
+  {
+    "id": "B1-01-p02",
+    "lesson": "B1",
+    "scene": "B1-01",
+    "paragraph": 1,
+    "text": "Time is on the bottom axis. Later times are farther to the right. The shaded area shows the night period in this example. Night shading does not mean that the sensor stopped measurement.",
+    "title": "Read time from left to right",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "Later times → right",
+        "Shaded night: measurement continues"
+      ],
+      "focus": "time"
+    }
+  },
+  {
+    "id": "B1-02-p01",
+    "lesson": "B1",
+    "scene": "B1-02",
+    "paragraph": 0,
+    "text": "The first line shows VWC. Read this line against the percentage scale on the left.",
+    "title": "VWC uses the left scale",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "Left axis: VWC in %",
+        "Blue: synthetic observations"
+      ],
+      "focus": "vwc"
+    }
+  },
+  {
+    "id": "B1-02-p02",
+    "lesson": "B1",
+    "scene": "B1-02",
+    "paragraph": 1,
+    "text": "This point shows sixty percent VWC at the indicated time. The solid line connects the example observations.",
+    "title": "Read the point at its time",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "Example point: 60% VWC",
+        "Solid line connects observations"
+      ],
+      "focus": "vwc"
+    }
+  },
+  {
+    "id": "B1-02-p03",
+    "lesson": "B1",
+    "scene": "B1-02",
+    "paragraph": 2,
+    "text": "In a live system, do a check of the reading age. Identify gaps in the readings.",
+    "title": "Check reading age and gaps",
+    "visual": {
+      "type": "evidence",
+      "labels": [
+        "Identify the sensor",
+        "Check reading timestamp",
+        "Look for missing readings"
+      ]
+    }
+  },
+  {
+    "id": "B1-03-p01",
+    "lesson": "B1",
+    "scene": "B1-03",
+    "paragraph": 0,
+    "text": "EC means electrical conductivity. The EC line uses the scale on the right. The unit is millisiemens per centimeter.",
+    "title": "EC uses the right scale",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "Right axis: EC in mS/cm",
+        "Electrical conductivity"
+      ],
+      "focus": "ec"
+    }
+  },
+  {
+    "id": "B1-03-p02",
+    "lesson": "B1",
+    "scene": "B1-03",
+    "paragraph": 1,
+    "text": "Identify the EC measurement assigned to the graph.",
+    "title": "Which EC measurement is shown?",
+    "visual": {
+      "type": "mapping",
+      "labels": [
+        "Graph EC series",
+        "Assigned sensor entity",
+        "Verify measurement identity"
+      ],
+      "focus": "flow"
+    }
+  },
+  {
+    "id": "B1-03-p03",
+    "lesson": "B1",
+    "scene": "B1-03",
+    "paragraph": 2,
+    "text": "Feed EC, bulk substrate EC, and pore-water EC describe different measurements. These names are not interchangeable.",
+    "title": "Three EC measurements",
+    "visual": {
+      "type": "comparison",
+      "labels": [
+        "Feed EC",
+        "Bulk substrate EC",
+        "Pore-water EC"
+      ]
+    }
+  },
+  {
+    "id": "B1-03-p04",
+    "lesson": "B1",
+    "scene": "B1-03",
+    "paragraph": 3,
+    "text": "The VWC line and EC line cross on the screen. Does this mean that the measured values are equal?",
+    "title": "Do crossing lines mean equal values?",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "The lines cross on screen",
+        "Are the measured values equal?"
+      ],
+      "focus": "ec"
+    }
+  },
+  {
+    "id": "B1-03-p05",
+    "lesson": "B1",
+    "scene": "B1-03",
+    "paragraph": 4,
+    "text": "No. VWC and EC have different units and scales. Each line shows how its measurement changes with time.",
+    "title": "Different units, different scales",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "VWC: percent on the left",
+        "EC: mS/cm on the right"
+      ],
+      "focus": "ec"
+    }
+  },
+  {
+    "id": "B1-03-p06",
+    "lesson": "B1",
+    "scene": "B1-03",
+    "paragraph": 5,
+    "text": "Do not subtract a VWC value from an EC value.",
+    "title": "Do not subtract unlike units",
+    "visual": {
+      "type": "comparison",
+      "labels": [
+        "VWC: %",
+        "EC: mS/cm",
+        "Subtraction is not meaningful"
+      ]
+    }
+  },
+  {
+    "id": "B1-04-p01",
+    "lesson": "B1",
+    "scene": "B1-04",
+    "paragraph": 0,
+    "text": "The markers show irrigation events. Water content can increase after water reaches the probe. Water content then decreases between events.",
+    "title": "Find the irrigation event markers",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "Markers: irrigation events",
+        "Water reaches the probe, then VWC rises"
+      ],
+      "focus": "events"
+    }
+  },
+  {
+    "id": "B1-04-p02",
+    "lesson": "B1",
+    "scene": "B1-04",
+    "paragraph": 1,
+    "text": "EC also changes. The EC line does not need to be the opposite shape of the VWC line. Water delivery, mixing, drainage, temperature, measurement method, and crop conditions affect the readings. One line does not prove the cause of a change.",
+    "title": "EC has several influences",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "EC need not mirror VWC",
+        "Delivery · mixing · drainage · temperature"
+      ],
+      "focus": "ec"
+    }
+  },
+  {
+    "id": "B1-04-p03",
+    "lesson": "B1",
+    "scene": "B1-04",
+    "paragraph": 2,
+    "text": "The graph also shows a planning reference. The program draws this reference from the selected settings. A measured line shows observations. A planning reference shows the behavior illustrated by the software. These lines need different labels, even when their positions are the same.",
+    "title": "Observation and reference differ",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "Solid: synthetic observations",
+        "Dashed: software planning references"
+      ],
+      "focus": "reference"
+    }
+  },
+  {
+    "id": "B1-05-p01",
+    "lesson": "B1",
+    "scene": "B1-05",
+    "paragraph": 0,
+    "text": "The planning reference continues through the night to the next morning. An unexplained break makes the reference difficult to read. A continuous line does not prove a correct prediction of the crop response.",
+    "title": "The reference continues through night",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "Continuous planning reference",
+        "Continuity does not prove prediction"
+      ],
+      "focus": "night"
+    }
+  },
+  {
+    "id": "B1-05-p02",
+    "lesson": "B1",
+    "scene": "B1-05",
+    "paragraph": 1,
+    "text": "The overnight EC reference connects the last daytime reference to the next morning reference. This connection is not a separately scheduled P3 EC target. It does not calculate or prove the behavior of salts overnight.",
+    "title": "Overnight EC is a reference connection",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "EC reference joins day to morning",
+        "No separately scheduled P3 EC target"
+      ],
+      "focus": "night"
+    }
+  },
+  {
+    "id": "B1-05-p03",
+    "lesson": "B1",
+    "scene": "B1-05",
+    "paragraph": 2,
+    "text": "Now watch this demo edit. We increase the P3 emergency VWC threshold in the local draft. The draft threshold changes from thirty-five percent to thirty-nine percent. The saved threshold remains visible for comparison. The measured example readings remain the same.",
+    "title": "Move only the draft threshold",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "Saved 35% → local draft 39%",
+        "Synthetic readings stay unchanged"
+      ],
+      "focus": "draft",
+      "values": [
+        35,
+        39
+      ]
+    }
+  },
+  {
+    "id": "B1-06-p01",
+    "lesson": "B1",
+    "scene": "B1-06",
+    "paragraph": 0,
+    "text": "Which item changed? The previous water content? The local draft of a threshold? Or a guaranteed irrigation event?",
+    "title": "Which item changed?",
+    "visual": {
+      "type": "question",
+      "labels": [
+        "Previous water content?",
+        "Local draft threshold?",
+        "Guaranteed irrigation event?"
+      ]
+    }
+  },
+  {
+    "id": "B1-06-p02",
+    "lesson": "B1",
+    "scene": "B1-06",
+    "paragraph": 1,
+    "text": "The local draft of the threshold changed. Review and application of the settings are separate actions. The controller uses its conditions and protection rules to decide if irrigation occurs. The emergency threshold is not a normal overnight target.",
+    "title": "Review and apply are separate actions",
+    "visual": {
+      "type": "process",
+      "labels": [
+        "Threshold draft changed",
+        "Review → apply settings",
+        "Controller conditions decide shots"
+      ],
+      "focus": "flow"
+    }
+  },
+  {
+    "id": "B1-06-p03",
+    "lesson": "B1",
+    "scene": "B1-06",
+    "paragraph": 2,
+    "text": "Point to the time axis. Point to the VWC scale. Point to the EC scale. Identify one irrigation marker. Identify one planning reference. Find the reading age.",
+    "title": "Read the whole graph",
+    "visual": {
+      "type": "graph",
+      "labels": [
+        "Find time · VWC · EC",
+        "Find event · reference · reading age"
+      ],
+      "focus": "recall"
+    }
+  },
+  {
+    "id": "B1-06-p04",
+    "lesson": "B1",
+    "scene": "B1-06",
+    "paragraph": 3,
+    "text": "The next lesson explains the irrigation phases from P0 to P3.",
+    "title": "Next: irrigation phases",
+    "visual": {
+      "type": "next",
+      "labels": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ]
+    }
+  },
+  {
+    "id": "C1-01-p01",
+    "lesson": "C1",
+    "scene": "C1-01",
+    "paragraph": 0,
+    "text": "Start with one zone.",
+    "title": "Start with one zone",
+    "visual": {
+      "type": "equipment",
+      "labels": [
+        "One zone",
+        "Verify before expanding"
+      ]
+    }
+  },
+  {
+    "id": "C1-01-p02",
+    "lesson": "C1",
+    "scene": "C1-01",
+    "paragraph": 1,
+    "text": "The system needs five functions. A computer runs the program. A sensor measures water content. The irrigation equipment supplies water. Control equipment operates the water delivery. Protection equipment and verification procedures help prevent incorrect operation.",
+    "title": "Five functions for one system",
+    "visual": {
+      "type": "equipment",
+      "labels": [
+        "Host",
+        "Measure",
+        "Deliver",
+        "Control",
+        "Protect + verify"
+      ]
+    }
+  },
+  {
+    "id": "C1-02-p01",
+    "lesson": "C1",
+    "scene": "C1-02",
+    "paragraph": 0,
+    "text": "The host is the computer that runs the software. One option is a supported Raspberry Pi installation. Another option is a supported dedicated Intel NUC or other x86-64 computer. You need only one host option.",
+    "title": "Choose one supported host",
+    "visual": {
+      "type": "host",
+      "labels": [
+        "Raspberry Pi",
+        "OR supported x86-64",
+        "One host is enough"
+      ]
+    }
+  },
+  {
+    "id": "C1-02-p02",
+    "lesson": "C1",
+    "scene": "C1-02",
+    "paragraph": 1,
+    "text": "Use the correct power supply. Use suitable storage. Connect the host to a reliable network.",
+    "title": "Provide the host essentials",
+    "visual": {
+      "type": "host",
+      "labels": [
+        "Correct power supply",
+        "Suitable storage",
+        "Reliable network"
+      ]
+    }
+  },
+  {
+    "id": "C1-02-p03",
+    "lesson": "C1",
+    "scene": "C1-02",
+    "paragraph": 2,
+    "text": "The two host lessons explain alternative installations. You do not need both installations.",
+    "title": "Two routes, one host choice",
+    "visual": {
+      "type": "host",
+      "labels": [
+        "Raspberry Pi route",
+        "OR x86-64 route"
+      ]
+    }
+  },
+  {
+    "id": "C1-02-p04",
+    "lesson": "C1",
+    "scene": "C1-02",
+    "paragraph": 3,
+    "text": "Home Assistant connects the devices. It gives their readings and controls names called entities. Crop Steering uses these entities. The Crop Steering integration and the separate Controller app are both necessary parts of the installation. A dashboard alone does not control irrigation.",
+    "title": "Entities connect the software",
+    "visual": {
+      "type": "mapping",
+      "labels": [
+        "Home Assistant entities",
+        "Crop Steering integration",
+        "Separate Controller app"
+      ],
+      "focus": "flow"
+    }
+  },
+  {
+    "id": "C1-02-p05",
+    "lesson": "C1",
+    "scene": "C1-02",
+    "paragraph": 4,
+    "text": "The next function is measurement. Use a compatible moisture probe at a location that represents the zone. Do a check of the exact sensor model. Do a check of the interface. Do a check of the units. Make sure that the sensor is suitable for the substrate.",
+    "title": "Verify the moisture measurement path",
+    "visual": {
+      "type": "sensor",
+      "labels": [
+        "Representative probe location",
+        "One probe cannot prove every pot",
+        "Model · interface · units"
+      ]
+    }
+  },
+  {
+    "id": "C1-02-p06",
+    "lesson": "C1",
+    "scene": "C1-02",
+    "paragraph": 5,
+    "text": "Some probes need a separate bridge. Matching wire colors do not prove compatibility. One working probe does not prove equal water delivery to all pots.",
+    "title": "Check the whole probe connection",
+    "visual": {
+      "type": "mapping",
+      "labels": [
+        "Probe",
+        "Compatible bridge if needed",
+        "Home Assistant entity"
+      ],
+      "focus": "flow"
+    }
+  },
+  {
+    "id": "C1-02-p07",
+    "lesson": "C1",
+    "scene": "C1-02",
+    "paragraph": 6,
+    "text": "Root-zone EC supplies additional information. Identify whether the sensor measures bulk substrate EC or pore-water EC. Tank feed EC is a different measurement.",
+    "title": "Identify the root-zone EC method",
+    "visual": {
+      "type": "comparison",
+      "labels": [
+        "Bulk substrate EC",
+        "Pore-water EC",
+        "Feed EC is a different measurement"
+      ]
+    }
+  },
+  {
+    "id": "C1-02-p08",
+    "lesson": "C1",
+    "scene": "C1-02",
+    "paragraph": 7,
+    "text": "Do not rename tank feed EC as root-zone EC.",
+    "title": "Keep feed EC correctly named",
+    "visual": {
+      "type": "comparison",
+      "labels": [
+        "Tank sensor: feed EC",
+        "Root-zone sensor: root-zone EC"
+      ]
+    }
+  },
+  {
+    "id": "C1-02-p09",
+    "lesson": "C1",
+    "scene": "C1-02",
+    "paragraph": 8,
+    "text": "Air temperature and humidity give additional information about water demand.",
+    "title": "Environment informs water demand",
+    "visual": {
+      "type": "environment",
+      "labels": [
+        "Air temperature",
+        "Relative humidity",
+        "Water-demand context"
+      ]
+    }
+  },
+  {
+    "id": "C1-03-p01",
+    "lesson": "C1",
+    "scene": "C1-03",
+    "paragraph": 0,
+    "text": "The next function is water delivery. A suitable pressurized supply can supply a zone valve without an additional pump. A reservoir system needs a pump if the supply cannot provide the necessary water pressure.",
+    "title": "Choose the actual supply route",
+    "visual": {
+      "type": "water-path",
+      "labels": [
+        "Pressurized supply → zone valve",
+        "OR reservoir → pump → zone valve",
+        "Pump only when pressure requires it"
+      ]
+    }
+  },
+  {
+    "id": "C1-03-p02",
+    "lesson": "C1",
+    "scene": "C1-03",
+    "paragraph": 1,
+    "text": "If the system needs a pump, include the pump in the design. Include its necessary protection equipment.",
+    "title": "Include the required pump protection",
+    "visual": {
+      "type": "protection",
+      "labels": [
+        "Pump, if required",
+        "Protection suited to that pump"
+      ]
+    }
+  },
+  {
+    "id": "C1-03-p03",
+    "lesson": "C1",
+    "scene": "C1-03",
+    "paragraph": 2,
+    "text": "Filtration, pressure regulation, drainage, and backflow or siphon protection must suit the installed equipment. The design must also meet applicable local requirements.",
+    "title": "Design the complete water path",
+    "visual": {
+      "type": "water-path",
+      "labels": [
+        "Filtration + pressure regulation",
+        "Drainage + backflow/siphon protection",
+        "Suit equipment + local requirements"
+      ]
+    }
+  },
+  {
+    "id": "C1-04-p01",
+    "lesson": "C1",
+    "scene": "C1-04",
+    "paragraph": 0,
+    "text": "The next function is safe control. The control hardware must have suitable ratings and a correct installation. A pump has a starting load as well as an operating load. A large power rating on a household smart plug does not prove suitability.",
+    "title": "Control hardware must suit the load",
+    "visual": {
+      "type": "controls",
+      "labels": [
+        "Starting load + operating load",
+        "Correct ratings + installation",
+        "Smart-plug rating alone is insufficient"
+      ]
+    }
+  },
+  {
+    "id": "C1-04-p02",
+    "lesson": "C1",
+    "scene": "C1-04",
+    "paragraph": 1,
+    "text": "Use an appropriately qualified installer for electrical work. Do not do mains electrical work as part of this course.",
+    "title": "Electrical work needs an installer",
+    "visual": {
+      "type": "protection",
+      "labels": [
+        "Appropriately qualified installer",
+        "No mains work in this course"
+      ]
+    }
+  },
+  {
+    "id": "C1-04-p03",
+    "lesson": "C1",
+    "scene": "C1-04",
+    "paragraph": 2,
+    "text": "Only one controller must control each physical pump or valve. An old irrigation system must not also operate that output.",
+    "title": "One controller for each output",
+    "visual": {
+      "type": "mapping",
+      "labels": [
+        "One controller",
+        "One physical pump or valve",
+        "Remove competing control"
+      ],
+      "focus": "flow"
+    }
+  },
+  {
+    "id": "C1-04-p04",
+    "lesson": "C1",
+    "scene": "C1-04",
+    "paragraph": 3,
+    "text": "Resolve shared control before you enable the new controller.",
+    "title": "Resolve shared control first",
+    "visual": {
+      "type": "check",
+      "labels": [
+        "Identify every control source",
+        "Resolve ownership",
+        "Then enable new control"
+      ]
+    }
+  },
+  {
+    "id": "C1-04-p05",
+    "lesson": "C1",
+    "scene": "C1-04",
+    "paragraph": 4,
+    "text": "The final function is verification and protection. The system needs an accessible physical shutdown and suitable independent protection. Test water must have a safe collection location. A software OFF command is not an emergency isolator.",
+    "title": "Software OFF is not isolation",
+    "visual": {
+      "type": "protection",
+      "labels": [
+        "Accessible physical shutdown",
+        "Independent protection",
+        "Safe test-water collection"
+      ]
+    }
+  },
+  {
+    "id": "C1-04-p06",
+    "lesson": "C1",
+    "scene": "C1-04",
+    "paragraph": 5,
+    "text": "Use collection cups and a stopwatch to measure water delivery. Make sure that water physically stops after the stop command.",
+    "title": "Measure delivery; prove stopping",
+    "visual": {
+      "type": "commissioning",
+      "labels": [
+        "Cups + stopwatch",
+        "Measure water delivered",
+        "Observe water physically stop"
+      ]
+    }
+  },
+  {
+    "id": "C1-04-p07",
+    "lesson": "C1",
+    "scene": "C1-04",
+    "paragraph": 6,
+    "text": "A changed dashboard icon does not prove that the water stopped.",
+    "title": "An icon is not physical proof",
+    "visual": {
+      "type": "evidence",
+      "labels": [
+        "Dashboard icon changes",
+        "Inspect the actual water outlet"
+      ]
+    }
+  },
+  {
+    "id": "C1-05-p01",
+    "lesson": "C1",
+    "scene": "C1-05",
+    "paragraph": 0,
+    "text": "Tank level, feed EC, pH, and tank temperature give useful operating information. Additional probes and a verified flow meter supply more information later. Automated dosing, thermal cameras, and artificial intelligence are not necessary for the first working zone.",
+    "title": "Add instruments after one proven zone",
+    "visual": {
+      "type": "equipment",
+      "labels": [
+        "Tank level · feed EC · pH · temperature",
+        "Later: more probes + verified flow meter",
+        "Dosing · cameras · AI are optional"
+      ]
+    }
+  },
+  {
+    "id": "C1-06-p01",
+    "lesson": "C1",
+    "scene": "C1-06",
+    "paragraph": 0,
+    "text": "Draw the water path. Label the water supply. Label the pump, if installed. Label the zone valve. Label the drippers. Label the drainage path.",
+    "title": "Sketch and label the water path",
+    "visual": {
+      "type": "water-path",
+      "labels": [
+        "Supply → pump, if installed",
+        "Zone valve → drippers",
+        "Drainage path"
+      ]
+    }
+  },
+  {
+    "id": "C1-06-p02",
+    "lesson": "C1",
+    "scene": "C1-06",
+    "paragraph": 1,
+    "text": "Draw the probe separately. Draw the controller separately. Identify the physical shutdown. Identify the controller for each output.",
+    "title": "Separate measurement and control",
+    "visual": {
+      "type": "mapping",
+      "labels": [
+        "Probe: measurement path",
+        "Controller: output ownership",
+        "Mark the physical shutdown"
+      ]
+    }
+  },
+  {
+    "id": "C1-06-p03",
+    "lesson": "C1",
+    "scene": "C1-06",
+    "paragraph": 2,
+    "text": "Circle each item that you cannot identify.",
+    "title": "Mark every unknown item",
+    "visual": {
+      "type": "check",
+      "labels": [
+        "Circle what you cannot identify",
+        "Resolve it before commissioning"
+      ]
+    }
+  },
+  {
+    "id": "C1-06-p04",
+    "lesson": "C1",
+    "scene": "C1-06",
+    "paragraph": 3,
+    "text": "Use the equipment sheet to do a check of exact models before purchase. Select one host lesson. The options are the Raspberry Pi lesson and the x86-64 lesson.",
+    "title": "Check models; choose one host route",
+    "visual": {
+      "type": "host",
+      "labels": [
+        "Equipment sheet: exact models",
+        "Choose Raspberry Pi OR x86-64"
+      ]
+    }
+  },
+  {
+    "id": "C1-06-p05",
+    "lesson": "C1",
+    "scene": "C1-06",
+    "paragraph": 4,
+    "text": "After host installation, both options use the same setup procedure. Install one zone first. Assign its sensors and outputs. Verify its operation before you add more zones.",
+    "title": "Commission one zone before expanding",
+    "visual": {
+      "type": "commissioning",
+      "labels": [
+        "Install one host + one zone",
+        "Assign sensors + outputs",
+        "Verify, then add zones"
+      ],
+      "focus": "flow"
+    }
+  }
+]

@@ -6,7 +6,7 @@ import {
   nextLesson,
   reviewDue,
 } from "./state.mjs";
-import { renderLesson } from "./lesson.mjs";
+import { renderLesson } from "./lesson.mjs?v=20261019r2";
 import { renderPractice } from "./labs.mjs";
 const main = document.querySelector("#main");
 const notice = document.querySelector("#storage-notice");
@@ -273,11 +273,11 @@ function productionNotes() {
     node(
       "p",
       "",
-      "The five pilot videos use the saved synthetic Scarjo voice. New slide lessons use the locally generated Kokoro af_heart voice. Readable transcripts remain available alongside narration.",
+      "All lessons use the locally generated Kokoro af_heart voice. The five pilot videos use paragraph-matched diagrams. Readable transcripts remain available alongside narration.",
     ),
     link(
       "Read the course guide, production notes and sources",
-      "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/ACADEMY.md",
+      "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/ACADEMY.md",
       "text-link",
     ),
     link(
@@ -638,7 +638,7 @@ async function render(focus = true) {
 }
 async function start() {
   try {
-    const response = await fetch("course/course.json");
+    const response = await fetch("course/course.json?v=20261019r2");
     if (!response.ok) throw Error("Course data returned " + response.status);
     course = await response.json();
     if (!Array.isArray(course.lessons) || !course.lessons.length)
@@ -670,7 +670,7 @@ function showError(error) {
     button("Try again", () => location.reload()),
     link(
       "Read the course workbook",
-      "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/tree/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero",
+      "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/tree/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero",
     ),
   );
   main.replaceChildren(panel);

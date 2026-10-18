@@ -61,7 +61,7 @@ def compile_course():
         "schema": 1,
         "title": "Crop Steering Academy",
         "description": "Learn the root zone, understand a watering day, and practise each control before live operation.",
-        "edition": "2026-10-19",
+        "edition": "2026-10-19-r2",
         "lessons": [indexed[lid] for lid in ORDER],
         "glossary": json.loads((COURSE / "glossary.json").read_text(encoding="utf-8")),
         "modules": [
@@ -87,7 +87,7 @@ def compile_course():
             },
         ],
         "disclosures": {
-            "narration": "Five pilot videos use the saved Scarjo custom voice; 19 new slide lessons use locally generated Kokoro af_heart speech.",
+            "narration": "All lessons use locally generated Kokoro af_heart speech. Five rebuilt 480p pilot videos use 108 paragraph-matched visual cards.",
             "language": "Written using ASD-STE100 principles. Not certified or represented as full formal conformance.",
             "evidence": "Research-informed instructional design; no learner outcome trial has been conducted.",
             "progress": "Local browser knowledge-practice record, not certification, verified identity or proof of safe hardware.",
