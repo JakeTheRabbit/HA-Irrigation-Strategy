@@ -76,7 +76,7 @@ Compare your reasoning: Pore spaces contain water or air. Roots need oxygen as w
 
 SOURCES
 
-Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
+Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
 
 METER: soil volumetric water content: https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/
 
@@ -150,7 +150,7 @@ Compare your reasoning: 40% VWC. The remainder includes solids and air; it is no
 
 SOURCES
 
-Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
+Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
 
 METER: soil volumetric water content: https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/
 
@@ -224,7 +224,7 @@ Compare your reasoning: The cards describe saturation, a drained container condi
 
 SOURCES
 
-Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
+Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
 
 METER: soil volumetric water content: https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/
 
@@ -280,7 +280,7 @@ SOURCES
 
 Crop Steering: GROW_PLANS.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md
 
-Crop Steering: training/crop-steering-from-zero/WORKBOOK.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/WORKBOOK.md
+Crop Steering: training/crop-steering-from-zero/WORKBOOK.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/WORKBOOK.md
 
 
 A5 — EC: what it measures, and which EC you are looking at
@@ -336,7 +336,7 @@ METER: Soil electrical conductivity, measurement types and conversions: https://
 
 METER TEROS 11/12 manual: measurements, installation and calibration: https://publications.metergroup.com/Manuals/20587_TEROS11-12_Manual_Web.pdf
 
-Crop Steering: training/crop-steering-from-zero/WORKBOOK.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/WORKBOOK.md
+Crop Steering: training/crop-steering-from-zero/WORKBOOK.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/WORKBOOK.md
 
 
 A6 — Can you trust that reading?
@@ -392,7 +392,7 @@ METER TEROS 11/12 manual: measurements, installation and calibration: https://pu
 
 Crop Steering: USER_GUIDE.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
 
-Crop Steering: training/crop-steering-from-zero/WORKBOOK.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/WORKBOOK.md
+Crop Steering: training/crop-steering-from-zero/WORKBOOK.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/WORKBOOK.md
 
 
 B1 — Read water and EC on the same graph
@@ -469,7 +469,7 @@ Compare your reasoning: The draft threshold moves. The fixed synthetic actual tr
 
 SOURCES
 
-Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
+Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
 
 METER: soil volumetric water content: https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/
 
@@ -633,7 +633,7 @@ SOURCES
 
 Crop Steering: GROW_PLANS.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md
 
-Crop Steering: training/crop-steering-from-zero/WORKBOOK.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/WORKBOOK.md
+Crop Steering: training/crop-steering-from-zero/WORKBOOK.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/WORKBOOK.md
 
 
 C1 — What you need: the smallest useful system
@@ -722,7 +722,7 @@ Compare your reasoning: The diagram identifies every function and the actual ins
 
 SOURCES
 
-Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
+Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
 
 METER: soil volumetric water content: https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/
 
@@ -773,7 +773,7 @@ SOURCES
 
 Home Assistant: Raspberry Pi installation: https://www.home-assistant.io/installation/raspberrypi/
 
-One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
 
 
 C2b — Install Home Assistant on a dedicated x86-64 PC
@@ -822,7 +822,7 @@ SOURCES
 
 Home Assistant: Generic x86-64 installation: https://www.home-assistant.io/installation/generic-x86-64/
 
-One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
 
 
 C3 — Your first Home Assistant: names, entities and backups
@@ -871,7 +871,7 @@ SOURCES
 
 Home Assistant: backups and recovery: https://www.home-assistant.io/common-tasks/general/#backups
 
-One-zone equipment and commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+One-zone equipment and commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
 
 Crop Steering user guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
 
@@ -920,7 +920,7 @@ Compare your reasoning: Rejects unverified interfaces and duplicate ownership; n
 
 SOURCES
 
-One-zone equipment and commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+One-zone equipment and commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
 
 Crop Steering user guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
 
@@ -973,7 +973,7 @@ Crop Steering installation guide: https://github.com/JakeTheRabbit/HA-Irrigation
 
 Crop Steering user guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
 
-One-zone equipment and commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+One-zone equipment and commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
 
 
 C6 — Map one room and zone
@@ -1024,7 +1024,7 @@ Crop Steering user guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strateg
 
 Crop Steering installation guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md
 
-One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
 
 
 C7 — First water: catch, measure, stop, prove
@@ -1071,7 +1071,7 @@ Compare your reasoning: Gets 3.24 L/h and keeps Watering OFF until acknowledged 
 
 SOURCES
 
-One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
 
 Crop Steering user guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
 
@@ -1359,7 +1359,7 @@ User guide: emergency warning, setup and troubleshooting: https://github.com/Jak
 
 Planning guide: hold and disarm limits: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md
 
-Workbook: three failure scenarios: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/WORKBOOK.md
+Workbook: three failure scenarios: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/WORKBOOK.md
 
 
 D6 — A five-minute daily check and a useful handover
@@ -1411,7 +1411,7 @@ Compare your reasoning: Another operator can identify scope, evidence age, uncer
 
 SOURCES
 
-Workbook: daily record, handover and delayed recall: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/3ddf84dd02a9f747227f11bb1344c2c19c81bd40/docs/training/crop-steering-from-zero/WORKBOOK.md
+Workbook: daily record, handover and delayed recall: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/0249a5bb663cb7c816b2be13db4d136160553b88/docs/training/crop-steering-from-zero/WORKBOOK.md
 
 User guide: control scope, AI actions and readback: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
 
