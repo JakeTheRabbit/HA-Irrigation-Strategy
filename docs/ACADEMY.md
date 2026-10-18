@@ -1,10 +1,10 @@
 # Crop Steering Academy
 
-The [pilot repair record](training/crop-steering-from-zero/PILOT-REPAIR-2026-10-19.md) explains the current narration and visual edit. The [original delivery record](training/crop-steering-from-zero/DELIVERY-2026-10-19.md) distinguishes the live website from the source review and application release process.
+The [R3 rebuild record](training/crop-steering-from-zero/COURSE-REBUILD-2026-10-19-R3.md) tracks the current rewrite, media build and publication checks. The [R2 pilot repair](training/crop-steering-from-zero/PILOT-REPAIR-2026-10-19.md) and [original delivery record](training/crop-steering-from-zero/DELIVERY-2026-10-19.md) are historical records; they do not establish that R3 is published.
 
 [Open the academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Try the isolated software demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Course plan and workbook](training/crop-steering-from-zero/README.md)
 
-The academy teaches a beginner to explain a reading, understand a watering day and check what a Crop Steering action changes. It contains **24 lessons and 153 slides**. Five lessons provide rebuilt 480p pilot videos, covering 27 slides through 108 paragraph-matched visual cards. The other 19 lessons provide 126 interactive slides with locally generated Kokoro `af_heart` narration. The public learning exercises do not connect to Home Assistant or operate equipment.
+The academy teaches a beginner to explain a reading, understand a watering day and check what a Crop Steering action changes. It contains **24 lessons and 153 slides**. R3 includes a captioned 480p video for every lesson. Its five introductory paragraph-led lessons use 108 matched visual cards; the other 19 use 126 lesson-specific scenes. The R3 rebuild record contains the measured media checks and publication status. Five longer, chaptered parts combine related lessons, with separate alternative Pi and x86 setup parts. The public learning exercises do not connect to Home Assistant or operate equipment.
 
 ## Choose a learning route
 
@@ -22,11 +22,27 @@ Use several sessions and return to the exercises. Installation, measurement and 
 
 ## Learn, practise and return
 
-Lessons connect a concrete object or screen to a short explanation. The new slide lessons include a worked example, a partly completed exercise and an independent problem with different data. Retrieval questions revisit earlier ideas. Quizzes explain why each answer is right or wrong and allow another attempt. The practice bench provides dryback and delivery calculations and a synthetic threshold graph whose recorded example observations do not move when a reference changes.
+Lessons connect a concrete object or screen to a short explanation. Lessons include a worked example, a partly completed exercise and an independent problem with different data. Retrieval questions revisit earlier ideas. Quizzes explain why each answer is right or wrong and allow another attempt. The practice bench provides dryback and delivery calculations and a synthetic threshold graph whose recorded example observations do not move when a reference changes.
 
 This design draws on the IES practice guide [Organizing Instruction and Study to Improve Student Learning](https://ies.ed.gov/ncee/wwc/PracticeGuide/1), including worked examples, graphics with explanations, retrieval and spaced study. The academy's particular sequence and review intervals are design choices. **No learner outcome trial has been conducted**, so this release does not establish that the course improves competence or retention.
 
-Use the slide and complete lesson transcripts, downloadable transcript, timed English captions and pause controls. New slide narration includes playback-speed selection and a caption toggle. Pilot videos use browser video controls and caption tracks. Text remains available when media cannot load. Diagrams have text alternatives; controls support keyboard use. These features do not constitute a claim of complete accessibility conformance across every browser or assistive technology.
+Use the slide and complete lesson transcripts, downloadable transcript, timed English captions and pause controls. Use the video controls for playback speed and **Show captions below video** for the separate caption area. Previous/next lesson buttons and a lesson selector work above and below each lesson. Video section buttons seek within the current lesson. Text remains available when media cannot load. Diagrams have text alternatives; controls support keyboard use. These features do not constitute a claim of complete accessibility conformance across every browser or assistive technology.
+
+## Watch a longer part
+
+Open **Course videos** from the course home or any lesson. Select a part, then use its section list or previous/next section buttons. The optional **Continue to the next video when this one ends** checkbox advances along your chosen learning route. Watching or skipping never passes a knowledge check.
+
+| Part | Lessons |
+| --- | --- |
+| Foundations | A1–A6 |
+| Watering and equipment | B1–B4 and C1 |
+| Raspberry Pi setup | C2a and C3–C7 |
+| Dedicated x86 setup | C2b and C3–C7 |
+| Daily operation | D1–D6 |
+
+Choose one setup route. Existing-installation operators can go from equipment to daily operation. Open a lesson from the player whenever you want its transcript, exercises, sources or knowledge check.
+
+Athena's grow guide and resources informed the project. The relevant lessons link the official handbook and irrigation guide; see [references and acknowledgements](REFERENCES.md). Project examples and software workflows are separate from Athena's guidance.
 
 ## Progress and privacy
 
@@ -48,7 +64,7 @@ For real equipment, follow the [installation guide](INSTALL.md), the exact manuf
 
 The writing uses short sentences, consistent terms and explicit actions informed by [ASD-STE100 Simplified Technical English](https://www.asd-ste100.org/). It has not undergone a full controlled-language conformity assessment and is **not represented as formally compliant or certified**.
 
-All 24 lessons now use synthetic speech generated locally with [Kokoro ONNX](https://github.com/thewh1teagle/kokoro-onnx), voice `af_heart`. Native web slides and editable SVG diagrams explain the remaining material; they are not footage of physical installation. Caption timings and transcripts accompany the narration.
+R3 uses synthetic speech generated locally for all 24 lessons with [Kokoro ONNX](https://github.com/thewh1teagle/kokoro-onnx), voice `af_heart`. R3 uses 13 AI-generated physical teaching illustrations, 15 genuine isolated-demo screenshots and native calculation diagrams. These are combined into lesson scenes; the asset count is not the scene count. Generated pictures are conceptual explanations, not photographs of installed equipment or measured evidence. Caption timings and transcripts accompany the narration.
 
 **Human listening review has not been performed.** File validation, caption generation and browser playback checks do not establish pronunciation, pacing or instructional quality. The course also has no completed learner outcome trial. These remain explicit review tasks when assessing a later edition.
 
@@ -61,20 +77,39 @@ From the repository root:
 ```sh
 python scripts/build_course.py
 node --test tests/academy.test.mjs
-python -m unittest tests.test_course_media -v
+python -m unittest tests.test_course_media tests.test_academy_catalogue -v
 python scripts/install_course_media.py
 npm ci --prefix frontend
-node frontend/node_modules/vite/bin/vite.js www --host 127.0.0.1 --port 8080
+node frontend/node_modules/vite/bin/vite.js preview --outDir www --host 127.0.0.1 --port 8080
 ```
 
-Open [the local academy](http://localhost:8080/learn/). Use the Vite preview server rather than opening the HTML file directly. It serves JSON, modules and byte-range requests for video seeking; Python’s basic HTTP server does not provide reliable seeking in this browser. The catalogue compiler validates lesson IDs, required content, quiz answers and prerequisites, then writes `www/learn/course/course.json`. It does not regenerate narration.
+Open [the local academy](http://localhost:8080/learn/). Use the Vite preview server rather than opening the HTML file directly. It serves JSON, modules and byte-range requests for video seeking; Python’s basic HTTP server does not provide reliable seeking in this browser. The catalogue compiler validates lesson IDs, required content, quiz answers and prerequisites, then writes `www/learn/course/course.json`. When `course/video-index.json` is present, it must bind all 24 videos to the current narration hash and exact chapter IDs. `course/video-groups.json` defines the five parts and their learning-route coverage. The compiler does not regenerate narration.
 
 Large media masters stay outside Git history. Pages installs a versioned public release bundle using `www/learn/course/media-release.json`, which supplies an HTTPS `url` and the whole-archive `sha256`. The [installer](../scripts/install_course_media.py) verifies that pin before inspecting the ZIP, requires root `manifest.json` schema 1, binds each declared path to its byte count and SHA-256, rejects unsafe members, and stages a complete replacement. Every non-manifest file must be declared; the manifest does not list itself. The destination is restricted to this repository's `www/learn/media`.
 
-For a previously downloaded matching bundle, use:
+Stop the local preview server before replacing media on Windows; its directory watch can prevent the installer’s atomic folder replacement. For a previously downloaded matching bundle, use:
 
 ```sh
 python scripts/install_course_media.py --archive /path/to/course-media.zip
 ```
 
-The configured checksum remains mandatory for local archives. When replacing a media edition, publish the bundle, update its pin and verify the installed catalogue/media together. The [Pages workflow](../.github/workflows/pages.yml) builds the workspace and academy catalogue, runs knowledge/practice tests, installs the pinned media, then uploads `www`. Learners do not install Kokoro, provide keys or run these commands.
+The configured checksum remains mandatory for local archives. When replacing a media edition, publish the bundle, update its pin and run `python scripts/build_course.py --verify-media` against the installed catalogue/media. This requires all 24 lesson videos, five route-complete groups, all 153 narration bindings and matching file byte counts and SHA-256 hashes. A failed check leaves the generated catalogue and transcript untouched. The [Pages workflow](../.github/workflows/pages.yml) builds the workspace and academy catalogue, runs knowledge/practice tests, installs the pinned media, then uploads `www`. Learners do not install Kokoro, provide keys or run these commands.
+
+
+## Verify a completed video edition
+
+Serve the compiled website for media checks. Vite preview preserves the published HTML bytes and supports byte-range requests for seeking:
+
+```sh
+node frontend/node_modules/vite/bin/vite.js preview --outDir www --host 127.0.0.1 --port 8794
+node tests/academy-navigation.browser.mjs
+node tests/academy-video.browser.mjs
+node tests/academy.browser.mjs
+node tests/academy-media.browser.mjs
+```
+
+The media check requires all 24 individual videos and five longer parts, verifies caption words against current scripts, decodes and seeks each video, and checks the actual served dashboard bytes. `HASH_MEDIA=1` additionally downloads and hashes every video against the installed manifest. Use `BASE_URL` to repeat against the published academy.
+
+With the private production masters available, set `ACADEMY_PRODUCTION` and run `node tests/academy-scene-sync.browser.mjs`. It compares decoded video scenes with their source-bound PNGs, including a changed-pixel check that the draft threshold actually moves. `QA_PARTIAL=1` permits an explicitly labelled check of completed files during production; it never establishes that all 29 videos are complete.
+
+Assemble with [build_course_videos.py](../scripts/build_course_videos.py), then package completed outputs with [package_course_videos.py](../scripts/package_course_videos.py). Source masters stay outside Git. The final archive and installed media must pass the strict compiler and browser checks before publication. Synthetic speech still needs human listening review; these checks do not establish learner outcomes.

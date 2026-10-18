@@ -1,0 +1,344 @@
+{
+  "version": 3,
+  "task": "Generated scientific teaching diagrams for Crop Steering beginner course",
+  "generator": "built-in image_gen.imagegen",
+  "assetCount": 10,
+  "reviewMethod": "Each generated output inspected directly for physical direction, text, count invariants, measurement scope and conceptual safety. One data-path generation rejected and edited before acceptance.",
+  "compositionLimits": [
+    "Images are conceptual teaching aids, not actual facility measurements or installation schematics",
+    "Final 854x480 course composition and caption clearance remains compositor verification",
+    "Do not imply VWC fraction is percent plant-available water",
+    "Water/data routes omit installation-specific protection and ratings"
+  ],
+  "assets": [
+    {
+      "filename": "a1-water-paths-r3.png",
+      "source": "C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-716c7a9d-1f8e-458f-bd10-19fd1c3d3a12.png",
+      "prompt": "Use case: scientific-educational. A finished landscape 16:9 teaching illustration for an adult beginner irrigation course, viewed at 854x480. Warm ivory background, forest green ink, blue water, muted ochre solids. Professional clear scientific illustration with realistic physical details and subtle cutaway texture, generous whitespace. All text extremely large and readable at video size, plain sans serif. No tiny text, no decorative UI, no watermark, no invented numerical readings. Keep bottom 15% uncluttered for video captions. Show one planted coco substrate pot in cutaway, with a healthy small leafy plant and distinct visible roots and brown fibrous substrate. THREE distinct arrows and EXACTLY THREE text labels only: 'Plant uptake', 'Evaporation', 'Drainage'. The Plant uptake arrow starts in the root zone, travels UP within the stem, ending at the leaves; its label leader points to that upward stem arrow, never to water leaving the pot. The Evaporation arrow rises UP from the exposed substrate surface into air, positioned separately outside the stem and labelled there. The Drainage arrow points DOWN through the bottom holes to a shallow collection tray. Arrange the uptake label above/right of the stem, evaporation label left of surface, drainage label right of tray. Correct arrow directions crucial. No arrow from leaves into roots. No watering inflow. No numbers. Do not show evaporation from the tray.",
+      "output_hint": "Generated images are saved to C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40 as C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-716c7a9d-1f8e-458f-bd10-19fd1c3d3a12.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "provenance": {
+        "generator": "built-in image_gen.imagegen",
+        "mode": "generate",
+        "transparent_background": false
+      },
+      "review": {
+        "accepted": true,
+        "checks": [
+          "Uptake arrow follows roots and stem upward",
+          "Evaporation arrows rise from substrate surface",
+          "Drainage arrow points down through pot to tray",
+          "All three labels correct and large"
+        ],
+        "limits": [
+          "Conceptual teaching illustration, not installation or measurement evidence",
+          "Final caption overlay and scaled webpage/video readability must be checked by course compositor"
+        ]
+      },
+      "path": "assets/diagrams/a1-water-paths-r3.png",
+      "sha256": "33626c3b5c5769ef39b9793a7c06083be6fabdc4874126663e0d28a5c507b520",
+      "bytes": 1740712,
+      "dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "filename": "a2-vwc-volumes-r3.png",
+      "source": "C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-cade22cd-8619-4320-8ff4-169cf06592e8.png",
+      "prompt": "Use case: scientific-educational. A finished landscape 16:9 teaching illustration for an adult beginner irrigation course, viewed at 854x480. Warm ivory background, forest green ink, blue water, muted ochre solids. Professional clear scientific illustration with realistic physical details and subtle cutaway texture, generous whitespace. All text extremely large and readable at video size, plain sans serif. No tiny text, no decorative UI, no watermark, no invented numerical readings. Keep bottom 15% uncluttered for video captions. Create an exact-count volume-ratio teaching illustration. A single orderly row or two rows of FIVE equal-sized separated cubes, TEN CUBES TOTAL. Exactly SIX cubes blue water; exactly TWO cubes ochre/brown solid material; exactly TWO cubes white/ivory air with green outlines. Every cube same size and perspective, no nested cubes, no backgrounds that look like extra cubes. Prefer 2 rows of5: first row FIVE blue water cubes, second row ONE blue water cube followed by TWO brown solid cubes followed by TWO white air cubes. Large heading text exactly '6 of 10 volumes = 60% VWC'. Large bottom legend of three colour swatches with exact labels 'Water', 'Solids', 'Air'. No other text, no other numbers. This is a schematic volume ratio; do not imply real substrate has separated water blocks, no plant-available-water gauge.",
+      "output_hint": "Generated images are saved to C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40 as C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-cade22cd-8619-4320-8ff4-169cf06592e8.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "provenance": {
+        "generator": "built-in image_gen.imagegen",
+        "mode": "generate",
+        "transparent_background": false
+      },
+      "review": {
+        "accepted": true,
+        "checks": [
+          "Ten equal main cubes: six blue, two brown, two outlined air",
+          "Equation 6 of 10 =60% correct",
+          "Small legend cubes separate from ten main counted volumes",
+          "No plant available water assertion"
+        ],
+        "limits": [
+          "Conceptual teaching illustration, not installation or measurement evidence",
+          "Final caption overlay and scaled webpage/video readability must be checked by course compositor"
+        ]
+      },
+      "path": "assets/diagrams/a2-vwc-volumes-r3.png",
+      "sha256": "5bb18a01c6d1adde76b6de75e15b1d2511e9afd753ea9c979ccce9c02b19756f",
+      "bytes": 1896067,
+      "dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "filename": "a5-ec-salt-r3.png",
+      "source": "C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-26cc2a76-e44c-4e7c-8dc8-23340bedd9a0.png",
+      "prompt": "Use case: scientific-educational. A finished landscape 16:9 teaching illustration for an adult beginner irrigation course, viewed at 854x480. Warm ivory background, forest green ink, blue water, muted ochre solids. Professional clear scientific illustration with realistic physical details and subtle cutaway texture, generous whitespace. All text extremely large and readable at video size, plain sans serif. No tiny text, no decorative UI, no watermark, no invented numerical readings. Keep bottom 15% uncluttered for video captions. Show TWO identical laboratory beakers at equal water depth side by side. Each has a separate safe handheld BATTERY-powered EC meter with a short probe dipped into the liquid, no wall power and no wiring to mains. Left solution has a FEW dispersed ion dots marked simple + and - signs; right has MORE dispersed + and - ion dots. Same beaker size, same blue liquid volume, same temperature indicated conceptually by identical small unnumbered thermometer icons. Top heading exactly 'EC measures conductivity'. Large left label 'Lower conductivity'; large right label 'Higher conductivity'. Footer exactly 'Dissolved salts help carry current'. Meters show no fake numeric reading, simply abstract screen or EC text. No nutrient quality claim, no taste imagery, no salt crystals piled on beaker floors, no different water volumes.",
+      "output_hint": "Generated images are saved to C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40 as C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-26cc2a76-e44c-4e7c-8dc8-23340bedd9a0.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "provenance": {
+        "generator": "built-in image_gen.imagegen",
+        "mode": "generate",
+        "transparent_background": false
+      },
+      "review": {
+        "accepted": true,
+        "checks": [
+          "Two identical beakers and matching depth",
+          "Same unnumbered temperature icons",
+          "Fewer vs more balanced positive/negative ion dots",
+          "No mains wires, fake values, or nutrition-quality claims"
+        ],
+        "limits": [
+          "Conceptual teaching illustration, not installation or measurement evidence",
+          "Final caption overlay and scaled webpage/video readability must be checked by course compositor"
+        ]
+      },
+      "path": "assets/diagrams/a5-ec-salt-r3.png",
+      "sha256": "460424fda5b5d395669d3e940027847fce32a11cbc6da7a05885aafce41e9781",
+      "bytes": 1559928,
+      "dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "filename": "a6-local-probe-r3.png",
+      "source": "C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-8c75d10f-d098-4158-b9e1-8be7583b964b.png",
+      "prompt": "Use case: scientific-educational. A finished landscape 16:9 teaching illustration for an adult beginner irrigation course, viewed at 854x480. Warm ivory background, forest green ink, blue water, muted ochre solids. Professional clear scientific illustration with realistic physical details and subtle cutaway texture, generous whitespace. All text extremely large and readable at video size, plain sans serif. No tiny text, no decorative UI, no watermark, no invented numerical readings. Keep bottom 15% uncluttered for video captions. Three similar separate coco substrate pots in a horizontal row, each with a small leafy plant. Show the middle pot in cutaway with exactly ONE moisture probe inserted into a small physical region of its substrate, away from its edges. Draw a small translucent orange sensing halo around the inserted probe tip, NOT around the whole pot. The left and right pots have NO probes, NO halos, NO numerical readings. Heading in large text exactly 'One probe measures one location'. Small only in relation to heading but still readable text directly under the middle pot exactly 'Local sensing region'. Do not imply the other pots are healthy or dry, leave them unmeasured. No radio waves, no cloud, no fake dashboard. Keep all text above bottom 15% caption margin.",
+      "output_hint": "Generated images are saved to C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40 as C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-8c75d10f-d098-4158-b9e1-8be7583b964b.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "provenance": {
+        "generator": "built-in image_gen.imagegen",
+        "mode": "generate",
+        "transparent_background": false
+      },
+      "review": {
+        "accepted": true,
+        "checks": [
+          "Exactly one probe in central pot",
+          "Orange sensing halo limited to probe tip region",
+          "Other pots have no probes, halos or invented readings",
+          "Heading/caption correct and large"
+        ],
+        "limits": [
+          "Conceptual teaching illustration, not installation evidence",
+          "Pump requirement must be decided from actual supply pressure",
+          "Final compositor must verify caption overlap"
+        ]
+      },
+      "path": "assets/diagrams/a6-local-probe-r3.png",
+      "sha256": "0ffc5afd1aead809e5048457082e9580c227a29523cfc540a30eda01b06f05ea",
+      "bytes": 2472040,
+      "dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "filename": "c1-water-path-r3.png",
+      "source": "C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-13cb0d05-9de3-456b-b23f-4dfca5672db2.png",
+      "prompt": "Use case: scientific-educational. A finished landscape 16:9 teaching illustration for an adult beginner irrigation course, viewed at 854x480. Warm ivory background, forest green ink, blue water, muted ochre solids. Professional clear scientific illustration with realistic physical details and subtle cutaway texture, generous whitespace. All text extremely large and readable at video size, plain sans serif. No tiny text, no decorative UI, no watermark, no invented numerical readings. Keep bottom 15% uncluttered for video captions. A scientific physical WATER PATH diagram for a beginner. Heading 'Follow the water'. Wide horizontal sequence using realistic clean illustrations and BLUE water-flow arrows: water supply tank at left labelled 'Supply', a compact small pump labelled 'Pump if needed', a zone valve labelled 'Zone valve', branching small irrigation drippers labelled 'Drippers', two planted substrate pots, then down-pointing drainage drops into a catch tray labelled 'Drainage'. Indicate pump is OPTIONAL with a large dashed box around only the pump and exact text 'Optional'. The main logical route is supply → pump IF USED → zone valve → drippers → substrate pots → drainage. The drippers must terminate physically at the TOP of the substrate pots and drainage leaves bottoms, never feed a pot from bottom. Do not show data cables or computers. No mains electrical wiring. Do not imply this is a complete hydraulic installation design; no detailed fittings, no extra filters or treatment devices, no ratings. Few large labels, readable at 854x480. All labels above lower caption margin.",
+      "output_hint": "Generated images are saved to C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40 as C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-13cb0d05-9de3-456b-b23f-4dfca5672db2.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "provenance": {
+        "generator": "built-in image_gen.imagegen",
+        "mode": "generate",
+        "transparent_background": false
+      },
+      "review": {
+        "accepted": true,
+        "checks": [
+          "Water travels supply through optional pump and valve to overhead drippers",
+          "Drippers deliver to top of substrate; drainage exits bottoms",
+          "Pump conditional label and dashed outline visible",
+          "No data wiring or hydraulic ratings"
+        ],
+        "limits": [
+          "Conceptual teaching illustration, not installation evidence",
+          "Pump requirement must be decided from actual supply pressure",
+          "Final compositor must verify caption overlap"
+        ]
+      },
+      "path": "assets/diagrams/c1-water-path-r3.png",
+      "sha256": "9d4d358fde0a369b14753c92ee0d1cd2508ae84343bfb76b479108f2c8e48071",
+      "bytes": 1635664,
+      "dimensions": {
+        "width": 1672,
+        "height": 940
+      }
+    },
+    {
+      "filename": "c1-data-path-r3.png",
+      "source": "C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-8f252c47-b415-4d65-9808-ab410140e38f.png",
+      "prompt": "Use case: precise-object-edit. Correct only the Controller station in the supplied teaching diagram. Replace the smartphone drawing and its fake switches/UI at the far right with a simple flat forest-green rounded rectangular conceptual SOFTWARE APP card, containing only a clear white cog symbol and the large white text 'Controller app'. It must not look like a phone, screen, extra computer or physical hardware. Keep the existing gold input arrow from the Home Assistant host and the existing gold downward 'Command' arrow to the Zone valve. Remove the old duplicate 'Controller' text below the smartphone so the app card label is the only controller label. ALL other objects, labels, colours, left-to-right data direction, valve, background, and exact heading unchanged. This is an information path, not electrical wiring.",
+      "output_hint": "Generated images are saved to C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40 as C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-8f252c47-b415-4d65-9808-ab410140e38f.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "history": [
+        {
+          "prompt": "Use case: scientific-educational. A finished landscape 16:9 teaching illustration for an adult beginner irrigation course, viewed at 854x480. Warm ivory background, forest green ink, blue water, muted ochre solids. Professional clear scientific illustration with realistic physical details and subtle cutaway texture, generous whitespace. All text extremely large and readable at video size, plain sans serif. No tiny text, no decorative UI, no watermark, no invented numerical readings. Keep bottom 15% uncluttered for video captions. A scientific INFORMATION AND CONTROL diagram, not plumbing and not an electrical wiring schematic. Heading 'Read the probe. Command the valve.' Arrange four clear illustrated stations left-to-right with LARGE GOLD DIRECTIONAL ARROWS and large short labels: 1 a moisture probe physically inserted into a small substrate pot, label 'Probe'; 2 a small generic interface box inside dashed optional outline, label 'Interface if needed'; 3 one mini computer host with a small screen, label 'Home Assistant host'; 4 a simple generic app/controller symbol, label 'Controller'. Data-flow gold arrows go Probe → Interface if needed → Home Assistant host → Controller. Then one clearly separate gold arrow labelled 'Command' goes DOWN from Controller to one physical irrigation valve at lower right labelled 'Zone valve'. No blue water pipe anywhere. Explicit small readable footer 'Conceptual path — not wiring instructions'. Do not include numbered ports, pinouts, universal direct wires, wire colours or fake screens. Do not imply dashboard alone operates valve. The host and Controller are conceptual software stations; do not draw a second unnecessary physical computer. Maintain readable physical simplicity and bottom caption space.",
+          "output_hint": "Generated images are saved to C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40 as C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-afb34e67-b0be-42c0-8e48-0317be8165af.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+          "review": "Rejected: smartphone Controller symbol could imply phone/dashboard alone operates valve."
+        }
+      ],
+      "provenance": {
+        "generator": "built-in image_gen.imagegen",
+        "mode": "edit",
+        "transparent_background": false
+      },
+      "review": {
+        "accepted": true,
+        "checks": [
+          "Probe→conditional interface→one HA host→abstract Controller app",
+          "Command arrow goes from Controller to valve",
+          "Corrected rejected phone/UI into software symbol",
+          "No direct electrical wiring or pipe implied"
+        ],
+        "limits": [
+          "Conceptual teaching illustration, not installed equipment verification",
+          "Final compositor must verify caption overlap and scale",
+          "Unequal catch volumes illustrate investigation need, not accepted uniformity"
+        ]
+      },
+      "path": "assets/diagrams/c1-data-path-r3.png",
+      "sha256": "e9b6b8883ac12761adf9dc2551d4947e4c3f48f4936ee0fe5568a035dd325c2b",
+      "bytes": 1717057,
+      "dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "filename": "c2-host-choice-r3.png",
+      "source": "C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-05d3bc21-9abb-4393-9092-0a6de60589d2.png",
+      "prompt": "Use case: scientific-educational. A finished landscape 16:9 teaching illustration for an adult beginner irrigation course, viewed at 854x480. Warm ivory background, forest green ink, blue water, muted ochre solids. Professional clear scientific illustration with realistic physical details and subtle cutaway texture, generous whitespace. All text extremely large and readable at video size, plain sans serif. No tiny text, no decorative UI, no watermark, no invented numerical readings. Keep bottom 15% uncluttered for video captions. Create a simple host-computer choice teaching illustration. Left: a realistic generic Raspberry Pi single-board computer, circuit board with approximate recognisable USB/network ports but NO pinout labels and no cables attached. Right: one compact dedicated x86 mini PC with approximate ports and no connected cables. HUGE central word exactly 'OR'. Top heading exactly 'Choose one host'. Large left label exactly 'Raspberry Pi'. Large right label exactly 'Dedicated x86 PC'. Bottom sentence exactly 'One computer runs the software'. No plus sign, no network link, no arrows connecting the two computers, no implication both are required. No model-specific port diagram, no fake screens, no tiny annotations.",
+      "output_hint": "Generated images are saved to C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40 as C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-05d3bc21-9abb-4393-9092-0a6de60589d2.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "history": [],
+      "provenance": {
+        "generator": "built-in image_gen.imagegen",
+        "mode": "generate",
+        "transparent_background": false
+      },
+      "review": {
+        "accepted": true,
+        "checks": [
+          "Two alternative host computers separated by OR",
+          "No connecting wiring, plus sign or both-required implication",
+          "Labels correct and large",
+          "Hardware ports conceptual, no installation pinouts"
+        ],
+        "limits": [
+          "Conceptual teaching illustration, not installed equipment verification",
+          "Final compositor must verify caption overlap and scale",
+          "Unequal catch volumes illustrate investigation need, not accepted uniformity"
+        ]
+      },
+      "path": "assets/diagrams/c2-host-choice-r3.png",
+      "sha256": "583a2860a758ead8ac7cf62e19005148bd56fc0dccce35baf166d0846d1bd157",
+      "bytes": 1760930,
+      "dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "filename": "c6-catch-test-r3.png",
+      "source": "C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-9426842b-cfaf-44df-8339-778d624cc5e5.png",
+      "prompt": "Use case: scientific-educational. A finished landscape 16:9 teaching illustration for an adult beginner irrigation course, viewed at 854x480. Warm ivory background, forest green ink, blue water, muted ochre solids. Professional clear scientific illustration with realistic physical details and subtle cutaway texture, generous whitespace. All text extremely large and readable at video size, plain sans serif. No tiny text, no decorative UI, no watermark, no invented numerical readings. Keep bottom 15% uncluttered for video captions. A practical irrigation delivery catch-test teaching illustration. Exactly THREE separate visible emitter tubes or dripper ends suspended above exactly THREE equal clear collection cups, with each emitter positioned over its own cup. The cups contain three visibly unequal measured water amounts (roughly low, medium and high) to illustrate why delivered water must be checked; no numerical target or fake scale numbers. Thin blue drip streams physically enter the cups. A large plain stopwatch beside the cups indicates timing, its dial has NO numeric target and no implausible timer reading. A separate lower-right closeup shows one emitter after stopping, with NO flowing water and a simple green check. Large top text exactly 'Measure what comes out'. Large lower text above the caption margin exactly 'Confirm it stops'. No plant pots catching water instead of cups, no electronics or hazardous wiring, no declaration unequal flow is acceptable, no fake dashboard.",
+      "output_hint": "Generated images are saved to C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40 as C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-9426842b-cfaf-44df-8339-778d624cc5e5.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "history": [],
+      "provenance": {
+        "generator": "built-in image_gen.imagegen",
+        "mode": "generate",
+        "transparent_background": false
+      },
+      "review": {
+        "accepted": true,
+        "checks": [
+          "Exactly three main catch cups and three emitters",
+          "Unequal collected volumes deliberately visible",
+          "Stopwatch has no invented numerical target",
+          "Separate stopped-emitter inset shows no flow"
+        ],
+        "limits": [
+          "Conceptual teaching illustration, not installed equipment verification",
+          "Final compositor must verify caption overlap and scale",
+          "Unequal catch volumes illustrate investigation need, not accepted uniformity"
+        ]
+      },
+      "path": "assets/diagrams/c6-catch-test-r3.png",
+      "sha256": "54233757d7b1c2f18e356e7d66228dd20fa70f94f53482fc9f78cc72a284cb2d",
+      "bytes": 1984651,
+      "dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "filename": "c7-one-owner-r3.png",
+      "source": "C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-38f7e8ef-a07f-4231-956a-9f4d1fa1b8ef.png",
+      "prompt": "Use case: scientific-educational. A finished landscape 16:9 teaching illustration for an adult beginner irrigation course, viewed at 854x480. Warm ivory background, forest green ink, blue water, muted ochre solids. Professional clear scientific illustration with realistic physical details and subtle cutaway texture, generous whitespace. All text extremely large and readable at video size, plain sans serif. No tiny text, no decorative UI, no watermark, no invented numerical readings. Keep bottom 15% uncluttered for video captions. An unambiguous conceptual control-ownership teaching illustration. One physical irrigation zone valve centered at lower middle, realistic simple black solenoid valve with two pipe openings but no water or electrical circuit. At upper-left ONE active conceptual software/controller card, forest-green rectangle with simple white cog icon and label exactly 'Controller'. Exactly ONE solid gold command arrow goes from this active card DOWN to the valve. At upper-right an inactive grey controller card labelled exactly 'Old controller', with a small pale key beside it; its former command path is visibly BROKEN with a gap and a large grey X, and DOES NOT touch the valve. This represents handover of ownership, not electrical disconnection instructions. Large top heading exactly 'One output. One controller.' Large short label below physical valve exactly 'Zone valve'. Large note near old controller exactly 'No competing control'. No phone/screens/fake UI, no wire colours, no relay pinouts, no plug sockets, no actual wiring or dangerous mains. The visual must make ONE active command route unmistakable; a second controller must never also appear connected. Keep wording large with whitespace.",
+      "output_hint": "Generated images are saved to C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40 as C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-38f7e8ef-a07f-4231-956a-9f4d1fa1b8ef.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "provenance": {
+        "generator": "built-in image_gen.imagegen",
+        "mode": "generate",
+        "transparent_background": false,
+        "referenced_image_paths": []
+      },
+      "review": {
+        "accepted": true,
+        "checks": [
+          "One gold active command path from Controller to valve",
+          "Old controller greyed, path cancelled by X",
+          "No electrical wiring, pinouts or multiple active controllers",
+          "Large text correctly states One output. One controller."
+        ],
+        "limits": [
+          "Conceptual control ownership, not electrical isolation instructions",
+          "Compositor must check final label/caption overlap"
+        ]
+      },
+      "path": "assets/diagrams/c7-one-owner-r3.png",
+      "sha256": "adf98a56d3c5fa784636998017f9e21d4f9a99e50f7be1ce57ef5d7aaf3dd303",
+      "bytes": 1781150,
+      "dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    },
+    {
+      "filename": "a3-setting-label-70-r3.png",
+      "source": "C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-474748f1-fd41-4413-b90c-3e6f23ad2605.png",
+      "prompt": "Use case: precise-object-edit. Edit only the numeral on the yellow reference note: change the large '60%' to '70%'. Preserve every pixel of the kitchen sponge, its exact retained water and air spaces, the tray and droplets, the note's other words 'REFERENCE:', note stand, background, heading and footer. The entire point is that changing the label adds NO water. Do not change sponge water level, shape, colour or wetness. Match the existing hand-drawn numeral typography and note lighting. No other visual changes.",
+      "output_hint": "Generated images are saved to C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40 as C:\\Users\\BenIsdale\\.codex\\generated_images\\01a15108-f44f-7011-b911-835637750e40\\exec-474748f1-fd41-4413-b90c-3e6f23ad2605.png by default.\nIf you need to use a generated image at another path, copy it and leave the original in place unless the user explicitly asks you to delete it.\nThe generated image is already displayed to the user. There is no need to render it in the final response as a Markdown image or file link.",
+      "provenance": {
+        "generator": "built-in image_gen.imagegen",
+        "mode": "edit",
+        "transparent_background": false,
+        "referenced_image_paths": [
+          "C:/Github/HA-Irrigation-Strategy/www/learn/assets/diagrams/a3-setting-label.png"
+        ]
+      },
+      "review": {
+        "accepted": true,
+        "checks": [
+          "Reference note now says 70%",
+          "Retained water and air region visually unchanged",
+          "All other labels preserved",
+          "Existing 60% asset left untouched"
+        ],
+        "limits": [
+          "Generative edit preserves conceptual water level, not guaranteed identical source pixels",
+          "Use only as alternate reference-label view; not a new water measurement"
+        ]
+      },
+      "path": "assets/diagrams/a3-setting-label-70-r3.png",
+      "sha256": "be8a6255164632b6c511f4e276a5e89c829d17ce47dbf6b2f956dc91bca82f97",
+      "bytes": 1898542,
+      "dimensions": {
+        "width": 1672,
+        "height": 941
+      }
+    }
+  ],
+  "createdAt": "2026-10-18T22:18:07.899Z"
+}

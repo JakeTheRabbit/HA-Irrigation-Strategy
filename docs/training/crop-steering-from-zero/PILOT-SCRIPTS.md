@@ -1,10 +1,10 @@
-# Pilot scripts and storyboards
+# Historical pilot scripts and storyboards
 
-**Archived production draft:** these are the original storyboard scripts, before the simplified Scarjo narration revision. The current recorded scripts are in [the academy lesson source](../../../www/learn/course/modules/pilots.json) and the [complete downloadable transcript](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/course/all-lesson-transcripts.txt). Use those for recording or teaching this edition.
+**Historical production draft, superseded by R3.** Preserve this document as a record of the original five-storyboard proposal. Its spoken wording, timings, voice references and production directions are not the current recording script. Edit narration only in [the lesson modules](../../../www/learn/course/modules/), then use the [generated source transcript](../../../www/learn/course/all-lesson-transcripts.txt). The [published transcript](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/course/all-lesson-transcripts.txt) reflects the deployed release, which may differ while R3 is being built. See the [R3 rebuild record](COURSE-REBUILD-2026-10-19-R3.md) for verification and publication status.
 
 [Open the illustrated 27-scene storyboard](storyboard/index.html) · [Printable PDF](storyboard/storyboard.pdf). Each scene has an image, full assigned draft narration, proposed timing, camera framing and edit notes.
 
-These are five complete spoken drafts with visual and practice directions. Read them aloud before locking duration. Proposed lengths include demonstrations, learner pauses and answer reveals; they are not measured recordings. Use a calm conversational voice and allow a learner to stop the video. Terms and numbers must appear in corrected captions and transcripts.
+The archived material below contains five spoken drafts with visual and practice directions. Read them aloud before locking duration. Proposed lengths include demonstrations, learner pauses and answer reveals; they are not measured recordings. Use a calm conversational voice and allow a learner to stop the video. Terms and numbers must appear in corrected captions and transcripts.
 
 Teaching examples are fictional. Put **“Example only — not recommended crop settings”** on numeric diagrams. Film real water demonstrations with spare, unplanted medium in a tray. No live HA output changes, credentials or identifiable facility data in screen recordings.
 

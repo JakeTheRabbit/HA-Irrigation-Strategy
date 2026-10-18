@@ -1258,3 +1258,47 @@ details[open] > summary {
   display: block;
   margin-top: 0.7rem;
 }
+
+/* Keep lesson and video navigation visible beside the learning material. */
+.lesson-navigation { margin: 1.5rem 0; }
+.lesson-sequence { margin-top: 0; }
+.lesson-adjacent, .watch-group-navigation, .video-chapters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: .75rem;
+}
+.lesson-adjacent > * { flex: 1 1 16rem; }
+.lesson-jump, .chapter-jump, .watch-group-picker {
+  display: flex;
+  flex-direction: column;
+  gap: .4rem;
+  min-width: 0;
+}
+.lesson-jump { margin: 1rem 0; }
+.lesson-jump select, .chapter-jump select, .watch-group-picker select { width: 100%; min-width: 0; }
+.video-chapters { margin: 1rem 0; }
+.chapter-jump { flex: 1 1 18rem; }
+.watch-group-picker { margin: 1.5rem 0; max-width: 48rem; }
+.watch-player { margin: 1.5rem 0; }
+.watch-player video { width: 100%; background: #17211b; display: block; aspect-ratio: 16 / 9; }
+.watch-player h2 { margin-top: 0; }
+.watch-current-section { margin: 1.5rem 0 .6rem; }
+.watch-caption-toggle { display: inline-block; margin-top: 1rem; }
+.watch-group-navigation > * { flex: 1 1 16rem; }
+.watch-auto-continue { display: block; margin: 1rem 0; }
+.watch-media-status { min-height: 1.65em; }
+.watch-media-error { color: var(--error); font-weight: 600; }
+.watch-contents { margin-top: 2.5rem; }
+.watch-chapter-list { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: .6rem; list-style: none; padding: 0; }
+.watch-chapter-list button { width: 100%; justify-content: flex-start; text-align: left; font-weight: 400; }
+.watch-chapter-list [aria-current="true"] { background: var(--forest); color: var(--white); }
+@media (max-width: 760px) {
+  .video-chapters .chapter-jump { order: -1; flex-basis: 100%; }
+  .video-chapters > button { flex: 1; }
+  .watch-chapter-list { grid-template-columns: minmax(0, 1fr); }
+}
+@media print {
+  .lesson-navigation, .video-chapters, .watch-group-navigation, .watch-group-picker,
+  .watch-chapter-list, .watch-auto-continue, .watch-caption-toggle { display: none !important; }
+}

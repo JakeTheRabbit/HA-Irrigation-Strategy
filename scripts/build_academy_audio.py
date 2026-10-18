@@ -6,6 +6,7 @@ Models and masters stay outside the repository. Resume skips only matching sourc
 import argparse
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import re
@@ -45,23 +46,37 @@ def main():
     ap.add_argument("--production", type=Path, required=True)
     ap.add_argument("--modules", type=Path, default=Path("www/learn/course/modules"))
     ap.add_argument("--speed", type=float, default=0.82)
+    ap.add_argument(
+        "--models", type=Path, help="Reuse an existing local model directory"
+    )
+    ap.add_argument(
+        "--lessons", nargs="+", help="Generate an independent lesson partition"
+    )
     args = ap.parse_args()
     from kokoro_onnx import Kokoro
     import soundfile as sf
+    import numpy as np
+    import onnxruntime as ort
 
     production = args.production.resolve()
     output = production / "narration"
     output.mkdir(exist_ok=True, parents=True)
-    k = Kokoro(
-        str(production / "models/kokoro-v1.0.onnx"),
-        str(production / "models/voices-v1.0.bin"),
+    models = args.models or production / "models"
+    options = ort.SessionOptions()
+    options.intra_op_num_threads = 4
+    options.inter_op_num_threads = 1
+    session = ort.InferenceSession(
+        str(models / "kokoro-v1.0.onnx"), options, providers=["CPUExecutionProvider"]
     )
+    k = Kokoro.from_session(session, str(models / "voices-v1.0.bin"))
     lessons = [
         lesson
         for p in sorted(args.modules.glob("*.json"))
         if p.stem != "pilots"
         for lesson in json.loads(p.read_text(encoding="utf-8-sig"))
     ]
+    if args.lessons:
+        lessons = [lesson for lesson in lessons if lesson["id"] in args.lessons]
     started = time.monotonic()
     records = []
     for lesson in lessons:
@@ -71,7 +86,7 @@ def main():
             source = slide["narration"]
             spoken = pronunciation(source)
             digest = hashlib.sha256(
-                (spoken + f"|af_heart|{args.speed}").encode()
+                (spoken + f"|af_heart|{args.speed}|frames24-r3").encode()
             ).hexdigest()
             wav = folder / f'{slide["id"]}.wav'
             info = wav.with_suffix(".json")
@@ -90,8 +105,12 @@ def main():
                     sentence_pause=0.35,
                     clause_pause=0.16,
                 )
+                assert sr == 24000
+                speech_duration = len(samples) / sr
+                frames = math.ceil((len(samples) + round(0.3 * sr)) / 1000)
+                samples = np.pad(samples, (0, frames * 1000 - len(samples)))
                 temporary = wav.with_suffix(".part.wav")
-                sf.write(temporary, samples, sr)
+                sf.write(temporary, samples, sr, subtype="PCM_16")
                 os.replace(temporary, wav)
                 record = {
                     "lesson": lesson["id"],
@@ -104,6 +123,9 @@ def main():
                     "engine": "Kokoro ONNX 0.6.1 / model v1.0",
                     "sample_rate": sr,
                     "duration": len(samples) / sr,
+                    "speech_duration": speech_duration,
+                    "frames": frames,
+                    "narration_sha256": hashlib.sha256(source.encode()).hexdigest(),
                     "words": len(source.split()),
                 }
                 info.write_text(
@@ -114,7 +136,8 @@ def main():
                 f'{lesson["id"]}/{slide["id"]}: {record["duration"]:.1f}s ({len(records)})',
                 flush=True,
             )
-    (production / "narration-manifest.json").write_text(
+    suffix = "-" + "-".join(args.lessons) if args.lessons else ""
+    (production / f"narration-manifest{suffix}.json").write_text(
         json.dumps(
             {"records": records, "elapsed": time.monotonic() - started}, indent=2
         ),

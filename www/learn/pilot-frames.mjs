@@ -43,6 +43,50 @@ function fraction(p,v){const [a,b]=v.values||[6,10],n=Number(a),d=Number(b),vali
  const labels=v.labels.length?v.labels:['Water volume','Total sample volume'];labelStack(p,labels.slice(0,3),430,40,330);
 }
 function capacity(p,v){const labels=v.labels.length?v.labels:['Saturated','After drainage','Configured reference'];if(['saturated','drained'].includes(v.focus)){pot(p,90,50,210,195,{wet:v.focus==='saturated',air:v.focus!=='saturated'});if(v.focus==='drained'){arrow(p,195,250,195,272);box(p,70,278,250,18,C.water,C.blue,4);}labelStack(p,labels.slice(0,3),390,43,365);}else if(v.focus==='comparison'||labels.length===2){pot(p,100,73,170,170,{wet:true,air:false});pot(p,480,73,170,170);lines(p,185,276,labels[0],24,22,C.ink,'middle');lines(p,565,276,labels[1],24,22,C.ink,'middle');arrow(p,298,150,442,150,C.blue);}else panels(p,v,['water','water','time']);}
+// A3 only: a sponge is an analogy for pore spaces, never a literal pot test.
+function spongeShape(p,x,y,w,h,wet=false){
+ box(p,x,y,w,h,'#efd081','#9d7527',22);
+ const holes=[[.16,.25],[.4,.18],[.68,.27],[.85,.2],[.26,.66],[.55,.65],[.82,.7]];
+ holes.forEach(([a,b],i)=>add(p,'ellipse',{cx:x+a*w,cy:y+b*h,rx:w*.064,ry:h*.12,fill:wet||i%2===0?C.water:C.white,stroke:wet||i%2===0?C.blue:C.muted,'stroke-width':2}));
+ if(wet)[.25,.53,.79].forEach(a=>add(p,'path',{d:`M ${x+a*w} ${y+h+8} q -10 15 0 22 q 10 -7 0 -22`,fill:C.water,stroke:C.blue,'stroke-width':1.5}));
+}
+function sponge(p,v){
+ const labels=v.labels||[],focus=v.focus||'comparison';
+ if(focus==='recall'){
+  panelIcon(p,399,58,'question');
+  lines(p,399,137,labels[0]||'Reference: 60% → 70%',43,28,C.ink,'middle',34);
+  lines(p,399,211,labels[1]||'What happens to the water?',43,27,C.ink,'middle',33);
+ }else if(focus==='comparison'){
+  spongeShape(p,58,48,265,131,true);spongeShape(p,470,48,265,131,false);
+  arrow(p,345,112,447,112,C.blue);
+  lines(p,190,245,labels[0]||'Soaked and dripping',27,23,C.ink,'middle',29);
+  lines(p,602,245,labels[1]||'Wet after drainage',27,23,C.ink,'middle',29);
+ }else if(focus==='reference'){
+  spongeShape(p,60,66,260,130,false);
+  text(p,190,244,'Same physical sponge',22,C.ink,'middle');
+  box(p,449,31,290,154,'#fff1a9','#c5a343',3);
+  text(p,594,68,'REFERENCE NOTE',21,C.muted,'middle',700);
+  text(p,594,119,'60% → 70%',35,C.ink,'middle',700);
+  arrow(p,338,132,425,132,C.muted);
+  labels.slice(0,2).forEach((l,i)=>lines(p,594,221+i*35,l,30,22,C.ink,'middle',27));
+ }else if(focus==='volume'){
+  pot(p,73,36,213,167,{wet:false,air:true});
+  text(p,180,247,'Total sample: 1000 mL',22,C.ink,'middle');
+  text(p,552,77,'600 mL water',28,C.blue,'middle',700);
+  text(p,552,128,'600 ÷ 1000 × 100',28,C.ink,'middle');
+  text(p,552,177,'= 60% VWC',33,C.blue,'middle',700);
+  text(p,552,234,'Example, not a target',22,C.muted,'middle');
+ }else if(focus==='transfer'){
+  spongeShape(p,57,68,240,126,false);pot(p,478,50,178,162,{wet:false,air:true});
+  arrow(p,326,127,443,127,C.green);
+  labels.slice(0,2).forEach((l,i)=>lines(p,399,244+i*31,l,58,22,C.ink,'middle',26));
+ }else{
+  spongeShape(p,57,52,270,140,focus==='wet');
+  line(p,48,245,337,245,C.muted,4);
+  text(p,193,284,focus==='wet'?'Dripping over the sink':'Wet after excess drips',22,C.ink,'middle');
+  labels.slice(0,2).forEach((l,i)=>{box(p,397,53+i*100,361,81,C.white,C.line,12);lines(p,415,86+i*100,l,28,23,C.ink,'start',28);});
+ }
+}
 // Fixed synthetic observations: reference/threshold edits never modify these values.
 const VWC=[46,45,44,43,54,51,57,54,60,56,53,50,47,44,42,40,39,38,37,36,35,34,33,32,31];
 const EC=[2.8,2.9,3,3.05,2.9,3,2.85,2.95,2.8,2.9,3.05,3.1,3,3.2,3.25,3.3,3.2,3.3,3.35,3.4,3.3,3.45,3.4,3.5,3.4];
@@ -67,12 +111,19 @@ function protection(p,v){const x=110,y=129,r=66;add(p,'polygon',{points:Array.fr
 /** Render one narration paragraph as a fixed-size, self-contained video card. */
 export function renderPilotCard(card){
  const el=document.createElement('article');el.className='pilot-card';el.dataset.card=card.id||'';Object.assign(el.style,{width:'854px',height:'480px',boxSizing:'border-box',position:'relative',overflow:'hidden',background:'#f7faf6',color:C.ink,fontFamily:'Arial, Helvetica, sans-serif',margin:'0',padding:'0'});
+ // AI concept illustrations use a plain local image; exact arithmetic stays SVG.
+ const asset=card.visual?.asset;
+ if(typeof asset==='string' && /^assets\/(?:diagrams|screens)\/[a-zA-Z0-9_./-]+\.(?:png|jpe?g|webp)$/.test(asset) && !asset.includes('..')){
+  el.dataset.visualMode='asset';
+  const img=document.createElement('img');img.src=asset;img.alt=card.visual.alt||card.title||'Teaching illustration';img.decoding='sync';
+  Object.assign(img.style,{display:'block',width:'854px',height:'480px',objectFit:'contain',background:'#f7faf6'});el.append(img);return el;
+ }
  const stripe=document.createElement('div');Object.assign(stripe.style,{height:'7px',background:C.green});el.append(stripe);
  const meta=document.createElement('div');meta.textContent=`CROP STEERING · ${card.lesson||''} · ${card.id||''}`;Object.assign(meta.style,{position:'absolute',left:'28px',top:'20px',fontSize:'16px',fontWeight:'700',letterSpacing:'1px',color:C.muted});el.append(meta);
  const heading=document.createElement('h1');heading.textContent=card.title||'';Object.assign(heading.style,{position:'absolute',left:'28px',right:'28px',top:'45px',margin:'0',fontSize:'29px',lineHeight:'35px',fontWeight:'700'});el.append(heading);
  const svg=s('svg',{viewBox:'0 0 798 307',width:798,height:307,role:'img','aria-label':card.title||'',style:'position:absolute;left:28px;top:94px;font-family:Arial,Helvetica,sans-serif;overflow:visible'});el.append(svg);
  const v={type:'process',labels:[],...card.visual};
- switch(v.type){case 'root-zone':rootZone(svg,v);break;case 'drainage':drainage(svg,v);break;case 'losses':losses(svg,v);break;case 'sensor':sensor(svg,v);break;case 'fraction':fraction(svg,v);break;case 'capacity':capacity(svg,v);break;case 'graph':graph(svg,v);break;case 'demo':demo(svg,v);break;
+ switch(v.type){case 'sponge':sponge(svg,v);break;case 'root-zone':rootZone(svg,v);break;case 'drainage':drainage(svg,v);break;case 'losses':losses(svg,v);break;case 'sensor':sensor(svg,v);break;case 'fraction':fraction(svg,v);break;case 'capacity':capacity(svg,v);break;case 'graph':graph(svg,v);break;case 'demo':demo(svg,v);break;
  case 'water-path':waterPath(svg,v);break;case 'protection':protection(svg,v);break;case 'commissioning':panels(svg,v,['water','time','check']);break;case 'equipment':panels(svg,v,['host','sensor','water','time','check']);break;
  case 'question':panels(svg,v,v.labels.map(l=>/^water$/i.test(l)?'water':/^oxygen$/i.test(l)?'plant':'question'));break;case 'check':panels(svg,v,['plant','check','sensor']);break;
  case 'steering':panels(svg,v,['plant','plant','plant']);break;

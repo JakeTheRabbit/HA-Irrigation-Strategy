@@ -6,7 +6,8 @@ import {
   nextLesson,
   reviewDue,
 } from "./state.mjs";
-import { renderLesson } from "./lesson.mjs?v=20261019r2";
+import { renderLesson } from "./lesson.mjs?v=20261019r3";
+import { renderWatch } from "./watch.mjs?v=20261019r3";
 import { renderPractice } from "./labs.mjs";
 const main = document.querySelector("#main");
 const notice = document.querySelector("#storage-notice");
@@ -170,6 +171,7 @@ function home() {
       "button primary",
     ),
     link("Explore the course", "#/course", "text-link"),
+    link("Watch the course videos", "#/watch", "text-link"),
   );
   add(
     copy,
@@ -212,7 +214,7 @@ function home() {
   );
   add(wrap, intro);
   const learning = node("section", "learning-map");
-  add(learning, node("h2", "", "Four parts, one connected picture."));
+  add(learning, node("h2", "", "Four learning areas."));
   const grid = node("div", "module-grid");
   for (const module of course.modules) {
     const count = course.lessons.filter((x) => x.module === module.id).length;
@@ -273,7 +275,7 @@ function productionNotes() {
     node(
       "p",
       "",
-      "All lessons use the locally generated Kokoro af_heart voice. The five pilot videos use paragraph-matched diagrams. Readable transcripts remain available alongside narration.",
+      "Lessons use locally generated synthetic narration with diagrams matched to the explanation. Readable transcripts remain available alongside the videos.",
     ),
     link(
       "Read the course guide, production notes and sources",
@@ -298,6 +300,7 @@ function catalogue() {
       "Start with measurement, then build toward decisions you can explain. The recommended route changes with your choice; every lesson remains open.",
     ),
     routePicker(),
+    link("Watch the course as grouped videos", "#/watch", "button"),
   );
   const recommended = new Set(path().map((x) => x.id));
   for (const module of course.modules) {
@@ -586,6 +589,8 @@ async function render(focus = true) {
       save();
       screen = await renderLesson({
         lesson,
+        catalogue: course.lessons,
+        recommended: path(),
         progress,
         onSave: save,
         onNavigate: navigate,
@@ -602,6 +607,18 @@ async function render(focus = true) {
       );
       title = "Lesson not found";
     }
+  } else if (section === "watch") {
+    let groupId;
+    try { groupId = decodeURIComponent(parts[1] || ""); } catch { groupId = ""; }
+    for (const media of main.querySelectorAll("audio,video")) media.pause();
+    const pending = node("section", "panel");
+    const pendingStatus = node("p", "", "Loading the video list…");
+    pendingStatus.setAttribute("role", "status");
+    add(pending, node("h1", "", "Course videos"), pendingStatus);
+    main.replaceChildren(pending);
+    screen = await renderWatch({ groupId, route: progress.route, lessons: course.lessons, onNavigate: navigate });
+    title = "Course videos";
+    section = "course";
   } else if (section === "course") {
     screen = catalogue();
     title = "Course";
@@ -638,7 +655,7 @@ async function render(focus = true) {
 }
 async function start() {
   try {
-    const response = await fetch("course/course.json?v=20261019r2");
+    const response = await fetch("course/course.json?v=20261019r3");
     if (!response.ok) throw Error("Course data returned " + response.status);
     course = await response.json();
     if (!Array.isArray(course.lessons) || !course.lessons.length)

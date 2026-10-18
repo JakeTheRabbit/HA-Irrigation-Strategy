@@ -23,12 +23,14 @@ A free course for people who have never used a substrate probe or crop-steering 
 
 ![Crop Steering Academy: beginner lessons, learning routes and practical exercises](img/academy-home.png)
 
-- **24 lessons:** five captioned 480p pilot videos and 19 narrated slide lessons, with labelled diagrams, worked examples, practice and answer-specific feedback.
+- **24 lessons:** a captioned 480p video for each lesson, with generated teaching illustrations, real demo screens, exact calculation diagrams, worked examples, practice and answer-specific feedback.
 - **Choose a route:** use an existing installation, or build with Raspberry Pi or x86-64. Host lessons are alternatives.
 - **Learn at your pace:** transcripts, captions, playback speed, a glossary and recall reminders. Progress stays in your browser; export it to keep a copy.
 - **Practise safely:** synthetic calculations and graphs never operate Home Assistant. Physical setup and commissioning require competent local supervision. Quiz passes are knowledge-practice records, not hardware certification.
 
-All lessons use locally generated Kokoro `af_heart` narration. The five 480p pilot videos have been rebuilt with 108 paragraph-matched visual cards. Scripts use ASD-STE100 principles; full formal conformance and learner outcomes have not been certified. [Course guide and production details](docs/ACADEMY.md) · [Learner workbook](docs/training/crop-steering-from-zero/WORKBOOK.md).
+All lessons use locally generated Kokoro `af_heart` narration. Every lesson has a video. Five longer, chaptered parts let you watch related lessons together; the Pi and x86 setup parts are alternatives. Jump directly between lessons or video sections. Scripts use ASD-STE100 principles; full formal conformance and learner outcomes have not been certified. [Course guide and production details](docs/ACADEMY.md) · [Learner workbook](docs/training/crop-steering-from-zero/WORKBOOK.md).
+
+![A3 capacity lesson with the drainage illustration, captions and direct section controls](img/academy-lesson.png)
 
 ## Safety first
 
@@ -543,3 +545,9 @@ Report a problem or ask a question in [GitHub issues](https://github.com/JakeThe
 ## License
 
 [MIT](LICENSE)
+
+## References and acknowledgements
+
+Athena's grow guide, handbook and educational resources informed this project's crop-steering and irrigation-strategy work. See the [Athena Commercial Handbook](https://growershub.athenaag.com/athena-handbook-v41iwrqr), [Precision Irrigation Strategy](https://support.athenaag.com/hc/en-us/articles/25975395644315-Precision-Irrigation-Strategy) and our [references and attribution notes](docs/REFERENCES.md).
+
+This is an independent project, with no implied Athena endorsement. Project examples and software behaviour are identified separately from Athena's published guidance.

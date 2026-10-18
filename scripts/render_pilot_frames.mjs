@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Render paragraph cards without an application server or external assets.
+ * Render paragraph cards without an application server or external network assets.
  *
  * node scripts/render_pilot_frames.mjs --output <production-root>
  * node scripts/render_pilot_frames.mjs --output <production-root> \
@@ -59,30 +59,51 @@ for (const source of expected) {
   for (const [key, value] of Object.entries(source)) assert.equal(card[key], value, `Source mismatch: ${source.id}.${key}`);
 }
 const renderer = fs.readFileSync(path.join(learn, 'pilot-frames.mjs'), 'utf8');
+const captureHash = hash(fs.readFileSync(fileURLToPath(import.meta.url)));
+function assetFiles(card) {
+  const asset = card.visual?.asset;
+  if (!asset) return [];
+  assert.match(asset, /^assets\/(?:diagrams|screens)\/[a-zA-Z0-9_./-]+\.(?:png|jpe?g|webp)$/);
+  assert.ok(!asset.includes('..'), 'Unsafe asset path');
+  const file = path.resolve(learn, asset);
+  assert.ok(file.startsWith(path.join(learn, 'assets') + path.sep));
+  return [{ file: asset, sha256: hash(fs.readFileSync(file)) }];
+}
 const { chromium } = await import('../frontend/node_modules/playwright/index.mjs');
-const browser = await chromium.launch({ headless: true, channel: process.env.BROWSER_CHANNEL || 'msedge' });
+const browser = await chromium.launch({ headless: true, channel: process.env.BROWSER_CHANNEL || 'msedge', args: ['--disable-gpu'] });
 try {
   const page = await browser.newPage({ viewport: { width: 854, height: 480 }, deviceScaleFactor: 1 });
-  await page.setContent('<html><body style="margin:0"></body></html>');
+  await page.route('**/*', async route => {
+    const url = new URL(route.request().url());
+    if (url.origin !== 'http://academy.local' || !/^\/learn\/assets\/(?:diagrams|screens)\/[a-zA-Z0-9_./-]+\.(?:png|jpe?g|webp)$/.test(url.pathname)) return route.abort();
+    const file = path.resolve(root, 'www', decodeURIComponent(url.pathname).slice(1));
+    if (!file.startsWith(path.join(learn, 'assets') + path.sep) || !fs.existsSync(file)) return route.abort();
+    await route.fulfill({status:200, contentType:/\.png$/i.test(file)?'image/png':/\.webp$/i.test(file)?'image/webp':'image/jpeg',body:fs.readFileSync(file)});
+  });
+  await page.setContent('<html><head><base href="http://academy.local/learn/"></head><body style="margin:0"></body></html>');
   await page.evaluate(async source => {
     const url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' }));
     try { window.renderPilotCard = (await import(url)).renderPilotCard; }
     finally { URL.revokeObjectURL(url); }
   }, renderer);
   async function render(card) {
-    await page.evaluate(c => document.body.replaceChildren(window.renderPilotCard(c)), card);
+    await page.evaluate(async c => { document.body.replaceChildren(window.renderPilotCard(c)); await Promise.all([...document.images].map(img => img.decode())); }, card);
     const qa = await page.evaluate(() => {
       const article = document.querySelector('article'), bounds = article.getBoundingClientRect();
       const overflow = [...article.querySelectorAll('svg text')].map(t => ({ text: t.textContent, r: t.getBoundingClientRect().toJSON() }))
         .filter(({ r }) => r.x < 27 || r.right > 827 || r.top < 93 || r.bottom > 405);
-      if (article.querySelector('h1').getBoundingClientRect().bottom > 94) overflow.push({ heading: 'wrap' });
+      const heading = article.querySelector('h1');
+      if (heading && heading.getBoundingClientRect().bottom > 94) overflow.push({ heading: 'wrap' });
+      const images = [...article.querySelectorAll('img')].map(img => ({src: img.getAttribute('src'), width: img.naturalWidth, height: img.naturalHeight, bounds: img.getBoundingClientRect().toJSON()}));
+      for (const img of images) if (!img.width || !img.height || img.bounds.left < 0 || img.bounds.top < 0 || img.bounds.right > 854 || img.bounds.bottom > 480) overflow.push({image:img});
       const traces = [...article.querySelectorAll('svg path')].filter(p => ['#1878b9', '#b76628'].includes(p.getAttribute('stroke')))
         .map(p => ({ stroke: p.getAttribute('stroke'), d: p.getAttribute('d') }));
-      return { width: bounds.width, height: bounds.height, overflow, traces,
+      return { width: bounds.width, height: bounds.height, overflow, traces, images,
         labels: [...article.querySelectorAll('svg text')].map(t => t.textContent) };
     });
     assert.equal(qa.width, 854); assert.equal(qa.height, 480);
     assert.equal(qa.overflow.length, 0, `${card.id} text outside teaching area: ${JSON.stringify(qa.overflow)}`);
+    assert.equal(qa.images.length, assetFiles(card).length, `${card.id}: declared asset did not render`);
     return qa;
   }
   function png(file) {
@@ -92,15 +113,26 @@ try {
     return hash(data);
   }
   const frameDir = path.join(output, 'frames'), frameHashes = [];
+  const previousFile = path.join(output, 'visual-qa', 'frame-hashes.json');
+  if (options.check) assert.ok(fs.existsSync(previousFile), 'Cannot verify existing frames without their source/hash manifest');
+  const previous = new Map((fs.existsSync(previousFile) ? read(previousFile) : []).map(frame => [frame.file, frame]));
   if (!options.check) fs.mkdirSync(frameDir, { recursive: true });
   for (const card of cards) {
     await render(card);
     const file = path.join(frameDir, `${card.id}.png`);
-    if (!options.check) await page.screenshot({ path: file });
-    frameHashes.push({ file: path.basename(file), sha256: png(file) });
+    const binding = {file:path.basename(file), source_sha256:hash(JSON.stringify(card)), renderer_sha256:hash(renderer), capture_sha256:captureHash, asset_files:assetFiles(card)};
+    const old = previous.get(binding.file), reusable = old && fs.existsSync(file) && old.sha256 === png(file) &&
+      Object.entries(binding).every(([key,value]) => JSON.stringify(old[key]) === JSON.stringify(value));
+    if (!options.check && !reusable) await page.screenshot({ path: file, timeout: 120000, animations: 'disabled' });
+    frameHashes.push({ ...binding, sha256: png(file) });
+    if (!options.check) {
+      fs.mkdirSync(path.join(output, 'visual-qa'), {recursive:true});
+      write(previousFile, frameHashes); // Source-bound checkpoint: a retry can reuse completed frames.
+      if (frameHashes.length % 12 === 0) console.log(`Captured/verified ${frameHashes.length}/${cards.length} pilot frames`);
+    }
   }
   const summary = { mode: options.check ? 'check-existing' : 'render', cards: cards.length,
-    source_coverage: 'exact', text_bounds_failures: 0, renderer_sha256: hash(renderer),
+    source_coverage: 'exact', text_bounds_failures: 0, renderer_sha256: hash(renderer), capture_sha256: captureHash,
     frames_manifest_sha256: hash(JSON.stringify(frameHashes)) };
   if (!options.check) {
     fs.mkdirSync(path.join(output, 'visual-qa'), { recursive: true });
@@ -148,7 +180,7 @@ try {
       if (traces) assert.equal(signature, traces, 'Observed traces changed during the edit'); else traces = signature;
       if (step === 0) assert.ok(!qa.labels.some(l => l.includes(`${after}%`)), 'Final draft leaked into initial picture');
       const file = path.join(uniqueDir, `value_${String(step).padStart(2, '0')}.png`);
-      await page.screenshot({ path: file }); unique.push({ file, value });
+      await page.screenshot({ path: file, timeout: 120000, animations: 'disabled' }); unique.push({ file, value });
     }
     const hashes = [], timeline = [];
     for (let frame = 0; frame < frames; frame++) {
@@ -163,7 +195,10 @@ try {
     write(path.join(motionDir, 'word-anchors.json'), alignment);
     write(path.join(motionDir, 'frame-hashes.json'), hashes);
     write(path.join(motionDir, 'frame-timeline.json'), timeline);
-    const ready = { id: original.id, status: 'ready', frozen: true, fps, frames, frame_count: frames,
+    const ready = { id: original.id, status: 'ready',
+      audio_sha256: hash(fs.readFileSync(path.join(output, 'narration', `${original.id}.wav`))),
+      audio_receipt_sha256: hash(fs.readFileSync(path.join(output, 'narration', `${original.id}.json`))),
+      source_sha256: hash(original.text), frozen: true, fps, frames, frame_count: frames,
       duration: frames / fps, width: 854, height: 480, first_frame: 0, last_frame: frames - 1,
       frame_pattern: path.join(sequenceDir, 'frame_%04d.png'), saved_value: before, initial_value: before, final_value: after,
       movement_start_frame: start, movement_end_frame: end, movement_start_seconds: start / fps, movement_end_seconds: end / fps,

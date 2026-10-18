@@ -85,7 +85,7 @@
   },
   {
     "term": "P0 / P1 / P2 / P3",
-    "definition": "Application phase identifiers. The detailed phase lesson is outside these five pilots."
+    "definition": "Application phase identifiers: P0 morning dryback, P1 ramp-up, P2 maintenance and P3 overnight dryback. See lesson B2."
   },
   {
     "term": "emergency VWC threshold",

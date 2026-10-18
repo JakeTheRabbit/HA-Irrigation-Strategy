@@ -1,8 +1,10 @@
 # Production, evaluation and evidence
 
-Prepared 19 October 2026. **Original production rationale and evidence ledger.** The current [Academy guide](../../ACADEMY.md) describes the delivered 24-lesson website, including five recorded pilots and 19 narrated slide lessons. Production intentions below can describe an earlier proposed filming approach. Human listening review, audience outcome trials and YouTube uploads have not been completed or claimed.
+Prepared 19 October 2026. **Original production rationale and evidence ledger.** The current [Academy guide](../../ACADEMY.md) describes the latest course edition. The first release had five recorded pilots and 19 narrated slide lessons; the replacement gives every lesson a video and adds longer chaptered parts. Production intentions below can describe an earlier proposed filming approach. Human listening review, audience outcome trials and YouTube uploads have not been completed or claimed.
 
 ## Editorial and visual rules
+
+Athena's grow guide, handbook and educational resources informed the project's crop-steering work. The official [Athena Commercial Handbook](https://growershub.athenaag.com/athena-handbook-v41iwrqr) and [Precision Irrigation Strategy](https://support.athenaag.com/hc/en-us/articles/25975395644315-Precision-Irrigation-Strategy) are credited as background sources in the relevant lessons. See [references and acknowledgements](../../REFERENCES.md) for attribution. Lesson examples, software workflows and calculations are this project's explanations; they do not imply Athena endorsement or universal Athena targets.
 
 - Friendly adult language. Explain an unfamiliar word before relying on it. Never joke about a learner being stupid, and never use intoxication as a framing device for operating equipment.
 - Film one question at a time. Introduce water alone, then EC, then reference, then controls. Remove irrelevant panels from explanatory graphics; use the real full interface for navigation/handover.

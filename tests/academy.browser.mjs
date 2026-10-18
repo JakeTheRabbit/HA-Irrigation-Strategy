@@ -40,6 +40,7 @@ const output = {
 async function open(route = "") {
   await page.goto(base + route);
   await page.locator("#main h1").waitFor();
+  if (route.startsWith("#/watch/")) await page.locator(".watch-player video").waitFor();
 }
 async function record() {
   return page.evaluate((key) => JSON.parse(localStorage.getItem(key)), key);
@@ -259,6 +260,7 @@ try {
     "#/",
     "#/course",
     "#/lesson/D3",
+    "#/watch/foundations",
     "#/practice",
     "#/glossary",
     "#/progress",
@@ -270,7 +272,7 @@ try {
       await noOverflow(width + " " + route);
     }
     output.viewports.push(width);
-    console.log("No overflow on six routes at " + width + "px.");
+    console.log("No overflow on " + routes.length + " routes at " + width + "px.");
   }
   await page.setViewportSize({ width: 320, height: 800 });
   for (const lesson of course.lessons) {
@@ -315,12 +317,25 @@ try {
     .getByRole("heading", { name: "Your learning path", exact: true })
     .waitFor();
   output.checks.push("keyboard skip link and primary navigation");
-  await page.setViewportSize({ width: 390, height: 1200 });
-  await open("#/lesson/A4");
-  await page.screenshot({
-    path: path.join(root, "img/academy-lesson.png"),
-    fullPage: false,
+  await page.setViewportSize({ width: 1280, height: 1000 });
+  await open("#/lesson/A3");
+  await page.waitForFunction(() => document.querySelector("video")?.readyState >= 2);
+  await page.getByRole("combobox", { name: "Choose video section", exact: true }).selectOption("1");
+  const capacityChapter = course.lessons.find(lesson => lesson.id === "A3").video.chapters[1].start;
+  await page.waitForFunction(start => {
+    const video = document.querySelector("video");
+    return !video.seeking && Math.abs(video.currentTime - start) < .25;
+  }, capacityChapter);
+  await page.locator("video").evaluate(async video => {
+    video.muted = true;
+    await video.play();
   });
+  await page.mouse.move(0, 0);
+  await page.waitForTimeout(3500);
+  await page.locator(".lesson-media").screenshot({
+    path: path.join(root, "img/academy-lesson.png"),
+  });
+  await page.locator("video").evaluate(video => video.pause());
   const blocked = await browser.newContext();
   await blocked.addInitScript(() =>
     Object.defineProperty(window, "localStorage", {
