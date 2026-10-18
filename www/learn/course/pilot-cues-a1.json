@@ -1,0 +1,317 @@
+[
+  {
+    "id": "A1-01-p01",
+    "lesson": "A1",
+    "scene": "A1-01",
+    "paragraph": 0,
+    "text": "Before you use the dashboard, identify the conditions inside the pot.",
+    "title": "Start inside the pot",
+    "visual": {
+      "type": "root-zone",
+      "labels": [
+        "Solid material",
+        "Water",
+        "Air"
+      ]
+    }
+  },
+  {
+    "id": "A1-01-p02",
+    "lesson": "A1",
+    "scene": "A1-01",
+    "paragraph": 1,
+    "text": "What do the roots need?",
+    "title": "What do roots need?",
+    "visual": {
+      "type": "question",
+      "labels": [
+        "What do the roots need?"
+      ]
+    }
+  },
+  {
+    "id": "A1-02-p01",
+    "lesson": "A1",
+    "scene": "A1-02",
+    "paragraph": 0,
+    "text": "The pot contains solid material, water, and air. The solid material around the roots is the substrate. Coco and stone wool are examples of substrates.",
+    "title": "Substrate, water and air",
+    "visual": {
+      "type": "root-zone",
+      "labels": [
+        "Substrate: solid material",
+        "Water",
+        "Air"
+      ]
+    }
+  },
+  {
+    "id": "A1-02-p02",
+    "lesson": "A1",
+    "scene": "A1-02",
+    "paragraph": 1,
+    "text": "There are spaces between the solid parts. These spaces contain water or air. Roots need water and oxygen.",
+    "title": "Spaces hold water or air",
+    "visual": {
+      "type": "root-zone",
+      "labels": [
+        "Solid parts",
+        "Water in spaces",
+        "Air in spaces"
+      ]
+    }
+  },
+  {
+    "id": "A1-02-p03",
+    "lesson": "A1",
+    "scene": "A1-02",
+    "paragraph": 2,
+    "text": "More water does not always improve conditions for the roots. The substrate must hold water and let excess water drain. Air must also return to some of the spaces.",
+    "title": "Hold water. Drain excess. Allow air.",
+    "visual": {
+      "type": "root-zone",
+      "labels": [
+        "Solid material",
+        "Water held in spaces",
+        "Air returns after drainage"
+      ]
+    }
+  },
+  {
+    "id": "A1-03-p01",
+    "lesson": "A1",
+    "scene": "A1-03",
+    "paragraph": 0,
+    "text": "Look at the spare container. Water enters the substrate. Some water stays in the substrate. Other water drains into the tray.",
+    "title": "Follow the water",
+    "visual": {
+      "type": "drainage",
+      "labels": [
+        "Water enters",
+        "Some stays in substrate",
+        "Some drains into the tray"
+      ]
+    }
+  },
+  {
+    "id": "A1-03-p02",
+    "lesson": "A1",
+    "scene": "A1-03",
+    "paragraph": 1,
+    "text": "The amount of water then decreases. The plant uses some water. Evaporation and drainage also remove water.",
+    "title": "Three ways water leaves",
+    "visual": {
+      "type": "losses",
+      "labels": [
+        "Plant uptake",
+        "Evaporation",
+        "Drainage"
+      ]
+    }
+  },
+  {
+    "id": "A1-03-p03",
+    "lesson": "A1",
+    "scene": "A1-03",
+    "paragraph": 2,
+    "text": "A decrease in water content does not show only the water that the plant used.",
+    "title": "Water loss has several causes",
+    "visual": {
+      "type": "losses",
+      "labels": [
+        "Plant uptake",
+        "Evaporation",
+        "Drainage also lowers VWC"
+      ]
+    }
+  },
+  {
+    "id": "A1-04-p01",
+    "lesson": "A1",
+    "scene": "A1-04",
+    "paragraph": 0,
+    "text": "This pot stays very wet. The leaves look unhealthy. Does this mean that you must add more water?",
+    "title": "Very wet: add more water?",
+    "visual": {
+      "type": "question",
+      "labels": [
+        "Pot stays very wet",
+        "Leaves look unhealthy",
+        "What is the cause?"
+      ]
+    }
+  },
+  {
+    "id": "A1-04-p02",
+    "lesson": "A1",
+    "scene": "A1-04",
+    "paragraph": 1,
+    "text": "Choose one answer. Add more water immediately. Or do a check to find the cause first.",
+    "title": "Choose the next action",
+    "visual": {
+      "type": "question",
+      "labels": [
+        "Add more immediately?",
+        "Check the cause first?"
+      ]
+    }
+  },
+  {
+    "id": "A1-04-p03",
+    "lesson": "A1",
+    "scene": "A1-04",
+    "paragraph": 2,
+    "text": "Do a check first.",
+    "title": "Check the cause first",
+    "visual": {
+      "type": "check",
+      "labels": [
+        "Observe the crop",
+        "Check the equipment",
+        "Review the reading"
+      ]
+    }
+  },
+  {
+    "id": "A1-04-p04",
+    "lesson": "A1",
+    "scene": "A1-04",
+    "paragraph": 3,
+    "text": "Different problems can cause similar symptoms. The graph gives useful information. It does not identify every problem in the roots.",
+    "title": "One symptom can have several causes",
+    "visual": {
+      "type": "evidence",
+      "labels": [
+        "Graph information",
+        "Physical checks",
+        "Root observations"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p01",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 0,
+    "text": "Crop steering means control of conditions to influence crop growth. These lessons explain irrigation. Irrigation supplies water to the crop.",
+    "title": "Irrigation supplies water",
+    "visual": {
+      "type": "drainage",
+      "labels": [
+        "Irrigation supplies water",
+        "Water reaches the substrate",
+        "Excess can drain"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p02",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 1,
+    "text": "The important irrigation settings control the time and quantity of each water delivery. The interval between deliveries is also important. Light, temperature, and humidity change the demand for water.",
+    "title": "Delivery settings and water demand",
+    "visual": {
+      "type": "controls",
+      "labels": [
+        "Time and interval",
+        "Quantity of water",
+        "Light, heat, humidity"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p03",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 2,
+    "text": "Later lessons explain vegetative steering and generative steering. These are directions of crop management. They do not guarantee a specific yield. Maximum drying is not the objective. The roots must continue to function correctly.",
+    "title": "Steering must support working roots",
+    "visual": {
+      "type": "steering",
+      "labels": [
+        "Vegetative direction",
+        "Generative direction",
+        "Keep roots functioning"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p04",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 3,
+    "text": "A sensor measures conditions at a specific location. One sensor does not measure every pot. A satisfactory reading does not prove that every dripper is clear.",
+    "title": "A probe measures one location",
+    "visual": {
+      "type": "sensor",
+      "labels": [
+        "Local sensing region",
+        "Check other pots and drippers",
+        "One reading is local"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p05",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 4,
+    "text": "Use sensor readings with equipment checks and crop observations.",
+    "title": "Use three kinds of evidence",
+    "visual": {
+      "type": "evidence",
+      "labels": [
+        "Sensor readings",
+        "Equipment checks",
+        "Crop observations"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p06",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 5,
+    "text": "The demo lets you learn the software without operation of a real pump. You do not need all the equipment to use the demo. For a new irrigation system, start with one zone.",
+    "title": "Learn in the demo",
+    "visual": {
+      "type": "demo",
+      "labels": [
+        "Practice without a real pump",
+        "New system: start with one zone"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p07",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 6,
+    "text": "Point to the solid material in the drawing. Point to the water. Point to the air. Give one example of information that the sensor cannot supply.",
+    "title": "Point to solids, water and air",
+    "visual": {
+      "type": "root-zone",
+      "labels": [
+        "Solid material",
+        "Water",
+        "Air"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p08",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 7,
+    "text": "The next lesson explains volumetric water content, or VWC.",
+    "title": "Next: volumetric water content",
+    "visual": {
+      "type": "next",
+      "labels": [
+        "VWC",
+        "Water volume in the measured sample"
+      ]
+    }
+  }
+]

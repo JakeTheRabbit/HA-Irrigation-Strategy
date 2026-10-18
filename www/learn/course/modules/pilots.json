@@ -183,9 +183,9 @@
       }
     ],
     "video": {
-      "src": "media/pilots/A1.mp4",
-      "captions": "media/pilots/A1.vtt",
-      "voice": "Saved custom voice: Scarjo"
+      "src": "media/pilots/A1.mp4?v=20261019r2",
+      "captions": "media/pilots/A1.vtt?v=20261019r2",
+      "voice": "Kokoro af_heart · paragraph-matched edition"
     }
   },
   {
@@ -374,9 +374,9 @@
       }
     ],
     "video": {
-      "src": "media/pilots/A2.mp4",
-      "captions": "media/pilots/A2.vtt",
-      "voice": "Saved custom voice: Scarjo"
+      "src": "media/pilots/A2.mp4?v=20261019r2",
+      "captions": "media/pilots/A2.vtt?v=20261019r2",
+      "voice": "Kokoro af_heart · paragraph-matched edition"
     }
   },
   {
@@ -566,9 +566,9 @@
       }
     ],
     "video": {
-      "src": "media/pilots/A3.mp4",
-      "captions": "media/pilots/A3.vtt",
-      "voice": "Saved custom voice: Scarjo"
+      "src": "media/pilots/A3.mp4?v=20261019r2",
+      "captions": "media/pilots/A3.vtt?v=20261019r2",
+      "voice": "Kokoro af_heart · paragraph-matched edition"
     }
   },
   {
@@ -773,9 +773,9 @@
       }
     ],
     "video": {
-      "src": "media/pilots/B1.mp4",
-      "captions": "media/pilots/B1.vtt",
-      "voice": "Saved custom voice: Scarjo"
+      "src": "media/pilots/B1.mp4?v=20261019r2",
+      "captions": "media/pilots/B1.vtt?v=20261019r2",
+      "voice": "Kokoro af_heart · paragraph-matched edition"
     }
   },
   {
@@ -978,9 +978,9 @@
       }
     ],
     "video": {
-      "src": "media/pilots/C1.mp4",
-      "captions": "media/pilots/C1.vtt",
-      "voice": "Saved custom voice: Scarjo"
+      "src": "media/pilots/C1.mp4?v=20261019r2",
+      "captions": "media/pilots/C1.vtt?v=20261019r2",
+      "voice": "Kokoro af_heart · paragraph-matched edition"
     }
   }
 ]

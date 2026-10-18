@@ -28,7 +28,7 @@ A free course for people who have never used a substrate probe or crop-steering 
 - **Learn at your pace:** transcripts, captions, playback speed, a glossary and recall reminders. Progress stays in your browser; export it to keep a copy.
 - **Practise safely:** synthetic calculations and graphs never operate Home Assistant. Physical setup and commissioning require competent local supervision. Quiz passes are knowledge-practice records, not hardware certification.
 
-The pilots use the saved Scarjo voice. New lessons use locally generated Kokoro `af_heart` narration. Scripts use ASD-STE100 principles; full formal conformance and learner outcomes have not been certified. [Course guide and production details](docs/ACADEMY.md) · [Learner workbook](docs/training/crop-steering-from-zero/WORKBOOK.md).
+All lessons use locally generated Kokoro `af_heart` narration. The five 480p pilot videos have been rebuilt with 108 paragraph-matched visual cards. Scripts use ASD-STE100 principles; full formal conformance and learner outcomes have not been certified. [Course guide and production details](docs/ACADEMY.md) · [Learner workbook](docs/training/crop-steering-from-zero/WORKBOOK.md).
 
 ## Safety first
 

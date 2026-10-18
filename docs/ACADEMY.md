@@ -1,10 +1,10 @@
 # Crop Steering Academy
 
-The [delivered edition and verification record](training/crop-steering-from-zero/DELIVERY-2026-10-19.md) distinguishes the live website from the source review and application release process.
+The [pilot repair record](training/crop-steering-from-zero/PILOT-REPAIR-2026-10-19.md) explains the current narration and visual edit. The [original delivery record](training/crop-steering-from-zero/DELIVERY-2026-10-19.md) distinguishes the live website from the source review and application release process.
 
 [Open the academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Try the isolated software demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Course plan and workbook](training/crop-steering-from-zero/README.md)
 
-The academy teaches a beginner to explain a reading, understand a watering day and check what a Crop Steering action changes. It contains **24 lessons and 153 slides**. Five lessons preserve the saved Scarjo pilot videos in 480p, covering 27 slides. The other 19 lessons provide 126 interactive slides with locally generated Kokoro `af_heart` narration. The public learning exercises do not connect to Home Assistant or operate equipment.
+The academy teaches a beginner to explain a reading, understand a watering day and check what a Crop Steering action changes. It contains **24 lessons and 153 slides**. Five lessons provide rebuilt 480p pilot videos, covering 27 slides through 108 paragraph-matched visual cards. The other 19 lessons provide 126 interactive slides with locally generated Kokoro `af_heart` narration. The public learning exercises do not connect to Home Assistant or operate equipment.
 
 ## Choose a learning route
 
@@ -48,7 +48,7 @@ For real equipment, follow the [installation guide](INSTALL.md), the exact manuf
 
 The writing uses short sentences, consistent terms and explicit actions informed by [ASD-STE100 Simplified Technical English](https://www.asd-ste100.org/). It has not undergone a full controlled-language conformity assessment and is **not represented as formally compliant or certified**.
 
-The five preserved pilot videos use the saved custom voice named Scarjo. The 19 new lessons use synthetic speech generated locally with [Kokoro ONNX](https://github.com/thewh1teagle/kokoro-onnx), voice `af_heart`. Native web slides and editable SVG diagrams explain the remaining material; they are not footage of physical installation. Caption timings and transcripts accompany the narration.
+All 24 lessons now use synthetic speech generated locally with [Kokoro ONNX](https://github.com/thewh1teagle/kokoro-onnx), voice `af_heart`. Native web slides and editable SVG diagrams explain the remaining material; they are not footage of physical installation. Caption timings and transcripts accompany the narration.
 
 **Human listening review has not been performed.** File validation, caption generation and browser playback checks do not establish pronunciation, pacing or instructional quality. The course also has no completed learner outcome trial. These remain explicit review tasks when assessing a later edition.
 
@@ -63,10 +63,11 @@ python scripts/build_course.py
 node --test tests/academy.test.mjs
 python -m unittest tests.test_course_media -v
 python scripts/install_course_media.py
-python -m http.server 8080 --directory www
+npm ci --prefix frontend
+node frontend/node_modules/vite/bin/vite.js www --host 127.0.0.1 --port 8080
 ```
 
-Open [the local academy](http://localhost:8080/learn/). Use an HTTP server rather than opening the HTML file directly, because the course loads JSON and media resources. The catalogue compiler validates lesson IDs, required content, quiz answers and prerequisites, then writes `www/learn/course/course.json`. It does not regenerate narration.
+Open [the local academy](http://localhost:8080/learn/). Use the Vite preview server rather than opening the HTML file directly. It serves JSON, modules and byte-range requests for video seeking; Python’s basic HTTP server does not provide reliable seeking in this browser. The catalogue compiler validates lesson IDs, required content, quiz answers and prerequisites, then writes `www/learn/course/course.json`. It does not regenerate narration.
 
 Large media masters stay outside Git history. Pages installs a versioned public release bundle using `www/learn/course/media-release.json`, which supplies an HTTPS `url` and the whole-archive `sha256`. The [installer](../scripts/install_course_media.py) verifies that pin before inspecting the ZIP, requires root `manifest.json` schema 1, binds each declared path to its byte count and SHA-256, rejects unsafe members, and stages a complete replacement. Every non-manifest file must be declared; the manifest does not list itself. The destination is restricted to this repository's `www/learn/media`.
 

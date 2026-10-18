@@ -6,7 +6,7 @@
 
 Start inside the pot: water, roots and air. Learn what VWC and EC actually measure, then read a watering day and practise the control workflow. Builders continue through supported host installation, mapping and supervised commissioning. Operators can learn with fictional data before a local handover.
 
-The 19 October 2026 academy edition contains **24 lessons and 153 slides**. Five preserved Scarjo pilot videos are delivered in 480p and cover 27 slides. The remaining 19 lessons contain 126 interactive slides with locally generated Kokoro `af_heart` narration. This directory holds the supporting teaching pack; editable lesson data and native SVG diagrams live in the website source.
+The 19 October 2026 academy edition contains **24 lessons and 153 slides**. Five rebuilt pilot videos are delivered in 480p and cover 27 slides through 108 paragraph-matched visual cards. The remaining 19 lessons contain 126 interactive slides with locally generated Kokoro `af_heart` narration. This directory holds the supporting teaching pack; editable lesson data and native SVG diagrams live in the website source.
 
 ## Choose your sequence
 
@@ -47,7 +47,7 @@ Planning documents can describe an earlier production intention. The current web
 
 All crop numbers are examples. A software OFF state is not physical isolation. Watering OFF also blocks Controller test shots. First-water commissioning needs an installer-approved equipment catch test with the Controller disabled; a supervised enabled Controller cycle follows only after every readiness check passes. Prove the correct outlet, actual stopping and no unwanted siphon. No mains wiring tutorial is supplied.
 
-The writing uses principles from [ASD-STE100](https://www.asd-ste100.org/), including short instructions and consistent terms. It has not been assessed for full formal conformance. The five pilot videos use the saved custom Scarjo voice; the other lessons use synthetic narration generated locally through [Kokoro ONNX](https://github.com/thewh1teagle/kokoro-onnx). Native slides are teaching illustrations, not footage proving an installation.
+The writing uses principles from [ASD-STE100](https://www.asd-ste100.org/), including short instructions and consistent terms. It has not been assessed for full formal conformance. All lessons use synthetic narration generated locally through [Kokoro ONNX](https://github.com/thewh1teagle/kokoro-onnx). Native slides are teaching illustrations, not footage proving an installation.
 
 **Human listening review has not been performed.** Automated file and caption checks do not prove pronunciation, pacing, instructional quality or learner outcomes. The course does not certify an installation or replace manufacturer documentation and competent local supervision.
 

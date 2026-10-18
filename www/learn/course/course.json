@@ -2,7 +2,7 @@
   "schema": 1,
   "title": "Crop Steering Academy",
   "description": "Learn the root zone, understand a watering day, and practise each control before live operation.",
-  "edition": "2026-10-19",
+  "edition": "2026-10-19-r2",
   "lessons": [
     {
       "id": "A1",
@@ -188,9 +188,9 @@
         }
       ],
       "video": {
-        "src": "media/pilots/A1.mp4",
-        "captions": "media/pilots/A1.vtt",
-        "voice": "Saved custom voice: Scarjo"
+        "src": "media/pilots/A1.mp4?v=20261019r2",
+        "captions": "media/pilots/A1.vtt?v=20261019r2",
+        "voice": "Kokoro af_heart · paragraph-matched edition"
       }
     },
     {
@@ -379,9 +379,9 @@
         }
       ],
       "video": {
-        "src": "media/pilots/A2.mp4",
-        "captions": "media/pilots/A2.vtt",
-        "voice": "Saved custom voice: Scarjo"
+        "src": "media/pilots/A2.mp4?v=20261019r2",
+        "captions": "media/pilots/A2.vtt?v=20261019r2",
+        "voice": "Kokoro af_heart · paragraph-matched edition"
       }
     },
     {
@@ -571,9 +571,9 @@
         }
       ],
       "video": {
-        "src": "media/pilots/A3.mp4",
-        "captions": "media/pilots/A3.vtt",
-        "voice": "Saved custom voice: Scarjo"
+        "src": "media/pilots/A3.mp4?v=20261019r2",
+        "captions": "media/pilots/A3.vtt?v=20261019r2",
+        "voice": "Kokoro af_heart · paragraph-matched edition"
       }
     },
     {
@@ -1681,9 +1681,9 @@
         }
       ],
       "video": {
-        "src": "media/pilots/B1.mp4",
-        "captions": "media/pilots/B1.vtt",
-        "voice": "Saved custom voice: Scarjo"
+        "src": "media/pilots/B1.mp4?v=20261019r2",
+        "captions": "media/pilots/B1.vtt?v=20261019r2",
+        "voice": "Kokoro af_heart · paragraph-matched edition"
       }
     },
     {
@@ -2801,9 +2801,9 @@
         }
       ],
       "video": {
-        "src": "media/pilots/C1.mp4",
-        "captions": "media/pilots/C1.vtt",
-        "voice": "Saved custom voice: Scarjo"
+        "src": "media/pilots/C1.mp4?v=20261019r2",
+        "captions": "media/pilots/C1.vtt?v=20261019r2",
+        "voice": "Kokoro af_heart · paragraph-matched edition"
       }
     },
     {
@@ -6589,7 +6589,7 @@
     }
   ],
   "disclosures": {
-    "narration": "Five pilot videos use the saved Scarjo custom voice; 19 new slide lessons use locally generated Kokoro af_heart speech.",
+    "narration": "All lessons use locally generated Kokoro af_heart speech. Five rebuilt 480p pilot videos use 108 paragraph-matched visual cards.",
     "language": "Written using ASD-STE100 principles. Not certified or represented as full formal conformance.",
     "evidence": "Research-informed instructional design; no learner outcome trial has been conducted.",
     "progress": "Local browser knowledge-practice record, not certification, verified identity or proof of safe hardware."

@@ -273,7 +273,7 @@ function productionNotes() {
     node(
       "p",
       "",
-      "The five pilot videos use the saved synthetic Scarjo voice. New slide lessons use the locally generated Kokoro af_heart voice. Readable transcripts remain available alongside narration.",
+      "All lessons use the locally generated Kokoro af_heart voice. The five pilot videos use paragraph-matched diagrams. Readable transcripts remain available alongside narration.",
     ),
     link(
       "Read the course guide, production notes and sources",
@@ -638,7 +638,7 @@ async function render(focus = true) {
 }
 async function start() {
   try {
-    const response = await fetch("course/course.json");
+    const response = await fetch("course/course.json?v=20261019r2");
     if (!response.ok) throw Error("Course data returned " + response.status);
     course = await response.json();
     if (!Array.isArray(course.lessons) || !course.lessons.length)

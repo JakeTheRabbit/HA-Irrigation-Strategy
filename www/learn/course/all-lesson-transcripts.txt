@@ -1,6 +1,6 @@
-CROP STEERING ACADEMY — EDITION 2026-10-19
+CROP STEERING ACADEMY — EDITION 2026-10-19-r2
 
-Five pilot videos use the saved Scarjo custom voice; 19 new slide lessons use locally generated Kokoro af_heart speech.
+All lessons use locally generated Kokoro af_heart speech. Five rebuilt 480p pilot videos use 108 paragraph-matched visual cards.
 
 Written using ASD-STE100 principles. Not certified or represented as full formal conformance.
 
