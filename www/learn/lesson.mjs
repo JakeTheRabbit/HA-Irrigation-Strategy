@@ -235,14 +235,41 @@ export function renderLesson({
       const captionSource = resource(
         lesson.video.captions?.src || lesson.video.captions || "",
       );
+      const captionArea = el("div");
       if (lesson.video.captions && captionSource) {
         const track = el("track");
         track.kind = "captions";
         track.srclang = "en";
         track.label = "English captions";
         track.src = captionSource;
-        track.default = true;
         video.append(track);
+        const toggle = el("input");
+        toggle.type = "checkbox";
+        toggle.checked = true;
+        const label = el("label");
+        label.append(toggle, document.createTextNode(" Show captions below video"));
+        const captions = el("p", "media-captions pilot-captions",
+          "Captions appear here during narration. The full transcript is below.");
+        const textTrack = track.track;
+        const updateCaptions = () => {
+          captions.hidden = !toggle.checked || textTrack.mode === "showing";
+          const cues = Array.from(textTrack.activeCues || []);
+          captions.textContent = cues.length
+            ? cues.map(cue => cue.text).join(" ")
+            : "Narration paused or between caption cues. Read the transcript below at any time.";
+        };
+        // Keep cues loaded without drawing them over the teaching diagram.
+        textTrack.mode = "hidden";
+        textTrack.addEventListener("cuechange", updateCaptions);
+        video.textTracks.addEventListener("change", updateCaptions);
+        toggle.addEventListener("change", () => {
+          textTrack.mode = "hidden";
+          updateCaptions();
+        });
+        track.addEventListener("error", () => {
+          captions.textContent = "Timed captions could not load. Read the complete transcript below.";
+        });
+        captionArea.append(label, captions);
       }
       const unavailable = el("p", "muted");
       unavailable.setAttribute("role", "status");
@@ -253,6 +280,7 @@ export function renderLesson({
       video.addEventListener("play", () => currentMedia?.pause());
       area.append(
         video,
+        captionArea,
         unavailable,
         el(
           "p",

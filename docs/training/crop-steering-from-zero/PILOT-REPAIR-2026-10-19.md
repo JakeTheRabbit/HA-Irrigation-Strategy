@@ -18,6 +18,8 @@ All 108 source cards were checked for complete, exact paragraph coverage. Native
 
 **Human listening review has not been performed.** These checks establish source binding, timing, readable graphics and file behaviour. They do not establish that every learner likes the replacement voice or prove learning outcomes. Synthetic diagrams do not prove hardware behaviour.
 
+The web player displays captions below the picture so that paused controls and captions do not cover diagram labels. A browser regression check verifies the spoken cue, caption position and show/hide control.
+
 ## Revised publication bundle
 
 The revision contains 264 declared media files and 153 source bindings. Its ZIP is 101,651,238 bytes with SHA-256 `8481c52fefb64cd50785d23a5da45aa7b6856279eb4e741c7e94ff78381d93fb`. The revised bundle was installed locally through the checksum-verifying installer. All 126 narration tracks and their captions for the other 19 lessons retain their previous hashes.

@@ -6,7 +6,7 @@ import {
   nextLesson,
   reviewDue,
 } from "./state.mjs";
-import { renderLesson } from "./lesson.mjs";
+import { renderLesson } from "./lesson.mjs?v=20261019r2";
 import { renderPractice } from "./labs.mjs";
 const main = document.querySelector("#main");
 const notice = document.querySelector("#storage-notice");
