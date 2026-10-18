@@ -1,5 +1,7 @@
 # Crop Steering Academy
 
+The [delivered edition and verification record](training/crop-steering-from-zero/DELIVERY-2026-10-19.md) distinguishes the live website from the source review and application release process.
+
 [Open the academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Try the isolated software demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Course plan and workbook](training/crop-steering-from-zero/README.md)
 
 The academy teaches a beginner to explain a reading, understand a watering day and check what a Crop Steering action changes. It contains **24 lessons and 153 slides**. Five lessons preserve the saved Scarjo pilot videos in 480p, covering 27 slides. The other 19 lessons provide 126 interactive slides with locally generated Kokoro `af_heart` narration. The public learning exercises do not connect to Home Assistant or operate equipment.

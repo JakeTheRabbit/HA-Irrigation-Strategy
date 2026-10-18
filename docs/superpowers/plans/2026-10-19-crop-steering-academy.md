@@ -59,7 +59,7 @@ No further Higgsfield generation after the five-pilot revision. No live HA write
 - [x] Integrate academy into Pages build and link from repository/documentation.
 - [x] Build and test existing frontend; inspect whole change and resolve material findings.
 - [ ] Commit only owned files, push authorized main, publish versioned media and deploy Pages.
-- [ ] Verify public course, all lesson data/media, captions, mobile screenshots and progress behavior.
+- [x] Verify public course, all lesson data/media, captions, mobile screenshots and progress behavior.
 
 Ruling: User explicitly authorized autonomous implementation and hosting; no additional plan-approval stop is required. Choose reversible static-site defaults and report actual limitations.
 
@@ -68,3 +68,5 @@ Ruling: Microsoft speech preflight failed with a service 403. Use locally genera
 Local verification: 9 knowledge/practice/catalogue tests pass; 17 media-installer tests pass with one Windows directory-symlink test skipped. ZIP symlink rejection passes. Frontend production build, repository Ruff, Black (122 files) and tracked YAML lint pass. Real-data Edge checks cover all 24 lessons, critical-answer blocking/retry, resume/import/export/reset, storage denial, keyboard focus and 320–1440px layouts. Six axe scans report no tested A/AA violations. These automated checks are not a complete accessibility certification or human listening review.
 
 Media acceptance: 126 new tracks, 74.52 minutes, 1,455 non-overlapping timed caption cues, all source words retained. All 153 slide bindings match current narration. Local install verifies 263 archive members; all 131 playable items decode and advance in Edge. A transient playback failure during changing local media was investigated with a fresh-context reproduction, unchanged matching file/HTTP hashes and a complete successful stable-bundle rerun. Clean staged-source snapshot passes both line-ending checks; the existing Windows working tree fails that broad check because of pre-existing CRLF files and local artifacts. The targeted installer/container/promotion checks otherwise pass (83 passed, one skip, 11 subtests).
+
+Publication completed through the existing permitted `gh-pages` channel: Pages run 39157278122 succeeded and every public media item passed playback. Source PR #190 targets `testing`. The requested direct push to `main` was rejected by protection; CONTRIBUTING.md and the release guard require separate human review and production promotion. No main merge, application release, hardware soak or live HA write is claimed. The remaining main-promotion checkbox is intentionally open; it is not a blocker to using the published academy.

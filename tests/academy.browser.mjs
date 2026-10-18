@@ -71,6 +71,11 @@ try {
   assert.equal(course.lessons[0].id, "A1");
   await open();
   await page.locator(".hero img").waitFor();
+  await page.locator(".hero img").evaluate(async (image) => {
+    await image.decode();
+    if (!image.naturalWidth)
+      throw Error("Hero image did not decode: " + image.src);
+  });
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({
     path: path.join(root, "img/academy-home.png"),
