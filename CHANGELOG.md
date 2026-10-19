@@ -9,6 +9,22 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.16.1] - 2026-10-20
+
+Pair: **controller 3.16.1**. **C0: teaching documentation and website.** Controller, engine, integration runtime, dashboard bundle, entities, options and persisted state are unchanged. Published at the owner's request; no soak is required for C0 and none is claimed.
+
+### 🌱 In plain English
+
+- **Learn crop steering from zero.** A free beginner course, the Crop Steering Academy, now ships with the project and on the project website: 24 short captioned lesson videos, five longer chaptered parts, exercises with feedback and full transcripts.
+- **Water, roots and air first.** The lessons build from physical basics to VWC, capacity, dryback, EC, reading the graphs, equipment, setup and day-to-day operation.
+- **Nothing changes on your box.** Updating changes no setting, no irrigation behaviour and no screen in the dashboard.
+
+### 🔧 Technical notes
+
+- New `www/learn/` academy (catalogue, player, navigation, quiz progress export/import) and `docs/training/` course sources; GitHub Pages builds and installs checksum-pinned narration and video from the `course-media-2026.10.19-r3` pre-release.
+- Course production scripts (`scripts/render_*`, `scripts/package_course_videos.py`, `scripts/pilot_timing.py`) and their Python/Node/browser tests. Release packaging workflow and Pages workflow updated for the academy; no runtime workflow gate changed.
+- No change to `addons/f2_control/`, `custom_components/crop_steering/` code, `crop-steering-engine/`, entity ids, add-on options or `/data/state.json`. Version fields advance together only to keep `main` on a tagged pair.
+
 ## [3.16.0] - 2026-10-18
 
 Pair: **controller 3.16.0**. **C1: dashboard and operator guidance.** Controller and integration runtime behavior are unchanged. Published at the owner's request after the live UI rehearsal; no full photoperiod or physical water-delivery soak is claimed.

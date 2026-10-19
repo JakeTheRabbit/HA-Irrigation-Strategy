@@ -19,6 +19,11 @@ for the people who build the system:
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
 
+## 3.16.1 - 2026-10-20
+
+- Learn crop steering from the ground up with the new free video course on the project website.
+- Bug fixes and improvements.
+
 ## 3.16.0 - 2026-10-18
 
 - See every room and zone together, with moisture, water delivery and feed supply at a glance.
