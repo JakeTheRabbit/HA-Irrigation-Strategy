@@ -11,6 +11,8 @@ on:
     paths:
       - 'www/**'
       - 'frontend/**'
+      - 'scripts/build_course.py'
+      - 'scripts/install_course_media.py'
       - '.github/workflows/pages.yml'
   workflow_dispatch:
 
@@ -38,6 +40,14 @@ jobs:
         run: |
           npm ci --prefix frontend
           npm run build --prefix frontend
+      - name: Build and verify academy catalogue
+        run: |
+          python scripts/build_course.py
+          node --test tests/academy.test.mjs
+      - name: Install pinned academy narration and video
+        run: |
+          python scripts/install_course_media.py
+          python scripts/build_course.py --verify-media
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

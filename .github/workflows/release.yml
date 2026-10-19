@@ -14,6 +14,7 @@ concurrency:
 
 jobs:
   package:
+    if: github.event_name != 'release' || startsWith(github.event.release.tag_name, 'v')
     name: Build release artifacts
     runs-on: ubuntu-latest
     timeout-minutes: 20

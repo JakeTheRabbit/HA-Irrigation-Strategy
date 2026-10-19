@@ -59,3 +59,7 @@ htmlcov/
 
 # The standalone controller's token file (docker-compose.yml)
 /ha_token.txt
+
+# Generated academy media is pinned in a versioned release and installed for Pages.
+/www/learn/media/**
+.playwright-cli/

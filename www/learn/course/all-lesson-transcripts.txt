@@ -1,0 +1,1448 @@
+CROP STEERING ACADEMY — EDITION 2026-10-19-r3
+
+All 24 lessons have captioned videos with locally generated Kokoro af_heart narration, AI-generated teaching illustrations, native diagrams and captures of the real application. Teaching images and screenshots do not verify a physical installation.
+
+Written using ASD-STE100 principles. Not certified or represented as full formal conformance.
+
+All numerical crop settings are examples. Online practice is not hardware certification.
+
+
+A1 — Before the buttons: water, roots and air
+
+Start with the pot: roots need access to water and oxygen. A sensor describes only a small part of the root zone.
+
+
+The question
+
+Before you use the dashboard, identify the conditions inside the pot.
+
+What do the roots need?
+
+
+Inside the root zone
+
+Picture a handful of gravel. The pieces are solid, but there are gaps between them. A pot also contains solid material and spaces. The growing material around the roots is called substrate; coco and stone wool are examples.
+
+Those spaces can contain water or air. Roots take up water, and they also need oxygen. Filling every space with water leaves less room for air.
+
+So pouring in more water is not always helpful. The substrate needs to hold water, let excess drain away, and allow air back into some spaces.
+
+
+Watch water arrive and drain
+
+Look at the spare container. Water enters the substrate. Some water stays in the substrate. Other water drains into the tray.
+
+The amount of water then decreases. The plant uses some water. Evaporation and drainage also remove water.
+
+A decrease in water content does not show only the water that the plant used.
+
+
+Pause before adding water
+
+This pot stays very wet. The leaves look unhealthy. Does this mean that you must add more water?
+
+Choose one answer. Add more water immediately. Or do a check to find the cause first.
+
+Do a check first.
+
+Different problems can cause similar symptoms. The graph gives useful information. It does not identify every problem in the roots.
+
+
+What steering and sensing can do
+
+Think of driving a car: you make adjustments to keep it on course. Crop steering means adjusting growing conditions to influence growth. Here we focus on irrigation, which means supplying water to the crop.
+
+With irrigation, you choose when water arrives, how much arrives, and how long to wait before the next delivery. Light, temperature and humidity also change how much water the crop needs.
+
+Later we will name two steering directions: vegetative and generative. They describe management intended to influence leafy growth or reproductive development. Neither guarantees yield. Drying the pot as much as possible is not the goal; roots must keep working.
+
+A thermometer in one room cannot tell you the temperature in every room. A moisture sensor has the same local limit: one reading does not describe every pot or prove every dripper is clear.
+
+Use sensor readings with equipment checks and crop observations.
+
+Practise in the demo first; it does not operate a real pump. For a new installation, start with one zone: a group of plants whose water delivery is controlled together.
+
+Point to the solid material in the drawing. Point to the water. Point to the air. Give one example of information that the sensor cannot supply.
+
+The next lesson explains volumetric water content, or VWC.
+
+
+INDEPENDENT PRACTICE
+
+Draw an unplanted pot. Label solids, water and air. Explain why one local moisture reading cannot prove that every plant has the same conditions.
+
+Compare your reasoning: Pore spaces contain water or air. Roots need oxygen as well as water. A local probe cannot establish every container’s condition.
+
+
+SOURCES
+
+Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
+
+METER: soil volumetric water content: https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/
+
+Athena Commercial Handbook: source guide and background (not a software specification): https://growershub.athenaag.com/athena-handbook-v41iwrqr
+
+Athena: Precision Irrigation Strategy: https://support.athenaag.com/hc/en-us/articles/25975395644315-Precision-Irrigation-Strategy
+
+
+A2 — VWC: what does 60% actually mean?
+
+Use equal volumes to understand volumetric water content, then separate VWC from plant-available water.
+
+
+Recall before the reveal
+
+The previous lesson showed three parts inside the pot.
+
+Name these parts before the answer appears.
+
+
+Six out of ten
+
+The three parts are solid material, water, and air.
+
+Think of ten equal boxes making up the whole sample. How many boxes worth of water are inside it? That is the idea behind volumetric water content, or VWC: water volume divided by total sample volume, shown as a percentage.
+
+In the drawing, water takes up six of the ten equal volumes. Six divided by ten is zero point six. Multiply by one hundred: sixty percent.
+
+The blocks make the arithmetic visible. In real substrate, that water is spread through spaces between solid parts. It does not sit in six separate water blocks.
+
+
+Put litres beside the fraction
+
+Use a larger example: a total substrate sample of five litres at sixty percent VWC. Five times zero point six is three, so this sample contains three litres of water.
+
+Imagine labelling the sample: three litres of water already inside. That label is not a watering instruction. It does not tell you to pour another three litres into a five litre pot.
+
+
+The probe sees a region
+
+Sixty percent of the total volume is water. Is all the remaining forty percent air?
+
+No. The remaining volume includes solid material and air. VWC alone does not give the complete air volume.
+
+Do not read VWC like a fuel gauge showing how much usable fuel remains. Water in substrate is not all equally easy for roots to take up. Some is held more tightly. The same VWC in different substrates can mean different conditions for the plant.
+
+Look at the probe. Its position and contact with the substrate matter. Calibration means checking how its output relates to the quantity being measured. These things affect whether the local reading is trustworthy.
+
+A probe near one dripper might not represent a dry pot at the end of a row. Later lessons explain how to select locations that represent the zone.
+
+
+Teach it back
+
+The sensor now shows forty percent VWC. Does this reading always mean that the substrate is too dry?
+
+No. Forty percent in one substrate can mean something different in another. Use your substrate, checked reference values, crop and current conditions to interpret it. There is no single VWC target for every system.
+
+Do not select a target yet. Complete this sentence. Sixty percent VWC means what?
+
+Approximately sixty percent of the measured sample volume is water. This is one correct answer.
+
+The reading does not give the exact water volume available to the plant. One sensor does not prove that all pots have the same conditions.
+
+Use these limits when you assess advice about VWC.
+
+Next, a kitchen sponge will help explain saturation, water left after drainage, and the reference number in the app.
+
+
+INDEPENDENT PRACTICE
+
+Imagine ten equal total substrate volumes. Four contain water. What is VWC? What else may occupy the remaining six?
+
+Compare your reasoning: 40% VWC. The remainder includes solids and air; it is not automatically 60% air or 60% usable water.
+
+
+SOURCES
+
+Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
+
+METER: soil volumetric water content: https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/
+
+
+A3 — The sponge, the pot and the Post-it
+
+Use a kitchen sponge to understand saturation, water left after drainage, and why an app reference cannot change the water in a pot.
+
+
+Start with a kitchen sponge
+
+Dunk a kitchen sponge, then lift it out, dripping. Water fills the spaces inside it. Picture that as saturation.
+
+The sponge material has not vanished. In substrate, water also fills spaces between solids. Saturation does not mean one hundred percent of the total sample is water.
+
+
+Let it drip, without squeezing
+
+Hold the sponge over the sink. Do not squeeze it. Let the excess water drip away. It still feels wet, but some spaces now contain air again.
+
+Soaked and dripping, then wet after drainage: those are two different conditions. The same distinction matters in a pot, where roots need both water and oxygen.
+
+
+From the sponge to the pot
+
+Now wet a spare container of substrate. Let excess water drain using a suitable, repeatable check. Do not squeeze the substrate.
+
+The water left after that check is its container capacity: water held under those particular container and drainage conditions.
+
+Tall and shallow containers can retain different amounts. Substrate matters too. One sponge cannot tell you what every pot holds.
+
+This drainage check describes container capacity. The app also has a field capacity reference. Check how it is set: automatic updates can follow observed wet peaks. A wet peak alone is not a drained-container measurement.
+
+Repeat with the same substrate, container, starting condition and drainage procedure. There is no single drainage time for every setup.
+
+Check probe placement and contact. Compare its reading with container weight and drainage. A number alone cannot show that the check worked.
+
+Example: a one litre total substrate sample contains six hundred millilitres of water. Six hundred divided by one thousand is sixty percent VWC: volumetric water content.
+
+
+A Post-it cannot add water
+
+Imagine writing that sixty percent on a Post-it beside the sponge. Changing the Post-it to seventy percent would not add a drop of water.
+
+The app reference works like that note. It tells the program which number to use. The edit itself adds no water.
+
+
+Change the note: what happens?
+
+You change the app reference from sixty to seventy percent. What happens to the water already in the pot?
+
+Nothing. You changed the note, not the water. A physical change needs water to enter or leave.
+
+And sixty percent was only our worked example. Your own container check could give a different result.
+
+The highest spike on a graph is not automatically the drained reference. It could be a brief wet peak or a bad reading.
+
+Think back to the sponge: dripping wet, then wet after excess water drains, then a note describing it.
+
+The first two describe physical conditions. The note, like the app setting, describes a reference supported by a suitable check.
+
+Next comes dryback: water content falls as water leaves. Keep the sponge and its Post-it separate mentally.
+
+
+INDEPENDENT PRACTICE
+
+Use a kitchen sponge over a sink: soak it, lift it dripping, then let excess water drain without squeezing. Describe what changed. Write a number on a note beside it, then change the number. Did the sponge gain water? Explain how this maps to a pot and the app reference.
+
+Compare your reasoning: You distinguish saturation from water retained after drainage, and explain that changing the reference number cannot add or remove water. A pot needs its own suitable, repeatable container check.
+
+
+SOURCES
+
+Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
+
+METER: soil volumetric water content: https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/
+
+
+A4 — Dryback without the confusing maths
+
+Use a familiar balance to understand a fall in water content, then calculate and label dryback.
+
+
+Think of a bank balance
+
+Imagine a bank balance falling from sixty dollars to forty-five. Fifteen dollars has gone. Now replace dollars with readings from the same water-content probe. Water content has fallen between two times. Growers call that fall dryback. The calculation describes the change. It cannot tell us how much went into the plant, drained away, or evaporated.
+
+
+First find the size of the fall
+
+VWC means the share of the measured sample volume occupied by water. Our example starts at sixty percent VWC and ends at forty-five percent. Subtract forty-five from sixty. The fall is fifteen percentage points. The word points matters because we are subtracting two percentage readings. Keep the starting reading and its time beside the ending reading.
+
+
+Then compare the fall with the start
+
+How large was that fall compared with the starting amount? Divide fifteen by sixty. That is one quarter. Multiply by one hundred to get twenty-five percent relative dryback. So this same fall is fifteen percentage points, or twenty-five percent of its start. Always divide by the starting reading for this calculation. A zero start cannot be used.
+
+
+Your turn, with the steps supplied
+
+Try the next example with help. Start at eighty percent VWC and finish at sixty. First subtract the end from the start. Then divide that answer by eighty and multiply by one hundred. Pause and write both answers. The fall is twenty percentage points. The relative dryback is twenty-five percent. Label each answer so another person can follow it.
+
+
+Try it without the steps
+
+Now use fifty percent to forty percent VWC. Work it out before continuing. The fall is ten percentage points. Ten divided by fifty, multiplied by one hundred, is twenty percent relative dryback. A useful record includes both readings, their times, and the labelled calculation. VWC describes water volume in the sampled region, rather than the percentage of usable water left.
+
+
+Read the field before entering a number
+
+The program uses relative dryback for its morning reference. With a sixty percent peak, a ten percent relative loss is six points. Sixty minus six gives a fifty-four percent VWC reference. Read the field help before entering a value. The reference tells the program what to compare against. The probe reading tells you what was observed.
+
+
+Recall the method
+
+Cover the examples and explain the method aloud. What are the starting and ending readings? What interval separates them? First subtract. For relative dryback, divide that fall by the start and multiply by one hundred. Finish the practice with new numbers. Before using a real record, check that its probe, units and timestamps match the situation you are describing.
+
+
+INDEPENDENT PRACTICE
+
+Calculate both dryback descriptions for 70% to 56% VWC. Then find the VWC reference for 10% relative dryback from a 50% peak.
+
+Compare your reasoning: 14 percentage points; 20% relative dryback; 45% VWC reference. Name the starting value used in each relative calculation.
+
+
+SOURCES
+
+Crop Steering: GROW_PLANS.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md
+
+Crop Steering: training/crop-steering-from-zero/WORKBOOK.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/WORKBOOK.md
+
+Athena Commercial Handbook: source guide and background (not a software specification): https://growershub.athenaag.com/athena-handbook-v41iwrqr
+
+Athena: Precision Irrigation Strategy: https://support.athenaag.com/hc/en-us/articles/25975395644315-Precision-Irrigation-Strategy
+
+
+A5 — EC: what it measures, and which EC you are looking at
+
+Understand EC using salted water, then identify where each conductivity measurement comes from.
+
+
+Start with salted water
+
+Think of making salted water stronger by dissolving more salt in it. A conductivity meter responds to how easily electrical current passes through that water. EC is short for electrical conductivity. It is a useful clue about dissolved salts. It does not list the amount of each nutrient. Keep the material being measured and its unit beside the number.
+
+
+Ask where the reading came from
+
+Follow the water. In the supply tank, we call the solution reading feed EC. A probe in the wet substrate can measure bulk EC: the combined material around it. Pore-water EC describes the water between the particles. Runoff is collected drainage. A laboratory extract uses its own collection procedure. These names describe different measurements, even when the units match.
+
+
+Worked example: label two readings
+
+Our tank sample reads two point zero millisiemens per centimetre. That unit is written mS slash cm. Label the record feed EC. The direct conductivity output from a TEROS twelve probe reads zero point eight in the same unit. Label it bulk EC. The difference alone does not diagnose a problem. The tank solution and the wet substrate are different things.
+
+
+A calculated value needs a method
+
+Some software estimates pore-water EC from bulk measurements. An estimate uses a calculation with required inputs and a range where it is reliable. Find that documented method before interpreting the result. Changing the display name does not perform the calculation. If the measurement type is unknown, record it as unknown while you trace its source.
+
+
+Your turn: finish the labels
+
+Finish these labels aloud. The supplied solution is feed EC. A cup collected under a stated drainage procedure is what? Water in the spaces between particles is what? Pause first. The answers are runoff EC and pore-water EC. Keep the drainage collection method with the result. Use the same measurement type and method when following a trend.
+
+
+Try a fresh record
+
+Try a supply reading of one point seven and a drainage reading of two point four, both in millisiemens per centimetre. Write feed EC and runoff EC beside them. Before interpreting the difference, check collection timing, the meter check, and temperature adjustment. These two numbers cannot identify a particular excessive nutrient or describe every part of every pot.
+
+
+Recall what the labels mean
+
+Cover the labels and name the four measurement locations again. EC describes conductivity. VWC describes the share of sample volume occupied by water. Neither is a direct measurement of how much water a plant can access. Keep each reading in its crop and substrate context. A useful comparison starts with the same kind of measurement, rather than a universal number to copy.
+
+
+INDEPENDENT PRACTICE
+
+Label these new samples: supply solution at 1.9 mS/cm; direct TEROS 12 output at 0.6 mS/cm; water extracted by a stated laboratory procedure at 2.7 mS/cm. Explain why these numbers cannot identify an individual deficient nutrient.
+
+Compare your reasoning: Feed EC; bulk EC; extract EC. EC gives conductivity information, not the concentration of each nutrient.
+
+
+SOURCES
+
+METER: Soil electrical conductivity, measurement types and conversions: https://metergroup.com/education-guides/soil-electrical-conductivity-the-complete-guide-to-measurements/
+
+METER TEROS 11/12 manual: measurements, installation and calibration: https://publications.metergroup.com/Manuals/20587_TEROS11-12_Manual_Web.pdf
+
+Crop Steering: training/crop-steering-from-zero/WORKBOOK.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/WORKBOOK.md
+
+
+A6 — Can you trust that reading?
+
+Check a reading as you would check a thermometer and a dated photograph: where it came from, when it arrived and whether it is reliable.
+
+
+A reading is a dated local observation
+
+A thermometer in the hallway cannot tell you the exact temperature in a bedroom. Yesterday’s photograph cannot show what the room looks like now. Treat a probe reading in the same way. Ask three separate questions. Is this the right location? Is the observation recent? Is the measurement reliable? A believable number can still fail one of those checks.
+
+
+Worked example: how old is it?
+
+The clock says two in the afternoon, or fourteen hundred. Probe A last supplied a valid observation at ten in the morning. Its reading is four hours old. Probe B updated at thirteen fifty-nine, one minute ago. We have calculated their ages. We have not established the current water content at A. A flat line might be steady conditions or missing updates.
+
+
+Check identity and units
+
+Next find the probe’s physical label and match it to the displayed room and zone. Then check units. A source value of zero point four five cubic metres per cubic metre is a fraction. Multiply by one hundred to display forty-five percent VWC. Reading it as zero point four five percent would create a hundredfold scale error.
+
+
+A fresh reading can still be inaccurate
+
+Accuracy is a separate question from age. Calibration is the method used to turn the sensor signal into a reported measurement. It must suit the sensor and substrate. Placement matters too. Air gaps near moisture-sensor needles can produce misleading readings. A probe near one dripper also samples a different place from the far side of the pot. Check the installation record.
+
+
+Your turn: calculate, then check
+
+It is fifteen thirty. The last valid observation was at fifteen twenty-five. Pause and calculate its age. The answer is five minutes. That answers freshness only. It does not prove the probe is correctly identified or calibrated. With the identity and units checked, look for suitable placement and calibration records. A recent reading still needs a trustworthy measurement behind it.
+
+
+Try a changed scenario
+
+Now compare forty-eight percent from twelve twenty with forty-three percent from sixteen nineteen. The current time is sixteen twenty. A is four hours old; B is one minute old. Check identities and last valid timestamps first. Then investigate availability and communications. Follow with appropriate physical evidence. The difference alone does not establish that every pot needs water.
+
+
+Recall the three questions
+
+Explain the three questions without looking: right probe, recent observation, reliable measurement. If sensing fails, record what you know and involve the responsible operator using the local fallback procedure. Lowering a protection to force irrigation leaves the sensing fault unresolved. Finish with a check record that separates the observation, its age, and the next step needed to trust it.
+
+
+INDEPENDENT PRACTICE
+
+At 09:45, probe A last reported 55% at 06:45. Probe B reports 50% at 09:44. Explain what is known, what remains unknown and your first three checks.
+
+Compare your reasoning: A is three hours old; B is one minute old. Current zone uniformity is unknown. Verify identity/timestamps, availability/communications, then suitable physical and calibration evidence.
+
+
+SOURCES
+
+METER TEROS 11/12 manual: measurements, installation and calibration: https://publications.metergroup.com/Manuals/20587_TEROS11-12_Manual_Web.pdf
+
+Crop Steering: USER_GUIDE.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Crop Steering: training/crop-steering-from-zero/WORKBOOK.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/WORKBOOK.md
+
+
+B1 — Read water and EC on the same graph
+
+Read both axes, find day and night, and keep recorded evidence separate from a planning reference.
+
+
+Start with time
+
+Think of a car dashboard: the speedometer and fuel gauge share one panel, but tell you different things. This graph puts water content and EC on one screen. We will learn what each line means.
+
+Read time along the bottom, like a diary laid out from left to right. Farther right means later. The shaded section is night in this example. The sensors can keep measuring through it.
+
+
+Add water content
+
+Start with the blue line: VWC, or water content by volume. Read its height against the percentage scale on the left. Use the time below to find when that reading happened.
+
+At this example point, the reading is sixty percent VWC. The solid line joins the observations so you can follow the change over time.
+
+A stale weather report cannot tell you the weather now. Check the age of live readings and look for missing sections. A smooth-looking line does not prove fresh, complete measurements.
+
+
+Add EC and a second scale
+
+Imagine a tiny electrical test through a sample. Dissolved salts help carry the current. EC, electrical conductivity, measures how readily current passes. Read EC on the right-hand scale, in millisiemens per centimetre.
+
+Before interpreting EC, ask where it was measured. A number from the tank does not automatically describe the water around the roots.
+
+Feed EC describes the irrigation solution. Bulk substrate EC measures the combined substrate region. Pore-water EC describes water in the spaces between solids. These are different measurements; identify which one your graph actually shows.
+
+Now the two lines cross on screen. Think of the speedometer needle and fuel-gauge needle pointing the same way. Would that make speed equal fuel? Do crossing VWC and EC lines mean equal measurements?
+
+No. One uses percent on the left; the other uses conductivity units on the right. Their screen positions depend on those scales. Follow how each measurement changes over time.
+
+Subtracting EC from VWC would be like subtracting litres from kilometres per hour. The quantities and units do not match. EC alone is not a complete nutrient recipe either.
+
+
+Events, observations and references
+
+On this teaching chart, delivery markers show when watering started. In the app, a dot marks a shot start; a ring marks a shot the watering software held. Neither alone measures water delivered. VWC may rise after water reaches the probe, then fall between deliveries.
+
+EC does not have to mirror VWC. Delivery, mixing, drainage, temperature, measurement method and crop conditions can affect it. Seeing two changes together does not prove that one caused the other.
+
+Think of a journey plan beside the trip you actually drove. The dashed planning reference comes from software settings. The measured line shows observations. They need different labels even if they happen to follow the same path.
+
+
+Continue into night; move a threshold
+
+Follow the planning line through the shaded night to the next morning. Like a route drawn on a map, it should be readable across the whole journey. A continuous line is still only a reference, not proof of tomorrow's crop response.
+
+Here the EC reference joins the last daytime reference to the next morning reference. The overnight phase is called P3. This join is not a separately scheduled P3 EC target, and it does not calculate how salts will behave overnight.
+
+Now watch this demo edit. We increase the P3 emergency VWC threshold in the local draft. The draft threshold changes from thirty-five percent to thirty-nine percent. The saved threshold remains visible for comparison. The measured example readings remain the same.
+
+
+Explain what changed
+
+Which item changed? The previous water content? The local draft of a threshold? Or a guaranteed irrigation event?
+
+Only the local draft changed. Think of a fridge alarm limit: it marks an exceptional condition, not the normal temperature you aim for. This emergency water threshold is not a normal overnight target. Review and apply are separate actions; the watering software, called the Controller, still checks its conditions and protection rules before irrigation.
+
+Point to the time axis. Point to the VWC scale. Point to the EC scale. Identify one irrigation marker. Identify one planning reference. Find the reading age.
+
+The next lesson explains the irrigation phases from P0 to P3.
+
+
+INDEPENDENT PRACTICE
+
+Open the practice graph. Move the example emergency VWC threshold from 35% to 39%. Which line changes? Can this edit change yesterday’s recorded moisture?
+
+Compare your reasoning: The draft threshold moves. The fixed synthetic actual trace does not move. A reference edit cannot rewrite measured history.
+
+
+SOURCES
+
+Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
+
+METER: soil volumetric water content: https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/
+
+Athena Commercial Handbook: source guide and background (not a software specification): https://growershub.athenaag.com/athena-handbook-v41iwrqr
+
+Athena: Precision Irrigation Strategy: https://support.athenaag.com/hc/en-us/articles/25975395644315-Precision-Irrigation-Strategy
+
+
+B2 — P0 to P3: build the day one phase at a time
+
+Follow a watering day as four familiar jobs: wait, refill, maintain and allow dryback; then attach the program’s P0–P3 labels.
+
+
+Four jobs across the watering day
+
+Think of the watering day as a journey with four jobs. Wait while the root zone dries in the morning. Refill with watering events. Maintain water content during the active period. Then allow dryback overnight. The program labels these jobs: P zero, P one, P two and P three. A phase simply means one part of that sequence.
+
+
+Wait first: morning dryback, P0
+
+The first job is waiting. At configured lights-on, a new grow-day begins in P zero, called morning dryback. Water content can continue falling before refill begins. The controller checks the dryback rule and timing limits, including a maximum wait. Lights-on alone therefore does not supply an exact first-shot time. Match the configured lighting schedule with the room.
+
+
+Refill: ramp-up, P1
+
+The second job is refill. The program calls it P one, or ramp-up. A shot means one watering event. Several shots can raise water content toward the configured target, with checks between events. The target is a comparison value used by the rule. The probe response also depends on delivery and drainage. Count completed events from records rather than from a drawing.
+
+
+Maintain: conditional watering, P2
+
+The third job is maintenance, called P two. A re-water threshold is the reference used when deciding whether another shot is needed. Readings, timing rules and protections still apply. A planning chart may show evenly spaced shots using an assumed drying rate. If actual drying is slower, fewer events may occur. Read the controller’s reason before calling a missing shot a fault.
+
+
+Worked example: a 06:00–18:00 lighting day
+
+Use a fictional room lit from six in the morning to six in the evening. At six, begin the morning wait. When its rules allow, move to refill, then maintenance. Daytime watering can finish before lights-off. The overnight period follows. Explain those four jobs in order. We cannot calculate the refill and maintenance transition times from lighting hours alone.
+
+
+Overnight dryback: P3
+
+The fourth job is overnight dryback, called P three. The emergency floor is a separate low-water reference for the overnight rescue rule. It is not a nightly destination to aim for. A rescue event depends on its conditions and protections; the label overnight does not order an automatic night shot. Unreliable sensing needs the local fallback procedure and the responsible operator.
+
+
+Your turn: explain another day
+
+Pause and fill the gaps. Morning wait is P zero. Maintenance is P two. Now explain a room lit from eight in the morning to eight in the evening using all four jobs. Which shot times remain unknown? Recall that a forecast describes assumed events, while the event record describes completed actions. Moving a reference line cannot change yesterday’s observed readings.
+
+
+INDEPENDENT PRACTICE
+
+For a fictional 07:00–19:00 lighting day, order all four phase cards and explain one purpose per card. Explain why a chart with six P2 events does not promise six actual events.
+
+Compare your reasoning: Correct order and purposes; conditional events and protections prevent a guaranteed count. The P3 floor is an emergency reference, not a routine destination.
+
+
+SOURCES
+
+Crop Steering: GROW_PLANS.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md
+
+Crop Steering: USER_GUIDE.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Athena Commercial Handbook: source guide and background (not a software specification): https://growershub.athenaag.com/athena-handbook-v41iwrqr
+
+Athena: Precision Irrigation Strategy: https://support.athenaag.com/hc/en-us/articles/25975395644315-Precision-Irrigation-Strategy
+
+
+B3 — Vegetative and generative: a bias, not a magic switch
+
+Use a dimmer-switch analogy to separate a steering direction from the planner’s numerical blend and the crop’s actual response.
+
+
+Think of a dimmer
+
+A dimmer moves gradually between two ends of a range. Keep that picture for the planner slider. First name the directions. Vegetative growth includes roots, leaves and shoots. Generative growth includes reproductive structures, such as flowers and fruit. A steering bias is an intended influence on that balance. It is separate from the plant’s stage and does not guarantee a response.
+
+
+The plant responds to its conditions
+
+Growers influence root-zone conditions through irrigation timing, dryback and suitable EC bounds. Climate and light also matter. In suitable conditions, smaller drybacks can support a vegetative direction; greater dryback can contribute to a generative direction. These are broad tendencies. Substrate, plant variety and stage change the response. A flowering plant may still need a vegetative bias to support balanced growth.
+
+
+What the slider actually calculates
+
+An endpoint is a set of values at one end of the slider. A profile stores both sets for reuse. Zero selects the configured vegetative endpoint. One hundred selects the generative endpoint. Between them, the planner blends supported settings. The grower supplies the bounds. Pot size and dripper flow help describe the setup, but cannot choose the biological targets automatically.
+
+
+Worked example: halfway
+
+Take fictional morning-wait endpoints of thirty and fifty minutes. Their difference is twenty. At slider fifty, use half the difference: ten minutes. Add ten to thirty. The result is forty minutes, before rounding to the setting’s supported step. This calculation explains the slider. Choosing suitable endpoints needs knowledge of the actual crop and substrate.
+
+
+Your turn, with the steps supplied
+
+Keep thirty and fifty as the endpoints. Set the slider to twenty-five. What fraction of the difference is that? Pause and calculate. One quarter of twenty is five. Add five to thirty to get thirty-five minutes. If both endpoints were thirty, their difference would be zero. Moving the slider would then leave that setting at thirty.
+
+
+Try a new pair independently
+
+Now try endpoints of twenty and sixty minutes at slider seventy-five. Work it out first. Their difference is forty. Three quarters of forty is thirty. Add thirty to twenty for fifty minutes. The slider number is a position along the range, rather than a time in minutes. This result predicts the configured blend, not the plant’s response.
+
+
+Recall the calculation and its scope
+
+Explain the dimmer analogy aloud, then name its limit: plants are not lamps with a guaranteed response. Check the whole profile, including the measurement type of any EC fields. A shared profile can serve several schedule blocks. A preview shows a draft; applying the plan is a separate workflow. Finish the practice by calculating first, then stating what the arithmetic cannot establish.
+
+
+INDEPENDENT PRACTICE
+
+On paper, blend fictional endpoints of 40 and 80 minutes at slider 25. Repeat with both endpoints at 40. Explain why neither calculation proves the values are suitable for a 5 L container.
+
+Compare your reasoning: 50 minutes; then 40 minutes. Pot size alone cannot establish safe timing, VWC, EC or crop response.
+
+
+SOURCES
+
+Crop Steering: GROW_PLANS.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md
+
+Grodan: Introduction to crop steering; substrate-specific manufacturer guidance: https://www.grodan.com/siteassets/downloads/downloads-na-101/grow-guide-2023/introduction-to-crop-steering.pdf
+
+Athena Commercial Handbook: source guide and background (not a software specification): https://growershub.athenaag.com/athena-handbook-v41iwrqr
+
+Athena: Precision Irrigation Strategy: https://support.athenaag.com/hc/en-us/articles/25975395644315-Precision-Irrigation-Strategy
+
+
+B4 — How much water did each plant get?
+
+Treat drippers as small taps, calculate delivered volume from flow and runtime, then separate delivery from drainage and plant uptake.
+
+
+A dripper is a small tap
+
+Picture each dripper as a small tap. Its flow rate says how much water it delivers in a given time. Four litres per hour, written four L slash h, means four litres in one hour at that stated flow. Two such emitters supply each example plant. A rated flow is a label; a timed catch test checks actual delivery.
+
+
+Worked example: thirty seconds
+
+Our completed watering event lasts thirty seconds. Two emitters at four litres per hour give eight litres per hour per plant. There are three thousand six hundred seconds in an hour. Multiply eight by thirty, then divide by three thousand six hundred. That is about zero point zero six six seven litres, or sixty-six point seven millilitres per plant.
+
+
+Scale from one plant to twelve
+
+The zone has twelve plants. Multiply the unrounded per-plant amount by twelve. The result is zero point eight litres for the whole zone. Per plant and per zone describe different scopes. For a longer shot at the same flow, the estimated volume rises in proportion to runtime. For a daily total, use completed events rather than every projected event on a plan.
+
+
+A volume fraction is not a VWC response
+
+Compare a separate forty-five-second shot using those same two emitters. It delivers zero point one litres, or one hundred millilitres per plant. In five litres of substrate, that volume is two percent of substrate volume. It does not promise a two-point VWC rise. Water can spread unevenly or drain, and the probe samples only part of the container.
+
+
+Your turn: complete the calculation
+
+Try one emitter at three litres per hour for sixty seconds. Multiply three by sixty and divide by three thousand six hundred. Pause and finish it. The answer is zero point zero five litres, or fifty millilitres per plant. Multiply by twelve plants to get zero point six litres per zone. State whether the flow came from a rating or a catch test.
+
+
+Use the time that actually ran
+
+A request can be shortened by the controller’s duration limit. If one hundred twenty seconds was requested but sixty was effective, use sixty in the estimate. Runtime still cannot prove equal flow from every outlet. Pressure and blocked emitters can change delivery. Commissioning checks actual catches, correct outlets and that water stops, with the responsible person supervising the test.
+
+
+Recall: delivery, drainage, uptake
+
+Finish with two emitters at three litres per hour for ninety seconds and fifteen plants. Calculate before continuing: zero point one five litres per plant and two point two five litres per zone. Delivery means supplied water. Runoff means water leaving by drainage. Uptake means water entering the plant. A flow-and-time delivery estimate measures neither runoff nor uptake.
+
+
+INDEPENDENT PRACTICE
+
+A fictional zone has 18 plants and two 2 L/h emitters per plant. Effective runtime is 75 seconds. Calculate litres and millilitres per plant, then zone litres. Explain why the result is not uptake.
+
+Compare your reasoning: About 0.0833 L = 83.3 mL per plant; 1.5 L per zone. These are flow/runtime delivery estimates, assuming the stated flow, and do not measure uptake or distribution.
+
+
+SOURCES
+
+Crop Steering: GROW_PLANS.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md
+
+Crop Steering: training/crop-steering-from-zero/WORKBOOK.md: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/WORKBOOK.md
+
+Athena Commercial Handbook: source guide and background (not a software specification): https://growershub.athenaag.com/athena-handbook-v41iwrqr
+
+Athena: Precision Irrigation Strategy: https://support.athenaag.com/hc/en-us/articles/25975395644315-Precision-Irrigation-Strategy
+
+
+C1 — What you need: the smallest useful system
+
+Plan equipment by function: host, measurement, water path, control and independent physical protection.
+
+
+Five functions, not a shopping spree
+
+Start with one zone: plants whose water delivery is controlled together. Prove that small system works before expanding.
+
+Think of watering by hand: you need somewhere to make the plan, a way to check wetness, a water supply, a way to start and stop it, and checks against mistakes. An automated system needs those same five functions.
+
+
+Host and measurement paths
+
+Every app needs a computer to run on. Here that computer is called the host. Choose one supported route: a Raspberry Pi, or a dedicated Intel NUC or other x86-64 computer. You only need one.
+
+Like any computer, the host needs the correct power supply, suitable storage for its software and data, and a reliable network connection.
+
+The two host lessons are alternative routes to the same starting point. Follow the one for your chosen computer.
+
+Think of labels on a switchboard: one label identifies a reading or a control. Home Assistant calls these named items entities. Crop Steering uses those entities. You need both the Crop Steering integration and the separate Controller app; a dashboard display alone cannot run irrigation. The integration holds room settings and the workspace. The Controller reads those settings and decides when to water.
+
+The moisture probe is the system's local wetness check. Choose a model suitable for the substrate and a position that represents the zone. Verify its exact model, connection interface and units, rather than buying on appearance.
+
+Some probes need a bridge: equipment that translates their connection into one the system can use. Matching wire colours do not prove compatibility. One working probe cannot prove equal delivery to every pot.
+
+EC needs a location label too. Bulk substrate EC describes a measurement through the substrate region; pore-water EC describes the water between solids. Feed EC describes the solution supplied to the crop. Check what the sensor actually measures.
+
+A tank reading stays a tank reading when you rename its label. Calling feed EC root-zone EC cannot move the measurement into the pot.
+
+Air temperature and humidity help explain changing water demand, just as laundry dries differently on a hot, dry day than a cool, damp one.
+
+
+Draw the actual water path
+
+Trace water from its source, as you would trace a garden hose. A suitable pressurised supply may feed a zone valve directly. A reservoir needs a pump if it cannot provide the required pressure.
+
+Do not add a pump just because a diagram has one. If your water path requires a pump, include that pump and the protection suited to it.
+
+Follow the whole path: filtration, pressure regulation, drainage, and protection against reverse flow or unwanted siphoning. These must suit the actual equipment and meet applicable local requirements.
+
+
+Safe control and proof
+
+Starting a pump can demand more power than keeping it running, like the extra push needed to get a loaded trolley moving. Control hardware needs suitable starting and operating ratings and correct installation. A household smart plug's large printed rating alone does not prove suitability.
+
+Use an appropriately qualified installer for electrical work. Do not do mains electrical work as part of this course.
+
+Two people turning the same tap can defeat each other's instructions. Give each physical pump or valve one controller. An old irrigation system must not also operate that output.
+
+Find and resolve competing control before enabling the new Controller.
+
+The final function is protection and proof. Provide an accessible physical shutdown, suitable independent protection and somewhere safe to collect test water. Software OFF is like a stop request on a screen; it is not an emergency isolator.
+
+Use collection cups and a stopwatch to measure what actually arrives. Then observe the outlet after the stop command: the water must physically stop.
+
+A changed dashboard icon is a report from software. Look at the water outlet to prove stopping.
+
+
+Essentials, conditional, later
+
+Build the basic working zone before adding instruments. Tank level, feed EC, pH, which describes acidity, and tank temperature add operating information. More probes and a verified flow meter can follow. Automated dosing, thermal cameras and artificial intelligence are not needed for the first working zone.
+
+
+Your own layout
+
+Sketch your water route like a simple road map. Label the supply, pump if installed, zone valve, drippers and drainage path.
+
+Beside that map, draw the probe and the Controller. Mark the physical shutdown and identify the one controller responsible for each output.
+
+Circle each item that you cannot identify.
+
+Check exact models using the equipment sheet before buying. Choose the host lesson for your Raspberry Pi or x86-64 computer.
+
+Both host routes then join the same setup procedure: install one zone, assign its sensor readings and water controls, and verify physical operation before adding more zones.
+
+
+INDEPENDENT PRACTICE
+
+On paper, trace your proposed water path. Mark the host, measurement path, controlled outlet and physical shutdown. Identify which parts need an installer’s confirmation. Do not operate live outputs.
+
+Compare your reasoning: The diagram identifies every function and the actual installation’s physical stop. Product compatibility and physical commissioning require local evidence.
+
+
+SOURCES
+
+Course evidence and production notes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/PRODUCTION-AND-SOURCES.md
+
+METER: soil volumetric water content: https://metergroup.com/measurement-insights/soil-moisture-sensors-how-they-work-why-some-are-not-research-grade/
+
+Athena Commercial Handbook: source guide and background (not a software specification): https://growershub.athenaag.com/athena-handbook-v41iwrqr
+
+Athena: Precision Irrigation Strategy: https://support.athenaag.com/hc/en-us/articles/25975395644315-Precision-Irrigation-Strategy
+
+
+C2a — Give Home Assistant a home: Raspberry Pi
+
+Use one dedicated computer, protect its storage, and open Home Assistant on your network.
+
+
+One computer keeps the desk open
+
+Think of Home Assistant as the front desk for your equipment. It needs a computer that stays on to receive readings and pass messages. That computer is the host. This route uses a Raspberry Pi. C2b uses a dedicated PC instead; choose one. If you already have a suitable working Home Assistant host, check its version and recovery plan and continue to C3. Keep watering equipment out of service during setup.
+
+
+Lay out the parts first
+
+A Pi is a small computer board, not a complete irrigation controller. You still need suitable power, storage, an enclosure, cooling and a network connection. The official guide lists Pi 4 or 5 with at least two gigabytes of memory and a card of at least thirty-two gigabytes. Check the current guide before buying. A plug that fits does not prove a charger supplies enough power. Use Ethernet for this installation.
+
+
+Example: choose the spare card
+
+Imagine your laptop shows a spare sixty-four gigabyte card and a one-terabyte photo drive. You want Home Assistant on the card. Writing the installation image replaces the selected storage contents. Identify the card by its device information and capacity, preserve needed files elsewhere, and leave the photo drive unselected. In Raspberry Pi Imager, choose Home Assistant OS for the exact Pi model and select the checked card.
+
+
+Your turn: the last check before Write
+
+Before pressing Write, finish this sentence: I am replacing the contents of this identified card, and the files I need are copied here. Add the Pi model and matching image. If any answer is uncertain, resolve it before writing. Follow the official guide through writing and verification. Eject the finished card, insert it into the unpowered Pi, connect Ethernet on the same network as your computer, then connect the proper power supply.
+
+
+Open the page on your own network
+
+Start with the local Home Assistant address given in the official guide. If needed, use the Pi address found on your own network, with port eight-one-two-three where required. Confirm the page belongs to this Pi rather than an older Home Assistant host. A page opening tells you the computer is reachable. Probes and water controls still need their own checks. Continue to onboarding; do not test a pump just because the page loads.
+
+
+Keep a way back
+
+Now try a different case: a card holds old research files with no separate copy. What must happen before writing? Preserve the needed files and identify the destination again. For your completed installation, record the model, storage, installed version and local address. If boot fails, check power, network and official troubleshooting before another write. C3 adds accounts and backups. This record should let another responsible person understand how the host was prepared.
+
+
+INDEPENDENT PRACTICE
+
+Prepare a Pi setup sheet naming the exact model, power supply, target card, separate backup and verified local access address.
+
+Compare your reasoning: Record a verified first boot and a recoverable starting point
+
+
+SOURCES
+
+Home Assistant: Raspberry Pi installation: https://www.home-assistant.io/installation/raspberrypi/
+
+One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+
+
+C2b — Give Home Assistant a home: dedicated PC
+
+Use a supported dedicated PC instead of a Pi, identify its disk before erasing it, and check first boot.
+
+
+Another home for the same front desk
+
+Home Assistant needs one computer that stays on, like a front desk that keeps receiving messages. This lesson uses a dedicated Intel or AMD PC. It reaches the same starting point as the Pi route; you do not need both. A small NUC-shaped computer may suit the job, but its shape or brand does not establish compatibility. Keep an existing suitable Home Assistant installation after checking it rather than erasing it for the lesson.
+
+
+Check the computer before changing it
+
+Use the official generic x86-64 guide to check the exact machine. It needs a sixty-four-bit processor, UEFI startup and supported storage. UEFI is the computer’s startup system. The guide requires storage that supports five-hundred-and-twelve-byte logical sectors; native four-kilobyte-only boot storage is unsupported. Disable Secure Boot as the official guide instructs. Writing Home Assistant OS replaces the selected disk’s operating system and files. Make a separate usable backup and record firmware settings first.
+
+
+Example: the USB and disk have different jobs
+
+Picture a workbench with a temporary toolbox and a permanent cabinet. In the recommended installation method, a live Ubuntu USB is the toolbox: it starts a temporary operating system. The internal disk is the cabinet that receives Home Assistant OS. Boot the USB using Try Ubuntu, identify both devices by their information and capacity, and check the internal disk backup. Follow the official disk-image restore steps. Never copy another computer’s disk name.
+
+
+Your turn: identify both devices
+
+Fill in the live USB identity, intended destination disk, separate backup location and firmware changes. Before confirming the image write, say which disk will lose its contents. If Ubuntu is running from that destination disk, correct the boot choice rather than working around a busy-disk warning. After the official write and shutdown steps finish, remove the temporary USB as directed. The next start should use the Home Assistant disk.
+
+
+A capable office PC may still be unavailable
+
+Now make the decision for a different machine. An office PC meets the processor requirements, but it still holds current work and nobody has agreed to dedicate it. Do not continue with the erase. Resolve permission, backups and its future job, or use another supported host. You can still study accounts, readings and the isolated demo. That learning does not depend on changing the office computer or risking its files.
+
+
+Check first boot and write down the result
+
+With the machine on suitable power and a reliable wired network, follow the official first-start steps. Open Home Assistant and verify that this particular host answers. Record the version and address alongside the hardware and backup details. If it fails, compare actual firmware and storage with official troubleshooting before another write. A working page establishes access. Continue to C3 for accounts, time and recovery; keep irrigation out of service until its own commissioning checks pass.
+
+
+INDEPENDENT PRACTICE
+
+Prepare a dedicated-PC installation record identifying the temporary USB, destination disk, separate backup, firmware changes and first-boot address.
+
+Compare your reasoning: Record a protected installation and verified first boot
+
+
+SOURCES
+
+Home Assistant: Generic x86-64 installation: https://www.home-assistant.io/installation/generic-x86-64/
+
+One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+
+
+C3 — Install the software and protect access
+
+Understand Home Assistant labels, install both Crop Steering parts, and keep a recovery copy.
+
+
+The front desk gives each item an address
+
+Home Assistant gives each reading or control an address, called an entity ID. Think of sensor dot practice underscore moisture as a labelled letterbox: it tells software where to look. One probe can provide moisture, temperature and battery entities. The label alone cannot prove the probe’s location. During onboarding, set your local timezone, protect individual accounts and record recovery access without publishing passwords.
+
+
+Two Crop Steering parts do different jobs
+
+Think of the integration as the interpreter and filing desk. It holds room settings and supplies the Crop Steering workspace inside Home Assistant. The Controller reads those settings and measurements and makes the watering decisions. You need both at matching versions. HACS is the community download library used to obtain the integration; downloading from it does not install the Controller. Before changes, keep watering disabled, confirm equipment state and preserve a backup outside the host.
+
+
+Example: install the integration and room
+
+If HACS is absent, install it through the guide first. Then open this project using its HACS link. Download the integration and restart Home Assistant. Then use the guide’s Crop Steering configuration link. Choose manual setup, name the room and enter its initial zone count. For example, name your paper room Practice Room with one zone. This creates its software record; it does not pair a probe or identify a valve. Use real names only after verification.
+
+
+Add and start the separate Controller
+
+Next use the guide to add the project to the app store’s list of sources, called app repositories. Install Crop Steering Controller from the Home Assistant app store at the same version as the integration. Review its options with affected watering controls OFF, then start the app. Check Start on boot and the documented Watchdog setting so it can restart after a failure. The HAOS Supervisor supplies its internal access token. Do not paste a secret into a repository file. Open Crop Steering in the Home Assistant sidebar.
+
+
+Your turn: a page opens but no report arrives
+
+A fictional installation has a working workspace but no recent Controller report. Check that the separate Controller is installed, running and compatible before enabling anything. Its regular status message is called a heartbeat. A fresh heartbeat shows recent communication, not correct mapping or water delivery. Record both versions, the intended room and report age. If an older Controller already owns that room, resolve the documented upgrade or migration before starting another.
+
+
+Keep a recovery copy you can actually use
+
+In Home Assistant Settings, System, Backups, arrange a backup and keep a usable copy away from this host. Keep required decryption information, including the emergency kit for encrypted backups, securely available. A screenshot saying complete cannot restore a failed disk. Practise recovery on paper or isolated hardware, never by overwriting production for the lesson. Check local time against a clock. Room lighting hours are configured separately. Continue to C4 with watering still OFF.
+
+
+INDEPENDENT PRACTICE
+
+Prepare a software record with both installed versions, intended room, current Controller report, account-recovery method and separate usable backup.
+
+Compare your reasoning: Verify the intended room, fresh Controller report, account access and separate backup
+
+
+SOURCES
+
+Crop Steering user guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Crop Steering installation, upgrade and rollback: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md
+
+One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+
+
+C4 — Tell the software which zone is which
+
+Map verified sensor and valve addresses, enter real sizing, and check that the Controller accepts the saved setup.
+
+
+A contact name needs the right number
+
+A phone contact can have a convincing name and still dial the wrong number. A zone mapping works the same way: its name must point to the right Home Assistant entities. First add each compatible device through its supported Home Assistant route. Check the exact entity ID against physical equipment labels. In Crop Steering, select the actual room and open Equipment, Setup. Keep affected Watering controls OFF and the installation’s required physical isolation in place.
+
+
+Match the real plumbing and measurements
+
+Choose Zone valves only if that matches the supply, or A pump, then zone valves when a pump is required. Map a pump only if it actually exists. Each zone needs its intended valve. For moisture, check suitable VWC units, placement and the last update. For EC, identify feed, bulk substrate or pore-water measurement. These describe different places or methods. Leave unavailable optional data explicitly unavailable instead of borrowing an unrelated number.
+
+
+Example: twelve plants, not one giant pot
+
+Imagine twelve plants, each in three litres of substrate. Each plant has two drippers measured at three litres per hour each. Enter twelve plants, three litres per plant, two drippers per plant and three litres per hour per dripper. The total estimated delivery is twelve times two times three: seventy-two litres per hour. Thirty-six litres is the total substrate, not the per-plant entry. Delivery estimates describe water supplied, not water taken up by plants.
+
+
+Check the clock and the receipt
+
+Record the local timezone, the room’s configured lights-on and lights-off hours, and the actual lighting system that owns the lights. Observe that they agree; the irrigation clock does not operate the lights. Review configuration with affected equipment confirmed OFF, then Save configuration. Saving is like sending a letter. Mapping acknowledged is the separate receipt from the Controller. Wait for acceptance of this revision. A fresh heartbeat alone does not supply it.
+
+
+Your turn: three faults in one record
+
+Review eight plants, four litres per plant, one dripper each, measured at two point five litres per hour. Calculate the twenty litres per hour zone delivery. Now find the faults: the moisture entity belongs to the next room, lighting hours are blank, and the revision is saved but unacknowledged. All need correction before enabling. Correct arithmetic cannot repair a wrong probe address. Practise this record review in the isolated demo without connecting equipment.
+
+
+Read the accepted setup back
+
+After acknowledgement, inspect the intended room in Overview and Equipment, Probes. Compare exact readings, units and age with the setup sheet. Verify sizing, measured-flow evidence, light timing and each output’s owner. Resolve an unreadable state instead of treating it as OFF. These checks show the intended software setup reached the Controller. C5 checks physical protections, and C6 proves delivery and stopping. Keep automatic operation disabled until those checks pass with the responsible local people.
+
+
+INDEPENDENT PRACTICE
+
+Review the eight-plant example, calculate zone flow, and correct wrong-room moisture, missing lighting hours and missing Controller acknowledgement.
+
+Compare your reasoning: Calculate 20 L/h, retain 4 L substrate per plant, and resolve wrong room, missing lighting hours and missing acknowledgement before enabling.
+
+
+SOURCES
+
+Crop Steering user guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Crop Steering installation, upgrade and rollback: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md
+
+One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+
+
+C5 — Make the physical equipment safe to test
+
+Check the documented sensor connection, proper equipment ratings, shutdown and one owner for every output.
+
+
+A stop message is not a disconnected machine
+
+Think of software OFF as a message telling a driver to stop. Physical isolation is the installation’s actual way to remove the hazard. They do different jobs. Crop Steering Watering OFF blocks its shots, but another timer or manual switch may still operate equipment, and electrical power may remain present. Before physical work, agree the installer-approved electrical and water shutdown, who controls it and how everybody knows the equipment’s state.
+
+
+Use the probe’s documented connection
+
+A matching plug is like a matching envelope: its contents may still be wrong. Check the exact probe, supply voltage, signal protocol, compatible interface and supported firmware. Some probes need a bridge before Home Assistant can read them. Prefer a documented assembled route for a first installation. Follow the maker’s placement and calibration instructions. Do not connect an unknown probe signal directly to a computer pin or copy wire colours from a different assembly.
+
+
+Example: a number can be fresh and irrelevant
+
+A fictional entity reports twenty-two with a recent timestamp. Its friendly name mentions the room, but its units are degrees Celsius and it measures the tank. It cannot stand in for moisture in that room’s substrate. Check quantity, units, real location, contact and age together. Apply the same care to EC: a bulk-conductivity reading does not become pore-water EC just because the field expects it. Verify any conversion and the range where it applies.
+
+
+Check what starts and stops the pump
+
+A control device’s headline rating may describe a simple heater load, while a pump draws a different starting load. Have the competent installer check the real motor, control input, electrical ratings and required protection. This course supplies no mains-wiring instructions. Also agree dry-run, spill, backflow and unwanted-siphon arrangements appropriate to the design. Before any test, name what may energise, where water can discharge, what remains isolated and how the test will end.
+
+
+Your turn: two controllers know the same valve
+
+Now consider a valve that an old timer can still open. You have also mapped it into Crop Steering, whose Watering switch is OFF. The timer remains another route to water, so the valve is not isolated. Record both routes and resolve ownership before commissioning. Never leave two independent controllers able to drive the same output. Keep read-only observation separate from commands. The local operator must still have an agreed way to maintain necessary crop care.
+
+
+Close the physical checks before the wet test
+
+Trace each probe to its verified Home Assistant reading, then trace each control address back to the physical valve or pump. A competent installer can use an approved low-risk identity check where appropriate. Do not use a live crop as the first wiring indicator. Record equipment ratings, protections, sole ownership and shutdown. Unresolved hardware questions keep this stage incomplete. Continue to C6 only with an approved catch-test method and safe collection ready; no attractive dashboard can replace these checks.
+
+
+INDEPENDENT PRACTICE
+
+Explain the old-timer conflict and complete a physical setup record naming the verified interface, output owner, equipment ratings, protections and shutdown.
+
+Compare your reasoning: Record the approved protection, shutdown and sole owner before wet testing
+
+
+SOURCES
+
+Crop Steering user guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Crop Steering installation, upgrade and rollback: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md
+
+One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+
+
+C6 — First water: catch it, measure it, stop it
+
+Use the approved equipment test first, then supervise a Controller cycle only after every readiness check passes.
+
+
+Two tests answer two questions
+
+First test the tap and hose, then test the automatic instructions. These are separate commissioning stages. In stage one, Crop Steering Watering stays OFF while the installer uses an approved equipment-level procedure. OFF blocks Controller test shots too; do not try to bypass it. Agree a bounded duration, collection and physical shutdown. If no suitable equipment test procedure exists, obtain one before proceeding. Neither the demo nor a quiz can supply physical evidence.
+
+
+Watch the whole water path
+
+With competent local supervision, remove only the isolation needed for that particular test. Use the manufacturer’s safe method and observe the intended outlet, other zones, relevant pressure and the required pump and valve sequence. Catch several emitters separately for the real measured runtime. Keep spills contained and shutdown available. Stop through the agreed method and observe actual water cease. A control icon changing colour does not establish that flow stopped or that unwanted siphon is absent.
+
+
+Example: a cup becomes a flow measurement
+
+Suppose an emitter delivers thirty millilitres in thirty seconds. Divide by one thousand to get zero point zero three litres. Multiply by thirty-six hundred seconds per hour and divide by the thirty-second runtime. That is three point six litres per hour for this catch. Separate catches of thirty, thirty-three and thirty-seven millilitres reveal differences their total hides. Investigate against the actual design and measurement uncertainty. These example volumes are not real calibration evidence or a universal tolerance.
+
+
+Your turn: finish the catch record
+
+Try twenty-four millilitres in thirty seconds: zero point zero two four times thirty-six hundred divided by thirty gives two point eight eight litres per hour. Add the actual emitter, runtime and test conditions to the record. Investigate leaks or uneven delivery, correct them and repeat the relevant checks. Test independent protections using their approved methods. Never simulate faults by pulling random wires or power under load, or risk deadheading a pump.
+
+
+A good catch is one part of readiness
+
+Now decide for a different record: the catch and stopping passed, but the latest mapping is saved without Controller acknowledgement. Keep Watering OFF. Before stage two, every required check must pass: correct room and outputs, fresh probes, accepted mapping, measured delivery, verified stopping, independent protections, lighting hours, timezone, approved local targets and recovery access. Update measured flow through the setup review and obtain acknowledgement. Do not enable just to repair incomplete software setup.
+
+
+Supervise the first enabled cycle
+
+After readiness passes, the responsible operator deliberately enables the selected room’s Watering through the documented review and confirms its state. Enabling allows eligible shots, including safety watering. Use approved local settings, safe collection and competent supervision. Observe the intended outlet, other zones, actual stopping, event record and next action. If water continues unexpectedly, use the agreed physical shutdown and disable Watering. Record the result and explicitly agreed final state. Repeat the checks for each new output.
+
+
+INDEPENDENT PRACTICE
+
+Calculate flow for 18 mL in 20 seconds, review a saved-but-unacknowledged mapping, and write the two-stage commissioning decision and final-state record.
+
+Compare your reasoning: 0.018 × 3600 ÷ 20 = 3.24 L/h. Keep Watering OFF while acknowledgement is missing; record real delivery, stopping and the agreed final state.
+
+
+SOURCES
+
+Crop Steering user guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Crop Steering installation, upgrade and rollback: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md
+
+One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+
+
+C7 — Move from Growlink one zone at a time
+
+Observe and record the existing system before a planned handover; keep one controller in charge of each output.
+
+
+Moving house starts with a labelled inventory
+
+Moving from Growlink is like moving house: label what you have before disconnecting anything. Begin with observation and available records. Name one room, one physical zone, its probes, valves, pump and current controller. Record who can operate or recover it. A working Growlink setup is useful evidence about the existing system, not proof that the same hardware can connect to Home Assistant. Keep the existing operator responsible for crop care while planning.
+
+
+Keep the records in their original context
+
+Use exports available in your actual Growlink account and product, or record visible settings and history manually. Do not assume an export feature, API or automatic importer exists. Preserve original files and dates. Note the timezone, lights-on and lights-off, substrate, plant and dripper counts, measured flow, targets and measurement methods. A number labelled EC needs its location and method. Similar field names in two systems do not guarantee the same meaning.
+
+
+Example: one old zone, several new addresses
+
+Imagine Growlink calls a valve Room A, Zone One. Your Home Assistant setup now has an entity with the same friendly name. That is a contact-book match, not physical proof. Trace the actual output and probe, confirm compatible interfaces, units and data age, and write exact new IDs beside the old record. Keep unknown items marked unknown. Reuse C4’s sizing and mapping checks; do not paste old targets into differently defined fields.
+
+
+Agree the handover and the way back
+
+With the responsible operator and competent installer, agree when ownership changes, which controls are disabled, and how the crop receives necessary water during work. Establish one controller per physical output. The new system may observe where supported; it must not command the same valve alongside Growlink. Record physical isolation and the steps to restore the previous arrangement if checks fail. A rollback plan is a checked procedure, not permission to leave both schedules active.
+
+
+Your turn: the name matches, the unit does not
+
+Review a different migration record. The old sensor is labelled EC, its method is unknown, and the new field expects pore-water EC. The valve name matches, but no physical identity check exists. Decide what to do. Park those mappings and investigate; a familiar display cannot close either gap. Keep the last verified arrangement under its agreed owner. Finish the checks from C3 to C5 before planning C6’s supervised catch and Controller stages.
+
+
+Prove one zone before expanding
+
+At the agreed handover, follow the approved shutdown and ownership procedure, then complete staged commissioning from C6. Check acknowledged mapping, fresh readings, real flow, stopping, approved targets and timing. Supervise the first enabled cycle and record its event and final state. If a check fails, leave the new output disabled and use the agreed recovery procedure. Expand only after this zone’s evidence is complete. Repeat for every output; one successful zone does not establish the rest.
+
+
+INDEPENDENT PRACTICE
+
+Build a one-zone Growlink handover sheet with original records, physical labels, new entity checks, sole ownership, crop-care cover, commissioning gates and rollback procedure.
+
+Compare your reasoning: Verify one migrated zone with commissioning evidence and a usable rollback plan
+
+
+SOURCES
+
+Crop Steering user guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Crop Steering installation, upgrade and rollback: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md
+
+One-zone equipment and staged commissioning guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md
+
+
+D1 — Find your room, zone and next action
+
+Use the room and zone like a full address, then read recent evidence and the controller’s reason.
+
+
+A zone needs its full address
+
+A shopping-centre directory helps you find a shop, but you still need its full address. Use the dashboard the same way. Open Overview in the isolated demo. All zones groups cards by room. Select the room, then open a zone from Selected room. Zone two in Room A is a different address from Zone two in Room B.
+
+
+Check when each source last reported
+
+Before interpreting a number, check its age. The header reports the controller’s latest communication. The probe has its own observation time and unit. A recent controller message cannot refresh an old probe reading. Unknown means the program cannot confirm a state. Keep that word in your record. Replacing an unknown pump state with OFF would invent certainty.
+
+
+Read the reason beside the state
+
+Open the zone page and find its phase, latest irrigation and Why / next action. Read them together. A waiting phase may be doing exactly what its rules require. The reason tells you what condition matters next. Inspect tank and equipment information where available. A recorded event describes an action; an output state describes a report. Physical delivery needs its own evidence.
+
+
+Worked example: Training East, Zone 2
+
+In this fictional paper example, training East is selected. Zone two is in maintenance, P two, and its last shot was at nine twelve. Recent reports say it is waiting for moisture. That is the supported explanation for the pause. Header Watering and Stop all address the selected room, Training East. Read the shared-pump caution: stopping a shared pump can also affect another room.
+
+
+Your turn: finish an honest record
+
+Now select Room B, Zone one. Record the pump state and report age exactly as shown. If a source says unknown, record that uncertainty. Next inspect the mapped source and its report age under the local procedure. Mapping means the connection between the displayed record and the real device. Pressing buttons is not a way to discover that connection.
+
+
+Find another zone independently
+
+Choose another demo zone without following the worked example. Record its full address, phase, last irrigation, report ages and next action. Then open Settings and help, Settings, Display, Default view. This chooses the landing page for this browser. A direct bookmark still opens its requested page. Return to Overview and say the selected room aloud before reading another card.
+
+
+Recall the address and control scope
+
+Close your notes. Which room do the header controls address? What does unknown establish? What evidence would confirm that water stopped? Answer: the selected room, an unconfirmed state, and the appropriate physical check. Software state alone cannot prove the plumbing stopped. Repeat the navigation tomorrow with a different demo address. Before independent live work, use the installation’s completed local handover.
+
+
+INDEPENDENT PRACTICE
+
+Identify another demo zone and explain its next action without changing irrigation.
+
+Compare your reasoning: Record room, zone, phase, last irrigation, ages and next action; preserve unknowns.
+
+
+SOURCES
+
+User guide: navigation, top bar and zone page: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Current source: selected-room safety controls: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/frontend/src/components/room-controls.tsx
+
+Current source: browser default view: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/frontend/src/components/landing-preference.tsx
+
+
+D2 — Change one target and see the curve move
+
+Treat a target change like editing and checking a shopping list: draft, review, apply, read back and restore.
+
+
+Begin with a pencil draft
+
+A shopping list written in pencil can change before checkout. A draft target is similar: it is a proposed local edit. Open Irrigation, Current day, in the isolated demo and choose a zone. Read Target source first. A plan can own these same targets, making them read-only here. Choose a manual demo zone for practice, leaving real plan ownership alone.
+
+
+Tell the three lines apart
+
+A reference is a value used for comparison. The saved reference shows the available configuration. The draft reference shows your proposed change. The actual trace shows recorded observations from the probe. Read those names in the legend. Moving the draft line changes the proposal on screen. It cannot move water already in the pot or rewrite yesterday’s readings.
+
+
+Learn what the field means
+
+For this exercise, open the help beside P three emergency floor. Think of it as a night alarm: a low-water safety reference used by overnight rules. It is not the water content to maintain routinely all night. The rule still has conditions and protections. Read the unit and allowed step, then record the original demo value before editing.
+
+
+Worked example: 30 becomes a 31 draft
+
+Record the original demo value and allowed step. For a paper example, thirty with one-point steps becomes thirty-one. Watch its reference move while the saved reference remains. Review changes is like checking the basket before checkout. Read the room, zone, field, unit, old value and new value. Apply is the action that sends the reviewed request to Home Assistant; the isolated demo changes sample state.
+
+
+Check the receipt, then restore
+
+After sending a request, check its receipt. Here, readback means inspecting the value returned by the system, along with any error. Sending a change does not prove acceptance. If the result is unclear, resolve that uncertainty before repeating it. Restore the original value you recorded through the same draft, review, apply and readback sequence. Practising the return path completes the exercise.
+
+
+Try another manual demo zone
+
+Choose another manual demo zone. Use its own original value and allowed step, rather than copying thirty and thirty-one. Predict which line will move. Make one step, review it, apply, check readback, then restore and check again. If a field is room-wide, inspect its scope carefully. A zone-specific value can override a shared room value for that zone.
+
+
+Recall the complete change journey
+
+Explain the shopping-list journey without looking at the screen. Draft proposes. Review checks the complete change. Apply sends it. Readback checks what was accepted. Tell another learner which line records observations and which shows a reference. Plan-owned dated targets are managed through Calendar. Finish by checking that the demo value is restored and noting both returned values in your practice record.
+
+
+INDEPENDENT PRACTICE
+
+Change the demo floor by one allowed step in a second manual zone, then restore it.
+
+Compare your reasoning: Both changes have correct scope, reviewed values and readback; distinguish references from actual history.
+
+
+SOURCES
+
+User guide: Current day and action effects: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Planning guide: reference lines and manual drafts: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md
+
+Current source: shared target ownership: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/frontend/src/pages/irrigation.tsx
+
+Current source: editing and review: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/frontend/src/pages/strategy.tsx
+
+
+D3 — Plan days and weeks without losing control
+
+Build an editable demo timetable from named bundles of settings, then separate storing, arming, activation and Watering permission.
+
+
+A timetable points to a settings card
+
+Think of a calendar timetable that points to a recipe card. The timetable says when; the card holds a bundle of settings. The planner calls that bundle a profile. Open Irrigation, Calendar, using an already editable demo draft. A draft is work still being prepared. Read its plan status and target ownership before opening any settings.
+
+
+A profile holds two endpoints
+
+Open Calendar and profiles, then Endpoint profiles. Each profile holds two sets of values, called endpoints: vegetative and generative. The balance slider blends between them, as you practised in B three. One profile can serve several schedule blocks and zones. Find those uses before editing. Duplicate the profile when you need an independent copy for another zone.
+
+
+Worked example: a 2%–4% blend
+
+Use fictional P two shot-size endpoints of two and four percent of substrate volume. Halfway gives three percent, before rounding to the supported step. This is a delivery-size setting, not a promise of a three-point probe rise. Give the demo zone its own start date. Assign the profile to days one through seven, checking neighbouring blocks for missing days or overlaps.
+
+
+Store first, then request activation
+
+Review and save stores the checked draft in Home Assistant. Arm is a separate request for the controller to start using it at the next local lights-on. Activation means the controller has taken over its dated targets. Check validation, controller support and reported status. Arming neither turns Watering on nor starts the pump. Those are separate control permissions and actions.
+
+
+Understand the return handover
+
+Disarm asks for a handover back to manual targets at the next lights-on. Existing active targets remain until that handover. Review the manual values that will return and wait for draft status before editing. A plan hold pauses plan steering, while controller safety watering may still occur. For uncontrolled physical flow, the local physical shutdown procedure takes priority.
+
+
+Your turn: another dated block
+
+Use another demo zone and days eight through fourteen. Say its start date, find every block sharing the chosen profile, and preview the dated values. Review the draft without arming real equipment. Recipes stores reusable copies for this browser, site, room and mode. Loading a copy creates local draft work; saving a library copy does not change active Home Assistant targets.
+
+
+Recall what each action does
+
+Close the screen and teach the timetable analogy. What does a profile contain? When does day one start for each zone? Explain save, arm, activation and Watering separately. Then explain when disarm returns manual control. Tomorrow repeat with a different zone start date. Your practice record should show the edited block and its preview, with shared uses and unresolved status clearly identified.
+
+
+INDEPENDENT PRACTICE
+
+Create a demo block for another zone and explain save-to-activation timing.
+
+Compare your reasoning: The block is valid; explanation includes next local lights-on, target ownership and the limits of disarm and hold.
+
+
+SOURCES
+
+Planning guide: endpoints, holds and scheduled handover: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md
+
+User guide: Calendar and Recipes: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Current source: save, arm and disarm review: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/frontend/src/pages/grow-planner.tsx
+
+
+D4 — Compare reality with the plan
+
+Read recorded history like a bank statement and a target reference like a budget, comparing equivalent periods and preserving source labels.
+
+
+A budget and a statement answer different questions
+
+A bank budget describes a plan. A bank statement records transactions. Keep that distinction when reading History in the isolated demo. Timeline lists events and changes. Water use shows delivery records. Compare runs helps compare available histories; Grows manages run records and summaries. Start by writing the question, room, zone and interval you want the evidence to answer.
+
+
+Match the comparison before calculating
+
+Compare the same elapsed grow age, such as day ten with day ten. Match the zone definition and check whether plant count changed. Then check units and measurement types, including which EC is displayed. Inspect the recorded dates and coverage. A full week and one day offer different opportunities for water use. Missing periods stay missing, rather than becoming zeros.
+
+
+Worked example: day ten, 12 L versus 15 L
+
+Two fictional runs have complete day-ten records for the same zone definition. Run A reports twelve litres estimated delivery. Run B reports fifteen. Subtract twelve from fifteen: B reports three litres more estimated delivery for that matched day. Preserve the word estimated. These totals cannot tell us that plants absorbed three litres more or that a changed target caused the difference.
+
+
+Date the reference as carefully as the reading
+
+A reference is a comparison value or configuration, like the budget beside the statement. A saved run can preserve a timestamped snapshot of its reference. Creating last month’s run record today captures today’s available reference, unless an existing saved reference is available. It cannot reconstruct last month’s targets or deleted readings. Read the reference source and capture date beside the actual trace.
+
+
+Your turn: name what the estimate means
+
+Complete the sentence: runtime multiplied by configured flow estimates delivery, rather than plant what? Pause. The answer is uptake: water entering the plant. A per-plant figure also averages the zone total over its plant count. It does not prove every emitter supplied equally. Keep estimated, measured or unknown beside the source when you copy values into a report.
+
+
+Try an incomplete comparison
+
+Now one record covers day six only; another covers days one through six. An EC series is missing. Decide whether their totals are directly comparable before calculating. They are not. Choose a matched interval with adequate coverage. Write one supported observation and one unanswered question. A longer chart axis cannot recover data the recorder no longer retains.
+
+
+Recall an observation before proposing a cause
+
+Without the chart, explain the difference between an actual observation, a saved reference and a current reference. Repeat the day-ten delivery comparison in one sentence. Then name other possible influences: climate, plant count, flow assumptions and other changes. Finish your practice with scope, interval, units, source and coverage limits. Those details let the next person assess the comparison and choose the next useful check.
+
+
+INDEPENDENT PRACTICE
+
+Write one defensible observation and one unsupported conclusion for another demo comparison.
+
+Compare your reasoning: The observation names scope, interval, units and source; the limit avoids inventing past targets, uptake or causation.
+
+
+SOURCES
+
+User guide: History and Grows: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Planning guide: comparison, retention and delivery estimates: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md
+
+Current source: Compare runs: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/frontend/src/pages/comparison.tsx
+
+Current source: grow and run recording: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/frontend/src/pages/grows.tsx
+
+
+D5 — Troubleshoot before you change a recipe
+
+Separate uncontrolled physical flow from bad information, restore trustworthy evidence and verify the actual repair.
+
+
+Repair the evidence before turning the dial
+
+Imagine a fridge thermometer with a dead battery. Turning the thermostat does not repair the missing measurement. Apply that idea to irrigation faults. First check for uncontrolled water or unsafe equipment. If water continues unexpectedly, use the installation’s physical shutdown procedure immediately. Once safe, preserve what happened. For a faulty reading without uncontrolled flow, investigate the source through the local fallback procedure.
+
+
+Worked example: a four-hour-old reading
+
+A fictional zone is holding and its moisture observation is four hours old. Lowering a threshold would leave the old information unresolved. Record the room, zone, timestamp and hold reason. Check the mapped source, communication path and probe condition under the local procedure. Use appropriate independent evidence with competent help. Verify fresh observations and recovered status before reconsidering targets.
+
+
+Conflicting tank evidence needs a real check
+
+The tank display says eighty percent, but the installed low-level indication says low. These conflict. Averaging them invents a level; choosing eighty because it is reassuring leaves the fault unresolved. Keep protections in use. Check physical level safely, then source identity, calibration and timestamps. Starting the pump is not a test for an empty tank. Record which evidence resolves the disagreement.
+
+
+A stored setup needs controller acceptance
+
+Saving setup confirms that configuration was stored. Acknowledgement means the controller reports which setup revision it accepted. Check that acceptance, its current heartbeat and setup problems; a heartbeat is a recent communication report. Keep affected watering disabled until acceptance is resolved under the local procedure. Competent commissioning must still prove device identity, the intended outlet’s operation and actual stopping.
+
+
+Your turn: OFF displayed, water flowing
+
+The screen says OFF but water is visibly flowing. Finish the first response: physical shutdown. After the installation is safe, competent help can investigate a sticking valve, siphon, incorrect mapping or competing control owners. Header Stop all is a selected-room software action. A returned OFF state cannot prove stopped flow. Disarm and plan hold also cannot replace the physical procedure.
+
+
+Try another fault report independently
+
+A selected zone shows no water-content rise after an event, while its neighbour rises. Write the observation before naming a cause. Check zone identities, timestamps and commissioning records; consider placement and delivery. Arrange supported equipment checks with competent help rather than forcing valves in turn. Report room, zone, event time, expected result and actual result. Exclude credentials from the report.
+
+
+Recall the repair sequence
+
+Teach the sequence without looking: make safe, preserve evidence, investigate, verify. Explain how a sensor repair differs from a target adjustment. Verification includes recovered readings and the agreed physical final state, with supervised recommissioning where needed. State any local shutdown knowledge you still need from the responsible operator. Finish with the fault record, the repair evidence and the person responsible for the next check.
+
+
+INDEPENDENT PRACTICE
+
+For the four-hour-old moisture reading, the tank conflict and the continuing-flow case, state the first response and evidence needed. Then write a report for the neighbouring-zone example.
+
+Compare your reasoning: Each answer includes a safe first action, relevant source checks and verification without a protection bypass.
+
+
+SOURCES
+
+User guide: emergency warning, setup and troubleshooting: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Planning guide: hold and disarm limits: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/GROW_PLANS.md
+
+Workbook: three failure scenarios: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/WORKBOOK.md
+
+
+D6 — A five-minute daily check and a useful handover
+
+Use a short preflight and a clear diary to make one defensible decision, then leave a handover another operator can use.
+
+
+A short preflight, then a brief diary
+
+A pilot checks the aircraft before departure, then records the flight. Use the same rhythm for the daily check: inspect first, leave a brief diary afterwards. The record has five parts: identity and freshness; state; water; feed and context; decision. Five minutes is a useful routine, not a deadline for an unresolved fault. Record unavailable sources explicitly.
+
+
+Fill the first four parts with evidence
+
+Start with room, zone, time and ages of the controller and relevant probes. State means the phase, Why / next action, last irrigation and confirmed output reports. Water means the delivery total and any per-plant average, labelled measured, estimated or unknown. Feed and context means tank indications, the EC measurement type and relevant crop or climate notes. These give the final decision a basis.
+
+
+Worked example: a reasoned no change
+
+In a fictional paper example, training North, Zone three, has recent reports, the expected maintenance phase and a clear waiting reason. Estimated delivery is within its recent observed range. Tank indications agree. The decision can be no change. Write that reason and when you will check again. The value of the check is a defensible decision. Moving a slider is not a required outcome.
+
+
+Your turn: finish the change record
+
+For a justified change, record scope, before and after, reason and the observation you expect next. A draft is the proposed edit. Review checks it, apply sends it, and readback checks the returned accepted value. Complete the sequence with a follow-up time. If several things change, record them all. One better day cannot isolate which change caused the difference.
+
+
+Use Crop AI as an assistant
+
+Crop AI can organise a question or explain a proposal. It does not measure the crop, and confident wording does not verify a claim. Check the readings, timestamps, room, zone, units and assumptions behind its suggestion. Review and verify any authorised action through the normal workflow. Keep credentials out of prompts and screenshots. Advanced AI configuration is unnecessary for this daily routine.
+
+
+Try another day and prepare the handover
+
+Choose another demo zone and record what is available. For a paper variation, suppose one source is unavailable. Complete the five parts and decide whether to retain settings, investigate or make one justified demo adjustment. Explain why. A handover names the responsible person, software versions, backup location, recovery procedure and agreed final state. A listed backup alone cannot prove it restores successfully. Preserve a recoverable backup and follow the local update and rollback guide.
+
+
+Teach it back, then recall it later
+
+Teach another learner to find the full room-and-zone address, check freshness and explain control scope. Demonstrate the change workflow in the demo. Physical shutdown and commissioning evidence need competent local handover. Tomorrow recall draft, apply and arm without notes. In about a week, solve a stale-data case with changed values. Keep your diary brief, specific and clear about unresolved checks.
+
+
+INDEPENDENT PRACTICE
+
+Complete a daily record for another demo zone, including one unavailable source.
+
+Compare your reasoning: Another operator can identify scope, evidence age, uncertainty, your decision and exactly how and when it will be checked.
+
+
+SOURCES
+
+Workbook: daily record, handover and delayed recall: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/WORKBOOK.md
+
+User guide: control scope, AI actions and readback: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md
+
+Install, upgrade and rollback guide: https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md

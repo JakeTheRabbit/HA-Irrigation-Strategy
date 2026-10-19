@@ -1,0 +1,39 @@
+{
+  "edition": "2026-10-19-r3",
+  "generator": "built-in image_gen.imagegen",
+  "assets": [
+    {
+      "filename": "a3-sponge-states.png",
+      "source": "C:/Users/BenIsdale/.codex/generated_images/01a07b84-c601-7cd2-bcef-3801204fa8dd/exec-d8f51418-7e6f-44dc-a2f5-7fb059d2376a.png",
+      "description": "Soaked sponge compared with wet sponge after drainage.",
+      "sha256": "ba2069ce7cea53079cf49a956a184b0f2edc3ced6ee99ed1062e3e0ad8f5a599",
+      "dimensions": [
+        1672,
+        941
+      ],
+      "review": "Generated output inspected for labelled physical meaning; conceptual illustration, not measurement or installation evidence."
+    },
+    {
+      "filename": "a3-pot-drainage.png",
+      "source": "C:/Users/BenIsdale/.codex/generated_images/01a07b84-c601-7cd2-bcef-3801204fa8dd/exec-a9a900a9-ab8d-49c1-9b5c-6a2d23d6d06f.png",
+      "description": "Container cutaway with substrate solids, retained water, air, roots and downward drainage.",
+      "sha256": "e4288ee6409e0fdfd93b3133c6c7f5d711dd15d4260f724a6c44385a888c41d5",
+      "dimensions": [
+        1672,
+        941
+      ],
+      "review": "Generated output inspected for labelled physical meaning; conceptual illustration, not measurement or installation evidence."
+    },
+    {
+      "filename": "a3-setting-label.png",
+      "source": "C:/Users/BenIsdale/.codex/generated_images/01a07b84-c601-7cd2-bcef-3801204fa8dd/exec-30b44180-dc3c-46b6-b3cb-ddcc2c6e8ec3.png",
+      "description": "Physical sponge beside a reference note: editing a software label adds no water.",
+      "sha256": "c25e00919525c2fd124c31395e05274e1b8d76599b0e77085f8646b735634b31",
+      "dimensions": [
+        1672,
+        941
+      ],
+      "review": "Generated output inspected for labelled physical meaning; conceptual illustration, not measurement or installation evidence."
+    }
+  ]
+}

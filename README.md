@@ -13,7 +13,24 @@ Crop Steering controls the water of a grow room from Home Assistant. The control
 
 You can also use the AI assistant. The AI assistant is optional and uses Claude Haiku with your own Anthropic API key. The controller asks it a question when a decision needs a grower's judgement. The dashboard shows each answer, the action of the controller, and the result.
 
-[Try the released demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Safety first](#safety-first) · [New to crop steering?](#new-to-crop-steering) · [Install](#install) · [First-run setup](#first-run-setup) · [Daily use](#daily-use) · [The AI assistant](#the-ai-assistant) · [Upgrade](#upgrade) · [Troubleshooting](#troubleshooting) · [Documents](#documents)
+[Take the free beginner course](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) · [Try the released demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Safety first](#safety-first) · [New to crop steering?](#new-to-crop-steering) · [Install](#install) · [First-run setup](#first-run-setup) · [Daily use](#daily-use) · [The AI assistant](#the-ai-assistant) · [Upgrade](#upgrade) · [Troubleshooting](#troubleshooting) · [Documents](#documents)
+
+## Learn crop steering from zero
+
+**[Open Crop Steering Academy →](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/)**
+
+A free course for people who have never used a substrate probe or crop-steering controller. Start with water, roots and air; learn VWC and EC; then practise reading graphs, calculating delivered water, mapping equipment and planning a grow.
+
+![Crop Steering Academy: beginner lessons, learning routes and practical exercises](img/academy-home.png)
+
+- **24 lessons:** a captioned 480p video for each lesson, with generated teaching illustrations, real demo screens, exact calculation diagrams, worked examples, practice and answer-specific feedback.
+- **Choose a route:** use an existing installation, or build with Raspberry Pi or x86-64. Host lessons are alternatives.
+- **Learn at your pace:** transcripts, captions, playback speed, a glossary and recall reminders. Progress stays in your browser; export it to keep a copy.
+- **Practise safely:** synthetic calculations and graphs never operate Home Assistant. Physical setup and commissioning require competent local supervision. Quiz passes are knowledge-practice records, not hardware certification.
+
+All lessons use locally generated Kokoro `af_heart` narration. Every lesson has a video. Five longer, chaptered parts let you watch related lessons together; the Pi and x86 setup parts are alternatives. Jump directly between lessons or video sections. Scripts use ASD-STE100 principles; full formal conformance and learner outcomes have not been certified. [Course guide and production details](docs/ACADEMY.md) · [Learner workbook](docs/training/crop-steering-from-zero/WORKBOOK.md).
+
+![A3 capacity lesson with the drainage illustration, captions and direct section controls](img/academy-lesson.png)
 
 ## Safety first
 
@@ -36,39 +53,33 @@ Before the first shot, do these steps:
 
 ## New to crop steering?
 
-Growers water plants in rockwool or coco many times each day, in small measured **shots**. The dryback between shots, and the salt in the substrate, **steer** the plant:
+Container growers can apply small irrigation events called **shots**. Water content, EC, drainage and environmental conditions contribute to steering:
 
-- When the substrate stays wetter, the plant grows leaves and stems. This is **vegetative** steering.
-- When the substrate dries back more, the plant puts its energy into the flowers. This is **generative** steering.
+- **Vegetative steering** aims to support vegetative growth through a coordinated set of conditions.
+- **Generative steering** aims to support reproductive development through a different coordinated set of conditions.
 
-Growers call this method crop steering.
+These describe an intended direction, not a guaranteed plant response. The slider blends your configured endpoints; pot size and dripper flow alone cannot establish safe targets. Start with the [academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) if the terms below are new.
 
 A group of plants on one valve is a **zone**. The probes in the substrate give the numbers that the controller uses:
 
 | Term | Meaning |
 | --- | --- |
-| **VWC** (moisture) | The quantity of water in the substrate, in percent. The controller waters by this number. |
-| **Pore EC** | The salt in the water of the substrate, in mS/cm. It increases when the plants drink. It decreases when new feed flows through. |
+| **VWC** (moisture) | Water volume divided by total measured sample volume, usually expressed as a percentage. It is not percent plant-available water. |
+| **Pore EC** | Conductivity of water in substrate pore spaces, in mS/cm. Identify the measurement type: feed, bulk substrate, pore-water and runoff/extract EC are not interchangeable. |
 | **Dryback** | The decrease of VWC between shots, overnight or in the morning. |
-| **Field capacity** | The highest VWC that the substrate can hold. More water drains out as **runoff**. The runoff removes salt. |
+| **Field capacity** | A configured reference in this program. Establish the appropriate drained container condition with a documented method; an entered value does not prove physical capacity. |
 | **Shot** | One short delivery of water. Its size is a percentage of the substrate volume. |
 
 Each grow-day has four phases:
 
 | Phase | What occurs | Why |
 | --- | --- | --- |
-| **P0: morning dryback** | After lights-on, the controller waits until the substrate dries by your dryback target. | A morning dryback tells the plant to grow roots. It also gives you control of the growth. |
+| **P0: morning dryback** | After lights-on, the controller uses configured timing and dryback conditions before ramp-up. | Sets the conditions for the first shot; it does not guarantee a root-growth response. |
 | **P1: ramp** | The controller gives small shots, some minutes apart, until VWC reaches your peak target. | The ramp fills the substrate slowly. It does not flood the roots. |
 | **P2: maintenance** | The controller gives a maintenance shot when VWC falls to your re-water point. | The maintenance shots keep the roots stable through the day. |
 | **P3: overnight dryback** | The usual shots stop before lights-off. The controller gives only a rescue shot when a zone becomes too dry. | Much of the steering occurs during the overnight dryback. |
 
-The targets also change with the **growth stage** of a flower run. The AI assistant follows this arc. Day 1 is the first day of 12 hours on and 12 hours off:
-
-| Stage | Flower days (56-day cultivar) | Steering | Pore EC | Runoff |
-| --- | --- | --- | --- | --- |
-| **Flower set** | 1 to 21 | Generative | 5 to 10 mS/cm | 1 to 7% of the feed |
-| **Flower bulk** | 22 to 42 | Vegetative | 3.5 to 6 mS/cm | 8 to 16% |
-| **Finish** | the last 14 days | Ripen | 3 to 4 mS/cm | 1 to 7% |
+Targets can change with the growth stage and local evidence. Build a plan from reviewed endpoint profiles and calendar blocks, then verify the active targets. Library recipes and illustrated reference curves are starting points for review, not universally safe prescriptions or validated crop-response forecasts. See [grow plans](docs/GROW_PLANS.md) and the academy’s planning lessons.
 
 ## How it works
 
@@ -534,3 +545,9 @@ Report a problem or ask a question in [GitHub issues](https://github.com/JakeThe
 ## License
 
 [MIT](LICENSE)
+
+## References and acknowledgements
+
+Athena's grow guide, handbook and educational resources informed this project's crop-steering and irrigation-strategy work. See the [Athena Commercial Handbook](https://growershub.athenaag.com/athena-handbook-v41iwrqr), [Precision Irrigation Strategy](https://support.athenaag.com/hc/en-us/articles/25975395644315-Precision-Irrigation-Strategy) and our [references and attribution notes](docs/REFERENCES.md).
+
+This is an independent project, with no implied Athena endorsement. Project examples and software behaviour are identified separately from Athena's published guidance.

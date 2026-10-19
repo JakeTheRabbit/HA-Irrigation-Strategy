@@ -1,0 +1,138 @@
+[
+  {
+    "term": "substrate",
+    "definition": "The growing material around the roots."
+  },
+  {
+    "term": "VWC",
+    "definition": "Volumetric water content: water volume divided by total sample volume, usually expressed as a percentage."
+  },
+  {
+    "term": "pore space",
+    "definition": "Space between the solid parts of the substrate."
+  },
+  {
+    "term": "saturation",
+    "definition": "Physical condition in which water fills the pore spaces."
+  },
+  {
+    "term": "container capacity",
+    "definition": "Water retained under the specified container and drainage conditions."
+  },
+  {
+    "term": "field capacity",
+    "definition": "Field-soil term also used by the application for a configured reference. It does not prove a measured container condition."
+  },
+  {
+    "term": "reference value",
+    "definition": "A documented value used for comparison; its meaning depends on its measurement method."
+  },
+  {
+    "term": "dryback",
+    "definition": "A decrease in substrate water content between irrigation events."
+  },
+  {
+    "term": "EC",
+    "definition": "Electrical conductivity. The measurement type and unit must be identified."
+  },
+  {
+    "term": "feed EC",
+    "definition": "EC of the supplied nutrient solution."
+  },
+  {
+    "term": "bulk substrate EC",
+    "definition": "EC measured for the combined substrate region."
+  },
+  {
+    "term": "pore-water EC",
+    "definition": "EC of the water within the substrate pore spaces."
+  },
+  {
+    "term": "dripper",
+    "definition": "Device that delivers irrigation water to a plant location. Use this name consistently."
+  },
+  {
+    "term": "probe",
+    "definition": "The sensing part installed in the substrate."
+  },
+  {
+    "term": "zone",
+    "definition": "A group of plants or irrigation outputs managed as one area."
+  },
+  {
+    "term": "host",
+    "definition": "Computer that runs the software."
+  },
+  {
+    "term": "entity",
+    "definition": "A named Home Assistant reading or control."
+  },
+  {
+    "term": "bridge",
+    "definition": "Interface device needed by some probes."
+  },
+  {
+    "term": "Controller app",
+    "definition": "The separate Crop Steering control application."
+  },
+  {
+    "term": "planning reference",
+    "definition": "The line illustrated from the selected settings; not the recorded sensor history."
+  },
+  {
+    "term": "draft threshold",
+    "definition": "Edited value that has not yet been reviewed and applied."
+  },
+  {
+    "term": "P0 / P1 / P2 / P3",
+    "definition": "Application phase identifiers: P0 morning dryback, P1 ramp-up, P2 maintenance and P3 overnight dryback. See lesson B2."
+  },
+  {
+    "term": "emergency VWC threshold",
+    "definition": "A protective lower threshold. It is not an ordinary overnight target."
+  },
+  {
+    "term": "emergency isolator",
+    "definition": "Physical means of isolation appropriate to the installed equipment. A software OFF command is not equivalent."
+  },
+  {
+    "term": "percentage point",
+    "definition": "The arithmetic difference between two percentage values. 60% to 45% is 15 percentage points."
+  },
+  {
+    "term": "relative dryback",
+    "definition": "The water-content fall divided by its stated starting water content, times 100. A fall from 60% to 45% is 25% relative dryback."
+  },
+  {
+    "term": "effective runtime",
+    "definition": "The time actually used after duration limits. Runtime-derived water delivery remains an estimate unless independently measured."
+  },
+  {
+    "term": "readback",
+    "definition": "Evidence that the applied setting or actual equipment state agrees with the intended change. A successful click alone is insufficient."
+  },
+  {
+    "term": "endpoint profile",
+    "definition": "A reusable pair of operator-configured vegetative and generative endpoints. A slider interpolates supported values between them."
+  },
+  {
+    "term": "hold",
+    "definition": "A condition that can prevent ordinary operation. Some plan holds can still permit safety watering; inspect the actual reason and scope."
+  },
+  {
+    "term": "freshness",
+    "definition": "How recently a reading was updated. A stale or unavailable reading is not zero or OFF."
+  },
+  {
+    "term": "arm a plan",
+    "definition": "Make a saved plan eligible for activation at the next local lights-on. This does not enable Watering."
+  },
+  {
+    "term": "plant uptake",
+    "definition": "Water entering the plant. It cannot be established from a runtime delivery estimate alone."
+  },
+  {
+    "term": "run record",
+    "definition": "A record used to group evidence for comparison. Starting a run record does not trigger irrigation or reconstruct past targets."
+  }
+]

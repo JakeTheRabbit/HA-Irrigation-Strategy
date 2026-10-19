@@ -2,6 +2,8 @@
 
 [Try the isolated demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1) · [Complete user guide](USER_GUIDE.md) · [Tested features and limits](FEATURE_MATRIX.md)
 
+First installation? The [free beginner course](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/) explains the equipment, alternative host routes, sensor mapping and supervised commissioning before live operation. See the [academy guide](ACADEMY.md) for the sequence.
+
 ## What gets installed
 
 | Component                 | Where it runs                                                       | Purpose                                                                                                                                |

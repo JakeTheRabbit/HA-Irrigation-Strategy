@@ -1,5 +1,7 @@
 # User guide
 
+New to VWC, EC or crop steering? Start with the free [Crop Steering Academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/). It includes narrated lessons, equipment/setup routes and isolated practice. [Course and progress guide](ACADEMY.md).
+
 The menu has five items:
 
 - **Overview** opens **All zones** across every configured room by default. **Selected room** shows one room and its zone cards.

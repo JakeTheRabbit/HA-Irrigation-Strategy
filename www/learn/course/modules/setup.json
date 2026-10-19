@@ -1,0 +1,1823 @@
+[
+  {
+    "id": "C2a",
+    "module": "C",
+    "title": "Give Home Assistant a home: Raspberry Pi",
+    "summary": "Use one dedicated computer, protect its storage, and open Home Assistant on your network.",
+    "outcomes": [
+      "Explain what the host computer does",
+      "Identify the Pi, power supply, storage and network",
+      "Record a verified first boot and a recoverable starting point"
+    ],
+    "prerequisites": [
+      "C1"
+    ],
+    "route": "pi",
+    "slides": [
+      {
+        "id": "1",
+        "title": "One computer keeps the desk open",
+        "body": [
+          "Host = the computer that runs Home Assistant",
+          "Choose Raspberry Pi OR the PC route"
+        ],
+        "narration": "Think of Home Assistant as the front desk for your equipment. It needs a computer that stays on to receive readings and pass messages. That computer is the host. This route uses a Raspberry Pi. C2b uses a dedicated PC instead; choose one. If you already have a suitable working Home Assistant host, check its version and recovery plan and continue to C3. Keep watering equipment out of service during setup.",
+        "visual": {
+          "type": "host",
+          "title": "One computer keeps the desk open",
+          "labels": [
+            "Readings and messages",
+            "One always-on host",
+            "Pi OR dedicated PC"
+          ],
+          "asset": "assets/diagrams/c2-host-choice-r3.png",
+          "alt": "Choose one supported always-on computer: Raspberry Pi OR a dedicated x86-64 host."
+        }
+      },
+      {
+        "id": "2",
+        "title": "Lay out the parts first",
+        "body": [
+          "Check the exact Pi model and its power supply",
+          "Use the official guide and wired network"
+        ],
+        "narration": "A Pi is a small computer board, not a complete irrigation controller. You still need suitable power, storage, an enclosure, cooling and a network connection. The official guide lists Pi 4 or 5 with at least two gigabytes of memory and a card of at least thirty-two gigabytes. Check the current guide before buying. A plug that fits does not prove a charger supplies enough power. Use Ethernet for this installation.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Lay out the parts first",
+          "labels": [
+            "Supported Pi",
+            "Suitable power",
+            "Storage and Ethernet"
+          ]
+        }
+      },
+      {
+        "id": "3",
+        "title": "Example: choose the spare card",
+        "body": [
+          "64 GB spare card: checked and backed up",
+          "1 TB photo drive: leave it alone"
+        ],
+        "narration": "Imagine your laptop shows a spare sixty-four gigabyte card and a one-terabyte photo drive. You want Home Assistant on the card. Writing the installation image replaces the selected storage contents. Identify the card by its device information and capacity, preserve needed files elsewhere, and leave the photo drive unselected. In Raspberry Pi Imager, choose Home Assistant OS for the exact Pi model and select the checked card.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Example: choose the spare card",
+          "labels": [
+            "64 GB: checked target",
+            "1 TB: protect photos",
+            "Image must match Pi"
+          ]
+        },
+        "workedExample": {
+          "prompt": "Which storage is ready?",
+          "steps": [
+            "Identify the spare 64 GB card.",
+            "Check its needed files have a separate copy.",
+            "Match the Home Assistant OS image to the exact Pi."
+          ],
+          "answer": "Only the identified, backed-up card is ready for writing."
+        }
+      },
+      {
+        "id": "4",
+        "title": "Your turn: the last check before Write",
+        "body": [
+          "Name the device that will be erased",
+          "Check the model, image and separate backup"
+        ],
+        "narration": "Before pressing Write, finish this sentence: I am replacing the contents of this identified card, and the files I need are copied here. Add the Pi model and matching image. If any answer is uncertain, resolve it before writing. Follow the official guide through writing and verification. Eject the finished card, insert it into the unpowered Pi, connect Ethernet on the same network as your computer, then connect the proper power supply.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Your turn: the last check before Write",
+          "labels": [
+            "Identify destination",
+            "Check separate backup",
+            "Write, verify, eject"
+          ]
+        }
+      },
+      {
+        "id": "5",
+        "title": "Open the page on your own network",
+        "body": [
+          "Use the local address in the official guide",
+          "Confirm this is the intended Pi"
+        ],
+        "narration": "Start with the local Home Assistant address given in the official guide. If needed, use the Pi address found on your own network, with port eight-one-two-three where required. Confirm the page belongs to this Pi rather than an older Home Assistant host. A page opening tells you the computer is reachable. Probes and water controls still need their own checks. Continue to onboarding; do not test a pump just because the page loads.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Open the page on your own network",
+          "labels": [
+            "Own network",
+            "Intended host",
+            "First page reached"
+          ]
+        }
+      },
+      {
+        "id": "6",
+        "title": "Keep a way back",
+        "body": [
+          "Record model, storage, version and address",
+          "Continue to accounts and backups in C3"
+        ],
+        "narration": "Now try a different case: a card holds old research files with no separate copy. What must happen before writing? Preserve the needed files and identify the destination again. For your completed installation, record the model, storage, installed version and local address. If boot fails, check power, network and official troubleshooting before another write. C3 adds accounts and backups. This record should let another responsible person understand how the host was prepared.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Keep a way back",
+          "labels": [
+            "Protect needed files",
+            "Record first boot",
+            "C3: accounts and backup"
+          ]
+        }
+      }
+    ],
+    "practice": {
+      "kind": "explain",
+      "prompt": "Prepare a Pi setup sheet naming the exact model, power supply, target card, separate backup and verified local access address.",
+      "hints": [
+        "Name the actual room, equipment and evidence you need.",
+        "Keep the example separate from a real installation."
+      ],
+      "success": "Record a verified first boot and a recoverable starting point"
+    },
+    "quiz": [
+      {
+        "id": "q1",
+        "prompt": "What happens when the image is written to the chosen card?",
+        "options": [
+          {
+            "text": "Its existing contents are replaced",
+            "correct": true,
+            "feedback": "Correct. Identify the selected storage and preserve needed files before writing."
+          },
+          {
+            "text": "Home Assistant is added beside every existing file",
+            "correct": false,
+            "feedback": "Review this step. Identify the selected storage and preserve needed files before writing."
+          },
+          {
+            "text": "Every connected disk is erased",
+            "correct": false,
+            "feedback": "Review this step. Identify the selected storage and preserve needed files before writing."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "q2",
+        "prompt": "Which power supply is ready?",
+        "options": [
+          {
+            "text": "One specified for the exact Pi model",
+            "correct": true,
+            "feedback": "Correct. Check the model and supply specification; matching connectors are insufficient."
+          },
+          {
+            "text": "Any charger with the same plug",
+            "correct": false,
+            "feedback": "Review this step. Check the model and supply specification; matching connectors are insufficient."
+          },
+          {
+            "text": "Any computer USB port",
+            "correct": false,
+            "feedback": "Review this step. Check the model and supply specification; matching connectors are insufficient."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "q3",
+        "prompt": "A suitable working Home Assistant PC already exists. What next?",
+        "options": [
+          {
+            "text": "Verify it and continue to C3",
+            "correct": true,
+            "feedback": "Correct. The Pi and PC routes are alternatives."
+          },
+          {
+            "text": "Buy a Pi because both hosts are required",
+            "correct": false,
+            "feedback": "Review this step. The Pi and PC routes are alternatives."
+          },
+          {
+            "text": "Erase the PC to match this lesson",
+            "correct": false,
+            "feedback": "Review this step. The Pi and PC routes are alternatives."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "q4",
+        "prompt": "The intended Pi opens its Home Assistant page. What have you checked?",
+        "options": [
+          {
+            "text": "The host is reachable; probes and water still need checking",
+            "correct": true,
+            "feedback": "Correct. Software access does not establish physical delivery."
+          },
+          {
+            "text": "The correct valve delivers water",
+            "correct": false,
+            "feedback": "Review this step. Software access does not establish physical delivery."
+          },
+          {
+            "text": "Every dripper has its measured flow",
+            "correct": false,
+            "feedback": "Review this step. Software access does not establish physical delivery."
+          }
+        ],
+        "safetyCritical": false
+      }
+    ],
+    "practicalTask": {
+      "instructions": [
+        "First explain the example on paper or practise in the isolated demo.",
+        "Prepare a Pi setup sheet naming the exact model, power supply, target card, separate backup and verified local access address.",
+        "For actual equipment, use the installation’s approved procedure, required local supervision and agreed physical shutdown. Record what was verified and what remains unresolved."
+      ],
+      "requiresLocalSupervision": false,
+      "proof": "physical"
+    },
+    "sources": [
+      {
+        "title": "Home Assistant: Raspberry Pi installation",
+        "url": "https://www.home-assistant.io/installation/raspberrypi/",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "One-zone equipment and staged commissioning guide",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+        "accessed": "2026-10-19"
+      }
+    ]
+  },
+  {
+    "id": "C2b",
+    "module": "C",
+    "title": "Give Home Assistant a home: dedicated PC",
+    "summary": "Use a supported dedicated PC instead of a Pi, identify its disk before erasing it, and check first boot.",
+    "outcomes": [
+      "Explain why this PC must be suitable and dedicated",
+      "Distinguish the temporary USB system from the destination disk",
+      "Record a protected installation and verified first boot"
+    ],
+    "prerequisites": [
+      "C1"
+    ],
+    "route": "x86",
+    "slides": [
+      {
+        "id": "1",
+        "title": "Another home for the same front desk",
+        "body": [
+          "Choose the PC route OR Raspberry Pi",
+          "Use one suitable dedicated host"
+        ],
+        "narration": "Home Assistant needs one computer that stays on, like a front desk that keeps receiving messages. This lesson uses a dedicated Intel or AMD PC. It reaches the same starting point as the Pi route; you do not need both. A small NUC-shaped computer may suit the job, but its shape or brand does not establish compatibility. Keep an existing suitable Home Assistant installation after checking it rather than erasing it for the lesson.",
+        "visual": {
+          "type": "host",
+          "title": "Another home for the same front desk",
+          "labels": [
+            "One host",
+            "Dedicated PC",
+            "Alternative to Pi"
+          ],
+          "asset": "assets/diagrams/c2-host-choice-r3.png",
+          "alt": "Pi and x86-64 are alternative host routes; only one host is needed."
+        }
+      },
+      {
+        "id": "2",
+        "title": "Check the computer before changing it",
+        "body": [
+          "64-bit processor and UEFI boot",
+          "Protect files and record firmware settings"
+        ],
+        "narration": "Use the official generic x86-64 guide to check the exact machine. It needs a sixty-four-bit processor, UEFI startup and supported storage. UEFI is the computer’s startup system. The guide requires storage that supports five-hundred-and-twelve-byte logical sectors; native four-kilobyte-only boot storage is unsupported. Disable Secure Boot as the official guide instructs. Writing Home Assistant OS replaces the selected disk’s operating system and files. Make a separate usable backup and record firmware settings first.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Check the computer before changing it",
+          "labels": [
+            "64-bit and UEFI",
+            "Supported disk",
+            "Backup before erase"
+          ]
+        }
+      },
+      {
+        "id": "3",
+        "title": "Example: the USB and disk have different jobs",
+        "body": [
+          "USB: temporarily runs Ubuntu",
+          "Internal disk: receives Home Assistant OS"
+        ],
+        "narration": "Picture a workbench with a temporary toolbox and a permanent cabinet. In the recommended installation method, a live Ubuntu USB is the toolbox: it starts a temporary operating system. The internal disk is the cabinet that receives Home Assistant OS. Boot the USB using Try Ubuntu, identify both devices by their information and capacity, and check the internal disk backup. Follow the official disk-image restore steps. Never copy another computer’s disk name.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Example: the USB and disk have different jobs",
+          "labels": [
+            "USB: temporary tools",
+            "Internal disk: destination",
+            "Separate backup"
+          ]
+        },
+        "workedExample": {
+          "prompt": "Which disk receives Home Assistant OS?",
+          "steps": [
+            "Boot the temporary Ubuntu USB.",
+            "Identify the intended destination disk and its separate backup.",
+            "Check the target again at the destructive confirmation."
+          ],
+          "answer": "The verified destination disk; its existing contents will be replaced."
+        }
+      },
+      {
+        "id": "4",
+        "title": "Your turn: identify both devices",
+        "body": [
+          "Live USB: ___. Destination disk: ___.",
+          "Read the destructive confirmation carefully"
+        ],
+        "narration": "Fill in the live USB identity, intended destination disk, separate backup location and firmware changes. Before confirming the image write, say which disk will lose its contents. If Ubuntu is running from that destination disk, correct the boot choice rather than working around a busy-disk warning. After the official write and shutdown steps finish, remove the temporary USB as directed. The next start should use the Home Assistant disk.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Your turn: identify both devices",
+          "labels": [
+            "Check boot source",
+            "Check write target",
+            "Remove temporary USB"
+          ]
+        }
+      },
+      {
+        "id": "5",
+        "title": "A capable office PC may still be unavailable",
+        "body": [
+          "Current work files are not backed up",
+          "Its owner has not agreed to dedicate it"
+        ],
+        "narration": "Now make the decision for a different machine. An office PC meets the processor requirements, but it still holds current work and nobody has agreed to dedicate it. Do not continue with the erase. Resolve permission, backups and its future job, or use another supported host. You can still study accounts, readings and the isolated demo. That learning does not depend on changing the office computer or risking its files.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "A capable office PC may still be unavailable",
+          "labels": [
+            "Hardware capable",
+            "Data unprotected",
+            "Do not erase"
+          ]
+        }
+      },
+      {
+        "id": "6",
+        "title": "Check first boot and write down the result",
+        "body": [
+          "Use suitable power, cooling and Ethernet",
+          "Verify the host, version and local address"
+        ],
+        "narration": "With the machine on suitable power and a reliable wired network, follow the official first-start steps. Open Home Assistant and verify that this particular host answers. Record the version and address alongside the hardware and backup details. If it fails, compare actual firmware and storage with official troubleshooting before another write. A working page establishes access. Continue to C3 for accounts, time and recovery; keep irrigation out of service until its own commissioning checks pass.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Check first boot and write down the result",
+          "labels": [
+            "Own host reached",
+            "Version and address",
+            "C3: protect access"
+          ]
+        }
+      }
+    ],
+    "practice": {
+      "kind": "explain",
+      "prompt": "Prepare a dedicated-PC installation record identifying the temporary USB, destination disk, separate backup, firmware changes and first-boot address.",
+      "hints": [
+        "Name the actual room, equipment and evidence you need.",
+        "Keep the example separate from a real installation."
+      ],
+      "success": "Record a protected installation and verified first boot"
+    },
+    "quiz": [
+      {
+        "id": "q1",
+        "prompt": "What happens to the selected destination disk?",
+        "options": [
+          {
+            "text": "Its operating system and files are replaced",
+            "correct": true,
+            "feedback": "Correct. Preserve needed data and identify the destination before writing."
+          },
+          {
+            "text": "Its files automatically move to the USB",
+            "correct": false,
+            "feedback": "Review this step. Preserve needed data and identify the destination before writing."
+          },
+          {
+            "text": "Only browser settings change",
+            "correct": false,
+            "feedback": "Review this step. Preserve needed data and identify the destination before writing."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "q2",
+        "prompt": "In the Ubuntu USB method, which device receives Home Assistant OS?",
+        "options": [
+          {
+            "text": "The verified intended destination disk",
+            "correct": true,
+            "feedback": "Correct. The temporary USB and destination have separate jobs."
+          },
+          {
+            "text": "Any disk named like the guide screenshot",
+            "correct": false,
+            "feedback": "Review this step. The temporary USB and destination have separate jobs."
+          },
+          {
+            "text": "Automatically the live USB",
+            "correct": false,
+            "feedback": "Review this step. The temporary USB and destination have separate jobs."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "q3",
+        "prompt": "A NUC-shaped PC is available. What must you establish?",
+        "options": [
+          {
+            "text": "Exact compatibility, dedicated use and recoverable data",
+            "correct": true,
+            "feedback": "Correct. Follow requirements for the actual machine and storage."
+          },
+          {
+            "text": "Its shape alone makes it supported",
+            "correct": false,
+            "feedback": "Review this step. Follow requirements for the actual machine and storage."
+          },
+          {
+            "text": "Every PC runs the image unchanged",
+            "correct": false,
+            "feedback": "Review this step. Follow requirements for the actual machine and storage."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "q4",
+        "prompt": "An office PC holds unprotected work files. What next?",
+        "options": [
+          {
+            "text": "Resolve ownership and backup before any destructive step",
+            "correct": true,
+            "feedback": "Correct. Processor compatibility does not authorise destroying data."
+          },
+          {
+            "text": "Write first and recover files afterwards",
+            "correct": false,
+            "feedback": "Review this step. Processor compatibility does not authorise destroying data."
+          },
+          {
+            "text": "Use it because the processor is suitable",
+            "correct": false,
+            "feedback": "Review this step. Processor compatibility does not authorise destroying data."
+          }
+        ],
+        "safetyCritical": true
+      }
+    ],
+    "practicalTask": {
+      "instructions": [
+        "First explain the example on paper or practise in the isolated demo.",
+        "Prepare a dedicated-PC installation record identifying the temporary USB, destination disk, separate backup, firmware changes and first-boot address.",
+        "For actual equipment, use the installation’s approved procedure, required local supervision and agreed physical shutdown. Record what was verified and what remains unresolved."
+      ],
+      "requiresLocalSupervision": false,
+      "proof": "physical"
+    },
+    "sources": [
+      {
+        "title": "Home Assistant: Generic x86-64 installation",
+        "url": "https://www.home-assistant.io/installation/generic-x86-64/",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "One-zone equipment and staged commissioning guide",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/95237d5a7f4971d98ca12104c586b1e7d277fbcf/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+        "accessed": "2026-10-19"
+      }
+    ]
+  },
+  {
+    "id": "C3",
+    "module": "C",
+    "title": "Install the software and protect access",
+    "summary": "Understand Home Assistant labels, install both Crop Steering parts, and keep a recovery copy.",
+    "outcomes": [
+      "Explain host, entity, integration and Controller in ordinary words",
+      "Install the matching integration and Controller using the documented HAOS steps",
+      "Verify the intended room, fresh Controller report, account access and separate backup"
+    ],
+    "prerequisites": [
+      "C1"
+    ],
+    "route": "builder",
+    "slides": [
+      {
+        "id": "1",
+        "title": "The front desk gives each item an address",
+        "body": [
+          "Entity = one named reading or control",
+          "A useful name still needs a physical label"
+        ],
+        "narration": "Home Assistant gives each reading or control an address, called an entity ID. Think of sensor dot practice underscore moisture as a labelled letterbox: it tells software where to look. One probe can provide moisture, temperature and battery entities. The label alone cannot prove the probe’s location. During onboarding, set your local timezone, protect individual accounts and record recovery access without publishing passwords.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "The front desk gives each item an address",
+          "labels": [
+            "Host: computer",
+            "Entity: software address",
+            "Physical label: verify"
+          ]
+        }
+      },
+      {
+        "id": "2",
+        "title": "Two Crop Steering parts do different jobs",
+        "body": [
+          "Integration: settings, labels and workspace",
+          "Controller: decides when to water"
+        ],
+        "narration": "Think of the integration as the interpreter and filing desk. It holds room settings and supplies the Crop Steering workspace inside Home Assistant. The Controller reads those settings and measurements and makes the watering decisions. You need both at matching versions. HACS is the community download library used to obtain the integration; downloading from it does not install the Controller. Before changes, keep watering disabled, confirm equipment state and preserve a backup outside the host.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Two Crop Steering parts do different jobs",
+          "labels": [
+            "HACS: download library",
+            "Integration: settings and UI",
+            "Controller: decisions"
+          ]
+        }
+      },
+      {
+        "id": "3",
+        "title": "Example: install the integration and room",
+        "body": [
+          "HACS download, then restart Home Assistant",
+          "Start the Crop Steering configuration flow"
+        ],
+        "narration": "If HACS is absent, install it through the guide first. Then open this project using its HACS link. Download the integration and restart Home Assistant. Then use the guide’s Crop Steering configuration link. Choose manual setup, name the room and enter its initial zone count. For example, name your paper room Practice Room with one zone. This creates its software record; it does not pair a probe or identify a valve. Use real names only after verification.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Example: install the integration and room",
+          "labels": [
+            "Download integration",
+            "Restart Home Assistant",
+            "Create named room"
+          ]
+        },
+        "workedExample": {
+          "prompt": "What has creating Practice Room established?",
+          "steps": [
+            "Download the integration and restart Home Assistant.",
+            "Run its configuration flow and name the room.",
+            "Install and check the separate matching Controller next."
+          ],
+          "answer": "A named software room exists; physical mapping and delivery remain to be proved."
+        }
+      },
+      {
+        "id": "4",
+        "title": "Add and start the separate Controller",
+        "body": [
+          "Add the project app repository",
+          "Install Controller; review options; start with watering OFF"
+        ],
+        "narration": "Next use the guide to add the project to the app store’s list of sources, called app repositories. Install Crop Steering Controller from the Home Assistant app store at the same version as the integration. Review its options with affected watering controls OFF, then start the app. Check Start on boot and the documented Watchdog setting so it can restart after a failure. The HAOS Supervisor supplies its internal access token. Do not paste a secret into a repository file. Open Crop Steering in the Home Assistant sidebar.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Add and start the separate Controller",
+          "labels": [
+            "Matching Controller version",
+            "Start on boot and Watchdog",
+            "Watering stays OFF"
+          ]
+        }
+      },
+      {
+        "id": "5",
+        "title": "Your turn: a page opens but no report arrives",
+        "body": [
+          "Workspace visible does not prove Controller running",
+          "Check the installed pair and report age"
+        ],
+        "narration": "A fictional installation has a working workspace but no recent Controller report. Check that the separate Controller is installed, running and compatible before enabling anything. Its regular status message is called a heartbeat. A fresh heartbeat shows recent communication, not correct mapping or water delivery. Record both versions, the intended room and report age. If an older Controller already owns that room, resolve the documented upgrade or migration before starting another.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Your turn: a page opens but no report arrives",
+          "labels": [
+            "Workspace opens",
+            "Controller report missing",
+            "Check both parts"
+          ]
+        }
+      },
+      {
+        "id": "6",
+        "title": "Keep a recovery copy you can actually use",
+        "body": [
+          "Settings → System → Backups",
+          "Separate backup plus emergency kit where needed"
+        ],
+        "narration": "In Home Assistant Settings, System, Backups, arrange a backup and keep a usable copy away from this host. Keep required decryption information, including the emergency kit for encrypted backups, securely available. A screenshot saying complete cannot restore a failed disk. Practise recovery on paper or isolated hardware, never by overwriting production for the lesson. Check local time against a clock. Room lighting hours are configured separately. Continue to C4 with watering still OFF.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Keep a recovery copy you can actually use",
+          "labels": [
+            "Off-host backup",
+            "Required recovery keys",
+            "Verified time and access"
+          ]
+        }
+      }
+    ],
+    "practice": {
+      "kind": "explain",
+      "prompt": "Prepare a software record with both installed versions, intended room, current Controller report, account-recovery method and separate usable backup.",
+      "hints": [
+        "HACS download, room configuration and Controller app installation are separate steps.",
+        "A separate backup needs any required decryption information."
+      ],
+      "success": "Verify the intended room, fresh Controller report, account access and separate backup"
+    },
+    "quiz": [
+      {
+        "id": "q1",
+        "prompt": "What does HACS download in this taught route?",
+        "options": [
+          {
+            "text": "The integration; Controller installation is separate",
+            "correct": true,
+            "feedback": "Correct. Use the integration configuration flow and app-store Controller steps as well."
+          },
+          {
+            "text": "Both parts and all connected devices automatically",
+            "correct": false,
+            "feedback": "Review this step. Use the integration configuration flow and app-store Controller steps as well."
+          },
+          {
+            "text": "Physical probe firmware for every sensor",
+            "correct": false,
+            "feedback": "Review this step. Use the integration configuration flow and app-store Controller steps as well."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "q2",
+        "prompt": "The workspace opens but no fresh Controller report exists. What next?",
+        "options": [
+          {
+            "text": "Check Controller installation, version and running state with watering OFF",
+            "correct": true,
+            "feedback": "Correct. A visible workspace is evidence about the interface only."
+          },
+          {
+            "text": "Enable watering to force a report",
+            "correct": false,
+            "feedback": "Review this step. A visible workspace is evidence about the interface only."
+          },
+          {
+            "text": "Assume the page proves the Controller works",
+            "correct": false,
+            "feedback": "Review this step. A visible workspace is evidence about the interface only."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "q3",
+        "prompt": "What is an entity ID?",
+        "options": [
+          {
+            "text": "A software address for one reading or control",
+            "correct": true,
+            "feedback": "Correct. Verify quantity, units and physical location separately."
+          },
+          {
+            "text": "Proof that a valve is correctly connected",
+            "correct": false,
+            "feedback": "Review this step. Verify quantity, units and physical location separately."
+          },
+          {
+            "text": "Always the serial number of a whole device",
+            "correct": false,
+            "feedback": "Review this step. Verify quantity, units and physical location separately."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "q4",
+        "prompt": "The only backup is on the failed host disk. Is recovery ready?",
+        "options": [
+          {
+            "text": "No; a separate usable copy and required recovery keys are needed",
+            "correct": true,
+            "feedback": "Correct. Recovery needs accessible files and credentials, not just past status."
+          },
+          {
+            "text": "Yes; the completion screenshot replaces the file",
+            "correct": false,
+            "feedback": "Review this step. Recovery needs accessible files and credentials, not just past status."
+          },
+          {
+            "text": "Yes; setting the timezone restores the files",
+            "correct": false,
+            "feedback": "Review this step. Recovery needs accessible files and credentials, not just past status."
+          }
+        ],
+        "safetyCritical": true
+      }
+    ],
+    "practicalTask": {
+      "instructions": [
+        "First explain the example on paper or practise in the isolated demo.",
+        "Prepare a software record with both installed versions, intended room, current Controller report, account-recovery method and separate usable backup.",
+        "For actual equipment, use the installation’s approved procedure, required local supervision and agreed physical shutdown. Record what was verified and what remains unresolved."
+      ],
+      "requiresLocalSupervision": false,
+      "proof": "explain"
+    },
+    "sources": [
+      {
+        "title": "Crop Steering user guide",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "Crop Steering installation, upgrade and rollback",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "One-zone equipment and staged commissioning guide",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+        "accessed": "2026-10-19"
+      }
+    ]
+  },
+  {
+    "id": "C4",
+    "module": "C",
+    "title": "Tell the software which zone is which",
+    "summary": "Map verified sensor and valve addresses, enter real sizing, and check that the Controller accepts the saved setup.",
+    "outcomes": [
+      "Map one named zone to its physical equipment",
+      "Distinguish moisture, feed EC and identified root-zone EC measurements",
+      "Verify per-plant sizing, room time and Controller acceptance without enabling watering"
+    ],
+    "prerequisites": [
+      "C3"
+    ],
+    "route": "builder",
+    "slides": [
+      {
+        "id": "1",
+        "title": "A contact name needs the right number",
+        "body": [
+          "Mapping = linking the zone to its real addresses",
+          "Pair and verify devices in Home Assistant first"
+        ],
+        "narration": "A phone contact can have a convincing name and still dial the wrong number. A zone mapping works the same way: its name must point to the right Home Assistant entities. First add each compatible device through its supported Home Assistant route. Check the exact entity ID against physical equipment labels. In Crop Steering, select the actual room and open Equipment, Setup. Keep affected Watering controls OFF and the installation’s required physical isolation in place.",
+        "visual": {
+          "type": "sensor-check",
+          "title": "A contact name needs the right number",
+          "labels": [
+            "Physical zone label",
+            "Exact entity ID",
+            "Equipment → Setup"
+          ],
+          "asset": "assets/screens/demo-equipment-setup-r3.png",
+          "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
+        }
+      },
+      {
+        "id": "2",
+        "title": "Match the real plumbing and measurements",
+        "body": [
+          "Zone valves only OR a pump then zone valves",
+          "Check quantity, units, location and timestamp"
+        ],
+        "narration": "Choose Zone valves only if that matches the supply, or A pump, then zone valves when a pump is required. Map a pump only if it actually exists. Each zone needs its intended valve. For moisture, check suitable VWC units, placement and the last update. For EC, identify feed, bulk substrate or pore-water measurement. These describe different places or methods. Leave unavailable optional data explicitly unavailable instead of borrowing an unrelated number.",
+        "visual": {
+          "type": "water-path",
+          "title": "Match the real plumbing and measurements",
+          "labels": [
+            "Real water path",
+            "Verified valve and probes",
+            "Units and update time"
+          ],
+          "asset": "assets/screens/demo-probes-r3.png",
+          "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
+        }
+      },
+      {
+        "id": "3",
+        "title": "Example: twelve plants, not one giant pot",
+        "body": [
+          "12 plants; 3 L substrate per plant",
+          "2 drippers per plant; measured 3 L/h each"
+        ],
+        "narration": "Imagine twelve plants, each in three litres of substrate. Each plant has two drippers measured at three litres per hour each. Enter twelve plants, three litres per plant, two drippers per plant and three litres per hour per dripper. The total estimated delivery is twelve times two times three: seventy-two litres per hour. Thirty-six litres is the total substrate, not the per-plant entry. Delivery estimates describe water supplied, not water taken up by plants.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Example: twelve plants, not one giant pot",
+          "labels": [
+            "12 × 2 × 3",
+            "72 L/h zone delivery",
+            "3 L substrate per plant"
+          ]
+        },
+        "workedExample": {
+          "prompt": "Estimate delivery for 12 plants with 2 drippers each at measured 3 L/h.",
+          "steps": [
+            "12 × 2 = 24 drippers.",
+            "24 × 3 = 72 L/h estimated zone delivery.",
+            "Keep substrate at 3 L per plant, not the 36 L total."
+          ],
+          "answer": "72 L/h zone delivery; this does not measure plant uptake."
+        }
+      },
+      {
+        "id": "4",
+        "title": "Check the clock and the receipt",
+        "body": [
+          "Timezone and room lighting hours are separate",
+          "Review configuration, save, then wait for acceptance"
+        ],
+        "narration": "Record the local timezone, the room’s configured lights-on and lights-off hours, and the actual lighting system that owns the lights. Observe that they agree; the irrigation clock does not operate the lights. Review configuration with affected equipment confirmed OFF, then Save configuration. Saving is like sending a letter. Mapping acknowledged is the separate receipt from the Controller. Wait for acceptance of this revision. A fresh heartbeat alone does not supply it.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Check the clock and the receipt",
+          "labels": [
+            "Local time and lighting",
+            "Review → Save",
+            "Mapping acknowledged"
+          ]
+        }
+      },
+      {
+        "id": "5",
+        "title": "Your turn: three faults in one record",
+        "body": [
+          "Wrong-room moisture; blank lighting hours",
+          "Saved setup with no acknowledgement"
+        ],
+        "narration": "Review eight plants, four litres per plant, one dripper each, measured at two point five litres per hour. Calculate the twenty litres per hour zone delivery. Now find the faults: the moisture entity belongs to the next room, lighting hours are blank, and the revision is saved but unacknowledged. All need correction before enabling. Correct arithmetic cannot repair a wrong probe address. Practise this record review in the isolated demo without connecting equipment.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Your turn: three faults in one record",
+          "labels": [
+            "20 L/h calculation",
+            "Wrong probe and missing time",
+            "Acceptance still missing"
+          ]
+        }
+      },
+      {
+        "id": "6",
+        "title": "Read the accepted setup back",
+        "body": [
+          "Check Overview and Equipment → Probes",
+          "Record unresolved items; keep watering OFF"
+        ],
+        "narration": "After acknowledgement, inspect the intended room in Overview and Equipment, Probes. Compare exact readings, units and age with the setup sheet. Verify sizing, measured-flow evidence, light timing and each output’s owner. Resolve an unreadable state instead of treating it as OFF. These checks show the intended software setup reached the Controller. C5 checks physical protections, and C6 proves delivery and stopping. Keep automatic operation disabled until those checks pass with the responsible local people.",
+        "visual": {
+          "type": "daily-check",
+          "title": "Read the accepted setup back",
+          "labels": [
+            "Accepted revision",
+            "Live values match record",
+            "Physical checks still required"
+          ],
+          "asset": "assets/screens/demo-probe-mapping-r3.png",
+          "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
+        }
+      }
+    ],
+    "practice": {
+      "kind": "explain",
+      "prompt": "Review the eight-plant example, calculate zone flow, and correct wrong-room moisture, missing lighting hours and missing Controller acknowledgement.",
+      "hints": [
+        "8 × 1 × 2.5 = 20 L/h estimated zone delivery.",
+        "The correct per-plant substrate entry remains 4 L."
+      ],
+      "success": "Calculate 20 L/h, retain 4 L substrate per plant, and resolve wrong room, missing lighting hours and missing acknowledgement before enabling."
+    },
+    "quiz": [
+      {
+        "id": "q1",
+        "prompt": "A matching friendly name points to a probe in the next room. What next?",
+        "options": [
+          {
+            "text": "Reject it and verify the intended physical probe address",
+            "correct": true,
+            "feedback": "Correct. Exact identity, quantity and location must match the selected zone."
+          },
+          {
+            "text": "Use it because its name sounds right",
+            "correct": false,
+            "feedback": "Review this step. Exact identity, quantity and location must match the selected zone."
+          },
+          {
+            "text": "Average it with tank temperature",
+            "correct": false,
+            "feedback": "Review this step. Exact identity, quantity and location must match the selected zone."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "q2",
+        "prompt": "Ten plants have two drippers each, measured at 2 L/h per dripper. Zone delivery?",
+        "options": [
+          {
+            "text": "40 L/h",
+            "correct": true,
+            "feedback": "Correct. Multiply plants by drippers per plant by measured flow per dripper."
+          },
+          {
+            "text": "4 L/h",
+            "correct": false,
+            "feedback": "Review this step. Multiply plants by drippers per plant by measured flow per dripper."
+          },
+          {
+            "text": "20 L/h",
+            "correct": false,
+            "feedback": "Review this step. Multiply plants by drippers per plant by measured flow per dripper."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "q3",
+        "prompt": "The Home Assistant timezone is correct. What still needs checking?",
+        "options": [
+          {
+            "text": "Room lighting hours against actual lights and their owner",
+            "correct": true,
+            "feedback": "Correct. The clock and lighting schedule have different jobs."
+          },
+          {
+            "text": "Nothing; timezone schedules every light",
+            "correct": false,
+            "feedback": "Review this step. The clock and lighting schedule have different jobs."
+          },
+          {
+            "text": "Only the browser theme",
+            "correct": false,
+            "feedback": "Review this step. The clock and lighting schedule have different jobs."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "q4",
+        "prompt": "Setup is saved and heartbeat fresh, but acknowledgement is missing. Ready?",
+        "options": [
+          {
+            "text": "No; keep Watering OFF and resolve acceptance",
+            "correct": true,
+            "feedback": "Correct. Stored settings and Controller acceptance are separate checks."
+          },
+          {
+            "text": "Yes; saved and accepted mean the same thing",
+            "correct": false,
+            "feedback": "Review this step. Stored settings and Controller acceptance are separate checks."
+          },
+          {
+            "text": "Yes; water will force acceptance",
+            "correct": false,
+            "feedback": "Review this step. Stored settings and Controller acceptance are separate checks."
+          }
+        ],
+        "safetyCritical": true
+      }
+    ],
+    "practicalTask": {
+      "instructions": [
+        "First explain the example on paper or practise in the isolated demo.",
+        "Review the eight-plant example, calculate zone flow, and correct wrong-room moisture, missing lighting hours and missing Controller acknowledgement.",
+        "For actual equipment, use the installation’s approved procedure, required local supervision and agreed physical shutdown. Record what was verified and what remains unresolved."
+      ],
+      "requiresLocalSupervision": true,
+      "proof": "physical"
+    },
+    "sources": [
+      {
+        "title": "Crop Steering user guide",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "Crop Steering installation, upgrade and rollback",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "One-zone equipment and staged commissioning guide",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+        "accessed": "2026-10-19"
+      }
+    ]
+  },
+  {
+    "id": "C5",
+    "module": "C",
+    "title": "Make the physical equipment safe to test",
+    "summary": "Check the documented sensor connection, proper equipment ratings, shutdown and one owner for every output.",
+    "outcomes": [
+      "Trace a reading from the actual probe through its supported interface",
+      "Explain why software OFF differs from physical isolation",
+      "Record the approved protection, shutdown and sole owner before wet testing"
+    ],
+    "prerequisites": [
+      "C4"
+    ],
+    "route": "builder",
+    "slides": [
+      {
+        "id": "1",
+        "title": "A stop message is not a disconnected machine",
+        "body": [
+          "Software OFF stops Controller requests",
+          "Physical isolation protects work on the equipment"
+        ],
+        "narration": "Think of software OFF as a message telling a driver to stop. Physical isolation is the installation’s actual way to remove the hazard. They do different jobs. Crop Steering Watering OFF blocks its shots, but another timer or manual switch may still operate equipment, and electrical power may remain present. Before physical work, agree the installer-approved electrical and water shutdown, who controls it and how everybody knows the equipment’s state.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "A stop message is not a disconnected machine",
+          "labels": [
+            "Watering OFF: software",
+            "Isolation: physical procedure",
+            "Agree responsible person"
+          ]
+        }
+      },
+      {
+        "id": "2",
+        "title": "Use the probe’s documented connection",
+        "body": [
+          "Exact model, signal, power and compatible interface",
+          "Never infer wire function from colour"
+        ],
+        "narration": "A matching plug is like a matching envelope: its contents may still be wrong. Check the exact probe, supply voltage, signal protocol, compatible interface and supported firmware. Some probes need a bridge before Home Assistant can read them. Prefer a documented assembled route for a first installation. Follow the maker’s placement and calibration instructions. Do not connect an unknown probe signal directly to a computer pin or copy wire colours from a different assembly.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Use the probe’s documented connection",
+          "labels": [
+            "Exact probe documentation",
+            "Compatible interface",
+            "Placement and calibration"
+          ]
+        }
+      },
+      {
+        "id": "3",
+        "title": "Example: a number can be fresh and irrelevant",
+        "body": [
+          "22 °C tank temperature is not zone moisture",
+          "Probe contact and measurement method still matter"
+        ],
+        "narration": "A fictional entity reports twenty-two with a recent timestamp. Its friendly name mentions the room, but its units are degrees Celsius and it measures the tank. It cannot stand in for moisture in that room’s substrate. Check quantity, units, real location, contact and age together. Apply the same care to EC: a bulk-conductivity reading does not become pore-water EC just because the field expects it. Verify any conversion and the range where it applies.",
+        "visual": {
+          "type": "sensor-check",
+          "title": "Example: a number can be fresh and irrelevant",
+          "labels": [
+            "Quantity and units",
+            "Real location and contact",
+            "Identified EC method"
+          ],
+          "asset": "assets/screens/demo-probes-r3.png",
+          "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
+        },
+        "workedExample": {
+          "prompt": "Can a fresh 22 °C tank reading fill zone moisture?",
+          "steps": [
+            "Read the exact quantity and units.",
+            "Check the physical location.",
+            "Select the actual suitable moisture entity instead."
+          ],
+          "answer": "No; tank temperature is not substrate moisture."
+        }
+      },
+      {
+        "id": "4",
+        "title": "Check what starts and stops the pump",
+        "body": [
+          "Installer checks starting load and protection",
+          "Agree bounded test and physical shutdown"
+        ],
+        "narration": "A control device’s headline rating may describe a simple heater load, while a pump draws a different starting load. Have the competent installer check the real motor, control input, electrical ratings and required protection. This course supplies no mains-wiring instructions. Also agree dry-run, spill, backflow and unwanted-siphon arrangements appropriate to the design. Before any test, name what may energise, where water can discharge, what remains isolated and how the test will end.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Check what starts and stops the pump",
+          "labels": [
+            "Actual motor and control",
+            "Required protections",
+            "Physical shutdown ready"
+          ]
+        }
+      },
+      {
+        "id": "5",
+        "title": "Your turn: two controllers know the same valve",
+        "body": [
+          "Old timer still active; Crop Steering OFF",
+          "One owner must be established before testing"
+        ],
+        "narration": "Now consider a valve that an old timer can still open. You have also mapped it into Crop Steering, whose Watering switch is OFF. The timer remains another route to water, so the valve is not isolated. Record both routes and resolve ownership before commissioning. Never leave two independent controllers able to drive the same output. Keep read-only observation separate from commands. The local operator must still have an agreed way to maintain necessary crop care.",
+        "visual": {
+          "type": "comparison",
+          "title": "Your turn: two controllers know the same valve",
+          "labels": [
+            "Old timer can act",
+            "New software is OFF",
+            "Resolve one owner"
+          ],
+          "asset": "assets/diagrams/c7-one-owner-r3.png",
+          "alt": "The old timer and new Controller must not both own an output."
+        }
+      },
+      {
+        "id": "6",
+        "title": "Close the physical checks before the wet test",
+        "body": [
+          "Verify readings and safe output identity",
+          "Carry the checked setup sheet into C6"
+        ],
+        "narration": "Trace each probe to its verified Home Assistant reading, then trace each control address back to the physical valve or pump. A competent installer can use an approved low-risk identity check where appropriate. Do not use a live crop as the first wiring indicator. Record equipment ratings, protections, sole ownership and shutdown. Unresolved hardware questions keep this stage incomplete. Continue to C6 only with an approved catch-test method and safe collection ready; no attractive dashboard can replace these checks.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Close the physical checks before the wet test",
+          "labels": [
+            "Probe path verified",
+            "Output identity verified",
+            "Approved C6 test plan"
+          ]
+        }
+      }
+    ],
+    "practice": {
+      "kind": "explain",
+      "prompt": "Explain the old-timer conflict and complete a physical setup record naming the verified interface, output owner, equipment ratings, protections and shutdown.",
+      "hints": [
+        "Name the actual room, equipment and evidence you need.",
+        "Keep the example separate from a real installation."
+      ],
+      "success": "Record the approved protection, shutdown and sole owner before wet testing"
+    },
+    "quiz": [
+      {
+        "id": "q1",
+        "prompt": "Watering is OFF but an old timer can still open the valve. What is true?",
+        "options": [
+          {
+            "text": "The valve is not physically isolated and ownership is unresolved",
+            "correct": true,
+            "feedback": "Correct. Software controls do not establish physical isolation or stop other owners."
+          },
+          {
+            "text": "The OFF label disables the old timer too",
+            "correct": false,
+            "feedback": "Review this step. Software controls do not establish physical isolation or stop other owners."
+          },
+          {
+            "text": "The valve is safe to work on because the dashboard is grey",
+            "correct": false,
+            "feedback": "Review this step. Software controls do not establish physical isolation or stop other owners."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "q2",
+        "prompt": "A probe plug fits a bridge. Is that enough to connect it?",
+        "options": [
+          {
+            "text": "No; verify exact power, signal and interface documentation",
+            "correct": true,
+            "feedback": "Correct. Electrical compatibility depends on exact specifications."
+          },
+          {
+            "text": "Yes; matching plugs guarantee compatible signals",
+            "correct": false,
+            "feedback": "Review this step. Electrical compatibility depends on exact specifications."
+          },
+          {
+            "text": "Yes; copy wire colours from any similar probe",
+            "correct": false,
+            "feedback": "Review this step. Electrical compatibility depends on exact specifications."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "q3",
+        "prompt": "A fresh value is tank temperature in °C. Can it fill zone VWC?",
+        "options": [
+          {
+            "text": "No; the quantity, units and location are wrong",
+            "correct": true,
+            "feedback": "Correct. Fresh data still must measure the intended quantity in the intended place."
+          },
+          {
+            "text": "Yes; freshness is the only requirement",
+            "correct": false,
+            "feedback": "Review this step. Fresh data still must measure the intended quantity in the intended place."
+          },
+          {
+            "text": "Yes; rename it moisture",
+            "correct": false,
+            "feedback": "Review this step. Fresh data still must measure the intended quantity in the intended place."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "q4",
+        "prompt": "Who verifies suitable pump switching and physical protections?",
+        "options": [
+          {
+            "text": "A competent installer using actual ratings and installation requirements",
+            "correct": true,
+            "feedback": "Correct. Starting loads and physical safeguards need installation-specific assessment."
+          },
+          {
+            "text": "The knowledge quiz alone",
+            "correct": false,
+            "feedback": "Review this step. Starting loads and physical safeguards need installation-specific assessment."
+          },
+          {
+            "text": "Any dashboard showing an OFF icon",
+            "correct": false,
+            "feedback": "Review this step. Starting loads and physical safeguards need installation-specific assessment."
+          }
+        ],
+        "safetyCritical": true
+      }
+    ],
+    "practicalTask": {
+      "instructions": [
+        "First explain the example on paper or practise in the isolated demo.",
+        "Explain the old-timer conflict and complete a physical setup record naming the verified interface, output owner, equipment ratings, protections and shutdown.",
+        "For actual equipment, use the installation’s approved procedure, required local supervision and agreed physical shutdown. Record what was verified and what remains unresolved."
+      ],
+      "requiresLocalSupervision": true,
+      "proof": "physical"
+    },
+    "sources": [
+      {
+        "title": "Crop Steering user guide",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "Crop Steering installation, upgrade and rollback",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "One-zone equipment and staged commissioning guide",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+        "accessed": "2026-10-19"
+      }
+    ]
+  },
+  {
+    "id": "C6",
+    "module": "C",
+    "title": "First water: catch it, measure it, stop it",
+    "summary": "Use the approved equipment test first, then supervise a Controller cycle only after every readiness check passes.",
+    "outcomes": [
+      "Distinguish the installer’s equipment test from an enabled Controller cycle",
+      "Calculate measured emitter flow and observe actual stopping",
+      "Keep Watering OFF until readiness passes, then record the supervised cycle and final state"
+    ],
+    "prerequisites": [
+      "C5"
+    ],
+    "route": "builder",
+    "slides": [
+      {
+        "id": "1",
+        "title": "Two tests answer two questions",
+        "body": [
+          "Equipment test: does the water path work?",
+          "Controller cycle: does the commissioned system work?"
+        ],
+        "narration": "First test the tap and hose, then test the automatic instructions. These are separate commissioning stages. In stage one, Crop Steering Watering stays OFF while the installer uses an approved equipment-level procedure. OFF blocks Controller test shots too; do not try to bypass it. Agree a bounded duration, collection and physical shutdown. If no suitable equipment test procedure exists, obtain one before proceeding. Neither the demo nor a quiz can supply physical evidence.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Two tests answer two questions",
+          "labels": [
+            "Stage one: equipment",
+            "Stage two: Controller",
+            "Approved local procedure"
+          ]
+        }
+      },
+      {
+        "id": "2",
+        "title": "Watch the whole water path",
+        "body": [
+          "Collect safely and keep other zones dry",
+          "Follow the approved pump and valve sequence"
+        ],
+        "narration": "With competent local supervision, remove only the isolation needed for that particular test. Use the manufacturer’s safe method and observe the intended outlet, other zones, relevant pressure and the required pump and valve sequence. Catch several emitters separately for the real measured runtime. Keep spills contained and shutdown available. Stop through the agreed method and observe actual water cease. A control icon changing colour does not establish that flow stopped or that unwanted siphon is absent.",
+        "visual": {
+          "type": "water-path",
+          "title": "Watch the whole water path",
+          "labels": [
+            "Approved bounded test",
+            "Separate catches",
+            "Observe actual stop"
+          ],
+          "asset": "assets/diagrams/c6-catch-test-r3.png",
+          "alt": "Timed individual catches, observed stopping and a checked water path."
+        }
+      },
+      {
+        "id": "3",
+        "title": "Example: a cup becomes a flow measurement",
+        "body": [
+          "30 mL caught in 30 seconds",
+          "0.030 × 3600 ÷ 30 = 3.6 L/h"
+        ],
+        "narration": "Suppose an emitter delivers thirty millilitres in thirty seconds. Divide by one thousand to get zero point zero three litres. Multiply by thirty-six hundred seconds per hour and divide by the thirty-second runtime. That is three point six litres per hour for this catch. Separate catches of thirty, thirty-three and thirty-seven millilitres reveal differences their total hides. Investigate against the actual design and measurement uncertainty. These example volumes are not real calibration evidence or a universal tolerance.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Example: a cup becomes a flow measurement",
+          "labels": [
+            "0.030 L in 30 s",
+            "× 3600 ÷ seconds",
+            "3.6 L/h"
+          ]
+        },
+        "workedExample": {
+          "prompt": "Convert 30 mL caught in 30 seconds into L/h.",
+          "steps": [
+            "30 ÷ 1000 = 0.030 litres.",
+            "0.030 × 3600 ÷ 30 = 3.6.",
+            "Record the actual emitter, runtime and test conditions."
+          ],
+          "answer": "3.6 L/h for that emitter during this catch."
+        }
+      },
+      {
+        "id": "4",
+        "title": "Your turn: finish the catch record",
+        "body": [
+          "24 mL in 30 seconds = 2.88 L/h",
+          "Record cessation, siphon check and corrections"
+        ],
+        "narration": "Try twenty-four millilitres in thirty seconds: zero point zero two four times thirty-six hundred divided by thirty gives two point eight eight litres per hour. Add the actual emitter, runtime and test conditions to the record. Investigate leaks or uneven delivery, correct them and repeat the relevant checks. Test independent protections using their approved methods. Never simulate faults by pulling random wires or power under load, or risk deadheading a pump.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Your turn: finish the catch record",
+          "labels": [
+            "Measured flow and runtime",
+            "Stopping and siphon checked",
+            "Correct and retest"
+          ]
+        }
+      },
+      {
+        "id": "5",
+        "title": "A good catch is one part of readiness",
+        "body": [
+          "Fresh probes and acknowledged mapping",
+          "Approved targets, light timing, protection and recovery"
+        ],
+        "narration": "Now decide for a different record: the catch and stopping passed, but the latest mapping is saved without Controller acknowledgement. Keep Watering OFF. Before stage two, every required check must pass: correct room and outputs, fresh probes, accepted mapping, measured delivery, verified stopping, independent protections, lighting hours, timezone, approved local targets and recovery access. Update measured flow through the setup review and obtain acknowledgement. Do not enable just to repair incomplete software setup.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "A good catch is one part of readiness",
+          "labels": [
+            "Catch passed",
+            "Acceptance missing",
+            "Keep Watering OFF"
+          ]
+        }
+      },
+      {
+        "id": "6",
+        "title": "Supervise the first enabled cycle",
+        "body": [
+          "Only after all required checks pass",
+          "Observe the actual event, stopping and final state"
+        ],
+        "narration": "After readiness passes, the responsible operator deliberately enables the selected room’s Watering through the documented review and confirms its state. Enabling allows eligible shots, including safety watering. Use approved local settings, safe collection and competent supervision. Observe the intended outlet, other zones, actual stopping, event record and next action. If water continues unexpectedly, use the agreed physical shutdown and disable Watering. Record the result and explicitly agreed final state. Repeat the checks for each new output.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Supervise the first enabled cycle",
+          "labels": [
+            "Readiness passed",
+            "Supervised enable",
+            "Observe and record"
+          ]
+        }
+      }
+    ],
+    "practice": {
+      "kind": "explain",
+      "prompt": "Calculate flow for 18 mL in 20 seconds, review a saved-but-unacknowledged mapping, and write the two-stage commissioning decision and final-state record.",
+      "hints": [
+        "18 mL = 0.018 L. Multiply by 3600 and divide by 20 seconds.",
+        "Stage two needs accepted mapping as well as all physical and software readiness checks."
+      ],
+      "success": "0.018 × 3600 ÷ 20 = 3.24 L/h. Keep Watering OFF while acknowledgement is missing; record real delivery, stopping and the agreed final state."
+    },
+    "quiz": [
+      {
+        "id": "q1",
+        "prompt": "Watering is OFF. Can a Controller test shot run?",
+        "options": [
+          {
+            "text": "No; stage one needs an installer-approved equipment procedure",
+            "correct": true,
+            "feedback": "Correct. OFF blocks ordinary, rescue and test shots; never bypass that lockout."
+          },
+          {
+            "text": "Yes; test shots bypass OFF",
+            "correct": false,
+            "feedback": "Review this step. OFF blocks ordinary, rescue and test shots; never bypass that lockout."
+          },
+          {
+            "text": "Yes; a demo test button operates the valve",
+            "correct": false,
+            "feedback": "Review this step. OFF blocks ordinary, rescue and test shots; never bypass that lockout."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "q2",
+        "prompt": "An emitter catches 40 mL in 40 seconds. Measured flow?",
+        "options": [
+          {
+            "text": "3.6 L/h",
+            "correct": true,
+            "feedback": "Correct. Convert to litres, multiply by 3600 and divide by runtime in seconds."
+          },
+          {
+            "text": "40 L/h",
+            "correct": false,
+            "feedback": "Review this step. Convert to litres, multiply by 3600 and divide by runtime in seconds."
+          },
+          {
+            "text": "0.001 L/h",
+            "correct": false,
+            "feedback": "Review this step. Convert to litres, multiply by 3600 and divide by runtime in seconds."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "q3",
+        "prompt": "The icon says OFF but water continues unexpectedly. What next?",
+        "options": [
+          {
+            "text": "Use the agreed physical shutdown and resolve the fault",
+            "correct": true,
+            "feedback": "Correct. Actual uncontrolled flow takes priority over a software display."
+          },
+          {
+            "text": "Wait for another colour change",
+            "correct": false,
+            "feedback": "Review this step. Actual uncontrolled flow takes priority over a software display."
+          },
+          {
+            "text": "Lower the moisture target",
+            "correct": false,
+            "feedback": "Review this step. Actual uncontrolled flow takes priority over a software display."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "q4",
+        "prompt": "When may the first supervised enabled Controller cycle begin?",
+        "options": [
+          {
+            "text": "After every required software and physical readiness check passes",
+            "correct": true,
+            "feedback": "Correct. The responsible operator also needs approved local settings, supervision and shutdown ready."
+          },
+          {
+            "text": "As soon as one catch succeeds",
+            "correct": false,
+            "feedback": "Review this step. The responsible operator also needs approved local settings, supervision and shutdown ready."
+          },
+          {
+            "text": "When the workspace opens",
+            "correct": false,
+            "feedback": "Review this step. The responsible operator also needs approved local settings, supervision and shutdown ready."
+          }
+        ],
+        "safetyCritical": true
+      }
+    ],
+    "practicalTask": {
+      "instructions": [
+        "First explain the example on paper or practise in the isolated demo.",
+        "Calculate flow for 18 mL in 20 seconds, review a saved-but-unacknowledged mapping, and write the two-stage commissioning decision and final-state record.",
+        "For actual equipment, use the installation’s approved procedure, required local supervision and agreed physical shutdown. Record what was verified and what remains unresolved."
+      ],
+      "requiresLocalSupervision": true,
+      "proof": "physical"
+    },
+    "sources": [
+      {
+        "title": "Crop Steering user guide",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "Crop Steering installation, upgrade and rollback",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "One-zone equipment and staged commissioning guide",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+        "accessed": "2026-10-19"
+      }
+    ]
+  },
+  {
+    "id": "C7",
+    "module": "C",
+    "title": "Move from Growlink one zone at a time",
+    "summary": "Observe and record the existing system before a planned handover; keep one controller in charge of each output.",
+    "outcomes": [
+      "Record the existing Growlink zone, measurements, timing and output ownership",
+      "Plan a controlled handover without assuming automatic import or compatible hardware",
+      "Verify one migrated zone with commissioning evidence and a usable rollback plan"
+    ],
+    "prerequisites": [
+      "C6"
+    ],
+    "route": "builder",
+    "slides": [
+      {
+        "id": "1",
+        "title": "Moving house starts with a labelled inventory",
+        "body": [
+          "Observe the existing system before changing it",
+          "Record one room and one physical zone"
+        ],
+        "narration": "Moving from Growlink is like moving house: label what you have before disconnecting anything. Begin with observation and available records. Name one room, one physical zone, its probes, valves, pump and current controller. Record who can operate or recover it. A working Growlink setup is useful evidence about the existing system, not proof that the same hardware can connect to Home Assistant. Keep the existing operator responsible for crop care while planning.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Moving house starts with a labelled inventory",
+          "labels": [
+            "Observe existing setup",
+            "One named physical zone",
+            "Existing owner recorded"
+          ]
+        }
+      },
+      {
+        "id": "2",
+        "title": "Keep the records in their original context",
+        "body": [
+          "Save available exports or make a manual record",
+          "Keep units, timestamps and method labels"
+        ],
+        "narration": "Use exports available in your actual Growlink account and product, or record visible settings and history manually. Do not assume an export feature, API or automatic importer exists. Preserve original files and dates. Note the timezone, lights-on and lights-off, substrate, plant and dripper counts, measured flow, targets and measurement methods. A number labelled EC needs its location and method. Similar field names in two systems do not guarantee the same meaning.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Keep the records in their original context",
+          "labels": [
+            "Available export or manual record",
+            "Original dates and units",
+            "Compare field meanings"
+          ]
+        }
+      },
+      {
+        "id": "3",
+        "title": "Example: one old zone, several new addresses",
+        "body": [
+          "Old label: Room A, Zone 1",
+          "Match new addresses to the physical equipment"
+        ],
+        "narration": "Imagine Growlink calls a valve Room A, Zone One. Your Home Assistant setup now has an entity with the same friendly name. That is a contact-book match, not physical proof. Trace the actual output and probe, confirm compatible interfaces, units and data age, and write exact new IDs beside the old record. Keep unknown items marked unknown. Reuse C4’s sizing and mapping checks; do not paste old targets into differently defined fields.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Example: one old zone, several new addresses",
+          "labels": [
+            "Old zone record",
+            "Verified physical equipment",
+            "Exact new entity IDs"
+          ]
+        },
+        "workedExample": {
+          "prompt": "Does a matching valve name prove migration is ready?",
+          "steps": [
+            "Preserve the original room and zone record.",
+            "Trace the physical output and verify the new entity ID.",
+            "Confirm compatible control and sole ownership before commissioning."
+          ],
+          "answer": "No; matching names alone establish neither physical identity nor exclusive control."
+        }
+      },
+      {
+        "id": "4",
+        "title": "Agree the handover and the way back",
+        "body": [
+          "One controller owns each output at a time",
+          "Plan shutdown, crop cover and rollback"
+        ],
+        "narration": "With the responsible operator and competent installer, agree when ownership changes, which controls are disabled, and how the crop receives necessary water during work. Establish one controller per physical output. The new system may observe where supported; it must not command the same valve alongside Growlink. Record physical isolation and the steps to restore the previous arrangement if checks fail. A rollback plan is a checked procedure, not permission to leave both schedules active.",
+        "visual": {
+          "type": "commissioning",
+          "title": "Agree the handover and the way back",
+          "labels": [
+            "Handover window",
+            "Sole output owner",
+            "Checked rollback procedure"
+          ],
+          "asset": "assets/diagrams/c7-one-owner-r3.png",
+          "alt": "Agree one output owner and a checked way back before the handover."
+        }
+      },
+      {
+        "id": "5",
+        "title": "Your turn: the name matches, the unit does not",
+        "body": [
+          "Old EC method unknown; new field expects pore-water EC",
+          "Do not fill the gap by guessing"
+        ],
+        "narration": "Review a different migration record. The old sensor is labelled EC, its method is unknown, and the new field expects pore-water EC. The valve name matches, but no physical identity check exists. Decide what to do. Park those mappings and investigate; a familiar display cannot close either gap. Keep the last verified arrangement under its agreed owner. Finish the checks from C3 to C5 before planning C6’s supervised catch and Controller stages.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Your turn: the name matches, the unit does not",
+          "labels": [
+            "EC meaning unresolved",
+            "Valve identity unresolved",
+            "Keep verified ownership"
+          ]
+        }
+      },
+      {
+        "id": "6",
+        "title": "Prove one zone before expanding",
+        "body": [
+          "Repeat staged commissioning after handover",
+          "Record operation, final state and responsible owner"
+        ],
+        "narration": "At the agreed handover, follow the approved shutdown and ownership procedure, then complete staged commissioning from C6. Check acknowledged mapping, fresh readings, real flow, stopping, approved targets and timing. Supervise the first enabled cycle and record its event and final state. If a check fails, leave the new output disabled and use the agreed recovery procedure. Expand only after this zone’s evidence is complete. Repeat for every output; one successful zone does not establish the rest.",
+        "visual": {
+          "type": "lesson-cues",
+          "title": "Prove one zone before expanding",
+          "labels": [
+            "C6 commissioning evidence",
+            "Final state and owner",
+            "Expand one zone at a time"
+          ]
+        }
+      }
+    ],
+    "practice": {
+      "kind": "explain",
+      "prompt": "Build a one-zone Growlink handover sheet with original records, physical labels, new entity checks, sole ownership, crop-care cover, commissioning gates and rollback procedure.",
+      "hints": [
+        "Name the actual room, equipment and evidence you need.",
+        "Keep the example separate from a real installation."
+      ],
+      "success": "Verify one migrated zone with commissioning evidence and a usable rollback plan"
+    },
+    "quiz": [
+      {
+        "id": "q1",
+        "prompt": "What is the first useful migration step?",
+        "options": [
+          {
+            "text": "Observe and record one existing zone and its owner",
+            "correct": true,
+            "feedback": "Correct. Preserve a verified baseline and investigate compatibility before changing control."
+          },
+          {
+            "text": "Disable every existing schedule immediately",
+            "correct": false,
+            "feedback": "Review this step. Preserve a verified baseline and investigate compatibility before changing control."
+          },
+          {
+            "text": "Assume every Growlink probe connects directly to Home Assistant",
+            "correct": false,
+            "feedback": "Review this step. Preserve a verified baseline and investigate compatibility before changing control."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "q2",
+        "prompt": "Old and new fields are both named EC. What must be checked?",
+        "options": [
+          {
+            "text": "Measurement method, location, units and valid interpretation",
+            "correct": true,
+            "feedback": "Correct. Matching labels do not establish matching measurement meaning."
+          },
+          {
+            "text": "Only whether the numbers look similar",
+            "correct": false,
+            "feedback": "Review this step. Matching labels do not establish matching measurement meaning."
+          },
+          {
+            "text": "Nothing; every EC field is interchangeable",
+            "correct": false,
+            "feedback": "Review this step. Matching labels do not establish matching measurement meaning."
+          }
+        ],
+        "safetyCritical": false
+      },
+      {
+        "id": "q3",
+        "prompt": "May Growlink and Crop Steering both command the same valve during migration?",
+        "options": [
+          {
+            "text": "No; establish one owner per physical output",
+            "correct": true,
+            "feedback": "Correct. Read-only observation and output command ownership are different."
+          },
+          {
+            "text": "Yes; their schedules resolve conflicts automatically",
+            "correct": false,
+            "feedback": "Review this step. Read-only observation and output command ownership are different."
+          },
+          {
+            "text": "Yes; if the new dashboard is open",
+            "correct": false,
+            "feedback": "Review this step. Read-only observation and output command ownership are different."
+          }
+        ],
+        "safetyCritical": true
+      },
+      {
+        "id": "q4",
+        "prompt": "One migrated zone has passed its supervised checks. What next?",
+        "options": [
+          {
+            "text": "Record its final state and repeat checks for each next output",
+            "correct": true,
+            "feedback": "Correct. Evidence for one output does not commission another."
+          },
+          {
+            "text": "Enable every other zone without testing",
+            "correct": false,
+            "feedback": "Review this step. Evidence for one output does not commission another."
+          },
+          {
+            "text": "Delete old records and rollback plan",
+            "correct": false,
+            "feedback": "Review this step. Evidence for one output does not commission another."
+          }
+        ],
+        "safetyCritical": true
+      }
+    ],
+    "practicalTask": {
+      "instructions": [
+        "First explain the example on paper or practise in the isolated demo.",
+        "Build a one-zone Growlink handover sheet with original records, physical labels, new entity checks, sole ownership, crop-care cover, commissioning gates and rollback procedure.",
+        "For actual equipment, use the installation’s approved procedure, required local supervision and agreed physical shutdown. Record what was verified and what remains unresolved."
+      ],
+      "requiresLocalSupervision": true,
+      "proof": "physical"
+    },
+    "sources": [
+      {
+        "title": "Crop Steering user guide",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/USER_GUIDE.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "Crop Steering installation, upgrade and rollback",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/INSTALL.md",
+        "accessed": "2026-10-19"
+      },
+      {
+        "title": "One-zone equipment and staged commissioning guide",
+        "url": "https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/blob/main/docs/training/crop-steering-from-zero/EQUIPMENT-AND-SETUP.md",
+        "accessed": "2026-10-19"
+      }
+    ]
+  }
+]

@@ -1,0 +1,335 @@
+[
+  {
+    "id": "A1-01-p01",
+    "lesson": "A1",
+    "scene": "A1-01",
+    "paragraph": 0,
+    "text": "Before you use the dashboard, identify the conditions inside the pot.",
+    "title": "Start inside the pot",
+    "visual": {
+      "type": "root-zone",
+      "labels": [
+        "Solid material",
+        "Water",
+        "Air"
+      ]
+    }
+  },
+  {
+    "id": "A1-01-p02",
+    "lesson": "A1",
+    "scene": "A1-01",
+    "paragraph": 1,
+    "text": "What do the roots need?",
+    "title": "What do roots need?",
+    "visual": {
+      "type": "question",
+      "labels": [
+        "What do the roots need?"
+      ]
+    }
+  },
+  {
+    "id": "A1-02-p01",
+    "lesson": "A1",
+    "scene": "A1-02",
+    "paragraph": 0,
+    "text": "Picture a handful of gravel. The pieces are solid, but there are gaps between them. A pot also contains solid material and spaces. The growing material around the roots is called substrate; coco and stone wool are examples.",
+    "title": "Substrate, water and air",
+    "visual": {
+      "type": "root-zone",
+      "labels": [
+        "Substrate: solid material",
+        "Water",
+        "Air"
+      ],
+      "asset": "assets/diagrams/a3-pot-drainage.png",
+      "alt": "Conceptual pot cutaway: solid substrate, held water, air spaces and roots."
+    }
+  },
+  {
+    "id": "A1-02-p02",
+    "lesson": "A1",
+    "scene": "A1-02",
+    "paragraph": 1,
+    "text": "Those spaces can contain water or air. Roots take up water, and they also need oxygen. Filling every space with water leaves less room for air.",
+    "title": "Spaces hold water or air",
+    "visual": {
+      "type": "root-zone",
+      "labels": [
+        "Solid parts",
+        "Water in spaces",
+        "Air in spaces"
+      ],
+      "asset": "assets/diagrams/a3-pot-drainage.png",
+      "alt": "Conceptual pot cutaway: solid substrate, held water, air spaces and roots."
+    }
+  },
+  {
+    "id": "A1-02-p03",
+    "lesson": "A1",
+    "scene": "A1-02",
+    "paragraph": 2,
+    "text": "So pouring in more water is not always helpful. The substrate needs to hold water, let excess drain away, and allow air back into some spaces.",
+    "title": "Hold water. Drain excess. Allow air.",
+    "visual": {
+      "type": "root-zone",
+      "labels": [
+        "Solid material",
+        "Water held in spaces",
+        "Air returns after drainage"
+      ],
+      "asset": "assets/diagrams/a3-pot-drainage.png",
+      "alt": "Conceptual pot cutaway: solid substrate, held water, air spaces and roots."
+    }
+  },
+  {
+    "id": "A1-03-p01",
+    "lesson": "A1",
+    "scene": "A1-03",
+    "paragraph": 0,
+    "text": "Look at the spare container. Water enters the substrate. Some water stays in the substrate. Other water drains into the tray.",
+    "title": "Follow the water",
+    "visual": {
+      "type": "drainage",
+      "labels": [
+        "Water enters",
+        "Some stays in substrate",
+        "Some drains into the tray"
+      ],
+      "asset": "assets/diagrams/a1-water-paths-r3.png",
+      "alt": "Example paths: delivered water can remain, drain, or leave through roots and evaporation."
+    }
+  },
+  {
+    "id": "A1-03-p02",
+    "lesson": "A1",
+    "scene": "A1-03",
+    "paragraph": 1,
+    "text": "The amount of water then decreases. The plant uses some water. Evaporation and drainage also remove water.",
+    "title": "Three ways water leaves",
+    "visual": {
+      "type": "losses",
+      "labels": [
+        "Plant uptake",
+        "Evaporation",
+        "Drainage"
+      ],
+      "asset": "assets/diagrams/a1-water-paths-r3.png",
+      "alt": "Example paths: delivered water can remain, drain, or leave through roots and evaporation."
+    }
+  },
+  {
+    "id": "A1-03-p03",
+    "lesson": "A1",
+    "scene": "A1-03",
+    "paragraph": 2,
+    "text": "A decrease in water content does not show only the water that the plant used.",
+    "title": "Water loss has several causes",
+    "visual": {
+      "type": "losses",
+      "labels": [
+        "Plant uptake",
+        "Evaporation",
+        "Drainage also lowers VWC"
+      ],
+      "asset": "assets/diagrams/a1-water-paths-r3.png",
+      "alt": "Example paths: delivered water can remain, drain, or leave through roots and evaporation."
+    }
+  },
+  {
+    "id": "A1-04-p01",
+    "lesson": "A1",
+    "scene": "A1-04",
+    "paragraph": 0,
+    "text": "This pot stays very wet. The leaves look unhealthy. Does this mean that you must add more water?",
+    "title": "Very wet: add more water?",
+    "visual": {
+      "type": "question",
+      "labels": [
+        "Pot stays very wet",
+        "Leaves look unhealthy",
+        "What is the cause?"
+      ]
+    }
+  },
+  {
+    "id": "A1-04-p02",
+    "lesson": "A1",
+    "scene": "A1-04",
+    "paragraph": 1,
+    "text": "Choose one answer. Add more water immediately. Or do a check to find the cause first.",
+    "title": "Choose the next action",
+    "visual": {
+      "type": "question",
+      "labels": [
+        "Add more immediately?",
+        "Check the cause first?"
+      ]
+    }
+  },
+  {
+    "id": "A1-04-p03",
+    "lesson": "A1",
+    "scene": "A1-04",
+    "paragraph": 2,
+    "text": "Do a check first.",
+    "title": "Check the cause first",
+    "visual": {
+      "type": "check",
+      "labels": [
+        "Observe the crop",
+        "Check the equipment",
+        "Review the reading"
+      ]
+    }
+  },
+  {
+    "id": "A1-04-p04",
+    "lesson": "A1",
+    "scene": "A1-04",
+    "paragraph": 3,
+    "text": "Different problems can cause similar symptoms. The graph gives useful information. It does not identify every problem in the roots.",
+    "title": "One symptom can have several causes",
+    "visual": {
+      "type": "evidence",
+      "labels": [
+        "Graph information",
+        "Physical checks",
+        "Root observations"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p01",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 0,
+    "text": "Think of driving a car: you make adjustments to keep it on course. Crop steering means adjusting growing conditions to influence growth. Here we focus on irrigation, which means supplying water to the crop.",
+    "title": "Steer growing conditions",
+    "visual": {
+      "type": "steering",
+      "labels": [
+        "Adjust growing conditions",
+        "Irrigation supplies water",
+        "Influence crop growth"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p02",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 1,
+    "text": "With irrigation, you choose when water arrives, how much arrives, and how long to wait before the next delivery. Light, temperature and humidity also change how much water the crop needs.",
+    "title": "Delivery settings and water demand",
+    "visual": {
+      "type": "controls",
+      "labels": [
+        "Time and interval",
+        "Quantity of water",
+        "Light, heat, humidity"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p03",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 2,
+    "text": "Later we will name two steering directions: vegetative and generative. They describe management intended to influence leafy growth or reproductive development. Neither guarantees yield. Drying the pot as much as possible is not the goal; roots must keep working.",
+    "title": "Steering must support working roots",
+    "visual": {
+      "type": "steering",
+      "labels": [
+        "Vegetative direction",
+        "Generative direction",
+        "Keep roots functioning"
+      ],
+      "asset": "assets/diagrams/a6-local-probe-r3.png",
+      "alt": "Local probe region: check the exact quantity, location and age."
+    }
+  },
+  {
+    "id": "A1-05-p04",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 3,
+    "text": "A thermometer in one room cannot tell you the temperature in every room. A moisture sensor has the same local limit: one reading does not describe every pot or prove every dripper is clear.",
+    "title": "Like a thermometer in one room",
+    "visual": {
+      "type": "sensor",
+      "labels": [
+        "Local sensing region",
+        "Check other pots and drippers",
+        "One reading is local"
+      ],
+      "asset": "assets/diagrams/a6-local-probe-r3.png",
+      "alt": "Local probe region: check the exact quantity, location and age."
+    }
+  },
+  {
+    "id": "A1-05-p05",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 4,
+    "text": "Use sensor readings with equipment checks and crop observations.",
+    "title": "Use three kinds of evidence",
+    "visual": {
+      "type": "evidence",
+      "labels": [
+        "Sensor readings",
+        "Equipment checks",
+        "Crop observations"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p06",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 5,
+    "text": "Practise in the demo first; it does not operate a real pump. For a new installation, start with one zone: a group of plants whose water delivery is controlled together.",
+    "title": "Learn in the demo",
+    "visual": {
+      "type": "demo",
+      "labels": [
+        "Practice without a real pump",
+        "New system: start with one zone"
+      ]
+    }
+  },
+  {
+    "id": "A1-05-p07",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 6,
+    "text": "Point to the solid material in the drawing. Point to the water. Point to the air. Give one example of information that the sensor cannot supply.",
+    "title": "Point to solids, water and air",
+    "visual": {
+      "type": "root-zone",
+      "labels": [
+        "Solid material",
+        "Water",
+        "Air"
+      ],
+      "asset": "assets/diagrams/a3-pot-drainage.png",
+      "alt": "Conceptual pot cutaway: solid substrate, held water, air spaces and roots."
+    }
+  },
+  {
+    "id": "A1-05-p08",
+    "lesson": "A1",
+    "scene": "A1-05",
+    "paragraph": 7,
+    "text": "The next lesson explains volumetric water content, or VWC.",
+    "title": "Next: volumetric water content",
+    "visual": {
+      "type": "next",
+      "labels": [
+        "VWC",
+        "Water volume in the measured sample"
+      ]
+    }
+  }
+]
