@@ -1,3 +1,7 @@
+# 3.16.1
+
+Pair with integration 3.16.1. **C0.** Adds the Crop Steering Academy teaching course and website publication. Controller, engine, state, options and physical safeguards are unchanged; the controller code is byte-identical to 3.16.0.
+
 # 3.16.0
 
 Pair with integration 3.16.0. **C1.** Updated dashboard package: all-room All zones landing, browser starting-page preference, consolidated Irrigation workspace and canonical settings ownership. Controller, engine, state and physical safeguards are unchanged. Published after an owner-requested UI rehearsal; no full photoperiod or physical plumbing soak is claimed. Rebuild/update both halves for matching packaged assets.
