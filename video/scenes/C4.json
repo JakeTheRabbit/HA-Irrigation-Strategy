@@ -1,0 +1,750 @@
+{
+ "slides": {
+  "1": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "A phone contact can",
+     "Software works the same"
+    ],
+    "props": {
+     "left": {
+      "icon": "contact",
+      "label": "Right name, wrong number"
+     },
+     "right": {
+      "icon": "app",
+      "label": "Right zone, wrong entity"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Mapping means telling Crop",
+    "steps": [
+     "which Home Assistant entities",
+     "this probe, this valve"
+    ],
+    "props": {
+     "term": "Mapping",
+     "meaning": "Telling Crop Steering which entities belong to each zone.",
+     "example": "This probe, this valve"
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "First add each probe",
+    "steps": [
+     "First add each probe",
+     "only maps entities that"
+    ],
+    "props": {
+     "src": "img/screens/demo-probe-mapping-r3.png",
+     "focus": [
+      {
+       "x": 16,
+       "y": 138,
+       "w": 446,
+       "h": 98,
+       "label": "Valve: an entity that already exists"
+      },
+      {
+       "x": 472,
+       "y": 138,
+       "w": 446,
+       "h": 98,
+       "label": "Probe: mapped to Zone 1"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Check each entity ID,",
+    "steps": [
+     "Check each entity ID",
+     "against the physical label",
+     "as the card shows"
+    ],
+    "props": {
+     "left": {
+      "title": "Entity ID",
+      "icon": "chart",
+      "tone": "neutral",
+      "items": [
+       "sensor.crop_steering_vwc_zone_1"
+      ]
+     },
+     "right": {
+      "title": "Physical label",
+      "icon": "probe",
+      "tone": "water",
+      "items": [
+       "Zone 1 VWC probe"
+      ]
+     },
+     "verdict": "Same probe, same zone: they must agree",
+     "order": "pairs"
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Then open Crop Steering,",
+    "steps": [
+     "select the room",
+     "the Equipment menu",
+     "then Setup"
+    ],
+    "props": {
+     "src": "img/screens/demo-equipment-setup-r3.png",
+     "focus": [
+      {
+       "x": 258,
+       "y": 10,
+       "w": 140,
+       "h": 36,
+       "label": "Select the room"
+      },
+      {
+       "x": 16,
+       "y": 252,
+       "w": 200,
+       "h": 46,
+       "label": "Equipment menu"
+      },
+      {
+       "x": 594,
+       "y": 82,
+       "w": 52,
+       "h": 36,
+       "label": "Setup"
+      }
+     ]
+    }
+   },
+   {
+    "type": "SafetyStop",
+    "cue": "Keep the Watering switch",
+    "steps": [
+     "Keep the Watering switch",
+     "keep the physical shutdowns"
+    ],
+    "props": {
+     "stages": [
+      "software",
+      "physical"
+     ]
+    }
+   }
+  ],
+  "2": [
+   {
+    "type": "Define",
+    "steps": [
+     "how water reaches the",
+     "called the supply type"
+    ],
+    "props": {
+     "term": "Supply type",
+     "meaning": "How water reaches the room.",
+     "example": "Zone valves only · A pump, then zone valves"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Choose Zone valves only",
+    "steps": [
+     "each zone valve is",
+     "a pressurised supply",
+     "Choose A pump, then",
+     "only while a pump"
+    ],
+    "props": {
+     "left": {
+      "title": "Zone valves only",
+      "icon": "water",
+      "tone": "water",
+      "items": [
+       "Each valve fed straight",
+       "From a pressurised supply"
+      ]
+     },
+     "right": {
+      "title": "A pump, then zone valves",
+      "icon": "power",
+      "tone": "neutral",
+      "items": [
+       "Pump runs first",
+       "Water flows only while it runs"
+      ]
+     },
+     "order": "columns"
+    }
+   },
+   {
+    "type": "WaterPath",
+    "cue": "Map a pump only",
+    "steps": [
+     "Map a pump only",
+     "if one really exists",
+     "give every zone its",
+     "its own valve"
+    ],
+    "props": {
+     "parts": [
+      "supply",
+      "pump",
+      "valve",
+      "drippers"
+     ],
+     "flow": true
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Check two things for",
+    "steps": [
+     "Check two things for",
+     "First the units",
+     "Second the last update"
+    ],
+    "props": {
+     "src": "img/screens/demo-probes-r3.png",
+     "focus": [
+      {
+       "x": 270,
+       "y": 476,
+       "w": 640,
+       "h": 68,
+       "label": "One moisture probe"
+      },
+      {
+       "x": 506,
+       "y": 494,
+       "w": 96,
+       "h": 32,
+       "label": "Units: VWC in percent"
+      },
+      {
+       "x": 638,
+       "y": 494,
+       "w": 104,
+       "h": 32,
+       "label": "Last update: newest reading"
+      }
+     ]
+    }
+   },
+   {
+    "type": "MeasurementMap",
+    "cue": "For each EC probe,",
+    "steps": [
+     "gives feed, bulk",
+     "bulk or pore-water",
+     "or pore-water EC"
+    ],
+    "props": {
+     "highlight": [
+      "feed",
+      "bulk",
+      "pore"
+     ]
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "If an optional reading",
+    "steps": [
+     "If an optional reading",
+     "leave it unmapped rather"
+    ],
+    "props": {
+     "src": "img/screens/demo-probe-mapping-r3.png",
+     "focus": [
+      {
+       "x": 472,
+       "y": 250,
+       "w": 446,
+       "h": 82,
+       "label": "Optional reading: Not mapped"
+      },
+      {
+       "x": 822,
+       "y": 252,
+       "w": 92,
+       "h": 26,
+       "label": "Leave it unmapped, don't borrow"
+      }
+     ]
+    }
+   }
+  ],
+  "3": [
+   {
+    "type": "Define",
+    "steps": [
+     "the numbers that turn",
+     "four numbers per zone"
+    ],
+    "props": {
+     "term": "Sizing",
+     "meaning": "The numbers that turn runtime into litres.",
+     "example": "Four numbers per zone; all but plant count are per plant"
+    }
+   },
+   {
+    "type": "Analogy",
+    "cue": "Imagine twelve plants, each",
+    "steps": [
+     "Imagine twelve plants, each",
+     "each with two drippers"
+    ],
+    "props": {
+     "left": {
+      "icon": "zone",
+      "label": "12 plants, 3 L each"
+     },
+     "right": {
+      "icon": "dripper",
+      "label": "2 drippers each, 3 L/h"
+     },
+     "joiner": "each with"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Enter plant count twelve,",
+    "steps": [
+     "plant count twelve",
+     "substrate per plant three",
+     "drippers per plant two",
+     "flow per dripper three"
+    ],
+    "props": {
+     "title": "Zone sizing",
+     "items": [
+      {
+       "text": "Plant count: 12"
+      },
+      {
+       "text": "Substrate per plant: 3 L"
+      },
+      {
+       "text": "Drippers per plant: 2"
+      },
+      {
+       "text": "Flow per dripper: 3 L/h"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Calc",
+    "cue": "The card shows the",
+    "steps": [
+     "Twelve plants times two",
+     "Twenty-four times three litres",
+     "seventy-two litres per hour"
+    ],
+    "props": {
+     "heading": "Zone delivery",
+     "lines": [
+      {
+       "expr": "12 × 2 = 24",
+       "note": "drippers"
+      },
+      {
+       "expr": "24 × 3 L/h = 72 L/h"
+      }
+     ],
+     "answer": "72 L/h for the zone"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Keep the per-plant box",
+    "steps": [
+     "at three litres, not",
+     "Thirty-six litres is the",
+     "each plant has a"
+    ],
+    "props": {
+     "left": {
+      "title": "Per plant: 3 L",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "Each plant's own substrate"
+      ]
+     },
+     "right": {
+      "title": "Per plant: 36 L",
+      "icon": "cross",
+      "tone": "bad",
+      "items": [
+       "The zone's total substrate",
+       "Software sees a giant pot"
+      ]
+     }
+    }
+   }
+  ],
+  "4": [
+   {
+    "type": "Compare",
+    "steps": [
+     "Write down the timezone",
+     "lights-on and lights-off hours",
+     "times on the real",
+     "Crop Steering does not"
+    ],
+    "props": {
+     "left": {
+      "title": "In Crop Steering",
+      "icon": "clock",
+      "tone": "neutral",
+      "items": [
+       "Timezone",
+       "Lights-on and lights-off hours"
+      ]
+     },
+     "right": {
+      "title": "Real light timer",
+      "icon": "sun",
+      "tone": "water",
+      "items": [
+       "Its on and off times"
+      ]
+     },
+     "verdict": "Must agree: it plans the day, it doesn't switch lights"
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Second, the receipt. Choose",
+    "steps": [
+     "Choose Review configuration",
+     "then choose Save configuration"
+    ],
+    "props": {
+     "src": "img/screens/demo-equipment-setup-r3.png",
+     "focus": [
+      {
+       "x": 1058,
+       "y": 308,
+       "w": 170,
+       "h": 44,
+       "label": "Review configuration"
+      },
+      {
+       "x": 760,
+       "y": 500,
+       "w": 200,
+       "h": 56,
+       "label": "Saved revision shown here"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Each save creates a",
+    "steps": [
+     "a numbered edition of",
+     "Saving is like posting"
+    ],
+    "props": {
+     "term": "Revision",
+     "meaning": "A numbered edition of the setup.",
+     "example": "Each save creates a new revision"
+    }
+   },
+   {
+    "type": "AckReceipt",
+    "cue": "Saving is like posting",
+    "steps": [
+     "Saving is like posting",
+     "The Controller then reads",
+     "sends back an acknowledgement"
+    ],
+    "props": {
+     "revision": 1,
+     "acknowledged": true
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Wait for that receipt",
+    "steps": [
+     "A fresh heartbeat shows",
+     "only the acknowledgement shows",
+     "it accepted your setup"
+    ],
+    "props": {
+     "left": {
+      "title": "Fresh heartbeat",
+      "icon": "chart",
+      "tone": "neutral",
+      "items": [
+       "The Controller is alive"
+      ]
+     },
+     "right": {
+      "title": "Acknowledgement",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "It accepted this revision"
+      ]
+     },
+     "verdict": "Wait for the receipt for this revision",
+     "order": "pairs"
+    }
+   }
+  ],
+  "5": [
+   {
+    "type": "Calc",
+    "steps": [
+     "Eight plants times one",
+     "Eight times two point",
+     "The arithmetic is right"
+    ],
+    "props": {
+     "heading": "8 plants · 4 L · 1 dripper · 2.5 L/h",
+     "lines": [
+      {
+       "expr": "8 × 1 = 8",
+       "note": "drippers"
+      },
+      {
+       "expr": "8 × 2.5 L/h = 20 L/h"
+      }
+     ],
+     "answer": "Arithmetic is right"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "but the card shows",
+    "steps": [
+     "The moisture entity belongs",
+     "lights-on and lights-off hours",
+     "And the revision is"
+    ],
+    "props": {
+     "title": "Three faults",
+     "items": [
+      {
+       "text": "Moisture entity: next room",
+       "state": "fail"
+      },
+      {
+       "text": "Lights-on and lights-off blank",
+       "state": "fail"
+      },
+      {
+       "text": "Saved, not acknowledged",
+       "state": "fail"
+      }
+     ]
+    }
+   },
+   {
+    "type": "AckReceipt",
+    "cue": "saved but not acknowledged",
+    "steps": [
+     "saved but not acknowledged",
+     "Each fault must be",
+     "before Watering can be"
+    ],
+    "props": {
+     "revision": 1,
+     "acknowledged": false
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "You can practise this",
+    "steps": [
+     "practise this kind of",
+     "with no equipment connected"
+    ],
+    "props": {
+     "src": "img/screens/demo-equipment-setup-r3.png",
+     "focus": [
+      {
+       "x": 540,
+       "y": 12,
+       "w": 86,
+       "h": 32,
+       "label": "Practise in the demo"
+      },
+      {
+       "x": 1058,
+       "y": 308,
+       "w": 170,
+       "h": 44,
+       "label": "Review: no equipment connected"
+      }
+     ]
+    }
+   }
+  ],
+  "6": [
+   {
+    "type": "ScreenTour",
+    "steps": [
+     "Open Overview, the main",
+     "then Selected room"
+    ],
+    "props": {
+     "src": "img/screens/demo-overview-r3.png",
+     "focus": [
+      {
+       "x": 16,
+       "y": 104,
+       "w": 200,
+       "h": 48,
+       "label": "Overview: main status screen"
+      },
+      {
+       "x": 336,
+       "y": 84,
+       "w": 106,
+       "h": 32,
+       "label": "Selected room: one room"
+      }
+     ]
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Next open Equipment, then",
+    "steps": [
+     "Next open Equipment",
+     "then Probes",
+     "Compare each reading"
+    ],
+    "props": {
+     "src": "img/screens/demo-probes-r3.png",
+     "focus": [
+      {
+       "x": 16,
+       "y": 252,
+       "w": 200,
+       "h": 46,
+       "label": "Equipment"
+      },
+      {
+       "x": 258,
+       "y": 82,
+       "w": 58,
+       "h": 38,
+       "label": "Probes"
+      },
+      {
+       "x": 270,
+       "y": 476,
+       "w": 480,
+       "h": 140,
+       "label": "Reading, units, age vs your sheet"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Check the sizing, the",
+    "steps": [
+     "Check the sizing",
+     "the measured flow",
+     "the light hours",
+     "the one owner of"
+    ],
+    "props": {
+     "title": "Read back vs setup sheet",
+     "items": [
+      {
+       "text": "Sizing"
+      },
+      {
+       "text": "Measured flow"
+      },
+      {
+       "text": "Light hours"
+      },
+      {
+       "text": "One owner of each output"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "A state that reads",
+    "steps": [
+     "A state that reads",
+     "the software cannot tell",
+     "treat it as a",
+     "not as OFF"
+    ],
+    "props": {
+     "left": {
+      "title": "Reads unknown",
+      "icon": "question",
+      "tone": "warn",
+      "items": [
+       "Software cannot tell",
+       "A fault to fix"
+      ]
+     },
+     "right": {
+      "title": "Not the same as OFF",
+      "icon": "cross",
+      "tone": "bad",
+      "items": [
+       "Never read it as OFF"
+      ]
+     },
+     "order": "columns"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "The card shows the",
+    "steps": [
+     "The card shows the",
+     "Lesson C five checks",
+     "lesson C six proves",
+     "Watering stays OFF"
+    ],
+    "props": {
+     "title": "Until these pass",
+     "steps": [
+      {
+       "label": "C4 accepted",
+       "icon": "check",
+       "note": "Accepted revision and live values"
+      },
+      {
+       "label": "C5 protection",
+       "icon": "shield",
+       "note": "Physical protections checked"
+      },
+      {
+       "label": "C6 water test",
+       "icon": "water",
+       "note": "Water starts and stops"
+      },
+      {
+       "label": "Watering",
+       "icon": "power",
+       "note": "Stays OFF until those pass"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

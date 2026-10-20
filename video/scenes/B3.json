@@ -1,0 +1,650 @@
+{
+ "slides": {
+  "B3-1": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "dimmer switch",
+     "slides smoothly between"
+    ],
+    "props": {
+     "left": {
+      "icon": "dimmer",
+      "label": "Dimmer: slides, not on/off"
+     },
+     "right": {
+      "icon": "setting",
+      "label": "Steering: a sliding balance"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A plant puts its effort",
+    "steps": [
+     "Vegetative growth builds roots"
+    ],
+    "props": {
+     "term": "Vegetative and generative growth",
+     "meaning": "Vegetative builds roots, stems, leaves; generative builds flowers, fruit."
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A planned nudge toward",
+    "steps": [
+     "called a steering bias"
+    ],
+    "props": {
+     "term": "Steering bias",
+     "meaning": "A planned nudge toward one side of the balance."
+    }
+   },
+   {
+    "type": "PlantBalance",
+    "cue": "Bias is your intention",
+    "steps": [
+     "separate from the plant's age",
+     "A young plant and",
+     "a vegetative bias for",
+     "to help it grow"
+    ],
+    "props": {
+     "tilt": "veg",
+     "labels": {
+      "message": "A flowering plant, a vegetative bias",
+      "sub": "For a week, to help it grow more leaf"
+     }
+    }
+   },
+   {
+    "type": "Analogy",
+    "cue": "The plant decides how",
+    "steps": [
+     "The plant decides how",
+     "watch the crop"
+    ],
+    "props": {
+     "left": {
+      "icon": "setting",
+      "label": "Settings: your nudge"
+     },
+     "right": {
+      "icon": "pot",
+      "label": "Crop: how it responds"
+     },
+     "joiner": "+"
+    }
+   }
+  ],
+  "B3-2": [
+   {
+    "type": "PotCrossSection",
+    "steps": [
+     "Smaller drybacks keep"
+    ],
+    "props": {
+     "mode": "dry",
+     "from": 0.62,
+     "to": 0.57,
+     "secs": 4,
+     "showRoots": true,
+     "labels": false,
+     "caption": "Smaller drybacks: more evenly wet"
+    }
+   },
+   {
+    "type": "PlantBalance",
+    "cue": "Larger drybacks let it",
+    "steps": [
+     "Larger drybacks let",
+     "dry further between shots",
+     "tends to support generative",
+     "tends to support generative"
+    ],
+    "props": {
+     "tilt": "gen",
+     "labels": {
+      "message": "Larger drybacks lean generative",
+      "sub": "The root zone dries further between shots"
+     }
+    }
+   },
+   {
+    "type": "DrybackBars",
+    "cue": "For example, compare a",
+    "steps": [
+     "drying from sixty",
+     "to fifty-seven percent",
+     "The first fall is"
+    ],
+    "props": {
+     "start": 60,
+     "end": 57,
+     "showRelative": false
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "The second is nine",
+    "steps": [
+     "The second is nine",
+     "nine points",
+     "a more generative",
+     "a more generative pattern"
+    ],
+    "props": {
+     "left": {
+      "title": "60 → 57%",
+      "icon": "water",
+      "tone": "water",
+      "items": [
+       "Falls 3 points",
+       "More vegetative"
+      ]
+     },
+     "right": {
+      "title": "60 → 51%",
+      "icon": "sun",
+      "tone": "warn",
+      "items": [
+       "Falls 9 points",
+       "More generative"
+      ]
+     },
+     "order": "pairs"
+    }
+   },
+   {
+    "type": "PlantBalance",
+    "cue": "So do the substrate,",
+    "steps": [
+     "So do the substrate",
+     "the plant variety",
+     "These are tendencies",
+     "check the crop"
+    ],
+    "props": {
+     "tilt": "balanced",
+     "labels": {
+      "message": "Tendencies: check the crop too",
+      "sub": "EC, light, climate, substrate, variety, stage"
+     }
+    }
+   }
+  ],
+  "B3-3": [
+   {
+    "type": "Define",
+    "steps": [
+     "Picture two complete sets"
+    ],
+    "props": {
+     "term": "Endpoint",
+     "meaning": "One complete set of settings for one end of the range."
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "The vegetative endpoint holds",
+    "steps": [
+     "The vegetative endpoint holds",
+     "The generative endpoint holds"
+    ],
+    "props": {
+     "left": {
+      "title": "Vegetative endpoint",
+      "icon": "sun",
+      "tone": "good",
+      "items": [
+       "A fully vegetative day"
+      ]
+     },
+     "right": {
+      "title": "Generative endpoint",
+      "icon": "sun",
+      "tone": "warn",
+      "items": [
+       "A fully generative day"
+      ]
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Together, the two endpoints",
+    "steps": [
+     "saved as a profile"
+    ],
+    "props": {
+     "term": "Profile",
+     "meaning": "The two endpoints saved together, ready to reuse."
+    }
+   },
+   {
+    "type": "BlendSlider",
+    "cue": "Between them sits the",
+    "steps": [
+     "Zero uses the vegetative",
+     "One hundred uses the",
+     "Fifty sits halfway"
+    ],
+    "props": {
+     "label": "Maximum wait",
+     "unit": "min",
+     "a": 30,
+     "b": 50,
+     "positions": [
+      0,
+      100,
+      50
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The app calls this",
+    "steps": [
+     "mixing a blend"
+    ],
+    "props": {
+     "term": "Blend",
+     "meaning": "Each setting mixed between its endpoints by the slider."
+    }
+   },
+   {
+    "type": "Analogy",
+    "cue": "because the app cannot",
+    "steps": [
+     "because the app cannot",
+     "from your pot size"
+    ],
+    "props": {
+     "left": {
+      "icon": "pot",
+      "label": "Pot size: the app can't use it"
+     },
+     "right": {
+      "icon": "setting",
+      "label": "Endpoint values: you choose"
+     },
+     "joiner": "≠"
+    }
+   }
+  ],
+  "B3-4": [
+   {
+    "type": "PhaseDay",
+    "steps": [
+     "the longest P zero"
+    ],
+    "props": {
+     "highlight": "P0",
+     "lightsOn": "06:00",
+     "lightsOff": "18:00"
+    }
+   },
+   {
+    "type": "BlendSlider",
+    "cue": "Say the vegetative endpoint",
+    "steps": [
+     "turn the slider into"
+    ],
+    "props": {
+     "label": "Maximum wait",
+     "unit": "min",
+     "a": 30,
+     "b": 50,
+     "positions": [
+      50
+     ]
+    }
+   },
+   {
+    "type": "Calc",
+    "cue": "Then take that fraction",
+    "steps": [
+     "half of twenty",
+     "thirty plus ten"
+    ],
+    "props": {
+     "heading": "Share, then add",
+     "lines": [
+      {
+       "expr": "½ × 20 = 10",
+       "note": "share of the difference"
+      },
+      {
+       "expr": "30 + 10 = 40 min",
+       "note": "add to vegetative"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The app then rounds",
+    "steps": [
+     "the smallest change",
+     "forty point four"
+    ],
+    "props": {
+     "term": "Step",
+     "meaning": "The smallest change a setting accepts.",
+     "example": "1-minute step: 40 stays 40; 40.4 → 40"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "The same four steps",
+    "steps": [
+     "The same four steps",
+     "work for every setting",
+     "in the profile",
+     "you try one"
+    ],
+    "props": {
+     "title": "Same four steps, every setting",
+     "steps": [
+      {
+       "label": "Difference",
+       "icon": "ruler"
+      },
+      {
+       "label": "Fraction",
+       "icon": "chart"
+      },
+      {
+       "label": "Share",
+       "icon": "search"
+      },
+      {
+       "label": "Add",
+       "icon": "check"
+      }
+     ]
+    }
+   }
+  ],
+  "B3-5": [
+   {
+    "type": "Checklist",
+    "steps": [
+     "Keep the endpoints at",
+     "set the slider to",
+     "Pause and work it"
+    ],
+    "props": {
+     "title": "Your turn",
+     "items": [
+      {
+       "text": "Endpoints 30 and 50 min"
+      },
+      {
+       "text": "Slider at 25"
+      },
+      {
+       "text": "Work it out before you listen on",
+       "state": "unknown"
+      }
+     ]
+    }
+   },
+   {
+    "type": "BlendSlider",
+    "steps": [
+     "Twenty-five out of one"
+    ],
+    "props": {
+     "label": "Maximum wait",
+     "unit": "min",
+     "a": 30,
+     "b": 50,
+     "positions": [
+      25
+     ]
+    },
+    "cue": "The difference is still"
+   },
+   {
+    "type": "Calc",
+    "cue": "Suppose both endpoints are",
+    "steps": [
+     "both endpoints are thirty",
+     "any fraction of zero",
+     "stays at thirty wherever"
+    ],
+    "props": {
+     "heading": "Both endpoints 30 min",
+     "lines": [
+      {
+       "expr": "30 − 30 = 0",
+       "note": "difference"
+      },
+      {
+       "expr": "any fraction × 0 = 0"
+      },
+      {
+       "expr": "30 + 0 = 30 min",
+       "note": "wherever the slider sits"
+      }
+     ]
+    }
+   },
+   {
+    "type": "BlendSlider",
+    "cue": "Existing set-ups often start",
+    "steps": [
+     "copy your current settings",
+     "seems to change nothing"
+    ],
+    "props": {
+     "label": "Endpoints equal",
+     "unit": "min",
+     "a": 30,
+     "b": 30,
+     "positions": [
+      50,
+      100
+     ]
+    }
+   }
+  ],
+  "B3-6": [
+   {
+    "type": "Compare",
+    "steps": [
+     "twenty and sixty",
+     "twenty and sixty",
+     "Work it out first"
+    ],
+    "props": {
+     "left": {
+      "title": "Vegetative endpoint",
+      "icon": "sun",
+      "tone": "good",
+      "items": [
+       "20 minutes"
+      ]
+     },
+     "right": {
+      "title": "Generative endpoint",
+      "icon": "sun",
+      "tone": "warn",
+      "items": [
+       "60 minutes"
+      ]
+     },
+     "verdict": "Slider at 75: work it out first"
+    }
+   },
+   {
+    "type": "Calc",
+    "steps": [
+     "sixty minus twenty",
+     "Seventy-five out of one",
+     "Three quarters of forty",
+     "Twenty plus thirty"
+    ],
+    "props": {
+     "heading": "Endpoints 20 and 60 · slider 75",
+     "lines": [
+      {
+       "expr": "60 − 20 = 40 min",
+       "note": "difference"
+      },
+      {
+       "expr": "75 ÷ 100 = ¾"
+      },
+      {
+       "expr": "¾ × 40 = 30"
+      },
+      {
+       "expr": "20 + 30 = 50 min"
+      }
+     ]
+    },
+    "cue": "The difference is sixty"
+   },
+   {
+    "type": "BlendSlider",
+    "cue": "Notice the trap",
+    "steps": [
+     "seventy-five is a position"
+    ],
+    "props": {
+     "label": "75 is a position, not a time",
+     "unit": "min",
+     "a": 20,
+     "b": 60,
+     "positions": [
+      75
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "The blend tells you",
+    "steps": [
+     "The blend tells you",
+     "Whether that setting suits"
+    ],
+    "props": {
+     "left": {
+      "title": "The blend tells you",
+      "icon": "note",
+      "tone": "neutral",
+      "items": [
+       "The setting the app will use"
+      ]
+     },
+     "right": {
+      "title": "The crop tells you",
+      "icon": "eye",
+      "tone": "good",
+      "items": [
+       "Whether it suits your plants"
+      ]
+     }
+    }
+   }
+  ],
+  "B3-7": [
+   {
+    "type": "CalendarPlan",
+    "steps": [
+     "Several zones or weeks"
+    ],
+    "props": {
+     "zone": "Zone 1",
+     "days": 14,
+     "blocks": [
+      {
+       "days": [
+        1,
+        14
+       ],
+       "label": "Shared profile"
+      }
+     ],
+     "stages": [
+      "assign"
+     ]
+    }
+   },
+   {
+    "type": "MeasurementMap",
+    "cue": "Second, check each EC",
+    "steps": [
+     "feed EC and",
+     "pore-water EC are"
+    ],
+    "props": {
+     "highlight": [
+      "feed",
+      "pore"
+     ]
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Third, moving the slider",
+    "steps": [
+     "makes a draft",
+     "the plan is saved",
+     "switched on, steps"
+    ],
+    "props": {
+     "title": "A slider change is a draft",
+     "steps": [
+      {
+       "label": "Draft",
+       "icon": "draft",
+       "note": "The plan on screen updates at once"
+      },
+      {
+       "label": "Save",
+       "icon": "save",
+       "note": "Nothing changes in the grow room yet"
+      },
+      {
+       "label": "Switch on",
+       "icon": "arm",
+       "note": "Covered in a later lesson"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Analogy",
+    "cue": "Now explain the dimmer",
+    "steps": [
+     "explain the dimmer aloud",
+     "explain the dimmer aloud",
+     "try the practice",
+     "how much water each"
+    ],
+    "props": {
+     "left": {
+      "icon": "dimmer",
+      "label": "Dimmer"
+     },
+     "right": {
+      "icon": "setting",
+      "label": "Steering slider"
+     },
+     "mappings": [
+      {
+       "from": "One end",
+       "to": "Vegetative endpoint"
+      },
+      {
+       "from": "Other end",
+       "to": "Generative endpoint"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

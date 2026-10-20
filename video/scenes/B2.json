@@ -1,0 +1,913 @@
+{
+ "slides": {
+  "B2-1": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Think of a working",
+     "A grow room has"
+    ],
+    "props": {
+     "left": {
+      "icon": "calendar",
+      "label": "A working day"
+     },
+     "right": {
+      "icon": "graph",
+      "label": "A grow-day, set by lights"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Lights-on is the time",
+    "steps": [
+     "Lights-off is the time",
+     "One grow-day runs from"
+    ],
+    "props": {
+     "term": "Lights-on · lights-off",
+     "meaning": "The times the grow lights switch on, and off."
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "One grow-day runs from",
+    "steps": [
+     "to the next lights-on",
+     "twenty-four hours"
+    ],
+    "props": {
+     "term": "Grow-day",
+     "meaning": "From one lights-on to the next lights-on.",
+     "example": "Lights-on 06:00 → 06:00 next day = 24 h"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The app splits each",
+    "steps": [
+     "one stage of the"
+    ],
+    "props": {
+     "term": "Phase",
+     "meaning": "One stage of the day, with its own job and rules."
+    }
+   },
+   {
+    "type": "PhaseDay",
+    "cue": "Look at the strip",
+    "steps": [
+     "labelled P zero",
+     "P one, P two",
+     "P two and P three",
+     "then dry back overnight"
+    ],
+    "props": {
+     "lightsOn": "06:00",
+     "lightsOff": "18:00",
+     "highlight": "all"
+    }
+   }
+  ],
+  "B2-2": [
+   {
+    "type": "PhaseDay",
+    "steps": [
+     "every zone starts in",
+     "the morning wait",
+     "the morning wait",
+     "the morning wait"
+    ],
+    "props": {
+     "lightsOn": "06:00",
+     "lightsOff": "18:00",
+     "highlight": "P0"
+    }
+   },
+   {
+    "type": "SpongeDemo",
+    "cue": "like a sponge draining",
+    "steps": [
+     "like a sponge draining",
+     "before you top it"
+    ],
+    "props": {
+     "stages": [
+      "soaked",
+      "drained"
+     ],
+     "captions": {
+      "soaked": "Topped up",
+      "drained": "P0: draining, no water given"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A target is the",
+    "steps": [
+     "the value a phase"
+    ],
+    "props": {
+     "term": "Target",
+     "meaning": "The value a phase is trying to reach."
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "P zero ends at",
+    "steps": [
+     "The dryback reaches its",
+     "Or the VWC falls",
+     "Or the time limit"
+    ],
+    "props": {
+     "title": "P0 ends at the first of",
+     "items": [
+      {
+       "text": "Dryback reaches its target"
+      },
+      {
+       "text": "VWC falls to P2 re-water line"
+      },
+      {
+       "text": "Time limit: the maximum wait"
+      }
+     ]
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "For example, lights-on is",
+    "steps": [
+     "For example, lights-on is",
+     "drying is slow",
+     "drying is slow",
+     "drying is slow",
+     "drying is slow",
+     "drying is slow",
+     "drying is slow",
+     "Six o'clock plus ninety"
+    ],
+    "props": {
+     "hours": 3,
+     "start": 5.5,
+     "nightFrom": 5.5,
+     "nightTo": 6,
+     "vwcRange": [
+      50,
+      66
+     ],
+     "vwc": [
+      [
+       5.5,
+       60.3
+      ],
+      [
+       6,
+       60
+      ],
+      [
+       6.5,
+       59.6
+      ],
+      [
+       7,
+       59.2
+      ],
+      [
+       7.5,
+       58.8
+      ]
+     ],
+     "now": 7.5,
+     "highlight": {
+      "h": 7.5,
+      "text": "06:00 + 90 min = 07:30"
+     }
+    }
+   }
+  ],
+  "B2-3": [
+   {
+    "type": "PhaseDay",
+    "steps": [
+     "The second phase is",
+     "P one, the refill",
+     "P one, the refill",
+     "P one, the refill"
+    ],
+    "props": {
+     "lightsOn": "06:00",
+     "lightsOff": "18:00",
+     "highlight": "P1"
+    }
+   },
+   {
+    "type": "Analogy",
+    "cue": "Each shot lifts the",
+    "steps": [
+     "Each shot lifts the",
+     "like filling a bath"
+    ],
+    "props": {
+     "left": {
+      "icon": "tap",
+      "label": "A bath, one bucket at a time"
+     },
+     "right": {
+      "icon": "graph",
+      "label": "VWC steps up each shot"
+     }
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "For example, P zero",
+    "steps": [
+     "For example, P zero",
+     "ended at fifty-four",
+     "ended at fifty-four",
+     "For example, P zero",
+     "ended at fifty-four",
+     "For example, P zero",
+     "For example, P zero",
+     "the target is sixty"
+    ],
+    "props": {
+     "hours": 2,
+     "start": 7.25,
+     "vwcRange": [
+      50,
+      64
+     ],
+     "vwc": [
+      [
+       7.25,
+       54.4
+      ],
+      [
+       7.5,
+       54
+      ],
+      [
+       7.55,
+       56.2
+      ],
+      [
+       8,
+       56
+      ],
+      [
+       8.05,
+       58.2
+      ],
+      [
+       8.5,
+       58
+      ],
+      [
+       8.55,
+       60.2
+      ],
+      [
+       9.25,
+       60
+      ]
+     ],
+     "shots": [
+      7.5,
+      8,
+      8.5
+     ],
+     "thresholds": [
+      {
+       "label": "P1 target",
+       "value": 60
+      }
+     ],
+     "highlight": {
+      "h": 7.5,
+      "text": "Refill from 54%"
+     }
+    }
+   },
+   {
+    "type": "Calc",
+    "cue": "That is six percentage",
+    "steps": [
+     "That is six percentage",
+     "six divided by two",
+     "about three shots"
+    ],
+    "props": {
+     "heading": "How many refill shots?",
+     "lines": [
+      {
+       "expr": "60 − 54 = 6",
+       "note": "percentage points"
+      },
+      {
+       "expr": "6 ÷ 2 = 3",
+       "note": "about 2 points per shot"
+      }
+     ],
+     "answer": "About 3 shots"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Some water drains, and",
+    "steps": [
+     "Some water drains",
+     "read the record of",
+     "not the drawing"
+    ],
+    "props": {
+     "left": {
+      "title": "The drawing",
+      "icon": "📝",
+      "tone": "neutral",
+      "items": [
+       "About 3 shots, estimated"
+      ]
+     },
+     "right": {
+      "title": "Record of shots",
+      "icon": "📋",
+      "tone": "good",
+      "items": [
+       "How many really ran"
+      ]
+     },
+     "verdict": "Read the record of shots, not the drawing"
+    }
+   }
+  ],
+  "B2-4": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Think of cruise control",
+     "P two holds the"
+    ],
+    "props": {
+     "left": {
+      "icon": "dashboard",
+      "label": "Cruise control"
+     },
+     "right": {
+      "icon": "graph",
+      "label": "P2 holds VWC near the top"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "It uses a threshold",
+    "steps": [
+     "Each time the VWC",
+     "the re-water point"
+    ],
+    "props": {
+     "term": "Re-water threshold",
+     "meaning": "When VWC falls to this line, one shot can follow.",
+     "example": "Some screens: the re-water point"
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "For example, the refill",
+    "steps": [
+     "For example, the refill",
+     "ends at sixty percent",
+     "ends at sixty percent",
+     "The planning chart draws",
+     "ends at sixty percent",
+     "re-water threshold is fifty-seven",
+     "re-water threshold is fifty-seven",
+     "one and a half"
+    ],
+    "props": {
+     "hours": 8,
+     "start": 10,
+     "vwcRange": [
+      52,
+      64
+     ],
+     "vwc": [
+      [
+       10,
+       60.2
+      ],
+      [
+       11.5,
+       57
+      ],
+      [
+       11.55,
+       60.2
+      ],
+      [
+       13,
+       57
+      ],
+      [
+       13.05,
+       60.2
+      ],
+      [
+       14.5,
+       57
+      ],
+      [
+       14.55,
+       60.2
+      ],
+      [
+       16,
+       57
+      ],
+      [
+       16.05,
+       60.2
+      ],
+      [
+       18,
+       57.6
+      ]
+     ],
+     "shots": [
+      11.5,
+      13,
+      14.5,
+      16
+     ],
+     "thresholds": [
+      {
+       "label": "Re-water",
+       "value": 57
+      }
+     ],
+     "highlight": {
+      "h": 13,
+      "text": "3 points ÷ 2 per hour = 1.5 h"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A drawing of shots",
+    "steps": [
+     "is called a forecast"
+    ],
+    "props": {
+     "term": "Forecast",
+     "meaning": "A drawing of the shots the plan expects."
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "If the zone dries",
+    "steps": [
+     "If the zone dries",
+     "fewer shots happen",
+     "that is normal"
+    ],
+    "props": {
+     "left": {
+      "title": "Dries 2 points an hour",
+      "icon": "⏱️",
+      "tone": "neutral",
+      "items": [
+       "A shot every 1.5 h"
+      ]
+     },
+     "right": {
+      "title": "Dries more slowly",
+      "icon": "🐢",
+      "tone": "good",
+      "items": [
+       "Fewer shots happen",
+       "That is normal"
+      ]
+     }
+    }
+   }
+  ],
+  "B2-5": [
+   {
+    "type": "Calc",
+    "steps": [
+     "Six in the morning plus",
+     "lights are on for"
+    ],
+    "props": {
+     "heading": "Our example room",
+     "lines": [
+      {
+       "expr": "06:00 + 12 h = 18:00",
+       "note": "lights-off"
+      }
+     ],
+     "answer": "12 hours of light"
+    }
+   },
+   {
+    "type": "PhaseDay",
+    "cue": "each zone enters P",
+    "steps": [
+     "each zone enters P",
+     "P one refills",
+     "P two maintains",
+     "every zone moves to"
+    ],
+    "props": {
+     "lightsOn": "06:00",
+     "lightsOff": "18:00"
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "The Controller can also",
+    "steps": [
+     "The Controller can also",
+     "The Controller can also",
+     "The Controller can also",
+     "The Controller can also",
+     "The Controller can also",
+     "The Controller can also",
+     "The Controller can also",
+     "a little earlier"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwcRange": [
+      40,
+      65
+     ],
+     "vwc": [
+      [
+       6,
+       52
+      ],
+      [
+       7,
+       51
+      ],
+      [
+       7.1,
+       54
+      ],
+      [
+       8,
+       53.5
+      ],
+      [
+       8.1,
+       57
+      ],
+      [
+       9,
+       56.5
+      ],
+      [
+       9.1,
+       60
+      ],
+      [
+       11,
+       57
+      ],
+      [
+       11.1,
+       60
+      ],
+      [
+       13,
+       57
+      ],
+      [
+       13.1,
+       60
+      ],
+      [
+       15,
+       57
+      ],
+      [
+       15.1,
+       60
+      ],
+      [
+       17,
+       57.5
+      ],
+      [
+       20,
+       55
+      ],
+      [
+       24,
+       52
+      ],
+      [
+       28,
+       50
+      ],
+      [
+       30,
+       49.5
+      ]
+     ],
+     "shots": [
+      7,
+      8,
+      9,
+      11,
+      13,
+      15
+     ],
+     "highlight": {
+      "h": 17,
+      "text": "P3 can start a little earlier"
+     }
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "P three lasts until",
+    "steps": [
+     "P three lasts until",
+     "twelve hours later",
+     "a new grow-day starts",
+     "a new grow-day starts",
+     "Expect phases by their"
+    ],
+    "props": {
+     "left": {
+      "title": "The clock gives",
+      "icon": "🕕",
+      "tone": "neutral",
+      "items": [
+       "P0 starts 06:00",
+       "P3 18:00 to 06:00"
+      ]
+     },
+     "right": {
+      "title": "Readings decide",
+      "icon": "📈",
+      "tone": "water",
+      "items": [
+       "When P1 starts",
+       "When P2 starts"
+      ]
+     },
+     "verdict": "Expect phases by their order, not clock times",
+     "order": "pairs"
+    }
+   }
+  ],
+  "B2-6": [
+   {
+    "type": "PhaseDay",
+    "steps": [
+     "The fourth phase is",
+     "P three, the overnight",
+     "P three, the overnight",
+     "P three, the overnight"
+    ],
+    "props": {
+     "lightsOn": "06:00",
+     "lightsOff": "18:00",
+     "highlight": "P3",
+     "showFloor": true
+    }
+   },
+   {
+    "type": "PotCrossSection",
+    "cue": "The root zone dries",
+    "steps": [
+     "dries slowly"
+    ],
+    "props": {
+     "mode": "dry",
+     "from": 0.6,
+     "to": 0.45,
+     "showRoots": true,
+     "caption": "Overnight: drying slowly, no water"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Growers call that line",
+    "steps": [
+     "the emergency floor",
+     "labelled Rescue floor"
+    ],
+    "props": {
+     "term": "Rescue floor",
+     "abbrev": "emergency floor",
+     "meaning": "Night alarm line: below it, a rescue shot can follow."
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A rescue shot is",
+    "steps": [
+     "a small protective shot"
+    ],
+    "props": {
+     "term": "Rescue shot",
+     "meaning": "A small protective shot that stops the root zone drying too far."
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "For example, with the",
+    "steps": [
+     "For example, with the",
+     "a reading of thirty-six",
+     "a reading of thirty-six",
+     "A reading of thirty-four",
+     "a reading of thirty-six",
+     "floor at thirty-five",
+     "floor at thirty-five",
+     "A reading of thirty-four"
+    ],
+    "props": {
+     "hours": 14.5,
+     "start": 15.5,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwcRange": [
+      30,
+      50
+     ],
+     "vwc": [
+      [
+       15.5,
+       47.5
+      ],
+      [
+       17,
+       45.5
+      ],
+      [
+       18,
+       44
+      ],
+      [
+       20,
+       39.5
+      ],
+      [
+       22,
+       36
+      ],
+      [
+       22.6,
+       34.6
+      ],
+      [
+       23,
+       34
+      ],
+      [
+       23.1,
+       37
+      ],
+      [
+       30,
+       35.6
+      ]
+     ],
+     "shots": [
+      23
+     ],
+     "thresholds": [
+      {
+       "label": "Rescue floor",
+       "value": 35
+      }
+     ],
+     "highlight": {
+      "h": 23,
+      "text": "34%: below the floor"
+     }
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Treat the floor as",
+    "steps": [
+     "an alarm line",
+     "never as a level"
+    ],
+    "props": {
+     "left": {
+      "title": "Alarm line",
+      "icon": "🚨",
+      "tone": "good",
+      "items": [
+       "Marks trouble overnight"
+      ]
+     },
+     "right": {
+      "title": "Not an aim",
+      "icon": "🎯",
+      "tone": "bad",
+      "items": [
+       "Never a level to aim for"
+      ]
+     }
+    }
+   }
+  ],
+  "B2-7": [
+   {
+    "type": "Checklist",
+    "steps": [
+     "The morning wait is",
+     "the maintain phase is"
+    ],
+    "props": {
+     "title": "Fill the gaps",
+     "items": [
+      {
+       "text": "Morning wait: P0"
+      },
+      {
+       "text": "Maintain: P2"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Calc",
+    "cue": "Eight in the morning plus",
+    "steps": [
+     "Eight in the morning plus",
+     "lights-off is at"
+    ],
+    "props": {
+     "heading": "A room lit from 08:00",
+     "lines": [
+      {
+       "expr": "08:00 + 12 h = 20:00",
+       "note": "lights-off"
+      }
+     ]
+    }
+   },
+   {
+    "type": "PhaseDay",
+    "cue": "P zero starts at",
+    "steps": [
+     "P zero starts at",
+     "The P one and",
+     "P two times stay",
+     "P three runs from"
+    ],
+    "props": {
+     "lightsOn": "08:00",
+     "lightsOff": "20:00"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Last, separate two lists",
+    "steps": [
+     "A forecast shows",
+     "The event record lists",
+     "with their times",
+     "read the event record"
+    ],
+    "props": {
+     "left": {
+      "title": "Forecast",
+      "icon": "📝",
+      "tone": "neutral",
+      "items": [
+       "Shots the plan expects"
+      ]
+     },
+     "right": {
+      "title": "Event record",
+      "icon": "📋",
+      "tone": "good",
+      "items": [
+       "Shots that really ran",
+       "With their times"
+      ]
+     },
+     "verdict": "To check what happened, read the event record"
+    }
+   }
+  ]
+ }
+}

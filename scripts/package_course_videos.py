@@ -22,7 +22,7 @@ else:
     import build_course as compiler
     import install_course_media as installer
 
-FPS = 24
+FPS = 30
 CHUNK_BYTES = 1024 * 1024
 
 

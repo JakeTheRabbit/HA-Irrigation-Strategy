@@ -1,0 +1,612 @@
+{
+ "slides": {
+  "1": [
+   {
+    "type": "SystemMap",
+    "steps": [
+     "Lesson C one named",
+     "Lesson C one named",
+     "Lesson C one named",
+     "Lesson C one named",
+     "Lesson C one named",
+     "collects readings and switches"
+    ],
+    "props": {
+     "highlight": [
+      "host"
+     ],
+     "showDataFlow": false
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "This lesson builds the",
+    "steps": [
+     "the credit-card-sized computer"
+    ],
+    "props": {
+     "term": "Raspberry Pi",
+     "meaning": "A small, low-cost computer about the size of a credit card."
+    }
+   },
+   {
+    "type": "Analogy",
+    "cue": "Every computer needs an",
+    "steps": [
+     "the base software that",
+     "as Windows does"
+    ],
+    "props": {
+     "left": {
+      "icon": "app",
+      "label": "Windows on a laptop"
+     },
+     "right": {
+      "icon": "dashboard",
+      "label": "Home Assistant OS on the Pi"
+     },
+     "mappings": [
+      {
+       "from": "Operating system",
+       "to": "Starts it, runs its programs"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "You will install Home",
+    "steps": [
+     "made only to run"
+    ],
+    "props": {
+     "term": "Home Assistant OS",
+     "meaning": "An operating system made only to run Home Assistant."
+    }
+   },
+   {
+    "type": "SystemMap",
+    "cue": "Look at the picture",
+    "steps": [
+     "Look at the picture",
+     "Look at the picture",
+     "Look at the picture",
+     "Look at the picture",
+     "Look at the picture",
+     "Readings come in"
+    ],
+    "props": {
+     "highlight": [
+      "host"
+     ],
+     "showDataFlow": true
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "If you already have",
+    "steps": [
+     "If you already have",
+     "skip ahead to lesson",
+     "Keep pumps and valves"
+    ],
+    "props": {
+     "title": "Before you start",
+     "items": [
+      {
+       "text": "Working host already? Check it"
+      },
+      {
+       "text": "Then skip ahead to lesson C3"
+      },
+      {
+       "text": "Pumps and valves disconnected"
+      }
+     ]
+    }
+   }
+  ],
+  "2": [
+   {
+    "type": "HostSetup",
+    "steps": [
+     "lay the parts out"
+    ],
+    "props": {
+     "device": "pi",
+     "stages": [
+      "parts"
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "You need a storage",
+    "steps": [
+     "a micro S D",
+     "a speed rating printed"
+    ],
+    "props": {
+     "term": "Storage card",
+     "meaning": "A micro SD card: the small memory card in cameras and phones.",
+     "example": "At least 32 GB; the guide suggests one marked A2"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "You need a card",
+    "steps": [
+     "You need a card",
+     "You need a card",
+     "a card reader for",
+     "the power supply made",
+     "an Ethernet cable"
+    ],
+    "props": {
+     "title": "Lay the parts out",
+     "items": [
+      {
+       "text": "Pi 4 or Pi 5, 2 GB memory or more"
+      },
+      {
+       "text": "micro SD card, 32 GB or more"
+      },
+      {
+       "text": "Card reader for your computer"
+      },
+      {
+       "text": "Power supply made for that Pi"
+      },
+      {
+       "text": "Ethernet cable"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "the network cable with",
+    "steps": [
+     "clip-on plug",
+     "requires it for installation"
+    ],
+    "props": {
+     "term": "Ethernet cable",
+     "meaning": "The network cable with a clip-on plug, joining Pi to router.",
+     "example": "The official guide requires it for installation"
+    }
+   }
+  ],
+  "3": [
+   {
+    "type": "Define",
+    "steps": [
+     "comes as an image"
+    ],
+    "props": {
+     "term": "Image",
+     "meaning": "One file: an exact copy of a ready-to-run storage card."
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Writing the image copies",
+    "steps": [
+     "Writing the image copies",
+     "Writing the image copies",
+     "replaces everything already",
+     "replaces everything already"
+    ],
+    "props": {
+     "left": {
+      "title": "Copying a file",
+      "icon": "note",
+      "tone": "neutral",
+      "items": [
+       "One more file on the card"
+      ]
+     },
+     "right": {
+      "title": "Writing an image",
+      "icon": "alert",
+      "tone": "warn",
+      "items": [
+       "Exact copy of a whole card",
+       "Replaces everything on it"
+      ]
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The tool for this",
+    "steps": [
+     "a free program from"
+    ],
+    "props": {
+     "term": "Raspberry Pi Imager",
+     "meaning": "A free program from the Pi makers that writes the image."
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Now imagine Imager lists",
+    "steps": [
+     "a spare sixty-four gigabyte",
+     "one terabyte photo drive",
+     "because it is the",
+     "You leave the photo"
+    ],
+    "props": {
+     "left": {
+      "title": "Spare 64 GB card",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "Checked and backed up",
+       "Choose this one"
+      ]
+     },
+     "right": {
+      "title": "1 TB photo drive",
+      "icon": "alert",
+      "tone": "bad",
+      "items": [
+       "Not the spare",
+       "Leave it alone"
+      ]
+     },
+     "order": "pairs"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "In Imager, choose OS",
+    "steps": [
+     "In Imager, choose OS",
+     "then Other specific-purpose OS",
+     "then Home assistants and",
+     "then Home Assistant",
+     "Pick the build for"
+    ],
+    "props": {
+     "title": "In Raspberry Pi Imager",
+     "steps": [
+      {
+       "label": "Choose OS",
+       "icon": "search"
+      },
+      {
+       "label": "Other OS",
+       "icon": "note",
+       "note": "Other specific-purpose OS"
+      },
+      {
+       "label": "Home autom.",
+       "icon": "note",
+       "note": "Home assistants and home automation"
+      },
+      {
+       "label": "HA",
+       "icon": "check",
+       "note": "Home Assistant"
+      },
+      {
+       "label": "Pi 4 or Pi 5",
+       "icon": "save",
+       "note": "Matching build, then the checked card as storage"
+      }
+     ]
+    }
+   }
+  ],
+  "4": [
+   {
+    "type": "Checklist",
+    "steps": [
+     "I am replacing everything",
+     "any files I need",
+     "Add the Pi model",
+     "the matching image you"
+    ],
+    "props": {
+     "title": "Say it out loud before Write",
+     "items": [
+      {
+       "text": "I am replacing everything on it"
+      },
+      {
+       "text": "Files I need are saved elsewhere"
+      },
+      {
+       "text": "Pi model named"
+      },
+      {
+       "text": "Matching image chosen"
+      }
+     ]
+    }
+   },
+   {
+    "type": "HostSetup",
+    "cue": "Then select Next, then",
+    "steps": [
+     "then Write, and wait"
+    ],
+    "props": {
+     "device": "pi",
+     "stages": [
+      "write"
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Select Finish, then eject",
+    "steps": [
+     "tell your computer it"
+    ],
+    "props": {
+     "term": "Eject",
+     "meaning": "Tell your computer the card is safe to remove."
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "The screen shows the",
+    "steps": [
+     "Push the card into",
+     "Plug the Ethernet cable",
+     "Connect the power supply"
+    ],
+    "props": {
+     "title": "The next three steps, in order",
+     "steps": [
+      {
+       "label": "Card in",
+       "icon": "save",
+       "note": "While the Pi has no power"
+      },
+      {
+       "label": "Ethernet",
+       "icon": "plug",
+       "note": "Same router as your everyday computer"
+      },
+      {
+       "label": "Power last",
+       "icon": "power"
+      }
+     ]
+    }
+   }
+  ],
+  "5": [
+   {
+    "type": "Define",
+    "steps": [
+     "like a house number"
+    ],
+    "props": {
+     "term": "Network address",
+     "meaning": "A device's number on your network, like a house number."
+    }
+   },
+   {
+    "type": "HostSetup",
+    "cue": "Wait a few minutes",
+    "steps": [
+     "Wait a few minutes",
+     "Wait a few minutes",
+     "Wait a few minutes",
+     "Then type homeassistant dot"
+    ],
+    "props": {
+     "device": "pi",
+     "stages": [
+      "parts",
+      "write",
+      "boot",
+      "browser"
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "That number is a",
+    "steps": [
+     "a numbered door on"
+    ],
+    "props": {
+     "term": "Port",
+     "meaning": "A numbered door on the host where a program answers.",
+     "example": ":8123 is where Home Assistant answers"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "You can also use",
+    "steps": [
+     "You can also use",
+     "listed in your router's",
+     "followed by colon eight",
+     "check it belongs to"
+    ],
+    "props": {
+     "left": {
+      "title": "By name",
+      "icon": "search",
+      "tone": "neutral",
+      "items": [
+       "homeassistant.local:8123"
+      ]
+     },
+     "right": {
+      "title": "By number",
+      "icon": "note",
+      "tone": "neutral",
+      "items": [
+       "Address from your router",
+       "Followed by :8123"
+      ]
+     },
+     "verdict": "Check it is this new Pi, not an older system"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "You will then see",
+    "steps": [
+     "the short set of",
+     "Lesson C three walks"
+    ],
+    "props": {
+     "term": "Onboarding",
+     "meaning": "The welcome screens Home Assistant shows on its first start.",
+     "example": "A working page: the host is reachable"
+    }
+   }
+  ],
+  "6": [
+   {
+    "type": "FlowSteps",
+    "steps": [
+     "A card holds old",
+     "you copy those files",
+     "identify the card again"
+    ],
+    "props": {
+     "title": "A card with files on it",
+     "steps": [
+      {
+       "label": "Old files",
+       "icon": "alert",
+       "note": "Research files with no other copy"
+      },
+      {
+       "label": "Copy them",
+       "icon": "save",
+       "note": "Somewhere safe"
+      },
+      {
+       "label": "Identify card",
+       "icon": "search",
+       "note": "Check it again before writing"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "For your real installation",
+    "steps": [
+     "Note the Pi model",
+     "the card size",
+     "the Home Assistant version",
+     "the address that worked"
+    ],
+    "props": {
+     "title": "Written host record",
+     "items": [
+      {
+       "text": "Pi model"
+      },
+      {
+       "text": "Card size"
+      },
+      {
+       "text": "Home Assistant version"
+      },
+      {
+       "text": "The address that worked"
+      }
+     ]
+    }
+   },
+   {
+    "type": "DecisionTree",
+    "cue": "If no page appears",
+    "steps": [
+     "If no page appears",
+     "check the power supply",
+     "Then follow the official"
+    ],
+    "props": {
+     "nodes": [
+      {
+       "id": "page",
+       "text": "Page after five minutes?",
+       "kind": "question"
+      },
+      {
+       "id": "ok",
+       "text": "Onboarding: lesson C3",
+       "kind": "action"
+      },
+      {
+       "id": "check",
+       "text": "Check power supply and network cable",
+       "kind": "action"
+      },
+      {
+       "id": "fix",
+       "text": "Official troubleshooting: write the card again",
+       "kind": "action"
+      }
+     ],
+     "edges": [
+      {
+       "from": "page",
+       "to": "ok",
+       "label": "Yes"
+      },
+      {
+       "from": "page",
+       "to": "check",
+       "label": "No"
+      },
+      {
+       "from": "check",
+       "to": "fix"
+      }
+     ],
+     "path": [
+      "page",
+      "check",
+      "fix"
+     ]
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Lesson C three picks",
+    "steps": [
+     "picks up at onboarding",
+     "adds the Crop Steering",
+     "accounts and",
+     "and backups"
+    ],
+    "props": {
+     "title": "Next: lesson C3",
+     "steps": [
+      {
+       "label": "Onboarding",
+       "icon": "person"
+      },
+      {
+       "label": "Crop Steering",
+       "icon": "water"
+      },
+      {
+       "label": "Accounts",
+       "icon": "lock"
+      },
+      {
+       "label": "Backups",
+       "icon": "save"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

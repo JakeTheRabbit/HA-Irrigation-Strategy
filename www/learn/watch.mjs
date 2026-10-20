@@ -18,7 +18,7 @@ const link = (text, href, cls = 'text-link') => {
 const time = seconds => `${Math.floor(seconds / 60)}:${String(Math.floor(seconds % 60)).padStart(2, '0')}`;
 let metadata;
 async function loadGroups() {
-  if (!metadata) metadata = fetch('course/video-groups.json?v=20261020r4').then(async response => {
+  if (!metadata) metadata = fetch('course/video-groups.json?v=20261021r5').then(async response => {
     if (!response.ok) throw Error('Video list returned ' + response.status);
     const data = await response.json();
     if (!Array.isArray(data.groups) || !data.groups.length) throw Error('No grouped videos are available yet.');

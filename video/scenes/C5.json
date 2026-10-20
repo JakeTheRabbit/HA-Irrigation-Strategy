@@ -1,0 +1,936 @@
+{
+ "slides": {
+  "1": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Think of a stop",
+     "Only that driver hears",
+     "switch works like that"
+    ],
+    "props": {
+     "left": {
+      "icon": "route",
+      "label": "Stop request to the driver"
+     },
+     "right": {
+      "icon": "setting",
+      "label": "Watering switch OFF"
+     },
+     "mappings": [
+      {
+       "from": "Only the driver hears it",
+       "to": "Only the Controller hears it"
+      }
+     ]
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Each room has a",
+    "steps": [
+     "Each room has a",
+     "kept it OFF since"
+    ],
+    "props": {
+     "src": "img/screens/demo-overview-r3.png",
+     "focus": [
+      {
+       "x": 258,
+       "y": 10,
+       "w": 140,
+       "h": 36,
+       "label": "Each room"
+      },
+      {
+       "x": 1026,
+       "y": 10,
+       "w": 136,
+       "h": 36,
+       "label": "Its Watering switch, top of screen"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "When Watering is OFF,",
+    "steps": [
+     "the Controller starts no",
+     "That includes rescue shots",
+     "and test shots"
+    ],
+    "props": {
+     "title": "Watering OFF in this room",
+     "items": [
+      {
+       "text": "No shots"
+      },
+      {
+       "text": "No rescue shots"
+      },
+      {
+       "text": "No test shots"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A test shot is",
+    "steps": [
+     "a shot you ask",
+     "already running stops within"
+    ],
+    "props": {
+     "term": "Test shot",
+     "meaning": "A shot you ask the app to run on demand.",
+     "example": "A running shot stops within a few seconds"
+    }
+   },
+   {
+    "type": "SafetyStop",
+    "cue": "That is a software",
+    "steps": [
+     "That is a software",
+     "cannot stop an old"
+    ],
+    "props": {
+     "stages": [
+      "software",
+      "bypass"
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Physical isolation means cutting",
+    "steps": [
+     "cutting power or water",
+     "with a real device"
+    ],
+    "props": {
+     "term": "Physical isolation",
+     "meaning": "Cutting power or water with a real device.",
+     "example": "Electrical isolation: the power part"
+    }
+   },
+   {
+    "type": "SafetyStop",
+    "cue": "Examples are a switch",
+    "steps": [
+     "Examples are a switch"
+    ],
+    "props": {
+     "stages": [
+      "physical"
+     ]
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Before anyone works on",
+    "steps": [
+     "approved electrical and water",
+     "and water shutdown",
+     "who controls it"
+    ],
+    "props": {
+     "title": "Before work on pump, valve, wiring",
+     "items": [
+      {
+       "text": "Approved electrical shutdown"
+      },
+      {
+       "text": "Approved water shutdown"
+      },
+      {
+       "text": "Who controls it"
+      }
+     ]
+    }
+   }
+  ],
+  "2": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "A plug that fits",
+     "like an envelope that",
+     "The letter inside can"
+    ],
+    "props": {
+     "left": {
+      "icon": "receipt",
+      "label": "Envelope fits the letterbox"
+     },
+     "right": {
+      "icon": "probe",
+      "label": "Plug fits the socket"
+     },
+     "mappings": [
+      {
+       "from": "Letter can still be wrong",
+       "to": "Signal can still be wrong"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Supply voltage is the",
+    "steps": [
+     "the electrical push the",
+     "Too much can destroy"
+    ],
+    "props": {
+     "term": "Supply voltage",
+     "meaning": "The electrical push a probe needs, in volts.",
+     "example": "Too much can destroy it"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The signal protocol is",
+    "steps": [
+     "the wiring language",
+     "how the probe sends"
+    ],
+    "props": {
+     "term": "Signal protocol",
+     "meaning": "The wiring language a probe uses to send readings.",
+     "example": "The interface must speak it too"
+    }
+   },
+   {
+    "type": "SystemMap",
+    "cue": "The interface is whatever",
+    "props": {
+     "highlight": [
+      "probe",
+      "bridge"
+     ],
+     "showDataFlow": true
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Firmware is the small",
+    "steps": [
+     "the small program built",
+     "need a particular firmware"
+    ],
+    "props": {
+     "term": "Firmware",
+     "meaning": "The small program built into a probe or bridge.",
+     "example": "Some probes need a particular version"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "For example, before you",
+    "steps": [
+     "read its maker's sheet",
+     "Confirm its voltage",
+     "protocol and the bridges",
+     "the bridges it supports",
+     "placement and calibration"
+    ],
+    "props": {
+     "title": "Before connecting a TEROS 12",
+     "items": [
+      {
+       "text": "Read the maker's sheet"
+      },
+      {
+       "text": "Voltage confirmed"
+      },
+      {
+       "text": "Protocol confirmed"
+      },
+      {
+       "text": "Supported bridges confirmed"
+      },
+      {
+       "text": "Placement and calibration steps"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Never guess a wire's",
+    "steps": [
+     "Never guess a wire's",
+     "never connect an unknown",
+     "choose a documented, assembled"
+    ],
+    "props": {
+     "left": {
+      "title": "Never",
+      "icon": "cross",
+      "tone": "bad",
+      "items": [
+       "Guess a wire's job by colour",
+       "Unknown signal to board pins"
+      ]
+     },
+     "right": {
+      "title": "First install",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "A documented, assembled route"
+      ]
+     }
+    }
+   }
+  ],
+  "3": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "A reading can be",
+     "Picture a thermometer hanging",
+     "not in the pot"
+    ],
+    "props": {
+     "left": {
+      "icon": "thermometer",
+      "label": "Thermometer in the tank"
+     },
+     "right": {
+      "icon": "pot",
+      "label": "Moisture is in the pot"
+     },
+     "joiner": "is not",
+     "mappings": [
+      {
+       "from": "Recent reading",
+       "to": "Answers the wrong question"
+      }
+     ]
+    }
+   },
+   {
+    "type": "ReadingAge",
+    "cue": "This entity shows twenty-two.",
+    "steps": [
+     "It updated two minutes"
+    ],
+    "props": {
+     "now": "14:00",
+     "readings": [
+      {
+       "name": "Room A entity",
+       "at": "13:58",
+       "value": "22"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Its name mentions Room",
+    "steps": [
+     "Its name mentions Room",
+     "its unit is degrees",
+     "the sensor sits in",
+     "So this number cannot"
+    ],
+    "props": {
+     "title": "This entity: 22",
+     "items": [
+      {
+       "text": "Name mentions Room A"
+      },
+      {
+       "text": "Unit: °C, not % VWC",
+       "state": "fail"
+      },
+      {
+       "text": "Sits in the tank, not the pot",
+       "state": "fail"
+      },
+      {
+       "text": "Cannot stand in for moisture",
+       "state": "fail"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Look at the three",
+    "steps": [
+     "quantity, units, real",
+     "quantity, units, real",
+     "units, real location",
+     "units, real location",
+     "real location and age",
+     "real location and age",
+     "and age. The",
+     "and age. The"
+    ],
+    "props": {
+     "left": {
+      "title": "This entity",
+      "icon": "cross",
+      "tone": "bad",
+      "items": [
+       "Temperature",
+       "°C",
+       "In the tank",
+       "2 min old"
+      ]
+     },
+     "right": {
+      "title": "Moisture needs",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "VWC",
+       "% of substrate volume",
+       "In the pot",
+       "Recent"
+      ]
+     },
+     "order": "pairs"
+    }
+   },
+   {
+    "type": "MeasurementMap",
+    "cue": "The same care applies",
+    "steps": [
+     "bulk EC is measured",
+     "Pore-water EC describes the"
+    ],
+    "props": {
+     "highlight": [
+      "bulk",
+      "pore"
+     ]
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "A bulk EC reading",
+    "steps": [
+     "A bulk EC reading",
+     "because a field asks",
+     "A wrong reading makes"
+    ],
+    "props": {
+     "title": "A wrong reading",
+     "steps": [
+      {
+       "label": "Bulk EC",
+       "icon": "probe"
+      },
+      {
+       "label": "Pore-water field",
+       "icon": "alert",
+       "note": "It does not become pore-water EC"
+      },
+      {
+       "label": "Wrong reason",
+       "icon": "water",
+       "note": "The Controller waters for the wrong reason"
+      }
+     ]
+    }
+   }
+  ],
+  "4": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Remember from lesson C",
+     "like the shove that",
+     "That burst is the"
+    ],
+    "props": {
+     "left": {
+      "icon": "route",
+      "label": "Shove a loaded trolley"
+     },
+     "right": {
+      "icon": "tap",
+      "label": "A pump starting"
+     },
+     "mappings": [
+      {
+       "from": "The shove to get rolling",
+       "to": "Starting load"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A rating is the",
+    "steps": [
+     "the most a device",
+     "printed on its label"
+    ],
+    "props": {
+     "term": "Rating",
+     "meaning": "The most a device is designed to handle safely.",
+     "example": "Printed on its label"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "A smart plug's headline",
+    "steps": [
+     "A smart plug's headline",
+     "describes a heater",
+     "not a motor"
+    ],
+    "props": {
+     "left": {
+      "title": "Smart plug headline",
+      "icon": "plug",
+      "tone": "warn",
+      "items": [
+       "Usually describes a heater"
+      ]
+     },
+     "right": {
+      "title": "Pump motor",
+      "icon": "power",
+      "tone": "bad",
+      "items": [
+       "Has a starting load"
+      ]
+     },
+     "order": "columns"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "That person checks the",
+    "steps": [
+     "checks the real pump",
+     "its control hardware",
+     "the ratings and the",
+     "the protection it needs"
+    ],
+    "props": {
+     "title": "Competent installer checks",
+     "items": [
+      {
+       "text": "The real pump"
+      },
+      {
+       "text": "Its control hardware"
+      },
+      {
+       "text": "The ratings"
+      },
+      {
+       "text": "The protection it needs"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Mains is the high-voltage",
+    "steps": [
+     "high-voltage power behind",
+     "gives no mains-wiring instructions"
+    ],
+    "props": {
+     "term": "Mains",
+     "meaning": "The high-voltage power behind your wall sockets.",
+     "example": "This course gives no mains-wiring instructions"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The installer also plans",
+    "steps": [
+     "Dry-run means the",
+     "runs with no water"
+    ],
+    "props": {
+     "term": "Dry-run",
+     "meaning": "The pump runs with no water and overheats."
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Deadheading means the pump",
+    "steps": [
+     "pushes against a closed",
+     "nowhere for water to"
+    ],
+    "props": {
+     "term": "Deadheading",
+     "meaning": "The pump pushes against a closed valve.",
+     "example": "Nowhere for water to go"
+    }
+   },
+   {
+    "type": "WaterPath",
+    "cue": "Backflow and siphon, from",
+    "steps": [
+     "Backflow and siphon",
+     "water running backwards",
+     "draining on its own",
+     "draining on its own"
+    ],
+    "props": {
+     "parts": [
+      "supply",
+      "backflow",
+      "valve",
+      "drippers"
+     ],
+     "flow": true
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Before any test, agree",
+    "steps": [
+     "what will be energised",
+     "where water comes out",
+     "how the test ends"
+    ],
+    "props": {
+     "title": "Before any test, agree",
+     "items": [
+      {
+       "text": "What is energised (gets power)"
+      },
+      {
+       "text": "Where water comes out"
+      },
+      {
+       "text": "How the test ends"
+      }
+     ]
+    }
+   }
+  ],
+  "5": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Two people steering one",
+     "A valve works the"
+    ],
+    "props": {
+     "left": {
+      "icon": "route",
+      "label": "Two people steering one car"
+     },
+     "right": {
+      "icon": "tap",
+      "label": "Two controllers, one valve"
+     }
+    }
+   },
+   {
+    "type": "OneOwner",
+    "cue": "Here is the case.",
+    "steps": [
+     "An old timer is"
+    ],
+    "props": {
+     "stage": "conflict"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The old timer is",
+    "steps": [
+     "a competing controller",
+     "can also open the"
+    ],
+    "props": {
+     "term": "Competing controller",
+     "meaning": "A second system that can also open the valve.",
+     "example": "The old timer"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Look at the comparison",
+    "steps": [
+     "Look at the comparison",
+     "Look at the comparison",
+     "The left side can",
+     "The right side is",
+     "So the valve is"
+    ],
+    "props": {
+     "left": {
+      "title": "Old timer",
+      "icon": "clock",
+      "tone": "bad",
+      "items": [
+       "Still wired to the valve",
+       "Can still act"
+      ]
+     },
+     "right": {
+      "title": "Crop Steering",
+      "icon": "power",
+      "tone": "neutral",
+      "items": [
+       "Valve mapped",
+       "Watering OFF"
+      ]
+     },
+     "verdict": "OFF does not stop the timer: not isolated",
+     "order": "pairs"
+    }
+   },
+   {
+    "type": "OneOwner",
+    "cue": "Write down both routes",
+    "steps": [
+     "Write down both routes",
+     "choose one owner for"
+    ],
+    "props": {
+     "stage": "both"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Crop Steering may still",
+    "steps": [
+     "reads values but sends",
+     "Agree how the plants"
+    ],
+    "props": {
+     "term": "Read-only observation",
+     "meaning": "Reading values but sending no commands.",
+     "example": "Agree how the plants still get water"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Two owners can fight,",
+    "steps": [
+     "Two owners can fight",
+     "double-water",
+     "leave a valve open"
+    ],
+    "props": {
+     "title": "Two owners can…",
+     "items": [
+      {
+       "text": "Fight",
+       "state": "fail"
+      },
+      {
+       "text": "Double-water",
+       "state": "fail"
+      },
+      {
+       "text": "Leave a valve open",
+       "state": "fail"
+      }
+     ]
+    }
+   }
+  ],
+  "6": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Before you leave a",
+     "This slide is that"
+    ],
+    "props": {
+     "left": {
+      "icon": "list",
+      "label": "Doors, oven, taps"
+     },
+     "right": {
+      "icon": "zone",
+      "label": "Last walk round"
+     },
+     "joiner": "is like"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A wet test is",
+    "steps": [
+     "the first time water"
+    ],
+    "props": {
+     "term": "Wet test",
+     "meaning": "The first time water really flows through the new system."
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "First, trace each probe",
+    "steps": [
+     "trace each probe to",
+     "trace each control entity"
+    ],
+    "props": {
+     "src": "img/screens/demo-probe-mapping-r3.png",
+     "focus": [
+      {
+       "x": 472,
+       "y": 138,
+       "w": 446,
+       "h": 98,
+       "label": "Probe → its Home Assistant reading"
+      },
+      {
+       "x": 16,
+       "y": 138,
+       "w": 446,
+       "h": 98,
+       "label": "Control entity → the real valve"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Where the design allows,",
+    "steps": [
+     "a low-risk indicator",
+     "such as a small",
+     "Never use a live"
+    ],
+    "props": {
+     "left": {
+      "title": "First output check",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "A low-risk indicator",
+       "Such as a small lamp"
+      ]
+     },
+     "right": {
+      "title": "Never",
+      "icon": "cross",
+      "tone": "bad",
+      "items": [
+       "A live crop as the first test"
+      ]
+     }
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Then write the setup",
+    "steps": [
+     "interface, ratings, protections",
+     "ratings, protections, one",
+     "protections, one owner",
+     "one owner and the",
+     "the physical shutdown"
+    ],
+    "props": {
+     "title": "Setup record",
+     "items": [
+      {
+       "text": "Interface"
+      },
+      {
+       "text": "Ratings"
+      },
+      {
+       "text": "Protections"
+      },
+      {
+       "text": "One owner"
+      },
+      {
+       "text": "Physical shutdown"
+      }
+     ]
+    }
+   },
+   {
+    "type": "OneOwner",
+    "cue": "For example: Zone one",
+    "steps": [
+     "For example: Zone one"
+    ],
+    "props": {
+     "stage": "resolved"
+    }
+   },
+   {
+    "type": "DecisionTree",
+    "cue": "An open question keeps",
+    "steps": [
+     "An open question keeps",
+     "Move to lesson C",
+     "Lesson C six runs"
+    ],
+    "props": {
+     "nodes": [
+      {
+       "id": "q",
+       "text": "Any open question?",
+       "kind": "question"
+      },
+      {
+       "id": "wait",
+       "text": "Stage stays unfinished",
+       "kind": "stop"
+      },
+      {
+       "id": "ready",
+       "text": "Catch-test method and collection ready?",
+       "kind": "question"
+      },
+      {
+       "id": "no",
+       "text": "Not yet",
+       "kind": "stop"
+      },
+      {
+       "id": "c6",
+       "text": "Lesson C6: first careful water test",
+       "kind": "action"
+      }
+     ],
+     "edges": [
+      {
+       "from": "q",
+       "to": "wait",
+       "label": "Yes"
+      },
+      {
+       "from": "q",
+       "to": "ready",
+       "label": "No"
+      },
+      {
+       "from": "ready",
+       "to": "no",
+       "label": "No"
+      },
+      {
+       "from": "ready",
+       "to": "c6",
+       "label": "Yes"
+      }
+     ],
+     "path": [
+      "q",
+      "ready",
+      "c6"
+     ]
+    }
+   }
+  ]
+ }
+}

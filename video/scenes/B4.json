@@ -1,0 +1,659 @@
+{
+ "slides": {
+  "B4-1": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "garden tap",
+     "its flow rate"
+    ],
+    "props": {
+     "left": {
+      "icon": "tap",
+      "label": "Garden tap left running"
+     },
+     "right": {
+      "icon": "dripper",
+      "label": "Dripper at each plant"
+     },
+     "mappings": [
+      {
+       "from": "Water out in a set time",
+       "to": "Flow rate"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A dripper is a small",
+    "steps": [
+     "small nozzle on a"
+    ],
+    "props": {
+     "term": "Dripper",
+     "meaning": "A small nozzle on a thin pipe; lets water out slowly."
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Its flow rate is given",
+    "steps": [
+     "litres per hour",
+     "Four litres per hour"
+    ],
+    "props": {
+     "term": "Flow rate",
+     "abbrev": "L/h, litres per hour",
+     "meaning": "The water that comes out in a set time.",
+     "example": "4 L/h: 4 litres in one full hour"
+    }
+   },
+   {
+    "type": "DripperFlow",
+    "cue": "Each example plant has",
+    "steps": [
+     "two times four",
+     "Next, flow becomes"
+    ],
+    "props": {
+     "plants": 12,
+     "drippersPerPlant": 2,
+     "lph": 4,
+     "seconds": 45,
+     "showZone": false
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A catch test measures",
+    "steps": [
+     "collect one dripper's water",
+     "measure it"
+    ],
+    "props": {
+     "term": "Catch test",
+     "meaning": "Collect one dripper's water in a cup for a timed period.",
+     "example": "Measures the real flow, not the printed rating"
+    }
+   }
+  ],
+  "B4-2": [
+   {
+    "type": "Define",
+    "steps": [
+     "called its runtime",
+     "thirty seconds"
+    ],
+    "props": {
+     "term": "Runtime",
+     "meaning": "The set time one shot runs for.",
+     "example": "Our example shot: 30 seconds"
+    }
+   },
+   {
+    "type": "Calc",
+    "cue": "The flow rate is",
+    "steps": [
+     "Sixty seconds times sixty"
+    ],
+    "props": {
+     "heading": "Seconds in an hour",
+     "lines": [
+      {
+       "expr": "60 s × 60 min = 3600 s"
+      }
+     ]
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Each plant gets eight",
+    "steps": [
+     "Multiply eight by thirty",
+     "Divide by three thousand",
+     "Multiply by one thousand"
+    ],
+    "props": {
+     "title": "One plant, one 30-second shot",
+     "steps": [
+      {
+       "label": "8 × 30",
+       "icon": "water",
+       "note": "8 L/h × 30 s = 240"
+      },
+      {
+       "label": "÷ 3600",
+       "icon": "clock",
+       "note": "240 ÷ 3600 ≈ 0.0667 L"
+      },
+      {
+       "label": "× 1000",
+       "icon": "ruler",
+       "note": "≈ 66.7 mL per plant"
+      }
+     ]
+    }
+   },
+   {
+    "type": "PotCrossSection",
+    "cue": "That is less than",
+    "steps": [
+     "less than a small"
+    ],
+    "props": {
+     "mode": "fill",
+     "from": 0.5,
+     "to": 0.53,
+     "secs": 3,
+     "showRoots": true,
+     "labels": false,
+     "caption": "One shot ≈ 66.7 mL: less than a small glass"
+    }
+   }
+  ],
+  "B4-3": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "one plant",
+     "twelve plants, all fed"
+    ],
+    "props": {
+     "left": {
+      "icon": "pot",
+      "label": "One plant"
+     },
+     "right": {
+      "icon": "zone",
+      "label": "Twelve plants, fed the same"
+     },
+     "joiner": "× 12"
+    }
+   },
+   {
+    "type": "Calc",
+    "cue": "Use the exact fraction",
+    "steps": [
+     "One fifteenth times twelve"
+    ],
+    "props": {
+     "heading": "Use the exact fraction",
+     "lines": [
+      {
+       "expr": "1/15 L × 12 = 0.8 L",
+       "note": "for the whole zone"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Per plant tells you",
+    "steps": [
+     "Per plant tells you",
+     "Per zone tells you",
+     "matters for the tank"
+    ],
+    "props": {
+     "left": {
+      "title": "Per plant",
+      "icon": "water",
+      "tone": "water",
+      "items": [
+       "What one pot received"
+      ]
+     },
+     "right": {
+      "title": "Per zone",
+      "icon": "chart",
+      "tone": "neutral",
+      "items": [
+       "What the whole group used",
+       "Matters for the tank"
+      ]
+     }
+    }
+   },
+   {
+    "type": "DripperFlow",
+    "cue": "Now double the runtime",
+    "steps": [
+     "Now double the runtime",
+     "At the same flow",
+     "one point six litres"
+    ],
+    "props": {
+     "plants": 12,
+     "drippersPerPlant": 2,
+     "lph": 4,
+     "seconds": 60,
+     "showZone": true
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "To total a whole",
+    "steps": [
+     "To total a whole",
+     "add up only",
+     "add up only",
+     "the shots in the",
+     "the shots in the",
+     "the shots that really",
+     "the shots that really",
+     "the shots that really"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwc": [
+      [
+       6,
+       48
+      ],
+      [
+       8,
+       47
+      ],
+      [
+       8.05,
+       50
+      ],
+      [
+       10,
+       49
+      ],
+      [
+       10.05,
+       52
+      ],
+      [
+       12,
+       51
+      ],
+      [
+       12.05,
+       54
+      ],
+      [
+       14,
+       53
+      ],
+      [
+       14.05,
+       56
+      ],
+      [
+       18,
+       54
+      ],
+      [
+       24,
+       50
+      ],
+      [
+       30,
+       47
+      ]
+     ],
+     "shots": [
+      8,
+      10,
+      12,
+      14
+     ],
+     "held": [
+      16
+     ],
+     "highlight": {
+      "h": 14.05,
+      "text": "Add only shots that ran"
+     },
+     "vwcRange": [
+      40,
+      60
+     ]
+    }
+   }
+  ],
+  "B4-4": [
+   {
+    "type": "DripperFlow",
+    "steps": [
+     "forty-five-second shot",
+     "Eight times forty-five"
+    ],
+    "props": {
+     "plants": 12,
+     "drippersPerPlant": 2,
+     "lph": 4,
+     "seconds": 45,
+     "showZone": false
+    }
+   },
+   {
+    "type": "Calc",
+    "cue": "Each pot holds five",
+    "steps": [
+     "Zero point one divided",
+     "Times one hundred is"
+    ],
+    "props": {
+     "heading": "Shot vs a 5-litre pot",
+     "lines": [
+      {
+       "expr": "0.1 L ÷ 5 L = 0.02"
+      },
+      {
+       "expr": "0.02 × 100 = 2%",
+       "note": "of the substrate volume"
+      }
+     ]
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "You might expect the",
+    "steps": [
+     "You might expect the",
+     "Often it rises less",
+     "Often it rises less",
+     "Often it rises less",
+     "expect the VWC to",
+     "some water drains out",
+     "some water drains out",
+     "some water drains out"
+    ],
+    "props": {
+     "hours": 4,
+     "start": 8,
+     "vwc": [
+      [
+       8,
+       50
+      ],
+      [
+       9,
+       50
+      ],
+      [
+       9.05,
+       51.2
+      ],
+      [
+       10,
+       51
+      ],
+      [
+       12,
+       50.6
+      ]
+     ],
+     "plan": [
+      [
+       8,
+       50
+      ],
+      [
+       9,
+       50
+      ],
+      [
+       9.05,
+       52
+      ],
+      [
+       12,
+       51.6
+      ]
+     ],
+     "shots": [
+      9
+     ],
+     "highlight": {
+      "h": 9.05,
+      "text": "Rose less than 2 points"
+     },
+     "vwcRange": [
+      46,
+      56
+     ]
+    }
+   },
+   {
+    "type": "ProbeZone",
+    "cue": "the probe samples only",
+    "steps": [
+     "samples only one spot",
+     "read the probe to"
+    ],
+    "props": {
+     "pots": 5,
+     "show": [
+      "region",
+      "uneven"
+     ],
+     "callout": "The probe samples only one spot",
+     "reading": "one spot"
+    }
+   }
+  ],
+  "B4-5": [
+   {
+    "type": "Checklist",
+    "steps": [
+     "one dripper rated",
+     "three litres per hour",
+     "sixty seconds",
+     "twelve plants"
+    ],
+    "props": {
+     "title": "Your turn",
+     "items": [
+      {
+       "text": "1 dripper per plant"
+      },
+      {
+       "text": "Rated 3 L/h"
+      },
+      {
+       "text": "60-second shot"
+      },
+      {
+       "text": "12 plants in the zone"
+      }
+     ]
+    }
+   },
+   {
+    "type": "DripperFlow",
+    "cue": "One dripper at three",
+    "steps": [
+     "One dripper at three",
+     "Divide by three thousand",
+     "Times twelve plants"
+    ],
+    "props": {
+     "plants": 12,
+     "drippersPerPlant": 1,
+     "lph": 3,
+     "seconds": 60,
+     "showZone": true
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Last, note where the",
+    "steps": [
+     "the printed rating",
+     "or a catch test",
+     "Write that beside the"
+    ],
+    "props": {
+     "left": {
+      "title": "Printed rating",
+      "icon": "note",
+      "tone": "warn",
+      "items": [
+       "A starting figure"
+      ]
+     },
+     "right": {
+      "title": "Catch test",
+      "icon": "water",
+      "tone": "good",
+      "items": [
+       "The real, measured flow"
+      ]
+     },
+     "verdict": "Write the source beside the answer"
+    }
+   }
+  ],
+  "B4-6": [
+   {
+    "type": "Define",
+    "steps": [
+     "The time asked for",
+     "The time that actually"
+    ],
+    "props": {
+     "term": "Requested vs effective runtime",
+     "meaning": "Requested: the time asked for. Effective: the time that ran."
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "For example, a shot",
+    "steps": [
+     "requests one hundred and",
+     "the limit is sixty",
+     "effective runtime is sixty"
+    ],
+    "props": {
+     "title": "A shot meets the safety limit",
+     "steps": [
+      {
+       "label": "Requested",
+       "icon": "clock",
+       "note": "120 s asked for"
+      },
+      {
+       "label": "Safety limit",
+       "icon": "shield",
+       "note": "60 s at most"
+      },
+      {
+       "label": "Effective",
+       "icon": "check",
+       "note": "60 s actually ran"
+      }
+     ]
+    }
+   },
+   {
+    "type": "DripperFlow",
+    "cue": "Each plant gets eight",
+    "steps": [
+     "Each plant gets eight",
+     "Eight times sixty, divided"
+    ],
+    "props": {
+     "plants": 12,
+     "drippersPerPlant": 2,
+     "lph": 4,
+     "seconds": 60,
+     "showZone": false
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Using the requested time",
+    "steps": [
+     "Using the requested time",
+     "two hundred and sixty-seven",
+     "double the real figure",
+     "always calculate with the",
+     "side by side"
+    ],
+    "props": {
+     "left": {
+      "title": "Requested: 120 s",
+      "icon": "clock",
+      "tone": "bad",
+      "items": [
+       "About 267 mL",
+       "Double the real figure"
+      ]
+     },
+     "right": {
+      "title": "Effective: 60 s",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "About 133 mL",
+       "Always calculate with this"
+      ]
+     },
+     "verdict": "The app shows both times side by side",
+     "order": "pairs"
+    }
+   }
+  ],
+  "B4-7": [
+   {
+    "type": "Define",
+    "steps": [
+     "Delivery is the water",
+     "Runoff, from lesson A"
+    ],
+    "props": {
+     "term": "Delivery, runoff, uptake",
+     "meaning": "Delivery: drippers supplied. Runoff: drains out. Uptake: enters plant.",
+     "example": "Flow × runtime gives delivery only"
+    }
+   },
+   {
+    "type": "DripperFlow",
+    "cue": "Try one more",
+    "steps": [
+     "Two times three is",
+     "Divide by three thousand",
+     "Times fifteen plants"
+    ],
+    "props": {
+     "plants": 15,
+     "drippersPerPlant": 2,
+     "lph": 3,
+     "seconds": 90,
+     "showZone": true
+    }
+   },
+   {
+    "type": "PotCrossSection",
+    "cue": "That is water delivered",
+    "steps": [
+     "That is water delivered",
+     "measure the runoff",
+     "the plant's uptake"
+    ],
+    "props": {
+     "mode": "fill",
+     "from": 0.45,
+     "to": 0.6,
+     "secs": 3,
+     "showRoots": true,
+     "arrows": [
+      "drainage",
+      "uptake"
+     ],
+     "labels": false,
+     "caption": "Delivered ≠ drained ≠ taken up"
+    }
+   }
+  ]
+ }
+}

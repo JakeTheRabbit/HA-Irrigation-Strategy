@@ -1,0 +1,52 @@
+{"slides":{
+"A2-01":[
+ {"type":"PotCrossSection","steps":["looked inside a pot"],"props":{"mode":"fill","from":0.2,"to":0.55,"secs":4,"showRoots":true,"caption":"The root zone holds three things"}},
+ {"type":"Title","cue":"Look at the question on","props":{"eyebrow":"Recall","title":"Three parts inside the pot?","subtitle":"Name all three before the answer appears"}},
+ {"type":"Checklist","cue":"Here is a hint","steps":["One part is solid","one is a liquid","one is a gas"],"props":{"title":"Hint: name the three parts","items":[{"text":"One part is solid","state":"unknown"},{"text":"One is a liquid","state":"unknown"},{"text":"One is a gas","state":"unknown"}]}}
+],
+"A2-02":[
+ {"type":"PotCrossSection","steps":["The three parts are","solid material, water","water and air","and air"],"props":{"mode":"static","from":0.55,"labels":true,"caption":"Solid, water and air"}},
+ {"type":"VolumeGrid","cue":"Look at the picture. It","steps":["as ten equal blocks","as ten equal blocks","as ten equal blocks"],"props":{"total":10,"water":6,"solid":2,"air":2,"label":"Three parts as ten equal blocks"}},
+ {"type":"Define","cue":"First, one word. Volume","steps":["how much space something"],"props":{"term":"Volume","meaning":"How much space something takes up."}},
+ {"type":"VolumeGrid","cue":"Picture the sample, the bit","steps":["Picture the sample, the","split into ten equal"],"props":{"total":10,"water":6,"label":"How many boxes would water fill?"}},
+ {"type":"Define","cue":"That share is called volumetric","steps":["water volume divided by","multiply by one hundred"],"props":{"term":"VWC","abbrev":"volumetric water content","meaning":"Water volume ÷ total sample volume, × 100.","example":"A percentage: a number out of every hundred"}},
+ {"type":"VolumeGrid","cue":"Water fills six of the","steps":["Water fills six of","Two boxes are solid","Two boxes are solid"],"props":{"total":10,"water":6,"solid":2,"air":2,"label":"Water fills 6 of 10 boxes"}},
+ {"type":"Calc","cue":"Now do the sum step","steps":["Six divided by ten","Zero point six times","at sixty percent VWC"],"props":{"heading":"Step by step","lines":[{"expr":"6 ÷ 10 = 0.6"},{"expr":"0.6 × 100 = 60"}],"answer":"60% VWC"}},
+ {"type":"PotCrossSection","cue":"The boxes make the sum","steps":["Real substrate does not"],"props":{"mode":"static","from":0.6,"labels":false,"caption":"Real water: thousands of pores"}},
+ {"type":"Compare","cue":"Use the boxes to picture","steps":["the share of water","not where the water","The share is what"],"props":{"left":{"title":"Boxes show","icon":"📦","tone":"good","items":["The share of water"]},"right":{"title":"Boxes don't show","icon":"📍","tone":"bad","items":["Where the water sits"]},"verdict":"The share is what VWC tells you"}}
+],
+"A2-03":[
+ {"type":"Define","steps":["a measure of volume"],"props":{"term":"Litre","abbrev":"L","meaning":"A measure of volume, written as a capital L."}},
+ {"type":"VolumeGrid","cue":"Take a bigger sample: five","steps":["five litres of substrate","sixty percent as a","sixty percent as a","Five times zero point"],"props":{"total":10,"water":6,"solid":2,"air":2,"litres":5,"label":"5 L of substrate at 60% VWC"}},
+ {"type":"Calc","cue":"The picture checks it the","steps":["Three divided by five","is sixty percent"],"props":{"heading":"Check it the other way","lines":[{"expr":"3 L ÷ 5 L = 0.6"},{"expr":"0.6 × 100 = 60%"}]}},
+ {"type":"Compare","cue":"The picture compares two ideas","steps":["three litres of water already","common beginner mistake"],"props":{"left":{"title":"Already inside","icon":"💧","tone":"good","items":["3 L of water in the sample"]},"right":{"title":"Beginner mistake","icon":"🚫","tone":"bad","items":["Read 60%, pour in 3 L more"]}}},
+ {"type":"PotCrossSection","cue":"The number describes what is","steps":["Three more litres in"],"props":{"mode":"fill","from":0.6,"to":1,"secs":4,"arrows":["drainage"],"caption":"3 L more: mostly drains out"}}
+],
+"A2-04":[
+ {"type":"VolumeGrid","steps":["Sixty percent of its","forty percent is something"],"props":{"total":10,"water":6,"label":"60% water, 40% something else"}},
+ {"type":"PotCrossSection","cue":"Is all of that forty","steps":["Is all of that","Think about the three","Think about the three","Think about the three"],"props":{"mode":"static","from":0.6,"labels":true,"caption":"Is all of the 40% air?"}},
+ {"type":"VolumeGrid","cue":"No, it is not all","steps":["No, it is not","holds the solid material","as well as the"],"props":{"total":10,"water":6,"solid":2,"air":2,"label":"40% = solid material + air"}},
+ {"type":"Compare","cue":"So VWC tells you how","steps":["how much water there","but not how much","how much space the"],"props":{"left":{"title":"VWC tells you","icon":"💧","tone":"good","items":["How much water"]},"right":{"title":"VWC does not tell you","icon":"🌬️","tone":"bad","items":["How much air","Unless you know the solids"]}}},
+ {"type":"Analogy","cue":"You might read VWC like","steps":["like a car's fuel","sixty percent means sixty","It does not work"],"props":{"left":{"icon":"dashboard","label":"Fuel gauge: 60% left"},"right":{"icon":"pot","label":"60% VWC"},"joiner":"is not like","mappings":[{"from":"60% of the fuel left","to":"Not 60% of usable water"}]}},
+ {"type":"Compare","cue":"Some water sits loosely in","steps":["sits loosely in the","take it up readily","clings tightly in the","struggle to pull it"],"props":{"left":{"title":"Loose water","icon":"💧","tone":"good","items":["In the bigger spaces","Roots take it up readily"]},"right":{"title":"Tightly held water","icon":"🧲","tone":"warn","items":["In the smallest spaces","Roots struggle to pull it out"]}}},
+ {"type":"Define","cue":"The water roots can actually","steps":["called plant-available water","Substrates hold water differently"],"props":{"term":"Plant-available water","meaning":"The water roots can actually use.","example":"Same VWC, different substrate: different conditions"}},
+ {"type":"ProbeZone","cue":"Look at the probe in","steps":["only the small region","no gaps of air","Second, calibration","Second, calibration"],"props":{"pots":5,"probeAt":2,"show":["region","airgap","dripper","uneven"],"reading":"60%","callout":"Measures only the region around it"}},
+ {"type":"Define","cue":"Second, calibration","steps":["checking the probe's number","and correcting it"],"props":{"term":"Calibration","meaning":"Checking a probe against known water, and correcting it."}},
+ {"type":"Compare","cue":"For example, a probe that","steps":["shows sixty percent","true value is fifty-five","mislead you every day"],"props":{"left":{"title":"Probe shows","icon":"📟","tone":"bad","items":["60%"]},"right":{"title":"True value","icon":"✅","tone":"good","items":["55%"]},"verdict":"Uncalibrated: misleads you every day"}},
+ {"type":"ProbeZone","cue":"Position matters across the zone","steps":["close to where the","far end of the","far end of the"],"props":{"pots":6,"probeAt":0,"show":["dripper","uneven","region"],"reading":"Wet","callout":"Near the inlet: may read wet"}},
+ {"type":"Compare","cue":"Look at the two pots","steps":["two pots in the","two pots in the","represent the whole zone"],"props":{"left":{"title":"Pot near the inlet","icon":"💧","tone":"water","items":["Probe may read wet"]},"right":{"title":"Pot at the far end","icon":"🏜️","tone":"warn","items":["Is dry"]},"verdict":"Choose probe spots that represent the zone"}}
+],
+"A2-05":[
+ {"type":"VolumeGrid","steps":["forty percent VWC","forty percent always mean"],"props":{"total":10,"water":4,"label":"40% VWC: always too dry?"}},
+ {"type":"Compare","cue":"No. Forty percent can mean","steps":["Coco and stone wool","stone wool hold water"],"props":{"left":{"title":"Coco","icon":"🥥","tone":"neutral","items":["40% means one thing"]},"right":{"title":"Stone wool","icon":"🪨","tone":"neutral","items":["40% means another"]}}},
+ {"type":"Checklist","cue":"The picture lists what you","steps":["your substrate, readings","readings you have checked","your crop, and","today's conditions","no single VWC target"],"props":{"title":"To judge a VWC reading, use","items":[{"text":"Your substrate"},{"text":"Readings checked against your pots"},{"text":"Your crop"},{"text":"Today's conditions"},{"text":"One target for every system","state":"fail"}]}},
+ {"type":"VolumeGrid","cue":"Before you choose any target","steps":["Before you choose any","make sure the meaning"],"props":{"total":10,"water":6,"label":"60% VWC means ... ?"}},
+ {"type":"Checklist","cue":"Say your answer in one","steps":["water, volume and","volume and sample","and sample"],"props":{"title":"Use these three words","items":[{"text":"Water"},{"text":"Volume"},{"text":"Sample"}]}},
+ {"type":"VolumeGrid","cue":"Here is one good answer","steps":["Here is one good","About sixty percent of","sample's volume is water"],"props":{"total":10,"water":6,"solid":2,"air":2,"label":"About 60% of the volume is water"}},
+ {"type":"Calc","cue":"Six divided by ten, times","steps":["Six divided by ten","is sixty percent"],"props":{"heading":"The sum again","lines":[{"expr":"6 ÷ 10 = 0.6"},{"expr":"0.6 × 100 = 60%"}]}},
+ {"type":"Compare","cue":"The picture shows two limits","steps":["two limits side by","sixty percent is not"],"props":{"left":{"title":"60% VWC is","icon":"💧","tone":"water","items":["Water in the sample"]},"right":{"title":"60% VWC is not","icon":"🚫","tone":"bad","items":["All usable by roots"]}}},
+ {"type":"ProbeZone","cue":"Second, one probe describes its","steps":["its own small spot","not every pot in","not every pot in"],"props":{"pots":5,"probeAt":3,"show":["region","uneven","dripper"],"reading":"40%","callout":"Its own small spot only"}},
+ {"type":"Checklist","cue":"You will hear plenty of","steps":["number actually measure","which substrate and pot"],"props":{"title":"Test any VWC advice","items":[{"text":"What does the number measure?","state":"unknown"},{"text":"Which substrate and pot?","state":"unknown"}]}},
+ {"type":"SpongeDemo","cue":"The next lesson uses a","steps":["a kitchen sponge","fully soaked means","how much water stays","a reference number in"],"props":{"stages":["dry","soaked","drained","note"],"note":{"from":"60%"}}}
+]
+}}

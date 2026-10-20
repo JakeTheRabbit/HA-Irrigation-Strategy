@@ -13,7 +13,7 @@ const browser=await chromium.launch({channel:process.env.BROWSER_CHANNEL || 'mse
 const page=await browser.newPage({viewport:{width:1280,height:1000}});
 page.setDefaultTimeout(60000);
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
-const results={base,edition:'2026-10-20-r4',videos:[]};
+const results={base,edition:'2026-10-21-r5',videos:[]};
 try{
  const course=await (await page.request.get(base+'course/course.json?verify=r3')).json();
  const manifest=await (await page.request.get(base+'media/manifest.json?verify=r3')).json();
@@ -22,13 +22,13 @@ try{
  assert.equal(course.lessons.length,24);assert.ok(course.lessons.every(l=>l.video?.src));assert.equal(grouped.groups.length,5);
  const entries=[...course.lessons.map(l=>({id:l.id,kind:'lesson',route:'lesson/'+l.id,video:l.video})),...grouped.groups.map(g=>({id:g.id,kind:'group',route:'watch/'+g.id,video:g}))];
  for(const entry of entries){
-  const metadata=entry.video;assert.match(metadata.src,/v=20261020r4/);
+  const metadata=entry.video;assert.match(metadata.src,/v=20261021r5/);
   await page.goto(base+'?verify=r3#/'+entry.route,{waitUntil:'domcontentloaded',timeout:90000});
   const video=page.locator('video');await video.waitFor();
   await page.waitForFunction(()=>document.querySelector('video')?.readyState>=1);
-  const played=await video.evaluate(async v=>{v.muted=true;await v.play();await new Promise(r=>setTimeout(r,400));v.pause();return {duration:v.duration,time:v.currentTime,width:v.videoWidth,height:v.videoHeight,src:v.currentSrc};});
+  const played=await video.evaluate(async v=>{v.muted=true;await v.play();for(let i=0;i<30&&v.currentTime<=.1;i++)await new Promise(r=>setTimeout(r,100));v.pause();return {duration:v.duration,time:v.currentTime,width:v.videoWidth,height:v.videoHeight,src:v.currentSrc};});
   assert.equal(played.src,new URL(metadata.src,base).href,'The requested lesson or group must be the video that actually loaded');
-  assert.ok(played.time>.1,entry.id+' playback did not advance');assert.equal(played.width,854);assert.equal(played.height,480);assert.ok(Number.isFinite(played.duration)&&played.duration>30);
+  assert.ok(played.time>.1,entry.id+' playback did not advance');assert.equal(played.width,1920);assert.equal(played.height,1080);assert.ok(Number.isFinite(played.duration)&&played.duration>30);
   await page.waitForFunction(()=>document.querySelector('video track')?.readyState===2);
   const cues=await video.evaluate(v=>Array.from(v.textTracks[0].cues).map(c=>({start:c.startTime,end:c.endTime,text:c.text})));
   assert.ok(cues.length>10);

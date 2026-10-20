@@ -1,0 +1,1402 @@
+{
+ "slides": {
+  "C1-01": [
+   {
+    "type": "WaterPath",
+    "steps": [
+     "group of plants that",
+     "one on and off"
+    ],
+    "props": {
+     "parts": [
+      "drippers",
+      "valve"
+     ],
+     "flow": true
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "You build that one",
+    "steps": [
+     "You build that one",
+     "prove it waters correctly",
+     "Only then do you"
+    ],
+    "props": {
+     "title": "One zone first",
+     "items": [
+      {
+       "text": "Build one zone"
+      },
+      {
+       "text": "Prove it waters correctly"
+      },
+      {
+       "text": "Only then add a second"
+      }
+     ]
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Now picture watering by",
+    "steps": [
+     "You decide when",
+     "push a finger",
+     "fill a watering can",
+     "You tip it",
+     "keep a towel"
+    ],
+    "props": {
+     "title": "Watering by hand",
+     "steps": [
+      {
+       "label": "Decide",
+       "icon": "note",
+       "note": "When and how much"
+      },
+      {
+       "label": "Finger test",
+       "icon": "probe",
+       "note": "How wet is the pot?"
+      },
+      {
+       "label": "Fill the can",
+       "icon": "water"
+      },
+      {
+       "label": "Tip, then stop",
+       "icon": "power"
+      },
+      {
+       "label": "Towel handy",
+       "icon": "shield",
+       "note": "For spills"
+      }
+     ]
+    }
+   },
+   {
+    "type": "SystemMap",
+    "cue": "An automatic system needs",
+    "steps": [
+     "calls them plan",
+     "measure, supply, switch",
+     "supply, switch and",
+     "switch and protect",
+     "and protect",
+     "The five labels on"
+    ],
+    "props": {
+     "highlight": [],
+     "showDataFlow": true
+    }
+   }
+  ],
+  "C1-02": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Start with the plan",
+     "day and night"
+    ],
+    "props": {
+     "left": {
+      "icon": "fridge",
+      "label": "Fridge: on day and night"
+     },
+     "right": {
+      "icon": "app",
+      "label": "Plan job: an always-on computer"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "On that computer runs",
+    "steps": [
+     "free home-automation software"
+    ],
+    "props": {
+     "term": "Home Assistant",
+     "meaning": "Free software that collects readings and switches equipment."
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The computer that runs",
+    "steps": [
+     "called the host"
+    ],
+    "props": {
+     "term": "Host",
+     "meaning": "The always-on computer that runs Home Assistant."
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "This card shows the",
+    "steps": [
+     "One is a Raspberry",
+     "size of a credit",
+     "The other is a",
+     "known as x eighty-six",
+     "You need only one"
+    ],
+    "props": {
+     "left": {
+      "title": "Raspberry Pi",
+      "icon": "power",
+      "tone": "good",
+      "items": [
+       "Small, low-cost",
+       "Size of a credit card"
+      ]
+     },
+     "right": {
+      "title": "Small PC",
+      "icon": "power",
+      "tone": "neutral",
+      "items": [
+       "Intel or AMD processor",
+       "Known as x86-64"
+      ]
+     },
+     "verdict": "You need only one",
+     "order": "pairs"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Like a laptop, the",
+    "steps": [
+     "correct power supply",
+     "suitable storage",
+     "reliable network connection"
+    ],
+    "props": {
+     "title": "Three host basics",
+     "items": [
+      {
+       "text": "Correct power supply"
+      },
+      {
+       "text": "Suitable storage"
+      },
+      {
+       "text": "Reliable network to the router"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "the box that links",
+    "steps": [
+     "links your devices"
+    ],
+    "props": {
+     "term": "Router",
+     "meaning": "The box linking your devices to each other and the internet."
+    }
+   },
+   {
+    "type": "DecisionTree",
+    "cue": "Setup has two alternative",
+    "steps": [
+     "Setup has two alternative",
+     "Lesson C two A",
+     "Lesson C two A"
+    ],
+    "props": {
+     "nodes": [
+      {
+       "id": "who",
+       "text": "Are you building the system?",
+       "kind": "question"
+      },
+      {
+       "id": "which",
+       "text": "Which computer?",
+       "kind": "question"
+      },
+      {
+       "id": "run",
+       "text": "Skip setup: daily-use lessons",
+       "kind": "action"
+      },
+      {
+       "id": "c2a",
+       "text": "C2a: Raspberry Pi",
+       "kind": "action"
+      },
+      {
+       "id": "c2b",
+       "text": "C2b: x86-64 PC",
+       "kind": "action"
+      }
+     ],
+     "edges": [
+      {
+       "from": "who",
+       "to": "which",
+       "label": "Yes"
+      },
+      {
+       "from": "who",
+       "to": "run",
+       "label": "No, I run it"
+      },
+      {
+       "from": "which",
+       "to": "c2a",
+       "label": "Pi"
+      },
+      {
+       "from": "which",
+       "to": "c2b",
+       "label": "PC"
+      }
+     ],
+     "path": [
+      "who",
+      "which",
+      "c2a"
+     ]
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "As the card shows, both",
+    "steps": [
+     "both arrive at",
+     "Home Assistant running and",
+     "ready for the next"
+    ],
+    "props": {
+     "title": "Both routes arrive at the same place",
+     "steps": [
+      {
+       "label": "C2a or C2b",
+       "icon": "wrench",
+       "note": "Follow the one that matches your computer"
+      },
+      {
+       "label": "HA running",
+       "icon": "check"
+      },
+      {
+       "label": "Next step",
+       "icon": "apply"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "If someone else built",
+    "steps": [
+     "If someone else built",
+     "you only run it",
+     "skip setup and go",
+     "the daily-use lessons"
+    ],
+    "props": {
+     "left": {
+      "title": "You build it",
+      "icon": "wrench",
+      "tone": "neutral",
+      "items": [
+       "C2a or C2b setup"
+      ]
+     },
+     "right": {
+      "title": "You only run it",
+      "icon": "person",
+      "tone": "good",
+      "items": [
+       "Skip setup",
+       "Go to the daily-use lessons"
+      ]
+     }
+    }
+   },
+   {
+    "type": "Analogy",
+    "cue": "Inside Home Assistant, every",
+    "steps": [
+     "every reading and every",
+     "labels on a switchboard",
+     "One tag might be",
+     "Another might be the"
+    ],
+    "props": {
+     "left": {
+      "icon": "list",
+      "label": "Labels on a switchboard"
+     },
+     "right": {
+      "icon": "probe",
+      "label": "Name tags in Home Assistant"
+     },
+     "mappings": [
+      {
+       "from": "One tag",
+       "to": "A moisture reading"
+      },
+      {
+       "from": "Another tag",
+       "to": "On and off for the water"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Home Assistant calls each",
+    "steps": [
+     "an entity"
+    ],
+    "props": {
+     "term": "Entity",
+     "meaning": "One named reading or control inside Home Assistant."
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Crop Steering joins Home",
+    "steps": [
+     "a package that teaches"
+    ],
+    "props": {
+     "term": "Integration",
+     "meaning": "A package that teaches Home Assistant a new job."
+    }
+   },
+   {
+    "type": "SystemMap",
+    "cue": "The integration stores your",
+    "steps": [
+     "The integration stores your",
+     "The integration stores your",
+     "The integration stores your",
+     "The integration stores",
+     "shows the Crop Steering",
+     "stores your room settings"
+    ],
+    "props": {
+     "highlight": [
+      "integration",
+      "controller"
+     ],
+     "showDataFlow": true
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "The Controller, the watering",
+    "steps": [
+     "The Controller, the watering",
+     "reads those settings and",
+     "decides when to water"
+    ],
+    "props": {
+     "title": "You need both Crop Steering parts",
+     "steps": [
+      {
+       "label": "Entity",
+       "icon": "probe",
+       "note": "A named reading or control"
+      },
+      {
+       "label": "Integration",
+       "icon": "save",
+       "note": "Stores settings, shows the screens"
+      },
+      {
+       "label": "Controller",
+       "icon": "water",
+       "note": "A separate program: decides when to water"
+      }
+     ]
+    }
+   },
+   {
+    "type": "ProbeZone",
+    "cue": "Now the measure job",
+    "steps": [
+     "measures one small spot",
+     "Place it in a"
+    ],
+    "props": {
+     "pots": 5,
+     "show": [
+      "region",
+      "uneven"
+     ],
+     "callout": "The probe measures one small spot",
+     "reading": "one spot"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Before buying, check the",
+    "steps": [
+     "the exact model",
+     "its connection type",
+     "the units it reports"
+    ],
+    "props": {
+     "title": "Maker's specification",
+     "items": [
+      {
+       "text": "Exact model"
+      },
+      {
+       "text": "Connection type: how it sends"
+      },
+      {
+       "text": "Units it reports"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "They need a bridge",
+    "steps": [
+     "a small box that"
+    ],
+    "props": {
+     "term": "Bridge",
+     "meaning": "A small box translating a probe's signal for Home Assistant."
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Follow the card from",
+    "steps": [
+     "from the probe",
+     "through the bridge",
+     "Home Assistant entity"
+    ],
+    "props": {
+     "title": "Probe to entity",
+     "steps": [
+      {
+       "label": "Probe",
+       "icon": "probe",
+       "note": "Its own wiring language"
+      },
+      {
+       "label": "Bridge",
+       "icon": "plug",
+       "note": "Check the maker's supported probe list"
+      },
+      {
+       "label": "Entity",
+       "icon": "note",
+       "note": "A reading Home Assistant understands"
+      }
+     ]
+    }
+   },
+   {
+    "type": "MeasurementMap",
+    "cue": "EC readings need a",
+    "steps": [
+     "EC readings need a"
+    ],
+    "props": {
+     "highlight": [
+      "feed"
+     ]
+    }
+   },
+   {
+    "type": "PotCrossSection",
+    "cue": "Bulk EC measures the",
+    "steps": [
+     "Bulk EC measures the",
+     "water and solid together",
+     "water and solid together",
+     "water and solid together"
+    ],
+    "props": {
+     "mode": "static",
+     "showProbe": true,
+     "labels": true,
+     "caption": "Bulk EC: water and solid together"
+    }
+   },
+   {
+    "type": "MeasurementMap",
+    "cue": "Pore-water EC describes the",
+    "steps": [
+     "estimated from bulk EC",
+     "Pore-water EC describes"
+    ],
+    "props": {
+     "highlight": [
+      "bulk",
+      "pore"
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "A reading belongs to",
+    "steps": [
+     "a tank sensor and",
+     "a root-zone sensor side",
+     "rename the tank sensor's",
+     "It still measures the",
+     "Keep every label true"
+    ],
+    "props": {
+     "left": {
+      "title": "Tank sensor",
+      "icon": "water",
+      "tone": "ec",
+      "items": [
+       "Measures the tank",
+       "Renamed 'root-zone EC'",
+       "Still measures the tank"
+      ]
+     },
+     "right": {
+      "title": "Root-zone sensor",
+      "icon": "probe",
+      "tone": "good",
+      "items": [
+       "Measures the root zone"
+      ]
+     },
+     "verdict": "Keep every label true to where its sensor is"
+    }
+   },
+   {
+    "type": "PotCrossSection",
+    "cue": "Air readings complete the",
+    "steps": [
+     "Air readings complete",
+     "why plants drink more",
+     "One is air temperature"
+    ],
+    "props": {
+     "mode": "dry",
+     "from": 0.62,
+     "to": 0.5,
+     "secs": 5,
+     "showRoots": true,
+     "arrows": [
+      "evaporation",
+      "uptake"
+     ],
+     "labels": false,
+     "caption": "Air readings explain thirsty days"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The other is relative",
+    "steps": [
+     "how much moisture the"
+    ],
+    "props": {
+     "term": "Relative humidity",
+     "meaning": "Moisture the air holds, compared with the most it could."
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Think of washing on",
+    "steps": [
+     "dries fast on a",
+     "hot, dry day",
+     "slowly on a cool",
+     "slowly on a cool",
+     "both readings feeding into"
+    ],
+    "props": {
+     "left": {
+      "title": "Hot, dry day",
+      "icon": "sun",
+      "tone": "warn",
+      "items": [
+       "Washing dries fast",
+       "Plants drink more"
+      ]
+     },
+     "right": {
+      "title": "Cool, damp day",
+      "icon": "water",
+      "tone": "water",
+      "items": [
+       "Washing dries slowly"
+      ]
+     },
+     "verdict": "Air temperature and humidity feed water demand"
+    }
+   }
+  ],
+  "C1-03": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Trace the water from",
+     "back to the tap"
+    ],
+    "props": {
+     "left": {
+      "icon": "tap",
+      "label": "Hose back to the tap"
+     },
+     "right": {
+      "icon": "route",
+      "label": "The water path to its start"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Each zone has a",
+    "steps": [
+     "a tap that opens"
+    ],
+    "props": {
+     "term": "Zone valve",
+     "meaning": "A tap that opens and closes on an electrical signal."
+    }
+   },
+   {
+    "type": "WaterPath",
+    "cue": "Water needs pressure, meaning",
+    "steps": [
+     "A pressurised supply",
+     "zone valve directly",
+     "zone valve directly"
+    ],
+    "props": {
+     "parts": [
+      "supply",
+      "valve",
+      "drippers"
+     ],
+     "flow": true
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "It needs a pump",
+    "steps": [
+     "motor-driven device"
+    ],
+    "props": {
+     "term": "Pump",
+     "meaning": "A motor-driven device that pushes water along the pipe."
+    }
+   },
+   {
+    "type": "DecisionTree",
+    "cue": "The card shows both",
+    "steps": [
+     "The card shows both",
+     "you add one only",
+     "it also needs protection"
+    ],
+    "props": {
+     "nodes": [
+      {
+       "id": "push",
+       "text": "Does the supply have enough push?",
+       "kind": "question"
+      },
+      {
+       "id": "none",
+       "text": "No pump: feed the valve directly",
+       "kind": "action"
+      },
+      {
+       "id": "pump",
+       "text": "Add a pump",
+       "kind": "action"
+      },
+      {
+       "id": "protect",
+       "text": "Add protection made for that pump",
+       "kind": "stop"
+      }
+     ],
+     "edges": [
+      {
+       "from": "push",
+       "to": "none",
+       "label": "Yes"
+      },
+      {
+       "from": "push",
+       "to": "pump",
+       "label": "No"
+      },
+      {
+       "from": "pump",
+       "to": "protect"
+      }
+     ],
+     "path": [
+      "push",
+      "pump",
+      "protect"
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "For example, dry-run protection",
+    "steps": [
+     "switches the pump off",
+     "can overheat and fail"
+    ],
+    "props": {
+     "term": "Dry-run protection",
+     "meaning": "Switches the pump off when the tank runs empty.",
+     "example": "A pump running without water can overheat and fail"
+    }
+   },
+   {
+    "type": "WaterPath",
+    "cue": "The card pairs the",
+    "steps": [
+     "The card pairs the",
+     "The card pairs the",
+     "The card pairs the",
+     "The card pairs the"
+    ],
+    "props": {
+     "parts": [
+      "supply",
+      "pump",
+      "valve",
+      "drippers"
+     ],
+     "flow": true
+    }
+   },
+   {
+    "type": "WaterPath",
+    "cue": "Now follow the rest",
+    "steps": [
+     "Now follow the rest",
+     "Now follow the rest",
+     "A filter catches grit",
+     "A pressure regulator holds",
+     "its rated flow",
+     "its rated flow",
+     "A drainage path carries",
+     "Backflow protection stops"
+    ],
+    "props": {
+     "parts": [
+      "supply",
+      "pump",
+      "filter",
+      "regulator",
+      "valve",
+      "drippers",
+      "drain",
+      "backflow"
+     ],
+     "flow": true
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Siphon protection stops water",
+    "steps": [
+     "draining out of the"
+    ],
+    "props": {
+     "term": "Backflow and siphon protection",
+     "meaning": "Stop water running backwards, or draining from the tank itself."
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "A qualified plumber confirms",
+    "steps": [
+     "A qualified plumber confirms",
+     "suit your equipment",
+     "your local rules"
+    ],
+    "props": {
+     "title": "A qualified plumber confirms",
+     "items": [
+      {
+       "text": "The parts on your water path"
+      },
+      {
+       "text": "They suit your equipment"
+      },
+      {
+       "text": "They meet your local rules"
+      }
+     ]
+    }
+   }
+  ],
+  "C1-04": [
+   {
+    "type": "Define",
+    "steps": [
+     "Control hardware is the",
+     "A relay is a"
+    ],
+    "props": {
+     "term": "Control hardware",
+     "meaning": "Turns a pump or valve on and off when software asks.",
+     "example": "A relay: a switch operated by an electrical signal"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A pump draws a",
+    "steps": [
+     "burst of extra power",
+     "loaded trolley rolling"
+    ],
+    "props": {
+     "term": "Starting load",
+     "meaning": "The burst of extra power a pump draws as it starts.",
+     "example": "Like the shove that gets a loaded trolley rolling"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "As the card shows",
+    "steps": [
+     "both the starting load",
+     "and the running load",
+     "The big number printed",
+     "such as heaters",
+     "check its rating for"
+    ],
+    "props": {
+     "left": {
+      "title": "Rated control hardware",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "Starting load",
+       "Running load"
+      ]
+     },
+     "right": {
+      "title": "Smart plug's big number",
+      "icon": "alert",
+      "tone": "warn",
+      "items": [
+       "Often simpler loads",
+       "Such as heaters",
+       "Check its rating for motors"
+      ]
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "electricity is the high-voltage",
+    "steps": [
+     "high-voltage supply behind",
+     "wiring it wrongly can"
+    ],
+    "props": {
+     "term": "Mains electricity",
+     "meaning": "The high-voltage supply behind your wall sockets and switchboard.",
+     "example": "Wiring it wrongly can kill"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "A licensed electrician does",
+    "steps": [
+     "A licensed electrician does",
+     "never asks you to",
+     "plan, label and check"
+    ],
+    "props": {
+     "title": "Mains: who does what",
+     "items": [
+      {
+       "text": "Licensed electrician: mains wiring"
+      },
+      {
+       "text": "You never open or wire mains"
+      },
+      {
+       "text": "You plan, label and check"
+      }
+     ]
+    }
+   },
+   {
+    "type": "OneOwner",
+    "cue": "Two people turning the",
+    "steps": [
+     "Two people turning"
+    ],
+    "props": {
+     "stage": "conflict"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "An output is anything",
+    "steps": [
+     "An output is anything",
+     "exactly one owner"
+    ],
+    "props": {
+     "term": "Output and owner",
+     "meaning": "An output is anything switched; its owner is the one allowed system.",
+     "example": "A pump or a valve"
+    }
+   },
+   {
+    "type": "OneOwner",
+    "cue": "The card shows one",
+    "steps": [
+     "The card shows one"
+    ],
+    "props": {
+     "stage": "resolved"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "So before the new",
+    "steps": [
+     "old timers",
+     "other home-automation rules",
+     "manual switches",
+     "choose one owner",
+     "remove the others"
+    ],
+    "props": {
+     "title": "Who can switch the pump?",
+     "items": [
+      {
+       "text": "Old timers"
+      },
+      {
+       "text": "Other home-automation rules"
+      },
+      {
+       "text": "Manual switches"
+      },
+      {
+       "text": "One owner chosen per output"
+      },
+      {
+       "text": "The others removed"
+      }
+     ]
+    }
+   },
+   {
+    "type": "SystemMap",
+    "cue": "The last job is",
+    "steps": [
+     "The last job is",
+     "The last job is",
+     "The last job is",
+     "The last job is",
+     "The last job is",
+     "The last job is"
+    ],
+    "props": {
+     "highlight": [
+      "shutdown"
+     ],
+     "showDataFlow": false
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "First, a physical shutdown",
+    "steps": [
+     "a real switch or"
+    ],
+    "props": {
+     "term": "Physical shutdown",
+     "meaning": "A real switch or valve, close at hand, cutting power or water."
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Second, independent protection, such",
+    "steps": [
+     "Second, independent protection",
+     "works even if the",
+     "a safe place to"
+    ],
+    "props": {
+     "title": "Protect: three parts",
+     "items": [
+      {
+       "text": "Physical shutdown"
+      },
+      {
+       "text": "Independent protection (dry-run)"
+      },
+      {
+       "text": "Safe place to catch test water"
+      }
+     ]
+    }
+   },
+   {
+    "type": "SafetyStop",
+    "cue": "The Crop Steering screens",
+    "steps": [
+     "Keep Watering OFF until",
+     "use the physical shutdown"
+    ],
+    "props": {
+     "stages": [
+      "software",
+      "physical"
+     ]
+    }
+   },
+   {
+    "type": "CatchTest",
+    "cue": "During testing, you measure",
+    "steps": [
+     "Put collection cups under",
+     "time the run with",
+     "send the stop command",
+     "The card shows the"
+    ],
+    "props": {
+     "cups": [
+      50,
+      50,
+      50
+     ],
+     "seconds": 45,
+     "otherZonesDry": true,
+     "showStop": true
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A dashboard is the",
+    "steps": [
+     "screen of readings and"
+    ],
+    "props": {
+     "term": "Dashboard",
+     "meaning": "The screen of readings and buttons you watch the system on."
+    }
+   },
+   {
+    "type": "WaterPath",
+    "cue": "When a dashboard icon",
+    "steps": [
+     "When a dashboard icon",
+     "When a dashboard icon",
+     "look at the outlet"
+    ],
+    "props": {
+     "parts": [
+      "valve",
+      "drippers"
+     ],
+     "flow": true,
+     "stop": true
+    }
+   }
+  ],
+  "C1-05": [
+   {
+    "type": "Checklist",
+    "steps": [
+     "A tank level sensor",
+     "Feed EC and pH"
+    ],
+    "props": {
+     "title": "First extras, once one zone works",
+     "items": [
+      {
+       "text": "Tank level sensor: water left"
+      },
+      {
+       "text": "Feed EC and pH: the solution"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "where pH describes how",
+    "steps": [
+     "how acidic or alkaline"
+    ],
+    "props": {
+     "term": "pH",
+     "meaning": "How acidic or alkaline a solution is."
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Later you might add",
+    "steps": [
+     "more probes",
+     "verified flow meter",
+     "Automated nutrient dosing",
+     "thermal cameras",
+     "artificial intelligence",
+     "works without them"
+    ],
+    "props": {
+     "left": {
+      "title": "Later",
+      "icon": "search",
+      "tone": "neutral",
+      "items": [
+       "More probes",
+       "A verified flow meter"
+      ]
+     },
+     "right": {
+      "title": "Optional extras",
+      "icon": "note",
+      "tone": "warn",
+      "items": [
+       "Automated nutrient dosing",
+       "Thermal cameras",
+       "Artificial intelligence"
+      ]
+     },
+     "verdict": "Your first zone works without them"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Build the basics, prove",
+    "steps": [
+     "Build the basics",
+     "prove them",
+     "add one item",
+     "one item at a"
+    ],
+    "props": {
+     "steps": [
+      {
+       "label": "Build basics",
+       "icon": "wrench"
+      },
+      {
+       "label": "Prove them",
+       "icon": "check"
+      },
+      {
+       "label": "Add one item",
+       "icon": "note"
+      }
+     ],
+     "loop": true,
+     "loopLabel": "One item at a time"
+    }
+   }
+  ],
+  "C1-06": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "apply all of this",
+     "sketch your water route"
+    ],
+    "props": {
+     "left": {
+      "icon": "route",
+      "label": "A simple road map"
+     },
+     "right": {
+      "icon": "dripper",
+      "label": "Your water route, on paper"
+     }
+    }
+   },
+   {
+    "type": "WaterPath",
+    "cue": "Label the supply, the",
+    "steps": [
+     "Label the supply",
+     "the pump if you",
+     "the zone valve",
+     "the drippers and",
+     "the drainage path"
+    ],
+    "props": {
+     "parts": [
+      "supply",
+      "pump",
+      "valve",
+      "drippers",
+      "drain"
+     ],
+     "flow": true
+    }
+   },
+   {
+    "type": "SystemMap",
+    "cue": "Beside the water route",
+    "steps": [
+     "the host and the",
+     "Add the probe",
+     "Beside the water route",
+     "Draw a line from",
+     "Draw a line from",
+     "the Controller to each"
+    ],
+    "props": {
+     "highlight": [
+      "probe",
+      "bridge",
+      "host",
+      "controller"
+     ],
+     "showDataFlow": true
+    }
+   },
+   {
+    "type": "OneOwner",
+    "cue": "check that each output",
+    "steps": [
+     "check that each output"
+    ],
+    "props": {
+     "stage": "resolved"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Now circle every item",
+    "steps": [
+     "circle every item",
+     "a pump with no",
+     "each circle is a"
+    ],
+    "props": {
+     "title": "Can you name it exactly?",
+     "items": [
+      {
+       "text": "Zone valve: model named"
+      },
+      {
+       "text": "Pump: no model number",
+       "state": "unknown"
+      },
+      {
+       "text": "Answer before you buy or wire",
+       "state": "unknown"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Check exact models against",
+    "steps": [
+     "Check exact models against",
+     "C two A for",
+     "C two B for"
+    ],
+    "props": {
+     "left": {
+      "title": "Equipment and setup guide",
+      "icon": "note",
+      "tone": "neutral",
+      "items": [
+       "Check exact models first"
+      ]
+     },
+     "right": {
+      "title": "Pick a host lesson",
+      "icon": "power",
+      "tone": "good",
+      "items": [
+       "C2a: Raspberry Pi",
+       "C2b: x86-64 PC"
+      ]
+     }
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Both host routes then",
+    "steps": [
+     "Install the host",
+     "Connect one zone's",
+     "Prove that the water",
+     "Only then add"
+    ],
+    "props": {
+     "title": "Same steps for both routes",
+     "steps": [
+      {
+       "label": "Install",
+       "icon": "wrench",
+       "note": "The host and both Crop Steering parts"
+      },
+      {
+       "label": "Connect",
+       "icon": "plug",
+       "note": "One zone's probes and outputs"
+      },
+      {
+       "label": "Prove",
+       "icon": "water",
+       "note": "Water physically starts and stops"
+      },
+      {
+       "label": "Next zone",
+       "icon": "check",
+       "note": "Only then"
+      }
+     ]
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "If you only run",
+    "steps": [
+     "you find your room",
+     "room and zone in"
+    ],
+    "props": {
+     "src": "img/screens/demo-overview-r3.png",
+     "focus": [
+      {
+       "x": 258,
+       "y": 10,
+       "w": 278,
+       "h": 36,
+       "label": "Find your room"
+      },
+      {
+       "x": 597,
+       "y": 273,
+       "w": 318,
+       "h": 397,
+       "label": "Find your zone"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

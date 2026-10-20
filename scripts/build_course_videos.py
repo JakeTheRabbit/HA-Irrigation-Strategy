@@ -26,8 +26,8 @@ FPS, RATE, WIDTH, HEIGHT = 24, 24000, 854, 480
 SAMPLES_PER_FRAME = RATE // FPS
 PILOTS = {"A1", "A2", "A3", "B1", "C1"}
 HOLDS = {"A1-04-p02": 8, "A2-01-p02": 8, "A3-05-p01": 8, "B1-06-p01": 8}
-EDITION = "2026-10-20-r4"
-CACHE_VERSION = "20261020r4"
+EDITION = "2026-10-21-r5"
+CACHE_VERSION = "20261021r5"
 VOICE = "Kokoro af_heart · source-matched local narration"
 GROUPS = [
     {

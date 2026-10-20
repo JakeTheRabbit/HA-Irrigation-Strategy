@@ -1,0 +1,964 @@
+{
+ "slides": {
+  "D2-s1": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Before you edit a",
+     "Targets work the same"
+    ],
+    "props": {
+     "left": {
+      "icon": "list",
+      "label": "Shared doc: who's editing?"
+     },
+     "right": {
+      "icon": "app",
+      "label": "Targets: who owns them?"
+     }
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Open Irrigation, then its",
+    "steps": [
+     "Open Irrigation, then its",
+     "Current day",
+     "Choose a zone from",
+     "read the line that"
+    ],
+    "props": {
+     "src": "img/screens/demo-currentday-r3.png",
+     "focus": [
+      {
+       "x": 16,
+       "y": 154,
+       "w": 199,
+       "h": 46,
+       "label": "Irrigation"
+      },
+      {
+       "x": 540,
+       "y": 179,
+       "w": 96,
+       "h": 34,
+       "label": "Current day tab"
+      },
+      {
+       "x": 304,
+       "y": 175,
+       "w": 226,
+       "h": 40,
+       "label": "Zone list"
+      },
+      {
+       "x": 264,
+       "y": 230,
+       "w": 984,
+       "h": 40,
+       "label": "Target source: who owns them"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Manual room targets means",
+    "steps": [
+     "Manual room targets means",
+     "Automatic setpoints means the",
+     "Armed schedule means a"
+    ],
+    "props": {
+     "title": "Target source says…",
+     "items": [
+      {
+       "text": "Manual room targets: you, here"
+      },
+      {
+       "text": "Automatic setpoints: app adjusts"
+      },
+      {
+       "text": "Armed schedule: a grow plan"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A grow plan is",
+    "steps": [
+     "a dated timetable of",
+     "which you build in"
+    ],
+    "props": {
+     "term": "Grow plan",
+     "meaning": "A dated timetable of targets.",
+     "example": "Built in Calendar, next lesson"
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "When a plan owns",
+    "steps": [
+     "You change them in",
+     "pick a demo room"
+    ],
+    "props": {
+     "src": "img/screens/demo-currentday-r3.png",
+     "focus": [
+      {
+       "x": 632,
+       "y": 179,
+       "w": 82,
+       "h": 34,
+       "label": "Calendar: plan-owned targets"
+      },
+      {
+       "x": 264,
+       "y": 230,
+       "w": 600,
+       "h": 40,
+       "label": "Practise: not armed schedule"
+      }
+     ]
+    }
+   },
+   {
+    "type": "OneOwner",
+    "cue": "Two owners writing the",
+    "steps": [
+     "Two owners writing the"
+    ],
+    "props": {
+     "stage": "conflict"
+    }
+   }
+  ],
+  "D2-s2": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "A recipe card, your",
+     "The Current day chart"
+    ],
+    "props": {
+     "left": {
+      "icon": "list",
+      "label": "Recipe, pencil notes, meal"
+     },
+     "right": {
+      "icon": "graph",
+      "label": "Three matching lines"
+     }
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Remember from B one",
+    "steps": [
+     "a dashed line is",
+     "a solid line is"
+    ],
+    "props": {
+     "src": "img/screens/demo-currentday-graph-r3.png",
+     "focus": [
+      {
+       "x": 92,
+       "y": 2,
+       "w": 80,
+       "h": 24,
+       "label": "Dashed: planning reference"
+      },
+      {
+       "x": 2,
+       "y": 2,
+       "w": 88,
+       "h": 24,
+       "label": "Solid: measured"
+      }
+     ],
+     "zoom": 1.4
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "The saved reference shows",
+    "steps": [
+     "The saved reference shows",
+     "The draft shows a",
+     "lives only in this"
+    ],
+    "props": {
+     "left": {
+      "title": "Saved reference",
+      "icon": "save",
+      "tone": "neutral",
+      "items": [
+       "Target values stored now"
+      ]
+     },
+     "right": {
+      "title": "Draft",
+      "icon": "draft",
+      "tone": "good",
+      "items": [
+       "Proposed, not sent",
+       "Only in this browser"
+      ]
+     }
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "The dark solid lines",
+    "steps": [
+     "The dark solid lines",
+     "Use the legend to"
+    ],
+    "props": {
+     "src": "img/screens/demo-currentday-graph-r3.png",
+     "focus": [
+      {
+       "x": 40,
+       "y": 120,
+       "w": 230,
+       "h": 70,
+       "label": "Dark solid: probes recorded"
+      },
+      {
+       "x": 0,
+       "y": 0,
+       "w": 521,
+       "h": 56,
+       "label": "Legend: match name to line"
+      }
+     ],
+     "zoom": 1.4
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "Here is an example",
+    "steps": [
+     "Here is an example",
+     "Here is an example",
+     "Here is an example",
+     "Here is an example",
+     "Here is an example",
+     "The saved re-water threshold",
+     "You drag the draft",
+     "The recorded moisture line"
+    ],
+    "props": {
+     "hours": 12,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwc": [
+      [
+       6,
+       56
+      ],
+      [
+       7,
+       63
+      ],
+      [
+       8,
+       62
+      ],
+      [
+       9,
+       60.5
+      ],
+      [
+       9.1,
+       64
+      ],
+      [
+       11,
+       61.5
+      ],
+      [
+       11.1,
+       64.5
+      ],
+      [
+       13,
+       61.8
+      ],
+      [
+       13.1,
+       64.5
+      ],
+      [
+       15,
+       61.5
+      ],
+      [
+       15.1,
+       64
+      ],
+      [
+       17,
+       61
+      ],
+      [
+       18,
+       59
+      ]
+     ],
+     "shots": [
+      7,
+      9.1,
+      11.1,
+      13.1,
+      15.1
+     ],
+     "thresholds": [
+      {
+       "label": "Saved",
+       "value": 60
+      },
+      {
+       "label": "Draft",
+       "value": 60,
+       "to": 61
+      }
+     ],
+     "highlight": {
+      "h": 12,
+      "text": "Recorded: does not move"
+     },
+     "vwcRange": [
+      56,
+      66
+     ]
+    }
+   }
+  ],
+  "D2-s3": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "A smoke alarm is",
+     "It acts only when"
+    ],
+    "props": {
+     "left": {
+      "icon": "thermometer",
+      "label": "Smoke alarm: acts on trouble"
+     },
+     "right": {
+      "icon": "graph",
+      "label": "Rescue floor: a night alarm"
+     }
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Select the question mark",
+    "steps": [
+     "Select the question mark"
+    ],
+    "props": {
+     "src": "img/screens/demo-currentday-r3.png",
+     "focus": [
+      {
+       "x": 444,
+       "y": 342,
+       "w": 36,
+       "h": 30,
+       "label": "? opens the field help"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "This is the field",
+    "steps": [
+     "what the setting does",
+     "when it acts"
+    ],
+    "props": {
+     "term": "Field help",
+     "meaning": "A short note: what a setting does, when, what changes."
+    }
+   },
+   {
+    "type": "PhaseDay",
+    "cue": "find the P three",
+    "steps": [
+     "find the P three",
+     "the P three setting",
+     "P three setting labelled",
+     "In P three, the"
+    ],
+    "props": {
+     "highlight": "P3",
+     "lightsOn": "06:00",
+     "lightsOff": "18:00",
+     "showFloor": true,
+     "showRescue": true
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The step is the",
+    "steps": [
+     "the smallest change the",
+     "We call it the"
+    ],
+    "props": {
+     "term": "Allowed step",
+     "meaning": "The smallest change a setting accepts.",
+     "example": "Rescue floor: unit % VWC, step 1 point"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "If the allowed step",
+    "steps": [
+     "thirty can become thirty",
+     "but not thirty point"
+    ],
+    "props": {
+     "left": {
+      "title": "Allowed",
+      "tone": "good",
+      "items": [
+       "30 → 31"
+      ]
+     },
+     "right": {
+      "title": "Not allowed",
+      "tone": "bad",
+      "items": [
+       "30 → 30.4"
+      ]
+     }
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Write down the starting",
+    "steps": [
+     "Write down the starting",
+     "You need it to"
+    ],
+    "props": {
+     "title": "Before you touch anything",
+     "items": [
+      {
+       "text": "Starting value written down"
+      },
+      {
+       "text": "Needed to put things back"
+      }
+     ]
+    }
+   }
+  ],
+  "D2-s4": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Think of checking your",
+     "In this fictional paper"
+    ],
+    "props": {
+     "left": {
+      "icon": "receipt",
+      "label": "Check the basket first"
+     },
+     "right": {
+      "icon": "app",
+      "label": "Review the change first"
+     }
+    }
+   },
+   {
+    "type": "Calc",
+    "cue": "the saved Rescue floor",
+    "steps": [
+     "the saved Rescue floor",
+     "Thirty plus one step"
+    ],
+    "props": {
+     "heading": "Rescue floor: one allowed step",
+     "lines": [
+      {
+       "expr": "30 + 1 = 31",
+       "note": "saved + one step of 1 point"
+      }
+     ],
+     "answer": "Draft: 31%"
+    }
+   },
+   {
+    "type": "LinesLegend",
+    "cue": "Type thirty one, or",
+    "steps": [
+     "Type thirty one, or",
+     "The draft line moves",
+     "A review box opens",
+     "The button at the",
+     "Apply is the only"
+    ],
+    "props": {
+     "from": 30,
+     "to": 31,
+     "unit": "%",
+     "showReview": true,
+     "setting": "Rescue floor",
+     "room": "Room A"
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Apply is the only",
+    "steps": [
+     "Apply is the only",
+     "In the isolated demo"
+    ],
+    "props": {
+     "src": "img/screens/demo-currentday-r3.png",
+     "focus": [
+      {
+       "x": 1064,
+       "y": 364,
+       "w": 120,
+       "h": 28,
+       "label": "Apply: the only step that sends"
+      },
+      {
+       "x": 548,
+       "y": 14,
+       "w": 84,
+       "h": 28,
+       "label": "Demo: sample data only"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "If a row is",
+    "steps": [
+     "If a row is",
+     "select Back to editing"
+    ],
+    "props": {
+     "left": {
+      "title": "Rows match",
+      "tone": "good",
+      "items": [
+       "Apply one change"
+      ]
+     },
+     "right": {
+      "title": "A row is wrong",
+      "tone": "warn",
+      "items": [
+       "Back to editing"
+      ]
+     }
+    }
+   }
+  ],
+  "D2-s5": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "After you pay, you",
+     "After Apply, you check"
+    ],
+    "props": {
+     "left": {
+      "icon": "receipt",
+      "label": "Check the receipt"
+     },
+     "right": {
+      "icon": "app",
+      "label": "Check the readback"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Readback means the app",
+    "steps": [
+     "reads the value back",
+     "what was actually accepted"
+    ],
+    "props": {
+     "term": "Readback",
+     "meaning": "The app shows what Home Assistant actually accepted."
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "While it works, the",
+    "steps": [
+     "the button says Applying"
+    ],
+    "props": {
+     "src": "img/screens/demo-currentday-r3.png",
+     "focus": [
+      {
+       "x": 1064,
+       "y": 364,
+       "w": 120,
+       "h": 28,
+       "label": "Applying and verifying"
+      }
+     ]
+    }
+   },
+   {
+    "type": "DecisionTree",
+    "cue": "If Home Assistant refused",
+    "steps": [
+     "If Home Assistant refused",
+     "If the result is",
+     "When the readback shows"
+    ],
+    "props": {
+     "nodes": [
+      {
+       "id": "q",
+       "text": "Did Home Assistant refuse a value?",
+       "kind": "question"
+      },
+      {
+       "id": "no",
+       "text": "Not applied: reason shown, stays in draft",
+       "kind": "action"
+      },
+      {
+       "id": "q2",
+       "text": "Is the result clear?",
+       "kind": "question"
+      },
+      {
+       "id": "find",
+       "text": "Find out what was accepted first",
+       "kind": "action"
+      },
+      {
+       "id": "ok",
+       "text": "Readback shows 31",
+       "kind": "action"
+      }
+     ],
+     "edges": [
+      {
+       "from": "q",
+       "to": "no",
+       "label": "Yes"
+      },
+      {
+       "from": "q",
+       "to": "q2",
+       "label": "No"
+      },
+      {
+       "from": "q2",
+       "to": "find",
+       "label": "No"
+      },
+      {
+       "from": "q2",
+       "to": "ok",
+       "label": "Yes"
+      }
+     ],
+     "path": [
+      "q",
+      "q2",
+      "ok"
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Restoring means returning to",
+    "steps": [
+     "the starting value you"
+    ],
+    "props": {
+     "term": "Restore",
+     "meaning": "Return to the starting value you wrote down."
+    }
+   },
+   {
+    "type": "LinesLegend",
+    "cue": "Thirty one minus one",
+    "steps": [
+     "Thirty one minus one",
+     "Use the same path",
+     "Review changes, Apply",
+     "Apply, then read",
+     "then read back thirty"
+    ],
+    "props": {
+     "from": 31,
+     "to": 30,
+     "unit": "%",
+     "showReview": true,
+     "setting": "Rescue floor",
+     "room": "Room A"
+    }
+   }
+  ],
+  "D2-s6": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "A recipe that worked",
+     "Choose a different zone"
+    ],
+    "props": {
+     "left": {
+      "icon": "fridge",
+      "label": "Recipe, another kitchen"
+     },
+     "right": {
+      "icon": "zone",
+      "label": "Change, another zone"
+     }
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Use its own starting",
+    "steps": [
+     "its own starting value",
+     "its own allowed step",
+     "rather than copying thirty"
+    ],
+    "props": {
+     "left": {
+      "title": "Use the zone's own",
+      "tone": "good",
+      "items": [
+       "Starting value",
+       "Allowed step"
+      ]
+     },
+     "right": {
+      "title": "Don't copy",
+      "tone": "bad",
+      "items": [
+       "30 and 31"
+      ]
+     }
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Before you edit, predict",
+    "steps": [
+     "make one step",
+     "review",
+     "apply",
+     "read back",
+     "restore",
+     "and read back again"
+    ],
+    "props": {
+     "title": "Predict which line moves, then",
+     "steps": [
+      {
+       "label": "One step",
+       "icon": "draft"
+      },
+      {
+       "label": "Review",
+       "icon": "review"
+      },
+      {
+       "label": "Apply",
+       "icon": "apply"
+      },
+      {
+       "label": "Read back",
+       "icon": "readback"
+      },
+      {
+       "label": "Restore",
+       "icon": "restore"
+      },
+      {
+       "label": "Read back",
+       "icon": "readback"
+      }
+     ]
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "The Zone list also",
+    "steps": [
+     "The Zone list also",
+     "A value set there"
+    ],
+    "props": {
+     "src": "img/screens/demo-currentday-r3.png",
+     "focus": [
+      {
+       "x": 304,
+       "y": 175,
+       "w": 226,
+       "h": 40,
+       "label": "Room lights and shared targets"
+      },
+      {
+       "x": 264,
+       "y": 274,
+       "w": 140,
+       "h": 22,
+       "label": "Room value: every zone"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Example: the room re-water",
+    "steps": [
+     "room re-water threshold is",
+     "its own value of",
+     "Zone three uses fifty",
+     "Every other zone uses"
+    ],
+    "props": {
+     "left": {
+      "title": "Room value",
+      "icon": "🏠",
+      "tone": "neutral",
+      "items": [
+       "Re-water 60%"
+      ]
+     },
+     "right": {
+      "title": "Zone 3 value",
+      "icon": "🎯",
+      "tone": "water",
+      "items": [
+       "Its own: 58%",
+       "Zone 3 uses 58%"
+      ]
+     },
+     "verdict": "Every other zone uses 60%"
+    }
+   }
+  ],
+  "D2-s7": [
+   {
+    "type": "FlowSteps",
+    "steps": [
+     "The draft proposes a",
+     "Review changes shows the",
+     "Apply sends it to",
+     "Readback shows what was",
+     "Restoring uses the same"
+    ],
+    "props": {
+     "title": "The change journey",
+     "steps": [
+      {
+       "label": "Draft",
+       "icon": "draft",
+       "note": "Proposes a change in this browser"
+      },
+      {
+       "label": "Review",
+       "icon": "review",
+       "note": "Room, setting, old and new value"
+      },
+      {
+       "label": "Apply",
+       "icon": "apply",
+       "note": "Sends it to Home Assistant"
+      },
+      {
+       "label": "Readback",
+       "icon": "readback",
+       "note": "Shows what was accepted"
+      }
+     ],
+     "loop": true,
+     "loopLabel": "Restore: the same four steps"
+    }
+   },
+   {
+    "type": "LinesLegend",
+    "cue": "Then name the lines",
+    "steps": [
+     "The saved reference shows",
+     "The draft shows your"
+    ],
+    "props": {
+     "from": 30,
+     "to": 31,
+     "unit": "%",
+     "showReview": false,
+     "setting": "Rescue floor"
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Finally, say who owns",
+    "steps": [
+     "Finally, say who owns",
+     "you change them in"
+    ],
+    "props": {
+     "src": "img/screens/demo-currentday-r3.png",
+     "focus": [
+      {
+       "x": 264,
+       "y": 230,
+       "w": 984,
+       "h": 40,
+       "label": "Target source: who owns them"
+      },
+      {
+       "x": 632,
+       "y": 179,
+       "w": 82,
+       "h": 34,
+       "label": "Armed schedule: use Calendar"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Check that the demo",
+    "steps": [
+     "Check that the demo",
+     "note both readback values",
+     "A clean record shows"
+    ],
+    "props": {
+     "title": "Practice record",
+     "items": [
+      {
+       "text": "Demo value back where it started"
+      },
+      {
+       "text": "Both readback values noted"
+      },
+      {
+       "text": "Nothing left half changed"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

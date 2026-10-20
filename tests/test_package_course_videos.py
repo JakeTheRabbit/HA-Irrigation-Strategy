@@ -69,7 +69,7 @@ class PackageCourseVideosTests(unittest.TestCase):
                 "source_sha256": compiler.source_hash(lesson),
                 "chapters": chapters,
                 "duration": len(chapters),
-                "frames": len(chapters) * 24,
+                "frames": len(chapters) * package.FPS,
             }
         for gid, (lesson_ids, routes) in compiler.GROUPS.items():
             chapters, offset = [], 0
@@ -99,7 +99,7 @@ class PackageCourseVideosTests(unittest.TestCase):
                     "chapters": chapters,
                     **pair("groups", gid),
                     "duration": offset,
-                    "frames": offset * 24,
+                    "frames": offset * package.FPS,
                     "source_sha256": hashlib.sha256(source.encode()).hexdigest(),
                 }
             )

@@ -1,0 +1,58 @@
+{"slides":{
+"A5-1":[
+ {"type":"PotCrossSection","steps":["Now we ask what"],"props":{"mode":"static","to":0.6,"showRoots":true,"caption":"What is dissolved in that water?"}},
+ {"type":"SaltWater","cue":"Stir a spoon of","steps":["Stir a spoon of","The salt seems to"],"props":{"readings":[0.0,1.0],"unit":"mS/cm","labels":["Plain water","+ 1 spoon of salt"]}},
+ {"type":"Define","cue":"We call this a","steps":["a dissolved salt"],"props":{"term":"Dissolved salt","meaning":"Salt split into tiny charged pieces in water."}},
+ {"type":"Define","cue":"Plant food works the","steps":["minerals a plant needs","such as nitrogen"],"props":{"term":"Nutrients","meaning":"The minerals a plant needs to grow.","example":"Nitrogen · potassium · calcium"}},
+ {"type":"SaltWater","cue":"Growers supply them as","steps":["Growers supply them as","The right one has"],"props":{"readings":[0.6,2.0],"unit":"mS/cm","labels":["Fewer pieces","More dissolved pieces"],"compare":{"label":"Fewer pieces","reading":0.6}}},
+ {"type":"Define","cue":"How easily current passes","steps":["electrical conductivity, or EC","called a meter"],"props":{"term":"EC","abbrev":"electrical conductivity","meaning":"How easily current passes through the water.","example":"Measured with a meter"}},
+ {"type":"Compare","cue":"EC tells you roughly","steps":["how much salt is","which nutrients are there","how much of each"],"props":{"left":{"title":"EC tells you","icon":"✅","tone":"good","items":["Roughly how much salt in total"]},"right":{"title":"EC can't tell you","icon":"❓","tone":"bad","items":["Which nutrients are there","How much of each"]}}}
+],
+"A5-2":[
+ {"type":"MeasurementMap","steps":["First, the tank"],"props":{"highlight":["feed"]}},
+ {"type":"Define","cue":"The EC of that","steps":["called feed EC"],"props":{"term":"Feed EC","meaning":"EC of the nutrient solution in the tank."}},
+ {"type":"PotCrossSection","cue":"Second, the substrate in","steps":["Second, the substrate in","A probe buried there","measures the wet substrate","the wet substrate as"],"props":{"mode":"static","to":0.6,"showProbe":true,"labels":true,"caption":"The probe senses all three"}},
+ {"type":"Define","cue":"That is called bulk","steps":["called bulk EC"],"props":{"term":"Bulk EC","meaning":"EC of the wet substrate as a whole."}},
+ {"type":"MeasurementMap","cue":"Third, the water held","steps":["Third, the water held","Third, the water held","in the pore spaces"],"props":{"highlight":["feed","bulk","pore"]}},
+ {"type":"Define","cue":"This is the water","steps":["This is the water","Its EC is called"],"props":{"term":"Pore-water EC","meaning":"EC of the water between the solid pieces.","example":"The water roots actually touch"}},
+ {"type":"Define","cue":"Water that drains out","steps":["is called runoff"],"props":{"term":"Runoff","meaning":"Water that drains out of the pot after watering."}},
+ {"type":"Define","cue":"A laboratory extract is","steps":["using a written method","then measures the liquid"],"props":{"term":"Lab extract","meaning":"Substrate mixed with water by a written method, then measured."}},
+ {"type":"MeasurementMap","cue":"All of these can","steps":["All of these can","the same unit","yet each measures","a different thing","a label always goes"],"props":{"highlight":["feed","bulk","pore","runoff","extract"]}}
+],
+"A5-3":[
+ {"type":"Define","steps":["called millisiemens","written mS slash cm"],"props":{"term":"mS/cm","abbrev":"millisiemens per centimetre","meaning":"Thousandths of a siemens, measured across one centimetre.","example":"Written mS/cm"}},
+ {"type":"MeasurementMap","cue":"Now two readings. A","steps":["dipped in the tank"],"props":{"highlight":["feed"],"values":{"feed":"2.0"}}},
+ {"type":"Define","cue":"The second comes from","steps":["one specific probe model","made by a company"],"props":{"term":"TEROS 12","meaning":"One specific moisture-and-EC probe model, made by METER."}},
+ {"type":"ProbeZone","cue":"You push its three","steps":["three metal needles"],"props":{"pots":3,"probeAt":1,"show":["region"],"reading":"0.8 mS/cm","callout":"Water, temperature and EC here"}},
+ {"type":"MeasurementMap","cue":"Its EC output is","steps":["Its EC output is","zero point eight"],"props":{"highlight":["feed","bulk"],"values":{"feed":"2.0","bulk":"0.8"}}},
+ {"type":"Compare","cue":"Look at the two","steps":["Look at the two","Bulk EC reads lower","partly because the probe","solid pieces and air","label each reading first"],"props":{"left":{"title":"Feed EC","icon":"🛢️","tone":"ec","items":["2.0 mS/cm","Meter dipped in the tank"]},"right":{"title":"Bulk EC","icon":"🌱","tone":"water","items":["0.8 mS/cm","Also senses solid and air"]},"verdict":"Label each reading first, then compare like with like","order":"pairs"}}
+],
+"A5-4":[
+ {"type":"MeasurementMap","steps":["Pore-water EC is closest"],"props":{"highlight":["pore"]}},
+ {"type":"Checklist","cue":"So some software works","steps":["feeds the bulk EC","such as water content","and temperature"],"props":{"title":"The formula needs","items":[{"text":"Bulk EC reading"},{"text":"Water content, same probe"},{"text":"Temperature, same probe"}]}},
+ {"type":"Define","cue":"A number worked out","steps":["called an estimate","calculated, not measured directly"],"props":{"term":"Estimate","meaning":"A number calculated, not measured directly."}},
+ {"type":"FlowSteps","cue":"Look at the chain","steps":["On the left is","In the middle is","On the right is"],"props":{"steps":[{"label":"Bulk EC 0.8","icon":"probe","note":"The direct reading"},{"label":"Formula","icon":"note","note":"Also uses water content and temperature"},{"label":"Estimate","icon":"chart","note":"Pore-water EC: a larger number"}]}},
+ {"type":"PotCrossSection","cue":"That is because pore","steps":["That is because pore","solid pieces and","carries the salts","and air"],"props":{"mode":"static","to":0.6,"labels":true,"caption":"Pore water carries the salts"}},
+ {"type":"Compare","cue":"Every formula has a","steps":["works well","very dry substrate","keep the word estimate"],"props":{"left":{"title":"Works well","icon":"💧","tone":"good","items":["Inside its range"]},"right":{"title":"Less reliable","icon":"🏜️","tone":"bad","items":["Very dry substrate"]},"verdict":"Keep the word estimate on your record"}}
+],
+"A5-5":[
+ {"type":"Checklist","steps":["Sample one is the","Sample two is a","Sample three is the"],"props":{"title":"Name each sample","items":[{"text":"1: solution in the tank","state":"unknown"},{"text":"2: cup from the drain hole","state":"unknown"},{"text":"3: water between pieces","state":"unknown"}]}},
+ {"type":"MeasurementMap","cue":"Here are the answers","steps":["Sample one is feed","Sample two is runoff","Sample three is pore-water"],"props":{"highlight":["feed","runoff","pore"]}},
+ {"type":"PotCrossSection","cue":"One more detail about","steps":["One more detail about","how and when you"],"props":{"mode":"drain","arrows":["drainage"],"caption":"Runoff EC depends on collection"}},
+ {"type":"Checklist","cue":"So write the collection","steps":["write the collection method","all the drainage from","caught in one cup","same method every time"],"props":{"title":"Runoff collection method","items":[{"text":"Method written beside result"},{"text":"All the drainage, one watering"},{"text":"Caught in one cup"},{"text":"Same method every time"}]}}
+],
+"A5-6":[
+ {"type":"MeasurementMap","steps":["The tank reads","The drainage cup reads"],"props":{"highlight":["feed","runoff"],"values":{"feed":"1.7","runoff":"2.4"}}},
+ {"type":"Calc","cue":"Look at the two","steps":["Two point four minus","higher by zero point"],"props":{"heading":"Runoff vs feed","lines":[{"expr":"2.4 − 1.7 = 0.7","note":"mS/cm"}],"answer":"Runoff is higher by 0.7"}},
+ {"type":"FlowSteps","cue":"First, check the meter","steps":["Dip it in","a bottle sold with","confirm the meter shows"],"props":{"title":"Check the meter","steps":[{"label":"Dip","icon":"probe","note":"Into a standard solution"},{"label":"Known EC","icon":"search","note":"A bottle sold with a known EC"},{"label":"Confirm","icon":"check","note":"The meter shows that number"}]}},
+ {"type":"Compare","cue":"Second, check temperature","steps":["Warm water conducts better","than cold water","reads higher when warm","when warm"],"props":{"left":{"title":"Warm water","icon":"🔥","tone":"warn","items":["Conducts better","Same solution reads higher"]},"right":{"title":"Cold water","icon":"❄️","tone":"water","items":["Conducts less","Same solution reads lower"]},"order":"pairs"}},
+ {"type":"Define","cue":"Most meters correct for","steps":["a standard temperature","twenty-five degrees Celsius"],"props":{"term":"Temperature adjustment","meaning":"Correcting a reading to a standard temperature.","example":"Usually to 25 °C"}},
+ {"type":"Checklist","cue":"Confirm both readings used","steps":["Confirm both readings used","With the meter checked","both readings adjusted"],"props":{"title":"Compare fairly","items":[{"text":"Feed EC 1.7: adjusted"},{"text":"Meter checked"},{"text":"Runoff EC 2.4: adjusted"}]}}
+],
+"A5-7":[
+ {"type":"MeasurementMap","steps":["feed, bulk, pore-water","bulk, pore-water","pore-water, and collected","such as runoff","a lab extract"],"props":{"highlight":["feed","bulk","pore","runoff","extract"]}},
+ {"type":"Checklist","cue":"Now look at the","steps":["Type: which of","Unit: for example","Method: how it","Context: the crop"],"props":{"title":"Every EC reading needs","items":[{"text":"Type: which place"},{"text":"Unit: e.g. mS/cm"},{"text":"Method: how, or estimate"},{"text":"Context: crop, substrate, time"}]}},
+ {"type":"Compare","cue":"Keep EC and VWC","steps":["VWC tells you how","EC tells you how","a clue to dissolved"],"props":{"left":{"title":"VWC","icon":"💧","tone":"water","items":["How much of the sample is water"]},"right":{"title":"EC","icon":"⚡","tone":"ec","items":["How easily the water carries current","A clue to dissolved salts"]}}},
+ {"type":"FlowSteps","cue":"For how much water","steps":["combine these readings","your substrate","crop and checks","and checks"],"props":{"title":"What roots can use","steps":[{"label":"Readings","icon":"probe"},{"label":"Substrate","icon":"🪴"},{"label":"Crop","icon":"🌿"},{"label":"Checks","icon":"check"}]}}
+]
+}}
