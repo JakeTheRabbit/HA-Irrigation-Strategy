@@ -1,0 +1,383 @@
+"""Exercise real sensor methods without importing Home Assistant's entity runtime."""
+
+import ast
+import logging
+import math
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from custom_components.crop_steering import units
+from custom_components.crop_steering.calculations import ec_type_key, fuse_probes
+from custom_components.crop_steering.const import (
+    DOMAIN,
+    PROBE_FAR,
+    PROBE_RANGE,
+    PROBE_STALE_SECONDS,
+)
+
+NOW = datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc)
+SOURCE = (
+    Path(__file__).resolve().parents[1] / "custom_components/crop_steering/sensor.py"
+)
+
+
+def sensor(states, prefix=""):
+    tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
+    original = next(
+        node
+        for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "CropSteeringSensor"
+    )
+    names = {
+        "_get_zone_weekly_water_usage",
+        "_get_zone_daily_water_usage",
+        "_get_zone_last_irrigation",
+        "extra_state_attributes",
+        "_average_sensor_values",
+        "_probe_readings",
+        "_fuse_zone",
+        "_probe_method_entity",
+        "_ec_types",
+        "_get_zone_vwc",
+        "_get_zone_ec",
+    }
+    methods = [
+        node
+        for node in original.body
+        if isinstance(node, ast.FunctionDef) and node.name in names
+    ]
+    cls = ast.ClassDef(
+        name="SensorMethods", bases=[], keywords=[], body=methods, decorator_list=[]
+    )
+    module = ast.fix_missing_locations(ast.Module(body=[cls], type_ignores=[]))
+    namespace = {
+        "math": math,
+        "_LOGGER": logging.getLogger(__name__),
+        "to_native": units.to_native,
+        "fuse_probes": fuse_probes,
+        "ec_type_key": ec_type_key,
+        "DOMAIN": DOMAIN,
+        "PROBE_FAR": PROBE_FAR,
+        "PROBE_RANGE": PROBE_RANGE,
+        "PROBE_STALE_SECONDS": PROBE_STALE_SECONDS,
+        "SHOT_SIZE_KEYS": next(
+            ast.literal_eval(node.value)
+            for node in tree.body
+            if isinstance(node, ast.Assign)
+            and getattr(node.targets[0], "id", None) == "SHOT_SIZE_KEYS"
+        ),
+        "dt_util": SimpleNamespace(
+            parse_datetime=datetime.fromisoformat,
+            as_local=lambda value: value.replace(tzinfo=timezone.utc),
+            utcnow=lambda: NOW,
+        ),
+    }
+    exec(compile(module, str(SOURCE), "exec"), namespace)
+    instance = namespace["SensorMethods"]()
+    instance.hass = SimpleNamespace(states=SimpleNamespace(get=states.get))
+    instance._prefix = prefix
+    instance._zone_number = 1
+    instance._zones_config = {}
+    instance._probe_offsets = {}
+    instance._offsets_at = None
+    instance._fusion = None
+    instance.entity_description = SimpleNamespace(key="zone_1_weekly_water_usage")
+    return instance
+
+
+@pytest.mark.parametrize(
+    "value", [None, "unknown", "unavailable", "NaN", "inf", "-1", "bad"]
+)
+def test_missing_or_invalid_weekly_source_is_unknown(value):
+    states = (
+        {}
+        if value is None
+        else {
+            "sensor.crop_steering_zone_1_weekly_water_app": SimpleNamespace(
+                state=value, attributes={}
+            )
+        }
+    )
+    entity = sensor(states)
+    assert entity._get_zone_weekly_water_usage(1) is None
+    assert entity.extra_state_attributes == {
+        "coverage": "unknown",
+        "history_complete": False,
+    }
+
+
+def test_weekly_consumer_uses_own_room_and_forwards_partial_coverage():
+    attrs = {
+        "coverage": "partial_history",
+        "history_complete": False,
+        "observed_grow_days": 2,
+        "complete_grow_days": 1,
+    }
+    entity = sensor(
+        {
+            "sensor.crop_steering_zone_1_weekly_water_app": SimpleNamespace(
+                state="999", attributes={}
+            ),
+            "sensor.crop_steering_veg_zone_1_weekly_water_app": SimpleNamespace(
+                state="0", attributes=attrs
+            ),
+        },
+        "veg_",
+    )
+    assert entity._get_zone_weekly_water_usage(1) == 0
+    assert entity.extra_state_attributes == attrs
+
+
+def test_fusion_rejects_nonfinite_without_changing_arithmetic_mean():
+    values = {
+        "sensor.a": "10",
+        "sensor.b": "40",
+        "sensor.c": "100",
+        "sensor.nan": "NaN",
+        "sensor.inf": "inf",
+        "sensor.neg_inf": "-inf",
+        "sensor.offline": "unavailable",
+        "sensor.bad": "not a number",
+    }
+    entity = sensor(
+        {key: SimpleNamespace(state=value) for key, value in values.items()}
+    )
+    assert entity._average_sensor_values(list(values)) == 50.0
+    assert (
+        entity._average_sensor_values(["sensor.nan", "sensor.inf", "sensor.neg_inf"])
+        is None
+    )
+
+
+def test_weekly_descriptor_allows_rolling_total_to_decrease():
+    tree = ast.parse(SOURCE.read_text(encoding="utf-8"))
+    descriptor = next(
+        node
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "SensorEntityDescription"
+        and any(
+            keyword.arg == "key" and "weekly_water_usage" in ast.unparse(keyword.value)
+            for keyword in node.keywords
+        )
+    )
+    state_class = next(
+        keyword.value for keyword in descriptor.keywords if keyword.arg == "state_class"
+    )
+    assert ast.unparse(state_class) == "SensorStateClass.TOTAL"
+
+
+@pytest.mark.parametrize(
+    "value", [None, "unknown", "unavailable", "", "NaN", "inf", "-inf", "-1", "bad"]
+)
+def test_invalid_daily_source_is_unknown(value):
+    entity = sensor(
+        {
+            "sensor.crop_steering_zone_1_daily_water_app": SimpleNamespace(
+                state=value, attributes={}
+            )
+        }
+    )
+    assert entity._get_zone_daily_water_usage(1) is None
+
+
+@pytest.mark.parametrize("prefix", ["", "veg_"])
+def test_missing_daily_source_does_not_borrow_another_room_or_zone(prefix):
+    other_prefix = "veg_" if not prefix else ""
+    entity = sensor(
+        {
+            f"sensor.crop_steering_{other_prefix}zone_1_daily_water_app": SimpleNamespace(
+                state="999", attributes={}
+            ),
+            f"sensor.crop_steering_{prefix}zone_2_daily_water_app": SimpleNamespace(
+                state="888", attributes={}
+            ),
+        },
+        prefix,
+    )
+    assert entity._get_zone_daily_water_usage(1) is None
+
+
+@pytest.mark.parametrize("value", [0, 1.25])
+def test_daily_consumer_preserves_named_room_zero_and_positive_delivery(value):
+    entity = sensor(
+        {
+            "sensor.crop_steering_zone_1_daily_water_app": SimpleNamespace(
+                state="999", attributes={}
+            ),
+            "sensor.crop_steering_veg_zone_1_daily_water_app": SimpleNamespace(
+                state=str(value), attributes={}
+            ),
+        },
+        "veg_",
+    )
+    assert entity._get_zone_daily_water_usage(1) == value
+
+
+def test_last_irrigation_wrapper_keeps_legacy_naive_timestamp_unknown():
+    entity = sensor(
+        {
+            "sensor.crop_steering_zone_1_last_irrigation_app": SimpleNamespace(
+                state="2026-09-08T10:30:00"
+            )
+        }
+    )
+    assert entity._get_zone_last_irrigation(1) is None
+
+
+@pytest.mark.parametrize(
+    "value",
+    ["2026-01-08T10:30:00+13:00", "2026-09-08T10:30:00+12:00", "2026-09-07T22:30:00Z"],
+)
+def test_last_irrigation_wrapper_preserves_explicit_event_timestamp(value):
+    entity = sensor(
+        {
+            "sensor.crop_steering_veg_zone_1_last_irrigation_app": SimpleNamespace(
+                state=value
+            )
+        },
+        "veg_",
+    )
+    assert entity._get_zone_last_irrigation(1) == datetime.fromisoformat(value)
+
+
+def test_last_irrigation_wrapper_does_not_borrow_other_room_timestamp():
+    entity = sensor(
+        {
+            "sensor.crop_steering_zone_1_last_irrigation_app": SimpleNamespace(
+                state="2026-09-08T10:30:00+12:00"
+            )
+        },
+        "veg_",
+    )
+    assert entity._get_zone_last_irrigation(1) is None
+
+
+# --------------------------------------------------------------------------- probe units
+def _probe(value, unit):
+    return SimpleNamespace(state=str(value), attributes={"unit_of_measurement": unit})
+
+
+def test_pore_ec_in_microsiemens_is_fused_as_millisiemens():
+    # Unconverted, 3200 next to 3.0 averages 1601.5 "mS/cm": far over any EC target, and the
+    # engine enlarges shots when pore EC is over target.
+    entity = sensor(
+        {"sensor.a": _probe(3200, "µS/cm"), "sensor.b": _probe(3.0, "mS/cm")}
+    )
+    assert entity._average_sensor_values(["sensor.a", "sensor.b"], "ec") == 3.1
+    greek_mu = sensor({"sensor.a": _probe(2500, "μS/cm")})
+    assert greek_mu._average_sensor_values(["sensor.a"], "ec") == 2.5
+
+
+def test_vwc_reported_as_a_volume_fraction_is_fused_as_percent():
+    entity = sensor({"sensor.a": _probe(0.42, "m³/m³"), "sensor.b": _probe(44, "%")})
+    assert entity._average_sensor_values(["sensor.a", "sensor.b"], "vwc") == 43.0
+
+
+def test_a_probe_with_no_unit_or_an_unknown_one_reads_exactly_as_before():
+    entity = sensor(
+        {"sensor.a": _probe(50, ""), "sensor.b": SimpleNamespace(state="52")}
+    )
+    assert entity._average_sensor_values(["sensor.a", "sensor.b"], "vwc") == 51.0
+    assert entity._average_sensor_values(["sensor.a", "sensor.b"]) == 51.0
+
+
+# --------------------------------------------------------------------------- a zone's probes
+def _reported(value, unit, minutes_ago):
+    return SimpleNamespace(
+        state=str(value),
+        attributes={"unit_of_measurement": unit},
+        last_reported=NOW - timedelta(minutes=minutes_ago),
+    )
+
+
+def _zone(states, **zone):
+    entity = sensor(states)
+    entity._zones_config = {
+        "1": zone
+    }  # string keys: what a reloaded config entry holds
+    entity.entity_description = SimpleNamespace(key="vwc_zone_1")
+    return entity
+
+
+def test_a_zone_converts_each_probe_before_combining_them():
+    entity = _zone(
+        {"sensor.a": _probe(3200, "µS/cm"), "sensor.b": _probe(3.0, "mS/cm")},
+        ec_sensors=["sensor.a", "sensor.b"],
+    )
+    assert entity._get_zone_ec(1) == 3.1
+
+
+def test_a_zones_reading_names_the_probes_it_was_made_from():
+    states = {
+        "sensor.a": _reported(40, "%", 1),
+        "sensor.b": _reported(42, "%", 1),
+        "sensor.c": _reported(90, "%", 1),
+    }
+    entity = _zone(states, vwc_sensors=["sensor.a", "sensor.b", "sensor.c"])
+    assert entity._get_zone_vwc(1) == 41.0
+    assert entity.extra_state_attributes == {
+        "probes": 3,
+        "used": ["sensor.a", "sensor.b"],
+        "excluded": {"sensor.c": "far from the others"},
+        "spread": 2.0,
+        "method": "Median",
+        "steered_by": "Median",
+        "quality": {
+            "sensor.a": {"quality": "good", "reason": "fresh"},
+            "sensor.b": {"quality": "good", "reason": "fresh"},
+            "sensor.c": {"quality": "bad", "reason": "excluded_outlier"},
+        },
+        "offsets_learned": None,
+        "primary": None,
+    }
+
+
+def test_a_probe_that_stops_reporting_is_set_aside_without_stepping_the_zone():
+    states = {"sensor.a": _reported(40, "%", 1), "sensor.b": _reported(46, "%", 1)}
+    entity = _zone(states, vwc_sensors=["sensor.a", "sensor.b"])
+    assert entity._get_zone_vwc(1) == 43.0
+    states["sensor.a"] = _reported(39, "%", 0)
+    states["sensor.b"] = _reported(46, "%", 30)  # last heard from half an hour ago
+    assert entity._get_zone_vwc(1) == 42.0
+    assert entity.extra_state_attributes["excluded"] == {"sensor.b": "not reporting"}
+
+
+def test_a_probe_set_aside_for_its_unit_is_named_with_that_unit():
+    """What the controller names in CS-503: the probe and its unit, not only that the zone is blind."""
+    states = {"sensor.a": _reported(1250, "mV", 1)}
+    entity = _zone(states, vwc_sensors=["sensor.a"])
+    assert entity._get_zone_vwc(1) is None
+    assert entity.extra_state_attributes["excluded"] == {
+        "sensor.a": "set aside for its unit"
+    }
+    assert entity.extra_state_attributes["unit_set_aside"] == {"sensor.a": "mV"}
+    assert entity.extra_state_attributes["quality"] == {
+        "sensor.a": {"quality": "bad", "reason": "unknown_unit"}
+    }
+    states["sensor.a"] = _reported(45, "%", 0)  # its unit corrected: it counts again
+    assert entity._get_zone_vwc(1) == 45.0
+    assert "unit_set_aside" not in entity.extra_state_attributes
+
+
+def test_a_unitless_probe_out_of_range_is_excluded_as_out_of_range_as_before():
+    entity = _zone(
+        {"sensor.a": _reported(450, "", 1), "sensor.b": _reported(44, "%", 1)},
+        vwc_sensors=["sensor.a", "sensor.b"],
+    )
+    assert entity._get_zone_vwc(1) == 44.0
+    assert entity.extra_state_attributes["excluded"] == {"sensor.a": "out of range"}
+    assert "unit_set_aside" not in entity.extra_state_attributes
+
+
+def test_the_legacy_front_and_back_pair_is_still_a_zones_probes():
+    entity = _zone(
+        {"sensor.front": _probe(40, "%"), "sensor.back": _probe(46, "%")},
+        vwc_front="sensor.front",
+        vwc_back="sensor.back",
+    )
+    assert entity._get_zone_vwc(1) == 43.0

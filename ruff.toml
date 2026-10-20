@@ -1,0 +1,11 @@
+extend-exclude = ["output", "frontend/node_modules", "frontend/dist"]
+
+# Repo-wide ruff gate. scripts/ are small release and build helpers: style rules
+# (one-line statements) are relaxed there; real error classes (F, E9, undefined
+# names) still apply everywhere.
+
+[lint.per-file-ignores]
+"scripts/*" = ["E701", "E702"]
+# Imports the `flow_module` pytest fixture from test_setup_flows.py and then names it as a test
+# parameter, which is how pytest fixtures work and what F811 mistakes for a redefinition.
+"tests/test_translations.py" = ["F811"]

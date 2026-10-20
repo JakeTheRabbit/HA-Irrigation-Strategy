@@ -6,8 +6,8 @@ import {
   nextLesson,
   reviewDue,
 } from "./state.mjs";
-import { renderLesson } from "./lesson.mjs?v=20261019r3";
-import { renderWatch } from "./watch.mjs?v=20261019r3";
+import { renderLesson } from "./lesson.mjs?v=20261020r4";
+import { renderWatch } from "./watch.mjs?v=20261020r4";
 import { renderPractice } from "./labs.mjs";
 const main = document.querySelector("#main");
 const notice = document.querySelector("#storage-notice");
@@ -639,6 +639,7 @@ async function render(focus = true) {
   if (token !== renderId) return;
   for (const media of main.querySelectorAll("audio,video")) media.pause();
   main.replaceChildren(screen);
+  document.body.classList.toggle("lesson-mode", screen.classList.contains("lp"));
   document.title = title + " | Crop Steering Academy";
   for (const a of document.querySelectorAll("[data-nav]")) {
     if (a.dataset.nav === section) a.setAttribute("aria-current", "page");
@@ -655,7 +656,7 @@ async function render(focus = true) {
 }
 async function start() {
   try {
-    const response = await fetch("course/course.json?v=20261019r3");
+    const response = await fetch("course/course.json?v=20261020r4");
     if (!response.ok) throw Error("Course data returned " + response.status);
     course = await response.json();
     if (!Array.isArray(course.lessons) || !course.lessons.length)

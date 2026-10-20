@@ -1,0 +1,89 @@
+.setpoint-editor-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.85fr) minmax(420px, 1.15fr);
+  align-items: start;
+  gap: 20px;
+}
+.setpoint-preview {
+  min-width: 0;
+}
+.setpoint-preview {
+  position: sticky;
+  top: 16px;
+}
+.setpoint-preview-context {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.setpoint-preview-context strong {
+  display: block;
+  font-size: 14px;
+}
+.setpoint-preview-context span {
+  display: block;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.setting-advisory > svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.setpoint-preview-note {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 1.6;
+  margin: 12px 0;
+}
+.setpoint-preview-zone {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.setpoint-preview-zone select {
+  padding: 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.setpoint-preview-zone p {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.setpoint-expand {
+  display: none;
+}
+@media (max-width: 1150px) {
+  .setpoint-editor-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .setpoint-preview {
+    grid-row: 1;
+    position: static;
+  }
+  .setpoint-expand {
+    display: inline-flex;
+  }
+  .setpoint-preview:not(.is-expanded) .planning-assumptions,
+  .setpoint-preview:not(.is-expanded) .setpoint-preview-note,
+  .setpoint-preview:not(.is-expanded) .setpoint-water {
+    display: none;
+  }
+  .setpoint-preview:not(.is-expanded) .planning-curve .panel-heading p {
+    display: none;
+  }
+}
+@media (max-width: 620px) {
+  .setpoint-preview-context strong {
+    font-size: 12px;
+  }
+}

@@ -1,1 +1,65 @@
+# NOTE: this is a SOURCE repository, not a Home Assistant config directory.
+# `custom_components/` and `www/` are SHIPPED deliverables and MUST NOT be ignored,
+# or new platform modules / dashboards silently never get committed or released.
+
+# Stray HA runtime artifacts (only if someone runs HA from a checkout by mistake)
+configuration.yaml
+secrets.yaml
+*.db
+*.log
+*.db-wal
+*.db-shm
+.storage/
+deps/
+tts/
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# IDE / editor / local agent config (local-only, never shipped)
+.vscode/
+.idea/
+.claude/
+*.swp
+*.swo
+
+# Python cache / build
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+*.egg-info/
+dist/
+build/
+
+# Node modules (if any)
+node_modules/
+
+# Personal secrets and keys
+*.key
+*.pem
+*.crt
+
+# Local browser verification artifacts
+output/
+
+# Local environment files, virtual environments and coverage output
+.env
+.env.*
+/crop_steering.env
+.venv/
+venv/
+.coverage
+htmlcov/
+
+# The standalone controller's token file (docker-compose.yml)
+/ha_token.txt
+
+# Generated academy media is pinned in a versioned release and installed for Pages.
 /www/learn/media/**
+.playwright-cli/

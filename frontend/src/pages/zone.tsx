@@ -1,0 +1,699 @@
+import { useState, type ReactNode } from "react";
+import { ArrowLeft, ArrowRight, Check, X } from "lucide-react";
+import { CanonicalControls } from "@/components/canonical-controls";
+import { Button } from "@/components/ui/button";
+import { Empty, number, ReviewDialog, time as clock, type Page } from "@/components/dashboard";
+import { useBrain } from "@/lib/brain";
+import { CameraCard, ClimatePanel, HardwarePanel, RootZonePanel } from "@/components/zone-extras";
+import { UiTip } from "@/components/info-tip";
+import { ZoneDay } from "@/components/day-timeline";
+import { OverlayRows, useOverlays } from "@/components/overlay-row";
+import { Pill } from "@/components/mini-visuals";
+import { PlantStressCard, ZoneGates, ZoneShots } from "@/components/sensing";
+import { rangeText, steeringOf } from "@/lib/day-chart";
+import {
+  attachOutcomes,
+  brainWords,
+  jevAnswer,
+  jevIds,
+  jevResult,
+  JEV_TITLES,
+  outcomeText,
+  parseBrainAnswers,
+  parseJevSetpoints,
+  parseJevZone,
+  readJev,
+  type JevSetpoints,
+} from "@/lib/jev";
+import { zoneOverlays } from "@/lib/overlays";
+import { buildSetpointPreview } from "@/lib/setpoint-preview";
+import { jevChip, TARGET_GROUPS } from "@/lib/targets";
+import { ecType, fusionMethod, PROBE_TONE, zoneProbes } from "@/lib/probes";
+import type { Controller, Zone } from "@/lib/types";
+import { dayWord } from "@/lib/utils";
+import { waitingText } from "@/lib/waiting-for";
+import { aiRead, zoneReasons } from "@/lib/zone-why";
+import "./zone.css";
+
+const PHASE_NAMES: Record<string, string> = {
+  P0: "Morning dryback",
+  P1: "Ramp",
+  P2: "Maintenance",
+  P3: "Overnight dryback",
+};
+const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** One zone: what it did today and why, whether it is on its stage's curve, whether its probes tell
+ * the truth, and what happens next. Reached from its card on Today; the switcher moves between
+ * zones. */
+export function ZonePage({
+  controller,
+  zoneId,
+  navigate,
+  onDirtyChange,
+}: {
+  controller: Controller;
+  zoneId: number | null;
+  onDirtyChange?: (dirty: boolean) => void;
+  navigate: (page: Page, zone?: number) => void;
+}) {
+  const zones = controller.room.zones;
+  const zone = zones.find((item) => item.id === zoneId) ?? zones[0];
+  if (!zone)
+    return (
+      <>
+        <div className="label-with-tip">
+          <h1 className="zone-empty-title">Zone</h1>
+          <UiTip copyKey="zone" />
+        </div>
+        <section className="panel">
+          <Empty
+            title="No zones found"
+            detail="Zones appear once the room’s zones are configured in Equipment › Setup."
+            action={<Button onClick={() => navigate("equipment/setup")}>Open setup</Button>}
+          />
+        </section>
+      </>
+    );
+  const { states, room } = controller;
+  const display = room.display.options;
+  const steering = steeringOf(
+    states[`select.crop_steering_${room.room.prefix}zone_${zone.id}_steering_mode`]?.state,
+    readJev(states, room.room.prefix).room?.stage?.steering,
+  );
+  return (
+    <div className="zone-page" data-zone-page={zone.id}>
+      <div className="zone-page-bar">
+        <Button variant="ghost" size="sm" onClick={() => navigate("today")}>
+          <ArrowLeft size={15} aria-hidden="true" /> Today
+        </Button>
+        {zones.length > 1 && (
+          <nav className="zone-switcher" aria-label="Zones">
+            {zones.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                aria-current={item.id === zone.id ? "page" : undefined}
+                onClick={() => navigate("zone", item.id)}
+              >
+                {item.name}
+              </button>
+            ))}
+          </nav>
+        )}
+      </div>
+      <div className="zone-page-title">
+        <h1>{zone.name}</h1>
+        {zone.cultivar && <span className="zone-cultivar">{zone.cultivar}</span>}
+        {/^P[0-3]$/.test(zone.phase) ? (
+          <span className="pill" data-phase={zone.phase}>
+            {zone.phase} · {PHASE_NAMES[zone.phase]}
+          </span>
+        ) : (
+          <Pill tone="unknown">Phase unavailable</Pill>
+        )}
+        <Pill
+          dot
+          tone={zone.valveOn === true ? "on" : zone.valveOn === false ? "neutral" : "unknown"}
+          data-zone-valve={zone.id}
+          title={zone.valveEntity ?? "No valve is mapped in the configuration of this room"}
+        >
+          Valve {zone.valveOn === true ? "open" : zone.valveOn === false ? "closed" : "unknown"}
+        </Pill>
+        {zone.enabled === false && (
+          <Pill dot tone="warn">
+            Scheduling paused
+          </Pill>
+        )}
+        {steering && (
+          <span className="zone-steering" data-steering={steering}>
+            {capital(steering)}
+          </span>
+        )}
+      </div>
+      <ZoneDay key={zone.id} controller={controller} zone={zone} />
+      {(display.show_climate || display.show_substrate_temp) && (
+        <div className="zone-extras-row">
+          {display.show_climate && <ClimatePanel controller={controller} zone={zone.id} />}
+          {display.show_substrate_temp && <RootZonePanel controller={controller} zone={zone} />}
+        </div>
+      )}
+      <Button variant="outline" onClick={() => navigate("history/timeline", zone.id)}>
+        Explore recorded history and comparisons <ArrowRight size={15} aria-hidden="true" />
+      </Button>
+      <ZoneWhy key={`why-${zone.id}`} controller={controller} zone={zone} navigate={navigate} />
+      <PlantStressCard key={`stress-${zone.id}`} controller={controller} zone={zone} />
+      {/* Hardware controls and optional camera retain their separate operational roles. */}
+      <div className={display.show_camera ? "zone-page-grid" : "zone-page-stack"}>
+        {display.show_camera && (
+          <div className="zone-page-column">
+            <CameraCard controller={controller} />
+          </div>
+        )}
+        <div className="zone-page-stack">
+          <ZoneControls key={zone.id} controller={controller} zone={zone} />
+          <CanonicalControls
+            key={`zone-config-${zone.id}`}
+            controller={controller}
+            owner="zone"
+            zoneId={zone.id}
+            onDirtyChange={onDirtyChange}
+          />
+          <HardwarePanel controller={controller} zone={zone} />
+        </div>
+      </div>
+      {/* The rest on request: the day chart above already shows today. */}
+      <Collapsed key={`targets-${zone.id}`} title="Targets (read only)">
+        {() => <ZoneTargets controller={controller} zone={zone} navigate={navigate} />}
+      </Collapsed>
+      <Collapsed key={`probes-${zone.id}`} title="Probes used and not used">
+        {() => <ZoneProbes controller={controller} zone={zone} navigate={navigate} />}
+      </Collapsed>
+      <ZoneShots key={`shots-${zone.id}`} controller={controller} zone={zone} />
+    </div>
+  );
+}
+
+/** Why this zone is doing what it is doing: the controller's reason from its decision record and what
+ * it waits for next; with the AI on, the AI's read and a "Why?" that asks it. On rules, the
+ * controller's reason only. */
+function ZoneWhy({
+  controller,
+  zone,
+  navigate,
+}: {
+  controller: Controller;
+  zone: Zone;
+  navigate: (page: Page, zone?: number) => void;
+}) {
+  const { panel: brainPanel, view: brainView } = useBrain(controller);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const { states, room } = controller;
+  const ids = jevIds(room.room.prefix);
+  const reasons = zoneReasons(
+    zone,
+    states[`sensor.crop_steering_${room.room.prefix}current_decision`],
+  );
+  const waiting = zone.waiting
+    ? waitingText(zone.waiting, { number: (value) => number(value), clock })
+    : "";
+  const on = !!readJev(states, room.room.prefix).room?.on;
+  const sensor = on ? parseJevZone(states[ids.zone(zone.id)]) : null;
+  const read = sensor ? aiRead(sensor.judges, sensor.acting) : null;
+  // "Why?" needs a controller that answers (its answers sensor); asking costs from the AI budget.
+  const answers = on ? parseBrainAnswers(states[ids.answers]) : null;
+  const answer = answers?.answers.find((item) => item.zone === zone.id);
+  const locked = controller.admin === false;
+  async function ask() {
+    setBusy(true);
+    setError("");
+    try {
+      await controller.operator("brain_ask", {
+        question: `Why is ${zone.name} doing what it is doing now?`,
+        zone: zone.id,
+      });
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : String(failure));
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <section className="panel zone-why-panel" aria-labelledby="zone-why-title" data-zone-why>
+      <div className="panel-heading">
+        <div>
+          <h2 id="zone-why-title">Why / next action</h2>
+          <p>{on ? "The controller’s reason, then the AI’s read" : "The controller’s reason"}</p>
+        </div>
+        {answers && (
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={busy || locked || !!answers.pending}
+            onClick={() => void ask()}
+          >
+            Why?
+          </Button>
+        )}
+      </div>
+      <div className="zone-panel-body">
+        {reasons.length ? (
+          <ul className="zone-reasons" aria-label="Controller reason">
+            {reasons.map((line) => (
+              <li key={line}>{line}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="muted small">The controller has not said anything about this zone yet.</p>
+        )}
+        {waiting && (
+          <p className="zone-waiting">
+            <span>The controller waits for</span> {waiting}
+          </p>
+        )}
+        <p className="muted small">{brainView.headline}</p>
+        {!sensor && brainPanel?.lastDecision?.zone === zone.id && (
+          <p className="zone-ai-read">
+            Latest AI proposal: {brainPanel.lastDecision.answer || "No answer"}.{" "}
+            {brainPanel.lastDecision.why}
+          </p>
+        )}
+        {read && (
+          <p className="zone-ai-read">
+            <span>AI’s read · {read.title}</span> {read.why}
+          </p>
+        )}
+        {answers && locked && (
+          <p className="muted small">
+            Only an administrator can ask: each answer costs from the room’s AI budget.
+          </p>
+        )}
+        {error && (
+          <p className="jev-trouble" role="alert">
+            {error}
+          </p>
+        )}
+        {!!answers?.pending && <p className="muted small">Asking…</p>}
+        {answer && (
+          <p className="zone-ai-read" data-cannot={answer.cannotAnswer || undefined}>
+            <span>AI’s answer{answer.answeredAt !== null && ` · ${clock(answer.answeredAt)}`}</span>{" "}
+            {answer.answer}
+          </p>
+        )}
+        <details className="zone-more">
+          <summary>All next-shot conditions</summary>
+          <ZoneGates controller={controller} zone={zone} />
+        </details>
+        <details className="zone-more">
+          <summary>AI proposals, applied changes and outcomes</summary>
+          <JevOnZone controller={controller} zone={zone} navigate={navigate} />
+        </details>
+      </div>
+    </section>
+  );
+}
+
+/** A section left closed until asked for: it renders only while open. */
+function Collapsed({ title, children }: { title: string; children: () => ReactNode }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details
+      className="zone-more"
+      open={open}
+      onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
+    >
+      <summary>{title}</summary>
+      {open && children()}
+    </details>
+  );
+}
+
+/** What the AI assistant says about this zone: which judges act on it now, each judge's last word, the setpoints
+ * it may move and within what range, and its latest decisions here with how they turned out. */
+function JevOnZone({
+  controller,
+  zone,
+  navigate,
+}: {
+  controller: Controller;
+  zone: Zone;
+  navigate: (page: Page, zone?: number) => void;
+}) {
+  const { states, room } = controller;
+  const ids = jevIds(room.room.prefix);
+  const { log, room: brain } = readJev(states, room.room.prefix);
+  const sensor = parseJevZone(states[ids.zone(zone.id)]);
+  const rules = brain && !brain.on ? brainWords(brain).subtitle : null;
+  const setpoints = parseJevSetpoints(states[ids.zone(zone.id)]);
+  const { doc, reload } = useOverlays(controller);
+  const overlays = zoneOverlays(doc, controller.roomId, zone.id);
+  if (!log && !sensor && !overlays.length) return null;
+  const { rest, outcomes } = attachOutcomes(log?.entries ?? []);
+  const recent = rest.filter((entry) => entry.zone === zone.id).slice(0, 6);
+  const now = Date.now();
+  return (
+    <div className="zone-jev" aria-labelledby="zone-jev-title" data-zone-jev>
+      <div className="panel-heading">
+        <div>
+          <h2 id="zone-jev-title">AI assistant on this zone</h2>
+          <p>
+            {rules ??
+              (sensor?.acting.length
+                ? `Acting now: ${sensor.acting.map((judge) => JEV_TITLES[judge] ?? judge).join(", ")}`
+                : "Watching: no judge acting on this zone now")}
+          </p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => navigate("history/timeline", zone.id)}>
+          History <ArrowRight size={15} aria-hidden="true" />
+        </Button>
+      </div>
+      <div className="zone-panel-body">
+        {setpoints && <JevSetpointsLine setpoints={setpoints} />}
+        <OverlayRows controller={controller} overlays={overlays} reload={reload} />
+        {!!sensor?.judges.length && (
+          <ul className="zone-judges" aria-label="Last answer of each judge">
+            {sensor.judges.map((judge) => (
+              <li key={judge.judge}>
+                <strong>{judge.title}</strong>{" "}
+                <span>{jevAnswer({ verdict: judge.answer, p: judge.p })}</span>
+                {judge.directive && <span className="muted"> → {judge.directive}</span>}
+                {judge.why && <span className="zone-why">{judge.why}</span>}
+              </li>
+            ))}
+          </ul>
+        )}
+        {recent.length > 0 && (
+          <ol className="zone-jev-list" aria-label="Last AI assistant decisions">
+            {recent.map((entry) => {
+              const result = jevResult(entry);
+              const checked = outcomes.get(entry.key)?.at(-1);
+              return (
+                <li key={entry.key} data-result={entry.result}>
+                  <time>
+                    {entry.time !== null && dayWord(entry.time, now) && (
+                      <small>{dayWord(entry.time, now)}</small>
+                    )}
+                    {entry.time === null ? "—" : clock(entry.time)}
+                  </time>
+                  <span className="zone-jev-what">
+                    <strong>{entry.title}</strong>{" "}
+                    {entry.kind === "outcome"
+                      ? `after “${entry.verdict || "an earlier call"}”`
+                      : jevAnswer(entry)}
+                    {entry.action && <> → {entry.action.replaceAll("->", "→")}</>}
+                  </span>
+                  <span className="zone-jev-result">
+                    <Pill tone={result.tone}>{result.label}</Pill>
+                    {checked && (
+                      <span
+                        className="zone-outcome"
+                        data-worked={checked.result === "worked"}
+                        title={outcomeText(checked)}
+                      >
+                        {checked.result === "worked" ? (
+                          <Check size={13} aria-hidden="true" />
+                        ) : (
+                          <X size={13} aria-hidden="true" />
+                        )}
+                        <span className="sr-only">{outcomeText(checked)}</span>
+                      </span>
+                    )}
+                  </span>
+                </li>
+              );
+            })}
+          </ol>
+        )}
+        {!recent.length && !sensor?.judges.length && (
+          <p className="muted small">No decisions on this zone yet.</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function JevSetpointsLine({ setpoints }: { setpoints: JevSetpoints }) {
+  const part = (key: "p2_shot_size" | "p2_vwc_threshold", name: string) => {
+    const range = setpoints.range[key];
+    if (!range) return null;
+    const home = setpoints.home[key],
+      now = setpoints.current[key];
+    return `${name} ${rangeText(range)}%${home === undefined ? "" : ` (yours ${number(home)}%${now !== undefined && now !== home ? `, now ${number(now)}%` : ""})`}`;
+  };
+  const parts = [part("p2_shot_size", "shot size"), part("p2_vwc_threshold", "re-water point")];
+  const paused = setpoints.pausedUntil !== null && setpoints.pausedUntil > Date.now();
+  return (
+    <p className="zone-jev-setpoints" data-managed={setpoints.managed}>
+      {setpoints.managed
+        ? `The AI assistant can change the P2 ${parts.filter(Boolean).join(" and ")}.`
+        : "The AI assistant does not change the setpoints of this zone (Auto setpoints is off, or a grow plan holds them)."}
+      {setpoints.last && ` Last change ${lastChange(setpoints.last).replaceAll("->", "→")}.`}
+      {paused && ` Paused until ${clock(setpoints.pausedUntil)} after a rescue put a change back.`}
+    </p>
+  );
+}
+
+/** The AI assistant's own "2026-09-27 22:57: P2 shot 4.5% -> 4%" with the stamp as a day and a clock time. */
+function lastChange(last: string) {
+  const parts = last.match(/^(\d{4})-(\d{2})-(\d{2})[ T](\d{2}):(\d{2})(?::\d{2})?: (.+)$/);
+  if (!parts) return last;
+  const [, year, month, day, hour, minute, what] = parts;
+  const at = new Date(+year, +month - 1, +day, +hour, +minute).getTime();
+  const word = dayWord(at, Date.now());
+  return `${word === "Yesterday" ? "yesterday" : word || "today"} ${clock(at)}: ${what}`;
+}
+
+/** The zone's targets as the controller uses them now, with the AI assistant's range where it manages one; they
+ * are edited in Plan. */
+function ZoneTargets({
+  controller,
+  zone,
+  navigate,
+}: {
+  controller: Controller;
+  zone: Zone;
+  navigate: (page: Page, zone?: number) => void;
+}) {
+  const { room, states } = controller;
+  const preview = buildSetpointPreview(room, states, zone.id, {});
+  const params = preview.saved.parameters;
+  const setpoints = parseJevSetpoints(states[jevIds(room.room.prefix).zone(zone.id)]);
+  return (
+    <section className="panel zone-targets" aria-labelledby="zone-targets-title">
+      <div className="panel-heading">
+        <div>
+          <h2 id="zone-targets-title">Targets</h2>
+          <p>
+            {preview.readOnly
+              ? "Set by the armed grow plan"
+              : preview.saved.mode
+                ? `${preview.saved.mode} steering: its dryback and EC targets`
+                : "As the controller reads them now"}
+          </p>
+        </div>
+        <Button variant="outline" size="sm" onClick={() => navigate("plan/targets", zone.id)}>
+          Edit in Plan <ArrowRight size={15} aria-hidden="true" />
+        </Button>
+      </div>
+      <table className="zone-targets-table">
+        {TARGET_GROUPS.map((group) => (
+          <tbody key={group.phase}>
+            <tr className="zone-targets-phase">
+              <th colSpan={3} scope="colgroup">
+                <span className="pill" data-phase={group.phase}>
+                  {group.phase}
+                </span>{" "}
+                {group.title.split(" · ")[1]}
+              </th>
+            </tr>
+            {group.rows.map((row) => {
+              const value = params[row.key];
+              const chip = jevChip(setpoints, row.key, row.unit);
+              return (
+                <tr key={row.key}>
+                  <th scope="row">{row.label}</th>
+                  <td className="numeric">
+                    {value === undefined ? "—" : number(value, row.digits ?? 1)}
+                    {value !== undefined && row.unit && <span className="unit"> {row.unit}</span>}
+                  </td>
+                  <td>{chip && <span className="jev-chip">{chip}</span>}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        ))}
+      </table>
+    </section>
+  );
+}
+
+/** The probes behind the zone's two readings: each one's reading, whether the combined reading uses
+ * it, and whether to believe it (lib/probes, as Equipment › Probes shows them). */
+function ZoneProbes({
+  controller,
+  zone,
+  navigate,
+}: {
+  controller: Controller;
+  zone: Zone;
+  navigate: (page: Page) => void;
+}) {
+  const { states } = controller;
+  const probes = zoneProbes(zone, states, Date.now());
+  return (
+    <section className="panel zone-probes" aria-labelledby="zone-probes-title">
+      <div className="panel-heading">
+        <div>
+          <div className="label-with-tip">
+            <h2 id="zone-probes-title">Probes</h2>
+            <UiTip copyKey="probes" />
+          </div>
+          <p>What each probe reads, and whether the zone’s reading uses it</p>
+        </div>
+        <Button variant="ghost" size="sm" onClick={() => navigate("equipment/probes")}>
+          Equipment <ArrowRight size={15} aria-hidden="true" />
+        </Button>
+      </div>
+      <div className="zone-panel-body">
+        {(["vwc", "ec"] as const).map((kind) => {
+          const metric = zone[kind];
+          const fused = metric.entityId ? states[metric.entityId] : undefined;
+          const spread =
+            typeof fused?.attributes.spread === "number" ? fused.attributes.spread : null;
+          const mine = probes.filter((probe) => probe.kind === kind);
+          const method = fusionMethod(fused);
+          const steersOn = kind === "ec" ? ecType(fused) : null;
+          return (
+            <div className="zone-probe-group" key={kind}>
+              <h3>
+                {kind === "vwc" ? "Moisture" : "Pore EC"}{" "}
+                <span className="muted">
+                  {metric.value === null
+                    ? "· no usable reading"
+                    : `· zone reads ${number(metric.value, kind === "ec" ? 2 : 1)}${kind === "vwc" ? "%" : ""}`}
+                  {spread !== null &&
+                    mine.filter((probe) => probe.used).length > 1 &&
+                    ` · probes ${number(spread, kind === "ec" ? 2 : 1)} apart`}
+                  {method && ` · the ${method}`}
+                  {steersOn && ` · ${steersOn}`}
+                </span>
+              </h3>
+              <ul className="zone-probe-list">
+                {mine.map((probe) => (
+                  <li key={probe.id}>
+                    <span className="zone-probe-name">
+                      {probe.name}
+                      <code>{probe.id}</code>
+                    </span>
+                    <span className="numeric">
+                      {probe.value === null ? "—" : `${probe.value} ${probe.unit}`.trim()}
+                    </span>
+                    <Pill dot tone={PROBE_TONE[probe.health]} data-probe-health={probe.health}>
+                      {probe.health !== "ok"
+                        ? probe.text
+                        : probe.used === null
+                          ? "Reporting"
+                          : "Used"}
+                    </Pill>
+                  </li>
+                ))}
+                {!mine.length && (
+                  <li>
+                    <span className="zone-probe-name">Not mapped</span>
+                  </li>
+                )}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+/** Pause the zone's scheduling, and move it to a phase by hand: each through its review. */
+function ZoneControls({ controller, zone }: { controller: Controller; zone: Zone }) {
+  const [review, setReview] = useState(false);
+  const [phaseChoice, setPhaseChoice] = useState<string | null>(null);
+  const connected = ["live", "demo"].includes(controller.connection);
+  const pauseWords =
+    "Paused, the zone gets no water at all, not even a rescue shot, and a shot already running in it stops within a few seconds. It is not an emergency stop: use the installation's physical shut-off for that.";
+  return (
+    <section className="panel zone-controls" aria-labelledby="zone-controls-title">
+      <div className="panel-heading">
+        <h2 id="zone-controls-title">Controls</h2>
+      </div>
+      <div className="zone-panel-body">
+        <div className="zone-control-row">
+          <span>
+            Scheduling{" "}
+            <Pill
+              dot
+              tone={zone.enabled === true ? "on" : zone.enabled === false ? "warn" : "unknown"}
+            >
+              {zone.enabled === true ? "On" : zone.enabled === false ? "Paused" : "Unavailable"}
+            </Pill>
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            title={
+              zone.enabled
+                ? pauseWords
+                : "The controller waters the zone again from its next check."
+            }
+            disabled={!zone.enabledEntity || zone.enabled === null || !connected}
+            onClick={() => setReview(true)}
+          >
+            {zone.enabled ? "Pause zone scheduling" : "Enable zone scheduling"}
+          </Button>
+        </div>
+        {zone.setPhaseEntity && (
+          <div className="zone-control-row zone-phase-row">
+            <span>Move to a phase</span>
+            <div className="phase-picker" role="group" aria-label={`Move ${zone.name} to`}>
+              {Object.entries(PHASE_NAMES).map(([phase, name]) => (
+                <Button
+                  key={phase}
+                  size="sm"
+                  variant="outline"
+                  aria-pressed={phase === zone.phase}
+                  title={`${phase} · ${name}: the controller moves the zone within a minute and continues from there. Lights-off still moves it to P3, and lights-on to P0.`}
+                  disabled={phase === zone.phase || !connected}
+                  onClick={() => setPhaseChoice(phase)}
+                >
+                  {phase} · {name}
+                </Button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      {zone.enabledEntity && (
+        <ReviewDialog
+          open={review}
+          onOpenChange={setReview}
+          controller={controller}
+          title="Review zone switch"
+          items={[
+            {
+              change: { entityId: zone.enabledEntity, value: !zone.enabled },
+              label: `${zone.name} scheduling`,
+              before: zone.enabled ? "Enabled" : "Paused",
+              after: zone.enabled ? "Paused" : "Enabled",
+            },
+          ]}
+          note={
+            zone.enabled
+              ? "Paused, the zone gets no water, not even a rescue shot, and a shot already running in it stops within a few seconds."
+              : "The controller waters the zone again from its next check."
+          }
+        />
+      )}
+      {zone.setPhaseEntity && (
+        <ReviewDialog
+          open={phaseChoice !== null}
+          onOpenChange={(open) => {
+            if (!open) setPhaseChoice(null);
+          }}
+          controller={controller}
+          title={`Move ${zone.name} to ${phaseChoice}?`}
+          items={
+            phaseChoice
+              ? [
+                  {
+                    change: { entityId: zone.setPhaseEntity, value: phaseChoice },
+                    label: `${zone.name} phase`,
+                    before: zone.phase,
+                    after: phaseChoice,
+                  },
+                ]
+              : []
+          }
+          note="The controller moves the zone at its next check, within a minute. Today's water and shot counts stay; a zone moved to P1 ramps from its first shot again."
+        />
+      )}
+    </section>
+  );
+}

@@ -1,0 +1,53 @@
+"""What the Setpoints judge remembers per zone, in /data/jev_setpoints.json (docs/AI_ASSISTANT.md).
+
+- `home`: the operator's own value of each setting the AI assistant may move, the centre of its band. It is the value first
+  seen, and it follows the operator: any value the AI assistant did not write becomes the new home.
+- `written`: the last value the AI assistant wrote for each setting, so an operator's edit can be told from the AI assistant's own.
+- `pending`: a write Home Assistant has not reflected yet {suffix, from, to, by, at, tries, next}: the old value is
+  not an edit while it is read back, sent again and, if it never lands, recorded as failed (brain_bridge.readback).
+- `last`: the last move {suffix, from, to, at, day, words, choice, reverted}.
+- `frozen_until`: when a zone paused after a safety revert may be moved again.
+- `ai`: the AI powers' memory for the zone (brain_bridge, "the AI assistant's powers"): the zone's scorecard by grow-day
+  (`days`), the AI assistant's own changes with what it expected (`changes`), what the powers wrote (`written`) and
+  writes being read back (`pending`).
+"""
+from __future__ import annotations
+
+import json
+import os
+import threading
+
+
+def _blank():
+    return {"home": {}, "written": {}, "pending": None, "last": None, "frozen_until": None, "ai": {}}
+
+
+class SetpointMemory:
+    def __init__(self, path=None):
+        self.path = path
+        self.zones: dict[str, dict] = {}
+        self._lock = threading.Lock()
+        if path and os.path.exists(path):
+            try:
+                with open(path, encoding="utf-8") as fh:
+                    data = json.load(fh)
+                self.zones = {k: {**_blank(), **v} for k, v in data.items() if isinstance(v, dict)}
+            except (OSError, ValueError, AttributeError):
+                self.zones = {}  # a damaged memory starts again: every zone re-centres on the operator's values
+
+    def zone(self, room, zone):
+        with self._lock:
+            return self.zones.setdefault(f"{room}:{zone}", _blank())
+
+    def save(self):
+        if not self.path:
+            return
+        with self._lock:
+            data = json.dumps(self.zones, default=str, indent=1)
+        tmp = self.path + ".tmp"
+        try:
+            with open(tmp, "w", encoding="utf-8") as fh:
+                fh.write(data)
+            os.replace(tmp, self.path)
+        except OSError:
+            pass  # lost memory re-centres the bands on the operator's values; it never stops the controller

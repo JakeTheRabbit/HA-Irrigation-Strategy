@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "minor_version": 1,
+  "key": "crop_steering.notify",
+  "data": {
+    "revision": 6,
+    "idle_hours": 2,
+    "recipients": [
+      {
+        "service": "notify.mobile_app_staff_phone",
+        "name": "Staff phone",
+        "user_id": null,
+        "kinds": ["sensors", "watering", "phases"],
+        "rooms": [],
+        "urgent_high_priority": true
+      },
+      {
+        "service": "notify.mobile_app_office_tablet",
+        "name": "Office tablet",
+        "user_id": null,
+        "kinds": ["emergency", "hardware"],
+        "rooms": [""],
+        "urgent_high_priority": false
+      }
+    ]
+  }
+}

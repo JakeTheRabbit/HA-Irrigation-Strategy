@@ -1,0 +1,100 @@
+{
+  "_about": "A room's stock and dosing stores exactly as 3.8.0 left them, modelled on a live room on 4 Oct 2026 (entity ids made generic). Four stock tanks, each linked to one pump of a 5.1.x ESPHome peristaltic doser that a Home Assistant automation doses by pressing its dose button, so the controller app never ran a dose there and never sent a draw. The levels were set by hand on 29 Sep and never moved: the history is 30 fills of the batch tank that drew nothing (every tank is linked to a pump), and there are no draw keys. Seed 'stock' and 'dosing' as the stores crop_steering.stock.<entry_id> and crop_steering.dosing.<entry_id>. 'states' is the doser idle, as it reports: its status reads 'Stopped' ('Running (Manual)' while it doses, which the setup's default dosing prefix 'Dosing' never matches) and its power switch reads off (on while it doses).",
+  "stock": {
+    "revision": 298,
+    "tanks": [
+      {"id": "balance", "name": "Balance", "capacity_l": 20.0, "level_l": 10.0, "dose_ml": 300.0, "dose_entity": "number.doser_balance_dose_amount", "low_l": 5.0, "refilled_at": null, "updated_at": "2026-09-28T20:58:41.512301+00:00"},
+      {"id": "bloom", "name": "Bloom", "capacity_l": 20.0, "level_l": 20.0, "dose_ml": 1800.0, "dose_entity": "number.doser_bloom_dose_amount", "low_l": 5.0, "refilled_at": null, "updated_at": "2026-09-28T20:58:41.512301+00:00"},
+      {"id": "core", "name": "Core", "capacity_l": 20.0, "level_l": 18.0, "dose_ml": 1080.0, "dose_entity": "number.doser_core_dose_amount", "low_l": 5.0, "refilled_at": null, "updated_at": "2026-09-28T20:58:41.512301+00:00"},
+      {"id": "cleanse", "name": "Cleanse", "capacity_l": 20.0, "level_l": 5.0, "dose_ml": 200.0, "dose_entity": "number.doser_cleanse_dose_amount", "low_l": 5.0, "refilled_at": null, "updated_at": "2026-09-28T20:58:41.512301+00:00"}
+    ],
+    "last_batch": "2026-10-03T20:39:54+13:00",
+    "history": [
+      {"at": "2026-10-03T20:39:54+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-10-03T11:49:41+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-10-02T15:39:31+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-10-01T18:08:08+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-10-01T17:45:07+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-10-01T17:41:02+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-10-01T11:15:32+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-30T16:11:14+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-30T12:32:19+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-30T10:52:30+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-30T10:52:29+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-30T10:52:27+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-30T10:52:25+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-30T10:40:55+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T10:01:16+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:19+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:18+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:17+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:14+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:12+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:11+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:10+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:08+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:07+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:05+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:03+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:02+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:59:00+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:58:59+13:00", "source": "fill", "draw_ml": {}},
+      {"at": "2026-09-29T09:58:58+13:00", "source": "fill", "draw_ml": {}}
+    ],
+    "draw_keys": []
+  },
+  "dosing": {
+    "revision": 1,
+    "pumps": [
+      {"id": "balance", "name": "Balance", "volume_entity": "number.doser_balance_dose_amount", "start_entity": "button.doser_balance_dose_now", "dosing_entity": "sensor.doser_balance_pump_status", "dosing_prefix": "Dosing", "power_entity": "switch.doser_balance_pump_power", "flow_entity": "sensor.doser_balance_flow_rate", "max_ml": 2000, "restore_volume": true, "stock_tank": "balance"},
+      {"id": "bloom", "name": "Bloom", "volume_entity": "number.doser_bloom_dose_amount", "start_entity": "button.doser_bloom_dose_now", "dosing_entity": "sensor.doser_bloom_pump_status", "dosing_prefix": "Dosing", "power_entity": "switch.doser_bloom_pump_power", "flow_entity": "sensor.doser_bloom_flow_rate", "max_ml": 2000, "restore_volume": true, "stock_tank": "bloom"},
+      {"id": "core", "name": "Core", "volume_entity": "number.doser_core_dose_amount", "start_entity": "button.doser_core_dose_now", "dosing_entity": "sensor.doser_core_pump_status", "dosing_prefix": "Dosing", "power_entity": "switch.doser_core_pump_power", "flow_entity": "sensor.doser_core_flow_rate", "max_ml": 2000, "restore_volume": true, "stock_tank": "core"},
+      {"id": "cleanse", "name": "Cleanse", "volume_entity": "number.doser_cleanse_dose_amount", "start_entity": "button.doser_cleanse_dose_now", "dosing_entity": "sensor.doser_cleanse_pump_status", "dosing_prefix": "Dosing", "power_entity": "switch.doser_cleanse_pump_power", "flow_entity": "sensor.doser_cleanse_flow_rate", "max_ml": 2000, "restore_volume": true, "stock_tank": "cleanse"}
+    ],
+    "batch": {
+      "fill_valve": "switch.batch_tank_fill_valve",
+      "full_entity": "sensor.batch_tank_float",
+      "full_state": "Full",
+      "fill_timeout_min": 20,
+      "mix_pump": "switch.batch_tank_mix_pump",
+      "mix_valves": ["switch.batch_tank_mix_valve"],
+      "mix_power_sensor": "sensor.batch_tank_mix_pump_power",
+      "mix_min_w": 200,
+      "premix_min": 2,
+      "postmix_min": 5,
+      "close_entities": ["switch.feed_valve_left", "switch.feed_valve_right", "switch.waste_valve"],
+      "hold_entity": "input_boolean.batch_tank_dosing",
+      "filled_at_entity": "input_datetime.batch_tank_filled_at",
+      "recipe": [
+        {"pump": "balance", "ml": 300, "ml_entity": "number.doser_balance_dose_amount"},
+        {"pump": "bloom", "ml": 1800, "ml_entity": "number.doser_bloom_dose_amount"},
+        {"pump": "core", "ml": 1080, "ml_entity": "number.doser_core_dose_amount"},
+        {"pump": "cleanse", "ml": 200, "ml_entity": "number.doser_cleanse_dose_amount"}
+      ]
+    },
+    "request": null,
+    "updated_at": "2026-09-28T12:00:00+13:00"
+  },
+  "states": {
+    "number.doser_balance_dose_amount": "300.0",
+    "button.doser_balance_dose_now": "2026-10-03T07:42:03.072326+00:00",
+    "sensor.doser_balance_pump_status": "Stopped",
+    "switch.doser_balance_pump_power": "off",
+    "sensor.doser_balance_flow_rate": "11.061206817627",
+    "number.doser_bloom_dose_amount": "1800.0",
+    "button.doser_bloom_dose_now": "2026-10-03T07:43:00.078386+00:00",
+    "sensor.doser_bloom_pump_status": "Stopped",
+    "switch.doser_bloom_pump_power": "off",
+    "sensor.doser_bloom_flow_rate": "10.1682958602905",
+    "number.doser_core_dose_amount": "1080.0",
+    "button.doser_core_dose_now": "2026-10-03T07:46:27.081871+00:00",
+    "sensor.doser_core_pump_status": "Stopped",
+    "switch.doser_core_pump_power": "off",
+    "sensor.doser_core_flow_rate": "11.6921768188477",
+    "number.doser_cleanse_dose_amount": "200.0",
+    "button.doser_cleanse_dose_now": "2026-10-03T07:48:29.087192+00:00",
+    "sensor.doser_cleanse_pump_status": "Stopped",
+    "switch.doser_cleanse_pump_power": "off",
+    "sensor.doser_cleanse_flow_rate": "10.1024017333984"
+  }
+}

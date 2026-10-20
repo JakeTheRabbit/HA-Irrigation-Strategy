@@ -1,0 +1,651 @@
+"""Batch-tank dosing: each room's dosing pumps, batch hardware and recipe, checked, and the one
+request the dashboard leaves for the controller app. Pure (no Home Assistant import), so it is tested
+directly; dosing_api.py stores it and serves the services. The contract is docs/DOSING.md.
+
+The integration only ever stores this. The controller app does every action, and only on a request
+younger than REQUEST_MAX_AGE_S seconds, so a request is "pending" only until the controller has
+handled it or it is too old for the controller to act on.
+
+The feed schedule: a room may keep named feed recipes, each a recipe like the batch's own, and give
+each week of the grow one of them (Week 1 Vege, Weeks 2-6 Bloom, Weeks 7-8 Fade) from the day its
+first week starts, counted in Home Assistant's days, so the recipe moves on by itself at the midnight
+that starts a week; after the last week, that week's recipe carries on. A recipe picked by hand while
+the schedule runs holds until the schedule's next week starts. Without a schedule running, the
+recipe picked by hand is the one in use, and with none picked the batch's own recipe is. A feed
+recipe may declare the feed EC it mixes to; the controller waters on it only without a feed EC probe.
+"""
+
+from __future__ import annotations
+
+import math
+import re
+from datetime import date, datetime, timedelta
+
+MAX_PUMPS = 8
+MAX_MIX_VALVES = 4
+MAX_CLOSE = 16
+MAX_ML = 5000
+MAX_PARTS = 100
+REQUEST_MAX_AGE_S = 120
+MAX_RECIPES = 12
+MAX_WEEKS = 52  # a feed schedule's weeks
+ACTIONS = ("dose", "batch", "stop")
+# A pump's pH role for pH auto-correct (docs/DOSING.md): at most one pump per role in a room. Stored only
+# when set, so a setup from before it reads back unchanged.
+PH_ROLES = ("ph_up", "ph_down")
+# Every domain a dosing setup can use: what dosing_get offers to pick from.
+CANDIDATE_DOMAINS = (
+    "number",
+    "input_number",
+    "button",
+    "input_button",
+    "script",
+    "binary_sensor",
+    "sensor",
+    "switch",
+    "input_boolean",
+    "input_datetime",
+)
+VOLUME = ("number", "input_number")
+START = ("button", "input_button", "script")
+DOSING = ("binary_sensor", "sensor")
+POWER = ("switch",)
+FLOW = ("number", "input_number", "sensor")
+FULL = ("binary_sensor", "sensor")
+ML_ENTITY = ("number", "input_number", "sensor")
+LEVEL = ("sensor", "number", "input_number")
+# The refill reminder's settings: a save that does not send them keeps the stored ones, so a page
+# that does not know them never switches the reminder off (dosing_api.py).
+REMINDER = ("level_entity", "remind_pct")
+
+# The room's dosing hardware profile (docs/DOSING.md, Hardware profile): the times and limits the
+# controller app works to, as key: (default, low, high, label). Each default is the value every room
+# used before it could be set, so a setup stored without a profile runs exactly as before.
+PROFILE = {
+    "hold_wait_s": (600, 60, 3600, "wait for a shot in flight (s)"),
+    "fill_open_s": (10, 2, 120, "fill valve open read-back (s)"),
+    "full_blind_s": (15, 5, 300, "full sensor silence (s)"),
+    "mix_power_s": (20, 5, 300, "mix pump power read-back (s)"),
+    "min_flow_ml_s": (0.05, 0.01, 100, "lowest calibrated flow (mL/s)"),
+    "max_dose_s": (1200, 60, 3600, "longest dose (s)"),
+}
+
+_ID = re.compile(r"^[a-z0-9_]{1,24}$")
+_OBJECT = re.compile(r"^[a-z0-9_]+$")
+
+
+class DosingError(ValueError):
+    """A dosing setup or request that cannot be accepted; the message is shown to the operator."""
+
+
+def empty_batch() -> dict:
+    return {
+        "fill_valve": None,
+        "full_entity": None,
+        "full_state": "on",
+        "fill_timeout_min": 20,
+        "mix_pump": None,
+        "mix_valves": [],
+        "mix_power_sensor": None,
+        "mix_min_w": 0,
+        "premix_min": 2,
+        "postmix_min": 5,
+        "close_entities": [],
+        "hold_entity": None,
+        "filled_at_entity": None,
+        "name": "",
+        "level_entity": None,
+        "remind_pct": 0,
+        "recipe": [],
+    }
+
+
+def empty_feed() -> dict:
+    return {
+        "recipes": [],
+        # Each week's recipe id from the day the first week starts; no start or no weeks = none.
+        "schedule": {"start": None, "weeks": []},
+        "stage": None,  # the recipe picked by hand
+        "held_until": None,  # a recipe picked while the schedule runs holds until this day
+    }
+
+
+def empty_profile() -> dict:
+    return {key: spec[0] for key, spec in PROFILE.items()}
+
+
+def empty() -> dict:
+    return {
+        "revision": 0,
+        "pumps": [],
+        "batch": empty_batch(),
+        "feed": empty_feed(),
+        "profile": empty_profile(),
+        "request": None,
+        "updated_at": None,
+    }
+
+
+def _choices(domains) -> str:
+    return (
+        domains[0]
+        if len(domains) == 1
+        else f"{', '.join(domains[:-1])} or {domains[-1]}"
+    )
+
+
+def _entity(value, domains, what, exists, optional=False):
+    text = "" if value is None else str(value).strip()
+    if not text:
+        if optional:
+            return None
+        raise DosingError(f"{what} is required")
+    domain, _, rest = text.partition(".")
+    if domain not in domains or not _OBJECT.match(rest):
+        raise DosingError(f"{what} must be a {_choices(domains)} entity, not {text}")
+    if exists is not None and not exists(text):
+        raise DosingError(f"{what}: {text} does not exist in Home Assistant")
+    return text
+
+
+def _entities(value, domains, what, most, exists):
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > most:
+        raise DosingError(f"{what}: send a list of at most {most}")
+    out = [_entity(item, domains, what, exists) for item in value]
+    if len(set(out)) != len(out):
+        raise DosingError(f"{what}: an entity is listed twice")
+    return out
+
+
+def _number(value, low, high, what, default=None):
+    if value is None:
+        value = default
+    if value is None or isinstance(value, bool):
+        raise DosingError(f"{what} must be a number")
+    try:
+        number = float(value)
+    except (TypeError, ValueError):
+        raise DosingError(f"{what} must be a number") from None
+    if not math.isfinite(number) or not low <= number <= high:
+        raise DosingError(f"{what} must be between {low:g} and {high:g}")
+    return int(number) if number.is_integer() else number
+
+
+def _text(value, default, what):
+    text = default if value in (None, "") else str(value).strip()
+    if not 1 <= len(text) <= 40:
+        raise DosingError(f"{what} must be 1 to 40 characters")
+    return text
+
+
+def _slug(name: str, taken: set[str]) -> str:
+    base = re.sub(r"[^a-z0-9]+", "_", name.lower()).strip("_")[:20] or "pump"
+    slug, n = base, 2
+    while slug in taken:
+        slug, n = f"{base}_{n}", n + 1
+    return slug
+
+
+def _stock_tank(value, label, stock_tanks):
+    """The id of the room's stock tank this pump doses from, or None (docs/DOSING.md, Stock tanks)."""
+    if value in (None, ""):
+        return None
+    tank = str(value).strip()
+    if stock_tanks is not None and tank not in stock_tanks:
+        raise DosingError(f"{label}: {tank} is not one of this room's stock tanks")
+    return tank
+
+
+def _pump(raw, taken, exists, stock_tanks=None) -> dict:
+    if not isinstance(raw, dict):
+        raise DosingError("each pump must be an object")
+    name = str(raw.get("name") or "").strip()
+    if not 1 <= len(name) <= 40:
+        raise DosingError("each pump needs a name of 1 to 40 characters")
+    given = raw.get("id")
+    pump_id = str(given).strip() if given not in (None, "") else _slug(name, taken)
+    if not _ID.match(pump_id):
+        raise DosingError(
+            f"pump {name}: its id must be 1 to 24 characters of a-z, 0-9 and _"
+        )
+    if pump_id in taken:
+        raise DosingError(f"two pumps have the id {pump_id}")
+    label = f"pump {name}"
+    restore = raw.get("restore_volume", True)
+    if not isinstance(restore, bool):
+        raise DosingError(f"{label}: restore volume must be true or false")
+    role = raw.get("ph_role")
+    if role in ("", "none"):
+        role = None
+    if role is not None and role not in PH_ROLES:
+        raise DosingError(f"{label}: its pH role must be ph_up, ph_down or none")
+    pump = {
+        "id": pump_id,
+        "name": name,
+        "volume_entity": _entity(
+            raw.get("volume_entity"), VOLUME, f"{label}: volume entity", exists
+        ),
+        "start_entity": _entity(
+            raw.get("start_entity"), START, f"{label}: start entity", exists
+        ),
+        "dosing_entity": _entity(
+            raw.get("dosing_entity"), DOSING, f"{label}: dosing entity", exists
+        ),
+        "dosing_prefix": _text(
+            raw.get("dosing_prefix"), "Dosing", f"{label}: dosing prefix"
+        ),
+        "power_entity": _entity(
+            raw.get("power_entity"), POWER, f"{label}: power switch", exists
+        ),
+        "flow_entity": _entity(
+            raw.get("flow_entity"), FLOW, f"{label}: flow entity", exists
+        ),
+        "max_ml": _number(raw.get("max_ml"), 1, MAX_ML, f"{label}: max mL"),
+        "restore_volume": restore,
+        "stock_tank": _stock_tank(raw.get("stock_tank"), label, stock_tanks),
+    }
+    if role:
+        pump["ph_role"] = role
+    return pump
+
+
+def whole_ml(ml) -> int:
+    """A recipe dose in whole mL, half up (12.5 -> 13): what the pump is sent."""
+    return math.floor(ml + 0.5)
+
+
+def _recipe(raw, pumps: dict, exists, part_ml=None) -> list[dict]:
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or len(raw) > MAX_PUMPS:
+        raise DosingError(f"the recipe: send a list of at most {MAX_PUMPS} doses")
+    out, seen = [], set()
+    for item in raw:
+        if not isinstance(item, dict):
+            raise DosingError("each recipe dose must be an object")
+        pump = pumps.get(str(item.get("pump") or ""))
+        if pump is None:
+            raise DosingError(
+                f"the recipe doses pump {item.get('pump')}, which is not set up"
+            )
+        if pump["id"] in seen:
+            raise DosingError(f"the recipe doses {pump['name']} twice")
+        seen.add(pump["id"])
+        label = f"the recipe's {pump['name']} dose"
+        parts = item.get("parts")
+        if parts is None:
+            ml = _number(item.get("ml"), 0, pump["max_ml"], f"{label} (mL)", 0)
+        elif part_ml is None:
+            raise DosingError(f"{label} is in parts: set how many mL 1 part is")
+        else:
+            parts = _number(parts, 0, MAX_PARTS, f"{label} (parts)")
+            ml = parts * part_ml
+            if ml > pump["max_ml"]:
+                raise DosingError(
+                    f"{label}: {parts:g} parts is {ml:g} mL, more than its "
+                    f"{pump['max_ml']:g} mL"
+                )
+        line = {
+            "pump": pump["id"],
+            "ml": whole_ml(ml),
+            "ml_entity": _entity(
+                item.get("ml_entity"),
+                ML_ENTITY,
+                f"{label}: mL entity",
+                exists,
+                optional=True,
+            ),
+        }
+        if parts is not None:
+            line["parts"] = parts
+        out.append(line)
+    return out
+
+
+def _batch(raw, pumps: dict, exists) -> dict:
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise DosingError("the batch must be an object")
+    fill_valve = _entity(
+        raw.get("fill_valve"), ("switch",), "fill valve", exists, optional=True
+    )
+    full_entity = _entity(
+        raw.get("full_entity"), FULL, "tank full entity", exists, optional=True
+    )
+    if fill_valve and not full_entity:
+        raise DosingError("a fill valve needs the entity that says the tank is full")
+    mix_power_sensor = _entity(
+        raw.get("mix_power_sensor"),
+        ("sensor",),
+        "mix pump power sensor",
+        exists,
+        optional=True,
+    )
+    mix_min_w = _number(
+        raw.get("mix_min_w"), 0, 100000, "mix pump minimum power (W)", 0
+    )
+    name = str(raw.get("name") or "").strip()
+    if len(name) > 40:
+        raise DosingError("the recipe's name must be at most 40 characters")
+    if mix_min_w > 0 and not mix_power_sensor:
+        # Without it the controller could not check the power, and would mix unchecked.
+        raise DosingError(
+            "a mix pump minimum power needs the mix pump power sensor that reads it"
+        )
+    part_ml = raw.get("part_ml")
+    if part_ml is not None:
+        part_ml = _number(part_ml, 0.1, MAX_ML, "1 part (mL)")
+    level_entity = _entity(
+        raw.get("level_entity"), LEVEL, "tank level entity", exists, optional=True
+    )
+    remind_pct = _number(raw.get("remind_pct"), 0, 100, "refill reminder (%)", 0)
+    if remind_pct > 0 and not level_entity:
+        raise DosingError(
+            "a refill reminder needs the entity that reads the tank's level"
+        )
+    cleaned = {
+        "fill_valve": fill_valve,
+        "full_entity": full_entity,
+        "full_state": _text(raw.get("full_state"), "on", "the full state"),
+        "fill_timeout_min": _number(
+            raw.get("fill_timeout_min"), 1, 60, "fill timeout (min)", 20
+        ),
+        "mix_pump": _entity(
+            raw.get("mix_pump"), ("switch",), "mix pump", exists, optional=True
+        ),
+        "mix_valves": _entities(
+            raw.get("mix_valves"), ("switch",), "mix valves", MAX_MIX_VALVES, exists
+        ),
+        "mix_power_sensor": mix_power_sensor,
+        "mix_min_w": mix_min_w,
+        "premix_min": _number(raw.get("premix_min"), 0, 30, "premix (min)", 2),
+        "postmix_min": _number(raw.get("postmix_min"), 0, 60, "postmix (min)", 5),
+        "close_entities": _entities(
+            raw.get("close_entities"),
+            ("switch",),
+            "switches to close",
+            MAX_CLOSE,
+            exists,
+        ),
+        "hold_entity": _entity(
+            raw.get("hold_entity"), ("input_boolean",), "hold", exists, optional=True
+        ),
+        "filled_at_entity": _entity(
+            raw.get("filled_at_entity"),
+            ("input_datetime",),
+            "filled-at",
+            exists,
+            optional=True,
+        ),
+        "name": name,
+        "level_entity": level_entity,
+        "remind_pct": remind_pct,
+        "recipe": _recipe(raw.get("recipe"), pumps, exists, part_ml),
+    }
+    if part_ml is not None:  # only when set, so an older store reads back unchanged
+        cleaned["part_ml"] = part_ml
+    return cleaned
+
+
+def clean(pumps, batch, exists=None, stock_tanks=None) -> tuple[list[dict], dict]:
+    """The operator's pumps and batch -> what is stored (docs/DOSING.md, Validation).
+
+    `exists(entity_id)` says whether Home Assistant knows an entity, and `stock_tanks` are the ids
+    of the room's stock tanks a pump may be linked to. None skips that check: a stored setup read
+    back at start-up, before every device has come back, is not thrown away. A pump keeps the id
+    it is sent; one sent without an id gets one from its name.
+    """
+    if not isinstance(pumps, list) or len(pumps) > MAX_PUMPS:
+        raise DosingError(f"send a list of at most {MAX_PUMPS} pumps")
+    ids = {
+        str(item.get("id")).strip()
+        for item in pumps
+        if isinstance(item, dict) and item.get("id") not in (None, "")
+    }
+    out = []
+    for raw in pumps:
+        # Every id sent counts as taken, so a new pump's generated id never steals one.
+        own = str(raw.get("id")).strip() if isinstance(raw, dict) else None
+        taken = {p["id"] for p in out} | (ids - {own})
+        out.append(_pump(raw, taken, exists, stock_tanks))
+    links = [pump["stock_tank"] for pump in out if pump["stock_tank"]]
+    twice = next((tank for tank in links if links.count(tank) > 1), None)
+    if twice:
+        raise DosingError(f"stock tank {twice} is linked to two pumps")
+    roles = [pump.get("ph_role") for pump in out if pump.get("ph_role")]
+    twice = next((role for role in roles if roles.count(role) > 1), None)
+    if twice:
+        raise DosingError(f"two pumps have the {twice.replace('_', ' ')} role")
+    by_id = {pump["id"]: pump for pump in out}
+    cleaned = _batch(batch, by_id, exists)
+    hardware = {
+        cleaned["fill_valve"],
+        cleaned["mix_pump"],
+        *cleaned["mix_valves"],
+        *cleaned["close_entities"],
+    } - {None}
+    for pump in out:
+        if pump["power_entity"] in hardware:
+            raise DosingError(
+                f"{pump['power_entity']} is pump {pump['name']}'s power switch and batch "
+                "hardware: it cannot be both"
+            )
+    return out, cleaned
+
+
+def _day(value, what) -> str | None:
+    """A day, YYYY-MM-DD, or None."""
+    if value in (None, ""):
+        return None
+    try:
+        return date.fromisoformat(str(value)).isoformat()
+    except ValueError:
+        raise DosingError(f"{what} must be a date (YYYY-MM-DD)") from None
+
+
+def clean_feed(raw, pumps: list[dict], exists=None) -> dict:
+    """The room's feed recipes and schedule -> what is stored. Each recipe doses only the room's
+    pumps, each at most once, as the batch's recipe does; each week of the schedule names one of the
+    recipes. `exists` as for clean()."""
+    if raw is None:
+        return empty_feed()
+    if not isinstance(raw, dict):
+        raise DosingError("the feed schedule must be an object")
+    recipes = raw.get("recipes") or []
+    if not isinstance(recipes, list) or len(recipes) > MAX_RECIPES:
+        raise DosingError(f"send a list of at most {MAX_RECIPES} feed recipes")
+    by_id = {pump["id"]: pump for pump in pumps}
+    given = {
+        str(item.get("id")).strip()
+        for item in recipes
+        if isinstance(item, dict) and item.get("id") not in (None, "")
+    }
+    out, names = [], set()
+    for item in recipes:
+        if not isinstance(item, dict):
+            raise DosingError("each feed recipe must be an object")
+        name = _text(item.get("name"), "", "a feed recipe's name")
+        if name.casefold() in names:
+            raise DosingError(f"two feed recipes are called {name}")
+        names.add(name.casefold())
+        own = str(item["id"]).strip() if item.get("id") not in (None, "") else None
+        taken = {recipe["id"] for recipe in out} | (given - {own})
+        recipe_id = own or _slug(name, taken)
+        if not _ID.match(recipe_id):
+            raise DosingError(
+                f"feed recipe {name}: its id must be 1 to 24 characters of a-z, 0-9 and _"
+            )
+        if recipe_id in taken:
+            raise DosingError(f"two feed recipes have the id {recipe_id}")
+        try:
+            doses = _recipe(item.get("doses"), by_id, exists)
+        except DosingError as error:
+            raise DosingError(f"feed recipe {name}: {error}") from None
+        # The feed EC the recipe mixes to, mS/cm, optional: watering compares pore EC with it
+        # when no feed EC probe is mapped.
+        ec = item.get("ec")
+        if ec not in (None, ""):
+            ec = _number(ec, 0.1, 10, f"feed recipe {name}: its feed EC (mS/cm)")
+        out.append({"id": recipe_id, "name": name, "doses": doses, "ec": ec or None})
+    ids = {recipe["id"] for recipe in out}
+    schedule = raw.get("schedule") or {}
+    if not isinstance(schedule, dict):
+        raise DosingError("the feed schedule's weeks must be an object")
+    weeks = schedule.get("weeks") or []
+    if not isinstance(weeks, list) or len(weeks) > MAX_WEEKS:
+        raise DosingError(f"a feed schedule has at most {MAX_WEEKS} weeks")
+    for number, recipe_id in enumerate(weeks, start=1):
+        if recipe_id not in ids:
+            raise DosingError(
+                f"week {number} of the feed schedule uses a feed recipe that is not there"
+            )
+    stage = raw.get("stage")
+    return {
+        "recipes": out,
+        "schedule": {
+            "start": _day(schedule.get("start"), "the feed schedule's first week"),
+            "weeks": list(weeks),
+        },
+        "stage": stage if stage in ids else None,
+        "held_until": _day(raw.get("held_until"), "a feed recipe held by hand"),
+    }
+
+
+def schedule_week(feed: dict, today: date) -> tuple[int, str] | None:
+    """The feed schedule's week today and the recipe id it doses then; None without a schedule (no
+    first day, or no weeks) or before it starts. Week 1 is the 7 days from its first day; after its
+    last week, the last week's recipe carries on."""
+    schedule = feed.get("schedule") or {}
+    start, weeks = schedule.get("start"), schedule.get("weeks") or []
+    if not start or not weeks:
+        return None
+    days = (today - date.fromisoformat(start)).days
+    if days < 0:
+        return None
+    week = days // 7 + 1
+    return week, weeks[min(week, len(weeks)) - 1]
+
+
+def held(feed: dict, today: date) -> str | None:
+    """Until when a recipe picked by hand holds over the schedule (YYYY-MM-DD), or None."""
+    until = feed.get("held_until")
+    if until and schedule_week(feed, today) and today < date.fromisoformat(until):
+        return until
+    return None
+
+
+def in_use(feed: dict, today: date) -> dict | None:
+    """The feed recipe in use today: the schedule's this week, unless one picked by hand still
+    holds; without a schedule running, the one picked by hand. None = the batch's own recipe.
+    """
+    now = schedule_week(feed, today)
+    wanted = feed.get("stage") if now is None or held(feed, today) else now[1]
+    return next((r for r in feed.get("recipes") or [] if r["id"] == wanted), None)
+
+
+def pick(feed: dict, recipe_id, today: date) -> dict:
+    """A recipe picked by hand, in `feed`: with the schedule running it holds until the schedule's
+    next week starts (this week's own recipe ends a hold); without one it is simply the one in use.
+    """
+    feed["stage"] = recipe_id
+    now = schedule_week(feed, today)
+    feed["held_until"] = (
+        (
+            date.fromisoformat(feed["schedule"]["start"]) + timedelta(days=7 * now[0])
+        ).isoformat()
+        if now is not None and recipe_id != now[1]
+        else None
+    )
+    return feed
+
+
+def feed_now(feed: dict, today: date) -> dict:
+    """What the room doses today and why: the recipe's name, id and declared feed EC in mS/cm (None =
+    the batch's own recipe, or no EC declared; the controller waters on a measured feed EC first),
+    the schedule's week and its length, and `source`: "schedule", "held" (picked by hand over the
+    schedule), "hand" (picked, no schedule running) or "batch" (the batch's own recipe).
+    """
+    recipe, now, holding = (
+        in_use(feed, today),
+        schedule_week(feed, today),
+        held(feed, today),
+    )
+    schedule = feed.get("schedule") or {}
+    if recipe is None:
+        source = "batch"
+    else:
+        source = "held" if holding else "schedule" if now else "hand"
+    return {
+        "recipe": recipe["name"] if recipe else None,
+        "recipe_id": recipe["id"] if recipe else None,
+        "ec": recipe.get("ec") if recipe else None,
+        "week": now[0] if now else None,
+        "weeks": len(schedule.get("weeks") or []),
+        "start": schedule.get("start"),
+        "held_until": holding,
+        "source": source,
+    }
+
+
+def clean_profile(raw) -> dict:
+    """The operator's hardware profile -> what is stored: every key, each a number in its range; a key
+    left out (or no profile at all) takes its default."""
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise DosingError("the hardware profile must be an object")
+    return {
+        key: _number(raw.get(key), low, high, f"hardware profile: {label}", default)
+        for key, (default, low, high, label) in PROFILE.items()
+    }
+
+
+def check_request(config: dict, action, pump=None, ml=None, run_anyway=False) -> tuple:
+    """A request's action, pump and mL, checked against the room's setup -> (pump, ml) to store.
+    A stop and a batch carry neither. `run_anyway`: only a batch (a test refill) may carry it.
+    """
+    if action not in ACTIONS:
+        raise DosingError("the action must be dose, batch or stop")
+    if not isinstance(run_anyway, bool):
+        raise DosingError("run anyway must be true or false")
+    if run_anyway and action != "batch":
+        raise DosingError("only a batch (a test refill) can be run anyway")
+    if action != "dose":
+        return None, None
+    found = next((p for p in config["pumps"] if p["id"] == pump), None)
+    if found is None:
+        raise DosingError(f"unknown pump: {pump}")
+    try:
+        amount = math.nan if isinstance(ml, bool) else float(ml)
+    except (TypeError, ValueError):
+        amount = math.nan
+    if not (math.isfinite(amount) and 0 < amount <= found["max_ml"]):
+        raise DosingError(
+            f"a dose of {found['name']} must be more than 0 and at most "
+            f"{found['max_ml']:g} mL"
+        )
+    return found["id"], int(amount) if amount.is_integer() else amount
+
+
+def request_time(request) -> datetime | None:
+    """When a stored request was made, as an aware time, or None when it has no usable time."""
+    try:
+        when = datetime.fromisoformat(str(request["at"]).replace("Z", "+00:00"))
+    except (KeyError, TypeError, ValueError):
+        return None
+    return when if when.tzinfo else None
+
+
+def pending(request, handled, now: datetime) -> bool:
+    """Whether the stored request still waits for the controller: it has not published the
+    request's id as handled, and the request is young enough for the controller to act on.
+    """
+    if not isinstance(request, dict) or not request.get("id"):
+        return False
+    if request["id"] == handled:
+        return False
+    when = request_time(request)
+    return when is not None and (now - when).total_seconds() <= REQUEST_MAX_AGE_S

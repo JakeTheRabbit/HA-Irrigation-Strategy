@@ -1,0 +1,453 @@
+import { loadHistoryWindow } from "./comparison-history";
+import { summarize } from "./comparison";
+import type { HistoryWindow } from "./comparison-types";
+import type { HistoryRequest } from "./comparison-types";
+import type { TimelineRequest, TimelineRows } from "./day-timeline";
+import type { OperatorAction } from "./operator-types";
+import type { Change, EntityState, RoomView, Series, States, WriteResult } from "./types";
+import { numeric, validateChange } from "./model";
+import { viewerTimeZone } from "./comparison";
+
+export interface HassSession {
+  callApi: <T>(method: string, path: string, data?: unknown) => Promise<T>;
+  callService: (domain: string, service: string, data: Record<string, unknown>) => Promise<unknown>;
+  callWS?: <T>(message: Record<string, unknown>) => Promise<T>;
+  /** Home Assistant's own websocket (`hass.connection`); see live.ts. */
+  connection?: unknown;
+  /** The signed-in user (`hass.user`). */
+  user?: { is_admin?: unknown };
+  /** Home Assistant's settings (`hass.config`). */
+  config?: { time_zone?: unknown };
+}
+export function findSession(base?: string): HassSession | undefined {
+  if (typeof window === "undefined") return;
+  for (const target of [window.parent, window]) {
+    try {
+      if (base && new URL(base).origin !== target.location.origin) continue;
+      const root = target.document.querySelector("home-assistant") as
+        (Element & { hass?: HassSession }) | null;
+      const session = root?.hass;
+      if (session) return session;
+    } catch {
+      /* Cross-origin parent; still inspect this window. */
+    }
+  }
+}
+/** Home Assistant's time zone (`time_zone` of its settings), the clock the controller keeps the
+ * grow-day on; the browser's own where it is not known yet or not a zone this browser knows. */
+export function haTimeZone(config?: { time_zone?: unknown }): string {
+  const zone = config?.time_zone;
+  try {
+    if (typeof zone === "string" && zone)
+      return new Intl.DateTimeFormat("en", { timeZone: zone }).resolvedOptions().timeZone;
+  } catch {
+    /* Unknown to this browser. */
+  }
+  return viewerTimeZone();
+}
+export function haSessionToken(): string {
+  try {
+    const value = JSON.parse(localStorage.getItem("hassTokens") || "null");
+    return typeof value?.access_token === "string" ? value.access_token : "";
+  } catch {
+    return "";
+  }
+}
+export function asStates(payload: unknown): States {
+  if (!Array.isArray(payload))
+    throw new Error("Home Assistant returned an invalid states response.");
+  return Object.fromEntries(
+    payload
+      .filter(
+        (e): e is EntityState =>
+          !!e &&
+          typeof e.entity_id === "string" &&
+          typeof e.state === "string" &&
+          !!e.attributes &&
+          typeof e.attributes === "object",
+      )
+      .map((e) => [e.entity_id, e]),
+  );
+}
+/** Rows of `GET history/period`: one array per entity, the first row naming it; a minimal
+ * response leaves later rows with only `state` and `last_changed`. */
+export function recordedRows(payload: unknown, attributes: boolean): TimelineRows {
+  if (!Array.isArray(payload)) throw new Error("Home Assistant returned invalid history.");
+  const rows: TimelineRows = {};
+  for (const group of payload) {
+    const id = Array.isArray(group) ? group[0]?.entity_id : undefined;
+    if (typeof id !== "string") continue;
+    rows[id] = (group as Partial<EntityState>[])
+      .flatMap((row) => {
+        const time = Date.parse(row?.last_updated ?? row?.last_changed ?? "");
+        return typeof row?.state === "string" && Number.isFinite(time)
+          ? [
+              {
+                state: row.state,
+                time,
+                ...(attributes ? { attributes: row.attributes ?? {} } : {}),
+              },
+            ]
+          : [];
+      })
+      .sort((a, b) => a.time - b.time);
+  }
+  return rows;
+}
+export class HaClient {
+  private controller = new AbortController();
+  readonly base: string;
+  constructor(
+    base: string,
+    private token = "",
+    private session?: HassSession,
+    private timeoutMs = 12_000,
+  ) {
+    const url = new URL(base || window.location.origin);
+    if (!["https:", "http:"].includes(url.protocol) || url.username || url.password)
+      throw new Error("Enter a Home Assistant HTTP or HTTPS URL without embedded credentials.");
+    this.base = url.origin;
+  }
+  dispose() {
+    this.controller.abort();
+  }
+  private async request<T>(
+    method: string,
+    path: string,
+    data?: unknown,
+    service?: { domain: string; action: string; response?: boolean },
+    externalSignal?: AbortSignal,
+  ): Promise<T> {
+    if (externalSignal?.aborted) throw new DOMException("History request cancelled.", "AbortError");
+    if (this.controller.signal.aborted) throw new Error("Connection was closed.");
+    const abort = new AbortController();
+    const cancel = () => abort.abort();
+    this.controller.signal.addEventListener("abort", cancel, { once: true });
+    externalSignal?.addEventListener("abort", cancel, { once: true });
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      onAbort = () =>
+        reject(
+          new Error(
+            this.controller.signal.aborted
+              ? "Connection was closed."
+              : externalSignal?.aborted
+                ? "History request cancelled."
+                : "Home Assistant request timed out.",
+          ),
+        );
+      abort.signal.addEventListener("abort", onAbort, { once: true });
+      timeout = setTimeout(() => abort.abort(), this.timeoutMs);
+    });
+    try {
+      const operation = this.session
+        ? service?.response && this.session.callWS
+          ? this.session.callWS<{ response?: unknown }>({
+              type: "call_service", domain: service.domain, service: service.action,
+              service_data: data, return_response: true,
+            }).then((result) => ({ service_response: result?.response }))
+          : service
+          ? this.session.callService(
+              service.domain,
+              service.action,
+              data as Record<string, unknown>,
+            )
+          : this.session.callApi<T>(method, path, data)
+        : fetch(`${this.base}/api/${path}`, {
+            method,
+            headers: {
+              ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}),
+              "Content-Type": "application/json",
+            },
+            signal: abort.signal,
+            ...(data === undefined ? {} : { body: JSON.stringify(data) }),
+          }).then(async (response) => {
+            if (!response.ok) {
+              const detail = await response.json().catch(() => null);
+              throw new Error(
+                response.status === 401 || response.status === 403
+                  ? "Home Assistant authentication failed or this action needs an administrator."
+                  : typeof detail?.message === "string"
+                    ? detail.message
+                    : "Home Assistant request failed (" +
+                      response.status +
+                      "). Check that the integration is updated.",
+              );
+            }
+            return response.json();
+          });
+      return (await Promise.race([operation, deadline])) as T;
+    } finally {
+      clearTimeout(timeout);
+      this.controller.signal.removeEventListener("abort", cancel);
+      externalSignal?.removeEventListener("abort", cancel);
+      if (onAbort) abort.signal.removeEventListener("abort", onAbort);
+    }
+  }
+  async operator<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
+    const allowed = [
+      "runs_get",
+      "runs_save",
+      "runs_archive",
+      "runs_import",
+      "setpoint_log_get",
+      "overlay_get",
+      "overlay_keep",
+      "overlay_undo",
+      "strategy_get",
+      "strategy_save",
+      "strategy_preview",
+      "strategy_activate",
+      "strategy_disarm",
+      "setup_read",
+      "setup_create",
+      "setup_save",
+      "setup_remove",
+      "setup_commission",
+      "test_shot",
+      "stop_all",
+      "stock_get",
+      "stock_save",
+      "stock_refill",
+      "stock_record_batch",
+      "calibration_get",
+      "calibration_record",
+      "dosing_get",
+      "dosing_save",
+      "dosing_request",
+      "notify_get",
+      "notify_save",
+      "notify_test",
+      "whats_new_get",
+      "whats_new_seen",
+      "brain_ask",
+      "brain_prompt_get",
+      "brain_prompt_save",
+      "brain_prompt_rollback",
+      "brain_prompt_rebuild",
+      "history_connection_get",
+      "history_connection_save",
+      "history_long",
+      "grow_days_get",
+      "grow_days_backfill",
+      "harvests_get",
+      "runs_set_harvest",
+      "display_get",
+      "display_save",
+    ];
+    if (!allowed.includes(action)) throw new Error("Unsupported workspace action.");
+    // Keep and Undo answer nothing: asking them for a response is refused.
+    if (action === "overlay_keep" || action === "overlay_undo") {
+      await this.service("crop_steering", action, data);
+      return undefined as T;
+    }
+    // HA's native websocket keeps service validation messages that REST can reduce to HTTP 500.
+    const response = await this.request<{ service_response?: T }>(
+      "POST",
+      "services/crop_steering/" + action + "?return_response",
+      data,
+      this.session?.callWS ? { domain: "crop_steering", action, response: true } : undefined,
+    );
+    if (!response || response.service_response === undefined)
+      throw new Error(
+        "This action needs the updated Crop Steering integration. Open Setup for installation instructions.",
+      );
+    return response.service_response;
+  }
+  /** Home Assistant's time zone: from the Home Assistant page this runs in, else `GET config`. */
+  async timeZone(): Promise<string> {
+    return haTimeZone(
+      this.session
+        ? this.session.config
+        : await this.request<{ time_zone?: unknown }>("GET", "config"),
+    );
+  }
+  async states(): Promise<States> {
+    return asStates(await this.request("GET", "states"));
+  }
+  async state(entityId: string): Promise<EntityState> {
+    return this.request("GET", `states/${encodeURIComponent(entityId)}`);
+  }
+  async service(domain: string, action: string, data: Record<string, unknown>): Promise<void> {
+    await this.request("POST", `services/${domain}/${action}`, data, {
+      domain,
+      action,
+    });
+  }
+  async historyWindow(request: HistoryRequest, roomId?: string): Promise<HistoryWindow> {
+    let warning = "";
+    if (roomId) {
+      let source = "recorder";
+      try {
+        const settings = await this.operator<{ connection: { source: string } }>("history_connection_get", { room_id: roomId });
+        source = settings.connection.source;
+      } catch { /* Old integrations and non-admin users keep Recorder. */ }
+      if (source === "influxdb") {
+        try {
+          const result = await this.operator<HistoryWindow>("history_long", { room_id: roomId,
+            entity_ids: request.entityIds, start: request.start, end: request.end });
+          if (!result.series.some(series => series.points.length)) throw new Error("No InfluxDB points");
+          return { ...result, series: result.series.map(series => ({ ...series, daily: summarize(series.points, request.timeZone) })) };
+        } catch {
+          if (request.signal?.aborted) throw new DOMException("History cancelled", "AbortError");
+          warning = "InfluxDB unavailable or empty; showing Home Assistant Recorder history.";
+        }
+      }
+    }
+    const result = await loadHistoryWindow(
+      (path, signal) => this.request("GET", path, undefined, undefined, signal),
+      request,
+    );
+    if (warning) result.warnings.unshift(warning);
+    return result;
+  }
+  /** One grow-day of history for the day timeline, in requests short enough for any URL limit. */
+  async timeline(request: TimelineRequest): Promise<TimelineRows> {
+    const read = async (ids: string[], attributes: boolean) => {
+      const rows: TimelineRows = {};
+      for (let index = 0; index < ids.length; index += 40) {
+        const query = new URLSearchParams({
+          end_time: new Date(request.end).toISOString(),
+          filter_entity_id: ids.slice(index, index + 40).join(","),
+          ...(attributes
+            ? { significant_changes_only: "0" }
+            : { minimal_response: "", no_attributes: "" }),
+        });
+        const start = new Date(request.start).toISOString();
+        const payload = await this.request<unknown>("GET", `history/period/${start}?${query}`);
+        Object.assign(rows, recordedRows(payload, attributes));
+      }
+      return rows;
+    };
+    return {
+      ...(await read(request.entityIds, false)),
+      ...(await read(request.attributeIds, true)),
+    };
+  }
+  async history(
+    entityIds: string[],
+    hours: number,
+    states: States,
+    signal?: AbortSignal,
+  ): Promise<Series[]> {
+    if (!entityIds.length) return [];
+    if (!Number.isFinite(hours) || hours <= 0 || hours > 720)
+      throw new Error("History range must be between 0 and 720 hours.");
+    const end = Date.now(),
+      start = end - hours * 3_600_000;
+    // One day per request, two at a time. A busy probe records thousands of changes a day: a
+    // month of a room's two tank probes in one request took 19 s on a live install, past the request
+    // timeout, and a day about 1 s. Each request needs its end_time; without one Home Assistant
+    // stops at start + 24 h. Each day starts with the state then in force, the value held then.
+    const days: number[] = [];
+    for (let from = start; from < end; from += 86_400_000) days.push(from);
+    const payloads: unknown[][] = [];
+    let next = 0;
+    const worker = async () => {
+      while (next < days.length) {
+        const index = next++,
+          from = days[index];
+        const query = new URLSearchParams({
+          end_time: new Date(Math.min(end, from + 86_400_000)).toISOString(),
+          filter_entity_id: entityIds.join(","),
+          minimal_response: "",
+          no_attributes: "",
+        });
+        try {
+          const payload = await this.request<unknown>(
+            "GET",
+            `history/period/${new Date(from).toISOString()}?${query}`,
+            undefined,
+            undefined,
+            signal,
+          );
+          if (!Array.isArray(payload)) throw new Error("Home Assistant returned invalid history.");
+          payloads[index] = payload;
+        } catch (error) {
+          next = days.length; // no more requests once one has failed or been cancelled
+          throw error;
+        }
+      }
+    };
+    await Promise.all([worker(), worker()]);
+    return entityIds.map((entityId) => ({
+      entityId,
+      label: String(states[entityId]?.attributes.friendly_name || entityId),
+      points: payloads.flatMap((payload) => {
+        const rows = payload.find(
+          (group: unknown) => Array.isArray(group) && group[0]?.entity_id === entityId,
+        ) as EntityState[] | undefined;
+        return (rows || []).flatMap((row) => {
+          const value = numeric(row);
+          const time = row.last_changed || row.last_updated;
+          return value !== null && time && Number.isFinite(Date.parse(time))
+            ? [{ value, time }]
+            : [];
+        });
+      }),
+    }));
+  }
+}
+
+export async function applyChanges(
+  client: Pick<HaClient, "service" | "state">,
+  room: RoomView,
+  states: States,
+  changes: Change[],
+  isCurrent = () => true,
+): Promise<WriteResult> {
+  const result: WriteResult = { applied: [], failed: [] };
+  const seen = new Set<string>();
+  for (const change of changes) {
+    let reason = !isCurrent()
+      ? "Room or connection changed; remaining changes cancelled."
+      : validateChange(room, states, change);
+    if (seen.has(change.entityId)) reason = "Duplicate entity in this batch.";
+    seen.add(change.entityId);
+    if (reason) {
+      result.failed.push({ entityId: change.entityId, reason });
+      continue;
+    }
+    try {
+      const domain = change.entityId.split(".")[0];
+      await client.service(
+        domain,
+        domain === "number"
+          ? "set_value"
+          : domain === "select"
+            ? "select_option"
+            : change.value
+              ? "turn_on"
+              : "turn_off",
+        {
+          entity_id: change.entityId,
+          ...(domain === "number"
+            ? { value: change.value }
+            : domain === "select"
+              ? { option: change.value }
+              : {}),
+        },
+      );
+      const readback = await client.state(change.entityId);
+      if (!isCurrent())
+        throw new Error("Room or connection changed during write; result is unconfirmed.");
+      const matches =
+        typeof change.value === "number"
+          ? numeric(readback) !== null && Math.abs(numeric(readback)! - change.value) < 1e-6
+          : readback.state ===
+            (typeof change.value === "boolean" ? (change.value ? "on" : "off") : change.value);
+      if (readback.entity_id !== change.entityId || !matches)
+        throw new Error(
+          "Readback did not confirm the requested value. Refresh and review before retrying.",
+        );
+      result.applied.push(change.entityId);
+    } catch (error) {
+      result.failed.push({
+        entityId: change.entityId,
+        reason: error instanceof Error ? error.message : "Write failed.",
+      });
+    }
+  }
+  return result;
+}

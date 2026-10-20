@@ -1,0 +1,94 @@
+/* Plan › Schedule: the flower by stage. Vegetative green, generative violet, ripening amber, as
+   the steering words are coloured everywhere else. */
+.grow-stages {
+  --stage-vegetative: color-mix(in srgb, var(--success) 70%, var(--surface));
+  --stage-generative: color-mix(in srgb, #7c4dbc 70%, var(--surface));
+  --stage-ripening: color-mix(in srgb, var(--warning) 75%, var(--surface));
+  margin-bottom: 16px;
+}
+.grow-stages .panel-heading {
+  padding-bottom: 10px;
+}
+.grow-weeks {
+  display: flex;
+  gap: 4px;
+  margin: 0 20px 14px;
+  padding: 0;
+  list-style: none;
+}
+.grow-weeks li {
+  flex: 1 1 0;
+  min-width: 0;
+  padding: 6px 0 4px;
+  border-top: 4px solid var(--border);
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  text-align: center;
+}
+.grow-weeks li[data-steering="vegetative"] {
+  border-top-color: var(--stage-vegetative);
+}
+.grow-weeks li[data-steering="generative"] {
+  border-top-color: var(--stage-generative);
+}
+.grow-weeks li[data-steering="ripening"] {
+  border-top-color: var(--stage-ripening);
+}
+.grow-weeks li[aria-current] {
+  border-radius: 0 0 6px 6px;
+  background: var(--muted);
+  color: var(--foreground);
+  font-weight: 700;
+}
+.grow-stage-table th[scope="row"],
+.grow-stage-table td {
+  vertical-align: top;
+}
+.grow-stage-table th[scope="row"] {
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  font-weight: 650;
+  white-space: normal;
+}
+.grow-stage-table th[scope="row"] .pill {
+  margin-left: 8px;
+  vertical-align: 1px;
+}
+.grow-stage-table small {
+  display: block;
+  white-space: normal;
+  max-width: 260px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 500;
+}
+.grow-stage-table tr[data-current] {
+  background: color-mix(in srgb, var(--primary) 6%, transparent);
+}
+.grow-stage-table td[data-steering="vegetative"] {
+  color: color-mix(in srgb, var(--success) 70%, var(--foreground));
+  font-weight: 600;
+}
+.grow-stage-table td[data-steering="generative"] {
+  color: color-mix(in srgb, #7c4dbc 75%, var(--foreground));
+  font-weight: 600;
+}
+.dark .grow-stage-table td[data-steering="generative"] {
+  color: color-mix(in srgb, #7c4dbc 55%, var(--foreground));
+}
+.grow-stage-table td[data-steering="ripening"] {
+  color: color-mix(in srgb, var(--warning) 75%, var(--foreground));
+  font-weight: 600;
+}
+.grow-stages-note {
+  padding: 10px 20px 16px;
+}
+@media (max-width: 720px) {
+  .grow-weeks {
+    margin: 0 14px 12px;
+  }
+  .grow-stages-note {
+    padding: 10px 14px 14px;
+  }
+}

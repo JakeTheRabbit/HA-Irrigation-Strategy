@@ -1,0 +1,30 @@
+{
+ "_about": "A site notification store crop_steering.notify (Store version 1) in the shape the 3.11.1 integration's notify_api.py saves through notify_save: two phones, one ticking emergencies, watering stopped, phase changes and Jev for every room, one ticking emergencies, hardware and stock tanks for the default room only, with a two-hour watering-stopped threshold. Written to that format (3.11.1 has no vitals kind), not recorded from a site. Seed it as hass_storage['crop_steering.notify'].",
+ "store": {
+  "version": 1,
+  "minor_version": 1,
+  "key": "crop_steering.notify",
+  "data": {
+   "revision": 3,
+   "idle_hours": 2,
+   "recipients": [
+    {
+     "service": "notify.mobile_app_grower_phone",
+     "name": "Grower phone",
+     "user_id": null,
+     "kinds": ["emergency", "watering", "phases", "jev"],
+     "rooms": [],
+     "urgent_high_priority": true
+    },
+    {
+     "service": "notify.mobile_app_office_tablet",
+     "name": "Office tablet",
+     "user_id": null,
+     "kinds": ["emergency", "hardware", "stock"],
+     "rooms": [""],
+     "urgent_high_priority": false
+    }
+   ]
+  }
+ }
+}

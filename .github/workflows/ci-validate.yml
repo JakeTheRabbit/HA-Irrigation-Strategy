@@ -1,0 +1,416 @@
+name: Validate
+
+on:
+  push:
+    # `main` is what production rooms install from; `testing` is what staging rooms install
+    # from (docs/RELEASING.md). Both are checked on every push.
+    branches: [ main, testing ]
+  # Every pull request, whatever branch it targets. This used to be limited to pull requests
+  # into `main`, so a feature branch proposed into `testing`, or stacked on another feature
+  # branch, was merged with no checks at all.
+  pull_request:
+  workflow_dispatch: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  lint-and-validate:
+    name: Lint (ruff/black/yamllint) and HA validations
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: [ '3.11', '3.12' ]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          # no pip cache: the repo intentionally has no requirements.txt/pyproject
+          # (integration is dependency-free)
+
+      - name: Install linters
+        run: |
+          python -m pip install --upgrade pip
+          # requests: add-on controller suite drives the real module; pyyaml: dashboard-generator test
+          pip install ruff==0.5.5 black==24.4.2 yamllint==1.35.1 pytest==8.2.2 requests pyyaml
+
+      - name: Ruff (lint)
+        run: |
+          ruff --version
+          ruff check .
+
+      - name: Black (format check)
+        # Scoped to the integration + tests (the add-on is deployed file-for-file, exempt).
+        run: |
+          black --version
+          black --check custom_components/ tests/
+
+      - name: Yamllint
+        run: |
+          yamllint --version
+          yamllint .  # rules in .yamllint (structural gate, style relaxed)
+
+      - name: Engine vendored-copy in sync
+        # The pure engine ships twice — the tested source package and the copy vendored into
+        # the add-on image (what actually runs). They must be byte-identical.
+        run: |
+          diff -r --exclude=__pycache__ \
+            crop-steering-engine/src/crop_steering_engine \
+            addons/f2_control/f2_control/crop_steering_engine
+
+      - name: Repo hygiene (no ignored shipped paths / tracked caches)
+        run: |
+          bad=0
+          for p in custom_components/crop_steering/__init__.py www addons/f2_control/config.yaml; do
+            if git check-ignore -q "$p"; then echo "IGNORED shipped path: $p"; bad=1; fi
+          done
+          if git ls-files | grep -E '__pycache__|\.pyc$|\.pytest_cache|\.ruff_cache'; then
+            echo "tracked cache/bytecode files"; bad=1
+          fi
+          exit $bad
+
+      - name: Doctrine pack current, true of the code and lint-clean
+        # doctrine/README.md, checks 1-6 (check 6, the controller's copy, whenever that directory exists).
+        # The private word list comes from the DOCTRINE_DENYLIST secret and runs on every push and
+        # on every pull request from this repository, where a missing secret fails the build. A pull
+        # request from a fork, or one Dependabot opened, gets no Actions secrets: it runs the public
+        # patterns only, the skip goes into the job summary, and the merge push runs the private list.
+        env:
+          DENYLIST: ${{ secrets.DOCTRINE_DENYLIST }}
+          NO_SECRETS: ${{ github.event_name == 'pull_request' && (github.event.pull_request.head.repo.full_name != github.repository || github.event.pull_request.user.login == 'dependabot[bot]') }}
+        run: |
+          set -- --check \
+            --core crop-steering-engine/src/crop_steering_engine/core.py \
+            --jev addons/f2_control/f2_control/brain/doctrine.py
+          if [ "$NO_SECRETS" = "true" ]; then
+            python doctrine/tools/build_doctrine.py "$@" \
+              --private-skip "pull request with no secrets (fork or Dependabot); the merge push runs it"
+          else
+            printf '%s' "$DENYLIST" > "$RUNNER_TEMP/doctrine-denylist.json"
+            python doctrine/tools/build_doctrine.py "$@" --private-denylist "$RUNNER_TEMP/doctrine-denylist.json"
+          fi
+
+      - name: Pytest (integration + health + services + state + version)
+        run: |
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest tests/ -v
+
+      - name: Pytest (add-on controller — drives the real engine)
+        run: |
+          PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 python -m pytest addons/f2_control/tests -q
+
+      - name: Pytest (pure crop-steering-engine — the active decision core)
+        run: |
+          PYTHONPATH=crop-steering-engine/src python -m pytest crop-steering-engine/tests -q
+
+      - name: Hassfest
+        uses: home-assistant/actions/hassfest@master
+
+      - name: HACS Validation (integration)
+        uses: hacs/action@main
+        with:
+          category: integration
+          # Nothing is ignored: HACS lists a repository in its default store only when this passes
+          # without ignores (tests/test_hacs_ready.py keeps it that way). Brands pass on the
+          # integration's own images in custom_components/crop_steering/brand/, which HACS accepts
+          # since hacs/integration#5128 (February 2026).
+
+  addon-build:
+    name: Build f2-control add-on image (amd64)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the add-on image
+        # Proves the Dockerfile builds from a clean checkout (COPY www/public, apk deps,
+        # vendored engine). Uses the amd64 base from build.yaml; no push.
+        uses: docker/build-push-action@v6
+        with:
+          context: addons/f2_control
+          push: false
+          build-args: |
+            BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
+
+  container-smoke:
+    # One image, both install modes: the same amd64 image runs tests_container as a standalone
+    # container and as the Supervisor runs the app, against a fake Home Assistant. Runs on every
+    # Validate run with no path or `if` filter, so a required check never waits on a job that did
+    # not run. Nothing is pushed.
+    name: Controller container smoke (both modes)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pytest
+        run: python -m pip install pytest==8.2.2
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build the controller image
+        # As the add-on build job, plus load: the image must be in the local daemon to be run.
+        id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: addons/f2_control
+          push: false
+          load: true
+          build-args: |
+            BUILD_FROM=ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.20
+
+      - name: Container smoke, both modes, on that image
+        # tests_container skips without an image; inspecting it first keeps a skip from passing.
+        env:
+          CONTROLLER_IMAGE: ${{ steps.build.outputs.imageid }}
+        run: |
+          docker image inspect "$CONTROLLER_IMAGE" > /dev/null
+          python -m pytest tests_container -q -rs
+
+  addon-image-per-arch:
+    # The image's Python packages come from pinned, hashed files: requirements.txt, and the
+    # Anthropic SDK's requirements-brain.txt, which the Dockerfile skips on armv7 by name. This
+    # builds the add-on the way the Supervisor does on every arch build.yaml lists (QEMU for the
+    # ARM ones) and proves each image imports what it should and holds exactly the pinned code.
+    name: Add-on image ${{ matrix.arch }} (imports and pinned packages)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            platform: linux/amd64
+          - arch: aarch64
+            platform: linux/arm64
+          - arch: armv7
+            platform: linux/arm/v7
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Base image from build.yaml
+        id: base
+        env:
+          ARCH: ${{ matrix.arch }}
+        run: echo "from=$(awk -v key="${ARCH}:" '$1 == key {print $2}' addons/f2_control/build.yaml)" >> "$GITHUB_OUTPUT"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - name: Build the add-on image for ${{ matrix.arch }}
+        uses: docker/build-push-action@v6
+        with:
+          context: addons/f2_control
+          platforms: ${{ matrix.platform }}
+          load: true
+          push: false
+          tags: f2-control:${{ matrix.arch }}
+          build-args: |
+            BUILD_FROM=${{ steps.base.outputs.from }}
+            BUILD_ARCH=${{ matrix.arch }}
+      - name: Imports, and pip freeze equals the pinned files
+        env:
+          ARCH: ${{ matrix.arch }}
+          PLATFORM: ${{ matrix.platform }}
+        run: |
+          in_image() { docker run --rm --platform "$PLATFORM" --entrypoint "$1" "f2-control:$ARCH" "${@:2}"; }
+          files=addons/f2_control/requirements.txt
+          if [ "$ARCH" = armv7 ]; then
+            in_image python3 -c "import requests"
+            in_image python3 -c "
+          try:
+              import anthropic
+          except ModuleNotFoundError:
+              print('anthropic is not installed, as intended on armv7')
+          else:
+              raise SystemExit('anthropic is installed on armv7')"
+          else
+            in_image python3 -c "import requests, anthropic"
+            files="$files addons/f2_control/requirements-brain.txt"
+          fi
+          in_image pip3 freeze > freeze.txt
+          python3 - freeze.txt $files <<'EOF'
+          import re, sys
+
+          def pins(text):
+              text = re.sub(r"\\\n", " ", text)
+              specs = (line.split("#", 1)[0].split() for line in text.splitlines())
+              found = set()
+              for spec in specs:
+                  if spec:
+                      name, _, version = spec[0].partition("==")
+                      found.add(f'{re.sub(r"[-_.]+", "-", name.lower())}=={version}')
+              return found
+
+          frozen = pins(open(sys.argv[1]).read())
+          pinned = set().union(*(pins(open(name).read()) for name in sys.argv[2:]))
+          print("in the image, not pinned:", sorted(frozen - pinned) or "none")
+          print("pinned, not in the image:", sorted(pinned - frozen) or "none")
+          sys.exit(frozen != pinned)
+          EOF
+
+  dependency-review:
+    name: Dependency Review (PR only)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Dependency Review
+        # Some installations/repos do not expose GitHub's dependency graph API. Keep
+        # the review visible in PR logs, but do not fail the whole validation suite
+        # when GitHub reports repository-level support is unavailable.
+        continue-on-error: true
+        uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+
+  real-home-assistant:
+    # Everything under tests/ runs against hand-written stubs of Home Assistant. These load the real
+    # config flow and entity registry, so they fail when Home Assistant itself would: 2.17.0 shipped
+    # switches whose entity ids HA generated from their labels while the stub tests passed.
+    #
+    # One leg per Home Assistant this repository vouches for, each pinned to the plugin release that
+    # brings exactly that Home Assistant, and each checking what it got. Unpinned, pip quietly fell
+    # back to an older plugin whenever the runner's Python was too old for the newest one, and this
+    # job tested 2026.2.3 while production ran 2026.9. The production leg keeps the exact check name
+    # that branch protection requires on `testing` and `main`: leave its suffix empty.
+    name: Real Home Assistant (setup wizard and entity ids)${{ matrix.suffix }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          # What production runs. The pin lives in requirements-test-ha.txt, which local runs
+          # install too. Home Assistant 2026.9 needs Python 3.14.2 or newer.
+          - python: '3.14'
+            homeassistant: '2026.9.3'
+            install: '-r requirements-test-ha.txt'
+            suffix: ''
+          # The oldest Home Assistant this repository claims to support: hacs.json, the README
+          # badge and docs/INSTALL.md all say 2024.10.0, and move with this leg. Before 2024.9.0
+          # the integration itself fails (unloading a room calls ConfigEntries.async_loaded_entries);
+          # on 2024.9.x the suite's automation test is written in the syntax 2024.10.0 introduced.
+          # josepy 2.0 (2025) removed an API that the acme release this Home Assistant pins still
+          # imports, so it is held at the josepy that was current when this Home Assistant shipped.
+          - python: '3.12'
+            homeassistant: '2024.10.0'
+            install: 'pytest-homeassistant-custom-component==0.13.171 josepy==1.14.0'
+            suffix: ' - oldest supported Home Assistant'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+      - name: Install Home Assistant ${{ matrix.homeassistant }} and its pytest plugin
+        run: python -m pip install ${{ matrix.install }}
+      - name: Check the Home Assistant under test is ${{ matrix.homeassistant }}
+        # An exact pin that cannot be installed already fails the step above. This catches the
+        # quieter failure: an install that succeeds with some other Home Assistant.
+        env:
+          EXPECTED: ${{ matrix.homeassistant }}
+        run: |
+          actual="$(python -c 'from homeassistant.const import __version__; print(__version__)')"
+          echo "Python $(python -c 'import platform; print(platform.python_version())'), Home Assistant ${actual}"
+          if [ "${actual}" != "${EXPECTED}" ]; then
+            echo "::error::Expected Home Assistant ${EXPECTED}, but ${actual} is installed."
+            exit 1
+          fi
+      - name: Setup wizard and entity registry
+        run: python -m pytest tests_ha -q
+
+  frontend:
+    name: Dashboard build and browser workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install dashboard dependencies
+        run: npm ci --prefix frontend
+      - name: Adapter and room isolation tests
+        run: npm test --prefix frontend
+      - name: Compile and package standalone dashboard
+        run: npm run build --prefix frontend
+      - name: Committed dashboard is exactly what the source builds
+        # The dashboard ships as one ~1 MB minified file, committed in three places, that nobody
+        # can review by eye. The build is reproducible (locked dependencies, no timestamps), so
+        # this proves the file a box will serve is the reviewed frontend/src and nothing else:
+        # a stale bundle, a hand-edited bundle and a bundle carrying code that is not in the
+        # source all fail here.
+        run: |
+          paths="www custom_components/crop_steering/www addons/f2_control/www"
+          if [ -n "$(git status --porcelain -- $paths)" ]; then
+            echo "::error::The committed dashboard differs from a fresh build of frontend/src."
+            echo "Run 'npm ci --prefix frontend && npm run build --prefix frontend' and commit the result."
+            git status --short -- $paths
+            git diff --stat -- $paths
+            exit 1
+          fi
+          echo "Committed dashboard matches a fresh build."
+      - name: Install Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Verify operator workflows and accessibility
+        run: |
+          node frontend/scripts/verify-dashboard.mjs
+          node frontend/scripts/verify-live.mjs
+          node frontend/scripts/verify-workspace.mjs
+          node frontend/scripts/verify-steering-visuals.mjs
+          node frontend/scripts/verify-recipe-library.mjs
+          node frontend/scripts/verify-tank-status.mjs
+          node frontend/scripts/verify-calibration.mjs
+          node frontend/scripts/verify-ha-shell.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: dashboard-browser-evidence
+          path: output/playwright/
+
+  mcp:
+    name: MCP protocol and reviewed configuration workflows
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: mcp-server/package-lock.json
+      - run: npm ci --prefix mcp-server
+      - run: npm test --prefix mcp-server

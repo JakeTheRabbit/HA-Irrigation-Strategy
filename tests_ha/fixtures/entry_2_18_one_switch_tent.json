@@ -1,0 +1,107 @@
+{
+  "_about": "A one-switch tent exactly as upstream 2.18.0 (cfb10cc) saved it: recorded by running that commit's own wizard in a real Home Assistant, not written by hand. No pump, no main-line, and no 'plumbing' key, because 2.18.0 inferred the layout from what was mapped. 'controller_saved' is what controller 0.15.1 wrote to /data/state.json after adopting it (its _setup_fingerprint, computed by that version's code).",
+  "entry_id": "seeded2x18tent000000000000000001",
+  "unique_id": "default",
+  "title": "Tent",
+  "data": {
+    "installation_mode": "manual",
+    "config_method": "manual",
+    "name": "Tent",
+    "room_name": "Tent",
+    "room_prefix": "",
+    "room_slug": "default",
+    "num_zones": 1,
+    "zones": {
+      "1": {
+        "zone_number": 1,
+        "active": true,
+        "name": "Tent",
+        "zone_switch": "switch.gt1_irrigation_switch",
+        "vwc_sensors": [
+          "sensor.gt1_vwc"
+        ],
+        "ec_sensors": [
+          "sensor.gt1_ec"
+        ],
+        "vwc_front": "sensor.gt1_vwc",
+        "vwc_back": "",
+        "ec_front": "sensor.gt1_ec",
+        "ec_back": "",
+        "plant_count": 4,
+        "max_daily_volume": 20.0,
+        "shot_multiplier": 1.0
+      }
+    },
+    "hardware": {
+      "pump_switch": "",
+      "main_line_switch": "",
+      "waste_switch": "",
+      "feed_ec_sensor": "",
+      "feed_ph_sensor": "",
+      "light_entity": "",
+      "temperature_sensor": "",
+      "humidity_sensor": "",
+      "vpd_sensor": "",
+      "water_level_sensor": "",
+      "tank_temperature_sensor": "",
+      "tank_ec_sensor": "",
+      "tank_ph_sensor": "",
+      "tank_last_fill_sensor": "",
+      "tank_fill_entity": "",
+      "notification_service": ""
+    },
+    "parameters": {
+      "substrate_volume": 6.0,
+      "dripper_flow_rate": 2.0,
+      "drippers_per_plant": 1,
+      "field_capacity": 70.0,
+      "max_ec": 9.0,
+      "lights_on_hour": 12,
+      "lights_off_hour": 0
+    },
+    "features": {
+      "ec_stacking": false,
+      "analytics": true,
+      "ml_features": false
+    },
+    "enable_flag": "switch.crop_steering_engine_enabled",
+    "active": true,
+    "setup_revision": 1
+  },
+  "options": {},
+  "states": {
+    "switch.gt1_irrigation_switch": [
+      "off",
+      {}
+    ],
+    "sensor.gt1_vwc": [
+      "41",
+      {
+        "unit_of_measurement": "%"
+      }
+    ],
+    "sensor.gt1_ec": [
+      "3100",
+      {
+        "unit_of_measurement": "µS/cm"
+      }
+    ]
+  },
+  "operator_tuned_numbers": {
+    "number.crop_steering_p1_target_vwc": "63"
+  },
+  "controller_saved": {
+    "default": {
+      "1": {
+        "phase": "P2",
+        "peak": 58.0,
+        "shots": 5,
+        "daily_vol": 1.9
+      },
+      "_setup": {
+        "revision": 1,
+        "fingerprint": "{\"active\": true, \"enable_flag\": \"switch.crop_steering_engine_enabled\", \"feed_ec_sensor\": \"\", \"feed_ph_sensor\": \"\", \"mainline\": \"\", \"pump\": \"\", \"valves\": {\"1\": \"switch.gt1_irrigation_switch\"}, \"zones\": [1]}"
+      }
+    }
+  }
+}

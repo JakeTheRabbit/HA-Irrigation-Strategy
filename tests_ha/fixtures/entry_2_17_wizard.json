@@ -1,0 +1,68 @@
+{
+  "_about": "A default room exactly as the 2.17 manual wizard saved it: pump + mainline + 2 valves, no plumbing / ec_unit / feed_ec_factor keys. Modelled on a pumped multi-zone room.",
+  "entry_id": "seeded2x17wizard0000000000000001",
+  "unique_id": "default",
+  "title": "Flower room",
+  "data": {
+    "installation_mode": "manual",
+    "config_method": "manual",
+    "name": "Flower room",
+    "room_name": "Flower room",
+    "room_prefix": "",
+    "room_slug": "default",
+    "active": true,
+    "num_zones": 2,
+    "setup_revision": 4,
+    "enable_flag": "switch.crop_steering_engine_enabled",
+    "zones": {
+      "1": {
+        "zone_number": 1, "active": true, "name": "Row 1", "zone_switch": "switch.row_1_valve",
+        "vwc_sensors": ["sensor.row_1_vwc_a", "sensor.row_1_vwc_b"], "ec_sensors": ["sensor.row_1_ec"],
+        "vwc_front": "sensor.row_1_vwc_a", "vwc_back": "sensor.row_1_vwc_b",
+        "ec_front": "sensor.row_1_ec", "ec_back": "",
+        "plant_count": 36, "max_daily_volume": 20.0, "shot_multiplier": 1.0
+      },
+      "2": {
+        "zone_number": 2, "active": true, "name": "Row 2", "zone_switch": "switch.row_2_valve",
+        "vwc_sensors": ["sensor.row_2_vwc"], "ec_sensors": ["sensor.row_2_ec"],
+        "vwc_front": "sensor.row_2_vwc", "vwc_back": "", "ec_front": "sensor.row_2_ec", "ec_back": "",
+        "plant_count": 36, "max_daily_volume": 20.0, "shot_multiplier": 1.0
+      }
+    },
+    "hardware": {
+      "pump_switch": "switch.main_pump", "main_line_switch": "switch.main_line", "waste_switch": "",
+      "feed_ec_sensor": "sensor.feed_ec", "feed_ph_sensor": "sensor.feed_ph", "light_entity": "",
+      "temperature_sensor": "", "humidity_sensor": "", "vpd_sensor": "", "water_level_sensor": "",
+      "tank_temperature_sensor": "", "tank_ec_sensor": "", "tank_ph_sensor": "",
+      "tank_last_fill_sensor": "", "tank_fill_entity": "", "notification_service": ""
+    },
+    "parameters": {
+      "substrate_volume": 6.0, "dripper_flow_rate": 4.0, "drippers_per_plant": 1,
+      "field_capacity": 70.0, "max_ec": 9.0, "lights_on_hour": 10, "lights_off_hour": 22
+    },
+    "features": {"ec_stacking": false, "analytics": true, "ml_features": false}
+  },
+  "options": {},
+  "states": {
+    "switch.row_1_valve": ["off", {}],
+    "switch.row_2_valve": ["off", {}],
+    "switch.main_pump": ["off", {}],
+    "switch.main_line": ["off", {}],
+    "sensor.row_1_vwc_a": ["52", {"unit_of_measurement": "%"}],
+    "sensor.row_1_vwc_b": ["56", {"unit_of_measurement": "%"}],
+    "sensor.row_1_ec": ["3.4", {"unit_of_measurement": "mS/cm"}],
+    "sensor.row_2_vwc": ["49", {"unit_of_measurement": "%"}],
+    "sensor.row_2_ec": ["3.1", {"unit_of_measurement": "mS/cm"}],
+    "sensor.feed_ec": ["2.4", {"unit_of_measurement": "mS/cm"}],
+    "sensor.feed_ph": ["6.0", {"unit_of_measurement": "pH"}]
+  },
+  "operator_tuned_numbers": {
+    "number.crop_steering_substrate_volume": "4.5",
+    "number.crop_steering_dripper_flow_rate": "3.2",
+    "number.crop_steering_lights_on_hour": "8",
+    "number.crop_steering_lights_off_hour": "20",
+    "number.crop_steering_field_capacity": "63",
+    "number.crop_steering_zone_1_plant_count": ["30", {"setup_revision": 4, "setup_value": 36}],
+    "number.crop_steering_zone_1_p1_target_vwc": "61.5"
+  }
+}

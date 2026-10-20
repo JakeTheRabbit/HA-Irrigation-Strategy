@@ -1,0 +1,176 @@
+/* Component sheets load before styles.css: a rule that overrides a shared class doubles its own
+   class so it wins on specificity, not on order. */
+.wu-table.wu-table td {
+  vertical-align: top;
+}
+.wu-value strong {
+  display: block;
+  font-size: var(--text-md);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.wu-value small {
+  display: block;
+  margin-top: 4px;
+  max-width: 36ch;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  line-height: 1.45;
+  white-space: normal;
+}
+.wu-value small + small {
+  margin-top: 0;
+}
+.wu-zone {
+  font-weight: 550;
+}
+.wu-zone i,
+.wu-legend i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 8px;
+}
+.wu-legend i {
+  margin-right: 0;
+}
+.wu-th {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.wu-hint {
+  position: relative;
+  display: inline-flex;
+}
+.wu-hint button {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--muted-foreground);
+}
+.wu-hint button:hover,
+.wu-hint button:focus-visible {
+  background: var(--muted);
+  color: var(--foreground);
+}
+/* Out of layout until shown, so it cannot widen the scrolling table. */
+.wu-hint [role="tooltip"] {
+  display: none;
+  position: absolute;
+  z-index: 5;
+  top: calc(100% + 4px);
+  right: 0;
+  width: max-content;
+  max-width: 260px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--foreground);
+  color: var(--surface);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 4px 12px rgb(0 0 0 / 18%);
+}
+.wu-hint:hover [role="tooltip"],
+.wu-hint:focus-within [role="tooltip"] {
+  display: block;
+}
+.wu-notes {
+  display: grid;
+  gap: 6px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+.wu-notes p,
+.wu-caption {
+  max-width: 100ch;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.wu-chart {
+  padding: 16px 0 16px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 55%, transparent);
+}
+.wu-chart-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 16px;
+  padding: 0 20px 8px;
+}
+.wu-chart-head h3 {
+  font-size: var(--text-md);
+}
+.wu-legend.wu-legend {
+  padding: 0;
+  gap: 14px;
+}
+.wu-bars.wu-bars {
+  height: 240px;
+}
+.wu-caption {
+  padding: 6px 20px 0;
+}
+.wu-loading.wu-loading {
+  min-height: 120px;
+}
+.wu-panel .table-scroll:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: -3px;
+}
+@media (max-width: 760px) {
+  .wu-table.wu-table {
+    white-space: normal;
+  }
+  .wu-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+  /* The headers are only for screen readers here; the cells say which week they count. */
+  .wu-hint {
+    display: none;
+  }
+  .wu-table tbody,
+  .wu-table tr {
+    display: block;
+  }
+  .wu-table.wu-table td {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 9px 14px;
+    border-bottom: 0;
+    text-align: right;
+  }
+  .wu-table td::before {
+    content: attr(data-label);
+    flex-shrink: 0;
+    color: var(--muted-foreground);
+    text-align: left;
+  }
+  .wu-table tr + tr {
+    border-top: 1px solid var(--border);
+  }
+  .wu-value small {
+    margin-left: auto;
+  }
+  .wu-notes,
+  .wu-chart-head,
+  .wu-caption {
+    padding-inline: 14px;
+  }
+}

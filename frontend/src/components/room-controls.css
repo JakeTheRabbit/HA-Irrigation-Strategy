@@ -1,0 +1,125 @@
+.room-power {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+/* Deliberately calm: an off room is a chosen state, not a fault. */
+.room-off-banner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 14px 0;
+  padding: 12px 16px;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+  background: var(--muted);
+  color: var(--foreground);
+}
+.room-off-banner > svg {
+  flex-shrink: 0;
+  color: var(--muted-foreground);
+}
+.room-off-banner > div:first-of-type {
+  flex: 1;
+  min-width: 0;
+}
+.room-off-banner strong {
+  font-size: 13px;
+}
+.room-off-banner p {
+  margin-top: 2px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+  max-width: 100%;
+  gap: 10px 16px;
+}
+.auto-chip {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin-top: 10px;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+.auto-chip b {
+  color: var(--foreground);
+  font-weight: 550;
+}
+.auto-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-color: var(--border);
+  background: var(--secondary);
+  color: var(--primary-strong);
+  font-size: var(--text-xs);
+  vertical-align: 1px;
+}
+@media (max-width: 720px) {
+  .room-off-banner {
+    flex-wrap: wrap;
+  }
+  .heading-actions {
+    justify-content: flex-start;
+  }
+}
+/* The room's switch over every zone, beside the zones' heading. */
+.all-zones {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+}
+.all-zones-count {
+  font-size: var(--text-xs);
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+/* A switch as Home Assistant draws one: the track fills with the primary colour when on. 44 × 24,
+   so a finger can hit it. */
+.switch {
+  position: relative;
+  flex-shrink: 0;
+  width: 44px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--foreground) 18%, var(--surface));
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+.switch[aria-checked="true"] {
+  border-color: var(--primary);
+  background: var(--primary);
+}
+.switch-thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--foreground) 35%, transparent);
+  transition: transform 0.15s ease;
+}
+.switch[aria-checked="true"] .switch-thumb {
+  transform: translateX(20px);
+}
+.switch:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+}
+.switch:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}

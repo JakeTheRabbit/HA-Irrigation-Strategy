@@ -1,0 +1,1119 @@
+"""Room-scoped, reversible setup. Never sends commands to physical hardware."""
+
+from __future__ import annotations
+
+import asyncio
+from copy import deepcopy
+from datetime import datetime
+import logging
+import math
+
+from . import units
+from .admin import async_require_admin
+from .const import DOMAIN, LEGACY_KILL_SWITCH, MAX_ZONES
+from .generated.defaults import SIZING_DEFAULTS
+from .plumbing import (
+    LABELS as PLUMBING_LABELS,
+    PLUMBING_LAYOUTS,
+    infer as infer_plumbing,
+    problems as plumbing_problems,
+)
+from .room import HVAC_LISTS, room_gate
+from .sizing import prefer_setup_value
+
+_LOGGER = logging.getLogger(__name__)
+API_VERSION = 1
+# What a zone valve, main line or pump can be: the kinds of device the controller can open and close
+# (its ACTUATORS table, addons/f2_control/f2_control/controller.py).
+ACTUATOR_DOMAINS = {"switch", "input_boolean", "valve"}
+HARDWARE_DOMAINS = {
+    "pump_switch": ACTUATOR_DOMAINS,
+    "main_line_switch": ACTUATOR_DOMAINS,
+    "waste_switch": {"switch"},
+    "light_entity": {"light", "switch"},
+    "feed_ec_sensor": {"sensor"},
+    "feed_ph_sensor": {"sensor"},
+    "temperature_sensor": {"sensor"},
+    "humidity_sensor": {"sensor"},
+    "vpd_sensor": {"sensor"},
+    "leaf_temperature_sensor": {"sensor"},
+    "water_level_sensor": {"sensor"},
+    "tank_temperature_sensor": {"sensor"},
+    "tank_ec_sensor": {"sensor"},
+    "tank_ph_sensor": {"sensor"},
+    "tank_last_fill_sensor": {"sensor", "input_datetime"},
+    "tank_fill_entity": {"switch", "binary_sensor"},
+    # The tank level the controller reads: a distance down to the water, and/or a low-level float.
+    "tank_distance_sensor": {"sensor"},
+    "tank_low_float": {"binary_sensor"},
+    # Shown on the dashboard only (Settings > Display): the room camera, its CO2 and its light
+    # level (PPFD). The controller reads none of them.
+    "camera_entity": {"camera"},
+    "co2_sensor": {"sensor"},
+    "ppfd_sensor": {"sensor"},
+    "dli_sensor": {"sensor"},
+}
+SIZING = {
+    "plant_count": (1, 1000, True),
+    "substrate_volume": (0.1, 200, False),
+    "drippers_per_plant": (1, 20, True),
+    "dripper_flow_rate": (0.1, 50, False),
+}
+UNITS = {
+    "vwc": units.accepted("vwc"),  # converted to % where the probe reports a fraction
+    "ec": units.accepted("ec"),  # converted to mS/cm where the probe reports uS/cm
+    "ph": units.accepted("ph"),
+    "tank_temperature": units.accepted("temperature"),
+    "distance": units.accepted("distance"),  # to mm; any other unit is refused
+}
+# Per zone and reading: the mapped probes that do not count, and the one that leads (calculations
+# fuse_probes). They map no hardware, so a change of only these needs nothing switched off.
+PROBE_CHOICE = {
+    f"{kind}_{what}" for kind in ("vwc", "ec") for what in ("unused", "primary")
+}
+# Which unit check each mapped sensor gets.
+SENSOR_KINDS = {
+    "feed_ec_sensor": "ec",
+    "tank_ec_sensor": "ec",
+    "feed_ph_sensor": "ph",
+    "tank_ph_sensor": "ph",
+    "tank_temperature_sensor": "tank_temperature",
+    "tank_distance_sensor": "distance",
+}
+# Each zone may map one root-zone temperature probe, for the dashboard only (no controller use).
+ZONE_TEMPERATURE = "substrate_temperature_sensor"
+TANK_LEVEL_FIELDS = {"full_mm", "empty_mm", "float_low_state"}
+# What an AC or dehumidifier of the room may be mapped as, for the runoff estimator: a switch or state that reads on
+# while it runs, a climate or humidifier entity, or its power sensor (running above hvac_run_power_w). Read only.
+HVAC_DOMAINS = {
+    "switch",
+    "input_boolean",
+    "binary_sensor",
+    "climate",
+    "humidifier",
+    "fan",
+    "sensor",
+}
+HVAC_MAX = 12
+
+
+def effective(entry):
+    return {**(entry.data or {}), **(getattr(entry, "options", None) or {})}
+
+
+def hardware_entities(data):
+    hw = data.get("hardware", {})
+    return {
+        entity
+        for entity in [
+            hw.get("pump_switch"),
+            hw.get("main_line_switch"),
+            hw.get("waste_switch"),
+            *[z.get("zone_switch") for z in data.get("zones", {}).values()],
+        ]
+        if entity
+    }
+
+
+def engine_flag(hass, data):
+    """The kill switch of the room this setup is for (room.room_gate, judged on the setup itself)."""
+    return room_gate(hass, data.get("room_prefix", ""), data)
+
+
+LIGHTS_SAME_HOUR = (
+    "Lights on and lights off at the same hour read as lights never on, so the controller "
+    "would keep every zone in its overnight phase. A room lit around the clock is not "
+    "supported yet: set the hours the lights switch on and off"
+)
+
+
+def _same_lights_hour(parameters):
+    """True when a setup's two lights hours are the same hour."""
+    try:
+        on, off = parameters["lights_on_hour"], parameters["lights_off_hour"]
+        return int(round(float(on))) == int(round(float(off)))
+    except (KeyError, TypeError, ValueError):
+        return False
+
+
+def safety_blockers(hass, entry=None, proposed=None):
+    """Require affected engines and union of old/new plumbing definitively OFF."""
+    old = effective(entry) if entry else {}
+    entities = hardware_entities(old) | hardware_entities(proposed or {})
+    affected = [entry] if entry else []
+    # Sharing is transitive: an affected room can connect another pump/mainline.
+    changed = True
+    while changed:
+        changed = False
+        for other in hass.config_entries.async_entries(DOMAIN):
+            if other in affected:
+                continue
+            other_hw = hardware_entities(effective(other))
+            if entities.intersection(other_hw):
+                affected.append(other)
+                entities.update(other_hw)
+                changed = True
+    controls = {engine_flag(hass, effective(other)) for other in affected}
+    # On first creation there is no existing engine, but an already present flag
+    # (for example a restored default helper) must not be ON when hardware is mapped.
+    if not entry and proposed:
+        flag = engine_flag(hass, proposed)
+        if hass.states.get(flag):
+            controls.add(flag)
+        if not proposed.get("room_prefix") and hass.states.get(LEGACY_KILL_SWITCH):
+            controls.add(LEGACY_KILL_SWITCH)
+    blockers = [
+        blocker
+        for eid in sorted(controls | entities)
+        if (blocker := _off_blocker(hass, eid))
+    ]
+    if _same_lights_hour((proposed or {}).get("parameters") or {}):
+        blockers.append(LIGHTS_SAME_HOUR)
+    plan = _plan_blocker(hass, entry, proposed)
+    return blockers + [plan] if plan else blockers
+
+
+def _zone_ids(data):
+    zones = data.get("zones") or {}
+    return {
+        z
+        for z in range(1, int(data.get("num_zones", 1)) + 1)
+        if (zones.get(str(z), zones.get(z, {})) or {}).get("active", True)
+    }
+
+
+def _plan_blocker(hass, entry, proposed):
+    """A grow-strategy plan that is armed or running manages a fixed set of zones. A change to
+    that set, or archiving the room, would hold the plan and the steering of every zone it
+    manages, so it waits until the plan is disarmed. A change back to the plan's own zones is
+    always allowed: it is how a room that got out of step is put right."""
+    if entry is None or proposed is None:
+        return None
+    manager = hass.data.get(DOMAIN, {}).get("_strategy", {}).get(entry.entry_id)
+    status = manager.document["status"] if manager else "draft"
+    if status == "draft":
+        return None
+    current, wanted = _zone_ids(effective(entry)), _zone_ids(proposed)
+    planned = {
+        zone["zone_id"]
+        for zone in (manager.document.get("plan") or {}).get("zones", [])
+    }
+    archiving = proposed.get("active", True) is False
+    if not archiving and wanted in (current, planned):
+        return None
+    return (
+        f"The grow strategy plan is {status}: disarm it (Irrigation plan > Schedule) and "
+        "wait for it to return to draft before changing this room's zones or archiving it"
+    )
+
+
+def _off_blocker(hass, eid):
+    """Why this entity stops a setup change, or None. "Must read OFF" used to be the whole message
+    for an entity that was on, unreachable, or did not exist at all: three different things to fix.
+    """
+    state = hass.states.get(eid)
+    # A valve reads open or closed; everything else here reads on or off.
+    on, off = ("open", "closed") if eid.startswith("valve.") else ("on", "off")
+    if state is not None and state.state == off:
+        return None
+    if state is None:
+        detail = (
+            "entity not found: check the id, or its device integration has not loaded"
+        )
+    elif state.state == on:
+        action = "close it" if on == "open" else "turn it off"
+        detail = f"it is {on.upper()}: {action}, then submit again"
+    else:
+        detail = f"it reads {state.state!r}: the device has to be reachable and {off.upper()}"
+    return f"{eid} must read {off.upper()} before changing setup ({detail})"
+
+
+def _entry(hass, entry_id):
+    return next(
+        (
+            entry
+            for entry in hass.config_entries.async_entries(DOMAIN)
+            if entry.entry_id == entry_id
+        ),
+        None,
+    )
+
+
+def _name(value):
+    if not isinstance(value, str) or not value.strip() or len(value.strip()) > 80:
+        raise ValueError("Room and zone names must contain 1–80 characters")
+    return value.strip()
+
+
+def _cultivar(value):
+    """A zone's cultivar label: free text of up to 40 characters, "" for none. A label only: nothing reads it to
+    decide anything."""
+    if value is None:
+        return ""
+    if not isinstance(value, str) or len(value.strip()) > 40:
+        raise ValueError("A cultivar must contain at most 40 characters")
+    return value.strip()
+
+
+def _entity(hass, eid, domains, kind=None):
+    if domains is ACTUATOR_DOMAINS and isinstance(eid, str) and "." in eid:
+        domain = eid.split(".")[0]
+        if domain not in domains:
+            raise ValueError(
+                f"{eid}: the controller can't open or close a {domain}. A zone valve, main line "
+                "or pump must be a switch, an input_boolean or a valve"
+            )
+    if not isinstance(eid, str) or eid.split(".")[0] not in domains:
+        raise ValueError(
+            f"Invalid entity domain for {eid!r}; expected {', '.join(sorted(domains))}"
+        )
+    state = hass.states.get(eid)
+    if state is None:
+        raise ValueError(f"Entity {eid} does not exist")
+    if kind:
+        unit = (
+            str(state.attributes.get("unit_of_measurement", ""))
+            .lower()
+            .replace(" ", "")
+        )
+        if unit not in UNITS[kind]:
+            why = units.refusal(kind, unit)
+            raise ValueError(
+                f"{eid}: incompatible {kind.upper()} unit {unit!r}"
+                + (
+                    f" ({why})"
+                    if why
+                    else f" (accepted: {', '.join(sorted(UNITS[kind]))})"
+                )
+            )
+    return eid
+
+
+def _tank_timestamp(hass, eid):
+    """Validate an explicit last-fill reading; never infer an event from state metadata."""
+    state = hass.states.get(eid)
+    unit = state.attributes.get("unit_of_measurement")
+    device_class = state.attributes.get("device_class")
+    if (unit is not None and str(unit).strip()) or device_class not in (
+        None,
+        "",
+        "timestamp",
+    ):
+        raise ValueError(f"{eid}: last fill requires a unitless timestamp sensor")
+    if eid.startswith("input_datetime."):
+        if (
+            state.attributes.get("has_date") is not True
+            or state.attributes.get("has_time") is not True
+        ):
+            raise ValueError(
+                f"{eid}: last fill helper must have both date and time enabled"
+            )
+        timestamp = state.attributes.get("timestamp")
+        if type(timestamp) not in (int, float) or not math.isfinite(timestamp):
+            raise ValueError(
+                f"{eid}: last fill helper requires a finite epoch timestamp"
+            )
+        return
+    if state.state in (None, "", "unknown", "unavailable"):
+        return  # The mapping can be saved offline; the overview must show it as unknown.
+    try:
+        value = datetime.fromisoformat(state.state.replace("Z", "+00:00"))
+    except (TypeError, ValueError, AttributeError):
+        raise ValueError(
+            f"{eid}: last fill requires an ISO timestamp with timezone"
+        ) from None
+    if value.tzinfo is None or value.utcoffset() is None:
+        raise ValueError(f"{eid}: last fill timestamp must include a timezone")
+
+
+def _tank_level(raw, hw):
+    """How a tank distance sensor's reading becomes a level, and which state of the float means low.
+
+    full_mm and empty_mm are the sensor's distances down to the water when the tank is full and when it
+    is empty, in millimetres whatever unit the sensor reports.
+    """
+    if not isinstance(raw, dict) or set(raw) - TANK_LEVEL_FIELDS:
+        raise ValueError("Unknown tank level field")
+    out = {}
+    for key in ("full_mm", "empty_mm"):
+        value = raw.get(key)
+        if value is None:
+            continue
+        if (
+            isinstance(value, bool)
+            or not isinstance(value, (float, int))
+            or not math.isfinite(value)
+            or not 0 <= value <= 10000
+        ):
+            raise ValueError(f"{key} must be a distance within 0–10000 mm")
+        out[key] = float(value)
+    if hw.get("tank_distance_sensor"):
+        if "full_mm" not in out or "empty_mm" not in out:
+            raise ValueError(
+                "A tank distance sensor needs its distance down to the water when the tank is "
+                "full (full_mm) and when it is empty (empty_mm)"
+            )
+        if out["empty_mm"] <= out["full_mm"]:
+            raise ValueError(
+                "empty_mm must be further from the sensor than full_mm: the water is further "
+                "away when the tank is empty"
+            )
+    state = raw.get("float_low_state", "on")
+    if state not in ("on", "off"):
+        raise ValueError("float_low_state must be on or off")
+    out["float_low_state"] = state
+    return out
+
+
+def prepare_setup(hass, payload, old=None, entry_id=None):
+    """Normalize a complete edit while retaining old fields and immutable IDs."""
+    old = old or {}
+    result = deepcopy(old)
+    result["room_name"] = _name(
+        payload.get("room_name", old.get("room_name", old.get("name", "Crop Steering")))
+    )
+    result["name"] = result["room_name"]
+    active = payload.get("active", old.get("active", True))
+    if type(active) is not bool:
+        raise ValueError("active must be a boolean")
+    result["active"] = active
+    rows = payload.get("zones")
+    if not isinstance(rows, list) or not rows or len(rows) > MAX_ZONES:
+        raise ValueError(f"Provide 1–{MAX_ZONES} zone slots (archive unused slots)")
+    old_zones = {int(k): v for k, v in old.get("zones", {}).items()}
+    ids = [row.get("id") for row in rows if isinstance(row, dict)]
+    if (
+        len(ids) != len(rows)
+        or any(type(z) is not int or z < 1 or z > MAX_ZONES for z in ids)
+        or len(set(ids)) != len(ids)
+    ):
+        raise ValueError("Every zone requires a unique valid integer id")
+    if not set(old_zones).issubset(ids):
+        raise ValueError(
+            "Existing zone IDs cannot disappear; archive the zone with active=false"
+        )
+    if sorted(ids) != list(range(1, max(ids) + 1)):
+        raise ValueError("New zone IDs must append in sequential order")
+    zones, allocated = {}, {}
+    foreign_shared = set()
+    for other in hass.config_entries.async_entries(DOMAIN):
+        if other.entry_id == entry_id:
+            continue
+        cfg = effective(other)
+        if not cfg.get("active", True):
+            continue
+        foreign_shared.update(
+            cfg.get("hardware", {}).get(key)
+            for key in ("pump_switch", "main_line_switch", "waste_switch")
+            if cfg.get("hardware", {}).get(key)
+        )
+        for zone in cfg.get("zones", {}).values():
+            if zone.get("active", True) and zone.get("zone_switch"):
+                allocated[zone["zone_switch"]] = other.entry_id
+    for row in rows:
+        z = row["id"]
+        prior = deepcopy(old_zones.get(z, {}))
+        enabled = row.get("active", True)
+        if type(enabled) is not bool:
+            raise ValueError("Zone active must be a boolean")
+        prior.update(
+            zone_number=z,
+            name=_name(row.get("name") or prior.get("name") or f"Zone {z}"),
+            active=enabled,
+        )
+        cultivar = _cultivar(row.get("cultivar", prior.get("cultivar")))
+        if cultivar:
+            prior["cultivar"] = cultivar
+        else:
+            prior.pop("cultivar", None)
+        valve = row.get("valve", prior.get("zone_switch", ""))
+        if valve:
+            _entity(hass, valve, ACTUATOR_DOMAINS)
+        elif enabled:
+            raise ValueError(f"Zone {z}: select a valve")
+        if enabled and active and valve:
+            if valve in foreign_shared:
+                raise ValueError(
+                    f"Valve {valve} conflicts with another room's shared hardware role"
+                )
+            if valve in allocated:
+                raise ValueError(
+                    f"Valve {valve} is already allocated to an active zone"
+                )
+            allocated[valve] = entry_id or "new room"
+        prior["zone_switch"] = valve
+        # Optional, display only: the zone's own leaf temperature sensor (the plant-stress card).
+        leaf = row.get(
+            "leaf_temperature_sensor", prior.get("leaf_temperature_sensor", "")
+        )
+        if not isinstance(leaf, str):
+            raise ValueError(f"Zone {z}: the leaf temperature sensor is one entity id")
+        if leaf:
+            _entity(hass, leaf, {"sensor"})
+            prior["leaf_temperature_sensor"] = leaf
+        else:
+            prior.pop("leaf_temperature_sensor", None)
+        for kind in ("vwc", "ec"):
+            sensors = row.get(
+                f"{kind}_sensors",
+                prior.get(f"{kind}_sensors")
+                or [
+                    prior[k] for k in (f"{kind}_front", f"{kind}_back") if prior.get(k)
+                ],
+            )
+            if (
+                not isinstance(sensors, list)
+                or len(sensors) > 32
+                or len(set(sensors)) != len(sensors)
+            ):
+                raise ValueError(
+                    "Sensor lists must contain at most 32 unique entity IDs"
+                )
+            for sensor in sensors:
+                if not isinstance(sensor, str) or not sensor.startswith("sensor."):
+                    raise ValueError("Sensor lists require sensor entity IDs")
+                if enabled and active:
+                    _entity(hass, sensor, {"sensor"}, kind)
+            remapped = set(sensors) != set(
+                prior.get(f"{kind}_sensors")
+                or [prior[k] for k in (f"{kind}_front", f"{kind}_back") if prior.get(k)]
+            )
+            prior[f"{kind}_sensors"] = sensors
+            prior[f"{kind}_front"] = sensors[0] if sensors else ""
+            prior[f"{kind}_back"] = sensors[1] if len(sensors) > 1 else ""
+            # Other probes: which count and which leads is chosen again (all count, none leads).
+            unused = row.get(f"{kind}_unused", prior.get(f"{kind}_unused") or [])
+            primary = row.get(f"{kind}_primary", prior.get(f"{kind}_primary") or "")
+            if not isinstance(unused, list) or not isinstance(primary, str):
+                raise ValueError(
+                    f"Zone {z}: probes left out are a list, the primary one id"
+                )
+            if remapped:
+                unused, primary = [], ""
+            unused = [s for s in sensors if s in unused]
+            primary = primary if primary in sensors else ""
+            if sensors and len(unused) == len(sensors):
+                raise ValueError(
+                    f"Zone {z}: at least one of its {kind.upper()} probes must count"
+                )
+            if primary in unused:
+                raise ValueError(f"Zone {z}: the primary probe must be one that counts")
+            for key, value in (
+                (f"{kind}_unused", unused),
+                (f"{kind}_primary", primary),
+            ):
+                if value:
+                    prior[key] = value
+                else:
+                    prior.pop(key, None)
+        temperature = row.get(ZONE_TEMPERATURE, prior.get(ZONE_TEMPERATURE) or "")
+        if temperature:
+            if not isinstance(temperature, str):
+                raise ValueError(
+                    f"Zone {z}: the root-zone temperature probe is one sensor"
+                )
+            _entity(hass, temperature, {"sensor"}, "tank_temperature")
+            prior[ZONE_TEMPERATURE] = temperature
+        else:
+            prior.pop(ZONE_TEMPERATURE, None)
+        for key, (low, high, integer) in SIZING.items():
+            value = row.get(key, prior.get(key))
+            if value is None:
+                continue
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (float, int))
+                or not math.isfinite(value)
+                or not low <= value <= high
+                or (integer and int(value) != value)
+            ):
+                raise ValueError(f"{key} must be within {low}–{high}")
+            prior[key] = int(value) if integer else float(value)
+        zones[str(z)] = prior
+    hw = deepcopy(old.get("hardware", {}))
+    incoming = payload.get("hardware", {})
+    if not isinstance(incoming, dict) or set(incoming) - set(HARDWARE_DOMAINS) - set(
+        HVAC_LISTS
+    ):
+        raise ValueError("Unknown hardware mapping field")
+    for key in HVAC_LISTS:
+        if key not in incoming:
+            continue
+        units = incoming.pop(key)
+        if (
+            not isinstance(units, list)
+            or len(units) > HVAC_MAX
+            or len(set(units)) != len(units)
+            or not all(isinstance(u, str) and u for u in units)
+        ):
+            raise ValueError(f"{key}: at most {HVAC_MAX} different entity ids")
+        for unit in units:
+            _entity(hass, unit, HVAC_DOMAINS)
+        if units:
+            hw[key] = units
+        else:
+            hw.pop(key, None)
+    for key, value in incoming.items():
+        if value:
+            _entity(hass, value, HARDWARE_DOMAINS[key], SENSOR_KINDS.get(key))
+            if key == "tank_last_fill_sensor":
+                _tank_timestamp(hass, value)
+        hw[key] = value or ""
+    shared = {
+        hw.get("pump_switch"),
+        hw.get("main_line_switch"),
+        hw.get("waste_switch"),
+    } - {None, ""}
+    if any(
+        entity in allocated and allocated[entity] != (entry_id or "new room")
+        for entity in shared
+    ):
+        raise ValueError(
+            "Shared hardware conflicts with another room's zone valve role"
+        )
+    if len(shared) != len(
+        [
+            hw[k]
+            for k in ("pump_switch", "main_line_switch", "waste_switch")
+            if hw.get(k)
+        ]
+    ):
+        raise ValueError("Pump, mainline and waste must use different switches")
+    if shared.intersection(
+        z["zone_switch"] for z in zones.values() if z.get("active", True)
+    ):
+        raise ValueError("A valve cannot also be pump, mainline or waste")
+    # The plumbing layout is DECLARED, never inferred here. Absent from the payload (an older
+    # dashboard, the env file, a room from before this existed) keeps whatever the room already
+    # had, which may be nothing: that room is then driven as it always was. Once declared it can
+    # be changed but not withdrawn.
+    layout = payload.get("plumbing") or old.get("plumbing") or None
+    if layout is not None:
+        if not isinstance(layout, str) or layout not in PLUMBING_LAYOUTS:
+            raise ValueError(plumbing_problems(str(layout), hw)[0])
+        found = plumbing_problems(layout, hw) if active else []
+        if found:
+            raise ValueError(". ".join(found))
+        result["plumbing"] = layout
+    # Absent from the payload keeps what the room had, like the plumbing.
+    tank = payload.get("tank_level", old.get("tank_level"))
+    if tank is not None or hw.get("tank_distance_sensor") or hw.get("tank_low_float"):
+        result["tank_level"] = _tank_level(tank or {}, hw)
+    result.update(zones=zones, num_zones=max(ids), hardware=hw)
+    return result
+
+
+def configuration_payload(data):
+    """Adapt existing/native-flow storage to the same validated operator payload."""
+    rows = []
+    for key, zone in data.get("zones", {}).items():
+        rows.append(
+            {
+                "id": int(key),
+                "name": zone.get("name", f"Zone {key}"),
+                "cultivar": zone.get("cultivar", ""),
+                "active": zone.get("active", True),
+                "valve": zone.get("zone_switch", ""),
+                **{
+                    f"{kind}_sensors": zone.get(f"{kind}_sensors")
+                    or [
+                        zone[k]
+                        for k in (f"{kind}_front", f"{kind}_back")
+                        if zone.get(k)
+                    ]
+                    for kind in ("vwc", "ec")
+                },
+                **{k: zone[k] for k in SIZING if k in zone},
+                **(
+                    {ZONE_TEMPERATURE: zone[ZONE_TEMPERATURE]}
+                    if zone.get(ZONE_TEMPERATURE)
+                    else {}
+                ),
+            }
+        )
+    return {
+        "room_name": data.get("room_name", data.get("name", "Crop Steering")),
+        "active": data.get("active", True),
+        "zones": rows,
+        "hardware": {
+            k: v for k, v in data.get("hardware", {}).items() if k in HARDWARE_DOMAINS
+        },
+        **({"plumbing": data["plumbing"]} if data.get("plumbing") else {}),
+        **({"tank_level": data["tank_level"]} if data.get("tank_level") else {}),
+    }
+
+
+def setup_sizing(hass, data, cfg, zone, key):
+    """Expose current hydraulic numbers without resetting a legacy room on save."""
+    prefix = data.get("room_prefix", "")
+    zone_state = hass.states.get(f"number.crop_steering_{prefix}zone_{zone}_{key}")
+    if key in cfg and prefer_setup_value(
+        zone_state.attributes if zone_state else {},
+        data.get("setup_revision", 0),
+        cfg[key],
+    ):
+        # An explicit save wins until its newly configured entity has reloaded.
+        return cfg[key]
+    room_state = hass.states.get(f"number.crop_steering_{prefix}{key}")
+    low, high, integer = SIZING[key]
+    for state in (zone_state, room_state):
+        if state is None:
+            continue
+        try:
+            value = float(state.state)
+        except (ValueError, TypeError):
+            continue
+        if (
+            math.isfinite(value)
+            and low <= value <= high
+            and (not integer or value.is_integer())
+        ):
+            return int(value) if integer else value
+    return cfg.get(
+        key,
+        data.get("parameters", {}).get(key, SIZING_DEFAULTS[key]),
+    )
+
+
+def setup_room(hass, entry):
+    from .commissioning import readiness
+
+    data = effective(entry)
+    zones = []
+    for z in range(1, int(data.get("num_zones", 1)) + 1):
+        cfg = data.get("zones", {}).get(str(z)) or data.get("zones", {}).get(z) or {}
+        sizing = {key: setup_sizing(hass, data, cfg, z, key) for key in SIZING}
+        zones.append(
+            {
+                "id": z,
+                "name": cfg.get("name", f"Zone {z}"),
+                "cultivar": cfg.get("cultivar", ""),
+                "active": cfg.get("active", True),
+                "valve": cfg.get("zone_switch", ""),
+                "leaf_temperature_sensor": cfg.get("leaf_temperature_sensor", ""),
+                **{
+                    f"{kind}_sensors": cfg.get(f"{kind}_sensors")
+                    or [cfg[k] for k in (f"{kind}_front", f"{kind}_back") if cfg.get(k)]
+                    for kind in ("vwc", "ec")
+                },
+                **{
+                    key: cfg.get(key) or ("" if key.endswith("_primary") else [])
+                    for key in sorted(PROBE_CHOICE)
+                },
+                ZONE_TEMPERATURE: cfg.get(ZONE_TEMPERATURE) or "",
+                **sizing,
+                # Sizing still at the generic value setup offers a new room, so not yet
+                # confirmed as this room's own: changing it to anything else clears it.
+                "sizing_generic": sorted(
+                    key
+                    for key, value in sizing.items()
+                    if value == SIZING_DEFAULTS[key]
+                ),
+            }
+        )
+    blockers = safety_blockers(hass, entry)
+    return {
+        "entry_id": entry.entry_id,
+        "revision": int(data.get("setup_revision", 0)),
+        "room_name": data.get("room_name", data.get("name", entry.title)),
+        "prefix": data.get("room_prefix", ""),
+        "slug": data.get("room_slug", "default"),
+        "active": data.get("active", True),
+        "num_zones": data.get("num_zones", 1),
+        "active_zone_ids": [z["id"] for z in zones if z["active"]],
+        "zones": zones,
+        "hardware": {
+            **{key: data.get("hardware", {}).get(key, "") for key in HARDWARE_DOMAINS},
+            # Each AC and dehumidifier mapped for the runoff estimator ([] when none).
+            **{
+                key: list(data.get("hardware", {}).get(key) or []) for key in HVAC_LISTS
+            },
+        },
+        # "" = never declared. `plumbing_inferred` is what the mapped switches imply, for a form
+        # to PREFILL; it becomes a declaration only when the operator saves it.
+        "plumbing": data.get("plumbing") or "",
+        "plumbing_inferred": infer_plumbing(data.get("hardware", {})),
+        "tank_level": data.get("tank_level") or {},
+        "safety": {"ready": not blockers, "blockers": blockers},
+        # The setup wizard's live checks; a room from before is commissioned and never sees it.
+        "commissioning": readiness(hass, entry),
+    }
+
+
+def read_setup(hass):
+    return {
+        "api_version": API_VERSION,
+        "capabilities": {
+            "create": True,
+            "save": True,
+            "remove": True,
+            "restore": True,
+            "stable_zone_ids": True,
+            "plumbing": True,
+            "commissioning": True,
+        },
+        "limits": {"max_zones": MAX_ZONES},
+        # What a new zone's sizing starts at: the one defaults table, as the HA wizard offers it.
+        "sizing_defaults": dict(SIZING_DEFAULTS),
+        "rooms": [
+            setup_room(hass, e) for e in hass.config_entries.async_entries(DOMAIN)
+        ],
+        "candidates": [
+            {
+                "entity_id": s.entity_id,
+                "name": s.attributes.get("friendly_name", s.entity_id),
+                "domain": s.entity_id.split(".")[0],
+                "state": s.state,
+                "unit": s.attributes.get("unit_of_measurement", ""),
+                "device_class": s.attributes.get("device_class"),
+            }
+            for s in hass.states.async_all()
+            if s.entity_id.split(".")[0]
+            in {
+                "sensor",
+                "light",
+                "binary_sensor",
+                "input_datetime",
+                "camera",
+                *ACTUATOR_DOMAINS,
+            }
+        ],
+    }
+
+
+def _selected(hass, payload):
+    entry = _entry(hass, payload.get("entry_id"))
+    if entry is None:
+        raise ValueError("Select an existing room entry")
+    revision = effective(entry).get("setup_revision", 0)
+    if (
+        type(payload.get("expected_revision")) is not int
+        or payload["expected_revision"] != revision
+    ):
+        raise ValueError("Room setup changed; refresh and review again")
+    return entry
+
+
+def _update(hass, entry, data, new_revision=True):
+    data["setup_revision"] = int(effective(entry).get("setup_revision", 0)) + (
+        1 if new_revision else 0
+    )
+    # Old installations may have setup fields in options; remove only shadowing
+    # fields we just updated, while retaining every unrelated option.
+    options = {
+        k: v
+        for k, v in (getattr(entry, "options", None) or {}).items()
+        if k
+        not in {
+            "room_name",
+            "name",
+            "active",
+            "num_zones",
+            "zones",
+            "hardware",
+            "plumbing",
+            "parameters",
+            "setup_revision",
+        }
+    }
+    hass.config_entries.async_update_entry(
+        entry, data=data, options=options, title=data.get("room_name", entry.title)
+    )
+
+
+def _choice_only(payload, old):
+    """A save that sends nothing but which probes count and which leads (PROBE_CHOICE), each zone
+    as active as it is stored: the Probes page's picker."""
+    zones = old.get("zones") or {}
+    rows = payload.get("zones")
+    return (
+        set(payload) <= {"entry_id", "expected_revision", "zones"}
+        and isinstance(rows, list)
+        and all(
+            isinstance(row, dict)
+            and set(row) <= {"id", "active"} | PROBE_CHOICE
+            and row.get("active", True)
+            == (zones.get(str(row.get("id"))) or {}).get("active", True)
+            for row in rows
+        )
+    )
+
+
+def _labels_only(hass, entry, payload, data, old):
+    """The saved setup differs from the stored one in zone names and cultivars only: labels, which the controller
+    reads as display text and never adopts (it needs no new setup revision, and the room keeps watering).
+    """
+
+    def bare(setup):
+        setup = deepcopy(setup)
+        for zone in (setup.get("zones") or {}).values():
+            if isinstance(zone, dict):
+                zone.pop("name", None)
+                zone.pop("cultivar", None)
+        return setup
+
+    # The editor includes derived sizing and empty mapping defaults. Compare
+    # against an unchanged editor round-trip, rather than the legacy encoding.
+    room = setup_room(hass, entry)
+    baseline = {
+        "room_name": room["room_name"],
+        "active": room["active"],
+        "zones": room["zones"],
+        "hardware": room["hardware"],
+    }
+    try:
+        unchanged = prepare_setup(hass, baseline, old, entry.entry_id)
+    except ValueError:
+        # An edit can repair stale mappings or invalid old plumbing. Such a save
+        # is not metadata-only; let the existing hardware safety path handle it.
+        return False
+    return bare(data) == bare(unchanged)
+
+
+async def save_setup(hass, payload):
+    entry = _selected(hass, payload)
+    old = effective(entry)
+    data = prepare_setup(hass, payload, old, entry.entry_id)
+    # Choosing which probes count and which leads, and nothing else, can be done while watering. It
+    # keeps the setup revision: a new one is a setup the controller takes on only with the engine
+    # switched off, and the room would stop watering until someone did.
+    choice = _choice_only(payload, old) or _labels_only(hass, entry, payload, data, old)
+    blockers = [] if choice else safety_blockers(hass, entry, data)
+    if blockers:
+        raise ValueError("; ".join(blockers))
+    _update(hass, entry, data, new_revision=not choice)
+    return setup_room(hass, entry)
+
+
+async def remove_setup(hass, payload):
+    entry = _selected(hass, payload)
+    data = deepcopy(effective(entry))
+    if payload.get("confirm_name") != data.get(
+        "room_name", data.get("name", entry.title)
+    ):
+        raise ValueError("Confirm the exact selected room name")
+    blockers = safety_blockers(hass, entry, {**data, "active": False})
+    if blockers:
+        raise ValueError("; ".join(blockers))
+    data["active"] = False
+    _update(hass, entry, data)
+    return {
+        "entry_id": entry.entry_id,
+        "archived": True,
+        "revision": data["setup_revision"],
+    }
+
+
+async def create_setup(hass, payload):
+    # HA remains responsible for entry creation, unique IDs, and platform setup.
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "user"}, data={"setup_payload": payload}
+    )
+    if result.get("type") != "create_entry":
+        detail = (result.get("description_placeholders") or {}).get("error")
+        raise ValueError(
+            f"Room creation did not complete: {detail or result.get('reason') or result.get('errors') or result.get('type')}"
+        )
+    entry = result.get("result")
+    return {
+        "entry_id": entry.entry_id,
+        "revision": effective(entry).get("setup_revision", 1),
+        "reload_required": False,
+    }
+
+
+# A saved setup change, in words, for Home Assistant's logbook (Activity) and its log: what each
+# mapping is called on the dashboard. tests/test_setup_changes.py holds it to HARDWARE_DOMAINS.
+HARDWARE_WORDS = {
+    "pump_switch": "pump",
+    "main_line_switch": "main-line valve",
+    "waste_switch": "waste valve",
+    "light_entity": "lights",
+    "feed_ec_sensor": "feed EC sensor",
+    "feed_ph_sensor": "feed pH sensor",
+    "temperature_sensor": "temperature sensor",
+    "humidity_sensor": "humidity sensor",
+    "vpd_sensor": "VPD sensor",
+    "leaf_temperature_sensor": "leaf temperature sensor",
+    "water_level_sensor": "tank level sensor",
+    "tank_temperature_sensor": "tank temperature sensor",
+    "tank_ec_sensor": "tank EC sensor",
+    "tank_ph_sensor": "tank pH sensor",
+    "tank_last_fill_sensor": "tank last-fill sensor",
+    "tank_fill_entity": "tank fill",
+    "tank_distance_sensor": "tank distance sensor",
+    "tank_low_float": "tank low float",
+    "camera_entity": "camera",
+    "co2_sensor": "CO2 sensor",
+    "ppfd_sensor": "PPFD sensor",
+    "dli_sensor": "DLI sensor",
+}
+ZONE_WORDS = {
+    "valve": "valve",
+    "vwc_sensors": "moisture probes",
+    "ec_sensors": "EC probes",
+    "plant_count": "plants",
+    "substrate_volume": "pot volume (L)",
+    "drippers_per_plant": "drippers per plant",
+    "dripper_flow_rate": "dripper flow (L/h)",
+    "leaf_temperature_sensor": "leaf temperature sensor",
+    ZONE_TEMPERATURE: "root-zone temperature probe",
+}
+# homeassistant.const.EVENT_LOGBOOK_ENTRY: the event the logbook records a line from.
+LOGBOOK_ENTRY = "logbook_entry"
+
+
+def _said(value):
+    if isinstance(value, list):
+        return ", ".join(value) or "none"
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return f"{value:g}"
+    return value or "none"
+
+
+def setup_changes(old, new):
+    """PURE. What a saved setup changed, in words. Both rooms are as `setup_room` gives them:
+    the one the setup page showed, and the one saved."""
+    said = []
+    if old.get("room_name") != new.get("room_name"):
+        said.append(f"renamed from “{old.get('room_name')}”")
+    if old.get("active", True) != new.get("active", True):
+        said.append("restored" if new.get("active", True) else "archived")
+    if old.get("plumbing") != new.get("plumbing"):
+        layout = new.get("plumbing")
+        said.append(f"plumbing: {PLUMBING_LABELS.get(layout, layout or 'none')}")
+    old_hw, new_hw = old.get("hardware") or {}, new.get("hardware") or {}
+    for key, word in HARDWARE_WORDS.items():
+        was, now = _said(old_hw.get(key)), _said(new_hw.get(key))
+        if was != now:
+            said.append(f"{word} {was} → {now}")
+    for key, word in (
+        ("ac_entities", "ACs"),
+        ("dehumidifier_entities", "dehumidifiers"),
+    ):
+        was, now = _said(old_hw.get(key)), _said(new_hw.get(key))
+        if was != now:
+            said.append(f"{word} {was} → {now}")
+    shown = {zone.get("id"): zone for zone in old.get("zones") or []}
+    for zone in new.get("zones") or []:
+        z, prior = zone.get("id"), shown.get(zone.get("id"))
+        if prior is None:
+            said.append(f"zone {z} added")
+            continue
+        if prior.get("active", True) != zone.get("active", True):
+            said.append(
+                f"zone {z} " + ("restored" if zone.get("active", True) else "archived")
+            )
+        if prior.get("name") != zone.get("name"):
+            said.append(
+                f"zone {z} renamed from “{prior.get('name')}” to “{zone.get('name')}”"
+            )
+        for field, word in ZONE_WORDS.items():
+            was, now = _said(prior.get(field)), _said(zone.get(field))
+            if was != now:
+                said.append(f"zone {z} {word} {was} → {now}")
+    return said
+
+
+def _record(hass, action, before, result, context):
+    """A saved setup change goes in Home Assistant's logbook, on the room's engine-config sensor
+    with the person who made it (the service call's context), and in its log at INFO. Recording
+    never undoes or fails the save."""
+    try:
+        entry = _entry(hass, (result or {}).get("entry_id"))
+        if entry is None:
+            return
+        room = setup_room(hass, entry)
+        if action == "setup_create":
+            message = f"set up (revision {room['revision']})"
+        elif action == "setup_remove":
+            message = f"archived (revision {room['revision']})"
+        elif action == "setup_commission":
+            # The wizard's draft is not part of the setup: it moves no revision and no mapping.
+            message = (
+                "set up: every switch-on check passed"
+                if room["commissioning"]["commissioned"]
+                else "setup wizard progress saved"
+            )
+        else:
+            changes = setup_changes(before or {}, room)
+            message = f"setup saved (revision {room['revision']}): " + (
+                "; ".join(changes) if changes else "nothing changed"
+            )
+        from homeassistant.helpers import entity_registry as er
+
+        # The id HA gave the sensor (sticky in the registry), else the one it is created with.
+        entity_id = (
+            er.async_get(hass).async_get_entity_id(
+                "sensor", DOMAIN, f"{DOMAIN}_{entry.entry_id}_engine_config"
+            )
+            or f"sensor.{DOMAIN}_{room['prefix']}engine_config"
+        )
+        hass.bus.async_fire(
+            LOGBOOK_ENTRY,
+            {
+                "name": room["room_name"],
+                "message": message,
+                "domain": DOMAIN,
+                "entity_id": entity_id,
+            },
+            context=context,
+        )
+        _LOGGER.info("%s: %s", room["room_name"], message)
+    except Exception:  # noqa: BLE001 - the save stands; say why it was not recorded
+        _LOGGER.exception("A saved room setup change could not be recorded")
+
+
+async def commission_setup(hass, payload):
+    """The setup wizard's draft (commissioning.py): saved beside the setup, revision-checked."""
+    from .commissioning import save_commissioning
+
+    return await save_commissioning(hass, payload)
+
+
+async def async_setup_setup_services(hass):
+    """Response services are discoverable through the standard HA service registry."""
+    from homeassistant.core import SupportsResponse
+    from homeassistant.exceptions import HomeAssistantError
+    import voluptuous as vol
+
+    state = hass.data.setdefault(DOMAIN, {}).setdefault("_setup", {})
+    if state.get("services_registered"):
+        return
+    lock = state.setdefault("lock", asyncio.Lock())
+    handlers = {
+        "setup_read": read_setup,
+        "setup_create": create_setup,
+        "setup_save": save_setup,
+        "setup_remove": remove_setup,
+        "setup_commission": commission_setup,
+    }
+    for name, handler in handlers.items():
+
+        async def call(service_call, fn=handler, action=name):
+            await async_require_admin(hass, service_call, "Setup", allow_no_user=False)
+            try:
+                async with lock:
+                    if action == "setup_read":
+                        result = fn(hass)
+                    else:
+                        entry = _entry(hass, service_call.data.get("entry_id"))
+                        before = setup_room(hass, entry) if entry else None
+                        result = await fn(hass, service_call.data)
+                        _record(hass, action, before, result, service_call.context)
+            except (ValueError, TypeError) as err:
+                raise HomeAssistantError(str(err)) from err
+            return result if service_call.return_response else None
+
+        hass.services.async_register(
+            DOMAIN,
+            name,
+            call,
+            schema=vol.Schema({}, extra=vol.ALLOW_EXTRA),
+            supports_response=(
+                SupportsResponse.ONLY
+                if name == "setup_read"
+                else SupportsResponse.OPTIONAL
+            ),
+        )
+    state["services_registered"] = True

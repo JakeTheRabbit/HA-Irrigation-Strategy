@@ -1,0 +1,101 @@
+{
+ "_about": "What controller 3.8.0 saved in /data/state.json for the 2.17-wizard room (entry_2_17_wizard.json) mid-grow on 1 Oct 2026: zone 1 in P2 after its ramp, zone 2 still ramping, the rate EWMAs learned, and the setup fingerprint it adopted. Written by 3.8.0's own _serialize_zone. It has no plateau or night history: 3.8.0 kept none.",
+ "state": {
+  "default": {
+   "1": {
+    "phase": "P2",
+    "peak": 36.1,
+    "shots": 9,
+    "daily_vol": 63.0,
+    "water_history": [
+     {"grow_day": "2026-09-30", "litres": 58.5, "complete": true},
+     {"grow_day": "2026-10-01", "litres": 63.0, "complete": false}
+    ],
+    "water_history_legacy_excluded_l": 0.0,
+    "learn": {
+     "peak_adj": 0.0,
+     "jev": {"day": null, "nudged": [], "asked": null, "last": null, "changed": null},
+     "peak": 36.0,
+     "gain": 0.62,
+     "day_rate": 0.87,
+     "night_rate": 0.45,
+     "day_n": 6,
+     "night_n": 6,
+     "day_acc": [0.0, 0],
+     "night_acc": [0.0, 0],
+     "hold_days": 0,
+     "day": "2026-10-01",
+     "ramp_start": null,
+     "ramp": [],
+     "pending": null,
+     "outcome": "plateau",
+     "stalled_at": null,
+     "last_change": "2026-09-30 p1_target_vwc 41 -> 36",
+     "prev_peak": null,
+     "prev_hold": 0,
+     "veto": null
+    },
+    "ec_smooth": 4.62,
+    "ec_settled": 4.7,
+    "ec_settled_at": "2026-10-01T15:40:00",
+    "ec_offset": 1.5,
+    "ec_integral": 0.4,
+    "ec_prev_err": 0.2,
+    "last_shot": "2026-10-01T15:28:00",
+    "last_shot_is_anchor": false,
+    "last_phase_change": "2026-10-01T12:10:00",
+    "last_ec_steer": "2026-10-01T15:30:00",
+    "last_daily_reset": "2026-10-01"
+   },
+   "2": {
+    "phase": "P1",
+    "peak": 44.2,
+    "shots": 3,
+    "daily_vol": 21.0,
+    "water_history": [
+     {"grow_day": "2026-10-01", "litres": 21.0, "complete": false}
+    ],
+    "water_history_legacy_excluded_l": 0.0,
+    "learn": {
+     "peak_adj": 0.0,
+     "jev": {"day": null, "nudged": [], "asked": null, "last": null, "changed": null},
+     "peak": null,
+     "gain": null,
+     "day_rate": 0.52,
+     "night_rate": 0.31,
+     "day_n": 4,
+     "night_n": 4,
+     "day_acc": [0.0, 0],
+     "night_acc": [0.0, 0],
+     "hold_days": 0,
+     "day": "2026-10-01",
+     "ramp_start": null,
+     "ramp": [],
+     "pending": null,
+     "outcome": "pending",
+     "stalled_at": null,
+     "last_change": "",
+     "prev_peak": null,
+     "prev_hold": 0,
+     "veto": null
+    },
+    "ec_smooth": 3.9,
+    "ec_settled": null,
+    "ec_settled_at": null,
+    "ec_offset": 0.0,
+    "ec_integral": 0.0,
+    "ec_prev_err": 0.0,
+    "last_shot": "2026-10-01T11:10:00",
+    "last_shot_is_anchor": false,
+    "last_phase_change": "2026-10-01T10:30:00",
+    "last_ec_steer": null,
+    "last_daily_reset": "2026-10-01"
+   },
+   "_room_active": true,
+   "_setup": {
+    "revision": 4,
+    "fingerprint": "{\"active\": true, \"enable_flag\": \"switch.crop_steering_engine_enabled\", \"feed_ec_sensor\": \"sensor.feed_ec\", \"feed_ph_sensor\": \"sensor.feed_ph\", \"mainline\": \"switch.main_line\", \"pump\": \"switch.main_pump\", \"valves\": {\"1\": \"switch.row_1_valve\", \"2\": \"switch.row_2_valve\"}, \"zones\": [1, 2]}"
+   }
+  }
+ }
+}

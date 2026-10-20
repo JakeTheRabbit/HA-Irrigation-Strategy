@@ -1,0 +1,1635 @@
+{
+  "about": "Each alert from the Crop Steering controller app, and each Crop Steering card in Settings → Repairs, ends with a code, for example CS-101. The regular status summary of the controller has no code. This file is the only list of the codes. The page docs/ERROR_CODES.md and the Settings & help → Help page of the dashboard come from this file. The test tests/test_error_codes.py keeps the file and the code in agreement.",
+  "groups": [
+    {
+      "prefix": "CS-1",
+      "name": "Probes",
+      "detail": "A VWC or EC reading that the controller cannot use."
+    },
+    {
+      "prefix": "CS-2",
+      "name": "Shots held",
+      "detail": "Something stops the shots of a room or a zone."
+    },
+    {
+      "prefix": "CS-3",
+      "name": "Pumps and valves",
+      "detail": "A switch did not obey its command, or a shot stopped early."
+    },
+    {
+      "prefix": "CS-4",
+      "name": "Settings",
+      "detail": "A setting is missing or out of range, or the controller reads it from a new source."
+    },
+    {
+      "prefix": "CS-5",
+      "name": "Zone comparisons",
+      "detail": "Advice from a comparison of the zones of a room, and a probe that the controller sets aside because of its unit."
+    },
+    {
+      "prefix": "CS-6",
+      "name": "Repairs cards",
+      "detail": "The integration makes these alerts in Settings → Repairs."
+    },
+    {
+      "prefix": "CS-7",
+      "name": "AI assistant",
+      "detail": "Decisions of the AI assistant about a zone (advice, or a probe that it sets aside). Also the status of the AI assistant (docs/AI_ASSISTANT.md). For example, its calls or its AI budget are almost used or used, or its key is refused. Other examples are a retired route and a judge on the stricter gate."
+    },
+    {
+      "prefix": "CS-8",
+      "name": "Dosing",
+      "detail": "Batch tank dosing: a dose or a batch that did not end correctly (docs/DOSING.md). Also pH auto-correct, and the light dimmed on dry substrate."
+    },
+    {
+      "prefix": "CS-9",
+      "name": "Reservoir and feed",
+      "detail": "The tank that a room gets water from (docs/USER_GUIDE.md, \"Reservoir minimum\"). It is at its minimum, its level cannot be read, or it needs a refill before the next shots. Or a fill stopped above the full mark. Also a batch tank that needs a refill (docs/DOSING.md)."
+    }
+  ],
+  "codes": [
+    {
+      "code": "CS-101",
+      "title": "Flat moisture reading",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "For more than 20 min, the moisture (VWC) reading of the zone does not change. The controller cannot tell a good probe from a probe that stopped or came out of the substrate. The controller does not steer the zone on this reading.",
+      "watering": "While the kill switch is on, the zone continues without its probe. The zone gets the same shots as a zone of the room with a probe that works. If no such zone exists, the zone gets one shot each 90 min (blind_fallback_min), inside its daily water limit. Phase changes that use VWC wait until the reading moves.",
+      "causes": [
+        "No plant in the cube, or the plant is too small to drink much water. Nothing removes water, so the reading does not change. This is usual on a bench test or a new installation.",
+        "The probe is out of the cube, or it is in a tray.",
+        "The cube is full of water, and the probe stays at its highest reading.",
+        "The integration of the probe stopped, and it continues to show its last value."
+      ],
+      "fixes": [
+        "Examine the cube first: a cube with no plant, or with a small plant, gives a flat reading.",
+        "Make sure that the probe is fully in the cube.",
+        "Open the history of the probe in Home Assistant.",
+        "If the line is flat for hours while the plants drink, restart the probe or its integration.",
+        "If the room has no plants, set \"Room Active\" to off."
+      ]
+    },
+    {
+      "code": "CS-102",
+      "title": "Probe with no reading",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The moisture (VWC) entity of the zone reads \"unavailable\" or \"unknown\", is not a number, or is not in Home Assistant. It can also show a time in the future. The alert tells which.",
+      "watering": "For the first 15 min, the zone waits and the controller gives no shot and no alert. After 15 min, while the kill switch is on, the zone continues without its probe. The zone gets the same shots as a zone of the room with a probe that works. If no such zone exists, the zone gets one shot each 90 min (blind_fallback_min), inside its daily water limit. Phase changes that use VWC wait for the probe.",
+      "causes": [
+        "The probe is offline: it has no power, its battery is flat, or it is out of Wi-Fi or Zigbee range.",
+        "Home Assistant restarted, and the integration of the probe took more than 15 min to load.",
+        "A person renamed or removed the probe, so the entity that is mapped to the zone does not exist.",
+        "The clock of Home Assistant is ahead of the clock of the controller. The reading then seems to come from the future, and the alert tells you."
+      ],
+      "fixes": [
+        "Find the entity that the alert names in Developer tools → States, and read its state.",
+        "Make sure that the probe device has power and is online.",
+        "Check the range of its Wi-Fi or Zigbee link.",
+        "In Crop Steering → Rooms and setup, make sure that the zone uses the correct probe.",
+        "If the alert shows a time in the future, correct the clocks of the Home Assistant host and the controller."
+      ]
+    },
+    {
+      "code": "CS-103",
+      "title": "Moisture reading out of range",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The moisture (VWC) entity of the zone gives a value below 0% or above 100%. The controller ignores this value.",
+      "watering": "The zone continues without its probe, the same as for a probe that does not report (CS-102).",
+      "causes": [
+        "The probe is defective, or its calibration is incorrect.",
+        "The entity that is mapped to the zone is not a VWC in %. It is a raw count, a voltage or a different reading of the same device."
+      ],
+      "fixes": [
+        "Check the calibration of the probe in its own integration.",
+        "In Crop Steering → Rooms and setup, make sure that the zone uses the VWC entity in %.",
+        "Do not map a raw count, a voltage or a different entity of the same device."
+      ]
+    },
+    {
+      "code": "CS-104",
+      "title": "EC reading not available",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The zone has no usable EC reading. The EC entity is missing, unavailable or out of range, or it has not changed for 20 min.",
+      "watering": "The controller steers the zone on VWC only. The controller cannot measure the salt in the substrate, so it cannot correct the EC with a flush.",
+      "causes": [
+        "No EC probe is mapped to the zone.",
+        "The EC probe is offline, or its reading does not change for more than 20 min. A cube with no plant gives this result, as for CS-101."
+      ],
+      "fixes": [
+        "CAUTION: Do not ignore this alert for many days. Salt can build up in the substrate when the controller cannot read EC.",
+        "If the zone has an EC probe, map it to the zone in Crop Steering → Rooms and setup.",
+        "Make sure that the EC probe is online.",
+        "Make sure that its reading changes. A cube with no plant gives a flat EC reading."
+      ]
+    },
+    {
+      "code": "CS-201",
+      "title": "Setup change on hold",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "The controller has a new setup for the room, or it loads the setup again after a restart. It applies a setup only when all the pumps and valves of the room are off. For a changed setup, the kill switch must also be off.",
+      "watering": "The room gets no shots until the controller applies the setup. If the hold continues, the substrate dries out.",
+      "causes": [
+        "A person saved the setup while the kill switch was on.",
+        "A pump or a valve stays on, or it reads \"unavailable\".",
+        "The controller restarted while a pump ran (for example, to circulate a tank), or while a switch read \"unavailable\"."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the room in this hold for a long time. The substrate dries out and the plants can wilt.",
+        "Read the list of devices in the alert.",
+        "Set each pump and valve in the list to off.",
+        "If the alert names the kill switch (Engine Enabled), set it to off.",
+        "Wait for the alert to clear.",
+        "Set the kill switch to on again."
+      ]
+    },
+    {
+      "code": "CS-202",
+      "title": "Pump or main-line mismatch",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "The setup of the room has a pump or a main-line valve, but no entity is mapped to it. Or an entity is mapped, but the setup has none. The controller holds the room, so it does not open a valve with no pump.",
+      "watering": "The room gets no shots until the setup and the mapped entities agree.",
+      "causes": [
+        "A person removed the pump or the main-line switch from the setup of the room, or removed its device.",
+        "The plumbing in the setup is not the real plumbing of the room.",
+        "The integration is newer than the controller, and it uses a plumbing layout that the controller does not know."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the room in this hold for a long time. The substrate dries out and the plants can wilt.",
+        "Read the detail in the alert.",
+        "In Crop Steering → Rooms and setup, map the missing switch.",
+        "Alternatively, set the layout to the real pipes and pumps of the room.",
+        "If the alert names a layout that the controller does not know, upgrade the controller. The hold clears when the controller applies the correct setup (CS-201)."
+      ]
+    },
+    {
+      "code": "CS-203",
+      "title": "Invalid maximum shot length",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "The maximum shot length (Maximum shot duration) of the room is not a number, or it is less than 5 s. The controller does not replace a value that you set with a default, because a default can flood the room.",
+      "watering": "The room gets no shots until the value is correct. The controller uses 900 s only when no Maximum shot duration entity exists, and then it gives no alert.",
+      "causes": [
+        "The setting reads \"unavailable\", because the integration did not load.",
+        "The setting is less than 5 s."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the room in this hold for a long time. The substrate dries out and the plants can wilt.",
+        "Make sure that the Crop Steering integration is loaded in Settings → Devices & services.",
+        "Set Maximum shot duration to 5 s or more.",
+        "If Repairs shows CS-605, do the steps of CS-605 first."
+      ]
+    },
+    {
+      "code": "CS-204",
+      "title": "Invalid shot size inputs",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "The controller calculates each shot from the substrate volume, the plant count, the drippers for each plant and the dripper flow. One of these values is zero, less than zero, or not a number.",
+      "watering": "The zone gets no shots. A missing or unavailable value does not cause this alert, because the controller then uses its built-in value (CS-402).",
+      "causes": [
+        "The substrate volume, the drippers for each plant or the dripper flow is 0 or less.",
+        "The flow_lps or substrate_l option of the controller is 0 or less, and the zone has no value of its own. The controller then uses the option."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the zone in this hold for a long time. The substrate dries out and the plants can wilt.",
+        "In Crop Steering → Rooms and setup, set the substrate volume, plant count, drippers per plant and dripper flow of the zone.",
+        "Make sure that each value is more than 0.",
+        "Check that the flow_lps and substrate_l options of the controller are more than 0."
+      ]
+    },
+    {
+      "code": "CS-205",
+      "title": "Daily water limit reached",
+      "source": "notification",
+      "severity": "info",
+      "meaning": "The zone has received its daily water limit (max daily volume) since lights-on. A shot that crosses the limit gets only the remaining volume.",
+      "watering": "Maintenance shots and EC correction shots stop until the next lights-on. The ramp, the rescue shot, the watchdog shot and high-EC flushes continue. A zone with no usable VWC reading gets no more water until lights-on, rescue shots included.",
+      "causes": [
+        "The plants use that much water: the limit is too low for their size.",
+        "The shots give more water than the controller calculates, because the dripper flow setting is lower than the real flow. The zone then reaches the limit early.",
+        "The probe continues to read dry, so the controller continues to ask for water. The probe can be in a dry spot, or the water does not get to it."
+      ],
+      "fixes": [
+        "CAUTION: Do not increase the limit before you do a catch test. If the dripper flow setting is too low, the substrate gets more water than the controller counts.",
+        "Do a catch test to measure the real dripper flow.",
+        "Correct the dripper flow setting.",
+        "Make sure that the probe is in the cube and that the drippers reach it.",
+        "Increase the max daily volume only after these checks."
+      ]
+    },
+    {
+      "code": "CS-206",
+      "title": "EC too high, zone held",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The EC of the zone is above its maximum EC setting. A flush cannot decrease it now. The feed EC is not lower than the EC in the substrate, or the substrate is at field capacity.",
+      "watering": "The controller holds the zone and no shot runs, the rescue shot and the watchdog shot included. The hold stops when a flush can help again. Without action, the substrate can dry out.",
+      "causes": [
+        "The feed EC is equal to or higher than the EC in the substrate.",
+        "The cube is at field capacity, so more water only becomes runoff.",
+        "The EC probe reads too high, because of its calibration or because the probe is dry."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the zone in this hold overnight without a check. The rescue shot does not run, so the substrate can dry out.",
+        "Measure the feed EC in the tank.",
+        "If the feed EC is high, decrease it.",
+        "Check the feed EC probe (feed_ec_sensor) against a hand-held meter.",
+        "Check the EC probe of the zone against a hand-held meter.",
+        "Make sure that the maximum EC setting of the zone is correct."
+      ]
+    },
+    {
+      "code": "CS-207",
+      "title": "Dry zone, all shots blocked",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "The VWC of the zone is below its re-water point. The zone has had no shot for longer than its watchdog time (3 h by default). Something blocks every shot. The alert names the block.",
+      "watering": "The zone gets no water until the block clears. The plants can wilt and the substrate can dry out.",
+      "causes": [
+        "The kill switch is off. On a new installation, this is usual: the alert tells you that no zone gets water until you set the kill switch to on.",
+        "Auto irrigation or the zone switch is off, or manual override is on.",
+        "A hold stops the shots. Examples are a setup change (CS-201), plumbing that does not agree (CS-202) and a hardware fault (CS-301). Other examples are an external hold (a dose, a fill or a flush) and the source-water gate. The hold of a grow plan (CS-606) does not stop this safety shot."
+      ],
+      "fixes": [
+        "CAUTION: Do not ignore this alert. The substrate of the zone is dry, and dry substrate can damage the roots.",
+        "Read \"Blocked by\" in the alert.",
+        "Remove the block that the alert names.",
+        "If the kill switch is off on purpose, water the zone by hand.",
+        "If the room has no plants, set \"Room Active\" to off."
+      ]
+    },
+    {
+      "code": "CS-208",
+      "title": "Retired switch is off",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "System Enabled and Auto Irrigation Enabled are retired. The kill switch (\"Watering\" on the dashboard) is now the only switch that stops water. One retired switch is off, so the controller sets the kill switch to off, and does this again while the retired switch stays off.",
+      "watering": "The room gets no shots. A shot in progress stops within some seconds. The controller continues to read the probes and to change the phases.",
+      "causes": [
+        "A person or an automation set System Enabled or Auto Irrigation Enabled to off before these switches were retired.",
+        "An automation still sets one of these switches to off to stop the water."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the room in this hold for a long time. The substrate dries out and the plants can wilt.",
+        "In Settings → Entities, show the hidden entities.",
+        "Set the retired switch that the alert names to on.",
+        "In Crop Steering, use Watering in the header to review switching it on.",
+        "Change each automation that sets a retired switch to off.",
+        "Make it set the kill switch of the room to off instead."
+      ]
+    },
+    {
+      "code": "CS-209",
+      "title": "No shots for some hours",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The room is on, its lights are on, and one or more zones are in P1 or P2. No zone of the room has had a shot for the number of hours that you set (3 h by default, 1 to 12 h). The alert gives the reason when the controller knows it.",
+      "watering": "The alert does not change the water. It comes again after each period of the same length. It clears at the next shot, at lights-off, or when no zone is in P1 or P2.",
+      "causes": [
+        "A person set the kill switch of the room to off, and did not set it to on again.",
+        "A hold stops each shot. Examples are a batch, a hardware hold after a pump or valve fault (CS-301), and a zone switch that is off. Other examples are manual override, the source-water gate, and a pump or valve that reads neither on nor off. The alert names the hold.",
+        "No zone needed water: each zone in P1 or P2 read wetter than its re-water point. For example, a probe is out of its cube or stays high, or the re-water point is too low for the plants."
+      ],
+      "fixes": [
+        "CAUTION: Do not ignore this alert for many hours. The zones get no water, and the substrate can dry out.",
+        "Read the reason in the alert.",
+        "Remove the hold that it names.",
+        "If the kill switch is off, set it to on.",
+        "If no zone needs water, compare the VWC of each zone with its re-water point.",
+        "Make sure that each probe is in its cube.",
+        "To change the number of hours, go to Crop Steering → Settings & help → Notifications."
+      ]
+    },
+    {
+      "code": "CS-210",
+      "title": "Hold entity missing",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The hold entities option of the controller app names one or more entities that Home Assistant does not have. The controller checks them when it starts, before it waters, also while the kill switch is off. The alert names each missing entity.",
+      "watering": "No room gets shots while a hold entity is missing, the same as while a hold is on. The status of each held zone tells which entity is missing. The alert clears by itself when each entity exists.",
+      "causes": [
+        "The entity ID in the option has a typo.",
+        "A person deleted or renamed the helper or switch that the option names."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the rooms in this hold for a long time. The substrate dries out and the plants can wilt.",
+        "Compare each entity that the alert names with the entities in Settings → Entities.",
+        "Correct or remove the entity in the hold entities option of the controller app, and restart the app.",
+        "Or make the missing helper or switch with that entity ID.",
+        "If you removed the entity from the option, dismiss the alert."
+      ]
+    },
+    {
+      "code": "CS-211",
+      "title": "Shots held for too long",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "A zone asked for water, and a hold stopped every shot for longer than the hours that you set (Shots held alert, 0 = off). A hold that a person sets on purpose (the kill switch, a zone switch, manual override) does not count. The alert names the hold.",
+      "watering": "The alert does not change the water. The zone gets no water until the hold clears. The alert comes again every 30 minutes, and clears at the next shot of the zone.",
+      "causes": [
+        "The source-water gate holds the shots: the feed pH or feed EC is outside its band, or the feed probe is dead.",
+        "A hardware hold after a pump or valve fault (CS-301), a hold entity that is on, or a batch or a dose that holds the room.",
+        "A pump or valve that reads neither on nor off."
+      ],
+      "fixes": [
+        "CAUTION: Do not ignore this alert. The zone gets no water, and the substrate can dry out.",
+        "Read the hold in the alert, and remove it.",
+        "If the feed pH or EC is outside its band, correct the tank, or turn on pH auto-correct.",
+        "If you cannot remove the hold soon, water the zone by hand.",
+        "To change the hours, or to turn the alert off, set Shots held alert in the settings of the room."
+      ]
+    },
+    {
+      "code": "CS-301",
+      "title": "Hardware fault latch",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "A pump or a valve did not read back off after the controller closed it. The device can still be on. The controller latches a hold on that hardware, and the hold stays after a restart.",
+      "watering": "No shot starts on that hardware, in each room that shares it, until the hold clears. If the device is still on, water can flow without control and flood the zone.",
+      "causes": [
+        "The device of the switch went offline during a shot.",
+        "A relay or a valve stays on.",
+        "The switch reports its state late, or does not report it."
+      ],
+      "fixes": [
+        "WARNING: Isolate the electrical power before you touch a pump, a valve or its wiring. Water near mains power can cause an electric shock.",
+        "CAUTION: Examine the hardware now. A valve or a pump that stays on can flood the substrate and the floor.",
+        "Go to the room now and examine the pump and the valves.",
+        "If a pump or a valve is on, stop it by hand.",
+        "Set the kill switch of each room that shares the hardware to off. The hold clears when all the pumps and valves read off.",
+        "Then set each kill switch to on again.",
+        "If the alert says that the controller could not save the fault, do not restart the controller. A dismissed alert does not clear the hold."
+      ]
+    },
+    {
+      "code": "CS-302",
+      "title": "Pump command error",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Home Assistant returned an error when the controller tried to start the pump. A device that reads \"unavailable\" does not cause this alert, because no shot starts then.",
+      "watering": "The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual.",
+      "causes": [
+        "Home Assistant did not reply (it restarted, or the network has a fault), or it returned an error for the command.",
+        "A switch that reads \"unavailable\" does not cause this alert. No shot starts while a switch on the feed path reads neither on nor off. The status of the zone names the offline switch. The zone gets water again when the switch reads again."
+      ],
+      "fixes": [
+        "WARNING: Make sure that no person works on the pump or its pipes before you start it by hand. A pump that starts suddenly can spray water near mains power.",
+        "Start and stop the pump by hand in Home Assistant to test it.",
+        "Make sure that the correct pump is mapped in Crop Steering → Rooms and setup.",
+        "Check the network link between Home Assistant and the device.",
+        "If a CS-301 alert also shows, do its steps."
+      ]
+    },
+    {
+      "code": "CS-303",
+      "title": "Main-line valve command error",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Home Assistant returned an error when the controller tried to start the main-line valve. A device that reads \"unavailable\" does not cause this alert, because no shot starts then.",
+      "watering": "The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual.",
+      "causes": [
+        "Home Assistant did not reply (it restarted, or the network has a fault), or it returned an error for the command.",
+        "A switch that reads \"unavailable\" does not cause this alert. No shot starts while a switch on the feed path reads neither on nor off. The status of the zone names the offline switch. The zone gets water again when the switch reads again."
+      ],
+      "fixes": [
+        "Start and stop the main-line valve by hand in Home Assistant to test it.",
+        "Make sure that the correct main-line valve is mapped in Crop Steering → Rooms and setup.",
+        "Check the network link between Home Assistant and the device.",
+        "If a CS-301 alert also shows, do its steps."
+      ]
+    },
+    {
+      "code": "CS-304",
+      "title": "Zone valve command error",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Home Assistant returned an error when the controller tried to start the zone valve. A device that reads \"unavailable\" does not cause this alert, because no shot starts then.",
+      "watering": "The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual.",
+      "causes": [
+        "Home Assistant did not reply (it restarted, or the network has a fault), or it returned an error for the command.",
+        "A switch that reads \"unavailable\" does not cause this alert. No shot starts while a switch on the feed path reads neither on nor off. The status of the zone names the offline switch. The zone gets water again when the switch reads again."
+      ],
+      "fixes": [
+        "Start and stop the zone valve by hand in Home Assistant to test it.",
+        "Make sure that the correct zone valve is mapped in Crop Steering → Rooms and setup.",
+        "Check the network link between Home Assistant and the device.",
+        "If a CS-301 alert also shows, do its steps."
+      ]
+    },
+    {
+      "code": "CS-305",
+      "title": "Early shot stop",
+      "source": "notification",
+      "severity": "info",
+      "meaning": "A shot stopped before its end, because a person or an automation changed a switch. The switch can be the kill switch, \"Room Active\", the zone switch or manual override. The controller closed the valve and the hardware upstream of it.",
+      "watering": "The controller counts the water that the zone got before the stop. The next shot follows the usual rules. If a device does not read back off, the controller also raises CS-301.",
+      "causes": [
+        "During a shot, a person set the kill switch, Room Active or the zone switch to off, or set manual override to on.",
+        "An automation made this change."
+      ],
+      "fixes": [
+        "If the stop was on purpose, no action is necessary.",
+        "If not, open the logbook of the switch that the alert names.",
+        "Find the person or the automation that changed the switch."
+      ]
+    },
+    {
+      "code": "CS-306",
+      "title": "Shot cut to maximum length",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The calculated shot was longer than the maximum shot length of the room. The controller cut the shot to the limit, so the zone got less water than planned.",
+      "watering": "Water continues, but each cut shot gives less water than the controller calculated. Three cut shots in sequence cause CS-312.",
+      "causes": [
+        "The dripper flow or the drippers for each plant is set too low, so the controller calculates a long shot.",
+        "The substrate volume is set too high.",
+        "The maximum shot length is too short for the room."
+      ],
+      "fixes": [
+        "CAUTION: Do not increase Maximum shot duration before you do the catch test. A long shot with a wrong flow setting can flood the substrate.",
+        "Check the substrate volume, drippers per plant and dripper flow of the zone.",
+        "Do a catch test to measure the real flow.",
+        "If the settings are correct, increase Maximum shot duration."
+      ]
+    },
+    {
+      "code": "CS-307",
+      "title": "Shot stopped by external change",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "During a shot, a hold of the room started (a dose, a tank fill or a flush). Or a different device or a person closed the zone valve. The shot stopped at that time. The controller closed its own valves, and did not stop the pump if a hold uses it.",
+      "watering": "The controller counts only the seconds that the valve was open. The next shot follows the usual rules.",
+      "causes": [
+        "A dose or tank fill automation used the tank or its pump during a shot. For example, a batch tank became empty 4 s after the start of a shot.",
+        "A guard automation or a person set the zone valve to off.",
+        "The device of the valve went off the network."
+      ],
+      "fixes": [
+        "If the stop was on purpose, no action is necessary.",
+        "If this occurs frequently, move the dose and tank fill times away from the shot times.",
+        "Otherwise, open the logbook of the zone valve to find what closed it.",
+        "Check the network link of the valve device."
+      ]
+    },
+    {
+      "code": "CS-308",
+      "title": "Interrupted shot, hardware on",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "A shot did not end correctly. The controller stopped or lost Home Assistant during the shot, or a device did not read back off. The controller tried to close the devices of the shot, and one or more still read on.",
+      "watering": "The controller latches a hardware hold (CS-301) and tries again on each loop. Water can still flow through the device that reads on.",
+      "causes": [
+        "A relay or a valve stays on.",
+        "The device of the switch is offline, so its state cannot change."
+      ],
+      "fixes": [
+        "WARNING: Isolate the electrical power before you touch a pump, a valve or its wiring. Water near mains power can cause an electric shock.",
+        "CAUTION: Examine the hardware now. A valve or a pump that stays on can flood the substrate and the floor.",
+        "Go to the room now.",
+        "Examine the device that the alert names, and its pipes.",
+        "If water flows, stop the device by hand.",
+        "Then do the steps of CS-301 to clear the hold."
+      ]
+    },
+    {
+      "code": "CS-309",
+      "title": "Interrupted shot, state unknown",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "A shot did not end, and the controller cannot read a device that the shot opened. Or Home Assistant has no change time or history for that device. The controller does not close the device, because a person can also use it by hand.",
+      "watering": "No new shot starts in the room until the controller settles the interrupted shot. It checks again on each loop. When it can read the device, it closes only what the shot opened.",
+      "causes": [
+        "The device of the switch is offline or reads \"unavailable\".",
+        "Its integration gives no time for the last change of the switch.",
+        "Home Assistant keeps no history for the switch. The recorder excludes the switch, or Home Assistant started a short time ago."
+      ],
+      "fixes": [
+        "WARNING: Isolate the electrical power before you touch a pump, a valve or its wiring. Water near mains power can cause an electric shock.",
+        "CAUTION: Examine the hardware now. A valve or a pump that stays on can flood the substrate and the floor.",
+        "Go to the room now.",
+        "Examine the device that the alert names, and its pipes.",
+        "If water flows, stop the device by hand.",
+        "Connect the device to Home Assistant again.",
+        "If the recorder excludes the device, include it again. The controller uses the history to tell a restart from a person."
+      ]
+    },
+    {
+      "code": "CS-310",
+      "title": "Table drain blocked",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "The VWC of a zone increased by 3 points or more in 1 h with no water from its valve. The valve was also closed for 45 min before the increase. Water comes from below, because the table or its drain is blocked or the sump does not pump. The controller does not monitor a room whose Drainage setting is free drain.",
+      "watering": "The controller holds the minimum daily volume and the EC flushes of the zone. The alert comes again each 30 min while the VWC increases, and clears after 1 h with no increase. Until the table drains, the roots sit in runoff.",
+      "causes": [
+        "Substrate, roots or debris block the drain or the drain line of a table.",
+        "The sump pump does not pump: it is defective, it has no power, or its float is stuck. The sump fills, and the water flows back into the tables.",
+        "A shared gutter or drain is full, and runoff from other tables flows into this table.",
+        "Less probable: a person moved the probe to a wetter spot, or gave water by hand without the zone valve (for example, with a hose)."
+      ],
+      "fixes": [
+        "WARNING: Isolate the electrical power to the sump pump before you touch it. Water near mains power can cause an electric shock.",
+        "CAUTION: Do not water the zone by hand until the table drains. More water can flood the table and damage the roots.",
+        "Go to the room now.",
+        "Look for water that stands on the table.",
+        "Check the drain outlets, the sump and the sump pump.",
+        "Remove the blockage.",
+        "Make sure that the sump pumps the water out.",
+        "If nothing is blocked, check that the probe did not move to a wetter spot."
+      ]
+    },
+    {
+      "code": "CS-311",
+      "title": "No sump pump run",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "The power reading of the sump pump (sump_power_sensor) shows no run for 3 h by default (sump_silent_hours). A run is a reading above the Sump Pump Run Threshold, 20 W by default. Without the pump, runoff fills the sump and flows back into the tables.",
+      "watering": "The alert does not change the water. It comes again each 30 min until the next pump run. If the VWC of a zone then increases with no water, CS-310 follows.",
+      "causes": [
+        "The sump pump is defective, or its float is stuck.",
+        "The pump has no power: its power plug is off, or it tripped.",
+        "No water gets to the sump: the drains of the tables or the line to the sump are blocked.",
+        "The power plug is offline, so the controller cannot see a run (the reading is unavailable)."
+      ],
+      "fixes": [
+        "WARNING: Isolate the electrical power to the sump pump before you touch it. Water near mains power can cause an electric shock.",
+        "CAUTION: Do not let the sump overflow. Runoff can flow back into the tables and flood the roots.",
+        "Go to the room now.",
+        "Check the water level in the sump.",
+        "Check the pump, its float switch and its power plug.",
+        "Remove what stops the water to or from the sump.",
+        "If the power plug is offline, connect it again.",
+        "Increase sump_silent_hours only if the pump really runs less frequently."
+      ]
+    },
+    {
+      "code": "CS-312",
+      "title": "Repeated maximum-length shots",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "The last 3 shots of a zone each needed more time than the maximum shot length of the room. The controller cut each shot (CS-306). This often shows a probe that reads dry, or a wrong substrate volume or dripper flow.",
+      "watering": "If the max-run latch switch of the room is on, the zone gets no more shots, rescue shots included, until you fix the Repairs card. If the latch switch is off, the card only reports. It clears after the next shot that the controller does not cut.",
+      "causes": [
+        "The probe of the zone reads dry when the slab is not dry. The probe can be stuck, disconnected from the slab, or out of the substrate. Each shot is then calculated for a dry slab.",
+        "The substrate volume, plant count, drippers for each plant or dripper flow of the zone is incorrect. The calculated shots are then much too long.",
+        "Some drippers are blocked, so the water flows more slowly than the dripper flow setting.",
+        "The maximum shot length of the room is shorter than the usual shots of this zone."
+      ],
+      "fixes": [
+        "CAUTION: Fix the card soon when the latch switch is on. The zone gets no water, and the substrate can dry out.",
+        "Examine the zone: the slab, the probe and the drippers.",
+        "Check the substrate volume, plant count, drippers per plant and dripper flow in Rooms and setup.",
+        "If all are correct, increase the maximum shot length of the room.",
+        "To water the zone again, open the card in Settings → Repairs and confirm it."
+      ]
+    },
+    {
+      "code": "CS-313",
+      "title": "Device type not supported",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "A zone valve, pump or main-line valve has a device type that the controller cannot open or close. The controller can use a switch, an input_boolean or a valve. The setup does not accept other types, so a person mapped this device by hand.",
+      "watering": "The zone gets no shots, and the controller sends no command to the device. Other zones continue.",
+      "causes": [
+        "A person mapped a cover, a light, a fan or a different type of device as a zone valve, the pump or the main-line valve.",
+        "The integration of the device shows it as a type that Crop Steering cannot operate."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the zone in this hold for a long time. The substrate dries out and the plants can wilt.",
+        "In Crop Steering → Rooms and setup, map a switch, an input_boolean or a valve in its place.",
+        "If the hardware exists only as a different device type, make a template switch for it in Home Assistant.",
+        "Map the template switch. The zone gets water again from the next loop."
+      ]
+    },
+    {
+      "code": "CS-314",
+      "title": "Sump water balance does not close",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "With the runoff estimator at shown_alerts or ai, a grow-day whose sump litres (its runs times the litres per run) miss what a sealed room must send to the sump (the water fed minus the change of water in the substrate) by more than 30%. In a sealed room the water the plants transpire comes back as AC and dehumidifier condensate, so the two agree on a normal day.",
+      "watering": "The alert does not change the water. The runoff estimate is a room-wide hint and never waters or holds a zone.",
+      "causes": [
+        "A leak: water leaves the room another way than the sump.",
+        "The power plug of the sump pump missed a run, or reports too slowly to see each run.",
+        "The float of the sump is stuck, so the pump runs at the wrong level.",
+        "The litres per run (a bucket test, or the pump flow) are wrong.",
+        "The room is not sealed: air is exchanged with outside, so condensate leaves with it."
+      ],
+      "fixes": [
+        "Look for water on the floor and at the drains of the tables.",
+        "Check that the power plug of the sump pump reports often enough to see each run (every 30 s or less).",
+        "Check the float of the sump.",
+        "Measure the litres of one sump run with a bucket and set Sump litres per run.",
+        "Set the runoff estimator to shadow if the room is not sealed."
+      ]
+    },
+    {
+      "code": "CS-315",
+      "title": "Rescue shots not absorbed",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "Rescue shots of a zone (P3 emergency or watchdog shots) did not raise its moisture, several in a row. Each rescue is judged 15 min after it, or at the next rescue if that comes first: it counts as a miss when the moisture rose less than 0.5 points. The alert comes at the number of misses that the room setting Rescue misses before alert gives (4 by default). The check runs only while the room select Rescue shots not absorbed is set to Alert.",
+      "watering": "The alert does not change the water. The rescue shots continue. The alert clears at the next rescue that raises the moisture.",
+      "causes": [
+        "A dripper, a dripper line or a filter is blocked.",
+        "The zone valve does not open, or the pump does not deliver.",
+        "The probe is out of the substrate or does not touch it, so it cannot see the water.",
+        "A line leaks before the drippers, so the water goes to the floor."
+      ],
+      "fixes": [
+        "CAUTION: Examine the zone now. A blocked line keeps the plants dry, and a leak puts the water on the floor.",
+        "Look at the drippers of the zone during the next shot.",
+        "Check the zone valve, the pump and the filters.",
+        "Check that the probe sits fully in the substrate.",
+        "If the probe is the problem, fix or replace it. The rescue shots continue meanwhile."
+      ]
+    },
+    {
+      "code": "CS-316",
+      "title": "Waste valve not closed",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The room has a waste valve mapped and its waste valve rule is set. With Check closed, the waste valve does not read off. With Close for each shot, the controller set it to off before a shot and it did not read off, or the controller cannot switch or read it. An open waste valve sends the feed to waste while the controller counts it as given.",
+      "watering": "No shot starts in the room until the waste valve reads off. A shot that is running stops when the waste valve opens (CS-307).",
+      "causes": [
+        "The waste valve is open, by hand or by an automation.",
+        "The switch of the waste valve is offline.",
+        "The waste valve or its relay is stuck open."
+      ],
+      "fixes": [
+        "Close the waste valve, or find what keeps it open.",
+        "Check the switch of the waste valve in Home Assistant.",
+        "If the plumbing does not need the waste valve closed for a shot, set the waste valve rule of the room to Off."
+      ]
+    },
+    {
+      "code": "CS-317",
+      "title": "Pump runs with every valve shut",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The feed pump of the room (option pump_power_sensor) uses more power than the room setting Pump dead-head power, for 1 min, while every zone valve of the room reads off, and no shot, hold or batch uses the pump. A pump that runs against shut valves (dead-head) heats up and can be damaged.",
+      "watering": "The alert does not change the water. The controller does not switch the pump off. The alert clears when the pump stops or a valve opens.",
+      "causes": [
+        "The pump was switched on by hand or by an automation with no valve open.",
+        "The pump relay is stuck on.",
+        "The Pump dead-head power setting is below the standby power of the pump."
+      ],
+      "fixes": [
+        "CAUTION: Check the pump now. A pump that runs dry or against shut valves can be damaged.",
+        "Switch the pump off, or open the valve that it should feed.",
+        "If the pump uses power when it is off, increase Pump dead-head power above that value."
+      ]
+    },
+    {
+      "code": "CS-401",
+      "title": "Setting outside controller range",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The entity accepts a wider range than the controller uses, and the value is outside the range of the controller. The alert names the setting, its value and the range. For a check of two settings, for example a minimum above its maximum, it names the two.",
+      "watering": "Water continues. The controller uses the nearest value inside its range.",
+      "causes": [
+        "A person set the setting to an extreme value. For example, a field capacity of 95% when the controller accepts a maximum of 90%."
+      ],
+      "fixes": [
+        "Set the value inside the range that the alert shows.",
+        "If the alert compares two settings, change one of them. The controller calculates the minimum daily volume from the mL for each plant and the plant count."
+      ]
+    },
+    {
+      "code": "CS-402",
+      "title": "Missing settings",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "The controller cannot read some settings by their entity IDs for 3 loops. It uses the last value that it read since its start, or its built-in value. The alert lists the settings.",
+      "watering": "All shots wait for 3 loops. Then water continues on the last value or the built-in value, which can be wrong for the room. A zone gets no shots, rescue shots included, if the controller has not read one of its water size settings since its start. These are the substrate volume, plant count, drippers per plant, dripper flow and daily water limit.",
+      "causes": [
+        "The Crop Steering integration did not load, or a person removed it.",
+        "A person changed an entity ID in Settings.",
+        "A person made the room while Home Assistant still ran an older integration. The settings then got different entity IDs (CS-605)."
+      ],
+      "fixes": [
+        "CAUTION: Do not let the controller run on built-in values for a long time. The built-in values can give too much or too little water for the room.",
+        "Make sure that the Crop Steering integration is loaded.",
+        "Reload the integration.",
+        "If Repairs shows CS-605, do the steps of CS-605.",
+        "Restore the original entity ID of each entity that you edited."
+      ]
+    },
+    {
+      "code": "CS-403",
+      "title": "Lights hours from the integration",
+      "source": "notification",
+      "severity": "info",
+      "meaning": "The controller now reads the lights-on and lights-off hours from the integration, not from its own options. The two sources do not agree.",
+      "watering": "Water continues on the hours of the integration. The controller uses its own options only when it has not read the hours of the integration since its start.",
+      "causes": [
+        "The installation is from before the integration had its own lights hours."
+      ],
+      "fixes": [
+        "If the hours of the integration are correct, set lights_on_hour and lights_off_hour in the controller options to the same hours.",
+        "If they are not correct, set Lights on hour and Lights off hour in the integration."
+      ]
+    },
+    {
+      "code": "CS-404",
+      "title": "Automatic setpoints paused",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Automatic setpoints change the targets of a zone from the ramp of each morning. This morning the ramp did not show water at the probe, so the controller paused the automatic changes for the zone. The alert tells what was wrong.",
+      "watering": "Water continues on the current targets. The controller examines the ramp again the next morning.",
+      "causes": [
+        "A dripper is blocked, a line is kinked, or a valve does not open.",
+        "The probe moved, or it is not where the drippers wet the cube.",
+        "The shots are too small to increase the reading."
+      ],
+      "fixes": [
+        "Check the drippers and the lines of the zone.",
+        "Do a catch test.",
+        "Check the position of the probe in the cube.",
+        "Make sure that the shots are large enough to increase the VWC reading."
+      ]
+    },
+    {
+      "code": "CS-405",
+      "title": "Time zone mismatch",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The clock of the controller uses a different time zone from Home Assistant. The controller uses its own clock for lights-on, lights-off, dryback and the daily reset.",
+      "watering": "Water continues, but the full grow-day moves by the time difference. Shots and phase changes occur at the wrong hours.",
+      "causes": [
+        "An old build of the controller has no time zone data.",
+        "A person changed the time zone of Home Assistant after the controller started.",
+        "The TZ setting of a controller container is not the time zone of Home Assistant."
+      ],
+      "fixes": [
+        "Upgrade or rebuild the controller, then restart it.",
+        "Check the time zone of Home Assistant in Settings → System → General.",
+        "For a controller container, set TZ in the compose file to the time zone of Home Assistant.",
+        "Alternatively, remove TZ from the compose file.",
+        "Restart the container."
+      ]
+    },
+    {
+      "code": "CS-501",
+      "title": "Low water compared to room",
+      "source": "notification",
+      "severity": "info",
+      "meaning": "Today the zone got less than 40% of the median daily water of the zones of the room. The controller makes this check only when that median is 5 L or more.",
+      "watering": "Water continues as usual. This alert is advice only.",
+      "causes": [
+        "The plants are smaller, or they drink less.",
+        "The probe is in a wetter spot than the roots, so the zone does not frequently need water.",
+        "A valve or a dripper has a problem."
+      ],
+      "fixes": [
+        "Compare the plants of this zone with the plants of the other zones.",
+        "Check the position of the probe.",
+        "Do a catch test on this zone and on one adjacent zone."
+      ]
+    },
+    {
+      "code": "CS-502",
+      "title": "Too few probes in agreement",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The zone steers its VWC or EC on its lowest or highest probe. This method needs 3 probes that agree. Fewer probes agree, so the zone uses their median, and it does not use a probe far from the others.",
+      "watering": "Water continues on the median of the remaining probes.",
+      "causes": [
+        "A probe is out of its cube or in a puddle, and its reading is far from the other probes.",
+        "A probe is offline or does not report.",
+        "The zone has only one or two probes."
+      ],
+      "fixes": [
+        "Under Probes for the zone, check the probes that the reading does not use.",
+        "If the zone has fewer than 3 probes, set its \"From Probes\" setting to Median."
+      ]
+    },
+    {
+      "code": "CS-503",
+      "title": "Probe unit not accepted",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The moisture probe of the zone uses a unit that is not a percentage, and its value is outside 0 to 100. The controller sets the probe aside, so the zone has no VWC reading. The controller reads %, converts m³/m³, and reads a probe with no unit as % while its value is 0 to 100.",
+      "watering": "The same as for CS-102. After 15 min, while the kill switch is on, the zone continues without its probe. The zone gets the same shots as a zone of the room with a probe that works. If no such zone exists, the zone gets one shot each 90 min (blind_fallback_min), inside its daily water limit. Phase changes that use VWC wait for the probe.",
+      "causes": [
+        "The entity that is mapped to the zone is a different reading of the same device: a raw count, a voltage or a temperature.",
+        "The integration of the probe gives the VWC in an unusual unit."
+      ],
+      "fixes": [
+        "In Crop Steering → Rooms and setup, map the VWC entity of the probe in % or m³/m³.",
+        "If the entity is the VWC entity, correct its unit in its own integration."
+      ]
+    },
+    {
+      "code": "CS-504",
+      "title": "Zone EC from bulk EC",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The zone has pore EC probes and bulk EC probes, and the controller never mixes the two. No pore EC probe gives a usable reading, so the zone uses its bulk EC probes. Bulk EC reads lower than pore EC in the same slab.",
+      "watering": "Water continues. EC targets and flushes act on the lower bulk EC value until a pore EC probe reports again.",
+      "causes": [
+        "A pore EC probe is offline, does not report, or reads out of range.",
+        "A person set the EC type of a probe incorrectly: pore EC for a bulk EC probe, or bulk EC for a pore EC probe."
+      ],
+      "fixes": [
+        "CAUTION: Do not let the zone steer on bulk EC for a long time. The lower value can let salt build up in the substrate.",
+        "Under Probes for the zone, check the pore EC probes that the reading does not use.",
+        "In the EC Type setting of each probe, set the correct type: pore, bulk or unknown."
+      ]
+    },
+    {
+      "code": "CS-505",
+      "title": "Primary probe offline",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The primary probe of the zone for VWC or EC gives no reading. The zone uses its other valid probes. The alert comes once, and clears when the primary probe reports again.",
+      "watering": "Water continues on the other probes of the zone.",
+      "causes": [
+        "The cable of the probe is loose or cut, or its device has no power.",
+        "The device of the probe is offline in Home Assistant."
+      ],
+      "fixes": [
+        "Check the cable and the power of the probe.",
+        "Check its device in Home Assistant.",
+        "Under Probes for the zone, choose a different primary probe, or none."
+      ]
+    },
+    {
+      "code": "CS-601",
+      "title": "Kill switch helper missing",
+      "source": "repairs",
+      "severity": "critical",
+      "meaning": "The integration cannot find the kill switch that the controller uses for this room.",
+      "watering": "The room gets no shots while the kill switch is missing.",
+      "causes": [
+        "The installation is from before the setup wizard, and a person deleted its helper input_boolean.f2_control_enabled.",
+        "On a room that the setup wizard made: the controller started before the integration was configured, and it still reports its built-in name."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the room in this hold for a long time. The substrate dries out and the plants can wilt.",
+        "On a room that the setup wizard made, do not make the helper. The kill switch of such a room is Engine Enabled.",
+        "Upgrade the integration, and the card clears when the controller finds the room.",
+        "Only for a room that uses input_boolean.f2_control_enabled, make that helper as a toggle in Settings → Devices & services → Helpers.",
+        "Keep the helper off until you are ready to water."
+      ]
+    },
+    {
+      "code": "CS-602",
+      "title": "No controller heartbeat",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "The controller sends a heartbeat each minute. The integration has not received a heartbeat for more than 10 min. The integration only makes the settings, and the controller gives the water.",
+      "watering": "No automatic shots occur while the controller is stopped. The substrate can dry out.",
+      "causes": [
+        "The controller app is not installed, is not started, or has stopped.",
+        "The controller cannot connect to Home Assistant.",
+        "A controller container is stopped, or Home Assistant does not accept its token."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the controller stopped for a long time. No automatic shots occur, and the substrate can dry out.",
+        "Start the controller app.",
+        "Read its log.",
+        "For Home Assistant Container or Core, start the controller container.",
+        "Read the container log.",
+        "Check that Home Assistant accepts the token of the container.",
+        "If you water by hand only, ignore this alert."
+      ]
+    },
+    {
+      "code": "CS-603",
+      "title": "Zone without a probe",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "No moisture probe is mapped to the zone, so the controller cannot steer it on VWC.",
+      "watering": "While the kill switch is on, the zone still gets shots. It gets the same shots as a zone with a probe that works, or one shot each 90 min inside its daily water limit.",
+      "causes": [
+        "The zone was configured without a probe, or a person removed its probe."
+      ],
+      "fixes": [
+        "CAUTION: Do not water this zone by hand without a check. The controller continues to water it, and the substrate can flood.",
+        "Map a moisture probe to the zone in Crop Steering → Rooms and setup."
+      ]
+    },
+    {
+      "code": "CS-604",
+      "title": "Combined moisture entity unavailable",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "The combined moisture entity of the zone reads unavailable, because the probe behind it does not report. The controller also raises CS-102 for the zone.",
+      "watering": "The same as for CS-102.",
+      "causes": [
+        "The probe is offline, or a person renamed or removed it."
+      ],
+      "fixes": [
+        "Check the probe in Developer tools → States.",
+        "Check the probe mapping of the zone in Crop Steering → Rooms and setup."
+      ]
+    },
+    {
+      "code": "CS-605",
+      "title": "Settings at unexpected entity IDs",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "The controller finds each setting by its exact entity ID. The settings on the card have different entity IDs. The controller uses its built-in values for them (CS-402).",
+      "watering": "Water continues on the built-in values, which can be wrong for the room.",
+      "causes": [
+        "A person changed an entity ID in Settings.",
+        "A person made the room after a HACS update and before a restart, while Home Assistant still ran the older integration."
+      ],
+      "fixes": [
+        "CAUTION: Do not set the kill switch to on until the entity IDs are correct. The built-in values can give too much or too little water.",
+        "If the card lists one or two settings, restore each entity ID in Settings → Devices & services → Entities.",
+        "If it lists almost all settings, delete the Crop Steering entry.",
+        "Restart Home Assistant.",
+        "Add the Crop Steering entry again. The integration does not rename an entity ID for you."
+      ]
+    },
+    {
+      "code": "CS-606",
+      "title": "Grow plan holds steering",
+      "source": "repairs",
+      "severity": "critical",
+      "meaning": "The grow plan of the room holds the steering of its zones. The plan has an error, the controller cannot use it, or a zone of the plan has no schedule today. The card gives the reason.",
+      "watering": "Those zones get only the rescue shot, the watchdog shot and the minimum daily volume. A zone with no usable probe gets its timed shots. Usual steering waits until the hold clears.",
+      "causes": [
+        "The plan has an error. For example, its zones are not the same as the zones of the room.",
+        "The controller reports that it cannot use the plan.",
+        "A zone of the plan has no schedule today."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the plan in this hold for many days. The zones get only safety shots, and the crop steering stops.",
+        "Open Irrigation › Calendar in the Crop Steering sidebar.",
+        "Read the reason.",
+        "Correct the cause.",
+        "If the error stays, disarm the plan and arm it again."
+      ]
+    },
+    {
+      "code": "CS-607",
+      "title": "Grow plan day not applied",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "At lights-on, the grow plan could not apply the new day. It keeps its last valid targets and tries again each minute. A plan that waits to start stays armed.",
+      "watering": "Water continues on the last valid targets.",
+      "causes": [
+        "The controller did not report at lights-on.",
+        "A probe gave an old reading at lights-on.",
+        "The integration could not read the lights-on hour."
+      ],
+      "fixes": [
+        "Usually, no action is necessary, because the alert clears when the cause stops.",
+        "If it stays, make sure that the controller runs.",
+        "Make sure that the probes report."
+      ]
+    },
+    {
+      "code": "CS-608",
+      "title": "Stock tanks low",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "One or more stock tanks of the room are at or below their low mark. Each batch takes a dose from each stock tank.",
+      "watering": "Water continues. A batch from an empty stock tank does not get enough of that nutrient.",
+      "causes": [
+        "The batches used the stock until it reached its low mark.",
+        "A person refilled a tank but did not press Refilled, so the tank still shows its old level."
+      ],
+      "fixes": [
+        "WARNING: Wear gloves and eye protection when you touch the batch tank or the stock tanks. Concentrated nutrients and pH adjusters can injure the skin and the eyes.",
+        "CAUTION: Do not make a batch from an empty stock tank. The batch then does not have enough of that nutrient.",
+        "Refill the stock tank.",
+        "Press Refilled on Crop Steering → Stock tanks.",
+        "Alternatively, set the level that you read on the tank. The card clears when each tank is above its low mark."
+      ]
+    },
+    {
+      "code": "CS-609",
+      "title": "Second controller for room",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Each controller writes its ID in the room heartbeat each minute. This controller found a heartbeat from a different controller, or from an old controller with no ID, less than 3 min ago.",
+      "watering": "This controller does not water or dose the room, and does not change its settings, until no other controller writes for 3 min in sequence. It refuses new dose and batch requests in that time. A stop still stops the pumps, and a dose or batch in progress continues to its end.",
+      "causes": [
+        "This is the first start after an upgrade from a version before this check. The last heartbeat of the old version has no ID. The alert clears in about 3 min.",
+        "Two controllers run this room: a controller app and a controller container, or two apps.",
+        "A controller from before this check still runs. It never holds, so only this controller holds."
+      ],
+      "fixes": [
+        "CAUTION: Do not leave the room in this hold for a long time. The substrate dries out and the plants can wilt.",
+        "After an upgrade, wait 3 min, and no other action is necessary.",
+        "If the alert stays, stop the controller that you do not use.",
+        "Remove that controller.",
+        "Only one controller must run a room."
+      ]
+    },
+    {
+      "code": "CS-610",
+      "title": "Engine Enabled not kill switch",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "Each room has one kill switch, which must be on before the room gets water. The controller reports that the kill switch of this room is a different entity. Engine Enabled set to off does not stop water in this room.",
+      "watering": "Water continues under the kill switch that the card names. Engine Enabled does not start or stop the water.",
+      "causes": [
+        "The installation is from before the setup wizard. Its kill switch is the entity in the enable_flag option of the controller (input_boolean.f2_control_enabled by default). It also has an Engine Enabled switch.",
+        "The setup of the room, or the enable_flag option, names a different kill switch on purpose."
+      ],
+      "fixes": [
+        "CAUTION: Do not use Engine Enabled to stop water in this room. It does not stop the shots, and the substrate can flood.",
+        "To stop water in this room, set the kill switch that the card names to off.",
+        "Change each automation that sets Engine Enabled to off, so that it uses that kill switch.",
+        "To make Engine Enabled the kill switch, follow \"Moving a room's kill switch\" in docs/INSTALL.md."
+      ]
+    },
+    {
+      "code": "CS-611",
+      "title": "Settings above zone limit",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "The limits of the daily water and the maximum shot length come from the size of each zone: its plants, substrate volume and dripper flow. These settings were above their limit before the limit started, so the integration keeps them as they are.",
+      "watering": "Water continues as before. The controller uses the settings as they are.",
+      "causes": [
+        "A person increased a setting for a larger zone than the zone in the setup now.",
+        "The plant count, the litres for each plant or the dripper flow of a zone is smaller than in the real zone."
+      ],
+      "fixes": [
+        "If the zone size is wrong, correct it in Rooms and setup, and the limit changes with it.",
+        "If the size is correct, decrease the setting to its limit at the next change. The card clears when each setting is inside its limit."
+      ]
+    },
+    {
+      "code": "CS-701",
+      "title": "No water at the zone",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The shot judge of the AI assistant found no sign of water at the zone for 2 shots in sequence. The VWC did not increase, but the controller counted the litres.",
+      "watering": "Water continues as usual. The litres that the controller counts can be more than the litres that the zone got, so the substrate can dry out.",
+      "causes": [
+        "A hand valve is closed, a line is kinked or blocked, or the drippers are blocked.",
+        "A tank hold or a dose hold closed the feed path during the shot.",
+        "The zone valve does not open, but it reads on."
+      ],
+      "fixes": [
+        "CAUTION: Do the catch test soon. A blocked line can leave the zone dry while the controller counts water.",
+        "During the next shot, check the zone valve, the line and the drippers.",
+        "Do a catch test on one dripper."
+      ]
+    },
+    {
+      "code": "CS-702",
+      "title": "Unusual water for each plant",
+      "source": "notification",
+      "severity": "info",
+      "meaning": "Today the water for each plant in this zone is less than 70% or more than 140% of the other zones of the room. The zones judge of the AI assistant gives the probable cause in the alert.",
+      "watering": "Water continues as usual. This alert is advice only.",
+      "causes": [
+        "The plants drink less or more.",
+        "The probe is in a wetter or drier spot than the roots.",
+        "A valve, a dripper or a line has a problem.",
+        "The shots do not go into the substrate."
+      ],
+      "fixes": [
+        "Compare the settings and the plants of the zone with the other zones.",
+        "Check the position of the probe.",
+        "Do a catch test on this zone and on one adjacent zone."
+      ]
+    },
+    {
+      "code": "CS-703",
+      "title": "Overnight probe fault suspected",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Overnight, the VWC of the zone falls toward the rescue floor. The night judge of the AI assistant reads this as a probe fault, not as dryback.",
+      "watering": "Water continues. The rescue shot still runs as usual.",
+      "causes": [
+        "The probe reading changed suddenly in one step, or it stopped.",
+        "A person or an object moved the probe from its position."
+      ],
+      "fixes": [
+        "Check the probe in the morning, before the ramp starts."
+      ]
+    },
+    {
+      "code": "CS-704",
+      "title": "Probe set aside by AI",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The AI assistant judged twice in sequence that the moisture probe does not follow the substrate, and the check of the controller agreed. The probe can be stuck, out of the block, on the wrong zone, or it can drift.",
+      "watering": "The zone continues without the probe, as for a probe that does not report. It gets the same shots as a zone with a probe that works, or timed shots inside its daily limit. The probe counts again when the AI assistant judges that it follows the substrate.",
+      "causes": [
+        "The probe is partly out of the block, or it is in a channel.",
+        "The probe is mapped to the wrong zone.",
+        "The probe does not measure, but it continues to report."
+      ],
+      "fixes": [
+        "Check the position and the wiring of the probe.",
+        "In Rooms and setup, check the zone that the probe is mapped to."
+      ]
+    },
+    {
+      "code": "CS-705",
+      "title": "Zone outside stage arc",
+      "source": "notification",
+      "severity": "info",
+      "meaning": "Each day, the stage judge of the AI assistant compares the zone with the stage arc for this flower week. It examines the steering mode, the dryback and the pore EC. The alert names what is outside the arc and what the doctrine says.",
+      "watering": "Water continues as usual. This alert is advice only, and the controller changes nothing.",
+      "causes": [
+        "The steering mode or the settings of the zone are for a different growth stage.",
+        "The overnight dryback or the pore EC moved outside the band of the growth stage.",
+        "The signs for the next growth stage are present."
+      ],
+      "fixes": [
+        "Compare the settings of the zone with the stage arc.",
+        "If the growth stage has changed, change the settings.",
+        "Check that ai_flower_start has the correct flip date."
+      ]
+    },
+    {
+      "code": "CS-706",
+      "title": "AI call budget almost used",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The AI assistant has used the warning share of its daily call budget, 80% by default, for all rooms. When it uses the full budget, the controller does not ask it again until midnight.",
+      "watering": "Water continues as usual. After the budget is spent, the engine rules decide each zone until midnight.",
+      "causes": [
+        "The budget is too low for the number of zones or judges.",
+        "The AI assistant was frequently not sure today, and it asked again many times.",
+        "The budget option is still at an older, lower value."
+      ],
+      "fixes": [
+        "Increase ai_daily_calls in the options of the controller.",
+        "Restart the controller.",
+        "Read reasks_today and errors_today on the AI assistant sensor to find what used the calls."
+      ]
+    },
+    {
+      "code": "CS-707",
+      "title": "Stricter gate for a judge",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Some calls in sequence of one judge for this zone, 3 by default, were wrong when the controller checked them. Until 2 calls in sequence are correct, the judge acts only when its two questions agree at 0.8 or more. A second look must also give the same answer.",
+      "watering": "Water continues. When the judge is not sure enough, the engine rules act, as they do without the AI assistant.",
+      "causes": [
+        "A probe or a sensor gives incorrect data to the judge.",
+        "The judge has not seen the conditions before, for example a new growth stage or a changed room.",
+        "A setting works against the decisions of the judge."
+      ],
+      "fixes": [
+        "Read the AI log of the zone on the dashboard.",
+        "Check the probe and the settings of the zone."
+      ]
+    },
+    {
+      "code": "CS-708",
+      "title": "AI budget used",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The AI assistant has spent its AI budget (anthropic_daily_budget_usd, US$1.00 by default) for this grow-day. The controller does not ask it again until the next lights-on.",
+      "watering": "Water continues. The engine rules, with the automatic setpoints, decide each zone until the next lights-on.",
+      "causes": [
+        "The budget is too low for the number of rooms and zones.",
+        "The AI assistant was frequently not sure today, and it asked again many times.",
+        "The budget is 0. The AI assistant then never asks."
+      ],
+      "fixes": [
+        "Increase anthropic_daily_budget_usd in the options of the controller.",
+        "Restart the controller.",
+        "Check the projected cost on the AI assistant panel to see if the budget is enough for a usual day."
+      ]
+    },
+    {
+      "code": "CS-709",
+      "title": "AI assistant not available",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The AI service refused the API key, does not know the selected model, or refused some requests in sequence. The AI assistant has stopped its questions.",
+      "watering": "Water continues on the engine rules. After refused requests, the AI assistant tries again after 1 h. After a refused key or model, it tries again after a controller restart.",
+      "causes": [
+        "The Anthropic API key is revoked or incorrect, or it has no credit.",
+        "The model in anthropic_model is not a model that this release has a price for.",
+        "Anthropic refuses requests for a period."
+      ],
+      "fixes": [
+        "Check the API key in the console of the AI provider.",
+        "Put a valid key in anthropic_api_key.",
+        "Set anthropic_model to claude-haiku-5-5, the default.",
+        "Restart the controller.",
+        "Read the state of the AI assistant panel and the controller log."
+      ]
+    },
+    {
+      "code": "CS-710",
+      "title": "Possible water bypass",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Shots on this zone make the probe increase and then fall back quickly. Or the zone uses less than 40% of the typical water for each plant in the room. The 40% check counts only when the room uses a tenth of the substrate volume of a plant each day, or more. The channel judge of the AI assistant then gives the probable cause.",
+      "watering": "Water continues as usual. This alert is advice only. More water does not correct water that does not go into the substrate.",
+      "causes": [
+        "The water flows down past the probe, or through the block and out of the drain, and does not wet the block.",
+        "A block is dry and hard, or the drippers are not on the block.",
+        "A dripper is slow, a valve is partly closed, or a line is restricted.",
+        "The plants use less water than the adjacent plants."
+      ],
+      "fixes": [
+        "Do a catch test on some drippers of the zone.",
+        "Make sure that the drippers sit in the blocks.",
+        "Make sure that the water wets the full block.",
+        "Make sure that the probe is firm in a typical spot."
+      ]
+    },
+    {
+      "code": "CS-711",
+      "title": "AI feed change proposal",
+      "source": "notification",
+      "severity": "info",
+      "meaning": "In a room with a feed EC sensor, the AI assistant examines the feed once each grow-day, 1 h after lights-on. It compares the feed EC and feed pH with their bands, and the pore EC of each zone with its target. When its two questions agree firmly, it proposes a feed change or a check.",
+      "watering": "The water and the dose do not change. The AI assistant never writes a feed, dose or other value. A person decides.",
+      "causes": [
+        "Across the room, the pore EC is above or below the targets of the zones, while the feed is in its band.",
+        "The feed pH is outside its band.",
+        "The feed EC is outside its band, gives no reading, or is not the EC that the recipe makes."
+      ],
+      "fixes": [
+        "Read the proposal and the pore EC of each zone.",
+        "Decide if the feed must change.",
+        "If the card asks for it, check the dosing system and the source water before you change the recipe."
+      ]
+    },
+    {
+      "code": "CS-712",
+      "title": "First AI route removed",
+      "source": "notification",
+      "severity": "info",
+      "meaning": "The options of the controller still name the first AI route of the AI assistant, or keep its Cloudflare or TypeSafe settings. This release removed that route. An installation that used it now uses Claude when it has an Anthropic API key, with every judge, and the rules of the controller when it has none.",
+      "watering": "The water does not change. Claude judges the decisions inside the same safety limits, or the engine rules water the room.",
+      "causes": [
+        "The installation was upgraded from a release that used the first AI route."
+      ],
+      "fixes": [
+        "To use the AI assistant, set brain_provider to claude_haiku and add an Anthropic API key.",
+        "Remove the old Cloudflare and TypeSafe options. The controller does not use them.",
+        "To stop the AI assistant, set brain_provider to rules."
+      ]
+    },
+    {
+      "code": "CS-713",
+      "title": "Room differs from grow plan",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The controller compared the grow plan with what the room does, and found a difference. Examples are a plan day not applied, a plan not armed, a manual setting change, or a phase that did not change. The card says which difference and what to do.",
+      "watering": "Water continues on the targets in force, and the card only reports. The controller never writes over a setting that a person changed by hand.",
+      "causes": [
+        "The probe of a zone stopped reporting, and the zone stays on the targets of an earlier day.",
+        "A person saved the plan but did not arm it, or the plan is armed and waits for a reading.",
+        "The last day in the schedule of the plan is near.",
+        "A person or an automation changed a setting while the plan runs.",
+        "The steering select or the lights hours do not agree with the plan.",
+        "The controller has a fault (this is rare)."
+      ],
+      "fixes": [
+        "Follow the suggestion on the card.",
+        "If the card names a probe, repair the probe or remove its mapping.",
+        "Arm, extend or disarm the plan as the card shows.",
+        "Make a change in the days of the plan, not in the setting.",
+        "Set the steering select to agree with the plan.",
+        "Check the lights hours.",
+        "If a phase did not change, send the controller log."
+      ]
+    },
+    {
+      "code": "CS-801",
+      "title": "Dosing pump overrun",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "A dose ran past its deadline. The deadline is 1.25 times the expected dose time plus 20 s, and 21 min at most. The controller set the pump power to off and read it back.",
+      "watering": "The batch tank can contain more nutrient than requested. A single dose does not stop the water, unless the pump power does not read off. Then the room gets no shots until it reads off. In a batch, the batch also stops (CS-806).",
+      "causes": [
+        "The firmware of the pump did not stop the motor at the given volume.",
+        "The flow calibration of the pump (mL/s) is much higher than the real flow, so the controller expected the end of the dose sooner.",
+        "The dose sensor of the pump continued to show a dose after the motor stopped."
+      ],
+      "fixes": [
+        "WARNING: Isolate the electrical power before you touch a pump, a valve or its wiring. Water near mains power can cause an electric shock.",
+        "CAUTION: Do not use the batch tank before you measure its EC. Too much nutrient can damage the roots.",
+        "Measure the EC of the batch tank before you use it.",
+        "Check the firmware and the dose sensor of the pump.",
+        "Calibrate the flow of the pump again.",
+        "If the pump power does not read off, stop the pump at the device or at its socket.",
+        "When the pump is repaired, set its power switch to on again."
+      ]
+    },
+    {
+      "code": "CS-802",
+      "title": "Dose not confirmed",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The controller started a dose but could not confirm it. The dose sensor of the pump did not show a dose in time, or it read unavailable or unknown during the dose. Alternatively, the dose ended in less than half its expected time.",
+      "watering": "For a dose that is not confirmed, the controller does not know the volume, and does not subtract it from the stock tank. For a dose that ended early, it subtracts the volume that ran. A single dose does not stop the water, but in a batch the batch also stops (CS-806).",
+      "causes": [
+        "The pump is offline, or its start button or script did nothing.",
+        "The dose sensor shows a dose in a form that the setup does not know. For example, the state of a text sensor does not start with the dosing prefix.",
+        "The firmware of the pump refused the given volume.",
+        "The pump restarted or went off the network during the dose.",
+        "The firmware of the pump stopped the dose early, or its flow calibration is much lower than the real flow."
+      ],
+      "fixes": [
+        "CAUTION: Do not dose again before you measure the EC of the batch tank. Some of the dose can already be in the tank.",
+        "Make sure that the pump is online.",
+        "Examine the dose sensor during a dose.",
+        "Set the dosing prefix to agree with the sensor state.",
+        "Measure the EC of the batch tank before the next dose."
+      ]
+    },
+    {
+      "code": "CS-803",
+      "title": "Dose interrupted by restart",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The controller stopped during a dose or a batch, or it could not read its dose record (dosing_state.json) at start. At the next start, it holds the water of the rooms that the dose or batch held. It sets all the dosing hardware of the room to off, and repeats this until each device reads off.",
+      "watering": "The held rooms get no shots until all the dosing hardware reads off. The controller never continues an interrupted dose or batch. The alert comes again each 30 min while a device does not read off.",
+      "causes": [
+        "A person upgraded, restarted or stopped the controller during a dose or a batch.",
+        "Home Assistant or the host restarted.",
+        "The controller could not read dosing_state.json at start. It keeps the file as dosing_state.json.bad."
+      ],
+      "fixes": [
+        "WARNING: Wear gloves and eye protection when you dose by hand. Concentrated nutrients and pH adjusters can injure the skin and the eyes.",
+        "CAUTION: Do not dose the full volume again. The tank already contains part of the dose, and too much nutrient can damage the roots.",
+        "Examine the batch tank, because it contains what the controller dosed before the stop.",
+        "Read the dosing history.",
+        "Dose the remaining volume by hand, or make a new batch.",
+        "Upgrade or restart the controller only between batches.",
+        "If a device stays unavailable, connect it again or stop it at its socket."
+      ]
+    },
+    {
+      "code": "CS-804",
+      "title": "Batch tank fill failure",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "A batch could not fill the tank. The fill valve did not read on within 10 s, or the full sensor gave no usable reading. Or the tank did not read full before the fill timeout. The controller closed the fill valve, read it back and stopped the batch (CS-806).",
+      "watering": "The rooms that the batch held get water again. The fill valve is closed.",
+      "causes": [
+        "The water supply is off or slow, or the fill valve did not open.",
+        "The full sensor is stuck or offline, or it reports a state that is not the full state of the setup.",
+        "The fill timeout is shorter than the time of a fill.",
+        "The fill valve is offline, or its relay did not switch.",
+        "The full sensor went offline."
+      ],
+      "fixes": [
+        "CAUTION: Make sure that the fill valve is closed. A fill valve that stays open can overflow the tank.",
+        "Check the water supply.",
+        "Check the fill valve.",
+        "Check what the full sensor shows when the tank is full.",
+        "If a fill takes longer than the fill timeout, increase the fill timeout in the dosing setup."
+      ]
+    },
+    {
+      "code": "CS-805",
+      "title": "Mix pump start failure",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "A batch opened the mix valves and started the mix pump. The pump did not read on, or its power sensor did not show the minimum power within 20 s. The batch stopped (CS-806).",
+      "watering": "The rooms that the batch held get water again when its hardware reads off.",
+      "causes": [
+        "The mix pump did not start, or its power plug did not switch.",
+        "The power sensor is offline, or it reports slowly.",
+        "The minimum power is set above the power of the pump."
+      ],
+      "fixes": [
+        "WARNING: Isolate the electrical power before you touch a pump, a valve or its wiring. Water near mains power can cause an electric shock.",
+        "Check the mix pump and its power plug.",
+        "Read the power sensor while the pump runs.",
+        "Set the minimum power below the power of the pump.",
+        "To skip the power check, set the minimum power to 0."
+      ]
+    },
+    {
+      "code": "CS-806",
+      "title": "Stopped batch or dose",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "A batch stopped before its end, or a dose needs a check. The cause can be a person, a failed step, a device that did not read off, or the batch watchdog. The alert names the step, the reason and what the controller dosed.",
+      "watering": "The controller sets all the dosing pumps, the fill valve, the mix pump and the mix valves to off. The rooms that the batch held get water again when its hardware and its hold read off. The alert comes again each 30 min until then.",
+      "causes": [
+        "A person stopped the batch.",
+        "A fill, a mix or a dose failed.",
+        "A switch of the batch, or of a room that the batch holds, did not read off.",
+        "The volume number of a pump did not go back to its earlier value.",
+        "The filled-at entity or the hold entity did not accept its command.",
+        "The controller has an error. Its log names the error."
+      ],
+      "fixes": [
+        "WARNING: Wear gloves and eye protection when you touch the batch tank or the stock tanks. Concentrated nutrients and pH adjusters can injure the skin and the eyes.",
+        "CAUTION: Do not make a full new batch before you examine the tank. The tank can already contain part of the dose.",
+        "Examine the batch tank before you make a new batch.",
+        "Read what the controller dosed before the stop.",
+        "Correct the cause that the alert names.",
+        "Make the batch again.",
+        "If the alert says that a volume number was not restored, set it by hand before the next batch.",
+        "If the alert names a controller error, read the controller log."
+      ]
+    },
+    {
+      "code": "CS-807",
+      "title": "Stock draw not recorded",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "A dose took nutrient from a stock tank, but Home Assistant did not record the draw. The tank is not linked to the room, Home Assistant refused the draw, or 24 h passed. The dosing history of the room keeps the draw.",
+      "watering": "Water continues as usual. The level of the stock tank shows more than the tank contains.",
+      "causes": [
+        "A person removed the stock tank after the pump was linked to it.",
+        "The stock service of Crop Steering refused the call, or it was not available at that time (an old integration, or a reload).",
+        "The controller could not connect to Home Assistant for 24 h."
+      ],
+      "fixes": [
+        "In Stock tanks, use Set level to enter the real level of the tank.",
+        "Check the stock tank of the pump in the dosing setup."
+      ]
+    },
+    {
+      "code": "CS-808",
+      "title": "Batch mix outside band",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "After the mix of a batch stopped, the controller waited 5 min and read the tank with the feed EC and feed pH probes. A reading was outside the EC or pH band of the room, or a probe gave no usable reading. The controller does not mark the batch good.",
+      "watering": "The mix check never holds the water. The source-water gate holds the water by itself when the feed probe reads outside its band. The controller refuses an automatic batch until a batch made by hand passes the check.",
+      "causes": [
+        "A recipe quantity, a stock tank or a dosing pump is incorrect.",
+        "A fill gave too much or too little water.",
+        "The feed EC or feed pH band is for a different growth stage.",
+        "A feed probe is offline, needs calibration, or reports in ppm."
+      ],
+      "fixes": [
+        "WARNING: Wear gloves and eye protection when you touch the batch tank or the stock tanks. Concentrated nutrients and pH adjusters can injure the skin and the eyes.",
+        "CAUTION: Correct the batch before you water from it. A wrong feed EC or feed pH can damage the roots.",
+        "Measure the tank with a hand-held meter.",
+        "Correct the tank with single doses or fresh water.",
+        "Check the recipe, the stock tanks and the EC and pH bands.",
+        "Calibrate the feed probe, or connect it again.",
+        "Set the probe to report mS/cm or µS/cm, not ppm.",
+        "Make the next batch by hand."
+      ]
+    },
+    {
+      "code": "CS-809",
+      "title": "Tank pH not corrected",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "pH auto-correct is on, and the batch tank read outside the feed pH band of the room. A correction did not bring the tank into the band: a dose did not move the pH, the pH went past the other side of the band, the probe could not be read after the mix, the doses were not enough, or the correction stopped. Or the controller could not start a correction (for example no pump has the pH role, there is no mixing pump, or the doses of the day are used).",
+      "watering": "The source-water gate holds the shots while the feed pH is outside its band. After a failed correction, pH auto-correct is locked for this tank: it doses no more until a person switches it off and on again, or the tank is filled again.",
+      "causes": [
+        "The pH probe needs calibration, or it is dirty or offline.",
+        "The pH pump is empty, blocked, or not calibrated.",
+        "The pH adjuster is too weak or too strong for the dose size.",
+        "No dosing pump has the pH up or pH down role, or the tank has no mixing pump."
+      ],
+      "fixes": [
+        "WARNING: Wear gloves and eye protection when you touch the batch tank or a pH adjuster. pH adjusters can injure the skin and the eyes.",
+        "Measure the tank with a hand-held meter, and correct it by hand.",
+        "Calibrate or clean the pH probe.",
+        "Check the pH pump, its stock and its calibration.",
+        "Change the dose length or the number of doses in the pH auto-correct settings of the room.",
+        "Switch pH auto-correct off and on again to unlock it."
+      ]
+    },
+    {
+      "code": "CS-810",
+      "title": "Lights dimmed on dry substrate",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "Dimming on dry substrate is on. A zone read under the dry floor with the lights on, and the controller dimmed the light of the room. Or the controller set the light back, or another controller changed the light while it was dimmed, so the controller no longer dims or restores it.",
+      "watering": "The alert does not change the water. A dimmed light slows the drying of the substrate. The controller never switches a light off or on, and never dims below 30%.",
+      "causes": [
+        "A hold stops the shots of a zone, the tank is empty, or a dripper is blocked.",
+        "The dry floor is too high for the substrate.",
+        "Another automation or a person changed the light while it was dimmed."
+      ],
+      "fixes": [
+        "Find out why the zone is dry, and water it.",
+        "Check the brightness of the light.",
+        "Change the dry floor, the dim level or the delay in the settings of the room, or switch dimming off."
+      ]
+    },
+    {
+      "code": "CS-811",
+      "title": "Light dimmed too long",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "The light of the room stayed dimmed for the longest time that you set (4 h by default), and the controller set it back. Or the light did not come back to its brightness when the controller asked.",
+      "watering": "The alert does not change the water. The zone that was dry is probably still dry.",
+      "causes": [
+        "A hold stops the shots of a zone for a long time.",
+        "The light is offline, or does not accept a brightness."
+      ],
+      "fixes": [
+        "CAUTION: Do not ignore this alert. The substrate of the zone is dry.",
+        "Find out why the zone is dry, and water it by hand if needed.",
+        "Check the light, and set its brightness by hand."
+      ]
+    },
+    {
+      "code": "CS-901",
+      "title": "Tank at minimum level",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "The tank level of this room is 8% or less, or its low float switch reads low. This check works only when a tank level entity is mapped in Rooms and setup.",
+      "watering": "The controller holds each zone of the room, so the pump does not run dry. Water starts again when the tank is at 12% or more and the float switch does not read low.",
+      "causes": [
+        "The tank became empty, because nobody refilled it in time. CS-903 tells you before the refill is necessary.",
+        "A fill did not occur, or it stopped early.",
+        "The full and empty distances of the tank are incorrect, so the level reads lower than the real level."
+      ],
+      "fixes": [
+        "CAUTION: Do not start the pump by hand while the tank is at its minimum. The pump can run dry and break.",
+        "Refill the tank.",
+        "Check the full and empty distances of the tank in Crop Steering → Rooms and setup.",
+        "Check the low state of the float switch."
+      ]
+    },
+    {
+      "code": "CS-902",
+      "title": "Tank level not readable",
+      "source": "notification",
+      "severity": "critical",
+      "meaning": "The tank level of this room gives no usable reading, or the distance sensor seems stuck. The shots took enough water to decrease the level, but the reading did not change. The controller cannot know how much water remains.",
+      "watering": "The controller holds each zone of the room until the level reads again, or until a stuck sensor moves. This hold prevents a pump that runs dry.",
+      "causes": [
+        "The sensor has no power, or it lost its connection to Home Assistant.",
+        "The distance sensor is stuck: an object is in its beam, it has condensation, or its reading stays high."
+      ],
+      "fixes": [
+        "CAUTION: Do not remove the tank level only to start the water again. Without a level, the pump can run dry.",
+        "Check the sensor, its power and its position.",
+        "Make sure that Home Assistant shows a reading.",
+        "Remove condensation or objects from the sensor beam.",
+        "If the room must water without a tank level, remove the level entity in Crop Steering → Rooms and setup."
+      ]
+    },
+    {
+      "code": "CS-903",
+      "title": "Refill needed before next shots",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "One more set of shots, the last shot of each zone, takes the tank to its 8% minimum or below. The controller calculates this from the litres for each 1% that the tank showed, and needs a distance sensor for it.",
+      "watering": "Water continues. A shot that takes the tank to its minimum waits until you refill the tank. The card clears when the tank has enough water for a full set of shots.",
+      "causes": [
+        "The tank level decreases, as it does between refills."
+      ],
+      "fixes": [
+        "Refill the tank, or start a batch."
+      ]
+    },
+    {
+      "code": "CS-904",
+      "title": "Tank above full mark",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The tank level reads 102% or more of its full distance.",
+      "watering": "Water continues. The controller closes the fill valve of a batch, and does not open it until the level reads 98% or less.",
+      "causes": [
+        "The fill valve did not close, or it leaks.",
+        "The full distance of the tank is set too far down, so a full tank reads more than 100%."
+      ],
+      "fixes": [
+        "CAUTION: Examine the tank and the fill valve now. A fill valve that leaks can overflow the tank.",
+        "Make sure that the fill valve closes fully.",
+        "Check the full distance of the tank in Crop Steering → Rooms and setup."
+      ]
+    },
+    {
+      "code": "CS-905",
+      "title": "Estimated tank level low",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The room has no tank level sensor, and a Tank size (estimate) above 0. From the litres that the shots used since the tank was last filled, the tank is at or below the room setting Estimated tank low alert (20% by default). The litres come from the dripper flow settings, not from a measurement.",
+      "watering": "The alert does not change the water. The estimate never holds a shot.",
+      "causes": [
+        "The tank level decreases, as it does between refills.",
+        "The tank was filled and Tank filled was not pressed.",
+        "The dripper flow settings are higher than the real flow."
+      ],
+      "fixes": [
+        "Refill the tank, then press Tank filled.",
+        "If the estimate is often wrong, check the dripper flow settings, or map a tank level sensor in Rooms and setup."
+      ]
+    },
+    {
+      "code": "CS-906",
+      "title": "Batch tank low",
+      "source": "notification",
+      "severity": "info",
+      "meaning": "The batch tank of the room read at or below its refill reminder level (remind_pct) 3 times, 1 min apart. Nothing refills the tank automatically.",
+      "watering": "Water continues as usual. The reminder clears when the level is 5 points above the reminder level. It comes again each day while the level stays low.",
+      "causes": [
+        "The shots of the room took water from the batch tank since the last fill."
+      ],
+      "fixes": [
+        "Refill the tank by hand, or make a batch.",
+        "To stop the reminders, set the refill reminder to 0% in the dosing setup."
+      ]
+    }
+  ]
+}

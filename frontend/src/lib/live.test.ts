@@ -1,0 +1,752 @@
+import { afterEach, describe, expect, it, vi } from "vitest";
+import {
+  applyEntityUpdate,
+  compressedRows,
+  liveHistory,
+  liveStatistics,
+  liveSensorStatistics,
+  watchedEntities,
+  whileVisible,
+  type EntityUpdate,
+  type PageEvents,
+} from "./live";
+import { historySpan, mergeSeries } from "./sensor-context";
+import { ControllerStore } from "./use-controller";
+import { createDemo } from "./demo";
+import { readJev } from "./jev";
+import type { EntityState, States } from "./types";
+
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
+
+const T = 1_790_000_000; // epoch seconds
+const iso = (seconds: number) => new Date(seconds * 1000).toISOString();
+const entity = (
+  entity_id: string,
+  state: string,
+  attributes: Record<string, unknown> = {},
+): EntityState => ({
+  entity_id,
+  state,
+  attributes,
+  last_changed: iso(T),
+  last_updated: iso(T),
+});
+const states = (...entities: EntityState[]): States =>
+  Object.fromEntries(entities.map((item) => [item.entity_id, item]));
+
+describe("subscribe_entities reducer", () => {
+  it("adds entities, taking last_updated from last_changed when Home Assistant leaves it out", () => {
+    const next = applyEntityUpdate(
+      {},
+      {
+        a: {
+          "sensor.a": { s: "1", a: { unit_of_measurement: "%" }, lc: T },
+          "sensor.b": { s: "2", a: {}, lc: T, lu: T + 5 },
+        },
+      },
+    );
+    expect(next["sensor.a"]).toEqual({
+      entity_id: "sensor.a",
+      state: "1",
+      attributes: { unit_of_measurement: "%" },
+      last_changed: iso(T),
+      last_updated: iso(T),
+    });
+    expect(next["sensor.b"].last_updated).toBe(iso(T + 5));
+  });
+  it("applies a change without touching what it does not name", () => {
+    const before = states(entity("sensor.a", "1", { keep: 1, gone: 2, edit: 3 }));
+    const next = applyEntityUpdate(before, {
+      c: {
+        "sensor.a": { "+": { s: "2", lc: T + 60, a: { edit: 4, added: 5 } }, "-": { a: ["gone"] } },
+      },
+    });
+    expect(next["sensor.a"]).toEqual({
+      entity_id: "sensor.a",
+      state: "2",
+      attributes: { keep: 1, edit: 4, added: 5 },
+      last_changed: iso(T + 60),
+      last_updated: iso(T + 60),
+    });
+    // Pure: the snapshot it was given is unchanged.
+    expect(before["sensor.a"]).toEqual(entity("sensor.a", "1", { keep: 1, gone: 2, edit: 3 }));
+  });
+  it("moves only last_updated for an attribute-only change", () => {
+    const next = applyEntityUpdate(states(entity("sensor.beat", "healthy", { last_beat: "a" })), {
+      c: { "sensor.beat": { "+": { lu: T + 60, a: { last_beat: "b" } } } },
+    });
+    expect(next["sensor.beat"]).toMatchObject({
+      state: "healthy",
+      attributes: { last_beat: "b" },
+      last_changed: iso(T),
+      last_updated: iso(T + 60),
+    });
+  });
+  it("removes entities, ignores changes to unknown ones, and returns the same object for no-ops", () => {
+    const before = states(entity("sensor.a", "1"), entity("sensor.b", "2"));
+    expect(Object.keys(applyEntityUpdate(before, { r: ["sensor.a"] }))).toEqual(["sensor.b"]);
+    const update: EntityUpdate = { c: { "sensor.unknown": { "+": { s: "9" } } }, r: ["sensor.x"] };
+    expect(applyEntityUpdate(before, update)).toBe(before);
+  });
+});
+
+describe("watched entities", () => {
+  const home = () =>
+    states(
+      entity("sensor.crop_steering_engine_config", "ready", {
+        prefix: "",
+        num_zones: 2,
+        enable_flag: "input_boolean.f2_control_enabled",
+        pump: "switch.pump",
+        valves: { 1: "switch.valve_1", 2: "switch.valve_2" },
+        water_level_sensor: "sensor.tank_level",
+        zone_names: { 1: "Front" },
+        feed_ec_sensor: "sensor.not_created_yet",
+      }),
+      entity("sensor.crop_steering_room_b_engine_config", "ready", {
+        prefix: "room_b_",
+        num_zones: 1,
+      }),
+      entity("sensor.crop_steering_room_b_ai_heartbeat", "healthy", {
+        enable_flag: "switch.custom_flag",
+      }),
+      entity("number.crop_steering_zone_1_p1_target_vwc", "60"),
+      ...[
+        "input_boolean.f2_control_enabled",
+        "switch.pump",
+        "switch.valve_1",
+        "switch.valve_2",
+        "sensor.tank_level",
+        "switch.custom_flag",
+        "light.kitchen",
+        "sensor.outdoor_temperature",
+      ].map((id) => entity(id, "on")),
+    );
+  it("covers the crop-steering entities and what the rooms point at, and nothing else", () => {
+    const ids = watchedEntities(home());
+    for (const id of [
+      "sensor.crop_steering_engine_config",
+      "number.crop_steering_zone_1_p1_target_vwc",
+      "input_boolean.f2_control_enabled",
+      "switch.pump",
+      "switch.valve_2",
+      "sensor.tank_level",
+      "switch.custom_flag",
+    ])
+      expect(ids).toContain(id);
+    for (const id of ["light.kitchen", "sensor.outdoor_temperature", "sensor.not_created_yet"])
+      expect(ids).not.toContain(id);
+    expect(ids.every((id) => /^[a-z_]+\.[a-z0-9_]+$/.test(id))).toBe(true);
+  });
+  it("includes the controller's sensors before the controller has posted them", () => {
+    // After a Home Assistant restart with the controller stopped, these do not exist yet.
+    const ids = watchedEntities(home());
+    for (const id of [
+      "sensor.crop_steering_ai_heartbeat",
+      "sensor.crop_steering_current_decision",
+      "sensor.crop_steering_zone_2_phase",
+      "sensor.crop_steering_zone_2_status",
+      "sensor.crop_steering_room_b_ai_heartbeat",
+      "sensor.crop_steering_room_b_zone_1_last_irrigation_app",
+      // The AI assistant's sensors: a log first posted after the page opened still updates live.
+      "sensor.crop_steering_jev",
+      "sensor.crop_steering_jev_log",
+      "sensor.crop_steering_zone_2_jev",
+      "sensor.crop_steering_room_b_jev_log",
+      "sensor.crop_steering_room_b_zone_1_jev",
+    ])
+      expect(ids).toContain(id);
+    expect(ids).not.toContain("sensor.crop_steering_room_b_zone_2_phase");
+    expect(ids).not.toContain("sensor.crop_steering_room_b_zone_2_jev");
+  });
+  it("includes each probe a zone's combined reading names, used or left out", () => {
+    const ids = watchedEntities({
+      ...home(),
+      ...states(
+        entity("sensor.crop_steering_vwc_zone_1", "58", {
+          used: ["sensor.z1_front_vwc"],
+          excluded: { "sensor.z1_back_vwc": "not reporting", "sensor.gone": "no reading" },
+        }),
+        entity("sensor.z1_front_vwc", "58.8"),
+        entity("sensor.z1_back_vwc", "57.2"),
+      ),
+    });
+    expect(ids).toContain("sensor.z1_front_vwc");
+    expect(ids).toContain("sensor.z1_back_vwc");
+    // A probe Home Assistant does not have would make it reject the whole subscription.
+    expect(ids).not.toContain("sensor.gone");
+  });
+  it("includes each room's dosing sensors and the hardware its dosing setup names", () => {
+    const ids = watchedEntities({
+      ...home(),
+      ...states(
+        entity("sensor.crop_steering_dosing_config", "3", {
+          pumps: [
+            {
+              id: "part_b",
+              flow_entity: "number.bloom_flow",
+              dosing_entity: "binary_sensor.bloom_dosing",
+            },
+          ],
+          batch: { mix_valves: ["switch.recirc"], fill_valve: "switch.not_in_ha" },
+        }),
+        entity("number.bloom_flow", "10.5"),
+        entity("binary_sensor.bloom_dosing", "off"),
+        entity("switch.recirc", "off"),
+      ),
+    });
+    for (const id of [
+      "sensor.crop_steering_dosing_config",
+      "number.bloom_flow",
+      "binary_sensor.bloom_dosing",
+      "switch.recirc",
+      // The controller's dosing report, before it has posted one.
+      "sensor.crop_steering_dosing",
+      "sensor.crop_steering_room_b_dosing",
+    ])
+      expect(ids).toContain(id);
+    expect(ids).not.toContain("switch.not_in_ha");
+  });
+  it("is empty without crop-steering entities, so nothing subscribes to all of Home Assistant", () => {
+    expect(watchedEntities(states(entity("light.kitchen", "on")))).toEqual([]);
+  });
+});
+
+describe("standalone polling pauses while the page is hidden", () => {
+  function page() {
+    const handlers = new Map<string, () => void>();
+    const events: PageEvents & { hide: boolean; fire(event: string): void; count(): number } = {
+      hide: false,
+      hidden: () => events.hide,
+      on(event, handler) {
+        handlers.set(event, handler);
+        return () => handlers.delete(event);
+      },
+      fire: (event) => handlers.get(event)?.(),
+      count: () => handlers.size,
+    };
+    return events;
+  }
+  it("polls on schedule only while visible and at once when shown again", () => {
+    vi.useFakeTimers();
+    const run = vi.fn();
+    const events = page();
+    const stop = whileVisible(run, 30_000, events);
+    vi.advanceTimersByTime(30_000);
+    expect(run).toHaveBeenCalledTimes(1);
+    events.hide = true;
+    vi.advanceTimersByTime(120_000);
+    events.fire("visibilitychange");
+    expect(run).toHaveBeenCalledTimes(1);
+    events.hide = false;
+    events.fire("visibilitychange");
+    expect(run).toHaveBeenCalledTimes(2);
+    // Showing a tab also focuses it, and focus comes and goes: one refresh per ten seconds.
+    events.fire("focus");
+    vi.advanceTimersByTime(9_000);
+    events.fire("focus");
+    expect(run).toHaveBeenCalledTimes(2);
+    vi.advanceTimersByTime(1_000);
+    events.fire("focus");
+    expect(run).toHaveBeenCalledTimes(3);
+    stop();
+    expect(events.count()).toBe(0);
+    vi.advanceTimersByTime(300_000);
+    expect(run).toHaveBeenCalledTimes(3);
+  });
+});
+
+describe("inside Home Assistant", () => {
+  const VWC = "sensor.crop_steering_vwc_zone_1";
+  const TARGET = "number.crop_steering_zone_1_p1_target_vwc";
+  function homeAssistant() {
+    const ha: States = { ...createDemo(), "light.kitchen": entity("light.kitchen", "on") };
+    const calls: string[] = [];
+    const listeners = new Map<string, () => void>();
+    let push: ((update: EntityUpdate) => void) | undefined;
+    const connection = {
+      connected: true,
+      subscribeMessage: vi.fn(async (callback: (update: EntityUpdate) => void) => {
+        push = callback;
+        return vi.fn();
+      }),
+      sendMessagePromise: vi.fn(
+        async (_message: Record<string, unknown>): Promise<unknown> => ({}),
+      ),
+      addEventListener: (event: string, callback: () => void) => listeners.set(event, callback),
+      removeEventListener: (event: string) => listeners.delete(event),
+    };
+    const session = {
+      connection,
+      callApi: vi.fn(async (method: string, path: string) => {
+        calls.push(`${method} ${path}`);
+        if (path === "states") return Object.values(ha);
+        if (path.startsWith("history/period/")) return [];
+        return ha[decodeURIComponent(path.slice("states/".length))];
+      }),
+      callService: vi.fn(
+        async (_domain: string, _service: string, data: Record<string, unknown>) => {
+          const id = String(data.entity_id);
+          ha[id] = { ...ha[id], state: String(data.value), last_updated: new Date().toISOString() };
+        },
+      ),
+    };
+    const view: Record<string, unknown> = {
+      location: {
+        origin: "http://ha.test",
+        hostname: "ha.test",
+        href: "http://ha.test/",
+        search: "",
+      },
+      history: { replaceState: vi.fn() },
+      document: {
+        querySelector: (selector: string) =>
+          selector === "home-assistant" ? { hass: session } : null,
+      },
+    };
+    view.parent = view;
+    vi.stubGlobal("window", view);
+    const storage = new Map<string, string>();
+    vi.stubGlobal("sessionStorage", {
+      getItem: (key: string) => storage.get(key) ?? null,
+      setItem: (key: string, value: string) => storage.set(key, value),
+      removeItem: (key: string) => storage.delete(key),
+    });
+    return {
+      ha,
+      calls,
+      connection,
+      session,
+      push: (update: EntityUpdate) => push!(update),
+      fire: (event: string) => listeners.get(event)?.(),
+      fullFetches: () => calls.filter((call) => call === "GET states").length,
+    };
+  }
+  async function started() {
+    vi.useFakeTimers();
+    const home = homeAssistant();
+    const store = new ControllerStore(false);
+    store.start();
+    await vi.advanceTimersByTimeAsync(0);
+    return { home, store };
+  }
+  it("downloads everything once, then subscribes to what it reads", async () => {
+    const { home, store } = await started();
+    expect(home.fullFetches()).toBe(1);
+    expect(store.getSnapshot().connection).toBe("live");
+    const [, message] = home.connection.subscribeMessage.mock.calls[0] as unknown as [
+      unknown,
+      { type: string; entity_ids: string[] },
+    ];
+    expect(message.type).toBe("subscribe_entities");
+    expect(message.entity_ids).toContain(VWC);
+    expect(message.entity_ids).toContain("switch.demo_valve_1");
+    expect(message.entity_ids).not.toContain("light.kitchen");
+    // Ten minutes later: no more full downloads.
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(home.fullFetches()).toBe(1);
+    store.stop();
+  });
+  it("shows live changes after one short batch", async () => {
+    const { home, store } = await started();
+    const before = store.getSnapshot();
+    home.push({ c: { [VWC]: { "+": { s: "61.5", lu: Date.now() / 1000 } } } });
+    home.push({
+      c: { "sensor.crop_steering_ec_zone_1": { "+": { s: "3.3", lu: Date.now() / 1000 } } },
+    });
+    expect(store.getSnapshot()).toBe(before);
+    await vi.advanceTimersByTimeAsync(250);
+    expect(store.getSnapshot().room.zones[0].vwc.value).toBe(61.5);
+    expect(store.getSnapshot().room.zones[0].ec.value).toBe(3.3);
+    store.stop();
+    // After stop nothing from the old subscription lands.
+    home.push({ c: { [VWC]: { "+": { s: "10" } } } });
+    await vi.advanceTimersByTimeAsync(250);
+    expect(store.getSnapshot().states[VWC].state).toBe("61.5");
+  });
+  it("shows a AI assistant log first posted after the page opened, and each decision after it", async () => {
+    // Room B's controller has not posted its log yet (an older controller, or the AI assistant just switched on).
+    const LOG = "sensor.crop_steering_room_b_jev_log";
+    const { home, store } = await started();
+    const [, message] = home.connection.subscribeMessage.mock.calls[0] as unknown as [
+      unknown,
+      { entity_ids: string[] },
+    ];
+    expect(message.entity_ids).toContain(LOG);
+    expect(readJev(store.getSnapshot().states, "room_b_").log).toBeNull();
+    const entry = (t: string, verdict: string) => ({
+      t,
+      zone: 1,
+      judge: "dawn",
+      title: "Morning start",
+      kind: "decision",
+      verdict,
+      p: 0.8,
+      agreed: true,
+      action: "",
+      result: "no action",
+      reason: "",
+    });
+    const first = entry("2026-09-28T08:05:00", "keep drying");
+    home.push({ a: { [LOG]: { s: "08:05 Z1 Morning start", a: { entries: [first] }, lc: 1 } } });
+    await vi.advanceTimersByTimeAsync(250);
+    expect(readJev(store.getSnapshot().states, "room_b_").log!.entries).toHaveLength(1);
+    const second = entry("2026-09-28T08:35:00", "start ramp now");
+    home.push({ c: { [LOG]: { "+": { s: "08:35 Z1", a: { entries: [second, first] }, lu: 2 } } } });
+    await vi.advanceTimersByTimeAsync(250);
+    expect(
+      readJev(store.getSnapshot().states, "room_b_").log!.entries.map((item) => item.verdict),
+    ).toEqual(["start ramp now", "keep drying"]);
+    store.stop();
+  });
+  it("writes by reading back only the written entity", async () => {
+    const { home, store } = await started();
+    home.calls.length = 0;
+    const result = await store.getSnapshot().write([{ entityId: TARGET, value: 65 }]);
+    expect(result).toEqual({ applied: [TARGET], failed: [] });
+    expect(home.calls).toEqual([`GET states/${TARGET}`, `GET states/${TARGET}`]);
+    expect(home.session.callService).toHaveBeenCalledWith("number", "set_value", {
+      entity_id: TARGET,
+      value: 65,
+    });
+    expect(store.getSnapshot().states[TARGET].state).toBe("65");
+    store.stop();
+  });
+  it("resynchronises after Home Assistant reconnects, and says when the socket stays down", async () => {
+    const { home, store } = await started();
+    home.connection.connected = false;
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(store.getSnapshot().connection).toBe("live");
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(store.getSnapshot().connection).toBe("offline");
+    home.connection.connected = true;
+    home.fire("ready");
+    await vi.advanceTimersByTimeAsync(0);
+    expect(home.fullFetches()).toBe(2);
+    expect(home.connection.subscribeMessage).toHaveBeenCalledTimes(2);
+    expect(store.getSnapshot().connection).toBe("live");
+    store.stop();
+  });
+  it("falls back to polling when Home Assistant refuses the subscription", async () => {
+    vi.useFakeTimers();
+    const home = homeAssistant();
+    home.connection.subscribeMessage.mockRejectedValue(new Error("unknown command"));
+    const store = new ControllerStore(false);
+    store.start();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(home.fullFetches()).toBe(1);
+    await vi.advanceTimersByTimeAsync(30_000);
+    expect(home.fullFetches()).toBe(2);
+    store.stop();
+  });
+  const DECISION = "sensor.crop_steering_current_decision";
+  const VALVE = "switch.demo_valve_1";
+  it("loads a grow day once over the websocket, attributes only for the decision", async () => {
+    const { home, store } = await started();
+    const start = Date.now() - 3_600_000,
+      end = Date.now();
+    home.connection.sendMessagePromise.mockImplementation(async (message) =>
+      message.no_attributes
+        ? {
+            [VALVE]: [
+              { s: "off", lu: start / 1000 },
+              { s: "on", lu: start / 1000 + 60 },
+            ],
+          }
+        : { [DECISION]: [{ s: "Holding", a: { fired: [], blocked: [] }, lu: start / 1000 }] },
+    );
+    home.calls.length = 0;
+    const rows = await store
+      .getSnapshot()
+      .timeline({ entityIds: [VALVE, VWC], attributeIds: [DECISION], start, end });
+    expect(rows[VALVE]).toEqual([
+      { state: "off", time: start },
+      { state: "on", time: start + 60_000 },
+    ]);
+    expect(rows[DECISION]).toEqual([
+      { state: "Holding", time: start, attributes: { fired: [], blocked: [] } },
+    ]);
+    const common = {
+      type: "history/history_during_period",
+      start_time: new Date(start).toISOString(),
+      end_time: new Date(end).toISOString(),
+      include_start_time_state: true,
+    };
+    expect(home.connection.sendMessagePromise.mock.calls.map(([message]) => message)).toEqual([
+      {
+        ...common,
+        entity_ids: [VALVE, VWC],
+        significant_changes_only: true,
+        minimal_response: true,
+        no_attributes: true,
+      },
+      {
+        ...common,
+        entity_ids: [DECISION],
+        significant_changes_only: false,
+        minimal_response: false,
+        no_attributes: false,
+      },
+    ]);
+    // Nothing went over REST, and nothing polls afterwards.
+    await vi.advanceTimersByTimeAsync(600_000);
+    expect(home.calls).toEqual([]);
+    expect(home.connection.sendMessagePromise).toHaveBeenCalledTimes(2);
+    store.stop();
+  });
+  it("reads a grow day over REST when the connection cannot send commands", async () => {
+    const { home, store } = await started();
+    delete (home.connection as { sendMessagePromise?: unknown }).sendMessagePromise;
+    home.calls.length = 0;
+    const start = Date.now() - 3_600_000;
+    await store
+      .getSnapshot()
+      .timeline({ entityIds: [VALVE], attributeIds: [DECISION], start, end: Date.now() });
+    expect(home.calls).toHaveLength(2);
+    expect(home.calls[0]).toMatch(/^GET history\/period\/.*minimal_response=&no_attributes=$/);
+    expect(home.calls[1]).toMatch(/^GET history\/period\/.*significant_changes_only=0$/);
+    store.stop();
+  });
+  const WATER = "sensor.crop_steering_zone_1_daily_water_app";
+  it("reads the water counters' hourly long-term statistics over the websocket", async () => {
+    const { home, store } = await started();
+    const end = Date.now(),
+      start = end - 30 * 86_400_000;
+    home.connection.sendMessagePromise.mockImplementation(async () => ({
+      [WATER]: [{ start: end - 7_200_000, end: end - 3_600_000, state: 41.2 }],
+    }));
+    home.calls.length = 0;
+    const record = await store.getSnapshot().waterRecord({ entityIds: [WATER], start, end });
+    expect(record).toEqual({
+      source: "statistics",
+      samples: { [WATER]: [{ time: end - 3_600_001, value: 41.2 }] },
+    });
+    expect(home.connection.sendMessagePromise).toHaveBeenCalledWith({
+      type: "recorder/statistics_during_period",
+      start_time: new Date(start).toISOString(),
+      end_time: new Date(end).toISOString(),
+      statistic_ids: [WATER],
+      period: "hour",
+      types: ["state"],
+    });
+    expect(home.calls).toEqual([]);
+    store.stop();
+  });
+  it("reads the water counters' recorded history over REST without the websocket", async () => {
+    const { home, store } = await started();
+    delete (home.connection as { sendMessagePromise?: unknown }).sendMessagePromise;
+    home.calls.length = 0;
+    const record = await store
+      .getSnapshot()
+      .waterRecord({ entityIds: [WATER], start: Date.now() - 86_400_000, end: Date.now() });
+    expect(record).toEqual({ source: "history", samples: {} });
+    expect(home.calls).toHaveLength(1);
+    expect(home.calls[0]).toMatch(/^GET history\/period\/.*minimal_response=&no_attributes=$/);
+    await expect(
+      store.getSnapshot().waterRecord({
+        entityIds: ["sensor.crop_steering_room_b_zone_1_daily_water_app"],
+        start: 0,
+        end: 1,
+      }),
+    ).rejects.toThrow("limited to the selected room");
+    store.stop();
+  });
+  const EC = "sensor.crop_steering_ec_zone_1";
+  it("reads a run's daily lows and highs from long-term statistics over the websocket", async () => {
+    const { home, store } = await started();
+    const day = Date.UTC(2026, 7, 24);
+    home.connection.sendMessagePromise.mockImplementation(async () => ({
+      [VWC]: [
+        { start: day, end: day + 86_400_000, min: 55.2, max: 66.1 },
+        { start: day + 86_400_000, end: day + 2 * 86_400_000, min: 54.8, max: 65.9 },
+      ],
+      [EC]: [
+        { start: new Date(day).toISOString(), min: 3.9, max: 4.6 },
+        { start: day, min: null },
+      ],
+    }));
+    home.calls.length = 0;
+    const request = {
+      entityIds: [VWC, EC],
+      start: new Date(day).toISOString(),
+      end: new Date(day + 2 * 86_400_000).toISOString(),
+      timeZone: "UTC",
+    };
+    const ranges = await store.getSnapshot().dailyRanges(request);
+    expect(ranges.source).toBe("statistics");
+    expect(ranges.series).toEqual([
+      {
+        entityId: VWC,
+        daily: [
+          { date: "2026-08-24", records: 1, min: 55.2, max: 66.1 },
+          { date: "2026-08-25", records: 1, min: 54.8, max: 65.9 },
+        ],
+      },
+      { entityId: EC, daily: [{ date: "2026-08-24", records: 1, min: 3.9, max: 4.6 }] },
+    ]);
+    expect(home.connection.sendMessagePromise).toHaveBeenCalledWith({
+      type: "recorder/statistics_during_period",
+      start_time: request.start,
+      end_time: request.end,
+      statistic_ids: [VWC, EC],
+      period: "day",
+      types: ["min", "max"],
+    });
+    expect(home.calls).toEqual([]);
+    store.stop();
+  });
+  it("reads a sensor without statistics, and every sensor standalone, from recorded history", async () => {
+    const { home, store } = await started();
+    const end = Date.now(),
+      start = end - 3 * 86_400_000;
+    home.connection.sendMessagePromise.mockImplementation(async () => ({
+      [VWC]: [{ start, min: 55, max: 66 }],
+    }));
+    home.calls.length = 0;
+    const request = {
+      entityIds: [VWC, EC],
+      start: new Date(start).toISOString(),
+      end: new Date(end).toISOString(),
+      timeZone: "UTC",
+    };
+    const mixed = await store.getSnapshot().dailyRanges(request);
+    expect(mixed.source).toBe("statistics");
+    expect(mixed.series.map((item) => item.entityId)).toEqual([VWC, EC]);
+    expect(mixed.warnings.join(" ")).toContain(`No long-term statistics for ${EC}`);
+    expect(home.calls.some((call) => call.startsWith("GET history/period/"))).toBe(true);
+    delete (home.connection as { sendMessagePromise?: unknown }).sendMessagePromise;
+    expect((await store.getSnapshot().dailyRanges(request)).source).toBe("history");
+    await expect(
+      store.getSnapshot().dailyRanges({ ...request, entityIds: ["sensor.somewhere_else"] }),
+    ).rejects.toThrow();
+    store.stop();
+  });
+  it("keeps a grow day to the selected room and one day", async () => {
+    const { store } = await started();
+    const start = Date.now() - 3_600_000,
+      end = Date.now();
+    const timeline = store.getSnapshot().timeline;
+    for (const id of ["light.kitchen", "number.crop_steering_room_b_zone_1_p1_target_vwc"])
+      await expect(timeline({ entityIds: [id], attributeIds: [], start, end })).rejects.toThrow(
+        "History is limited to entities in the selected room.",
+      );
+    await expect(
+      timeline({ entityIds: [VALVE], attributeIds: [], start: end - 30 * 3_600_000, end }),
+    ).rejects.toThrow("at most one grow-day");
+    store.stop();
+  });
+  it("reads the tank and pump the selected room maps, and no other room's", async () => {
+    const { home, store } = await started();
+    const start = Date.now() - 3_600_000,
+      end = Date.now();
+    const timeline = store.getSnapshot().timeline;
+    const tank = {
+      entityIds: ["binary_sensor.demo_tank_filling", "sensor.demo_tank_level", "switch.demo_pump"],
+      attributeIds: ["sensor.demo_tank_last_fill"],
+      start,
+      end,
+    };
+    await expect(timeline(tank)).resolves.toEqual({});
+    // The last-fill record comes with its attributes: a date-and-time helper's timestamp.
+    expect(home.connection.sendMessagePromise).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity_ids: ["sensor.demo_tank_last_fill"],
+        no_attributes: false,
+      }),
+    );
+    await expect(
+      timeline({ entityIds: ["sensor.demo_room_b_tank_level"], attributeIds: [], start, end }),
+    ).rejects.toThrow("History is limited to entities in the selected room.");
+    store.stop();
+  });
+});
+
+describe("recorder rows over the websocket", () => {
+  it("reads the compressed form: lu on every row, lc only where it differs, sorted", () => {
+    expect(
+      compressedRows(
+        {
+          "sensor.a": [
+            { s: "P1", lu: 1_790_000_060 },
+            { s: "P0", lu: 1_790_000_000, lc: 1_789_999_000 },
+            { s: "junk" },
+          ],
+          "sensor.b": "not rows",
+        },
+        false,
+      ),
+    ).toEqual({
+      "sensor.a": [
+        { state: "P0", time: 1_790_000_000_000 },
+        { state: "P1", time: 1_790_000_060_000 },
+      ],
+    });
+    expect(() => compressedRows(null, false)).toThrow("invalid history");
+  });
+  it("gives up on water statistics Home Assistant never answers", async () => {
+    vi.useFakeTimers();
+    const connection = {
+      subscribeMessage: vi.fn(),
+      sendMessagePromise: () => new Promise<never>(() => {}),
+    };
+    const pending = liveStatistics(connection, { entityIds: ["sensor.a"], start: 0, end: 1 });
+    const failed = expect(pending).rejects.toThrow("did not return the water statistics");
+    await vi.advanceTimersByTimeAsync(60_000);
+    await failed;
+  });
+  it("gives up on a history request Home Assistant never answers", async () => {
+    vi.useFakeTimers();
+    const connection = {
+      subscribeMessage: vi.fn(),
+      sendMessagePromise: () => new Promise<never>(() => {}),
+    };
+    const request = { entityIds: ["sensor.a"], attributeIds: [], start: 0, end: 1 };
+    const pending = liveHistory(connection, request, 30_000);
+    const failed = expect(pending).rejects.toThrow("did not return the day's history");
+    await vi.advanceTimersByTimeAsync(30_000);
+    await failed;
+  });
+});
+
+describe("recorded history after the first load", () => {
+  const point = (minute: number, value: number) => ({
+    time: new Date(Date.UTC(2026, 8, 23, 0, minute)).toISOString(),
+    value,
+  });
+  const at = (minute: number) => Date.UTC(2026, 8, 23, 0, minute);
+  it("asks for the window once, then only for the minutes since", () => {
+    expect(historySpan(72, null, at(0))).toBe(72);
+    expect(historySpan(72, at(0), at(1)) * 60).toBeCloseTo(3);
+    expect(historySpan(24, at(0), at(0) + 30 * 3_600_000)).toBe(24);
+  });
+  it("replaces the overlap with the new slice and drops a repeated first reading", () => {
+    const held = [
+      { entityId: "sensor.v", label: "V", points: [point(1, 50), point(5, 49), point(8, 48)] },
+    ];
+    // The slice starts at minute 7 with the value held then (49), then records a change.
+    const recent = [{ entityId: "sensor.v", label: "V", points: [point(7, 49), point(9, 47)] }];
+    expect(mergeSeries(held, recent, at(0))[0].points).toEqual([
+      point(1, 50),
+      point(5, 49),
+      point(9, 47),
+    ]);
+    // A slice that starts on a different value keeps it; readings before `since` go.
+    const moved = [{ entityId: "sensor.v", label: "V", points: [point(7, 46)] }];
+    expect(mergeSeries(held, moved, at(2))[0].points).toEqual([point(5, 49), point(7, 46)]);
+    // No new readings: the window stays as loaded.
+    expect(mergeSeries(held, [], at(0))[0].points).toEqual(held[0].points);
+  });
+});
+
+
+it("requests hourly mean/min/max through the existing Recorder websocket without privileged operations", async () => {
+  const sendMessagePromise = vi.fn(async () => ({ "sensor.probe": [{ start: 1000, mean: 45, min: 40, max: 50 }] }));
+  const request = { entityIds: ["sensor.probe"], start: "2026-09-01T00:00:00Z", end: "2026-09-02T00:00:00Z", timeZone: "UTC" };
+  expect(await liveSensorStatistics({ sendMessagePromise } as never, request)).toHaveProperty("sensor.probe");
+  expect(sendMessagePromise).toHaveBeenCalledExactlyOnceWith({ type: "recorder/statistics_during_period", start_time: request.start,
+    end_time: request.end, statistic_ids: request.entityIds, period: "hour", types: ["mean", "min", "max"] });
+});

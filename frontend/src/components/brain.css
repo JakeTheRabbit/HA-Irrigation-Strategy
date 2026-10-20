@@ -1,0 +1,205 @@
+/* The AI assistant: a chip in the header, a card on Today and on a zone, its own page and its settings.
+   A fallback is amber, never red: the rules keep watering. */
+.brain-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 2px 10px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.brain-chip-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.brain-chip[data-tone="positive"] .brain-chip-dot {
+  background: var(--success);
+}
+.brain-chip[data-tone="info"] .brain-chip-dot {
+  background: var(--primary);
+}
+.brain-chip[data-tone="warning"] .brain-chip-dot {
+  background: var(--warning);
+}
+/* Today's card: one screen of Today holds it. */
+[data-brain-card] {
+  margin-bottom: 0;
+}
+[data-brain-card] .panel-heading {
+  padding: 12px 18px 6px;
+}
+[data-brain-card] .brain-body {
+  gap: 4px;
+  padding: 0 18px 12px;
+}
+[data-brain-card] .brain-status {
+  padding: 6px 10px;
+}
+.brain-body {
+  display: grid;
+  gap: 8px;
+  padding: 0 20px 18px;
+  min-width: 0;
+}
+.settings-section .brain-body {
+  padding: 0;
+}
+.brain-line {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+.brain-line strong {
+  color: var(--foreground);
+}
+.brain-status {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border-left: 3px solid var(--muted-foreground);
+  border-radius: 8px;
+  background: var(--muted);
+}
+.brain-status p {
+  margin: 0;
+  font-size: var(--text-sm);
+}
+.brain-status[data-tone="positive"] {
+  border-left-color: var(--success);
+}
+.brain-status[data-tone="info"] {
+  border-left-color: var(--primary);
+}
+.brain-status[data-tone="warning"] {
+  border-left-color: var(--warning);
+  background: var(--warning-bg);
+}
+.brain-demo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+  font-size: var(--text-sm);
+}
+.brain-demo select {
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--foreground);
+}
+.brain-details summary {
+  cursor: pointer;
+  font-size: var(--text-sm);
+}
+.brain-details p {
+  margin: 4px 0 0;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+.brain-table-wrap {
+  overflow-x: auto;
+}
+.brain-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+.brain-table th,
+.brain-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.brain-list {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: var(--text-sm);
+}
+.brain-list li {
+  display: grid;
+  grid-template-columns: 3.5em 5em minmax(0, 1fr) auto;
+  gap: 8px;
+  overflow-wrap: anywhere;
+}
+.brain-where [role="tablist"] {
+  display: flex;
+  gap: 6px;
+}
+.brain-where [role="tab"] {
+  padding: 4px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--foreground);
+  font-size: var(--text-sm);
+  cursor: pointer;
+}
+.brain-where [role="tab"][aria-selected="true"] {
+  border-color: var(--primary);
+  font-weight: 600;
+}
+.brain-where ol {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}
+@media (max-width: 600px) {
+  .brain-list li {
+    grid-template-columns: 3.5em minmax(0, 1fr);
+  }
+}
+/* What the AI assistant may do: a checkbox per power, its one line of help under it. */
+.brain-powers {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.brain-powers li {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.brain-powers label {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--text-sm);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+.brain-powers input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 1px 0 0;
+  flex: none;
+  accent-color: var(--primary-strong);
+}
+.brain-powers input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+}
+.brain-powers p {
+  margin: 0 0 0 26px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  overflow-wrap: anywhere;
+}

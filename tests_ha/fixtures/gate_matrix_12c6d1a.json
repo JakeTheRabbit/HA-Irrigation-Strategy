@@ -1,0 +1,9053 @@
+{
+ "F-217|engine_switch": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|absent|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|helper|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|absent|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|helper|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|off|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|off|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|on|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|on|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|on|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|off|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|off|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|on|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|on|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|on|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|off|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|off|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|on|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|on|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|on|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    4
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1,
+    2
+   ],
+   "enable_flag": "switch.crop_steering_engine_enabled",
+   "entry_id": "seeded2x17wizard0000000000000001",
+   "feed_ec_sensor": "sensor.feed_ec",
+   "feed_ph_sensor": "sensor.feed_ph",
+   "mainline": "switch.main_line",
+   "num_zones": 2,
+   "prefix": "",
+   "pump": "switch.main_pump",
+   "room_name": "Flower room",
+   "setup_api_version": 1,
+   "setup_revision": 4,
+   "slug": "default",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.row_1_valve",
+    "2": "switch.row_2_valve"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Row 1",
+    "2": "Row 2"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"switch.crop_steering_engine_enabled\", \"feed_ec_sensor\": \"sensor.feed_ec\", \"feed_ph_sensor\": \"sensor.feed_ph\", \"mainline\": \"switch.main_line\", \"pump\": \"switch.main_pump\", \"valves\": {\"1\": \"switch.row_1_valve\", \"2\": \"switch.row_2_valve\"}, \"zones\": [1, 2]}",
+  "integration": {
+   "absent": "switch.crop_steering_engine_enabled",
+   "behind": "switch.crop_steering_engine_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "F-217|helper": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1,
+    2
+   ],
+   "enable_flag": "input_boolean.f2_control_enabled",
+   "entry_id": "seeded2x17wizard0000000000000001",
+   "feed_ec_sensor": "sensor.feed_ec",
+   "feed_ph_sensor": "sensor.feed_ph",
+   "mainline": "switch.main_line",
+   "num_zones": 2,
+   "prefix": "",
+   "pump": "switch.main_pump",
+   "room_name": "Flower room",
+   "setup_api_version": 1,
+   "setup_revision": 4,
+   "slug": "default",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.row_1_valve",
+    "2": "switch.row_2_valve"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Row 1",
+    "2": "Row 2"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"input_boolean.f2_control_enabled\", \"feed_ec_sensor\": \"sensor.feed_ec\", \"feed_ph_sensor\": \"sensor.feed_ph\", \"mainline\": \"switch.main_line\", \"pump\": \"switch.main_pump\", \"valves\": {\"1\": \"switch.row_1_valve\", \"2\": \"switch.row_2_valve\"}, \"zones\": [1, 2]}",
+  "integration": {
+   "absent": "input_boolean.f2_control_enabled",
+   "behind": "input_boolean.f2_control_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "F-217|kind_default": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ],
+   "resumed|other|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    4
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1,
+    2
+   ],
+   "enable_flag": "input_boolean.f2_control_enabled",
+   "entry_id": "seeded2x17wizard0000000000000001",
+   "feed_ec_sensor": "sensor.feed_ec",
+   "feed_ph_sensor": "sensor.feed_ph",
+   "mainline": "switch.main_line",
+   "num_zones": 2,
+   "prefix": "",
+   "pump": "switch.main_pump",
+   "room_name": "Flower room",
+   "setup_api_version": 1,
+   "setup_revision": 4,
+   "slug": "default",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.row_1_valve",
+    "2": "switch.row_2_valve"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Row 1",
+    "2": "Row 2"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"input_boolean.f2_control_enabled\", \"feed_ec_sensor\": \"sensor.feed_ec\", \"feed_ph_sensor\": \"sensor.feed_ph\", \"mainline\": \"switch.main_line\", \"pump\": \"switch.main_pump\", \"valves\": {\"1\": \"switch.row_1_valve\", \"2\": \"switch.row_2_valve\"}, \"zones\": [1, 2]}",
+  "integration": {
+   "absent": "input_boolean.f2_control_enabled",
+   "behind": "input_boolean.f2_control_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "F-2251|engine_switch": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1,
+    2
+   ],
+   "enable_flag": "switch.crop_steering_engine_enabled",
+   "entry_id": "01M4XGATS85FVGRP8XSD4P80XW",
+   "feed_ec_sensor": "sensor.feed_ec",
+   "feed_ph_sensor": "sensor.feed_ph",
+   "mainline": "switch.irrigation_main_line",
+   "num_zones": 2,
+   "plumbing": "pump_mainline_valves",
+   "prefix": "",
+   "pump": "switch.irrigation_pump",
+   "room_name": "Flower room",
+   "setup_api_version": 1,
+   "setup_revision": 1,
+   "slug": "default",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.zone_1_valve",
+    "2": "switch.zone_2_valve"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Bench 1",
+    "2": "Bench 2"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"switch.crop_steering_engine_enabled\", \"feed_ec_sensor\": \"sensor.feed_ec\", \"feed_ph_sensor\": \"sensor.feed_ph\", \"mainline\": \"switch.irrigation_main_line\", \"plumbing\": \"pump_mainline_valves\", \"pump\": \"switch.irrigation_pump\", \"valves\": {\"1\": \"switch.zone_1_valve\", \"2\": \"switch.zone_2_valve\"}, \"zones\": [1, 2]}",
+  "integration": {
+   "absent": "switch.crop_steering_engine_enabled",
+   "behind": "switch.crop_steering_engine_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "F-2251|helper": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1,
+    2
+   ],
+   "enable_flag": "input_boolean.f2_control_enabled",
+   "entry_id": "01M4XGATS85FVGRP8XSD4P80XW",
+   "feed_ec_sensor": "sensor.feed_ec",
+   "feed_ph_sensor": "sensor.feed_ph",
+   "mainline": "switch.irrigation_main_line",
+   "num_zones": 2,
+   "plumbing": "pump_mainline_valves",
+   "prefix": "",
+   "pump": "switch.irrigation_pump",
+   "room_name": "Flower room",
+   "setup_api_version": 1,
+   "setup_revision": 1,
+   "slug": "default",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.zone_1_valve",
+    "2": "switch.zone_2_valve"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Bench 1",
+    "2": "Bench 2"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"input_boolean.f2_control_enabled\", \"feed_ec_sensor\": \"sensor.feed_ec\", \"feed_ph_sensor\": \"sensor.feed_ph\", \"mainline\": \"switch.irrigation_main_line\", \"plumbing\": \"pump_mainline_valves\", \"pump\": \"switch.irrigation_pump\", \"valves\": {\"1\": \"switch.zone_1_valve\", \"2\": \"switch.zone_2_valve\"}, \"zones\": [1, 2]}",
+  "integration": {
+   "absent": "input_boolean.f2_control_enabled",
+   "behind": "input_boolean.f2_control_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "F-2251|kind_default": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1,
+    2
+   ],
+   "enable_flag": "input_boolean.f2_control_enabled",
+   "entry_id": "01M4XGATS85FVGRP8XSD4P80XW",
+   "feed_ec_sensor": "sensor.feed_ec",
+   "feed_ph_sensor": "sensor.feed_ph",
+   "mainline": "switch.irrigation_main_line",
+   "num_zones": 2,
+   "plumbing": "pump_mainline_valves",
+   "prefix": "",
+   "pump": "switch.irrigation_pump",
+   "room_name": "Flower room",
+   "setup_api_version": 1,
+   "setup_revision": 1,
+   "slug": "default",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.zone_1_valve",
+    "2": "switch.zone_2_valve"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Bench 1",
+    "2": "Bench 2"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"input_boolean.f2_control_enabled\", \"feed_ec_sensor\": \"sensor.feed_ec\", \"feed_ph_sensor\": \"sensor.feed_ph\", \"mainline\": \"switch.irrigation_main_line\", \"plumbing\": \"pump_mainline_valves\", \"pump\": \"switch.irrigation_pump\", \"valves\": {\"1\": \"switch.zone_1_valve\", \"2\": \"switch.zone_2_valve\"}, \"zones\": [1, 2]}",
+  "integration": {
+   "absent": "input_boolean.f2_control_enabled",
+   "behind": "input_boolean.f2_control_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "F-38|engine_switch": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "switch.crop_steering_engine_enabled"
+    ],
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|absent": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|off": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|on": [
+    "switch.crop_steering_engine_enabled",
+    false,
+    null,
+    1
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1
+   ],
+   "enable_flag": "switch.crop_steering_engine_enabled",
+   "entry_id": "seeded2x18tent000000000000000001",
+   "feed_ec_sensor": "",
+   "feed_ph_sensor": "",
+   "mainline": "",
+   "num_zones": 1,
+   "prefix": "",
+   "pump": "",
+   "room_name": "Tent",
+   "setup_api_version": 1,
+   "setup_revision": 1,
+   "slug": "default",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.gt1_irrigation_switch"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Tent"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"switch.crop_steering_engine_enabled\", \"feed_ec_sensor\": \"\", \"feed_ph_sensor\": \"\", \"mainline\": \"\", \"pump\": \"\", \"valves\": {\"1\": \"switch.gt1_irrigation_switch\"}, \"zones\": [1]}",
+  "integration": {
+   "absent": "switch.crop_steering_engine_enabled",
+   "behind": "switch.crop_steering_engine_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "F-38|helper": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1
+   ],
+   "enable_flag": "input_boolean.f2_control_enabled",
+   "entry_id": "seeded2x18tent000000000000000001",
+   "feed_ec_sensor": "",
+   "feed_ph_sensor": "",
+   "mainline": "",
+   "num_zones": 1,
+   "prefix": "",
+   "pump": "",
+   "room_name": "Tent",
+   "setup_api_version": 1,
+   "setup_revision": 1,
+   "slug": "default",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.gt1_irrigation_switch"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Tent"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"input_boolean.f2_control_enabled\", \"feed_ec_sensor\": \"\", \"feed_ph_sensor\": \"\", \"mainline\": \"\", \"pump\": \"\", \"valves\": {\"1\": \"switch.gt1_irrigation_switch\"}, \"zones\": [1]}",
+  "integration": {
+   "absent": "input_boolean.f2_control_enabled",
+   "behind": "input_boolean.f2_control_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "F-38|kind_default": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "none|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|off|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch"
+    ],
+    0
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.another_kill_switch",
+    true,
+    [
+     "input_boolean.another_kill_switch",
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1
+   ],
+   "enable_flag": "input_boolean.f2_control_enabled",
+   "entry_id": "seeded2x18tent000000000000000001",
+   "feed_ec_sensor": "",
+   "feed_ph_sensor": "",
+   "mainline": "",
+   "num_zones": 1,
+   "prefix": "",
+   "pump": "",
+   "room_name": "Tent",
+   "setup_api_version": 1,
+   "setup_revision": 1,
+   "slug": "default",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.gt1_irrigation_switch"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Tent"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"input_boolean.f2_control_enabled\", \"feed_ec_sensor\": \"\", \"feed_ph_sensor\": \"\", \"mainline\": \"\", \"pump\": \"\", \"valves\": {\"1\": \"switch.gt1_irrigation_switch\"}, \"zones\": [1]}",
+  "integration": {
+   "absent": "input_boolean.f2_control_enabled",
+   "behind": "input_boolean.f2_control_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "F-ENV|engine_switch": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|off|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|off|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|off|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|off|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|off|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|off|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|on|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|on|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1
+   ],
+   "enable_flag": "switch.crop_steering_engine_enabled",
+   "entry_id": "seededenvera00000000000000000001",
+   "feed_ec_sensor": "",
+   "feed_ph_sensor": "",
+   "mainline": "switch.veg_main",
+   "num_zones": 1,
+   "prefix": "",
+   "pump": "switch.veg_pump",
+   "room_name": "Crop Steering System",
+   "setup_api_version": 1,
+   "setup_revision": 0,
+   "slug": "default",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.veg_valve"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Zone 1"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"switch.crop_steering_engine_enabled\", \"feed_ec_sensor\": \"\", \"feed_ph_sensor\": \"\", \"mainline\": \"switch.veg_main\", \"pump\": \"switch.veg_pump\", \"valves\": {\"1\": \"switch.veg_valve\"}, \"zones\": [1]}",
+  "integration": {
+   "absent": "switch.crop_steering_engine_enabled",
+   "behind": "switch.crop_steering_engine_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "F-ENV|helper": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|off|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|off|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|off|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|off|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|off|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|off|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|on|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|on|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1
+   ],
+   "enable_flag": "input_boolean.f2_control_enabled",
+   "entry_id": "seededenvera00000000000000000001",
+   "feed_ec_sensor": "",
+   "feed_ph_sensor": "",
+   "mainline": "switch.veg_main",
+   "num_zones": 1,
+   "prefix": "",
+   "pump": "switch.veg_pump",
+   "room_name": "Crop Steering System",
+   "setup_api_version": 1,
+   "setup_revision": 0,
+   "slug": "default",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.veg_valve"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Zone 1"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"input_boolean.f2_control_enabled\", \"feed_ec_sensor\": \"\", \"feed_ph_sensor\": \"\", \"mainline\": \"switch.veg_main\", \"pump\": \"switch.veg_pump\", \"valves\": {\"1\": \"switch.veg_valve\"}, \"zones\": [1]}",
+  "integration": {
+   "absent": "input_boolean.f2_control_enabled",
+   "behind": "input_boolean.f2_control_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "F-ENV|kind_default": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|off|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|off|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|off|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|off|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|absent|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|absent|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|absent|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|off|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|off|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|off|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|on|absent": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|on|off": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ],
+   "resumed|other|on|on": [
+    "input_boolean.another_kill_switch",
+    false,
+    null,
+    0
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1
+   ],
+   "enable_flag": "input_boolean.f2_control_enabled",
+   "entry_id": "seededenvera00000000000000000001",
+   "feed_ec_sensor": "",
+   "feed_ph_sensor": "",
+   "mainline": "switch.veg_main",
+   "num_zones": 1,
+   "prefix": "",
+   "pump": "switch.veg_pump",
+   "room_name": "Crop Steering System",
+   "setup_api_version": 1,
+   "setup_revision": 0,
+   "slug": "default",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.veg_valve"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Zone 1"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"input_boolean.f2_control_enabled\", \"feed_ec_sensor\": \"\", \"feed_ph_sensor\": \"\", \"mainline\": \"switch.veg_main\", \"pump\": \"switch.veg_pump\", \"valves\": {\"1\": \"switch.veg_valve\"}, \"zones\": [1]}",
+  "integration": {
+   "absent": "input_boolean.f2_control_enabled",
+   "behind": "input_boolean.f2_control_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "named|engine_switch": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|other|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|other|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|other|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|other|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|other|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|other|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1,
+    2
+   ],
+   "enable_flag": "switch.crop_steering_room_b_engine_enabled",
+   "entry_id": "01M4XGATS85FVGRP8XSD4P80XW",
+   "feed_ec_sensor": "sensor.feed_ec",
+   "feed_ph_sensor": "sensor.feed_ph",
+   "mainline": "switch.irrigation_main_line",
+   "num_zones": 2,
+   "plumbing": "pump_mainline_valves",
+   "prefix": "room_b_",
+   "pump": "switch.irrigation_pump",
+   "room_name": "Room B",
+   "setup_api_version": 1,
+   "setup_revision": 1,
+   "slug": "room_b",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.zone_1_valve",
+    "2": "switch.zone_2_valve"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Bench 1",
+    "2": "Bench 2"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"switch.crop_steering_room_b_engine_enabled\", \"feed_ec_sensor\": \"sensor.feed_ec\", \"feed_ph_sensor\": \"sensor.feed_ph\", \"mainline\": \"switch.irrigation_main_line\", \"plumbing\": \"pump_mainline_valves\", \"pump\": \"switch.irrigation_pump\", \"valves\": {\"1\": \"switch.zone_1_valve\", \"2\": \"switch.zone_2_valve\"}, \"zones\": [1, 2]}",
+  "integration": {
+   "absent": "switch.crop_steering_room_b_engine_enabled",
+   "behind": "switch.crop_steering_room_b_engine_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "named|helper": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|other|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|other|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|other|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "none|other|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|other|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|other|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|other|on|absent": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|off": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|on": [
+    "input_boolean.f2_control_enabled",
+    true,
+    [
+     "input_boolean.f2_control_enabled"
+    ],
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|absent": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|off": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|on": [
+    "input_boolean.f2_control_enabled",
+    false,
+    null,
+    1
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1,
+    2
+   ],
+   "enable_flag": "input_boolean.f2_control_enabled",
+   "entry_id": "01M4XGATS85FVGRP8XSD4P80XW",
+   "feed_ec_sensor": "sensor.feed_ec",
+   "feed_ph_sensor": "sensor.feed_ph",
+   "mainline": "switch.irrigation_main_line",
+   "num_zones": 2,
+   "plumbing": "pump_mainline_valves",
+   "prefix": "room_b_",
+   "pump": "switch.irrigation_pump",
+   "room_name": "Room B",
+   "setup_api_version": 1,
+   "setup_revision": 1,
+   "slug": "room_b",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.zone_1_valve",
+    "2": "switch.zone_2_valve"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Bench 1",
+    "2": "Bench 2"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"input_boolean.f2_control_enabled\", \"feed_ec_sensor\": \"sensor.feed_ec\", \"feed_ph_sensor\": \"sensor.feed_ph\", \"mainline\": \"switch.irrigation_main_line\", \"plumbing\": \"pump_mainline_valves\", \"pump\": \"switch.irrigation_pump\", \"valves\": {\"1\": \"switch.zone_1_valve\", \"2\": \"switch.zone_2_valve\"}, \"zones\": [1, 2]}",
+  "integration": {
+   "absent": "input_boolean.f2_control_enabled",
+   "behind": "input_boolean.f2_control_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ },
+ "named|kind_default": {
+  "cases": {
+   "none|absent|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|absent|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|absent|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|helper|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|helper|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|other|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|other|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "none|other|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "none|other|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|absent|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|absent|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|helper|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|helper|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|other|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|other|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "pending|other|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "pending|other|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    true,
+    [
+     "switch.crop_steering_room_b_engine_enabled"
+    ],
+    0
+   ],
+   "resumed|absent|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|absent|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|helper|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|absent|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|off|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|absent": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|off": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ],
+   "resumed|other|on|on": [
+    "switch.crop_steering_room_b_engine_enabled",
+    false,
+    null,
+    1
+   ]
+  },
+  "descriptor": {
+   "active": true,
+   "active_zone_ids": [
+    1,
+    2
+   ],
+   "enable_flag": "switch.crop_steering_room_b_engine_enabled",
+   "entry_id": "01M4XGATS85FVGRP8XSD4P80XW",
+   "feed_ec_sensor": "sensor.feed_ec",
+   "feed_ph_sensor": "sensor.feed_ph",
+   "mainline": "switch.irrigation_main_line",
+   "num_zones": 2,
+   "plumbing": "pump_mainline_valves",
+   "prefix": "room_b_",
+   "pump": "switch.irrigation_pump",
+   "room_name": "Room B",
+   "setup_api_version": 1,
+   "setup_revision": 1,
+   "slug": "room_b",
+   "tank_ec_sensor": "",
+   "tank_fill_entity": "",
+   "tank_last_fill_sensor": "",
+   "tank_ph_sensor": "",
+   "tank_temperature_sensor": "",
+   "valves": {
+    "1": "switch.zone_1_valve",
+    "2": "switch.zone_2_valve"
+   },
+   "water_level_sensor": "",
+   "zone_names": {
+    "1": "Bench 1",
+    "2": "Bench 2"
+   }
+  },
+  "fingerprint": "{\"active\": true, \"enable_flag\": \"switch.crop_steering_room_b_engine_enabled\", \"feed_ec_sensor\": \"sensor.feed_ec\", \"feed_ph_sensor\": \"sensor.feed_ph\", \"mainline\": \"switch.irrigation_main_line\", \"plumbing\": \"pump_mainline_valves\", \"pump\": \"switch.irrigation_pump\", \"valves\": {\"1\": \"switch.zone_1_valve\", \"2\": \"switch.zone_2_valve\"}, \"zones\": [1, 2]}",
+  "integration": {
+   "absent": "switch.crop_steering_room_b_engine_enabled",
+   "behind": "switch.crop_steering_room_b_engine_enabled",
+   "current": "input_boolean.reported_kill_switch"
+  }
+ }
+}

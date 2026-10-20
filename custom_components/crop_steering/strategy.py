@@ -1,0 +1,688 @@
+"""Durable room-local strategy authoring and explicitly armed daily activation.
+
+The integration publishes one coherent parameter snapshot. The controller opts
+into that versioned snapshot; no recipe service or individual number is changed.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import copy
+import logging
+import math
+from datetime import date, datetime, time, timedelta, timezone
+
+from .const import DOMAIN
+from .room import room_prefix
+from .strategy_model import (
+    ENGINE_BOUNDS,
+    MODE_KEYS,
+    PARAMETERS,
+    REQUIRED_PARAMETERS,
+    SCHEMA_VERSION,
+    hydraulic_preview,
+    normalize_plan,
+    preview_zone,
+)
+
+_LOGGER = logging.getLogger(__name__)
+
+
+def _now():
+    try:
+        from homeassistant.util import dt as dt_util
+
+        return dt_util.now()
+    except ImportError:
+        return datetime.now(timezone.utc)
+
+
+def _number(state):
+    try:
+        value = float(state.state)
+        return value if math.isfinite(value) else None
+    except (AttributeError, TypeError, ValueError):
+        return None
+
+
+def _age(state, now):
+    try:
+        updated = state.last_updated
+        if isinstance(updated, str):
+            updated = datetime.fromisoformat(updated.replace("Z", "+00:00"))
+        return (now - updated).total_seconds()
+    except (AttributeError, TypeError, ValueError):
+        return float("inf")
+
+
+def _utc(value):
+    """Compare instants in UTC: two times in the same zone compare by wall clock, which a
+    daylight-saving change makes lie."""
+    return value.astimezone(timezone.utc)
+
+
+class _Hold(ValueError):
+    """A fault only the operator can clear: the plan goes to error and the controller holds the
+    steering of the zones it manages (never their emergency, watchdog or minimum-daily shots).
+    """
+
+
+class _Waiting(ValueError):
+    """What keeps the plan from moving on for now, by kind (the published `degraded_kind`): probe_stale,
+    heartbeat, flags, lights_hour or hydraulics. Recoverable: the plan tries again every tick.
+    """
+
+    def __init__(self, kind, message):
+        super().__init__(message)
+        self.kind = kind
+
+
+class StrategyManager:
+    """Per-entry persistent document, coherent snapshots and guarded scheduler."""
+
+    def __init__(self, hass, entry, store=None):
+        self.hass, self.entry = hass, entry
+        self.prefix = room_prefix(entry)
+        self.room_id = f"room:{self.prefix}"
+        self.entity_id = f"sensor.{DOMAIN}_{self.prefix}strategy_plan"
+        self._store = store
+        self._lock = asyncio.Lock()
+        self._unsubscribe = None
+        self.document = self._fresh_document()
+        # Why the last tick could not move the plan on (a stale heartbeat or probe at lights-on,
+        # Home Assistant down across it, an unreadable lights_on_hour). The plan keeps publishing
+        # its last valid snapshot meanwhile and tries again every tick.
+        self.degraded_reason = None
+        self.degraded_kind = (
+            None  # _Waiting.kind, "other" for anything else, None when not degraded
+        )
+
+    def _fresh_document(self):
+        return {
+            "storage_version": 1,
+            "revision": 0,
+            "status": "draft",
+            "plan": None,
+            "active": {"grow_day": None, "zones": []},
+            "error": None,
+            "armed_at": None,
+            "armed_after": None,
+            "disarm_at": None,
+            "disarm_after": None,
+            "release_legacy": False,
+        }
+
+    def _config(self):
+        return self.hass.data.get(DOMAIN, {}).get(self.entry.entry_id, {})
+
+    def zone_ids(self):
+        config = self._config()
+        zones = config.get("zones") or {}
+        return [
+            z
+            for z in range(1, int(config.get("num_zones", 1)) + 1)
+            if (zones.get(str(z), zones.get(z, {})) or {}).get("active", True)
+        ]
+
+    def _state(self, suffix, domain="sensor"):
+        return self.hass.states.get(f"{domain}.{DOMAIN}_{self.prefix}{suffix}")
+
+    def _native_number(self, zone, key):
+        for suffix in (f"zone_{zone}_{key}", key):
+            state = self._state(suffix, "number")
+            if _number(state) is not None:
+                return state
+        return None
+
+    def catalog(self):
+        result = {}
+        for zone in self.zone_ids():
+            mode = self._state(f"zone_{zone}_steering_mode", "select") or self._state(
+                "steering_mode", "select"
+            )
+            gen = getattr(mode, "state", "").lower().startswith("gen")
+            row = {}
+            for key in PARAMETERS:
+                native_keys = MODE_KEYS.get(key, (key,))
+                states = [self._native_number(zone, native) for native in native_keys]
+                readable = [state for state in states if state is not None]
+                if not readable:
+                    continue
+                try:
+                    minimum = max(float(state.attributes["min"]) for state in readable)
+                    maximum = min(float(state.attributes["max"]) for state in readable)
+                    minimum = max(minimum, ENGINE_BOUNDS[key][0])
+                    maximum = min(maximum, ENGINE_BOUNDS[key][1])
+                    step = max(float(state.attributes["step"]) for state in readable)
+                    if (
+                        not all(math.isfinite(v) for v in (minimum, maximum, step))
+                        or minimum > maximum
+                        or step <= 0
+                    ):
+                        continue
+                except (KeyError, TypeError, ValueError):
+                    continue
+                selected = states[1 if gen and len(states) > 1 else 0]
+                row[key] = {
+                    "value": _number(selected),
+                    "min": minimum,
+                    "max": maximum,
+                    "step": step,
+                    "unit": (
+                        "% of peak"
+                        if key == "dryback_target"
+                        else readable[0].attributes.get("unit_of_measurement", "")
+                    ),
+                    "entity_ids": [state.entity_id for state in readable],
+                }
+            result[zone] = row
+        return result
+
+    def _seed_plan(self, now):
+        profiles, zones = [], []
+        catalog = self.catalog()
+        for zone in self.zone_ids():
+            values = {
+                key: field["value"]
+                for key, field in catalog.get(zone, {}).items()
+                if field["value"] is not None
+            }
+            if not set(REQUIRED_PARAMETERS) <= set(values):
+                values = {}  # Never invent grower endpoints from missing configuration.
+            pid = f"zone-{zone}-current"
+            profiles.append(
+                {
+                    "id": pid,
+                    "name": f"Zone {zone} current values — configure endpoints",
+                    "vegetative": dict(values),
+                    "generative": dict(values),
+                }
+            )
+            zones.append(
+                {
+                    "zone_id": zone,
+                    "start_date": now.date().isoformat(),
+                    "schedule": [
+                        {"start_day": 1, "end_day": 84, "profile_id": pid, "bias": 50}
+                    ],
+                }
+            )
+        return {"schema_version": SCHEMA_VERSION, "profiles": profiles, "zones": zones}
+
+    async def async_init(self):
+        if self._store is None:
+            try:
+                from homeassistant.helpers.storage import Store
+
+                self._store = Store(
+                    self.hass, 1, f"{DOMAIN}_strategy_{self.entry.entry_id}"
+                )
+            except ImportError:
+                pass
+        try:
+            loaded = await self._store.async_load() if self._store else None
+            if loaded:
+                if not isinstance(loaded, dict) or loaded.get("storage_version") != 1:
+                    raise ValueError("Unsupported or corrupt strategy storage")
+                self.document.update(copy.deepcopy(loaded))
+                if self.document["status"] not in (
+                    "draft",
+                    "armed",
+                    "active",
+                    "disarming",
+                    "error",
+                ):
+                    raise ValueError("Invalid stored strategy status")
+                if (
+                    type(self.document["revision"]) is not int
+                    or self.document["revision"] < 0
+                    or not isinstance(self.document["active"], dict)
+                    or not isinstance(self.document["active"].get("zones"), list)
+                    or (
+                        self.document["plan"] is not None
+                        and not isinstance(self.document["plan"], dict)
+                    )
+                ):
+                    raise ValueError("Malformed stored strategy document")
+                for field in ("armed_at", "armed_after", "disarm_at", "disarm_after"):
+                    if self.document.get(field):
+                        datetime.fromisoformat(self.document[field])
+                if self.document["status"] == "disarming" and not (
+                    self.document.get("disarm_at") or self.document.get("disarm_after")
+                ):
+                    self.document["disarm_at"] = _now().isoformat()
+        except Exception as error:
+            self.document = self._fresh_document()
+            self.document["status"] = "error"
+            self.document["error"] = str(error)
+        if self.document["plan"] is None:
+            self.document["plan"] = self._seed_plan(_now())
+        # A lights-on missed while Home Assistant was down is not an error: the stored snapshot
+        # stays published and the first tick applies the day it missed.
+        self._publish(_now())
+        return self
+
+    def controller_supported(self, now):
+        heartbeat = self._state("ai_heartbeat")
+        return bool(
+            heartbeat
+            and heartbeat.attributes.get("strategy_snapshot_version") == 1
+            and -60 <= _age(heartbeat, now) <= 180
+        )
+
+    def response(self, now=None):
+        now = now or _now()
+        return {
+            "room_id": self.room_id,
+            "revision": self.document["revision"],
+            "status": self.document["status"],
+            "plan": copy.deepcopy(self.document["plan"]),
+            "active": copy.deepcopy(self.document["active"]),
+            "error": self.document["error"],
+            "capabilities": {
+                "strategy_snapshot_version": 1,
+                "controller_supported": self.controller_supported(now),
+            },
+            "catalog": self.catalog(),
+            "armed_after": self._takes_effect("armed", now),
+            "disarm_after": self._takes_effect("disarm", now),
+            "degraded_reason": self.degraded_reason,
+            "degraded_kind": self.degraded_kind,
+            "disarm_policy": "Return to legacy setpoints at the next lights-on boundary; no hardware flag is enabled.",
+        }
+
+    def _takes_effect(self, key, now):
+        """When a pending arm or disarm takes effect: the first lights-on after it was asked for,
+        by the room's lights_on_hour now. A document stored before `*_at` existed says when.
+        """
+        asked = self.document.get(f"{key}_at")
+        if not asked:
+            return self.document.get(f"{key}_after")
+        try:
+            asked = datetime.fromisoformat(asked).astimezone(now.tzinfo)
+            return self._next_boundary(asked).isoformat()
+        except ValueError:
+            return None
+
+    def _sizing(self, zone):
+        fields = {
+            "substrate_l_per_plant": "substrate_volume",
+            "plant_count": "plant_count",
+            "drippers_per_plant": "drippers_per_plant",
+            "dripper_flow_lph": "dripper_flow_rate",
+        }
+        values = {
+            name: _number(self._native_number(zone, key))
+            for name, key in fields.items()
+        }
+        values["max_shot_duration"] = _number(
+            self._state("max_shot_duration", "number")
+        )
+        return values
+
+    def preview(self, plan=None, grow_day=None):
+        catalog = self.catalog()
+        plan = normalize_plan(plan or self.document["plan"], self.zone_ids(), catalog)
+        day = grow_day or _now().date().isoformat()
+        date.fromisoformat(day)
+        zones = []
+        for assignment in plan["zones"]:
+            row = preview_zone(
+                plan, assignment["zone_id"], day, catalog.get(assignment["zone_id"])
+            )
+            row["errors"] = []
+            try:
+                row["hydraulics"] = hydraulic_preview(
+                    self._sizing(row["zone_id"]), row["parameters"]
+                )
+            except ValueError as error:
+                row["hydraulics"] = None
+                row["errors"].append(str(error))
+            zones.append(row)
+        return {"date": day, "zones": zones}
+
+    async def _persist(self):
+        if self._store is None:
+            raise RuntimeError("Strategy storage is unavailable")
+        await self._store.async_save(copy.deepcopy(self.document))
+
+    async def save(self, plan, expected_revision):
+        async with self._lock:
+            if expected_revision != self.document["revision"]:
+                raise ValueError("Strategy revision changed; reload before saving")
+            if self.document["status"] != "draft":
+                raise ValueError(
+                    "Disarm the strategy and wait for the next boundary before replacing it"
+                )
+            normalized = normalize_plan(plan, self.zone_ids(), self.catalog())
+            prior = copy.deepcopy(self.document)
+            self.document.update(
+                plan=normalized,
+                revision=prior["revision"] + 1,
+                error=None,
+                release_legacy=False,
+            )
+            try:
+                await self._persist()
+            except Exception:
+                self.document = prior
+                raise
+            self._publish(_now())
+            return self.response()
+
+    def _lights_on(self, day, tz):
+        """Lights-on on the local date `day`, at the room's lights_on_hour. An hour inside a
+        daylight-saving gap is the instant the clocks jump to: 02:30, on a night that goes from
+        02:00 straight to 03:00, is 03:30."""
+        hour = _number(self._state("lights_on_hour", "number"))
+        if hour is None or not 0 <= hour < 24:
+            raise _Waiting("lights_hour", "Readable room lights_on_hour is required")
+        wall = datetime.combine(day, time()) + timedelta(seconds=int(hour * 3600))
+        return _utc(wall.replace(tzinfo=tz)).astimezone(tz)
+
+    def _boundary(self, now):
+        """The latest lights-on at or before `now`."""
+        boundary = self._lights_on(now.date(), now.tzinfo)
+        if _utc(now) < _utc(boundary):
+            boundary = self._lights_on(now.date() - timedelta(days=1), now.tzinfo)
+        return boundary
+
+    def _next_boundary(self, now):
+        """The first lights-on after `now`."""
+        return self._lights_on(
+            self._boundary(now).date() + timedelta(days=1), now.tzinfo
+        )
+
+    def _due(self, key, boundary):
+        """Has the lights-on a pending arm or disarm waits for come, `boundary` being the latest?
+        It is the first lights-on after the request, by the room's lights_on_hour now, so a
+        changed hour moves it. A document stored before `*_at` existed says when (`*_after`).
+        """
+        asked = self.document.get(f"{key}_at")
+        if asked:
+            return _utc(boundary) > _utc(datetime.fromisoformat(asked))
+        due = self.document.get(f"{key}_after")
+        return bool(due) and _utc(boundary) >= _utc(datetime.fromisoformat(due))
+
+    def _readiness(self, now, zone_ids):
+        """Raise for what holds the whole room; -> {zone: why} for each zone whose moisture reading is
+        unusable. A zone's root-zone EC is never waited for: the engine waters a zone without one on
+        moisture alone, with only its EC rules paused."""
+        if not self.controller_supported(now):
+            raise _Waiting(
+                "heartbeat",
+                "A fresh controller heartbeat with strategy_snapshot_version=1 is required",
+            )
+        heartbeat = self._state("ai_heartbeat")
+        flag = heartbeat.attributes.get("enable_flag")
+        flag_state = self.hass.states.get(flag) if isinstance(flag, str) else None
+        if getattr(flag_state, "state", None) not in ("on", "off"):
+            raise _Waiting("flags", "The current room engine flag is unreadable")
+        stale = {}
+        for zone in zone_ids:
+            enabled = self._state(f"zone_{zone}_enabled", "switch")
+            if getattr(enabled, "state", None) not in ("on", "off"):
+                raise _Waiting(
+                    "flags", f"Zone {zone} enable configuration is unreadable"
+                )
+            state = self._state(f"vwc_zone_{zone}") or self._state(f"zone_{zone}_vwc")
+            if _number(state) is None or not -60 <= _age(state, now) <= 1200:
+                stale[zone] = f"Zone {zone} VWC is unavailable or stale"
+        return stale
+
+    async def activate(self, expected_revision, now=None):
+        now = now or _now()
+        async with self._lock:
+            if expected_revision != self.document["revision"]:
+                raise ValueError("Strategy revision changed; reload before activating")
+            if self.document["status"] != "draft":
+                raise ValueError("Only a saved draft can be armed")
+            preview = self.preview()
+            stale = self._readiness(now, [row["zone_id"] for row in preview["zones"]])
+            if stale:  # arming needs every zone's moisture reading
+                raise ValueError("; ".join(stale.values()))
+            if any(row["errors"] for row in preview["zones"]):
+                raise ValueError(
+                    "Resolve hydraulic configuration errors before activation"
+                )
+            # An unreadable lights_on_hour refuses to arm.
+            first = self._next_boundary(now)
+            prior = copy.deepcopy(self.document)
+            self.document.update(
+                status="armed",
+                error=None,
+                release_legacy=False,
+                armed_at=now.isoformat(),
+                armed_after=first.isoformat(),  # what a version before armed_at reads
+            )
+            try:
+                await self._persist()
+            except Exception:
+                self.document = prior
+                raise
+            self._publish(now)
+            return self.response(now)
+
+    async def disarm(self, now=None):
+        now = now or _now()
+        async with self._lock:
+            prior = copy.deepcopy(self.document)
+            if self.document["active"]["zones"] or self.document["status"] == "error":
+                self.document.update(status="disarming", error=None)
+                if not (
+                    self.document.get("disarm_at") or self.document.get("disarm_after")
+                ):
+                    self.document["disarm_at"] = now.isoformat()
+            else:
+                self.document.update(
+                    status="draft",
+                    armed_at=None,
+                    armed_after=None,
+                    disarm_at=None,
+                    disarm_after=None,
+                    error=None,
+                    release_legacy=True,
+                )
+            try:
+                await self._persist()
+            except Exception:
+                self.document = prior
+                raise
+            self._publish(now)
+            return self.response(now)
+
+    async def tick(self, now=None):
+        now = now or _now()
+        async with self._lock:
+            self.degraded_reason = self.degraded_kind = None
+            if self.document["status"] != "draft":
+                prior = copy.deepcopy(self.document)
+                try:
+                    await self._advance(now)
+                except _Hold as error:
+                    changed = (prior["status"], prior["error"]) != ("error", str(error))
+                    self.document = prior
+                    self.document.update(status="error", error=str(error))
+                    if changed:
+                        try:
+                            await self._persist()
+                        except Exception:  # held and published either way
+                            _LOGGER.exception("Could not store the strategy hold")
+                except Exception as error:
+                    # Recoverable: the plan keeps its last valid snapshot and tries again next tick.
+                    self.document = prior
+                    self.degraded_reason = str(error)
+                    self.degraded_kind = getattr(error, "kind", "other")
+                else:
+                    self.degraded_reason = self._held_reason()
+                    self.degraded_kind = "probe_stale" if self.degraded_reason else None
+            self._publish(now)
+
+    def _held_reason(self):
+        """Why some zones are still on an earlier day's targets, or None."""
+        held = [z for z in self.document["active"]["zones"] if z.get("held")]
+        return (
+            "; ".join(
+                f"{z['held']}: zone {z['zone_id']} stays on the targets of "
+                f"{z.get('applied_day') or 'an earlier day'} until it reads again"
+                for z in held
+            )
+            or None
+        )
+
+    async def _advance(self, now):
+        """Move the plan on to the latest lights-on, on whichever tick first sees it: a lights-on
+        missed while Home Assistant was down, or held by a stale heartbeat, is applied late rather
+        than holding the room all day. Raises _Hold for what only the operator can clear.
+        """
+        boundary = self._boundary(now)
+        day = boundary.date().isoformat()
+        # An explicit disarm wins over everything else, a stored error included.
+        if self.document.get("disarm_at") or self.document.get("disarm_after"):
+            if self._due("disarm", boundary):
+                self.document.update(
+                    status="draft",
+                    active={"grow_day": None, "zones": []},
+                    armed_at=None,
+                    armed_after=None,
+                    disarm_at=None,
+                    disarm_after=None,
+                    error=None,
+                    release_legacy=True,
+                )
+                await self._persist()
+            return
+        assigned = {zone["zone_id"] for zone in self.document["plan"].get("zones", [])}
+        if (
+            assigned != set(self.zone_ids())
+            or self._config().get("active", True) is False
+        ):
+            raise _Hold(
+                "Strategy zones do not match room setup; disarm and reconcile the draft"
+            )
+        # An error/reload must never invent an activation that was not explicitly armed and
+        # successfully stored by the user. A day already applied is never applied again, and a
+        # lights_on_hour moved later never takes the plan back a day.
+        if not self._due("armed", boundary):
+            return
+        applied = self.document["active"].get("grow_day") or ""
+        if applied > day:
+            return
+        if applied == day:
+            await self._release_held(now, day)
+            return
+        preview = self.preview(grow_day=day)
+        stale = self._readiness(now, [row["zone_id"] for row in preview["zones"]])
+        if any(row["errors"] for row in preview["zones"]):
+            raise _Waiting(
+                "hydraulics",
+                "Hydraulic preview failed; the day is applied once it passes",
+            )
+        # The day moves on for every zone whose moisture reads. A zone whose does not keeps the
+        # targets it had until it reads again, unless no zone reads or it has none to keep.
+        before = {row["zone_id"]: row for row in self.document["active"]["zones"]}
+        if stale and (
+            len(stale) == len(preview["zones"]) or any(z not in before for z in stale)
+        ):
+            raise _Waiting("probe_stale", "; ".join(stale.values()))
+        zones = [
+            (
+                {
+                    **before[row["zone_id"]],
+                    "applied_day": before[row["zone_id"]].get("applied_day") or applied,
+                    "held": stale[row["zone_id"]],
+                }
+                if row["zone_id"] in stale
+                else {**row, "applied_day": day}
+            )
+            for row in preview["zones"]
+        ]
+        self.document.update(
+            status="active",
+            active={"grow_day": day, "zones": zones},
+            error=None,
+        )
+        await self._persist()
+
+    async def _release_held(self, now, day):
+        """Apply `day` to each zone kept on an earlier day's targets whose moisture reads again."""
+        rows = self.document["active"]["zones"]
+        waiting = [row["zone_id"] for row in rows if row.get("held")]
+        if not waiting:
+            return
+        stale = self._readiness(now, waiting)
+        ready = {z for z in waiting if z not in stale}
+        if not ready:
+            return
+        preview = {row["zone_id"]: row for row in self.preview(grow_day=day)["zones"]}
+        if any(preview[z]["errors"] for z in ready):
+            raise _Waiting(
+                "hydraulics",
+                "Hydraulic preview failed; the day is applied once it passes",
+            )
+        self.document["active"] = {
+            "grow_day": day,
+            "zones": [
+                (
+                    {**preview[row["zone_id"]], "applied_day": day}
+                    if row["zone_id"] in ready
+                    else row
+                )
+                for row in rows
+            ],
+        }
+        await self._persist()
+
+    def _publish(self, now):
+        status = self.document["status"]
+        active = self.document["active"]
+        enabled = bool(active["zones"]) or status in ("active", "disarming", "error")
+        attributes = {
+            "friendly_name": "Grow strategy plan",
+            "room_id": self.room_id,
+            "snapshot_version": 1,
+            "revision": self.document["revision"],
+            "enabled": enabled,
+            "release_legacy": self.document.get("release_legacy", False),
+            "updated_at": now.isoformat(),
+            "valid_until": (now + timedelta(seconds=180)).isoformat(),
+            "grow_day": active["grow_day"],
+            "zones": copy.deepcopy(active["zones"]),
+            "managed_zone_ids": [
+                zone["zone_id"]
+                for zone in (self.document.get("plan") or {}).get("zones", [])
+            ],
+            "error": self.document["error"],
+            "degraded_reason": self.degraded_reason,
+            "degraded_kind": self.degraded_kind,
+            "status": status,
+        }
+        self.hass.states.async_set(self.entity_id, status, attributes)
+
+
+async def async_setup_strategy(hass, entry):
+    """Lifecycle hook called after number/select platforms are loaded."""
+    manager = await StrategyManager(hass, entry).async_init()
+    hass.data[DOMAIN].setdefault("_strategy", {})[entry.entry_id] = manager
+    from homeassistant.helpers.event import async_track_time_interval
+
+    async def local_tick(_utc_event_time):
+        # HA time-interval callbacks carry UTC. Photoperiod hours are HA-local.
+        await manager.tick()
+
+    manager._unsubscribe = async_track_time_interval(
+        hass, local_tick, timedelta(seconds=60)
+    )
+    from .strategy_api import async_setup_strategy_services
+
+    await async_setup_strategy_services(hass)
+
+
+async def async_unload_strategy(hass, entry):
+    manager = hass.data.get(DOMAIN, {}).get("_strategy", {}).pop(entry.entry_id, None)
+    if manager and manager._unsubscribe:
+        manager._unsubscribe()
+    if not hass.data.get(DOMAIN, {}).get("_strategy"):
+        from .strategy_api import async_unload_strategy_services
+
+        await async_unload_strategy_services(hass)

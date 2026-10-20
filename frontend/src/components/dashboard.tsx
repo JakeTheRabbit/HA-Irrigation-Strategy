@@ -1,0 +1,568 @@
+import { useEffect, useState, type ReactNode } from "react";
+import { Activity, Droplets, Info, LoaderCircle } from "lucide-react";
+import {
+  CartesianGrid,
+  ComposedChart,
+  Line,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import type { Change, Controller, LogEvent, Series, Zone } from "@/lib/types";
+import { errorText } from "@/lib/utils";
+import { coreWaterValue, waterParameters } from "@/lib/water-delivery";
+import type { Page } from "@/lib/routes";
+import { plantAmount } from "@/lib/water-view";
+import { Notice, UiTip } from "@/components/info-tip";
+import { Pill, type PillTone } from "./mini-visuals";
+
+export type { Page };
+export const number = (value: number | null, digits = 1) =>
+  value === null || !Number.isFinite(value)
+    ? "Unavailable"
+    : value.toLocaleString(undefined, { maximumFractionDigits: digits });
+export const time = (value?: string | number | null) =>
+  typeof value === "string" && /^\d{1,2}:\d{2}(:\d{2})?$/.test(value)
+    ? value
+    : !value || !Number.isFinite(new Date(value).getTime())
+      ? "Not reported"
+      : new Date(value).toLocaleTimeString([], {
+          hour: "2-digit",
+          minute: "2-digit",
+        });
+export function Heading({
+  title,
+  description,
+  action,
+}: {
+  title: string;
+  /** Only a behaviour the operator could get wrong; never a restatement of the title. */
+  description?: string;
+  action?: ReactNode;
+}) {
+  return (
+    <div className="page-heading">
+      <div>
+        <h1>{title}</h1>
+        {description && <p>{description}</p>}
+      </div>
+      {action}
+    </div>
+  );
+}
+export function Empty({
+  title,
+  detail,
+  action,
+  tip,
+}: {
+  title: string;
+  detail: string;
+  action?: ReactNode;
+  /** An "About" button beside the title. */
+  tip?: ReactNode;
+}) {
+  return (
+    <div className="empty-state">
+      <Info size={24} />
+      <h3>
+        {title}
+        {tip && <> {tip}</>}
+      </h3>
+      <p>{detail}</p>
+      {action}
+    </div>
+  );
+}
+/** On is a green pill, paused an amber one, anything else grey. */
+export function Status({ enabled, label }: { enabled?: boolean | null; label?: string }) {
+  return (
+    <Pill dot tone={enabled === true ? "on" : enabled === false ? "warn" : "unknown"}>
+      {label || (enabled === true ? "Enabled" : enabled === false ? "Paused" : "Unavailable")}
+    </Pill>
+  );
+}
+/** Each kind of controller record, as the words and colour of its pill. */
+const EVENT_TYPES: Record<LogEvent["type"], { label: string; tone: PillTone }> = {
+  water: { label: "Water", tone: "water" },
+  phase: { label: "Phase", tone: "phase" },
+  warning: { label: "Warning", tone: "warn" },
+  info: { label: "Info", tone: "neutral" },
+};
+export function EventType({ type }: { type: LogEvent["type"] }) {
+  return (
+    <Pill tone={EVENT_TYPES[type].tone} data-event-type={type}>
+      {EVENT_TYPES[type].label}
+    </Pill>
+  );
+}
+/** The zone's daily water limit as the controller enforces it: the configured value inside its
+ * safety bounds. */
+export const dailyLimit = (controller: Controller, zoneId: number) =>
+  coreWaterValue("max_daily_volume", waterParameters(controller, zoneId).max_daily_volume).value;
+const HISTORY_RANGES = [
+  { hours: 6, label: "Last 6 hours" },
+  { hours: 24, label: "Last 24 hours" },
+  { hours: 72, label: "Last 3 days" },
+];
+export function HistoryChart({
+  controller,
+  zones,
+  ranges,
+  title = "Moisture & EC history",
+}: {
+  controller: Controller;
+  zones: Zone[];
+  /** A few ranges as a toggle, the first chosen; without, the 6 h to 3 day choice. */
+  ranges?: { hours: number; label: string }[];
+  title?: string;
+}) {
+  const [hours, setHours] = useState(ranges?.[0].hours ?? 24);
+  const [data, setData] = useState<Series[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [hiddenZones, setHiddenZones] = useState<number[]>([]);
+  const [retry, setRetry] = useState(0);
+  const ids = [
+    ...new Set(
+      zones
+        .flatMap((zone) => [zone.vwc.entityId, zone.ec.entityId])
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const key = ids.join("|");
+  useEffect(() => setHiddenZones([]), [controller.roomId]);
+  useEffect(() => {
+    let current = true;
+    setLoading(true);
+    setError("");
+    setData([]);
+    if (!key) {
+      setLoading(false);
+      return;
+    }
+    controller
+      .history(key.split("|"), hours)
+      .then((result) => {
+        if (current) setData(result);
+      })
+      .catch((error) => {
+        if (current) setError(errorText(error));
+      })
+      .finally(() => {
+        if (current) setLoading(false);
+      });
+    return () => {
+      current = false;
+    };
+  }, [controller.roomId, controller.connection, key, hours, retry]);
+  const palette = ["#03a9f4", "#e5a43b", "#a57bf3", "#e97d98", "#43bdab"];
+  const visibleZones = zones.filter((zone) => !hiddenZones.includes(zone.id));
+  const lines = visibleZones.flatMap((zone) =>
+    (["vwc", "ec"] as const).map((kind) => {
+      const entityId = zone[kind].entityId;
+      const points = (data.find((series) => series.entityId === entityId)?.points || [])
+        .filter((point) => Number.isFinite(point.value) && Number.isFinite(Date.parse(point.time)))
+        .map((point) => ({ timestamp: Date.parse(point.time), value: point.value }))
+        .sort((a, b) => a.timestamp - b.timestamp);
+      return {
+        zone,
+        kind,
+        entityId,
+        points,
+        color: palette[zones.findIndex((z) => z.id === zone.id) % palette.length],
+      };
+    }),
+  );
+  const recordedLines = lines.filter((line) => line.points.length);
+  const times = [
+    ...new Set(recordedLines.flatMap((line) => line.points.map((point) => point.timestamp))),
+  ].sort((a, b) => a - b);
+  const missing = lines
+    .filter((line) => !line.points.length)
+    .map((line) => `${line.zone.name} ${line.kind.toUpperCase()}`);
+  return (
+    <section className="panel chart-panel">
+      <div className="panel-heading">
+        <div>
+          <h2>{title}</h2>
+          <p>Water content and root-zone conductivity, as Home Assistant recorded them</p>
+        </div>
+        {ranges ? (
+          <span className="label-with-tip">
+            <div className="history-toggle" role="group" aria-label="History range">
+              {ranges.map((range) => (
+                <button
+                  type="button"
+                  key={range.hours}
+                  aria-pressed={hours === range.hours}
+                  onClick={() => setHours(range.hours)}
+                >
+                  {range.label}
+                </button>
+              ))}
+            </div>
+            <UiTip copyKey="history range" />
+          </span>
+        ) : (
+          <span className="label-with-tip">
+            <label className="sr-only" htmlFor="history-range">
+              History range
+            </label>
+            <select
+              id="history-range"
+              value={hours}
+              onChange={(event) => setHours(Number(event.target.value))}
+            >
+              {HISTORY_RANGES.map((range) => (
+                <option key={range.hours} value={range.hours}>
+                  {range.label}
+                </option>
+              ))}
+            </select>
+            <UiTip copyKey="history range" />
+          </span>
+        )}
+      </div>
+      {zones.length > 1 && (
+        <div className="history-controls">
+          <div className="history-zone-options" aria-label="Zones on the chart">
+            {zones.map((zone, index) => (
+              <button
+                key={zone.id}
+                aria-pressed={!hiddenZones.includes(zone.id)}
+                onClick={() =>
+                  setHiddenZones((current) =>
+                    current.includes(zone.id)
+                      ? current.filter((id) => id !== zone.id)
+                      : [...current, zone.id],
+                  )
+                }
+              >
+                <i style={{ background: palette[index % palette.length] }} />
+                {zone.name}
+              </button>
+            ))}
+          </div>
+          <span className="history-selection">
+            {visibleZones.length} of {zones.length} zones shown
+          </span>
+        </div>
+      )}
+      <div className="history-axis-key">
+        <span>
+          <i />
+          VWC · left axis (%)
+        </span>
+        <span>
+          <i className="dashed" />
+          EC · right axis (mS/cm)
+        </span>
+      </div>
+      {loading ? (
+        <div className="chart-placeholder" role="status">
+          <LoaderCircle className="spin" />
+          Loading recorded history…
+        </div>
+      ) : error ? (
+        <Empty
+          title="History did not load"
+          tip={<UiTip copyKey="history could not load" />}
+          detail={error}
+          action={
+            <Button variant="outline" onClick={() => setRetry((value) => value + 1)}>
+              Retry history
+            </Button>
+          }
+        />
+      ) : !visibleZones.length ? (
+        <Empty
+          title="Select a zone to compare"
+          tip={<UiTip copyKey="choose a zone to compare" />}
+          detail="Select one or more zones above to show their recorded moisture and EC."
+          action={
+            <Button variant="outline" onClick={() => setHiddenZones([])}>
+              Show all zones
+            </Button>
+          }
+        />
+      ) : !recordedLines.length ? (
+        <Empty
+          title="No recorded VWC or EC"
+          detail="History appears when Home Assistant records the selected sensors. Missing measurements are not replaced with sample values."
+        />
+      ) : (
+        <>
+          <div
+            className="chart-wrap combined-chart"
+            role="img"
+            aria-label={`VWC and EC history chart. Recorded VWC on the left axis in %, and EC on the right axis in mS/cm, for ${visibleZones.map((zone) => zone.name).join(", ")} over ${hours} hours.`}
+          >
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart
+                data={times.map((timestamp) => ({ timestamp }))}
+                margin={{ top: 12, right: 3, bottom: 8, left: 3 }}
+              >
+                <CartesianGrid strokeDasharray="3 5" vertical={false} stroke="var(--border)" />
+                <XAxis
+                  dataKey="timestamp"
+                  type="number"
+                  scale="time"
+                  domain={["dataMin", "dataMax"]}
+                  tickFormatter={(value) =>
+                    hours <= 24
+                      ? time(value)
+                      : hours <= 72
+                        ? `${new Date(value).toLocaleDateString([], { weekday: "short" })} ${time(value)}`
+                        : new Date(value).toLocaleDateString([], {
+                            weekday: "short",
+                            day: "numeric",
+                          })
+                  }
+                  minTickGap={65}
+                  tickLine={false}
+                  axisLine={false}
+                  stroke="var(--muted-foreground)"
+                />
+                <YAxis
+                  yAxisId="vwc"
+                  orientation="left"
+                  unit="%"
+                  domain={[0, 100]}
+                  width={44}
+                  tickCount={5}
+                  tickLine={false}
+                  axisLine={false}
+                  stroke="var(--muted-foreground)"
+                />
+                <YAxis
+                  yAxisId="ec"
+                  orientation="right"
+                  domain={[0, "auto"]}
+                  width={38}
+                  tickCount={5}
+                  tickFormatter={(value) => number(Number(value), 1)}
+                  tickLine={false}
+                  axisLine={false}
+                  stroke="var(--muted-foreground)"
+                />
+                <Tooltip
+                  labelFormatter={(value) => new Date(Number(value)).toLocaleString()}
+                  contentStyle={{
+                    background: "var(--surface)",
+                    color: "var(--foreground)",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                  }}
+                  formatter={(value, name, item) => [
+                    `${Number(value).toFixed(item.unit === "%" ? 1 : 2)} `,
+                    name,
+                  ]}
+                />
+                {recordedLines.map((line) => (
+                  <Line
+                    key={`${line.zone.id}-${line.kind}`}
+                    data={line.points}
+                    dataKey="value"
+                    name={`${line.zone.name} · ${line.kind.toUpperCase()}`}
+                    unit={line.kind === "vwc" ? "%" : "mS/cm"}
+                    yAxisId={line.kind}
+                    type="linear"
+                    stroke={line.color}
+                    strokeWidth={line.kind === "vwc" ? 2.2 : 1.8}
+                    strokeDasharray={line.kind === "ec" ? "5 4" : undefined}
+                    connectNulls={false}
+                    dot={line.points.length === 1 ? { r: 3 } : false}
+                    activeDot={{ r: 4 }}
+                    isAnimationActive={false}
+                  />
+                ))}
+              </ComposedChart>
+            </ResponsiveContainer>
+          </div>
+          {!!missing.length && (
+            <p className="history-missing" role="status">
+              No recorded samples: {missing.join(", ")}.
+            </p>
+          )}
+          <p className="history-caption">
+            {controller.demo ? "Demo history · " : "Home Assistant history · "}Solid lines: VWC.
+            Dashed lines: EC. Each axis has its own scale.
+          </p>
+        </>
+      )}
+    </section>
+  );
+}
+
+export function PlantAmount({ ml }: { ml: number }) {
+  const { value, unit, digits } = plantAmount(ml);
+  return (
+    <>
+      {number(value, digits)}
+      <span className="unit"> {unit}</span>
+    </>
+  );
+}
+
+export interface ReviewItem {
+  change: Change;
+  label: string;
+  before: string;
+  after: string;
+}
+export function ReviewDialog({
+  open,
+  onOpenChange,
+  controller,
+  items,
+  onApplied,
+  title = "Review changes",
+  note,
+  warning,
+  caution,
+  run,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  controller: Controller;
+  items: ReviewItem[];
+  onApplied?: (applied: string[]) => void;
+  title?: string;
+  note?: string;
+  /** A "WARNING: ..." line (a risk to a person), shown before the values, styled as in an About tip. */
+  warning?: string | null;
+  /** A "CAUTION: ..." line (a risk to the plants or the equipment), shown after any warning. */
+  caution?: string | null;
+  /** Applies the reviewed change some other way than writing its values (an AI overlay's Keep or
+   * Undo); it throws when Home Assistant refuses. */
+  run?: () => Promise<void>;
+}) {
+  const [busy, setBusy] = useState(false);
+  const [errors, setErrors] = useState<string[]>([]);
+  useEffect(() => {
+    if (open) setErrors([]);
+  }, [open]);
+  async function apply() {
+    setBusy(true);
+    setErrors([]);
+    try {
+      if (run) {
+        await run();
+        onApplied?.(items.map((item) => item.change.entityId));
+        onOpenChange(false);
+        return;
+      }
+      const result = await controller.write(items.map((item) => item.change));
+      onApplied?.(result.applied);
+      if (result.failed.length)
+        setErrors(
+          result.failed.map(
+            (f) =>
+              `${items.find((i) => i.change.entityId === f.entityId)?.label || f.entityId}: ${f.reason}`,
+          ),
+        );
+      else onOpenChange(false);
+    } catch (error) {
+      setErrors([errorText(error)]);
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <Dialog
+      open={open}
+      onOpenChange={(v) => {
+        if (!busy) onOpenChange(v);
+      }}
+    >
+      <DialogContent className="review-dialog">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+          <DialogDescription>
+            {controller.demo ? "Demo only. " : ""}These changes affect {controller.room.room.name}{" "}
+            only. Confirm each value before applying.
+          </DialogDescription>
+        </DialogHeader>
+        {warning && <Notice kind="warning" text={warning} />}
+        {caution && <Notice kind="caution" text={caution} />}
+        <div className="review-list">
+          {items.map((item) => (
+            <div className="review-row" key={item.change.entityId}>
+              <strong>{item.label}</strong>
+              <span>
+                {item.before} <span aria-hidden="true">→</span> <b>{item.after}</b>
+              </span>
+            </div>
+          ))}
+        </div>
+        {note && <p className="notice-inline">{note}</p>}
+        {errors.length > 0 && (
+          <div role="alert" className="form-error">
+            <strong>Some changes were not applied.</strong>
+            {errors.map((error) => (
+              <p key={error}>{error}</p>
+            ))}
+            <p>Successful changes were saved. Failed changes remain available for review.</p>
+          </div>
+        )}
+        <DialogFooter>
+          <Button variant="outline" disabled={busy} onClick={() => onOpenChange(false)}>
+            Back to editing
+          </Button>
+          <Button
+            disabled={
+              busy ||
+              !items.length ||
+              controller.connection === "offline" ||
+              controller.connection === "connecting"
+            }
+            onClick={apply}
+          >
+            {busy && <LoaderCircle className="spin" size={16} />}
+            {busy
+              ? "Applying & verifying…"
+              : `Apply ${items.length} ${items.length === 1 ? "change" : "changes"}`}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+export function EventList({ events }: { events: Controller["room"]["events"] }) {
+  return events.length ? (
+    <div className="event-list">
+      {events.map((event) => (
+        <div className="event-row" key={event.id}>
+          <span className={`event-icon event-${event.type}`}>
+            {event.type === "water" ? <Droplets size={16} /> : <Activity size={16} />}
+          </span>
+          <div>
+            <p>{event.message}</p>
+            <span className="event-meta">
+              <EventType type={event.type} />
+              {event.zoneId !== undefined ? `Zone ${event.zoneId}` : "Room"}
+            </span>
+          </div>
+          <time dateTime={event.timestamp}>{time(event.timestamp)}</time>
+        </div>
+      ))}
+    </div>
+  ) : (
+    <Empty
+      title="No recorded activity"
+      detail="Controller events will appear here when they are available. An empty log does not mean no irrigation occurred."
+    />
+  );
+}

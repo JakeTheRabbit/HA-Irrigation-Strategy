@@ -1,6 +1,19 @@
-name: Publish verified academy website
+name: Deploy demo to GitHub Pages
+
+# Publishes the compiled, self-contained demo workspace in www/ to GitHub Pages.
+# The dashboards auto-enter demo mode (baked-in mock data) when served from *.github.io,
+# so dashboard.html runs standalone with no Home Assistant or credentials.
+# Demo: https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'www/**'
+      - 'frontend/**'
+      - 'scripts/build_course.py'
+      - 'scripts/install_course_media.py'
+      - '.github/workflows/pages.yml'
   workflow_dispatch:
 
 permissions:
@@ -23,9 +36,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Verify knowledge and practice logic
-        run: node --test tests/academy.test.mjs
-      - name: Install verified course media and check text bindings
+      - name: Build current workspace
+        run: |
+          npm ci --prefix frontend
+          npm run build --prefix frontend
+      - name: Build and verify academy catalogue
+        run: |
+          python scripts/build_course.py
+          node --test tests/academy.test.mjs
+      - name: Install pinned academy narration and video
         run: |
           python scripts/install_course_media.py
           python scripts/build_course.py --verify-media

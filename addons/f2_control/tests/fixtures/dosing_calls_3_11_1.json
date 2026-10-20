@@ -1,0 +1,205 @@
+{
+ "_about": "What the 3.11.1 dosing runner (v3.11.1, 12c6d1a; dosing_runner.py unchanged up to this fixture) sent and read for one dose, one dose that ran past its time and one whole batch, on a switch fill valve, a light relay mix pump and an input_boolean mix valve, driven by test_dosing_units_and_actuators._everything on the in-memory Home Assistant. Recorded by running that code, not written by hand.",
+ "calls": [
+  [
+   "number",
+   "set_value",
+   {
+    "entity_id": "number.balance_volume",
+    "value": 50
+   }
+  ],
+  [
+   "button",
+   "press",
+   {
+    "entity_id": "button.balance_start"
+   }
+  ],
+  [
+   "number",
+   "set_value",
+   {
+    "entity_id": "number.balance_volume",
+    "value": 25.0
+   }
+  ],
+  [
+   "number",
+   "set_value",
+   {
+    "entity_id": "number.balance_volume",
+    "value": 120
+   }
+  ],
+  [
+   "button",
+   "press",
+   {
+    "entity_id": "button.balance_start"
+   }
+  ],
+  [
+   "switch",
+   "turn_off",
+   {
+    "entity_id": "switch.balance_power"
+   }
+  ],
+  [
+   "number",
+   "set_value",
+   {
+    "entity_id": "number.balance_volume",
+    "value": 25.0
+   }
+  ],
+  [
+   "input_boolean",
+   "turn_on",
+   {
+    "entity_id": "input_boolean.tank_hold"
+   }
+  ],
+  [
+   "switch",
+   "turn_off",
+   {
+    "entity_id": "switch.row1"
+   }
+  ],
+  [
+   "switch",
+   "turn_off",
+   {
+    "entity_id": "switch.main_line"
+   }
+  ],
+  [
+   "switch",
+   "turn_off",
+   {
+    "entity_id": "switch.main_pump"
+   }
+  ],
+  [
+   "switch",
+   "turn_off",
+   {
+    "entity_id": "switch.room_b_feed"
+   }
+  ],
+  [
+   "switch",
+   "turn_on",
+   {
+    "entity_id": "switch.tank_fill"
+   }
+  ],
+  [
+   "switch",
+   "turn_off",
+   {
+    "entity_id": "switch.tank_fill"
+   }
+  ],
+  [
+   "input_boolean",
+   "turn_on",
+   {
+    "entity_id": "input_boolean.mix_valve"
+   }
+  ],
+  [
+   "light",
+   "turn_on",
+   {
+    "entity_id": "light.tank_mixer"
+   }
+  ],
+  [
+   "number",
+   "set_value",
+   {
+    "entity_id": "number.balance_volume",
+    "value": 300
+   }
+  ],
+  [
+   "button",
+   "press",
+   {
+    "entity_id": "button.balance_start"
+   }
+  ],
+  [
+   "number",
+   "set_value",
+   {
+    "entity_id": "number.balance_volume",
+    "value": 25.0
+   }
+  ],
+  [
+   "input_number",
+   "set_value",
+   {
+    "entity_id": "input_number.bloom_volume",
+    "value": 150.0
+   }
+  ],
+  [
+   "script",
+   "turn_on",
+   {
+    "entity_id": "script.bloom_start"
+   }
+  ],
+  [
+   "light",
+   "turn_off",
+   {
+    "entity_id": "light.tank_mixer"
+   }
+  ],
+  [
+   "input_boolean",
+   "turn_off",
+   {
+    "entity_id": "input_boolean.mix_valve"
+   }
+  ],
+  [
+   "input_datetime",
+   "set_datetime",
+   {
+    "entity_id": "input_datetime.tank_filled",
+    "timestamp": 1790557796.0
+   }
+  ],
+  [
+   "input_boolean",
+   "turn_off",
+   {
+    "entity_id": "input_boolean.tank_hold"
+   }
+  ]
+ ],
+ "reads": [
+  "switch.balance_power",
+  "switch.balance_power",
+  "switch.balance_power",
+  "input_boolean.tank_hold",
+  "input_boolean.tank_hold",
+  "switch.room_b_feed",
+  "switch.tank_fill",
+  "switch.tank_fill",
+  "input_boolean.mix_valve",
+  "light.tank_mixer",
+  "switch.balance_power",
+  "switch.bloom_power",
+  "light.tank_mixer",
+  "input_boolean.mix_valve",
+  "input_boolean.tank_hold"
+ ]
+}

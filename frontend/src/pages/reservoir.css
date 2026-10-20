@@ -1,0 +1,32 @@
+/* Equipment › Tank & feed: what the reservoir minimum is doing, and the batch on the tank. */
+.reservoir-guard .panel-heading {
+  flex-wrap: wrap;
+}
+.reservoir-guard-body {
+  display: grid;
+  gap: 12px;
+  padding: 0 20px 18px;
+  font-size: var(--text-sm);
+}
+.reservoir-guard-state,
+.reservoir-guard-batch {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+}
+.reservoir-guard-state a {
+  font-size: 12px;
+}
+.reservoir-guard-facts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px 20px;
+}
+.reservoir-guard-facts dt {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.reservoir-guard-facts dd {
+  font-weight: 550;
+}

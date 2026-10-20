@@ -1,0 +1,481 @@
+/* The grow day as a phase reference chart: a light band on top, phase columns with P0-P3 badges,
+   field capacity in red with the steering's runoff zone (green vegetative, purple generative), VWC in
+   blue with its shots as dots, pore EC in the steering's colour. Every text is at least 12 px. */
+.day-timeline {
+  --gd-veg: #16a34a;
+  --gd-gen: #9146b4;
+  --gd-veg-text: #11743a;
+  --gd-gen-text: #7a3799;
+  --gd-day: #f5d443;
+  --gd-night: #34405a;
+  --gd-ink: #1f2430;
+  --gd-on-ink: #ffffff;
+  --gd-red: #c62828;
+  --gd-band: color-mix(in srgb, var(--primary) 12%, transparent);
+}
+.dark .day-timeline {
+  --gd-veg: #4ade80;
+  --gd-gen: #c58af0;
+  --gd-veg-text: #6ee7a0;
+  --gd-gen-text: #d6a8f5;
+  --gd-day: #d9b52f;
+  --gd-night: #2b3754;
+  --gd-ink: #e6e6e6;
+  --gd-on-ink: #161616;
+  --gd-red: #f07b72;
+  --gd-band: color-mix(in srgb, var(--primary) 16%, transparent);
+}
+.day-timeline .timeline-heading-side {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px 10px;
+}
+.day-timeline .timeline-compare {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.day-timeline .timeline-heading-side select {
+  height: 26px;
+  padding: 0 28px 0 8px;
+  font-size: 12px;
+}
+.day-timeline .timeline-age {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  white-space: nowrap;
+}
+.day-timeline .timeline-age[data-age="amber"] {
+  color: var(--warning);
+  font-weight: 600;
+}
+.day-timeline .timeline-age[data-age="red"] {
+  color: var(--destructive);
+  font-weight: 600;
+}
+.day-timeline .timeline-body {
+  padding: 0 20px 12px;
+}
+
+.day-timeline .grow-chart {
+  position: relative;
+  margin-top: 4px;
+}
+.day-timeline .grow-svg {
+  display: block;
+  overflow: visible;
+  font-family: inherit;
+  touch-action: manipulation;
+  user-select: none;
+}
+.day-timeline .grow-tip {
+  position: absolute;
+  z-index: 2;
+  max-width: min(280px, 90%);
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 14%);
+  font-size: 12px;
+  line-height: 1.45;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+}
+.day-timeline .grow-tip[hidden] {
+  display: none;
+}
+/* The reading under the chart: one wrapped line, the same height whether or not it reads. */
+.day-timeline .grow-readout {
+  min-height: calc(2 * 1.45em + 12px);
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+.day-timeline .grow-readout strong {
+  font-weight: 600;
+}
+.day-timeline .grow-readout[data-empty] {
+  color: var(--muted-foreground);
+}
+/* Where the reading is taken: a bar up the plot, a dot on each line it crosses. */
+.day-timeline .grow-cursor {
+  pointer-events: none;
+}
+.day-timeline .cursor-bar {
+  stroke: var(--foreground);
+  stroke-opacity: 0.55;
+  stroke-width: 1;
+}
+.day-timeline .cursor-dot {
+  fill: var(--surface);
+  stroke: var(--primary);
+  stroke-width: 1.8;
+}
+.day-timeline .cursor-dot[data-series="ec"] {
+  stroke: var(--muted-foreground);
+}
+.day-timeline .cursor-dot[data-series="ec"][data-steering="vegetative"] {
+  stroke: var(--gd-veg);
+}
+.day-timeline .cursor-dot[data-series="ec"][data-steering="generative"] {
+  stroke: var(--gd-gen);
+}
+.day-timeline .cursor-dot[data-series="yesterday"] {
+  stroke: var(--muted-foreground);
+}
+
+/* The chart's marks. */
+.day-timeline .light-day {
+  stop-color: var(--gd-day);
+}
+.day-timeline .light-night {
+  stop-color: var(--gd-night);
+}
+.day-timeline .grid {
+  stroke: color-mix(in srgb, var(--border) 85%, transparent);
+  stroke-width: 1;
+}
+.day-timeline .axis-label,
+.day-timeline .axis-title,
+.day-timeline .ref-label,
+.day-timeline .badge-word {
+  font-size: 12px;
+  fill: var(--muted-foreground);
+}
+.day-timeline .axis-title {
+  font-weight: 600;
+}
+.day-timeline .ref-label {
+  paint-order: stroke;
+  stroke: var(--surface);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  font-weight: 600;
+}
+.day-timeline .ref-label.fc,
+.day-timeline .ref-label.rescue {
+  fill: var(--gd-red);
+}
+.day-timeline .runoff-zone {
+  fill: var(--gd-veg);
+  fill-opacity: 0.16;
+}
+.day-timeline [data-steering="generative"] .runoff-zone {
+  fill: var(--gd-gen);
+}
+.day-timeline .maintenance-band {
+  fill: var(--gd-band);
+}
+.day-timeline .maintenance-band.stopped {
+  fill-opacity: 0.45;
+}
+.day-timeline .typical-band {
+  fill: var(--muted-foreground);
+  fill-opacity: 0.2;
+}
+.day-timeline .phase-divider {
+  stroke: var(--muted-foreground);
+  stroke-opacity: 0.55;
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+.day-timeline .fc-line {
+  fill: none;
+  stroke: var(--gd-red);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 4;
+}
+.day-timeline .rescue-line {
+  fill: none;
+  stroke: var(--gd-red);
+  stroke-width: 1.3;
+  stroke-dasharray: 1.5 3;
+  stroke-linecap: round;
+}
+.day-timeline .yesterday-line {
+  fill: none;
+  stroke: var(--muted-foreground);
+  stroke-opacity: 0.75;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+.day-timeline .ec-line {
+  fill: none;
+  stroke: var(--muted-foreground);
+  stroke-width: 1.7;
+  stroke-linejoin: round;
+}
+.day-timeline .ec-line[data-steering="vegetative"],
+.day-timeline .ec-axis[data-steering="vegetative"] .ec-band {
+  stroke: var(--gd-veg);
+}
+.day-timeline .ec-line[data-steering="generative"],
+.day-timeline .ec-axis[data-steering="generative"] .ec-band {
+  stroke: var(--gd-gen);
+}
+.day-timeline .ec-band {
+  fill: var(--muted-foreground);
+  fill-opacity: 0.3;
+  stroke-width: 0;
+}
+.day-timeline .ec-axis[data-steering="vegetative"] .ec-band {
+  fill: var(--gd-veg);
+  fill-opacity: 0.55;
+}
+.day-timeline .ec-axis[data-steering="generative"] .ec-band {
+  fill: var(--gd-gen);
+  fill-opacity: 0.55;
+}
+.day-timeline .vwc-line {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.day-timeline .projection {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 1.6;
+  stroke-dasharray: 5 4;
+  stroke-linejoin: round;
+  opacity: 0.85;
+}
+.day-timeline .shot-dot {
+  fill: var(--gd-ink);
+  stroke: var(--surface);
+  stroke-width: 1;
+}
+.day-timeline .held-ring {
+  fill: var(--surface);
+  stroke: var(--gd-ink);
+  stroke-width: 1.6;
+}
+.day-timeline .expected-shot {
+  fill: var(--surface);
+  stroke: var(--muted-foreground);
+  stroke-width: 1.3;
+  stroke-dasharray: 2 1.5;
+}
+.day-timeline .expected-shot.emergency {
+  stroke: var(--gd-red);
+}
+.day-timeline .jev-mark {
+  fill: var(--surface);
+  stroke: var(--gd-ink);
+  stroke-width: 1.5;
+}
+.day-timeline .jev-mark[data-acted] {
+  fill: var(--gd-ink);
+}
+.day-timeline .now-line {
+  stroke: var(--foreground);
+  stroke-width: 1;
+  stroke-dasharray: 1 2.5;
+  opacity: 0.8;
+}
+.day-timeline .now-mark {
+  fill: var(--foreground);
+}
+.day-timeline .phase-badge circle {
+  fill: var(--gd-ink);
+}
+.day-timeline .phase-badge .badge-text {
+  font-size: 12px;
+  font-weight: 700;
+  fill: var(--gd-on-ink);
+}
+.day-timeline .phase-badge[data-future] circle {
+  fill: var(--surface);
+  stroke: var(--gd-ink);
+  stroke-width: 1.3;
+  stroke-dasharray: 2.5 2;
+}
+.day-timeline .phase-badge[data-future] .badge-text {
+  fill: var(--gd-ink);
+}
+
+/* One small key for every zone's chart, and today's events at the end of its line. */
+.day-timeline .grow-foot {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px 18px;
+  margin-top: 10px;
+}
+.day-timeline .grow-legend {
+  display: flex;
+  flex: 1 1 420px;
+  flex-wrap: wrap;
+  gap: 6px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.day-timeline .grow-legend li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+/* Each key entry switches its layer: off reads faded and struck through. */
+.day-timeline .grow-legend button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  margin: 0;
+  padding: 0 2px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.day-timeline .grow-legend button:hover {
+  color: var(--foreground);
+}
+.day-timeline .grow-legend button:focus-visible {
+  outline: 2px solid var(--ring, var(--primary));
+  outline-offset: 2px;
+}
+.day-timeline .grow-legend button[aria-pressed="false"] {
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+.day-timeline .grow-readout-choice {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+.day-timeline .grow-readout-choice select {
+  height: 26px;
+  padding: 0 28px 0 8px;
+  font-size: 12px;
+}
+.day-timeline .grow-legend i {
+  display: inline-block;
+  flex: none;
+  width: 16px;
+  height: 0;
+}
+/* Solid, then dashed: today, then what is expected. */
+.day-timeline .key-vwc {
+  width: 24px !important;
+  height: 2px !important;
+  background: linear-gradient(
+    90deg,
+    var(--primary) 0 11px,
+    transparent 11px 14px,
+    var(--primary) 14px 18px,
+    transparent 18px 20px,
+    var(--primary) 20px 24px
+  );
+}
+.day-timeline .key-ec {
+  border-top: 2px solid var(--gd-veg);
+}
+.day-timeline .key-ec[data-steering="generative"] {
+  border-top-color: var(--gd-gen);
+}
+.day-timeline .key-shot,
+.day-timeline .key-held {
+  width: 9px !important;
+  height: 9px !important;
+  border-radius: 50%;
+  background: var(--gd-ink);
+}
+.day-timeline .key-held {
+  margin-left: 4px;
+  background: var(--surface);
+  border: 1.6px solid var(--gd-ink);
+}
+.day-timeline .key-fc {
+  border-top: 2px dashed var(--gd-red);
+}
+.day-timeline .key-runoff {
+  height: 10px !important;
+  width: 12px !important;
+  margin-left: -4px;
+  border-radius: 2px;
+  background: color-mix(in srgb, var(--gd-veg) 30%, transparent);
+}
+.day-timeline .key-runoff[data-steering="generative"] {
+  background: color-mix(in srgb, var(--gd-gen) 30%, transparent);
+}
+.day-timeline .key-band {
+  height: 10px !important;
+  border-radius: 2px;
+  background: var(--gd-band);
+  border-top: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--primary) 40%, transparent);
+}
+.day-timeline .key-rescue {
+  border-top: 2px dotted var(--gd-red);
+}
+.day-timeline .key-jev {
+  width: 9px !important;
+  height: 9px !important;
+  background: var(--gd-ink);
+  transform: rotate(45deg);
+}
+.day-timeline .key-compare {
+  border-top: 2px solid color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+}
+
+.day-timeline .timeline-events {
+  flex: none;
+  margin-left: auto;
+  font-size: 13px;
+}
+.day-timeline .timeline-events[open] {
+  flex-basis: 100%;
+}
+.day-timeline .timeline-events summary {
+  cursor: pointer;
+  font-weight: 500;
+  min-height: 24px;
+}
+.day-timeline .timeline-events ol {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+}
+.day-timeline .timeline-events li,
+.day-timeline .timeline-events p {
+  overflow-wrap: anywhere;
+  line-height: 1.45;
+}
+@media (max-width: 720px) {
+  .day-timeline .timeline-body {
+    padding: 0 12px 14px;
+  }
+  .day-timeline .panel-heading {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .day-timeline .timeline-age {
+    white-space: normal;
+  }
+}
+/* Settings › Display › Day deltas: grey chips under the day chart, coloured only when far off. */
+.zone-day-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0 0;
+}

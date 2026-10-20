@@ -1,0 +1,810 @@
+"""In-place upgrade contract for the f2-control add-on (now multi-room aware).
+
+The add-on persists per-zone runtime state to /data/state.json (non-ephemeral). It is
+live-installed on many boxes, old and new, so a version bump MUST load an OLDER state
+file transparently in place: a missing file, missing keys, unknown extra keys, a bad
+timestamp, and zones not present in the file must all be tolerated — new fields fall
+back to fresh defaults, never an error, never a wipe.
+
+Stage 2 nests state by room slug ({"default": {"1": {...}}, "veg": {"1": {...}}}). An
+OLD single-room file is FLAT ({"1": {...}, "2": {...}}) and MUST still load transparently
+as the 'default' room. These tests lock both contracts so an upgrade can't wipe a live box.
+"""
+
+import json
+import sys
+import types
+from datetime import date, datetime
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+ADDON = ROOT / "addons" / "f2_control" / "f2_control"  # controller.py + vendored engine
+
+# controller.py imports `requests` (only present inside the add-on container). Stub it so
+# the module imports offline; we only exercise the pure state load/save logic here.
+if "requests" not in sys.modules:
+    _req = types.ModuleType("requests")
+    _req.Session = lambda: types.SimpleNamespace(get=None, post=None, headers={})
+    sys.modules["requests"] = _req
+
+if str(ADDON) not in sys.path:
+    sys.path.insert(0, str(ADDON))
+
+import controller as C  # noqa: E402  (after sys.path / stub setup)
+
+
+def _room(zones, slug="default", prefix=""):
+    """A minimal Room for the given zone numbers."""
+    z = {
+        int(k): {"vwc": f"sensor.x_{prefix}vwc_{k}", "ec": f"sensor.x_{prefix}ec_{k}"}
+        for k in zones
+    }
+    hw = {
+        "pump": "switch.p",
+        "mainline": "switch.m",
+        "valves": {int(k): f"switch.v{k}" for k in zones},
+    }
+    return C.Room(
+        slug, prefix, z, hw, "input_boolean.f2_control_enabled", "", "", 10.0, 22.0
+    )
+
+
+def _make(zones, state_path, rooms=None):
+    """A Controller with just the attributes _load_state/_save_state need — no __init__,
+    so no HA connection, signals, or option parsing."""
+    c = C.Controller.__new__(C.Controller)
+    c._state_path = str(state_path)
+    c.rooms = rooms if rooms is not None else [_room(zones)]
+    return c
+
+
+def test_dripper_settings_drive_flow_without_plant_count(tmp_path):
+    """The dripper flow rate + drippers/plant must drive shot length even if plant_count is
+    unset (0) — not silently fall back to the flow_lps option. Regression for "it ignored my
+    dripper flowrate and drippers per plant"."""
+    c = _make([1], tmp_path / "s.json")
+    c.flow_lps = 0.02  # the fallback that must NOT win
+    room = c.rooms[0]
+    c._zone_num = lambda room, zone, key, default: {
+        "plant_count": 0,
+        "drippers_per_plant": 2,
+    }.get(key, default)
+    c._num = lambda ent, default: 1.2 if "dripper_flow_rate" in ent else default
+    flow = c._zone_flow_lps(room, 1)
+    assert (
+        abs(flow - (1 * 2 * 1.2 / 3600.0)) < 1e-9
+    )  # plant_count defaults to 1 (it cancels)
+    assert flow != 0.02  # did NOT fall back to the option
+
+
+def test_missing_file_yields_fresh_state(tmp_path):
+    c = _make([1, 2, 3], tmp_path / "does_not_exist.json")
+    c._load_state()
+    st = c.rooms[0].state
+    assert set(st) == {1, 2, 3}
+    assert all(st[z]["phase"] == "P2" for z in st)  # fresh-zone default
+
+
+def test_corrupt_json_yields_fresh_state(tmp_path):
+    p = tmp_path / "state.json"
+    p.write_text("{ this is not valid json", encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()  # must not raise
+    assert c.rooms[0].state[1]["phase"] == "P2"
+
+
+def test_old_flat_partial_state_loads_as_default(tmp_path):
+    """An OLD flat file (top-level zone keys) loads as the default room, keeping known keys,
+    dropping unknown ones, and seeding absent zones fresh."""
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"1": {"phase": "P1", "peak": 55.0, "legacy_removed_field": 7}}),
+        encoding="utf-8",
+    )
+    c = _make([1, 2], p)
+    c._load_state()
+    st = c.rooms[0].state
+    assert st[1]["phase"] == "P1"  # known key restored
+    assert st[1]["peak"] == 55.0
+    assert "legacy_removed_field" not in st[1]  # unknown key ignored
+    assert "shots" in st[1]  # a key absent from the file -> fresh default present
+    assert st[2]["phase"] == "P2"  # a zone absent from the file -> seeded fresh
+
+
+def test_bad_timestamp_is_tolerated(tmp_path):
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"1": {"phase": "P3", "last_shot": "not-a-date"}}), encoding="utf-8"
+    )
+    c = _make([1], p)
+    c._load_state()  # must not raise
+    st = c.rooms[0].state
+    assert st[1]["phase"] == "P3"
+    assert st[1]["last_shot"] is None  # unparseable value rejected, default kept
+
+
+def test_save_then_load_roundtrip(tmp_path):
+    p = tmp_path / "state.json"
+    c = _make([1], p)
+    c._load_state()  # seed fresh (no file yet)
+    c.rooms[0].state[1].update(
+        {
+            "phase": "P1",
+            "peak": 61.0,
+            "shots": 3,
+            "last_shot": datetime(2026, 6, 27, 10, 5),
+            "last_daily_reset": date(2026, 6, 27),
+        }
+    )
+    c._save_state()
+    c2 = _make([1], p)
+    c2._load_state()
+    st = c2.rooms[0].state
+    assert st[1]["phase"] == "P1"
+    assert st[1]["peak"] == 61.0
+    assert st[1]["shots"] == 3
+    assert st[1]["last_shot"] == datetime(2026, 6, 27, 10, 5)
+    assert st[1]["last_daily_reset"] == date(2026, 6, 27)
+
+
+def test_pid_era_state_loads_and_drops_the_pid_terms(tmp_path):
+    """The EC PID is gone: a state file it wrote still loads, keeps the EC offset, and the
+    next save carries no ec_integral / ec_prev_err."""
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps(
+            {
+                "default": {
+                    "1": {
+                        "phase": "P2",
+                        "ec_offset": -1.5,
+                        "ec_integral": 0.4,
+                        "ec_prev_err": 0.2,
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+    c = _make([1], p)
+    c._load_state()
+    st = c.rooms[0].state[1]
+    assert st["phase"] == "P2" and st["ec_offset"] == -1.5
+    assert "ec_integral" not in st and "ec_prev_err" not in st
+    c._save_state()
+    saved = json.loads(p.read_text(encoding="utf-8"))["default"]["1"]
+    assert saved["ec_offset"] == -1.5
+    assert "ec_integral" not in saved and "ec_prev_err" not in saved
+
+
+# ----------------------------------------------------------------------- multi-room (Stage 2)
+
+
+def test_two_rooms_keep_independent_state(tmp_path):
+    """Default and a named room have overlapping zone numbers; their state must not clobber."""
+    p = tmp_path / "state.json"
+    rooms = [_room([1, 2], "default", ""), _room([1], "veg", "veg_")]
+    c = _make(None, p, rooms=rooms)
+    c._load_state()  # seed fresh
+    c.rooms[0].state[1]["phase"] = "P1"
+    c.rooms[1].state[1]["phase"] = "P3"
+    c._save_state()
+    # the file is nested by slug, with both rooms present
+    saved = json.loads(p.read_text(encoding="utf-8"))
+    assert set(saved) == {"default", "veg"}
+    assert saved["default"]["1"]["phase"] == "P1"
+    assert saved["veg"]["1"]["phase"] == "P3"
+    # reload into fresh rooms -> each keeps its own
+    c2 = _make(None, p, rooms=[_room([1, 2], "default", ""), _room([1], "veg", "veg_")])
+    c2._load_state()
+    assert c2.rooms[0].state[1]["phase"] == "P1"
+    assert c2.rooms[1].state[1]["phase"] == "P3"
+    assert c2.rooms[0].state[2]["phase"] == "P2"  # untouched default zone stays fresh
+
+
+def test_old_flat_file_loads_default_only_named_rooms_seed_fresh(tmp_path):
+    """Upgrading a live single-room box that now has a second room: the old flat file becomes
+    the default room's state; the new room seeds fresh (never errors)."""
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"1": {"phase": "P1", "peak": 60.0}}), encoding="utf-8")
+    c = _make(None, p, rooms=[_room([1], "default", ""), _room([1], "veg", "veg_")])
+    c._load_state()
+    assert c.rooms[0].state[1]["phase"] == "P1"  # old flat -> default room
+    assert c.rooms[0].state[1]["peak"] == 60.0
+    assert c.rooms[1].state[1]["phase"] == "P2"  # named room seeded fresh
+
+
+def test_nested_file_loads_per_room(tmp_path):
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"default": {"1": {"phase": "P3"}}, "veg": {"1": {"phase": "P1"}}}),
+        encoding="utf-8",
+    )
+    c = _make(None, p, rooms=[_room([1], "default", ""), _room([1], "veg", "veg_")])
+    c._load_state()
+    assert c.rooms[0].state[1]["phase"] == "P3"
+    assert c.rooms[1].state[1]["phase"] == "P1"
+
+
+# --------------------------------------------------------------------------- options compat
+# An old /data/options.json predates the feed_ec_sensor / feed_ph_sensor keys and may carry
+# the old facility-specific substrate_l / flow_lps numbers. Loading it must still work, must
+# NOT resurrect any site-specific default entity id, and an unset feed sensor must DISABLE that
+# half of the source-water gate (generic, zero-config-safe) rather than poll a dead entity.
+
+
+def _init(opts, monkeypatch):
+    """Full Controller() with load_options() stubbed to `opts` and no HA reachable (the
+    module-level requests stub makes every ha_get/ha_call a caught no-op). Returns the
+    default room and the controller."""
+    monkeypatch.setattr(C, "load_options", lambda: dict(opts))
+    c = C.Controller()
+    return c, c.rooms[0]
+
+
+def test_old_options_without_feed_keys_disables_gate(monkeypatch):
+    # an "old" file: no feed_* keys at all
+    c, room = _init({"num_zones": 2, "substrate_l": 6, "flow_lps": 0.067}, monkeypatch)
+    assert room.feed_ec_sensor == ""  # no fallback to one site's feed probe
+    assert room.feed_ph_sensor == ""
+    assert (
+        c._read_feed_ec(room) is None
+    )  # gate reader short-circuits, never polls an entity
+    assert c._read_feed_ph(room) is None
+
+
+def test_blank_or_whitespace_feed_sensor_is_disabled(monkeypatch):
+    c, room = _init({"feed_ec_sensor": "   ", "feed_ph_sensor": ""}, monkeypatch)
+    assert room.feed_ec_sensor == ""
+    assert room.feed_ph_sensor == ""
+    assert c._read_feed_ec(room) is None
+
+
+def test_feed_sensors_honored_when_explicitly_set(monkeypatch):
+    # any operator keeps its behavior by setting these explicitly
+    opts = {
+        "feed_ec_sensor": "sensor.tank_probe_1_ec",
+        "feed_ph_sensor": "sensor.my_ph",
+    }
+    c, room = _init(opts, monkeypatch)
+    assert room.feed_ec_sensor == "sensor.tank_probe_1_ec"
+    assert room.feed_ph_sensor == "sensor.my_ph"
+
+
+def test_substrate_flow_defaults_are_generic_not_one_sites(monkeypatch):
+    # empty options -> code fallbacks; must be generic placeholders, not one site's real numbers
+    c, room = _init({}, monkeypatch)
+    assert room.feed_ec_sensor == "" and room.feed_ph_sensor == ""
+    assert c.substrate_l == 5.0
+    assert c.flow_lps == 0.02  # NOT one site's real 0.04
+
+
+def test_default_room_is_unprefixed(monkeypatch):
+    """The default room must stay un-prefixed so a single-room install's entity ids are unchanged."""
+    c, room = _init({"num_zones": 1}, monkeypatch)
+    assert room.slug == "default" and room.prefix == ""
+    assert c._cs(room, "sensor", "vwc_zone_1") == "sensor.crop_steering_vwc_zone_1"
+    assert len(c.rooms) == 1  # no extra rooms discovered offline
+
+
+# ---------------------------------------------------------------------------
+# `last_shot_is_anchor` (added after 0.16.1): an OLD file has no such key and must still load.
+# ---------------------------------------------------------------------------
+def test_an_old_file_without_the_anchor_flag_loads_and_gets_a_sane_value(tmp_path):
+    """Old timestamps keep their existing meaning: zero counters or missing/expired history
+    cannot prove whether an unmarked timestamp was a switch-on or an actual irrigation.
+    """
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps(
+            {
+                "default": {
+                    # ambiguous old timestamp: could be switch-on or an older irrigation
+                    "1": {"phase": "P3", "shots": 0, "daily_vol": 0.0,
+                          "last_shot": "2026-09-21T18:19:37.355321",
+                          "water_history": [{"grow_day": "2026-09-21", "litres": 0.0}]},
+                    # a zone with a real irrigation history
+                    "2": {"phase": "P2", "shots": 0, "daily_vol": 0.0,
+                          "last_shot": "2026-09-20T21:40:00",
+                          "water_history": [{"grow_day": "2026-09-20", "litres": 3.5}]},
+                    # nothing at all
+                    "3": {"phase": "P2"},
+                }
+            }
+        ),
+        encoding="utf-8",
+    )  # fmt: skip
+    c = _make([1, 2, 3], p)
+    c._load_state()
+    st = c.rooms[0].state
+    assert st[1]["last_shot_is_anchor"] is False and st[1]["last_shot"] is not None
+    assert st[2]["last_shot_is_anchor"] is False and st[2]["last_shot"] is not None
+    assert st[3]["last_shot_is_anchor"] is False and st[3]["last_shot"] is None
+
+
+def test_the_anchor_flag_round_trips_and_junk_is_tolerated(tmp_path):
+    p = tmp_path / "state.json"
+    c = _make([1, 2], p)
+    c._load_state()
+    c.rooms[0].state[1].update(
+        last_shot=datetime(2026, 9, 21, 18, 19, 37), last_shot_is_anchor=True
+    )
+    c._save_state()
+    saved = json.loads(p.read_text(encoding="utf-8"))["default"]
+    assert (
+        saved["1"]["last_shot_is_anchor"] is True
+        and saved["2"]["last_shot_is_anchor"] is False
+    )
+    again = _make([1, 2], p)
+    again._load_state()
+    assert again.rooms[0].state[1]["last_shot_is_anchor"] is True
+    saved["1"]["last_shot_is_anchor"] = "yes please"  # hand-edited nonsense
+    p.write_text(json.dumps({"default": saved}), encoding="utf-8")
+    third = _make([1, 2], p)
+    third._load_state()
+    assert (
+        third.rooms[0].state[1]["last_shot_is_anchor"] is False
+    )  # invalid metadata cannot establish that an old timestamp was an anchor
+
+
+def test_a_learned_zone_saved_by_3_10_0_loads_without_the_retired_limit_keys(tmp_path):
+    """3.9.0 and 3.10.0 saved the 2-points-a-day limit's keys (day_ceiling, p1_entry,
+    stale_target) and the settled-reading keys (full_date, full_day, full_prev) in the learner
+    block. The limit is gone (6 Oct 2026): those keys are dropped on load, everything else the
+    learner had learned loads as it was."""
+    learned = {
+        "peak": 65.54,
+        "gain": 1.368,
+        "day": "2026-10-05",
+        "outcome": "reached",
+        "ramp": [{"pct": 2.0, "rise": 1.8, "settled": 47.9, "flat": False}],
+    }
+    retired = {
+        "day_ceiling": 50.0,
+        "p1_entry": 48.1,
+        "stale_target": False,
+        "full_date": "2026-10-05T10:00:00+13:00",
+        "full_day": 39.6,
+        "full_prev": None,
+    }
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"default": {"2": {"learn": {**learned, **retired}}}}),
+        encoding="utf-8",
+    )
+    c = _make([2], p)
+    c._load_state()
+    learn = c.rooms[0].state[2]["learn"]
+    assert {k: learn[k] for k in learned} == learned
+    assert not set(retired) & set(learn)
+
+
+def test_an_old_zone_loads_with_the_day_befores_peak_and_the_p1_rule_empty(tmp_path):
+    """Before 3.11.0 a zone kept no peak_prev (the grow-day before's highest reading, the next
+    P1 target) and no P1 rule state, and before the settled P1 rise no settled reading or
+    expected rise: it loads with them empty, its own peak as it was.
+    """
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"default": {"2": {"phase": "P3", "peak": 71.48, "shots": 7}}}),
+        encoding="utf-8",
+    )
+    c = _make([2], p)
+    c._load_state()
+    st = c.rooms[0].state[2]
+    assert (st["phase"], st["peak"], st["shots"]) == ("P3", 71.48, 7)
+    assert (
+        st["peak_prev"],
+        st["p1_reached"],
+        st["p1_peak_before"],
+        st["p1_extra"],
+        st["p1_settled_before"],
+        st["p1_expected_rise"],
+    ) == (
+        None,
+        False,
+        None,
+        0,
+        None,
+        None,
+    )
+
+
+def test_an_old_file_without_history_loads_with_it_empty(tmp_path):
+    """3.8.0 kept no plateau or night history: its file loads as it was, history empty."""
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"default": {"1": {"phase": "P2", "peak": 36.1, "shots": 9}}}),
+        encoding="utf-8",
+    )
+    c = _make([1], p)
+    c._load_state()
+    st = c.rooms[0].state[1]
+    assert (st["phase"], st["peak"], st["shots"]) == ("P2", 36.1, 9)
+    assert (st["plateau_hist"], st["night_hist"], st["night"]) == ([], [], None)
+
+
+def test_the_history_survives_a_restart_and_junk_in_it_is_dropped(tmp_path):
+    p = tmp_path / "state.json"
+    c = _make([1], p)
+    c._load_state()
+    plateau = {"date": "2026-10-01", "value": 36.0, "how": "P1 recovered", "shots": 6}
+    night = {
+        "off_at": "2026-10-01T22:00:00",
+        "off_vwc": 32.78,
+        "plateau": 36.0,
+        "day": "2026-10-01",
+        "on_at": None,
+        "on_vwc": None,
+        "on_shots": 0,
+        "shots": 0,
+        "end_at": None,
+        "end_vwc": None,
+    }
+    c.rooms[0].state[1].update(plateau_hist=[plateau, "junk"], night=night)
+    c._save_state()
+    c2 = _make([1], p)
+    c2._load_state()
+    st = c2.rooms[0].state[1]
+    assert st["plateau_hist"] == [plateau] and st["night_hist"] == []
+    assert st["night"] == night
+
+
+def test_a_3_11_1_state_file_loads_and_is_written_back_as_it_was(tmp_path):
+    """What controller 3.11.1 saved for a learned two-zone room mid-grow
+    (tests_ha/fixtures/state_3_11_1_learn_jev.json, recorded from that release): the learner with the
+    working peak the AI assistant held above the learned one (learn.peak_adj, learn.jev), the day before's peak, the
+    P1 rule's state and both histories load, and saving writes back every value 3.11.1 wrote except
+    the removed EC PID's two terms.
+    """
+    fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
+    seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": seed}), encoding="utf-8")
+    c = _make([1, 2], p)
+    c._load_state()
+    for zone in (1, 2):
+        st, old = c.rooms[0].state[zone], seed[str(zone)]
+        assert st["learn"]["peak_adj"] == old["learn"]["peak_adj"] == 1.0
+        assert st["learn"]["jev"] == old["learn"]["jev"]
+        assert st["peak_prev"] == old["peak_prev"]
+        assert st["plateau_hist"] == old["plateau_hist"]
+    c._save_state()
+    saved = json.loads(p.read_text(encoding="utf-8"))["default"]
+    pid = ("ec_integral", "ec_prev_err")
+    for zone in ("1", "2"):
+        kept = {k: v for k, v in seed[zone].items() if k not in pid}
+        assert {k: saved[zone][k] for k in kept} == kept
+        assert not any(k in saved[zone] for k in pid)
+
+
+def test_a_3_11_1_data_folder_gets_an_instance_id_once_and_keeps_it(tmp_path):
+    """No instance_id beside a 3.11.1 state.json: one uuid4 is made there, and a restart reads it back.
+    It is the duplicate-controller guard's identity; nothing else in the folder is touched.
+    """
+    (tmp_path / "state.json").write_text('{"1": {"phase": "P2"}}', encoding="utf-8")
+    path = tmp_path / "instance_id"
+    made = C._instance_id(str(path))
+    assert str(C.uuid.UUID(made)) == made and C.uuid.UUID(made).version == 4
+    assert path.read_text(encoding="utf-8").strip() == made
+    assert C._instance_id(str(path)) == made
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["instance_id", "state.json"]
+
+
+def test_a_corrupt_instance_id_is_replaced_and_an_unwritable_one_never_stops_the_start(
+    tmp_path,
+):
+    path = tmp_path / "instance_id"
+    path.write_text("not a uuid", encoding="utf-8")
+    made = C._instance_id(str(path))
+    assert path.read_text(encoding="utf-8").strip() == made != "not a uuid"
+    elsewhere = tmp_path / "missing-folder" / "instance_id"
+    assert C.uuid.UUID(C._instance_id(str(elsewhere))) and not elsewhere.exists()
+
+
+def test_an_old_zone_loads_unlatched_and_a_latch_survives_a_restart(tmp_path):
+    """Before the max-run latch a zone kept no run of cut shots: it loads with none, and is not
+    latched. A latched zone stays latched across a restart; a malformed latch is dropped.
+    """
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"default": {"1": {"phase": "P2", "peak": 60.0, "shots": 4}}}),
+        encoding="utf-8",
+    )
+    c = _make([1], p)
+    c._load_state()
+    st = c.rooms[0].state[1]
+    assert (st["shots"], st["capped_in_a_row"], st["max_run_latch"]) == (4, 0, None)
+
+    st["capped_in_a_row"] = 3
+    st["max_run_latch"] = {"since": "2026-10-15T10:00:00", "resets": 2}
+    assert c._save_state()
+    again = _make([1], p)
+    again._load_state()
+    st = again.rooms[0].state[1]
+    assert st["capped_in_a_row"] == 3
+    assert st["max_run_latch"] == {"since": "2026-10-15T10:00:00", "resets": 2}
+
+    for junk in ({"since": "x"}, {"resets": "2"}, "latched", 5):
+        p.write_text(
+            json.dumps(
+                {"default": {"1": {"max_run_latch": junk, "capped_in_a_row": -1}}}
+            ),
+            encoding="utf-8",
+        )
+        c = _make([1], p)
+        c._load_state()
+        st = c.rooms[0].state[1]
+        assert (st["capped_in_a_row"], st["max_run_latch"]) == (0, None), junk
+
+
+def test_vmax_series_absent_from_a_3_11_1_file_loads_empty(tmp_path):
+    """A 3.11.1 state file has no Vmax wet-up series: it loads as an empty one, with no advisory yet."""
+    fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
+    seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
+    assert "vmax_wetup" not in seed["1"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": seed}), encoding="utf-8")
+    c = _make([1, 2], p)
+    c._load_state()
+    assert c.rooms[0].state[1]["vmax_wetup"] == []
+    assert c.rooms[0]._vmax == {}
+
+
+def test_vmax_series_round_trips_and_its_advisory_survives_a_restart(tmp_path):
+    p = tmp_path / "state.json"
+    c = _make([1], p)
+    c._load_state()
+    c.rooms[0].state[1]["vmax_wetup"] = [50.0, 55.0, 60.0, 62.0, 62.3, 62.4]
+    c._save_state()
+    c2 = _make([1], p)
+    c2._load_state()
+    assert c2.rooms[0].state[1]["vmax_wetup"] == [50.0, 55.0, 60.0, 62.0, 62.3, 62.4]
+    assert c2.rooms[0]._vmax[1] == C.detect_vmax([50.0, 55.0, 60.0, 62.0, 62.3, 62.4])
+    assert c2.rooms[0]._vmax[1][0] is not None
+
+
+def test_vmax_series_stays_bounded_and_drops_bad_readings(tmp_path):
+    p = tmp_path / "state.json"
+    series = [40.0 + i * 0.1 for i in range(C.VMAX_SERIES_MAX + 25)]
+    saved = {"vmax_wetup": [None, "x", True, float("nan"), 140.0] + series}
+    p.write_text(json.dumps({"default": {"1": saved}}), encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()
+    assert c.rooms[0].state[1]["vmax_wetup"] == series[25:]
+
+
+# ---- plan adherence's record (_adherence): additive, field by field ----
+def test_a_file_without_plan_adherence_loads_fresh_and_saves_no_record(tmp_path):
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": {"1": {"phase": "P2"}}}), encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()
+    assert c.rooms[0]._adherence == C.plan_adherence.fresh()
+    c._save_state()
+    assert "_adherence" not in json.loads(p.read_text(encoding="utf-8"))["default"]
+
+
+def test_a_plan_adherence_record_that_is_not_one_loads_fresh(tmp_path):
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": {"_adherence": ["junk"]}}), encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()
+    assert c.rooms[0]._adherence == C.plan_adherence.fresh()
+
+
+def test_each_wrong_field_of_the_record_starts_fresh_and_a_later_field_is_kept(
+    tmp_path,
+):
+    p = tmp_path / "state.json"
+    today = datetime.now().date().isoformat()
+    saved = {
+        "v": 1,
+        "draft_seen": "yesterday",
+        "baseline": {"revision": 3, "values": "x"},
+        "alerted": {"plan_saved_not_armed_default_r3": today, "bad": 7},
+        "phase_log": {
+            "1": [{"at": "x", "from": "P3", "to": "P0", "how": "lights-on"}, 5]
+        },
+        "bridge": 5,
+        "bridge_day": 12,
+        "cooldown_until": None,
+        "from_a_later_release": {"kept": True},
+    }
+    p.write_text(json.dumps({"default": {"_adherence": saved}}), encoding="utf-8")
+    c = _make([1], p)
+    c._load_state()
+    adh = c.rooms[0]._adherence
+    assert (
+        adh["draft_seen"] is None and adh["baseline"] is None and adh["bridge"] is None
+    )
+    assert adh["bridge_day"] is None
+    assert adh["alerted"] == {"plan_saved_not_armed_default_r3": today}
+    assert adh["phase_log"] == {"1": [saved["phase_log"]["1"][0]]}
+    c._save_state()
+    written = json.loads(p.read_text(encoding="utf-8"))["default"]["_adherence"]
+    assert written["from_a_later_release"] == {"kept": True}
+    assert written["alerted"] == {"plan_saved_not_armed_default_r3": today}
+
+
+def test_a_3_11_1_zone_loads_with_no_stalled_ramp_and_a_stall_round_trips(tmp_path):
+    """Before the P1 stall exit a zone kept no count of flat ramp shots and no stalled day: an old file loads
+    them as 0 and None, a saved stall survives a restart, and junk in either loads fresh.
+    """
+    fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
+    seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": seed}), encoding="utf-8")
+    c = _make([1, 2], p)
+    c._load_state()
+    for zone in (1, 2):
+        assert (
+            c.rooms[0].state[zone]["p1_flat"],
+            c.rooms[0].state[zone]["p1_stall"],
+        ) == (0, None)
+    st = c.rooms[0].state[1]
+    st["p1_flat"], st["p1_stall"] = 1, {
+        "day": "2026-10-16",
+        "at": 25.2,
+        "rewater": 23.7,
+    }
+    c._save_state()
+    c2 = _make([1, 2], p)
+    c2._load_state()
+    assert (c2.rooms[0].state[1]["p1_flat"], c2.rooms[0].state[1]["p1_stall"]) == (
+        1,
+        {"day": "2026-10-16", "at": 25.2, "rewater": 23.7},
+    )
+    for flat, stall in (
+        (-1, {"day": 5}),
+        ("2", {"day": "2026-10-16", "at": "x", "rewater": 1}),
+        (True, {"day": "2026-10-16", "at": 250.0, "rewater": 23.7}),
+        (None, "junk"),
+    ):
+        p.write_text(
+            json.dumps(
+                {"default": {"1": {"phase": "P2", "p1_flat": flat, "p1_stall": stall}}}
+            ),
+            encoding="utf-8",
+        )
+        c3 = _make([1], p)
+        c3._load_state()
+        assert (c3.rooms[0].state[1]["p1_flat"], c3.rooms[0].state[1]["p1_stall"]) == (
+            0,
+            None,
+        )
+
+
+def test_an_old_file_loads_without_rescue_keys_or_a_tank_estimate_and_both_round_trip(
+    tmp_path,
+):
+    """3.14.0 files have no rescue_misses / rescue_check per zone and no _tank_estimate block: they load
+    fresh (no misses, nothing to judge, no fill seen), and once written they come back as written.
+    """
+    p = tmp_path / "state.json"
+    p.write_text(
+        json.dumps({"default": {"1": {"phase": "P2", "peak": 40.0}}}), encoding="utf-8"
+    )
+    c = _make([1], p)
+    c._load_state()
+    room = c.rooms[0]
+    st = room.state[1]
+    assert (st["rescue_misses"], st["rescue_check"]) == (0, None)
+    assert room.tank_estimate == {"filled_at": None, "used_l": 0.0}
+    st["rescue_misses"], st["rescue_check"] = 2, {
+        "before": 31.5,
+        "at": "2026-10-17T03:00:00",
+    }
+    room.tank_estimate = {"filled_at": "2026-10-17T01:00:00+00:00", "used_l": 12.5}
+    c._save_state()
+    c2 = _make([1], p)
+    c2._load_state()
+    assert c2.rooms[0].state[1]["rescue_misses"] == 2
+    assert c2.rooms[0].state[1]["rescue_check"] == {
+        "before": 31.5,
+        "at": "2026-10-17T03:00:00",
+    }
+    assert c2.rooms[0].tank_estimate == {
+        "filled_at": "2026-10-17T01:00:00+00:00",
+        "used_l": 12.5,
+    }
+    for misses, check, estimate in (
+        (-1, {"at": 5}, "junk"),
+        ("2", {"before": "x", "at": "t"}, {"used_l": "x"}),
+    ):
+        p.write_text(
+            json.dumps(
+                {
+                    "default": {
+                        "1": {
+                            "phase": "P2",
+                            "rescue_misses": misses,
+                            "rescue_check": check,
+                        },
+                        "_tank_estimate": estimate,
+                    }
+                }
+            ),
+            encoding="utf-8",
+        )
+        c3 = _make([1], p)
+        c3._load_state()
+        assert (
+            c3.rooms[0].state[1]["rescue_misses"],
+            c3.rooms[0].state[1]["rescue_check"],
+        ) == (0, None)
+        assert c3.rooms[0].tank_estimate == {"filled_at": None, "used_l": 0.0}
+
+
+def test_a_3_11_1_room_loads_with_no_runoff_record_and_one_round_trips(tmp_path):
+    """Before the runoff estimator (runoff_balance.py) a room kept no sump record: an old file loads it empty and
+    writes none back, a saved record survives a restart, and junk loads fresh."""
+    import runoff_balance
+
+    fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
+    seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": seed}), encoding="utf-8")
+    c = _make([1, 2], p)
+    c._load_state()
+    assert c.rooms[0]._runoff == runoff_balance.fresh()
+    c._save_state()
+    assert "_runoff" not in json.loads(p.read_text(encoding="utf-8"))["default"]
+    c.rooms[0]._runoff["runs"] = [[1.0, 61.0]]
+    c.rooms[0]._runoff["days"] = [{"date": "2026-10-16", "runs": 9, "fed_l": 180.0}]
+    c._save_state()
+    c2 = _make([1, 2], p)
+    c2._load_state()
+    assert c2.rooms[0]._runoff["runs"] == [[1.0, 61.0]]
+    assert c2.rooms[0]._runoff["days"] == [
+        {"date": "2026-10-16", "runs": 9, "fed_l": 180.0}
+    ]
+    p.write_text(
+        json.dumps({"default": {"_runoff": "junk", "1": {"phase": "P2"}}}),
+        encoding="utf-8",
+    )
+    c3 = _make([1], p)
+    c3._load_state()
+    assert c3.rooms[0]._runoff == runoff_balance.fresh()
+
+
+def test_a_3_11_1_zone_loads_with_no_water_vpd_record_and_one_round_trips(tmp_path):
+    """Before the water-and-VPD record (sensing.py) a zone kept no day records: an old file loads them empty, a
+    saved record survives a restart, and junk in either loads fresh."""
+    fixture = ROOT / "tests_ha" / "fixtures" / "state_3_11_1_learn_jev.json"
+    seed = json.loads(fixture.read_text(encoding="utf-8"))["state"]["default"]
+    p = tmp_path / "state.json"
+    p.write_text(json.dumps({"default": seed}), encoding="utf-8")
+    c = _make([1, 2], p)
+    c._load_state()
+    for zone in (1, 2):
+        st = c.rooms[0].state[zone]
+        assert (st["water_vpd"], st["day_hist"]) == (None, [])
+    st = c.rooms[0].state[1]
+    st["water_vpd"] = {
+        "day": "2026-10-16",
+        "rates": [0.8],
+        "vpd": [2.4, 2],
+        "last": 5.0,
+    }
+    st["day_hist"] = [
+        {"date": "2026-10-15", "rate": 0.7, "vpd": 1.1, "samples": 9, "litres": 4.5}
+    ]
+    c._save_state()
+    c2 = _make([1, 2], p)
+    c2._load_state()
+    st2 = c2.rooms[0].state[1]
+    assert st2["water_vpd"] == st["water_vpd"]
+    assert st2["day_hist"] == st["day_hist"]
+    p.write_text(
+        json.dumps(
+            {"default": {"1": {"phase": "P2", "water_vpd": "junk", "day_hist": [5]}}}
+        ),
+        encoding="utf-8",
+    )
+    c3 = _make([1], p)
+    c3._load_state()
+    assert (
+        c3.rooms[0].state[1]["water_vpd"],
+        c3.rooms[0].state[1]["day_hist"],
+    ) == (None, [])

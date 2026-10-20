@@ -1,0 +1,486 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { mockHa, stdio, call, data, planFixture, TOKEN } from "./mock-ha.mjs";
+
+const preview = async (client) =>
+  data(
+    await call(client, "preview_setup", {
+      room_id: "room:room_b_",
+      changes: {
+        room_name: "Room B renamed",
+        zones: [{ id: 1, plant_count: 48 }],
+      },
+    }),
+  );
+const apply = (client, p, overrides = {}) =>
+  call(client, "apply_proposal", {
+    room_id: p.room_id,
+    expected_revision: p.expected_revision,
+    proposal_token: p.proposal_token,
+    ...overrides,
+  });
+const error = (result, pattern) => {
+  assert.equal(result.isError, true);
+  assert.match(result.content[0].text, pattern);
+};
+
+test("real stdio initialize, tools/list, bounded reads, exact room isolation, and missing values", async (t) => {
+  const ha = await mockHa(t),
+    { client, stderr } = await stdio(t, ha);
+  assert.equal(client.getServerVersion().name, "crop-steering");
+  const tools = (await client.listTools()).tools;
+  assert.equal(tools.length, 9);
+  assert.deepEqual(
+    tools
+      .filter((tool) => !tool.annotations.readOnlyHint)
+      .map((tool) => tool.name),
+    ["apply_proposal"],
+  );
+  assert.ok(
+    !tools.some((tool) =>
+      /activate|turn_on|execute|create_room/.test(tool.name),
+    ),
+  );
+  const rooms = data(await call(client, "list_rooms"));
+  assert.equal(rooms.writes_enabled, false);
+  assert.deepEqual(
+    rooms.rooms.map((r) => r.room_id),
+    ["room:", "room:room_b_"],
+  );
+  assert.ok(!JSON.stringify(rooms).includes(TOKEN));
+  const cfg = data(
+    await call(client, "get_room_configuration", { room_id: "room:room_b_" }),
+  );
+  assert.equal(cfg.hardware.pump_switch, "switch.room_b_pump");
+  const status = data(
+    await call(client, "get_room_status", { room_id: "room:room_b_" }),
+  );
+  assert.equal(
+    status.readings.find((r) => r.entity_id.endsWith("last_irrigation_app"))
+      .state,
+    null,
+  );
+  assert.ok(!status.readings.some((r) => r.entity_id === "switch.pump"));
+  assert.ok(!JSON.stringify(status).includes("internal_secret"));
+  const search = data(
+    await call(client, "search_candidate_entities", { query: "room_b", limit: 2 }),
+  );
+  assert.equal(search.candidates.length, 2);
+  assert.equal(search.next_offset, 2);
+  const runs = data(
+    await call(client, "get_room_runs", {
+      room_id: "room:room_b_",
+      limit: 2,
+      offset: 3,
+    }),
+  );
+  assert.equal(runs.runs[0].id, "run-3");
+  assert.equal(runs.total, 12);
+  error(
+    await call(client, "get_room_configuration", { room_id: "room:missing_" }),
+    /unknown/,
+  );
+  error(
+    await call(client, "get_room_status", { room_id: "room:room_b_", zone_id: 2 }),
+    /does not belong/,
+  );
+  assert.equal(ha.saveCount, 0);
+  assert.equal(stderr(), "");
+});
+
+test("reviewed setup saves exact server payload and reads back, preserving other room/settings", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const before = structuredClone(ha.rooms[0]);
+  const p = await preview(client);
+  assert.equal(ha.saveCount, 0);
+  assert.equal(p.expected_revision, 4);
+  assert.equal(p.diff.length, 2);
+  error(
+    await apply(client, p, { changes: { room_name: "injected" } }),
+    /Unrecognized|Invalid/,
+  );
+  error(await apply(client, p, { room_id: "room:" }), /does not match/);
+  const saved = data(await apply(client, p));
+  assert.equal(saved.verified, true);
+  assert.equal(saved.revision, 5);
+  assert.equal(ha.rooms[1].zones[0].plant_count, 48);
+  assert.equal(ha.rooms[1].zones[0].substrate_volume, 6.75);
+  assert.deepEqual(ha.rooms[0], before);
+  assert.equal(ha.saveCount, 1);
+  const submitted = ha.calls.find((row) =>
+    row.path.includes("/setup_save?"),
+  ).body;
+  assert.deepEqual(submitted, {
+    entry_id: "entry-room_b_",
+    expected_revision: 4,
+    ...p.proposed_configuration,
+  });
+  error(await apply(client, p), /already used/);
+  assert.equal(ha.saveCount, 1);
+});
+
+test("read-only default and strict input schema block saves and control flags", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha);
+  const p = await preview(client);
+  error(await apply(client, p), /Writes are disabled/);
+  for (const changes of [
+    { enabled: true },
+    { hardware: { enable_flag: "switch.engine" } },
+    { zones: [{ id: 1, active: true }] },
+    { zones: [{ id: 1, plant_count: 1.5 }] },
+    { hardware: { pump_switch: "http://outside" } },
+  ]) {
+    error(
+      await call(client, "preview_setup", { room_id: "room:room_b_", changes }),
+      /Invalid|Unrecognized|integer/,
+    );
+  }
+  assert.equal(ha.saveCount, 0);
+});
+
+test("stale revision or sizing changed without revision invalidates exact preview", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const p = await preview(client);
+  ha.rooms[1].revision++;
+  error(await apply(client, p), /changed after preview/);
+  const q = await preview(client);
+  ha.rooms[1].zones[0].dripper_flow_rate = 2;
+  error(await apply(client, q), /changed after preview/);
+  assert.equal(ha.saveCount, 0);
+});
+
+test("setup blocks unavailable equipment and HA remains final safety authority", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  let p = await preview(client);
+  ha.rooms[1].safety = { ready: false, blockers: ["Unknown pump"] };
+  error(await apply(client, p), /setup blockers/);
+  assert.equal(ha.saveCount, 0);
+  ha.rooms[1].safety = { ready: true, blockers: [] };
+  p = await preview(client);
+  ha.intercept = (req, res, body, json) => {
+    if (!req.url.includes("/setup_save?")) return false;
+    json({ message: "New mapped pump must read OFF" }, 400);
+    return true;
+  };
+  error(await apply(client, p), /must read OFF/);
+  assert.equal(ha.saveCount, 0);
+});
+
+test("candidate existence, units, duplicate zones and foreign zones are checked before token issue", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha);
+  for (const [changes, pattern] of [
+    [{ hardware: { tank_ec_sensor: "sensor.room_b_vwc" } }, /Incompatible ec/],
+    [{ hardware: { pump_switch: "switch.missing" } }, /existing switch/],
+    [{ zones: [{ id: 2, plant_count: 20 }] }, /existing zone IDs/],
+    [{ zones: [{ id: 1 }, { id: 1 }] }, /Duplicate/],
+    [
+      { zones: [{ id: 1, vwc_sensors: ["sensor.room_b_vwc", "sensor.room_b_vwc"] }] },
+      /unique/,
+    ],
+  ])
+    error(
+      await call(client, "preview_setup", { room_id: "room:room_b_", changes }),
+      pattern,
+    );
+  assert.equal(ha.saveCount, 0);
+});
+
+test("HA validates plan preview, then only draft saved with exact readback; no activation call", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const plan = planFixture();
+  plan.profiles[0].vegetative.p1_target_vwc = 65;
+  const p = data(
+    await call(client, "preview_plan", { room_id: "room:room_b_", plan }),
+  );
+  assert.equal(ha.saveCount, 0);
+  assert.equal(p.preview.zones[0].parameters.p1_target_vwc, 65);
+  const result = data(await apply(client, p));
+  assert.equal(result.status, "draft");
+  assert.equal(result.revision, 8);
+  assert.deepEqual(ha.plans["room:room_b_"].plan, plan);
+  assert.equal(ha.plans["room:"].revision, 7);
+  assert.ok(ha.calls.some((row) => row.path.includes("/strategy_preview?")));
+  assert.ok(
+    !ha.calls.some((row) =>
+      /activate|disarm|turn_on|number\/set_value/.test(row.path),
+    ),
+  );
+  const invalid = planFixture();
+  invalid.profiles[0].vegetative.p1_target_vwc = 99;
+  error(
+    await call(client, "preview_plan", { room_id: "room:room_b_", plan: invalid }),
+    /outside readable HA bounds/,
+  );
+  ha.plans["room:room_b_"].status = "active";
+  error(
+    await call(client, "preview_plan", { room_id: "room:room_b_", plan }),
+    /not draft/,
+  );
+});
+
+test("changed plan bounds or active status after preview block draft save", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const plan = planFixture();
+  plan.profiles[0].name = "New profile";
+  let p = data(
+    await call(client, "preview_plan", { room_id: "room:room_b_", plan }),
+  );
+  ha.plans["room:room_b_"].catalog = {
+    1: { p1_target_vwc: { min: 20, max: 60 } },
+  };
+  error(await apply(client, p), /bounds changed/);
+  p = data(await call(client, "preview_plan", { room_id: "room:room_b_", plan }));
+  ha.plans["room:room_b_"].status = "armed";
+  error(await apply(client, p), /bounds changed/);
+  assert.equal(ha.saveCount, 0);
+});
+
+test("simultaneous token replay submits at most one write", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const p = await preview(client);
+  const results = await Promise.all([apply(client, p), apply(client, p)]);
+  assert.equal(results.filter((r) => !r.isError).length, 1);
+  assert.equal(ha.saveCount, 1);
+});
+
+test("write timeout is uncertain, consumes token, never automatically retries", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, {
+      CROP_STEERING_ALLOW_WRITES: "true",
+      HA_TIMEOUT_MS: "100",
+    });
+  const p = await preview(client);
+  ha.intercept = (req, res) => {
+    if (!req.url.includes("/setup_save?")) return false;
+    ha.saveCount++;
+    return true;
+  };
+  error(await apply(client, p), /timed out.*Do not assume/);
+  error(await apply(client, p), /already used/);
+  assert.equal(ha.saveCount, 1);
+});
+
+test("redirects are rejected without forwarding credentials and errors redact secrets", async (t) => {
+  const ha = await mockHa(t),
+    sink = await mockHa(t),
+    { client } = await stdio(t, ha);
+  ha.intercept = (req, res) => {
+    res.writeHead(302, { Location: sink.url + "/api/states" });
+    res.end();
+    return true;
+  };
+  error(await call(client, "list_rooms"), /Redirects are rejected/);
+  assert.equal(sink.calls.length, 0);
+  ha.intercept = (req, res, body, json) => {
+    json({ message: `Rejected ${TOKEN}` }, 400);
+    return true;
+  };
+  const result = await call(client, "list_rooms");
+  error(result, /REDACTED/);
+  assert.ok(!JSON.stringify(result).includes(TOKEN));
+});
+
+test("readback mismatch is reported as submitted, never verified success", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const p = await preview(client);
+  ha.intercept = (req, res, body, json) => {
+    if (!req.url.includes("/setup_save?")) return false;
+    ha.saveCount++;
+    json({ service_response: {} });
+    return true;
+  };
+  error(await apply(client, p), /submitted but readback did not match/);
+  assert.equal(ha.saveCount, 1);
+});
+
+test("legacy default descriptor is default-only and its prefix must match the room", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha);
+  ha.states.delete("sensor.crop_steering_ai_heartbeat");
+  ha.states.set("sensor.crop_steering_system_engine_config", {
+    state: "configured",
+    attributes: { prefix: "", enable_flag: "switch.legacy_engine" },
+  });
+  ha.states.set("switch.legacy_engine", { state: "off" });
+  const status = data(
+    await call(client, "get_room_status", { room_id: "room:" }),
+  );
+  assert.equal(
+    status.readings.find((row) => row.entity_id === "switch.legacy_engine")
+      .state,
+    "off",
+  );
+  ha.calls.length = 0;
+  await call(client, "get_room_status", { room_id: "room:room_b_" });
+  assert.ok(!ha.calls.some((row) => row.path.includes("system_engine_config")));
+  ha.states.set("sensor.crop_steering_room_b_engine_config", {
+    state: "configured",
+    attributes: { prefix: "", enable_flag: "switch.legacy_engine" },
+  });
+  error(
+    await call(client, "get_room_status", { room_id: "room:room_b_" }),
+    /prefix does not match/,
+  );
+});
+
+test("legacy null mappings normalize only inbound, preserve setup, reject new null writes", async (t) => {
+  const ha = await mockHa(t);
+  ha.rooms[1].hardware.waste_switch = null;
+  const { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const cfg = data(
+    await call(client, "get_room_configuration", { room_id: "room:room_b_" }),
+  );
+  assert.equal(cfg.hardware.waste_switch, "");
+  const p = await preview(client);
+  assert.equal(p.proposed_configuration.hardware.waste_switch, "");
+  const applied = data(await apply(client, p));
+  assert.equal(applied.verified, true);
+  assert.equal(ha.rooms[1].hardware.pump_switch, "switch.room_b_pump");
+  error(
+    await call(client, "preview_setup", {
+      room_id: "room:room_b_",
+      changes: { hardware: { waste_switch: null } },
+    }),
+    /Invalid/,
+  );
+});
+
+// Review finding on JakeTheRabbit/HA-Irrigation-Strategy#47. Since 2.19.0 the integration refuses
+// an active room whose mapped switches contradict its DECLARED plumbing. The strict input schema
+// rejected `plumbing`, the room schema stripped it and the payload omitted it, so a declared room
+// could never gain or lose its pump through these tools: the hardware-only change previewed
+// cleanly and failed on apply, and the only payload Home Assistant would accept failed the schema.
+const setup = (client, room_id, changes) =>
+  call(client, "preview_setup", { room_id, changes });
+const saved = (ha) =>
+  ha.calls.filter((row) => row.path.includes("/setup_save?")).at(-1).body;
+
+test("plumbing layout and the mapping it implies change together, and are read back", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const cfg = data(
+    await call(client, "get_room_configuration", { room_id: "room:room_b_" }),
+  );
+  assert.equal(cfg.plumbing, "pump_valves");
+  assert.equal(cfg.plumbing_inferred, "pump_valves");
+
+  // The room loses its pump: layout and mapping in ONE reviewed proposal.
+  const p = data(
+    await setup(client, "room:room_b_", {
+      plumbing: "valves_only",
+      hardware: { pump_switch: "" },
+    }),
+  );
+  assert.deepEqual(
+    p.diff.map((row) => [row.path, row.before, row.after]),
+    [
+      ["/hardware/pump_switch", "switch.room_b_pump", ""],
+      ["/plumbing", "pump_valves", "valves_only"],
+    ],
+  );
+  const done = data(await apply(client, p));
+  assert.equal(done.verified, true);
+  assert.equal(done.configuration.plumbing, "valves_only");
+  assert.equal(saved(ha).plumbing, "valves_only");
+  assert.equal(saved(ha).hardware.pump_switch, "");
+  assert.equal(ha.rooms[1].plumbing, "valves_only");
+
+  // ...and gains a pump and a main line again, the other way round.
+  const q = data(
+    await setup(client, "room:room_b_", {
+      plumbing: "pump_mainline_valves",
+      hardware: {
+        pump_switch: "switch.room_b_pump",
+        main_line_switch: "switch.room_b_main_line",
+      },
+    }),
+  );
+  assert.equal(data(await apply(client, q)).verified, true);
+  assert.equal(ha.rooms[1].plumbing, "pump_mainline_valves");
+  assert.equal(ha.rooms[1].plumbing_inferred, "pump_mainline_valves");
+  assert.equal(ha.saveCount, 2);
+});
+
+test("a mapping that contradicts the declared plumbing is refused at preview, before any token", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  for (const [changes, pattern] of [
+    // hardware only: what used to preview cleanly and then fail on apply
+    [{ hardware: { pump_switch: "" } }, /no pump switch is mapped/],
+    [
+      { hardware: { main_line_switch: "switch.room_b_main_line" } },
+      /a main-line valve switch is mapped/,
+    ],
+    // layout only: the same contradiction from the other side
+    [{ plumbing: "valves_only" }, /a pump switch is mapped/],
+    [{ plumbing: "pump_mainline_valves" }, /no main-line valve switch/],
+    [{ plumbing: "gravity" }, /Invalid/],
+    [{ plumbing: "" }, /Invalid/], // a declaration cannot be withdrawn, only changed
+  ])
+    error(await setup(client, "room:room_b_", changes), pattern);
+  assert.equal(ha.saveCount, 0);
+  assert.ok(!ha.calls.some((row) => row.path.includes("/setup_save?")));
+});
+
+test("a room that never declared its plumbing is not declared by an unrelated save", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const cfg = data(
+    await call(client, "get_room_configuration", { room_id: "room:" }),
+  );
+  assert.equal(cfg.plumbing, "");
+  assert.equal(cfg.plumbing_inferred, "pump_valves"); // what its switches imply, for a prompt
+  const p = data(await setup(client, "room:", { room_name: "Flower" }));
+  assert.ok(!("plumbing" in p.proposed_configuration));
+  assert.equal(data(await apply(client, p)).verified, true);
+  assert.ok(!("plumbing" in saved(ha)));
+  assert.equal(ha.rooms[0].plumbing, "");
+
+  // Undeclared also means unenforced, exactly as before: its pump can still be unmapped.
+  const q = data(await setup(client, "room:", { hardware: { pump_switch: "" } }));
+  assert.equal(data(await apply(client, q)).verified, true);
+  assert.equal(ha.rooms[0].plumbing, "");
+
+  // Declaring it is an explicit, reviewed change like any other.
+  const r = data(await setup(client, "room:", { plumbing: "valves_only" }));
+  assert.deepEqual(
+    r.diff.map((row) => [row.path, row.before, row.after]),
+    [["/plumbing", null, "valves_only"]],
+  );
+  assert.equal(data(await apply(client, r)).verified, true);
+  assert.equal(ha.rooms[0].plumbing, "valves_only");
+});
+
+test("a declaration made elsewhere after the preview invalidates the proposal", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  const p = data(await setup(client, "room:", { room_name: "Flower" }));
+  ha.rooms[0].plumbing = "pump_valves"; // declared in Rooms & setup meanwhile, same revision
+  error(await apply(client, p), /changed after preview/);
+  assert.equal(ha.saveCount, 0);
+});
+
+test("an integration from before declared plumbing is still read and saved", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, { CROP_STEERING_ALLOW_WRITES: "true" });
+  for (const r of ha.rooms) {
+    delete r.plumbing;
+    delete r.plumbing_inferred;
+  }
+  const cfg = data(
+    await call(client, "get_room_configuration", { room_id: "room:room_b_" }),
+  );
+  assert.ok(!("plumbing" in cfg));
+  const p = await preview(client);
+  assert.ok(!("plumbing" in p.proposed_configuration));
+  assert.equal(data(await apply(client, p)).verified, true);
+});
