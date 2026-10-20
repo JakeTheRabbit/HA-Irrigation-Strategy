@@ -1,0 +1,716 @@
+{
+ "slides": {
+  "1": [
+   {
+    "type": "Checklist",
+    "steps": [
+     "Complete them now",
+     "Create your own account",
+     "Write down how you"
+    ],
+    "props": {
+     "title": "Finish onboarding",
+     "items": [
+      {
+       "text": "Welcome screens completed"
+      },
+      {
+       "text": "Your own username and password"
+      },
+      {
+       "text": "Recovery note: private and safe"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Set your timezone, the",
+    "steps": [
+     "the local clock region",
+     "so lights-on times match"
+    ],
+    "props": {
+     "term": "Timezone",
+     "meaning": "The local clock region.",
+     "example": "Lights-on times match the real clock"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Now recall an entity:",
+    "steps": [
+     "called an entity ID",
+     "The card shows one"
+    ],
+    "props": {
+     "term": "Entity ID",
+     "meaning": "The exact written address of one entity.",
+     "example": "sensor.practice_moisture"
+    }
+   },
+   {
+    "type": "Analogy",
+    "cue": "One probe can supply",
+    "steps": [
+     "One probe can supply",
+     "several entity IDs",
+     "moisture, temperature and",
+     "temperature and battery",
+     "and battery"
+    ],
+    "props": {
+     "left": {
+      "icon": "probe",
+      "label": "One probe"
+     },
+     "right": {
+      "icon": "app",
+      "label": "Several entity IDs"
+     },
+     "joiner": "supplies",
+     "mappings": [
+      {
+       "from": "Moisture",
+       "to": "sensor.…_moisture"
+      },
+      {
+       "from": "Temperature",
+       "to": "sensor.…_temperature"
+      },
+      {
+       "from": "Battery",
+       "to": "sensor.…_battery"
+      }
+     ]
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "The entity ID tells",
+    "steps": [
+     "The entity ID tells",
+     "the physical label on"
+    ],
+    "props": {
+     "src": "img/screens/demo-probes-r3.png",
+     "focus": [
+      {
+       "x": 280,
+       "y": 512,
+       "w": 170,
+       "h": 22,
+       "label": "Entity ID: where software looks"
+      },
+      {
+       "x": 280,
+       "y": 488,
+       "w": 120,
+       "h": 24,
+       "label": "Match it to the probe's own label"
+      }
+     ]
+    }
+   }
+  ],
+  "2": [
+   {
+    "type": "SystemMap",
+    "props": {
+     "highlight": [
+      "integration",
+      "controller"
+     ],
+     "showDataFlow": true
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "The integration is the",
+    "steps": [
+     "adds Crop Steering to",
+     "stores your room settings",
+     "shows the Crop Steering",
+     "The Controller is a",
+     "reads those settings",
+     "decides when to water"
+    ],
+    "props": {
+     "left": {
+      "title": "Integration",
+      "icon": "chart",
+      "tone": "neutral",
+      "items": [
+       "Adds Crop Steering to HA",
+       "Stores room settings",
+       "Shows the screens"
+      ]
+     },
+     "right": {
+      "title": "Controller",
+      "icon": "power",
+      "tone": "water",
+      "items": [
+       "A separate program",
+       "Reads those settings",
+       "Decides when to water"
+      ]
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Both parts carry one",
+    "steps": [
+     "This is called version",
+     "lets each part understand"
+    ],
+    "props": {
+     "term": "Version matching",
+     "meaning": "Installing the same version number of both parts.",
+     "example": "Integration vX = Controller vX"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "You get the integration",
+    "steps": [
+     "Home Assistant Community Store",
+     "a free extra for"
+    ],
+    "props": {
+     "term": "HACS",
+     "abbrev": "Home Assistant Community Store",
+     "meaning": "A free extra that downloads community-made integrations.",
+     "example": "It does not install the Controller"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "HACS does not install",
+    "steps": [
+     "HACS does not install",
+     "HACS does not install",
+     "comes from a different"
+    ],
+    "props": {
+     "title": "Three pieces",
+     "steps": [
+      {
+       "label": "HACS",
+       "icon": "search",
+       "note": "Downloads the integration"
+      },
+      {
+       "label": "Integration",
+       "icon": "chart",
+       "note": "Screens and settings"
+      },
+      {
+       "label": "Controller",
+       "icon": "power",
+       "note": "Comes from a different place"
+      }
+     ]
+    }
+   },
+   {
+    "type": "SafetyStop",
+    "cue": "keep the Watering switch",
+    "steps": [
+     "keep the Watering switch"
+    ],
+    "props": {
+     "stages": [
+      "software"
+     ]
+    }
+   }
+  ],
+  "3": [
+   {
+    "type": "FlowSteps",
+    "steps": [
+     "using the links in",
+     "If HACS is not",
+     "select Download",
+     "Then restart Home Assistant"
+    ],
+    "props": {
+     "title": "Install the integration",
+     "steps": [
+      {
+       "label": "Guide links",
+       "icon": "note",
+       "note": "Crop Steering installation guide"
+      },
+      {
+       "label": "HACS ready?",
+       "icon": "search",
+       "note": "If not, follow its own guide first"
+      },
+      {
+       "label": "Download",
+       "icon": "save"
+      },
+      {
+       "label": "Restart",
+       "icon": "restore"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Restarting closes and reopens",
+    "steps": [
+     "closes and reopens Home",
+     "takes a minute or"
+    ],
+    "props": {
+     "term": "Restart",
+     "meaning": "Close and reopen Home Assistant so it loads the new part.",
+     "example": "Takes a minute or two"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Next, open the guide's",
+    "steps": [
+     "Crop Steering setup link",
+     "Choose manual setup",
+     "type a room name",
+     "how many zones the"
+    ],
+    "props": {
+     "title": "Create a room",
+     "steps": [
+      {
+       "label": "Setup link",
+       "icon": "search"
+      },
+      {
+       "label": "Manual setup",
+       "icon": "wrench"
+      },
+      {
+       "label": "Room name",
+       "icon": "draft"
+      },
+      {
+       "label": "Zones",
+       "icon": "ruler",
+       "note": "How many zones the room has"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "For practice, the card",
+    "steps": [
+     "called Practice Room",
+     "with one zone",
+     "in software only",
+     "The real probes and",
+     "probes and valves are"
+    ],
+    "props": {
+     "left": {
+      "title": "Created now",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "Practice Room",
+       "One zone",
+       "A record in software only"
+      ]
+     },
+     "right": {
+      "title": "Lesson C4",
+      "icon": "plug",
+      "tone": "neutral",
+      "items": [
+       "Real probes",
+       "Real valves"
+      ]
+     }
+    }
+   }
+  ],
+  "4": [
+   {
+    "type": "Define",
+    "steps": [
+     "a separate program that",
+     "on the same host"
+    ],
+    "props": {
+     "term": "App",
+     "meaning": "A separate program running beside Home Assistant on the host.",
+     "example": "The Controller is an app"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "The app store is",
+    "steps": [
+     "the screen where you",
+     "only lists apps from",
+     "An app repository is",
+     "adds another source to"
+    ],
+    "props": {
+     "left": {
+      "title": "App store",
+      "icon": "search",
+      "tone": "neutral",
+      "items": [
+       "Screen where you install apps",
+       "Lists only known sources"
+      ]
+     },
+     "right": {
+      "title": "App repository",
+      "icon": "plug",
+      "tone": "water",
+      "items": [
+       "A web address",
+       "Adds another source"
+      ]
+     }
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Use the guide's Add",
+    "steps": [
+     "Add the app repository",
+     "Then install Crop Steering",
+     "Review its options",
+     "and start it, with"
+    ],
+    "props": {
+     "title": "Add the Controller",
+     "steps": [
+      {
+       "label": "Add repository",
+       "icon": "plug"
+      },
+      {
+       "label": "Install",
+       "icon": "save",
+       "note": "Same version as the integration"
+      },
+      {
+       "label": "Review options",
+       "icon": "review"
+      },
+      {
+       "label": "Start",
+       "icon": "power",
+       "note": "Watering still OFF"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The card shows two",
+    "steps": [
+     "starts the Controller whenever",
+     "on by default"
+    ],
+    "props": {
+     "term": "Start on boot",
+     "meaning": "Starts the Controller whenever the host starts.",
+     "example": "On by default"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "The Supervisor is the",
+    "steps": [
+     "The Supervisor is the",
+     "Watchdog, which you turn",
+     "restart the Controller if"
+    ],
+    "props": {
+     "title": "Watchdog ON",
+     "steps": [
+      {
+       "label": "Supervisor",
+       "icon": "shield",
+       "note": "Manages apps on Home Assistant OS"
+      },
+      {
+       "label": "Watchdog",
+       "icon": "eye",
+       "note": "You turn it on"
+      },
+      {
+       "label": "Restart",
+       "icon": "restore",
+       "note": "If the Controller stops"
+      }
+     ],
+     "loop": false
+    }
+   }
+  ],
+  "5": [
+   {
+    "type": "ScreenTour",
+    "steps": [
+     "Open Crop Steering in",
+     "check that the Controller"
+    ],
+    "props": {
+     "src": "img/screens/demo-probes-r3.png",
+     "focus": [
+      {
+       "x": 18,
+       "y": 22,
+       "w": 200,
+       "h": 56,
+       "label": "Crop Steering screens open"
+      },
+      {
+       "x": 596,
+       "y": 196,
+       "w": 320,
+       "h": 92,
+       "label": "Controller: how recently it reported"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A running Controller regularly",
+    "steps": [
+     "This message is called",
+     "Its age tells you"
+    ],
+    "props": {
+     "term": "Heartbeat",
+     "meaning": "The Controller's regular short message saying it is alive.",
+     "example": "Its age shows how recently it reported"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "The Controller sends it",
+    "steps": [
+     "The Controller sends it",
+     "using an access key",
+     "the Supervisor hands over",
+     "you never type or"
+    ],
+    "props": {
+     "title": "Heartbeat access key",
+     "steps": [
+      {
+       "label": "Controller",
+       "icon": "power"
+      },
+      {
+       "label": "Access key",
+       "icon": "lock"
+      },
+      {
+       "label": "Supervisor",
+       "icon": "shield",
+       "note": "Hands it over automatically"
+      },
+      {
+       "label": "Nothing to type",
+       "icon": "check",
+       "note": "You never type or paste one"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Now the case on",
+    "steps": [
+     "the Crop Steering screens",
+     "no heartbeat arrives",
+     "The screens come from",
+     "check the Controller app"
+    ],
+    "props": {
+     "left": {
+      "title": "Screens open",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "Come from the integration"
+      ]
+     },
+     "right": {
+      "title": "No heartbeat",
+      "icon": "alert",
+      "tone": "bad",
+      "items": [
+       "Check the Controller app"
+      ]
+     },
+     "order": "columns"
+    }
+   },
+   {
+    "type": "DecisionTree",
+    "cue": "Is it installed, started",
+    "steps": [
+     "Is it installed, started",
+     "at the same version",
+     "If an older Controller"
+    ],
+    "props": {
+     "nodes": [
+      {
+       "id": "run",
+       "text": "Controller installed and started?",
+       "kind": "question"
+      },
+      {
+       "id": "start",
+       "text": "Install and start the app",
+       "kind": "action"
+      },
+      {
+       "id": "ver",
+       "text": "Same version as the integration?",
+       "kind": "question"
+      },
+      {
+       "id": "match",
+       "text": "Match the versions",
+       "kind": "action"
+      },
+      {
+       "id": "old",
+       "text": "Older Controller here? Finish its upgrade",
+       "kind": "stop"
+      }
+     ],
+     "edges": [
+      {
+       "from": "run",
+       "to": "start",
+       "label": "No"
+      },
+      {
+       "from": "run",
+       "to": "ver",
+       "label": "Yes"
+      },
+      {
+       "from": "ver",
+       "to": "match",
+       "label": "No"
+      },
+      {
+       "from": "ver",
+       "to": "old",
+       "label": "Yes"
+      }
+     ],
+     "path": [
+      "run",
+      "ver",
+      "old"
+     ]
+    }
+   }
+  ],
+  "6": [
+   {
+    "type": "Define",
+    "steps": [
+     "a saved copy of",
+     "Make one in Settings"
+    ],
+    "props": {
+     "term": "Backup",
+     "meaning": "A saved copy of your setup that can rebuild it.",
+     "example": "Settings → System → Backups"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Home Assistant normally encrypts",
+    "steps": [
+     "a long code needed",
+     "called the emergency kit"
+    ],
+    "props": {
+     "term": "Encryption key",
+     "meaning": "A long code needed to open your locked backups.",
+     "example": "Download it as the emergency kit"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "As the card shows,",
+    "steps": [
+     "keep the emergency kit",
+     "and a backup copy",
+     "A USB stick in",
+     "A backup kept only",
+     "is lost if its"
+    ],
+    "props": {
+     "left": {
+      "title": "Away from the host",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "Emergency kit",
+       "A backup copy",
+       "USB stick in a drawer"
+      ]
+     },
+     "right": {
+      "title": "Only on the host",
+      "icon": "cross",
+      "tone": "bad",
+      "items": [
+       "Backup kept only here",
+       "Lost if its storage fails"
+      ]
+     }
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Finally, compare Home Assistant's",
+    "steps": [
+     "Finally, compare Home Assistant's",
+     "with your phone",
+     "move on to lesson",
+     "with Watering still OFF"
+    ],
+    "props": {
+     "title": "Before lesson C4",
+     "items": [
+      {
+       "text": "Home Assistant's clock checked"
+      },
+      {
+       "text": "Matches your phone"
+      },
+      {
+       "text": "Move on to lesson C4"
+      },
+      {
+       "text": "Watering still OFF"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

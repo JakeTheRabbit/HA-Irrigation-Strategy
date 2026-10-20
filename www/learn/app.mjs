@@ -6,8 +6,8 @@ import {
   nextLesson,
   reviewDue,
 } from "./state.mjs";
-import { renderLesson } from "./lesson.mjs?v=20261020r4";
-import { renderWatch } from "./watch.mjs?v=20261020r4";
+import { renderLesson } from "./lesson.mjs?v=20261021r5";
+import { renderWatch } from "./watch.mjs?v=20261021r5";
 import { renderPractice } from "./labs.mjs";
 const main = document.querySelector("#main");
 const notice = document.querySelector("#storage-notice");
@@ -656,7 +656,7 @@ async function render(focus = true) {
 }
 async function start() {
   try {
-    const response = await fetch("course/course.json?v=20261020r4");
+    const response = await fetch("course/course.json?v=20261021r5");
     if (!response.ok) throw Error("Course data returned " + response.status);
     course = await response.json();
     if (!Array.isArray(course.lessons) || !course.lessons.length)

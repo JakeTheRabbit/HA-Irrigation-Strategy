@@ -1,0 +1,942 @@
+{
+ "slides": {
+  "1": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "you label every box",
+     "This lesson is about"
+    ],
+    "props": {
+     "left": {
+      "icon": "list",
+      "label": "Label every box first"
+     },
+     "right": {
+      "icon": "zone",
+      "label": "List every part first"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Growlink is a commercial",
+    "steps": [
+     "commercial irrigation controller sold",
+     "Some growers already water"
+    ],
+    "props": {
+     "term": "Growlink",
+     "meaning": "A commercial irrigation controller sold by another company."
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Migration means moving control",
+    "steps": [
+     "from one system to",
+     "here from Growlink to"
+    ],
+    "props": {
+     "term": "Migration",
+     "meaning": "Moving watering control from one system to another.",
+     "example": "Growlink → Crop Steering"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "First, observe and change",
+    "steps": [
+     "its probes, valves, pump",
+     "valves, pump and the",
+     "pump and the controller",
+     "the controller in charge",
+     "who runs it",
+     "who can recover it"
+    ],
+    "props": {
+     "title": "Observe: change nothing",
+     "items": [
+      {
+       "text": "Probes"
+      },
+      {
+       "text": "Valves"
+      },
+      {
+       "text": "Pump"
+      },
+      {
+       "text": "Controller in charge today"
+      },
+      {
+       "text": "Who runs it"
+      },
+      {
+       "text": "Who can recover it"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "For example: Room A",
+    "steps": [
+     "one moisture probe",
+     "one valve, shared",
+     "shared pump",
+     "owned by Growlink",
+     "run by the head"
+    ],
+    "props": {
+     "left": {
+      "title": "Room A, Zone 1",
+      "icon": "🌱",
+      "tone": "water",
+      "items": [
+       "One moisture probe",
+       "One valve",
+       "Shared pump"
+      ]
+     },
+     "right": {
+      "title": "Who",
+      "icon": "👤",
+      "tone": "neutral",
+      "items": [
+       "Owned by Growlink",
+       "Run by the head grower"
+      ]
+     }
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "A working Growlink probe",
+    "steps": [
+     "A working Growlink probe",
+     "unable to connect to",
+     "The current operator keeps"
+    ],
+    "props": {
+     "title": "Growlink probe",
+     "items": [
+      {
+       "text": "Works with Growlink"
+      },
+      {
+       "text": "Connects to Home Assistant?",
+       "state": "unknown"
+      },
+      {
+       "text": "Operator keeps caring for crop"
+      }
+     ]
+    }
+   }
+  ],
+  "2": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Photos of the old",
+     "Old records do the"
+    ],
+    "props": {
+     "left": {
+      "icon": "list",
+      "label": "Photos of the old house"
+     },
+     "right": {
+      "icon": "graph",
+      "label": "Old Growlink records"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "An export is a",
+    "steps": [
+     "a file a program",
+     "such as a spreadsheet"
+    ],
+    "props": {
+     "term": "Export",
+     "meaning": "A file a program saves for use elsewhere.",
+     "example": "Such as a spreadsheet"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Some products also offer",
+    "steps": [
+     "a doorway that lets"
+    ],
+    "props": {
+     "term": "API",
+     "meaning": "A doorway that lets other software fetch data automatically."
+    }
+   },
+   {
+    "type": "DecisionTree",
+    "cue": "Use only what your",
+    "steps": [
+     "Use only what your",
+     "If it offers neither",
+     "Keep the original files"
+    ],
+    "props": {
+     "nodes": [
+      {
+       "id": "q",
+       "text": "Account offers an export or API?",
+       "kind": "question"
+      },
+      {
+       "id": "use",
+       "text": "Use only what it actually shows",
+       "kind": "action"
+      },
+      {
+       "id": "hand",
+       "text": "Copy by hand or with screenshots",
+       "kind": "action"
+      },
+      {
+       "id": "keep",
+       "text": "Keep originals and dates unchanged",
+       "kind": "action"
+      }
+     ],
+     "edges": [
+      {
+       "from": "q",
+       "to": "use",
+       "label": "Yes"
+      },
+      {
+       "from": "q",
+       "to": "hand",
+       "label": "Neither"
+      },
+      {
+       "from": "hand",
+       "to": "keep"
+      }
+     ],
+     "path": [
+      "q",
+      "hand",
+      "keep"
+     ]
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Write down the timezone",
+    "steps": [
+     "Write down the timezone",
+     "lights-on and lights-off times",
+     "substrate per plant",
+     "plant and dripper counts",
+     "measured flow, targets",
+     "how each value was"
+    ],
+    "props": {
+     "title": "Copy from the old records",
+     "items": [
+      {
+       "text": "Timezone"
+      },
+      {
+       "text": "Lights-on and lights-off times"
+      },
+      {
+       "text": "Substrate per plant"
+      },
+      {
+       "text": "Plant and dripper counts"
+      },
+      {
+       "text": "Measured flow and targets"
+      },
+      {
+       "text": "How each value was measured"
+      }
+     ]
+    }
+   },
+   {
+    "type": "MeasurementMap",
+    "cue": "a value labelled EC",
+    "steps": [
+     "tank, runoff",
+     "runoff or substrate",
+     "or substrate"
+    ],
+    "props": {
+     "highlight": [
+      "feed",
+      "runoff",
+      "bulk"
+     ]
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Crop Steering does not",
+    "steps": [
+     "does not read Growlink",
+     "enter checked values yourself"
+    ],
+    "props": {
+     "src": "img/screens/demo-equipment-setup-r3.png",
+     "focus": [
+      {
+       "x": 592,
+       "y": 82,
+       "w": 56,
+       "h": 40,
+       "label": "Setup: no Growlink import"
+      },
+      {
+       "x": 264,
+       "y": 272,
+       "w": 984,
+       "h": 118,
+       "label": "Enter checked values yourself"
+      }
+     ]
+    }
+   }
+  ],
+  "3": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "A contact called Mum",
+     "Names in two systems",
+     "work the same way"
+    ],
+    "props": {
+     "left": {
+      "icon": "contact",
+      "label": "Contact called Mum"
+     },
+     "right": {
+      "icon": "app",
+      "label": "A friendly name"
+     },
+     "mappings": [
+      {
+       "from": "Is the number right?",
+       "to": "Is the device right?"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Each Home Assistant entity",
+    "steps": [
+     "the readable label people",
+     "such as Room A"
+    ],
+    "props": {
+     "term": "Friendly name",
+     "meaning": "The readable label people see.",
+     "example": "Room A Zone 1 valve"
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "It also has an",
+    "steps": [
+     "It also has an",
+     "the exact address software"
+    ],
+    "props": {
+     "src": "img/screens/demo-probes-r3.png",
+     "focus": [
+      {
+       "x": 280,
+       "y": 486,
+       "w": 200,
+       "h": 24,
+       "label": "Friendly name: people read it"
+      },
+      {
+       "x": 280,
+       "y": 512,
+       "w": 180,
+       "h": 22,
+       "label": "Entity ID: software's address"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Imagine Growlink calls a",
+    "steps": [
+     "Growlink calls a valve",
+     "Your Home Assistant now",
+     "That match proves nothing"
+    ],
+    "props": {
+     "left": {
+      "title": "Growlink",
+      "icon": "📋",
+      "tone": "neutral",
+      "items": [
+       "Valve: Room A, Zone 1"
+      ]
+     },
+     "right": {
+      "title": "Home Assistant",
+      "icon": "🏠",
+      "tone": "neutral",
+      "items": [
+       "Same friendly name"
+      ]
+     },
+     "verdict": "That match proves nothing about the real device"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Trace the actual valve",
+    "steps": [
+     "Trace the actual valve",
+     "Confirm the interface, units",
+     "Write the exact new",
+     "Mark anything you cannot"
+    ],
+    "props": {
+     "title": "Before you map it",
+     "items": [
+      {
+       "text": "Trace valve and probe with installer"
+      },
+      {
+       "text": "Interface, units, data age"
+      },
+      {
+       "text": "Exact new entity ID written"
+      },
+      {
+       "text": "Can't confirm: marked unknown",
+       "state": "unknown"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Old targets may mean",
+    "steps": [
+     "Old targets may mean",
+     "in Crop Steering’s fields"
+    ],
+    "props": {
+     "left": {
+      "title": "Old Growlink target",
+      "icon": "📋",
+      "tone": "neutral",
+      "items": [
+       "Meant one thing there"
+      ]
+     },
+     "right": {
+      "title": "Crop Steering field",
+      "icon": "⚙️",
+      "tone": "warn",
+      "items": [
+       "May mean something different"
+      ]
+     }
+    }
+   }
+  ],
+  "4": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "When a night nurse",
+     "Only one is in"
+    ],
+    "props": {
+     "left": {
+      "icon": "contact",
+      "label": "Night nurse → day nurse"
+     },
+     "right": {
+      "icon": "zone",
+      "label": "Growlink → Crop Steering"
+     },
+     "joiner": "is like"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A handover is that",
+    "steps": [
+     "control of its valve"
+    ],
+    "props": {
+     "term": "Handover",
+     "meaning": "The moment a zone's valve control changes owner.",
+     "example": "Growlink → Crop Steering"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Plan it with the",
+    "steps": [
+     "Plan it with the",
+     "Agree the time",
+     "which old controls get",
+     "how the plants get"
+    ],
+    "props": {
+     "title": "Handover plan · Zone 1",
+     "items": [
+      {
+       "text": "Operator and installer agree"
+      },
+      {
+       "text": "The time"
+      },
+      {
+       "text": "Old controls to disable"
+      },
+      {
+       "text": "Water during the work"
+      }
+     ]
+    }
+   },
+   {
+    "type": "OneOwner",
+    "cue": "Look at the diagram",
+    "steps": [
+     "Look at the diagram",
+     "Each physical output has"
+    ],
+    "props": {
+     "stage": "both"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A rollback is a",
+    "steps": [
+     "put the old arrangement",
+     "if a check fails"
+    ],
+    "props": {
+     "term": "Rollback",
+     "meaning": "Checked steps to put the old arrangement back.",
+     "example": "Used if a check fails"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "For example: make sure",
+    "steps": [
+     "make sure Crop Steering",
+     "re-enable its Growlink schedule",
+     "watch one shot start"
+    ],
+    "props": {
+     "title": "Rollback · Zone 1",
+     "steps": [
+      {
+       "label": "Lock out",
+       "icon": "lock",
+       "note": "Crop Steering can no longer run Zone 1"
+      },
+      {
+       "label": "Growlink on",
+       "icon": "calendar",
+       "note": "Re-enable its Growlink schedule"
+      },
+      {
+       "label": "Watch one shot",
+       "icon": "eye",
+       "note": "One shot starts and stops"
+      }
+     ]
+    }
+   },
+   {
+    "type": "OneOwner",
+    "cue": "A rollback never means",
+    "steps": [
+     "leaving both schedules running"
+    ],
+    "props": {
+     "stage": "conflict"
+    }
+   }
+  ],
+  "5": [
+   {
+    "type": "Checklist",
+    "steps": [
+     "the old sensor is",
+     "nobody knows how it"
+    ],
+    "props": {
+     "title": "Fact one: the old sensor",
+     "items": [
+      {
+       "text": "Labelled EC"
+      },
+      {
+       "text": "How it was measured",
+       "state": "unknown"
+      }
+     ]
+    }
+   },
+   {
+    "type": "MeasurementMap",
+    "cue": "The Crop Steering field",
+    "steps": [
+     "expects pore-water EC"
+    ],
+    "props": {
+     "highlight": [
+      "pore"
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Fact two: the valve’s",
+    "steps": [
+     "the valve’s friendly name",
+     "no one has traced"
+    ],
+    "props": {
+     "left": {
+      "title": "Friendly name",
+      "tone": "good",
+      "items": [
+       "Matches"
+      ]
+     },
+     "right": {
+      "title": "Real valve",
+      "tone": "warn",
+      "items": [
+       "Not traced yet"
+      ]
+     }
+    }
+   },
+   {
+    "type": "DecisionTree",
+    "cue": "Both gaps stay open",
+    "steps": [
+     "Both gaps stay open",
+     "So park both mappings"
+    ],
+    "props": {
+     "nodes": [
+      {
+       "id": "q",
+       "text": "Both gaps closed?",
+       "kind": "question"
+      },
+      {
+       "id": "park",
+       "text": "Park both mappings",
+       "kind": "action"
+      },
+      {
+       "id": "go",
+       "text": "Finish the C3 to C5 checks",
+       "kind": "action"
+      }
+     ],
+     "edges": [
+      {
+       "from": "q",
+       "to": "park",
+       "label": "No"
+      },
+      {
+       "from": "q",
+       "to": "go",
+       "label": "Yes"
+      }
+     ],
+     "path": [
+      "q",
+      "park"
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "That means leave them",
+    "steps": [
+     "list them as unresolved"
+    ],
+    "props": {
+     "term": "Park a mapping",
+     "meaning": "Leave it out for now; list it as unresolved."
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Investigate the EC method",
+    "steps": [
+     "Investigate the EC method",
+     "trace the valve with",
+     "here Growlink"
+    ],
+    "props": {
+     "title": "Open gaps · this zone",
+     "items": [
+      {
+       "text": "Investigate the EC method",
+       "state": "unknown"
+      },
+      {
+       "text": "Trace the valve with installer",
+       "state": "unknown"
+      },
+      {
+       "text": "Owner meanwhile: Growlink"
+      }
+     ]
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Once both gaps are",
+    "steps": [
+     "Once both gaps are",
+     "finish the checks from",
+     "Then plan lesson C"
+    ],
+    "props": {
+     "title": "Then, and only then",
+     "steps": [
+      {
+       "label": "Gaps closed",
+       "icon": "search"
+      },
+      {
+       "label": "C3 to C5",
+       "icon": "check",
+       "note": "Finish the checks"
+      },
+      {
+       "label": "C6 stages",
+       "icon": "water",
+       "note": "Plan lesson C6's two stages"
+      }
+     ]
+    }
+   }
+  ],
+  "6": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "A builder proves one",
+     "before plastering the next"
+    ],
+    "props": {
+     "left": {
+      "icon": "tap",
+      "label": "One room watertight"
+     },
+     "right": {
+      "icon": "zone",
+      "label": "One zone proven"
+     }
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "At the agreed handover",
+    "steps": [
+     "follow the approved shutdown",
+     "an installer-run equipment test",
+     "then a supervised Controller"
+    ],
+    "props": {
+     "title": "This zone, at handover",
+     "steps": [
+      {
+       "label": "Handover",
+       "icon": "person",
+       "note": "Approved shutdown and ownership steps"
+      },
+      {
+       "label": "Stage one",
+       "icon": "water",
+       "note": "Installer test, Watering OFF"
+      },
+      {
+       "label": "Stage two",
+       "icon": "eye",
+       "note": "Supervised Controller cycle"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Check acknowledged mapping, fresh",
+    "steps": [
+     "Check acknowledged mapping",
+     "fresh readings",
+     "measured flow and",
+     "water stopping",
+     "Check approved targets",
+     "record its event and"
+    ],
+    "props": {
+     "title": "Zone 1 record",
+     "items": [
+      {
+       "text": "Acknowledged mapping"
+      },
+      {
+       "text": "Fresh readings"
+      },
+      {
+       "text": "Measured flow"
+      },
+      {
+       "text": "Water stopping"
+      },
+      {
+       "text": "Approved targets, light timing"
+      },
+      {
+       "text": "First cycle: event, final state"
+      }
+     ]
+    }
+   },
+   {
+    "type": "DecisionTree",
+    "cue": "If any check fails",
+    "steps": [
+     "If any check fails",
+     "keep the new output",
+     "follow your rollback"
+    ],
+    "props": {
+     "nodes": [
+      {
+       "id": "q",
+       "text": "Any check failed?",
+       "kind": "question"
+      },
+      {
+       "id": "off",
+       "text": "Keep the new output off",
+       "kind": "stop"
+      },
+      {
+       "id": "rb",
+       "text": "Follow your rollback",
+       "kind": "action"
+      },
+      {
+       "id": "go",
+       "text": "Record complete: expand",
+       "kind": "action"
+      }
+     ],
+     "edges": [
+      {
+       "from": "q",
+       "to": "off",
+       "label": "Yes"
+      },
+      {
+       "from": "q",
+       "to": "go",
+       "label": "No"
+      },
+      {
+       "from": "off",
+       "to": "rb"
+      }
+     ],
+     "path": [
+      "q",
+      "off",
+      "rb"
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "For example, Zone one",
+    "steps": [
+     "Zone one passes on",
+     "its own catch, stop",
+     "stop and supervised cycle",
+     "supervised cycle, even if",
+     "even if it looks"
+    ],
+    "props": {
+     "left": {
+      "title": "Zone 1",
+      "tone": "good",
+      "items": [
+       "Passed on Monday"
+      ]
+     },
+     "right": {
+      "title": "Zone 2",
+      "tone": "warn",
+      "items": [
+       "Its own catch",
+       "Its own stop",
+       "Its own supervised cycle"
+      ]
+     },
+     "verdict": "Even if it looks identical"
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Keep the old records",
+    "steps": [
+     "Keep the old records",
+     "lesson D one opens"
+    ],
+    "props": {
+     "src": "img/screens/demo-overview-r3.png",
+     "focus": [
+      {
+       "x": 264,
+       "y": 228,
+       "w": 984,
+       "h": 446,
+       "label": "Keep records until all proven"
+      },
+      {
+       "x": 16,
+       "y": 106,
+       "w": 199,
+       "h": 44,
+       "label": "Next: Overview, used every day"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

@@ -1,0 +1,51 @@
+{"slides":{
+"A6-1":[
+ {"type":"Analogy","steps":["Think of a thermometer","It cannot tell you","Now think of a","A probe reading has"],"props":{"left":{"icon":"thermometer","label":"Hallway thermometer"},"right":{"icon":"probe","label":"Probe reading"},"mappings":[{"from":"Not the bedroom","to":"One small spot"},{"from":"Yesterday's photo","to":"One moment"}]}},
+ {"type":"Checklist","cue":"Look at the three","steps":["One: is this","Two: is the","Three: is the"],"props":{"title":"Three checks, every time","items":[{"text":"Right probe, right place?","state":"unknown"},{"text":"Recent reading?","state":"unknown"},{"text":"Reliable measurement?","state":"unknown"}]}},
+ {"type":"ProbeZone","cue":"A sensible-looking number can","steps":["the wrong pot","from a badly placed"],"props":{"pots":5,"probeAt":2,"show":["uneven","airgap"],"reading":"4 h old"}}
+],
+"A6-2":[
+ {"type":"ReadingAge","steps":["Probe A last sent"],"props":{"now":"14:00","readings":[{"name":"Probe A","at":"10:00"}],"staleAfter":60}},
+ {"type":"Calc","cue":"Fourteen minus ten is","steps":["Fourteen minus ten is","four hours old"],"props":{"heading":"Age of Probe A","lines":[{"expr":"14:00 − 10:00 = 4 h"}],"answer":"4 hours old"}},
+ {"type":"ReadingAge","cue":"Probe B last sent","steps":["Probe B last sent","one minute ago"],"props":{"now":"14:00","readings":[{"name":"Probe A","at":"10:00"},{"name":"Probe B","at":"13:59"}],"staleAfter":60}},
+ {"type":"Define","cue":"Growers call how recent","steps":["its freshness"],"props":{"term":"Freshness","meaning":"How recent a reading is."}},
+ {"type":"Define","cue":"A reading too old","steps":["is called stale","Probe A is stale"],"props":{"term":"Stale","meaning":"Too old to describe the pot now.","example":"Probe A: 4 hours old"}},
+ {"type":"DayGraph","cue":"Watch for one trap","steps":["Watch for one trap","stops sending","stops sending","stops sending","stops sending","stops sending","stops sending","A flat line can"],"props":{"hours":10,"start":6,"vwc":[[6,46],[7,51],[8,49],[9,53],[10,50],[14,50]],"now":14,"vwcRange":[40,60],"highlight":{"h":12,"text":"Flat line: steady, or no data?"}}}
+],
+"A6-3":[
+ {"type":"Define","steps":["A room is a","each zone is a"],"props":{"term":"Room","meaning":"A space with its own lights; holds one or more zones.","example":"Zone: a group of plants watered together"}},
+ {"type":"Compare","cue":"Every probe should carry","steps":["physical tag naming","name in the app","A swapped cable can"],"props":{"left":{"title":"Tag on the probe","icon":"🏷️","tone":"neutral","items":["Room 2, Zone 1"]},"right":{"title":"Name in the app","icon":"📱","tone":"neutral","items":["Room 2, Zone 1"]},"verdict":"They must match: a swapped cable breaks this"}},
+ {"type":"Define","cue":"Matching tag to screen","steps":["checking probe identity"],"props":{"term":"Probe identity","meaning":"The probe's tag matches its room and zone on screen."}},
+ {"type":"Calc","cue":"Then check units. Some","steps":["cubic metres of water","Multiply by one hundred"],"props":{"heading":"Fraction to percent","lines":[{"expr":"0.45 m³/m³ = 45 hundredths"},{"expr":"0.45 × 100 = 45% VWC"}]}},
+ {"type":"Define","cue":"Reading it as zero","steps":["one hundred times too","called a scale error"],"props":{"term":"Scale error","meaning":"A unit mix-up that makes a value 100 times wrong.","example":"0.45 read as 0.45%, not 45%"}}
+],
+"A6-4":[
+ {"type":"ProbeZone","steps":["Look at the probe"],"props":{"pots":5,"probeAt":2,"show":["region"],"reading":"50%","callout":"Fresh and named: still right?"}},
+ {"type":"Compare","cue":"In lesson A two","steps":["A probe set up","can misread in another","must suit your substrate"],"props":{"left":{"title":"Calibrated substrate","icon":"✅","tone":"good","items":["Reads correctly"]},"right":{"title":"Different substrate","icon":"⚠️","tone":"bad","items":["Can misread"]},"verdict":"Calibration must suit your substrate"}},
+ {"type":"Define","cue":"Placement matters too","steps":["where in the pot"],"props":{"term":"Placement","meaning":"Where in the pot the probe sits."}},
+ {"type":"PotCrossSection","cue":"A probe right beside","steps":["right beside the spot"],"props":{"mode":"fill","from":0.3,"to":0.65,"showProbe":true,"caption":"Beside the dripper: reads wetter"}},
+ {"type":"ProbeZone","cue":"Then there are air","steps":["A pocket of air"],"props":{"pots":5,"probeAt":2,"show":["airgap"],"reading":"41%"}},
+ {"type":"Define","cue":"Growers call these pockets","steps":["air gaps"],"props":{"term":"Air gap","meaning":"A pocket of air around a probe needle; reads too dry."}},
+ {"type":"Compare","cue":"For example, two identical","steps":["fifty percent and","forty-one percent only","only because one","an air gap"],"props":{"left":{"title":"Pot 1","icon":"🪴","tone":"good","items":["50%","Firm contact"]},"right":{"title":"Pot 2","icon":"🪴","tone":"bad","items":["41%","Air gap"]},"order":"pairs"}},
+ {"type":"Checklist","cue":"Push each probe in","steps":["Push each probe in","firm the substrate","record where and how"],"props":{"title":"Install the probe","items":[{"text":"Pushed in fully"},{"text":"Substrate firmed around it"},{"text":"Where and how recorded"}]}}
+],
+"A6-5":[
+ {"type":"ReadingAge","steps":["fifteen twenty-five"],"props":{"now":"15:30","readings":[{"name":"Last valid reading","at":"15:25"}],"staleAfter":60}},
+ {"type":"Calc","cue":"Fifteen thirty minus fifteen","steps":["Fifteen thirty minus fifteen","the reading is fresh"],"props":{"heading":"Age of the reading","lines":[{"expr":"15:30 − 15:25 = 5 min"}],"answer":"Fresh"}},
+ {"type":"Checklist","cue":"Now look at the","steps":["Age is answered","Identity is checked","The third row is"],"props":{"title":"Three rows","items":[{"text":"Age: 5 min, fresh"},{"text":"Identity: tag matches app"},{"text":"Placement and calibration","state":"unknown"}]}},
+ {"type":"Compare","cue":"To close it, look","steps":["where the probe sits","pushed in firmly","which calibration it uses","Freshness tells you","With all three rows"],"props":{"left":{"title":"Installation record","icon":"📋","tone":"good","items":["Where the probe sits","Pushed in firmly","Which calibration it uses"]},"right":{"title":"Freshness","icon":"⏱️","tone":"water","items":["The reading is recent"]},"verdict":"All three rows ticked: use the number"}}
+],
+"A6-6":[
+ {"type":"ReadingAge","steps":["Probe A shows","Probe B shows"],"props":{"now":"16:20","readings":[{"name":"Probe A","at":"12:20","value":"48%"},{"name":"Probe B","at":"16:19","value":"43%"}],"staleAfter":60}},
+ {"type":"Calc","cue":"Work out the ages","steps":["Sixteen twenty minus twelve","B is one minute","describe different moments"],"props":{"heading":"Two ages","lines":[{"expr":"16:20 − 12:20 = 4 h","note":"A is stale"},{"expr":"16:20 − 16:19 = 1 min","note":"B is fresh"}],"answer":"Different moments"}},
+ {"type":"Checklist","cue":"Check in this order","steps":["First, identity","Second, communications","Third, physical evidence"],"props":{"title":"Check in this order","items":[{"text":"Identity: both tags match"},{"text":"Communications: cable or link"},{"text":"Pot: placement, air, weight"}]}},
+ {"type":"Compare","cue":"Treat the gap between","steps":["Treat the gap","between forty-eight and","and forty-three","as unexplained until","those checks are done"],"props":{"left":{"title":"Probe A","icon":"⏳","tone":"warn","items":["48% at 12:20","4 hours old"]},"right":{"title":"Probe B","icon":"📡","tone":"water","items":["43% at 16:19","1 minute old"]},"verdict":"Gap unexplained until the checks are done","order":"pairs"}}
+],
+"A6-7":[
+ {"type":"FlowSteps","steps":["right probe","recent reading","reliable measurement"],"props":{"title":"Three questions","steps":[{"label":"Right probe","icon":"probe"},{"label":"Recent","icon":"clock"},{"label":"Reliable","icon":"check"}]}},
+ {"type":"Define","cue":"Every site should have","steps":["a plan for watering","lifting pots to judge"],"props":{"term":"Fallback procedure","meaning":"A written plan for watering safely without trusted readings.","example":"Lift pots to judge their weight"}},
+ {"type":"Define","cue":"Your site also has","steps":["the person in charge"],"props":{"term":"Responsible operator","meaning":"The person in charge of irrigation decisions on site."}},
+ {"type":"Checklist","cue":"Look at the three","steps":["First, a fault record","Second, independent evidence","Third, the local fallback"],"props":{"title":"When sensing fails","items":[{"text":"Fault record: probe, what, when"},{"text":"Independent evidence: lift a pot"},{"text":"Local fallback procedure"}]}},
+ {"type":"Compare","cue":"Keep the app's safety","steps":["Keep the app's safety","fix the sensing","Changing them to force","hides the fault"],"props":{"left":{"title":"Do","icon":"✅","tone":"good","items":["Keep safety settings","Fix the sensing"]},"right":{"title":"Don't","icon":"⛔","tone":"bad","items":["Change them to force water","Hide the fault"]}}}
+]
+}}

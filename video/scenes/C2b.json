@@ -1,0 +1,738 @@
+{
+ "slides": {
+  "1": [
+   {
+    "type": "SystemMap",
+    "props": {
+     "highlight": [
+      "host"
+     ],
+     "showDataFlow": true
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "This lesson builds the",
+    "steps": [
+     "Intel or AMD processor",
+     "most desktop computers use"
+    ],
+    "props": {
+     "term": "x86-64 PC",
+     "meaning": "A computer with an Intel or AMD processor.",
+     "example": "The chip design most desktop computers use"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Lesson C two A",
+    "steps": [
+     "uses a Raspberry Pi",
+     "Raspberry Pi instead, and",
+     "you need only one"
+    ],
+    "props": {
+     "left": {
+      "title": "Lesson C2a",
+      "icon": "probe",
+      "tone": "neutral",
+      "items": [
+       "Raspberry Pi"
+      ]
+     },
+     "right": {
+      "title": "Lesson C2b",
+      "icon": "power",
+      "tone": "good",
+      "items": [
+       "x86-64 PC"
+      ]
+     },
+     "verdict": "You need only one host",
+     "order": "pairs"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A popular choice is",
+    "steps": [
+     "a palm-sized box PC",
+     "does not make it suitable"
+    ],
+    "props": {
+     "term": "NUC",
+     "meaning": "A palm-sized box PC.",
+     "example": "Small shape alone does not make it suitable"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "The PC must be dedicated",
+    "steps": [
+     "meaning it does this",
+     "one host is enough",
+     "skip ahead to lesson",
+     "Keep pumps and valves"
+    ],
+    "props": {
+     "title": "Before you set up",
+     "items": [
+      {
+       "text": "Dedicated: this one job only"
+      },
+      {
+       "text": "One host is enough"
+      },
+      {
+       "text": "Working host? Check it, go to C3"
+      },
+      {
+       "text": "Pumps and valves disconnected"
+      }
+     ]
+    }
+   }
+  ],
+  "2": [
+   {
+    "type": "Define",
+    "steps": [
+     "the base software that",
+     "as Windows does on"
+    ],
+    "props": {
+     "term": "Operating system",
+     "meaning": "The base software that starts a computer and runs programs.",
+     "example": "Like Windows on a laptop"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "You will install Home",
+    "steps": [
+     "made only to run",
+     "against the official guide"
+    ],
+    "props": {
+     "term": "Home Assistant OS",
+     "meaning": "An operating system made only to run Home Assistant.",
+     "example": "Check the PC against the official x86-64 guide"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Look at the three",
+    "steps": [
+     "the three checks on",
+     "checks on this card",
+     "One, the processor must"
+    ],
+    "props": {
+     "title": "Three checks on this PC",
+     "items": [
+      {
+       "text": "64-bit processor"
+      },
+      {
+       "text": "Starts with UEFI, Secure Boot off",
+       "state": "unknown"
+      },
+      {
+       "text": "512-byte logical sectors",
+       "state": "unknown"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Two, the PC must",
+    "steps": [
+     "the built-in startup program",
+     "still call it the"
+    ],
+    "props": {
+     "term": "UEFI",
+     "meaning": "The built-in startup program that runs when you press power.",
+     "example": "Open it with a key at startup; often called the BIOS"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "There, turn off Secure",
+    "steps": [
+     "There, turn off Secure",
+     "a feature that only",
+     "approved operating systems start"
+    ],
+    "props": {
+     "title": "Secure Boot",
+     "steps": [
+      {
+       "label": "UEFI settings",
+       "icon": "wrench"
+      },
+      {
+       "label": "Secure Boot",
+       "icon": "shield",
+       "note": "Only lets approved operating systems start"
+      },
+      {
+       "label": "Turn it OFF",
+       "icon": "power",
+       "note": "Write down the change"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Three, the disk must",
+    "steps": [
+     "five-hundred-and-twelve-byte logical sectors",
+     "Home Assistant OS cannot",
+     "only use four-kilobyte blocks"
+    ],
+    "props": {
+     "left": {
+      "title": "512-byte sectors",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "Small blocks it stores data in"
+      ]
+     },
+     "right": {
+      "title": "4-kilobyte drives",
+      "icon": "cross",
+      "tone": "bad",
+      "items": [
+       "Home Assistant OS cannot start",
+       "Only 4-kilobyte blocks"
+      ]
+     }
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Installing replaces everything on",
+    "steps": [
+     "replaces everything on the",
+     "back up its files",
+     "write down each setting"
+    ],
+    "props": {
+     "title": "Installing replaces everything",
+     "items": [
+      {
+       "text": "Everything on the disk is erased",
+       "state": "fail"
+      },
+      {
+       "text": "Its files backed up"
+      },
+      {
+       "text": "Each changed setting written down"
+      }
+     ]
+    }
+   }
+  ],
+  "3": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Picture a workbench with",
+     "workbench with a borrowed",
+     "a borrowed toolbox and",
+     "a permanent cabinet"
+    ],
+    "props": {
+     "left": {
+      "icon": "list",
+      "label": "Workbench"
+     },
+     "right": {
+      "icon": "app",
+      "label": "Setting up the PC"
+     },
+     "joiner": "is like",
+     "mappings": [
+      {
+       "from": "Borrowed toolbox",
+       "to": "USB stick, live Ubuntu"
+      },
+      {
+       "from": "Permanent cabinet",
+       "to": "Internal disk, HA OS"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Ubuntu is a free",
+    "steps": [
+     "a free operating system",
+     "leaves no trace when"
+    ],
+    "props": {
+     "term": "Live Ubuntu",
+     "meaning": "A free operating system that runs straight from a USB stick.",
+     "example": "Leaves no trace when you remove the stick"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "The cabinet is the",
+    "steps": [
+     "The cabinet is the",
+     "cabinet is the PC's",
+     "PC's internal disk, which",
+     "for good",
+     "The card shows both"
+    ],
+    "props": {
+     "left": {
+      "title": "USB stick: toolbox",
+      "icon": "plug",
+      "tone": "neutral",
+      "items": [
+       "At least 8 GB",
+       "Runs live Ubuntu"
+      ]
+     },
+     "right": {
+      "title": "Internal disk: cabinet",
+      "icon": "save",
+      "tone": "good",
+      "items": [
+       "Holds Home Assistant OS",
+       "Kept for good"
+      ]
+     },
+     "verdict": "Two devices, two different jobs"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Start the PC from",
+    "steps": [
+     "Start the PC from",
+     "choose Try Ubuntu",
+     "Plug in an Ethernet"
+    ],
+    "props": {
+     "title": "Start from the USB stick",
+     "steps": [
+      {
+       "label": "Start from USB",
+       "icon": "power"
+      },
+      {
+       "label": "Try Ubuntu",
+       "icon": "check",
+       "note": "Try Ubuntu, not Install Ubuntu"
+      },
+      {
+       "label": "Ethernet",
+       "icon": "plug",
+       "note": "So Ubuntu can reach the internet"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "the network cable that",
+    "steps": [
+     "joins the PC to",
+     "so Ubuntu can reach"
+    ],
+    "props": {
+     "term": "Ethernet cable",
+     "meaning": "The network cable that joins the PC to your router.",
+     "example": "Ubuntu needs it to reach the internet"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "From the official Home",
+    "steps": [
+     "one file that is",
+     "The next slide restores"
+    ],
+    "props": {
+     "term": "Disk image",
+     "meaning": "One file that is an exact copy of a ready-to-run disk.",
+     "example": "Next: restore it onto the internal disk"
+    }
+   }
+  ],
+  "4": [
+   {
+    "type": "FlowSteps",
+    "steps": [
+     "open Show Applications",
+     "the program called Disks",
+     "Select the internal disk",
+     "choose Restore Disk Image",
+     "Pick the downloaded file",
+     "then Start Restoring"
+    ],
+    "props": {
+     "title": "Restore the image in Ubuntu",
+     "steps": [
+      {
+       "label": "Show Apps",
+       "icon": "search"
+      },
+      {
+       "label": "Disks",
+       "icon": "wrench"
+      },
+      {
+       "label": "Internal disk",
+       "icon": "save"
+      },
+      {
+       "label": "Restore image",
+       "icon": "restore",
+       "note": "Three-dot menu → Restore Disk Image"
+      },
+      {
+       "label": "Pick file",
+       "icon": "note",
+       "note": "The downloaded Home Assistant OS image"
+      },
+      {
+       "label": "Start",
+       "icon": "apply",
+       "note": "Start Restoring"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Before you press the",
+    "steps": [
+     "The USB stick is",
+     "The destination is that",
+     "Its backup is stored"
+    ],
+    "props": {
+     "title": "Fill in before Restore",
+     "items": [
+      {
+       "text": "USB stick: this device",
+       "state": "unknown"
+      },
+      {
+       "text": "Destination: that disk",
+       "state": "unknown"
+      },
+      {
+       "text": "Its backup: stored there",
+       "state": "unknown"
+      }
+     ]
+    }
+   },
+   {
+    "type": "HostSetup",
+    "cue": "Identify each one by",
+    "steps": [
+     "Identify each one by",
+     "by the name and"
+    ],
+    "props": {
+     "device": "pc",
+     "stages": [
+      "parts",
+      "write"
+     ]
+    }
+   },
+   {
+    "type": "DecisionTree",
+    "cue": "If Ubuntu reports the",
+    "steps": [
+     "If Ubuntu reports the",
+     "When the restore finishes",
+     "Then set UEFI to"
+    ],
+    "props": {
+     "nodes": [
+      {
+       "id": "busy",
+       "text": "Ubuntu says destination is busy?",
+       "kind": "question"
+      },
+      {
+       "id": "fix",
+       "text": "Wrong startup device: fix it",
+       "kind": "stop"
+      },
+      {
+       "id": "done",
+       "text": "Shut down, remove the USB stick",
+       "kind": "action"
+      },
+      {
+       "id": "uefi",
+       "text": "UEFI: start from the internal disk",
+       "kind": "action"
+      }
+     ],
+     "edges": [
+      {
+       "from": "busy",
+       "to": "fix",
+       "label": "Yes"
+      },
+      {
+       "from": "busy",
+       "to": "done",
+       "label": "No"
+      },
+      {
+       "from": "done",
+       "to": "uefi"
+      }
+     ],
+     "path": [
+      "busy",
+      "done",
+      "uefi"
+     ]
+    }
+   }
+  ],
+  "5": [
+   {
+    "type": "Checklist",
+    "steps": [
+     "An office PC passes",
+     "every hardware check from",
+     "slide two",
+     "current work files with",
+     "owner has not agreed"
+    ],
+    "props": {
+     "title": "Office PC",
+     "items": [
+      {
+       "text": "64-bit processor"
+      },
+      {
+       "text": "UEFI, Secure Boot off"
+      },
+      {
+       "text": "512-byte logical sectors"
+      },
+      {
+       "text": "Work files backed up",
+       "state": "fail"
+      },
+      {
+       "text": "Owner agreed to give it up",
+       "state": "fail"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "The card shows the",
+    "steps": [
+     "capable hardware and",
+     "unprotected data, so",
+     "unprotected data, so",
+     "so you stop before"
+    ],
+    "props": {
+     "left": {
+      "title": "Capable hardware",
+      "icon": "check",
+      "tone": "good",
+      "items": [
+       "Passes every check"
+      ]
+     },
+     "right": {
+      "title": "Unprotected data",
+      "icon": "alert",
+      "tone": "bad",
+      "items": [
+       "No backup",
+       "Owner has not agreed"
+      ]
+     },
+     "verdict": "Stop before erasing"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "First get the owner's",
+    "steps": [
+     "owner's agreement and a",
+     "a working backup",
+     "choose another suitable host"
+    ],
+    "props": {
+     "title": "Before erasing",
+     "steps": [
+      {
+       "label": "Owner agrees",
+       "icon": "person"
+      },
+      {
+       "label": "Working backup",
+       "icon": "save"
+      },
+      {
+       "label": "Or another host",
+       "icon": "search",
+       "note": "Choose another suitable host"
+      }
+     ]
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "While you wait, you",
+    "steps": [
+     "keep learning in the",
+     "which runs no equipment"
+    ],
+    "props": {
+     "src": "img/screens/demo-overview-r3.png",
+     "focus": [
+      {
+       "x": 540,
+       "y": 12,
+       "w": 86,
+       "h": 32,
+       "label": "Demo: the practice copy from A1"
+      },
+      {
+       "x": 14,
+       "y": 656,
+       "w": 210,
+       "h": 46,
+       "label": "Changes stay here: runs no equipment"
+      }
+     ]
+    }
+   }
+  ],
+  "6": [
+   {
+    "type": "HostSetup",
+    "steps": [
+     "Start the PC from",
+     "with the Ethernet cable"
+    ],
+    "props": {
+     "device": "pc",
+     "stages": [
+      "parts",
+      "boot"
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Every device on your",
+    "steps": [
+     "like a house number",
+     "Your web browser uses"
+    ],
+    "props": {
+     "term": "Network address",
+     "meaning": "A device's number on your network, like a house number.",
+     "example": "Your browser uses it to reach the device"
+    }
+   },
+   {
+    "type": "HostSetup",
+    "cue": "On your everyday computer,",
+    "steps": [
+     "On your everyday computer",
+     "On your everyday computer",
+     "type homeassistant dot local"
+    ],
+    "props": {
+     "device": "pc",
+     "stages": [
+      "parts",
+      "boot",
+      "browser"
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "That number is a",
+    "steps": [
+     "a numbered door on",
+     "where Home Assistant answers"
+    ],
+    "props": {
+     "term": "Port",
+     "meaning": "A numbered door on the host where Home Assistant answers.",
+     "example": "homeassistant.local:8123"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "You will see onboarding:",
+    "steps": [
+     "the welcome screens Home",
+     "shows on first start"
+    ],
+    "props": {
+     "term": "Onboarding",
+     "meaning": "The welcome screens Home Assistant shows on first start.",
+     "example": "First check the page is this PC"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "As the card shows,",
+    "steps": [
+     "record the PC model",
+     "disk, backup location",
+     "backup location, changed",
+     "changed settings, version",
+     "version and address",
+     "and address. Lesson"
+    ],
+    "props": {
+     "title": "Host record",
+     "items": [
+      {
+       "text": "PC model"
+      },
+      {
+       "text": "Disk"
+      },
+      {
+       "text": "Backup location"
+      },
+      {
+       "text": "Changed settings"
+      },
+      {
+       "text": "Version"
+      },
+      {
+       "text": "Address"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

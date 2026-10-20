@@ -1,0 +1,8 @@
+node_modules/
+public/audio/
+public/clips/
+public/data/
+public/img/
+out/
+hyperframes/opener/.hyperframes/
+hyperframes/opener/renders/

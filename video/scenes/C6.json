@@ -1,0 +1,829 @@
+{
+ "slides": {
+  "1": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Before a new building",
+     "checks the pipes and"
+    ],
+    "props": {
+     "left": {
+      "icon": "list",
+      "label": "New building: pipes, wiring"
+     },
+     "right": {
+      "icon": "zone",
+      "label": "Your system: water, valves"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "that check is called commissioning",
+    "steps": [
+     "proving each part works",
+     "It has two stages"
+    ],
+    "props": {
+     "term": "Commissioning",
+     "meaning": "Proving each part works safely before you rely on it.",
+     "example": "Stage one: equipment · Stage two: Controller cycle"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Look at the cues",
+    "steps": [
+     "does water go where",
+     "and does it stop",
+     "does Crop Steering water",
+     "while someone watches"
+    ],
+    "props": {
+     "left": {
+      "title": "Stage one: equipment test",
+      "icon": "🔧",
+      "tone": "water",
+      "items": [
+       "Water goes where it should?",
+       "Water stops?"
+      ]
+     },
+     "right": {
+      "title": "Stage two: Controller cycle",
+      "icon": "👀",
+      "tone": "good",
+      "items": [
+       "Crop Steering waters on its own?",
+       "Someone watches"
+      ]
+     }
+    }
+   },
+   {
+    "type": "SafetyStop",
+    "cue": "In stage one, the",
+    "steps": [
+     "Watering switch stays OFF"
+    ],
+    "props": {
+     "stages": [
+      "software"
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The test has a bounded",
+    "steps": [
+     "a fixed length of",
+     "For example, thirty seconds"
+    ],
+    "props": {
+     "term": "Bounded duration",
+     "meaning": "A fixed test length, agreed in advance.",
+     "example": "30 seconds, cups under the drippers"
+    }
+   },
+   {
+    "type": "SafetyStop",
+    "cue": "and the physical shutdown",
+    "steps": [
+     "and the physical shutdown"
+    ],
+    "props": {
+     "stages": [
+      "physical"
+     ]
+    }
+   }
+  ],
+  "2": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Picture filling a bath",
+     "You want one tap",
+     "and no others"
+    ],
+    "props": {
+     "left": {
+      "icon": "tap",
+      "label": "One tap running"
+     },
+     "right": {
+      "icon": "zone",
+      "label": "One zone flowing"
+     },
+     "mappings": [
+      {
+       "from": "Every other tap shut",
+       "to": "Every other zone dry"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "With the installer present",
+    "steps": [
+     "remove only the isolation",
+     "Leave everything else shut"
+    ],
+    "props": {
+     "left": {
+      "title": "This one test",
+      "icon": "🔓",
+      "tone": "water",
+      "items": [
+       "Remove only its isolation"
+      ]
+     },
+     "right": {
+      "title": "Everything else",
+      "icon": "🔒",
+      "tone": "neutral",
+      "items": [
+       "Leave it shut off"
+      ]
+     }
+    }
+   },
+   {
+    "type": "WaterPath",
+    "cue": "Look at the diagram",
+    "steps": [
+     "from the supply",
+     "through the valve",
+     "to the drippers"
+    ],
+    "props": {
+     "parts": [
+      "supply",
+      "valve",
+      "drippers"
+     ],
+     "flow": true
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Place a catch cup",
+    "steps": [
+     "a small measuring cup",
+     "one cup per dripper"
+    ],
+    "props": {
+     "term": "Catch cup",
+     "meaning": "A small measuring cup under one dripper.",
+     "example": "One cup per dripper, not one for all"
+    }
+   },
+   {
+    "type": "CatchTest",
+    "cue": "Time the run with",
+    "steps": [
+     "with a stopwatch",
+     "Other zones should stay",
+     "Then stop the test",
+     "A screen icon reports"
+    ],
+    "props": {
+     "cups": [
+      30,
+      33,
+      37
+     ],
+     "seconds": 30,
+     "otherZonesDry": true,
+     "showStop": true
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "A screen icon reports",
+    "steps": [
+     "what the software sent",
+     "your eyes on the"
+    ],
+    "props": {
+     "left": {
+      "title": "Screen icon",
+      "icon": "📱",
+      "tone": "neutral",
+      "items": [
+       "What the software sent"
+      ]
+     },
+     "right": {
+      "title": "Eyes on the dripper",
+      "icon": "👀",
+      "tone": "good",
+      "items": [
+       "The proof"
+      ]
+     }
+    }
+   }
+  ],
+  "3": [
+   {
+    "type": "Compare",
+    "steps": [
+     "A cup tells you",
+     "asks for litres per"
+    ],
+    "props": {
+     "left": {
+      "title": "A cup tells you",
+      "icon": "🥛",
+      "tone": "water",
+      "items": [
+       "Millilitres in some seconds"
+      ]
+     },
+     "right": {
+      "title": "Setup (lesson C4) asks",
+      "icon": "⚙️",
+      "tone": "neutral",
+      "items": [
+       "Litres per hour: L/h"
+      ]
+     }
+    }
+   },
+   {
+    "type": "CatchTest",
+    "cue": "Suppose one dripper fills",
+    "steps": [
+     "Suppose one dripper fills",
+     "fills its cup with",
+     "in thirty seconds",
+     "Step one: change millilitres"
+    ],
+    "props": {
+     "cups": [
+      30
+     ],
+     "seconds": 30,
+     "otherZonesDry": false,
+     "showStop": false
+    }
+   },
+   {
+    "type": "Calc",
+    "cue": "Step one: change millilitres",
+    "steps": [
+     "Thirty divided by one",
+     "Zero point zero three times",
+     "One hundred and eight divided",
+     "So this dripper delivers"
+    ],
+    "props": {
+     "heading": "30 mL in 30 s → L/h",
+     "lines": [
+      {
+       "expr": "30 ÷ 1000 = 0.03 L",
+       "note": "step one: mL to litres"
+      },
+      {
+       "expr": "0.03 × 3600 = 108",
+       "note": "step two: scale up to an hour"
+      },
+      {
+       "expr": "108 ÷ 30 = 3.6",
+       "note": "step three: divide by the run"
+      }
+     ],
+     "answer": "3.6 L/h"
+    }
+   },
+   {
+    "type": "CatchTest",
+    "cue": "Now say three cups",
+    "steps": [
+     "Now say three cups",
+     "thirty-three and thirty-seven",
+     "thirty-three and thirty-seven",
+     "They work out to"
+    ],
+    "props": {
+     "cups": [
+      30,
+      33,
+      37
+     ],
+     "seconds": 30,
+     "otherZonesDry": false,
+     "showStop": false
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "These are example numbers",
+    "steps": [
+     "never enter them for"
+    ],
+    "props": {
+     "title": "Example numbers only",
+     "items": [
+      {
+       "text": "Enter them for a real zone",
+       "state": "fail"
+      }
+     ]
+    }
+   }
+  ],
+  "4": [
+   {
+    "type": "CatchTest",
+    "steps": [
+     "A dripper fills twenty-four",
+     "in thirty seconds",
+     "Pause and work it",
+     "Twenty-four divided by one"
+    ],
+    "props": {
+     "cups": [
+      24
+     ],
+     "seconds": 30,
+     "otherZonesDry": false,
+     "showStop": false
+    }
+   },
+   {
+    "type": "Calc",
+    "cue": "Twenty-four divided by one",
+    "steps": [
+     "Twenty-four divided by one",
+     "Times three thousand six",
+     "Divided by thirty is",
+     "two point eight eight"
+    ],
+    "props": {
+     "heading": "24 mL in 30 s → L/h",
+     "lines": [
+      {
+       "expr": "24 ÷ 1000 = 0.024 L"
+      },
+      {
+       "expr": "0.024 × 3600 = 86.4"
+      },
+      {
+       "expr": "86.4 ÷ 30 = 2.88"
+      }
+     ],
+     "answer": "2.88 L/h"
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Write that on the",
+    "steps": [
+     "Write that on the",
+     "with the dripper",
+     "the runtime and",
+     "the conditions"
+    ],
+    "props": {
+     "title": "Catch record",
+     "items": [
+      {
+       "text": "Flow: 2.88 L/h"
+      },
+      {
+       "text": "Which dripper"
+      },
+      {
+       "text": "Runtime: 30 s"
+      },
+      {
+       "text": "Conditions"
+      }
+     ]
+    }
+   },
+   {
+    "type": "CatchTest",
+    "cue": "Suppose its neighbours gave",
+    "steps": [
+     "Suppose its neighbours gave",
+     "about three point six",
+     "about three point six",
+     "That gap is uneven"
+    ],
+    "props": {
+     "cups": [
+      30,
+      24,
+      30
+     ],
+     "seconds": 30,
+     "otherZonesDry": false,
+     "showStop": false
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "meaning some plants get",
+    "steps": [
+     "meaning some plants get"
+    ],
+    "props": {
+     "term": "Uneven delivery",
+     "meaning": "Some plants get less water than others.",
+     "example": "2.88 L/h beside about 3.6 L/h"
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Look for a clog",
+    "steps": [
+     "Look for a clog",
+     "Fix it, then repeat",
+     "repeat the catch"
+    ],
+    "props": {
+     "title": "Uneven? Find it, fix it",
+     "steps": [
+      {
+       "label": "Find cause",
+       "icon": "search",
+       "note": "A clog, a leak or low pressure"
+      },
+      {
+       "label": "Fix it",
+       "icon": "wrench"
+      },
+      {
+       "label": "Repeat catch",
+       "icon": "water",
+       "note": "Catch every cup again"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Then the installer tests",
+    "steps": [
+     "the installer tests the",
+     "with the maker’s method",
+     "pulling wires or power",
+     "shutting valves against it",
+     "That can wreck the"
+    ],
+    "props": {
+     "left": {
+      "title": "Test protections",
+      "tone": "good",
+      "items": [
+       "Installer tests them",
+       "Maker's method"
+      ]
+     },
+     "right": {
+      "title": "Never fake a fault",
+      "tone": "bad",
+      "items": [
+       "Pull wires or power mid-run",
+       "Shut valves against the pump"
+      ]
+     },
+     "verdict": "That can wreck the pump or flood the room"
+    }
+   }
+  ],
+  "5": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "A pilot runs a",
+     "Your system needs the"
+    ],
+    "props": {
+     "left": {
+      "icon": "list",
+      "label": "Pilot's whole checklist"
+     },
+     "right": {
+      "icon": "zone",
+      "label": "Your system's checklist"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The readiness checklist is",
+    "steps": [
+     "must all pass before"
+    ],
+    "props": {
+     "term": "Readiness checklist",
+     "meaning": "The checks that must all pass before stage two."
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "The items are: correct",
+    "steps": [
+     "correct room and outputs",
+     "fresh probe readings and",
+     "Then measured flow",
+     "tested protections",
+     "lights-on and lights-off hours",
+     "approved local targets and"
+    ],
+    "props": {
+     "title": "Readiness checklist",
+     "items": [
+      {
+       "text": "Correct room and outputs"
+      },
+      {
+       "text": "Fresh readings, acknowledged mapping"
+      },
+      {
+       "text": "Measured flow, water seen stopping"
+      },
+      {
+       "text": "Tested protections"
+      },
+      {
+       "text": "Light hours and timezone"
+      },
+      {
+       "text": "Approved targets, recovery access"
+      }
+     ]
+    }
+   },
+   {
+    "type": "AckReceipt",
+    "cue": "acknowledgement is the Controller’s receipt",
+    "steps": [
+     "acknowledgement is the Controller’s",
+     "receipt for a saved",
+     "Now decide a case"
+    ],
+    "props": {
+     "revision": 12,
+     "acknowledged": true
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "The catch and the",
+    "steps": [
+     "The catch and the",
+     "the stop both passed",
+     "pressed Save configuration",
+     "has not appeared"
+    ],
+    "props": {
+     "title": "The case",
+     "items": [
+      {
+       "text": "Catch passed"
+      },
+      {
+       "text": "Stop passed"
+      },
+      {
+       "text": "Flow entered and saved"
+      },
+      {
+       "text": "Mapping acknowledged",
+       "state": "unknown"
+      }
+     ]
+    }
+   },
+   {
+    "type": "AckReceipt",
+    "cue": "Keep Watering OFF",
+    "steps": [
+     "Keep Watering OFF",
+     "Find out why the",
+     "wait for the receipt"
+    ],
+    "props": {
+     "revision": 12,
+     "acknowledged": false
+    }
+   }
+  ],
+  "6": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "A learner driver’s first",
+     "Stage two is that",
+     "turns Watering ON for"
+    ],
+    "props": {
+     "left": {
+      "icon": "route",
+      "label": "Learner's first trip"
+     },
+     "right": {
+      "icon": "zone",
+      "label": "First Controller cycle"
+     },
+     "mappings": [
+      {
+       "from": "Instructor in the next seat",
+       "to": "Operator watching"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Enabling Watering lets Crop",
+    "steps": [
+     "start any shot it",
+     "including rescue shots"
+    ],
+    "props": {
+     "term": "Enabling Watering",
+     "meaning": "Lets Crop Steering start any shot it decides is due.",
+     "example": "Rescue shots included: real watering"
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Use approved local settings",
+    "steps": [
+     "Use approved local settings",
+     "not this course’s example",
+     "Keep the catch cups",
+     "and the shutdown ready"
+    ],
+    "props": {
+     "left": {
+      "title": "Use",
+      "tone": "good",
+      "items": [
+       "Approved local settings",
+       "Catch cups ready",
+       "Shutdown ready"
+      ]
+     },
+     "right": {
+      "title": "Not",
+      "tone": "bad",
+      "items": [
+       "This course's example numbers"
+      ]
+     },
+     "order": "pairs"
+    }
+   },
+   {
+    "type": "CatchTest",
+    "cue": "Watch the right drippers",
+    "steps": [
+     "Watch the right drippers",
+     "other zones stay dry",
+     "and the water stop",
+     "Then check the event"
+    ],
+    "props": {
+     "cups": [
+      30,
+      33,
+      37
+     ],
+     "seconds": 30,
+     "otherZonesDry": true,
+     "showStop": true
+    }
+   },
+   {
+    "type": "ScreenTour",
+    "cue": "Then check the event",
+    "steps": [
+     "Then check the event",
+     "Check the next action"
+    ],
+    "props": {
+     "src": "img/screens/demo-zone-detail-r3.png",
+     "focus": [
+      {
+       "x": 604,
+       "y": 362,
+       "w": 300,
+       "h": 60,
+       "label": "Event record: shots that happened"
+      },
+      {
+       "x": 276,
+       "y": 456,
+       "w": 300,
+       "h": 28,
+       "label": "Next action: what it plans next"
+      }
+     ]
+    }
+   },
+   {
+    "type": "DecisionTree",
+    "cue": "If water keeps flowing",
+    "steps": [
+     "If water keeps flowing",
+     "use the physical shutdown",
+     "Then turn Watering OFF",
+     "Write down what happened"
+    ],
+    "props": {
+     "nodes": [
+      {
+       "id": "q",
+       "text": "Water flowing when it should not?",
+       "kind": "question"
+      },
+      {
+       "id": "shut",
+       "text": "Physical shutdown first",
+       "kind": "stop"
+      },
+      {
+       "id": "off",
+       "text": "Then turn Watering OFF",
+       "kind": "action"
+      },
+      {
+       "id": "rec",
+       "text": "Write down what happened",
+       "kind": "action"
+      },
+      {
+       "id": "ok",
+       "text": "Record the agreed final state",
+       "kind": "action"
+      }
+     ],
+     "edges": [
+      {
+       "from": "q",
+       "to": "shut",
+       "label": "Yes"
+      },
+      {
+       "from": "q",
+       "to": "ok",
+       "label": "No"
+      },
+      {
+       "from": "shut",
+       "to": "off"
+      },
+      {
+       "from": "off",
+       "to": "rec"
+      }
+     ],
+     "path": [
+      "q",
+      "shut",
+      "off",
+      "rec"
+     ]
+    }
+   },
+   {
+    "type": "FlowSteps",
+    "cue": "Repeat both stages for",
+    "steps": [
+     "Repeat both stages for",
+     "both stages for each",
+     "for each new output"
+    ],
+    "props": {
+     "title": "Every new output",
+     "steps": [
+      {
+       "label": "Stage one",
+       "icon": "water",
+       "note": "Equipment test, Watering OFF"
+      },
+      {
+       "label": "Stage two",
+       "icon": "eye",
+       "note": "Supervised Controller cycle"
+      },
+      {
+       "label": "Record",
+       "icon": "note",
+       "note": "What happened and the final state"
+      }
+     ]
+    }
+   }
+  ]
+ }
+}

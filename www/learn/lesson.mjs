@@ -1,4 +1,4 @@
-import { createVisual } from "./visuals.mjs?v=20261020r4";
+import { createVisual } from "./visuals.mjs?v=20261021r5";
 import { gradeQuiz } from "./practice.mjs";
 
 // One-screen lesson player. A lesson is a sequence of steps:

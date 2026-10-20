@@ -1,0 +1,2356 @@
+{
+ "slides": {
+  "B1-01": [
+   {
+    "type": "Analogy",
+    "steps": [
+     "Think of a car",
+     "A graph does the"
+    ],
+    "props": {
+     "left": {
+      "icon": "dashboard",
+      "label": "Car dashboard"
+     },
+     "right": {
+      "icon": "graph",
+      "label": "Root-zone graph"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A graph is a",
+    "steps": [
+     "picture of readings over",
+     "Each reading becomes"
+    ],
+    "props": {
+     "term": "Graph",
+     "meaning": "A picture of readings over time.",
+     "example": "Each reading is a point; a line joins them"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The small key beside",
+    "steps": [
+     "called the legend"
+    ],
+    "props": {
+     "term": "Legend",
+     "meaning": "The small key that tells you which line is which."
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "The blue line is",
+    "steps": [
+     "The blue line is",
+     "The blue line is",
+     "The orange line is",
+     "The orange line is",
+     "The orange line is",
+     "The orange line is",
+     "The orange line is",
+     "The orange line is"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       7,
+       44.5
+      ],
+      [
+       7.1,
+       49
+      ],
+      [
+       7.75,
+       48
+      ],
+      [
+       7.85,
+       52
+      ],
+      [
+       8.5,
+       51
+      ],
+      [
+       8.6,
+       55
+      ],
+      [
+       9.25,
+       54
+      ],
+      [
+       9.35,
+       58
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       10.1,
+       60
+      ],
+      [
+       12,
+       57.5
+      ],
+      [
+       12.1,
+       60
+      ],
+      [
+       14,
+       57.5
+      ],
+      [
+       14.1,
+       60
+      ],
+      [
+       16,
+       57
+      ],
+      [
+       16.1,
+       59.5
+      ],
+      [
+       18,
+       57
+      ],
+      [
+       20,
+       55
+      ],
+      [
+       21,
+       54
+      ],
+      [
+       23.5,
+       51.5
+      ],
+      [
+       26,
+       49
+      ],
+      [
+       28,
+       47.5
+      ],
+      [
+       30,
+       46.5
+      ]
+     ],
+     "ec": [
+      [
+       6,
+       3
+      ],
+      [
+       8,
+       2.7
+      ],
+      [
+       10,
+       2.5
+      ],
+      [
+       14,
+       2.6
+      ],
+      [
+       18,
+       2.8
+      ],
+      [
+       21,
+       2.9
+      ],
+      [
+       24,
+       3
+      ],
+      [
+       30,
+       3.1
+      ]
+     ],
+     "ecName": "EC"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Now look along the",
+    "steps": [
+     "This edge is the",
+     "An axis is a"
+    ],
+    "props": {
+     "term": "Time axis",
+     "meaning": "The ruler along the bottom edge: time, left to right.",
+     "example": "Axis: a ruler printed along one edge"
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "Read time from left",
+    "steps": [
+     "Read time from left",
+     "Moving right means later",
+     "Moving right means later",
+     "Moving right means later",
+     "Moving right means later",
+     "Moving right means later",
+     "Moving right means later",
+     "noon sits to the"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       7,
+       44.5
+      ],
+      [
+       7.1,
+       49
+      ],
+      [
+       7.75,
+       48
+      ],
+      [
+       7.85,
+       52
+      ],
+      [
+       8.5,
+       51
+      ],
+      [
+       8.6,
+       55
+      ],
+      [
+       9.25,
+       54
+      ],
+      [
+       9.35,
+       58
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       10.1,
+       60
+      ],
+      [
+       12,
+       57.5
+      ],
+      [
+       12.1,
+       60
+      ],
+      [
+       14,
+       57.5
+      ],
+      [
+       14.1,
+       60
+      ],
+      [
+       16,
+       57
+      ],
+      [
+       16.1,
+       59.5
+      ],
+      [
+       18,
+       57
+      ],
+      [
+       20,
+       55
+      ],
+      [
+       21,
+       54
+      ],
+      [
+       23.5,
+       51.5
+      ],
+      [
+       26,
+       49
+      ],
+      [
+       28,
+       47.5
+      ],
+      [
+       30,
+       46.5
+      ]
+     ],
+     "highlight": {
+      "h": 12,
+      "text": "Noon: right of 06:00"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The shaded band is",
+    "steps": [
+     "when the lights in"
+    ],
+    "props": {
+     "term": "Night shading",
+     "meaning": "The shaded band: night, when the grow lights are off."
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "The probes keep measuring",
+    "steps": [
+     "The probes keep measuring",
+     "keep measuring through",
+     "both lines carry on",
+     "both lines carry on",
+     "both lines carry on",
+     "both lines carry on",
+     "both lines carry on",
+     "carry on across the"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       7,
+       44.5
+      ],
+      [
+       7.1,
+       49
+      ],
+      [
+       7.75,
+       48
+      ],
+      [
+       7.85,
+       52
+      ],
+      [
+       8.5,
+       51
+      ],
+      [
+       8.6,
+       55
+      ],
+      [
+       9.25,
+       54
+      ],
+      [
+       9.35,
+       58
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       10.1,
+       60
+      ],
+      [
+       12,
+       57.5
+      ],
+      [
+       12.1,
+       60
+      ],
+      [
+       14,
+       57.5
+      ],
+      [
+       14.1,
+       60
+      ],
+      [
+       16,
+       57
+      ],
+      [
+       16.1,
+       59.5
+      ],
+      [
+       18,
+       57
+      ],
+      [
+       20,
+       55
+      ],
+      [
+       21,
+       54
+      ],
+      [
+       23.5,
+       51.5
+      ],
+      [
+       26,
+       49
+      ],
+      [
+       28,
+       47.5
+      ],
+      [
+       30,
+       46.5
+      ]
+     ],
+     "ec": [
+      [
+       6,
+       3
+      ],
+      [
+       8,
+       2.7
+      ],
+      [
+       10,
+       2.5
+      ],
+      [
+       14,
+       2.6
+      ],
+      [
+       18,
+       2.8
+      ],
+      [
+       21,
+       2.9
+      ],
+      [
+       24,
+       3
+      ],
+      [
+       30,
+       3.1
+      ]
+     ],
+     "ecName": "EC",
+     "highlight": {
+      "h": 26,
+      "text": "Both lines carry on at night"
+     }
+    }
+   }
+  ],
+  "B1-02": [
+   {
+    "type": "DayGraph",
+    "steps": [
+     "The blue VWC line",
+     "its own ruler on",
+     "This left axis is",
+     "This left axis is",
+     "This left axis is",
+     "This left axis is",
+     "This left axis is",
+     "This left axis is"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwcRange": [
+      30,
+      70
+     ],
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       7,
+       44.5
+      ],
+      [
+       7.1,
+       49
+      ],
+      [
+       7.75,
+       48
+      ],
+      [
+       7.85,
+       52
+      ],
+      [
+       8.5,
+       51
+      ],
+      [
+       8.6,
+       55
+      ],
+      [
+       9.25,
+       54
+      ],
+      [
+       9.35,
+       58
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       10.1,
+       60
+      ],
+      [
+       12,
+       57.5
+      ],
+      [
+       12.1,
+       60
+      ],
+      [
+       14,
+       57.5
+      ],
+      [
+       14.1,
+       60
+      ],
+      [
+       16,
+       57
+      ],
+      [
+       16.1,
+       59.5
+      ],
+      [
+       18,
+       57
+      ],
+      [
+       20,
+       55
+      ],
+      [
+       21,
+       54
+      ],
+      [
+       23.5,
+       51.5
+      ],
+      [
+       26,
+       49
+      ],
+      [
+       28,
+       47.5
+      ],
+      [
+       30,
+       46.5
+      ]
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Its scale, the spacing",
+    "steps": [
+     "the spacing of the",
+     "from thirty percent"
+    ],
+    "props": {
+     "term": "Scale",
+     "meaning": "The spacing of the numbers along an axis.",
+     "example": "30% at the bottom to 70% at the top"
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "To read the line",
+    "steps": [
+     "To read the line",
+     "pick one point on",
+     "pick one point on",
+     "pick one point on",
+     "pick one point on",
+     "pick one point on",
+     "pick one point on",
+     "Try it at the"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwcRange": [
+      30,
+      70
+     ],
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       7,
+       44.5
+      ],
+      [
+       7.1,
+       49
+      ],
+      [
+       7.75,
+       48
+      ],
+      [
+       7.85,
+       52
+      ],
+      [
+       8.5,
+       51
+      ],
+      [
+       8.6,
+       55
+      ],
+      [
+       9.25,
+       54
+      ],
+      [
+       9.35,
+       58
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       10.1,
+       60
+      ],
+      [
+       12,
+       57.5
+      ],
+      [
+       12.1,
+       60
+      ],
+      [
+       14,
+       57.5
+      ],
+      [
+       14.1,
+       60
+      ],
+      [
+       16,
+       57
+      ],
+      [
+       16.1,
+       59.5
+      ],
+      [
+       18,
+       57
+      ],
+      [
+       20,
+       55
+      ],
+      [
+       21,
+       54
+      ],
+      [
+       23.5,
+       51.5
+      ],
+      [
+       26,
+       49
+      ],
+      [
+       28,
+       47.5
+      ],
+      [
+       30,
+       46.5
+      ]
+     ],
+     "highlight": {
+      "h": 12.1,
+      "text": "60%"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The line here is",
+    "steps": [
+     "joins real readings",
+     "the measured line"
+    ],
+    "props": {
+     "term": "Measured line",
+     "meaning": "The solid line joining real readings from the probe."
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "A smooth line can",
+    "steps": [
+     "Confirm which probe",
+     "Read the time of",
+     "Look for gaps"
+    ],
+    "props": {
+     "title": "Before you trust the line",
+     "items": [
+      {
+       "text": "Which probe drew it"
+      },
+      {
+       "text": "Time of its last reading"
+      },
+      {
+       "text": "Gaps where readings are missing"
+      }
+     ]
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "If the last reading",
+    "steps": [
+     "If the last reading",
+     "If the last reading",
+     "If the last reading",
+     "If the last reading",
+     "If the last reading",
+     "If the last reading",
+     "If the last reading",
+     "describes four hours ago"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwcRange": [
+      30,
+      70
+     ],
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       7,
+       44.5
+      ],
+      [
+       7.1,
+       49
+      ],
+      [
+       7.75,
+       48
+      ],
+      [
+       7.85,
+       52
+      ],
+      [
+       8.5,
+       51
+      ],
+      [
+       8.6,
+       55
+      ],
+      [
+       9.25,
+       54
+      ],
+      [
+       9.35,
+       58
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       10.1,
+       60
+      ],
+      [
+       12,
+       57.5
+      ],
+      [
+       12.1,
+       60
+      ],
+      [
+       14,
+       57.5
+      ]
+     ],
+     "gap": [
+      14,
+      18
+     ],
+     "now": 18,
+     "highlight": {
+      "h": 14,
+      "text": "Last reading: 4 hours old"
+     }
+    }
+   }
+  ],
+  "B1-03": [
+   {
+    "type": "SaltWater",
+    "steps": [
+     "Remember the salted water",
+     "More dissolved salt"
+    ],
+    "props": {
+     "readings": [
+      0.5,
+      2
+     ],
+     "unit": "mS/cm",
+     "labels": [
+      "Less salt",
+      "More dissolved salt"
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The orange EC line",
+    "steps": [
+     "called the right axis",
+     "millisiemens per centimetre"
+    ],
+    "props": {
+     "term": "Right axis",
+     "meaning": "The ruler on the right edge, for the EC line.",
+     "example": "Marked in mS/cm"
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "Read an orange point",
+    "steps": [
+     "Read an orange point",
+     "Read an orange point",
+     "Read an orange point",
+     "Read an orange point",
+     "Read an orange point",
+     "Read an orange point",
+     "Read an orange point",
+     "never the left"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       7,
+       44.5
+      ],
+      [
+       7.1,
+       49
+      ],
+      [
+       7.75,
+       48
+      ],
+      [
+       7.85,
+       52
+      ],
+      [
+       8.5,
+       51
+      ],
+      [
+       8.6,
+       55
+      ],
+      [
+       9.25,
+       54
+      ],
+      [
+       9.35,
+       58
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       10.1,
+       60
+      ],
+      [
+       12,
+       57.5
+      ],
+      [
+       12.1,
+       60
+      ],
+      [
+       14,
+       57.5
+      ],
+      [
+       14.1,
+       60
+      ],
+      [
+       16,
+       57
+      ],
+      [
+       16.1,
+       59.5
+      ],
+      [
+       18,
+       57
+      ],
+      [
+       20,
+       55
+      ],
+      [
+       21,
+       54
+      ],
+      [
+       23.5,
+       51.5
+      ],
+      [
+       26,
+       49
+      ],
+      [
+       28,
+       47.5
+      ],
+      [
+       30,
+       46.5
+      ]
+     ],
+     "ec": [
+      [
+       6,
+       3
+      ],
+      [
+       8,
+       2.7
+      ],
+      [
+       10,
+       2.5
+      ],
+      [
+       14,
+       2.6
+      ],
+      [
+       18,
+       2.8
+      ],
+      [
+       21,
+       2.9
+      ],
+      [
+       24,
+       3
+      ],
+      [
+       30,
+       3.1
+      ]
+     ],
+     "ecName": "EC",
+     "highlight": {
+      "h": 14,
+      "text": "Read EC on the right axis",
+      "line": "ec"
+     }
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "Next, ask where this",
+    "steps": [
+     "supply tank describes",
+     "probe in the root"
+    ],
+    "props": {
+     "left": {
+      "title": "Supply tank",
+      "icon": "🛢️",
+      "tone": "neutral",
+      "items": [
+       "The solution before the plants"
+      ]
+     },
+     "right": {
+      "title": "Root-zone probe",
+      "icon": "🌱",
+      "tone": "water",
+      "items": [
+       "The water around the roots"
+      ]
+     }
+    }
+   },
+   {
+    "type": "MeasurementMap",
+    "cue": "Lesson A five gave",
+    "steps": [
+     "Feed EC is measured",
+     "Bulk EC is measured",
+     "Pore-water EC describes"
+    ],
+    "props": {
+     "highlight": [
+      "feed",
+      "bulk",
+      "pore"
+     ]
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "Check the line's name",
+    "steps": [
+     "Check the line's name",
+     "Check the line's name",
+     "Check the line's name",
+     "Check the line's name",
+     "Check the line's name",
+     "Check the line's name",
+     "Check the line's name",
+     "in the legend"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       7,
+       44.5
+      ],
+      [
+       7.1,
+       49
+      ],
+      [
+       7.75,
+       48
+      ],
+      [
+       7.85,
+       52
+      ],
+      [
+       8.5,
+       51
+      ],
+      [
+       8.6,
+       55
+      ],
+      [
+       9.25,
+       54
+      ],
+      [
+       9.35,
+       58
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       10.1,
+       60
+      ],
+      [
+       12,
+       57.5
+      ],
+      [
+       12.1,
+       60
+      ],
+      [
+       14,
+       57.5
+      ],
+      [
+       14.1,
+       60
+      ],
+      [
+       16,
+       57
+      ],
+      [
+       16.1,
+       59.5
+      ],
+      [
+       18,
+       57
+      ],
+      [
+       20,
+       55
+      ],
+      [
+       21,
+       54
+      ],
+      [
+       23.5,
+       51.5
+      ],
+      [
+       26,
+       49
+      ],
+      [
+       28,
+       47.5
+      ],
+      [
+       30,
+       46.5
+      ]
+     ],
+     "ec": [
+      [
+       6,
+       3
+      ],
+      [
+       8,
+       2.7
+      ],
+      [
+       10,
+       2.5
+      ],
+      [
+       14,
+       2.6
+      ],
+      [
+       18,
+       2.8
+      ],
+      [
+       21,
+       2.9
+      ],
+      [
+       24,
+       3
+      ],
+      [
+       30,
+       3.1
+      ]
+     ],
+     "ecName": "Bulk EC",
+     "highlight": {
+      "h": 21,
+      "text": "Legend says: Bulk EC",
+      "line": "ec"
+     }
+    }
+   },
+   {
+    "type": "Analogy",
+    "cue": "Now look where the",
+    "steps": [
+     "Picture the speedometer",
+     "Does a crossing mean"
+    ],
+    "props": {
+     "left": {
+      "icon": "dashboard",
+      "label": "Two needles, same angle"
+     },
+     "right": {
+      "icon": "graph",
+      "label": "Two lines cross"
+     },
+     "joiner": "is like"
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "Each line is drawn",
+    "steps": [
+     "Each line is drawn",
+     "the blue line might",
+     "The orange line might",
+     "The orange line might",
+     "The orange line might",
+     "The orange line might",
+     "The orange line might",
+     "They meet on the"
+    ],
+    "props": {
+     "hours": 12,
+     "start": 6,
+     "vwcRange": [
+      30,
+      70
+     ],
+     "ecRange": [
+      1,
+      4
+     ],
+     "vwc": [
+      [
+       6,
+       58
+      ],
+      [
+       10,
+       55
+      ],
+      [
+       14,
+       50
+      ],
+      [
+       18,
+       46
+      ]
+     ],
+     "ec": [
+      [
+       6,
+       1.9
+      ],
+      [
+       10,
+       2.2
+      ],
+      [
+       14,
+       2.5
+      ],
+      [
+       18,
+       2.8
+      ]
+     ],
+     "ecName": "EC",
+     "highlight": {
+      "h": 14,
+      "text": "50% left · 2.5 mS/cm right"
+     }
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "So never subtract one",
+    "steps": [
+     "never subtract one",
+     "litres away from",
+     "Compare VWC with VWC",
+     "and EC with EC"
+    ],
+    "props": {
+     "left": {
+      "title": "Never",
+      "icon": "⛔",
+      "tone": "bad",
+      "items": [
+       "EC taken away from VWC",
+       "Litres minus km/h"
+      ]
+     },
+     "right": {
+      "title": "Like with like",
+      "icon": "✅",
+      "tone": "good",
+      "items": [
+       "VWC with VWC",
+       "EC with EC"
+      ]
+     }
+    }
+   }
+  ],
+  "B1-04": [
+   {
+    "type": "Define",
+    "steps": [
+     "from start to stop",
+     "called an event marker"
+    ],
+    "props": {
+     "term": "Shot",
+     "meaning": "One watering, from start to stop.",
+     "example": "Marked at its start: an event marker"
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The decision to water",
+    "steps": [
+     "decides when to water",
+     "Lesson C one explains"
+    ],
+    "props": {
+     "term": "Controller",
+     "meaning": "The part of Crop Steering that decides when to water."
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "In the app, a",
+    "steps": [
+     "In the app, a",
+     "In the app, a",
+     "In the app, a",
+     "a filled dot marks",
+     "a filled dot marks",
+     "a filled dot marks",
+     "a filled dot marks",
+     "look for the blue"
+    ],
+    "props": {
+     "hours": 12,
+     "start": 6,
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       7,
+       44.5
+      ],
+      [
+       7.1,
+       49
+      ],
+      [
+       7.75,
+       48
+      ],
+      [
+       7.85,
+       52
+      ],
+      [
+       8.5,
+       51
+      ],
+      [
+       8.6,
+       55
+      ],
+      [
+       9.25,
+       54
+      ],
+      [
+       9.35,
+       58
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       10.1,
+       60
+      ],
+      [
+       12,
+       57.5
+      ],
+      [
+       12.1,
+       60
+      ],
+      [
+       14,
+       57.5
+      ],
+      [
+       14.1,
+       60
+      ],
+      [
+       16,
+       57
+      ],
+      [
+       18,
+       55.5
+      ]
+     ],
+     "shots": [
+      7,
+      7.75,
+      8.5,
+      9.25,
+      10,
+      12,
+      14
+     ],
+     "held": [
+      16
+     ],
+     "highlight": {
+      "h": 10.1,
+      "text": "Line steps up after a shot"
+     }
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "The orange line does",
+    "steps": [
+     "Mixing in the substrate",
+     "drainage, temperature",
+     "temperature and the",
+     "and the plant"
+    ],
+    "props": {
+     "title": "After a shot, EC is moved by",
+     "items": [
+      {
+       "text": "Mixing in the substrate"
+      },
+      {
+       "text": "Drainage"
+      },
+      {
+       "text": "Temperature"
+      },
+      {
+       "text": "The plant"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Analogy",
+    "cue": "Think of a journey",
+    "steps": [
+     "Think of a journey",
+     "The graph can show",
+     "The graph can show",
+     "The graph can show"
+    ],
+    "props": {
+     "left": {
+      "icon": "route",
+      "label": "Journey plan"
+     },
+     "right": {
+      "icon": "graph",
+      "label": "Plan beside measurement"
+     },
+     "mappings": [
+      {
+       "from": "The plan",
+       "to": "Dashed planning reference"
+      },
+      {
+       "from": "The trip you drove",
+       "to": "Solid measured line"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "The dashed line is",
+    "steps": [
+     "the path the app's"
+    ],
+    "props": {
+     "term": "Planning reference",
+     "meaning": "The dashed line: the path the app's settings aim for."
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "For example, the plan",
+    "steps": [
+     "For example, the plan",
+     "the probe read fifty-eight",
+     "the probe read fifty-eight",
+     "the probe read fifty-eight",
+     "the plan might say",
+     "Each line shows",
+     "Each line shows",
+     "Each line shows"
+    ],
+    "props": {
+     "hours": 12,
+     "start": 6,
+     "vwcRange": [
+      40,
+      65
+     ],
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       8,
+       52
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       12,
+       58
+      ],
+      [
+       14,
+       57
+      ],
+      [
+       16,
+       59
+      ],
+      [
+       18,
+       57
+      ]
+     ],
+     "plan": [
+      [
+       6,
+       45
+      ],
+      [
+       10,
+       60
+      ],
+      [
+       12,
+       60
+      ],
+      [
+       18,
+       57
+      ]
+     ],
+     "highlight": {
+      "h": 12,
+      "text": "Plan 60% · probe 58%"
+     }
+    }
+   }
+  ],
+  "B1-05": [
+   {
+    "type": "DayGraph",
+    "steps": [
+     "Follow the dashed planning",
+     "Follow the dashed planning",
+     "Follow the dashed planning",
+     "Follow the dashed planning",
+     "Follow the dashed planning",
+     "like a route on",
+     "like a route on",
+     "like a route on"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       7,
+       44.5
+      ],
+      [
+       7.1,
+       49
+      ],
+      [
+       7.75,
+       48
+      ],
+      [
+       7.85,
+       52
+      ],
+      [
+       8.5,
+       51
+      ],
+      [
+       8.6,
+       55
+      ],
+      [
+       9.25,
+       54
+      ],
+      [
+       9.35,
+       58
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       10.1,
+       60
+      ],
+      [
+       12,
+       57.5
+      ],
+      [
+       12.1,
+       60
+      ],
+      [
+       14,
+       57.5
+      ],
+      [
+       14.1,
+       60
+      ],
+      [
+       16,
+       57
+      ],
+      [
+       16.1,
+       59.5
+      ],
+      [
+       18,
+       57
+      ]
+     ],
+     "plan": [
+      [
+       6,
+       45
+      ],
+      [
+       10,
+       60
+      ],
+      [
+       18,
+       57
+      ],
+      [
+       30,
+       45
+      ]
+     ],
+     "now": 18
+    }
+   },
+   {
+    "type": "Analogy",
+    "cue": "like a route on",
+    "steps": [
+     "like a route on",
+     "This lets you see"
+    ],
+    "props": {
+     "left": {
+      "icon": "route",
+      "label": "Route for the whole journey"
+     },
+     "right": {
+      "icon": "graph",
+      "label": "Plan for a day and night"
+     }
+    }
+   },
+   {
+    "type": "Compare",
+    "cue": "The dashed line shows",
+    "steps": [
+     "The dashed line shows",
+     "the solid line will"
+    ],
+    "props": {
+     "left": {
+      "title": "Dashed line",
+      "icon": "🗺️",
+      "tone": "neutral",
+      "items": [
+       "What the settings plan"
+      ]
+     },
+     "right": {
+      "title": "Solid line",
+      "icon": "📈",
+      "tone": "water",
+      "items": [
+       "What really happened"
+      ]
+     }
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "The dashed orange EC",
+    "steps": [
+     "The dashed orange EC",
+     "The dashed orange EC",
+     "draws a straight join",
+     "draws a straight join",
+     "draws a straight join",
+     "draws a straight join",
+     "draws a straight join",
+     "two point eight in"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       7,
+       44.5
+      ],
+      [
+       7.1,
+       49
+      ],
+      [
+       7.75,
+       48
+      ],
+      [
+       7.85,
+       52
+      ],
+      [
+       8.5,
+       51
+      ],
+      [
+       8.6,
+       55
+      ],
+      [
+       9.25,
+       54
+      ],
+      [
+       9.35,
+       58
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       10.1,
+       60
+      ],
+      [
+       12,
+       57.5
+      ],
+      [
+       12.1,
+       60
+      ],
+      [
+       14,
+       57.5
+      ],
+      [
+       14.1,
+       60
+      ],
+      [
+       16,
+       57
+      ],
+      [
+       16.1,
+       59.5
+      ],
+      [
+       18,
+       57
+      ]
+     ],
+     "ec": [
+      [
+       6,
+       3
+      ],
+      [
+       10,
+       2.6
+      ],
+      [
+       14,
+       2.7
+      ],
+      [
+       18,
+       2.8
+      ],
+      [
+       30,
+       3
+      ]
+     ],
+     "ecName": "EC plan",
+     "ecRange": [
+      2,
+      3.5
+     ],
+     "highlight": {
+      "h": 18,
+      "text": "2.8 → 3.0: a straight join",
+      "line": "ec"
+     }
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Now a new idea",
+    "steps": [
+     "a trigger line",
+     "the Controller may act"
+    ],
+    "props": {
+     "term": "Threshold",
+     "meaning": "A trigger line: when crossed, the Controller may act."
+    }
+   },
+   {
+    "type": "PotCrossSection",
+    "cue": "This graph has a",
+    "steps": [
+     "If the root zone"
+    ],
+    "props": {
+     "mode": "dry",
+     "from": 0.5,
+     "to": 0.3,
+     "showRoots": true,
+     "caption": "Too dry overnight: a protective shot"
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "Watch a practice edit",
+    "steps": [
+     "Watch a practice edit",
+     "Watch a practice edit",
+     "Watch a practice edit",
+     "Watch a practice edit",
+     "Watch a practice edit",
+     "The draft threshold changes",
+     "to thirty-nine percent",
+     "a rise of four"
+    ],
+    "props": {
+     "hours": 14.5,
+     "start": 15.5,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwcRange": [
+      30,
+      60
+     ],
+     "vwc": [
+      [
+       15.5,
+       59.5
+      ],
+      [
+       17,
+       58
+      ],
+      [
+       18,
+       57
+      ],
+      [
+       21,
+       52
+      ],
+      [
+       24,
+       48
+      ],
+      [
+       27,
+       45
+      ],
+      [
+       30,
+       43
+      ]
+     ],
+     "thresholds": [
+      {
+       "label": "Night emergency",
+       "value": 35,
+       "to": 39
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "A draft is a",
+    "steps": [
+     "a proposed change"
+    ],
+    "props": {
+     "term": "Draft",
+     "meaning": "A proposed change that is not saved yet."
+    }
+   },
+   {
+    "type": "LinesLegend",
+    "cue": "The saved line at",
+    "steps": [
+     "The saved line at",
+     "measured blue line"
+    ],
+    "props": {
+     "from": 35,
+     "to": 39,
+     "unit": "%",
+     "showReview": false,
+     "setting": "Night emergency"
+    }
+   }
+  ],
+  "B1-06": [
+   {
+    "type": "DayGraph",
+    "steps": [
+     "Test yourself",
+     "the past water content",
+     "the past water content",
+     "a shot booked",
+     "a shot booked",
+     "Test yourself",
+     "After that edit",
+     "a shot booked"
+    ],
+    "props": {
+     "hours": 14.5,
+     "start": 15.5,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwcRange": [
+      30,
+      60
+     ],
+     "vwc": [
+      [
+       15.5,
+       59.5
+      ],
+      [
+       17,
+       58
+      ],
+      [
+       18,
+       57
+      ],
+      [
+       21,
+       52
+      ],
+      [
+       24,
+       48
+      ],
+      [
+       27,
+       45
+      ],
+      [
+       30,
+       43
+      ]
+     ],
+     "thresholds": [
+      {
+       "label": "Night emergency",
+       "value": 35,
+       "to": 39
+      }
+     ]
+    }
+   },
+   {
+    "type": "Checklist",
+    "cue": "Only the draft threshold",
+    "steps": [
+     "Only the draft threshold",
+     "Only the draft threshold",
+     "A draft stays on"
+    ],
+    "props": {
+     "title": "What changed?",
+     "items": [
+      {
+       "text": "Past water content",
+       "state": "fail"
+      },
+      {
+       "text": "Draft threshold"
+      },
+      {
+       "text": "Shot booked for tonight",
+       "state": "fail"
+      }
+     ]
+    }
+   },
+   {
+    "type": "Define",
+    "cue": "Saving is a separate",
+    "steps": [
+     "sends the value to"
+    ],
+    "props": {
+     "term": "Save",
+     "meaning": "The separate step that sends a value to the system."
+    }
+   },
+   {
+    "type": "Analogy",
+    "cue": "Think of a fridge",
+    "steps": [
+     "Think of a fridge",
+     "Think of a fridge",
+     "it marks trouble",
+     "not the temperature"
+    ],
+    "props": {
+     "left": {
+      "icon": "fridge",
+      "label": "Fridge alarm limit"
+     },
+     "right": {
+      "icon": "setting",
+      "label": "Threshold"
+     },
+     "mappings": [
+      {
+       "from": "Marks trouble",
+       "to": "A trigger line"
+      },
+      {
+       "from": "Not the aim",
+       "to": "Books no shot"
+      }
+     ]
+    }
+   },
+   {
+    "type": "DayGraph",
+    "cue": "Now read the whole",
+    "steps": [
+     "Point to the time",
+     "left VWC axis",
+     "right EC axis",
+     "Find one shot",
+     "Find the dashed",
+     "Find the dashed",
+     "Find the dashed",
+     "time of the last"
+    ],
+    "props": {
+     "hours": 24,
+     "start": 6,
+     "nightFrom": 18,
+     "nightTo": 6,
+     "vwc": [
+      [
+       6,
+       46
+      ],
+      [
+       7,
+       44.5
+      ],
+      [
+       7.1,
+       49
+      ],
+      [
+       7.75,
+       48
+      ],
+      [
+       7.85,
+       52
+      ],
+      [
+       8.5,
+       51
+      ],
+      [
+       8.6,
+       55
+      ],
+      [
+       9.25,
+       54
+      ],
+      [
+       9.35,
+       58
+      ],
+      [
+       10,
+       57
+      ],
+      [
+       10.1,
+       60
+      ],
+      [
+       12,
+       57.5
+      ],
+      [
+       12.1,
+       60
+      ],
+      [
+       14,
+       57.5
+      ],
+      [
+       14.1,
+       60
+      ],
+      [
+       16,
+       57
+      ],
+      [
+       16.1,
+       59.5
+      ]
+     ],
+     "ec": [
+      [
+       6,
+       3
+      ],
+      [
+       8,
+       2.7
+      ],
+      [
+       10,
+       2.5
+      ],
+      [
+       14,
+       2.6
+      ],
+      [
+       16,
+       2.7
+      ]
+     ],
+     "ecName": "Bulk EC",
+     "plan": [
+      [
+       6,
+       45
+      ],
+      [
+       10,
+       60
+      ],
+      [
+       18,
+       57
+      ],
+      [
+       30,
+       45
+      ]
+     ],
+     "shots": [
+      7,
+      7.75,
+      8.5,
+      9.25,
+      10,
+      12,
+      14,
+      16
+     ],
+     "now": 16.1,
+     "highlight": {
+      "h": 16.1,
+      "text": "Last reading: check its age"
+     }
+    }
+   },
+   {
+    "type": "PhaseDay",
+    "cue": "In the next lesson",
+    "steps": [
+     "four parts, labelled",
+     "P zero to",
+     "P zero to",
+     "to P three"
+    ],
+    "props": {
+     "lightsOn": "06:00",
+     "lightsOff": "18:00",
+     "highlight": "all"
+    }
+   }
+  ]
+ }
+}

@@ -13,7 +13,7 @@ try {
   await page.waitForFunction(() => document.querySelector("video track")?.readyState === 2);
   await video.evaluate(v => new Promise(resolve => {
     v.addEventListener("seeked", resolve, {once:true});
-    v.currentTime = 1;
+    v.currentTime = 6; // after the 4 s lesson opener
   }));
   await page.waitForFunction(() => document.querySelector(".lp-caption")?.textContent.trim().length > 10);
   assert.equal(await video.evaluate(v => v.textTracks[0].mode), "hidden");
