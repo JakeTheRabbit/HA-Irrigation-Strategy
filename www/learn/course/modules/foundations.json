@@ -3,11 +3,11 @@
     "id": "A4",
     "module": "A",
     "title": "Dryback without the confusing maths",
-    "summary": "Use a familiar balance to understand a fall in water content, then calculate and label dryback.",
+    "summary": "Use a bank balance to understand dryback, then describe a fall in water content two ways: in percentage points and as relative dryback.",
     "outcomes": [
-      "Explain dryback as a fall between two water-content readings.",
+      "Explain dryback as a fall between two timestamped readings from the same probe.",
       "Calculate percentage points and relative dryback from the starting reading.",
-      "Read the meaning of a program field before using its number."
+      "Turn a morning dryback setting and a peak into the app's VWC reference."
     ],
     "prerequisites": [
       "A2",
@@ -19,10 +19,11 @@
         "id": "A4-1",
         "title": "Think of a bank balance",
         "body": [
-          "A balance falls from 60 to 45: the decrease is 15.",
-          "Dryback describes a fall in measured water content."
+          "A balance falls from $60 to $45: $15 has gone.",
+          "VWC falls from 60% to 45% on the same probe.",
+          "That fall in water content is called dryback."
         ],
-        "narration": "Imagine a bank balance falling from sixty dollars to forty-five. Fifteen dollars has gone. Now replace dollars with readings from the same water-content probe. Water content has fallen between two times. Growers call that fall dryback. The calculation describes the change. It cannot tell us how much went into the plant, drained away, or evaporated.",
+        "narration": "In lesson A three you watched water fill a pot and drain. Now we follow what happens next, as the pot slowly dries. Start with something familiar. Your bank balance is sixty dollars in the morning. By evening it is forty-five dollars. Fifteen dollars has gone. You know how much left, but not yet where it went. Water in a pot behaves the same way. Look at the line on screen. Remember, VWC is the share of the sample volume that is water. The probe read sixty percent VWC earlier and forty-five percent later. Water left the pot between those two readings. Growers call this fall in water content dryback. Some of that water went into the plant. Some evaporated from the surface, and some drained out. Dryback counts all of them together. Always compare two readings from the same probe, because each probe samples its own small spot. Next, we measure the size of the fall.",
         "visual": {
           "type": "dryback",
           "title": "Think of a bank balance",
@@ -32,16 +33,37 @@
             "Compare the same probe"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "A probe reads 55% VWC at 08:00 and 47% VWC at 14:00. What does the word dryback describe here?",
+          "options": [
+            {
+              "text": "The fall in water content between the two readings",
+              "correct": true,
+              "feedback": "Yes. Dryback is the fall between two readings from the same probe, whatever caused it."
+            },
+            {
+              "text": "Only the water the plant drank",
+              "correct": false,
+              "feedback": "Dryback adds plant uptake, evaporation and drainage together. It cannot separate them."
+            },
+            {
+              "text": "The amount of water you must add now",
+              "correct": false,
+              "feedback": "Dryback describes what already happened. It is not a watering instruction."
+            }
+          ]
         }
       },
       {
         "id": "A4-2",
         "title": "First find the size of the fall",
         "body": [
-          "Start 60% VWC; end 45% VWC.",
-          "60 − 45 = 15 percentage points."
+          "Starting reading 60% VWC; ending reading 45% VWC.",
+          "60 − 45 = 15 percentage points.",
+          "Write a timestamp beside each reading."
         ],
-        "narration": "VWC means the share of the measured sample volume occupied by water. Our example starts at sixty percent VWC and ends at forty-five percent. Subtract forty-five from sixty. The fall is fifteen percentage points. The word points matters because we are subtracting two percentage readings. Keep the starting reading and its time beside the ending reading.",
+        "narration": "Back to the bank balance. Sixty minus forty-five is fifteen dollars. Water content works the same way, with two new words. The first reading in a comparison is called the starting reading. Here it is sixty percent VWC. The ending reading is forty-five percent VWC. Subtract the end from the start. Sixty minus forty-five is fifteen. Look at the bar marked drop on screen. Because we subtracted one percentage from another, we do not call the answer fifteen percent. We call it fifteen percentage points. A percentage point is the plain gap between two percentages. Each reading also needs the time it was taken. That recorded time is called a timestamp. Say the readings came at eight in the morning and two in the afternoon. Write those timestamps beside both readings. Without them, nobody can tell whether the fall took one hour or one day. Next, we compare the fall with where it started.",
         "visual": {
           "type": "dryback",
           "title": "First find the size of the fall",
@@ -60,27 +82,48 @@
         "workedExample": {
           "prompt": "Describe a fall from 60% to 45% VWC.",
           "steps": [
-            "Subtract: 60 - 45 = 15 percentage points.",
-            "Divide the drop by the starting value: 15 / 60 = 0.25.",
-            "Multiply by 100: relative dryback = 25%."
+            "Subtract the ending reading from the starting reading: 60 − 45 = 15 percentage points.",
+            "Divide the drop by the starting reading: 15 ÷ 60 = 0.25.",
+            "Multiply by 100: 0.25 × 100 = 25% relative dryback."
           ],
           "answer": "15 percentage points; 25% relative dryback."
+        },
+        "check": {
+          "prompt": "A probe reads 72% VWC at 06:00 and 58% VWC at 12:00. How big is the fall?",
+          "options": [
+            {
+              "text": "14 percentage points",
+              "correct": true,
+              "feedback": "72 − 58 = 14. Subtracting two percentages gives percentage points."
+            },
+            {
+              "text": "14%",
+              "correct": false,
+              "feedback": "The number is right but the label is not. A gap between two percentages is in points."
+            },
+            {
+              "text": "130 percentage points",
+              "correct": false,
+              "feedback": "That adds the readings. Subtract the end from the start: 72 − 58 = 14."
+            }
+          ]
         }
       },
       {
         "id": "A4-3",
         "title": "Then compare the fall with the start",
         "body": [
-          "Drop / starting reading × 100",
-          "15 / 60 × 100 = 25% relative dryback."
+          "Relative dryback = fall ÷ starting reading × 100",
+          "15 ÷ 60 = 0.25; 0.25 × 100 = 25%",
+          "Same fall: 15 points, or 25% relative dryback"
         ],
-        "narration": "How large was that fall compared with the starting amount? Divide fifteen by sixty. That is one quarter. Multiply by one hundred to get twenty-five percent relative dryback. So this same fall is fifteen percentage points, or twenty-five percent of its start. Always divide by the starting reading for this calculation. A zero start cannot be used.",
+        "narration": "Fifteen points sounds like one fixed amount. But picture two pots. One starts at sixty percent, the other at thirty percent. Losing fifteen points is a quarter of the first pot's water. It is half of the second pot's water. So growers also compare the fall with the starting reading. Divide the fall by the starting reading. Then multiply by one hundred to turn the answer into a percentage. This result is called relative dryback. Look at the fraction on screen, with fifteen on top and sixty below. Fifteen divided by sixty is zero point two five. Zero point two five times one hundred is twenty-five. So the relative dryback is twenty-five percent. The same fall now has two correct descriptions: fifteen percentage points, or twenty-five percent relative dryback. Always divide by the starting reading, because that is the amount the fall is compared with. Next, you try one with the steps laid out.",
         "visual": {
           "type": "fraction",
           "title": "Then compare the fall with the start",
           "labels": [
             "Drop 15",
-            "Starting value 60",
+            "Starting reading 60",
             "Relative dryback 25%"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
@@ -90,6 +133,26 @@
             25
           ],
           "quantity": "Relative dryback"
+        },
+        "check": {
+          "prompt": "A reading falls from 40% to 30% VWC. What is the relative dryback?",
+          "options": [
+            {
+              "text": "25%",
+              "correct": true,
+              "feedback": "The fall is 10 points. 10 ÷ 40 = 0.25, and 0.25 × 100 = 25%."
+            },
+            {
+              "text": "33%",
+              "correct": false,
+              "feedback": "That divides by the ending reading, 30. Divide by the start: 10 ÷ 40 × 100 = 25%."
+            },
+            {
+              "text": "10%",
+              "correct": false,
+              "feedback": "10 is the fall in points. Divide it by 40, then multiply by 100, to get 25%."
+            }
+          ]
         }
       },
       {
@@ -98,9 +161,9 @@
         "body": [
           "Start 80%; end 60%.",
           "80 − 60 = __ points.",
-          "__ / 80 × 100 = __% relative dryback."
+          "__ ÷ 80 × 100 = __% relative dryback."
         ],
-        "narration": "Try the next example with help. Start at eighty percent VWC and finish at sixty. First subtract the end from the start. Then divide that answer by eighty and multiply by one hundred. Pause and write both answers. The fall is twenty percentage points. The relative dryback is twenty-five percent. Label each answer so another person can follow it.",
+        "narration": "Now you try, with the steps laid out. Look at the two numbers on screen. The starting reading is eighty percent VWC. The ending reading is sixty percent. Step one: subtract the end from the start. Step two: divide that fall by the starting reading, eighty. Step three: multiply by one hundred. Pause the video now and write both answers. Here they are. Eighty minus sixty is twenty, so the fall is twenty percentage points. Twenty divided by eighty is zero point two five. Times one hundred gives twenty-five percent relative dryback. Notice something useful. The first example also gave twenty-five percent, though its fall was only fifteen points. Different falls can give the same relative dryback when the starting readings differ. That is why every answer needs its label, points or relative. Next, you work one with no steps shown.",
         "visual": {
           "type": "lesson-cues",
           "title": "Your turn, with the steps supplied",
@@ -114,22 +177,43 @@
             80,
             60
           ]
+        },
+        "check": {
+          "prompt": "Start 90% VWC, end 72% VWC. Which pair of answers is right?",
+          "options": [
+            {
+              "text": "18 points; 20% relative dryback",
+              "correct": true,
+              "feedback": "90 − 72 = 18 points. 18 ÷ 90 = 0.2, and 0.2 × 100 = 20%."
+            },
+            {
+              "text": "18 points; 25% relative dryback",
+              "correct": false,
+              "feedback": "The fall is right. Now divide by this start, 90: 18 ÷ 90 × 100 = 20%."
+            },
+            {
+              "text": "20 points; 18% relative dryback",
+              "correct": false,
+              "feedback": "Subtract first: 90 − 72 = 18 points. Then 18 ÷ 90 × 100 = 20% relative."
+            }
+          ]
         }
       },
       {
         "id": "A4-5",
         "title": "Try it without the steps",
         "body": [
-          "Start 50%; end 40%.",
-          "Write both labelled answers before continuing."
+          "Start 50% at 07:00; end 40% at 11:00.",
+          "50 − 40 = 10 points; 10 ÷ 50 × 100 = 20% relative.",
+          "Record both readings, both timestamps, both results."
         ],
-        "narration": "Now use fifty percent to forty percent VWC. Work it out before continuing. The fall is ten percentage points. Ten divided by fifty, multiplied by one hundred, is twenty percent relative dryback. A useful record includes both readings, their times, and the labelled calculation. VWC describes water volume in the sampled region, rather than the percentage of usable water left.",
+        "narration": "This time there are no steps on screen. The starting reading is fifty percent VWC, taken at seven in the morning. The ending reading is forty percent, taken at eleven. Work out both descriptions, then pause. Here is the working. Fifty minus forty is ten, so the fall is ten percentage points. Ten divided by fifty is zero point two. Zero point two times one hundred is twenty, so the relative dryback is twenty percent. Now write the full record as a grower would. Fifty percent at seven, forty percent at eleven, same probe. Ten points, or twenty percent relative dryback. Another person can check every step from that one line. Keep one idea from lesson A two in mind. Forty percent VWC tells you how much water is in the sample. Judge how easily roots can use it from your substrate and crop. Next, we see how the app uses relative dryback.",
         "visual": {
           "type": "lesson-cues",
           "title": "Try it without the steps",
           "labels": [
-            "Start 50%",
-            "End 40%",
+            "Start 50% at 07:00",
+            "End 40% at 11:00",
             "Explain both results"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
@@ -137,22 +221,43 @@
             50,
             40
           ]
+        },
+        "check": {
+          "prompt": "Which note lets another person check your dryback?",
+          "options": [
+            {
+              "text": "60% at 06:00 to 51% at 10:00, same probe: 9 points, 15% relative",
+              "correct": true,
+              "feedback": "Both readings, both timestamps and both labelled results. 9 ÷ 60 × 100 = 15%."
+            },
+            {
+              "text": "Dryback 15%",
+              "correct": false,
+              "feedback": "Points or relative? From what start? Add the readings, timestamps and label."
+            },
+            {
+              "text": "9 points",
+              "correct": false,
+              "feedback": "Correct fall, but add the readings, timestamps and the relative result."
+            }
+          ]
         }
       },
       {
         "id": "A4-6",
-        "title": "Read the field before entering a number",
+        "title": "Read the setting before entering a number",
         "body": [
-          "Peak 60%; requested relative loss 10%.",
-          "10% of 60 = 6 points; reference = 54% VWC."
+          "Morning dryback setting = relative dryback from the peak.",
+          "Peak 60%; setting 10%: 10% of 60 = 6 points.",
+          "60 − 6 = 54% VWC reference."
         ],
-        "narration": "The program uses relative dryback for its morning reference. With a sixty percent peak, a ten percent relative loss is six points. Sixty minus six gives a fifty-four percent VWC reference. Read the field help before entering a value. The reference tells the program what to compare against. The probe reading tells you what was observed.",
+        "narration": "Now connect this to the app. In lesson A three you met three ideas. A setting is a value you type into the app. A reference value is a number the app compares readings against, like the Post-it. The peak is the highest water-content reading the probe recorded. One setting is called morning dryback. It tells the app how far the pot should dry below its peak before the first watering of the day. Lesson B two explains that morning period. The app reads this setting as relative dryback, measured from the peak. Look at the three numbers on screen. The peak is sixty percent VWC. The setting is ten percent. Ten percent of sixty is six points. Sixty minus six is fifty-four. So the app's reference is fifty-four percent VWC. If you read ten as points, you would expect fifty percent and misjudge when watering starts. Before typing any number, read the help text beside the setting to learn which kind it is. Next, we recall the whole method.",
         "visual": {
           "type": "lesson-cues",
-          "title": "Read the field before entering a number",
+          "title": "Read the setting before entering a number",
           "labels": [
             "Peak 60%",
-            "Relative loss 10%",
+            "Morning dryback 10%",
             "Reference 54%"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
@@ -161,16 +266,37 @@
             10,
             54
           ]
+        },
+        "check": {
+          "prompt": "The peak is 50% VWC. The morning dryback setting is 20%. What reference does the app use?",
+          "options": [
+            {
+              "text": "40% VWC",
+              "correct": true,
+              "feedback": "20% of 50 is 10 points. 50 − 10 = 40% VWC."
+            },
+            {
+              "text": "30% VWC",
+              "correct": false,
+              "feedback": "That subtracts 20 points. The setting is relative: 20% of 50 = 10 points, so 40%."
+            },
+            {
+              "text": "10% VWC",
+              "correct": false,
+              "feedback": "10 is the fall in points. Subtract it from the peak: 50 − 10 = 40%."
+            }
+          ]
         }
       },
       {
         "id": "A4-7",
         "title": "Recall the method",
         "body": [
-          "Find the start, end and interval.",
-          "Subtract; then divide by the start for the relative result."
+          "Two readings, same probe, each with a timestamp.",
+          "Subtract for points; divide by the start × 100 for relative.",
+          "Keep observed, calculated and configured values apart."
         ],
-        "narration": "Cover the examples and explain the method aloud. What are the starting and ending readings? What interval separates them? First subtract. For relative dryback, divide that fall by the start and multiply by one hundred. Finish the practice with new numbers. Before using a real record, check that its probe, units and timestamps match the situation you are describing.",
+        "narration": "Time to pull the lesson together. Cover the screen and say the method aloud. First, find two readings from the same probe, each with its timestamp. Second, subtract the ending reading from the starting reading. That gives the fall in percentage points. Third, divide that fall by the starting reading and multiply by one hundred. That gives relative dryback. Look at the three boxes on screen. The first holds what the probe observed. The second holds what you calculated from those observations. The third holds the reference the app works out from its setting. Keep these three apart in your notes. A setting changes the reference, not the water in the pot, like the Post-it in lesson A three. Try one more aloud. Seventy-five percent falls to sixty. That is fifteen points. Fifteen divided by seventy-five is zero point two, so twenty percent relative dryback. The next lesson moves from the water itself to the salts dissolved in it.",
         "visual": {
           "type": "lesson-cues",
           "title": "Recall the method",
@@ -180,17 +306,37 @@
             "Configured reference"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "Which of these is a setting, not an observation or a calculation?",
+          "options": [
+            {
+              "text": "Morning dryback 10%",
+              "correct": true,
+              "feedback": "You type it into the app. It changes the reference, not the water."
+            },
+            {
+              "text": "Probe reading 58% at 09:00",
+              "correct": false,
+              "feedback": "That is what the probe observed at a stated time."
+            },
+            {
+              "text": "A fall of 6 points",
+              "correct": false,
+              "feedback": "That is calculated by subtracting one observation from another."
+            }
+          ]
         }
       }
     ],
     "practice": {
       "kind": "calculation",
-      "prompt": "Calculate both dryback descriptions for 70% to 56% VWC. Then find the VWC reference for 10% relative dryback from a 50% peak.",
+      "prompt": "Calculate both dryback descriptions for 70% to 56% VWC. Then find the VWC reference for a 10% morning dryback setting from a 50% peak.",
       "hints": [
         "Subtract the end from the start.",
         "For relative dryback, divide the drop by the start and multiply by 100."
       ],
-      "success": "14 percentage points; 20% relative dryback; 45% VWC reference. Name the starting value used in each relative calculation."
+      "success": "14 percentage points; 20% relative dryback; 45% VWC reference. Name the starting reading used in each relative calculation."
     },
     "quiz": [
       {
@@ -205,7 +351,7 @@
           {
             "text": "10 percentage points and 10% relative dryback",
             "correct": false,
-            "feedback": "Ten is the point difference. The relative result uses 50 as the denominator and is 20%."
+            "feedback": "Ten is the fall in points. For relative dryback, divide by the starting reading, 50: that gives 20%."
           },
           {
             "text": "20 percentage points and 10% relative dryback",
@@ -244,17 +390,17 @@
           {
             "text": "It needs a higher target.",
             "correct": false,
-            "feedback": "The problem is missing meaning, not target size. State points or relative percentage and the interval."
+            "feedback": "Size is not the problem. Say whether 15 means points or relative dryback, and give the readings."
           },
           {
-            "text": "It does not state the calculation convention.",
+            "text": "It does not say whether 15 means points or relative dryback.",
             "correct": true,
-            "feedback": "Fifteen points and 15% of a starting value usually give different ending readings."
+            "feedback": "From 60%, 15 points ends at 45%, but 15% relative ends at 51%."
           },
           {
             "text": "Dryback can only be expressed in points.",
             "correct": false,
-            "feedback": "Both points and relative percentage are useful when clearly labelled."
+            "feedback": "Both are useful. Each needs its label: points or relative dryback."
           }
         ],
         "safetyCritical": false
@@ -266,7 +412,7 @@
           {
             "text": "Exactly 60% of usable water remains.",
             "correct": false,
-            "feedback": "VWC is water volume divided by total measured sample volume. Availability is a different property."
+            "feedback": "VWC is the water share of the sample. How much roots can use is a separate question."
           },
           {
             "text": "Every pot has the same water content.",
@@ -276,7 +422,7 @@
           {
             "text": "About 60% of the measured sample volume is water.",
             "correct": true,
-            "feedback": "That is the VWC definition from A2; it does not establish availability or zone uniformity."
+            "feedback": "That is the VWC definition from A2. It says nothing about usable water or other pots."
           }
         ],
         "safetyCritical": false
@@ -318,11 +464,11 @@
     "id": "A5",
     "module": "A",
     "title": "EC: what it measures, and which EC you are looking at",
-    "summary": "Understand EC using salted water, then identify where each conductivity measurement comes from.",
+    "summary": "Use salted water to understand EC, then label each reading by where it came from: feed, bulk, pore-water, runoff or lab extract.",
     "outcomes": [
-      "Explain EC as electrical conductivity without treating it as a nutrient analysis.",
-      "Distinguish supplied solution, bulk substrate, pore water and collected drainage.",
-      "Label a reading with its type, unit and method before comparing it."
+      "Explain EC as electrical conductivity, a total-salt clue rather than a nutrient list.",
+      "Name feed, bulk, pore-water, runoff and lab-extract EC by where each comes from.",
+      "Record type, unit, method and context, including meter check and temperature adjustment."
     ],
     "prerequisites": [
       "A2",
@@ -334,33 +480,54 @@
         "id": "A5-1",
         "title": "Start with salted water",
         "body": [
-          "Dissolved salts affect how easily water carries electrical current.",
-          "EC is short for electrical conductivity."
+          "Dissolved salts help water carry electrical current.",
+          "More dissolved salt: current passes more easily.",
+          "EC = electrical conductivity, measured with a meter."
         ],
-        "narration": "Think of making salted water stronger by dissolving more salt in it. A conductivity meter responds to how easily electrical current passes through that water. EC is short for electrical conductivity. It is a useful clue about dissolved salts. It does not list the amount of each nutrient. Keep the material being measured and its unit beside the number.",
+        "narration": "In lesson A four you tracked how much water is in the pot. Now we ask what is dissolved in that water. Stir a spoon of table salt into a glass of water. The salt seems to vanish, but it is still there, split into tiny charged pieces. We call this a dissolved salt. Plant food works the same way. Nutrients are the minerals a plant needs to grow, such as nitrogen, potassium and calcium. Growers supply them as salts dissolved in water. Those charged pieces let electricity pass through the water. Look at the two beakers. The right one has more dissolved pieces, and its reading shows higher conductivity. How easily current passes is called electrical conductivity, or EC for short. The device that measures it is called a meter. EC tells you roughly how much salt is dissolved in total. It cannot tell you which nutrients are there, or how much of each. Next, we follow the water to see where EC gets measured.",
         "visual": {
           "type": "ec-path",
           "title": "Start with salted water",
           "labels": [
             "Conductivity",
             "Dissolved salts",
-            "Measurement label"
+            "Meter reading"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
           "asset": "assets/diagrams/a5-ec-salt-r3.png",
           "alt": "Conceptual conductivity comparison: dissolved salts carry electrical charge in water."
+        },
+        "check": {
+          "prompt": "You stir more fertiliser into a bucket of water. What happens to its EC?",
+          "options": [
+            {
+              "text": "It rises",
+              "correct": true,
+              "feedback": "More dissolved salt gives more charged pieces, so current passes more easily."
+            },
+            {
+              "text": "It falls",
+              "correct": false,
+              "feedback": "Adding salt helps current pass, so conductivity goes up, not down."
+            },
+            {
+              "text": "It now lists each nutrient",
+              "correct": false,
+              "feedback": "EC is one total number. It cannot name the nutrients inside."
+            }
+          ]
         }
       },
       {
         "id": "A5-2",
         "title": "Ask where the reading came from",
         "body": [
-          "Feed: solution being supplied.",
-          "Bulk: the wet substrate around a probe.",
-          "Pore water: water between substrate particles.",
-          "Runoff or extract: a collected sample."
+          "Feed EC: the solution in the tank.",
+          "Bulk EC: wet substrate around a probe.",
+          "Pore-water EC: water between the substrate pieces.",
+          "Runoff or lab extract: a collected sample."
         ],
-        "narration": "Follow the water. In the supply tank, we call the solution reading feed EC. A probe in the wet substrate can measure bulk EC: the combined material around it. Pore-water EC describes the water between the particles. Runoff is collected drainage. A laboratory extract uses its own collection procedure. These names describe different measurements, even when the units match.",
+        "narration": "The same water travels through several places, and EC can be measured at each one. Follow it on screen from left to right. First, the tank: the container where nutrient solution is mixed before watering. The EC of that solution is called feed EC. Second, the substrate in the pot. A probe buried there measures the wet substrate as a whole: water, solid pieces and air together. That is called bulk EC. Third, the water held in the pore spaces between the solid pieces. This is the water roots actually touch. Its EC is called pore-water EC. Fourth, collected samples. Water that drains out of the bottom of the pot after watering is called runoff. A laboratory extract is different. A lab mixes substrate with water using a written method, then measures the liquid. All of these can use the same unit, yet each measures a different thing. So a label always goes beside the number. Next, we label two real readings.",
         "visual": {
           "type": "lesson-cues",
           "title": "Ask where the reading came from",
@@ -368,19 +535,40 @@
             "Feed solution",
             "Bulk medium",
             "Pore water",
-            "Runoff / extract"
+            "Runoff or extract"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "You catch water dripping from the pot's drain hole and measure its EC. Which label fits?",
+          "options": [
+            {
+              "text": "Runoff EC",
+              "correct": true,
+              "feedback": "Water that has drained out of the pot is runoff."
+            },
+            {
+              "text": "Feed EC",
+              "correct": false,
+              "feedback": "Feed EC is the solution in the tank, before it reaches the pot."
+            },
+            {
+              "text": "Pore-water EC",
+              "correct": false,
+              "feedback": "Pore water is still held between the substrate pieces. This water has left the pot."
+            }
+          ]
         }
       },
       {
         "id": "A5-3",
         "title": "Worked example: label two readings",
         "body": [
-          "Tank: feed EC 2.0 mS/cm.",
-          "TEROS 12 direct output: bulk EC 0.8 mS/cm."
+          "Unit: millisiemens per centimetre, written mS/cm.",
+          "Tank meter 2.0 mS/cm → feed EC.",
+          "TEROS 12 probe in the pot 0.8 mS/cm → bulk EC."
         ],
-        "narration": "Our tank sample reads two point zero millisiemens per centimetre. That unit is written mS slash cm. Label the record feed EC. The direct conductivity output from a TEROS twelve probe reads zero point eight in the same unit. Label it bulk EC. The difference alone does not diagnose a problem. The tank solution and the wet substrate are different things.",
+        "narration": "First, the unit. Conductivity is measured in siemens, named after an engineer. Plant solutions conduct only weakly, so we use thousandths of a siemens, called millisiemens. The meter measures across a set distance of one centimetre. So the full unit is millisiemens per centimetre, written mS slash cm. Now two readings. A meter dipped in the tank reads two point zero millisiemens per centimetre. Label it feed EC. The second comes from a TEROS twelve. That is one specific probe model, made by a company called METER. You push its three metal needles into the substrate. It measures water content, temperature and EC at the same spot. Its EC output is bulk EC. Here it reads zero point eight millisiemens per centimetre. Look at the two bars on screen. Bulk EC reads lower partly because the probe also senses solid pieces and air, which carry little current. So label each reading first, then compare like with like. Next, we see how software turns bulk EC into an estimate.",
         "visual": {
           "type": "lesson-cues",
           "title": "Worked example: label two readings",
@@ -396,74 +584,156 @@
           ]
         },
         "workedExample": {
-          "prompt": "Label a tank reading of 2.0 mS/cm and a TEROS 12 direct conductivity reading of 0.8 mS/cm.",
+          "prompt": "Label a tank reading of 2.0 mS/cm and a TEROS 12 conductivity reading of 0.8 mS/cm.",
           "steps": [
-            "Find where each sample or measurement came from.",
-            "Label the supplied solution feed EC.",
-            "Label the direct TEROS 12 conductivity output bulk EC."
+            "Find where each measurement came from: the tank, or the substrate in the pot.",
+            "The tank solution is feed EC: 2.0 mS/cm.",
+            "The TEROS 12 output in the substrate is bulk EC: 0.8 mS/cm."
           ],
-          "answer": "Feed EC 2.0 mS/cm; bulk EC 0.8 mS/cm. The difference alone does not diagnose nutrition."
+          "answer": "Feed EC 2.0 mS/cm; bulk EC 0.8 mS/cm. They measure different things, so the gap alone does not diagnose nutrition."
+        },
+        "check": {
+          "prompt": "A meter in the mixing tank reads 1.8 mS/cm. A TEROS 12 in the pot reads 0.7 mS/cm. Which labels fit?",
+          "options": [
+            {
+              "text": "Feed EC 1.8; bulk EC 0.7",
+              "correct": true,
+              "feedback": "The tank holds the feed. The probe in the substrate gives bulk EC."
+            },
+            {
+              "text": "Bulk EC 1.8; feed EC 0.7",
+              "correct": false,
+              "feedback": "Swapped. The tank is feed EC; the probe in the pot is bulk EC."
+            },
+            {
+              "text": "Both are pore-water EC",
+              "correct": false,
+              "feedback": "Neither was taken from water between the pieces. Label by where each came from."
+            }
+          ]
         }
       },
       {
         "id": "A5-4",
         "title": "A calculated value needs a method",
         "body": [
-          "Bulk EC → documented calculation → estimated pore-water EC.",
+          "Bulk EC + other readings → formula → estimated pore-water EC.",
+          "An estimate is calculated, not measured directly.",
           "Renaming a value does not convert it."
         ],
-        "narration": "Some software estimates pore-water EC from bulk measurements. An estimate uses a calculation with required inputs and a range where it is reliable. Find that documented method before interpreting the result. Changing the display name does not perform the calculation. If the measurement type is unknown, record it as unknown while you trace its source.",
+        "narration": "Pore-water EC is closest to what roots experience. But you cannot easily push a meter between substrate pieces. So some software works it out instead. It feeds the bulk EC reading into a formula. The formula also needs other readings from the same probe, such as water content and temperature. A number worked out this way is called an estimate. It is calculated, not measured directly. Look at the chain on screen. On the left is the direct bulk reading. In the middle is the formula. On the right is the estimated pore-water EC. For example, a bulk reading of zero point eight goes in, and a larger number comes out. That is because pore water carries the salts without the solid pieces and air. Every formula has a range where it works well, and these formulas are usually less reliable in very dry substrate. Find the app's note on which formula it uses, and keep the word estimate on your record. Next, you finish some labels yourself.",
         "visual": {
           "type": "lesson-cues",
           "title": "A calculated value needs a method",
           "labels": [
             "Direct bulk reading",
-            "Documented model",
+            "Formula",
             "Estimated pore-water EC"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "An app shows pore-water EC 2.1, calculated from a TEROS 12 bulk reading. How do you record it?",
+          "options": [
+            {
+              "text": "Estimated pore-water EC 2.1 mS/cm, formula noted",
+              "correct": true,
+              "feedback": "It was calculated, so say estimate and note the method."
+            },
+            {
+              "text": "Measured pore-water EC 2.1 mS/cm",
+              "correct": false,
+              "feedback": "Nothing measured the pore water directly. It is an estimate from bulk EC."
+            },
+            {
+              "text": "Feed EC 2.1 mS/cm",
+              "correct": false,
+              "feedback": "Feed EC is the tank solution. This value came from the probe in the pot."
+            }
+          ]
         }
       },
       {
         "id": "A5-5",
         "title": "Your turn: finish the labels",
         "body": [
-          "Supplied solution: feed EC.",
-          "Collected drainage: __ EC.",
-          "Water between particles: __ EC."
+          "Tank solution: feed EC.",
+          "Cup from the drain hole: __ EC.",
+          "Water between substrate pieces: __ EC."
         ],
-        "narration": "Finish these labels aloud. The supplied solution is feed EC. A cup collected under a stated drainage procedure is what? Water in the spaces between particles is what? Pause first. The answers are runoff EC and pore-water EC. Keep the drainage collection method with the result. Use the same measurement type and method when following a trend.",
+        "narration": "Your turn. Three samples are on screen, and you name each one. Sample one is the solution in the tank, ready to go to the pots. Sample two is a cup of water caught from the pot's drain hole after watering. Sample three is the water held in the spaces between substrate pieces. Pause now and say all three labels aloud. Here are the answers. Sample one is feed EC. Sample two is runoff EC. Sample three is pore-water EC. One more detail about runoff. Its EC depends on how and when you collect it. Water caught in the first minute can read differently from the last drops. So write the collection method beside the result. For example: all the drainage from one watering, caught in one cup. Use that same method every time you want to follow a trend. Next, a fresh record with real numbers.",
         "visual": {
           "type": "lesson-cues",
           "title": "Your turn: finish the labels",
           "labels": [
             "Feed: supplied",
-            "Drainage cup: complete label",
-            "Pores: complete label"
+            "Drainage cup: complete the label",
+            "Pores: complete the label"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "You want to compare runoff EC from day to day. What matters most?",
+          "options": [
+            {
+              "text": "Collect it the same way at the same point each time",
+              "correct": true,
+              "feedback": "A fixed method makes day-to-day changes meaningful."
+            },
+            {
+              "text": "Use a different pot each day",
+              "correct": false,
+              "feedback": "Changing pots adds a new difference. Keep the pot and method the same."
+            },
+            {
+              "text": "Only the number matters, not the method",
+              "correct": false,
+              "feedback": "Early and late drainage can read differently. Record and repeat the method."
+            }
+          ]
         }
       },
       {
         "id": "A5-6",
         "title": "Try a fresh record",
         "body": [
-          "Supply 1.7 mS/cm; drainage cup 2.4 mS/cm.",
-          "Label both before interpreting their difference."
+          "Feed EC 1.7 mS/cm; runoff EC 2.4 mS/cm; gap 0.7.",
+          "Check the meter in a standard solution first.",
+          "Confirm both readings are adjusted to 25 °C."
         ],
-        "narration": "Try a supply reading of one point seven and a drainage reading of two point four, both in millisiemens per centimetre. Write feed EC and runoff EC beside them. Before interpreting the difference, check collection timing, the meter check, and temperature adjustment. These two numbers cannot identify a particular excessive nutrient or describe every part of every pot.",
+        "narration": "Here is a fresh record. The tank reads one point seven millisiemens per centimetre. The drainage cup reads two point four. Start with the labels. The tank solution is feed EC. The drainage cup is runoff EC. Look at the two bars. Two point four minus one point seven is zero point seven, so runoff is higher by zero point seven. Before you explain that gap, check two things about the measurements. First, check the meter. Dip it in a standard solution, a bottle sold with a known EC, and confirm the meter shows that number. Second, check temperature. Warm water conducts better than cold water, so the same solution reads higher when warm. Most meters correct for this automatically to a standard temperature, usually twenty-five degrees Celsius. This correction is called temperature adjustment. Confirm both readings used it. With the meter checked and both readings adjusted, you can compare the two numbers fairly. Next, we pull the lesson together.",
         "visual": {
           "type": "lesson-cues",
           "title": "Try a fresh record",
           "labels": [
-            "Supply 1.7 mS/cm",
-            "Drainage 2.4 mS/cm",
-            "Method and timing required"
+            "Feed 1.7 mS/cm",
+            "Runoff 2.4 mS/cm",
+            "Check meter and temperature"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
           "values": [
             1.7,
             2.4
+          ]
+        },
+        "check": {
+          "prompt": "One solution reads 1.5 mS/cm cold and 1.8 mS/cm warm on a meter. What is the likely cause?",
+          "options": [
+            {
+              "text": "The meter is not applying temperature adjustment",
+              "correct": true,
+              "feedback": "Warm water conducts better. Adjusting both to 25 °C makes them comparable."
+            },
+            {
+              "text": "Warming added nutrients",
+              "correct": false,
+              "feedback": "Heat adds no salt. It only lets current pass more easily."
+            },
+            {
+              "text": "The warm reading is bulk EC",
+              "correct": false,
+              "feedback": "Both are the same solution on the same meter. The type has not changed."
+            }
           ]
         }
       },
@@ -471,10 +741,11 @@
         "id": "A5-7",
         "title": "Recall what the labels mean",
         "body": [
-          "What material? Which unit? Which method?",
-          "VWC describes water volume; EC describes conductivity."
+          "Type, unit, method and context go with every EC reading.",
+          "VWC: how much of the sample is water.",
+          "EC: how easily that water carries current."
         ],
-        "narration": "Cover the labels and name the four measurement locations again. EC describes conductivity. VWC describes the share of sample volume occupied by water. Neither is a direct measurement of how much water a plant can access. Keep each reading in its crop and substrate context. A useful comparison starts with the same kind of measurement, rather than a universal number to copy.",
+        "narration": "Cover the screen and name the places EC is measured: feed, bulk, pore-water, and collected samples such as runoff or a lab extract. Now look at the four words on screen. Every EC reading needs all four. Type: which of those places it came from. Unit: for example, millisiemens per centimetre. Method: how it was measured or collected, and whether it is an estimate. Context: the crop, the substrate and the time. Keep EC and VWC apart in your head too. VWC tells you how much of the sample is water. EC tells you how easily that water carries current, which is a clue to dissolved salts. For how much water or food the roots can actually use, combine these readings with your substrate, crop and checks. With all four labels in place, you can compare like with like. The next lesson asks whether you can trust a reading at all.",
         "visual": {
           "type": "lesson-cues",
           "title": "Recall what the labels mean",
@@ -485,6 +756,26 @@
             "Context"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "Which EC record is complete enough to compare next week?",
+          "options": [
+            {
+              "text": "Runoff EC 2.2 mS/cm, whole-drainage cup, 25 °C adjusted, coco, day 30",
+              "correct": true,
+              "feedback": "Type, unit, method and context are all there."
+            },
+            {
+              "text": "EC 2.2",
+              "correct": false,
+              "feedback": "No type, unit, method or context. Nobody can compare it fairly."
+            },
+            {
+              "text": "Runoff 2.2 mS/cm",
+              "correct": false,
+              "feedback": "Type and unit are there. Add the collection method and context."
+            }
+          ]
         }
       }
     ],
@@ -500,22 +791,22 @@
     "quiz": [
       {
         "id": "A5-q1",
-        "prompt": "A TEROS 12 provides a direct conductivity measurement in the medium. What type is it?",
+        "prompt": "A TEROS 12 pushed into the substrate reports EC directly. Which type is that?",
         "options": [
           {
             "text": "Feed EC",
             "correct": false,
-            "feedback": "Feed EC measures supplied solution. The direct TEROS 12 measurement is bulk EC."
+            "feedback": "Feed EC is the tank solution. A TEROS 12 in the substrate measures bulk EC."
           },
           {
             "text": "Bulk EC",
             "correct": true,
-            "feedback": "The direct conductivity output describes the bulk medium. A pore-water estimate needs an identified conversion."
+            "feedback": "It measures the wet substrate as a whole. Pore-water EC would need a formula."
           },
           {
             "text": "Automatically pore-water EC",
             "correct": false,
-            "feedback": "A bulk measurement is not automatically pore-water EC. Check the conversion and its valid range."
+            "feedback": "Bulk EC becomes pore-water EC only through a formula, and then it is an estimate."
           }
         ],
         "safetyCritical": false
@@ -527,17 +818,17 @@
           {
             "text": "Compare them directly because the units match.",
             "correct": false,
-            "feedback": "Matching units do not make feed, bulk, pore-water and extract values interchangeable."
+            "feedback": "Matching units do not make feed, bulk, pore-water and extract EC the same thing."
           },
           {
             "text": "Change the lower value to match the higher one.",
             "correct": false,
-            "feedback": "A difference may reflect measurement type. Establish type and method before making an operational decision."
+            "feedback": "The gap may come from different measurement types. Find out the type and method before acting."
           },
           {
             "text": "Identify both measurement types and methods.",
             "correct": true,
-            "feedback": "This establishes what the numbers represent and whether a comparison is meaningful."
+            "feedback": "Then you know what each number means and whether comparing them is fair."
           }
         ],
         "safetyCritical": false
@@ -549,17 +840,17 @@
           {
             "text": "Exactly which nutrient is excessive.",
             "correct": false,
-            "feedback": "EC does not give the concentration of each nutrient."
+            "feedback": "EC is one total number. It does not give the amount of each nutrient."
           },
           {
-            "text": "The conductivity under the measurement conditions.",
+            "text": "How easily that sample carried current when measured.",
             "correct": true,
-            "feedback": "Interpret it with type, method, temperature treatment and crop context."
+            "feedback": "Read it with its type, method, temperature adjustment and crop context."
           },
           {
             "text": "A universal target has been exceeded.",
             "correct": false,
-            "feedback": "Suitable interpretation depends on crop, medium and measurement method. This lesson supplies no universal target."
+            "feedback": "Suitable values depend on crop, substrate and measurement type. This lesson gives no universal target."
           }
         ],
         "safetyCritical": false
@@ -571,7 +862,7 @@
           {
             "text": "Only a new display name.",
             "correct": false,
-            "feedback": "Renaming the entity does not establish a valid conversion."
+            "feedback": "Renaming a value does not convert it. The number still came from bulk EC."
           },
           {
             "text": "The assumption that all EC types are equal.",
@@ -579,9 +870,9 @@
             "feedback": "The methods are related but measure different things."
           },
           {
-            "text": "An identified conversion method, inputs and validity limits.",
+            "text": "The word estimate, the formula used and its inputs.",
             "correct": true,
-            "feedback": "A model needs its assumptions and operating range documented before interpretation."
+            "feedback": "Right. Note the formula and its inputs. Formulas are less reliable in dry substrate."
           }
         ],
         "safetyCritical": false
@@ -618,11 +909,11 @@
     "id": "A6",
     "module": "A",
     "title": "Can you trust that reading?",
-    "summary": "Check a reading as you would check a thermometer and a dated photograph: where it came from, when it arrived and whether it is reliable.",
+    "summary": "Check every reading with three questions: is it the right probe, is it recent, and is the measurement reliable?",
     "outcomes": [
-      "Separate freshness, correct identity and measurement accuracy.",
-      "Calculate reading age and recognise the VWC fraction-to-percent conversion.",
-      "Choose a supported check when a reading is unreliable."
+      "Separate freshness, probe identity and measurement accuracy.",
+      "Calculate reading age and convert a VWC fraction to a percentage.",
+      "Respond to failed sensing with a fault record, the responsible operator and the fallback procedure."
     ],
     "prerequisites": [
       "A2",
@@ -636,32 +927,53 @@
         "id": "A6-1",
         "title": "A reading is a dated local observation",
         "body": [
-          "Thermometer: which room?",
-          "Photograph: taken when?",
-          "Probe: is the measurement reliable?"
+          "Right probe, in the place you think?",
+          "Recent reading?",
+          "Reliable measurement?"
         ],
-        "narration": "A thermometer in the hallway cannot tell you the exact temperature in a bedroom. Yesterday’s photograph cannot show what the room looks like now. Treat a probe reading in the same way. Ask three separate questions. Is this the right location? Is the observation recent? Is the measurement reliable? A believable number can still fail one of those checks.",
+        "narration": "You now know what VWC and EC mean. This lesson asks a different question: can you trust the number in front of you? Think of a thermometer in the hallway. It cannot tell you the temperature in the bedroom. Now think of a photo taken yesterday. It cannot show the room as it looks today. A probe reading has both limits. It describes one small spot, at one moment. Look at the three checks on screen. One: is this the right probe, in the place you think it is? Two: is the reading recent? Three: is the measurement itself reliable? Ask all three every time, because each one can fail on its own. A sensible-looking number can come from the wrong pot, from four hours ago, or from a badly placed probe. We take the three questions one at a time. Next: how old is the reading?",
         "visual": {
           "type": "sensor-check",
           "title": "A reading is a dated local observation",
           "labels": [
-            "Correct location",
-            "Recent observation",
+            "Right probe",
+            "Recent reading",
             "Reliable measurement"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
           "asset": "assets/diagrams/a6-local-probe-r3.png",
           "alt": "A probe observes a small local region. Other pots and distant parts of the medium may differ."
+        },
+        "check": {
+          "prompt": "A screen shows 52% VWC, a normal-looking value. What do you still need to confirm?",
+          "options": [
+            {
+              "text": "Which probe it is, how recent it is, and how reliable it is",
+              "correct": true,
+              "feedback": "All three checks apply, however normal the number looks."
+            },
+            {
+              "text": "Nothing, because the value looks normal",
+              "correct": false,
+              "feedback": "A normal-looking number can still be old, misnamed or badly measured."
+            },
+            {
+              "text": "Only whether it is above 50%",
+              "correct": false,
+              "feedback": "The size of the number comes after the three trust checks."
+            }
+          ]
         }
       },
       {
         "id": "A6-2",
         "title": "Worked example: how old is it?",
         "body": [
-          "Now 14:00; probe A last observed at 10:00.",
-          "A is four hours old; probe B at 13:59 is one minute old."
+          "Age = time now − timestamp.",
+          "Now 14:00; probe A at 10:00 → 4 hours old: stale.",
+          "Probe B at 13:59 → 1 minute old: fresh."
         ],
-        "narration": "The clock says two in the afternoon, or fourteen hundred. Probe A last supplied a valid observation at ten in the morning. Its reading is four hours old. Probe B updated at thirteen fifty-nine, one minute ago. We have calculated their ages. We have not established the current water content at A. A flat line might be steady conditions or missing updates.",
+        "narration": "Lesson A four introduced the timestamp: the time a reading was taken. To find a reading's age, subtract its timestamp from the time now. Look at the clock on screen. It is fourteen hundred, which is two in the afternoon. Probe A last sent a reading at ten hundred, ten in the morning. Fourteen minus ten is four, so that reading is four hours old. Probe B last sent a reading at thirteen fifty-nine. That is one minute ago. Growers call how recent a reading is its freshness. A reading too old to describe the pot now is called stale. Probe A is stale. Probe B is fresh. Watch for one trap. When a probe stops sending, many graphs keep drawing a flat line at the last value. A flat line can mean steady conditions, or no new readings at all. The timestamp tells you which. Next, we check that the probe is the one you think it is.",
         "visual": {
           "type": "lesson-cues",
           "title": "Worked example: how old is it?",
@@ -679,92 +991,196 @@
         "workedExample": {
           "prompt": "At 14:00, probe A last updated at 10:00. What is the first finding?",
           "steps": [
-            "Confirm the timestamp belongs to the last valid observation.",
-            "Subtract 10:00 from 14:00.",
-            "Record four-hour-old data and investigate its source."
+            "Confirm the timestamp belongs to the last valid reading.",
+            "Subtract: 14:00 − 10:00 = 4 hours.",
+            "Record the reading as 4 hours old and stale, then find out why it stopped."
           ],
-          "answer": "Probe A has four-hour-old data. The record cannot establish current water content."
+          "answer": "Probe A's reading is 4 hours old. Treat it as stale and find out why updates stopped."
+        },
+        "check": {
+          "prompt": "It is 09:30. A probe's last reading has the timestamp 08:45. How old is it?",
+          "options": [
+            {
+              "text": "45 minutes",
+              "correct": true,
+              "feedback": "09:30 − 08:45 = 45 minutes."
+            },
+            {
+              "text": "1 hour 15 minutes",
+              "correct": false,
+              "feedback": "Count from 08:45 to 09:30: 15 minutes to 09:00, then 30 more. That is 45."
+            },
+            {
+              "text": "8 hours 45 minutes",
+              "correct": false,
+              "feedback": "That is the timestamp itself. Subtract it from the time now."
+            }
+          ]
         }
       },
       {
         "id": "A6-3",
         "title": "Check identity and units",
         "body": [
-          "Match the physical probe label to the displayed record.",
-          "0.45 m³/m³ = 45% VWC."
+          "The probe's tag must match the room and zone in the app.",
+          "0.45 m³/m³ × 100 = 45% VWC.",
+          "Reading 0.45 as 0.45% is a hundredfold scale error."
         ],
-        "narration": "Next find the probe’s physical label and match it to the displayed room and zone. Then check units. A source value of zero point four five cubic metres per cubic metre is a fraction. Multiply by one hundred to display forty-five percent VWC. Reading it as zero point four five percent would create a hundredfold scale error.",
+        "narration": "Next, identity. First, one new word. A room is a space with its own lights. It holds one or more zones, and each zone is a group of plants watered together. Every probe should carry a physical tag naming its room and zone. Look at the tag on the probe and the name in the app. They must match. If the app says room two, zone one, the probe should sit in room two, zone one. A swapped cable can make one zone's probe report under another zone's name. Matching tag to screen is called checking probe identity. Then check units. Some probes send VWC as a fraction instead of a percentage. The unit is cubic metres of water per cubic metre of substrate. A value of zero point four five means forty-five hundredths. Multiply by one hundred to get forty-five percent VWC. Reading it as zero point four five percent makes it one hundred times too small. That is called a scale error. Next, we look at the probe in the pot.",
         "visual": {
           "type": "lesson-cues",
           "title": "Check identity and units",
           "labels": [
-            "Physical label",
-            "Entity identity",
+            "Physical tag",
+            "Name in the app",
             "Unit and scale"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "A probe sends a VWC of 0.38 m³/m³. What percentage is that?",
+          "options": [
+            {
+              "text": "38%",
+              "correct": true,
+              "feedback": "0.38 × 100 = 38%. The fraction and the percentage say the same thing."
+            },
+            {
+              "text": "0.38%",
+              "correct": false,
+              "feedback": "That is a scale error. Multiply the fraction by 100 to get 38%."
+            },
+            {
+              "text": "3.8%",
+              "correct": false,
+              "feedback": "That multiplies by 10. Multiply by 100: 0.38 × 100 = 38%."
+            }
+          ]
         }
       },
       {
         "id": "A6-4",
         "title": "A fresh reading can still be inaccurate",
         "body": [
-          "Placement: where the probe samples.",
-          "Calibration: how its signal becomes a reported value."
+          "Placement: where in the pot the probe sits.",
+          "Air gaps around the needles make readings too dry.",
+          "Calibration must suit the probe and the substrate."
         ],
-        "narration": "Accuracy is a separate question from age. Calibration is the method used to turn the sensor signal into a reported measurement. It must suit the sensor and substrate. Placement matters too. Air gaps near moisture-sensor needles can produce misleading readings. A probe near one dripper also samples a different place from the far side of the pot. Check the installation record.",
+        "narration": "A reading can be fresh and correctly named, yet still wrong. Look at the probe in the pot on screen. In lesson A two, calibration meant checking how a probe's output relates to the real quantity. A probe set up for one substrate can misread in another, so the calibration must suit your substrate. Placement matters too. Placement means where in the pot the probe sits. A probe right beside the spot where water enters reads wetter than the far side of the pot. Then there are air gaps. The probe's needles must be in firm contact with the substrate. A pocket of air around a needle makes the probe read drier than the pot really is. Growers call these pockets air gaps. For example, two identical pots might read fifty percent and forty-one percent only because one probe has an air gap. Push each probe in fully, and firm the substrate around it. Then record where and how you installed it. Next, you practise the age check, with one more step.",
         "visual": {
           "type": "root-zone",
           "title": "A fresh reading can still be inaccurate",
           "labels": [
-            "Probe location",
-            "Medium contact",
+            "Probe placement",
+            "Contact, no air gaps",
             "Calibration record"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
           "asset": "assets/diagrams/a6-local-probe-r3.png",
           "alt": "Check local probe position and contact; a fresh value cannot establish whole-zone accuracy."
+        },
+        "check": {
+          "prompt": "Two probes in identical pots read 50% and 41%. Both are fresh and correctly tagged. What do you check next?",
+          "options": [
+            {
+              "text": "Placement, air gaps and calibration",
+              "correct": true,
+              "feedback": "Fresh and correctly named still leaves the measurement itself to check."
+            },
+            {
+              "text": "Water the drier pot straight away",
+              "correct": false,
+              "feedback": "The pot may not be drier. An air gap can make a probe read low."
+            },
+            {
+              "text": "Average the two and move on",
+              "correct": false,
+              "feedback": "Averaging hides a faulty probe. Find out why they differ first."
+            }
+          ]
         }
       },
       {
         "id": "A6-5",
         "title": "Your turn: calculate, then check",
         "body": [
-          "Now 15:30; last valid observation 15:25.",
-          "Age = __ minutes. What does age alone establish?"
+          "Now 15:30; last valid reading 15:25.",
+          "Age = __ minutes.",
+          "Then confirm placement and calibration records."
         ],
-        "narration": "It is fifteen thirty. The last valid observation was at fifteen twenty-five. Pause and calculate its age. The answer is five minutes. That answers freshness only. It does not prove the probe is correctly identified or calibrated. With the identity and units checked, look for suitable placement and calibration records. A recent reading still needs a trustworthy measurement behind it.",
+        "narration": "Your turn. It is fifteen thirty, half past three in the afternoon. The last valid reading arrived at fifteen twenty-five. Valid means the probe sent a real number, not an error message. Pause and work out the age. Fifteen thirty minus fifteen twenty-five is five minutes. So the reading is fresh. Now look at the three rows on screen. Age is answered. Identity is checked, because the tag matches the app. The third row is still open: placement and calibration. To close it, look up the installation record. It should show where the probe sits, that it was pushed in firmly, and which calibration it uses. Freshness tells you the reading is recent, and this record tells you the measurement is sound. With all three rows ticked, you can use the number. Next, two probes that disagree.",
         "visual": {
           "type": "lesson-cues",
           "title": "Your turn: calculate, then check",
           "labels": [
             "Age: fill the gap",
             "Identity: matched",
-            "Placement and calibration: investigate"
+            "Placement and calibration: check the record"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "A reading is 2 minutes old and its tag matches the app. Which check is still open?",
+          "options": [
+            {
+              "text": "Placement and calibration",
+              "correct": true,
+              "feedback": "Age and identity are done. The measurement itself still needs its record."
+            },
+            {
+              "text": "Freshness",
+              "correct": false,
+              "feedback": "Two minutes old is fresh. That check is already done."
+            },
+            {
+              "text": "None, it is ready to use",
+              "correct": false,
+              "feedback": "A fresh, correctly named probe can still be badly placed or wrongly calibrated."
+            }
+          ]
         }
       },
       {
         "id": "A6-6",
         "title": "Try a changed scenario",
         "body": [
-          "At 16:20: A shows 48% from 12:20.",
-          "B shows 43% from 16:19."
+          "16:20: A = 48% from 12:20, 4 hours old; B = 43% from 16:19.",
+          "Check identity, then communications, then the pot.",
+          "Communications: the link carrying readings to the app."
         ],
-        "narration": "Now compare forty-eight percent from twelve twenty with forty-three percent from sixteen nineteen. The current time is sixteen twenty. A is four hours old; B is one minute old. Check identities and last valid timestamps first. Then investigate availability and communications. Follow with appropriate physical evidence. The difference alone does not establish that every pot needs water.",
+        "narration": "Now two probes in the same zone disagree. It is sixteen twenty. Probe A shows forty-eight percent, timestamped twelve twenty. Probe B shows forty-three percent, timestamped sixteen nineteen. Work out the ages first. Sixteen twenty minus twelve twenty is four hours, so A is stale. B is one minute old. So these two numbers describe different moments. Probe A may have stopped reporting. Check in this order. First, identity: do both tags match the screen? Second, communications. That means the cable or wireless link that carries readings from the probe to the app. A loose plug or a dropped wireless connection stops new readings arriving. Third, physical evidence in the pot: placement, air gaps, and how heavy and wet the pot feels when lifted. Treat the gap between forty-eight and forty-three as unexplained until those checks are done. Next, what to do when sensing fails.",
         "visual": {
           "type": "lesson-cues",
           "title": "Try a changed scenario",
           "labels": [
             "A: 48% at 12:20",
             "B: 43% at 16:19",
-            "Investigate before interpreting"
+            "Check before interpreting"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
           "values": [
             48,
             43
+          ]
+        },
+        "check": {
+          "prompt": "A probe's line went flat at 07:10. It is now 11:10 and its tag matches. What do you check next?",
+          "options": [
+            {
+              "text": "Its communications link to the app",
+              "correct": true,
+              "feedback": "Four hours with no new reading points first to the link: cable, plug or wireless."
+            },
+            {
+              "text": "Assume the pot has stopped drying",
+              "correct": false,
+              "feedback": "A flat line often means no new readings. The timestamp shows 4 hours of silence."
+            },
+            {
+              "text": "Water the zone by hand at once",
+              "correct": false,
+              "feedback": "First find out why readings stopped, then follow your site's plan."
+            }
           ]
         }
       },
@@ -772,19 +1188,40 @@
         "id": "A6-7",
         "title": "Recall the three questions",
         "body": [
-          "Right probe? Recent observation? Reliable measurement?",
-          "Record a fault and use the local fallback procedure."
+          "Right probe? Recent reading? Reliable measurement?",
+          "Record the fault and tell the responsible operator.",
+          "Follow the written fallback procedure; keep safety settings."
         ],
-        "narration": "Explain the three questions without looking: right probe, recent observation, reliable measurement. If sensing fails, record what you know and involve the responsible operator using the local fallback procedure. Lowering a protection to force irrigation leaves the sensing fault unresolved. Finish with a check record that separates the observation, its age, and the next step needed to trust it.",
+        "narration": "Say the three questions aloud: right probe, recent reading, reliable measurement. Sometimes sensing fails and you cannot fix it straight away. Every site should have a written fallback procedure. That is a plan for watering safely without trusted probe readings, for example by lifting pots to judge their weight. Your site also has a responsible operator: the person in charge of irrigation decisions there. Tell them what failed and follow the procedure with them. Look at the three boxes on screen. First, a fault record: which probe, what you saw, and when. Second, independent evidence, meaning a check that does not rely on the faulty probe, such as lifting a pot. Third, the local fallback procedure itself. Keep the app's safety settings where they are and fix the sensing. Changing them to force water hides the fault and can harm the crop. The next lesson shows how to read these readings on a graph.",
         "visual": {
           "type": "lesson-cues",
           "title": "Recall the three questions",
           "labels": [
             "Fault record",
             "Independent evidence",
-            "Local fallback"
+            "Fallback procedure"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "A stale probe is stopping watering. A friend says: change a safety setting to force water. What do you do?",
+          "options": [
+            {
+              "text": "Record the fault, tell the operator, follow the fallback",
+              "correct": true,
+              "feedback": "That keeps the crop safe while the sensing is fixed."
+            },
+            {
+              "text": "Change the setting as suggested",
+              "correct": false,
+              "feedback": "That hides the fault and can over- or under-water the crop."
+            },
+            {
+              "text": "Wait and hope the probe recovers",
+              "correct": false,
+              "feedback": "Act now: record it, tell the responsible operator, and follow the fallback."
+            }
+          ]
         }
       }
     ],
@@ -795,27 +1232,27 @@
         "Compute ages before judging values.",
         "Disagreement may involve identity, communication, placement or calibration."
       ],
-      "success": "A is three hours old; B is one minute old. Current zone uniformity is unknown. Verify identity/timestamps, availability/communications, then suitable physical and calibration evidence."
+      "success": "A is three hours old; B is one minute old. Current zone uniformity is unknown. Check identity and timestamps, then communications, then placement, air gaps and calibration."
     },
     "quiz": [
       {
         "id": "A6-q1",
-        "prompt": "At 11:00, the last valid observation is from 07:30. What do you know?",
+        "prompt": "At 11:00, the last valid reading is from 07:30. What do you know?",
         "options": [
           {
-            "text": "The current VWC is proven by the display.",
+            "text": "The display shows the current VWC.",
             "correct": false,
-            "feedback": "The display contains an observation from 3 hours 30 minutes ago. Current VWC remains unknown."
+            "feedback": "The display shows a reading from 3 hours 30 minutes ago. The VWC now is unknown."
           },
           {
-            "text": "The observation is 3 hours 30 minutes old.",
+            "text": "The reading is 3 hours 30 minutes old.",
             "correct": true,
-            "feedback": "Subtract the timestamps. Check freshness and source before interpreting current crop conditions."
+            "feedback": "11:00 − 07:30 = 3 h 30 min. It is stale, so find out why before you rely on it."
           },
           {
             "text": "The crop has stopped using water.",
             "correct": false,
-            "feedback": "An old or flat trace cannot establish plant water use."
+            "feedback": "An old reading says nothing about what the plant is doing now."
           }
         ],
         "safetyCritical": false
@@ -827,7 +1264,7 @@
           {
             "text": "The whole zone is uniform.",
             "correct": false,
-            "feedback": "Two local samples do not prove every container or location is the same."
+            "feedback": "Two probes measure two small spots. Other pots can still differ."
           },
           {
             "text": "Calibration must be correct.",
@@ -847,19 +1284,19 @@
         "prompt": "An unreliable probe is holding irrigation. What is the next response?",
         "options": [
           {
-            "text": "Lower a protection to force a shot.",
+            "text": "Lower a safety setting to force watering.",
             "correct": false,
-            "feedback": "That bypasses the fault instead of restoring trustworthy evidence. Follow the safe fallback procedure."
+            "feedback": "That hides the fault instead of fixing the sensing. Follow the fallback procedure."
           },
           {
-            "text": "Investigate sensing and follow the local safe fallback procedure.",
+            "text": "Investigate the sensing and follow the local fallback procedure.",
             "correct": true,
-            "feedback": "Resolve identity, freshness, communication and physical evidence with the responsible operator."
+            "feedback": "Check identity, freshness, communications and the pot, with the responsible operator."
           },
           {
             "text": "Treat the old number as a current measurement.",
             "correct": false,
-            "feedback": "An old value does not establish the current condition."
+            "feedback": "An old reading is stale. It does not describe the pot now."
           }
         ],
         "safetyCritical": true
@@ -876,7 +1313,7 @@
           {
             "text": "45%",
             "correct": true,
-            "feedback": "The fraction and percentage express the same water-to-sample volume ratio."
+            "feedback": "0.45 × 100 = 45%. The fraction and the percentage say the same thing."
           },
           {
             "text": "450%",
@@ -890,8 +1327,8 @@
     "practicalTask": {
       "instructions": [
         "Use the synthetic timestamps in the practice task.",
-        "Write identity, unit, age, placement/calibration evidence and an independent check.",
-        "Explain a fallback without operating real outputs."
+        "Write identity, unit, age, placement and calibration evidence, and one independent check.",
+        "Explain the fallback procedure without operating real equipment."
       ],
       "requiresLocalSupervision": false,
       "proof": "explain"
@@ -918,11 +1355,11 @@
     "id": "B2",
     "module": "B",
     "title": "P0 to P3: build the day one phase at a time",
-    "summary": "Follow a watering day as four familiar jobs: wait, refill, maintain and allow dryback; then attach the program’s P0–P3 labels.",
+    "summary": "Split the grow-day into four phases, learn what starts and ends each one, and tell forecast shots from shots that really ran.",
     "outcomes": [
-      "Put wait, refill, maintain and overnight dryback in order.",
-      "Match those purposes to this program’s P0, P1, P2 and P3 phases.",
-      "Explain why projected events and an emergency reference do not guarantee watering."
+      "Put P0 wait, P1 refill, P2 maintain and P3 overnight in order on a grow-day.",
+      "Explain what ends P0, what P1 aims for and what triggers a P2 or rescue shot.",
+      "Tell a forecast of shots from the event record of shots that ran."
     ],
     "prerequisites": [
       "A4",
@@ -933,15 +1370,15 @@
     "slides": [
       {
         "id": "B2-1",
-        "title": "Four jobs across the watering day",
+        "title": "Four phases across the grow-day",
         "body": [
-          "Wait in the morning → refill → maintain → allow overnight dryback.",
-          "The program labels these P0 → P1 → P2 → P3."
+          "One grow-day runs from lights-on to the next lights-on",
+          "Four phases: P0 wait, P1 refill, P2 maintain, P3 night"
         ],
-        "narration": "Think of the watering day as a journey with four jobs. Wait while the root zone dries in the morning. Refill with watering events. Maintain water content during the active period. Then allow dryback overnight. The program labels these jobs: P zero, P one, P two and P three. A phase simply means one part of that sequence.",
+        "narration": "Think of a working day: arrive, warm up, keep going, then go home. A grow room has a daily rhythm too, set by its lights. Lights-on is the time the grow lights switch on. Lights-off is the time they switch off. One grow-day runs from one lights-on to the next lights-on. For example, with lights on at six in the morning, the grow-day lasts twenty-four hours, until six the next morning. The app splits each grow-day into four parts called phases. A phase is one stage of the day with its own job and its own rules. Look at the strip. The four phases are labelled P zero, P one, P two and P three: wait, refill, maintain, then dry back overnight. Knowing the order lets you read any day on the graph. Next, the first phase.",
         "visual": {
           "type": "phases",
-          "title": "Four jobs across the watering day",
+          "title": "Four phases across the grow-day",
           "labels": [
             "Wait: P0",
             "Refill: P1",
@@ -949,74 +1386,154 @@
             "Overnight dryback: P3"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "Lights-on is 07:00 and lights-off is 19:00. When does this grow-day end?",
+          "options": [
+            {
+              "text": "07:00 the next morning",
+              "correct": true,
+              "feedback": "A grow-day runs from one lights-on to the next lights-on."
+            },
+            {
+              "text": "19:00 the same day",
+              "correct": false,
+              "feedback": "Lights-off ends the lit hours. The grow-day runs on to the next lights-on."
+            },
+            {
+              "text": "Midnight",
+              "correct": false,
+              "feedback": "The app follows the lights, not the calendar date."
+            }
+          ]
         }
       },
       {
         "id": "B2-2",
-        "title": "Wait first: morning dryback, P0",
+        "title": "Wait first: P0 morning dryback",
         "body": [
-          "At configured lights-on, the new grow-day starts in P0.",
-          "Dryback and timing rules decide when the refill can begin."
+          "At lights-on each zone starts P0: no water",
+          "P0 ends at its dryback target or its maximum wait"
         ],
-        "narration": "The first job is waiting. At configured lights-on, a new grow-day begins in P zero, called morning dryback. Water content can continue falling before refill begins. The controller checks the dryback rule and timing limits, including a maximum wait. Lights-on alone therefore does not supply an exact first-shot time. Match the configured lighting schedule with the room.",
+        "narration": "At lights-on, every zone starts in P zero, the morning wait. No water is given, so the root zone keeps drying, like a sponge draining before you top it up. Lesson A four called this fall dryback. P zero aims for a dryback target. A target is the value a phase is trying to reach. P zero ends at the first of three events. The dryback reaches its target. Or the VWC falls to the P two re-water threshold, which you meet on slide four. Or the time limit runs out; the app calls that limit the maximum wait. For example, lights-on is six in the morning, the maximum wait is ninety minutes, and drying is slow. Six o'clock plus ninety minutes is half past seven, so P zero ends by then at the latest. That is why lights-on alone cannot tell you when the first shot comes.",
         "visual": {
           "type": "phases",
-          "title": "Wait first: morning dryback, P0",
+          "title": "Wait first: P0 morning dryback",
           "labels": [
-            "Configured lights-on",
-            "P0 dryback",
-            "Timing conditions"
+            "Lights-on: P0 starts",
+            "Dryback toward its target",
+            "Maximum wait: time limit"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "Lights-on is 06:00 and the maximum wait is 120 minutes. Drying is slow. What is the latest P0 can end?",
+          "options": [
+            {
+              "text": "08:00",
+              "correct": true,
+              "feedback": "120 minutes is two hours. 06:00 plus two hours is 08:00."
+            },
+            {
+              "text": "06:00",
+              "correct": false,
+              "feedback": "P0 starts at lights-on. It waits for its dryback target or its time limit."
+            },
+            {
+              "text": "07:20",
+              "correct": false,
+              "feedback": "120 minutes is two hours, not one hour and twenty minutes."
+            }
+          ]
         }
       },
       {
         "id": "B2-3",
-        "title": "Refill: ramp-up, P1",
+        "title": "Refill: P1 ramp-up",
         "body": [
-          "A shot is one watering event.",
-          "P1 uses shots and checks to approach a configured target."
+          "P1 refill: shots with pauses between them",
+          "Each shot lifts VWC a step toward the P1 target"
         ],
-        "narration": "The second job is refill. The program calls it P one, or ramp-up. A shot means one watering event. Several shots can raise water content toward the configured target, with checks between events. The target is a comparison value used by the rule. The probe response also depends on delivery and drainage. Count completed events from records rather than from a drawing.",
+        "narration": "The second phase is P one, the refill. The app calls it ramp-up. The Controller gives a series of shots, one watering each, with a pause between them. Each shot lifts the VWC a step, like filling a bath one bucket at a time. The refill aims for the P one target. For example, P zero ended at fifty-four percent and the target is sixty. That is six percentage points to climb. If each shot lifts the reading about two points, six divided by two gives about three shots. Some water drains, and the probe sees only part of the pot, so the real count can differ. To know how many shots ran, read the record of shots, not the drawing. Next, the long middle of the day.",
         "visual": {
           "type": "phases",
-          "title": "Refill: ramp-up, P1",
+          "title": "Refill: P1 ramp-up",
           "labels": [
-            "P1 shot",
-            "Observe response",
-            "Check rules"
+            "Shot, pause, shot",
+            "VWC climbs in steps",
+            "Stops at the P1 target"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "P1 starts at 50% VWC, the P1 target is 59%, and each shot adds about 3 points. Roughly how many shots?",
+          "options": [
+            {
+              "text": "About 3",
+              "correct": true,
+              "feedback": "59 minus 50 is 9 points. 9 divided by 3 is about 3 shots."
+            },
+            {
+              "text": "About 9",
+              "correct": false,
+              "feedback": "9 is the gap in points. Divide it by 3 points per shot."
+            },
+            {
+              "text": "About 20",
+              "correct": false,
+              "feedback": "Find the gap first: 59 minus 50 is 9 points, then divide by 3."
+            }
+          ]
         }
       },
       {
         "id": "B2-4",
-        "title": "Maintain: conditional watering, P2",
+        "title": "Maintain: P2 and the re-water threshold",
         "body": [
-          "P2 checks a re-water threshold.",
-          "A threshold is a value used to decide whether another shot is needed."
+          "P2: a shot each time VWC falls to the re-water threshold",
+          "Shots drawn on a planning chart are a forecast"
         ],
-        "narration": "The third job is maintenance, called P two. A re-water threshold is the reference used when deciding whether another shot is needed. Readings, timing rules and protections still apply. A planning chart may show evenly spaced shots using an assumed drying rate. If actual drying is slower, fewer events may occur. Read the controller’s reason before calling a missing shot a fault.",
+        "narration": "The third phase is P two, maintain. Think of cruise control: the car holds its speed instead of speeding up. P two holds the VWC near the top of the refill. It uses a threshold called the re-water threshold. Each time the VWC falls to that line, the Controller can give one shot. Some screens label it the re-water point; it is the same line. For example, the refill ends at sixty percent and the re-water threshold is fifty-seven. That is a three-point fall. If the zone dries two points an hour, three divided by two gives one and a half hours between shots. The planning chart draws shots at that spacing. A drawing of shots the plan expects is called a forecast. If the zone dries more slowly, fewer shots happen, and that is normal.",
         "visual": {
           "type": "phases",
-          "title": "Maintain: conditional watering, P2",
+          "title": "Maintain: P2 and the re-water threshold",
           "labels": [
-            "P2 threshold",
-            "Actual readings",
-            "Conditional shot"
+            "Re-water threshold: 57%",
+            "Falls 2 points an hour",
+            "A shot each time it is hit"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "P2 refills to 62%, the re-water threshold is 58%, and VWC falls 2 points an hour. Forecast gap between shots?",
+          "options": [
+            {
+              "text": "2 hours",
+              "correct": true,
+              "feedback": "62 minus 58 is 4 points. 4 divided by 2 points an hour is 2 hours."
+            },
+            {
+              "text": "4 hours",
+              "correct": false,
+              "feedback": "4 is the fall in points. Divide by the rate of 2 points an hour."
+            },
+            {
+              "text": "8 hours",
+              "correct": false,
+              "feedback": "Divide the 4-point fall by the 2-point hourly rate, do not multiply."
+            }
+          ]
         }
       },
       {
         "id": "B2-5",
         "title": "Worked example: a 06:00–18:00 lighting day",
         "body": [
-          "06:00: configured lights-on and start of the grow-day.",
-          "Wait → refill → maintain → overnight dryback.",
-          "Lighting hours do not fix every transition or shot time."
+          "06:00 lights-on: P0 starts the grow-day",
+          "P0 → P1 → P2 hand-overs depend on readings",
+          "18:00 lights-off: every zone moves to P3"
         ],
-        "narration": "Use a fictional room lit from six in the morning to six in the evening. At six, begin the morning wait. When its rules allow, move to refill, then maintenance. Daytime watering can finish before lights-off. The overnight period follows. Explain those four jobs in order. We cannot calculate the refill and maintenance transition times from lighting hours alone.",
+        "narration": "Now put the phases on a clock. Our example room has lights on at six in the morning and lights off at six in the evening. Six in the morning plus twelve hours is six in the evening, so the lights are on for twelve hours. At six in the morning, each zone enters P zero and waits. When P zero ends, P one refills, then P two maintains. Those hand-overs depend on the readings, so the clock cannot give their times. At lights-off, six in the evening, every zone moves to P three, whatever phase it was in. The Controller can also start P three a little earlier, so the night's dryback finishes by morning. P three lasts until six the next morning, twelve hours later, when a new grow-day starts. Expect phases by their order, not by fixed clock times.",
         "visual": {
           "type": "phases",
           "title": "Worked example: a 06:00–18:00 lighting day",
@@ -1028,148 +1545,208 @@
           "caption": "Teaching example. Numbers are not recommended crop settings."
         },
         "workedExample": {
-          "prompt": "Explain a 06:00–18:00 lighting day without inventing shot times.",
+          "prompt": "Place the four phases on a 06:00–18:00 lighting day.",
           "steps": [
-            "Place P0 at the start of the grow-day.",
-            "Describe P1 ramp-up and P2 maintenance by purpose.",
-            "Describe P3 overnight and its separate emergency floor."
+            "06:00 lights-on: the grow-day starts and each zone enters P0.",
+            "P0 → P1 → P2: these hand-overs depend on readings, so the clock cannot give their times.",
+            "18:00 lights-off: every zone is in P3 until 06:00. 12 h lit + 12 h night = 24 h."
           ],
-          "answer": "The sequence explains rules and purposes. Lighting hours alone do not determine exact transitions or shot counts."
+          "answer": "P0 starts at 06:00 and P3 runs from 18:00 at the latest to 06:00. The P1 and P2 times come from the readings."
+        },
+        "check": {
+          "prompt": "Lights-on is 05:00 and lights-off is 23:00. How many hours run from lights-off to the next lights-on?",
+          "options": [
+            {
+              "text": "6 hours",
+              "correct": true,
+              "feedback": "23:00 to midnight is 1 hour, then midnight to 05:00 is 5. Total 6."
+            },
+            {
+              "text": "18 hours",
+              "correct": false,
+              "feedback": "18 hours is the lit period, from 05:00 to 23:00."
+            },
+            {
+              "text": "5 hours",
+              "correct": false,
+              "feedback": "Count the hour from 23:00 to midnight as well: 1 + 5 = 6."
+            }
+          ]
         }
       },
       {
         "id": "B2-6",
-        "title": "Overnight dryback: P3",
+        "title": "Overnight: P3 and the Rescue floor",
         "body": [
-          "P3 covers the overnight period.",
-          "Its emergency floor is a separate rescue reference."
+          "P3: overnight dryback, normally no water",
+          "Below the Rescue floor, a rescue shot can run"
         ],
-        "narration": "The fourth job is overnight dryback, called P three. The emergency floor is a separate low-water reference for the overnight rescue rule. It is not a nightly destination to aim for. A rescue event depends on its conditions and protections; the label overnight does not order an automatic night shot. Unreliable sensing needs the local fallback procedure and the responsible operator.",
+        "narration": "The fourth phase is P three, the overnight dryback. The lights are off, and normally no water is given. The root zone dries slowly, like a sponge left on the sink overnight. One protection stays awake. In lesson B one you dragged a night-time emergency threshold. Growers call that line the emergency floor. In the app it is labelled Rescue floor, and this course uses that name from here on. If the VWC falls below the Rescue floor overnight, the Controller can give a rescue shot. A rescue shot is a small protective shot that stops the root zone drying too far. For example, with the floor at thirty-five percent, a reading of thirty-six gets no shot. A reading of thirty-four is below the floor, so a rescue shot can follow. Treat the floor as an alarm line, never as a level to aim for each night.",
         "visual": {
           "type": "phases",
-          "title": "Overnight dryback: P3",
+          "title": "Overnight: P3 and the Rescue floor",
           "labels": [
-            "P3 overnight",
-            "Separate emergency floor",
-            "Check conditions"
+            "P3: lights off, dry back",
+            "Rescue floor: alarm line",
+            "Below it: a rescue shot"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "The Rescue floor is 40%. At 02:00 VWC reads 43% and is falling slowly. What happens now?",
+          "options": [
+            {
+              "text": "No shot yet; 43% is above the floor",
+              "correct": true,
+              "feedback": "A rescue shot can run only once VWC falls below 40%."
+            },
+            {
+              "text": "A rescue shot, because the zone is in P3",
+              "correct": false,
+              "feedback": "Being in P3 gives no water by itself. The floor triggers the rescue."
+            },
+            {
+              "text": "A rescue shot every hour by default",
+              "correct": false,
+              "feedback": "Rescue shots follow the floor, not the clock."
+            }
+          ]
         }
       },
       {
         "id": "B2-7",
         "title": "Your turn: explain another day",
         "body": [
-          "Complete: wait = __; refill = P1; maintain = __; overnight = P3.",
-          "Then explain an 08:00–20:00 example."
+          "Wait = P0, refill = P1, maintain = P2, night = P3",
+          "Forecast = planned shots; event record = real shots"
         ],
-        "narration": "Pause and fill the gaps. Morning wait is P zero. Maintenance is P two. Now explain a room lit from eight in the morning to eight in the evening using all four jobs. Which shot times remain unknown? Recall that a forecast describes assumed events, while the event record describes completed actions. Moving a reference line cannot change yesterday’s observed readings.",
+        "narration": "Pause and fill the gaps. The morning wait is P zero, and the maintain phase is P two. Now picture a room lit from eight in the morning. Eight in the morning plus twelve hours is eight in the evening, so lights-off is at eight in the evening. P zero starts at eight in the morning. P three runs from eight in the evening to eight the next morning. The P one and P two times stay unknown until the readings decide them. Last, separate two lists of shots. A forecast shows the shots the plan expects. The event record lists the shots that really ran, with their times. When you check what happened, read the event record. The next lesson shows how a slider tilts these settings toward one kind of growth.",
         "visual": {
           "type": "phases",
           "title": "Your turn: explain another day",
           "labels": [
             "Complete P0 and P2",
             "08:00–20:00 example",
-            "State what remains unknown"
+            "Forecast vs event record"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "Yesterday’s forecast showed six P2 shots. The event record lists four. How many P2 shots ran?",
+          "options": [
+            {
+              "text": "Four",
+              "correct": true,
+              "feedback": "The event record lists the shots that really ran."
+            },
+            {
+              "text": "Six",
+              "correct": false,
+              "feedback": "Six was the plan's expectation. The event record shows what happened."
+            },
+            {
+              "text": "Ten",
+              "correct": false,
+              "feedback": "Do not add the lists. The forecast and the record describe the same day."
+            }
+          ]
         }
       }
     ],
     "practice": {
       "kind": "sequence",
-      "prompt": "For a fictional 07:00–19:00 lighting day, order all four phase cards and explain one purpose per card. Explain why a chart with six P2 events does not promise six actual events.",
+      "prompt": "For a fictional 07:00–19:00 lighting day, order the four phase cards and give one job per card. Then explain why a forecast of six P2 shots does not promise six shots.",
       "hints": [
-        "Use P0 morning dryback, P1 ramp-up, P2 maintenance and P3 overnight.",
-        "A projection uses assumptions; events still depend on rules and observations."
+        "P0 morning wait, P1 refill, P2 maintain, P3 overnight dryback.",
+        "P2 shots happen when VWC falls to the re-water threshold; slow drying means fewer."
       ],
-      "success": "Correct order and purposes; conditional events and protections prevent a guaranteed count. The P3 floor is an emergency reference, not a routine destination."
+      "success": "P0 from 07:00, then P1, P2, and P3 from 19:00 at the latest to 07:00. P2 shots follow the readings, so the count can differ. The Rescue floor is an alarm line, not a nightly target."
     },
     "quiz": [
       {
         "id": "B2-q1",
-        "prompt": "Which order matches this program’s normal day sequence?",
+        "prompt": "Which order matches a normal grow-day?",
         "options": [
           {
-            "text": "P0 morning dryback → P1 ramp-up → P2 maintenance → P3 overnight",
+            "text": "P0 morning wait → P1 refill → P2 maintain → P3 overnight",
             "correct": true,
-            "feedback": "These are the four phases in order. Actual transitions also depend on conditions and timing rules."
+            "feedback": "Lights-on starts P0; lights-off moves every zone to P3."
           },
           {
-            "text": "P0 overnight → P1 maintenance → P2 ramp-up → P3 morning",
+            "text": "P0 overnight → P1 maintain → P2 refill → P3 morning",
             "correct": false,
-            "feedback": "The labels are reversed. P0 is morning dryback; P3 is overnight."
+            "feedback": "The labels are mixed up. P0 is the morning wait; P3 is overnight."
           },
           {
             "text": "P2 → P0 → P3 → P1",
             "correct": false,
-            "feedback": "Begin at lights-on with P0, then ramp-up, maintenance and overnight."
+            "feedback": "Start at lights-on with P0, then refill, maintain and overnight."
           }
         ],
         "safetyCritical": false
       },
       {
         "id": "B2-q2",
-        "prompt": "A planning curve shows P2 shots at exact times. What do those times establish?",
+        "prompt": "A planning chart shows P2 shots at exact times. What are those times?",
         "options": [
           {
-            "text": "Guaranteed pump appointments.",
+            "text": "Fixed appointments for the pump",
             "correct": false,
-            "feedback": "The projection uses a drying rate. Actual events depend on rules, fresh readings and protections."
+            "feedback": "P2 shots come when VWC falls to the re-water threshold, not at set times."
           },
           {
-            "text": "Illustrative times under the projection’s assumptions.",
+            "text": "A forecast, based on an assumed drying rate",
             "correct": true,
-            "feedback": "Use actual event records to determine what happened."
+            "feedback": "Read the event record to see which shots really ran."
           },
           {
-            "text": "Proof those shots already completed.",
+            "text": "Proof the shots already ran",
             "correct": false,
-            "feedback": "Actual event and delivery evidence are needed to support a claim about completed watering."
+            "feedback": "Only the event record lists shots that ran."
           }
         ],
         "safetyCritical": false
       },
       {
         "id": "B2-q3",
-        "prompt": "What is the P3 emergency floor?",
+        "prompt": "What is the P3 Rescue floor, also called the emergency floor?",
         "options": [
           {
-            "text": "A routine nightly destination to chase.",
+            "text": "A level to aim for each night",
             "correct": false,
-            "feedback": "It is a separate protection reference, not a routine moisture target."
+            "feedback": "It is an alarm line. Aiming for it would dry the root zone too far."
           },
           {
-            "text": "Proof that a rescue shot must always occur.",
+            "text": "A promise of one rescue shot every night",
             "correct": false,
-            "feedback": "The rescue rule still has conditions and protections. A threshold does not guarantee a shot."
+            "feedback": "A rescue shot runs only if VWC falls below the floor and safety checks pass."
           },
           {
-            "text": "A reference used by the overnight rescue rule.",
+            "text": "A low line that can trigger a rescue shot overnight",
             "correct": true,
-            "feedback": "Keep its protection role separate from ordinary targets and projected dryback."
+            "feedback": "It protects the root zone; it is not a routine target."
           }
         ],
         "safetyCritical": true
       },
       {
         "id": "B2-q4",
-        "prompt": "What can configured lights-on and lights-off times alone tell you?",
+        "prompt": "Lights-on is 06:00 and lights-off is 18:00. What do these times tell you?",
         "options": [
           {
-            "text": "Every P1 shot time.",
+            "text": "Every P1 shot time",
             "correct": false,
-            "feedback": "Ramp timing also depends on configured rules and observed conditions."
+            "feedback": "P1 starts when P0 ends, which depends on the readings."
           },
           {
-            "text": "The lighting period used as context for the grow-day.",
+            "text": "When the grow-day starts and when P3 starts at the latest",
             "correct": true,
-            "feedback": "Verify it matches the actual installation; it does not fully determine irrigation transitions."
+            "feedback": "Lights-on starts P0; lights-off moves every zone to P3."
           },
           {
-            "text": "The exact amount each plant takes up.",
+            "text": "How much water each plant takes up",
             "correct": false,
-            "feedback": "Lighting hours do not measure delivery or uptake."
+            "feedback": "Light times say nothing about water amounts."
           }
         ],
         "safetyCritical": false
@@ -1178,8 +1755,8 @@
     "practicalTask": {
       "instructions": [
         "Draw a blank day strip using fictional lighting hours.",
-        "Place the four phase cards and write their purposes.",
-        "Label assumed event times projected; label recorded events actual."
+        "Place the four phase cards and write one job for each.",
+        "Label shots the plan expects as forecast, and shots that ran as event record."
       ],
       "requiresLocalSupervision": false,
       "proof": "explain"
@@ -1211,11 +1788,11 @@
     "id": "B3",
     "module": "B",
     "title": "Vegetative and generative: a bias, not a magic switch",
-    "summary": "Use a dimmer-switch analogy to separate a steering direction from the planner’s numerical blend and the crop’s actual response.",
+    "summary": "Use a dimmer picture to learn vegetative and generative steering, then calculate how the slider blends two endpoints in a profile.",
     "outcomes": [
-      "Explain vegetative and generative as intended directions, separate from growth stage.",
-      "Calculate a blend between two configured endpoint values.",
-      "Name the crop and substrate context needed to judge whether those settings suit a zone."
+      "Explain vegetative growth, generative growth and steering bias, separate from growth stage.",
+      "Calculate a slider blend between two endpoint values and round it to the step.",
+      "Check a profile's sharing and EC fields before trusting a slider change."
     ],
     "prerequisites": [
       "A4",
@@ -1228,52 +1805,94 @@
         "id": "B3-1",
         "title": "Think of a dimmer",
         "body": [
-          "Vegetative: roots, leaves and shoots.",
-          "Generative: reproductive growth, such as flowers and fruit.",
-          "Bias means an intended direction."
+          "Vegetative growth: roots, stems and leaves",
+          "Generative growth: flowers and fruit",
+          "Steering bias: the direction you intend"
         ],
-        "narration": "A dimmer moves gradually between two ends of a range. Keep that picture for the planner slider. First name the directions. Vegetative growth includes roots, leaves and shoots. Generative growth includes reproductive structures, such as flowers and fruit. A steering bias is an intended influence on that balance. It is separate from the plant’s stage and does not guarantee a response.",
+        "narration": "Think of a dimmer switch. It does more than switch a light on or off. It slides smoothly between the two. Keep that picture for this lesson. A plant puts its effort into two broad kinds of growth. Vegetative growth builds roots, stems and leaves. Generative growth builds flowers and fruit. Growers can nudge that balance through watering. A planned nudge toward one side is called a steering bias. Bias is your intention, separate from the plant's age. A young plant and a flowering plant can each get either bias. For example, a grower may give a flowering plant a vegetative bias for a week to help it grow more leaf. The plant decides how it responds, so you watch the crop as well as the settings. Next: how watering does the nudging.",
         "visual": {
           "type": "steering",
           "title": "Think of a dimmer",
           "labels": [
-            "Intended direction",
-            "Gradual adjustment",
-            "Observed plant response"
+            "Vegetative: roots, leaves",
+            "Generative: flowers, fruit",
+            "Bias: your intended nudge"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "A plant is flowering. Can it be given a vegetative bias?",
+          "options": [
+            {
+              "text": "Yes; bias is your intent, separate from growth stage",
+              "correct": true,
+              "feedback": "Stage is what the plant is doing. Bias is the direction you choose."
+            },
+            {
+              "text": "No; flowering plants must use generative bias",
+              "correct": false,
+              "feedback": "Stage does not lock the bias. Growers choose it for a purpose."
+            },
+            {
+              "text": "Only when VWC is above 60%",
+              "correct": false,
+              "feedback": "Bias is not set by one reading. It is a planned direction."
+            }
+          ]
         }
       },
       {
         "id": "B3-2",
-        "title": "The plant responds to its conditions",
+        "title": "How watering nudges the plant",
         "body": [
-          "Irrigation timing, dryback and EC interact with climate and light.",
-          "The substrate, variety and crop stage affect the response."
+          "Smaller drybacks tend toward vegetative",
+          "Larger drybacks tend toward generative",
+          "Light, climate, substrate and variety also matter"
         ],
-        "narration": "Growers influence root-zone conditions through irrigation timing, dryback and suitable EC bounds. Climate and light also matter. In suitable conditions, smaller drybacks can support a vegetative direction; greater dryback can contribute to a generative direction. These are broad tendencies. Substrate, plant variety and stage change the response. A flowering plant may still need a vegetative bias to support balanced growth.",
+        "narration": "How does watering nudge the plant? Think of the sponge again. Smaller drybacks keep the root zone more evenly wet. In suitable conditions, that tends to support vegetative growth. Larger drybacks let it dry further between shots, which tends to support generative growth. For example, compare a zone drying from sixty to fifty-seven percent each morning with one drying from sixty to fifty-one. The first fall is three points, a gentler, more vegetative pattern. The second is nine points, a more generative pattern. EC, light and climate also push the balance. So do the substrate, the plant variety and its growth stage. These are tendencies, so check the crop as well as the numbers. Next: how the app stores a set of numbers for each direction.",
         "visual": {
           "type": "lesson-cues",
-          "title": "The plant responds to its conditions",
+          "title": "How watering nudges the plant",
           "labels": [
-            "Irrigation",
+            "Watering: size of dryback",
             "Climate and light",
-            "Crop and medium"
+            "Substrate, variety, stage"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "Zone A dries from 60% to 58% each morning. Zone B dries from 60% to 50%. Which leans more generative?",
+          "options": [
+            {
+              "text": "Zone B, with the 10-point dryback",
+              "correct": true,
+              "feedback": "Larger drybacks tend toward generative growth."
+            },
+            {
+              "text": "Zone A, with the 2-point dryback",
+              "correct": false,
+              "feedback": "Smaller drybacks keep it wetter, which tends toward vegetative."
+            },
+            {
+              "text": "Neither; dryback has no effect",
+              "correct": false,
+              "feedback": "Dryback size is one of the main ways watering nudges the balance."
+            }
+          ]
         }
       },
       {
         "id": "B3-3",
-        "title": "What the slider actually calculates",
+        "title": "Endpoints, profiles and the slider",
         "body": [
-          "A profile stores two sets of operator-defined values.",
-          "0 selects the vegetative endpoint; 100 selects the generative endpoint."
+          "Endpoint: a full set of settings for one end",
+          "Profile: both endpoints saved together",
+          "Slider: 0 = vegetative, 100 = generative"
         ],
-        "narration": "An endpoint is a set of values at one end of the slider. A profile stores both sets for reuse. Zero selects the configured vegetative endpoint. One hundred selects the generative endpoint. Between them, the planner blends supported settings. The grower supplies the bounds. Pot size and dripper flow help describe the setup, but cannot choose the biological targets automatically.",
+        "narration": "Now the dimmer becomes a setting in the app. Picture two complete sets of numbers, one for each end of the range. Each set is called an endpoint. The vegetative endpoint holds the settings you want for a fully vegetative day. The generative endpoint holds the settings for a fully generative day. Together, the two endpoints are saved as a profile, so you can reuse them. Between them sits the slider, a control you drag from zero to one hundred. Look at the scale. Zero uses the vegetative endpoint. One hundred uses the generative endpoint. Fifty sits halfway, so each setting lands halfway between its two endpoint values. The app calls this mixing a blend. You choose the endpoint values yourself, because the app cannot work them out from your pot size. Next, a blend worked step by step.",
         "visual": {
           "type": "steering",
-          "title": "What the slider actually calculates",
+          "title": "Endpoints, profiles and the slider",
           "labels": [
             "0: vegetative endpoint",
             "50: halfway",
@@ -1285,16 +1904,37 @@
             100,
             0.5
           ]
+        },
+        "check": {
+          "prompt": "Maximum wait endpoints: 30 min vegetative, 50 min generative. The slider is at 0. What wait does the app use?",
+          "options": [
+            {
+              "text": "30 minutes",
+              "correct": true,
+              "feedback": "Right. 0 is the vegetative end, so the app uses that endpoint as it is."
+            },
+            {
+              "text": "40 minutes",
+              "correct": false,
+              "feedback": "40 is the halfway blend, at slider 50. At 0 the app uses one end only."
+            },
+            {
+              "text": "50 minutes",
+              "correct": false,
+              "feedback": "50 is the generative endpoint, used at slider 100, the other end."
+            }
+          ]
         }
       },
       {
         "id": "B3-4",
         "title": "Worked example: halfway",
         "body": [
-          "Fictional wait endpoints: 30 and 50 minutes.",
-          "30 + 0.5 × (50 − 30) = 40 minutes."
+          "Endpoints 30 and 50 min; slider 50",
+          "30 + 0.5 × (50 − 30) = 40 minutes",
+          "Then round to the setting's step"
         ],
-        "narration": "Take fictional morning-wait endpoints of thirty and fifty minutes. Their difference is twenty. At slider fifty, use half the difference: ten minutes. Add ten to thirty. The result is forty minutes, before rounding to the setting’s supported step. This calculation explains the slider. Choosing suitable endpoints needs knowledge of the actual crop and substrate.",
+        "narration": "Work one setting through. Take the maximum wait from lesson B two, the longest P zero can last. Say the vegetative endpoint is thirty minutes and the generative endpoint is fifty. First, find the difference: fifty minus thirty is twenty minutes. Next, turn the slider into a fraction: fifty out of one hundred is one half. Then take that fraction of the difference: half of twenty is ten. Last, add it to the vegetative endpoint: thirty plus ten is forty minutes. The app then rounds the result to the setting's step, the smallest change that setting accepts. With a one-minute step, forty stays forty. A result of forty point four would round to forty. The same four steps work for every setting in the profile. Next, you try one.",
         "visual": {
           "type": "steering",
           "title": "Worked example: halfway",
@@ -1311,31 +1951,50 @@
           ]
         },
         "workedExample": {
-          "prompt": "Blend fictional endpoints of 30 and 50 minutes at slider 50.",
+          "prompt": "Blend fictional maximum-wait endpoints of 30 and 50 minutes at slider 50.",
           "steps": [
-            "Difference: 50 - 30 = 20 minutes.",
-            "Fraction: 50 / 100 = 0.5.",
-            "Blend: 30 + 0.5 × 20 = 40 minutes, before parameter-step rounding."
+            "Difference: 50 − 30 = 20 minutes.",
+            "Fraction: 50 ÷ 100 = 0.5.",
+            "Blend: 30 + 0.5 × 20 = 40 minutes, then round to the step: 40."
           ],
-          "answer": "40 minutes in this arithmetic example. Endpoint suitability remains a separate local decision."
+          "answer": "40 minutes. Whether 30 and 50 suit your crop is a separate choice you make."
+        },
+        "check": {
+          "prompt": "Endpoints are 10 and 30 minutes, the slider is 50 and the step is 1 minute. What is the blend?",
+          "options": [
+            {
+              "text": "20 minutes",
+              "correct": true,
+              "feedback": "Difference 20, half of it is 10, and 10 + 10 = 20."
+            },
+            {
+              "text": "10 minutes",
+              "correct": false,
+              "feedback": "10 is half the difference. Add it to the first endpoint, 10."
+            },
+            {
+              "text": "40 minutes",
+              "correct": false,
+              "feedback": "Do not add the endpoints. Take half the difference and add it to 10."
+            }
+          ]
         }
       },
       {
         "id": "B3-5",
         "title": "Your turn, with the steps supplied",
         "body": [
-          "Endpoints 30 and 50; slider 25.",
-          "30 + __ × 20 = __ minutes.",
-          "Equal endpoints produce no change."
+          "30 + 0.25 × 20 = 35 minutes",
+          "Equal endpoints give the same value everywhere"
         ],
-        "narration": "Keep thirty and fifty as the endpoints. Set the slider to twenty-five. What fraction of the difference is that? Pause and calculate. One quarter of twenty is five. Add five to thirty to get thirty-five minutes. If both endpoints were thirty, their difference would be zero. Moving the slider would then leave that setting at thirty.",
+        "narration": "Your turn, with the steps laid out. Keep the endpoints at thirty and fifty minutes, and set the slider to twenty-five. Pause and work it out before you listen on. The difference is still twenty minutes. Twenty-five out of one hundred is one quarter. One quarter of twenty is five. Thirty plus five is thirty-five minutes. Now a special case. Suppose both endpoints are thirty minutes. The difference is zero, and any fraction of zero is zero. So the setting stays at thirty wherever the slider sits. Existing set-ups often start this way, because both endpoints copy your current settings. If the slider seems to change nothing, check whether the endpoints are equal.",
         "visual": {
           "type": "lesson-cues",
           "title": "Your turn, with the steps supplied",
           "labels": [
-            "Endpoints: 30 and 50 minutes",
-            "Slider: 25 out of 100",
-            "Calculate the blended time before continuing."
+            "Endpoints: 30 and 50 min",
+            "Slider 25 = one quarter",
+            "Equal endpoints: no change"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
           "values": [
@@ -1343,19 +2002,39 @@
             50,
             0.25
           ]
+        },
+        "check": {
+          "prompt": "Both endpoints are 45 minutes. You move the slider from 20 to 80. What happens to the setting?",
+          "options": [
+            {
+              "text": "It stays at 45 minutes",
+              "correct": true,
+              "feedback": "Equal endpoints have zero difference, so every position gives 45."
+            },
+            {
+              "text": "It rises to 80 minutes",
+              "correct": false,
+              "feedback": "The slider is a position, not minutes. With equal endpoints nothing moves."
+            },
+            {
+              "text": "It doubles to 90 minutes",
+              "correct": false,
+              "feedback": "The blend moves between the endpoints and never beyond them."
+            }
+          ]
         }
       },
       {
         "id": "B3-6",
-        "title": "Try a new pair independently",
+        "title": "Try a new pair on your own",
         "body": [
-          "Endpoints 20 and 60 minutes; slider 75.",
-          "Calculate the blend before continuing."
+          "20 + 0.75 × (60 − 20) = 50 minutes",
+          "The slider is a position, not minutes"
         ],
-        "narration": "Now try endpoints of twenty and sixty minutes at slider seventy-five. Work it out first. Their difference is forty. Three quarters of forty is thirty. Add thirty to twenty for fifty minutes. The slider number is a position along the range, rather than a time in minutes. This result predicts the configured blend, not the plant’s response.",
+        "narration": "Now try one on your own. The endpoints are twenty and sixty minutes, and the slider is at seventy-five. Work it out first, then check. The difference is sixty minus twenty, which is forty minutes. Seventy-five out of one hundred is three quarters. Three quarters of forty is thirty. Twenty plus thirty is fifty minutes. Notice the trap: seventy-five is a position on the slider, not a time. It never goes into the answer as minutes. The blend tells you the setting the app will use. Whether that setting suits your plants is a separate question, which you answer by watching the crop.",
         "visual": {
           "type": "lesson-cues",
-          "title": "Try a new pair independently",
+          "title": "Try a new pair on your own",
           "labels": [
             "Endpoint 20 min",
             "Slider 75",
@@ -1367,100 +2046,141 @@
             60,
             0.75
           ]
+        },
+        "check": {
+          "prompt": "Endpoints are 40 and 80 minutes and the slider is 75. What is the blend?",
+          "options": [
+            {
+              "text": "70 minutes",
+              "correct": true,
+              "feedback": "Difference 40; three quarters is 30; 40 + 30 = 70."
+            },
+            {
+              "text": "75 minutes",
+              "correct": false,
+              "feedback": "75 is the slider position, not a time."
+            },
+            {
+              "text": "30 minutes",
+              "correct": false,
+              "feedback": "30 is the increase. Add it to the first endpoint, 40."
+            }
+          ]
         }
       },
       {
         "id": "B3-7",
-        "title": "Recall the calculation and its scope",
+        "title": "Check the profile before you trust it",
         "body": [
-          "Check every supported setting and every schedule using a shared profile.",
-          "Previewing a change does not apply a plan."
+          "A shared profile changes every zone that uses it",
+          "Check which EC each field means",
+          "A slider change is a draft until saved and switched on"
         ],
-        "narration": "Explain the dimmer analogy aloud, then name its limit: plants are not lamps with a guaranteed response. Check the whole profile, including the measurement type of any EC fields. A shared profile can serve several schedule blocks. A preview shows a draft; applying the plan is a separate workflow. Finish the practice by calculating first, then stating what the arithmetic cannot establish.",
+        "narration": "Last, three checks before you trust a slider change. First, a profile can be shared. Several zones or weeks can use the same profile. Edit it once, and every one of them changes. So before you edit, look at which zones use it. Second, check each EC value in the profile. Lesson A five showed that feed EC and pore-water EC are different measurements, so confirm which one each field means. Third, moving the slider makes a draft, like the draft threshold in lesson B one. The plan on screen updates at once. Nothing changes in the grow room until the plan is saved and switched on, steps a later lesson covers. Now explain the dimmer aloud, then try the practice. The next lesson works out how much water each shot delivers.",
         "visual": {
           "type": "lesson-cues",
-          "title": "Recall the calculation and its scope",
+          "title": "Check the profile before you trust it",
           "labels": [
-            "Measurement meaning",
-            "Profile scope",
-            "Preview versus applied"
+            "Shared profile changes all",
+            "Which EC is each field?",
+            "Slider edit = draft"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings."
+        },
+        "check": {
+          "prompt": "Zones 1 and 2 share a profile. You raise its generative maximum wait from 50 to 60 minutes. Whose plan changes?",
+          "options": [
+            {
+              "text": "Both zones’ plans",
+              "correct": true,
+              "feedback": "A shared profile feeds every zone that uses it. Check users before editing."
+            },
+            {
+              "text": "Only the zone you had selected",
+              "correct": false,
+              "feedback": "The edit is to the profile, and both zones read from it."
+            },
+            {
+              "text": "Neither; profiles cannot be edited",
+              "correct": false,
+              "feedback": "You can edit endpoint values. That is why sharing matters."
+            }
+          ]
         }
       }
     ],
     "practice": {
       "kind": "calculation",
-      "prompt": "On paper, blend fictional endpoints of 40 and 80 minutes at slider 25. Repeat with both endpoints at 40. Explain why neither calculation proves the values are suitable for a 5 L container.",
+      "prompt": "On paper, blend fictional endpoints of 40 and 80 minutes at slider 25. Repeat with both endpoints at 40. Then explain why pot size alone cannot choose these endpoints.",
       "hints": [
-        "Use first endpoint + slider/100 × (second - first).",
-        "A zero endpoint difference gives zero change."
+        "First endpoint + slider ÷ 100 × (second − first).",
+        "Equal endpoints have zero difference, so nothing changes."
       ],
-      "success": "50 minutes; then 40 minutes. Pot size alone cannot establish safe timing, VWC, EC or crop response."
+      "success": "40 + 0.25 × 40 = 50 minutes; then 40 minutes. You choose endpoints from your crop, substrate and readings; pot size alone cannot set them."
     },
     "quiz": [
       {
         "id": "B3-q1",
-        "prompt": "Both configured endpoints are 45. What happens to that parameter when the slider moves?",
+        "prompt": "Both endpoints for a setting are 45. What happens to it when the slider moves?",
         "options": [
           {
-            "text": "It always doubles.",
+            "text": "It doubles",
             "correct": false,
-            "feedback": "The blend uses the endpoint difference. Here the difference is zero."
+            "feedback": "The blend uses the difference between endpoints, which here is zero."
           },
           {
-            "text": "It stays at 45.",
+            "text": "It stays at 45",
             "correct": true,
             "feedback": "Equal endpoints give the same value at every slider position."
           },
           {
-            "text": "The program invents a crop-specific range.",
+            "text": "The app works out a new range for your crop",
             "correct": false,
-            "feedback": "The operator must provide suitable endpoints. The slider only blends them."
+            "feedback": "You set the endpoints. The slider only blends them."
           }
         ],
         "safetyCritical": false
       },
       {
         "id": "B3-q2",
-        "prompt": "Which statement correctly separates stage and bias?",
+        "prompt": "Which statement keeps growth stage and steering bias apart?",
         "options": [
           {
-            "text": "Every flowering crop must use the generative endpoint.",
+            "text": "Every flowering crop must use the generative endpoint",
             "correct": false,
-            "feedback": "Growth stage and steering direction differ. Suitable direction requires crop context and evidence."
+            "feedback": "Stage does not lock the bias. You choose it for a purpose."
           },
           {
-            "text": "Generative bias means a guaranteed yield increase.",
+            "text": "A generative bias guarantees a bigger yield",
             "correct": false,
-            "feedback": "A management direction does not guarantee yield or another crop response."
+            "feedback": "Bias is a nudge. Watch the crop to see how it responds."
           },
           {
-            "text": "A flowering crop can receive a vegetative bias for a locally justified purpose.",
+            "text": "A flowering crop can get a vegetative bias for a clear reason",
             "correct": true,
-            "feedback": "Bias is the intended management direction; stage alone does not select a complete recipe."
+            "feedback": "Bias is your intended direction; stage is what the plant is doing."
           }
         ],
         "safetyCritical": false
       },
       {
         "id": "B3-q3",
-        "prompt": "What does pot size alone establish about endpoint suitability?",
+        "prompt": "What does pot size alone tell you about choosing endpoint values?",
         "options": [
           {
-            "text": "All safe VWC and EC settings.",
+            "text": "All the right VWC and EC values",
             "correct": false,
-            "feedback": "Medium, crop, calibration, delivery and climate also matter."
+            "feedback": "Substrate, crop, light and readings also decide them."
           },
           {
-            "text": "It does not establish a complete safe recipe.",
+            "text": "Not enough to choose them",
             "correct": true,
-            "feedback": "Container volume is one input. Local evidence and competent review are still required."
+            "feedback": "Pot size turns a shot into litres. Endpoints need crop and substrate knowledge."
           },
           {
-            "text": "The exact number of daily shots.",
+            "text": "The exact number of daily shots",
             "correct": false,
-            "feedback": "Events depend on actual conditions and rules, not volume alone."
+            "feedback": "Shots follow the readings, not the pot size."
           }
         ],
         "safetyCritical": false
@@ -1472,17 +2192,17 @@
           {
             "text": "50 minutes",
             "correct": true,
-            "feedback": "20 + 0.75 × (60 - 20) = 50 minutes."
+            "feedback": "20 + 0.75 × (60 − 20) = 20 + 30 = 50 minutes."
           },
           {
             "text": "75 minutes",
             "correct": false,
-            "feedback": "The slider is a fraction of the endpoint difference, not a time in minutes."
+            "feedback": "75 is the slider position, not a time."
           },
           {
             "text": "30 minutes",
             "correct": false,
-            "feedback": "Thirty is the blended increase. Add it to the first endpoint, 20, to obtain 50."
+            "feedback": "30 is the increase. Add it to the first endpoint, 20, for 50."
           }
         ],
         "safetyCritical": false
@@ -1490,9 +2210,9 @@
     ],
     "practicalTask": {
       "instructions": [
-        "Explain the difference between crop stage, phase and steering bias.",
+        "Explain the difference between growth stage, phase and steering bias.",
         "Calculate a fictional blend and an equal-endpoint case.",
-        "List the local crop and equipment evidence needed before real endpoints are chosen."
+        "List the crop, substrate and equipment facts you need before choosing real endpoints."
       ],
       "requiresLocalSupervision": false,
       "proof": "explain"
@@ -1524,11 +2244,11 @@
     "id": "B4",
     "module": "B",
     "title": "How much water did each plant get?",
-    "summary": "Treat drippers as small taps, calculate delivered volume from flow and runtime, then separate delivery from drainage and plant uptake.",
+    "summary": "Treat drippers as small taps, calculate water per plant and per zone from flow and runtime, then separate delivery from runoff and uptake.",
     "outcomes": [
-      "Read L/h as litres per hour for each emitter.",
-      "Calculate estimated water per plant and per zone from effective runtime.",
-      "Explain why delivery volume does not measure plant uptake or guarantee a VWC rise."
+      "Read L/h as litres per hour for each dripper.",
+      "Calculate water per plant and per zone from the effective runtime.",
+      "Explain why delivered water is not runoff, uptake or a promised VWC rise."
     ],
     "prerequisites": [
       "A2",
@@ -1542,17 +2262,17 @@
         "id": "B4-1",
         "title": "A dripper is a small tap",
         "body": [
-          "Flow rate says how much water passes in a given time.",
-          "Each example emitter delivers 4 L/h; two serve each plant.",
-          "Rated flow is also called nominal flow."
+          "A dripper lets water out slowly at the plant",
+          "Flow rate in litres per hour: L/h",
+          "2 drippers × 4 L/h = 8 L/h per plant"
         ],
-        "narration": "Picture each dripper as a small tap. Its flow rate says how much water it delivers in a given time. Four litres per hour, written four L slash h, means four litres in one hour at that stated flow. Two such emitters supply each example plant. A rated flow is a label; a timed catch test checks actual delivery.",
+        "narration": "Picture a garden tap left running. The water that comes out in a set time is its flow rate. In a grow room, each plant is fed by drippers. A dripper is a small nozzle on a thin pipe that lets water out slowly at the plant. Its flow rate is given in litres per hour, written L slash h. Four litres per hour means four litres would come out in one full hour. Look at the picture. Each example plant has two drippers, each rated at four litres per hour. The zone has twelve plants. So each plant gets two times four, which is eight litres per hour. The printed rating is a starting figure. A catch test measures the real flow: you collect one dripper's water in a cup for a timed period and measure it. Next, flow becomes a shot volume.",
         "visual": {
           "type": "flow",
           "title": "A dripper is a small tap",
           "labels": [
-            "4 L/h per emitter",
-            "2 emitters per plant",
+            "4 L/h per dripper",
+            "2 drippers per plant",
             "12 plants"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
@@ -1562,23 +2282,44 @@
             30,
             12
           ]
+        },
+        "check": {
+          "prompt": "A plant has three drippers rated 2 L/h each. What is its flow rate?",
+          "options": [
+            {
+              "text": "6 L/h",
+              "correct": true,
+              "feedback": "3 drippers × 2 L/h = 6 L/h for the plant."
+            },
+            {
+              "text": "2 L/h",
+              "correct": false,
+              "feedback": "That is one dripper. Multiply by the 3 drippers."
+            },
+            {
+              "text": "5 L/h",
+              "correct": false,
+              "feedback": "Multiply the number of drippers by the rating: 3 × 2 = 6."
+            }
+          ]
         }
       },
       {
         "id": "B4-2",
         "title": "Worked example: thirty seconds",
         "body": [
-          "4 L/h × 2 emitters × 30 seconds / 3600",
-          "0.0667 L ≈ 66.7 mL per plant."
+          "Runtime: how long a shot runs",
+          "1 hour = 3600 seconds",
+          "8 × 30 ÷ 3600 ≈ 0.0667 L ≈ 66.7 mL per plant"
         ],
-        "narration": "Our completed watering event lasts thirty seconds. Two emitters at four litres per hour give eight litres per hour per plant. There are three thousand six hundred seconds in an hour. Multiply eight by thirty, then divide by three thousand six hundred. That is about zero point zero six six seven litres, or sixty-six point seven millilitres per plant.",
+        "narration": "A shot runs for a set time, called its runtime. Our example shot has a runtime of thirty seconds. The flow rate is per hour, so first count the seconds in an hour. Sixty seconds times sixty minutes is three thousand six hundred seconds. Each plant gets eight litres per hour. Multiply eight by thirty to get two hundred and forty. Divide by three thousand six hundred. The answer is about zero point zero six six seven litres. Multiply by one thousand to get millilitres: about sixty-six point seven millilitres per plant. That is less than a small glass of water. Keep the unrounded figure for the next step, so later answers stay accurate.",
         "visual": {
           "type": "lesson-cues",
           "title": "Worked example: thirty seconds",
           "labels": [
-            "2 emitters × 4 L/h = 8 L/h per plant",
+            "8 L/h per plant",
             "8 × 30 seconds ÷ 3600",
-            "0.0667 L = 66.7 mL per plant"
+            "≈ 0.0667 L = 66.7 mL per plant"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
           "values": [
@@ -1589,24 +2330,44 @@
           ]
         },
         "workedExample": {
-          "prompt": "Estimate one 30-second event with two 4 L/h emitters for each of 12 plants.",
+          "prompt": "Estimate one 30-second shot with two 4 L/h drippers for each of 12 plants.",
           "steps": [
-            "Per-plant flow: 4 × 2 = 8 L/h.",
-            "Per-plant delivery: 8 × 30 / 3600 = 1/15 L ≈ 66.7 mL.",
-            "Zone delivery: (1/15) × 12 = 0.8 L."
+            "Per-plant flow: 2 × 4 = 8 L/h.",
+            "Per-plant water: 8 × 30 ÷ 3600 = 1/15 L ≈ 66.7 mL.",
+            "Zone water: 1/15 × 12 = 0.8 L."
           ],
-          "answer": "Approximately 66.7 mL per plant and exactly 0.8 L per zone at the stated constant flow and runtime."
+          "answer": "About 66.7 mL per plant and 0.8 L per zone, if every dripper gives its stated flow."
+        },
+        "check": {
+          "prompt": "A plant gets 6 L/h and the runtime is 60 seconds. How much water does that plant get?",
+          "options": [
+            {
+              "text": "0.1 L, which is 100 mL",
+              "correct": true,
+              "feedback": "6 × 60 ÷ 3600 = 0.1 L."
+            },
+            {
+              "text": "360 L",
+              "correct": false,
+              "feedback": "You multiplied but did not divide by 3600 seconds per hour."
+            },
+            {
+              "text": "6 L",
+              "correct": false,
+              "feedback": "6 L would take a full hour. 60 seconds is one sixtieth of that."
+            }
+          ]
         }
       },
       {
         "id": "B4-3",
         "title": "Scale from one plant to twelve",
         "body": [
-          "12 × (4 × 2 × 30 / 3600) = 0.8 L per zone.",
-          "Use the unrounded per-plant result.",
-          "At 45 seconds: 0.1 L/plant × 20 plants = 2 L/zone; ten identical events = 20 L."
+          "Per zone = per plant × number of plants",
+          "1/15 L × 12 = 0.8 L per zone",
+          "Double the runtime, double the water"
         ],
-        "narration": "The zone has twelve plants. Multiply the unrounded per-plant amount by twelve. The result is zero point eight litres for the whole zone. Per plant and per zone describe different scopes. For a longer shot at the same flow, the estimated volume rises in proportion to runtime. For a daily total, use completed events rather than every projected event on a plan.",
+        "narration": "So far you have worked out one plant. The zone has twelve plants, all fed the same way. Multiply the per-plant amount by twelve. Use the exact fraction, one fifteenth of a litre, rather than the rounded figure. One fifteenth times twelve is zero point eight litres for the whole zone. Per plant tells you what one pot received. Per zone tells you what the whole group used, which matters for the tank. Now double the runtime to sixty seconds. At the same flow, the water doubles too: zero point eight times two is one point six litres per zone. To total a whole day, add up only the shots in the event record, the shots that really ran.",
         "visual": {
           "type": "flow",
           "title": "Scale from one plant to twelve",
@@ -1622,23 +2383,44 @@
             30,
             12
           ]
+        },
+        "check": {
+          "prompt": "One shot gives 0.05 L per plant. The zone has 20 plants. What is the zone total?",
+          "options": [
+            {
+              "text": "1 L",
+              "correct": true,
+              "feedback": "0.05 × 20 = 1 L for the zone."
+            },
+            {
+              "text": "0.05 L",
+              "correct": false,
+              "feedback": "That is one plant. Multiply by the 20 plants."
+            },
+            {
+              "text": "20 L",
+              "correct": false,
+              "feedback": "20 is the plant count, not litres. Multiply it by 0.05."
+            }
+          ]
         }
       },
       {
         "id": "B4-4",
-        "title": "A volume fraction is not a VWC response",
+        "title": "A shot's share of the pot",
         "body": [
-          "A separate 45-second example delivers 0.1 L per plant.",
-          "0.1 L / 5 L substrate × 100 = 2% of substrate volume."
+          "45 s × 8 L/h ÷ 3600 = 0.1 L per plant",
+          "0.1 L ÷ 5 L × 100 = 2% of substrate volume",
+          "The probe may rise by less than 2 points"
         ],
-        "narration": "Compare a separate forty-five-second shot using those same two emitters. It delivers zero point one litres, or one hundred millilitres per plant. In five litres of substrate, that volume is two percent of substrate volume. It does not promise a two-point VWC rise. Water can spread unevenly or drain, and the probe samples only part of the container.",
+        "narration": "How big is a shot compared with the pot? Take a separate example: a forty-five-second shot on the same two drippers. Eight times forty-five is three hundred and sixty. Divided by three thousand six hundred, that is zero point one litres, or one hundred millilitres per plant. Each pot holds five litres of substrate. Zero point one divided by five is zero point zero two. Times one hundred is two percent of the substrate volume. You might expect the VWC to rise two points. Often it rises less, or unevenly, because some water drains out and the probe samples only one spot. Use two percent as a size guide, and read the probe to see the real response.",
         "visual": {
           "type": "fraction",
-          "title": "A volume fraction is not a VWC response",
+          "title": "A shot's share of the pot",
           "labels": [
-            "0.1 L delivery",
+            "0.1 L delivered",
             "5 L substrate",
-            "2% volume fraction"
+            "2% of the volume"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
           "values": [
@@ -1647,16 +2429,37 @@
             2
           ],
           "quantity": "Delivered / substrate volume"
+        },
+        "check": {
+          "prompt": "A shot gives 0.3 L to a pot holding 6 L of substrate. What share of the substrate volume is that?",
+          "options": [
+            {
+              "text": "5%",
+              "correct": true,
+              "feedback": "0.3 ÷ 6 = 0.05, and 0.05 × 100 = 5%."
+            },
+            {
+              "text": "0.05%",
+              "correct": false,
+              "feedback": "0.05 is the fraction. Multiply by 100 for percent."
+            },
+            {
+              "text": "18%",
+              "correct": false,
+              "feedback": "Divide the shot by the pot volume; do not multiply them."
+            }
+          ]
         }
       },
       {
         "id": "B4-5",
         "title": "Your turn: complete the calculation",
         "body": [
-          "One 3 L/h emitter; 60 seconds; 12 plants.",
-          "3 × 1 × 60 / 3600 = __ L per plant."
+          "1 × 3 L/h × 60 s ÷ 3600 = 0.05 L per plant",
+          "0.05 L × 12 = 0.6 L per zone",
+          "Note it: rated flow or catch test?"
         ],
-        "narration": "Try one emitter at three litres per hour for sixty seconds. Multiply three by sixty and divide by three thousand six hundred. Pause and finish it. The answer is zero point zero five litres, or fifty millilitres per plant. Multiply by twelve plants to get zero point six litres per zone. State whether the flow came from a rating or a catch test.",
+        "narration": "Your turn. Each plant has one dripper rated at three litres per hour, and the shot runs for sixty seconds. The zone has twelve plants. Pause and work it out before you listen on. One dripper at three litres per hour gives three litres per hour per plant. Three times sixty is one hundred and eighty. Divide by three thousand six hundred: zero point zero five litres, or fifty millilitres per plant. Times twelve plants is zero point six litres per zone. Last, note where the three litres per hour came from. Was it the printed rating, or a catch test? Write that beside the answer, so the next reader knows how firm the number is.",
         "visual": {
           "type": "lesson-cues",
           "title": "Your turn: complete the calculation",
@@ -1672,47 +2475,89 @@
             60,
             12
           ]
+        },
+        "check": {
+          "prompt": "Two drippers at 1.5 L/h each run for 120 seconds. How much water per plant?",
+          "options": [
+            {
+              "text": "0.1 L",
+              "correct": true,
+              "feedback": "2 × 1.5 = 3 L/h; 3 × 120 ÷ 3600 = 0.1 L."
+            },
+            {
+              "text": "0.05 L",
+              "correct": false,
+              "feedback": "That uses one dripper. The plant has two, so 3 L/h."
+            },
+            {
+              "text": "0.2 L",
+              "correct": false,
+              "feedback": "Check the flow: 2 × 1.5 is 3 L/h, not 6."
+            }
+          ]
         }
       },
       {
         "id": "B4-6",
         "title": "Use the time that actually ran",
         "body": [
-          "Requested 120 seconds; effective runtime 60 seconds.",
-          "Calculate with 60 seconds and the stated flow."
+          "Requested runtime: the time asked for",
+          "Effective runtime: the time that actually ran",
+          "Always calculate with the effective runtime"
         ],
-        "narration": "A request can be shortened by the controller’s duration limit. If one hundred twenty seconds was requested but sixty was effective, use sixty in the estimate. Runtime still cannot prove equal flow from every outlet. Pressure and blocked emitters can change delivery. Commissioning checks actual catches, correct outlets and that water stops, with the responsible person supervising the test.",
+        "narration": "Sometimes a shot does not run as long as asked. The Controller has a safety limit on how long one shot may last. The time asked for is the requested runtime. The time that actually ran is the effective runtime. For example, a shot requests one hundred and twenty seconds, but the limit is sixty seconds. The effective runtime is sixty. Each plant gets eight litres per hour. Eight times sixty, divided by three thousand six hundred, is about zero point one three three litres. That is about one hundred and thirty-three millilitres. Using the requested time would give about two hundred and sixty-seven millilitres, double the real figure. So always calculate with the effective runtime. The app shows both times side by side.",
         "visual": {
           "type": "lesson-cues",
           "title": "Use the time that actually ran",
           "labels": [
             "Requested 120 s",
             "Effective 60 s",
-            "Catch-test evidence"
+            "Use effective: ≈ 133 mL"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
           "values": [
             120,
             60
           ]
+        },
+        "check": {
+          "prompt": "A shot requested 90 s, but the limit cut it to 45 s. Flow is 8 L/h per plant. Which estimate is right?",
+          "options": [
+            {
+              "text": "0.1 L, using 45 s",
+              "correct": true,
+              "feedback": "8 × 45 ÷ 3600 = 0.1 L. Use the time that actually ran."
+            },
+            {
+              "text": "0.2 L, using 90 s",
+              "correct": false,
+              "feedback": "90 s was requested but never ran. That doubles the real figure."
+            },
+            {
+              "text": "0.15 L, the average of both",
+              "correct": false,
+              "feedback": "Do not average. Only the effective 45 s delivered water."
+            }
+          ]
         }
       },
       {
         "id": "B4-7",
-        "title": "Recall: delivery, drainage, uptake",
+        "title": "Recall: delivery, runoff, uptake",
         "body": [
-          "Two 3 L/h emitters; 90 seconds; 15 plants.",
-          "Estimate: 0.15 L per plant; 2.25 L per zone."
+          "2 × 3 L/h × 90 s ÷ 3600 = 0.15 L per plant",
+          "0.15 L × 15 = 2.25 L per zone",
+          "Delivery is not runoff, and not uptake"
         ],
-        "narration": "Finish with two emitters at three litres per hour for ninety seconds and fifteen plants. Calculate before continuing: zero point one five litres per plant and two point two five litres per zone. Delivery means supplied water. Runoff means water leaving by drainage. Uptake means water entering the plant. A flow-and-time delivery estimate measures neither runoff nor uptake.",
+        "narration": "Last, three words that sound alike but mean different things. Delivery is the water the drippers supplied. Runoff, from lesson A five, is water that drains out of the pot. Uptake is water that enters the plant. A flow-times-runtime calculation gives delivery only. Try one more. Two drippers at three litres per hour run for ninety seconds, with fifteen plants. Two times three is six litres per hour per plant. Six times ninety is five hundred and forty. Divide by three thousand six hundred: zero point one five litres per plant. Times fifteen plants is two point two five litres per zone. That is water delivered. To learn how much drained, measure the runoff. Neither number tells you the plant's uptake. The next lesson looks at the equipment that makes each shot happen.",
         "visual": {
           "type": "lesson-cues",
-          "title": "Recall: delivery, drainage, uptake",
+          "title": "Recall: delivery, runoff, uptake",
           "labels": [
             "2 × 3 L/h",
             "90 seconds",
             "15 plants",
-            "Separate delivery and uptake"
+            "Delivery ≠ runoff ≠ uptake"
           ],
           "caption": "Teaching example. Numbers are not recommended crop settings.",
           "values": [
@@ -1721,79 +2566,99 @@
             90,
             15
           ]
+        },
+        "check": {
+          "prompt": "A zone was delivered 3 L, and you collected 0.6 L of runoff. What do you know about uptake?",
+          "options": [
+            {
+              "text": "These numbers do not measure it",
+              "correct": true,
+              "feedback": "Some water stays in the substrate or evaporates, so uptake stays unknown."
+            },
+            {
+              "text": "Uptake was 2.4 L",
+              "correct": false,
+              "feedback": "2.4 L did not drain. Some stayed in the substrate and some evaporated, so uptake is unknown."
+            },
+            {
+              "text": "Uptake was 3 L",
+              "correct": false,
+              "feedback": "3 L is delivery. Delivery and uptake are different things."
+            }
+          ]
         }
       }
     ],
     "practice": {
       "kind": "calculation",
-      "prompt": "A fictional zone has 18 plants and two 2 L/h emitters per plant. Effective runtime is 75 seconds. Calculate litres and millilitres per plant, then zone litres. Explain why the result is not uptake.",
+      "prompt": "A fictional zone has 18 plants and two 2 L/h drippers per plant. The effective runtime is 75 seconds. Calculate litres and millilitres per plant, then litres per zone. Explain why the result is not uptake.",
       "hints": [
-        "Use 2 × 2 × 75 / 3600 for litres per plant.",
-        "Multiply per-plant litres by 18 for the zone."
+        "Use 2 × 2 × 75 ÷ 3600 for litres per plant.",
+        "Multiply the per-plant litres by 18 for the zone."
       ],
-      "success": "About 0.0833 L = 83.3 mL per plant; 1.5 L per zone. These are flow/runtime delivery estimates, assuming the stated flow, and do not measure uptake or distribution."
+      "success": "About 0.0833 L = 83.3 mL per plant; 1.5 L per zone. This is delivery at the stated flow. It does not measure runoff or uptake."
     },
     "quiz": [
       {
         "id": "B4-q1",
-        "prompt": "Two 4 L/h emitters run for 45 seconds per plant. What is the per-plant estimate?",
+        "prompt": "Each plant has two 4 L/h drippers and the shot runs 45 seconds. How much water per plant?",
         "options": [
           {
             "text": "2 L",
             "correct": false,
-            "feedback": "Two litres is the zone estimate for 20 plants. The per-plant estimate is 0.1 L."
+            "feedback": "2 L is the total for a 20-plant zone. Per plant it is 0.1 L."
           },
           {
             "text": "0.1 L",
             "correct": true,
-            "feedback": "4 × 2 × 45 / 3600 = 0.1 L per plant."
+            "feedback": "2 × 4 = 8 L/h; 8 × 45 ÷ 3600 = 0.1 L."
           },
           {
             "text": "8 L",
             "correct": false,
-            "feedback": "Eight is flow in litres per hour per plant, not the volume of a 45-second shot."
+            "feedback": "8 is the flow in L/h, not the water from a 45-second shot."
           }
         ],
         "safetyCritical": false
       },
       {
         "id": "B4-q2",
-        "prompt": "An estimate is 0.15 L per plant for 15 plants. What is the zone estimate?",
+        "prompt": "A shot gives 0.15 L per plant to 15 plants. What is the zone total?",
         "options": [
           {
             "text": "0.01 L",
             "correct": false,
-            "feedback": "Zone volume is per-plant volume multiplied by plant count."
+            "feedback": "Multiply per-plant water by the plant count; do not divide."
           },
           {
             "text": "15 L",
             "correct": false,
-            "feedback": "Plant count is not a water volume. Multiply 0.15 by 15."
+            "feedback": "15 is the plant count, not litres. Multiply 0.15 by 15."
           },
           {
             "text": "2.25 L",
             "correct": true,
-            "feedback": "0.15 × 15 = 2.25 L for the zone, assuming equal stated delivery."
+            "feedback": "0.15 × 15 = 2.25 L, if every dripper gives its stated flow."
           }
         ],
         "safetyCritical": false
       },
       {
         "id": "B4-q3",
-        "prompt": "A shot equals 2% of substrate volume. What follows?",
+        "prompt": "A shot equals 2% of the substrate volume. What follows?",
         "options": [
           {
-            "text": "The probe must rise exactly two percentage points.",
+            "text": "The probe must rise exactly two points",
             "correct": false,
-            "feedback": "Drainage, distribution and local probe sampling prevent that guarantee."
+            "feedback": "Drainage, uneven spread and probe position mean the rise is often less."
           },
           {
-            "text": "Its volume is 2% of the stated substrate volume.",
+            "text": "The shot's volume is 2% of the substrate volume",
             "correct": true,
-            "feedback": "That fraction describes delivered volume relative to substrate volume. It does not establish the VWC response."
+            "feedback": "That is a size guide. Read the probe for the real response."
           },
           {
-            "text": "The plant took up 2% of its daily need.",
+            "text": "The plant took up 2% of its daily need",
             "correct": false,
             "feedback": "Delivery is not uptake, and daily need was not measured."
           }
@@ -1802,22 +2667,22 @@
       },
       {
         "id": "B4-q4",
-        "prompt": "A 120-second request is limited to an effective 60 seconds. Which time belongs in the estimate?",
+        "prompt": "A shot requested 120 seconds but the limit cut it to 60. Which time goes in the estimate?",
         "options": [
           {
-            "text": "120 seconds, because that was requested.",
+            "text": "120 seconds, because it was requested",
             "correct": false,
-            "feedback": "That would overestimate delivery if the effective runtime is 60 seconds."
+            "feedback": "That would double the estimate. The shot only ran 60 seconds."
           },
           {
-            "text": "Either time gives the same volume.",
+            "text": "Either time; the answer is the same",
             "correct": false,
-            "feedback": "At constant flow, halving runtime halves estimated volume."
+            "feedback": "At the same flow, half the time gives half the water."
           },
           {
-            "text": "60 seconds, with the flow assumption labelled.",
+            "text": "60 seconds, noting whether flow is rated or tested",
             "correct": true,
-            "feedback": "Use effective runtime and state whether flow is nominal or measured."
+            "feedback": "Use the effective runtime and say where the flow figure came from."
           }
         ],
         "safetyCritical": false
@@ -1825,10 +2690,10 @@
     ],
     "practicalTask": {
       "instructions": [
-        "Calculate the independent problem on paper and label every unit.",
-        "State a per-plant result and a zone result.",
+        "Calculate the practice problem on paper and label every unit.",
+        "State a per-plant result and a per-zone result.",
         "Explain why a catch test and a plant-uptake measurement answer different questions.",
-        "Do not operate real irrigation for this calculation exercise."
+        "Do not run real irrigation for this calculation exercise."
       ],
       "requiresLocalSupervision": false,
       "proof": "explain"

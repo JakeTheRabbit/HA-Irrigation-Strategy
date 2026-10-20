@@ -31,6 +31,11 @@ def pronunciation(text):
         r"\bL/h\b": "litres per hour",
         r"\bmS/cm\b": "millisiemens per centimetre",
         r"\bpp\b": "percentage points",
+        r"\bTEROS\b": "Terros",
+        r"\bMETER\b": "Meter",
+        r"\bHACS\b": "H A C S",
+        r"\bNUC\b": "nuck",
+        r"\b([A-D])([1-7])(a|b)?\b": lambda m: f"{m[1]} {'one two three four five six seven'.split()[int(m[2]) - 1]}{' ' + m[3].upper() if m[3] else ''}",
     }
     for pattern, value in replacements.items():
         text = re.sub(pattern, value, text)

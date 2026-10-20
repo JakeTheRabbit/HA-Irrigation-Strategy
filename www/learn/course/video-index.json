@@ -1,49 +1,49 @@
 {
-  "edition": "2026-10-19-r3",
+  "edition": "2026-10-20-r4",
   "lessons": {
     "A1": {
-      "src": "media/lessons/A1.mp4?v=20261019r3",
-      "captions": "media/lessons/A1.vtt?v=20261019r3",
+      "src": "media/lessons/A1.mp4?v=20261020r4",
+      "captions": "media/lessons/A1.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
           "id": "A1-01",
           "slide": "A1-01",
-          "title": "The question",
+          "title": "Start inside the pot",
           "start": 0.0
         },
         {
           "id": "A1-02",
           "slide": "A1-02",
           "title": "Inside the root zone",
-          "start": 7.333333333333333
+          "start": 44.208333333333336
         },
         {
           "id": "A1-03",
           "slide": "A1-03",
-          "title": "Watch water arrive and drain",
-          "start": 48.166666666666664
+          "title": "Follow the water",
+          "start": 128.20833333333334
         },
         {
           "id": "A1-04",
           "slide": "A1-04",
           "title": "Pause before adding water",
-          "start": 71.91666666666667
+          "start": 209.33333333333334
         },
         {
           "id": "A1-05",
           "slide": "A1-05",
           "title": "What steering and sensing can do",
-          "start": 105.70833333333333
+          "start": 309.9166666666667
         }
       ],
-      "source_sha256": "141749b68ecc5cb9760586a94c7b3e85a883f12063d26d27f30405737f1e1aed",
-      "duration": 203.625,
-      "frames": 4887
+      "source_sha256": "514ec6192a8a515803043a5359d2ddc8a1bdc546f8fff358c4c5c5b7f8b3c59c",
+      "duration": 514.375,
+      "frames": 12345
     },
     "A2": {
-      "src": "media/lessons/A2.mp4?v=20261019r3",
-      "captions": "media/lessons/A2.vtt?v=20261019r3",
+      "src": "media/lessons/A2.mp4?v=20261020r4",
+      "captions": "media/lessons/A2.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -56,34 +56,34 @@
           "id": "A2-02",
           "slide": "A2-02",
           "title": "Six out of ten",
-          "start": 15.166666666666666
+          "start": 39.875
         },
         {
           "id": "A2-03",
           "slide": "A2-03",
           "title": "Put litres beside the fraction",
-          "start": 63.541666666666664
+          "start": 144.20833333333334
         },
         {
           "id": "A2-04",
           "slide": "A2-04",
-          "title": "The probe sees a region",
-          "start": 92.91666666666667
+          "title": "What VWC does not tell you",
+          "start": 199.66666666666666
         },
         {
           "id": "A2-05",
           "slide": "A2-05",
           "title": "Teach it back",
-          "start": 155.95833333333334
+          "start": 335.125
         }
       ],
-      "source_sha256": "16e843860c95540822fa3d672b12bbcd7333c367853581f9a10cfee29b07494d",
-      "duration": 220.45833333333334,
-      "frames": 5291
+      "source_sha256": "16dcac7d6e8eed64d3d826cb5347a85d75b8fdf2321cc46729918e410e2f8d8d",
+      "duration": 479.625,
+      "frames": 11511
     },
     "A3": {
-      "src": "media/lessons/A3.mp4?v=20261019r3",
-      "captions": "media/lessons/A3.vtt?v=20261019r3",
+      "src": "media/lessons/A3.mp4?v=20261020r4",
+      "captions": "media/lessons/A3.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -96,34 +96,34 @@
           "id": "A3-02",
           "slide": "A3-02",
           "title": "Let it drip, without squeezing",
-          "start": 22.75
+          "start": 55.416666666666664
         },
         {
           "id": "A3-03",
           "slide": "A3-03",
           "title": "From the sponge to the pot",
-          "start": 46.083333333333336
+          "start": 103.08333333333333
         },
         {
           "id": "A3-04",
           "slide": "A3-04",
           "title": "A Post-it cannot add water",
-          "start": 128.83333333333334
+          "start": 291.8333333333333
         },
         {
           "id": "A3-05",
           "slide": "A3-05",
           "title": "Change the note: what happens?",
-          "start": 147.91666666666666
+          "start": 345.0
         }
       ],
-      "source_sha256": "772e4bb5aa349d655dcefa922bb874d83722a123e9330130b2e779ab41b9808d",
-      "duration": 212.58333333333334,
-      "frames": 5102
+      "source_sha256": "d1ccbb9d125614a8c094823c9e489bc20cb4fefec62c85c859b94b84e3ad5a30",
+      "duration": 515.0833333333334,
+      "frames": 12362
     },
     "A4": {
-      "src": "media/lessons/A4.mp4?v=20261019r3",
-      "captions": "media/lessons/A4.vtt?v=20261019r3",
+      "src": "media/lessons/A4.mp4?v=20261020r4",
+      "captions": "media/lessons/A4.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -136,46 +136,46 @@
           "id": "A4-2",
           "slide": "A4-2",
           "title": "First find the size of the fall",
-          "start": 25.416666666666668
+          "start": 59.625
         },
         {
           "id": "A4-3",
           "slide": "A4-3",
           "title": "Then compare the fall with the start",
-          "start": 52.666666666666664
+          "start": 127.125
         },
         {
           "id": "A4-4",
           "slide": "A4-4",
           "title": "Your turn, with the steps supplied",
-          "start": 78.83333333333333
+          "start": 195.125
         },
         {
           "id": "A4-5",
           "slide": "A4-5",
           "title": "Try it without the steps",
-          "start": 105.79166666666667
+          "start": 254.08333333333334
         },
         {
           "id": "A4-6",
           "slide": "A4-6",
-          "title": "Read the field before entering a number",
-          "start": 135.625
+          "title": "Read the setting before entering a number",
+          "start": 313.7916666666667
         },
         {
           "id": "A4-7",
           "slide": "A4-7",
           "title": "Recall the method",
-          "start": 161.04166666666666
+          "start": 383.2083333333333
         }
       ],
-      "source_sha256": "804fedb91144aafb90d95dc726591acfa2a0ee239bb91ff268cd4d09a2928725",
-      "duration": 187.08333333333334,
-      "frames": 4490
+      "source_sha256": "6fb8e20b2dc50f8e722728bfe64a01df8188e6dd2486952d36cf40da3fd17861",
+      "duration": 451.25,
+      "frames": 10830
     },
     "A5": {
-      "src": "media/lessons/A5.mp4?v=20261019r3",
-      "captions": "media/lessons/A5.vtt?v=20261019r3",
+      "src": "media/lessons/A5.mp4?v=20261020r4",
+      "captions": "media/lessons/A5.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -188,46 +188,46 @@
           "id": "A5-2",
           "slide": "A5-2",
           "title": "Ask where the reading came from",
-          "start": 26.333333333333332
+          "start": 68.29166666666667
         },
         {
           "id": "A5-3",
           "slide": "A5-3",
           "title": "Worked example: label two readings",
-          "start": 53.708333333333336
+          "start": 138.91666666666666
         },
         {
           "id": "A5-4",
           "slide": "A5-4",
           "title": "A calculated value needs a method",
-          "start": 80.75
+          "start": 213.29166666666666
         },
         {
           "id": "A5-5",
           "slide": "A5-5",
           "title": "Your turn: finish the labels",
-          "start": 107.0
+          "start": 282.7916666666667
         },
         {
           "id": "A5-6",
           "slide": "A5-6",
           "title": "Try a fresh record",
-          "start": 133.58333333333334
+          "start": 340.2083333333333
         },
         {
           "id": "A5-7",
           "slide": "A5-7",
           "title": "Recall what the labels mean",
-          "start": 160.66666666666666
+          "start": 411.3333333333333
         }
       ],
-      "source_sha256": "a42d69f11d077713288741a55fea6e38afead389bb46e086eedf4d0e52b62a57",
-      "duration": 188.79166666666666,
-      "frames": 4531
+      "source_sha256": "bd89a59a73f3bce3877214da10db682a865af1e2e69fa92b27e0f1f6362fdb95",
+      "duration": 469.7083333333333,
+      "frames": 11273
     },
     "A6": {
-      "src": "media/lessons/A6.mp4?v=20261019r3",
-      "captions": "media/lessons/A6.vtt?v=20261019r3",
+      "src": "media/lessons/A6.mp4?v=20261020r4",
+      "captions": "media/lessons/A6.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -240,46 +240,46 @@
           "id": "A6-2",
           "slide": "A6-2",
           "title": "Worked example: how old is it?",
-          "start": 25.208333333333332
+          "start": 54.5
         },
         {
           "id": "A6-3",
           "slide": "A6-3",
           "title": "Check identity and units",
-          "start": 51.416666666666664
+          "start": 111.33333333333333
         },
         {
           "id": "A6-4",
           "slide": "A6-4",
           "title": "A fresh reading can still be inaccurate",
-          "start": 77.16666666666667
+          "start": 181.33333333333334
         },
         {
           "id": "A6-5",
           "slide": "A6-5",
           "title": "Your turn: calculate, then check",
-          "start": 104.33333333333333
+          "start": 248.75
         },
         {
           "id": "A6-6",
           "slide": "A6-6",
           "title": "Try a changed scenario",
-          "start": 132.29166666666666
+          "start": 303.9166666666667
         },
         {
           "id": "A6-7",
           "slide": "A6-7",
           "title": "Recall the three questions",
-          "start": 160.54166666666666
+          "start": 364.0416666666667
         }
       ],
-      "source_sha256": "45a4f1969af7d29a7d055e4487a1910c333f68f02f7a1b648597c99450d1fb7f",
-      "duration": 189.45833333333334,
-      "frames": 4547
+      "source_sha256": "664421f1d81d76494f722044819b6caf4fae632dec56a0c8a2ae6e54ee8cd492",
+      "duration": 425.4166666666667,
+      "frames": 10210
     },
     "B1": {
-      "src": "media/lessons/B1.mp4?v=20261019r3",
-      "captions": "media/lessons/B1.vtt?v=20261019r3",
+      "src": "media/lessons/B1.mp4?v=20261020r4",
+      "captions": "media/lessons/B1.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -291,93 +291,93 @@
         {
           "id": "B1-02",
           "slide": "B1-02",
-          "title": "Add water content",
-          "start": 27.666666666666668
+          "title": "Read water content on the left",
+          "start": 76.125
         },
         {
           "id": "B1-03",
           "slide": "B1-03",
-          "title": "Add EC and a second scale",
-          "start": 65.5
+          "title": "Add EC and a second axis",
+          "start": 149.125
         },
         {
           "id": "B1-04",
           "slide": "B1-04",
-          "title": "Events, observations and references",
-          "start": 158.29166666666666
+          "title": "Shots, plans and measurements",
+          "start": 294.0
         },
         {
           "id": "B1-05",
           "slide": "B1-05",
-          "title": "Continue into night; move a threshold",
-          "start": 211.58333333333334
+          "title": "Through the night; move a threshold",
+          "start": 378.5833333333333
         },
         {
           "id": "B1-06",
           "slide": "B1-06",
           "title": "Explain what changed",
-          "start": 269.125
+          "start": 471.625
         }
       ],
-      "source_sha256": "d32899bc203a323effec260a9dd902d51be441acfe0af50e8eb65d17283b0bf0",
-      "duration": 332.25,
-      "frames": 7974
+      "source_sha256": "3d2d70a919f1e2d01f7d3cb5583b15509bf5fcbb232a654591e4dbb11a08c0f2",
+      "duration": 541.5,
+      "frames": 12996
     },
     "B2": {
-      "src": "media/lessons/B2.mp4?v=20261019r3",
-      "captions": "media/lessons/B2.vtt?v=20261019r3",
+      "src": "media/lessons/B2.mp4?v=20261020r4",
+      "captions": "media/lessons/B2.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
           "id": "B2-1",
           "slide": "B2-1",
-          "title": "Four jobs across the watering day",
+          "title": "Four phases across the grow-day",
           "start": 0.0
         },
         {
           "id": "B2-2",
           "slide": "B2-2",
-          "title": "Wait first: morning dryback, P0",
-          "start": 24.791666666666668
+          "title": "Wait first: P0 morning dryback",
+          "start": 51.916666666666664
         },
         {
           "id": "B2-3",
           "slide": "B2-3",
-          "title": "Refill: ramp-up, P1",
-          "start": 52.166666666666664
+          "title": "Refill: P1 ramp-up",
+          "start": 107.33333333333333
         },
         {
           "id": "B2-4",
           "slide": "B2-4",
-          "title": "Maintain: conditional watering, P2",
-          "start": 79.91666666666667
+          "title": "Maintain: P2 and the re-water threshold",
+          "start": 157.16666666666666
         },
         {
           "id": "B2-5",
           "slide": "B2-5",
           "title": "Worked example: a 06:00–18:00 lighting day",
-          "start": 107.54166666666667
+          "start": 212.29166666666666
         },
         {
           "id": "B2-6",
           "slide": "B2-6",
-          "title": "Overnight dryback: P3",
-          "start": 133.54166666666666
+          "title": "Overnight: P3 and the Rescue floor",
+          "start": 265.4583333333333
         },
         {
           "id": "B2-7",
           "slide": "B2-7",
           "title": "Your turn: explain another day",
-          "start": 161.45833333333334
+          "start": 322.5416666666667
         }
       ],
-      "source_sha256": "37abaf545ac3b0964de6b041d285c1172c0c2327117ad34abfb35edbd47070de",
-      "duration": 188.0,
-      "frames": 4512
+      "source_sha256": "d7bd3904f6562041a6f5873a1c197fe0e4eead17806d516e5aa7ec21bdad70b4",
+      "duration": 371.9166666666667,
+      "frames": 8926
     },
     "B3": {
-      "src": "media/lessons/B3.mp4?v=20261019r3",
-      "captions": "media/lessons/B3.vtt?v=20261019r3",
+      "src": "media/lessons/B3.mp4?v=20261020r4",
+      "captions": "media/lessons/B3.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -389,47 +389,47 @@
         {
           "id": "B3-2",
           "slide": "B3-2",
-          "title": "The plant responds to its conditions",
-          "start": 27.541666666666668
+          "title": "How watering nudges the plant",
+          "start": 53.041666666666664
         },
         {
           "id": "B3-3",
           "slide": "B3-3",
-          "title": "What the slider actually calculates",
-          "start": 58.333333333333336
+          "title": "Endpoints, profiles and the slider",
+          "start": 107.5
         },
         {
           "id": "B3-4",
           "slide": "B3-4",
           "title": "Worked example: halfway",
-          "start": 86.66666666666667
+          "start": 163.08333333333334
         },
         {
           "id": "B3-5",
           "slide": "B3-5",
           "title": "Your turn, with the steps supplied",
-          "start": 112.58333333333333
+          "start": 216.04166666666666
         },
         {
           "id": "B3-6",
           "slide": "B3-6",
-          "title": "Try a new pair independently",
-          "start": 136.20833333333334
+          "title": "Try a new pair on your own",
+          "start": 264.2083333333333
         },
         {
           "id": "B3-7",
           "slide": "B3-7",
-          "title": "Recall the calculation and its scope",
-          "start": 160.91666666666666
+          "title": "Check the profile before you trust it",
+          "start": 306.2916666666667
         }
       ],
-      "source_sha256": "64309063d190592611447939a75eb96efd7d982f87d00fb6391a7554bae3d21e",
-      "duration": 188.58333333333334,
-      "frames": 4526
+      "source_sha256": "83a57d989c9144ccafc215544dda97685ee23ffe1324731e0c5d17ef68dd9083",
+      "duration": 358.8333333333333,
+      "frames": 8612
     },
     "B4": {
-      "src": "media/lessons/B4.mp4?v=20261019r3",
-      "captions": "media/lessons/B4.vtt?v=20261019r3",
+      "src": "media/lessons/B4.mp4?v=20261020r4",
+      "captions": "media/lessons/B4.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -442,230 +442,230 @@
           "id": "B4-2",
           "slide": "B4-2",
           "title": "Worked example: thirty seconds",
-          "start": 23.875
+          "start": 52.75
         },
         {
           "id": "B4-3",
           "slide": "B4-3",
           "title": "Scale from one plant to twelve",
-          "start": 48.791666666666664
+          "start": 100.375
         },
         {
           "id": "B4-4",
           "slide": "B4-4",
-          "title": "A volume fraction is not a VWC response",
-          "start": 76.33333333333333
+          "title": "A shot's share of the pot",
+          "start": 147.58333333333334
         },
         {
           "id": "B4-5",
           "slide": "B4-5",
           "title": "Your turn: complete the calculation",
-          "start": 102.91666666666667
+          "start": 197.16666666666666
         },
         {
           "id": "B4-6",
           "slide": "B4-6",
           "title": "Use the time that actually ran",
-          "start": 129.0
+          "start": 243.33333333333334
         },
         {
           "id": "B4-7",
           "slide": "B4-7",
-          "title": "Recall: delivery, drainage, uptake",
-          "start": 156.95833333333334
+          "title": "Recall: delivery, runoff, uptake",
+          "start": 296.5833333333333
         }
       ],
-      "source_sha256": "3d9e793191e5aae266f0e403171aa11c6f7b9170e6d781f1d386e287343289bf",
-      "duration": 184.25,
-      "frames": 4422
+      "source_sha256": "a196dcfb2aae552679ed3118184f4fdaa91575b712dfda509b297f2002b72ca9",
+      "duration": 351.9583333333333,
+      "frames": 8447
     },
     "C1": {
-      "src": "media/lessons/C1.mp4?v=20261019r3",
-      "captions": "media/lessons/C1.vtt?v=20261019r3",
+      "src": "media/lessons/C1.mp4?v=20261020r4",
+      "captions": "media/lessons/C1.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
           "id": "C1-01",
           "slide": "C1-01",
-          "title": "Five functions, not a shopping spree",
+          "title": "Five jobs, one small zone",
           "start": 0.0
         },
         {
           "id": "C1-02",
           "slide": "C1-02",
-          "title": "Host and measurement paths",
-          "start": 24.625
+          "title": "Host, software and probes",
+          "start": 54.25
         },
         {
           "id": "C1-03",
           "slide": "C1-03",
           "title": "Draw the actual water path",
-          "start": 163.95833333333334
+          "start": 356.375
         },
         {
           "id": "C1-04",
           "slide": "C1-04",
-          "title": "Safe control and proof",
-          "start": 204.79166666666666
+          "title": "Safe switching and proof",
+          "start": 454.5416666666667
         },
         {
           "id": "C1-05",
           "slide": "C1-05",
-          "title": "Essentials, conditional, later",
-          "start": 292.9583333333333
+          "title": "Essentials first, extras later",
+          "start": 652.0
         },
         {
           "id": "C1-06",
           "slide": "C1-06",
           "title": "Your own layout",
-          "start": 316.6666666666667
+          "start": 696.7916666666666
         }
       ],
-      "source_sha256": "7ce1a54c120f27cd378304834cb274ecd5ed3bff92842242b264397d93a0609f",
-      "duration": 364.8333333333333,
-      "frames": 8756
+      "source_sha256": "fd1288ccac28fb3c778e83e2b500cd1c28e591beeafd511b74f8bc54a654d583",
+      "duration": 791.8333333333334,
+      "frames": 19004
     },
     "C2a": {
-      "src": "media/lessons/C2a.mp4?v=20261019r3",
-      "captions": "media/lessons/C2a.vtt?v=20261019r3",
+      "src": "media/lessons/C2a.mp4?v=20261020r4",
+      "captions": "media/lessons/C2a.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
           "id": "1",
           "slide": "1",
-          "title": "One computer keeps the desk open",
+          "title": "One computer keeps the system running",
           "start": 0.0
         },
         {
           "id": "2",
           "slide": "2",
           "title": "Lay out the parts first",
-          "start": 29.875
+          "start": 53.791666666666664
         },
         {
           "id": "3",
           "slide": "3",
           "title": "Example: choose the spare card",
-          "start": 58.625
+          "start": 109.29166666666667
         },
         {
           "id": "4",
           "slide": "4",
           "title": "Your turn: the last check before Write",
-          "start": 89.83333333333333
+          "start": 172.41666666666666
         },
         {
           "id": "5",
           "slide": "5",
-          "title": "Open the page on your own network",
-          "start": 120.41666666666667
+          "title": "Open Home Assistant in a browser",
+          "start": 217.625
         },
         {
           "id": "6",
           "slide": "6",
           "title": "Keep a way back",
-          "start": 150.20833333333334
+          "start": 275.4583333333333
         }
       ],
-      "source_sha256": "e2509a86f534ba70a5c61ef1e6882123078a9aa5814da00a2cf47878d89b099d",
-      "duration": 186.75,
-      "frames": 4482
+      "source_sha256": "fc30d1809625fe56fd864ae74f84e50492116f2fc04982b71aa5679dcf4ab0a9",
+      "duration": 324.0833333333333,
+      "frames": 7778
     },
     "C2b": {
-      "src": "media/lessons/C2b.mp4?v=20261019r3",
-      "captions": "media/lessons/C2b.vtt?v=20261019r3",
+      "src": "media/lessons/C2b.mp4?v=20261020r4",
+      "captions": "media/lessons/C2b.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
           "id": "1",
           "slide": "1",
-          "title": "Another home for the same front desk",
+          "title": "Another home for Home Assistant",
           "start": 0.0
         },
         {
           "id": "2",
           "slide": "2",
           "title": "Check the computer before changing it",
-          "start": 31.5
+          "start": 55.166666666666664
         },
         {
           "id": "3",
           "slide": "3",
-          "title": "Example: the USB and disk have different jobs",
-          "start": 74.54166666666667
+          "title": "Example: the USB stick and the disk have different jobs",
+          "start": 133.04166666666666
         },
         {
           "id": "4",
           "slide": "4",
           "title": "Your turn: identify both devices",
-          "start": 111.91666666666667
+          "start": 191.91666666666666
         },
         {
           "id": "5",
           "slide": "5",
           "title": "A capable office PC may still be unavailable",
-          "start": 143.04166666666666
+          "start": 247.41666666666666
         },
         {
           "id": "6",
           "slide": "6",
-          "title": "Check first boot and write down the result",
-          "start": 172.625
+          "title": "Check first start and write down the result",
+          "start": 283.1666666666667
         }
       ],
-      "source_sha256": "8f29d360df15d4c0181a6b3ce50e0b9c8732fb85d15d45b82a6b5e7b0ab6115c",
-      "duration": 210.625,
-      "frames": 5055
+      "source_sha256": "87ed9cf167724e84f56b656b41dcca1166314768853676ff6772f050951212c4",
+      "duration": 338.0833333333333,
+      "frames": 8114
     },
     "C3": {
-      "src": "media/lessons/C3.mp4?v=20261019r3",
-      "captions": "media/lessons/C3.vtt?v=20261019r3",
+      "src": "media/lessons/C3.mp4?v=20261020r4",
+      "captions": "media/lessons/C3.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
           "id": "1",
           "slide": "1",
-          "title": "The front desk gives each item an address",
+          "title": "Finish onboarding, then read an entity ID",
           "start": 0.0
         },
         {
           "id": "2",
           "slide": "2",
           "title": "Two Crop Steering parts do different jobs",
-          "start": 31.25
+          "start": 56.291666666666664
         },
         {
           "id": "3",
           "slide": "3",
-          "title": "Example: install the integration and room",
-          "start": 68.04166666666667
+          "title": "Example: install the integration and create a room",
+          "start": 114.375
         },
         {
           "id": "4",
           "slide": "4",
           "title": "Add and start the separate Controller",
-          "start": 99.70833333333333
+          "start": 165.41666666666666
         },
         {
           "id": "5",
           "slide": "5",
-          "title": "Your turn: a page opens but no report arrives",
-          "start": 142.375
+          "title": "Your turn: the screens open but no heartbeat arrives",
+          "start": 222.83333333333334
         },
         {
           "id": "6",
           "slide": "6",
           "title": "Keep a recovery copy you can actually use",
-          "start": 179.41666666666666
+          "start": 279.2083333333333
         }
       ],
-      "source_sha256": "0a50ea374b75407656cacfb5ab8d5c502980ed519b67620a2a4fa12c6fa04dc8",
-      "duration": 218.66666666666666,
-      "frames": 5248
+      "source_sha256": "9141d83f549d883d009ced14fa16bc3def63978e5a8ca4d1a68722a59f3b2101",
+      "duration": 327.1666666666667,
+      "frames": 7852
     },
     "C4": {
-      "src": "media/lessons/C4.mp4?v=20261019r3",
-      "captions": "media/lessons/C4.vtt?v=20261019r3",
+      "src": "media/lessons/C4.mp4?v=20261020r4",
+      "captions": "media/lessons/C4.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -678,86 +678,86 @@
           "id": "2",
           "slide": "2",
           "title": "Match the real plumbing and measurements",
-          "start": 36.208333333333336
+          "start": 50.875
         },
         {
           "id": "3",
           "slide": "3",
           "title": "Example: twelve plants, not one giant pot",
-          "start": 73.79166666666667
+          "start": 100.5
         },
         {
           "id": "4",
           "slide": "4",
           "title": "Check the clock and the receipt",
-          "start": 104.54166666666667
+          "start": 151.79166666666666
         },
         {
           "id": "5",
           "slide": "5",
           "title": "Your turn: three faults in one record",
-          "start": 136.70833333333334
+          "start": 207.16666666666666
         },
         {
           "id": "6",
           "slide": "6",
           "title": "Read the accepted setup back",
-          "start": 167.75
+          "start": 249.875
         }
       ],
-      "source_sha256": "acb8e75115fe5e505cb07f1baf85587509bfbc02bd7ff6cba49b68a633703c9a",
-      "duration": 207.58333333333334,
-      "frames": 4982
+      "source_sha256": "631d7fb37dc9ca488d4626b156e5523a034ff171e632c7c4ec0ac1d7e0a70d3c",
+      "duration": 300.0,
+      "frames": 7200
     },
     "C5": {
-      "src": "media/lessons/C5.mp4?v=20261019r3",
-      "captions": "media/lessons/C5.vtt?v=20261019r3",
+      "src": "media/lessons/C5.mp4?v=20261020r4",
+      "captions": "media/lessons/C5.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
           "id": "1",
           "slide": "1",
-          "title": "A stop message is not a disconnected machine",
+          "title": "Watering OFF is a software block, not isolation",
           "start": 0.0
         },
         {
           "id": "2",
           "slide": "2",
           "title": "Use the probe’s documented connection",
-          "start": 31.291666666666668
+          "start": 71.83333333333333
         },
         {
           "id": "3",
           "slide": "3",
           "title": "Example: a number can be fresh and irrelevant",
-          "start": 67.75
+          "start": 147.625
         },
         {
           "id": "4",
           "slide": "4",
           "title": "Check what starts and stops the pump",
-          "start": 99.54166666666667
+          "start": 220.33333333333334
         },
         {
           "id": "5",
           "slide": "5",
           "title": "Your turn: two controllers know the same valve",
-          "start": 137.875
+          "start": 298.7083333333333
         },
         {
           "id": "6",
           "slide": "6",
           "title": "Close the physical checks before the wet test",
-          "start": 169.66666666666666
+          "start": 367.9583333333333
         }
       ],
-      "source_sha256": "25e4004e12576c58449b2298a012f1105ef6a686194bc9dd96dea0d77462e28a",
-      "duration": 209.5,
-      "frames": 5028
+      "source_sha256": "4e09449973425a76b5940616db749c2bf0fe0a3f290f44e6e3eb47aa6ddd481f",
+      "duration": 435.5,
+      "frames": 10452
     },
     "C6": {
-      "src": "media/lessons/C6.mp4?v=20261019r3",
-      "captions": "media/lessons/C6.vtt?v=20261019r3",
+      "src": "media/lessons/C6.mp4?v=20261020r4",
+      "captions": "media/lessons/C6.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -770,40 +770,40 @@
           "id": "2",
           "slide": "2",
           "title": "Watch the whole water path",
-          "start": 37.833333333333336
+          "start": 59.708333333333336
         },
         {
           "id": "3",
           "slide": "3",
           "title": "Example: a cup becomes a flow measurement",
-          "start": 76.58333333333333
+          "start": 128.75
         },
         {
           "id": "4",
           "slide": "4",
           "title": "Your turn: finish the catch record",
-          "start": 117.5
+          "start": 203.33333333333334
         },
         {
           "id": "5",
           "slide": "5",
           "title": "A good catch is one part of readiness",
-          "start": 150.25
+          "start": 274.8333333333333
         },
         {
           "id": "6",
           "slide": "6",
           "title": "Supervise the first enabled cycle",
-          "start": 189.33333333333334
+          "start": 336.0
         }
       ],
-      "source_sha256": "299e201152e9a61b239138f03ee81084d27114b7192b784f72443b27cfb91bd6",
-      "duration": 232.41666666666666,
-      "frames": 5578
+      "source_sha256": "95dc9363c49c7c69fbfc0593160909e932e8f75bd068b9852646bd12d26ea066",
+      "duration": 411.0416666666667,
+      "frames": 9865
     },
     "C7": {
-      "src": "media/lessons/C7.mp4?v=20261019r3",
-      "captions": "media/lessons/C7.vtt?v=20261019r3",
+      "src": "media/lessons/C7.mp4?v=20261020r4",
+      "captions": "media/lessons/C7.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -816,40 +816,40 @@
           "id": "2",
           "slide": "2",
           "title": "Keep the records in their original context",
-          "start": 32.041666666666664
+          "start": 59.916666666666664
         },
         {
           "id": "3",
           "slide": "3",
           "title": "Example: one old zone, several new addresses",
-          "start": 68.875
+          "start": 129.08333333333334
         },
         {
           "id": "4",
           "slide": "4",
           "title": "Agree the handover and the way back",
-          "start": 100.5
+          "start": 199.625
         },
         {
           "id": "5",
           "slide": "5",
-          "title": "Your turn: the name matches, the unit does not",
-          "start": 137.25
+          "title": "Your turn: the name matches, the method is unknown",
+          "start": 265.5416666666667
         },
         {
           "id": "6",
           "slide": "6",
           "title": "Prove one zone before expanding",
-          "start": 173.75
+          "start": 325.8333333333333
         }
       ],
-      "source_sha256": "478af8496d70fd827a0a16caa633759cb2d6dbd73cbee962748f189296247e4a",
-      "duration": 213.08333333333334,
-      "frames": 5114
+      "source_sha256": "97b7a9ce72ddfebe08b5ec944c2dc5c2901fe81d54bc06a417dab6e8d787381e",
+      "duration": 397.625,
+      "frames": 9543
     },
     "D1": {
-      "src": "media/lessons/D1.mp4?v=20261019r3",
-      "captions": "media/lessons/D1.vtt?v=20261019r3",
+      "src": "media/lessons/D1.mp4?v=20261020r4",
+      "captions": "media/lessons/D1.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -862,98 +862,98 @@
           "id": "D1-s2",
           "slide": "D1-s2",
           "title": "Check when each source last reported",
-          "start": 23.291666666666668
+          "start": 57.125
         },
         {
           "id": "D1-s3",
           "slide": "D1-s3",
           "title": "Read the reason beside the state",
-          "start": 50.375
+          "start": 128.20833333333334
         },
         {
           "id": "D1-s4",
           "slide": "D1-s4",
           "title": "Worked example: Training East, Zone 2",
-          "start": 79.25
+          "start": 186.25
         },
         {
           "id": "D1-s5",
           "slide": "D1-s5",
           "title": "Your turn: finish an honest record",
-          "start": 107.16666666666667
+          "start": 254.41666666666666
         },
         {
           "id": "D1-s6",
           "slide": "D1-s6",
           "title": "Find another zone independently",
-          "start": 133.41666666666666
+          "start": 313.5416666666667
         },
         {
           "id": "D1-s7",
           "slide": "D1-s7",
           "title": "Recall the address and control scope",
-          "start": 161.54166666666666
+          "start": 371.5416666666667
         }
       ],
-      "source_sha256": "80a005d75417ec96f3932ec5d1de141fae17514b003e840b9f189a195ae8771a",
-      "duration": 190.04166666666666,
-      "frames": 4561
+      "source_sha256": "b253d2d668f5b906456e30b24306812bec26e45544c5fca36ca312eac238e5b4",
+      "duration": 430.0833333333333,
+      "frames": 10322
     },
     "D2": {
-      "src": "media/lessons/D2.mp4?v=20261019r3",
-      "captions": "media/lessons/D2.vtt?v=20261019r3",
+      "src": "media/lessons/D2.mp4?v=20261020r4",
+      "captions": "media/lessons/D2.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
           "id": "D2-s1",
           "slide": "D2-s1",
-          "title": "Begin with a pencil draft",
+          "title": "Begin by reading who owns the targets",
           "start": 0.0
         },
         {
           "id": "D2-s2",
           "slide": "D2-s2",
           "title": "Tell the three lines apart",
-          "start": 26.666666666666668
+          "start": 67.83333333333333
         },
         {
           "id": "D2-s3",
           "slide": "D2-s3",
-          "title": "Learn what the field means",
-          "start": 54.083333333333336
+          "title": "Learn what the setting means",
+          "start": 136.33333333333334
         },
         {
           "id": "D2-s4",
           "slide": "D2-s4",
           "title": "Worked example: 30 becomes a 31 draft",
-          "start": 80.41666666666667
+          "start": 204.875
         },
         {
           "id": "D2-s5",
           "slide": "D2-s5",
           "title": "Check the receipt, then restore",
-          "start": 110.125
+          "start": 263.25
         },
         {
           "id": "D2-s6",
           "slide": "D2-s6",
-          "title": "Try another manual demo zone",
-          "start": 139.45833333333334
+          "title": "Try another demo zone",
+          "start": 319.7916666666667
         },
         {
           "id": "D2-s7",
           "slide": "D2-s7",
           "title": "Recall the complete change journey",
-          "start": 165.875
+          "start": 376.375
         }
       ],
-      "source_sha256": "e23331fb27d48e7062c3137c5f202d4065e0af2cd493d2232a13a23c9905540d",
-      "duration": 194.66666666666666,
-      "frames": 4672
+      "source_sha256": "f3c7e453f88518d1ea9f6735e6fa19b8339485910cd2992ad9b8ce9476f1febd",
+      "duration": 432.9583333333333,
+      "frames": 10391
     },
     "D3": {
-      "src": "media/lessons/D3.mp4?v=20261019r3",
-      "captions": "media/lessons/D3.vtt?v=20261019r3",
+      "src": "media/lessons/D3.mp4?v=20261020r4",
+      "captions": "media/lessons/D3.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -966,46 +966,46 @@
           "id": "D3-s2",
           "slide": "D3-s2",
           "title": "A profile holds two endpoints",
-          "start": 25.208333333333332
+          "start": 57.416666666666664
         },
         {
           "id": "D3-s3",
           "slide": "D3-s3",
           "title": "Worked example: a 2%–4% blend",
-          "start": 53.25
+          "start": 118.54166666666667
         },
         {
           "id": "D3-s4",
           "slide": "D3-s4",
           "title": "Store first, then request activation",
-          "start": 80.33333333333333
+          "start": 188.83333333333334
         },
         {
           "id": "D3-s5",
           "slide": "D3-s5",
           "title": "Understand the return handover",
-          "start": 108.45833333333333
+          "start": 258.7083333333333
         },
         {
           "id": "D3-s6",
           "slide": "D3-s6",
           "title": "Your turn: another dated block",
-          "start": 135.91666666666666
+          "start": 317.25
         },
         {
           "id": "D3-s7",
           "slide": "D3-s7",
           "title": "Recall what each action does",
-          "start": 163.5
+          "start": 374.2083333333333
         }
       ],
-      "source_sha256": "9196f5f6cfdd873db33583118d537fa7b511af097fe309f2fcf99a8fa18ec573",
-      "duration": 192.5,
-      "frames": 4620
+      "source_sha256": "dd79c42f60355f56a22040c0091cc6ab55c64e87732b459614b39a9d2e2831fb",
+      "duration": 433.7083333333333,
+      "frames": 10409
     },
     "D4": {
-      "src": "media/lessons/D4.mp4?v=20261019r3",
-      "captions": "media/lessons/D4.vtt?v=20261019r3",
+      "src": "media/lessons/D4.mp4?v=20261020r4",
+      "captions": "media/lessons/D4.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -1018,46 +1018,46 @@
           "id": "D4-s2",
           "slide": "D4-s2",
           "title": "Match the comparison before calculating",
-          "start": 28.583333333333332
+          "start": 68.20833333333333
         },
         {
           "id": "D4-s3",
           "slide": "D4-s3",
           "title": "Worked example: day ten, 12 L versus 15 L",
-          "start": 55.083333333333336
+          "start": 127.08333333333333
         },
         {
           "id": "D4-s4",
           "slide": "D4-s4",
           "title": "Date the reference as carefully as the reading",
-          "start": 84.0
+          "start": 188.625
         },
         {
           "id": "D4-s5",
           "slide": "D4-s5",
           "title": "Your turn: name what the estimate means",
-          "start": 114.29166666666667
+          "start": 255.5
         },
         {
           "id": "D4-s6",
           "slide": "D4-s6",
           "title": "Try an incomplete comparison",
-          "start": 142.04166666666666
+          "start": 315.8333333333333
         },
         {
           "id": "D4-s7",
           "slide": "D4-s7",
           "title": "Recall an observation before proposing a cause",
-          "start": 170.29166666666666
+          "start": 373.0416666666667
         }
       ],
-      "source_sha256": "45fbba55615621fae8df42633db39896a8cf5cc4ca14c87d3889ef24f3cee76b",
-      "duration": 200.375,
-      "frames": 4809
+      "source_sha256": "af3921d1da11fb022207a07bb8f0616880f263d22e384250ce92dcbb88205d31",
+      "duration": 427.6666666666667,
+      "frames": 10264
     },
     "D5": {
-      "src": "media/lessons/D5.mp4?v=20261019r3",
-      "captions": "media/lessons/D5.vtt?v=20261019r3",
+      "src": "media/lessons/D5.mp4?v=20261020r4",
+      "captions": "media/lessons/D5.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -1070,46 +1070,46 @@
           "id": "D5-s2",
           "slide": "D5-s2",
           "title": "Worked example: a four-hour-old reading",
-          "start": 31.208333333333332
+          "start": 70.58333333333333
         },
         {
           "id": "D5-s3",
           "slide": "D5-s3",
           "title": "Conflicting tank evidence needs a real check",
-          "start": 61.666666666666664
+          "start": 140.0
         },
         {
           "id": "D5-s4",
           "slide": "D5-s4",
-          "title": "A stored setup needs controller acceptance",
-          "start": 91.08333333333333
+          "title": "A stored setup needs Controller acceptance",
+          "start": 204.29166666666666
         },
         {
           "id": "D5-s5",
           "slide": "D5-s5",
           "title": "Your turn: OFF displayed, water flowing",
-          "start": 123.0
+          "start": 265.9583333333333
         },
         {
           "id": "D5-s6",
           "slide": "D5-s6",
           "title": "Try another fault report independently",
-          "start": 152.70833333333334
+          "start": 324.2083333333333
         },
         {
           "id": "D5-s7",
           "slide": "D5-s7",
           "title": "Recall the repair sequence",
-          "start": 182.875
+          "start": 385.3333333333333
         }
       ],
-      "source_sha256": "aedfd0813a11666f098416d6c38c27c49c2b500a12fdcb1995f17e8bd9af2063",
-      "duration": 213.75,
-      "frames": 5130
+      "source_sha256": "5abb27957e54d0076c095fdeebb44b721a8c1f846d4035234d92afb7e7d7f05e",
+      "duration": 441.2083333333333,
+      "frames": 10589
     },
     "D6": {
-      "src": "media/lessons/D6.mp4?v=20261019r3",
-      "captions": "media/lessons/D6.vtt?v=20261019r3",
+      "src": "media/lessons/D6.mp4?v=20261020r4",
+      "captions": "media/lessons/D6.vtt?v=20261020r4",
       "voice": "Kokoro af_heart · source-matched local narration",
       "chapters": [
         {
@@ -1122,42 +1122,42 @@
           "id": "D6-s2",
           "slide": "D6-s2",
           "title": "Fill the first four parts with evidence",
-          "start": 28.333333333333332
+          "start": 58.208333333333336
         },
         {
           "id": "D6-s3",
           "slide": "D6-s3",
           "title": "Worked example: a reasoned no change",
-          "start": 58.583333333333336
+          "start": 124.83333333333333
         },
         {
           "id": "D6-s4",
           "slide": "D6-s4",
           "title": "Your turn: finish the change record",
-          "start": 87.04166666666667
+          "start": 183.5
         },
         {
           "id": "D6-s5",
           "slide": "D6-s5",
-          "title": "Use Crop AI as an assistant",
-          "start": 114.20833333333333
+          "title": "Use the AI assistant as advice to check",
+          "start": 238.41666666666666
         },
         {
           "id": "D6-s6",
           "slide": "D6-s6",
           "title": "Try another day and prepare the handover",
-          "start": 145.04166666666666
+          "start": 301.0
         },
         {
           "id": "D6-s7",
           "slide": "D6-s7",
           "title": "Teach it back, then recall it later",
-          "start": 184.29166666666666
+          "start": 360.875
         }
       ],
-      "source_sha256": "619a806190b93fd2af5a552f2b5aa042d3dc960f2f7b3f9b3754a5dd68d7f3a6",
-      "duration": 212.95833333333334,
-      "frames": 5111
+      "source_sha256": "43ffc7868ff481329e8a63b9d84d873cac96b6e7fde1e802b5cbf613f6ab2ee6",
+      "duration": 412.7083333333333,
+      "frames": 9905
     }
   }
 }

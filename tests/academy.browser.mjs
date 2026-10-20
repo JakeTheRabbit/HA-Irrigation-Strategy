@@ -147,49 +147,47 @@ try {
   );
   const lesson = course.lessons.find((x) => x.id === "D3");
   await open("#/lesson/D3");
+  // Questions are one per screen after the sections; the step track jumps there.
+  const firstQuestion = 1 + lesson.slides.length + (lesson.practice || lesson.practicalTask ? 1 : 0);
+  const answerAll = async (pick) => {
+    await page.locator(".lp-dot").nth(firstQuestion).click();
+    for (let i = 0; i < lesson.quiz.length; i++) {
+      await page.locator(".quiz-question input[type=radio]").nth(pick(lesson.quiz[i])).check();
+      await page.locator(".lp-next").click();
+    }
+  };
   let criticalMiss = false;
-  for (let i = 0; i < lesson.quiz.length; i++) {
-    const q = lesson.quiz[i];
-    const index =
-      q.safetyCritical && !criticalMiss
-        ? ((criticalMiss = true), q.options.findIndex((x) => !x.correct))
-        : q.options.findIndex((x) => x.correct);
-    await page
-      .locator(".quiz-question")
-      .nth(i)
-      .locator("input[type=radio]")
-      .nth(index)
-      .check();
-  }
-  await page
-    .getByRole("button", { name: "Check answers", exact: true })
-    .click();
-  await page.getByText(/A safety-critical answer needs correction/).waitFor();
+  await answerAll((q) =>
+    q.safetyCritical && !criticalMiss
+      ? ((criticalMiss = true), q.options.findIndex((x) => !x.correct))
+      : q.options.findIndex((x) => x.correct),
+  );
+  await page.getByText(/A safety-critical answer needs fixing/).waitFor();
   assert.equal(
     (await record()).completed.D3,
     undefined,
     "Safety-critical miss must block even with 80%",
   );
-  for (let i = 0; i < lesson.quiz.length; i++)
-    await page
-      .locator(".quiz-question")
-      .nth(i)
-      .locator("input[type=radio]")
-      .nth(lesson.quiz[i].options.findIndex((x) => x.correct))
-      .check();
-  await page
-    .getByRole("button", { name: "Check answers", exact: true })
-    .click();
+  await page.getByRole("button", { name: "Try the questions again", exact: true }).click();
+  for (let i = 0; i < lesson.quiz.length; i++) {
+    await page.locator(".quiz-question input[type=radio]").nth(lesson.quiz[i].options.findIndex((x) => x.correct)).check();
+    await page.locator(".lp-next").click();
+  }
   await page.getByText(/^Passed: 5 of 5/).waitFor();
   assert.equal((await record()).completed.D3.percent, 100);
+  // Visiting Result again without a new attempt must keep the saved pass.
+  await page.reload();
+  await page.locator(".lp-dot").last().click();
+  await page.getByText(/earlier pass \(100%\) is still recorded/).waitFor();
+  assert.equal((await record()).completed.D3.percent, 100, "Opening Result must not erase a pass");
   output.checks.push(
     "80% safety-critical failure blocks, correct retry passes",
   );
-  await page.getByRole("button", { name: "Next slide", exact: true }).click();
-  const position = await page.locator(".slide-counter").textContent();
+  await page.locator(".lp-dot").nth(2).click();
+  const position = await page.locator(".lp-counter").textContent();
   await page.reload();
-  await page.locator(".slide-counter").waitFor();
-  assert.equal(await page.locator(".slide-counter").textContent(), position);
+  await page.locator(".lp-counter").waitFor();
+  assert.equal(await page.locator(".lp-counter").textContent(), position);
   output.checks.push("slide resume after reload");
   await open("#/progress");
   const pending = page.waitForEvent("download");
@@ -320,7 +318,7 @@ try {
   await page.setViewportSize({ width: 1280, height: 1000 });
   await open("#/lesson/A3");
   await page.waitForFunction(() => document.querySelector("video")?.readyState >= 2);
-  await page.getByRole("combobox", { name: "Choose video section", exact: true }).selectOption("1");
+  await page.locator(".lp-dot").nth(2).click();
   const capacityChapter = course.lessons.find(lesson => lesson.id === "A3").video.chapters[1].start;
   await page.waitForFunction(start => {
     const video = document.querySelector("video");
@@ -332,7 +330,7 @@ try {
   });
   await page.mouse.move(0, 0);
   await page.waitForTimeout(3500);
-  await page.locator(".lesson-media").screenshot({
+  await page.locator(".lp").screenshot({
     path: path.join(root, "img/academy-lesson.png"),
   });
   await page.locator("video").evaluate(video => video.pause());
@@ -346,14 +344,11 @@ try {
   );
   const blockedPage = await blocked.newPage();
   await blockedPage.goto(base + "#/lesson/D2");
-  await blockedPage.locator(".lesson-player").waitFor();
-  await blockedPage
-    .getByRole("button", { name: "Next slide", exact: true })
-    .click();
-  assert.ok(await blockedPage.locator("#storage-notice").isVisible());
-  await blockedPage
-    .getByRole("link", { name: "Progress", exact: true })
-    .click();
+  await blockedPage.locator(".lp").waitFor();
+  await blockedPage.locator(".lp-next").click();
+  assert.ok(await blockedPage.locator(".lp-save").isVisible(), "Lesson shows its own save warning");
+  assert.ok(await blockedPage.locator(".lp-nav").evaluate((n) => n.getBoundingClientRect().bottom <= innerHeight), "Warning must not push lesson navigation off screen");
+  await blockedPage.goto(base + "#/progress");
   await blockedPage
     .getByRole("button", { name: "Export progress", exact: true })
     .waitFor();

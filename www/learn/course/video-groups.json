@@ -1,5 +1,5 @@
 {
-  "edition": "2026-10-19-r3",
+  "edition": "2026-10-20-r4",
   "groups": [
     {
       "id": "foundations",
@@ -18,229 +18,229 @@
         "A5",
         "A6"
       ],
-      "src": "media/groups/foundations.mp4?v=20261019r3",
-      "captions": "media/groups/foundations.vtt?v=20261019r3",
+      "src": "media/groups/foundations.mp4?v=20261020r4",
+      "captions": "media/groups/foundations.vtt?v=20261020r4",
       "chapters": [
         {
           "id": "A1-01",
           "lesson": "A1",
-          "title": "The question",
+          "title": "Start inside the pot",
           "start": 0.0
         },
         {
           "id": "A1-02",
           "lesson": "A1",
           "title": "Inside the root zone",
-          "start": 7.333333333333333
+          "start": 44.208333333333336
         },
         {
           "id": "A1-03",
           "lesson": "A1",
-          "title": "Watch water arrive and drain",
-          "start": 48.166666666666664
+          "title": "Follow the water",
+          "start": 128.20833333333334
         },
         {
           "id": "A1-04",
           "lesson": "A1",
           "title": "Pause before adding water",
-          "start": 71.91666666666667
+          "start": 209.33333333333334
         },
         {
           "id": "A1-05",
           "lesson": "A1",
           "title": "What steering and sensing can do",
-          "start": 105.70833333333333
+          "start": 309.9166666666667
         },
         {
           "id": "A2-01",
           "lesson": "A2",
           "title": "Recall before the reveal",
-          "start": 203.625
+          "start": 514.375
         },
         {
           "id": "A2-02",
           "lesson": "A2",
           "title": "Six out of ten",
-          "start": 218.79166666666666
+          "start": 554.25
         },
         {
           "id": "A2-03",
           "lesson": "A2",
           "title": "Put litres beside the fraction",
-          "start": 267.1666666666667
+          "start": 658.5833333333334
         },
         {
           "id": "A2-04",
           "lesson": "A2",
-          "title": "The probe sees a region",
-          "start": 296.5416666666667
+          "title": "What VWC does not tell you",
+          "start": 714.0416666666666
         },
         {
           "id": "A2-05",
           "lesson": "A2",
           "title": "Teach it back",
-          "start": 359.58333333333337
+          "start": 849.5
         },
         {
           "id": "A3-01",
           "lesson": "A3",
           "title": "Start with a kitchen sponge",
-          "start": 424.0833333333333
+          "start": 994.0
         },
         {
           "id": "A3-02",
           "lesson": "A3",
           "title": "Let it drip, without squeezing",
-          "start": 446.8333333333333
+          "start": 1049.4166666666667
         },
         {
           "id": "A3-03",
           "lesson": "A3",
           "title": "From the sponge to the pot",
-          "start": 470.16666666666663
+          "start": 1097.0833333333333
         },
         {
           "id": "A3-04",
           "lesson": "A3",
           "title": "A Post-it cannot add water",
-          "start": 552.9166666666666
+          "start": 1285.8333333333333
         },
         {
           "id": "A3-05",
           "lesson": "A3",
           "title": "Change the note: what happens?",
-          "start": 572.0
+          "start": 1339.0
         },
         {
           "id": "A4-1",
           "lesson": "A4",
           "title": "Think of a bank balance",
-          "start": 636.6666666666666
+          "start": 1509.0833333333333
         },
         {
           "id": "A4-2",
           "lesson": "A4",
           "title": "First find the size of the fall",
-          "start": 662.0833333333333
+          "start": 1568.7083333333333
         },
         {
           "id": "A4-3",
           "lesson": "A4",
           "title": "Then compare the fall with the start",
-          "start": 689.3333333333333
+          "start": 1636.2083333333333
         },
         {
           "id": "A4-4",
           "lesson": "A4",
           "title": "Your turn, with the steps supplied",
-          "start": 715.5
+          "start": 1704.2083333333333
         },
         {
           "id": "A4-5",
           "lesson": "A4",
           "title": "Try it without the steps",
-          "start": 742.4583333333333
+          "start": 1763.1666666666665
         },
         {
           "id": "A4-6",
           "lesson": "A4",
-          "title": "Read the field before entering a number",
-          "start": 772.2916666666666
+          "title": "Read the setting before entering a number",
+          "start": 1822.875
         },
         {
           "id": "A4-7",
           "lesson": "A4",
           "title": "Recall the method",
-          "start": 797.7083333333333
+          "start": 1892.2916666666665
         },
         {
           "id": "A5-1",
           "lesson": "A5",
           "title": "Start with salted water",
-          "start": 823.75
+          "start": 1960.3333333333333
         },
         {
           "id": "A5-2",
           "lesson": "A5",
           "title": "Ask where the reading came from",
-          "start": 850.0833333333334
+          "start": 2028.625
         },
         {
           "id": "A5-3",
           "lesson": "A5",
           "title": "Worked example: label two readings",
-          "start": 877.4583333333334
+          "start": 2099.25
         },
         {
           "id": "A5-4",
           "lesson": "A5",
           "title": "A calculated value needs a method",
-          "start": 904.5
+          "start": 2173.625
         },
         {
           "id": "A5-5",
           "lesson": "A5",
           "title": "Your turn: finish the labels",
-          "start": 930.75
+          "start": 2243.125
         },
         {
           "id": "A5-6",
           "lesson": "A5",
           "title": "Try a fresh record",
-          "start": 957.3333333333334
+          "start": 2300.5416666666665
         },
         {
           "id": "A5-7",
           "lesson": "A5",
           "title": "Recall what the labels mean",
-          "start": 984.4166666666666
+          "start": 2371.6666666666665
         },
         {
           "id": "A6-1",
           "lesson": "A6",
           "title": "A reading is a dated local observation",
-          "start": 1012.5416666666666
+          "start": 2430.0416666666665
         },
         {
           "id": "A6-2",
           "lesson": "A6",
           "title": "Worked example: how old is it?",
-          "start": 1037.75
+          "start": 2484.5416666666665
         },
         {
           "id": "A6-3",
           "lesson": "A6",
           "title": "Check identity and units",
-          "start": 1063.9583333333333
+          "start": 2541.375
         },
         {
           "id": "A6-4",
           "lesson": "A6",
           "title": "A fresh reading can still be inaccurate",
-          "start": 1089.7083333333333
+          "start": 2611.375
         },
         {
           "id": "A6-5",
           "lesson": "A6",
           "title": "Your turn: calculate, then check",
-          "start": 1116.875
+          "start": 2678.7916666666665
         },
         {
           "id": "A6-6",
           "lesson": "A6",
           "title": "Try a changed scenario",
-          "start": 1144.8333333333333
+          "start": 2733.958333333333
         },
         {
           "id": "A6-7",
           "lesson": "A6",
           "title": "Recall the three questions",
-          "start": 1173.0833333333333
+          "start": 2794.083333333333
         }
       ],
-      "duration": 1202.0,
-      "frames": 28848,
-      "source_sha256": "76cf2ec560c26b043f7f8350b27d47ea5227c7036fa42128048af31702a82c1a"
+      "duration": 2855.4583333333335,
+      "frames": 68531,
+      "source_sha256": "de7ef134a9ade9eb9160b05fe2f8345725ab6d52ec8310bf60d5595043eb53dd"
     },
     {
       "id": "watering-equipment",
@@ -258,8 +258,8 @@
         "B4",
         "C1"
       ],
-      "src": "media/groups/watering-equipment.mp4?v=20261019r3",
-      "captions": "media/groups/watering-equipment.vtt?v=20261019r3",
+      "src": "media/groups/watering-equipment.mp4?v=20261020r4",
+      "captions": "media/groups/watering-equipment.vtt?v=20261020r4",
       "chapters": [
         {
           "id": "B1-01",
@@ -270,199 +270,199 @@
         {
           "id": "B1-02",
           "lesson": "B1",
-          "title": "Add water content",
-          "start": 27.666666666666668
+          "title": "Read water content on the left",
+          "start": 76.125
         },
         {
           "id": "B1-03",
           "lesson": "B1",
-          "title": "Add EC and a second scale",
-          "start": 65.5
+          "title": "Add EC and a second axis",
+          "start": 149.125
         },
         {
           "id": "B1-04",
           "lesson": "B1",
-          "title": "Events, observations and references",
-          "start": 158.29166666666666
+          "title": "Shots, plans and measurements",
+          "start": 294.0
         },
         {
           "id": "B1-05",
           "lesson": "B1",
-          "title": "Continue into night; move a threshold",
-          "start": 211.58333333333334
+          "title": "Through the night; move a threshold",
+          "start": 378.5833333333333
         },
         {
           "id": "B1-06",
           "lesson": "B1",
           "title": "Explain what changed",
-          "start": 269.125
+          "start": 471.625
         },
         {
           "id": "B2-1",
           "lesson": "B2",
-          "title": "Four jobs across the watering day",
-          "start": 332.25
+          "title": "Four phases across the grow-day",
+          "start": 541.5
         },
         {
           "id": "B2-2",
           "lesson": "B2",
-          "title": "Wait first: morning dryback, P0",
-          "start": 357.0416666666667
+          "title": "Wait first: P0 morning dryback",
+          "start": 593.4166666666666
         },
         {
           "id": "B2-3",
           "lesson": "B2",
-          "title": "Refill: ramp-up, P1",
-          "start": 384.4166666666667
+          "title": "Refill: P1 ramp-up",
+          "start": 648.8333333333334
         },
         {
           "id": "B2-4",
           "lesson": "B2",
-          "title": "Maintain: conditional watering, P2",
-          "start": 412.1666666666667
+          "title": "Maintain: P2 and the re-water threshold",
+          "start": 698.6666666666666
         },
         {
           "id": "B2-5",
           "lesson": "B2",
           "title": "Worked example: a 06:00–18:00 lighting day",
-          "start": 439.7916666666667
+          "start": 753.7916666666666
         },
         {
           "id": "B2-6",
           "lesson": "B2",
-          "title": "Overnight dryback: P3",
-          "start": 465.79166666666663
+          "title": "Overnight: P3 and the Rescue floor",
+          "start": 806.9583333333333
         },
         {
           "id": "B2-7",
           "lesson": "B2",
           "title": "Your turn: explain another day",
-          "start": 493.70833333333337
+          "start": 864.0416666666667
         },
         {
           "id": "B3-1",
           "lesson": "B3",
           "title": "Think of a dimmer",
-          "start": 520.25
+          "start": 913.4166666666666
         },
         {
           "id": "B3-2",
           "lesson": "B3",
-          "title": "The plant responds to its conditions",
-          "start": 547.7916666666666
+          "title": "How watering nudges the plant",
+          "start": 966.4583333333333
         },
         {
           "id": "B3-3",
           "lesson": "B3",
-          "title": "What the slider actually calculates",
-          "start": 578.5833333333334
+          "title": "Endpoints, profiles and the slider",
+          "start": 1020.9166666666666
         },
         {
           "id": "B3-4",
           "lesson": "B3",
           "title": "Worked example: halfway",
-          "start": 606.9166666666666
+          "start": 1076.5
         },
         {
           "id": "B3-5",
           "lesson": "B3",
           "title": "Your turn, with the steps supplied",
-          "start": 632.8333333333334
+          "start": 1129.4583333333333
         },
         {
           "id": "B3-6",
           "lesson": "B3",
-          "title": "Try a new pair independently",
-          "start": 656.4583333333334
+          "title": "Try a new pair on your own",
+          "start": 1177.625
         },
         {
           "id": "B3-7",
           "lesson": "B3",
-          "title": "Recall the calculation and its scope",
-          "start": 681.1666666666666
+          "title": "Check the profile before you trust it",
+          "start": 1219.7083333333333
         },
         {
           "id": "B4-1",
           "lesson": "B4",
           "title": "A dripper is a small tap",
-          "start": 708.8333333333334
+          "start": 1272.25
         },
         {
           "id": "B4-2",
           "lesson": "B4",
           "title": "Worked example: thirty seconds",
-          "start": 732.7083333333334
+          "start": 1325.0
         },
         {
           "id": "B4-3",
           "lesson": "B4",
           "title": "Scale from one plant to twelve",
-          "start": 757.625
+          "start": 1372.625
         },
         {
           "id": "B4-4",
           "lesson": "B4",
-          "title": "A volume fraction is not a VWC response",
-          "start": 785.1666666666667
+          "title": "A shot's share of the pot",
+          "start": 1419.8333333333333
         },
         {
           "id": "B4-5",
           "lesson": "B4",
           "title": "Your turn: complete the calculation",
-          "start": 811.75
+          "start": 1469.4166666666667
         },
         {
           "id": "B4-6",
           "lesson": "B4",
           "title": "Use the time that actually ran",
-          "start": 837.8333333333334
+          "start": 1515.5833333333333
         },
         {
           "id": "B4-7",
           "lesson": "B4",
-          "title": "Recall: delivery, drainage, uptake",
-          "start": 865.7916666666667
+          "title": "Recall: delivery, runoff, uptake",
+          "start": 1568.8333333333333
         },
         {
           "id": "C1-01",
           "lesson": "C1",
-          "title": "Five functions, not a shopping spree",
-          "start": 893.0833333333334
+          "title": "Five jobs, one small zone",
+          "start": 1624.2083333333333
         },
         {
           "id": "C1-02",
           "lesson": "C1",
-          "title": "Host and measurement paths",
-          "start": 917.7083333333334
+          "title": "Host, software and probes",
+          "start": 1678.4583333333333
         },
         {
           "id": "C1-03",
           "lesson": "C1",
           "title": "Draw the actual water path",
-          "start": 1057.0416666666667
+          "start": 1980.5833333333333
         },
         {
           "id": "C1-04",
           "lesson": "C1",
-          "title": "Safe control and proof",
-          "start": 1097.875
+          "title": "Safe switching and proof",
+          "start": 2078.75
         },
         {
           "id": "C1-05",
           "lesson": "C1",
-          "title": "Essentials, conditional, later",
-          "start": 1186.0416666666667
+          "title": "Essentials first, extras later",
+          "start": 2276.208333333333
         },
         {
           "id": "C1-06",
           "lesson": "C1",
           "title": "Your own layout",
-          "start": 1209.75
+          "start": 2321.0
         }
       ],
-      "duration": 1257.9166666666667,
-      "frames": 30190,
-      "source_sha256": "57ded0ceb22a232be44c158a0947f91e1c2f9b88135c63bf64190bb526aa68f9"
+      "duration": 2416.0416666666665,
+      "frames": 57985,
+      "source_sha256": "0182d5334859bd06ec0e9e3ed5afe11efd5e95494e13f78988518c35e438316e"
     },
     {
       "id": "setup-pi",
@@ -479,229 +479,229 @@
         "C6",
         "C7"
       ],
-      "src": "media/groups/setup-pi.mp4?v=20261019r3",
-      "captions": "media/groups/setup-pi.vtt?v=20261019r3",
+      "src": "media/groups/setup-pi.mp4?v=20261020r4",
+      "captions": "media/groups/setup-pi.vtt?v=20261020r4",
       "chapters": [
         {
           "id": "1",
           "lesson": "C2a",
-          "title": "One computer keeps the desk open",
+          "title": "One computer keeps the system running",
           "start": 0.0
         },
         {
           "id": "2",
           "lesson": "C2a",
           "title": "Lay out the parts first",
-          "start": 29.875
+          "start": 53.791666666666664
         },
         {
           "id": "3",
           "lesson": "C2a",
           "title": "Example: choose the spare card",
-          "start": 58.625
+          "start": 109.29166666666667
         },
         {
           "id": "4",
           "lesson": "C2a",
           "title": "Your turn: the last check before Write",
-          "start": 89.83333333333333
+          "start": 172.41666666666666
         },
         {
           "id": "5",
           "lesson": "C2a",
-          "title": "Open the page on your own network",
-          "start": 120.41666666666667
+          "title": "Open Home Assistant in a browser",
+          "start": 217.625
         },
         {
           "id": "6",
           "lesson": "C2a",
           "title": "Keep a way back",
-          "start": 150.20833333333334
+          "start": 275.4583333333333
         },
         {
           "id": "1",
           "lesson": "C3",
-          "title": "The front desk gives each item an address",
-          "start": 186.75
+          "title": "Finish onboarding, then read an entity ID",
+          "start": 324.0833333333333
         },
         {
           "id": "2",
           "lesson": "C3",
           "title": "Two Crop Steering parts do different jobs",
-          "start": 218.0
+          "start": 380.375
         },
         {
           "id": "3",
           "lesson": "C3",
-          "title": "Example: install the integration and room",
-          "start": 254.79166666666669
+          "title": "Example: install the integration and create a room",
+          "start": 438.4583333333333
         },
         {
           "id": "4",
           "lesson": "C3",
           "title": "Add and start the separate Controller",
-          "start": 286.4583333333333
+          "start": 489.5
         },
         {
           "id": "5",
           "lesson": "C3",
-          "title": "Your turn: a page opens but no report arrives",
-          "start": 329.125
+          "title": "Your turn: the screens open but no heartbeat arrives",
+          "start": 546.9166666666666
         },
         {
           "id": "6",
           "lesson": "C3",
           "title": "Keep a recovery copy you can actually use",
-          "start": 366.16666666666663
+          "start": 603.2916666666666
         },
         {
           "id": "1",
           "lesson": "C4",
           "title": "A contact name needs the right number",
-          "start": 405.4166666666667
+          "start": 651.25
         },
         {
           "id": "2",
           "lesson": "C4",
           "title": "Match the real plumbing and measurements",
-          "start": 441.625
+          "start": 702.125
         },
         {
           "id": "3",
           "lesson": "C4",
           "title": "Example: twelve plants, not one giant pot",
-          "start": 479.20833333333337
+          "start": 751.75
         },
         {
           "id": "4",
           "lesson": "C4",
           "title": "Check the clock and the receipt",
-          "start": 509.95833333333337
+          "start": 803.0416666666666
         },
         {
           "id": "5",
           "lesson": "C4",
           "title": "Your turn: three faults in one record",
-          "start": 542.125
+          "start": 858.4166666666666
         },
         {
           "id": "6",
           "lesson": "C4",
           "title": "Read the accepted setup back",
-          "start": 573.1666666666667
+          "start": 901.125
         },
         {
           "id": "1",
           "lesson": "C5",
-          "title": "A stop message is not a disconnected machine",
-          "start": 613.0
+          "title": "Watering OFF is a software block, not isolation",
+          "start": 951.25
         },
         {
           "id": "2",
           "lesson": "C5",
           "title": "Use the probe’s documented connection",
-          "start": 644.2916666666666
+          "start": 1023.0833333333334
         },
         {
           "id": "3",
           "lesson": "C5",
           "title": "Example: a number can be fresh and irrelevant",
-          "start": 680.75
+          "start": 1098.875
         },
         {
           "id": "4",
           "lesson": "C5",
           "title": "Check what starts and stops the pump",
-          "start": 712.5416666666666
+          "start": 1171.5833333333333
         },
         {
           "id": "5",
           "lesson": "C5",
           "title": "Your turn: two controllers know the same valve",
-          "start": 750.875
+          "start": 1249.9583333333333
         },
         {
           "id": "6",
           "lesson": "C5",
           "title": "Close the physical checks before the wet test",
-          "start": 782.6666666666666
+          "start": 1319.2083333333333
         },
         {
           "id": "1",
           "lesson": "C6",
           "title": "Two tests answer two questions",
-          "start": 822.5
+          "start": 1386.75
         },
         {
           "id": "2",
           "lesson": "C6",
           "title": "Watch the whole water path",
-          "start": 860.3333333333334
+          "start": 1446.4583333333333
         },
         {
           "id": "3",
           "lesson": "C6",
           "title": "Example: a cup becomes a flow measurement",
-          "start": 899.0833333333334
+          "start": 1515.5
         },
         {
           "id": "4",
           "lesson": "C6",
           "title": "Your turn: finish the catch record",
-          "start": 940.0
+          "start": 1590.0833333333333
         },
         {
           "id": "5",
           "lesson": "C6",
           "title": "A good catch is one part of readiness",
-          "start": 972.75
+          "start": 1661.5833333333333
         },
         {
           "id": "6",
           "lesson": "C6",
           "title": "Supervise the first enabled cycle",
-          "start": 1011.8333333333334
+          "start": 1722.75
         },
         {
           "id": "1",
           "lesson": "C7",
           "title": "Moving house starts with a labelled inventory",
-          "start": 1054.9166666666667
+          "start": 1797.7916666666667
         },
         {
           "id": "2",
           "lesson": "C7",
           "title": "Keep the records in their original context",
-          "start": 1086.9583333333335
+          "start": 1857.7083333333335
         },
         {
           "id": "3",
           "lesson": "C7",
           "title": "Example: one old zone, several new addresses",
-          "start": 1123.7916666666667
+          "start": 1926.875
         },
         {
           "id": "4",
           "lesson": "C7",
           "title": "Agree the handover and the way back",
-          "start": 1155.4166666666667
+          "start": 1997.4166666666667
         },
         {
           "id": "5",
           "lesson": "C7",
-          "title": "Your turn: the name matches, the unit does not",
-          "start": 1192.1666666666667
+          "title": "Your turn: the name matches, the method is unknown",
+          "start": 2063.3333333333335
         },
         {
           "id": "6",
           "lesson": "C7",
           "title": "Prove one zone before expanding",
-          "start": 1228.6666666666667
+          "start": 2123.625
         }
       ],
-      "duration": 1268.0,
-      "frames": 30432,
-      "source_sha256": "7bc3d71dae2fa30bdcd13afef29746bdfec114a356aae17bc5979571b7f2c123"
+      "duration": 2195.4166666666665,
+      "frames": 52690,
+      "source_sha256": "6689a4a78807c738be4d16b62f91d72b55eb3fe8f93de1e7e2218208b75952c5"
     },
     {
       "id": "setup-x86",
@@ -718,229 +718,229 @@
         "C6",
         "C7"
       ],
-      "src": "media/groups/setup-x86.mp4?v=20261019r3",
-      "captions": "media/groups/setup-x86.vtt?v=20261019r3",
+      "src": "media/groups/setup-x86.mp4?v=20261020r4",
+      "captions": "media/groups/setup-x86.vtt?v=20261020r4",
       "chapters": [
         {
           "id": "1",
           "lesson": "C2b",
-          "title": "Another home for the same front desk",
+          "title": "Another home for Home Assistant",
           "start": 0.0
         },
         {
           "id": "2",
           "lesson": "C2b",
           "title": "Check the computer before changing it",
-          "start": 31.5
+          "start": 55.166666666666664
         },
         {
           "id": "3",
           "lesson": "C2b",
-          "title": "Example: the USB and disk have different jobs",
-          "start": 74.54166666666667
+          "title": "Example: the USB stick and the disk have different jobs",
+          "start": 133.04166666666666
         },
         {
           "id": "4",
           "lesson": "C2b",
           "title": "Your turn: identify both devices",
-          "start": 111.91666666666667
+          "start": 191.91666666666666
         },
         {
           "id": "5",
           "lesson": "C2b",
           "title": "A capable office PC may still be unavailable",
-          "start": 143.04166666666666
+          "start": 247.41666666666666
         },
         {
           "id": "6",
           "lesson": "C2b",
-          "title": "Check first boot and write down the result",
-          "start": 172.625
+          "title": "Check first start and write down the result",
+          "start": 283.1666666666667
         },
         {
           "id": "1",
           "lesson": "C3",
-          "title": "The front desk gives each item an address",
-          "start": 210.625
+          "title": "Finish onboarding, then read an entity ID",
+          "start": 338.0833333333333
         },
         {
           "id": "2",
           "lesson": "C3",
           "title": "Two Crop Steering parts do different jobs",
-          "start": 241.875
+          "start": 394.375
         },
         {
           "id": "3",
           "lesson": "C3",
-          "title": "Example: install the integration and room",
-          "start": 278.6666666666667
+          "title": "Example: install the integration and create a room",
+          "start": 452.4583333333333
         },
         {
           "id": "4",
           "lesson": "C3",
           "title": "Add and start the separate Controller",
-          "start": 310.3333333333333
+          "start": 503.5
         },
         {
           "id": "5",
           "lesson": "C3",
-          "title": "Your turn: a page opens but no report arrives",
-          "start": 353.0
+          "title": "Your turn: the screens open but no heartbeat arrives",
+          "start": 560.9166666666666
         },
         {
           "id": "6",
           "lesson": "C3",
           "title": "Keep a recovery copy you can actually use",
-          "start": 390.04166666666663
+          "start": 617.2916666666666
         },
         {
           "id": "1",
           "lesson": "C4",
           "title": "A contact name needs the right number",
-          "start": 429.2916666666667
+          "start": 665.25
         },
         {
           "id": "2",
           "lesson": "C4",
           "title": "Match the real plumbing and measurements",
-          "start": 465.5
+          "start": 716.125
         },
         {
           "id": "3",
           "lesson": "C4",
           "title": "Example: twelve plants, not one giant pot",
-          "start": 503.08333333333337
+          "start": 765.75
         },
         {
           "id": "4",
           "lesson": "C4",
           "title": "Check the clock and the receipt",
-          "start": 533.8333333333334
+          "start": 817.0416666666666
         },
         {
           "id": "5",
           "lesson": "C4",
           "title": "Your turn: three faults in one record",
-          "start": 566.0
+          "start": 872.4166666666666
         },
         {
           "id": "6",
           "lesson": "C4",
           "title": "Read the accepted setup back",
-          "start": 597.0416666666667
+          "start": 915.125
         },
         {
           "id": "1",
           "lesson": "C5",
-          "title": "A stop message is not a disconnected machine",
-          "start": 636.875
+          "title": "Watering OFF is a software block, not isolation",
+          "start": 965.25
         },
         {
           "id": "2",
           "lesson": "C5",
           "title": "Use the probe’s documented connection",
-          "start": 668.1666666666666
+          "start": 1037.0833333333333
         },
         {
           "id": "3",
           "lesson": "C5",
           "title": "Example: a number can be fresh and irrelevant",
-          "start": 704.625
+          "start": 1112.875
         },
         {
           "id": "4",
           "lesson": "C5",
           "title": "Check what starts and stops the pump",
-          "start": 736.4166666666666
+          "start": 1185.5833333333333
         },
         {
           "id": "5",
           "lesson": "C5",
           "title": "Your turn: two controllers know the same valve",
-          "start": 774.75
+          "start": 1263.9583333333333
         },
         {
           "id": "6",
           "lesson": "C5",
           "title": "Close the physical checks before the wet test",
-          "start": 806.5416666666666
+          "start": 1333.2083333333333
         },
         {
           "id": "1",
           "lesson": "C6",
           "title": "Two tests answer two questions",
-          "start": 846.375
+          "start": 1400.75
         },
         {
           "id": "2",
           "lesson": "C6",
           "title": "Watch the whole water path",
-          "start": 884.2083333333334
+          "start": 1460.4583333333333
         },
         {
           "id": "3",
           "lesson": "C6",
           "title": "Example: a cup becomes a flow measurement",
-          "start": 922.9583333333334
+          "start": 1529.5
         },
         {
           "id": "4",
           "lesson": "C6",
           "title": "Your turn: finish the catch record",
-          "start": 963.875
+          "start": 1604.0833333333333
         },
         {
           "id": "5",
           "lesson": "C6",
           "title": "A good catch is one part of readiness",
-          "start": 996.625
+          "start": 1675.5833333333333
         },
         {
           "id": "6",
           "lesson": "C6",
           "title": "Supervise the first enabled cycle",
-          "start": 1035.7083333333333
+          "start": 1736.75
         },
         {
           "id": "1",
           "lesson": "C7",
           "title": "Moving house starts with a labelled inventory",
-          "start": 1078.7916666666667
+          "start": 1811.7916666666667
         },
         {
           "id": "2",
           "lesson": "C7",
           "title": "Keep the records in their original context",
-          "start": 1110.8333333333335
+          "start": 1871.7083333333335
         },
         {
           "id": "3",
           "lesson": "C7",
           "title": "Example: one old zone, several new addresses",
-          "start": 1147.6666666666667
+          "start": 1940.875
         },
         {
           "id": "4",
           "lesson": "C7",
           "title": "Agree the handover and the way back",
-          "start": 1179.2916666666667
+          "start": 2011.4166666666667
         },
         {
           "id": "5",
           "lesson": "C7",
-          "title": "Your turn: the name matches, the unit does not",
-          "start": 1216.0416666666667
+          "title": "Your turn: the name matches, the method is unknown",
+          "start": 2077.3333333333335
         },
         {
           "id": "6",
           "lesson": "C7",
           "title": "Prove one zone before expanding",
-          "start": 1252.5416666666667
+          "start": 2137.625
         }
       ],
-      "duration": 1291.875,
-      "frames": 31005,
-      "source_sha256": "79be2109616a6f9b0389c5201c973ae8d2e56ef2a93026cc76ea7b5fd8c64b06"
+      "duration": 2209.4166666666665,
+      "frames": 53026,
+      "source_sha256": "91c45781e1f718787371b5768f1b247f1768570e2a043a0ce164d3877a98bf98"
     },
     {
       "id": "operations",
@@ -959,8 +959,8 @@
         "D5",
         "D6"
       ],
-      "src": "media/groups/operations.mp4?v=20261019r3",
-      "captions": "media/groups/operations.vtt?v=20261019r3",
+      "src": "media/groups/operations.mp4?v=20261020r4",
+      "captions": "media/groups/operations.vtt?v=20261020r4",
       "chapters": [
         {
           "id": "D1-s1",
@@ -972,252 +972,252 @@
           "id": "D1-s2",
           "lesson": "D1",
           "title": "Check when each source last reported",
-          "start": 23.291666666666668
+          "start": 57.125
         },
         {
           "id": "D1-s3",
           "lesson": "D1",
           "title": "Read the reason beside the state",
-          "start": 50.375
+          "start": 128.20833333333334
         },
         {
           "id": "D1-s4",
           "lesson": "D1",
           "title": "Worked example: Training East, Zone 2",
-          "start": 79.25
+          "start": 186.25
         },
         {
           "id": "D1-s5",
           "lesson": "D1",
           "title": "Your turn: finish an honest record",
-          "start": 107.16666666666667
+          "start": 254.41666666666666
         },
         {
           "id": "D1-s6",
           "lesson": "D1",
           "title": "Find another zone independently",
-          "start": 133.41666666666666
+          "start": 313.5416666666667
         },
         {
           "id": "D1-s7",
           "lesson": "D1",
           "title": "Recall the address and control scope",
-          "start": 161.54166666666666
+          "start": 371.5416666666667
         },
         {
           "id": "D2-s1",
           "lesson": "D2",
-          "title": "Begin with a pencil draft",
-          "start": 190.04166666666666
+          "title": "Begin by reading who owns the targets",
+          "start": 430.0833333333333
         },
         {
           "id": "D2-s2",
           "lesson": "D2",
           "title": "Tell the three lines apart",
-          "start": 216.70833333333331
+          "start": 497.91666666666663
         },
         {
           "id": "D2-s3",
           "lesson": "D2",
-          "title": "Learn what the field means",
-          "start": 244.125
+          "title": "Learn what the setting means",
+          "start": 566.4166666666666
         },
         {
           "id": "D2-s4",
           "lesson": "D2",
           "title": "Worked example: 30 becomes a 31 draft",
-          "start": 270.4583333333333
+          "start": 634.9583333333333
         },
         {
           "id": "D2-s5",
           "lesson": "D2",
           "title": "Check the receipt, then restore",
-          "start": 300.16666666666663
+          "start": 693.3333333333333
         },
         {
           "id": "D2-s6",
           "lesson": "D2",
-          "title": "Try another manual demo zone",
-          "start": 329.5
+          "title": "Try another demo zone",
+          "start": 749.875
         },
         {
           "id": "D2-s7",
           "lesson": "D2",
           "title": "Recall the complete change journey",
-          "start": 355.91666666666663
+          "start": 806.4583333333333
         },
         {
           "id": "D3-s1",
           "lesson": "D3",
           "title": "A timetable points to a settings card",
-          "start": 384.7083333333333
+          "start": 863.0416666666666
         },
         {
           "id": "D3-s2",
           "lesson": "D3",
           "title": "A profile holds two endpoints",
-          "start": 409.91666666666663
+          "start": 920.4583333333333
         },
         {
           "id": "D3-s3",
           "lesson": "D3",
           "title": "Worked example: a 2%–4% blend",
-          "start": 437.9583333333333
+          "start": 981.5833333333333
         },
         {
           "id": "D3-s4",
           "lesson": "D3",
           "title": "Store first, then request activation",
-          "start": 465.04166666666663
+          "start": 1051.875
         },
         {
           "id": "D3-s5",
           "lesson": "D3",
           "title": "Understand the return handover",
-          "start": 493.16666666666663
+          "start": 1121.75
         },
         {
           "id": "D3-s6",
           "lesson": "D3",
           "title": "Your turn: another dated block",
-          "start": 520.625
+          "start": 1180.2916666666665
         },
         {
           "id": "D3-s7",
           "lesson": "D3",
           "title": "Recall what each action does",
-          "start": 548.2083333333333
+          "start": 1237.25
         },
         {
           "id": "D4-s1",
           "lesson": "D4",
           "title": "A budget and a statement answer different questions",
-          "start": 577.2083333333334
+          "start": 1296.75
         },
         {
           "id": "D4-s2",
           "lesson": "D4",
           "title": "Match the comparison before calculating",
-          "start": 605.7916666666667
+          "start": 1364.9583333333333
         },
         {
           "id": "D4-s3",
           "lesson": "D4",
           "title": "Worked example: day ten, 12 L versus 15 L",
-          "start": 632.2916666666667
+          "start": 1423.8333333333333
         },
         {
           "id": "D4-s4",
           "lesson": "D4",
           "title": "Date the reference as carefully as the reading",
-          "start": 661.2083333333334
+          "start": 1485.375
         },
         {
           "id": "D4-s5",
           "lesson": "D4",
           "title": "Your turn: name what the estimate means",
-          "start": 691.5
+          "start": 1552.25
         },
         {
           "id": "D4-s6",
           "lesson": "D4",
           "title": "Try an incomplete comparison",
-          "start": 719.25
+          "start": 1612.5833333333333
         },
         {
           "id": "D4-s7",
           "lesson": "D4",
           "title": "Recall an observation before proposing a cause",
-          "start": 747.5
+          "start": 1669.7916666666667
         },
         {
           "id": "D5-s1",
           "lesson": "D5",
           "title": "Repair the evidence before turning the dial",
-          "start": 777.5833333333334
+          "start": 1724.4166666666667
         },
         {
           "id": "D5-s2",
           "lesson": "D5",
           "title": "Worked example: a four-hour-old reading",
-          "start": 808.7916666666667
+          "start": 1795.0
         },
         {
           "id": "D5-s3",
           "lesson": "D5",
           "title": "Conflicting tank evidence needs a real check",
-          "start": 839.25
+          "start": 1864.4166666666667
         },
         {
           "id": "D5-s4",
           "lesson": "D5",
-          "title": "A stored setup needs controller acceptance",
-          "start": 868.6666666666667
+          "title": "A stored setup needs Controller acceptance",
+          "start": 1928.7083333333335
         },
         {
           "id": "D5-s5",
           "lesson": "D5",
           "title": "Your turn: OFF displayed, water flowing",
-          "start": 900.5833333333334
+          "start": 1990.375
         },
         {
           "id": "D5-s6",
           "lesson": "D5",
           "title": "Try another fault report independently",
-          "start": 930.2916666666667
+          "start": 2048.625
         },
         {
           "id": "D5-s7",
           "lesson": "D5",
           "title": "Recall the repair sequence",
-          "start": 960.4583333333334
+          "start": 2109.75
         },
         {
           "id": "D6-s1",
           "lesson": "D6",
           "title": "A short preflight, then a brief diary",
-          "start": 991.3333333333334
+          "start": 2165.625
         },
         {
           "id": "D6-s2",
           "lesson": "D6",
           "title": "Fill the first four parts with evidence",
-          "start": 1019.6666666666667
+          "start": 2223.8333333333335
         },
         {
           "id": "D6-s3",
           "lesson": "D6",
           "title": "Worked example: a reasoned no change",
-          "start": 1049.9166666666667
+          "start": 2290.4583333333335
         },
         {
           "id": "D6-s4",
           "lesson": "D6",
           "title": "Your turn: finish the change record",
-          "start": 1078.375
+          "start": 2349.125
         },
         {
           "id": "D6-s5",
           "lesson": "D6",
-          "title": "Use Crop AI as an assistant",
-          "start": 1105.5416666666667
+          "title": "Use the AI assistant as advice to check",
+          "start": 2404.0416666666665
         },
         {
           "id": "D6-s6",
           "lesson": "D6",
           "title": "Try another day and prepare the handover",
-          "start": 1136.375
+          "start": 2466.625
         },
         {
           "id": "D6-s7",
           "lesson": "D6",
           "title": "Teach it back, then recall it later",
-          "start": 1175.625
+          "start": 2526.5
         }
       ],
-      "duration": 1204.2916666666667,
-      "frames": 28903,
-      "source_sha256": "e7c03c1badb9f463300cddc9f249d13dac23fe771c197c63b7a203655820eb09"
+      "duration": 2578.3333333333335,
+      "frames": 61880,
+      "source_sha256": "870b7811dbe226b6fa764482b8c472405f6c3a65b91b98acbecd6f1d59b89d31"
     }
   ]
 }

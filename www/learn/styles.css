@@ -1302,3 +1302,562 @@ details[open] > summary {
   .lesson-navigation, .video-chapters, .watch-group-navigation, .watch-group-picker,
   .watch-chapter-list, .watch-auto-continue, .watch-caption-toggle { display: none !important; }
 }
+
+/* ---- R4 one-screen lesson player ------------------------------------- */
+body.lesson-mode .site-header,
+body.lesson-mode .site-footer {
+  display: none;
+}
+body.lesson-mode {
+  overflow: hidden;
+}
+body.lesson-mode #main {
+  padding: 0;
+  max-width: none;
+  margin: 0;
+}
+.lp {
+  --lp-gap: clamp(0.75rem, 1.6vw, 1.25rem);
+  height: 100vh;
+  height: 100dvh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  max-width: 1440px;
+  margin: 0 auto;
+  background: var(--paper);
+}
+.lp-bar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 0.25rem 0.75rem;
+  padding: 0.6rem var(--lp-gap) 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+.lp-back,
+.lp-menu-button {
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  text-decoration: none;
+  font-size: 1.2rem;
+  color: var(--forest);
+}
+.lp-title {
+  min-width: 0;
+}
+.lp-title h1 {
+  font: 600 clamp(1rem, 2.2vw, 1.3rem) / 1.25 var(--sans);
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.lp-eyebrow {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.lp-track {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 3px;
+  list-style: none;
+  margin: 0.2rem 0 0;
+  padding: 0;
+}
+.lp-track li {
+  flex: 1;
+  display: flex;
+}
+.lp-dot {
+  flex: 1;
+  min-height: 0;
+  height: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: var(--line);
+}
+.lp-dot[data-kind="quiz"],
+.lp-dot[data-kind="result"] {
+  background: #e3dcc0;
+}
+.lp-dot.is-done {
+  background: #6e8d76;
+}
+.lp-dot.is-current {
+  background: var(--forest);
+}
+.lp-dot:hover {
+  background: var(--gold);
+}
+.lp-body {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1.55fr) minmax(320px, 1fr);
+  gap: var(--lp-gap);
+  padding: var(--lp-gap);
+}
+.lp.lp-no-stage .lp-body {
+  grid-template-columns: minmax(0, 760px);
+  justify-content: center;
+}
+.lp.lp-no-stage .lp-stage {
+  display: none;
+}
+.lp-stage {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.lp-stage-inner {
+  min-height: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.lp-video {
+  display: block;
+  width: 100%;
+  min-height: 0;
+  flex: 0 1 auto;
+  aspect-ratio: 16 / 9;
+  background: #10241f;
+  border-radius: 10px;
+  object-fit: contain;
+}
+.lp-stage-inner > * {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+.lp-stage-inner > figure {
+  overflow: auto;
+  min-height: 0;
+}
+.lp-caption {
+  margin: 0;
+  min-height: 2.9em;
+  padding: 0.35rem 0.7rem;
+  border-radius: 6px;
+  background: var(--forest);
+  color: var(--white);
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+.lp-caption:empty::before {
+  content: "Captions appear here while the narrator speaks.";
+  opacity: 0.6;
+}
+.lp-media-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  align-items: center;
+}
+.lp-chip {
+  min-height: 36px;
+  padding: 0.25rem 0.7rem;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--white);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--forest);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+.lp-section-status {
+  font-size: 0.85rem;
+  color: var(--forest);
+  font-weight: 600;
+}
+.lp-section-status:empty {
+  display: none;
+}
+.lp-panel {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.lp-panel-body {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: clamp(1rem, 2vw, 1.5rem);
+}
+.lp-panel-body h2 {
+  font: 400 clamp(1.45rem, 2.6vw, 2rem) / 1.15 var(--serif);
+  margin: 0.25rem 0 0.75rem;
+}
+.lp-panel-body h2:focus {
+  outline: none;
+}
+.lp-lead {
+  font-size: 1.08rem;
+  margin-top: 0;
+}
+.lp-points {
+  margin: 0 0 1rem;
+  padding-left: 1.2rem;
+}
+.lp-points li {
+  margin: 0.3rem 0;
+  font-weight: 500;
+}
+.lp-outcomes li {
+  margin: 0.35rem 0;
+}
+.lp-muted,
+.lp-save {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+.lp-save {
+  margin: 0;
+  padding: 0 var(--lp-gap);
+}
+.lp-save:empty {
+  display: none;
+}
+.lp-done {
+  padding: 0.6rem 0.8rem;
+  background: var(--leaf);
+  border-radius: 6px;
+}
+.lp-example {
+  margin: 0.75rem 0;
+  padding: 0.6rem 0.9rem;
+  border-left: 3px solid #667e52;
+  background: var(--leaf);
+  border-radius: 0 6px 6px 0;
+}
+.lp-example summary,
+.lp-transcript summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+.lp-example ol {
+  margin: 0.4rem 0;
+  padding-left: 1.3rem;
+}
+.lp-answer {
+  font-weight: 700;
+  margin-bottom: 0;
+}
+.lp-transcript {
+  margin-top: 1rem;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+.lp-check {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  margin: 1rem 0 0;
+  padding: 0.9rem;
+  min-width: 0;
+  background: #fbfbf3;
+}
+.lp-check legend {
+  font-weight: 700;
+  padding: 0 0.3rem;
+}
+.lp-slide .lp-check legend::before {
+  content: "Quick check · ";
+  color: var(--muted);
+  font-weight: 600;
+}
+.lp-option {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin: 0.45rem 0;
+  padding: 0.65rem 0.75rem;
+  min-height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--white);
+  cursor: pointer;
+  line-height: 1.4;
+}
+.lp-option input {
+  margin-top: 0.2rem;
+  accent-color: var(--forest);
+}
+.lp-option.is-selected {
+  border-color: var(--forest);
+}
+.lp-option.is-correct {
+  border-color: #3f7a4f;
+  background: #e5f1e2;
+}
+.lp-option.is-incorrect {
+  border-color: var(--error);
+  background: #f8e7e3;
+}
+.lp-feedback {
+  margin: 0.5rem 0 0;
+  font-size: 0.92rem;
+}
+.lp-feedback:empty {
+  display: none;
+}
+.lp-feedback.correct {
+  color: #2f6b3e;
+}
+.lp-feedback.incorrect {
+  color: var(--error);
+}
+.lp-notes {
+  width: 100%;
+  min-height: 90px;
+  margin: 0.5rem 0;
+  padding: 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.lp-review {
+  padding-left: 1.2rem;
+}
+.lp-review li {
+  margin: 0.6rem 0;
+}
+.lp-review li.is-correct strong::after {
+  content: " \2713";
+  color: #2f6b3e;
+}
+.lp-review li.is-incorrect strong::after {
+  content: " \2717";
+  color: var(--error);
+}
+.lp-review p {
+  margin: 0.2rem 0 0;
+  font-size: 0.92rem;
+}
+.lp-nav {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem var(--lp-gap) max(0.6rem, env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line);
+  background: var(--paper);
+}
+.lp-counter {
+  text-align: center;
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+.lp-next {
+  min-width: 9rem;
+}
+.lp-drawer {
+  width: min(440px, 100vw);
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0 0 0 auto;
+  padding: 1rem 1.25rem 2rem;
+  border: 0;
+  border-left: 1px solid var(--line);
+  background: var(--white);
+  overflow-y: auto;
+}
+.lp-drawer::backdrop {
+  background: rgb(16 36 31 / 0.45);
+}
+.lp-drawer h2 {
+  font: 600 1rem var(--sans);
+  margin: 1.25rem 0 0.5rem;
+}
+.lp-drawer-close {
+  float: right;
+}
+.lp-jump {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+.lp-jump button {
+  width: 100%;
+  justify-content: flex-start;
+  text-align: left;
+  border-color: transparent;
+  min-height: 40px;
+  font-weight: 500;
+}
+.lp-jump button.is-current {
+  background: var(--leaf);
+  font-weight: 700;
+}
+.lp-drawer select,
+.lp-adjacent button,
+.lp-drawer section > button {
+  width: 100%;
+  margin: 0.25rem 0;
+  justify-content: flex-start;
+  text-align: left;
+}
+.lp-drawer select {
+  min-height: 44px;
+}
+.lp-print {
+  display: none;
+}
+
+/* Phones and narrow tablets: video on top, panel below, sticky nav. */
+@media (max-width: 860px) {
+  .lp-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    padding: 0;
+    gap: 0;
+  }
+  .lp.lp-no-stage .lp-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: minmax(0, 1fr);
+  }
+  .lp-stage-inner {
+    gap: 0;
+  }
+  .lp-video {
+    border-radius: 0;
+    max-height: 34dvh;
+  }
+  .lp-caption {
+    border-radius: 0;
+    font-size: 0.86rem;
+    min-height: 2.6em;
+  }
+  .lp-media-bar {
+    padding: 0.35rem 0.75rem;
+    border-bottom: 1px solid var(--line);
+    flex-wrap: nowrap;
+    overflow-x: auto;
+  }
+  .lp-chip {
+    flex-shrink: 0;
+  }
+  .lp-autopause {
+    display: none;
+  }
+  .lp-panel {
+    border: 0;
+    border-radius: 0;
+  }
+  .lp-stage-inner > figure {
+    max-height: 36dvh;
+  }
+  .lp-next {
+    min-width: 0;
+  }
+}
+@media (max-width: 420px) {
+  .lp-counter {
+    display: none;
+  }
+  .lp-nav {
+    grid-template-columns: auto 1fr;
+  }
+}
+@media print {
+  body.lesson-mode {
+    overflow: visible;
+  }
+  .lp {
+    display: block;
+    height: auto;
+  }
+  .lp-bar,
+  .lp-body,
+  .lp-nav,
+  .lp-drawer {
+    display: none !important;
+  }
+  .lp-print {
+    display: block;
+  }
+}
+
+/* R4: compact course list on phones */
+@media (max-width: 600px) {
+  .lesson-row-link {
+    gap: 0.75rem;
+    padding: 0.8rem 0.25rem;
+  }
+  .lesson-row-text .muted {
+    display: none;
+  }
+  .lesson-row-text strong {
+    line-height: 1.35;
+  }
+  .lesson-status {
+    font-size: 0.72rem;
+  }
+  .course-module {
+    margin-top: 1.75rem;
+  }
+  .module-heading h2 {
+    font-size: 1.7rem;
+  }
+}
+/* R4: legend sits inside the question box; stage captions hidden on phones */
+.lp-check legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin-bottom: 0.4rem;
+}
+.lp-check legend + * {
+  clear: both;
+}
+@media (max-width: 860px) {
+  .lp-stage-inner > figure figcaption {
+    display: none;
+  }
+}
+/* The lesson shows its own save warning inside the layout (.lp-save). */
+body.lesson-mode .storage-notice {
+  display: none;
+}
+/* Diagram kept for screen readers while the video shows the same picture. */
+.lp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.lp-diagram {
+  min-height: 0;
+  overflow: auto;
+}
+.lp-diagram > figure {
+  margin: 0;
+}
+@media (max-width: 860px) {
+  .lp-diagram {
+    max-height: 36dvh;
+  }
+  .lp-diagram figcaption {
+    display: none;
+  }
+}

@@ -233,8 +233,8 @@ class CourseVideoTests(unittest.TestCase):
             set(groups["foundations"]["routes"]),
             {"operator", "builder-pi", "builder-x86"},
         )
-        self.assertEqual(video.EDITION, "2026-10-19-r3")
-        self.assertEqual(video.CACHE_VERSION, "20261019r3")
+        self.assertEqual(video.EDITION, "2026-10-20-r4")
+        self.assertEqual(video.CACHE_VERSION, "20261020r4")
 
     def make_capture(self):
         regular = {

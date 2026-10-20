@@ -14,8 +14,8 @@ from urllib.parse import urlsplit
 
 ROOT = Path(__file__).resolve().parents[1]
 COURSE = ROOT / "www/learn/course"
-EDITION = "2026-10-19-r3"
-CACHE_VERSION = "20261019r3"
+EDITION = "2026-10-20-r4"
+CACHE_VERSION = "20261020r4"
 ORDER = (
     "A1 A2 A3 A4 A5 A6 B1 B2 B3 B4 C1 C2a C2b C3 C4 C5 C6 C7 D1 D2 D3 D4 D5 D6".split()
 )

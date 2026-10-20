@@ -4,7 +4,7 @@
     "lesson": "A2",
     "scene": "A2-01",
     "paragraph": 0,
-    "text": "The previous lesson showed three parts inside the pot.",
+    "text": "Last lesson you looked inside a pot. The root zone, the part of the pot where roots live, holds three things. Look at the question on the screen. Before the answer appears, try to name all three. Saying them out loud helps you remember. This whole lesson builds on those three parts.",
     "title": "Recall the root zone",
     "visual": {
       "type": "question",
@@ -19,7 +19,7 @@
     "lesson": "A2",
     "scene": "A2-01",
     "paragraph": 1,
-    "text": "Name these parts before the answer appears.",
+    "text": "Here is a hint. One part is solid, one is a liquid and one is a gas. Take a moment now, before the answer appears. What are the three parts inside the pot?",
     "title": "Name the three parts",
     "visual": {
       "type": "recall",
@@ -35,7 +35,7 @@
     "lesson": "A2",
     "scene": "A2-02",
     "paragraph": 0,
-    "text": "The three parts are solid material, water, and air.",
+    "text": "The three parts are solid material, water and air. The solid material is the substrate, such as coco or stone wool. Water and air share the pore spaces, the gaps between the solid pieces. Look at the picture. It draws all three parts as ten equal blocks. Now we want one number that says how wet the substrate is.",
     "title": "Solids, water and air",
     "visual": {
       "type": "root-zone",
@@ -53,7 +53,7 @@
     "lesson": "A2",
     "scene": "A2-02",
     "paragraph": 1,
-    "text": "Think of ten equal boxes making up the whole sample. How many boxes worth of water are inside it? That is the idea behind volumetric water content, or VWC: water volume divided by total sample volume, shown as a percentage.",
+    "text": "First, one word. Volume means how much space something takes up. Picture the sample, the bit of substrate you are measuring, split into ten equal boxes. Then ask how many of those boxes the water would fill. That share is called volumetric water content, or VWC. It is the water volume divided by the total sample volume. You then multiply by one hundred to make a percentage, which means a number out of every hundred.",
     "title": "What VWC measures",
     "visual": {
       "type": "fraction",
@@ -76,7 +76,7 @@
     "lesson": "A2",
     "scene": "A2-02",
     "paragraph": 2,
-    "text": "In the drawing, water takes up six of the ten equal volumes. Six divided by ten is zero point six. Multiply by one hundred: sixty percent.",
+    "text": "Look at the picture. Water fills six of the ten equal boxes. Two boxes are solid material and two are air. Now do the sum step by step. Six divided by ten is zero point six. Zero point six times one hundred is sixty. So this sample is at sixty percent VWC. Sixty out of every hundred parts of its volume is water.",
     "title": "Six out of ten",
     "visual": {
       "type": "fraction",
@@ -99,14 +99,14 @@
     "lesson": "A2",
     "scene": "A2-02",
     "paragraph": 3,
-    "text": "The blocks make the arithmetic visible. In real substrate, that water is spread through spaces between solid parts. It does not sit in six separate water blocks.",
-    "title": "A ratio, not separate blocks",
+    "text": "The boxes make the sum visible. Real substrate does not look like that. The water spreads through thousands of tiny pore spaces between the solid pieces. It does not sit in six neat blocks. Use the boxes to picture the share of water, not where the water sits. The share is what the VWC number tells you.",
+    "title": "A share, not separate blocks",
     "visual": {
       "type": "fraction",
       "labels": [
         "60% water by volume",
         "Water fills pore spaces",
-        "Blocks illustrate the ratio"
+        "Blocks only show the share"
       ],
       "focus": "meaning",
       "values": [
@@ -122,7 +122,7 @@
     "lesson": "A2",
     "scene": "A2-03",
     "paragraph": 0,
-    "text": "Use a larger example: a total substrate sample of five litres at sixty percent VWC. Five times zero point six is three, so this sample contains three litres of water.",
+    "text": "Now turn the percentage into litres. A litre is a measure of volume, written as a capital L. Take a bigger sample: five litres of substrate at sixty percent VWC. Sixty percent as a decimal is zero point six. Five times zero point six is three. So the sample holds three litres of water. The picture checks it the other way. Three divided by five, times one hundred, is sixty percent.",
     "title": "Water already in the sample",
     "visual": {
       "type": "fraction",
@@ -143,13 +143,13 @@
     "lesson": "A2",
     "scene": "A2-03",
     "paragraph": 1,
-    "text": "Imagine labelling the sample: three litres of water already inside. That label is not a watering instruction. It does not tell you to pour another three litres into a five litre pot.",
-    "title": "Existing water, not an added dose",
+    "text": "The picture compares two ideas. One side shows three litres of water already inside the sample. The other side shows a common beginner mistake: reading sixty percent and pouring in another three litres. The number describes what is already there. It is not an amount to add. Three more litres in a five litre pot would mostly run straight out of the bottom as drainage.",
+    "title": "Water already there, not a dose",
     "visual": {
       "type": "comparison",
       "labels": [
         "3 L already present",
-        "Not a 3 L irrigation instruction"
+        "Not a 3 L watering instruction"
       ]
     }
   },
@@ -158,7 +158,7 @@
     "lesson": "A2",
     "scene": "A2-04",
     "paragraph": 0,
-    "text": "Sixty percent of the total volume is water. Is all the remaining forty percent air?",
+    "text": "Back to the sixty percent sample. Sixty percent of its volume is water, so forty percent is something else. Look at the forty percent marked in the picture. Many people get the next question wrong. Is all of that forty percent air? Think about the three parts from the start of the lesson before you answer.",
     "title": "What is in the other 40%?",
     "visual": {
       "type": "fraction",
@@ -181,14 +181,14 @@
     "lesson": "A2",
     "scene": "A2-04",
     "paragraph": 1,
-    "text": "No. The remaining volume includes solid material and air. VWC alone does not give the complete air volume.",
-    "title": "The remainder includes solids",
+    "text": "No, it is not all air. The forty percent holds the solid material as well as the air. In our ten boxes, two were solid and two were air. So VWC tells you how much water there is, but not how much air. To know the air share, you also need to know how much space the solids take up. That depends on the substrate.",
+    "title": "The rest includes solids",
     "visual": {
       "type": "fraction",
       "labels": [
         "60% water",
         "40% solids + air",
-        "VWC does not give air volume"
+        "VWC alone gives no air figure"
       ],
       "focus": "remainder",
       "values": [
@@ -204,14 +204,14 @@
     "lesson": "A2",
     "scene": "A2-04",
     "paragraph": 2,
-    "text": "Do not read VWC like a fuel gauge showing how much usable fuel remains. Water in substrate is not all equally easy for roots to take up. Some is held more tightly. The same VWC in different substrates can mean different conditions for the plant.",
+    "text": "You might read VWC like a car's fuel gauge, as if sixty percent means sixty percent of the plant's water is left. It does not work that way. Some water sits loosely in the bigger spaces, and roots take it up readily. Some clings tightly in the smallest spaces, and roots struggle to pull it out. The water roots can actually use is called plant-available water. Substrates hold water differently, so the same VWC can mean different conditions for the plant.",
     "title": "VWC is not a fuel gauge",
     "visual": {
       "type": "comparison",
       "labels": [
         "Water volume in the sample",
-        "Water availability needs context",
-        "Not a time-to-water countdown"
+        "Not all water is usable",
+        "Not a fuel gauge"
       ],
       "asset": "assets/diagrams/a6-local-probe-r3.png",
       "alt": "One probe samples a local region, not every pot."
@@ -222,14 +222,14 @@
     "lesson": "A2",
     "scene": "A2-04",
     "paragraph": 3,
-    "text": "Look at the probe. Its position and contact with the substrate matter. Calibration means checking how its output relates to the quantity being measured. These things affect whether the local reading is trustworthy.",
-    "title": "The probe samples one region",
+    "text": "Look at the probe in the picture. It measures only the small region of substrate around it. Two things make its reading trustworthy. First, position and contact. The probe must sit firmly in the substrate with no gaps of air around it. Second, calibration. Calibration means checking the probe's number against a known amount of water, and correcting it if they differ. For example, a probe that shows sixty percent when the true value is fifty-five would mislead you every day.",
+    "title": "The probe measures one spot",
     "visual": {
       "type": "sensor",
       "labels": [
-        "Local sensing region",
-        "Other pots still need checking",
-        "Contact · calibration · location"
+        "Probe measures one small spot",
+        "Position and contact",
+        "Calibration"
       ],
       "asset": "assets/diagrams/a6-local-probe-r3.png",
       "alt": "One probe samples a local region, not every pot."
@@ -240,14 +240,14 @@
     "lesson": "A2",
     "scene": "A2-04",
     "paragraph": 4,
-    "text": "A probe near one dripper might not represent a dry pot at the end of a row. Later lessons explain how to select locations that represent the zone.",
-    "title": "Check beyond the nearest dripper",
+    "text": "Position matters across the zone too. Remember, a zone is a group of plants watered together. A probe in a pot close to where the water comes in may read wet. Meanwhile, a pot at the far end of the row is dry. Look at the two pots in the picture. Later lessons show how to choose probe positions that represent the whole zone.",
+    "title": "Other pots can differ",
     "visual": {
       "type": "sensor",
       "labels": [
-        "Probe near one dripper",
+        "Probe near the water supply",
         "A distant pot may be dry",
-        "Select representative locations"
+        "Choose representative spots"
       ],
       "asset": "assets/diagrams/a6-local-probe-r3.png",
       "alt": "One probe samples a local region, not every pot."
@@ -258,13 +258,13 @@
     "lesson": "A2",
     "scene": "A2-05",
     "paragraph": 0,
-    "text": "The sensor now shows forty percent VWC. Does this reading always mean that the substrate is too dry?",
+    "text": "Now apply what you know. A probe shows forty percent VWC. Look at the question on the screen. Does forty percent always mean the substrate is too dry and needs water? Decide before you go on.",
     "title": "Does 40% always mean too dry?",
     "visual": {
       "type": "question",
       "labels": [
         "40% VWC",
-        "Enough information to decide?"
+        "Enough to decide?"
       ]
     }
   },
@@ -273,14 +273,14 @@
     "lesson": "A2",
     "scene": "A2-05",
     "paragraph": 1,
-    "text": "No. Forty percent in one substrate can mean something different in another. Use your substrate, checked reference values, crop and current conditions to interpret it. There is no single VWC target for every system.",
-    "title": "A target needs local evidence",
+    "text": "No. Forty percent can mean different things in different substrates. Coco and stone wool hold water differently, so forty percent in one is not the same as forty percent in the other. The picture lists what you use to judge it: your substrate, readings you have checked against your own pots, your crop, and today's conditions. There is no single VWC target that suits every system.",
+    "title": "Judge it with local evidence",
     "visual": {
       "type": "evidence",
       "labels": [
-        "Substrate + validated references",
-        "Crop + current conditions",
-        "No universal VWC target"
+        "Substrate and checked readings",
+        "Crop and today's conditions",
+        "No single VWC target"
       ]
     }
   },
@@ -289,7 +289,7 @@
     "lesson": "A2",
     "scene": "A2-05",
     "paragraph": 2,
-    "text": "Do not select a target yet. Complete this sentence. Sixty percent VWC means what?",
+    "text": "Before you choose any target, make sure the meaning is clear. Look at the unfinished sentence on the screen. Sixty percent VWC means what? Say your answer in one sentence. Try to use the words water, volume and sample. Then continue and compare.",
     "title": "Explain 60% VWC",
     "visual": {
       "type": "recall",
@@ -304,8 +304,8 @@
     "lesson": "A2",
     "scene": "A2-05",
     "paragraph": 3,
-    "text": "Approximately sixty percent of the measured sample volume is water. This is one correct answer.",
-    "title": "60% of measured sample volume",
+    "text": "Here is one good answer. About sixty percent of the measured sample's volume is water. The picture shows it again: six of ten equal boxes are water. Six divided by ten, times one hundred, is sixty percent. If your sentence said the same thing in other words, you have it.",
+    "title": "60% of the sample's volume",
     "visual": {
       "type": "fraction",
       "labels": [
@@ -325,8 +325,8 @@
     "lesson": "A2",
     "scene": "A2-05",
     "paragraph": 4,
-    "text": "The reading does not give the exact water volume available to the plant. One sensor does not prove that all pots have the same conditions.",
-    "title": "Know what the reading cannot prove",
+    "text": "The picture shows two limits side by side. First, sixty percent is not the amount of plant-available water. Some of that water is held too tightly for roots to use. Second, one probe describes its own small spot, not every pot in the zone. Keep both limits in mind each time you read a VWC number.",
+    "title": "Two limits to remember",
     "visual": {
       "type": "comparison",
       "labels": [
@@ -340,13 +340,13 @@
     "lesson": "A2",
     "scene": "A2-05",
     "paragraph": 5,
-    "text": "Use these limits when you assess advice about VWC.",
-    "title": "Check the meaning of VWC advice",
+    "text": "You will hear plenty of advice about VWC from other growers and online. Use the two questions on the screen to test it. What does the number actually measure? And in which substrate and pot was it measured? Advice that answers both is advice you can compare with your own grow.",
+    "title": "Test any VWC advice",
     "visual": {
       "type": "check",
       "labels": [
         "What does the number measure?",
-        "What context supports it?"
+        "Which substrate and pot?"
       ]
     }
   },
@@ -355,14 +355,14 @@
     "lesson": "A2",
     "scene": "A2-05",
     "paragraph": 6,
-    "text": "Next, a kitchen sponge will help explain saturation, water left after drainage, and the reference number in the app.",
+    "text": "The next lesson uses a kitchen sponge. You will see what fully soaked means, which growers call saturation. You will see how much water stays after the extra drains away. And you will meet a reference number in the app, and learn why changing it adds no water.",
     "title": "Next: when is a pot full?",
     "visual": {
       "type": "next",
       "labels": [
         "Saturation",
-        "Drained container capacity",
-        "Configured reference"
+        "Water left after draining",
+        "A reference number in the app"
       ]
     }
   },
@@ -371,14 +371,14 @@
     "lesson": "A3",
     "scene": "A3-01",
     "paragraph": 0,
-    "text": "Dunk a kitchen sponge, then lift it out, dripping. Water fills the spaces inside it. Picture that as saturation.",
-    "title": "Dunk the sponge",
+    "text": "Last lesson, VWC was the share of a sample that is water. Now picture a kitchen sponge. Dunk it in a sink full of water, then lift it out. It drips. Look at the sponge on the screen. Water has filled the spaces inside it. Growers call this state saturation. Saturation means the pore spaces are filled with water.",
+    "title": "Dunk the sponge: saturation",
     "visual": {
       "type": "sponge",
       "focus": "wet",
       "labels": [
         "Water fills the spaces",
-        "Lift it out: dripping"
+        "Lifted out: dripping"
       ],
       "asset": "assets/diagrams/a3-sponge-states.png",
       "alt": "Let excess water drain without squeezing. Water remains and air returns to some spaces."
@@ -389,14 +389,14 @@
     "lesson": "A3",
     "scene": "A3-01",
     "paragraph": 1,
-    "text": "The sponge material has not vanished. In substrate, water also fills spaces between solids. Saturation does not mean one hundred percent of the total sample is water.",
+    "text": "Notice what has not changed. The sponge material is still there. Water filled the spaces, but it did not replace the solid parts. Substrate behaves the same way. When it is saturated, water fills the spaces between the solid pieces, and those pieces still take up room. So a saturated sample is below one hundred percent VWC. For example, if solids take up one fifth of the volume, water can fill at most eighty percent.",
     "title": "The solid material stays",
     "visual": {
       "type": "sponge",
       "focus": "wet",
       "labels": [
         "Water between solids",
-        "Not 100% water"
+        "Still not 100% water"
       ],
       "asset": "assets/diagrams/a3-sponge-states.png",
       "alt": "Let excess water drain without squeezing. Water remains and air returns to some spaces."
@@ -407,8 +407,8 @@
     "lesson": "A3",
     "scene": "A3-02",
     "paragraph": 0,
-    "text": "Hold the sponge over the sink. Do not squeeze it. Let the excess water drip away. It still feels wet, but some spaces now contain air again.",
-    "title": "Let excess water drip",
+    "text": "Now hold the sponge over the sink. Do not squeeze it. Let the extra water drip out on its own. After a while the dripping stops. Look at the sponge in the picture. It still feels wet, but some of its spaces now hold air again. Squeezing would force out water the sponge normally keeps, so you leave it alone.",
+    "title": "Let the extra water drip",
     "visual": {
       "type": "sponge",
       "focus": "drained",
@@ -425,14 +425,14 @@
     "lesson": "A3",
     "scene": "A3-02",
     "paragraph": 1,
-    "text": "Soaked and dripping, then wet after drainage: those are two different conditions. The same distinction matters in a pot, where roots need both water and oxygen.",
-    "title": "Two wet conditions",
+    "text": "The picture shows two different states side by side. One is soaked and dripping: saturation. The other is wet after draining: water held, with air back in some spaces. A pot goes through the same two states after a big watering. Roots need oxygen, so the second state, with some air, is the one that lets them breathe. Keep these two states separate in your mind.",
+    "title": "Two wet states",
     "visual": {
       "type": "sponge",
       "focus": "comparison",
       "labels": [
         "Soaked and dripping",
-        "Wet after drainage"
+        "Wet after draining"
       ],
       "asset": "assets/diagrams/a3-sponge-states.png",
       "alt": "Let excess water drain without squeezing. Water remains and air returns to some spaces."
@@ -443,8 +443,8 @@
     "lesson": "A3",
     "scene": "A3-03",
     "paragraph": 0,
-    "text": "Now wet a spare container of substrate. Let excess water drain using a suitable, repeatable check. Do not squeeze the substrate.",
-    "title": "Now check the container",
+    "text": "Now move from the sponge to a real pot. Take a spare container of substrate with no plant in it. Water it until it is saturated. Then let the extra water drain out of the bottom on its own. Do not press or squeeze the substrate. Look at the picture. It is the same idea as the sponge, now in a pot.",
+    "title": "Now drain a real pot",
     "visual": {
       "type": "sponge",
       "focus": "transfer",
@@ -461,8 +461,8 @@
     "lesson": "A3",
     "scene": "A3-03",
     "paragraph": 1,
-    "text": "The water left after that check is its container capacity: water held under those particular container and drainage conditions.",
-    "title": "Water left after the check",
+    "text": "When the draining stops, look at what is left. The cutaway shows water still held in the spaces, and air back in some of them. The amount of water the pot holds at that point has a name. Growers call it container capacity. It is the water your substrate holds in that container once the extra has drained away. It is lower than saturation.",
+    "title": "Water left: container capacity",
     "visual": {
       "type": "sponge",
       "focus": "drained",
@@ -479,13 +479,13 @@
     "lesson": "A3",
     "scene": "A3-03",
     "paragraph": 2,
-    "text": "Tall and shallow containers can retain different amounts. Substrate matters too. One sponge cannot tell you what every pot holds.",
+    "text": "Container capacity depends on the setup. A tall pot drains more water from its upper part than a short, wide pot of the same substrate. So two pots of the same coco can hold different amounts. Different substrates hold different amounts too. The two labels in the picture sum it up: the substrate and the container both matter. That is why you check your own pots rather than borrow someone else's number.",
     "title": "Your container matters",
     "visual": {
       "type": "sponge",
       "focus": "transfer",
       "labels": [
-        "Substrate + container height",
+        "Substrate and container height",
         "Check your own setup"
       ],
       "asset": "assets/diagrams/a3-pot-drainage.png",
@@ -497,14 +497,14 @@
     "lesson": "A3",
     "scene": "A3-03",
     "paragraph": 3,
-    "text": "This drainage check describes container capacity. The app also has a field capacity reference. Check how it is set: automatic updates can follow observed wet peaks. A wet peak alone is not a drained-container measurement.",
-    "title": "The program says field capacity",
+    "text": "Now the app. It needs numbers to compare readings against. Each one is called a reference value. One reference value is named field capacity. The name comes from farming in open fields, but in the app it stands for your container capacity. The picture shows the order: first the container check, then the number. The app can also update this number by itself from peaks. A peak is the highest reading, usually right after watering. Check which way yours is set.",
+    "title": "The app calls it field capacity",
     "visual": {
       "type": "sponge",
       "focus": "reference",
       "labels": [
         "Container check",
-        "Then a reference number"
+        "Then a number in the app"
       ]
     }
   },
@@ -513,14 +513,14 @@
     "lesson": "A3",
     "scene": "A3-03",
     "paragraph": 4,
-    "text": "Repeat with the same substrate, container, starting condition and drainage procedure. There is no single drainage time for every setup.",
+    "text": "To trust your container check, repeat it the same way each time. Use the same substrate, the same container, the same starting wetness and the same way of draining. There is no single drainage time that suits every setup, so write down how long you let it drain. If two repeats give close results, your method is working.",
     "title": "Repeat the same conditions",
     "visual": {
       "type": "sponge",
       "focus": "transfer",
       "labels": [
         "Same setup and procedure",
-        "No universal drainage time"
+        "No single drainage time"
       ],
       "asset": "assets/diagrams/a3-pot-drainage.png",
       "alt": "Conceptual container cutaway: excess water drains; water and air remain among solids."
@@ -531,14 +531,14 @@
     "lesson": "A3",
     "scene": "A3-03",
     "paragraph": 5,
-    "text": "Check probe placement and contact. Compare its reading with container weight and drainage. A number alone cannot show that the check worked.",
-    "title": "Compare reading and reality",
+    "text": "Then compare the probe with what you can see and weigh. Look at the probe in the picture. It must sit firmly in the substrate, in a sensible spot. Weigh the container when saturated, and again after draining. A litre of water weighs one kilogram. So a pot that is three hundred grams lighter lost about three hundred millilitres. A millilitre, written mL, is one thousandth of a litre. If plenty drained but the reading barely moved, check the probe's placement and contact.",
+    "title": "Compare the probe with the pot",
     "visual": {
       "type": "sponge",
       "focus": "transfer",
       "labels": [
-        "Probe placement + contact",
-        "Weight + visible drainage"
+        "Probe placement and contact",
+        "Weight and visible drainage"
       ],
       "asset": "assets/diagrams/a6-local-probe-r3.png",
       "alt": "Placement and contact matter; compare with appropriate independent evidence."
@@ -549,8 +549,8 @@
     "lesson": "A3",
     "scene": "A3-03",
     "paragraph": 6,
-    "text": "Example: a one litre total substrate sample contains six hundred millilitres of water. Six hundred divided by one thousand is sixty percent VWC: volumetric water content.",
-    "title": "A concrete VWC example",
+    "text": "Now a worked example. After draining, a one litre substrate sample holds six hundred millilitres of water. First put both in the same unit. One litre is one thousand millilitres. Six hundred divided by one thousand is zero point six. Times one hundred, that is sixty percent VWC. So in this example the container capacity is sixty percent. Your own pot may give a different number.",
+    "title": "A worked VWC example",
     "visual": {
       "type": "sponge",
       "focus": "volume",
@@ -565,7 +565,7 @@
     "lesson": "A3",
     "scene": "A3-04",
     "paragraph": 0,
-    "text": "Imagine writing that sixty percent on a Post-it beside the sponge. Changing the Post-it to seventy percent would not add a drop of water.",
+    "text": "Imagine writing sixty percent on a sticky note, a Post-it, and putting it beside the drained sponge. The note describes the sponge. Look at the picture: a wet sponge and its note. Now cross out sixty and write seventy. Has the sponge gained a single drop of water? No. Writing on the note changes the note, and nothing else.",
     "title": "The Post-it cannot wet it",
     "visual": {
       "type": "sponge",
@@ -583,13 +583,13 @@
     "lesson": "A3",
     "scene": "A3-04",
     "paragraph": 1,
-    "text": "The app reference works like that note. It tells the program which number to use. The edit itself adds no water.",
-    "title": "The app is a reference note",
+    "text": "The app works like that note. A value you type into the app is called a setting. The field capacity reference is one such setting. It tells the app which number to compare readings against. Look at the picture. The note now reads seventy, and the sponge is unchanged. Change the setting from sixty to seventy, and the pot holds the same water as before. The new number can change what the app does next, but the edit itself adds no water.",
+    "title": "A setting works like the note",
     "visual": {
       "type": "sponge",
       "focus": "reference",
       "labels": [
-        "Edit the app number",
+        "Edit the number in the app",
         "Water stays the same"
       ],
       "asset": "assets/diagrams/a3-setting-label-70-r3.png",
@@ -601,7 +601,7 @@
     "lesson": "A3",
     "scene": "A3-05",
     "paragraph": 0,
-    "text": "You change the app reference from sixty to seventy percent. What happens to the water already in the pot?",
+    "text": "Test the idea on a pot. You change the field capacity reference in the app from sixty to seventy percent. Look at the question on the screen. What happens to the water already in the pot at that moment?",
     "title": "Pause and think",
     "visual": {
       "type": "sponge",
@@ -617,7 +617,7 @@
     "lesson": "A3",
     "scene": "A3-05",
     "paragraph": 1,
-    "text": "Nothing. You changed the note, not the water. A physical change needs water to enter or leave.",
+    "text": "Nothing happens to the water. You changed the note, not the pot. The picture shows it: the note reads seventy, and the sponge is the same. For the water to change, water must physically enter the pot by watering. Or it must leave by drainage, evaporation or plant uptake. A changed setting can change what the app decides later, but it moves no water by itself.",
     "title": "Nothing happens to the water",
     "visual": {
       "type": "sponge",
@@ -635,7 +635,7 @@
     "lesson": "A3",
     "scene": "A3-05",
     "paragraph": 2,
-    "text": "And sixty percent was only our worked example. Your own container check could give a different result.",
+    "text": "Remember that sixty percent was a worked example. It came from six hundred millilitres in a one litre sample. Your own substrate and container may give fifty-two percent, or sixty-five. The picture puts the example beside a reminder: your pot needs its own check. Use the number from your own container check, not one from a lesson.",
     "title": "Example, not a target",
     "visual": {
       "type": "sponge",
@@ -651,14 +651,14 @@
     "lesson": "A3",
     "scene": "A3-05",
     "paragraph": 3,
-    "text": "The highest spike on a graph is not automatically the drained reference. It could be a brief wet peak or a bad reading.",
-    "title": "A peak is not a container check",
+    "text": "One more trap. Remember the peak, the highest reading, usually right after watering. At that moment the substrate is close to saturation and still draining. So the peak usually sits above container capacity. A single sharp spike can also be a faulty reading. Look at the two questions on the screen. Before you use any peak as your reference, compare it with your drained container check.",
+    "title": "A peak is not a drained check",
     "visual": {
       "type": "sponge",
       "focus": "wet",
       "labels": [
         "A brief wet peak?",
-        "Or a bad reading?"
+        "Or a faulty reading?"
       ]
     }
   },
@@ -667,14 +667,14 @@
     "lesson": "A3",
     "scene": "A3-05",
     "paragraph": 4,
-    "text": "Think back to the sponge: dripping wet, then wet after excess water drains, then a note describing it.",
+    "text": "Now bring it all together with the sponge. Picture three things in order. First, the sponge soaked and dripping. Second, the same sponge wet after the extra water drained away. Third, a note beside it with a number. The picture shows the first two. They are the sponge's real, physical states.",
     "title": "Remember the sponge",
     "visual": {
       "type": "sponge",
       "focus": "comparison",
       "labels": [
         "Soaked and dripping",
-        "Wet after drainage"
+        "Wet after draining"
       ],
       "asset": "assets/diagrams/a3-sponge-states.png",
       "alt": "Let excess water drain without squeezing. Water remains and air returns to some spaces."
@@ -685,13 +685,13 @@
     "lesson": "A3",
     "scene": "A3-05",
     "paragraph": 5,
-    "text": "The first two describe physical conditions. The note, like the app setting, describes a reference supported by a suitable check.",
-    "title": "Condition and description",
+    "text": "The note is different. It holds no water. It describes the sponge. In a pot, saturation and container capacity are physical states of the substrate. The field capacity reference is a setting in the app, like the note. It is useful when it comes from a careful container check. Look at the picture: the real sponge on one side, and the note on the other.",
+    "title": "Real state and the note",
     "visual": {
       "type": "sponge",
       "focus": "reference",
       "labels": [
-        "Physical wet sponge",
+        "Real wet sponge",
         "Reference note in the app"
       ],
       "asset": "assets/diagrams/a3-setting-label.png",
@@ -703,14 +703,14 @@
     "lesson": "A3",
     "scene": "A3-05",
     "paragraph": 6,
-    "text": "Next comes dryback: water content falls as water leaves. Keep the sponge and its Post-it separate mentally.",
+    "text": "In the next lesson the pot starts to dry. After watering, water leaves by plant uptake, evaporation and drainage, so the readings fall. You will learn two ways to measure that fall. As you go, keep the sponge and its note separate in your mind. One is the water. The other is a number about the water.",
     "title": "Next: water content falls",
     "visual": {
       "type": "sponge",
       "focus": "drained",
       "labels": [
         "Water leaves the substrate",
-        "That decrease is dryback"
+        "Next: measuring that fall"
       ]
     }
   },
@@ -719,13 +719,13 @@
     "lesson": "B1",
     "scene": "B1-01",
     "paragraph": 0,
-    "text": "Think of a car dashboard: the speedometer and fuel gauge share one panel, but tell you different things. This graph puts water content and EC on one screen. We will learn what each line means.",
-    "title": "Two gauges, one screen",
+    "text": "Think of a car dashboard. The speedometer and the fuel gauge sit on one panel, but each one tells you something different. A graph does the same job for the root zone. A graph is a picture of readings over time. Each reading becomes a point, and a line joins the points. This graph has two lines. The small key beside it, called the legend, tells you which line is which. The blue line is VWC, the water content you met in lesson A two. The orange line is EC, the conductivity you met in lesson A five.",
+    "title": "Two lines, one graph",
     "visual": {
       "type": "graph",
       "labels": [
-        "Blue: synthetic VWC",
-        "Orange: synthetic EC"
+        "Blue line: VWC",
+        "Orange line: EC"
       ],
       "focus": "all"
     }
@@ -735,13 +735,13 @@
     "lesson": "B1",
     "scene": "B1-01",
     "paragraph": 1,
-    "text": "Read time along the bottom, like a diary laid out from left to right. Farther right means later. The shaded section is night in this example. The sensors can keep measuring through it.",
-    "title": "Read time from left to right",
+    "text": "Now look along the bottom edge. This edge is the time axis. An axis is a ruler printed along one edge of a graph. Read time from left to right, like the pages of a diary. Moving right means later. For example, six in the morning sits to the left of noon, and noon sits to the left of six in the evening. The shaded band is night, when the lights in the grow room are off. The probes keep measuring through the night, so both lines carry on across the band. Next, you read the blue line against its own ruler.",
+    "title": "Time runs left to right",
     "visual": {
       "type": "graph",
       "labels": [
-        "Later times → right",
-        "Shaded night: measurement continues"
+        "Bottom axis: time, later →",
+        "Shaded band: night"
       ],
       "focus": "time"
     }
@@ -751,13 +751,13 @@
     "lesson": "B1",
     "scene": "B1-02",
     "paragraph": 0,
-    "text": "Start with the blue line: VWC, or water content by volume. Read its height against the percentage scale on the left. Use the time below to find when that reading happened.",
-    "title": "VWC uses the left scale",
+    "text": "The blue VWC line has its own ruler on the left edge. This left axis is marked in percent. Its scale, the spacing of the numbers, might run from thirty percent at the bottom to seventy percent at the top. To read the line, pick one point on it. Look straight across to the left axis to read its value. Then look straight down to the time axis to see when it was measured.",
+    "title": "VWC uses the left axis",
     "visual": {
       "type": "graph",
       "labels": [
         "Left axis: VWC in %",
-        "Blue: synthetic observations"
+        "Across for value, down for time"
       ],
       "focus": "vwc"
     }
@@ -767,13 +767,13 @@
     "lesson": "B1",
     "scene": "B1-02",
     "paragraph": 1,
-    "text": "At this example point, the reading is sixty percent VWC. The solid line joins the observations so you can follow the change over time.",
-    "title": "Read the point at its time",
+    "text": "Try it at the marked point. Straight across, the left axis reads sixty percent. So at that moment, sixty percent of the sampled volume was water. The line here is solid because it joins real readings from the probe. Growers call this the measured line.",
+    "title": "Read one point: 60% VWC",
     "visual": {
       "type": "graph",
       "labels": [
         "Example point: 60% VWC",
-        "Solid line connects observations"
+        "Solid line: measured readings"
       ],
       "focus": "vwc"
     }
@@ -783,14 +783,14 @@
     "lesson": "B1",
     "scene": "B1-02",
     "paragraph": 2,
-    "text": "A stale weather report cannot tell you the weather now. Check the age of live readings and look for missing sections. A smooth-looking line does not prove fresh, complete measurements.",
-    "title": "Check reading age and gaps",
+    "text": "A smooth line can still be old. Lesson A six showed that every reading has an age, the time since the probe last reported. Before you trust the line, make three checks. Confirm which probe drew it. Read the time of its last reading. Look for gaps where readings are missing. If the last reading is four hours old, the line describes four hours ago. To know about now, you need a fresh reading.",
+    "title": "Check the line is fresh",
     "visual": {
       "type": "evidence",
       "labels": [
-        "Identify the sensor",
-        "Check reading timestamp",
-        "Look for missing readings"
+        "Which probe drew it?",
+        "When was its last reading?",
+        "Any gaps in the line?"
       ]
     }
   },
@@ -799,13 +799,13 @@
     "lesson": "B1",
     "scene": "B1-03",
     "paragraph": 0,
-    "text": "Imagine a tiny electrical test through a sample. Dissolved salts help carry the current. EC, electrical conductivity, measures how readily current passes. Read EC on the right-hand scale, in millisiemens per centimetre.",
-    "title": "EC: how readily current passes",
+    "text": "Remember the salted water from lesson A five. More dissolved salt lets electrical current pass more easily, and EC measures how easily it passes. The orange EC line uses a second ruler on the right edge, called the right axis. It is marked in millisiemens per centimetre, written mS slash cm. Read an orange point by looking straight across to the right axis, never the left.",
+    "title": "EC uses the right axis",
     "visual": {
       "type": "graph",
       "focus": "ec",
       "labels": [
-        "Dissolved salts help carry current",
+        "EC: how easily current passes",
         "Right axis: EC in mS/cm"
       ]
     }
@@ -815,14 +815,14 @@
     "lesson": "B1",
     "scene": "B1-03",
     "paragraph": 1,
-    "text": "Before interpreting EC, ask where it was measured. A number from the tank does not automatically describe the water around the roots.",
-    "title": "Which EC measurement is shown?",
+    "text": "Next, ask where this EC came from. A line on a graph is only as good as the device behind it. Follow the orange line back to the probe that supplied it. A reading from the supply tank describes the solution before it reaches the plants. To learn about the water around the roots, you need a probe in the root zone.",
+    "title": "Trace the EC line to its probe",
     "visual": {
       "type": "mapping",
       "labels": [
-        "Graph EC series",
-        "Assigned sensor entity",
-        "Verify measurement identity"
+        "Orange EC line",
+        "The probe that feeds it",
+        "Where does it measure?"
       ],
       "focus": "flow"
     }
@@ -832,13 +832,13 @@
     "lesson": "B1",
     "scene": "B1-03",
     "paragraph": 2,
-    "text": "Feed EC describes the irrigation solution. Bulk substrate EC measures the combined substrate region. Pore-water EC describes water in the spaces between solids. These are different measurements; identify which one your graph actually shows.",
-    "title": "Where was EC measured?",
+    "text": "Lesson A five gave you three names. Feed EC is measured on the solution you supply from the tank. Bulk EC is measured by a probe in the wet substrate, across the whole mix around it. Pore-water EC describes only the water in the spaces between the solid pieces. Check the line's name in the legend to see which one your graph shows.",
+    "title": "Feed, bulk or pore-water EC?",
     "visual": {
       "type": "comparison",
       "labels": [
-        "Feed: irrigation solution",
-        "Bulk: substrate region",
+        "Feed: the tank solution",
+        "Bulk: the substrate mix",
         "Pore water: between solids"
       ]
     }
@@ -848,13 +848,13 @@
     "lesson": "B1",
     "scene": "B1-03",
     "paragraph": 3,
-    "text": "Now the two lines cross on screen. Think of the speedometer needle and fuel-gauge needle pointing the same way. Would that make speed equal fuel? Do crossing VWC and EC lines mean equal measurements?",
-    "title": "Crossing lines: equal measurements?",
+    "text": "Now look where the blue and orange lines cross. Picture the speedometer needle and the fuel needle pointing the same way. Would that mean your speed equals your fuel? Ask the same question here. Does a crossing mean VWC and EC are equal?",
+    "title": "The lines cross. Equal values?",
     "visual": {
       "type": "graph",
       "labels": [
-        "The lines cross on screen",
-        "Are the measured values equal?"
+        "The lines cross here",
+        "Are the values equal?"
       ],
       "focus": "ec"
     }
@@ -864,13 +864,13 @@
     "lesson": "B1",
     "scene": "B1-03",
     "paragraph": 4,
-    "text": "No. One uses percent on the left; the other uses conductivity units on the right. Their screen positions depend on those scales. Follow how each measurement changes over time.",
-    "title": "Different units, different scales",
+    "text": "No. Each line is drawn against its own ruler. At the crossing, the blue line might read fifty percent on the left axis. The orange line might read two point five mS slash cm on the right axis. They meet on the screen only because of how the two rulers are spaced. Read each line on its own axis, and follow how each one changes over time.",
+    "title": "Each line has its own ruler",
     "visual": {
       "type": "graph",
       "labels": [
-        "VWC: percent on the left",
-        "EC: mS/cm on the right"
+        "VWC: percent, left axis",
+        "EC: mS/cm, right axis"
       ],
       "focus": "ec"
     }
@@ -880,14 +880,14 @@
     "lesson": "B1",
     "scene": "B1-03",
     "paragraph": 5,
-    "text": "Subtracting EC from VWC would be like subtracting litres from kilometres per hour. The quantities and units do not match. EC alone is not a complete nutrient recipe either.",
-    "title": "Do not subtract unlike units",
+    "text": "So never subtract one line from the other. Taking EC away from VWC is like taking litres away from kilometres per hour. The two numbers measure different things in different units, so the answer means nothing. Compare VWC with VWC, and EC with EC. Next, you add the moments when water was given.",
+    "title": "Compare like with like",
     "visual": {
       "type": "comparison",
       "labels": [
         "VWC: %",
         "EC: mS/cm",
-        "Subtraction is not meaningful"
+        "Do not subtract them"
       ]
     }
   },
@@ -896,13 +896,13 @@
     "lesson": "B1",
     "scene": "B1-04",
     "paragraph": 0,
-    "text": "On this teaching chart, delivery markers show when watering started. In the app, a dot marks a shot start; a ring marks a shot the watering software held. Neither alone measures water delivered. VWC may rise after water reaches the probe, then fall between deliveries.",
-    "title": "Find the irrigation event markers",
+    "text": "One watering, from start to stop, is called a shot. Each shot appears on the graph as a small mark at its start time, called an event marker. The decision to water comes from the Controller, the part of Crop Steering that decides when to water. Lesson C one explains it fully. In the app, a filled dot marks a shot that started. A ring marks a shot the Controller held back. After a dot, look for the blue line to step up as water reaches the probe. Between shots, the line slopes down again.",
+    "title": "Find the shots",
     "visual": {
       "type": "graph",
       "labels": [
-        "Markers: irrigation events",
-        "Water reaches the probe, then VWC rises"
+        "Dot: a shot started",
+        "Ring: a shot held back"
       ],
       "focus": "events"
     }
@@ -912,13 +912,13 @@
     "lesson": "B1",
     "scene": "B1-04",
     "paragraph": 1,
-    "text": "EC does not have to mirror VWC. Delivery, mixing, drainage, temperature, measurement method and crop conditions can affect it. Seeing two changes together does not prove that one caused the other.",
-    "title": "EC has several influences",
+    "text": "The orange line does not have to move with the blue one. After a shot, EC can rise, fall or stay level. Mixing in the substrate, drainage, temperature and the plant all affect it. So when the two lines change together, treat it as a clue to check, rather than a cause you have found.",
+    "title": "EC follows its own path",
     "visual": {
       "type": "graph",
       "labels": [
-        "EC need not mirror VWC",
-        "Delivery · mixing · drainage · temperature"
+        "EC need not copy VWC",
+        "Mixing, drainage, temperature"
       ],
       "focus": "ec"
     }
@@ -928,13 +928,13 @@
     "lesson": "B1",
     "scene": "B1-04",
     "paragraph": 2,
-    "text": "Think of a journey plan beside the trip you actually drove. The dashed planning reference comes from software settings. The measured line shows observations. They need different labels even if they happen to follow the same path.",
-    "title": "The journey plan and the actual trip",
+    "text": "Think of a journey plan beside the trip you actually drove. The graph can show both. The dashed line is the planning reference: the path the app's settings aim for. The solid line is the measured line: what the probe recorded. For example, the plan might say sixty percent at noon while the probe read fifty-eight. Each line shows its own number. Keep the two apart, even where they overlap.",
+    "title": "Plan dashed, measured solid",
     "visual": {
       "type": "graph",
       "labels": [
-        "Solid: synthetic observations",
-        "Dashed: software planning references"
+        "Solid: what the probe measured",
+        "Dashed: what the settings plan"
       ],
       "focus": "reference"
     }
@@ -944,13 +944,13 @@
     "lesson": "B1",
     "scene": "B1-05",
     "paragraph": 0,
-    "text": "Follow the planning line through the shaded night to the next morning. Like a route drawn on a map, it should be readable across the whole journey. A continuous line is still only a reference, not proof of tomorrow's crop response.",
-    "title": "The reference continues through night",
+    "text": "Follow the dashed planning line into the shaded night. It keeps going to the next morning, like a route on a map that covers the whole journey. This lets you see the plan for a full day and night in one view. The dashed line shows what the settings plan. Tomorrow, the solid line will show what really happened.",
+    "title": "The plan runs through the night",
     "visual": {
       "type": "graph",
       "labels": [
-        "Continuous planning reference",
-        "Continuity does not prove prediction"
+        "Dashed plan continues overnight",
+        "Solid line: what happened"
       ],
       "focus": "night"
     }
@@ -960,13 +960,13 @@
     "lesson": "B1",
     "scene": "B1-05",
     "paragraph": 1,
-    "text": "Here the EC reference joins the last daytime reference to the next morning reference. The overnight phase is called P3. This join is not a separately scheduled P3 EC target, and it does not calculate how salts will behave overnight.",
-    "title": "Overnight EC is a reference connection",
+    "text": "The dashed orange EC line does something simpler at night. The app sets no separate EC aim for the night. Instead, it draws a straight join from the last daytime EC value in the plan to the next morning's value. For example, it might join two point eight in the evening to three point zero the next morning. Read that join as a link between two settings, not a prediction of salts.",
+    "title": "Night EC: a straight join",
     "visual": {
       "type": "graph",
       "labels": [
-        "EC reference joins day to morning",
-        "No separately scheduled P3 EC target"
+        "EC plan joins day to morning",
+        "No separate night EC target"
       ],
       "focus": "night"
     }
@@ -976,13 +976,13 @@
     "lesson": "B1",
     "scene": "B1-05",
     "paragraph": 2,
-    "text": "Now watch this demo edit. We increase the P3 emergency VWC threshold in the local draft. The draft threshold changes from thirty-five percent to thirty-nine percent. The saved threshold remains visible for comparison. The measured example readings remain the same.",
-    "title": "Move only the draft threshold",
+    "text": "Now a new idea. A threshold is a trigger line: when the reading crosses it, the Controller may act. This graph has a night-time emergency threshold for VWC. If the root zone dries below it overnight, the Controller may give a protective shot. Watch a practice edit in the demo. The draft threshold changes from thirty-five percent to thirty-nine percent, a rise of four percentage points. A draft is a proposed change that is not saved yet. The saved line at thirty-five percent stays on screen for comparison. The measured blue line does not move at all.",
+    "title": "Drag a draft threshold",
     "visual": {
       "type": "graph",
       "labels": [
-        "Saved 35% → local draft 39%",
-        "Synthetic readings stay unchanged"
+        "Saved 35% → draft 39%",
+        "Measured line stays put"
       ],
       "focus": "draft",
       "values": [
@@ -996,14 +996,14 @@
     "lesson": "B1",
     "scene": "B1-06",
     "paragraph": 0,
-    "text": "Which item changed? The previous water content? The local draft of a threshold? Or a guaranteed irrigation event?",
+    "text": "Test yourself. After that edit, one thing changed. Was it the past water content, the draft threshold, or a shot booked for tonight?",
     "title": "Which item changed?",
     "visual": {
       "type": "question",
       "labels": [
-        "Previous water content?",
-        "Local draft threshold?",
-        "Guaranteed irrigation event?"
+        "The past water content?",
+        "The draft threshold?",
+        "A shot booked for tonight?"
       ]
     }
   },
@@ -1012,15 +1012,15 @@
     "lesson": "B1",
     "scene": "B1-06",
     "paragraph": 1,
-    "text": "Only the local draft changed. Think of a fridge alarm limit: it marks an exceptional condition, not the normal temperature you aim for. This emergency water threshold is not a normal overnight target. Review and apply are separate actions; the watering software, called the Controller, still checks its conditions and protection rules before irrigation.",
-    "title": "An alarm limit is not a normal target",
+    "text": "Only the draft threshold changed. A draft stays on your screen until you save it. Saving is a separate step that sends the value to the system. Even a saved threshold books no shot. Think of a fridge alarm limit: it marks trouble, not the temperature you aim for. The Controller checks its readings and safety rules each time before it waters.",
+    "title": "Only the draft changed",
     "visual": {
       "type": "process",
       "focus": "flow",
       "labels": [
-        "Draft → review → apply",
-        "Emergency limit ≠ normal target",
-        "Controller checks conditions"
+        "Draft → save → in use",
+        "Alarm line, not a goal",
+        "Controller checks first"
       ]
     }
   },
@@ -1029,13 +1029,13 @@
     "lesson": "B1",
     "scene": "B1-06",
     "paragraph": 2,
-    "text": "Point to the time axis. Point to the VWC scale. Point to the EC scale. Identify one irrigation marker. Identify one planning reference. Find the reading age.",
+    "text": "Now read the whole graph in one pass. Point to the time axis. Point to the left VWC axis and the right EC axis. Find one shot marker. Find the dashed planning line. Then find the time of the last reading, so you know its age.",
     "title": "Read the whole graph",
     "visual": {
       "type": "graph",
       "labels": [
-        "Find time · VWC · EC",
-        "Find event · reference · reading age"
+        "Time · VWC axis · EC axis",
+        "Shot · plan line · reading age"
       ],
       "focus": "recall"
     }
@@ -1045,8 +1045,8 @@
     "lesson": "B1",
     "scene": "B1-06",
     "paragraph": 3,
-    "text": "The next lesson explains the irrigation phases from P0 to P3.",
-    "title": "Next: irrigation phases",
+    "text": "In the next lesson, you split the watering day into four parts, labelled P zero to P three.",
+    "title": "Next: four parts of the day",
     "visual": {
       "type": "next",
       "labels": [
@@ -1062,13 +1062,13 @@
     "lesson": "C1",
     "scene": "C1-01",
     "paragraph": 0,
-    "text": "Start with one zone: plants whose water delivery is controlled together. Prove that small system works before expanding.",
+    "text": "In lesson A one you met the zone. It is a group of plants that get their water together, through one pipe and one on and off control. This lesson plans the equipment for one zone. Look at the single zone on this card. You build that one zone first and prove it waters correctly. Only then do you add a second. A mistake in a small system costs one zone, not a whole room.",
     "title": "Start with one zone",
     "visual": {
       "type": "equipment",
       "labels": [
-        "One zone",
-        "Verify before expanding"
+        "One zone first",
+        "Prove it, then add more"
       ]
     }
   },
@@ -1077,16 +1077,16 @@
     "lesson": "C1",
     "scene": "C1-01",
     "paragraph": 1,
-    "text": "Think of watering by hand: you need somewhere to make the plan, a way to check wetness, a water supply, a way to start and stop it, and checks against mistakes. An automated system needs those same five functions.",
+    "text": "Now picture watering by hand. You decide when and how much. You push a finger into the pot to feel how wet it is. You fill a watering can. You tip it, then stop. And you keep a towel handy for spills. An automatic system needs the same five jobs. This course calls them plan, measure, supply, switch and protect. The five labels on this card name them, and the rest of this lesson takes them one at a time.",
     "title": "Five jobs, as with hand watering",
     "visual": {
       "type": "equipment",
       "labels": [
         "Plan",
         "Measure",
-        "Deliver",
-        "Control",
-        "Protect + verify"
+        "Supply",
+        "Switch",
+        "Protect"
       ]
     }
   },
@@ -1095,13 +1095,13 @@
     "lesson": "C1",
     "scene": "C1-02",
     "paragraph": 0,
-    "text": "Every app needs a computer to run on. Here that computer is called the host. Choose one supported route: a Raspberry Pi, or a dedicated Intel NUC or other x86-64 computer. You only need one.",
-    "title": "Host means the computer",
+    "text": "Start with the plan job. It needs a computer that stays switched on day and night. On that computer runs Home Assistant: free home-automation software that collects readings from sensors and switches equipment on and off. The computer that runs it is called the host. This card shows the two kinds of host the course supports. One is a Raspberry Pi, a small, low-cost computer about the size of a credit card. The other is a small PC with an Intel or AMD processor, the chip design most desktop computers use, known as x eighty-six sixty-four. You need only one.",
+    "title": "The host runs Home Assistant",
     "visual": {
       "type": "host",
       "labels": [
         "Raspberry Pi",
-        "OR supported x86-64",
+        "OR a small x86-64 PC",
         "One host is enough"
       ],
       "asset": "assets/diagrams/c2-host-choice-r3.png",
@@ -1113,14 +1113,14 @@
     "lesson": "C1",
     "scene": "C1-02",
     "paragraph": 1,
-    "text": "Like any computer, the host needs the correct power supply, suitable storage for its software and data, and a reliable network connection.",
-    "title": "Provide the host essentials",
+    "text": "Like a laptop, the host needs three basics, listed on this card. It needs the correct power supply, because a weak charger can make it restart at random. It needs suitable storage: the memory card or disk that holds its software and saved data. And it needs a reliable network connection to your router, the box that links your devices to each other and to the internet. The host lessons name the exact parts.",
+    "title": "Give the host the basics",
     "visual": {
       "type": "host",
       "labels": [
         "Correct power supply",
         "Suitable storage",
-        "Reliable network"
+        "Reliable network link"
       ],
       "asset": "assets/diagrams/c2-host-choice-r3.png",
       "alt": "Pi OR dedicated x86-64: alternative host routes."
@@ -1131,13 +1131,13 @@
     "lesson": "C1",
     "scene": "C1-02",
     "paragraph": 2,
-    "text": "The two host lessons are alternative routes to the same starting point. Follow the one for your chosen computer.",
+    "text": "Setup has two alternative host lessons. Lesson C two A installs Home Assistant on a Raspberry Pi. Lesson C two B installs it on an x eighty-six sixty-four PC. As the card shows, both arrive at the same place: Home Assistant running and ready for the next step. Follow the lesson that matches your computer and skip the other. If someone else built the system and you only run it, you skip setup and go straight to the daily-use lessons.",
     "title": "Two routes, one host choice",
     "visual": {
       "type": "host",
       "labels": [
-        "Raspberry Pi route",
-        "OR x86-64 route"
+        "C2a: Raspberry Pi route",
+        "OR C2b: x86-64 PC route"
       ],
       "asset": "assets/diagrams/c2-host-choice-r3.png",
       "alt": "Pi OR dedicated x86-64: alternative host routes."
@@ -1148,14 +1148,14 @@
     "lesson": "C1",
     "scene": "C1-02",
     "paragraph": 3,
-    "text": "Think of labels on a switchboard: one label identifies a reading or a control. Home Assistant calls these named items entities. Crop Steering uses those entities. You need both the Crop Steering integration and the separate Controller app; a dashboard display alone cannot run irrigation. The integration holds room settings and the workspace. The Controller reads those settings and decides when to water.",
-    "title": "Entities are named readings or controls",
+    "text": "Inside Home Assistant, every reading and every control gets its own name tag, like the labels on a switchboard. One tag might be a moisture reading. Another might be the on and off control for the water. Home Assistant calls each named reading or control an entity. Crop Steering joins Home Assistant through an integration: a package that teaches Home Assistant a new job. The integration stores your room settings and shows the Crop Steering screens. The Controller, the watering software from lesson B one, is a separate program. It reads those settings and entities and decides when to water. Follow the path on this card from entity to integration to Controller. You need both Crop Steering parts.",
+    "title": "Entities, integration, Controller",
     "visual": {
       "type": "mapping",
       "labels": [
-        "Home Assistant entities",
-        "Crop Steering integration",
-        "Separate Controller app"
+        "Entity: one named reading",
+        "Integration: settings + screens",
+        "Controller: decides when"
       ],
       "focus": "flow",
       "asset": "assets/diagrams/c1-data-path-r3.png",
@@ -1167,14 +1167,14 @@
     "lesson": "C1",
     "scene": "C1-02",
     "paragraph": 4,
-    "text": "The moisture probe is the system's local wetness check. Choose a model suitable for the substrate and a position that represents the zone. Verify its exact model, connection interface and units, rather than buying on appearance.",
-    "title": "Verify the moisture measurement path",
+    "text": "Now the measure job. Lesson A one introduced the probe, a device that measures one small spot. The moisture probe is your system's wetness check, so choose it with care. Pick a model made for your substrate. Place it in a pot that behaves like the rest of the zone. Before buying, check the maker's specification for the three items on this card. They are the exact model, its connection type, meaning how it sends readings, and the units it reports.",
+    "title": "Choose the moisture probe",
     "visual": {
       "type": "sensor",
       "labels": [
-        "Representative probe location",
-        "One probe cannot prove every pot",
-        "Model · interface · units"
+        "A pot typical of the zone",
+        "Check model, connection, units",
+        "Suits your substrate"
       ],
       "asset": "assets/diagrams/c1-data-path-r3.png",
       "alt": "Conceptual information path from sensors through a compatible interface and Home Assistant to Crop Steering."
@@ -1185,13 +1185,13 @@
     "lesson": "C1",
     "scene": "C1-02",
     "paragraph": 5,
-    "text": "Some probes need a bridge: equipment that translates their connection into one the system can use. Matching wire colours do not prove compatibility. One working probe cannot prove equal delivery to every pot.",
-    "title": "A bridge translates the connection",
+    "text": "Some probes send their readings in a wiring language that Home Assistant cannot read on its own. They need a bridge: a small box that translates the probe's signal into one Home Assistant understands. Follow the card from the probe, through the bridge, to a Home Assistant entity. Confirm compatibility from the maker's list of supported probes for that exact bridge, rather than from matching wire colours.",
+    "title": "A bridge translates the signal",
     "visual": {
       "type": "mapping",
       "labels": [
         "Probe",
-        "Compatible bridge if needed",
+        "Bridge, if needed",
         "Home Assistant entity"
       ],
       "focus": "flow",
@@ -1204,14 +1204,14 @@
     "lesson": "C1",
     "scene": "C1-02",
     "paragraph": 6,
-    "text": "EC needs a location label too. Bulk substrate EC describes a measurement through the substrate region; pore-water EC describes the water between solids. Feed EC describes the solution supplied to the crop. Check what the sensor actually measures.",
-    "title": "Identify the root-zone EC method",
+    "text": "EC readings need a location label too. Lesson A five named several kinds of EC, and this card compares three of them. Feed EC measures the nutrient solution in the tank. Bulk EC measures the wet substrate as a whole, water and solid together. Pore-water EC describes the water held in the pore spaces between the pieces of substrate, and it is usually estimated from bulk EC. When you choose an EC probe, read which of these it actually reports.",
+    "title": "Know which EC you measure",
     "visual": {
       "type": "comparison",
       "labels": [
-        "Bulk substrate EC",
-        "Pore-water EC",
-        "Feed EC is a different measurement"
+        "Bulk EC: substrate as a whole",
+        "Pore-water EC: water in pores",
+        "Feed EC: solution in the tank"
       ]
     }
   },
@@ -1220,8 +1220,8 @@
     "lesson": "C1",
     "scene": "C1-02",
     "paragraph": 7,
-    "text": "A tank reading stays a tank reading when you rename its label. Calling feed EC root-zone EC cannot move the measurement into the pot.",
-    "title": "Changing a label cannot move a reading",
+    "text": "A reading belongs to the place where its sensor sits. The card shows a tank sensor and a root-zone sensor side by side. Suppose you rename the tank sensor's reading root-zone EC. It still measures the tank, because the name changed and the sensor did not move. Keep every label true to where its sensor really is, so later decisions use the right number.",
+    "title": "A new name cannot move a sensor",
     "visual": {
       "type": "comparison",
       "labels": [
@@ -1235,14 +1235,14 @@
     "lesson": "C1",
     "scene": "C1-02",
     "paragraph": 8,
-    "text": "Air temperature and humidity help explain changing water demand, just as laundry dries differently on a hot, dry day than a cool, damp one.",
-    "title": "Environment informs water demand",
+    "text": "Air readings complete the measure job. Two readings help explain why plants drink more on some days. One is air temperature. The other is relative humidity: how much moisture the air holds, compared with the most it could hold. Think of washing on a line. It dries fast on a hot, dry day and slowly on a cool, damp one. The card shows both readings feeding into water demand. Next comes the supply job: how water reaches the pots.",
+    "title": "Air readings explain demand",
     "visual": {
       "type": "environment",
       "labels": [
         "Air temperature",
         "Relative humidity",
-        "Water-demand context"
+        "Explain water demand"
       ]
     }
   },
@@ -1251,14 +1251,14 @@
     "lesson": "C1",
     "scene": "C1-03",
     "paragraph": 0,
-    "text": "Trace water from its source, as you would trace a garden hose. A suitable pressurised supply may feed a zone valve directly. A reservoir needs a pump if it cannot provide the required pressure.",
-    "title": "Choose the actual supply route",
+    "text": "Trace the water from where it starts, the way you would follow a garden hose back to the tap. Each zone has a zone valve: a tap that opens and closes when it receives an electrical signal. Water needs pressure, meaning push, to flow out of the drippers. A pressurised supply, such as a building's water pipe, may have enough push to feed the zone valve directly. A tank of stored water usually does not. It needs a pump: a motor-driven device that pushes water along the pipe. The card shows both routes.",
+    "title": "Two ways water reaches the valve",
     "visual": {
       "type": "water-path",
       "labels": [
-        "Pressurized supply → zone valve",
-        "OR reservoir → pump → zone valve",
-        "Pump only when pressure requires it"
+        "Pressurised supply → zone valve",
+        "OR tank → pump → zone valve",
+        "Pump only if push is needed"
       ],
       "asset": "assets/diagrams/c1-water-path-r3.png",
       "alt": "An example irrigation path. Draw and verify the components actually installed in your setup."
@@ -1269,13 +1269,13 @@
     "lesson": "C1",
     "scene": "C1-03",
     "paragraph": 1,
-    "text": "Do not add a pump just because a diagram has one. If your water path requires a pump, include that pump and the protection suited to it.",
-    "title": "Include the required pump protection",
+    "text": "Many diagrams show a pump, but you add one only when your supply needs the extra push. If your route does need a pump, it also needs protection made for that pump. For example, dry-run protection switches the pump off when the tank runs empty, because a pump running without water can overheat and fail. The card pairs the pump with its protection, and the pump maker's instructions list exactly what it requires.",
+    "title": "A pump brings its own protection",
     "visual": {
       "type": "protection",
       "labels": [
-        "Pump, if required",
-        "Protection suited to that pump"
+        "Pump, only if needed",
+        "Protection made for that pump"
       ],
       "asset": "assets/diagrams/c1-water-path-r3.png",
       "alt": "An example irrigation path. Draw and verify the components actually installed in your setup."
@@ -1286,14 +1286,14 @@
     "lesson": "C1",
     "scene": "C1-03",
     "paragraph": 2,
-    "text": "Follow the whole path: filtration, pressure regulation, drainage, and protection against reverse flow or unwanted siphoning. These must suit the actual equipment and meet applicable local requirements.",
-    "title": "Design the complete water path",
+    "text": "Now follow the rest of the path on the card. A filter catches grit that would block the drippers. A pressure regulator holds the push steady, so each dripper delivers its rated flow. A drainage path carries runoff away. Backflow protection stops water running backwards into the supply. Siphon protection stops water draining out of the tank by itself through the pipe after the pump stops. A qualified plumber confirms these parts suit your equipment and your local rules.",
+    "title": "Filter, regulator, drain, backflow",
     "visual": {
       "type": "water-path",
       "labels": [
-        "Filtration + pressure regulation",
-        "Drainage + backflow/siphon protection",
-        "Suit equipment + local requirements"
+        "Filter + pressure regulator",
+        "Drainage path",
+        "Backflow + siphon protection"
       ],
       "asset": "assets/diagrams/c1-water-path-r3.png",
       "alt": "An example irrigation path. Draw and verify the components actually installed in your setup."
@@ -1304,14 +1304,14 @@
     "lesson": "C1",
     "scene": "C1-04",
     "paragraph": 0,
-    "text": "Starting a pump can demand more power than keeping it running, like the extra push needed to get a loaded trolley moving. Control hardware needs suitable starting and operating ratings and correct installation. A household smart plug's large printed rating alone does not prove suitability.",
+    "text": "Now the switch job. Control hardware is the device that turns a pump or valve on and off when the software asks. A relay is a common example: a switch operated by an electrical signal. A pump draws a burst of extra power for a moment as it starts, like the extra shove needed to get a loaded trolley rolling. That burst is called the starting load. As the card shows, choose control hardware rated for both the starting load and the running load. The big number printed on a household smart plug often describes simpler loads, such as heaters, so check its rating for motors.",
     "title": "Control hardware must suit the load",
     "visual": {
       "type": "controls",
       "labels": [
-        "Starting load + operating load",
-        "Correct ratings + installation",
-        "Smart-plug rating alone is insufficient"
+        "Starting load + running load",
+        "Rated for both loads",
+        "Check plug ratings for motors"
       ]
     }
   },
@@ -1320,12 +1320,12 @@
     "lesson": "C1",
     "scene": "C1-04",
     "paragraph": 1,
-    "text": "Use an appropriately qualified installer for electrical work. Do not do mains electrical work as part of this course.",
-    "title": "Electrical work needs an installer",
+    "text": "Mains electricity is the high-voltage supply behind your wall sockets and switchboard, and wiring it wrongly can kill. A licensed electrician does any mains wiring for your system. This course never asks you to open or wire mains equipment, as the card reminds you. Your part is to plan, label and check.",
+    "title": "An electrician does mains wiring",
     "visual": {
       "type": "protection",
       "labels": [
-        "Appropriately qualified installer",
+        "Licensed electrician wires mains",
         "No mains work in this course"
       ]
     }
@@ -1335,14 +1335,14 @@
     "lesson": "C1",
     "scene": "C1-04",
     "paragraph": 2,
-    "text": "Two people turning the same tap can defeat each other's instructions. Give each physical pump or valve one controller. An old irrigation system must not also operate that output.",
-    "title": "One tap, one controller",
+    "text": "Two people turning the same tap send mixed instructions: one opens it while the other closes it. Equipment works the same way. An output is anything the system switches, such as a pump or a valve. Give each output exactly one owner, meaning the one system allowed to switch it. The card shows one owner linked to one output. An old irrigation timer must not also switch that output.",
+    "title": "One output, one owner",
     "visual": {
       "type": "mapping",
       "labels": [
-        "One controller",
-        "One physical pump or valve",
-        "Remove competing control"
+        "One owner",
+        "One pump or valve",
+        "Disconnect the old timer"
       ],
       "focus": "flow",
       "asset": "assets/diagrams/c7-one-owner-r3.png",
@@ -1354,14 +1354,14 @@
     "lesson": "C1",
     "scene": "C1-04",
     "paragraph": 3,
-    "text": "Find and resolve competing control before enabling the new Controller.",
-    "title": "Resolve shared control first",
+    "text": "So before the new Controller switches anything, list every system that can already switch your pump and valves. Include old timers, other home-automation rules and manual switches. Then choose one owner for each output and remove the others, following the checklist on this card.",
+    "title": "Remove competing control first",
     "visual": {
       "type": "check",
       "labels": [
-        "Identify every control source",
-        "Resolve ownership",
-        "Then enable new control"
+        "List every control source",
+        "Keep one owner per output",
+        "Then connect the Controller"
       ],
       "asset": "assets/diagrams/c7-one-owner-r3.png",
       "alt": "Verify one output owner and real stopping; a software state alone is insufficient."
@@ -1372,14 +1372,14 @@
     "lesson": "C1",
     "scene": "C1-04",
     "paragraph": 4,
-    "text": "The final function is protection and proof. Provide an accessible physical shutdown, suitable independent protection and somewhere safe to collect test water. Software OFF is like a stop request on a screen; it is not an emergency isolator.",
-    "title": "Software OFF is not isolation",
+    "text": "The last job is protect, and the card shows its three parts. First, a physical shutdown: a real switch or valve, close at hand, that cuts power or water directly. Second, independent protection, such as dry-run protection, that works even if the software fails. Third, a safe place to catch test water. The Crop Steering screens also have a Watering switch, which tells the Controller whether it may start shots. Keep Watering OFF until your system passes its checks, and use the physical shutdown in an emergency, because it stops the equipment itself.",
+    "title": "A physical shutdown, not a screen",
     "visual": {
       "type": "protection",
       "labels": [
-        "Accessible physical shutdown",
+        "Physical shutdown in reach",
         "Independent protection",
-        "Safe test-water collection"
+        "Safe place for test water"
       ]
     }
   },
@@ -1388,14 +1388,14 @@
     "lesson": "C1",
     "scene": "C1-04",
     "paragraph": 5,
-    "text": "Use collection cups and a stopwatch to measure what actually arrives. Then observe the outlet after the stop command: the water must physically stop.",
-    "title": "Measure delivery; prove stopping",
+    "text": "During testing, you measure what really arrives. Put collection cups under the drippers and time the run with a stopwatch, as in the catch test from lesson B four. Then send the stop command and watch the outlet. The water must physically stop. The card shows the cups, the stopwatch and the outlet.",
+    "title": "Measure delivery, watch it stop",
     "visual": {
       "type": "commissioning",
       "labels": [
         "Cups + stopwatch",
-        "Measure water delivered",
-        "Observe water physically stop"
+        "Measure what arrives",
+        "Watch the water stop"
       ]
     }
   },
@@ -1404,13 +1404,13 @@
     "lesson": "C1",
     "scene": "C1-04",
     "paragraph": 6,
-    "text": "A changed dashboard icon is a report from software. Look at the water outlet to prove stopping.",
-    "title": "An icon is not physical proof",
+    "text": "A dashboard is the screen of readings and buttons you use to watch the system. When a dashboard icon changes to off, the software is reporting what it believes happened. To know the water really stopped, look at the outlet itself, as the card shows.",
+    "title": "Trust the outlet, not the icon",
     "visual": {
       "type": "evidence",
       "labels": [
-        "Dashboard icon changes",
-        "Inspect the actual water outlet"
+        "Dashboard icon says off",
+        "Look at the outlet itself"
       ]
     }
   },
@@ -1419,14 +1419,14 @@
     "lesson": "C1",
     "scene": "C1-05",
     "paragraph": 0,
-    "text": "Build the basic working zone before adding instruments. Tank level, feed EC, pH, which describes acidity, and tank temperature add operating information. More probes and a verified flow meter can follow. Automated dosing, thermal cameras and artificial intelligence are not needed for the first working zone.",
-    "title": "Add instruments after one proven zone",
+    "text": "Once one zone works, extra instruments add useful information. The card lists the first ones. A tank level sensor shows how much water is left. Feed EC and pH show what is in the solution, where pH describes how acidic or alkaline it is. Tank temperature shows how warm the solution is. Later you might add more probes and a verified flow meter, which measures the water passing through the pipe. Automated nutrient dosing, thermal cameras and artificial intelligence are optional extras. Your first zone works without them. Build the basics, prove them, then add one item at a time.",
+    "title": "Add instruments after one zone",
     "visual": {
       "type": "equipment",
       "labels": [
-        "Tank level · feed EC · pH · temperature",
-        "Later: more probes + verified flow meter",
-        "Dosing · cameras · AI are optional"
+        "Tank: level · EC · pH · temp",
+        "Later: more probes, flow meter",
+        "Optional: dosing · cameras · AI"
       ]
     }
   },
@@ -1435,12 +1435,12 @@
     "lesson": "C1",
     "scene": "C1-06",
     "paragraph": 0,
-    "text": "Sketch your water route like a simple road map. Label the supply, pump if installed, zone valve, drippers and drainage path.",
+    "text": "Now apply all of this to your own space. On paper, sketch your water route like a simple road map. Label the supply, the pump if you need one, the zone valve, the drippers and the drainage path, in the order the water travels. The card shows that order.",
     "title": "Sketch a road map for the water",
     "visual": {
       "type": "water-path",
       "labels": [
-        "Supply → pump, if installed",
+        "Supply → pump, if needed",
         "Zone valve → drippers",
         "Drainage path"
       ]
@@ -1451,13 +1451,13 @@
     "lesson": "C1",
     "scene": "C1-06",
     "paragraph": 1,
-    "text": "Beside that map, draw the probe and the Controller. Mark the physical shutdown and identify the one controller responsible for each output.",
-    "title": "Separate measurement and control",
+    "text": "Beside the water route, draw the measure and switch side. Add the probe, its bridge if it needs one, the host and the Controller. Draw a line from the Controller to each output it switches, and check that each output has only one line. Then mark the physical shutdown. The card shows both sides together.",
+    "title": "Add the measure and switch side",
     "visual": {
       "type": "mapping",
       "labels": [
-        "Probe: measurement path",
-        "Controller: output ownership",
+        "Probe → host → Controller",
+        "One line per output",
         "Mark the physical shutdown"
       ]
     }
@@ -1467,13 +1467,13 @@
     "lesson": "C1",
     "scene": "C1-06",
     "paragraph": 2,
-    "text": "Circle each item that you cannot identify.",
-    "title": "Mark every unknown item",
+    "text": "Now circle every item you cannot name exactly, for example a pump with no model number. As the card says, each circle is a question to answer before you buy or wire anything.",
+    "title": "Circle every unknown",
     "visual": {
       "type": "check",
       "labels": [
-        "Circle what you cannot identify",
-        "Resolve it before commissioning"
+        "Circle what you can't name",
+        "Answer it before buying"
       ]
     }
   },
@@ -1482,13 +1482,13 @@
     "lesson": "C1",
     "scene": "C1-06",
     "paragraph": 3,
-    "text": "Check exact models using the equipment sheet before buying. Choose the host lesson for your Raspberry Pi or x86-64 computer.",
-    "title": "Check models; choose one host route",
+    "text": "Check exact models against the course's equipment and setup guide before you buy. Builders then pick a host lesson: C two A for a Raspberry Pi, or C two B for an x eighty-six sixty-four PC.",
+    "title": "Check models; choose one host",
     "visual": {
       "type": "host",
       "labels": [
-        "Equipment sheet: exact models",
-        "Choose Raspberry Pi OR x86-64"
+        "Check models in the guide",
+        "C2a: Pi OR C2b: x86-64 PC"
       ]
     }
   },
@@ -1497,14 +1497,14 @@
     "lesson": "C1",
     "scene": "C1-06",
     "paragraph": 4,
-    "text": "Both host routes then join the same setup procedure: install one zone, assign its sensor readings and water controls, and verify physical operation before adding more zones.",
-    "title": "Commission one zone before expanding",
+    "text": "Both host routes then join the same steps, shown on this card. Install the host and both Crop Steering parts. Connect one zone's probes and outputs in the software. Prove that the water physically starts and stops. Only then add the next zone. If you only run a system someone else built, go straight to lesson D one. There you find your room and zone in the app.",
+    "title": "One proven zone, then the next",
     "visual": {
       "type": "commissioning",
       "labels": [
-        "Install one host + one zone",
-        "Assign sensors + outputs",
-        "Verify, then add zones"
+        "Install host + software",
+        "Connect one zone",
+        "Prove it, then add zones"
       ],
       "focus": "flow"
     }
