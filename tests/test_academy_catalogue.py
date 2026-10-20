@@ -145,7 +145,7 @@ class CatalogueMediaTests(unittest.TestCase):
 
     def test_complete_index_replaces_legacy_videos_and_exact_routes_verify(self):
         course = self.compile()
-        self.assertEqual(course["edition"], "2026-10-19-r3")
+        self.assertEqual(course["edition"], "2026-10-20-r4")
         self.assertEqual(
             len([lesson for lesson in course["lessons"] if lesson.get("video")]), 24
         )
@@ -209,9 +209,9 @@ class CatalogueMediaTests(unittest.TestCase):
     def test_remote_traversal_and_stale_cache_urls_are_rejected(self):
         for source in (
             "https://example.com/A1.mp4",
-            "media/lessons/../A1.mp4?v=20261019r3",
+            "media/lessons/../A1.mp4?v=20261020r4",
             "media/lessons/A1.mp4?v=20261019r2",
-            "media\\lessons\\A1.mp4?v=20261019r3",
+            "media\\lessons\\A1.mp4?v=20261020r4",
         ):
             data = copy.deepcopy(self.index)
             data["lessons"]["A1"]["src"] = source

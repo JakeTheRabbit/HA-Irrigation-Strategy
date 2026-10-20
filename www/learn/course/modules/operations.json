@@ -3,12 +3,13 @@
     "id": "D1",
     "module": "D",
     "title": "Find your room, zone and next action",
-    "summary": "Use the room and zone like a full address, then read recent evidence and the controller’s reason.",
+    "summary": "Find a zone by its full address, check how old each report is, and read the Controller’s reason for what it does next.",
     "outcomes": [
-      "Navigate from All zones to the intended room and zone.",
-      "Read controller age, probe age, phase and Why / next action.",
-      "Explain selected-room controls, shared equipment and unknown states.",
-      "Set a browser landing-page preference."
+      "Go from Overview › All zones to the right room and zone page.",
+      "Read the Controller’s report age and each probe’s report time separately.",
+      "Read phase, last shot and Why / next action together.",
+      "Explain what Watering, Stop all, a shared pump and an unknown state mean.",
+      "Set this browser’s Default view."
     ],
     "prerequisites": [
       "B4"
@@ -18,147 +19,287 @@
       {
         "title": "A zone needs its full address",
         "body": [
-          "Overview → All zones → Selected room.",
-          "Read the room name and zone number together."
+          "Overview › All zones: every zone, grouped by room.",
+          "Selected room: one room, chosen with its room chip."
         ],
-        "narration": "A shopping-centre directory helps you find a shop, but you still need its full address. Use the dashboard the same way. Open Overview in the isolated demo. All zones groups cards by room. Select the room, then open a zone from Selected room. Zone two in Room A is a different address from Zone two in Room B.",
+        "narration": "Think of a block of flats. Flat two in one building is not flat two in the building next door. Zones work the same way. Remember from A one: a zone is a group of plants watered together. A room is a space with its own lights, and it holds one or more zones. Open the isolated demo, the practice copy that runs no equipment, and select Overview, the screen for checking rooms and zones. Its first tab, All zones, shows a card for every zone, grouped by room. The second tab, Selected room, shows one room at a time. Across the top, each room has a small button with its name, called a room chip. Select a chip, then select a zone card. That opens the zone page: one page about one zone. Zone two in Room A and Zone two in Room B are different addresses. Next, you check how fresh the information on that page is.",
         "visual": {
           "type": "navigation",
           "title": "A zone needs its full address",
           "labels": [
-            "Overview → All zones → Selected room.",
-            "Read the room name and zone number together."
+            "Overview › All zones: every zone, grouped by room.",
+            "Selected room: one room, chosen with its room chip."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-overview-r3.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
-        "id": "D1-s1"
+        "id": "D1-s1",
+        "check": {
+          "prompt": "Room A and Room B both have a Zone 2. You need Room B’s Zone 2. What do you select first?",
+          "options": [
+            {
+              "text": "The Room B chip, then the Zone 2 card.",
+              "correct": true,
+              "feedback": "Right. The room chip sets the room; the zone number only means something inside that room."
+            },
+            {
+              "text": "Any Zone 2 card in All zones.",
+              "correct": false,
+              "feedback": "Two cards say Zone 2. Read the room name too, or select the Room B chip first."
+            },
+            {
+              "text": "The Room A chip, because it is listed first.",
+              "correct": false,
+              "feedback": "List order does not choose the room. Select the room you actually need: Room B."
+            }
+          ]
+        }
       },
       {
         "title": "Check when each source last reported",
         "body": [
-          "Controller report age and probe reading age are separate.",
-          "Unknown means the state is unconfirmed."
+          "Top bar: how long ago the Controller last reported.",
+          "Each probe keeps its own last report time."
         ],
-        "narration": "Before interpreting a number, check its age. The header reports the controller’s latest communication. The probe has its own observation time and unit. A recent controller message cannot refresh an old probe reading. Unknown means the program cannot confirm a state. Keep that word in your record. Replacing an unknown pump state with OFF would invent certainty.",
+        "narration": "Yesterday’s weather report cannot tell you if it is raining now. Every number on screen has an age too. Remember from C one: Home Assistant collects readings and switches equipment. Each named reading or control inside it is an entity, and each entity keeps the time of its own last report. Look at the top bar, the strip across the top of every page. Beside the room chips, it shows how long ago the Controller last reported for this room. That regular message from the Controller, saying it is running, is called a heartbeat. A probe has its own last report time. The Equipment screen, on its Probes tab, shows it for every probe. Here is an example. The top bar says the Controller reported one minute ago. The moisture probe last reported at nine in the morning, and it is now one in the afternoon. From nine to one is four hours, so that moisture reading is four hours old. Check each source’s own age before you trust its number. Next, read the reason the Controller gives.",
         "visual": {
           "type": "lesson-cues",
           "title": "Check when each source last reported",
           "labels": [
-            "Controller report age and probe reading age are separate.",
-            "Unknown means the state is unconfirmed."
+            "Top bar: how long ago the Controller last reported.",
+            "Each probe keeps its own last report time."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D1-s2"
+        "id": "D1-s2",
+        "check": {
+          "prompt": "Top bar: Controller reported 2 minutes ago. The VWC probe last reported at 06:00. It is now 11:00. How old is the VWC reading?",
+          "options": [
+            {
+              "text": "2 minutes",
+              "correct": false,
+              "feedback": "That is the Controller’s heartbeat. The probe keeps its own report time: 06:00."
+            },
+            {
+              "text": "5 hours",
+              "correct": true,
+              "feedback": "Right. From 06:00 to 11:00 is 5 hours. The fresh heartbeat does not refresh the probe."
+            },
+            {
+              "text": "It cannot be known.",
+              "correct": false,
+              "feedback": "It can. Subtract the probe’s last report time from the time now: 11 − 6 = 5 hours."
+            }
+          ]
+        }
       },
       {
         "title": "Read the reason beside the state",
         "body": [
-          "Find phase, latest irrigation and Why / next action.",
-          "Check tank and equipment information where available."
+          "Zone page: phase, last shot and Why / next action.",
+          "Why / next action: the reason now and what it waits for."
         ],
-        "narration": "Open the zone page and find its phase, latest irrigation and Why / next action. Read them together. A waiting phase may be doing exactly what its rules require. The reason tells you what condition matters next. Inspect tank and equipment information where available. A recorded event describes an action; an output state describes a report. Physical delivery needs its own evidence.",
+        "narration": "When a bus is late, the board at the stop usually says why. The zone page has the same kind of board. On the zone page, find three things. The phase, which you met in B two. The last shot. And the panel called Why slash next action. That panel gives the Controller’s reason for what it is doing now, and the condition it is waiting for next. Here is an example. The zone is in P two. The last shot was at nine twelve. The panel says it is waiting for moisture to fall to the re-water threshold of sixty percent. The probe reads sixty three percent. Sixty three minus sixty is three points still to dry, so no shot is due yet. That pause is the rule working as designed. The Controller’s records say what it decided; to see that water reached the plants, you look at the pots. Next, you put these pieces together in a worked example.",
         "visual": {
           "type": "daily-check",
           "title": "Read the reason beside the state",
           "labels": [
-            "Find phase, latest irrigation and Why / next action.",
-            "Check tank and equipment information where available."
+            "Zone page: phase, last shot and Why / next action.",
+            "Why / next action: the reason now and what it waits for."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-selected-room-r3.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
-        "id": "D1-s3"
+        "id": "D1-s3",
+        "check": {
+          "prompt": "Zone in P2. Last shot 10:05. Why / next action: waiting for VWC to fall to 58%. Probe reads 61%. What do you conclude?",
+          "options": [
+            {
+              "text": "A fault: no shot has followed.",
+              "correct": false,
+              "feedback": "The panel explains the wait. 61 − 58 = 3 points still to dry before a shot is due."
+            },
+            {
+              "text": "Lower the re-water threshold so it waters now.",
+              "correct": false,
+              "feedback": "The rule is working. A normal wait needs no target change."
+            },
+            {
+              "text": "No shot is due yet; 3 points still to dry.",
+              "correct": true,
+              "feedback": "Right. 61 − 58 = 3. The Controller is waiting by its rule."
+            }
+          ]
+        }
       },
       {
         "title": "Worked example: Training East, Zone 2",
         "body": [
-          "Training East / Zone 2; P2; last shot 09:12.",
-          "Reason: waiting for moisture.",
-          "Header Watering and Stop all address Training East."
+          "Training East chip pressed: Zone 2, P2, last shot 09:12.",
+          "Watering and Stop all act on the selected room only.",
+          "A shared pump stops for every room it feeds."
         ],
-        "narration": "In this fictional paper example, training East is selected. Zone two is in maintenance, P two, and its last shot was at nine twelve. Recent reports say it is waiting for moisture. That is the supported explanation for the pause. Header Watering and Stop all address the selected room, Training East. Read the shared-pump caution: stopping a shared pump can also affect another room.",
+        "narration": "Now add the two controls in the top bar. In this fictional paper example, the Training East chip is pressed, so Training East is the selected room. Zone two is in P two. Its last shot was at nine twelve. Why slash next action says it is waiting for moisture to fall. Now look at the top bar. Watering is the room’s on and off permission for the Controller. When Watering is off, the Controller starts no shots in that room, rescue shots included. Stop all turns Watering off, then switches every pump and valve of that room off, and reads each one back. Both controls act on the selected room only, Training East. One more idea: a shared pump is one pump that feeds more than one room. If Training East shares its pump with Training West, Stop all also stops that pump, so Training West loses water too. The review box warns you about this. Read it before you confirm. Next, you meet a state the screen cannot confirm.",
         "visual": {
           "type": "lesson-cues",
           "title": "Worked example: Training East, Zone 2",
           "labels": [
-            "Training East / Zone 2; P2; last shot 09:12.",
-            "Reason: waiting for moisture.",
-            "Header Watering and Stop all address Training East."
+            "Training East chip pressed: Zone 2, P2, last shot 09:12.",
+            "Watering and Stop all act on the selected room only.",
+            "A shared pump stops for every room it feeds."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
         "workedExample": {
-          "prompt": "Which room does the header control?",
+          "prompt": "Which room do the top bar Watering and Stop all controls act on?",
           "steps": [
             "Read the pressed room chip: Training East.",
             "Confirm Zone 2 belongs to Training East.",
-            "Check report ages and the decision reason.",
-            "Read shared-equipment cautions."
+            "Check report ages and Why / next action.",
+            "Read the shared-pump caution before confirming Stop all."
           ],
-          "answer": "The selected room is Training East. Shared equipment may create wider physical consequences."
+          "answer": "Training East. If its pump also feeds another room, Stop all stops water there too."
         },
-        "id": "D1-s4"
+        "id": "D1-s4",
+        "check": {
+          "prompt": "Training North is selected. Its pump also feeds Training South. You confirm Stop all. What happens?",
+          "options": [
+            {
+              "text": "Only Training North is affected.",
+              "correct": false,
+              "feedback": "Its valves go off, but so does the shared pump. Training South loses water too."
+            },
+            {
+              "text": "North’s pumps and valves go off; South loses water from the shared pump.",
+              "correct": true,
+              "feedback": "Right. Stop all acts on the selected room, and shared equipment reaches further."
+            },
+            {
+              "text": "Every room on the site stops.",
+              "correct": false,
+              "feedback": "Stop all acts on the selected room. Only equipment that room shares reaches further."
+            }
+          ]
+        }
       },
       {
         "title": "Your turn: finish an honest record",
         "body": [
-          "Select Room B, Zone 1 in the isolated demo.",
-          "Record the state and report age exactly as displayed.",
-          "If a source is unknown, record that uncertainty and inspect its source."
+          "Room B, Zone 1: record pump state and report age as shown.",
+          "Unknown means the app cannot confirm the state.",
+          "Mapping: the link from a screen name to a real device."
         ],
-        "narration": "Now select Room B, Zone one. Record the pump state and report age exactly as shown. If a source says unknown, record that uncertainty. Next inspect the mapped source and its report age under the local procedure. Mapping means the connection between the displayed record and the real device. Pressing buttons is not a way to discover that connection.",
+        "narration": "A fuel gauge showing dashes instead of a number does not mean the tank is empty. It means the gauge cannot tell. The app does the same. When it cannot confirm a state, it shows the word unknown. For example, the top bar reads Watering unknown when that switch is missing or not answering in Home Assistant. Now practise in the demo. Select Room B, then Zone one. Find the pump state and its report age. Write them down exactly as displayed. If a state says unknown, write unknown. Writing off instead would claim something nobody confirmed. Then check the source, meaning the real device behind the display. The link between a name on screen and a real device is called a mapping. It is set up under Equipment, Setup. You check a mapping with the person who installed it, by reading the setup, rather than pressing buttons to see what moves. Next, find another zone on your own.",
         "visual": {
           "type": "lesson-cues",
           "title": "Your turn: finish an honest record",
           "labels": [
-            "Room B / Zone 1: read the displayed pump state.",
-            "Unknown means unconfirmed. Check the source and age."
+            "Room B, Zone 1: record pump state and report age as shown.",
+            "Unknown means the app cannot confirm the state."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D1-s5"
+        "id": "D1-s5",
+        "check": {
+          "prompt": "The pump state reads unknown. What do you write in your record?",
+          "options": [
+            {
+              "text": "Pump: off.",
+              "correct": false,
+              "feedback": "Off is a confirmed state. Unknown means nobody confirmed it. Write what the screen shows."
+            },
+            {
+              "text": "Nothing, until it shows a real value.",
+              "correct": false,
+              "feedback": "Leaving it out hides a problem. Record unknown so someone checks the source."
+            },
+            {
+              "text": "Pump: unknown, with its report age.",
+              "correct": true,
+              "feedback": "Right. An honest record keeps the uncertainty visible."
+            }
+          ]
+        }
       },
       {
         "title": "Find another zone independently",
         "body": [
-          "Record room, zone, phase, last irrigation, ages and next action.",
-          "Settings & help → Settings → Display → Default view."
+          "Record room, zone, phase, last shot, report ages, next action.",
+          "Settings & help › Settings › Display › Default view."
         ],
-        "narration": "Choose another demo zone without following the worked example. Record its full address, phase, last irrigation, report ages and next action. Then open Settings and help, Settings, Display, Default view. This chooses the landing page for this browser. A direct bookmark still opens its requested page. Return to Overview and say the selected room aloud before reading another card.",
+        "narration": "Now find a zone without the example, like finding a friend’s flat with only the address. Choose any other demo zone. Write six things: the room, the zone number, the phase, the last shot time, the report ages and the next action. Then choose where the app opens. Open Settings and help, then Settings, then Display, then Default view. The default view is the page this browser shows first when you open the app. For example, choose Selected room if you check one room every morning. This choice lives only in this browser. Another person’s phone keeps its own choice, and nothing about watering changes. A saved bookmark still opens the page it points to. Return to Overview and say the selected room’s name aloud before you read any card. That habit stops you reading one room’s numbers while thinking of another. The last slide checks what you remember.",
         "visual": {
           "type": "navigation",
           "title": "Find another zone independently",
           "labels": [
-            "Record room, zone, phase, last irrigation, ages and next action.",
-            "Settings & help → Settings → Display → Default view."
+            "Record room, zone, phase, last shot, report ages, next action.",
+            "Settings & help › Settings › Display › Default view."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-settings-defaultview-r3.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
-        "id": "D1-s6"
+        "id": "D1-s6",
+        "check": {
+          "prompt": "You set Default view to Selected room on your laptop. A colleague opens the app on their phone. What do they see first?",
+          "options": [
+            {
+              "text": "Their own Default view; yours applies only to your browser.",
+              "correct": true,
+              "feedback": "Right. Default view is a setting for one browser, not for everyone."
+            },
+            {
+              "text": "Selected room, because you changed it for everyone.",
+              "correct": false,
+              "feedback": "Default view belongs to one browser. Their phone keeps its own choice."
+            },
+            {
+              "text": "Nothing, until the Controller restarts.",
+              "correct": false,
+              "feedback": "Default view is a display choice. The Controller is not involved."
+            }
+          ]
+        }
       },
       {
         "title": "Recall the address and control scope",
         "body": [
-          "Which room is selected? What remains unknown?",
-          "Physical checks establish whether water stopped."
+          "Top bar controls act on the selected room only.",
+          "To know water stopped, look at the outlets."
         ],
-        "narration": "Close your notes. Which room do the header controls address? What does unknown establish? What evidence would confirm that water stopped? Answer: the selected room, an unconfirmed state, and the appropriate physical check. Software state alone cannot prove the plumbing stopped. Repeat the navigation tomorrow with a different demo address. Before independent live work, use the installation’s completed local handover.",
+        "narration": "Close your notes and answer three questions aloud, the way a pilot repeats instructions back. First: which room do Watering and Stop all act on? The selected room, the one whose chip is pressed. Second: what does unknown tell you? That the app cannot confirm the state, so you record unknown and check the source. Third: after Stop all, how do you know the water really stopped? You look at the outlets and drippers. Off on the screen is a report from software. Remember from C one: the physical shutdown is the hand-operated way to cut water or power at the equipment itself. If water keeps flowing when it should not, use the physical shutdown first, then investigate. Tomorrow, repeat the navigation with a different demo address. Work on real equipment comes after your site’s responsible person has shown you around it. Next lesson, you change one target safely.",
         "visual": {
           "type": "lesson-cues",
           "title": "Recall the address and control scope",
           "labels": [
-            "Which room is selected? What remains unknown?",
-            "Physical checks establish whether water stopped."
+            "Top bar controls act on the selected room only.",
+            "To know water stopped, look at the outlets."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D1-s7"
+        "id": "D1-s7",
+        "check": {
+          "prompt": "After Stop all, the screen shows every valve off, but water still drips from a dripper. What first?",
+          "options": [
+            {
+              "text": "Use the physical shutdown, then investigate.",
+              "correct": true,
+              "feedback": "Right. Cut the water at the equipment first. The screen is a report from software."
+            },
+            {
+              "text": "Trust the screen; off means stopped.",
+              "correct": false,
+              "feedback": "The dripper shows water still flowing. What you see at the outlet wins."
+            },
+            {
+              "text": "Press Stop all again and wait.",
+              "correct": false,
+              "feedback": "Repeating a software request delays the fix. Cut the water at the equipment first."
+            }
+          ]
+        }
       }
     ],
     "practice": {
@@ -166,29 +307,29 @@
       "prompt": "Identify another demo zone and explain its next action without changing irrigation.",
       "hints": [
         "Read the pressed room chip.",
-        "Check controller and probe ages.",
-        "Find Why / next action."
+        "Check the Controller’s and the probe’s report ages.",
+        "Read Why / next action."
       ],
-      "success": "Record room, zone, phase, last irrigation, ages and next action; preserve unknowns."
+      "success": "Record room, zone, phase, last shot, report ages and next action; keep any unknown as unknown."
     },
     "quiz": [
       {
-        "prompt": "All zones is visible and Training West is selected. What is the scope of header Stop all?",
+        "prompt": "All zones is visible and Training West is selected. What does Stop all in the top bar act on?",
         "options": [
           {
-            "text": "The selected room, with a possible shared-pump consequence.",
+            "text": "The selected room, plus any pump it shares with another room.",
             "correct": true,
-            "feedback": "Correct. Read the selected room and shared-pump caution; the view does not widen the request."
+            "feedback": "Correct. All zones changes what you see, not what Stop all acts on."
           },
           {
             "text": "Every room shown in All zones.",
             "correct": false,
-            "feedback": "All zones changes the view. Header controls still address the selected room."
+            "feedback": "All zones changes the view. Top bar controls still act on the selected room."
           },
           {
             "text": "Only the nearest zone card.",
             "correct": false,
-            "feedback": "The header action has room scope, not the position or focus of a card."
+            "feedback": "Stop all acts on the whole selected room, not on one card."
           }
         ],
         "safetyCritical": true,
@@ -200,39 +341,39 @@
           {
             "text": "The pump is definitely stopped.",
             "correct": false,
-            "feedback": "Unknown is no confirmation of OFF or physical cessation."
+            "feedback": "Unknown means nobody confirmed it is off. Check the outlet and the source."
           },
           {
             "text": "The pump state is unconfirmed; check the source safely.",
             "correct": true,
-            "feedback": "Correct. Keep uncertainty visible and use the installed verification procedure."
+            "feedback": "Correct. Record unknown and check the real device with the person who installed it."
           },
           {
             "text": "The pump is running at zero flow.",
             "correct": false,
-            "feedback": "An unavailable state supplies neither runtime nor measured flow."
+            "feedback": "Unknown tells you nothing about flow. Record unknown and check the source."
           }
         ],
         "safetyCritical": true,
         "id": "D1-q2"
       },
       {
-        "prompt": "The controller is recent but the probe timestamp is old. What follows?",
+        "prompt": "The Controller reported recently, but the probe’s last report is old. What follows?",
         "options": [
           {
-            "text": "The probe is fresh because the controller is fresh.",
+            "text": "The probe is fresh because the Controller is fresh.",
             "correct": false,
-            "feedback": "Each source has its own freshness; a heartbeat cannot refresh an old reading."
+            "feedback": "Each source has its own age. A heartbeat cannot refresh an old reading."
           },
           {
             "text": "Replace the reading with zero.",
             "correct": false,
-            "feedback": "Stale data must stay explicit. Zero would invent a measurement."
+            "feedback": "An old reading stays old. Zero would invent a measurement."
           },
           {
             "text": "Check the probe before interpreting moisture.",
             "correct": true,
-            "feedback": "Correct. Verify timestamp, mapping and communications before a crop adjustment."
+            "feedback": "Correct. Check its report time, mapping and connection before any crop decision."
           }
         ],
         "safetyCritical": false,
@@ -244,7 +385,7 @@
           {
             "text": "This browser’s landing page.",
             "correct": true,
-            "feedback": "Correct. Direct page links still take precedence and irrigation settings are unchanged."
+            "feedback": "Correct. Bookmarks still open their own page, and watering is unchanged."
           },
           {
             "text": "Every operator’s room selection.",
@@ -252,9 +393,9 @@
             "feedback": "This is a browser preference, not a site-wide operator setting."
           },
           {
-            "text": "Which room the controller waters.",
+            "text": "Which room the Controller waters.",
             "correct": false,
-            "feedback": "A navigation preference has no authority over watering."
+            "feedback": "Default view only changes which page opens first. It never affects watering."
           }
         ],
         "safetyCritical": false,
@@ -263,8 +404,8 @@
     ],
     "practicalTask": {
       "instructions": [
-        "Complete the demo identity and freshness record for two zones.",
-        "Explain selected-room scope and shared-pump caution to another person."
+        "Complete the demo address and report-age record for two zones.",
+        "Explain to another person which room Watering and Stop all act on, and what a shared pump means."
       ],
       "requiresLocalSupervision": false,
       "proof": "demo"
@@ -291,11 +432,12 @@
     "id": "D2",
     "module": "D",
     "title": "Change one target and see the curve move",
-    "summary": "Treat a target change like editing and checking a shopping list: draft, review, apply, read back and restore.",
+    "summary": "Change one target the safe way: read who owns it, draft, review, apply, read back, then restore.",
     "outcomes": [
-      "Define draft, saved reference and actual observation.",
-      "Review and apply one allowed demo change, then confirm and restore it.",
-      "Explain the P3 emergency floor and why plan-owned targets are read-only."
+      "Read Target source and say who owns today’s targets.",
+      "Tell the saved reference, the draft and the recorded lines apart.",
+      "Draft, review and apply one allowed step on the Rescue floor, then read back and restore it.",
+      "Explain why the Rescue floor is a night alarm, not a nightly target."
     ],
     "prerequisites": [
       "D1"
@@ -303,242 +445,382 @@
     "route": "everyone",
     "slides": [
       {
-        "title": "Begin with a pencil draft",
+        "title": "Begin by reading who owns the targets",
         "body": [
-          "A draft is a proposed edit that has not been applied.",
-          "Irrigation → Current day → choose a zone → Target source."
+          "Irrigation › Current day › Zone › Target source.",
+          "Armed schedule: a grow plan owns targets; edit in Calendar."
         ],
-        "narration": "A shopping list written in pencil can change before checkout. A draft target is similar: it is a proposed local edit. Open Irrigation, Current day, in the isolated demo and choose a zone. Read Target source first. A plan can own these same targets, making them read-only here. Choose a manual demo zone for practice, leaving real plan ownership alone.",
+        "narration": "Before you edit a shared document, you check whether someone else is editing it. Targets work the same way. Remember from B two: a target is a comparison value the Controller’s rules use. Open Irrigation, then its first tab, Current day. Choose a zone from the Zone list. Under the tabs, read the line that starts Target source. It names who owns today’s targets. Manual room targets means you set them here. Automatic setpoints means the app can adjust some targets by itself. Setpoint is another word for target. Armed schedule means a grow plan owns them. A grow plan is a dated timetable of targets, which you build in the next lesson. When a plan owns the targets, this page shows them read only. You change them in Calendar, the planning screen. For practice, pick a demo room whose Target source is not armed schedule. Two owners writing the same target would undo each other’s work. Next, look at the chart beside the targets.",
         "visual": {
           "type": "navigation",
-          "title": "Begin with a pencil draft",
+          "title": "Begin by reading who owns the targets",
           "labels": [
-            "A draft is a proposed edit that has not been applied.",
-            "Irrigation → Current day → choose a zone → Target source."
+            "Irrigation › Current day › Zone › Target source.",
+            "Armed schedule: a grow plan owns targets; edit in Calendar."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-currentday-r3.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
-        "id": "D2-s1"
+        "id": "D2-s1",
+        "check": {
+          "prompt": "Target source reads armed schedule. You want to change a P2 target today. Where do you go?",
+          "options": [
+            {
+              "text": "Current day: type the new value.",
+              "correct": false,
+              "feedback": "Current day is locked while a grow plan owns the targets. Use Calendar."
+            },
+            {
+              "text": "Calendar, because the grow plan owns the targets.",
+              "correct": true,
+              "feedback": "Right. The plan’s dated targets are changed in Calendar."
+            },
+            {
+              "text": "Equipment › Setup.",
+              "correct": false,
+              "feedback": "Setup holds substrate, sizing and safety limits, not daily targets."
+            }
+          ]
+        }
       },
       {
         "title": "Tell the three lines apart",
         "body": [
-          "Saved reference: the available configured value.",
-          "Draft reference: your proposed value.",
-          "Actual trace: recorded probe observations."
+          "Saved reference: the target stored now.",
+          "Draft: your proposed change, not yet sent.",
+          "Solid dark lines: what the probes recorded."
         ],
-        "narration": "A reference is a value used for comparison. The saved reference shows the available configuration. The draft reference shows your proposed change. The actual trace shows recorded observations from the probe. Read those names in the legend. Moving the draft line changes the proposal on screen. It cannot move water already in the pot or rewrite yesterday’s readings.",
+        "narration": "A recipe card, your pencil notes on it, and the meal you actually cooked are three different things. The Current day chart shows three matching lines. Remember from B one: a dashed line is a planning reference and a solid line is measured. The saved reference shows the target values stored now. The draft shows a change you have proposed but not sent. As in B one, a draft is an unsaved proposal. Here it lives only in this browser until you apply it. The dark solid lines show what the zone’s probes recorded. Use the legend to match each name to its line. Here is an example. The saved re-water threshold sits at sixty percent. You drag the draft to sixty one. The draft line moves up one point. The saved line stays at sixty. The recorded moisture line does not move at all, because it is history. Mixing these up makes people think an edit changed the plants. Next, you learn what the setting you are about to edit actually does.",
         "visual": {
           "type": "comparison",
           "title": "Tell the three lines apart",
           "labels": [
-            "Saved reference: the available configured value.",
-            "Draft reference: your proposed value.",
-            "Actual trace: recorded probe observations."
+            "Saved reference: the target stored now.",
+            "Draft: your proposed change, not yet sent.",
+            "Solid dark lines: what the probes recorded."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-currentday-graph-r3.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
-        "id": "D2-s2"
+        "id": "D2-s2",
+        "check": {
+          "prompt": "You drag a draft target from 55% to 57%. Which line moves?",
+          "options": [
+            {
+              "text": "Only the draft line.",
+              "correct": true,
+              "feedback": "Right. Saved values and recorded readings stay where they are."
+            },
+            {
+              "text": "The draft and the recorded moisture line.",
+              "correct": false,
+              "feedback": "Recorded readings are history. An edit cannot change them."
+            },
+            {
+              "text": "The saved reference line.",
+              "correct": false,
+              "feedback": "The saved line moves only after Apply and a good readback."
+            }
+          ]
+        }
       },
       {
-        "title": "Learn what the field means",
+        "title": "Learn what the setting means",
         "body": [
-          "Read the P3 emergency floor help, unit and allowed step.",
-          "Think of a night alarm, rather than an ordinary destination."
+          "Rescue floor: the P3 safety level for a rescue shot.",
+          "Read the ? help, unit and allowed step; note the start value."
         ],
-        "narration": "For this exercise, open the help beside P three emergency floor. Think of it as a night alarm: a low-water safety reference used by overnight rules. It is not the water content to maintain routinely all night. The rule still has conditions and protections. Read the unit and allowed step, then record the original demo value before editing.",
+        "narration": "A smoke alarm is not the temperature you set the heater to. It acts only when something goes wrong. Select the question mark beside a setting. This is the field help: a short note on what the setting does, when it acts and what it changes. For this exercise, find the P three setting labelled Rescue floor. You met it in B two, where growers also call it the emergency floor. The help calls it the overnight safety level of water content. In P three, the Controller gives a rescue shot each time moisture is below it. So it is a night alarm, not a level to aim for every night. Next, read its unit and its step. The unit is percent VWC. The step is the smallest change the setting accepts. We call it the allowed step. If the allowed step is one point, thirty can become thirty one, but not thirty point four. Write down the starting value before you touch anything. You need it to put things back. Next, you make the change.",
         "visual": {
           "type": "lesson-cues",
-          "title": "Learn what the field means",
+          "title": "Learn what the setting means",
           "labels": [
-            "Read the P3 emergency floor help, unit and allowed step.",
-            "Think of a night alarm, rather than an ordinary destination."
+            "Rescue floor: the P3 safety level for a rescue shot.",
+            "Read the ? help, unit and allowed step; note the start value."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D2-s3"
+        "id": "D2-s3",
+        "check": {
+          "prompt": "A setting’s allowed step is 0.5 points. It reads 35%. Which value can you set next?",
+          "options": [
+            {
+              "text": "35.2%",
+              "correct": false,
+              "feedback": "0.2 is smaller than the step. Values move in multiples of 0.5."
+            },
+            {
+              "text": "36.3%",
+              "correct": false,
+              "feedback": "1.3 is not a multiple of 0.5. Try 35.5 or 36."
+            },
+            {
+              "text": "35.5%",
+              "correct": true,
+              "feedback": "Right. 35 + 0.5 = 35.5, one allowed step."
+            }
+          ]
+        }
       },
       {
         "title": "Worked example: 30 becomes a 31 draft",
         "body": [
-          "Saved 30% VWC; allowed step one point.",
-          "Draft 31%; review room, zone, field, unit and both values."
+          "Saved 30%, step 1 point: draft 30 + 1 = 31%.",
+          "Review changes lists room, setting, 30 → 31; then Apply."
         ],
-        "narration": "Record the original demo value and allowed step. For a paper example, thirty with one-point steps becomes thirty-one. Watch its reference move while the saved reference remains. Review changes is like checking the basket before checkout. Read the room, zone, field, unit, old value and new value. Apply is the action that sends the reviewed request to Home Assistant; the isolated demo changes sample state.",
+        "narration": "Think of checking your online shopping basket before you pay. In this fictional paper example, the saved Rescue floor is thirty percent and the allowed step is one point. Thirty plus one step is thirty one. Type thirty one, or drag the line. The draft line moves to thirty one while the saved line stays at thirty. Now select Review changes. A review box opens and names the room the change affects. It lists the setting with its old value and new value: thirty, then an arrow, then thirty one. Read every row against what you meant to do. The button at the bottom says Apply one change. Apply is the only step that sends the value to Home Assistant, where the Controller reads its targets. In the isolated demo, Apply changes sample data only. If a row is wrong, select Back to editing instead. Next, you check that the change was accepted.",
         "visual": {
           "type": "lesson-cues",
           "title": "Worked example: 30 becomes a 31 draft",
           "labels": [
-            "Saved 30% VWC; allowed step one point.",
-            "Draft 31%; review room, zone, field, unit and both values."
+            "Saved 30%, step 1 point: draft 30 + 1 = 31%.",
+            "Review changes lists room, setting, 30 → 31; then Apply."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
         "workedExample": {
-          "prompt": "What changes when a saved 30% floor becomes a 31% draft?",
+          "prompt": "What changes when a saved 30% Rescue floor becomes a 31% draft?",
           "steps": [
-            "Record saved value and allowed step.",
-            "Set the local draft.",
-            "Inspect the draft reference movement.",
-            "Review exact scope and diff before apply."
+            "Record the saved value, 30%, and the allowed step, 1 point.",
+            "Set the draft: 30 + 1 = 31%.",
+            "See the draft line move while the saved line stays at 30%.",
+            "Select Review changes and check room, setting, 30 → 31 before Apply."
           ],
-          "answer": "Only the proposed floor changes from drafting; recorded measurements and saved targets do not."
+          "answer": "Only the proposed Rescue floor changes. Recorded readings and the saved 30% stay until Apply and readback."
         },
-        "id": "D2-s4"
+        "id": "D2-s4",
+        "check": {
+          "prompt": "Review changes shows Rescue floor 30 → 32. You meant 31. What do you do?",
+          "options": [
+            {
+              "text": "Apply, then fix it later.",
+              "correct": false,
+              "feedback": "Fixing later means two changes and a wrong value in between. Correct the draft first."
+            },
+            {
+              "text": "Back to editing, fix the draft, review again.",
+              "correct": true,
+              "feedback": "Right. The review exists to catch exactly this."
+            },
+            {
+              "text": "Apply; one point does not matter.",
+              "correct": false,
+              "feedback": "One point on a safety level does matter. Apply only what you meant."
+            }
+          ]
+        }
       },
       {
         "title": "Check the receipt, then restore",
         "body": [
-          "Draft → Review → Apply → Readback.",
-          "Readback means inspecting the returned accepted value or error."
+          "Readback: the value Home Assistant actually accepted.",
+          "Restore 31 → 30 by the same draft, review, apply, readback."
         ],
-        "narration": "After sending a request, check its receipt. Here, readback means inspecting the value returned by the system, along with any error. Sending a change does not prove acceptance. If the result is unclear, resolve that uncertainty before repeating it. Restore the original value you recorded through the same draft, review, apply and readback sequence. Practising the return path completes the exercise.",
+        "narration": "After you pay, you check the receipt. After Apply, you check the readback. Readback means the app reads the value back from Home Assistant and shows what was actually accepted. While it works, the button says Applying and verifying. If Home Assistant refused a value, the box says Some changes were not applied, and gives the reason. That value stays in your draft for review. If the result is unclear, for example because the connection dropped, find out what was accepted before you try again. When the readback shows thirty one, put things back. Restoring means returning to the starting value you wrote down. Thirty one minus one step is thirty. Use the same path: draft thirty, Review changes, Apply, then read back thirty. Practising the way back matters as much as the way forward. Next, try it in a different zone.",
         "visual": {
           "type": "lesson-cues",
           "title": "Check the receipt, then restore",
           "labels": [
-            "Draft → Review → Apply → Readback.",
-            "Readback means inspecting the returned accepted value or error."
+            "Readback: the value Home Assistant actually accepted.",
+            "Restore 31 → 30 by the same draft, review, apply, readback."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D2-s5"
+        "id": "D2-s5",
+        "check": {
+          "prompt": "You applied 31%. The box says Some changes were not applied, and the value shows 30%. What is true?",
+          "options": [
+            {
+              "text": "The change was refused; the target is still 30%.",
+              "correct": true,
+              "feedback": "Right. Read the reason before trying again."
+            },
+            {
+              "text": "The target is 31%; the message is cosmetic.",
+              "correct": false,
+              "feedback": "The readback is the receipt. It says 30%, so 31% was not accepted."
+            },
+            {
+              "text": "The target is now 0%.",
+              "correct": false,
+              "feedback": "A refusal never means zero. Read the value shown and the reason."
+            }
+          ]
+        }
       },
       {
-        "title": "Try another manual demo zone",
+        "title": "Try another demo zone",
         "body": [
-          "Record that zone’s original value and allowed step.",
-          "Predict the moving line; change, verify and restore."
+          "Use that zone’s own start value and allowed step.",
+          "A zone value overrides the room value for that zone only."
         ],
-        "narration": "Choose another manual demo zone. Use its own original value and allowed step, rather than copying thirty and thirty-one. Predict which line will move. Make one step, review it, apply, check readback, then restore and check again. If a field is room-wide, inspect its scope carefully. A zone-specific value can override a shared room value for that zone.",
+        "narration": "A recipe that worked in one kitchen still needs checking in another. Choose a different zone, ideally in another demo room. Use its own starting value and its own allowed step, rather than copying thirty and thirty one. Before you edit, predict which line will move. Then make one step, review, apply, read back, restore, and read back again. One more idea matters here. The Zone list also has an option called Room lights and shared targets. A value set there applies to every zone in the room. A value set on one zone overrides the room value, for that zone only. Example: the room re-water threshold is sixty percent, and Zone three has its own value of fifty eight. Zone three uses fifty eight. Every other zone uses sixty. Check which scope you are editing before you apply. Next, recall the whole journey.",
         "visual": {
           "type": "lesson-cues",
-          "title": "Try another manual demo zone",
+          "title": "Try another demo zone",
           "labels": [
-            "Record that zone’s original value and allowed step.",
-            "Predict the moving line; change, verify and restore."
+            "Use that zone’s own start value and allowed step.",
+            "A zone value overrides the room value for that zone only."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D2-s6"
+        "id": "D2-s6",
+        "check": {
+          "prompt": "Room re-water threshold: 60%. Zone 2 has its own value: 57%. Zone 4 has none. What does Zone 4 use?",
+          "options": [
+            {
+              "text": "57%, Zone 2’s value.",
+              "correct": false,
+              "feedback": "A zone value applies to that zone only. Zone 4 falls back to the room value."
+            },
+            {
+              "text": "60%, the room value.",
+              "correct": true,
+              "feedback": "Right. With no value of its own, Zone 4 uses the room’s 60%."
+            },
+            {
+              "text": "No threshold at all.",
+              "correct": false,
+              "feedback": "A zone without its own value uses the room value."
+            }
+          ]
+        }
       },
       {
         "title": "Recall the complete change journey",
         "body": [
-          "Draft, review, apply and readback are separate actions.",
-          "Plan-owned dated targets are managed through Calendar."
+          "Draft → Review changes → Apply → Readback; restore the same way.",
+          "Armed schedule targets change in Calendar."
         ],
-        "narration": "Explain the shopping-list journey without looking at the screen. Draft proposes. Review checks the complete change. Apply sends it. Readback checks what was accepted. Tell another learner which line records observations and which shows a reference. Plan-owned dated targets are managed through Calendar. Finish by checking that the demo value is restored and noting both returned values in your practice record.",
+        "narration": "Teach the shopping journey to someone else without looking at the screen. The draft proposes a change in this browser. Review changes shows the room, the setting, the old value and the new value. Apply sends it to Home Assistant. Readback shows what was accepted. Restoring uses the same four steps to go back. Then name the lines. The saved reference shows the stored target. The draft shows your proposal. The dark solid lines show what the probes recorded. Finally, say who owns the targets. If Target source says armed schedule, a grow plan owns them, and you change them in Calendar. Check that the demo value is back where it started, and note both readback values in your practice record. A clean record shows the next person that nothing was left half changed. Next lesson, you build that grow plan in Calendar.",
         "visual": {
           "type": "lesson-cues",
           "title": "Recall the complete change journey",
           "labels": [
-            "Draft, review, apply and readback are separate actions.",
-            "Plan-owned dated targets are managed through Calendar."
+            "Draft → Review changes → Apply → Readback; restore the same way.",
+            "Armed schedule targets change in Calendar."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D2-s7"
+        "id": "D2-s7",
+        "check": {
+          "prompt": "You drag a draft, open Review changes, then close the browser. Did Home Assistant receive the value?",
+          "options": [
+            {
+              "text": "Yes; Review changes sent it",
+              "correct": false,
+              "feedback": "Review only shows the change. Nothing is sent until Apply."
+            },
+            {
+              "text": "Yes; dragging the draft sent it",
+              "correct": false,
+              "feedback": "Dragging changes the draft in this browser only. Nothing reached Home Assistant."
+            },
+            {
+              "text": "No; only Apply sends a value",
+              "correct": true,
+              "feedback": "Right. Without Apply, nothing was sent. Apply sends it; readback shows what was accepted."
+            }
+          ]
+        }
       }
     ],
     "practice": {
       "kind": "demo-and-explain",
-      "prompt": "Change the demo floor by one allowed step in a second manual zone, then restore it.",
+      "prompt": "Change the demo Rescue floor by one allowed step in a second zone, then restore it.",
       "hints": [
-        "Find Target source.",
-        "Record the original value.",
-        "Read the complete diff and readback on both passes."
+        "Read Target source.",
+        "Write down the starting value and allowed step.",
+        "Read the review and the readback on both passes."
       ],
       "success": "Both changes have correct scope, reviewed values and readback; distinguish references from actual history."
     },
     "quiz": [
       {
-        "prompt": "You move the draft P3 floor. What changes immediately?",
+        "prompt": "You move the draft Rescue floor. What changes immediately?",
         "options": [
           {
             "text": "Recorded VWC history.",
             "correct": false,
-            "feedback": "Recorded observations do not change when a draft reference moves."
+            "feedback": "Recorded readings are history. A draft cannot move them."
           },
           {
-            "text": "The local proposed reference.",
+            "text": "The draft line in this browser.",
             "correct": true,
-            "feedback": "Correct. A local edit remains a draft until reviewed and applied."
+            "feedback": "Correct. It stays a draft until you review and apply it."
           },
           {
-            "text": "Physical volume already delivered.",
+            "text": "Water already delivered.",
             "correct": false,
-            "feedback": "A reference edit cannot alter past delivery or measure it."
+            "feedback": "A draft cannot change water that was already delivered."
           }
         ],
         "safetyCritical": false,
         "id": "D2-q1"
       },
       {
-        "prompt": "An armed plan owns read-only targets. What is the appropriate learning action?",
+        "prompt": "Target source says armed schedule, so the targets are read-only. What is the right learning action?",
         "options": [
           {
-            "text": "Force the underlying entity.",
+            "text": "Change the value directly in Home Assistant.",
             "correct": false,
-            "feedback": "Bypassing ownership defeats the workflow and does not establish a safe edit."
+            "feedback": "Going around the plan skips the review, and the plan can overwrite it."
           },
           {
             "text": "Disarm the live plan for practice.",
             "correct": false,
-            "feedback": "A real disarm is a scheduled handover, not a lesson shortcut."
+            "feedback": "That changes who owns a real crop’s targets. You meet Disarm in the next lesson; it is not a practice shortcut."
           },
           {
-            "text": "Read Calendar and practise in a manual demo zone.",
+            "text": "Read Calendar and practise in a manual demo room.",
             "correct": true,
-            "feedback": "Correct. Calendar holds dated targets; manual practice needs an appropriate demo zone."
+            "feedback": "Correct. Calendar holds the plan’s targets; manual practice belongs in the demo."
           }
         ],
         "safetyCritical": true,
         "id": "D2-q2"
       },
       {
-        "prompt": "What is the P3 emergency floor?",
+        "prompt": "What is the Rescue floor in P3?",
         "options": [
           {
-            "text": "A safety threshold used under overnight rules.",
+            "text": "A safety level: below it overnight, a rescue shot is given.",
             "correct": true,
-            "feedback": "Correct. It is not an ordinary overnight target or command for a guaranteed shot."
+            "feedback": "Correct. It is a night alarm, not an everyday target."
           },
           {
-            "text": "A normal moisture value to maintain every night.",
+            "text": "A normal moisture value to hold every night.",
             "correct": false,
-            "feedback": "Treating the floor as an ordinary target changes its safety meaning."
+            "feedback": "Treating the floor as a target changes its safety meaning."
           },
           {
             "text": "A time when a shot always starts.",
             "correct": false,
-            "feedback": "It is a threshold; conditions and protections determine whether a shot occurs."
+            "feedback": "It is a moisture level, not a time."
           }
         ],
         "safetyCritical": true,
         "id": "D2-q3"
       },
       {
-        "prompt": "Apply finished but readback is unavailable. What is established?",
+        "prompt": "Apply finished but no readback came back. What do you know?",
         "options": [
           {
             "text": "The target was definitely accepted.",
             "correct": false,
-            "feedback": "A completed request without clear readback does not prove acceptance."
+            "feedback": "Without a readback, nobody has confirmed the new value."
           },
           {
-            "text": "Acceptance remains unresolved.",
+            "text": "You do not yet know if it was accepted.",
             "correct": true,
-            "feedback": "Correct. Inspect the result and connection before further changes."
+            "feedback": "Correct. Check the value shown and the connection before changing anything else."
           },
           {
             "text": "The old target is now zero.",
             "correct": false,
-            "feedback": "Unavailable readback must not become an invented zero."
+            "feedback": "A missing readback never means zero. Check the value shown."
           }
         ],
         "safetyCritical": false,
@@ -548,7 +830,7 @@
     "practicalTask": {
       "instructions": [
         "Complete workbook exercise 8 in the isolated demo.",
-        "Show saved, draft, review and readback, then restore the starting value."
+        "Show the saved, draft, review and readback, then restore the starting value."
       ],
       "requiresLocalSupervision": false,
       "proof": "demo"
@@ -580,12 +862,13 @@
     "id": "D3",
     "module": "D",
     "title": "Plan days and weeks without losing control",
-    "summary": "Build an editable demo timetable from named bundles of settings, then separate storing, arming, activation and Watering permission.",
+    "summary": "Build a dated timetable of targets in Calendar, then keep Review & save, Arm plan, activation and the Watering switch apart.",
     "outcomes": [
-      "Define a profile, endpoints and a dated schedule block.",
-      "Calculate the 2%–4% halfway blend and check shared profile use.",
-      "Separate save, arm, next-lights-on activation and Watering permission.",
-      "Explain the timing of disarm and why a plan hold can permit safety watering."
+      "Define grow plan, profile, endpoint, schedule block and Zone start date.",
+      "Calculate the 2%–4% halfway blend and find every block that shares a profile.",
+      "Separate Review & save, Arm plan, activation at the next lights-on and the Watering switch.",
+      "Explain Disarm plan timing and why a plan hold still allows safety watering.",
+      "Say what a Recipes copy is and what it does not change."
     ],
     "prerequisites": [
       "D2"
@@ -595,206 +878,346 @@
       {
         "title": "A timetable points to a settings card",
         "body": [
-          "Calendar is the dated timetable.",
-          "A profile is a named bundle of settings.",
-          "Use an already editable demo draft."
+          "Calendar: the dated timetable of the grow plan.",
+          "Profile: a named bundle of settings each day points to.",
+          "Edit only while the plan status is draft."
         ],
-        "narration": "Think of a calendar timetable that points to a recipe card. The timetable says when; the card holds a bundle of settings. The planner calls that bundle a profile. Open Irrigation, Calendar, using an already editable demo draft. A draft is work still being prepared. Read its plan status and target ownership before opening any settings.",
+        "narration": "A school timetable says which lesson happens on which day. The lesson notes live in a separate folder. A grow plan works the same way. A grow plan is a dated timetable of targets for each zone. In Irrigation, open the second tab, Calendar. Calendar shows that timetable. Each day in it points to a profile. A profile is a named bundle of settings, like one folder of lesson notes. Before you change anything, read two things. First, the plan’s status. Draft means you can still edit it. Armed or active means the Controller is about to use it, or is using it, so editing is locked. Second, Target source, which you read in D two. In the demo, start with a plan whose status is draft. Editing a plan the Controller is following would change a live crop’s targets. Next, look inside a profile.",
         "visual": {
           "type": "calendar",
           "title": "A timetable points to a settings card",
           "labels": [
-            "Calendar is the dated timetable.",
-            "A profile is a named bundle of settings.",
-            "Use an already editable demo draft."
+            "Calendar: the dated timetable of the grow plan.",
+            "Profile: a named bundle of settings each day points to.",
+            "Edit only while the plan status is draft."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-calendar-r3.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
-        "id": "D3-s1"
+        "id": "D3-s1",
+        "check": {
+          "prompt": "Calendar shows a plan with status active. You want to change week 3. What is true?",
+          "options": [
+            {
+              "text": "Edit freely; changes wait until tomorrow.",
+              "correct": false,
+              "feedback": "An active plan is locked. It must go back to draft before you edit."
+            },
+            {
+              "text": "It is locked; it must return to draft first.",
+              "correct": true,
+              "feedback": "Right. Only a draft plan can be edited."
+            },
+            {
+              "text": "Active is another word for draft.",
+              "correct": false,
+              "feedback": "Draft means editable. Active means the Controller is following it."
+            }
+          ]
+        }
       },
       {
         "title": "A profile holds two endpoints",
         "body": [
-          "Calendar & profiles → Endpoint profiles.",
-          "Each endpoint is a set of values at one end of the slider."
+          "Calendar & profiles › Endpoint profiles: two endpoint columns.",
+          "Shared profile: duplicate it before changing one zone."
         ],
-        "narration": "Open Calendar and profiles, then Endpoint profiles. Each profile holds two sets of values, called endpoints: vegetative and generative. The balance slider blends between them, as you practised in B three. One profile can serve several schedule blocks and zones. Find those uses before editing. Duplicate the profile when you need an independent copy for another zone.",
+        "narration": "Remember the dimmer from B three. An endpoint is the set of values at one end of the slider: vegetative at zero, generative at one hundred. A profile stores both endpoints. Under Calendar, open the section called Calendar and profiles. It has three tabs: Steering balance, Endpoint profiles and Recipes. Open Endpoint profiles. Look at the two columns, one for each endpoint. One profile can serve many days and many zones. A run of days in one zone that uses one profile is called a schedule block. For example, a profile named Bulk might serve days one to fourteen in Zone one, and days one to twenty one in Zone two. That is two blocks sharing one profile. Change the profile, and both blocks change. If one zone needs different values, duplicate the profile first, then edit the copy. A shared edit can change a zone you never meant to touch. Next, work out a blend.",
         "visual": {
           "type": "steering",
           "title": "A profile holds two endpoints",
           "labels": [
-            "Calendar & profiles → Endpoint profiles.",
-            "Each endpoint is a set of values at one end of the slider."
+            "Calendar & profiles › Endpoint profiles: two endpoint columns.",
+            "Shared profile: duplicate it before changing one zone."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-endpoint-profiles-r3.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
-        "id": "D3-s2"
+        "id": "D3-s2",
+        "check": {
+          "prompt": "Profile Bulk serves Zone 1 days 1–14 and Zone 2 days 1–21. You want only Zone 2 changed. What first?",
+          "options": [
+            {
+              "text": "Duplicate Bulk and give Zone 2 the copy.",
+              "correct": true,
+              "feedback": "Right. The copy is independent, so Zone 1 keeps Bulk unchanged."
+            },
+            {
+              "text": "Edit Bulk; only Zone 2 is selected.",
+              "correct": false,
+              "feedback": "Selection does not limit a shared profile. Both blocks would change."
+            },
+            {
+              "text": "Edit Bulk; Zone 1 will not mind.",
+              "correct": false,
+              "feedback": "Zone 1 uses Bulk too. Its targets would change as well."
+            }
+          ]
+        }
       },
       {
         "title": "Worked example: a 2%–4% blend",
         "body": [
-          "Fictional P2 shot-size endpoints: 2% and 4% of substrate volume.",
-          "Halfway: 2 + 0.5 × (4 − 2) = 3%.",
-          "Assign days 1–7 from this zone’s start date."
+          "P2 shot size endpoints 2% and 4%: 2 + 0.5 × (4 − 2) = 3%.",
+          "Zone start date = day 1 for that zone.",
+          "Days 1–7 assigned; no gaps, no overlaps."
         ],
-        "narration": "Use fictional P two shot-size endpoints of two and four percent of substrate volume. Halfway gives three percent, before rounding to the supported step. This is a delivery-size setting, not a promise of a three-point probe rise. Give the demo zone its own start date. Assign the profile to days one through seven, checking neighbouring blocks for missing days or overlaps.",
+        "narration": "Halfway between two numbers sits in the middle. Shot size is how much water each P two shot gives, as a share of the substrate volume, as in B four. In this fictional profile, the P two shot size is two percent at the vegetative endpoint. At the generative endpoint it is four percent. The difference is four minus two, which is two. Half of two is one. Add one to two, and the halfway blend is three percent, before rounding to the setting’s step. The probe may rise by a different amount. Now give it dates. Open Steering balance and set the Zone start date. That date is day one for this zone. Each zone can have its own start date. If Zone one starts on the first of March, day seven is the seventh of March. Assign the profile to days one to seven, then read the blocks either side. Every day needs exactly one block, with no gaps and no overlaps. A day with no block has no targets, and the plan holds that zone. Next, store the plan and switch it on.",
         "visual": {
           "type": "lesson-cues",
           "title": "Worked example: a 2%–4% blend",
           "labels": [
-            "Fictional P2 shot-size endpoints: 2% and 4% of substrate volume.",
-            "Halfway: 2 + 0.5 × (4 − 2) = 3%.",
-            "Assign days 1–7 from this zone’s start date."
+            "P2 shot size endpoints 2% and 4%: 2 + 0.5 × (4 − 2) = 3%.",
+            "Zone start date = day 1 for that zone.",
+            "Days 1–7 assigned; no gaps, no overlaps."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
         "workedExample": {
-          "prompt": "What does 50% balance mean between 2% and 4% endpoints?",
+          "prompt": "What does a 50% balance give between 2% and 4% shot-size endpoints?",
           "steps": [
-            "Check the setting and unit.",
+            "Check the setting and its unit: P2 shot size, % of substrate volume.",
             "Calculate 2 + 0.5 × (4 − 2) = 3.",
-            "Check the supported step and preview.",
-            "Confirm start date, day range and profile references."
+            "Check the setting’s step and the preview.",
+            "Confirm the Zone start date, the day range and every block that uses the profile."
           ],
-          "answer": "The illustrative shot-size setting is 3% if its step permits. This does not guarantee a three-point VWC rise."
+          "answer": "A 3% shot size, if the step allows it. This sets shot size; it does not promise a 3-point VWC rise."
         },
-        "id": "D3-s3"
+        "id": "D3-s3",
+        "check": {
+          "prompt": "Zone start date: 10 April. Which date is day 5?",
+          "options": [
+            {
+              "text": "15 April",
+              "correct": false,
+              "feedback": "Day 1 is 10 April, so day 5 is 4 days later, not 5."
+            },
+            {
+              "text": "14 April",
+              "correct": true,
+              "feedback": "Right. Day 1 is 10 April; add 4 days to reach day 5."
+            },
+            {
+              "text": "5 April",
+              "correct": false,
+              "feedback": "Day numbers count from the Zone start date, not from the 1st of the month."
+            }
+          ]
+        }
       },
       {
         "title": "Store first, then request activation",
         "body": [
-          "Review & save stores the draft.",
-          "Arm requests activation at the next local lights-on.",
-          "Watering permission remains separate."
+          "Review & save: checks and stores the plan, still as a draft.",
+          "Arm plan: start at the next local lights-on (activation).",
+          "Arming never turns Watering on or starts a pump."
         ],
-        "narration": "Review and save stores the checked draft in Home Assistant. Arm is a separate request for the controller to start using it at the next local lights-on. Activation means the controller has taken over its dated targets. Check validation, controller support and reported status. Arming neither turns Watering on nor starts the pump. Those are separate control permissions and actions.",
+        "narration": "Booking a flight, checking in and boarding are separate steps. A grow plan has the same kind of steps. First, Review and save. The app checks the draft for problems, then stores it in Home Assistant. A saved plan is still a draft. Second, Arm plan. Arming is a request: start using this plan at the next local lights-on. The Arm plan button stays unavailable until the Controller reports that it supports plans. Third, activation. Activation is the moment the Controller takes over the plan’s dated targets. Example: you arm at three in the afternoon, and lights-on is at six in the morning. From three in the afternoon to six the next morning is fifteen hours, so activation comes fifteen hours later. Check the status the Controller reports, not only your click. Fourth, and separate from all of these, is the Watering switch in the top bar. Arming never turns Watering on and never starts a pump. Next, learn how to hand control back.",
         "visual": {
           "type": "calendar",
           "title": "Store first, then request activation",
           "labels": [
-            "Review & save stores the draft.",
-            "Arm requests activation at the next local lights-on.",
-            "Watering permission remains separate."
+            "Review & save: checks and stores the plan, still as a draft.",
+            "Arm plan: start at the next local lights-on (activation).",
+            "Arming never turns Watering on or starts a pump."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-calendar-profile-grid-r3.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
-        "id": "D3-s4"
+        "id": "D3-s4",
+        "check": {
+          "prompt": "You select Arm plan at 20:00. Lights-on is at 06:00. When does the plan take over?",
+          "options": [
+            {
+              "text": "At 20:00, straight away.",
+              "correct": false,
+              "feedback": "Arming is a request for the next lights-on, not an immediate switch."
+            },
+            {
+              "text": "Only after you switch Watering on.",
+              "correct": false,
+              "feedback": "Watering is separate. Activation happens at lights-on either way."
+            },
+            {
+              "text": "At 06:00, 10 hours later.",
+              "correct": true,
+              "feedback": "Right. From 20:00 to 06:00 is 10 hours."
+            }
+          ]
+        }
       },
       {
         "title": "Understand the return handover",
         "body": [
-          "Disarm requests manual targets at the next lights-on.",
-          "Wait for draft status before editing.",
-          "A plan hold can still permit safety watering."
+          "Disarm plan: manual targets return at the next lights-on.",
+          "Edit again only when the status reads draft.",
+          "Plan hold: no plan steering, but safety watering still runs."
         ],
-        "narration": "Disarm asks for a handover back to manual targets at the next lights-on. Existing active targets remain until that handover. Review the manual values that will return and wait for draft status before editing. A plan hold pauses plan steering, while controller safety watering may still occur. For uncontrolled physical flow, the local physical shutdown procedure takes priority.",
+        "narration": "A shift handover happens at a set time, not halfway through a task. Disarm plan asks the Controller to go back to manual targets at the next lights-on. Until then, the plan’s targets stay in force. Wait for the status to read draft before you edit. From then on, the plan is yours to change again. A plan hold is a different thing. A hold happens when a zone’s day in the plan is missing, finished or invalid. The Controller then stops steering that zone by the plan, rather than invent targets. Safety watering still runs during a hold, such as the overnight rescue shot below the Rescue floor. So a hold pauses the plan, and the zone can still get water. If water flows when it should not, use the physical shutdown at the equipment first. Disarm plan and a hold are software states, and they come after that. Next, practise a second block on your own.",
         "visual": {
           "type": "lesson-cues",
           "title": "Understand the return handover",
           "labels": [
-            "Disarm requests manual targets at the next lights-on.",
-            "Wait for draft status before editing.",
-            "A plan hold can still permit safety watering."
+            "Disarm plan: manual targets return at the next lights-on.",
+            "Edit again only when the status reads draft.",
+            "Plan hold: no plan steering, but safety watering still runs."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D3-s5"
+        "id": "D3-s5",
+        "check": {
+          "prompt": "At 02:00 a zone shows a plan hold, and its moisture is below the Rescue floor. What can happen?",
+          "options": [
+            {
+              "text": "Nothing; a hold stops all water.",
+              "correct": false,
+              "feedback": "A hold stops plan steering only. Safety watering continues."
+            },
+            {
+              "text": "A rescue shot can still run.",
+              "correct": true,
+              "feedback": "Right. The hold pauses the plan, not the overnight safety rule."
+            },
+            {
+              "text": "The plan disarms itself.",
+              "correct": false,
+              "feedback": "A hold is not a disarm. The plan stays and waits for a valid day."
+            }
+          ]
+        }
       },
       {
         "title": "Your turn: another dated block",
         "body": [
-          "Use another demo zone and days 8–14.",
-          "Check start date, profile uses and contiguous coverage.",
-          "Recipes saves reusable copies in this browser."
+          "Another zone, days 8–14: start date, shared uses, no gaps.",
+          "Review & save the demo draft; leave Arm plan alone.",
+          "Recipes: copies in this browser; loading changes only the draft."
         ],
-        "narration": "Use another demo zone and days eight through fourteen. Say its start date, find every block sharing the chosen profile, and preview the dated values. Review the draft without arming real equipment. Recipes stores reusable copies for this browser, site, room and mode. Loading a copy creates local draft work; saving a library copy does not change active Home Assistant targets.",
+        "narration": "A second try without the worked example shows what you really learned. Choose another demo zone and plan days eight to fourteen. Say its Zone start date aloud, then work out the calendar date of day eight. Find every block that uses your chosen profile. Check the days either side for gaps or overlaps. Use Review and save on the demo draft, and leave Arm plan alone. Then open the Recipes tab. A recipe is a saved copy of a plan, kept in this browser for this site, this room and this mode, demo or live. The button Load into local draft copies a recipe into your draft. It keeps each zone’s current start dates. Saving a recipe changes nothing in Home Assistant. Loading one changes only your draft. A recipe is a notebook, not the plan the Controller follows. Next, recall the whole sequence.",
         "visual": {
           "type": "lesson-cues",
           "title": "Your turn: another dated block",
           "labels": [
-            "Use another demo zone and days 8–14.",
-            "Check start date, profile uses and contiguous coverage.",
-            "Recipes saves reusable copies in this browser."
+            "Another zone, days 8–14: start date, shared uses, no gaps.",
+            "Review & save the demo draft; leave Arm plan alone.",
+            "Recipes: copies in this browser; loading changes only the draft."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D3-s6"
+        "id": "D3-s6",
+        "check": {
+          "prompt": "Zone start date: 3 May. What date is day 8?",
+          "options": [
+            {
+              "text": "10 May",
+              "correct": true,
+              "feedback": "Right. Day 1 is 3 May; add 7 days to reach day 8."
+            },
+            {
+              "text": "11 May",
+              "correct": false,
+              "feedback": "That adds 8 days. Day 1 is already 3 May, so add 7."
+            },
+            {
+              "text": "8 May",
+              "correct": false,
+              "feedback": "Day numbers count from the Zone start date, not the 1st of the month."
+            }
+          ]
+        }
       },
       {
         "title": "Recall what each action does",
         "body": [
-          "Explain save, arm, activation and Watering separately.",
-          "Explain profile sharing and scheduled disarm."
+          "Save, arm, activation and Watering are four separate things.",
+          "Disarm plan returns manual targets at the next lights-on."
         ],
-        "narration": "Close the screen and teach the timetable analogy. What does a profile contain? When does day one start for each zone? Explain save, arm, activation and Watering separately. Then explain when disarm returns manual control. Tomorrow repeat with a different zone start date. Your practice record should show the edited block and its preview, with shared uses and unresolved status clearly identified.",
+        "narration": "Close the screen and teach the timetable idea to someone else. What does a profile contain? Two endpoints, one at each end of the slider. When is day one for a zone? Its own Zone start date. Now separate the four actions. Review and save stores a checked draft. Arm plan asks for activation at the next local lights-on. Activation is when the Controller takes over the dated targets. Watering is the room’s own switch, and arming never touches it. Then explain the way back. Disarm plan returns manual targets at the next lights-on, and you edit once the status reads draft. Finish with the hold: plan steering pauses, and safety watering continues. Tomorrow, repeat the exercise with a different start date. Your practice record should show the block, its preview and every block that shares its profile. Next lesson, you compare what happened with what was planned.",
         "visual": {
           "type": "lesson-cues",
           "title": "Recall what each action does",
           "labels": [
-            "Explain save, arm, activation and Watering separately.",
-            "Explain profile sharing and scheduled disarm."
+            "Save, arm, activation and Watering are four separate things.",
+            "Disarm plan returns manual targets at the next lights-on."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D3-s7"
+        "id": "D3-s7",
+        "check": {
+          "prompt": "Which action stores the plan without changing what the Controller does today?",
+          "options": [
+            {
+              "text": "Arm plan",
+              "correct": false,
+              "feedback": "Arming asks the Controller to take over at the next lights-on."
+            },
+            {
+              "text": "Review & save",
+              "correct": true,
+              "feedback": "Right. It stores a checked draft. Nothing changes until it is armed and activated."
+            },
+            {
+              "text": "Switching Watering on",
+              "correct": false,
+              "feedback": "Watering lets the Controller give shots. It does not store a plan."
+            }
+          ]
+        }
       }
     ],
     "practice": {
       "kind": "demo-and-explain",
       "prompt": "Create a demo block for another zone and explain save-to-activation timing.",
       "hints": [
-        "Check editable status.",
-        "Inspect start date and shared-profile references.",
-        "Say separately what save, arm and Watering do."
+        "Check the plan status reads draft.",
+        "Find the Zone start date and every block sharing the profile.",
+        "Say separately what Review & save, Arm plan and Watering do."
       ],
-      "success": "The block is valid; explanation includes next local lights-on, target ownership and the limits of disarm and hold."
+      "success": "The block is valid; your explanation covers activation at the next local lights-on, who owns the targets, and what Disarm plan and a hold do."
     },
     "quiz": [
       {
-        "prompt": "A reviewed plan is saved. What is established?",
+        "prompt": "A reviewed plan is saved with Review & save. What do you know?",
         "options": [
           {
             "text": "A stored draft exists; saving did not arm it.",
             "correct": true,
-            "feedback": "Correct. Save and arm are separate actions."
+            "feedback": "Correct. Review & save and Arm plan are separate actions."
           },
           {
             "text": "Watering starts immediately.",
             "correct": false,
-            "feedback": "Saving does not enable Watering, start a pump or arm the plan."
+            "feedback": "Saving does not turn Watering on, start a pump or arm the plan."
           },
           {
             "text": "All zones now use the plan.",
             "correct": false,
-            "feedback": "Activation needs a separate arm and verified scheduled handover."
+            "feedback": "The plan needs Arm plan, then activation at the next lights-on."
           }
         ],
         "safetyCritical": false,
         "id": "D3-q1"
       },
       {
-        "prompt": "What does arming do?",
+        "prompt": "What does Arm plan do?",
         "options": [
           {
             "text": "Turns Watering on automatically.",
             "correct": false,
-            "feedback": "Watering permission is separate. Arming never enables the engine or pump."
+            "feedback": "Watering is separate. Arming never turns Watering on or starts a pump."
           },
           {
             "text": "Requests activation at the next local lights-on.",
             "correct": true,
-            "feedback": "Correct. Verify room hours, controller support and activation status."
+            "feedback": "Correct. Then check the lights-on time and the status the Controller reports."
           },
           {
             "text": "Immediately replaces recorded history.",
             "correct": false,
-            "feedback": "Arming changes neither observations nor past target evidence."
+            "feedback": "Arming never changes recorded readings or past targets."
           }
         ],
         "safetyCritical": true,
@@ -804,19 +1227,19 @@
         "prompt": "An active plan needs an edit. What is correct?",
         "options": [
           {
-            "text": "Edit the manual fallback and assume it takes effect.",
+            "text": "Edit the manual targets and assume they take effect.",
             "correct": false,
-            "feedback": "Plan ownership does not change through a manual fallback edit."
+            "feedback": "While the plan is active, it owns the targets. Manual edits do not take over."
           },
           {
-            "text": "Disarm and edit immediately.",
+            "text": "Select Disarm plan and edit immediately.",
             "correct": false,
-            "feedback": "Active targets remain until the next-lights-on handover. Wait for draft status."
+            "feedback": "Active targets stay until the next lights-on. Wait for the draft status."
           },
           {
-            "text": "Review the handover, disarm and wait for draft before editing.",
+            "text": "Review the handover, Disarm plan, and wait for draft before editing.",
             "correct": true,
-            "feedback": "Correct. This respects ownership and the scheduled return to manual targets."
+            "feedback": "Correct. This respects the plan’s ownership and the lights-on handover."
           }
         ],
         "safetyCritical": true,
@@ -826,19 +1249,19 @@
         "prompt": "A plan hold is displayed. Which statement is correct?",
         "options": [
           {
-            "text": "Safety watering is guaranteed disabled.",
+            "text": "Safety watering is definitely off.",
             "correct": false,
-            "feedback": "A plan hold can still permit safety watering under controller rules."
+            "feedback": "A plan hold still allows safety watering, such as a rescue shot."
           },
           {
-            "text": "The water path is physically isolated.",
+            "text": "The water supply is physically shut off.",
             "correct": false,
-            "feedback": "A software status cannot prove physical isolation."
+            "feedback": "A software status cannot shut off water. Only the physical shutdown does."
           },
           {
-            "text": "Investigate the hold reason; safety watering may still occur.",
+            "text": "Find the hold reason; safety watering may still run.",
             "correct": true,
-            "feedback": "Correct. A hold controls plan steering and is not a physical emergency stop."
+            "feedback": "Correct. A hold pauses plan steering; it is not an emergency stop."
           }
         ],
         "safetyCritical": true,
@@ -848,19 +1271,19 @@
         "prompt": "A profile is used by three blocks in two zones. What requires review?",
         "options": [
           {
-            "text": "All references, or duplicate the profile for independence.",
+            "text": "Every block using it, or duplicate the profile first.",
             "correct": true,
-            "feedback": "Correct. Shared references can spread changes beyond the selected block."
+            "feedback": "Correct. A shared profile spreads a change to every block that uses it."
           },
           {
             "text": "Only the selected cell.",
             "correct": false,
-            "feedback": "Cell selection does not limit a shared profile’s references."
+            "feedback": "Selecting a cell does not limit a shared profile."
           },
           {
-            "text": "Save a recipe to apply immediately.",
+            "text": "Save a recipe to apply it immediately.",
             "correct": false,
-            "feedback": "A browser recipe does not apply active targets."
+            "feedback": "A recipe is a browser copy. It does not change the plan in Home Assistant."
           }
         ],
         "safetyCritical": false,
@@ -870,8 +1293,8 @@
     "practicalTask": {
       "instructions": [
         "Build and review one independent demo block.",
-        "Explain arm and disarm timing using the demo room’s lights-on hour.",
-        "List all references to one shared profile."
+        "Explain Arm plan and Disarm plan timing using the demo room’s lights-on hour.",
+        "List every block that uses one shared profile."
       ],
       "requiresLocalSupervision": false,
       "proof": "demo"
@@ -898,12 +1321,12 @@
     "id": "D4",
     "module": "D",
     "title": "Compare reality with the plan",
-    "summary": "Read recorded history like a bank statement and a target reference like a budget, comparing equivalent periods and preserving source labels.",
+    "summary": "Read History like a bank statement and targets like a budget: compare matched periods, keep estimate labels and date every reference.",
     "outcomes": [
-      "Choose a history view for the question being asked.",
-      "Compare matched grow age, zone definitions, units and coverage.",
-      "Separate historical observations from reference snapshots and delivery estimates.",
-      "State the 12 L versus 15 L difference without inventing uptake or cause."
+      "Pick the History tab that answers your question.",
+      "Match grow age, zone, units and coverage before comparing.",
+      "Separate recorded readings, saved reference snapshots and delivery estimates.",
+      "State the 12 L versus 15 L difference without claiming uptake or cause."
     ],
     "prerequisites": [
       "D3"
@@ -913,178 +1336,318 @@
       {
         "title": "A budget and a statement answer different questions",
         "body": [
-          "History → Timeline: events and changes.",
-          "Water use: delivery records.",
-          "Compare runs: matched histories; Grows: run records."
+          "Timeline: Controller records, newest first.",
+          "Water use: litres per zone. Compare runs: two runs side by side.",
+          "Grows: run records with names and dates."
         ],
-        "narration": "A bank budget describes a plan. A bank statement records transactions. Keep that distinction when reading History in the isolated demo. Timeline lists events and changes. Water use shows delivery records. Compare runs helps compare available histories; Grows manages run records and summaries. Start by writing the question, room, zone and interval you want the evidence to answer.",
+        "narration": "A budget says what you planned to spend. A bank statement shows what was actually spent. The app has both kinds of information. Targets are the budget. History is the statement. Open History in the isolated demo. It has four main tabs. Timeline is one list of the Controller’s records, such as shots, phase changes and target changes, newest first. Water use shows the litres each zone was given today, this grow week and since the grow started. A run is one grow in one room, from start to finish. Compare runs puts the run in progress beside an earlier run, week by week. Grows holds the run records: the name, start date and end date of each run. Before you open any tab, write down your question, the room, the zone and the time period. For example: did Zone two in Room A get more water on day ten than last run? A clear question tells you which tab to open. Next, make sure two runs are fair to compare.",
         "visual": {
           "type": "navigation",
           "title": "A budget and a statement answer different questions",
           "labels": [
-            "History → Timeline: events and changes.",
-            "Water use: delivery records.",
-            "Compare runs: matched histories; Grows: run records."
+            "Timeline: Controller records, newest first.",
+            "Water use: litres per zone. Compare runs: two runs side by side.",
+            "Grows: run records with names and dates."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-history-compare-r3.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
-        "id": "D4-s1"
+        "id": "D4-s1",
+        "check": {
+          "prompt": "You want to know when Zone 3’s phase changed yesterday. Which tab do you open?",
+          "options": [
+            {
+              "text": "Water use",
+              "correct": false,
+              "feedback": "Water use shows litres, not phase changes."
+            },
+            {
+              "text": "Grows",
+              "correct": false,
+              "feedback": "Grows holds run names and dates, not daily events."
+            },
+            {
+              "text": "Timeline",
+              "correct": true,
+              "feedback": "Right. Timeline lists the Controller’s records, including phase changes."
+            }
+          ]
+        }
       },
       {
         "title": "Match the comparison before calculating",
         "body": [
-          "Match elapsed grow age and zone definition.",
-          "Check units, EC type, time window and coverage."
+          "Match grow age, zone, plant count, units and EC type.",
+          "Coverage: how much of the period has records. Missing ≠ zero."
         ],
-        "narration": "Compare the same elapsed grow age, such as day ten with day ten. Match the zone definition and check whether plant count changed. Then check units and measurement types, including which EC is displayed. Inspect the recorded dates and coverage. A full week and one day offer different opportunities for water use. Missing periods stay missing, rather than becoming zeros.",
+        "narration": "Comparing one child’s height at age five with another’s at age eight tells you little. You compare at the same age. Grow age is the number of days since a run started. Compare day ten with day ten. Next, match the zone. Check it had the same plant count and the same setup in both runs. Then match the units and the type of EC. Pore-water EC and feed EC are different measurements, as you learned in A five. Last, check coverage. Coverage means how much of the period actually has recorded data. In Compare runs, the section called Data quality and history coverage shows each day’s recorded range as a bar. Example: one run has twenty four hours of records for day ten, and the other has six hours. That is not a fair match. A day with no records stays empty, and empty is different from zero. Next, try a fair comparison.",
         "visual": {
           "type": "lesson-cues",
           "title": "Match the comparison before calculating",
           "labels": [
-            "Match elapsed grow age and zone definition.",
-            "Check units, EC type, time window and coverage."
+            "Match grow age, zone, plant count, units and EC type.",
+            "Coverage: how much of the period has records. Missing ≠ zero."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D4-s2"
+        "id": "D4-s2",
+        "check": {
+          "prompt": "Run A day 10 has 24 h of records. Run B day 10 has 6 h. Can you compare their day-10 totals?",
+          "options": [
+            {
+              "text": "Yes; both are day 10.",
+              "correct": false,
+              "feedback": "Same day number, but B is missing 18 hours. Coverage must match too."
+            },
+            {
+              "text": "No; coverage differs, so pick a matched period.",
+              "correct": true,
+              "feedback": "Right. Only compare periods that both have full records."
+            },
+            {
+              "text": "Yes, counting the missing 18 h as zero.",
+              "correct": false,
+              "feedback": "Missing hours are unknown, not zero. Counting them as zero invents data."
+            }
+          ]
+        }
       },
       {
         "title": "Worked example: day ten, 12 L versus 15 L",
         "body": [
-          "Same zone definition; complete matched day-ten records.",
-          "A: 12 L estimated; B: 15 L estimated.",
-          "B reports 3 L more estimated delivery."
+          "Same zone and plant count; complete day-10 records.",
+          "A: 12 L estimated; B: 15 L estimated; 15 − 12 = 3 L.",
+          "3 L more delivery, not proof of uptake or cause."
         ],
-        "narration": "Two fictional runs have complete day-ten records for the same zone definition. Run A reports twelve litres estimated delivery. Run B reports fifteen. Subtract twelve from fifteen: B reports three litres more estimated delivery for that matched day. Preserve the word estimated. These totals cannot tell us that plants absorbed three litres more or that a changed target caused the difference.",
+        "narration": "Now a fair comparison. Two fictional runs have complete day ten records for the same zone, with the same plant count. Run A shows twelve litres of estimated delivery. Run B shows fifteen. Subtract twelve from fifteen. That is three. So Run B received three litres more estimated delivery on day ten. Remember from B four: delivery is water supplied through the drippers, runoff is water that drains out, and uptake is water that enters the plant. Water use counts delivery, worked out from each shot’s runtime and the configured dripper flow. Keep the word estimated in your sentence. Three litres more delivery does not show the plants took up three litres more, or that a target change caused it. Climate, plant size and other changes can all play a part. A careful sentence is: Run B shows three litres more estimated delivery on matched day ten. Next, date the reference you compare against.",
         "visual": {
           "type": "lesson-cues",
           "title": "Worked example: day ten, 12 L versus 15 L",
           "labels": [
-            "Same zone definition; complete matched day-ten records.",
-            "A: 12 L estimated; B: 15 L estimated.",
-            "B reports 3 L more estimated delivery."
+            "Same zone and plant count; complete day-10 records.",
+            "A: 12 L estimated; B: 15 L estimated; 15 − 12 = 3 L.",
+            "3 L more delivery, not proof of uptake or cause."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
         "workedExample": {
-          "prompt": "What follows from matched day-ten estimates of 12 L and 15 L?",
+          "prompt": "What follows from matched day-10 estimates of 12 L and 15 L?",
           "steps": [
-            "Confirm zone definition and equal grow age.",
-            "Check complete coverage and estimate sources.",
+            "Confirm the same zone, plant count and grow age.",
+            "Check complete coverage and the source of each estimate.",
             "Subtract 15 − 12 = 3 L.",
-            "Preserve the estimate label and avoid attributing cause."
+            "Keep the word estimated and do not name a cause."
           ],
-          "answer": "Run B has 3 L more reported estimated delivery for that interval; uptake and cause are not established."
+          "answer": "Run B shows 3 L more estimated delivery on matched day 10; uptake and cause are not shown."
         },
-        "id": "D4-s3"
+        "id": "D4-s3",
+        "check": {
+          "prompt": "Matched day 7: Run A 9 L, Run B 13.5 L estimated delivery. Which statement is supported?",
+          "options": [
+            {
+              "text": "B shows 4.5 L more estimated delivery.",
+              "correct": true,
+              "feedback": "Right. 13.5 − 9 = 4.5 L, and the label stays estimated."
+            },
+            {
+              "text": "B’s plants took up 4.5 L more.",
+              "correct": false,
+              "feedback": "Delivery is not uptake. Some water may have drained as runoff."
+            },
+            {
+              "text": "B’s new targets caused 4.5 L more.",
+              "correct": false,
+              "feedback": "The totals alone cannot show cause. Check climate and other changes."
+            }
+          ]
+        }
       },
       {
         "title": "Date the reference as carefully as the reading",
         "body": [
-          "A reference is a comparison value or configuration.",
-          "A saved snapshot has a capture time.",
-          "Creating an old run today cannot reconstruct past targets."
+          "Target reference: what you compare readings against.",
+          "Snapshot: targets saved at one moment, with a time stamp.",
+          "A run recorded late gets today’s targets, not past ones."
         ],
-        "narration": "A reference is a comparison value or configuration, like the budget beside the statement. A saved run can preserve a timestamped snapshot of its reference. Creating last month’s run record today captures today’s available reference, unless an existing saved reference is available. It cannot reconstruct last month’s targets or deleted readings. Read the reference source and capture date beside the actual trace.",
+        "narration": "A budget is only useful if you know which month it was written for. A target reference is the same. Here, a reference is the set of targets you compare the readings against. In Compare runs, open the full-resolution chart and select a Target reference. There are three choices: Current configured daily plan, Saved run daily reference, and Current phase reference. A snapshot is a copy saved at one moment, with a time stamp. When you save a run record in Grows, the app saves a snapshot of the targets at that moment. Example: today is the twentieth of October, and you record last month’s run for the first time. Its snapshot holds today’s targets, not last month’s. Targets nobody saved cannot be rebuilt. Read the note beside the reference. It says when the reference was captured and where it came from. Comparing old readings with the wrong month’s targets leads to false conclusions. Next, label the delivery figure correctly.",
         "visual": {
           "type": "lesson-cues",
           "title": "Date the reference as carefully as the reading",
           "labels": [
-            "A reference is a comparison value or configuration.",
-            "A saved snapshot has a capture time.",
-            "Creating an old run today cannot reconstruct past targets."
+            "Target reference: what you compare readings against.",
+            "Snapshot: targets saved at one moment, with a time stamp.",
+            "A run recorded late gets today’s targets, not past ones."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D4-s4"
+        "id": "D4-s4",
+        "check": {
+          "prompt": "On 20 October you record a run that ended on 1 September. What does its saved reference show?",
+          "options": [
+            {
+              "text": "Targets as they were on 1 September.",
+              "correct": false,
+              "feedback": "The snapshot is taken when you save. Past targets cannot be recovered."
+            },
+            {
+              "text": "Targets as they were on 20 October.",
+              "correct": true,
+              "feedback": "Right. The snapshot captures the targets on the day you saved it."
+            },
+            {
+              "text": "The targets for every day of that run.",
+              "correct": false,
+              "feedback": "One snapshot holds one moment’s targets, not the run’s history."
+            }
+          ]
+        }
       },
       {
         "title": "Your turn: name what the estimate means",
         "body": [
-          "Runtime × configured flow estimates delivery.",
-          "Per-plant figures are averages based on plant count."
+          "Runtime × configured flow = estimated delivery, not uptake.",
+          "Per plant = zone total ÷ plant count: an average."
         ],
-        "narration": "Complete the sentence: runtime multiplied by configured flow estimates delivery, rather than plant what? Pause. The answer is uptake: water entering the plant. A per-plant figure also averages the zone total over its plant count. It does not prove every emitter supplied equally. Keep estimated, measured or unknown beside the source when you copy values into a report.",
+        "narration": "A taxi meter estimates the fare from time and distance. Delivery figures work the same way. The app multiplies each shot’s runtime by the configured dripper flow. That gives estimated delivery. Measured delivery would need a water meter or a catch test. Complete the sentence in your head: runtime times flow estimates delivery, not plant what? Pause. The answer is uptake. A per-plant figure adds one more step. It divides the zone total by the plant count from setup. Example: twelve litres across six plants is twelve divided by six, which is two litres per plant on average. Some plants may have had more and some less, if a dripper was blocked. When you copy a number into a report, keep its label beside it: measured, estimated or unknown. A label lost in a report becomes a false fact for the next reader. Next, try a messy comparison.",
         "visual": {
           "type": "lesson-cues",
           "title": "Your turn: name what the estimate means",
           "labels": [
-            "Runtime × configured flow estimates delivery.",
-            "Per-plant figures are averages based on plant count."
+            "Runtime × configured flow = estimated delivery, not uptake.",
+            "Per plant = zone total ÷ plant count: an average."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D4-s5"
+        "id": "D4-s5",
+        "check": {
+          "prompt": "A zone of 8 plants shows 12 L estimated delivery. What is the per-plant figure and its label?",
+          "options": [
+            {
+              "text": "1.5 L measured at each dripper.",
+              "correct": false,
+              "feedback": "It is worked out from the total, not measured at each dripper."
+            },
+            {
+              "text": "12 L per plant.",
+              "correct": false,
+              "feedback": "12 L is the zone total. Divide by 8 plants: 1.5 L."
+            },
+            {
+              "text": "1.5 L, an estimated average per plant.",
+              "correct": true,
+              "feedback": "Right. 12 ÷ 8 = 1.5, and both labels stay: estimated and average."
+            }
+          ]
+        }
       },
       {
         "title": "Try an incomplete comparison",
         "body": [
-          "One record covers day 6; another covers days 1–6.",
-          "One EC series is missing.",
-          "Choose a matched interval before subtracting totals."
+          "Day 6 only vs days 1–6: not comparable as totals.",
+          "Recorder retention: old readings are removed after a set time.",
+          "Pick a matched period with good coverage."
         ],
-        "narration": "Now one record covers day six only; another covers days one through six. An EC series is missing. Decide whether their totals are directly comparable before calculating. They are not. Choose a matched interval with adequate coverage. Write one supported observation and one unanswered question. A longer chart axis cannot recover data the recorder no longer retains.",
+        "narration": "Comparing one day’s shopping with a whole week’s would make the week look expensive. Here, one record covers day six only. The other covers days one to six. One run is also missing its pore-water EC readings. Are their totals comparable? Decide first. They are not, because the periods differ. Choose a matched period with good coverage, such as day six in both. Why might data be missing? Home Assistant stores past readings in a part called the Recorder. The Recorder keeps readings for a limited time, and that time is called retention. Older readings are removed. Water use can also read Home Assistant’s long-term statistics, which are kept with no time limit. A longer chart cannot bring back readings the Recorder removed. Write one thing you can support, and one question you cannot answer yet. Next, recall the whole method.",
         "visual": {
           "type": "lesson-cues",
           "title": "Try an incomplete comparison",
           "labels": [
-            "One record covers day 6; another covers days 1–6.",
-            "One EC series is missing.",
-            "Choose a matched interval before subtracting totals."
+            "Day 6 only vs days 1–6: not comparable as totals.",
+            "Recorder retention: old readings are removed after a set time.",
+            "Pick a matched period with good coverage."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D4-s6"
+        "id": "D4-s6",
+        "check": {
+          "prompt": "Run A covers days 1–6. Run B covers only day 6. Which comparison is fair?",
+          "options": [
+            {
+              "text": "Days 1–6 against day 6.",
+              "correct": false,
+              "feedback": "Six days against one day is not a fair total comparison."
+            },
+            {
+              "text": "Day 6 against day 6.",
+              "correct": true,
+              "feedback": "Right. Both runs have day 6, so that period is matched."
+            },
+            {
+              "text": "Days 1–6, with B’s missing days as zero.",
+              "correct": false,
+              "feedback": "Missing days are unknown, not zero."
+            }
+          ]
+        }
       },
       {
         "title": "Recall an observation before proposing a cause",
         "body": [
-          "Record scope, matched interval, units, source and coverage.",
-          "Inspect climate, plant count, flow assumptions and other changes."
+          "Record scope, matched period, units, source and coverage.",
+          "List other influences before naming a cause."
         ],
-        "narration": "Without the chart, explain the difference between an actual observation, a saved reference and a current reference. Repeat the day-ten delivery comparison in one sentence. Then name other possible influences: climate, plant count, flow assumptions and other changes. Finish your practice with scope, interval, units, source and coverage limits. Those details let the next person assess the comparison and choose the next useful check.",
+        "narration": "Explain the budget and statement idea without the chart. A recorded reading is the statement: what the probe actually measured. A saved reference is a budget written at a known moment. A current reference is today’s budget, which may differ from last month’s. Now repeat the day ten result in one sentence: Run B shows three litres more estimated delivery on matched day ten. Then list other things that could explain it: climate, plant count, flow settings and other changes that week. Finish your practice record with five labels. The scope, meaning the room and zone. The matched period. The units. The source of each number. And the coverage. Those labels let the next person check your comparison instead of trusting it. Next lesson, you use the same care when something goes wrong.",
         "visual": {
           "type": "lesson-cues",
           "title": "Recall an observation before proposing a cause",
           "labels": [
-            "Record scope, matched interval, units, source and coverage.",
-            "Inspect climate, plant count, flow assumptions and other changes."
+            "Record scope, matched period, units, source and coverage.",
+            "List other influences before naming a cause."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D4-s7"
+        "id": "D4-s7",
+        "check": {
+          "prompt": "Which sentence is best for a report?",
+          "options": [
+            {
+              "text": "B used more water.",
+              "correct": false,
+              "feedback": "Too vague: no zone, period, amount or label."
+            },
+            {
+              "text": "B’s new targets made the plants take up 3 L more.",
+              "correct": false,
+              "feedback": "That claims uptake and cause, which totals cannot show."
+            },
+            {
+              "text": "Zone 2, matched day 10: B shows 3 L more estimated delivery than A.",
+              "correct": true,
+              "feedback": "Right. It names scope, period, amount and label."
+            }
+          ]
+        }
       }
     ],
     "practice": {
       "kind": "demo-and-explain",
       "prompt": "Write one defensible observation and one unsupported conclusion for another demo comparison.",
       "hints": [
-        "Align elapsed grow age.",
-        "Check identity, EC type and coverage.",
-        "Label reference timestamp and delivery source."
+        "Match grow age.",
+        "Check zone, EC type and coverage.",
+        "Label the reference’s capture date and the delivery source."
       ],
       "success": "The observation names scope, interval, units and source; the limit avoids inventing past targets, uptake or causation."
     },
     "quiz": [
       {
-        "prompt": "You register last month’s run today with a current reference. What is established?",
+        "prompt": "Today you save a record of last month’s run in Grows. What does its saved reference hold?",
         "options": [
           {
             "text": "Every target used last month.",
             "correct": false,
-            "feedback": "A current snapshot cannot reconstruct earlier targets."
+            "feedback": "The snapshot is taken today. Last month’s targets cannot be rebuilt."
           },
           {
-            "text": "Run metadata and an available timestamped reference.",
+            "text": "The run’s name and dates, plus today’s targets with a time stamp.",
             "correct": true,
-            "feedback": "Correct. Historical readings and targets require their own retained evidence."
+            "feedback": "Correct. Past readings and targets need their own saved records."
           },
           {
-            "text": "A backdated irrigation start.",
+            "text": "A record that restarts last month’s watering.",
             "correct": false,
-            "feedback": "Run records start no shots and cannot alter past operations."
+            "feedback": "A run record starts no shots and cannot change the past."
           }
         ],
         "safetyCritical": false,
@@ -1099,14 +1662,14 @@
             "feedback": "Runtime and flow estimate delivery, not uptake."
           },
           {
-            "text": "Proof of equal emitter delivery.",
+            "text": "Proof every dripper delivered the same.",
             "correct": false,
-            "feedback": "The per-plant result is an average; uniformity needs physical evidence."
+            "feedback": "A per-plant figure is an average. Even delivery needs a physical check."
           },
           {
             "text": "Estimated average delivery per plant.",
             "correct": true,
-            "feedback": "Correct. Keep both estimate and average labels when using the number."
+            "feedback": "Correct. Keep both labels, estimated and average, when you use it."
           }
         ],
         "safetyCritical": false,
@@ -1116,14 +1679,14 @@
         "prompt": "Run A covers days 1–7 and B covers day 7 only. How should you compare totals?",
         "options": [
           {
-            "text": "First choose a matched interval with adequate coverage.",
+            "text": "First choose a matched period with good coverage.",
             "correct": true,
-            "feedback": "Correct. Different windows cannot directly support the same total comparison."
+            "feedback": "Correct. Totals over different periods cannot be compared fairly."
           },
           {
             "text": "Divide both by plant count and compare immediately.",
             "correct": false,
-            "feedback": "Per-plant conversion does not repair unequal time coverage."
+            "feedback": "Dividing by plants does not fix unequal periods."
           },
           {
             "text": "Treat the missing days as zero.",
@@ -1140,17 +1703,17 @@
           {
             "text": "The change definitely caused higher uptake.",
             "correct": false,
-            "feedback": "Neither causal attribution nor uptake is established."
+            "feedback": "Totals show neither uptake nor cause."
           },
           {
-            "text": "State the delivery difference and inspect other variables.",
+            "text": "State the delivery difference and check other changes.",
             "correct": true,
-            "feedback": "Correct. Examine climate, age, flow assumptions and other changes before attributing cause."
+            "feedback": "Correct. Check climate, grow age, flow settings and other changes before naming a cause."
           },
           {
             "text": "The current reference proves the previous target.",
             "correct": false,
-            "feedback": "A present reference does not document which target was used historically."
+            "feedback": "Today’s reference cannot show which target was used before."
           }
         ],
         "safetyCritical": false,
@@ -1192,12 +1755,12 @@
     "id": "D5",
     "module": "D",
     "title": "Troubleshoot before you change a recipe",
-    "summary": "Separate uncontrolled physical flow from bad information, restore trustworthy evidence and verify the actual repair.",
+    "summary": "When something looks wrong, make it safe, keep the evidence, find the real cause and prove the repair, before touching any target.",
     "outcomes": [
-      "Choose physical shutdown first for uncontrolled water.",
-      "Investigate four-hour-old moisture and conflicting tank indications without bypassing protections.",
-      "Define controller acknowledgement and separate it from saved setup and physical commissioning.",
-      "Write a fault report and verify recovery."
+      "Use the physical shutdown first for water that will not stop.",
+      "Investigate a four-hour-old reading and a tank conflict without bypassing protections.",
+      "Separate a saved setup, Controller acknowledgement and commissioning.",
+      "Write a fault report and verify the repair."
     ],
     "prerequisites": [
       "D4"
@@ -1207,238 +1770,378 @@
       {
         "title": "Repair the evidence before turning the dial",
         "body": [
-          "Uncontrolled water: use the physical shutdown procedure first.",
-          "A target edit cannot repair a sensor or pipe."
+          "Make safe → preserve → investigate → verify.",
+          "Water that will not stop: physical shutdown first."
         ],
-        "narration": "Imagine a fridge thermometer with a dead battery. Turning the thermostat does not repair the missing measurement. Apply that idea to irrigation faults. First check for uncontrolled water or unsafe equipment. If water continues unexpectedly, use the installation’s physical shutdown procedure immediately. Once safe, preserve what happened. For a faulty reading without uncontrolled flow, investigate the source through the local fallback procedure.",
+        "narration": "If a fridge thermometer’s battery dies, turning the thermostat colder does not fix the thermometer. A fault is anything that stops the system working as it should. Examples are a dead probe, a valve that will not close, or a wrong reading. A fault needs a repair, not a new target. Use the same four steps every time, in this order. One, make safe. If water keeps flowing when it should not, use the physical shutdown first. Remember from C one: the physical shutdown is the hand-operated way to cut water or power at the equipment itself. Two, preserve. Write down what you saw, with times, before anything changes. Three, investigate. Find the real cause with competent help, meaning someone trained on your site’s equipment. Four, verify. Prove the fix worked, with fresh readings and a look at the equipment. Example: a reading drops to zero at two o’clock. Changing a target would leave that reading broken. Next, work through an old reading.",
         "visual": {
           "type": "lesson-cues",
           "title": "Repair the evidence before turning the dial",
           "labels": [
-            "Uncontrolled water: use the physical shutdown procedure first.",
-            "A target edit cannot repair a sensor or pipe."
+            "Make safe → preserve → investigate → verify.",
+            "Water that will not stop: physical shutdown first."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D5-s1"
+        "id": "D5-s1",
+        "check": {
+          "prompt": "A valve keeps dripping after its shot ended. Which step comes first?",
+          "options": [
+            {
+              "text": "Preserve: photograph the screen.",
+              "correct": false,
+              "feedback": "Evidence matters, but water is still flowing. Make safe first."
+            },
+            {
+              "text": "Make safe: use the physical shutdown.",
+              "correct": true,
+              "feedback": "Right. Stop the water at the equipment, then preserve and investigate."
+            },
+            {
+              "text": "Investigate: open the mapping.",
+              "correct": false,
+              "feedback": "Investigating while water flows wastes water and risks damage. Make safe first."
+            }
+          ]
+        }
       },
       {
         "title": "Worked example: a four-hour-old reading",
         "body": [
-          "Moisture observation is four hours old; zone is holding.",
-          "Check identity, source, communications and independent evidence."
+          "Last reported 06:10; now 10:10: the reading is four hours old.",
+          "Check Equipment › Probes health, cable, power and mapping."
         ],
-        "narration": "A fictional zone is holding and its moisture observation is four hours old. Lowering a threshold would leave the old information unresolved. Record the room, zone, timestamp and hold reason. Check the mapped source, communication path and probe condition under the local procedure. Use appropriate independent evidence with competent help. Verify fresh observations and recovered status before reconsidering targets.",
+        "narration": "A note on the fridge saying the milk is fine means little if it was written last week. In this fictional example, a zone is holding. Holding means the Controller is giving it no shots for now. The zone’s moisture reading was last reported at six ten. It is now ten ten. From six ten to ten ten is four hours, so the reading is four hours old. Lowering a threshold would leave the old reading in place. Instead, follow the four steps. Make safe: nothing is flowing, so the zone is already safe. Preserve: record the room, the zone, the time and the reason shown in Why slash next action. Investigate: open Equipment, Probes. Read the probe’s health, such as Silent or Not reporting. Then, with competent help, check its cable, its power and its mapping, the link between the name on screen and the real probe. Verify: wait for fresh readings and a normal status before you think about targets again. Next, two readings that disagree.",
         "visual": {
           "type": "lesson-cues",
           "title": "Worked example: a four-hour-old reading",
           "labels": [
-            "Moisture observation is four hours old; zone is holding.",
-            "Check identity, source, communications and independent evidence."
+            "Last reported 06:10; now 10:10: the reading is four hours old.",
+            "Check Equipment › Probes health, cable, power and mapping."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
         "workedExample": {
-          "prompt": "What comes next when an old moisture source causes a hold?",
+          "prompt": "What comes next when a zone is holding and its moisture reading is four hours old?",
           "steps": [
-            "Confirm scope and preserve the timestamp and reason.",
-            "Inspect the mapped source and communications.",
-            "Use installed safe fallback and independent checks with competent help.",
-            "Verify fresh readings and recovered status."
+            "Confirm the room and zone; record the time and the reason shown.",
+            "Read the probe’s health in Equipment › Probes.",
+            "With competent help, check cable, power and mapping.",
+            "Verify fresh readings and a normal status."
           ],
-          "answer": "Investigate sensing and mapping; do not lower the floor, bypass the hold or force an output."
+          "answer": "Repair the reading. Do not lower the Rescue floor, bypass the hold or force a valve on."
         },
-        "id": "D5-s2"
+        "id": "D5-s2",
+        "check": {
+          "prompt": "A probe last reported at 21:45. It is now 23:15. How old is the reading?",
+          "options": [
+            {
+              "text": "45 minutes",
+              "correct": false,
+              "feedback": "From 21:45 to 22:45 is already an hour. Count on to 23:15."
+            },
+            {
+              "text": "2 hours 30 minutes",
+              "correct": false,
+              "feedback": "Too long. 21:45 to 23:15 is 1 hour 30 minutes."
+            },
+            {
+              "text": "1 hour 30 minutes",
+              "correct": true,
+              "feedback": "Right. 21:45 to 22:45 is 1 hour, plus 30 minutes to 23:15."
+            }
+          ]
+        }
       },
       {
         "title": "Conflicting tank evidence needs a real check",
         "body": [
-          "Tank display: 80%; installed low-level indication: low.",
-          "Supply readiness remains unresolved."
+          "Tank display 80%; low float says low: conflicting evidence.",
+          "Keep protections on; look at the tank, then check each sensor."
         ],
-        "narration": "The tank display says eighty percent, but the installed low-level indication says low. These conflict. Averaging them invents a level; choosing eighty because it is reassuring leaves the fault unresolved. Keep protections in use. Check physical level safely, then source identity, calibration and timestamps. Starting the pump is not a test for an empty tank. Record which evidence resolves the disagreement.",
+        "narration": "If a car’s fuel gauge shows half full but the low fuel light is on, one of them is wrong. A tank level sensor measures how full the feed tank is. Some tanks also have a low float: a floating switch that reports low when the water drops past it. Here, the tank display says eighty percent, but the low float says low. That is conflicting evidence: two sources that cannot both be right. Averaging them would invent a level, and choosing eighty because it reassures you would hide the fault. Keep the protections switched on. When a tank level is mapped, the Controller holds shots at eight percent or less, or when the low float reads low. That hold stops the pump running a dry tank. Look at the tank itself, safely. Then check each sensor’s mapping, calibration and last report time. Record which check settled the disagreement. Next, a saved setup the Controller has not accepted.",
         "visual": {
           "type": "lesson-cues",
           "title": "Conflicting tank evidence needs a real check",
           "labels": [
-            "Tank display: 80%; installed low-level indication: low.",
-            "Supply readiness remains unresolved."
+            "Tank display 80%; low float says low: conflicting evidence.",
+            "Keep protections on; look at the tank, then check each sensor."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D5-s3"
+        "id": "D5-s3",
+        "check": {
+          "prompt": "Tank display: 65%. Low float: low. What do you do?",
+          "options": [
+            {
+              "text": "Use 65%; the float is probably stuck.",
+              "correct": false,
+              "feedback": "Picking the reassuring number hides the fault. Check the tank itself."
+            },
+            {
+              "text": "Average them to about 33%.",
+              "correct": false,
+              "feedback": "An average of two conflicting sources is a number nobody measured."
+            },
+            {
+              "text": "Keep protections on and look at the tank itself.",
+              "correct": true,
+              "feedback": "Right. A direct look settles which source is wrong."
+            }
+          ]
+        }
       },
       {
-        "title": "A stored setup needs controller acceptance",
+        "title": "A stored setup needs Controller acceptance",
         "body": [
-          "Saved: configuration stored.",
-          "Acknowledgement: controller confirms the setup revision it accepted.",
-          "Commissioning: prove the correct outlets operate and stop."
+          "Saved: the new setup revision is stored.",
+          "Acknowledged: the Controller confirms the revision it accepted.",
+          "Commissioned: a supervised water test proves outlets run and stop."
         ],
-        "narration": "Saving setup confirms that configuration was stored. Acknowledgement means the controller reports which setup revision it accepted. Check that acceptance, its current heartbeat and setup problems; a heartbeat is a recent communication report. Keep affected watering disabled until acceptance is resolved under the local procedure. Competent commissioning must still prove device identity, the intended outlet’s operation and actual stopping.",
+        "narration": "Posting a letter, the letter arriving, and the reader acting on it are three different events. Setup changes have three similar stages. If you skipped the setup lessons, here they are in plain words. Equipment, Setup is where an administrator links each zone to its real valves and probes. That link is the mapping. Each saved version of the setup gets a number, called a revision. Stage one: Save configuration stores the new revision in Home Assistant. Stage two: acknowledgement. The Controller reports which revision it has accepted, like a signed receipt. Check that it matches, and that the heartbeat, the Controller’s regular report that it is running, is recent. Until the Controller accepts the revision, keep the room’s Watering switch off. Stage three: commissioning. Commissioning is a supervised test with real water. It proves each valve feeds the right drippers and then stops. Next, the most urgent case.",
         "visual": {
           "type": "mapping",
-          "title": "A stored setup needs controller acceptance",
+          "title": "A stored setup needs Controller acceptance",
           "labels": [
-            "Saved: configuration stored.",
-            "Acknowledgement: controller confirms the setup revision it accepted.",
-            "Commissioning: prove the correct outlets operate and stop."
+            "Saved: the new setup revision is stored.",
+            "Acknowledged: the Controller confirms the revision it accepted.",
+            "Commissioned: a supervised water test proves outlets run and stop."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-equipment-setup-r3.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
-        "id": "D5-s4"
+        "id": "D5-s4",
+        "check": {
+          "prompt": "Setup shows revision 12 saved. The Controller reports revision 11 accepted. What is true?",
+          "options": [
+            {
+              "text": "Revision 12 is not accepted yet; keep Watering off.",
+              "correct": true,
+              "feedback": "Right. Saved and accepted are different states."
+            },
+            {
+              "text": "Revision 12 is active.",
+              "correct": false,
+              "feedback": "The Controller still reports revision 11. Revision 12 is only stored."
+            },
+            {
+              "text": "The valves are commissioned.",
+              "correct": false,
+              "feedback": "Commissioning is a supervised water test. Saving cannot prove it."
+            }
+          ]
+        }
       },
       {
         "title": "Your turn: OFF displayed, water flowing",
         "body": [
-          "First complete: physical ____.",
-          "Then investigate the outlet, mapping, feedback and control owners."
+          "Off on screen, water flowing: physical shutdown first.",
+          "Then check for a sticking valve, siphon, wrong mapping, old timer."
         ],
-        "narration": "The screen says OFF but water is visibly flowing. Finish the first response: physical shutdown. After the installation is safe, competent help can investigate a sticking valve, siphon, incorrect mapping or competing control owners. Header Stop all is a selected-room software action. A returned OFF state cannot prove stopped flow. Disarm and plan hold also cannot replace the physical procedure.",
+        "narration": "A light switch in the off position with the bulb still glowing tells you the switch is not the whole story. The screen says off, but water is visibly flowing. Finish the first response aloud: physical shutdown. Close the water or cut the power at the equipment, using your site’s procedure. Then investigate with competent help. There are four common causes. A sticking valve is a valve that stays partly open after it is told to close. A siphon, which you met in C one, is water that keeps running downhill through the pipe on its own. A wrong mapping means the screen controls a different valve. An old timer or another system may still switch the same valve. Remember from C one: each output needs one owner. Stop all, Disarm plan and a plan hold are all software requests, so they come after the physical shutdown, not instead of it. Next, write a fault report.",
         "visual": {
           "type": "lesson-cues",
           "title": "Your turn: OFF displayed, water flowing",
           "labels": [
-            "First complete: physical ____.",
-            "Then investigate the outlet, mapping, feedback and control owners."
+            "Off on screen, water flowing: physical shutdown first.",
+            "Then check for a sticking valve, siphon, wrong mapping, old timer."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D5-s5"
+        "id": "D5-s5",
+        "check": {
+          "prompt": "The screen shows Watering off. Water flows from Zone 4. Which response comes first?",
+          "options": [
+            {
+              "text": "Stop all in the top bar.",
+              "correct": false,
+              "feedback": "Stop all is a software request. Cut the water at the equipment first."
+            },
+            {
+              "text": "Disarm plan.",
+              "correct": false,
+              "feedback": "Disarm acts at the next lights-on. The water must stop now, at the equipment."
+            },
+            {
+              "text": "Physical shutdown at the equipment.",
+              "correct": true,
+              "feedback": "Right. Make safe first, then investigate the cause."
+            }
+          ]
+        }
       },
       {
         "title": "Try another fault report independently",
         "body": [
-          "No rise in the selected zone; neighbouring zone rises after the event.",
-          "Record address, time, expected result, actual result and evidence."
+          "Zone 2 shot, no rise; Zone 3 rose instead.",
+          "Report: room, zone, time, expected, actual, evidence."
         ],
-        "narration": "A selected zone shows no water-content rise after an event, while its neighbour rises. Write the observation before naming a cause. Check zone identities, timestamps and commissioning records; consider placement and delivery. Arrange supported equipment checks with competent help rather than forcing valves in turn. Report room, zone, event time, expected result and actual result. Exclude credentials from the report.",
+        "narration": "A good doctor’s note says what happened and when, before guessing why. In this case, a shot ran for Zone two, but Zone two’s moisture did not rise. Zone three, next door, rose instead. Write the observation first: room, zone, event time, what you expected and what actually happened. Example: Room A, Zone two, shot at ten fifteen, expected a rise of about two points, saw none. Zone three rose two points at ten seventeen. Then list possible causes without choosing one. The valves may be mapped the wrong way round. The probes may be in the wrong pots. Delivery may have failed. Check the zone names, the times and the commissioning records. Arrange checks with competent help, rather than switching valves one after another to see what happens. Leave out passwords and access tokens, the digital keys that let software sign in. A clear report lets someone else find the cause quickly. Next, recall the sequence.",
         "visual": {
           "type": "lesson-cues",
           "title": "Try another fault report independently",
           "labels": [
-            "No rise in the selected zone; neighbouring zone rises after the event.",
-            "Record address, time, expected result, actual result and evidence."
+            "Zone 2 shot, no rise; Zone 3 rose instead.",
+            "Report: room, zone, time, expected, actual, evidence."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D5-s6"
+        "id": "D5-s6",
+        "check": {
+          "prompt": "Which fault report line is best?",
+          "options": [
+            {
+              "text": "Room A Z2 shot 10:15, no rise; Z3 rose 2 points at 10:17.",
+              "correct": true,
+              "feedback": "Right. It records place, time, expected and actual, with no guessed cause."
+            },
+            {
+              "text": "Zone 2 probe is broken.",
+              "correct": false,
+              "feedback": "That names a cause before checking. Record what you saw first."
+            },
+            {
+              "text": "Valves are wired backwards.",
+              "correct": false,
+              "feedback": "Possible, but unproven. Write the observation, then investigate."
+            }
+          ]
+        }
       },
       {
         "title": "Recall the repair sequence",
         "body": [
-          "Make safe → preserve evidence → investigate → verify.",
-          "Check recovered readings and the agreed physical final state."
+          "Make safe → preserve → investigate → verify.",
+          "Verify: fresh readings, normal status, agreed physical state."
         ],
-        "narration": "Teach the sequence without looking: make safe, preserve evidence, investigate, verify. Explain how a sensor repair differs from a target adjustment. Verification includes recovered readings and the agreed physical final state, with supervised recommissioning where needed. State any local shutdown knowledge you still need from the responsible operator. Finish with the fault record, the repair evidence and the person responsible for the next check.",
+        "narration": "Teach the four steps to someone else without notes: make safe, preserve, investigate, verify. Then explain how repairing a sensor differs from changing a target. A repair fixes the information. A target change tells the Controller to aim somewhere else, using whatever information it has. Verifying means fresh readings and a normal status. It also means a look at the equipment in its agreed final state, such as valves closed. After a valve or mapping repair, a supervised commissioning test may be needed again. Ask your site’s responsible person what you do not yet know about the physical shutdown. Where is it? What does it switch off? Who may use it? Finish your record with the fault, the repair evidence and the name of the person doing the next check. Next lesson, you build a short daily routine.",
         "visual": {
           "type": "lesson-cues",
           "title": "Recall the repair sequence",
           "labels": [
-            "Make safe → preserve evidence → investigate → verify.",
-            "Check recovered readings and the agreed physical final state."
+            "Make safe → preserve → investigate → verify.",
+            "Verify: fresh readings, normal status, agreed physical state."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D5-s7"
+        "id": "D5-s7",
+        "check": {
+          "prompt": "A probe was re-plugged and now reports. What completes the verify step?",
+          "options": [
+            {
+              "text": "Lower the targets to catch up.",
+              "correct": false,
+              "feedback": "The fault was the reading. Targets were never the problem."
+            },
+            {
+              "text": "Fresh readings, a normal status and a look at the zone.",
+              "correct": true,
+              "feedback": "Right. Verify proves the repair, not just the restart."
+            },
+            {
+              "text": "Nothing; reporting again proves it.",
+              "correct": false,
+              "feedback": "One report is a start. Check readings stay fresh and sensible."
+            }
+          ]
+        }
       }
     ],
     "practice": {
       "kind": "demo-and-explain",
       "prompt": "For the four-hour-old moisture reading, the tank conflict and the continuing-flow case, state the first response and evidence needed. Then write a report for the neighbouring-zone example.",
       "hints": [
-        "Physical shutdown comes first for uncontrolled flow.",
-        "Do not bypass holds, lower safety floors or force outputs.",
-        "Separate observations from proposed causes."
+        "Physical shutdown comes first for water that will not stop.",
+        "Keep holds, the Rescue floor and protections as they are.",
+        "Write what you saw before naming a cause."
       ],
       "success": "Each answer includes a safe first action, relevant source checks and verification without a protection bypass."
     },
     "quiz": [
       {
-        "prompt": "The app says OFF but water still flows. What comes first?",
+        "prompt": "The app says off but water still flows. What comes first?",
         "options": [
           {
-            "text": "Disarm and wait for lights-on.",
+            "text": "Disarm plan and wait for lights-on.",
             "correct": false,
-            "feedback": "Disarm is a scheduled handover, not a response to uncontrolled flow."
+            "feedback": "Disarm plan is a scheduled handover, not a response to flowing water."
           },
           {
-            "text": "Use the installation’s physical shutdown procedure.",
+            "text": "Use the physical shutdown at the equipment.",
             "correct": true,
-            "feedback": "Correct. Make the installation safe, then investigate physical and software causes."
+            "feedback": "Correct. Make safe first, then look for the cause."
           },
           {
-            "text": "Lower the emergency floor.",
+            "text": "Lower the Rescue floor.",
             "correct": false,
-            "feedback": "A threshold edit cannot safely stop uncontrolled physical flow."
+            "feedback": "A target edit cannot stop water that is already flowing."
           }
         ],
         "safetyCritical": true,
         "id": "D5-q1"
       },
       {
-        "prompt": "Old moisture causes a hold. What is appropriate?",
+        "prompt": "A zone is holding because its moisture reading is old. What is appropriate?",
         "options": [
           {
-            "text": "Restore trustworthy sensing through the safe procedure.",
+            "text": "Repair the reading, with competent help.",
             "correct": true,
-            "feedback": "Correct. Verify source, communications and recovery before target changes."
+            "feedback": "Correct. Check the probe, its cable, power and mapping before any target change."
           },
           {
             "text": "Bypass the hold and force a shot.",
             "correct": false,
-            "feedback": "That removes protection while evidence remains unreliable."
+            "feedback": "That removes a protection while the reading is still untrustworthy."
           },
           {
-            "text": "Lower the floor until it clears.",
+            "text": "Lower the Rescue floor until the hold clears.",
             "correct": false,
-            "feedback": "A safety-reference edit cannot make an old reading trustworthy."
+            "feedback": "Changing a safety level cannot make an old reading fresh."
           }
         ],
         "safetyCritical": true,
         "id": "D5-q2"
       },
       {
-        "prompt": "A tank percentage conflicts with low-level indication. What should you do?",
+        "prompt": "The tank display says 70%, but the low float says low. What should you do?",
         "options": [
           {
             "text": "Trust the higher value and start the pump.",
             "correct": false,
-            "feedback": "The reassuring value does not resolve the contradiction or prove safe supply."
+            "feedback": "Picking the reassuring number hides the fault. The tank may really be low."
           },
           {
             "text": "Average the two readings.",
             "correct": false,
-            "feedback": "Averaging conflicting sources invents a level rather than verifying it."
+            "feedback": "An average of two conflicting sources is a level nobody measured."
           },
           {
-            "text": "Verify level and sources safely, keeping protections.",
+            "text": "Keep protections on, look at the tank, then check each sensor.",
             "correct": true,
-            "feedback": "Correct. Treat readiness as unresolved until physical and source checks resolve it."
+            "feedback": "Correct. A direct look settles which source is wrong."
           }
         ],
         "safetyCritical": true,
         "id": "D5-q3"
       },
       {
-        "prompt": "Setup is saved but not acknowledged. What is established?",
+        "prompt": "Setup is saved but the Controller has not acknowledged it. What do you know?",
         "options": [
           {
-            "text": "Correct outlets have been commissioned.",
+            "text": "The correct valves have been commissioned.",
             "correct": false,
-            "feedback": "Saving, and even acknowledgement alone, cannot prove physical operation."
+            "feedback": "Saving, and even acknowledgement, cannot prove the water test."
           },
           {
-            "text": "Storage succeeded; controller acceptance is unresolved.",
+            "text": "The setup is stored, but the Controller has not accepted it yet.",
             "correct": true,
-            "feedback": "Correct. Check revision acceptance and keep affected watering disabled until resolved."
+            "feedback": "Correct. Check the accepted revision and keep Watering off until it matches."
           },
           {
-            "text": "The mappings are safe to test by forced output.",
+            "text": "The mappings are safe to test by forcing a valve on.",
             "correct": false,
-            "feedback": "Use supervised commissioning instead of bypassing controls."
+            "feedback": "Use a supervised commissioning test instead of forcing outputs."
           }
         ],
         "safetyCritical": true,
@@ -1476,12 +2179,12 @@
     "id": "D6",
     "module": "D",
     "title": "A five-minute daily check and a useful handover",
-    "summary": "Use a short preflight and a clear diary to make one defensible decision, then leave a handover another operator can use.",
+    "summary": "Run a short preflight, keep a five-part diary, make one reasoned decision, treat the AI assistant as advice to check, and leave a handover the next person can use.",
     "outcomes": [
-      "Complete the five-part daily record with source labels and unknowns.",
-      "Record a justified no-change decision or a reviewed change and follow-up.",
-      "Use Crop AI as assistance while checking evidence and protecting credentials.",
-      "Explain local handover, recoverable backups and later recall."
+      "Run a preflight and complete the five-part daily record.",
+      "Record a reasoned no-change decision, or a reviewed change with a follow-up.",
+      "Check the evidence behind any AI assistant suggestion and keep credentials out of it.",
+      "Prepare a handover note with backup, update and rollback details."
     ],
     "prerequisites": [
       "D5"
@@ -1491,155 +2194,295 @@
       {
         "title": "A short preflight, then a brief diary",
         "body": [
-          "Five parts: identity/freshness; state; water; feed/context; decision.",
-          "The record helps the next operator understand your decision."
+          "Preflight: a quick check before you decide anything.",
+          "Five parts: identity, state, water, feed and context, decision."
         ],
-        "narration": "A pilot checks the aircraft before departure, then records the flight. Use the same rhythm for the daily check: inspect first, leave a brief diary afterwards. The record has five parts: identity and freshness; state; water; feed and context; decision. Five minutes is a useful routine, not a deadline for an unresolved fault. Record unavailable sources explicitly.",
+        "narration": "Before take-off, a pilot walks round the plane with a checklist. That short check is called a preflight. After landing, the pilot writes a log. Use the same rhythm each day. First, a preflight: a quick look at the screens and the room before you decide anything. Then a daily diary: a short written record of what you found and what you decided. The diary has five parts. One, identity and freshness: which room and zone, and how old each reading is. Two, state: the phase and the reason. Three, water: how much was delivered. Four, feed and context: the tank, the EC and the room conditions. Five, the decision. About five minutes is a good routine on a normal day. A fault takes as long as it needs. If a source has no current reading, write unknown, as you learned in D one. Next, fill in the first four parts.",
         "visual": {
           "type": "lesson-cues",
           "title": "A short preflight, then a brief diary",
           "labels": [
-            "Five parts: identity/freshness; state; water; feed/context; decision.",
-            "The record helps the next operator understand your decision."
+            "Preflight: a quick check before you decide anything.",
+            "Five parts: identity, state, water, feed and context, decision."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D6-s1"
+        "id": "D6-s1",
+        "check": {
+          "prompt": "Your preflight finds no current tank EC reading. What goes in the diary?",
+          "options": [
+            {
+              "text": "Nothing; record only good readings.",
+              "correct": false,
+              "feedback": "Gaps matter. The next person needs to know the source was missing."
+            },
+            {
+              "text": "Tank EC: unknown, with the time.",
+              "correct": true,
+              "feedback": "Right. Record the gap honestly so it gets checked."
+            },
+            {
+              "text": "Yesterday’s tank EC value.",
+              "correct": false,
+              "feedback": "That would present an old number as today’s. Write unknown."
+            }
+          ]
+        }
       },
       {
         "title": "Fill the first four parts with evidence",
         "body": [
-          "Identity: room, zone, time and source ages.",
-          "State: phase, reason and last event.",
-          "Water: source-labelled delivery. Feed/context: tank, EC type and relevant conditions."
+          "Identity: room, zone, time, report ages.",
+          "State: phase, reason, last shot. Water: labelled delivery.",
+          "Feed and context: tank, EC type, room conditions."
         ],
-        "narration": "Start with room, zone, time and ages of the controller and relevant probes. State means the phase, Why / next action, last irrigation and confirmed output reports. Water means the delivery total and any per-plant average, labelled measured, estimated or unknown. Feed and context means tank indications, the EC measurement type and relevant crop or climate notes. These give the final decision a basis.",
+        "narration": "A weather report gives the place, the time, the conditions and the outlook, in that order. The first four diary parts work the same way. Identity and freshness: write the room, the zone, the time, the Controller’s report age from the top bar, and each probe’s report age. State: the phase, the reason from Why slash next action, the last shot, and any equipment state the screen confirms. Water: the delivery total, and if useful the per-plant average, each labelled measured, estimated or unknown, as in D four. Feed and context: the tank level, which type of EC you are reading, and anything unusual in the room, such as a hot afternoon. Example: Room A, Zone one, eight fifteen. Controller one minute, probe two minutes. P one. Eleven litres estimated. These four parts are the evidence. The fifth part, the decision, rests on them. Next, a decision to change nothing.",
         "visual": {
           "type": "lesson-cues",
           "title": "Fill the first four parts with evidence",
           "labels": [
-            "Identity: room, zone, time and source ages.",
-            "State: phase, reason and last event.",
-            "Water: source-labelled delivery. Feed/context: tank, EC type and relevant conditions."
+            "Identity: room, zone, time, report ages.",
+            "State: phase, reason, last shot. Water: labelled delivery.",
+            "Feed and context: tank, EC type, room conditions."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D6-s2"
+        "id": "D6-s2",
+        "check": {
+          "prompt": "Which water entry is complete for a 10-plant zone?",
+          "options": [
+            {
+              "text": "Zone 1: 11 L.",
+              "correct": false,
+              "feedback": "Missing the label. Is 11 L measured, estimated or unknown?"
+            },
+            {
+              "text": "Zone 1: 11 L estimated, 1.1 L per plant average.",
+              "correct": true,
+              "feedback": "Right. 11 ÷ 10 = 1.1, and both figures carry their labels."
+            },
+            {
+              "text": "Zone 1: plants took up 11 L.",
+              "correct": false,
+              "feedback": "Delivery is not uptake. Say delivered, and label it estimated."
+            }
+          ]
+        }
       },
       {
         "title": "Worked example: a reasoned no change",
         "body": [
-          "Training North / Zone 3; recent reports and expected maintenance.",
-          "Delivery labelled estimated; tank indications agree.",
-          "No change; record the reason and next check time."
+          "Training North, Zone 3: fresh reports, P2, clear reason.",
+          "14 L estimated, inside the usual 13–15 L; tank sources agree.",
+          "Decision: no change, the reason, next check at 14:00."
         ],
-        "narration": "In a fictional paper example, training North, Zone three, has recent reports, the expected maintenance phase and a clear waiting reason. Estimated delivery is within its recent observed range. Tank indications agree. The decision can be no change. Write that reason and when you will check again. The value of the check is a defensible decision. Moving a slider is not a required outcome.",
+        "narration": "A health check-up that finds nothing wrong is still a useful check-up. In this fictional example, Training North, Zone three, has recent reports, the expected P two phase and a clear waiting reason. Today’s estimated delivery is fourteen litres. The last five days ranged from thirteen to fifteen litres, so fourteen sits inside the usual range. The tank level and the low float agree. The decision is no change. Write that decision down, with the reason and when you will check again. A decision record is the part of the diary that says what you decided, why, and when you will look again. For example: No change. Delivery within the usual thirteen to fifteen litres. Next check at two in the afternoon. Changing a target every day only to have done something adds noise and hides real problems. Next, record a change when one is needed.",
         "visual": {
           "type": "lesson-cues",
           "title": "Worked example: a reasoned no change",
           "labels": [
-            "Training North / Zone 3; recent reports and expected maintenance.",
-            "Delivery labelled estimated; tank indications agree.",
-            "No change; record the reason and next check time."
+            "Training North, Zone 3: fresh reports, P2, clear reason.",
+            "14 L estimated, inside the usual 13–15 L; tank sources agree.",
+            "Decision: no change, the reason, next check at 14:00."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
         "workedExample": {
-          "prompt": "Must fresh and consistent evidence lead to a target change?",
+          "prompt": "Must fresh, consistent evidence lead to a target change?",
           "steps": [
-            "Confirm identity and freshness.",
-            "Read phase and decision reason.",
-            "Label delivery and inspect tank/context evidence.",
-            "Record a justified no-change decision and next check."
+            "Confirm the address and report ages.",
+            "Read the phase and Why / next action.",
+            "Label delivery and compare it with the usual 13–15 L.",
+            "Record no change, the reason and the next check time."
           ],
-          "answer": "No. Keeping targets can be a reasoned decision; record its evidence and follow-up."
+          "answer": "No. Keeping the targets is a decision too; record its evidence and the follow-up."
         },
-        "id": "D6-s3"
+        "id": "D6-s3",
+        "check": {
+          "prompt": "Delivery today 21 L; last 5 days 20–23 L; reports fresh; tank sources agree. Best decision?",
+          "options": [
+            {
+              "text": "Raise a target so the day has an outcome.",
+              "correct": false,
+              "feedback": "A change needs a reason. This day is inside its usual range."
+            },
+            {
+              "text": "Skip the diary because nothing changed.",
+              "correct": false,
+              "feedback": "A no-change day still needs its record and next check."
+            },
+            {
+              "text": "No change; record why and the next check time.",
+              "correct": true,
+              "feedback": "Right. 21 L sits inside 20–23 L, so no change is reasoned."
+            }
+          ]
+        }
       },
       {
         "title": "Your turn: finish the change record",
         "body": [
-          "Scope, before/after, reason and expected observation.",
-          "Draft → Review → Apply → Readback → Follow-up."
+          "Scope, before and after, reason, expected result.",
+          "Draft → Review changes → Apply → Readback → follow-up time."
         ],
-        "narration": "For a justified change, record scope, before and after, reason and the observation you expect next. A draft is the proposed edit. Review checks it, apply sends it, and readback checks the returned accepted value. Complete the sequence with a follow-up time. If several things change, record them all. One better day cannot isolate which change caused the difference.",
+        "narration": "A note on a recipe is only useful if it says what you changed and how it turned out. When a change is justified, the decision record needs more. Write the scope, meaning the room and zone. Write the before and after values. Write the reason, and what you expect to see next. Then make the change with the path from D two: draft, Review changes, Apply, then readback. Finish with a follow-up: a time when you will check the result. Example: Room A, Zone two. Rescue floor thirty to thirty one percent, as agreed with the head grower. Expect the Rescue floor line one point higher on the chart. Readback thirty one. Check tomorrow at seven. If you change two things on the same day, record both. A better day after two changes cannot tell you which one helped. Next, the AI assistant.",
         "visual": {
           "type": "lesson-cues",
           "title": "Your turn: finish the change record",
           "labels": [
-            "Scope, before/after, reason and expected observation.",
-            "Draft → Review → Apply → Readback → Follow-up."
+            "Scope, before and after, reason, expected result.",
+            "Draft → Review changes → Apply → Readback → follow-up time."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D6-s4"
+        "id": "D6-s4",
+        "check": {
+          "prompt": "Which change record is complete?",
+          "options": [
+            {
+              "text": "Changed the recipe today.",
+              "correct": false,
+              "feedback": "Missing scope, values, reason, readback and a follow-up time."
+            },
+            {
+              "text": "Room A Z2 Rescue floor 30→31%, agreed reason, readback 31, check 07:00.",
+              "correct": true,
+              "feedback": "Right. Scope, values, reason, readback and follow-up are all there."
+            },
+            {
+              "text": "Rescue floor up; should be better tomorrow.",
+              "correct": false,
+              "feedback": "No scope, values, readback or check time."
+            }
+          ]
+        }
       },
       {
-        "title": "Use Crop AI as an assistant",
+        "title": "Use the AI assistant as advice to check",
         "body": [
-          "Check source readings, age, scope, units and assumptions.",
-          "Advice, accepted changes and physical results need separate evidence.",
-          "Keep credentials out of prompts and screenshots."
+          "Check its readings, report times, scope, units and assumptions.",
+          "Filled mark: action. Outline mark: advice, no action or refusal.",
+          "Keep passwords and tokens out of prompts and screenshots."
         ],
-        "narration": "Crop AI can organise a question or explain a proposal. It does not measure the crop, and confident wording does not verify a claim. Check the readings, timestamps, room, zone, units and assumptions behind its suggestion. Review and verify any authorised action through the normal workflow. Keep credentials out of prompts and screenshots. Advanced AI configuration is unnecessary for this daily routine.",
+        "narration": "A sat nav can suggest a route, but you still watch the road. The app has an AI assistant. AI stands for artificial intelligence: software that writes answers in everyday language. Find it under Settings and help, AI assistant. Its decisions also appear as marks on the zone page chart. A filled mark is an action it took. An outline mark is advice, no action or a refusal. The AI assistant can organise a question or explain a proposal. It does not measure the crop. Check what its suggestion rests on: the readings, their report times, the room, the zone, the units and its assumptions. Example: it suggests a lower re-water threshold, but cites a probe reading that is three hours old. That suggestion rests on old evidence. Any change you accept still goes through review and readback. Keep passwords and access tokens out of your questions and screenshots. Next, prepare a handover.",
         "visual": {
           "type": "sensor-check",
-          "title": "Use Crop AI as an assistant",
+          "title": "Use the AI assistant as advice to check",
           "labels": [
-            "Check source readings, age, scope, units and assumptions.",
-            "Advice, accepted changes and physical results need separate evidence.",
-            "Keep credentials out of prompts and screenshots."
+            "Check its readings, report times, scope, units and assumptions.",
+            "Filled mark: action. Outline mark: advice, no action or refusal.",
+            "Keep passwords and tokens out of prompts and screenshots."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo.",
           "asset": "assets/screens/demo-ai-assistant-r3.png",
           "alt": "Actual isolated demo screen. Read the displayed room and current sample values; separate paper examples use fictional values."
         },
-        "id": "D6-s5"
+        "id": "D6-s5",
+        "check": {
+          "prompt": "The AI assistant suggests a change and cites a probe reading 3 hours old. What do you do?",
+          "options": [
+            {
+              "text": "Check the probe first; the advice rests on old data.",
+              "correct": true,
+              "feedback": "Right. Fix or confirm the evidence before weighing the advice."
+            },
+            {
+              "text": "Apply it; the explanation sounds confident.",
+              "correct": false,
+              "feedback": "Confident wording does not make the evidence fresh."
+            },
+            {
+              "text": "Apply it; a filled mark proves it is right.",
+              "correct": false,
+              "feedback": "A filled mark records an action. It does not prove the advice was sound."
+            }
+          ]
+        }
       },
       {
         "title": "Try another day and prepare the handover",
         "body": [
-          "Another demo zone; one unavailable source.",
-          "Record a decision and next check.",
-          "Handover: responsible person, versions, backup, recovery and final state."
+          "Another zone, one source unknown: five parts and a decision.",
+          "Handover: who, versions, backup location, recovery, final state.",
+          "Rollback: return to the previous version after a bad update."
         ],
-        "narration": "Choose another demo zone and record what is available. For a paper variation, suppose one source is unavailable. Complete the five parts and decide whether to retain settings, investigate or make one justified demo adjustment. Explain why. A handover names the responsible person, software versions, backup location, recovery procedure and agreed final state. A listed backup alone cannot prove it restores successfully. Preserve a recoverable backup and follow the local update and rollback guide.",
+        "narration": "A good shift handover means the next person can carry on without phoning you. First, practise another day. Choose a different demo zone, and suppose one source has no current reading. Complete the five parts, then decide: keep the settings, investigate, or make one justified demo change. Say why. Then write a handover note: a short note that gives the next responsible person what they need. Include who is responsible now, the software versions, where the backup is, how to recover, and the agreed final state of the equipment. A backup is a saved copy of the whole setup that can be restored after a failure. A backup counts once someone has restored it successfully in a test. An update installs a newer software version. Rollback means going back to the previous version if an update causes trouble. Follow your site’s update and rollback guide. Next, teach it back.",
         "visual": {
           "type": "lesson-cues",
           "title": "Try another day and prepare the handover",
           "labels": [
-            "Another demo zone; one unavailable source.",
-            "Record a decision and next check.",
-            "Handover: responsible person, versions, backup, recovery and final state."
+            "Another zone, one source unknown: five parts and a decision.",
+            "Handover: who, versions, backup location, recovery, final state.",
+            "Rollback: return to the previous version after a bad update."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D6-s6"
+        "id": "D6-s6",
+        "check": {
+          "prompt": "Handover: Sam responsible; version 3.2; backup on the office USB drive; valves closed. What is missing?",
+          "options": [
+            {
+              "text": "How to recover from the backup.",
+              "correct": true,
+              "feedback": "Right. A backup without recovery steps leaves the next person stuck."
+            },
+            {
+              "text": "The backup location.",
+              "correct": false,
+              "feedback": "It is there: on the office USB drive."
+            },
+            {
+              "text": "The agreed final state.",
+              "correct": false,
+              "feedback": "It is there: valves closed."
+            }
+          ]
+        }
       },
       {
         "title": "Teach it back, then recall it later",
         "body": [
-          "Demonstrate navigation and reviewed changes in the demo.",
-          "Local supervision covers physical shutdown and commissioning evidence.",
-          "Recall tomorrow; repeat a changed scenario in about a week."
+          "Teach: address, report ages, control scope, change path.",
+          "On site: physical shutdown and commissioning, shown in person.",
+          "Recall tomorrow; repeat a new case in about a week."
         ],
-        "narration": "Teach another learner to find the full room-and-zone address, check freshness and explain control scope. Demonstrate the change workflow in the demo. Physical shutdown and commissioning evidence need competent local handover. Tomorrow recall draft, apply and arm without notes. In about a week, solve a stale-data case with changed values. Keep your diary brief, specific and clear about unresolved checks.",
+        "narration": "You remember best what you teach, and what you recall later. Teach another learner to find a zone’s full address, check report ages and explain what Watering and Stop all act on. Then show them the change path in the demo: draft, Review changes, Apply, readback and restore. Some skills cannot be learned from a screen. Where the physical shutdown is, and what commissioning proved at your site, need a competent local person to show you. Tomorrow, recall without notes the difference between a draft, Apply and Arm plan. In about a week, solve an old-reading case with new numbers. Spacing practice out like this makes it stick. Keep your diary short, specific and honest about anything still unresolved. That completes the daily operation lessons.",
         "visual": {
           "type": "lesson-cues",
           "title": "Teach it back, then recall it later",
           "labels": [
-            "Demonstrate navigation and reviewed changes in the demo.",
-            "Local supervision covers physical shutdown and commissioning evidence.",
-            "Recall tomorrow; repeat a changed scenario in about a week."
+            "Teach: address, report ages, control scope, change path.",
+            "On site: physical shutdown and commissioning, shown in person.",
+            "Recall tomorrow; repeat a new case in about a week."
           ],
           "caption": "Fictional learning example. Practise software actions only in the isolated demo."
         },
-        "id": "D6-s7"
+        "id": "D6-s7",
+        "check": {
+          "prompt": "Which of these needs a competent local person rather than the demo?",
+          "options": [
+            {
+              "text": "Setting Default view.",
+              "correct": false,
+              "feedback": "Default view can be practised safely in the demo."
+            },
+            {
+              "text": "Drafting a target change.",
+              "correct": false,
+              "feedback": "The demo is built for practising drafts and reviews."
+            },
+            {
+              "text": "Where the physical shutdown is and how to use it.",
+              "correct": true,
+              "feedback": "Right. That knowledge belongs to your site and is shown in person."
+            }
+          ]
+        }
       }
     ],
     "practice": {
       "kind": "demo-and-explain",
-      "prompt": "Complete a daily record for another demo zone, including one unavailable source.",
+      "prompt": "Complete a daily record for another demo zone, including one unknown source.",
       "hints": [
         "Keep unknowns explicit.",
         "Label delivery source and averaging assumptions.",
@@ -1671,22 +2514,22 @@
         "id": "D6-q1"
       },
       {
-        "prompt": "Crop AI recommends a target. How should it be handled?",
+        "prompt": "The AI assistant recommends a target. How should you handle it?",
         "options": [
           {
             "text": "Trust its confident explanation.",
             "correct": false,
-            "feedback": "Fluent advice does not verify readings, crop response or software acceptance."
+            "feedback": "Fluent advice does not check readings, crop response or what Home Assistant accepted."
           },
           {
             "text": "Treat a chart mark as proof.",
             "correct": false,
-            "feedback": "An assistant mark records an event, not proof the advice is valid."
+            "feedback": "A mark records an event. It does not prove the advice is sound."
           },
           {
-            "text": "Check evidence and assumptions; review and verify any authorised action separately.",
+            "text": "Check its evidence and assumptions; review and read back any change you accept.",
             "correct": true,
-            "feedback": "Correct. Advice, accepted software changes and physical results are distinct evidence."
+            "feedback": "Correct. Advice, accepted changes and physical results are separate evidence."
           }
         ],
         "safetyCritical": true,
