@@ -35,14 +35,16 @@ function button(text, className = "", onClick) {
 
 // A multiple-choice block. Unlimited tries; the correct answer is revealed after
 // two wrong tries so nobody gets stuck. onAnswer(index, correct) runs each time.
-function choiceBlock(question, name, { onAnswer = () => {}, initial } = {}) {
+function choiceBlock(question, name, { onAnswer = () => {}, initial, wrongTries = 0 } = {}) {
   const box = el("fieldset", "lp-check");
-  box.append(el("legend", "", question.prompt));
+  const legend = el("legend", "", question.prompt);
+  legend.tabIndex = -1;
+  box.append(legend);
   if (question.safetyCritical) box.append(el("p", "critical-label", "Safety-critical"));
   const feedback = el("p", "lp-feedback");
   feedback.setAttribute("role", "status");
   const rows = [];
-  let wrong = 0;
+  let wrong = wrongTries;
   const show = (oi, announce = true) => {
     const option = question.options[oi];
     rows.forEach((row, i) => {
@@ -104,18 +106,24 @@ export function renderLesson({
     ...questions.map((question, qi) => ({ kind: "quiz", question, qi, label: `Question ${qi + 1}` })),
     { kind: "result", label: "Result" },
   ];
+  // progress.slides stores a slide index (the format used before steps existed):
+  // 0 is the intro, 1..n-1 that slide, n the steps after the last slide.
   const saved = progress.slides[lesson.id];
-  let index = Number.isInteger(saved) ? Math.max(0, Math.min(saved, steps.length - 1)) : 0;
+  const n = lesson.slides.length;
+  let index = !Number.isInteger(saved) || saved <= 0 ? 0 : saved < n ? saved + 1 : n + 1;
   // Quiz answers live only in this page, so an interrupted quiz restarts at question 1.
   if (steps[index].kind === "quiz" || steps[index].kind === "result")
     index = steps.findIndex((s) => s.kind === "quiz");
   const checked = Object.create(null); // slide id → passed (correct, or revealed)
   const quizAnswers = Object.create(null); // question id → option index
+  let attemptGraded = false; // the current answers are already recorded
 
   const saveStatus = el("p", "lp-save");
   saveStatus.setAttribute("role", "status");
   const persist = () => {
-    progress.slides = { ...progress.slides, [lesson.id]: index };
+    const step = steps[index];
+    const position = step.kind === "intro" ? 0 : step.kind === "slide" ? step.i : lesson.slides.length;
+    progress.slides = { ...progress.slides, [lesson.id]: position };
     progress.lastLesson = lesson.id;
     const fail = () => {
       saveStatus.textContent = "Progress could not be saved in this browser. Export it from Progress to keep a copy.";
@@ -138,7 +146,10 @@ export function renderLesson({
   const videoSrc = lesson.video?.src && resource(lesson.video.src);
   const chapters = (lesson.video?.chapters || []).filter((c) => Number.isFinite(c.start) && c.start >= 0);
   const useVideo = Boolean(videoSrc) && chapters.length === lesson.slides.length;
-  let video, captionLine, sectionEnd = Infinity, autoPause = true, engaged = false;
+  let video, captionLine, sectionEnd = Infinity, autoPause = true, engaged = false, videoFailed = false;
+  // The diagram (alt text, SVG title and description) stays in the page for screen
+  // readers while the video plays, and is shown instead if the video fails.
+  const diagram = el("div", "lp-diagram");
   const stage = el("section", "lp-stage");
   stage.setAttribute("aria-label", "Lesson video");
   const stageInner = el("div", "lp-stage-inner");
@@ -162,6 +173,15 @@ export function renderLesson({
       track.src = captionSrc;
       video.append(track);
       track.track.mode = "hidden";
+      // Native controls can switch the track to "showing", drawing captions over the diagram.
+      video.textTracks.addEventListener("change", () => {
+        if (track.track.mode === "showing") {
+          track.track.mode = "hidden";
+          captionLine.hidden = false;
+          ccToggle.textContent = "CC on";
+          ccToggle.setAttribute("aria-pressed", "true");
+        }
+      });
       track.track.addEventListener("cuechange", () => {
         const cues = Array.from(track.track.activeCues || []);
         captionLine.textContent = cues.map((cue) => cue.text).join(" ");
@@ -178,9 +198,12 @@ export function renderLesson({
     video.addEventListener("play", () => {
       engaged = true;
       sectionStatus.textContent = "";
+      if (steps[index].kind === "intro") goTo(index + 1);
     });
     video.addEventListener("error", () => {
-      sectionStatus.textContent = "The video could not load. Read the key points and transcript instead.";
+      videoFailed = true;
+      sectionStatus.textContent = "The video could not load. The diagram and key points are shown instead.";
+      stageFor(steps[index]);
     });
   }
   const mediaBar = el("div", "lp-media-bar");
@@ -374,11 +397,14 @@ export function renderLesson({
       video?.pause();
       return;
     }
-    if (useVideo) {
-      if (!stageInner.contains(video)) stageInner.replaceChildren(video, captionLine, mediaBar, sectionStatus);
+    const stageSlide = step.kind === "slide" ? step.slide : lesson.slides[0];
+    diagram.replaceChildren(createVisual(stageSlide.visual, { lessonId: lesson.id, slideId: stageSlide.id }));
+    if (useVideo && !videoFailed) {
+      diagram.classList.add("lp-sr-only");
+      if (!stageInner.contains(video)) stageInner.replaceChildren(video, captionLine, mediaBar, sectionStatus, diagram);
       const i = step.kind === "slide" ? step.i : 0;
       const start = chapters[i].start;
-      sectionEnd = step.kind === "slide" && chapters[i + 1] ? chapters[i + 1].start : Infinity;
+      sectionEnd = chapters[i + 1] ? chapters[i + 1].start : Infinity;
       const playing = !video.paused;
       const seek = () => {
         if (Math.abs(video.currentTime - start) > 0.25) video.currentTime = start;
@@ -390,8 +416,9 @@ export function renderLesson({
       if (step.kind === "intro") video.pause();
       else if (playing || engaged) void video.play().catch(() => {});
     } else {
-      const slide = step.kind === "slide" ? step.slide : lesson.slides[0];
-      stageInner.replaceChildren(createVisual(slide.visual, { lessonId: lesson.id, slideId: slide.id }));
+      video?.pause();
+      diagram.classList.remove("lp-sr-only");
+      stageInner.replaceChildren(diagram, ...(videoFailed ? [sectionStatus] : []));
     }
   }
 
@@ -434,9 +461,10 @@ export function renderLesson({
       box.append(
         choiceBlock(slide.check, `${prefix}-check-${i}`, {
           initial: checked[slide.id]?.choice,
+          wrongTries: checked[slide.id]?.wrong || 0,
           onAnswer: (choice, correct, wrong) => {
             const passed = correct || wrong >= 2 || checked[slide.id]?.passed;
-            checked[slide.id] = { choice, passed };
+            checked[slide.id] = { choice, passed, wrong };
             updateNav();
           },
         }),
@@ -498,6 +526,7 @@ export function renderLesson({
       radio.checked = quizAnswers[question.id] === oi;
       radio.addEventListener("change", () => {
         quizAnswers[question.id] = oi;
+        attemptGraded = false;
         block.querySelectorAll(".lp-option").forEach((row) => row.classList.toggle("is-selected", row === label));
         updateNav();
       });
@@ -523,13 +552,16 @@ export function renderLesson({
       return box;
     }
     const grade = gradeQuiz(questions, quizAnswers);
-    if (grade.passed) {
+    if (attemptGraded) {
+      // Revisiting Result with unchanged answers records nothing new.
+    } else if (grade.passed) {
       progress.completed = { ...progress.completed, [lesson.id]: { percent: grade.percent, passedAt: Date.now() } };
     } else {
       const completed = { ...progress.completed };
       delete completed[lesson.id];
       progress.completed = completed;
     }
+    attemptGraded = true;
     const result = el("p", `quiz-result ${grade.passed ? "correct" : "incorrect"}`);
     result.setAttribute("role", "status");
     const critical = grade.feedback.some((x) => x.critical && !x.correct);
@@ -546,6 +578,7 @@ export function renderLesson({
     box.append(review);
     if (!grade.passed) box.append(button("Try the questions again", "primary", () => {
       for (const k in quizAnswers) delete quizAnswers[k];
+      attemptGraded = false;
       goTo(steps.findIndex((s) => s.kind === "quiz"));
     }));
     if (lesson.practicalTask?.requiresLocalSupervision)
@@ -609,7 +642,13 @@ export function renderLesson({
     panelBody.scrollTop = 0;
     persist();
     updateNav();
-    if (focus) content.querySelector("h2")?.focus?.({ preventScroll: true });
+    if (focus) {
+      const target = content.querySelector("h2") || content.querySelector("legend");
+      if (target) {
+        target.tabIndex = -1;
+        target.focus({ preventScroll: true });
+      }
+    }
   }
 
   root.addEventListener("keydown", (e) => {

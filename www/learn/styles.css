@@ -1834,3 +1834,30 @@ body.lesson-mode #main {
 body.lesson-mode .storage-notice {
   display: none;
 }
+/* Diagram kept for screen readers while the video shows the same picture. */
+.lp-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+.lp-diagram {
+  min-height: 0;
+  overflow: auto;
+}
+.lp-diagram > figure {
+  margin: 0;
+}
+@media (max-width: 860px) {
+  .lp-diagram {
+    max-height: 36dvh;
+  }
+  .lp-diagram figcaption {
+    display: none;
+  }
+}
