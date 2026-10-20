@@ -106,7 +106,9 @@ export function renderLesson({
   ];
   const saved = progress.slides[lesson.id];
   let index = Number.isInteger(saved) ? Math.max(0, Math.min(saved, steps.length - 1)) : 0;
-  if (steps[index].kind === "result") index = 0;
+  // Quiz answers live only in this page, so an interrupted quiz restarts at question 1.
+  if (steps[index].kind === "quiz" || steps[index].kind === "result")
+    index = steps.findIndex((s) => s.kind === "quiz");
   const checked = Object.create(null); // slide id → passed (correct, or revealed)
   const quizAnswers = Object.create(null); // question id → option index
 
@@ -136,7 +138,7 @@ export function renderLesson({
   const videoSrc = lesson.video?.src && resource(lesson.video.src);
   const chapters = (lesson.video?.chapters || []).filter((c) => Number.isFinite(c.start) && c.start >= 0);
   const useVideo = Boolean(videoSrc) && chapters.length === lesson.slides.length;
-  let video, captionLine, sectionEnd = Infinity, autoPause = true;
+  let video, captionLine, sectionEnd = Infinity, autoPause = true, engaged = false;
   const stage = el("section", "lp-stage");
   stage.setAttribute("aria-label", "Lesson video");
   const stageInner = el("div", "lp-stage-inner");
@@ -174,6 +176,7 @@ export function renderLesson({
       }
     });
     video.addEventListener("play", () => {
+      engaged = true;
       sectionStatus.textContent = "";
     });
     video.addEventListener("error", () => {
@@ -317,13 +320,21 @@ export function renderLesson({
     if (e.target === drawer) drawer.close();
   });
 
+  function practicalNote() {
+    return lesson.practicalTask?.requiresLocalSupervision
+      ? "Do physical work only with competent local supervision and the installation’s approved procedure. A quiz cannot verify hardware safety."
+      : "Do this on paper or in the demo. Nothing checks it automatically.";
+  }
   function downloadTranscript() {
     const lines = [lesson.id + " · " + lesson.title, lesson.summary, ""];
     lesson.slides.forEach((s, i) => {
       lines.push(`${i + 1}. ${s.title}`, "", s.narration || "", "");
       if (s.workedExample) lines.push("Worked example: " + s.workedExample.prompt, ...s.workedExample.steps, s.workedExample.answer, "");
     });
-    if (lesson.practice) lines.push("Practice", lesson.practice.prompt, "");
+    if (lesson.practice) lines.push("Practice", lesson.practice.prompt, ...(lesson.practice.hints || []).map((h) => "Hint: " + h), "");
+    if (lesson.practicalTask)
+      lines.push("Practical task", ...lesson.practicalTask.instructions, practicalNote(), "");
+    if (questions.length) lines.push("Knowledge check", ...questions.flatMap((q, i) => [`${i + 1}. ${q.prompt}`, ...q.options.map((o) => "   - " + o.text)]), "");
     if (lesson.sources) lines.push("Sources", ...lesson.sources.map((s) => s.title + ": " + s.url));
     const url = URL.createObjectURL(new Blob([lines.join("\n")], { type: "text/plain;charset=utf-8" }));
     const a = el("a");
@@ -342,6 +353,19 @@ export function renderLesson({
     printNotes.append(el("h3", "", `${i + 1}. ${s.title}`), list(s.body), el("p", "", s.narration));
     if (s.check) printNotes.append(el("p", "", "Check: " + s.check.prompt));
   });
+  if (lesson.practice) printNotes.append(el("h3", "", "Practice"), el("p", "", lesson.practice.prompt), list(lesson.practice.hints));
+  if (lesson.practicalTask)
+    printNotes.append(el("h3", "", "Practical task"), list(lesson.practicalTask.instructions, true), el("p", "", practicalNote()));
+  if (questions.length) {
+    printNotes.append(el("h3", "", "Knowledge check"));
+    const qs = el("ol");
+    for (const q of questions) {
+      const li = el("li", "", q.prompt);
+      li.append(list(q.options.map((o) => o.text)));
+      qs.append(li);
+    }
+    printNotes.append(qs);
+  }
 
   // ---- step rendering ----
   function stageFor(step) {
@@ -364,7 +388,7 @@ export function renderLesson({
       sectionStatus.textContent = "";
       captionLine.textContent = "";
       if (step.kind === "intro") video.pause();
-      else if (playing) void video.play().catch(() => {});
+      else if (playing || engaged) void video.play().catch(() => {});
     } else {
       const slide = step.kind === "slide" ? step.slide : lesson.slides[0];
       stageInner.replaceChildren(createVisual(slide.visual, { lessonId: lesson.id, slideId: slide.id }));
@@ -453,9 +477,7 @@ export function renderLesson({
     if (lesson.practicalTask) {
       const task = el("section", "practical-task");
       task.append(el("h3", "", "Practical task"), list(lesson.practicalTask.instructions, true));
-      task.append(el("p", "lp-muted", lesson.practicalTask.requiresLocalSupervision
-        ? "Do physical work only with competent local supervision and the installation’s approved procedure."
-        : "Do this on paper or in the demo. Nothing checks it automatically."));
+      task.append(el("p", "lp-muted", practicalNote()));
       box.append(task);
     }
     return box;
@@ -489,6 +511,17 @@ export function renderLesson({
 
   function resultPanel() {
     const box = el("div", "lp-result");
+    const unanswered = questions.findIndex((q) => !Number.isInteger(quizAnswers[q.id]));
+    if (unanswered !== -1) {
+      const saved = progress.completed[lesson.id];
+      box.append(
+        el("p", "lp-eyebrow", "Result"),
+        el("h2", "", "Answer every question first"),
+        el("p", "quiz-result", saved ? `Your earlier pass (${saved.percent}%) is still recorded.` : "Your result appears after you answer all the questions."),
+        button(`Go to question ${unanswered + 1}`, "primary", () => goTo(steps.findIndex((s) => s.kind === "quiz") + unanswered)),
+      );
+      return box;
+    }
     const grade = gradeQuiz(questions, quizAnswers);
     if (grade.passed) {
       progress.completed = { ...progress.completed, [lesson.id]: { percent: grade.percent, passedAt: Date.now() } };

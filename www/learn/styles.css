@@ -1830,3 +1830,7 @@ body.lesson-mode #main {
     display: none;
   }
 }
+/* The lesson shows its own save warning inside the layout (.lp-save). */
+body.lesson-mode .storage-notice {
+  display: none;
+}

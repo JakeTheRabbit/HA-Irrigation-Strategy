@@ -1,6 +1,6 @@
 # Crop Steering Academy: R4 rebuild record
 
-**Edition:** `2026-10-20-r4`. **Status:** built and verified locally; media release not yet published.
+**Edition:** `2026-10-20-r4`. **Status:** built and verified locally; media release published as the [course-media-2026.10.20-r4 prerelease](https://github.com/JakeTheRabbit/HA-Irrigation-Strategy/releases/tag/course-media-2026.10.20-r4) (asset SHA-256 and size match the pin).
 
 ## What changed
 
@@ -47,5 +47,5 @@ Narration uses Kokoro `af_heart` at speed 0.82, generated locally. Pronunciation
 
 ## Still to do
 
-1. Publish the archive as the GitHub prerelease asset `course-media-2026.10.20-r4`. The pin in `www/learn/course/media-release.json` already points there.
-2. Merge and deploy the site, then repeat `academy-media.browser.mjs` against the public URL.
+1. Merge and deploy the site, then repeat `academy-media.browser.mjs` against the public URL.
+2. Human listening review of the R4 narration.

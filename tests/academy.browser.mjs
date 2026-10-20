@@ -175,6 +175,11 @@ try {
   }
   await page.getByText(/^Passed: 5 of 5/).waitFor();
   assert.equal((await record()).completed.D3.percent, 100);
+  // Visiting Result again without a new attempt must keep the saved pass.
+  await page.reload();
+  await page.locator(".lp-dot").last().click();
+  await page.getByText(/earlier pass \(100%\) is still recorded/).waitFor();
+  assert.equal((await record()).completed.D3.percent, 100, "Opening Result must not erase a pass");
   output.checks.push(
     "80% safety-critical failure blocks, correct retry passes",
   );
@@ -341,7 +346,8 @@ try {
   await blockedPage.goto(base + "#/lesson/D2");
   await blockedPage.locator(".lp").waitFor();
   await blockedPage.locator(".lp-next").click();
-  assert.ok(await blockedPage.locator("#storage-notice").isVisible());
+  assert.ok(await blockedPage.locator(".lp-save").isVisible(), "Lesson shows its own save warning");
+  assert.ok(await blockedPage.locator(".lp-nav").evaluate((n) => n.getBoundingClientRect().bottom <= innerHeight), "Warning must not push lesson navigation off screen");
   await blockedPage.goto(base + "#/progress");
   await blockedPage
     .getByRole("button", { name: "Export progress", exact: true })
