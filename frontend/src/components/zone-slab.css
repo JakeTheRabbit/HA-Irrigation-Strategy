@@ -104,3 +104,22 @@
 .feed-tank-float[data-full] {
   fill: var(--success);
 }
+
+/* Each sensor in the slab: green reads, amber to look at, red cannot be used. */
+.zone-slab-sensor {
+  fill: var(--success);
+  stroke: #ffffff;
+  stroke-width: 1.5;
+}
+.zone-slab-sensor[data-health="stale"],
+.zone-slab-sensor[data-health="stuck"],
+.zone-slab-sensor[data-health="left-out"] {
+  fill: var(--warning);
+}
+.zone-slab-sensor[data-health="no-reading"],
+.zone-slab-sensor[data-health="out-of-range"] {
+  fill: var(--destructive);
+}
+.zone-slab-sensor[data-health="not-counted"] {
+  fill: var(--muted-foreground);
+}

@@ -2,6 +2,7 @@ import { ArrowRight, Pause, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Empty, number, time as clock } from "@/components/dashboard";
 import { FeedTankDrawing, ZoneSlab } from "@/components/zone-slab";
+import { DrinkBar, MiniGauge, ShotDots } from "@/components/zone-gauges";
 import { StockBottle } from "@/components/stock-bottle";
 import { STOCK_STATES } from "@/lib/dosing";
 import {
@@ -25,14 +26,6 @@ const perPlant = (ml: number) => {
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
 /** The root zone's comfortable range; outside it the value is marked, never coloured alone. */
 const ROOT_BAND: [number, number] = [19, 23];
-
-/** A value against its band: "ok", "low" or "high", and how far out (▼0.4). */
-function against(value: number | null, band: readonly [number, number] | null, digits = 1) {
-  if (value === null || !band) return { state: "none" as const, delta: "" };
-  if (value < band[0]) return { state: "low" as const, delta: ` ▼${number(band[0] - value, digits)}` };
-  if (value > band[1]) return { state: "high" as const, delta: ` ▲${number(value - band[1], digits)}` };
-  return { state: "ok" as const, delta: "" };
-}
 
 type Open = (room: string, page: Page, zone?: number) => void;
 
@@ -94,6 +87,12 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
   const run = day !== null && days !== null && days > 0;
   const pct = (d: number) => `${Math.max(0, Math.min(100, (d / days!) * 100))}%`;
   const problem = status.tone === "stopped" || status.tone === "off" || stale;
+  const drunk = r.zones
+    .map((z) => z.mlPerPlant)
+    .filter((ml): ml is number => ml !== null)
+    .sort((x, y) => x - y);
+  const median = drunk.length ? drunk[Math.floor(drunk.length / 2)] : null;
+  const maxMl = Math.max(1, ...drunk) * 1.15;
   return (
     <section
       className="facility-room panel"
@@ -186,11 +185,27 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
       </div>
       <div className="facility-zones">
         {r.zones.map((z) => (
-          <ZoneCard key={z.zone.id} r={r} z={z} stale={stale} open={open} />
+          <ZoneCard
+            key={z.zone.id}
+            r={r}
+            z={z}
+            stale={stale}
+            open={open}
+            median={median}
+            maxMl={maxMl}
+          />
         ))}
       </div>
     </section>
   );
+}
+
+/** A sensor's own name inside its zone's card: "Zone 1 front" reads "Front". */
+function sensorName(sensor: ZoneSensor, context: string[]) {
+  let name = sensor.name;
+  for (const word of context)
+    if (name.toLowerCase().startsWith(word.toLowerCase())) name = name.slice(word.length).trim();
+  return name ? name.charAt(0).toUpperCase() + name.slice(1) : "Sensor";
 }
 
 function ZoneCard({
@@ -198,11 +213,16 @@ function ZoneCard({
   z,
   stale,
   open,
+  median,
+  maxMl,
 }: {
   r: FacilityRoom;
   z: FacilityZone;
   stale: boolean;
   open: Open;
+  /** The room's median water per plant today, and the bar's end, for the zone's drink bar. */
+  median: number | null;
+  maxMl: number;
 }) {
   const { zone } = z;
   const mode = stale && z.mode !== "room-off" ? "offline" : z.mode;
@@ -218,10 +238,10 @@ function ZoneCard({
       : zone.phase === "P3" && z.rescue !== null
         ? [z.rescue, Number.POSITIVE_INFINITY]
         : null;
-  const vwc = against(zone.vwc.value, band);
-  const ec = against(zone.ec.value, r.stage?.poreEc ?? null);
-  const root = against(z.rootTemp, ROOT_BAND);
+  const poreEc = r.stage?.poreEc ?? null;
   const phase = /^P[0-3]$/.test(zone.phase) ? zone.phase : null;
+  const context = [r.room.name, zone.name];
+  const troubled = z.sensors.filter((s) => s.health !== "ok" && s.health !== "not-counted");
   return (
     <article
       className="facility-zone"
@@ -236,9 +256,17 @@ function ZoneCard({
           rewater={z.rewater}
           target={z.target}
           ec={zone.ec.value}
-          ecBand={r.stage?.poreEc ?? null}
+          ecBand={poreEc}
           level={level}
           label=""
+          sensors={z.sensors.map((s) => ({
+            health: s.health,
+            label: `${sensorName(s, context)}: ${
+              s.vwc?.value == null ? "—" : `${number(s.vwc.value)}%`
+            }${s.ec?.value == null ? "" : `, EC ${number(s.ec.value)}`}${
+              s.health === "ok" ? "" : ` (${s.text})`
+            }`,
+          }))}
         />
         <div className="facility-zone-head">
           <h3>
@@ -256,85 +284,59 @@ function ZoneCard({
               {ZONE_MODE[mode]}
             </span>
           </span>
-          <span className="facility-zone-drink">
-            {z.mlPerPlant !== null ? (
-              <>
-                <strong>{perPlant(z.mlPerPlant)}</strong> per plant
-              </>
-            ) : (
-              <span className="muted">Per plant unknown</span>
-            )}
-          </span>
-          {z.waterL !== null && (
-            <span className="facility-zone-total">{number(z.waterL, 1)} L today</span>
-          )}
+          <ShotDots shots={zone.shots.value === null ? null : Math.round(zone.shots.value)} />
         </div>
       </div>
-      <dl className="facility-zone-readings">
-        <div data-state={vwc.state}>
-          <dt>VWC</dt>
-          <dd>
-            {zone.vwc.value === null ? "—" : `${number(zone.vwc.value)}%`}
-            {vwc.delta}
-          </dd>
-        </div>
-        <div>
-          <dt>Dryback</dt>
-          <dd>{z.drybackPoints === null ? "—" : `${number(z.drybackPoints)} pts`}</dd>
-        </div>
-        <div data-state={ec.state}>
-          <dt>Pore EC</dt>
-          <dd>
-            {zone.ec.value === null ? "—" : number(zone.ec.value)}
-            {ec.delta}
-          </dd>
-        </div>
-        <div data-state={root.state}>
-          <dt>Root</dt>
-          <dd>
-            {z.rootTemp === null ? "—" : `${number(z.rootTemp)}°`}
-            {root.delta}
-          </dd>
-        </div>
-      </dl>
+      <DrinkBar
+        ml={z.mlPerPlant}
+        median={median}
+        max={maxMl}
+        text={
+          z.mlPerPlant !== null ? (
+            <>
+              <strong>{perPlant(z.mlPerPlant)}</strong> per plant
+              {z.waterL !== null && <span className="muted"> · {number(z.waterL, 1)} L today</span>}
+            </>
+          ) : (
+            <span className="muted">Per plant unknown</span>
+          )
+        }
+      />
+      <div className="facility-gauges">
+        <MiniGauge label="VWC" value={zone.vwc.value} unit="%" band={band} scale={[20, 80]} />
+        <MiniGauge
+          label="Dryback"
+          value={z.drybackPoints}
+          unit=" pt"
+          band={r.stage?.drybackPoints ?? null}
+          scale={[0, 20]}
+        />
+        <MiniGauge
+          label="Pore EC"
+          value={zone.ec.value}
+          band={poreEc}
+          scale={poreEc ? [0, poreEc[1] * 1.6] : [0, 10]}
+        />
+        <MiniGauge label="Root" value={z.rootTemp} unit="°" band={ROOT_BAND} scale={[14, 30]} />
+      </div>
       {z.attention
-        // Pore EC out of band is marked on its reading, and a probe's trouble on its sensor row.
+        // Pore EC out of band shows on its gauge, and a probe's trouble on its sensor.
         .filter((reason) => reason.rule !== "pore-ec" && reason.rule !== "probe")
         .map((reason) => (
-        <p key={reason.rule} className="facility-flag" data-level={reason.level}>
-          <TriangleAlert size={14} aria-hidden="true" /> {reason.text}
-        </p>
+          <p key={reason.rule} className="facility-flag" data-level={reason.level}>
+            <TriangleAlert size={14} aria-hidden="true" /> {reason.text}
+          </p>
         ))}
-      {z.sensors.length > 0 && (
-        <ul className="facility-sensors" aria-label={`${zone.name} sensors`}>
-          {z.sensors.map((sensor) => (
-            <SensorRow key={sensor.key} sensor={sensor} context={[r.room.name, zone.name]} />
-          ))}
-        </ul>
-      )}
+      {troubled.map((s) => (
+        <p
+          key={s.key}
+          className="facility-flag"
+          data-level={s.health === "no-reading" || s.health === "out-of-range" ? "critical" : "warning"}
+        >
+          <TriangleAlert size={14} aria-hidden="true" /> {sensorName(s, context)} sensor: {s.text}
+        </p>
+      ))}
     </article>
-  );
-}
-
-function SensorRow({ sensor, context }: { sensor: ZoneSensor; context: string[] }) {
-  const bad = sensor.health !== "ok" && sensor.health !== "not-counted";
-  // Inside its zone's card the room and zone names say nothing: "Zone 1 front" reads "Front".
-  let name = sensor.name;
-  for (const word of context)
-    if (name.toLowerCase().startsWith(word.toLowerCase())) name = name.slice(word.length).trim();
-  name = name ? name.charAt(0).toUpperCase() + name.slice(1) : "Sensor";
-  return (
-    <li className="facility-sensor" data-health={sensor.health}>
-      <span className="facility-sensor-dot" aria-hidden="true" />
-      <span className="facility-sensor-name" title={sensor.name}>
-        {name}
-      </span>
-      <span className="facility-sensor-values">
-        {sensor.vwc && <span>{sensor.vwc.value === null ? "—" : `${number(sensor.vwc.value)}%`}</span>}
-        {sensor.ec && <span>EC {sensor.ec.value === null ? "—" : number(sensor.ec.value)}</span>}
-      </span>
-      {bad && <span className="facility-sensor-issue">{sensor.text}</span>}
-    </li>
   );
 }
 

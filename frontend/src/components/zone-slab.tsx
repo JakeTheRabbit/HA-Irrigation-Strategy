@@ -26,6 +26,7 @@ export function ZoneSlab({
   ecBand,
   level,
   label,
+  sensors = [],
 }: {
   vwc: number | null;
   peak: number | null;
@@ -35,6 +36,8 @@ export function ZoneSlab({
   ecBand: readonly [number, number] | null;
   level: AttentionLevel | null;
   label: string;
+  /** The zone's sensors, drawn as dots in the slab coloured by their health. */
+  sensors?: { health: string; label: string }[];
 }) {
   const clip = useId();
   const water = vwc === null ? null : y(vwc);
@@ -79,6 +82,18 @@ export function ZoneSlab({
       {rewater !== null && target !== null && target > rewater && (
         <rect className="zone-slab-band" x="0" y={y(target)} width="3" height={y(rewater) - y(target)} />
       )}
+      {sensors.map((sensor, i) => (
+        <circle
+          key={i}
+          className="zone-slab-sensor"
+          data-health={sensor.health}
+          cx={4 + (92 * (i + 1)) / (sensors.length + 1)}
+          cy={TOP + 9}
+          r="5"
+        >
+          <title>{sensor.label}</title>
+        </circle>
+      ))}
       {peak !== null && water !== null && (
         <>
           <line className="zone-slab-peak" x1="4" x2="96" y1={y(peak)} y2={y(peak)} />
