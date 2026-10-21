@@ -238,7 +238,7 @@ The code raises CS-713 (room differs from grow plan) with each brain, also with 
 
 ## What the dashboard and Home Assistant show
 
-The dashboard shows the decisions of the AI assistant in each zone’s **Why / next action** panel, on **Irrigation › Current day**, in **History › Timeline**, and on **Equipment › Probes**. Room-level automation permissions live in **Settings & help › AI assistant**. A room without the AI assistant shows none of it. The [README](../README.md#daily-use) shows each page.
+The dashboard shows the decisions of the AI assistant in each zone’s **Why / next action** panel, on **Irrigation › Current day**, in **History › Timeline**, and on **Equipment › Probes**. Room-level automation permissions live in **Settings › AI assistant**. A room without the AI assistant shows none of it. The [README](../README.md#daily-use) shows each page.
 
 - `sensor.crop_steering_<prefix>jev`: the AI assistant panel of the room. It shows the brain, the model, the mode (acting or dry run), the calls, the cost and the budget of today, the last error and the judges. It also shows the stage of today.
 - `sensor.crop_steering_<prefix>zone_N_jev`: the judges that act on the zone, the setpoint range, and the last answers of each judge with what the code did.

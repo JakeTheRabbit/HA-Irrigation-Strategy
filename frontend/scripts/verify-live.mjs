@@ -187,12 +187,12 @@ const connected = (target = page) =>
 const menu = async (name) => {
   await page
     .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: name === "Today" ? "Overview" : name, exact: true })
+    .getByRole("button", { name: name === "Today" ? "Status" : name, exact: true })
     .click();
   if (name === "Today")
     await page
-      .getByRole("navigation", { name: "Overview views" })
-      .getByRole("button", { name: "Selected room", exact: true })
+      .getByRole("navigation", { name: "Status views" })
+      .getByRole("button", { name: "Room", exact: true })
       .click();
 };
 async function check(name, run) {
@@ -255,7 +255,7 @@ try {
         assert.ok((await drawer.evaluate((el) => el.scrollTop)) > 0, "it really scrolled");
         // and the first item is still reachable on the way back
         await drawer
-          .getByRole("button", { name: "Overview", exact: true })
+          .getByRole("button", { name: "Status", exact: true })
           .scrollIntoViewIfNeeded();
       } finally {
         await phone.close();
@@ -461,7 +461,7 @@ try {
     "probes: each probe's line, and the controller's sensors', one request each",
     async () => {
       // Settings reads no history: anything asked for after this is Equipment's.
-      await menu("Settings & help");
+      await menu("Settings");
       await visible(page.getByRole("heading", { name: "Settings", exact: true }));
       await page.waitForTimeout(1000);
       history.length = 0;
@@ -578,9 +578,9 @@ try {
       await visible(
         page.locator('input[id="setting-number.crop_steering_f2_zone_1_p2_vwc_threshold"]'),
       );
-      await menu("Settings & help");
+      await menu("Settings");
       await page
-        .getByRole("navigation", { name: "Settings & help views" })
+        .getByRole("navigation", { name: "Settings views" })
         .getByRole("button", { name: "Help", exact: true })
         .click();
       await visible(page.getByRole("heading", { name: "Help", exact: true }));

@@ -1643,7 +1643,7 @@ try {
               .getPropertyValue("--ha-native-canvas")
               .trim() === "#fafafa",
         );
-        await navigate("Settings & help", frame);
+        await navigate("Settings", frame);
         await frame.getByRole("button", { name: "Light", exact: true }).click();
         await frame.waitForFunction(
           () => document.documentElement.dataset.themeSource === "override",

@@ -24,7 +24,7 @@ const open = async (hash = "") => {
 };
 try {
   await open();
-  await page.getByRole("heading", { name: "All zones", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "All rooms", exact: true }).waitFor();
   assert.ok((await page.locator("[data-facility-room]").count()) >= 2);
   assert.ok((await page.locator("[data-facility-zone]").count()) >= 6);
   const room = page.locator("[data-facility-room]").nth(1);
@@ -52,7 +52,7 @@ try {
   await open("#/settings");
   await page.locator("#landing-view").selectOption("all-zones");
   await open();
-  await page.getByRole("heading", { name: "All zones", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "All rooms", exact: true }).waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.deepEqual(errors, []);

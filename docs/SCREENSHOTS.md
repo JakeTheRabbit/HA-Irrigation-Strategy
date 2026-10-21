@@ -2,15 +2,19 @@
 
 [Open the interactive demo](https://jaketherabbit.github.io/HA-Irrigation-Strategy/dashboard.html?demo=1).
 
-Captured on 18 October 2026 from `www/dashboard.html?demo=1`, with isolated sample data, a fixed 15:50 local clock and the light theme. These are current UI examples, not photographs or live facility readings.
+Captured on 21 October 2026 from `www/dashboard.html?demo=1`, with isolated sample data, a fixed 15:50 local clock and the light theme. These are current UI examples, not photographs or live facility readings.
 
-## Overview: all zones
+## Status: all rooms
 
 ![All rooms and zones grouped by room](../img/all-zones.png)
 
-## Overview: selected room
+## Status on a phone
 
-![Overview](../img/operator-dashboard.png)
+![All rooms on a 390 px phone, with the five sections in the bottom bar](../img/mobile-all-rooms.png)
+
+## Status: room
+
+![Status, room](../img/operator-dashboard.png)
 
 ## Tank and pump
 

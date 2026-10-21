@@ -33,8 +33,8 @@ export function AllZones({
   return (
     <div className="facility">
       <Heading
-        title="All zones"
-        description="Every room in one view. Open a zone for its chart, targets and next action."
+        title="All rooms"
+        description="Every room and zone in one view. Tap a zone for its chart, targets and next action."
         action={
           <label className="facility-filter">
             Show room
@@ -74,6 +74,23 @@ export function AllZones({
         .map(({ room, view, status, tank }) => {
           const scoped = { ...controller, room: view, roomId: room.id };
           const stale = status.tone === "stale" || controller.connection === "offline";
+          // The room's water today: the zones' delivered litres added up, and per plant over the
+          // plants of the zones that report both.
+          let roomL = 0;
+          let counted = 0;
+          let plantsCounted = 0;
+          let litresCounted = 0;
+          for (const zone of view.zones) {
+            const plants = waterParameters(scoped, zone.id).plant_count;
+            const water = dailyWater(zone, plants);
+            if (water.zoneL === null) continue;
+            roomL += water.zoneL;
+            counted += 1;
+            if (plants !== null && plants > 0) {
+              plantsCounted += plants;
+              litresCounted += water.zoneL;
+            }
+          }
           return (
             <section
               className="facility-room"
@@ -104,6 +121,21 @@ export function AllZones({
                           : "Watering paused"}
                   </Pill>
                   <span className="muted">{view.zones.length} zones</span>
+                  {counted > 0 && (
+                    <span
+                      className="facility-room-water"
+                      title={
+                        counted < view.zones.length
+                          ? `${view.zones.length - counted} zones report no delivery yet and are left out.`
+                          : "Delivered today across the room's zones."
+                      }
+                    >
+                      Water today <strong>{number(roomL, 1)} L</strong>
+                      {plantsCounted > 0 && (
+                        <> · {number(litresCounted / plantsCounted, 2)} L per plant</>
+                      )}
+                    </span>
+                  )}
                 </div>
                 <Button variant="ghost" onClick={() => open(room.id, "today")}>
                   Room overview <ArrowRight size={16} />

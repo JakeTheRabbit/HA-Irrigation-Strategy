@@ -1661,3 +1661,66 @@ nav button.active > svg {
   flex-basis: auto;
   grid-column: auto;
 }
+
+/* Phones: the five sections sit in a bar along the bottom, where a thumb reaches them; the menu
+   button at the top opens the rooms and zones. */
+.bottom-nav {
+  display: none;
+}
+@media (max-width: 720px) {
+  .bottom-nav {
+    position: fixed;
+    inset: auto 0 0 0;
+    z-index: 40;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    padding-bottom: env(safe-area-inset-bottom);
+    background: var(--ha-native-sidebar, var(--surface));
+    border-top: 1px solid var(--border);
+  }
+  .bottom-nav button {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-height: 60px;
+    padding: 6px 2px;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    color: var(--muted-foreground);
+    font-size: var(--text-xs);
+    font-weight: 500;
+    min-width: 0;
+  }
+  .bottom-nav button span:last-child {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .bottom-nav button[aria-current="page"] {
+    color: var(--foreground);
+    font-weight: 600;
+    box-shadow: inset 0 3px 0 var(--primary);
+  }
+  .bottom-nav-icon {
+    position: relative;
+    display: inline-flex;
+  }
+  .bottom-nav-icon .nav-draft-count {
+    position: absolute;
+    top: -6px;
+    left: 14px;
+    margin: 0;
+  }
+  .app-main {
+    padding-bottom: calc(64px + env(safe-area-inset-bottom));
+  }
+}
+@media print {
+  .bottom-nav {
+    display: none;
+  }
+}

@@ -45,8 +45,25 @@
   gap: 16px;
 }
 .facility-zone {
+  position: relative;
   padding: 20px;
   min-width: 0;
+}
+/* The whole card opens the zone: one tap on a phone, not a hunt for the title. */
+.facility-zone h3 button::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+}
+.facility-room-water {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  font-variant-numeric: tabular-nums;
+}
+.facility-room-water strong {
+  color: var(--foreground);
+  font-weight: 600;
 }
 .facility-zone-title {
   display: flex;

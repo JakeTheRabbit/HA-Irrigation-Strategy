@@ -1,5 +1,5 @@
 {
-  "about": "Each alert from the Crop Steering controller app, and each Crop Steering card in Settings → Repairs, ends with a code, for example CS-101. The regular status summary of the controller has no code. This file is the only list of the codes. The page docs/ERROR_CODES.md and the Settings & help → Help page of the dashboard come from this file. The test tests/test_error_codes.py keeps the file and the code in agreement.",
+  "about": "Each alert from the Crop Steering controller app, and each Crop Steering card in Settings → Repairs, ends with a code, for example CS-101. The regular status summary of the controller has no code. This file is the only list of the codes. The page docs/ERROR_CODES.md and the Settings → Help page of the dashboard come from this file. The test tests/test_error_codes.py keeps the file and the code in agreement.",
   "groups": [
     {
       "prefix": "CS-1",
@@ -302,7 +302,7 @@
         "If the kill switch is off, set it to on.",
         "If no zone needs water, compare the VWC of each zone with its re-water point.",
         "Make sure that each probe is in its cube.",
-        "To change the number of hours, go to Crop Steering → Settings & help → Notifications."
+        "To change the number of hours, go to Crop Steering → Settings → Notifications."
       ]
     },
     {

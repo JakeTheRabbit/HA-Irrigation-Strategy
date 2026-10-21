@@ -2,21 +2,22 @@
 
 New to VWC, EC or crop steering? Start with the free [Crop Steering Academy](https://jaketherabbit.github.io/HA-Irrigation-Strategy/learn/). It includes narrated lessons, equipment/setup routes and isolated practice. [Course and progress guide](ACADEMY.md).
 
-The menu has five items:
+The menu has five sections, and under them a live list of rooms and zones (see [Getting around](#getting-around)):
 
-- **Overview** opens **All zones** across every configured room by default. **Selected room** shows one room and its zone cards.
+- **Status** opens **All rooms** across every configured room by default. **Room** shows one room and its zone cards.
 - **Irrigation** has **Current day** targets and the **Calendar** grow schedule in one workspace.
 - **History** has the **Timeline**, **Water use**, **Compare runs**, **Grows** and optional **Dryback drivers**.
 - **Equipment** has **Probes**, **Stock tanks**, **Tank and feed**, **Dosing** and **Setup**.
-- **Settings & help** has **Settings**, **Capabilities**, **Notifications**, **AI assistant** and **Help**.
+- **Settings** has **Settings**, **Capabilities**, **Notifications**, **AI assistant** and **Help**.
 
-Each zone has its own page. Open it from the card of the zone on **Overview › Selected room**. Select the room before you change a value. The zone numbers belong to that room.
+Each zone has its own page. Open it from the card of the zone on **Status › Room**. Select the room before you change a value. The zone numbers belong to that room.
 
 Old bookmarks open the page that now has their content:
 
 | Old address                            | Opens                                   |
 | -------------------------------------- | --------------------------------------- |
-| `#/overview`, `#/zones`                | Overview › Selected room                |
+| `#/overview`                           | Status › Room                           |
+| `#/zones`                              | Status › All rooms                      |
 | `#/strategy`                           | Irrigation › Current day                          |
 | `#/grow-plan`                          | Irrigation › Calendar                         |
 | `#/activity`                           | History › Timeline                      |
@@ -43,14 +44,14 @@ For a new installation, start with [Install, upgrade and rollback](INSTALL.md). 
 | Save configuration (Equipment › Setup) | The setup of the room and its zones in Home Assistant. Wait until the controller accepts it. |
 | Dose, make a batch, stop (Equipment › Dosing) | A request that the controller does. The page itself operates nothing. |
 | Save the dosing setup (Equipment › Dosing) | The stored dosing setup of the room in Home Assistant. The controller reads it. |
-| Save notifications (Settings & help › Notifications) | The stored notification setup of the whole site. The next push follows it. |
-| Send a test (Settings & help › Notifications) | One push to that phone. Nothing is saved. |
+| Save notifications (Settings › Notifications) | The stored notification setup of the whole site. The next push follows it. |
+| Send a test (Settings › Notifications) | One push to that phone. Nothing is saved. |
 
 ## Try the demo
 
 The demo is a software demonstration only. Its readings, history, plans and run records are sample data. They are not a recommended configuration, and they do not come from a real grow. A demo tab cannot connect to Home Assistant. The demo follows the time of day: at night, the zones are in P3 and the pump is off.
 
-1. Open **Overview › All zones** to see every room. Select a zone to open its room, or use **Selected room** and the room chips.
+1. Open **Status › All rooms** to see every room. Select a zone in the menu or on its card, or use **Room** and the room chips.
 2. Read the room line and zone cards. Open a zone and read **Why / next action**.
 3. On the page of the zone, point at the shots and the marks of the AI assistant on the chart.
 4. Select **Compare with** yesterday or a typical day. Read the probes and the controls.
@@ -62,13 +63,19 @@ The demo is a software demonstration only. Its readings, history, plans and run 
 10. Open **History**. Filter the **Timeline**, read **Water use**, and open **Compare runs**.
 11. Open **Equipment › Setup**. Try the entity search, the room and zone names and the mapping review.
 12. Open **Equipment › Dosing**. Dose a pump, make a batch and stop it. The demo moves faster than real time.
-13. Open **Settings & help › Notifications**. Tick a kind of alert for a phone, save it through the review, and send a test.
+13. Open **Settings › Notifications**. Tick a kind of alert for a phone, save it through the review, and send a test.
 
 The demo sends nothing to your Home Assistant server and no push to a phone. To see the Notifications page as a grower who is not an administrator, add `&notify-user=grower` to the address.
 
 A production recipe library starts empty. The demo recipes are examples, and the dashboard keeps them apart from production libraries. It does not change the demo libraries that exist, also when they are empty or corrupt.
 
 To restore the sample rooms, readings, run records and planner drafts, use **Settings › Sample workspace › Reset demo session…** and confirm. The reset discards the demo work that you did not save. It keeps all saved recipe libraries and the live connection data. It does not restore a recipe that you removed. Export the session work that you want to keep before the reset.
+
+## Getting around
+
+- **Desktop:** the menu lists the five sections, then **Rooms**: **All rooms**, each room with its state, and each zone with its phase and VWC. Select a room to open it in the section you are in; select a zone to open its page. The open room or zone is marked.
+- **Phone:** the five sections are in a bar along the bottom of the screen. The menu button at the top left opens the rooms and zones. On **All rooms**, tap anywhere on a zone card to open the zone.
+- **Links:** the address holds the selected room (`?room=`) and the page (`#/zone/2`), so a bookmark, a shared link or the back button returns to the same place.
 
 ## The top bar
 
@@ -83,11 +90,11 @@ Next to the chips, the top bar shows these items:
 
 > **WARNING:** Do not use the **Watering** switch or the **Room in use** control as an emergency stop. In an emergency, use the physical shutdown procedure of your installation.
 
-## Overview
+## Status
 
-**All zones** groups zones by room and shows phase, moisture, pore EC, recent irrigation and water delivery. Paused rooms stay visible. Each feed strip opens its room’s tank view. The header switches act only on the room named beside them.
+**All rooms** groups zones by room and shows phase, moisture, pore EC, recent irrigation and water delivery. Each room's heading shows its water today: the litres delivered across its zones and the litres per plant. Paused rooms stay visible. Each feed strip opens its room’s tank view. The header switches act only on the room named beside them.
 
-**Selected room** opens the compact Today summary for one room. Choose **Settings & help › Settings › Display › Default view** to change this browser’s landing page. Bookmarks and notification links take precedence.
+**Room** opens the compact Today summary for one room. Choose **Settings › Settings › Display › Default view** to change this browser’s landing page. Bookmarks and notification links take precedence.
 
 - **The room line** shows the **Watering** switch, the stage and the day of flower, and the steering mode. The stage shows only when the controller publishes the stage arc.
 - The room line also shows the pore EC band of the stage, the lights, the phases of the zones and the open alerts.
@@ -113,7 +120,7 @@ A card has a flag, with the reason in one line, only when the zone needs you:
 
 ## A zone's page
 
-Open a zone from its card on **Overview › Selected room**, or with the address `#/zone/N`. Use the switcher at the top to go to a different zone. The page has these parts.
+Open a zone from its card on **Status › Room**, or with the address `#/zone/N`. Use the switcher at the top to go to a different zone. The page has these parts.
 
 **Today in numbers**
 
@@ -409,7 +416,7 @@ A Home Assistant administrator uses **Equipment › Setup**. Pair the devices an
 11. Select **Review configuration**. Examine the changes and the problems that stop the save.
 12. Select **Save configuration**. The integration checks the setup before it saves it.
 13. Wait until the controller accepts the saved setup revision. A saved setup and an accepted setup are different states.
-14. Examine **Overview › Selected room** and **Equipment › Probes**. Then set the switches back to their earlier states.
+14. Examine **Status › Room** and **Equipment › Probes**. Then set the switches back to their earlier states.
 
 A pump, a main-line valve or a zone valve can be a switch, an `input_boolean` helper or a valve entity. The setup refuses other types, for example a cover or a light. A valve must read closed, and a switch must read off, before the setup saves.
 
@@ -429,7 +436,7 @@ Below the rooms, **substrate, sizing and safety limits** shows the numbers that 
 
 Each change shows a review before the dashboard writes it. **Water & calibration**, one tap down, shows the water of a shot of each phase, in litres for each zone and millilitres for each plant. It also shows the run time, its limits and a catch-test calculator. The calculator uses a measured flow only in that calculation. It does not write a calibration, and it starts no shot.
 
-## Settings & help
+## Settings
 
 **Settings** holds connection, appearance, units and display preferences. Other controls have one owner:
 
@@ -464,7 +471,7 @@ To release the override is not the same as to set the zone switch or the room sw
 
 > **CAUTION:** Set the override to off after the work. While it is on, the zone gets no water, not even a rescue shot.
 
-## Settings & help › Notifications
+## Settings › Notifications
 
 Each alert is still a Home Assistant notification. This page selects who gets a phone push for each kind of alert, for the whole site. The grid has one row for each phone and one checkbox for each kind of alert. A push goes only to the phones whose row ticks its kind. An alert of two ticked kinds goes to that phone one time. [Notifications](NOTIFICATIONS.md) tells what the integration, the controller and this page each do.
 
@@ -489,7 +496,7 @@ When no phone is in the list, each push goes to the `notify_service` option of t
 
 ## A daily routine
 
-1. Open **Overview › Selected room**. A room with shots in progress and no flagged card needs nothing.
+1. Open **Status › Room**. A room with shots in progress and no flagged card needs nothing.
 2. Read **AI assistant changes today**.
 3. Open each flagged zone from its card. Read its numbers, its day chart and its **Controls**.
 4. Change targets only in **Irrigation › Current day**, through the review.

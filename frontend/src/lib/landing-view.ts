@@ -1,8 +1,8 @@
 import { parseRoute, type Page, type Route } from "./routes";
 export const LANDING_KEY = "crop-steering-landing-view";
 export const LANDING_VIEWS = [
-  { value: "all-zones", label: "All zones · every room" },
-  { value: "today", label: "Today · selected room" },
+  { value: "all-zones", label: "Status · all rooms" },
+  { value: "today", label: "Status · selected room" },
   { value: "plan/targets", label: "Irrigation · current day" },
   { value: "plan/schedule", label: "Irrigation · calendar" },
   { value: "history/timeline", label: "History · readings and events" },
