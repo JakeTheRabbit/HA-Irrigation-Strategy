@@ -10,6 +10,68 @@ import type { Controller, EntityState, LogEvent, Metric, States, Zone } from "./
 import { dailyWater } from "./water-delivery";
 import { roomPlants } from "./water-view";
 import { climateReadings, rootZoneSensor, type ClimateReading } from "./zone-extras";
+import { zoneProbes, type Probe, type ProbeHealth } from "./probes";
+
+/** A physical substrate sensor: its moisture and EC probes paired by entity id (sensor.f1_z1_front_vwc
+ * and sensor.f1_z1_front_ec are one sensor), with the worse of their two healths. */
+export interface ZoneSensor {
+  key: string;
+  name: string;
+  vwc: Probe | null;
+  ec: Probe | null;
+  health: ProbeHealth;
+  text: string;
+}
+const HEALTH_RANK: Record<ProbeHealth, number> = {
+  "no-reading": 0,
+  "out-of-range": 1,
+  stale: 2,
+  stuck: 3,
+  "left-out": 4,
+  "not-counted": 5,
+  ok: 6,
+};
+const KIND_SUFFIX = /[_ ](vwc|moisture|water_content|wc|ec|pwec|pw_ec|pore_ec|porewater_ec|bulk_ec|conductivity)$/i;
+export function zoneSensors(probes: readonly Probe[]): ZoneSensor[] {
+  const groups = new Map<string, ZoneSensor>();
+  for (const probe of probes) {
+    const key = probe.id.replace(/^sensor\./, "").replace(KIND_SUFFIX, "");
+    const name = probe.name.replace(/\s*(VWC|moisture|water content|pore EC|pwEC|EC|conductivity)\s*$/i, "").trim() || key;
+    const group = groups.get(key) ?? { key, name, vwc: null, ec: null, health: "ok" as ProbeHealth, text: "" };
+    group[probe.kind] = probe;
+    if (HEALTH_RANK[probe.health] < HEALTH_RANK[group.health]) {
+      group.health = probe.health;
+      group.text = probe.text;
+    }
+    groups.set(key, group);
+  }
+  // Probes whose ids do not share a stem but whose names do (one sensor's moisture and EC
+  // entities named alike) are still one sensor.
+  const byName = new Map<string, ZoneSensor>();
+  for (const group of groups.values()) {
+    const same = byName.get(group.name);
+    if (same && !(same.vwc && group.vwc) && !(same.ec && group.ec)) {
+      same.vwc ??= group.vwc;
+      same.ec ??= group.ec;
+      if (HEALTH_RANK[group.health] < HEALTH_RANK[same.health]) {
+        same.health = group.health;
+        same.text = group.text;
+      }
+    } else byName.set(group.name + (same ? `#${group.key}` : ""), group);
+  }
+  return [...byName.values()];
+}
+
+/** Where a zone stands with the automation, the most limiting first. */
+export type ZoneMode = "room-off" | "offline" | "paused" | "watering-off" | "watering" | "automated";
+export const ZONE_MODE: Record<ZoneMode, string> = {
+  "room-off": "Room off",
+  offline: "Offline",
+  paused: "Paused",
+  "watering-off": "Watering off",
+  watering: "Watering now",
+  automated: "Automated",
+};
 
 /** Why a zone's reading is not usable: the controller's rule is a fresh, readable number. */
 export function readingIssue(metric: Metric, states: States): string | null {
@@ -57,6 +119,10 @@ export interface FacilityZone {
   rootTemp: number | null;
   rootUnit: string;
   mlPerPlant: number | null;
+  /** Water delivered to the zone today, in litres. */
+  waterL: number | null;
+  mode: ZoneMode;
+  sensors: ZoneSensor[];
   attention: AttentionReason[];
 }
 export interface FacilityRoom {
@@ -140,6 +206,19 @@ export function facilityView(
           rootTemp: rootId ? numeric(states[rootId]) : null,
           rootUnit: rootId ? String(states[rootId]?.attributes.unit_of_measurement || "°C") : "°C",
           mlPerPlant: water.mlPerPlant,
+          waterL: water.zoneL,
+          mode: (!view.roomActive
+            ? "room-off"
+            : zone.stale
+              ? "offline"
+              : zone.enabled === false
+                ? "paused"
+                : view.engine.enabled === false
+                  ? "watering-off"
+                  : zone.valveOn === true
+                    ? "watering"
+                    : "automated") as ZoneMode,
+          sensors: zoneSensors(zoneProbes(zone, states, now)),
           attention: [] as AttentionReason[],
         } satisfies FacilityZone,
       };

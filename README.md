@@ -220,7 +220,7 @@ Do these steps each day:
 
 ### Landing page and room overview
 
-**All rooms** is the default landing page. It lists what needs you first, then each room: its run day and stage, air temperature, humidity and VPD, its water today (total and per plant), and each zone drawn as a slab: the water in it is the moisture, the dashed line today's peak (the gap is the dryback), the strip the target band, and the specks the pore EC. Under each zone are its VWC, pore EC and root-zone temperature, marked ▲▼ when outside their band. Then each room's feed tank (level, minimum, pH, EC, a held-shots warning) and its stock tanks. Tap anywhere on a zone to open it.
+**All rooms** is the default landing page. It is organised room → zones → sensors. Each room shows its run day and stage, water drunk today (per plant and in total), air temperature, humidity and VPD, and its own feed tank (level, usable litres, pH, EC, pump, and a held-shots warning) and stock tanks. Each zone is a card with its slab drawing (water = moisture, dashed line = today's peak, specks = pore EC), its phase and its automation state (Automated, Watering now, Paused, Watering off, Offline, Room off), water per plant, VWC, dryback, pore EC and root-zone temperature (▲▼ outside their band), and every sensor in it with its readings. A problem shows on the room, zone, sensor or tank it belongs to. A zone being watered glows; a zone out of the automation is greyed. Tap a zone to open it.
 
 Choose **Settings › Settings › Display › Default view** to open another workspace by default. The preference is saved in this browser. Bookmarks and notification links take precedence; choosing a default never redirects an explicit page link. **Status › Room** opens Today for the selected room.
 
