@@ -1,6 +1,6 @@
 import { ArrowRight, Pause, TriangleAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Heading, Empty, number, time as clock } from "@/components/dashboard";
+import { Empty, number, time as clock } from "@/components/dashboard";
 import { FeedTankDrawing, ZoneSlab } from "@/components/zone-slab";
 import { StockBottle } from "@/components/stock-bottle";
 import { STOCK_STATES } from "@/lib/dosing";
@@ -53,10 +53,8 @@ export function AllZones({ controller, open }: { controller: Controller; open: O
   const offline = controller.connection === "offline";
   return (
     <div className="facility">
-      <Heading
-        title="All rooms"
-        description="Rooms, their zones and each zone's sensors. Tap a zone for its chart, targets and next action."
-      />
+      {/* The menu already marks All rooms: the heading is for screen readers only. */}
+      <h1 className="sr-only">All rooms</h1>
       {offline && (
         <p className="warning-banner" role="status">
           Connection unavailable. These are the last received readings.
@@ -190,14 +188,16 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
             )}
           </dl>
         </div>
-        <TankCard r={r} open={open} />
+        <div className="facility-supply">
+          <TankCard r={r} open={open} />
+          {r.stock.length > 0 && <StockRow r={r} open={open} />}
+        </div>
       </div>
       <div className="facility-zones">
         {r.zones.map((z) => (
           <ZoneCard key={z.zone.id} r={r} z={z} stale={stale} open={open} />
         ))}
       </div>
-      {r.stock.length > 0 && <StockRow r={r} open={open} />}
     </section>
   );
 }

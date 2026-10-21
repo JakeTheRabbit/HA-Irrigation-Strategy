@@ -2773,7 +2773,7 @@ try {
     assert.deepEqual(entries, ["Status", "Irrigation", "History", "Equipment", "Settings"]);
     // Under the sections: every room, and every zone under its room, one tap each.
     const tree = mobileMenu.getByRole("navigation", { name: "Rooms" });
-    assert.equal(await tree.locator("button").first().innerText(), "All rooms");
+    assert.ok((await tree.locator(".room-tree-room").count()) >= 2, "every room listed");
     assert.ok((await tree.locator(".room-tree-zone").count()) >= 2, "zones listed under rooms");
     await mobileMenu.getByRole("button", { name: "Irrigation", exact: true }).click();
     await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));

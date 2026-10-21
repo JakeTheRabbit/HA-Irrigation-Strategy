@@ -264,7 +264,6 @@ export default function App() {
         controller={controller}
         allRooms={page === "all-zones"}
         currentZone={page === "zone" ? (route.zone ?? controller.room.zones[0]?.id ?? null) : null}
-        openAll={() => navigate("all-zones")}
         openRoom={openRoom}
         openZone={(room, zone) =>
           room === controller.roomId ? navigate("zone", zone) : openRoomPage(room, "zone", zone)
