@@ -34,6 +34,7 @@ import type { Controller, EntityState, LogEvent, Metric, Notice, States, Zone } 
 import { useRecentHistory } from "@/lib/use-recent-moisture";
 import { waitingText } from "@/lib/waiting-for";
 import { dailyWater } from "@/lib/water-delivery";
+import { excludedProbes, isRescue, readingIssue } from "@/lib/facility-view";
 import { plantAmount, roomPlants } from "@/lib/water-view";
 import "./today.css";
 
@@ -49,34 +50,6 @@ const perPlant = (ml: number) => {
   const { value, unit, digits } = plantAmount(ml);
   return `${number(value, digits)} ${unit}`;
 };
-
-/** Why a zone's reading is not usable: the controller's rule is a fresh, readable number. */
-function readingIssue(metric: Metric, states: States): string | null {
-  if (metric.value !== null) return null;
-  const entity = metric.entityId ? states[metric.entityId] : undefined;
-  if (!entity) return "not mapped";
-  if (!readable(entity) || numeric(entity) === null) return "not reporting";
-  return "not reporting lately";
-}
-/** The probes a zone's combined reading leaves out (the integration's fused sensor attributes), but
- * not those the zone's setup chose not to count. */
-function excludedProbes(entity: EntityState | undefined, kind: "vwc" | "ec") {
-  const excluded = entity?.attributes.excluded;
-  return excluded && typeof excluded === "object" && !Array.isArray(excluded)
-    ? Object.entries(excluded as Record<string, unknown>)
-        .filter(([, reason]) => reason !== "not counted")
-        .map(([probe, reason]) => ({
-          probe,
-          reason: typeof reason === "string" && reason ? reason : "left out",
-          kind,
-        }))
-    : [];
-}
-/** A shot in P3 is a rescue: the controller waters overnight only below the rescue floor. */
-const isRescue = (event: LogEvent) =>
-  event.zoneId !== undefined &&
-  event.type === "water" &&
-  /\bP3\b|rescue|emergency/i.test(event.message);
 
 /** When the zone's last shot was, the short way: its time today, "yesterday 21:40", or its date. */
 function shotWhen(stamp: string | null, day: GrowDay | null, now: number): string {

@@ -349,7 +349,7 @@ try {
     const banner = page.locator(".room-off-banner");
     await banner.waitFor();
     assert.match(await banner.innerText(), /no shots, no alerts/i);
-    assert.match(await page.locator('.room-chip[data-room="room:"]').innerText(), /Room off/);
+    assert.match(await page.locator('.desktop-sidebar .room-tree-row[data-room="room:"]').innerText(), /Room off/);
     await page.evaluate(() => window.scrollTo(0, 0));
     await page.screenshot({
       path: fileURLToPath(new URL("../../img/room-off.png", import.meta.url)),
@@ -549,7 +549,7 @@ try {
         .filter({ hasText: "Previous room run" })
         .getByRole("button", { name: "Restore", exact: true })
         .click();
-      await page.locator('.room-chip[data-room="room:room_b_"]').click();
+      await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();
       await page.waitForFunction(
         () => document.querySelectorAll(".comparison-run-list article").length >= 2,
       );

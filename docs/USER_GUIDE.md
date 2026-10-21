@@ -92,7 +92,7 @@ Next to the chips, the top bar shows these items:
 
 ## Status
 
-**All rooms** groups zones by room and shows phase, moisture, pore EC, recent irrigation and water delivery. Each room's heading shows its water today: the litres delivered across its zones and the litres per plant. Paused rooms stay visible. Each feed strip opens its room’s tank view. The header switches act only on the room named beside them.
+**All rooms** shows what needs you first, then each room with its run day, climate and water today, and its zones drawn as slabs: water = moisture, dashed line = today's peak (the gap is the dryback), side strip = target band, specks = pore EC (amber above the stage's band). Under each zone: VWC, pore EC and root-zone temperature, with ▲▼ when outside their band. Below the rooms are the feed tanks and stock tanks. The header switches act only on the room named beside them.
 
 **Room** opens the compact Today summary for one room. Choose **Settings › Settings › Display › Default view** to change this browser’s landing page. Bookmarks and notification links take precedence.
 

@@ -227,7 +227,7 @@
 .dosing-caption {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  line-height: 1.4;
+  line-height: 1.5;
 }
 .dosing-bar {
   height: 4px;
@@ -274,7 +274,7 @@
   padding-top: 8px;
   border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
   font-size: var(--text-xs);
-  line-height: 1.4;
+  line-height: 1.5;
 }
 .dosing-pump-stock .stock-bottle {
   flex: none;
@@ -286,7 +286,7 @@
   gap: 1px;
   min-width: 0;
   font-size: var(--text-xs);
-  line-height: 1.4;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .dosing-stock-litres {
@@ -340,7 +340,7 @@
 .dosing-reason {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  line-height: 1.4;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 
@@ -672,7 +672,7 @@
   align-items: flex-start;
   gap: 8px;
   font-size: var(--text-sm);
-  line-height: 1.4;
+  line-height: 1.5;
 }
 .dosing-check input {
   margin-top: 3px;

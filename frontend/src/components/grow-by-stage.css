@@ -48,7 +48,7 @@
 .grow-stage-table th[scope="row"] {
   color: var(--foreground);
   font-size: var(--text-sm);
-  font-weight: 650;
+  font-weight: 600;
   white-space: normal;
 }
 .grow-stage-table th[scope="row"] .pill {

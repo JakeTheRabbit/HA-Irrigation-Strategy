@@ -188,7 +188,7 @@ try {
     await expectVisible(page.getByRole("heading", { name: "All rooms", exact: true }));
     assert.match(page.url(), /dashboard\.html\?demo=&room=room_b#\/all-zones$/);
     assert.equal(
-      await page.locator('.room-chip[aria-pressed="true"]').getAttribute("data-room"),
+      await page.locator('.desktop-sidebar .room-tree-row[data-selected]').getAttribute("data-room"),
       "room:room_b_",
     );
   });
@@ -205,7 +205,7 @@ try {
     await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
     assert.equal(await page.locator(".irrigation-workspace").getAttribute("data-view"), "calendar");
     assert.equal(
-      await page.locator('.room-chip[aria-pressed="true"]').getAttribute("data-room"),
+      await page.locator('.desktop-sidebar .room-tree-row[data-selected]').getAttribute("data-room"),
       "room:room_b_",
     );
     await go("today");
@@ -340,10 +340,13 @@ try {
     "the header: each room's state, the data's age and the two safety switches",
     async () => {
       await go("today");
-      const chips = page.getByRole("group", { name: "Rooms" }).getByRole("button");
-      assert.equal(await chips.count(), 2, "one chip per room");
-      const chip = (id) => page.locator(`.room-chip[data-room="${id}"]`);
-      assert.equal(await chip("room:").getAttribute("aria-pressed"), "true");
+      // On a desktop the menu's room tree is the room picker; the header chips step aside.
+      assert.ok(!(await page.locator(".topbar .room-chips").isVisible()), "chips hidden");
+      const rooms = page.locator(".desktop-sidebar .room-tree-room");
+      assert.equal(await rooms.count(), 2, "one tree entry per room");
+      const chip = (id) =>
+        page.locator(`.desktop-sidebar .room-tree-room[data-room="${id}"] > button`).first();
+      assert.equal(await chip("room:").getAttribute("aria-current"), "page");
       assert.match(await chip("room:").innerText(), /Room A\s+Watering/);
       assert.match(await page.locator(".data-age").innerText(), /^Updated \d+ (s|min) ago$/);
       await expectVisible(page.getByRole("button", { name: "Recent activity", exact: true }));
@@ -365,10 +368,7 @@ try {
       // Another room's chip opens it.
       await chip("room:room_b_").click();
       await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
-      assert.equal(
-        await page.locator('.room-chip[aria-pressed="true"]').getAttribute("data-room"),
-        "room:room_b_",
-      );
+      assert.equal(await chip("room:room_b_").getAttribute("aria-current"), "page");
       // Watering switched off from the header, through its review.
       await page
         .getByRole("button", { name: "Watering on: switch watering off…", exact: true })
@@ -398,10 +398,10 @@ try {
       .getByRole("navigation", { name: "Main navigation" })
       .getByRole("button", { name: "Status", exact: true })
       .click();
-    await page
-      .getByRole("navigation", { name: "Status views" })
-      .getByRole("button", { name: "Room", exact: true })
-      .click();
+    // The Status tabs give way to the room tree on a desktop; open the room page directly.
+    await page.evaluate(() => {
+      location.hash = "#/today";
+    });
     await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
     const stopped = page.locator(".today-stopped");
     assert.match(
@@ -409,7 +409,7 @@ try {
       /Not watering\. The kill switch \(Watering\) of this room is off/,
     );
     assert.match(
-      await page.locator('.room-chip[data-room="room:room_b_"]').innerText(),
+      await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').innerText(),
       /Not watering/,
     );
     assert.match(await page.locator("[data-today-line]").innerText(), /Watering off/);
@@ -692,10 +692,10 @@ try {
         .locator(".desktop-sidebar")
         .getByRole("button", { name: "Status", exact: true })
         .click();
-      await page
-        .getByRole("navigation", { name: "Status views" })
-        .getByRole("button", { name: "Room", exact: true })
-        .click();
+      // The Status tabs give way to the room tree on a desktop; open the room page directly.
+    await page.evaluate(() => {
+      location.hash = "#/today";
+    });
       const empty = page.locator('[data-run-progress="none"]');
       await expectVisible(empty);
       assert.match(await empty.innerText(), /^No run is active in this room\./);
@@ -875,8 +875,8 @@ try {
     await expectVisible(page.locator(".zone-page-title").getByText("Scheduling paused"));
     // The switcher moves between zones; Edit in Plan opens this zone's targets.
     await page
-      .getByRole("navigation", { name: "Zones" })
-      .getByRole("button", { name: "Zone 2" })
+      .locator(".desktop-sidebar .room-tree-room:has(.room-tree-row[data-selected])")
+      .locator(".room-tree-zone", { hasText: "Zone 2" })
       .click();
     await expectVisible(page.getByRole("heading", { name: "Zone 2", exact: true }));
     await page.getByText("Targets (read only)", { exact: true }).click();
@@ -1079,7 +1079,7 @@ try {
     await expectVisible(page.getByText("Changes applied and verified by controller readback."));
     assert.equal(await field.inputValue(), String(original + 1));
     await field.fill(String(original + 2));
-    await page.locator('.room-chip[data-room="room:room_b_"]').click();
+    await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();
     await expectVisible(
       page.getByRole("heading", {
         name: "Discard unsaved workspace changes?",
@@ -1087,10 +1087,10 @@ try {
     );
     await page.getByRole("button", { name: "Keep editing" }).click();
     assert.equal(await field.inputValue(), String(original + 2));
-    await page.locator('.room-chip[data-room="room:room_b_"]').click();
+    await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();
     await page.getByRole("button", { name: "Discard and continue" }).click();
     assert.equal(
-      await page.locator('.room-chip[aria-pressed="true"]').getAttribute("data-room"),
+      await page.locator('.desktop-sidebar .room-tree-row[data-selected]').getAttribute("data-room"),
       "room:room_b_",
     );
     await expectVisible(
@@ -1891,7 +1891,7 @@ try {
         "the page wrote nothing but its dosing requests",
       );
       // A room without pumps says what dosing does, and offers to set it up.
-      await live.locator('.room-chip[data-room="room:room_b_"]').click();
+      await live.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();
       await expectVisible(live.getByRole("heading", { name: "No dosing pumps in Room B" }));
       await expectVisible(live.getByRole("button", { name: "Set up dosing", exact: true }));
       await ha.close();
@@ -2071,10 +2071,10 @@ try {
     );
     await axe("settings: water per plant");
     // The choice is Room A's: Room B keeps each zone's total.
-    await page.locator('.room-chip[data-room="room:room_b_"]').click();
+    await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();
     await page.waitForTimeout(300);
     assert.equal(await pressed("Zone total"), "true");
-    await page.locator('.room-chip[data-room="room:"]').click();
+    await page.locator('.desktop-sidebar .room-tree-row[data-room="room:"]').click();
     await page.waitForTimeout(300);
     assert.equal(await pressed("For each plant"), "true");
     // A zone's page leads with each plant's share, the zone's litres under it.

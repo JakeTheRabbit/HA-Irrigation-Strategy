@@ -45,6 +45,8 @@ export function RoomTree({
               type="button"
               className="room-tree-row"
               data-tone={status.tone}
+              data-room={room.id}
+              data-selected={selected || undefined}
               aria-current={selected && !allRooms && currentZone === null ? "page" : undefined}
               title={`${room.name}: ${status.text}. ${status.detail}`}
               onClick={() => openRoom(room.id)}

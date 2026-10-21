@@ -1,0 +1,106 @@
+/* The zone slab and feed tank drawings (zone-slab.tsx). */
+.zone-slab,
+.feed-tank {
+  display: block;
+  width: 100%;
+  height: auto;
+  overflow: visible;
+}
+.zone-slab-stem {
+  stroke: #4c8c3a;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  fill: none;
+}
+.zone-slab-leaf {
+  fill: #64a548;
+}
+.zone-slab-block {
+  fill: #e8dfc8;
+  stroke: #b5a684;
+  stroke-width: 1.5;
+}
+.zone-slab-body {
+  fill: #efe7d2;
+}
+.zone-slab-fibre {
+  stroke: #e2d8bf;
+  stroke-width: 1;
+}
+.zone-slab-water {
+  fill: #2f86c4;
+  fill-opacity: 0.6;
+}
+.zone-slab-salt {
+  fill: #ffffff;
+}
+.zone-slab-salt[data-high] {
+  fill: #ffd166;
+}
+.zone-slab-edge {
+  fill: none;
+  stroke: #b5a684;
+  stroke-width: 1.5;
+}
+.zone-slab[data-level="warning"] .zone-slab-edge {
+  stroke: var(--warning);
+  stroke-width: 3;
+}
+.zone-slab[data-level="critical"] .zone-slab-edge {
+  stroke: var(--destructive);
+  stroke-width: 3;
+}
+.zone-slab-band {
+  fill: var(--muted-foreground);
+}
+.zone-slab-peak {
+  stroke: #1b4f72;
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+}
+.zone-slab-dryback {
+  stroke: var(--foreground);
+  stroke-width: 1.5;
+  fill: none;
+}
+.feed-tank-leg {
+  stroke: var(--muted-foreground);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+.feed-tank-body {
+  fill: color-mix(in srgb, var(--surface) 70%, #9fb8c6);
+}
+.feed-tank-liquid {
+  fill: #2f86c4;
+  fill-opacity: 0.65;
+}
+.feed-tank[data-low] .feed-tank-liquid {
+  fill: var(--warning);
+}
+.feed-tank-edge {
+  fill: none;
+  stroke: var(--muted-foreground);
+  stroke-width: 1.5;
+}
+.feed-tank-minimum {
+  stroke: var(--foreground);
+  stroke-width: 1.5;
+  stroke-dasharray: 3 3;
+}
+.feed-tank-lid {
+  fill: var(--muted-foreground);
+  opacity: 0.55;
+}
+.feed-tank-float-rod {
+  stroke: var(--muted-foreground);
+  stroke-width: 1.5;
+}
+.feed-tank-float {
+  fill: var(--surface);
+  stroke: var(--muted-foreground);
+  stroke-width: 1.5;
+}
+.feed-tank-float[data-full] {
+  fill: var(--success);
+}

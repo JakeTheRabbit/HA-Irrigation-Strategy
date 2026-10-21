@@ -50,7 +50,7 @@
 .setting-help dt {
   color: var(--muted-foreground);
   font-size: var(--text-xs);
-  font-weight: 650;
+  font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }

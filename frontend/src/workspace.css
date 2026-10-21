@@ -15,7 +15,7 @@
   margin: 0 0 6px;
 }
 .workspace-card p {
-  line-height: 1.55;
+  line-height: 1.5;
 }
 .workspace-actions {
   display: flex;
@@ -147,7 +147,7 @@
   background: var(--card);
   padding: 12px 10px;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
   white-space: nowrap;
 }
 .calendar-label {
@@ -351,7 +351,7 @@
   justify-content: space-between;
   gap: 10px;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
   margin-top: 5px;
 }
 .delivery-grid {
@@ -365,7 +365,7 @@
   padding: 18px 0;
 }
 .delivery-grid span {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
   display: block;
   margin-bottom: 8px;
@@ -375,7 +375,7 @@
   font-weight: 500;
 }
 .delivery-grid small {
-  font-size: 12px;
+  font-size: var(--text-xs);
   color: var(--muted-foreground);
 }
 .short-input {
@@ -404,7 +404,7 @@
 .schedule-blocks span {
   margin-top: 6px;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
 }
 .profile-grid {
   display: grid;
@@ -419,7 +419,7 @@
 }
 .profile-heading {
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: var(--text-xs);
   padding-bottom: 10px;
 }
 .profile-heading strong {
@@ -550,7 +550,7 @@
 }
 .mapping-reading {
   text-align: right;
-  font-size: 13px;
+  font-size: var(--text-sm);
   flex: none;
   max-width: 90px;
   overflow-wrap: anywhere;
@@ -607,7 +607,7 @@
 .catch-test .catch-test-result,
 .catch-test .field-error {
   margin: 12px 0;
-  font-size: 13px;
+  font-size: var(--text-sm);
 }
 .sizing-action {
   height: auto;
@@ -665,7 +665,7 @@
     margin-bottom: 16px;
   }
   .workspace-actions button {
-    font-size: 12px;
+    font-size: var(--text-xs);
   }
   .workspace-tabs button {
     padding: 12px;

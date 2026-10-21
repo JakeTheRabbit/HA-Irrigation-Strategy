@@ -169,11 +169,11 @@ try {
     const exported = await downloadPlan(
       page.getByRole("button", { name: "Export recipe My saved plan", exact: true }),
     );
-    await page.locator('.room-chip[data-room="room:room_b_"]').click();
+    await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();
     await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
     await openLibrary();
     assert.equal(await library().locator(".recipe-list li").count(), 2);
-    await page.locator('.room-chip[data-room="room:"]').click();
+    await page.locator('.desktop-sidebar .room-tree-row[data-room="room:"]').click();
     await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
     await openLibrary();
     await page.getByRole("button", { name: "Remove recipe My saved plan", exact: true }).click();

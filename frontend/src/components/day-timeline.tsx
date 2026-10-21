@@ -815,7 +815,8 @@ function ZoneNumbers({
     <div className="zone-numbers-wrap">
       <StatusLine
         name="Today"
-        phase={phase ? `${phase} · ${PHASE_WORDS[phase] ?? phase}` : null}
+        // The zone page title already names the phase.
+        phase={null}
         state={{ text: offPlan ? "off plan" : "on plan", abnormal: offPlan }}
       >
         {!!lane?.gaps.length && (

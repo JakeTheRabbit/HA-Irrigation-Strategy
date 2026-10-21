@@ -485,11 +485,11 @@ try {
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(new URL(page.url()).hash, "#/plan/schedule");
-      await page.locator('.room-chip[data-room="room:room_b_"]').click();
+      await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Keep editing" }).click();
       assert.equal(
-        await page.locator('.room-chip[data-room="room:"]').getAttribute("aria-pressed"),
+        await page.locator('.desktop-sidebar .room-tree-row[data-room="room:"]').getAttribute("data-selected"),
         "true",
       );
       await navigate("Today");
@@ -575,7 +575,7 @@ try {
       await fresh("setup");
       await visible(page.locator("#room-name"));
       await page.locator("#room-name").fill("Must be discarded");
-      await page.locator('.room-chip[data-room="room:room_b_"]').click();
+      await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
       await page.getByRole("button", { name: "Discard and continue" }).click();
       assert.equal(await page.locator("#room-name").inputValue(), "Room B");
