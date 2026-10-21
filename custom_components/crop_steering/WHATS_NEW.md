@@ -2,7 +2,7 @@
 
 The dashboard's **What's new** window shows these to the first person who opens the dashboard after
 an update: every release since the last one it showed there, newest first, at most five. A new
-installation has nothing to catch up on and shows none. **Settings & help → Help → What's new** opens it
+installation has nothing to catch up on and shows none. **Settings → Help → What's new** opens it
 again at any time.
 
 Every release adds its section at the top, in its release pull request. Write it for growers, not
@@ -18,6 +18,14 @@ for the people who build the system:
 
 `tests/test_whats_new.py` checks the shape and the plain words, and that the newest section is the
 version being released.
+
+## 3.17.0 - 2026-10-21
+
+- Every room and zone is listed in the menu with its phase and moisture: one click opens any of them.
+- On a phone, the five sections sit along the bottom of the screen, and a tap on a zone card opens the zone.
+- Each room shows its water today, in total and per plant.
+- Bookmarks and shared links now remember the room you had open.
+- Bug fixes and improvements.
 
 ## 3.16.1 - 2026-10-20
 

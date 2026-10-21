@@ -1,3 +1,7 @@
+# 3.17.0
+
+Pair with integration 3.17.0. **C1.** Updated dashboard package only: room and zone tree in the menu, phone bottom section bar, the selected room in the page address, Overview renamed Status and Settings & help renamed Settings, room water totals on All rooms. Controller, engine, state, options and physical safeguards are unchanged; the controller code is byte-identical to 3.16.1.
+
 # 3.16.1
 
 Pair with integration 3.16.1. **C0.** Adds the Crop Steering Academy teaching course and website publication. Controller, engine, state, options and physical safeguards are unchanged; the controller code is byte-identical to 3.16.0.
