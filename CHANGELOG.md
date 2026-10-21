@@ -9,6 +9,25 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.17.0] - 2026-10-21
+
+Pair: **controller 3.17.0**. **C1: dashboard navigation.** Controller, engine, integration runtime, entities, options and persisted state are unchanged. The dashboard bundle was hot-deployed to the owner's Work HA add-on before release, at the owner's request; no photoperiod soak is claimed.
+
+### 🌱 In plain English
+
+- **Get to any zone in one click.** The menu lists every room with its state, and every zone under it with its phase and moisture. Choosing a room keeps you in the section you are in; choosing a zone opens its page, in any room.
+- **Built for a phone in the grow room.** The five sections sit in a bar along the bottom of the screen, where a thumb reaches them, and a tap anywhere on a zone card opens the zone.
+- **Links remember the room.** The address now holds the room you have open, so a bookmark, a shared link or a reload brings you back to the same room.
+- **Clearer names.** Overview is now **Status** (with **All rooms** and **Room**), and Settings & help is now **Settings**. Old links still work.
+- **Water at room level.** Each room on All rooms shows its water today: total litres and litres per plant.
+
+### 🔧 Technical notes
+
+- New `frontend/src/components/room-tree.tsx` (+ css): rooms from `facilityRooms`, zones with phase, VWC and stale/paused flags; desktop sidebar and the phone sheet. `App.tsx` gains `openRoom` (keeps the section) and a fixed `.bottom-nav` at ≤720 px; the selected room is written to `?room=` as its short alias (`resolveRequestedRoom`), else its id.
+- `page-tabs.tsx` labels: Status / All rooms / Room / Settings. Routes, hashes and legacy redirects are unchanged. `all-zones.tsx`: room water total and per-plant average over zones reporting both; whole-card zone tap via a stretched title button.
+- Docs, `docs/error-codes.json` labels (regenerated `ERROR_CODES.md`), screenshots (27, plus `img/mobile-all-rooms.png`) and browser checks follow the new names; `verify-dashboard.mjs`'s static server reads a file before writing headers.
+- No change to `addons/f2_control/f2_control/`, `crop-steering-engine/`, integration Python, entity ids, add-on options or `/data/state.json`.
+
 ## [3.16.1] - 2026-10-20
 
 Pair: **controller 3.16.1**. **C0: teaching documentation and website.** Controller, engine, integration runtime, dashboard bundle, entities, options and persisted state are unchanged. Published at the owner's request; no soak is required for C0 and none is claimed.
