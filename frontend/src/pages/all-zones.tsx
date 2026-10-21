@@ -135,15 +135,6 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
               role="img"
               aria-label={`Day ${day} of ${days}${stage?.name ? `, ${stage.name}` : ""}`}
             >
-              {stage?.stageDays && (
-                <span
-                  className="facility-run-stage"
-                  style={{
-                    left: pct(stage.stageDays[0] - 1),
-                    width: `calc(${pct(stage.stageDays[1])} - ${pct(stage.stageDays[0] - 1)})`,
-                  }}
-                />
-              )}
               <span className="facility-run-done" style={{ width: pct(day!) }} />
               <span className="facility-run-today" style={{ left: pct(day!) }} />
             </div>
@@ -188,10 +179,10 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
             )}
           </dl>
         </div>
-        <div className="facility-supply">
-          <TankCard r={r} open={open} />
-          {r.stock.length > 0 && <StockRow r={r} open={open} />}
-        </div>
+      </div>
+      <div className="facility-supply">
+        <TankCard r={r} open={open} />
+        {r.stock.length > 0 && <StockRow r={r} open={open} />}
       </div>
       <div className="facility-zones">
         {r.zones.map((z) => (
@@ -273,8 +264,10 @@ function ZoneCard({
             ) : (
               <span className="muted">Per plant unknown</span>
             )}
-            {z.waterL !== null && <span className="muted"> · {number(z.waterL, 1)} L zone</span>}
           </span>
+          {z.waterL !== null && (
+            <span className="facility-zone-total">{number(z.waterL, 1)} L today</span>
+          )}
         </div>
       </div>
       <dl className="facility-zone-readings">
@@ -304,15 +297,18 @@ function ZoneCard({
           </dd>
         </div>
       </dl>
-      {z.attention.map((reason) => (
+      {z.attention
+        // Pore EC out of band is marked on its reading, and a probe's trouble on its sensor row.
+        .filter((reason) => reason.rule !== "pore-ec" && reason.rule !== "probe")
+        .map((reason) => (
         <p key={reason.rule} className="facility-flag" data-level={reason.level}>
           <TriangleAlert size={14} aria-hidden="true" /> {reason.text}
         </p>
-      ))}
+        ))}
       {z.sensors.length > 0 && (
         <ul className="facility-sensors" aria-label={`${zone.name} sensors`}>
           {z.sensors.map((sensor) => (
-            <SensorRow key={sensor.key} sensor={sensor} />
+            <SensorRow key={sensor.key} sensor={sensor} context={[r.room.name, zone.name]} />
           ))}
         </ul>
       )}
@@ -320,13 +316,18 @@ function ZoneCard({
   );
 }
 
-function SensorRow({ sensor }: { sensor: ZoneSensor }) {
+function SensorRow({ sensor, context }: { sensor: ZoneSensor; context: string[] }) {
   const bad = sensor.health !== "ok" && sensor.health !== "not-counted";
+  // Inside its zone's card the room and zone names say nothing: "Zone 1 front" reads "Front".
+  let name = sensor.name;
+  for (const word of context)
+    if (name.toLowerCase().startsWith(word.toLowerCase())) name = name.slice(word.length).trim();
+  name = name ? name.charAt(0).toUpperCase() + name.slice(1) : "Sensor";
   return (
     <li className="facility-sensor" data-health={sensor.health}>
       <span className="facility-sensor-dot" aria-hidden="true" />
       <span className="facility-sensor-name" title={sensor.name}>
-        {sensor.name}
+        {name}
       </span>
       <span className="facility-sensor-values">
         {sensor.vwc && <span>{sensor.vwc.value === null ? "—" : `${number(sensor.vwc.value)}%`}</span>}
@@ -398,7 +399,7 @@ function StockRow({ r, open }: { r: FacilityRoom; open: Open }) {
           <StockBottle
             tank={tank}
             state={tank.state}
-            scale={tank.capacity_l / largest}
+            scale={Math.max(0.6, tank.capacity_l / largest)}
             label={`${tank.name}: ${number(tank.level_l)} of ${number(tank.capacity_l)} L${
               STOCK_STATES[tank.state] ? `, ${STOCK_STATES[tank.state].toLowerCase()}` : ""
             }`}
