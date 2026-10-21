@@ -7,7 +7,7 @@
 
 **Crop Steering waters a grow room automatically from Home Assistant. An optional AI assistant gives a second opinion on the decisions that need judgement.**
 
-![All zones across both demo rooms, grouped by room with current VWC, pore EC, water delivery and feed supply](img/all-zones.png)
+![All rooms across both demo rooms, grouped by room with current VWC, pore EC, water delivery and feed supply](img/all-zones.png)
 
 Crop Steering controls the water of a grow room from Home Assistant. The controller measures the water and the salt in each group of plants. It decides when the plants need water and how much water they need. Then it operates your pump and your valves. These fixed decisions are the rules of the controller.
 
@@ -196,7 +196,7 @@ A Home Assistant administrator does the setup in **Equipment › Setup**. Pair t
 11. Make sure that the kill switch and the equipment of the room are off.
 12. Select **Review configuration**, then **Save configuration**.
 13. Wait for **Mapping acknowledged**. A saved setup and an accepted setup are different states.
-14. Examine **Overview › Selected room** and **Equipment › Probes**.
+14. Examine **Status › Room** and **Equipment › Probes**.
 15. Set the lights-on and lights-off hours of the room.
 16. Examine the water limits, the shot sizes and the rescue floor of each zone.
 17. Set the "Watering" switch in the top bar to on.
@@ -207,11 +207,11 @@ The setup checks the entity types, the units, duplicate valves and revision conf
 
 ## Daily use
 
-The dashboard is the **Crop Steering** page in the Home Assistant sidebar. It has five menu items: **Overview**, **Irrigation**, **History**, **Equipment** and **Settings & help**. Each zone also has its own page. The screenshots come from the demo of the dashboard, with sample data.
+The dashboard is the **Crop Steering** page in the Home Assistant sidebar. The menu has five sections: **Status**, **Irrigation**, **History**, **Equipment** and **Settings**. Under them, the menu lists every room with its state, and every zone with its phase and VWC: one click opens any room or zone. On a phone the five sections sit in a bar along the bottom, and the menu button at the top opens the rooms and zones. The selected room is part of the page address (`?room=`), so a bookmark or a shared link opens that room. Each zone also has its own page. The screenshots come from the demo of the dashboard, with sample data.
 
 Do these steps each day:
 
-1. Open **Overview › All zones** to see every configured room and zone together. Paused rooms remain visible. Select a zone to open its room and detail page.
+1. Open **Status › All rooms** to see every configured room and zone together. Paused rooms remain visible. Select a zone to open its room and detail page.
 2. Open each flagged zone from its card. Read its numbers, its day chart and **Why / next action**.
 3. Use **History › Timeline** for controller and AI changes.
 4. Change targets only in **Irrigation › Current day**, through the review.
@@ -220,13 +220,13 @@ Do these steps each day:
 
 ### Landing page and room overview
 
-**All zones** is the default landing page. It shows each room separately, with current phase, VWC, pore EC, last irrigation, zone litres and average litres per plant. The feed strip opens that room’s detailed tank view. The watering and stop controls in the header apply only to the selected room, whose name appears beside them.
+**All rooms** is the default landing page. It shows each room separately, with the room's water today (total litres and litres per plant), and each zone's phase, VWC, pore EC, last irrigation, zone litres and average litres per plant. Tap anywhere on a zone card to open the zone. The feed strip opens that room’s detailed tank view. The watering and stop controls in the header apply only to the selected room, whose name appears beside them.
 
-Choose **Settings & help › Settings › Display › Default view** to open another workspace by default. The preference is saved in this browser. Bookmarks and notification links take precedence; choosing a default never redirects an explicit page link. **Overview › Selected room** opens Today for the selected room.
+Choose **Settings › Settings › Display › Default view** to open another workspace by default. The preference is saved in this browser. Bookmarks and notification links take precedence; choosing a default never redirects an explicit page link. **Status › Room** opens Today for the selected room.
 
-### Selected room
+### Room
 
-**Overview › Selected room** answers one question: is the room correct, and does a zone need you?
+**Status › Room** answers one question: is the room correct, and does a zone need you?
 
 - **The room line** shows the "Watering" switch, the stage and the day of flower, and the steering mode. It also shows the pore EC range of the stage, the lights-off time, the phases of the zones and the alerts.
 - **The card of each zone** shows the VWC now and a line of the day. A bar shows the VWC against the rescue floor, the re-water point and the peak target. The card also shows the pore EC, the water for each plant against the room, the last shot and the next event.
@@ -284,7 +284,7 @@ Current-day targets and future schedules share one workspace, one zone selector 
 
 > **WARNING:** Wear the correct protective equipment when you fill a stock tank or touch a dosing pump. Nutrient concentrates and pH adjusters can injure skin and eyes.
 
-### Settings & help
+### Settings
 
 - **Default view, units and display**: choose browser landing and display preferences here.
 - **Capabilities**: search the current values and follow a link to the one workspace that edits each setting. It is a directory, not another set of switches.

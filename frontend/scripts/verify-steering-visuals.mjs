@@ -469,7 +469,7 @@ try {
       await page.getByLabel("Run name", { exact: true }).fill("Unsaved run draft");
       await page
         .locator(".desktop-sidebar")
-        .getByRole("button", { name: "Overview", exact: true })
+        .getByRole("button", { name: "Status", exact: true })
         .click();
       await page.getByRole("heading", { name: "Discard unsaved workspace changes?" }).waitFor();
       await page.getByRole("button", { name: "Keep editing", exact: true }).click();

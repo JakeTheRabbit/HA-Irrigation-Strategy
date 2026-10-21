@@ -1,0 +1,102 @@
+/* The menu's live room list (room-tree.tsx): rooms, and the zones under each, in the sidebar. */
+.room-tree {
+  margin-top: 26px;
+  gap: 1px;
+}
+.room-tree-heading {
+  padding: 0 12px 6px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.room-tree-room {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin-top: 6px;
+}
+nav.room-tree .room-tree-row {
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px 10px;
+  color: var(--foreground);
+  font-weight: 500;
+  font-size: var(--text-sm);
+}
+nav.room-tree .room-tree-zone {
+  min-height: 34px;
+  padding: 4px 10px 4px 26px;
+  color: var(--muted-foreground);
+  font-weight: 400;
+}
+nav.room-tree .room-tree-row[aria-current="page"] {
+  background: var(--muted);
+  box-shadow: inset 2px 0 0 var(--primary);
+  color: var(--foreground);
+  font-weight: 600;
+}
+.room-tree-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.room-tree-state,
+.room-tree-value {
+  margin-left: auto;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-weight: 400;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+.room-tree-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--muted-foreground);
+}
+.room-tree-row[data-tone="holding"] .room-tree-dot {
+  background: var(--success);
+}
+.room-tree-row[data-tone="watering"] .room-tree-dot {
+  background: var(--primary);
+}
+.room-tree-row[data-tone="stopped"] .room-tree-dot,
+.room-tree-row[data-tone="stale"] .room-tree-dot {
+  background: var(--destructive);
+}
+/* Phase colours as the zone pages draw them. */
+.room-tree-phase {
+  flex: none;
+  min-width: 22px;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: #6b7580;
+  color: #fff;
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-align: center;
+}
+.room-tree-phase[data-phase="P1"] {
+  background: #2f6fb5;
+}
+.room-tree-phase[data-phase="P2"] {
+  background: #6450b0;
+}
+.room-tree-phase[data-phase="P3"] {
+  background: #34405a;
+}
+.room-tree-flag {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--warning);
+}
+.room-tree-zone[data-flag="stale"] .room-tree-flag {
+  background: var(--destructive);
+}

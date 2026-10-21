@@ -431,7 +431,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - If the kill switch is off, set it to on.
 - If no zone needs water, compare the VWC of each zone with its re-water point.
 - Make sure that each probe is in its cube.
-- To change the number of hours, go to Crop Steering → Settings & help → Notifications.
+- To change the number of hours, go to Crop Steering → Settings → Notifications.
 
 <a id="cs-210"></a>
 

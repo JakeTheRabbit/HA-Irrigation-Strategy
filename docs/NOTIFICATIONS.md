@@ -14,7 +14,7 @@ This document is the contract between the three layers. Nothing in it names a si
 |---|---|---|
 | Integration | The site's notification setup (one store for the whole site, not per room); the list of phones; the services to read, save, test and send; routing each push to the phones that want it | Push anything nobody ticked (except the fallback below) |
 | Controller app | Raising alerts (unchanged) and the new events; handing each push to `crop_steering.notify`; the fallback to its old `notify_service` option | Decide who gets what |
-| Dashboard | Settings & help › Notifications: the checkbox grid, each phone's rooms, a test push per phone, the watering-stopped threshold | Call a notify service itself |
+| Dashboard | Settings › Notifications: the checkbox grid, each phone's rooms, a test push per phone, the watering-stopped threshold | Call a notify service itself |
 
 ## The kinds of alert (the checkboxes)
 
@@ -221,7 +221,7 @@ In detail:
   every install. The message says why when it can: watering switched off (the room's engine switch), a hold
   (each zone's reason from the controller's gates), or nothing called for water.
 
-## The page (Settings & help › Notifications)
+## The page (Settings › Notifications)
 
 - A grid: a row per phone (the owner's name and the device), a column per kind with a checkbox, the rooms
   it covers (all, or ticked rooms), high priority for emergencies, and **Send a test**. On a phone the grid

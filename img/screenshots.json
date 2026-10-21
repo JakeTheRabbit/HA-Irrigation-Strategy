@@ -1,6 +1,6 @@
 {
   "source": "www/dashboard.html?demo=1",
-  "sourceSha256": "1914a9180d3051636f560d00074de48213df134edb34b5ed6e806161884d220c",
+  "sourceSha256": "027839acedf1e02e676ddc27884e51c0ec8ba6afb1ee5f1c2a3d5115b1d3ad32",
   "fixedLocalTime": "2026-10-18T15:50:00",
   "captures": [
     {
@@ -11,6 +11,15 @@
         "height": 1000
       },
       "selector": "full page"
+    },
+    {
+      "file": "img/mobile-all-rooms.png",
+      "route": "#/all-zones",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "selector": "viewport"
     },
     {
       "file": "img/operator-dashboard.png",

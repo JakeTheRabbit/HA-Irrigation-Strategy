@@ -28,8 +28,9 @@ const server = createServer(async (req, res) => {
         ".css": "text/css",
         ".png": "image/png",
       }[path.extname(file)] || "application/octet-stream";
+    const body = await readFile(file);
     res.writeHead(200, { "Content-Type": type, "Cache-Control": "no-store" });
-    res.end(await readFile(file));
+    res.end(body);
   } catch {
     res.writeHead(404);
     res.end("Not found");
@@ -184,7 +185,7 @@ try {
   await check("primary entry preserves room, demo and route", async () => {
     // An old bookmark opens the overview across all rooms.
     await page.goto(`${base}/index.html?demo&room=room_b#/zones`);
-    await expectVisible(page.getByRole("heading", { name: "All zones", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "All rooms", exact: true }));
     assert.match(page.url(), /dashboard\.html\?demo=&room=room_b#\/all-zones$/);
     assert.equal(
       await page.locator('.room-chip[aria-pressed="true"]').getAttribute("data-room"),
@@ -193,7 +194,7 @@ try {
   });
   await check("default view persists while explicit links retain their destination", async () => {
     await page.goto(`${base}/dashboard.html?demo&room=f2`, { waitUntil: "networkidle" });
-    await expectVisible(page.getByRole("heading", { name: "All zones", exact: true, level: 1 }));
+    await expectVisible(page.getByRole("heading", { name: "All rooms", exact: true, level: 1 }));
     await go("settings");
     const landing = page.getByLabel("Landing page", { exact: true });
     assert.equal(await landing.inputValue(), "all-zones");
@@ -217,7 +218,7 @@ try {
   await check("every old address lands where its content lives now", async () => {
     const moved = [
       ["overview", "today", "Room A today"],
-      ["zones", "all-zones", "All zones"],
+      ["zones", "all-zones", "All rooms"],
       ["strategy", "plan/targets", "Irrigation"],
       ["grow-plan", "plan/schedule", "Irrigation"],
       ["compare", "history/compare", "Compare runs"],
@@ -251,7 +252,7 @@ try {
     await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
   });
   const routes = [
-    ["all-zones", "All zones"],
+    ["all-zones", "All rooms"],
     ["today", "Room A today"],
     ["zone/1", "Zone 1"],
     ["today/ai", "AI assistant"],
@@ -276,8 +277,8 @@ try {
       plan: "Irrigation",
       history: "History",
       equipment: "Equipment",
-      settings: "Settings & help",
-      help: "Settings & help",
+      settings: "Settings",
+      help: "Settings",
     })[route.split("/")[0]];
   for (const [route, heading] of routes)
     await check(`${route}: render, desktop layout and accessibility`, async () => {
@@ -304,11 +305,11 @@ try {
       await go("today");
       const menu = page.getByRole("navigation", { name: "Main navigation" });
       assert.deepEqual(await menu.getByRole("button").allInnerTexts(), [
-        "Overview",
+        "Status",
         "Irrigation",
         "History",
         "Equipment",
-        "Settings & help",
+        "Settings",
       ]);
       await menu.getByRole("button", { name: "Irrigation", exact: true }).click();
       await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
@@ -395,11 +396,11 @@ try {
     await page.getByRole("dialog").waitFor({ state: "hidden" });
     await page
       .getByRole("navigation", { name: "Main navigation" })
-      .getByRole("button", { name: "Overview", exact: true })
+      .getByRole("button", { name: "Status", exact: true })
       .click();
     await page
-      .getByRole("navigation", { name: "Overview views" })
-      .getByRole("button", { name: "Selected room", exact: true })
+      .getByRole("navigation", { name: "Status views" })
+      .getByRole("button", { name: "Room", exact: true })
       .click();
     await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
     const stopped = page.locator(".today-stopped");
@@ -543,7 +544,9 @@ try {
     // The run strip sits above the zones and adds its own height; the rest keeps its two screens.
     const run = await strip.evaluate((el) => el.getBoundingClientRect().height + 16);
     assert.ok(run <= 220, `the run strip is ${run}px tall on a phone`);
-    assert.ok(height - run <= 2 * 844, `Today is ${height}px tall on a 844px phone`);
+    // The bottom section bar is fixed chrome; the page pads itself clear of it.
+    const bar = await page.evaluate(() => document.querySelector(".bottom-nav")?.getBoundingClientRect().height ?? 0);
+    assert.ok(height - run - bar <= 2 * 844, `Today is ${height}px tall on a 844px phone`);
     await noOverflow();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
@@ -583,8 +586,10 @@ try {
       .catch(() => {});
     const phone = await page.evaluate(() => document.documentElement.scrollHeight);
     const run = await strip.evaluate((el) => el.getBoundingClientRect().height + 16);
+    // The bottom section bar is fixed chrome; the page pads itself clear of it.
+    const bar = await page.evaluate(() => document.querySelector(".bottom-nav")?.getBoundingClientRect().height ?? 0);
     assert.ok(
-      phone - run <= 2 * 844 + 64,
+      phone - run - bar <= 2 * 844 + 64,
       `Today with every option on is ${phone}px tall on a phone`,
     );
     await noOverflow();
@@ -685,11 +690,11 @@ try {
       await ongoing.waitFor({ state: "detached" });
       await page
         .locator(".desktop-sidebar")
-        .getByRole("button", { name: "Overview", exact: true })
+        .getByRole("button", { name: "Status", exact: true })
         .click();
       await page
-        .getByRole("navigation", { name: "Overview views" })
-        .getByRole("button", { name: "Selected room", exact: true })
+        .getByRole("navigation", { name: "Status views" })
+        .getByRole("button", { name: "Room", exact: true })
         .click();
       const empty = page.locator('[data-run-progress="none"]');
       await expectVisible(empty);
@@ -2752,15 +2757,24 @@ try {
       "Watering on",
       "Stop all",
     ]);
+    // The five sections along the bottom of the phone.
+    assert.deepEqual(
+      await page.getByRole("navigation", { name: "Sections" }).locator("button").allInnerTexts(),
+      ["Status", "Irrigation", "History", "Equipment", "Settings"],
+    );
     await page.getByRole("button", { name: "Open navigation" }).click();
     await axe("mobile navigation");
     const mobileMenu = page.getByRole("dialog");
     // The "About" buttons of the menu's controls are help, not entries.
-    const entries = await mobileMenu.locator("button:not(.info-tip-trigger)").allInnerTexts();
-    assert.deepEqual(
-      entries.filter((text) => text !== "Close"),
-      ["Overview", "Irrigation", "History", "Equipment", "Settings & help"],
-    );
+    const entries = await mobileMenu
+      .getByRole("navigation", { name: "Main navigation" })
+      .locator("button:not(.info-tip-trigger)")
+      .allInnerTexts();
+    assert.deepEqual(entries, ["Status", "Irrigation", "History", "Equipment", "Settings"]);
+    // Under the sections: every room, and every zone under its room, one tap each.
+    const tree = mobileMenu.getByRole("navigation", { name: "Rooms" });
+    assert.equal(await tree.locator("button").first().innerText(), "All rooms");
+    assert.ok((await tree.locator(".room-tree-zone").count()) >= 2, "zones listed under rooms");
     await mobileMenu.getByRole("button", { name: "Irrigation", exact: true }).click();
     await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
     const views = page.getByRole("navigation", { name: "Irrigation views" });

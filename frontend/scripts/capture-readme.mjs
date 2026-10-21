@@ -65,6 +65,12 @@ async function shot(name, selector) {
 try {
   await go("all-zones");
   await shot("all-zones");
+  // A phone: the sections in the bottom bar, every zone card one tap from its page.
+  const desktop = page.viewportSize();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await go("all-zones");
+  await shot("mobile-all-rooms");
+  await page.setViewportSize(desktop);
   await go("today");
   await shot("operator-dashboard");
   await shot("jev-today");

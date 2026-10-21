@@ -4,16 +4,16 @@ import "./page-tabs.css";
 /** The menu's five entries and the pages under each: one row of tabs above a page that has more
  * than one view. */
 export const SECTION_LABELS: Record<Section, string> = {
-  today: "Overview",
+  today: "Status",
   plan: "Irrigation",
   history: "History",
   equipment: "Equipment",
-  settings: "Settings & help",
+  settings: "Settings",
 };
 export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
   today: [
-    { page: "all-zones", label: "All zones" },
-    { page: "today", label: "Selected room" },
+    { page: "all-zones", label: "All rooms" },
+    { page: "today", label: "Room" },
   ],
   plan: [
     { page: "plan/targets", label: "Current day" },
@@ -44,7 +44,7 @@ export const TABS: Partial<Record<Section, { page: Page; label: string }[]>> = {
 };
 /** A page's own name, for its tab and the window title. */
 export function pageLabel(page: Page): string {
-  if (page === "all-zones") return "All zones";
+  if (page === "all-zones") return "All rooms";
   if (page === "today") return "Today";
   if (page === "zone") return "Zone";
   if (page === "today/ai") return "AI assistant";

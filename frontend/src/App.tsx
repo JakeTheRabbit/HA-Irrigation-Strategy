@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import {
+  Activity,
   ArrowUpRight,
   CalendarRange,
   Droplets,
@@ -28,7 +29,7 @@ import { useController } from "@/lib/use-controller";
 import { useHaTheme } from "@/lib/ha-theme";
 import { useHaShell } from "@/lib/ha-shell";
 import { errorText } from "@/lib/utils";
-import { runningVersions } from "@/lib/model";
+import { resolveRequestedRoom, runningVersions } from "@/lib/model";
 import {
   canonicalHash,
   routeHash,
@@ -40,6 +41,7 @@ import {
 import { AppHeader, StaleBanner } from "@/components/app-header";
 import { UiTip } from "@/components/info-tip";
 import { PageTabs, pageLabel, SECTION_LABELS } from "@/components/page-tabs";
+import { RoomTree } from "@/components/room-tree";
 import { WaterViewProvider } from "@/lib/water-view";
 import { WhatsNewOnUpdate } from "@/components/whats-new";
 import { Tour } from "@/components/tour";
@@ -66,7 +68,7 @@ import { WaterUsePage } from "@/pages/water-use";
 import { AiSettings, BrainPage } from "@/components/brain";
 
 const navigation = [
-  { page: "all-zones", label: SECTION_LABELS.today, icon: House },
+  { page: "all-zones", label: SECTION_LABELS.today, icon: Activity },
   { page: "plan/targets", label: SECTION_LABELS.plan, icon: CalendarRange },
   { page: "history/timeline", label: SECTION_LABELS.history, icon: History },
   { page: "equipment/probes", label: SECTION_LABELS.equipment, icon: Wrench },
@@ -198,6 +200,31 @@ export default function App() {
       window.scrollTo({ top: 0 });
     });
   }
+  /** Opens a room in the section already open: Status opens the room's own page, any other
+   * section stays where it is. */
+  function openRoom(id: string) {
+    const next: Page = page === "all-zones" || page === "zone" ? "today" : page;
+    if (id === controller.roomId) navigate(next);
+    else openRoomPage(id, next);
+  }
+  // The selected room is part of the address (?room=f1), so a bookmark or a shared link opens it.
+  useEffect(() => {
+    if (!controller.roomId) return;
+    const query = new URLSearchParams(window.location.search);
+    if (resolveRequestedRoom(controller.rooms, query.get("room"))?.id === controller.roomId) return;
+    // The room's short name where it has one (f1, room_b; f2 for the unprefixed room), else its id.
+    const room = controller.room.room;
+    const short = room.prefix ? room.prefix.replace(/_$/, "") : "f2";
+    query.set(
+      "room",
+      resolveRequestedRoom(controller.rooms, short)?.id === controller.roomId ? short : controller.roomId,
+    );
+    window.history.replaceState(
+      window.history.state,
+      "",
+      `${window.location.pathname}?${query.toString()}${window.location.hash}`,
+    );
+  }, [controller.roomId]);
   const versions = runningVersions(controller.states, controller.room.room);
   const section = sectionOf(page);
   const sidebar = (variant: string) => (
@@ -233,6 +260,16 @@ export default function App() {
           </button>
         ))}
       </nav>
+      <RoomTree
+        controller={controller}
+        allRooms={page === "all-zones"}
+        currentZone={page === "zone" ? (route.zone ?? controller.room.zones[0]?.id ?? null) : null}
+        openAll={() => navigate("all-zones")}
+        openRoom={openRoom}
+        openZone={(room, zone) =>
+          room === controller.roomId ? navigate("zone", zone) : openRoomPage(room, "zone", zone)
+        }
+      />
       <div className="sidebar-footer">
         {haShell.available && (
           <Button
@@ -287,7 +324,7 @@ export default function App() {
         <SheetContent side="left" className="mobile-sidebar">
           <SheetHeader className="sr-only">
             <SheetTitle>Navigation</SheetTitle>
-            <SheetDescription>Choose a room or dashboard page.</SheetDescription>
+            <SheetDescription>Choose a room, a zone or a dashboard page.</SheetDescription>
           </SheetHeader>
           {sidebar("mobile")}
         </SheetContent>
@@ -447,6 +484,24 @@ export default function App() {
           </div>
         </main>
       </div>
+      <nav className="bottom-nav" aria-label="Sections">
+        {navigation.map((item) => (
+          <button
+            type="button"
+            key={item.page}
+            aria-current={section === sectionOf(item.page) ? "page" : undefined}
+            onClick={() => navigate(item.page)}
+          >
+            <span className="bottom-nav-icon">
+              <item.icon size={21} aria-hidden="true" />
+              {item.page === "plan/targets" && Object.keys(drafts).length > 0 && (
+                <i className="nav-draft-count">{Object.keys(drafts).length}</i>
+              )}
+            </span>
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </nav>
       <WhatsNewOnUpdate controller={controller} />
       <Tour navigate={navigate} />
       <Dialog
