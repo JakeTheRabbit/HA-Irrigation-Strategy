@@ -567,3 +567,118 @@ def test_switches_that_read_on_add_no_time_before_the_valve_opens(rig, monkeypat
     assert room.state[1]["daily_vol"] == pytest.approx(3.0)
     assert room.state[1]["shots"] == 1
     assert room.shot_inflight is None
+
+
+def _valve_reads(c, fake, clock, monkeypatch, state_at):
+    """The valve's state as Home Assistant reports it: `state_at(seconds since its turn_on, window_over)`.
+    `window_over` turns True once the controller's ON read-back has given up. Returns the seconds of the
+    valve's turn_on and turn_off, and the alerts raised (code, message)."""
+    times, alerts, over = {}, [], [False]
+    real_call, real_get, real_confirm, alert = controller.ha_call, controller.ha_get, c._confirm_switches, c._alert
+
+    def call(domain, service, **data):
+        if data.get("entity_id") == "switch.v1":
+            times.setdefault(service, clock.seconds)
+            fake.calls.append((domain, service, data))
+            if service == "turn_off":
+                fake.set_state("switch.v1", "off")
+            return True
+        return real_call(domain, service, **data)
+
+    def get(entity, timeout=8):
+        if entity == "switch.v1" and "turn_on" in times and "turn_off" not in times:
+            return controller.HAState(state_at(clock.seconds - times["turn_on"], over[0]), {}, None)
+        return real_get(entity, timeout=timeout)
+
+    def confirm(entities, want, deadline=None, reads=None):
+        ok = real_confirm(entities, want, deadline, reads)
+        over[0] = over[0] or (want == "on" and tuple(entities) == ("switch.v1",) and not ok)
+        return ok
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller, "ha_get", get)
+    monkeypatch.setattr(c, "_confirm_switches", confirm)
+    monkeypatch.setattr(c, "_alert", lambda key, cs, title, msg, *a, **k: (alerts.append((cs, msg)),
+                                                                          alert(key, cs, title, msg, *a, **k))[1])
+    return times, alerts
+
+
+def test_a_valve_that_reports_on_late_inside_the_read_back_runs_a_normal_shot(rig, monkeypatch):
+    """CTL-002 review: a plug that reports its ON about 10 s late (seen on a live install) is not a dead valve."""
+    c, fake, clock = rig
+    room = c.rooms[0]
+    times, alerts = _valve_reads(c, fake, clock, monkeypatch, lambda t, over: "on" if t >= 10 else "off")
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    assert alerts == []
+    assert times["turn_off"] - times["turn_on"] == pytest.approx(60)  # the read-back ran inside the shot
+    assert room.state[1]["daily_vol"] == pytest.approx(3.0) and room.state[1]["shots"] == 1
+    assert room.state[1]["on_failures"] is None
+
+
+@pytest.mark.parametrize("valve, counted", [
+    ("off", False),  # a dead relay: every read a definite OFF, no water
+    ("unavailable", True),  # unreadable throughout: water may have flowed
+    ("late", True),  # ON just after the read-back gave up: it did open
+], ids=["definite-off", "unavailable", "on-just-after-the-window"])
+def test_a_valve_that_does_not_read_on_is_counted_only_when_it_may_have_opened(rig, monkeypatch, valve, counted):
+    """CTL-002 review: count conservatively. Only a valve read as a definite OFF throughout counts no water."""
+    c, fake, clock = rig
+    room = c.rooms[0]
+    states = {"off": lambda t, over: "off", "unavailable": lambda t, over: "unavailable",
+              "late": lambda t, over: "on" if over else "off"}
+    times, alerts = _valve_reads(c, fake, clock, monkeypatch, states[valve])
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    assert [code for code, _msg in alerts] == ["CS-304"]
+    assert f"did not read on within {controller.SWITCH_ON_S:g} s" in alerts[0][1]
+    assert times["turn_off"] - times["turn_on"] >= controller.SWITCH_ON_S
+    if counted:
+        assert room.state[1]["daily_vol"] == pytest.approx(0.05 * (times["turn_off"] - times["turn_on"]))
+        assert "counts the" in alerts[0][1]
+    else:
+        assert room.state[1]["daily_vol"] == 0 and room.state[1]["shots"] == 0
+        assert "did not count the shot" in alerts[0][1]
+    assert all(fake.states[e][0] == "off" for e in ("switch.p", "switch.m", "switch.v1"))
+    assert room.shot_inflight is None and c._hardware_fault_block(room) is None
+
+
+def test_a_zone_whose_valve_will_not_open_backs_off_then_resets_once_it_does(rig, monkeypatch):
+    """CTL-002 review: a dead valve is not retried every pass (short-cycling the pump). After three such shots
+    in a row the zone, rescue shots included, is tried at most once every 30 min, until its valve reads on."""
+    c, fake, clock = rig
+    room = c.rooms[0]
+    dead = [True]
+    times, alerts = _valve_reads(c, fake, clock, monkeypatch, lambda t, over: "off" if dead[0] else "on")
+
+    def shot(**kw):
+        times.clear()
+        c._execute_shot(room, 1, 60, 5, flow_lps=0.05, **kw)
+        return "turn_on" in times
+
+    assert shot() and shot()
+    assert "at most once every 30 min" not in alerts[-1][1]
+    assert shot()  # the third in a row: the zone backs off, and says so at once
+    assert "The last 3 shots of this zone in a row could not start" in alerts[-1][1]
+    assert not shot() and not shot(plan_exempt=True)  # held, a rescue shot too: no command sent
+    room.state[1]["on_failures"]["last"] = (datetime.now() - timedelta(minutes=31)).isoformat()
+    assert shot()  # retried after 30 min, still dead: backed off again
+    assert room.state[1]["on_failures"]["count"] == 4 and not shot()
+    room.state[1]["on_failures"]["last"] = (datetime.now() - timedelta(minutes=31)).isoformat()
+    dead[0] = False
+    assert shot()
+    assert room.state[1]["on_failures"] is None and room.state[1]["shots"] == 1
+    assert shot()  # and the next shot runs as usual
+
+
+def test_the_switch_on_backoff_survives_a_restart_and_an_old_state_file_loads(rig):
+    c, _fake, _clock = rig
+    room = c.rooms[0]
+    old = c._serialize_zone(room.state[1])
+    del old["on_failures"]  # a state file from before the backoff
+    assert c._apply_saved_zone(c._fresh_zone(), old)["on_failures"] is None
+    room.state[1]["on_failures"] = {"count": 3, "last": datetime.now().isoformat()}
+    assert c._save_state()
+    c._load_state()
+    assert room.state[1]["on_failures"]["count"] == 3
+    assert controller._switch_on_retry_at(room.state[1]) > datetime.now()
+    bad = {**old, "on_failures": {"count": "3", "last": "yesterday"}}
+    assert c._apply_saved_zone(c._fresh_zone(), bad)["on_failures"] is None
