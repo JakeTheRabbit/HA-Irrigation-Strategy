@@ -842,6 +842,10 @@
       "title": "Crop Steering: {count} stock tank(s) low (CS-608)",
       "description": "These stock tanks are at or below their low mark:\n\n{tanks}\n\nEach batch tank that the room makes takes a dose from every stock tank.\n\nRefill the stock tanks. Open Crop Steering → Stock tanks. Press Refilled, or enter the level that you read on the tank. The card clears when every tank is above its low mark.\n\nCode CS-608. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
+    "calibration_due": {
+      "title": "Crop Steering: Feed probe calibration due (CS-612)",
+      "description": "The last calibration of these feed probes is 30 days old or older:\n\n{probes}\n\nA probe drifts over time. The controller uses its reading for the feed checks and the pH correction.\n\nCalibrate each probe in two reference solutions. Open Crop Steering → Equipment → Tank and feed and press Calibrate. The card clears when each probe has a calibration less than 30 days old.\n\nCode CS-612. What it means and what to do: Crop Steering → Help & tools → Error codes."
+    },
     "outside_zone_bounds": {
       "title": "Crop Steering: {count} setting(s) above zone limit (CS-611)",
       "description": "The limits of the daily water and the maximum shot length now follow the size of each zone. The size comes from the plants, the litres per plant and the dripper flow. These settings were already above the new limit:\n\n{settings}\n\nThe controller keeps these settings and uses them as before. Nothing changes until you edit one of them. A new value must then be in the limit.\n\nExamine the plants, the litres per plant and the dripper flow of each zone in Rooms and setup. If a zone size is too small, correct it. The limit then follows. The card clears when each setting is in its limit.\n\nCode CS-611. What it means and what to do: Crop Steering → Help & tools → Error codes."

@@ -158,12 +158,21 @@ class DosingStore:
             return None, {"error": self.error}
         batch = deepcopy(self.data["batch"])
         batch["recipe"] = self.recipe()
+        # Only while a feed-probe calibration session is open (calibration.py): the controller holds
+        # batches and pH correction on it. Absent otherwise, so the descriptor is as it always was.
+        calibration = (
+            self.hass.data.get(DOMAIN, {})
+            .get("_calibration", {})
+            .get(self.entry.entry_id)
+        )
+        calibrating = calibration.calibrating() if calibration is not None else None
         return self.data["revision"], {
             "pumps": deepcopy(self.data["pumps"]),
             "batch": batch,
             "profile": deepcopy(self.data["profile"]),
             "request": deepcopy(self.data["request"]),
             "feed": dosing.feed_now(self.data["feed"], _today()),
+            **({"calibrating": calibrating} if calibrating else {}),
         }
 
     def recipe(self) -> list[dict]:

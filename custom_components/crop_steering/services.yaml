@@ -751,6 +751,148 @@ calibration_record:
       required: false
       selector:
         text:
+calibration_start:
+  name: Start a probe calibration
+  description: >-
+    Opens a calibration session for the feed pH or feed EC probe of the room and starts to watch its
+    reading. While the session is open the dosing descriptor carries `calibrating`, so the controller
+    holds batches and pH correction. Only one session is open in a room: a new start replaces the last.
+    The session ends at commit, revert or abandon, or 30 minutes after its last capture. Refused when the
+    probe has not reported for 2 minutes. Returns the session ID, the raw and tank temperature entities,
+    `dosing_paused` and when the session expires. When a signed-in user calls it, that user must be a
+    Home Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    probe:
+      name: Probe
+      description: >-
+        The feed probe: `feed_ph` or `feed_ec`. Example: `feed_ph`.
+      required: true
+      selector:
+        select:
+          options:
+            - feed_ph
+            - feed_ec
+    solutions:
+      name: Reference solutions
+      description: >-
+        The two reference solutions, in the order you use them. Optional. Default: [7.0, 4.0] for pH and
+        [1.413, 2.77] mS/cm for EC. Example: [7.0, 4.0].
+      required: false
+      selector:
+        object:
+calibration_capture:
+  name: Capture a calibration point
+  description: >-
+    Captures what the probe reads now in reference solution 0 or 1 of the session. A reading that moved
+    in the last 30 seconds (0.02 pH, or 1 % of the EC) is not captured unless `force` is true: the
+    answer then has `stable` false. Answers the reading, the raw value, `stable`, the drift and how many
+    seconds the reading has been steady. When a signed-in user calls it, that user must be a Home
+    Assistant administrator.
+  fields:
+    session_id:
+      name: Session ID
+      description: >-
+        The session ID that calibration_start returned. An unknown or expired session is refused with
+        "Calibration session expired. Start again." Example: 01JB2Y3M4N5P6Q7R8S9T0V1W2X.
+      required: true
+      selector:
+        text:
+    point:
+      name: Point
+      description: >-
+        Which reference solution the probe is in: 0 for the first, 1 for the second. Example: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1
+          mode: box
+    force:
+      name: Capture anyway
+      description: >-
+        Capture the reading even though it still moves. The calibration can then be off. Optional.
+        Default: false.
+      required: false
+      selector:
+        boolean:
+calibration_status:
+  name: Read a calibration session
+  description: >-
+    Answers what the probe of the session reads now, whether it is steady, its drift, the steady
+    seconds, how many points are captured and when the session expires. Changes nothing, never
+    captures a point and does not extend the session. It has no administrator check.
+  fields:
+    session_id:
+      name: Session ID
+      description: >-
+        The session ID that calibration_start returned. An unknown or expired session is refused with
+        "Calibration session expired. Start again." Example: 01JB2Y3M4N5P6Q7R8S9T0V1W2X.
+      required: true
+      selector:
+        text:
+calibration_commit:
+  name: Apply a probe calibration
+  description: >-
+    Works out the slope, the offset and the result from the two captured points, records them and
+    ends the session. A "pass" or "drifting" result is applied: the corrected feed sensor of the room
+    then reads the raw value corrected, and the result replaces the calibration applied before. A
+    "fail" is recorded but not applied, and the call is refused with a message that says so. When a
+    signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    session_id:
+      name: Session ID
+      description: >-
+        The session ID that calibration_start returned. An unknown or expired session is refused with
+        "Calibration session expired. Start again." Example: 01JB2Y3M4N5P6Q7R8S9T0V1W2X.
+      required: true
+      selector:
+        text:
+calibration_revert:
+  name: Put back the previous probe calibration
+  description: >-
+    Takes the applied calibration off the probe and applies the calibration that it replaced, or
+    none: the corrected feed sensor then reads unknown and the controller reads the raw probe. Ends
+    any calibration session of the room. When a signed-in user calls it, that user must be a Home
+    Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    probe:
+      name: Probe
+      description: >-
+        The feed probe: `feed_ph` or `feed_ec`. Example: `feed_ph`.
+      required: true
+      selector:
+        select:
+          options:
+            - feed_ph
+            - feed_ec
+calibration_abandon:
+  name: Abandon a probe calibration
+  description: >-
+    Ends the calibration session without a record. The dosing descriptor drops `calibrating`. When a
+    signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    session_id:
+      name: Session ID
+      description: >-
+        The session ID that calibration_start returned. An unknown or expired session is refused with
+        "Calibration session expired. Start again." Example: 01JB2Y3M4N5P6Q7R8S9T0V1W2X.
+      required: true
+      selector:
+        text:
 stock_get:
   name: Read stock tanks
   description: >-

@@ -65,6 +65,7 @@ RESERVED = {
     "CS-609": ("feat/duplicate-controller-guard", "two controllers on one room"),
     "CS-610": ("fix/one-kill-switch-rule", "a room switch that does not stop water"),
     "CS-611": ("feat/caps-scale-with-zone", "a setting held above its zone's limit"),
+    "CS-612": ("feat/parity-system", "a feed probe calibration due"),
     "CS-708": ("feat/claude-haiku-brain", "the brain"),
     "CS-709": ("feat/claude-haiku-brain", "the brain"),
     "CS-710": ("feat/brain-channel", "the brain: water finding a channel"),

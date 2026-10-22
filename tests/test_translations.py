@@ -131,10 +131,12 @@ SETUP_ONLY = {"config_flow.py", "setup_api.py"}
 
 
 def _runtime_consumers(key):
+    # The whole key: tank_temperature_sensor is another setting than temperature_sensor.
+    word = re.compile(rf"(?<!\w){re.escape(key)}(?!\w)")
     return sorted(
         path.name
         for path in RUNTIME
-        if path.name not in SETUP_ONLY and key in path.read_text(encoding="utf-8")
+        if path.name not in SETUP_ONLY and word.search(path.read_text(encoding="utf-8"))
     )
 
 

@@ -49,6 +49,13 @@ CHANGES = {
         "probe": "feed_ph",
         "points": [],
     },
+    # The feed probe calibration wizard: a session pauses the room's dosing, a commit changes what the
+    # controller reads from the feed probe.
+    "calibration_start": {"room_id": ROOM, "probe": "feed_ph"},
+    "calibration_capture": {"session_id": "s", "point": 0},
+    "calibration_commit": {"session_id": "s"},
+    "calibration_revert": {"room_id": ROOM, "probe": "feed_ph"},
+    "calibration_abandon": {"session_id": "s"},
     "dosing_save": {"room_id": ROOM, "expected_revision": 0, "pumps": [], "batch": {}},
     # A stop is the one dosing request anyone may make (test_an_ordinary_user_may_stop_dosing).
     "dosing_request": {"room_id": ROOM, "action": "dose", "pump": "balance", "ml": 5},
@@ -91,6 +98,7 @@ READS = {
     "overlay_get": {"room_id": ROOM},
     "stock_get": {"room_id": ROOM},
     "calibration_get": {"room_id": ROOM},
+    "calibration_status": {"session_id": "s"},
     "dosing_get": {"room_id": ROOM},
     "display_get": {"room_id": ROOM},
     "supply_get": {},

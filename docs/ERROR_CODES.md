@@ -89,6 +89,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-609](#cs-609) | Second controller for room | Warning | Notification |
 | [CS-610](#cs-610) | Engine Enabled not kill switch | Warning | Repairs card |
 | [CS-611](#cs-611) | Settings above zone limit | Warning | Repairs card |
+| [CS-612](#cs-612) | Feed probe calibration due | Warning | Repairs card |
 | [CS-701](#cs-701) | No water at the zone | Warning | Notification |
 | [CS-702](#cs-702) | Unusual water for each plant | Information | Notification |
 | [CS-703](#cs-703) | Overnight probe fault suspected | Warning | Notification |
@@ -1354,6 +1355,26 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 - If the zone size is wrong, correct it in Rooms and setup, and the limit changes with it.
 - If the size is correct, decrease the setting to its limit at the next change. The card clears when each setting is inside its limit.
+
+<a id="cs-612"></a>
+
+### CS-612: Feed probe calibration due
+
+*Warning · Repairs card*
+
+**What it means.** The last calibration of the feed pH or feed EC probe of the room is 30 days old or older. A probe drifts over time, and the controller trusts its reading for the feed checks and the pH correction.
+
+**Effect on water.** Water continues. The controller uses the calibration that is applied, or the raw reading if none is applied. A probe that drifted can make the feed checks and the pH correction wrong.
+
+**Probable causes**
+
+- Nobody calibrated the probe in the last 30 days.
+- A calibration was not finished, so the last calibration is still the old one.
+
+**What to do**
+
+- Calibrate the probe in two reference solutions: open Crop Steering → Equipment → Tank and feed and press Calibrate.
+- The card clears when each probe has a calibration less than 30 days old. A calibration from before this release is never due.
 
 ## AI assistant (CS-7xx)
 

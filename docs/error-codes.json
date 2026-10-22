@@ -1060,6 +1060,22 @@
       ]
     },
     {
+      "code": "CS-612",
+      "title": "Feed probe calibration due",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "The last calibration of the feed pH or feed EC probe of the room is 30 days old or older. A probe drifts over time, and the controller trusts its reading for the feed checks and the pH correction.",
+      "watering": "Water continues. The controller uses the calibration that is applied, or the raw reading if none is applied. A probe that drifted can make the feed checks and the pH correction wrong.",
+      "causes": [
+        "Nobody calibrated the probe in the last 30 days.",
+        "A calibration was not finished, so the last calibration is still the old one."
+      ],
+      "fixes": [
+        "Calibrate the probe in two reference solutions: open Crop Steering → Equipment → Tank and feed and press Calibrate.",
+        "The card clears when each probe has a calibration less than 30 days old. A calibration from before this release is never due."
+      ]
+    },
+    {
       "code": "CS-701",
       "title": "No water at the zone",
       "source": "notification",

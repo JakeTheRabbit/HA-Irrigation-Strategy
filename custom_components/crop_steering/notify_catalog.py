@@ -48,10 +48,11 @@ KINDS = (
         "detail": "Alerts about a VWC or EC reading that the controller cannot use, "
         "a probe set aside for its unit, and a zone without a probe. Also a zone "
         "whose probes disagree or whose primary probe is offline, and a zone that "
-        "steers on bulk EC. Also a probe that the AI assistant doubts or sets aside.",
+        "steers on bulk EC. Also a probe that the AI assistant doubts or sets aside, "
+        "and a feed probe due for calibration.",
         "codes": _codes(
-            "CS-101 CS-102 CS-103 CS-104 CS-502 CS-503 CS-504 CS-505 CS-603 CS-604 CS-703 "
-            "CS-704"
+            "CS-101 CS-102 CS-103 CS-104 CS-502 CS-503 CS-504 CS-505 CS-603 CS-604 CS-612 "
+            "CS-703 CS-704"
         ),
         "events": (),
     },
@@ -153,6 +154,7 @@ REPAIRS = {
     "stock_low": "CS-608",
     "engine_switch_not_gate": "CS-610",
     "outside_zone_bounds": "CS-611",
+    "calibration_due": "CS-612",
 }
 
 

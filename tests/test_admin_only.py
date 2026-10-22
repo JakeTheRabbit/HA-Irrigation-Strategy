@@ -45,6 +45,7 @@ READ_ONLY = {
     "runs_get",
     "stock_get",
     "calibration_get",
+    "calibration_status",
     "dosing_get",
     "notify_get",
     "whats_new_get",
@@ -81,6 +82,13 @@ CHANGES = {
         "probe": "feed_ph",
         "points": [],
     },
+    # The feed probe calibration wizard: a session pauses the room's dosing, a commit changes what the
+    # controller reads from the feed probe.
+    "calibration_start": {"room_id": ROOM, "probe": "feed_ph"},
+    "calibration_capture": {"session_id": "s", "point": 0},
+    "calibration_commit": {"session_id": "s"},
+    "calibration_revert": {"room_id": ROOM, "probe": "feed_ph"},
+    "calibration_abandon": {"session_id": "s"},
     # A dose or a batch is what makes the controller app run a pump: never for a
     # non-administrator. A stop only switches things off (STOP, below).
     "dosing_save": {"room_id": ROOM, "expected_revision": 0, "pumps": [], "batch": {}},
@@ -158,6 +166,15 @@ def rig(monkeypatch):
         async_init=AsyncMock(),
         response=MagicMock(return_value={"records": []}),
         record=AsyncMock(return_value={"records": []}),
+        listen=MagicMock(return_value=None),
+        sessions={"s": {}},
+        expire=MagicMock(),
+        status=MagicMock(return_value={"stable": False}),
+        start=AsyncMock(return_value={}),
+        capture=AsyncMock(return_value={}),
+        commit=AsyncMock(return_value={}),
+        revert=AsyncMock(return_value={}),
+        abandon=MagicMock(return_value={"abandoned": True}),
     )
     monkeypatch.setattr(calibration, "CalibrationStore", lambda hass, entry: probes)
     dosing = SimpleNamespace(
@@ -233,6 +250,10 @@ def rig(monkeypatch):
             tanks.mutate,
             tanks.draw,
             probes.record,
+            probes.start,
+            probes.capture,
+            probes.commit,
+            probes.revert,
             dosing.save,
             dosing.request,
             notifier.save,
@@ -247,6 +268,7 @@ def rig(monkeypatch):
             len(hass.bus.events),
             len(hass.services.calls),
             setup["read_setup"].call_count,
+            probes.abandon.call_count,
             *(fake.await_count for fake in writes),
         )
 
@@ -364,5 +386,5 @@ def test_a_user_home_assistant_does_not_know_may_not_stop_dosing(rig):
 @pytest.mark.parametrize("name", sorted(READ_ONLY))
 def test_reading_stays_open_to_every_login(rig, name, user):
     before = rig.effects()
-    rig.call(name, user, {"room_id": ROOM})
+    rig.call(name, user, {"room_id": ROOM, "session_id": "s"})
     assert rig.effects() == before
