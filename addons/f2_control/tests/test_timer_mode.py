@@ -389,3 +389,108 @@ def test_projection_is_written_after_the_last_pump_closes(rig, engine, monkeypat
         order.append(("set", e)), real_set(e, s, a, timeout))[1])
     _pass(c)
     assert order.index(("set", PROJECTION)) > order.index(("switch", "turn_off", V1))
+
+
+# ------------------------------------------------------------------------------- review round 1 (Task 15 rulings)
+@pytest.mark.parametrize("kept", [RESCUE, FLOOR])
+def test_a_rescue_or_floor_wins_over_a_due_timer_slot_and_the_slot_follows(rig, engine, kept):
+    c, fake = rig
+    fake.set_state(_mode(1), "timer")
+    _timers(fake)
+    _pass_at(c, fake, 12, 0)
+    engine[1] = kept
+    _pass_at(c, fake, 12, 30)  # the 12:30 slot is due and so is the safety shot: the safety shot goes first
+    first, = _started(c)
+    assert first["source"]["actor"] == "engine" and first["data"]["kind"] == kept.kind
+    engine[1] = IDLE
+    _pass_at(c, fake, 12, 31)  # the slot was kept owed, not dropped
+    second = _started(c)[1]
+    assert second["source"]["actor"] == "timer" and second["source"]["program_id"] == "P1"
+    _pass_at(c, fake, 12, 32)  # and it is owed once only
+    assert len(_started(c)) == 2
+
+
+def test_an_owed_slot_is_replaced_by_a_later_one_never_given_twice(rig, engine):
+    c, fake = rig
+    fake.set_state(_mode(1), "timer")
+    _timers(fake)
+    _pass_at(c, fake, 12, 0)
+    engine[1] = RESCUE
+    _pass_at(c, fake, 12, 30)
+    _pass_at(c, fake, 13, 0)  # still a rescue: the 13:00 slot replaces the owed 12:30 one
+    engine[1] = IDLE
+    _pass_at(c, fake, 13, 1)
+    _pass_at(c, fake, 13, 2)
+    assert [e["source"]["actor"] for e in _started(c)] == ["engine", "engine", "timer"]
+
+
+def test_an_owed_slot_is_dropped_when_the_zone_leaves_timer_mode(rig, engine):
+    c, fake = rig
+    fake.set_state(_mode(1), "timer")
+    _timers(fake)
+    _pass_at(c, fake, 12, 0)
+    engine[1] = RESCUE
+    _pass_at(c, fake, 12, 30)
+    engine[1] = IDLE
+    fake.set_state(_mode(1), "steering")
+    _pass_at(c, fake, 12, 31)
+    fake.set_state(_mode(1), "timer")
+    _pass_at(c, fake, 12, 32)
+    assert [e["source"]["actor"] for e in _started(c)] == ["engine"]
+
+
+def test_a_skip_names_who_asked_for_it(rig, engine):
+    c, fake = rig
+    fake.set_state(_mode(1), "timer")
+    slot = _slot(12, 30)
+    _timers(fake, skips=[{"zone": 1, "at": slot.isoformat(), "until": (slot + timedelta(minutes=15)).isoformat(),
+                          "by": {"actor": "manual", "user_id": "ben"}}])
+    _pass_at(c, fake, 12, 0)
+    _pass_at(c, fake, 12, 30)
+    refused, = _refused(c)
+    assert refused["data"]["reason"] == "skipped by ben"
+
+
+def test_a_timer_shot_is_not_a_learner_input(rig, engine):
+    c, fake = rig
+    fake.set_state(_mode(1), "timer")
+    _timers(fake)
+    st = c.rooms[0].state[1]
+    _pass_at(c, fake, 12, 0)
+    st["last_vwc"] = 40.0
+    st["learn"]["pending"] = {"t": 0.0, "pre": 40.0, "pct": 2.0, "ramp": False}  # an engine shot settling
+    _pass_at(c, fake, 12, 30)
+    assert _started(c)[0]["source"]["actor"] == "timer"
+    assert st["learn"]["pending"] is None  # its reading now holds timer water: not that shot's to learn from
+    engine[1] = RESCUE
+    st["last_vwc"] = 40.0
+    _pass_at(c, fake, 12, 35)
+    assert st["learn"]["pending"] is not None  # an engine shot still is
+
+
+def test_a_test_shot_on_an_off_zone_runs_as_the_operators(rig, engine):
+    c, fake = rig
+    fake.set_state(_mode(1), "off")
+    button = "button.crop_steering_zone_1_test_shot"
+    fake.set_state(button, "2026-10-22T11:00:00+00:00")  # the first state seen is a starting point, not a press
+    _pass_at(c, fake, 12, 0)
+    fake.set_state(button, _Wall.current.astimezone().isoformat())
+    _pass_at(c, fake, 12, 0)
+    assert _valves(fake) == [("turn_on", V1), ("turn_off", V1)]
+    assert _started(c)[0]["source"]["actor"] == "manual"
+
+
+def test_the_projection_follows_the_nz_spring_forward(rig, engine, monkeypatch):
+    """A daily 08:00 slot the day the clocks go forward (27 Sep 2026, 02:00 NZST -> 03:00 NZDT) is 08:00 NZDT:
+    19:00 UTC, not the 20:00 UTC a fixed +12:00 gives."""
+    monkeypatch.setenv("TZ", "Pacific/Auckland")
+    c, fake = rig
+    fake.set_state(_mode(1), "timer")
+    _timers(fake, programs=[{**PROGRAM, "interval_min": 1440.0, "sync_time": "08:00"}])
+    _Wall.current = _Wall(2026, 9, 26, 12, 0)  # NZST, +12:00
+    _fresh(fake)
+    _pass(c)
+    timer = [i for i in _projection(fake) if i["source"] == "timer"]
+    assert [controller._aware(i["at"]) for i in timer] == [
+        controller.datetime(2026, 9, 26, 19, 0, tzinfo=timezone.utc)]
+    assert timer[0]["at"].endswith("+00:00")  # each slot in UTC

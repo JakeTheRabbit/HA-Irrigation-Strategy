@@ -269,7 +269,10 @@ def test_skip_is_published_and_expires_after_24h(journal):
         "revision": 1,
     }
     assert backing.value["skips"][0]["by"] == {"actor": "manual", "user_id": "u1"}
-    assert hass.states.get(room.sensor).attributes["skips"] == [out["skip"]]
+    # who asked is published too: the controller's intent.refused says "skipped by <who>"
+    assert hass.states.get(room.sensor).attributes["skips"] == [
+        {**out["skip"], "by": {"actor": "manual", "user_id": "u1"}}
+    ]
     ((_, kind, kw),) = journal
     assert kind == "config.changed"
     assert (kw["data"]["store"], kw["data"]["section"]) == ("timers", "skip")

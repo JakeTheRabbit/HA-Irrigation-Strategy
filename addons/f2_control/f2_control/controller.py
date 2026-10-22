@@ -1146,6 +1146,18 @@ def _timer_reason(program, seconds):
     return reason
 
 
+def _wall_clock(now):
+    """`now` on the controller's own wall clock, aware: in its zone (TZ, as the Supervisor sets the container's) when
+    zoneinfo knows it, so the timer slots after a DST change get that day's offset; else in now's fixed offset."""
+    try:
+        from zoneinfo import ZoneInfo
+
+        zone = ZoneInfo(os.environ["TZ"])
+    except Exception:
+        return now.astimezone()
+    return now.astimezone(zone) if now.tzinfo is not None else now.replace(tzinfo=zone)
+
+
 def _skipped_by(skip):
     """intent.refused's words for a skip (timer_skip): who asked for it, when the integration says."""
     by = skip.get("by")
@@ -5127,9 +5139,11 @@ class Controller:
         }
         return round(sum(item["litres"] for item in history), 2), attrs
 
-    def _advance_shot_counters(self, room, zone, size_pct, *, delivered_l=None, steering=True):
+    def _advance_shot_counters(self, room, zone, size_pct, *, delivered_l=None, steering=True, learn=True):
         """A delivered shot's water, counted. A test shot (steering False) is water like any other, but
-        not one of the day's shots: it is not a ramp shot, and nothing learns from it."""
+        not one of the day's shots: it is not a ramp shot, and nothing learns from it. A timer shot (learn False) is
+        one of the day's shots, but the Auto setpoints learner never reads it: a timer's water must not steer the
+        engine's setpoints, and an engine shot still settling cannot be judged once timer water is on top of it."""
         st = room.state[zone]
         now = datetime.now()
         self._water_usage(room, zone, now)
@@ -5143,7 +5157,10 @@ class Controller:
         if steering:
             if not isinstance(st.get("learn"), dict):
                 st["learn"] = auto_setpoints.fresh()
-            auto_setpoints.shot(st["learn"], st.get("phase"), size_pct, st.get("last_vwc"), now.timestamp())
+            if learn:
+                auto_setpoints.shot(st["learn"], st.get("phase"), size_pct, st.get("last_vwc"), now.timestamp())
+            else:
+                st["learn"]["pending"] = None
             first = st.get("phase") == "P1" and st["shots"] == 0
             try:  # the day's first shot closes the night: the VWC it started from is what the zone landed on
                 record = zone_history.shot(st, vwc_before=st.get("last_vwc"), now=now, day=day, first=first)
@@ -5840,6 +5857,7 @@ class Controller:
         # What _act_zone kept of the decision for shot.started (its snapshot and the shot's kind), taken now so
         # it never outlives this call.
         intent = room.__dict__.get("_shot_intent", {}).pop(zone, None) or {}
+        learn = intent.get("kind") != "timer"  # a timer's water is never the Auto setpoints learner's input
         turn = room.__dict__.get("_turn", {}).pop(zone, None)  # its turn at the pump (_take_turn), likewise
 
         # Before anything opens: guards.PREOPEN, in order. Passing its last check marks the shot in flight (_busy).
@@ -5874,7 +5892,7 @@ class Controller:
                 counted = True
                 run = (time.monotonic() - valve_started) / duration_s if duration_s > 0 else 1.0
                 self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
-                                            steering=steering)
+                                            steering=steering, learn=learn)
 
         pending = [None]  # the switch sent ON and not yet read back ON
 
@@ -6072,7 +6090,7 @@ class Controller:
                 run = elapsed / duration_s if duration_s > 0 else 1.0
                 counted = True
                 self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
-                                            steering=steering)
+                                            steering=steering, learn=learn)
                 journaled["end"], journaled["elapsed"] = ("aborted", "CS-307"), elapsed
                 return
             # CLOSE sequence. A failed close (e.g. HA went unreachable mid-shot) leaves the valve
@@ -6116,7 +6134,7 @@ class Controller:
             self._advance_shot_counters(
                 room, zone, delivered_pct,
                 delivered_l=nominal_l * (elapsed / duration_s if duration_s > 0 else 1.0),
-                steering=steering,
+                steering=steering, learn=learn,
             )
             journaled["elapsed"] = elapsed
             journaled["end"] = ("aborted", None if aborted[0] == "refused" else "CS-305") if aborted else "completed"
@@ -6139,7 +6157,7 @@ class Controller:
                     counted = True
                     run = elapsed / duration_s if duration_s > 0 else 1.0
                     self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
-                                                steering=steering)
+                                                steering=steering, learn=learn)
                 if stopped.by[0] != "external":  # _close_cut_short raised its CS-307
                     stopped_early(stopped.by, elapsed)
             except Exception as e:
@@ -7341,26 +7359,32 @@ class Controller:
         - off: no shot at all, the rescues included;
         - timer: of the engine's shots only TIMER_KEEPS, plus its program's latest slot in (since, now] (`since` is
           the room's last decided pass, kept in memory: the first pass after a restart only starts the clock, so no
-          missed slot is owed); a slot takes the zone's turn even from a kept shot, which the next pass decides again;
+          missed slot is owed). A rescue or floor shot due in the same pass goes first, never delayed: the slot stays
+          owed (room._timer_owed, in memory) until it is the zone's decision, a later slot replaces it, or the zone
+          leaves timer mode;
         - steering: as always.
         A skip (timers_config.skips, compared as UTC instants) drops a timer slot at its `at`, or the zone's first
         engine shot outside TIMER_KEEPS in [at, until), once. Both are journaled intent.refused (guard skipped).
         The slots are decisions like any other: every guard holds them (PASS, SIZED, QUEUE, PREOPEN). A test shot a
-        person asks for is decided after this, untouched. Nothing here writes to Home Assistant."""
+        person asks for is decided after this, untouched, even on an off zone: it is the operator's own act (journaled
+        actor manual), and the kill switch and every other guard still hold it. Nothing here writes to Home
+        Assistant."""
         modes = self._irrigation_modes(room)
         state, attrs, _ = ha_get(TIMERS_SENSOR.format(room.prefix))
         readable = state not in (None, "", "unknown", "unavailable") and isinstance(attrs, dict)
         programs = [p for p in attrs.get("programs") or [] if isinstance(p, dict)] if readable else []
         skips = [s for s in attrs.get("skips") or [] if isinstance(s, dict)] if readable else []
         room._timers = {"modes": modes, "programs": programs, "published": state is not None}
-        until = now.astimezone()
+        until = _wall_clock(now)
         self._timer_last_pass[room.slug] = until
         tick = timedelta(microseconds=1)  # project() is [start, end): (since, until] is [since + tick, until + tick)
-        due = {}
+        owed = room.__dict__.setdefault("_timer_owed", {})  # zone -> (slot, program) not yet the zone's decision
+        for zone in [z for z in owed if modes.get(z) != "timer"]:
+            del owed[zone]
         for program in programs if since is not None else ():
             for slot in self._project(room, program, since + tick, until + tick):
                 if modes.get(slot.zone) == "timer":
-                    due[slot.zone] = (slot, program)  # in time order: the latest slot is the one owed
+                    owed[slot.zone] = (slot, program)  # in time order: the latest slot is the one owed
         used = room.__dict__.setdefault("_skips_used", set())  # (zone, at) of the skips an engine shot used up
         now_utc = until.astimezone(timezone.utc)
         used.difference_update([k for k in used if k[1] < now_utc - timedelta(days=1)])  # long past their until
@@ -7395,8 +7419,8 @@ class Controller:
                     used.add(key)
                     refuse(zone, skip, "engine", reason)
                     decisions[zone] = (False, 0.0, Reason(f"SKIPPED: {_skipped_by(skip)}", "skipped"))
-            if zone in due:
-                slot, program = due[zone]
+            if zone in owed and not fire:  # a rescue or floor shot firing now goes first; the slot waits a pass
+                slot, program = owed.pop(zone)
                 timed = _timer_reason(program, slot.duration_s)
                 skip, _key = skip_of(zone, lambda at, end: at == slot.at.astimezone(timezone.utc))
                 if skip is not None:
@@ -7417,19 +7441,23 @@ class Controller:
         if not timers or not timers["published"]:
             return
         try:
-            start, intents = now.astimezone(), []
+            # the slots on the zone-aware wall clock (a DST change inside the 24 h moves the later ones), each in UTC
+            start, intents = _wall_clock(now), []
+            end = (start.astimezone(timezone.utc) + timedelta(hours=PROJECTION_H)).astimezone(start.tzinfo)
             for program in timers["programs"]:
-                for slot in self._project(room, program, start, start + timedelta(hours=PROJECTION_H)):
+                for slot in self._project(room, program, start, end):
                     if timers["modes"].get(slot.zone) == "timer":
-                        intents.append((slot.at, {
-                            "id": derived_id(slot.at, f"{room.prefix}:{slot.zone}:timer"), "zone": slot.zone,
-                            "at": slot.at.isoformat(), "duration_s": slot.duration_s, "source": "timer",
+                        at = slot.at.astimezone(timezone.utc)
+                        intents.append((at, {
+                            "id": derived_id(at, f"{room.prefix}:{slot.zone}:timer"), "zone": slot.zone,
+                            "at": at.isoformat(), "duration_s": slot.duration_s, "source": "timer",
                             "program_id": slot.program_id, "expected": False}))
             for zone, (conditions, at) in (getattr(room, "_waiting", None) or {}).items():
                 waits = [c["in_min"] for c in conditions if c.get("shot") and c.get("in_min") is not None]
                 if timers["modes"].get(zone) != "steering" or not waits:
                     continue
-                when = (at.astimezone() + timedelta(minutes=min(waits))).replace(second=0, microsecond=0)
+                when = (_wall_clock(at).astimezone(timezone.utc)
+                        + timedelta(minutes=min(waits))).replace(second=0, microsecond=0)
                 intents.append((when, {
                     "id": derived_id(when, f"{room.prefix}:{zone}:engine"), "zone": zone, "at": when.isoformat(),
                     "duration_s": None, "source": "engine", "expected": True}))

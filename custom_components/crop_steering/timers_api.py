@@ -267,7 +267,7 @@ class TimerPrograms:
                     deepcopy(p) for p in self.document["programs"] if _shown(p)
                 ],
                 "skips": [
-                    {key: s[key] for key in ("zone", "at", "until")}
+                    {key: s.get(key) for key in ("zone", "at", "until", "by")}
                     for s in self.skips_in_force()
                 ],
             },
