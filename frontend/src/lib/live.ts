@@ -11,6 +11,8 @@ export interface LiveConnection {
   subscribeMessage<T>(
     callback: (message: T) => void,
     message: Record<string, unknown>,
+    /** `resubscribe: false`: not re-sent after a reconnect (the caller resubscribes on `ready`). */
+    options?: { resubscribe?: boolean },
   ): Promise<() => unknown>;
   sendMessagePromise?<T>(message: Record<string, unknown>): Promise<T>;
   addEventListener?(event: "ready", callback: () => void): void;

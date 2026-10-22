@@ -447,6 +447,52 @@ describe("inside Home Assistant", () => {
     expect(home.fullFetches()).toBe(2);
     store.stop();
   });
+  it("subscribes the crop_steering event feed, and ends it on stop, disconnect and connect", async () => {
+    vi.useFakeTimers();
+    const home = homeAssistant();
+    const feeds: { message: Record<string, unknown>; options: unknown; unsubscribe: ReturnType<typeof vi.fn>; push: (event: unknown) => void }[] = [];
+    const subscribe = home.connection.subscribeMessage.getMockImplementation()!;
+    home.connection.subscribeMessage.mockImplementation(async (callback, message, ...rest: unknown[]) => {
+      if (message.type !== "crop_steering/subscribe") return subscribe(callback, message);
+      const unsubscribe = vi.fn();
+      feeds.push({ message, options: rest[0], unsubscribe, push: callback as (event: unknown) => void });
+      return unsubscribe;
+    });
+    const run = async (end: (store: ControllerStore) => unknown) => {
+      const store = new ControllerStore(false);
+      store.start();
+      await vi.advanceTimersByTimeAsync(0);
+      const feed = feeds.at(-1)!;
+      return { store, feed, end: async () => { await end(store); await vi.advanceTimersByTimeAsync(0); } };
+    };
+
+    const first = await run((store) => store.stop());
+    const rooms = first.store.getSnapshot().rooms.map((room) => room.id).sort();
+    expect(feeds).toHaveLength(1);
+    expect(first.feed.message).toEqual({ type: "crop_steering/subscribe", rooms });
+    expect(first.feed.options).toEqual({ resubscribe: false });
+    const event = { v: 1, id: "01JEVENT", ts: new Date().toISOString(), room_id: rooms[0], zone: 1, kind: "shot.completed",
+      outcome: "ok", code: null, source: { actor: "engine" }, data: {} };
+    first.feed.push(event);
+    expect(first.store.getSnapshot().recentEvents).toEqual([event]);
+    // A write's refresh keeps the same feed.
+    await first.store.refresh();
+    expect(feeds).toHaveLength(1);
+    await first.end();
+    expect(first.feed.unsubscribe).toHaveBeenCalledTimes(1);
+
+    const second = await run((store) => store.disconnect());
+    await second.end();
+    expect(second.feed.unsubscribe).toHaveBeenCalledTimes(1);
+    second.store.stop();
+
+    const third = await run((store) => store.connect("http://other.test", "token"));
+    third.feed.push(event);
+    await third.end();
+    expect(third.feed.unsubscribe).toHaveBeenCalledTimes(1);
+    expect(third.store.getSnapshot().recentEvents).toEqual([]);
+    third.store.stop();
+  });
   const DECISION = "sensor.crop_steering_current_decision";
   const VALVE = "switch.demo_valve_1";
   it("loads a grow day once over the websocket, attributes only for the decision", async () => {

@@ -130,9 +130,11 @@ export class ControllerStore {
   private operatorDemo?: OperatorDemo;
   private runDocuments = new Map<string, { generation: number; document: RunsDocument }>();
   private historyAborters = new Set<AbortController>();
-  /** The live event feed (Controller.recentEvents), over the rooms in `feedRooms`. */
+  /** The live event feed (Controller.recentEvents), over the rooms in `feedRooms`; `feedSince`
+   * keeps each room's last event time when the room set changes. */
   private stopFeed?: () => void;
   private feedRooms = "";
+  private feedSince = new Map<string, string>();
   private recentEvents: readonly CsEvent[] = [];
   constructor(
     demo = typeof window !== "undefined" && isDemoLocation(window.location),
@@ -380,7 +382,7 @@ export class ControllerStore {
   /** Every room's live Journal events into `recentEvents`: one feed per connection and set of
    * rooms. A feed that stopped itself (an older integration) stays stopped until they change. */
   private startFeed() {
-    const rooms = discoverRooms(this.states).map((room) => room.id);
+    const rooms = discoverRooms(this.states).map((room) => room.id).sort();
     if (!rooms.length || (this.stopFeed && rooms.join() === this.feedRooms)) return;
     this.endFeed();
     this.feedRooms = rooms.join();
@@ -400,6 +402,9 @@ export class ControllerStore {
         this.publish();
       },
       visible: () => typeof document === "undefined" || !document.hidden,
+      since: this.feedSince,
+      // The demo's Journal is generated up to now: show it from the start.
+      ...(this.demo ? { start: new Date(0).toISOString() } : {}),
     });
   }
   private endFeed() {
@@ -463,6 +468,7 @@ export class ControllerStore {
     this.unsubscribe();
     this.endFeed();
     this.recentEvents = [];
+    this.feedSince.clear();
     this.watched.clear();
     this.live = liveConnection(session);
     this.states = {};

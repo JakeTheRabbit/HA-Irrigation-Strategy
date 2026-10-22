@@ -10,19 +10,37 @@ const ev = (n: number, room = "room:f2_", ts = new Date(Date.parse(START) + n * 
   outcome: "ok", code: null, source: { actor: "engine" }, data: {},
 });
 
-/** A Home Assistant websocket whose `crop_steering/subscribe` answers with `answer()`. */
+/** A Home Assistant websocket whose `crop_steering/subscribe` answers with `answer()`. Like
+ * home-assistant-js-websocket, a reconnect drops every server-side listener and re-registers those
+ * subscribed without `resubscribe: false` before it fires `ready`. */
 function fakeConnection(answer: () => Promise<() => unknown>) {
   const ready = new Set<() => void>();
-  const sent: { callback: (event: CsEvent) => void; message: Record<string, unknown> }[] = [];
+  const sent: { callback: (event: CsEvent) => void; message: Record<string, unknown>; options?: { resubscribe?: boolean } }[] = [];
+  const active = new Set<number>();
+  const resubscribed = new Set<number>();
+  let next = 0;
   const connection: LiveConnection = {
-    subscribeMessage: vi.fn((callback, message) => {
-      sent.push({ callback: callback as (event: CsEvent) => void, message });
-      return answer();
+    subscribeMessage: vi.fn((callback, message, options?: { resubscribe?: boolean }) => {
+      sent.push({ callback: callback as (event: CsEvent) => void, message, options });
+      return answer().then((unsubscribe) => {
+        const id = next++;
+        active.add(id);
+        if (options?.resubscribe !== false) resubscribed.add(id);
+        return () => {
+          active.delete(id);
+          resubscribed.delete(id);
+          return unsubscribe();
+        };
+      });
     }) as LiveConnection["subscribeMessage"],
     addEventListener: (_event, callback) => ready.add(callback),
     removeEventListener: (_event, callback) => ready.delete(callback),
   };
-  return { connection, sent, reconnect: () => ready.forEach((callback) => callback()), ready };
+  const reconnect = () => {
+    for (const id of active) if (!resubscribed.has(id)) active.delete(id);
+    ready.forEach((callback) => callback());
+  };
+  return { connection, sent, reconnect, ready, active };
 }
 const refuse = (code: string) => () => Promise.reject({ code, message: code });
 
@@ -46,8 +64,10 @@ describe("startEventFeed", () => {
     expect(live.sent.map((s) => s.message)).toEqual([{ type: "crop_steering/subscribe", rooms: ["room:f2_", "room:f1_"] }]);
     live.sent[0].callback(ev(1));
     expect(onEvents).toHaveBeenCalledWith([ev(1)]);
+    // One catch-up read per room once subscribed, then none.
+    expect(poll.mock.calls).toEqual([["room:f2_", START], ["room:f1_", START]]);
     await vi.advanceTimersByTimeAsync(90_000);
-    expect(poll).not.toHaveBeenCalled();
+    expect(poll).toHaveBeenCalledTimes(2);
     stop();
     await vi.advanceTimersByTimeAsync(0);
     expect(unsubscribe).toHaveBeenCalledTimes(1);
@@ -56,11 +76,12 @@ describe("startEventFeed", () => {
 
     // An older integration (3.17) has no subscribe command: poll every 30 s, never resubscribe.
     const old = fakeConnection(refuse("unknown_command"));
-    const stopOld = startEventFeed({ connection: old.connection, rooms: ["room:f2_"], poll, onEvents, visible: () => true });
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(poll).toHaveBeenCalledTimes(1);
-    await vi.advanceTimersByTimeAsync(30_000);
-    expect(poll).toHaveBeenCalledTimes(2);
+    const oldPoll = vi.fn().mockResolvedValue([]);
+    const stopOld = startEventFeed({ connection: old.connection, rooms: ["room:f2_"], poll: oldPoll, onEvents, visible: () => true });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(oldPoll).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(oldPoll).toHaveBeenCalledTimes(2);
     expect(old.sent).toHaveLength(1);
     stopOld();
   });
@@ -71,13 +92,14 @@ describe("startEventFeed", () => {
     const poll = vi.fn().mockResolvedValue([]);
     const stop = startEventFeed({ connection: live.connection, rooms: ["room:f2_"], poll, onEvents: vi.fn(), visible: () => true });
     await vi.advanceTimersByTimeAsync(0);
+    expect(poll).not.toHaveBeenCalled();
     answer = () => Promise.resolve(vi.fn());
     await vi.advanceTimersByTimeAsync(30_000);
-    expect(poll).toHaveBeenCalledTimes(1);
+    // The tick's read, then the catch-up once the retry subscribed.
+    expect(poll).toHaveBeenCalledTimes(2);
     expect(live.sent).toHaveLength(2);
-    // Subscribed: the poll stops.
     await vi.advanceTimersByTimeAsync(90_000);
-    expect(poll).toHaveBeenCalledTimes(1);
+    expect(poll).toHaveBeenCalledTimes(2);
     expect(live.sent).toHaveLength(2);
     stop();
   });
@@ -93,31 +115,56 @@ describe("startEventFeed", () => {
     expect(live.sent).toHaveLength(1);
   });
 
-  test("resubscribes once on reconnect and ends the old subscription", async () => {
+  test("leaves exactly one subscription after a reconnect, and catches up", async () => {
     const unsubscribes = [vi.fn(), vi.fn()];
     let n = 0;
     const live = fakeConnection(() => Promise.resolve(unsubscribes[n++]));
     const onEvents = vi.fn();
-    const stop = startEventFeed({ connection: live.connection, rooms: ["room:f2_"], poll: vi.fn(), onEvents, visible: () => true });
+    const poll = vi.fn().mockResolvedValue([]);
+    const stop = startEventFeed({ connection: live.connection, rooms: ["room:f2_"], poll, onEvents, visible: () => true });
     await vi.advanceTimersByTimeAsync(0);
+    expect(live.sent[0].options).toEqual({ resubscribe: false });
+    expect(poll).toHaveBeenCalledTimes(1);
+    poll.mockResolvedValueOnce([ev(3)]);
     live.reconnect();
     await vi.advanceTimersByTimeAsync(0);
     expect(live.sent).toHaveLength(2);
-    expect(unsubscribes[0]).toHaveBeenCalledTimes(1);
+    expect(live.active.size).toBe(1);
     expect(unsubscribes[1]).not.toHaveBeenCalled();
+    // The catch-up reads what the socket missed while it was down.
+    expect(poll).toHaveBeenCalledTimes(2);
     live.sent[0].callback(ev(1));
     live.sent[1].callback(ev(2));
-    expect(onEvents.mock.calls).toEqual([[[ev(2)]]]);
+    expect(onEvents.mock.calls).toEqual([[[ev(3)]], [[ev(2)]]]);
     stop();
     await vi.advanceTimersByTimeAsync(0);
     expect(unsubscribes[1]).toHaveBeenCalledTimes(1);
+    expect(live.active.size).toBe(0);
     expect(live.ready.size).toBe(0);
+  });
+
+  test("a catch-up without journal_query keeps the subscription", async () => {
+    const unsubscribe = vi.fn();
+    const live = fakeConnection(() => Promise.resolve(unsubscribe));
+    const poll = vi.fn().mockRejectedValue(new JournalMissing());
+    const onEvents = vi.fn();
+    const stop = startEventFeed({ connection: live.connection, rooms: ["room:f2_"], poll, onEvents, visible: () => true });
+    await vi.advanceTimersByTimeAsync(0);
+    live.reconnect();
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(poll).toHaveBeenCalledTimes(1);
+    expect(unsubscribe).toHaveBeenCalledTimes(1); // the pre-reconnect one only
+    live.sent[1].callback(ev(1));
+    expect(onEvents).toHaveBeenCalledWith([ev(1)]);
+    stop();
   });
 
   test("polls each room with room_id and its own last ts", async () => {
     const poll = vi.fn(async (room: string, _since: string) => (room === "room:f2_" && poll.mock.calls.length === 1 ? [ev(5)] : []));
     const onEvents = vi.fn();
     const stop = startEventFeed({ connection: null, rooms: ["room:f2_", "room:f1_"], poll, onEvents, visible: () => true });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(poll).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(30_000);
     expect(poll.mock.calls).toEqual([["room:f2_", START], ["room:f1_", START]]);
     expect(onEvents).toHaveBeenCalledWith([ev(5)]);
@@ -126,6 +173,27 @@ describe("startEventFeed", () => {
     stop();
     await vi.advanceTimersByTimeAsync(60_000);
     expect(poll).toHaveBeenCalledTimes(4);
+  });
+
+  test("carries each room's since over to the next feed, and starts others at start", async () => {
+    const since = new Map<string, string>();
+    const poll = vi.fn().mockResolvedValueOnce([ev(5)]).mockResolvedValue([]);
+    const stop = startEventFeed({ connection: null, rooms: ["room:f2_"], poll, onEvents: vi.fn(), visible: () => true, since });
+    await vi.advanceTimersByTimeAsync(30_000);
+    stop();
+    const epoch = new Date(0).toISOString();
+    const again = startEventFeed({ connection: null, rooms: ["room:f1_", "room:f2_"], poll, onEvents: vi.fn(), visible: () => true, since, start: epoch });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(poll.mock.calls.slice(1)).toEqual([["room:f1_", epoch], ["room:f2_", ev(5).ts]]);
+    again();
+  });
+
+  test("a poll that never settles times out and frees the next tick", async () => {
+    const poll = vi.fn().mockReturnValueOnce(new Promise(() => {})).mockResolvedValue([]);
+    const stop = startEventFeed({ connection: null, rooms: ["room:f2_"], poll, onEvents: vi.fn(), visible: () => true });
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(poll).toHaveBeenCalledTimes(2);
+    stop();
   });
 
   test("does not poll while hidden and resumes when visible", async () => {
@@ -171,28 +239,42 @@ describe("the ring", () => {
     expect(ring[0].id).toBe(ev(21).id);
     expect(ring.at(-1)!.id).toBe(ev(320).id);
   });
+  test("a full ring is unchanged by an event older than all of it", () => {
+    const ring = mergeEvents([], Array.from({ length: 300 }, (_, i) => ev(i + 1)));
+    expect(mergeEvents(ring, [ev(0)])).toBe(ring);
+  });
   test("useCsEvents applies its filter", () => {
     const ring = [ev(1, "room:f2_"), ev(2, "room:f1_"), ev(3, "room:f2_")];
     expect(selectEvents(ring, (e) => e.room_id === "room:f2_").map((e) => e.id)).toEqual([ev(1).id, ev(3).id]);
   });
 });
 
-describe("controller feed", () => {
-  test("polls every room's journal and fills recentEvents until stopped", async () => {
+describe("controller feed (demo)", () => {
+  test("reads every room's journal from the epoch at once, then until stopped", async () => {
     const store = new ControllerStore(true, "?demo=1");
-    const rooms = store.getSnapshot().rooms.map((room) => room.id);
+    const rooms = store.getSnapshot().rooms.map((room) => room.id).sort();
     const operator = vi.spyOn(store, "operator").mockImplementation(async (_action, data) =>
       ({ api: 2, ok: true, data: { events: data?.room_id === rooms[0] ? [ev(1, rooms[0])] : [], cursor: null } }) as never);
     const stop = store.start();
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(0);
+    const epoch = new Date(0).toISOString();
     expect(operator.mock.calls.filter(([action]) => action === "journal_query").map(([, data]) => data)).toEqual(
-      rooms.map((room_id) => ({ room_id, since: START, limit: 500, api: 2 })),
+      rooms.map((room_id) => ({ room_id, since: epoch, limit: 500, api: 2 })),
     );
     expect(store.getSnapshot().recentEvents).toEqual([ev(1, rooms[0])]);
     stop();
     operator.mockClear();
     await vi.advanceTimersByTimeAsync(90_000);
     expect(operator.mock.calls.filter(([action]) => action === "journal_query")).toEqual([]);
+  });
+  test("shows the fixture's events under ?demo=1", async () => {
+    vi.useRealTimers();
+    const store = new ControllerStore(true, "?demo=1");
+    const stop = store.start();
+    await vi.waitFor(() => expect(store.getSnapshot().recentEvents.length).toBeGreaterThan(0));
+    const events = store.getSnapshot().recentEvents;
+    expect(Date.parse(events.at(-1)!.ts)).toBeLessThanOrEqual(Date.now());
+    stop();
   });
   test("an older integration stops the poll quietly", async () => {
     const store = new ControllerStore(true, "?demo=1&backend=3.17");
