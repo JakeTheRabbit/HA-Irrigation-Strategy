@@ -91,6 +91,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-610](#cs-610) | Engine Enabled not kill switch | Warning | Repairs card |
 | [CS-611](#cs-611) | Settings above zone limit | Warning | Repairs card |
 | [CS-612](#cs-612) | Feed probe calibration due | Warning | Repairs card |
+| [CS-614](#cs-614) | Retired entities in use | Warning | Repairs card |
 | [CS-615](#cs-615) | Probe offsets unreadable | Warning | Repairs card |
 | [CS-701](#cs-701) | No water at the zone | Warning | Notification |
 | [CS-702](#cs-702) | Unusual water for each plant | Information | Notification |
@@ -1403,6 +1404,25 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 - Calibrate the probe in two reference solutions: open Crop Steering → Equipment → Tank and feed and press Calibrate.
 - The card clears when each probe has a calibration less than 30 days old. A calibration from before this release is never due.
+
+<a id="cs-614"></a>
+
+### CS-614: Retired entities in use
+
+*Warning · Repairs card*
+
+**What it means.** An automation or a script uses an entity of Crop Steering that is retired. Nothing in Crop Steering reads it, and the controller never used it: the EC ratio, the adjusted re-water point, the high and low P2 EC ratios, the P3 EC targets and the irrigation phase select. The integration keeps these entities, hidden, so that the automation or the script still loads.
+
+**Effect on water.** Water continues as before. The retired entities do not change the shots.
+
+**Probable causes**
+
+- An automation or a script was made when these entities showed values of their own.
+
+**What to do**
+
+- Remove the entities that the card names from the automations and scripts that it names. The re-water point in force for each zone is on its zone page, under Waiting for.
+- The card clears at the next start of Home Assistant after no automation or script uses one.
 
 <a id="cs-615"></a>
 

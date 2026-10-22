@@ -31,7 +31,7 @@ except ImportError:  # pragma: no cover - enables non-HA unit tests
         BINARY_SENSOR = "binary_sensor"
 
 
-from .const import DOMAIN
+from .const import DEPRECATED, DOMAIN
 
 # Set up from the UI only: nothing is read from configuration.yaml. Saying so is what hassfest asks
 # of an integration with async_setup, and Home Assistant then tells anyone who writes a
@@ -242,7 +242,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         _LOGGER.warning("Ask why unavailable: %s", err)
 
     _remove_retired_entities(hass, entry)
-    _hide_retired_switches(hass, entry)
+    _hide_retired_entities(hass, entry)
 
     # Set up platforms
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -253,6 +253,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # A number platform that failed to set up leaves nothing to check, never a failed room.
     numbers = hass.data[DOMAIN].get("_numbers", {}).get(entry.entry_id, {})
     check_held_values(hass, entry, numbers.values())
+    # Once Home Assistant has started: name each deprecated entity an automation or script uses.
+    from .deprecation import async_setup_deprecation
+
+    async_setup_deprecation(hass, entry)
 
     # Set up services
     await async_setup_services(hass)
@@ -381,11 +385,15 @@ def _remove_retired_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
         _LOGGER.info("Removed %d retired entities from the registry", removed)
 
 
-# Switches kept only for controllers from 2.24.0 or before (see switch.py): hidden, not removed.
-_HIDDEN_RETIRED = {"system_enabled", "auto_irrigation_enabled"}
+# Hidden, not removed: switches kept only for controllers from 2.24.0 or before (see switch.py), and
+# the entities kept only for an old install's automations and scripts (deprecation.py).
+_HIDDEN_RETIRED = {
+    "switch": {"system_enabled", "auto_irrigation_enabled"},
+    **DEPRECATED,
+}
 
 
-def _hide_retired_switches(hass: HomeAssistant, entry: ConfigEntry) -> None:
+def _hide_retired_entities(hass: HomeAssistant, entry: ConfigEntry) -> None:
     """Hide this room's existing registry entries for _HIDDEN_RETIRED. A new install creates them
     hidden (entity_registry_visible_default); an older one registered them visible."""
     from homeassistant.helpers import entity_registry as er
@@ -394,11 +402,7 @@ def _hide_retired_switches(hass: HomeAssistant, entry: ConfigEntry) -> None:
     head = f"{DOMAIN}_{entry.entry_id}_"
     for item in er.async_entries_for_config_entry(registry, entry.entry_id):
         key = str(item.unique_id).removeprefix(head)
-        if (
-            item.domain == "switch"
-            and key in _HIDDEN_RETIRED
-            and item.hidden_by is None
-        ):
+        if key in _HIDDEN_RETIRED.get(item.domain, ()) and item.hidden_by is None:
             registry.async_update_entity(
                 item.entity_id, hidden_by=er.RegistryEntryHider.INTEGRATION
             )

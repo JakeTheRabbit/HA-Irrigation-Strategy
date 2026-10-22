@@ -66,6 +66,10 @@ RESERVED = {
     "CS-610": ("fix/one-kill-switch-rule", "a room switch that does not stop water"),
     "CS-611": ("feat/caps-scale-with-zone", "a setting held above its zone's limit"),
     "CS-612": ("feat/parity-system", "a feed probe calibration due"),
+    "CS-614": (
+        "fix/one-source-for-derived-watering-values",
+        "a retired entity an automation or script still uses",
+    ),
     "CS-615": ("feat/parity-system", "probe offsets that cannot be read"),
     "CS-708": ("feat/claude-haiku-brain", "the brain"),
     "CS-709": ("feat/claude-haiku-brain", "the brain"),

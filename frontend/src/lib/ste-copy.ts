@@ -100,9 +100,8 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The pore EC target in P2 for a zone in generative steering mode. It changes the size of maintenance shots, and the controller gives dilution shots above 1.2 times this target. With EC stacking on, it also moves the re-water point."
   },
   "ec_target_gen_p3": {
-    "guidance": "The default is 4.5 mS/cm. Change it only to change the EC ratio that the dashboard shows in P3.",
-    "impact": "Increase: The EC ratio sensor shows a lower ratio in P3. Decrease: The EC ratio sensor shows a higher ratio in P3. The shots do not change.",
-    "tooltip": "The pore EC target in P3 for generative steering mode. The integration shows it in the EC ratio sensor during P3. The controller does not read it."
+    "guidance": "Do not use it. The integration keeps it hidden only so that an automation or a script that uses it still loads, and Repairs names each one that does (CS-614).",
+    "tooltip": "A retired pore EC target for P3 in generative steering mode. Nothing reads it, and the controller does not steer EC in P3."
   },
   "ec_target_veg_p0": {
     "guidance": "The default is 3.0 mS/cm. If the controller cannot read a value, it uses 4 mS/cm. The controller uses values from 0.5 mS/cm to 9 mS/cm, and it sends a CS-401 alert for a value outside this range. The multiple comes from the substrate type of the room, and the generic type uses 2.5. The controller reads the zone value first, so the zone value overrides the room value for that zone only.",
@@ -120,9 +119,8 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The pore EC target in P2 for a zone in vegetative steering mode. It changes the size of maintenance shots, and the controller gives dilution shots above 1.2 times this target. With EC stacking on, it also moves the re-water point."
   },
   "ec_target_veg_p3": {
-    "guidance": "The default is 3.0 mS/cm. Change it only to change the EC ratio that the dashboard shows in P3.",
-    "impact": "Increase: The EC ratio sensor shows a lower ratio in P3. Decrease: The EC ratio sensor shows a higher ratio in P3. The shots do not change.",
-    "tooltip": "The pore EC target in P3 for vegetative steering mode. The integration shows it in the EC ratio sensor during P3. The controller does not read it."
+    "guidance": "Do not use it. The integration keeps it hidden only so that an automation or a script that uses it still loads, and Repairs names each one that does (CS-614).",
+    "tooltip": "A retired pore EC target for P3 in vegetative steering mode. Nothing reads it, and the controller does not steer EC in P3."
   },
   "enabled": {
     "caution": "CAUTION: Do not leave a zone with plants off. The zone gets no water, not even a rescue shot.",
@@ -178,9 +176,9 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The lowest feed pH at which the controller starts shots. While the feed pH is below this value, all shots in the room wait. It operates only when the controller app has a feed pH sensor."
   },
   "irrigation_phase": {
-    "guidance": "Do not use this select to move a zone. Use the Set phase select of the zone.",
-    "impact": "P0, P1, P2 or P3: the `current_phase` sensor shows the selected phase when the controller publishes no phase. The EC ratio sensor uses the selected phase to find its EC target. A change sends the event `crop_steering_phase_transition` for automations.",
-    "tooltip": "A manual phase marker for the room. The controller does not read it, and a change does not move a zone."
+    "guidance": "Do not use this select to move a zone. Use the Set phase select of the zone. The integration keeps it hidden only so that an automation or a script that uses it still loads, and Repairs names each one that does (CS-614).",
+    "impact": "P0, P1, P2 or P3: a change sends the event `crop_steering_phase_transition` for automations. Nothing else reads the select.",
+    "tooltip": "A retired manual phase marker for the room. The controller does not read it, and a change does not move a zone."
   },
   "main_line_lead_time": {
     "caution": "CAUTION: Do not set a long lead time for a pump that must not run against a closed valve. During this time, the pump runs while the zone valve is closed.",
@@ -287,14 +285,12 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The minimum time between ramp shots. A ramp shot or an extra P1 shot starts only when this time has passed since the last shot."
   },
   "p2_ec_high_threshold": {
-    "guidance": "Keep the default of 1.2. To move the re-water point with pore EC, use the EC stacking switch. In P2, the controller gives dilution shots above 1.2 times the P2 EC target, and does not use this setting.",
-    "impact": "Increase: The adjusted P2 threshold sensor shows a higher value at a higher EC ratio. Decrease: The sensor shows a higher value at a lower EC ratio. The shots do not change.",
-    "tooltip": "A ratio of pore EC to the EC target. The integration uses it only for the adjusted P2 threshold sensor. The controller does not read it."
+    "guidance": "Do not use it. The integration keeps it hidden only so that an automation or a script that uses it still loads, and Repairs names each one that does (CS-614). To move the re-water point with pore EC, use the EC stacking switch.",
+    "tooltip": "A retired ratio of pore EC to the EC target. Nothing reads it. In P2, the controller gives dilution shots above 1.2 times the P2 EC target, or above the zone dilute ratio."
   },
   "p2_ec_low_threshold": {
-    "guidance": "Keep the default of 0.8. To move the re-water point with pore EC, use the EC stacking switch.",
-    "impact": "Increase: The adjusted P2 threshold sensor shows a lower value at a higher EC ratio. Decrease: The sensor shows a lower value at a lower EC ratio. The shots do not change.",
-    "tooltip": "A ratio of pore EC to the EC target. The integration uses it only for the adjusted P2 threshold sensor. The controller does not read it."
+    "guidance": "Do not use it. The integration keeps it hidden only so that an automation or a script that uses it still loads, and Repairs names each one that does (CS-614). To move the re-water point with pore EC, use the EC stacking switch.",
+    "tooltip": "A retired ratio of pore EC to the EC target. Nothing reads it."
   },
   "p2_shot_size": {
     "caution": "CAUTION: Do not set a large maintenance shot. EC flushes use 1.5 times this size or more, and a large shot can flood the substrate.",

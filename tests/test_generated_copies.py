@@ -1,10 +1,10 @@
 """Files that ship as copies are their source, byte for byte.
 
-The one defaults table is written once, in the engine, and ships three times: the engine itself, the
-controller's vendored engine and the integration (which Home Assistant installs on its own, so it
-cannot import the engine). A copy edited by hand, or a source edited without its copies, would let
-the integration offer one value and the controller use another. To fix a failure, edit the source
-and copy it over: cp <source> <copy>.
+The one defaults table, and the one rule for how long a shot runs, are each written once, in the
+engine, and ship three times: the engine itself, the controller's vendored engine and the integration
+(which Home Assistant installs on its own, so it cannot import the engine). A copy edited by hand, or
+a source edited without its copies, would let the integration offer or show one value and the
+controller use another. To fix a failure, edit the source and copy it over: cp <source> <copy>.
 """
 
 from pathlib import Path
@@ -19,7 +19,7 @@ COPY_DIRS = [
 ]
 PAIRS: list[tuple[Path, Path]] = [
     (ROOT / SRC / name, ROOT / d / name)
-    for name in ("defaults.py", "ids.py", "timers.py", "guards.py")
+    for name in ("defaults.py", "ids.py", "timers.py", "guards.py", "shot_length.py")
     for d in COPY_DIRS
 ] + [(ROOT / SRC / "flow.py", ROOT / COPY_DIRS[0] / "flow.py")]
 

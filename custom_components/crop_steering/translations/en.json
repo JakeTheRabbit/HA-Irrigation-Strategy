@@ -853,6 +853,10 @@
     "outside_zone_bounds": {
       "title": "Crop Steering: {count} setting(s) above zone limit (CS-611)",
       "description": "The limits of the daily water and the maximum shot length now follow the size of each zone. The size comes from the plants, the litres per plant and the dripper flow. These settings were already above the new limit:\n\n{settings}\n\nThe controller keeps these settings and uses them as before. Nothing changes until you edit one of them. A new value must then be in the limit.\n\nExamine the plants, the litres per plant and the dripper flow of each zone in Rooms and setup. If a zone size is too small, correct it. The limit then follows. The card clears when each setting is in its limit.\n\nCode CS-611. What it means and what to do: Crop Steering → Help & tools → Error codes."
+    },
+    "deprecated_entities": {
+      "title": "Crop Steering: {count} retired entity(s) in use (CS-614)",
+      "description": "Nothing in Crop Steering reads these entities any more, and the controller never used them. They are kept, hidden, so that your automations and scripts still load. These automations and scripts use them:\n\n{entities}\n\nThe shots do not change. The entities do not show what the controller does: the EC ratio and the adjusted re-water point read unknown, and the settings change nothing.\n\nRemove the entities from the automations and scripts above. Dashboards and their cards are not checked: look there too. The card clears at the next start of Home Assistant after none of them uses one.\n\nCode CS-614. What it means and what to do: Crop Steering → Help & tools → Error codes."
     }
   },
   "selector": {

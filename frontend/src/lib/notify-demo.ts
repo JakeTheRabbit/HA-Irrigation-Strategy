@@ -105,7 +105,7 @@ export const DEMO_KINDS: NotifyKind[] = [
     id: "setup",
     name: "Setup and settings",
     detail:
-      "A setup change waiting, settings missing or out of range, a grow plan holding, and an Engine Enabled switch that does not stop water.",
+      "A setup change waiting, settings missing or out of range, a grow plan holding, an Engine Enabled switch that does not stop water, and a retired entity an automation still uses.",
     codes: [
       "CS-201",
       ...codes(401, 405, [404]),
@@ -115,6 +115,7 @@ export const DEMO_KINDS: NotifyKind[] = [
       "CS-607",
       "CS-610",
       "CS-611",
+      "CS-614",
       "CS-713",
     ],
     events: [],

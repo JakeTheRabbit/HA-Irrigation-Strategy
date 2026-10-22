@@ -32,7 +32,7 @@ either gets it once.
 | `stock` | Stock tanks | CS-608, CS-807 |
 | `dosing` | Dosing | CS-801 to CS-806, CS-808, CS-809 (the batch tank's pH not corrected), CS-810 and CS-811 (the light dimmed on dry substrate) |
 | `jev` | AI assistant | CS-501, CS-702, CS-705, CS-706, CS-707, CS-404, CS-708 (the AI assistant's budget is spent until lights-on), CS-709 (its key was refused or it is not answering), CS-711 (a proposal to change the feed, for a person to decide), CS-712 (the options name the removed first AI route), CS-713 (the room not running its grow plan as written), and the AI assistant moving a setting (new event, no card) |
-| `setup` | Setup and settings | CS-201, CS-401 to CS-405 (except 404), CS-601, CS-605, CS-606, CS-607, CS-610, CS-611, CS-713 (the room not running its grow plan as written: also under `jev`) |
+| `setup` | Setup and settings | CS-201, CS-401 to CS-405 (except 404), CS-601, CS-605, CS-606, CS-607, CS-610, CS-611, CS-614 (a retired entity an automation or script still uses), CS-713 (the room not running its grow plan as written: also under `jev`) |
 
 The mapping lives in one place in the integration (`notify_catalog.py`) and is returned by `notify_get`,
 so the page shows exactly what each checkbox covers. A code the catalog does not know goes to

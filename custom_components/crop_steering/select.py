@@ -58,6 +58,7 @@ SELECT_DESCRIPTIONS = [
         name="Irrigation phase",
         icon="mdi:water-circle",
         options=PHASES,  # Use constant from const.py (P0-P3 only)
+        entity_registry_visible_default=False,  # deprecated, nothing reads it (deprecation.py)
     ),
     # Named-stage recipe: picking a stage applies its setpoints to the zones.
     SelectEntityDescription(

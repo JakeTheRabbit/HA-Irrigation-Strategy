@@ -33,9 +33,6 @@ from homeassistant.helpers.restore_state import RestoredExtraData, RestoreEntity
 from .const import (
     DOMAIN,
     CONF_NUM_ZONES,
-    DEFAULT_EC_RATIO,
-    DEFAULT_EC_FALLBACK,
-    VWC_ADJUSTMENT_PERCENT,
     SOFTWARE_VERSION,
     PROBE_FAR,
     PROBE_RANGE,
@@ -44,8 +41,15 @@ from .const import (
 )
 from .room import room_prefix, build_engine_config
 from . import stock
-from .calculations import ShotCalculator, ec_type_key, fuse_probes
+from .calculations import ec_type_key, fuse_probes
 from .probe_offsets import read as read_probe
+from .generated.defaults import CONTROLLER_FALLBACKS
+from .generated.shot_length import (
+    DEFAULT_MAX_SHOT_S,
+    raw_seconds,
+    shot_seconds,
+    valid_cap,
+)
 from .units import to_native
 from .zone_status import (
     app_phase_entity,
@@ -62,6 +66,20 @@ SHOT_SIZE_KEYS = {
     "p1_shot_duration_seconds": "p1_initial_shot_size",
     "p2_shot_duration_seconds": "p2_shot_size",
     "p3_shot_duration_seconds": "p3_emergency_shot_size",
+}
+
+# Sensors kept for old installs that nothing reads, which show unknown with this reason. Each had a
+# number of its own that differed from the one the controller steers with. A room whose automations
+# or scripts still use one gets a Repairs issue (deprecation.py).
+RETIRED_SENSORS = {
+    "ec_ratio": (
+        "Retired: the controller does not use it. It steers the EC of each zone against the "
+        "target of that zone's own phase."
+    ),
+    "p2_vwc_threshold_adjusted": (
+        "Retired: the controller does not use this re-water point. The re-water point in force "
+        "for each zone is on its zone page, under Waiting for."
+    ),
 }
 
 
@@ -103,6 +121,7 @@ BASE_SENSOR_DESCRIPTIONS = [
         name="EC ratio",
         state_class=SensorStateClass.MEASUREMENT,
         icon="mdi:division",
+        entity_registry_visible_default=False,  # deprecated, nothing reads it (deprecation.py)
     ),
     SensorEntityDescription(
         key="p2_vwc_threshold_adjusted",
@@ -110,6 +129,7 @@ BASE_SENSOR_DESCRIPTIONS = [
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=PERCENTAGE,
         icon="mdi:water-alert",
+        entity_registry_visible_default=False,  # deprecated, nothing reads it (deprecation.py)
     ),
     SensorEntityDescription(
         key="configured_avg_vwc",
@@ -901,14 +921,10 @@ class CropSteeringSensor(SensorEntity):
         if self.entity_description.key in SHOT_SIZE_KEYS:
             seconds = self._shot_seconds_by_zone(self.entity_description.key)
             return max(seconds.values()) if seconds else None
-        elif self.entity_description.key == "ec_ratio":
-            return self._calculate_ec_ratio()
-        elif self.entity_description.key == "p2_vwc_threshold_adjusted":
-            return self._calculate_adjusted_p2_threshold()
         elif self.entity_description.key == "configured_avg_vwc":
-            return self._calculate_avg_vwc()
+            return self._active_zone_mean("vwc")
         elif self.entity_description.key == "configured_avg_ec":
-            return self._calculate_avg_ec()
+            return self._active_zone_mean("ec")
         else:
             # Other sensors return None (placeholder)
             return None
@@ -932,8 +948,10 @@ class CropSteeringSensor(SensorEntity):
 
     def _shot_seconds_by_zone(self, key: str) -> dict[int, int]:
         """How long the controller runs the configured shot `key` times, in each of the room's
-        active zones: the zone's pot size, drippers per plant and dripper flow, in whole seconds
-        within the room's shot limits. A zone whose sizing doesn't give a flow is left out.
+        active zones, by its own rule (generated/shot_length.py): the zone's pot size, plants,
+        drippers per plant and dripper flow, in whole seconds within the room's shot limits. A zone
+        whose sizing doesn't give a flow is left out, and every zone when the room's maximum shot
+        length is not a valid one (the controller then starts no shot, CS-203).
         """
         zones = sorted(
             int(zone)
@@ -941,18 +959,17 @@ class CropSteeringSensor(SensorEntity):
             if str(zone).isdigit() and (config or {}).get("active", True)
         ) or [1]
         # The room's maximum shot length, or its older entity's, as the controller reads it.
-        cap = None
+        cap = DEFAULT_MAX_SHOT_S
         for suffix in ("max_shot_duration", "maximum_shot_duration"):
             cap_state = self.hass.states.get(
                 f"number.crop_steering_{self._prefix}{suffix}"
             )
             if cap_state is None:
                 continue
-            try:
-                cap = float(cap_state.state)
-            except (TypeError, ValueError):
-                cap = None
+            cap = valid_cap(cap_state.state)
             break
+        if cap is None:
+            return {}
         seconds = {}
         for zone in zones:
             sizing = [
@@ -967,46 +984,15 @@ class CropSteeringSensor(SensorEntity):
             if any(value is None or value <= 0 for value in sizing):
                 continue
             substrate, size, drippers, flow = sizing
-            raw = ShotCalculator.calculate_shot_duration(
-                flow, substrate, size, drippers
-            )
-            seconds[zone] = ShotCalculator.capped_shot_seconds(raw, cap)
+            # Zone totals, as the controller's _substrate_l and _zone_flow_lps make them.
+            plants = self._zone_setting(zone, "plant_count")
+            plants = CONTROLLER_FALLBACKS["plant_count"] if plants is None else plants
+            if plants < 0:
+                continue  # the controller's flow is negative: it starts no shot (CS-204)
+            substrate_l = substrate * plants if plants > 0 else substrate
+            flow_lps = (plants or 1) * drippers * flow / 3600.0
+            seconds[zone] = shot_seconds(raw_seconds(size, substrate_l, flow_lps), cap)
         return seconds
-
-    def _calculate_ec_ratio(self) -> float:
-        """Calculate current EC ratio vs target."""
-        try:
-            current_ec = self._calculate_avg_ec()
-            # Get current EC target based on phase and mode
-            target_ec = self._get_current_ec_target()
-
-            if target_ec > 0 and current_ec is not None:
-                return round(current_ec / target_ec, 2)
-            return DEFAULT_EC_RATIO
-        except Exception:
-            return DEFAULT_EC_RATIO
-
-    def _calculate_adjusted_p2_threshold(self) -> float:
-        """Calculate P2 VWC threshold adjusted for EC ratio."""
-        try:
-            base_threshold = self._get_number_value("p2_vwc_threshold")
-            ec_ratio = self._calculate_ec_ratio()
-            ec_high_threshold = self._get_number_value("p2_ec_high_threshold")
-            ec_low_threshold = self._get_number_value("p2_ec_low_threshold")
-
-            # Simplified adjustment logic
-            if ec_ratio > ec_high_threshold:
-                return round(
-                    base_threshold + VWC_ADJUSTMENT_PERCENT, 2
-                )  # Raise threshold when EC high
-            elif ec_ratio < ec_low_threshold:
-                return round(
-                    base_threshold - VWC_ADJUSTMENT_PERCENT, 2
-                )  # Lower threshold when EC low
-            else:
-                return round(base_threshold, 2)
-        except Exception:
-            return self._get_number_value("p2_vwc_threshold")
 
     def _get_zone_vwc(self, zone_num: int) -> float | None:
         """Get VWC value for specific zone from configured sensors.
@@ -1104,7 +1090,9 @@ class CropSteeringSensor(SensorEntity):
     def extra_state_attributes(self) -> dict | None:
         """Expose the weekly producer's coverage so partial history stays visible, which probes
         a zone's VWC/EC reading was made from, and a shot-duration sensor's seconds in each zone
-        (it shows the longest)."""
+        (it shows the longest), and why a retired sensor shows unknown."""
+        if self.entity_description.key in RETIRED_SENSORS:
+            return {"reason": RETIRED_SENSORS[self.entity_description.key]}
         if self.entity_description.key in SHOT_SIZE_KEYS:
             seconds = self._shot_seconds_by_zone(self.entity_description.key)
             return {"zones": {str(zone): value for zone, value in seconds.items()}}
@@ -1139,8 +1127,8 @@ class CropSteeringSensor(SensorEntity):
             }
         return None
 
-    def _get_zone_irrigation_count_today(self, zone_num: int) -> int:
-        """Get today's irrigation count for zone."""
+    def _get_zone_irrigation_count_today(self, zone_num: int) -> int | None:
+        """Get today's irrigation count for zone; unknown, never 0, without the controller's."""
         # Check the engine sensor for count
         count_sensor = self.hass.states.get(
             f"sensor.crop_steering_{self._prefix}zone_{zone_num}_irrigation_count_app"
@@ -1150,7 +1138,7 @@ class CropSteeringSensor(SensorEntity):
                 return int(count_sensor.state)
             except ValueError:
                 pass
-        return 0
+        return None
 
     def _user_corrections(self) -> dict:
         """{probe: (offset, curve)} the grower set for the room's moisture probes (calibration.py)."""
@@ -1304,111 +1292,28 @@ class CropSteeringSensor(SensorEntity):
         )
         return value
 
-    def _average_sensor_values(
-        self, sensor_ids: list[str], kind: str | None = None
-    ) -> float | None:
-        """Plain average of every finite probe reading (the room-wide figures)."""
-        if not sensor_ids:
-            _LOGGER.debug("No sensor IDs provided for averaging")
-            return None
-
-        values = [
-            value
-            for _sensor_id, value, _age in self._probe_readings(sensor_ids, kind)
-            if value is not None and math.isfinite(value)
-        ]
-
-        if values:
-            return round(sum(values) / len(values), 2)
-
-        _LOGGER.debug(f"No valid sensor values found from {len(sensor_ids)} sensors")
-        return None
-
-    def _calculate_avg_vwc(self) -> float | None:
-        """Calculate average VWC from all configured zone sensors."""
-        all_sensors = []
-        for zone_config in self._zones_config.values():
-            sensors = list(zone_config.get("vwc_sensors", []))
-            if sensors:
-                all_sensors.extend(sensors)
-            else:
-                if zone_config.get("vwc_front"):
-                    all_sensors.append(zone_config["vwc_front"])
-                if zone_config.get("vwc_back"):
-                    all_sensors.append(zone_config["vwc_back"])
-
-        return self._average_sensor_values(all_sensors, "vwc")
-
-    def _calculate_avg_ec(self) -> float | None:
-        """Calculate average EC from all configured zone sensors."""
-        all_sensors = []
-        for zone_config in self._zones_config.values():
-            sensors = list(zone_config.get("ec_sensors", []))
-            if sensors:
-                all_sensors.extend(sensors)
-            else:
-                if zone_config.get("ec_front"):
-                    all_sensors.append(zone_config["ec_front"])
-                if zone_config.get("ec_back"):
-                    all_sensors.append(zone_config["ec_back"])
-
-        return self._average_sensor_values(all_sensors, "ec")
-
-    def _get_number_value(self, key: str) -> float:
-        """Get value from integration number entity."""
-        try:
-            entity_id = f"number.crop_steering_{self._prefix}{key}"
-            state = self.hass.states.get(entity_id)
-            if state is None:
-                _LOGGER.debug(f"Number entity not found: {entity_id}")
-                return 0.0
-            if state.state not in ["unknown", "unavailable", "none", None]:
-                return float(state.state)
-            return 0.0
-        except (ValueError, TypeError) as e:
-            _LOGGER.warning(f"Could not parse number value for {key}: {e}")
-            return 0.0
-
-    def _get_current_ec_target(self) -> float:
-        """Get current EC target based on phase and steering mode."""
-        try:
-            # Get current phase and mode
-            phase_state = self.hass.states.get(
-                f"select.crop_steering_{self._prefix}irrigation_phase"
-            )
-            mode_state = self.hass.states.get(
-                f"select.crop_steering_{self._prefix}steering_mode"
-            )
-
-            if not phase_state or not mode_state:
-                return DEFAULT_EC_FALLBACK  # Default fallback
-
-            phase = phase_state.state
-            mode = mode_state.state.lower()
-
-            # Map to EC target entities
-            if mode == "vegetative":
-                if phase == "P0":
-                    return self._get_number_value("ec_target_veg_p0")
-                elif phase == "P1":
-                    return self._get_number_value("ec_target_veg_p1")
-                elif phase == "P2":
-                    return self._get_number_value("ec_target_veg_p2")
-                elif phase == "P3":
-                    return self._get_number_value("ec_target_veg_p3")
-            else:  # Generative
-                if phase == "P0":
-                    return self._get_number_value("ec_target_gen_p0")
-                elif phase == "P1":
-                    return self._get_number_value("ec_target_gen_p1")
-                elif phase == "P2":
-                    return self._get_number_value("ec_target_gen_p2")
-                elif phase == "P3":
-                    return self._get_number_value("ec_target_gen_p3")
-
-            return DEFAULT_EC_FALLBACK  # Default fallback
-        except Exception:
-            return DEFAULT_EC_FALLBACK
+    def _active_zone_mean(self, kind: str) -> float | None:
+        """The mean of the room's active zones' `kind` readings: each zone's own vwc_zone_N or
+        ec_zone_N, so only the probes it counts, fused as the controller reads them. A room set up
+        before that name keeps its zone_N_vwc / zone_N_ec id, and is read under it, as the
+        controller's _fused_id does. Unknown when no active zone has a reading."""
+        values = []
+        for zone, config in self._zones_config.items():
+            if not str(zone).isdigit() or not (config or {}).get("active", True):
+                continue
+            for entity_id in (
+                f"sensor.{DOMAIN}_{self._prefix}{kind}_zone_{zone}",
+                f"sensor.{DOMAIN}_{self._prefix}zone_{zone}_{kind}",
+            ):
+                state = self.hass.states.get(entity_id)
+                try:
+                    value = float(state.state)
+                except (AttributeError, TypeError, ValueError):
+                    continue
+                if math.isfinite(value):
+                    values.append(value)
+                    break
+        return round(sum(values) / len(values), 2) if values else None
 
     @property
     def available(self) -> bool:

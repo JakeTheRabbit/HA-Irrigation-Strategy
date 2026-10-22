@@ -25,12 +25,18 @@ MIN_ZONES = 1
 MAX_ZONES = 24  # No practical limit — env parser auto-detects zones
 DEFAULT_NUM_ZONES = 1
 
-# Calculation constants
-SECONDS_PER_HOUR = 3600
-PERCENTAGE_TO_RATIO = 0.01
-DEFAULT_EC_RATIO = 1.0
-DEFAULT_EC_FALLBACK = 3.0
-VWC_ADJUSTMENT_PERCENT = 5.0
+# Entities kept only for an old install's automations and scripts, which nothing reads any more,
+# by platform and key (deprecation.py): hidden, never removed.
+DEPRECATED = {
+    "sensor": {"ec_ratio", "p2_vwc_threshold_adjusted"},
+    "number": {
+        "p2_ec_high_threshold",
+        "p2_ec_low_threshold",
+        "ec_target_veg_p3",
+        "ec_target_gen_p3",
+    },
+    "select": {"irrigation_phase"},
+}
 
 # Combining a zone's probes. The ranges are the ones the controller refuses a zone reading outside
 # of, and the age is the controller's own: a probe that has not reported for longer is set aside
