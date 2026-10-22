@@ -2331,7 +2331,7 @@ class Controller:
         """CS-907, raised once: a room with no feed EC probe and no recipe feed EC has an unknown feed, and decide()
         takes no EC flush on a feed it never measured. The card comes down when either appears."""
         key = f"feed_unknown_{room.slug}"
-        if room.feed_ec_sensor or self._recipe_feed_ec(room) is not None:
+        if not room.zones or room.feed_ec_sensor or self._recipe_feed_ec(room) is not None:
             self._dismiss(key)
         elif key not in self._alerted:
             self._alert(
