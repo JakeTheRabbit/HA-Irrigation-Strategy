@@ -79,6 +79,41 @@ class _Waiting(ValueError):
         self.kind = kind
 
 
+def grow_summary(plan, previews, fallback_stage):
+    """PURE. The room's grow day, days to harvest and stage, from its lowest-numbered active zone.
+
+    `previews` are the applied per-zone plan rows. Without an active zone all three are "unknown";
+    an open-ended last segment leaves days_to_harvest unknown; a profile without a name falls back to
+    the growth_stage select's state."""
+    unknown = "unknown"
+    rows = sorted(
+        (r for r in previews or [] if r.get("status") == "active"),
+        key=lambda r: r["zone_id"],
+    )
+    if not rows:
+        return {"grow_day": unknown, "days_to_harvest": unknown, "stage": unknown}
+    row = rows[0]
+    day = row["day"]
+    plan = plan or {}
+    zone = next(
+        (z for z in plan.get("zones", []) if z["zone_id"] == row["zone_id"]), {}
+    )
+    last = (zone.get("schedule") or [{}])[-1].get("end_day")
+    profile = next(
+        (p for p in plan.get("profiles", []) if p["id"] == row.get("profile_id")), {}
+    )
+    stage = profile.get("name") or (
+        fallback_stage
+        if fallback_stage not in (None, "", "unavailable", "unknown")
+        else unknown
+    )
+    return {
+        "grow_day": day,
+        "days_to_harvest": unknown if last is None else last - day,
+        "stage": stage,
+    }
+
+
 class StrategyManager:
     """Per-entry persistent document, coherent snapshots and guarded scheduler."""
 
@@ -704,6 +739,21 @@ class StrategyManager:
             "status": status,
         }
         self.hass.states.async_set(self.entity_id, status, attributes)
+        stage = self._state("growth_stage", "select")
+        summary = grow_summary(
+            self.document.get("plan"),
+            active["zones"],
+            stage.state if stage is not None else None,
+        )
+        for key, value in summary.items():
+            self.hass.states.async_set(
+                f"sensor.{DOMAIN}_{self.prefix}{key}",
+                str(value),
+                {
+                    "friendly_name": key.replace("_", " ").capitalize(),
+                    "room_id": self.room_id,
+                },
+            )
 
 
 async def async_setup_strategy(hass, entry):
