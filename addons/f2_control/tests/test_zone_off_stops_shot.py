@@ -43,7 +43,7 @@ def test_the_stopped_shot_is_closed_counted_and_named(monkeypatch):
     alerts = [d for dom, svc, d in fake.calls if dom == "persistent_notification" and svc == "create"]
     stopped = [d for d in alerts if "killshot" in d.get("notification_id", "")]
     assert stopped and "because this zone was set to off" in stopped[0]["message"]
-    assert ZONE in stopped[0]["message"] and "stopped after 2 s of 10 s" in stopped[0]["message"]
+    assert ZONE in stopped[0]["message"] and "stopped after 1 s of 10 s" in stopped[0]["message"]
 
 
 def test_the_engine_switch_is_still_named_as_the_engine_switch(monkeypatch):

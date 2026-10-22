@@ -539,13 +539,14 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 *Warning · Notification*
 
-**What it means.** Home Assistant returned an error when the controller tried to start the pump. A device that reads "unavailable" does not cause this alert, because no shot starts then.
+**What it means.** The pump did not start. Home Assistant returned an error when the controller tried to start it, or took the command but the pump did not read on within 16 s. A device that already reads "unavailable" does not cause this alert, because no shot starts then.
 
-**Effect on water.** The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual.
+**Effect on water.** The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual. After 3 such shots of a zone in a row (CS-302, CS-303 or CS-304), the controller tries that zone at most once every 30 min, rescue shots too, until its switches read on again. A Test Shot is not held.
 
 **Probable causes**
 
 - Home Assistant did not reply (it restarted, or the network has a fault), or it returned an error for the command.
+- The device took the command but did not switch: a dead relay, or an offline Zigbee plug that still accepts commands. Or it reports its new state more than 16 s late.
 - A switch that reads "unavailable" does not cause this alert. No shot starts while a switch on the feed path reads neither on nor off. The status of the zone names the offline switch. The zone gets water again when the switch reads again.
 
 **What to do**
@@ -562,13 +563,14 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 *Warning · Notification*
 
-**What it means.** Home Assistant returned an error when the controller tried to start the main-line valve. A device that reads "unavailable" does not cause this alert, because no shot starts then.
+**What it means.** The main-line valve did not open. Home Assistant returned an error when the controller tried to open it, or took the command but the main-line valve did not read on within 16 s. A device that already reads "unavailable" does not cause this alert, because no shot starts then.
 
-**Effect on water.** The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual.
+**Effect on water.** The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual. After 3 such shots of a zone in a row (CS-302, CS-303 or CS-304), the controller tries that zone at most once every 30 min, rescue shots too, until its switches read on again. A Test Shot is not held.
 
 **Probable causes**
 
 - Home Assistant did not reply (it restarted, or the network has a fault), or it returned an error for the command.
+- The device took the command but did not switch: a dead relay, or an offline Zigbee plug that still accepts commands. Or it reports its new state more than 16 s late.
 - A switch that reads "unavailable" does not cause this alert. No shot starts while a switch on the feed path reads neither on nor off. The status of the zone names the offline switch. The zone gets water again when the switch reads again.
 
 **What to do**
@@ -584,13 +586,14 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 *Warning · Notification*
 
-**What it means.** Home Assistant returned an error when the controller tried to start the zone valve. A device that reads "unavailable" does not cause this alert, because no shot starts then.
+**What it means.** The zone valve did not open. Home Assistant returned an error when the controller tried to open it, or took the command but the zone valve did not read on within 16 s, or by the end of a shorter shot (at least 6 s). A device that already reads "unavailable" does not cause this alert, because no shot starts then.
 
-**Effect on water.** The controller cancels the shot and does not count it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual.
+**Effect on water.** The controller cancels the shot. If every read of the valve was a definite off, no water went to the zone and the controller does not count the shot. If a read was anything else (unavailable, unknown, opening, or on too late), water may have flowed, so the controller counts the time from opening the valve to closing it. It closes the pump, the main-line valve and the zone valve, and reads them back. If they do not read off, it latches a hardware hold (CS-301). If they read off, the next shot runs as usual. After 3 such shots of a zone in a row (CS-302, CS-303 or CS-304), the controller tries that zone at most once every 30 min, rescue shots too, until its switches read on again. A Test Shot is not held.
 
 **Probable causes**
 
 - Home Assistant did not reply (it restarted, or the network has a fault), or it returned an error for the command.
+- The device took the command but did not switch: a dead relay, or an offline Zigbee plug that still accepts commands. Or it reports its new state more than 16 s late.
 - A switch that reads "unavailable" does not cause this alert. No shot starts while a switch on the feed path reads neither on nor off. The status of the zone names the offline switch. The zone gets water again when the switch reads again.
 
 **What to do**

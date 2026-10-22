@@ -153,10 +153,23 @@ def test_execute_shot_abort_closes_valve_and_alerts(monkeypatch):
 
     def sleep(dt):
         clock["seconds"] += dt
-        fake.set_state("input_boolean.kill", "off")
+        if fake.states["switch.v1"][0] == "on":  # the kill switch goes off once the valve is open
+            fake.set_state("input_boolean.kill", "off")
 
     monkeypatch.setattr(controller.time, "sleep", sleep)
+    valve, real_call = {}, controller.ha_call
+
+    def call(domain, service, **data):
+        if data.get("entity_id") == "switch.v1":
+            valve.setdefault(service, clock["seconds"])
+        return real_call(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    c.rooms[0].state[1]["on_failures"] = {"count": 1, "last": datetime.now().isoformat()}
     c._execute_shot(c.rooms[0], 1, 10, 6)
+    # the valve read back ON (its earlier failure reset only then), and the wait after it stopped the shot
+    assert c.rooms[0].state[1]["on_failures"] is None
+    assert valve["turn_off"] - valve["turn_on"] >= controller.CONFIRM_FIRST_READ_S
     # valve driven closed
     assert fake.states["switch.v1"][0] == "off"
     # a kill/override abort alert was raised

@@ -169,7 +169,8 @@ def test_a_valve_switched_off_by_something_else_counts_only_the_time_it_was_open
     c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=FLOW)
 
     room, st = c.rooms[0], c.rooms[0].state[1]
-    counted = 30.4 if stamped else 32  # else the first check after it (every 2 s: 30, then 32)
+    # else the first check after it (every 2 s from the valve's ON read-back at 1 s: 29, then 31)
+    counted = 30.4 if stamped else 31
     assert st["daily_vol"] == pytest.approx(FLOW * counted, rel=1e-3) and st["shots"] == 1
     assert offs(fake) == [MAIN, PUMP]  # the shot's main line and pump; its valve is not switched again
     assert room.hardware_fault is None and room.shot_inflight is None
@@ -192,11 +193,11 @@ def test_a_hold_that_comes_on_mid_shot_closes_valve_and_main_line_and_leaves_the
     assert offs(fake) == [VALVE, MAIN]  # the shot's own, valve first
     assert fake.states[PUMP][0] == "on"  # the dose's now: never switched off, never read back
     assert room.hardware_fault is None and room.shot_inflight is None
-    # Still open when the hold was seen at the 12 s check: its change time is when it opened, not a close.
-    assert st["daily_vol"] == pytest.approx(FLOW * 12) and st["shots"] == 1
+    # Still open when the hold was seen at the 11 s check: its change time is when it opened, not a close.
+    assert st["daily_vol"] == pytest.approx(FLOW * 11) and st["shots"] == 1
     alerts = notifications(fake)
     assert [n["title"] for n in alerts] == [CUT]
-    assert HOLD in alerts[0]["message"] and "after 12 s of 170 s" in alerts[0]["message"]
+    assert HOLD in alerts[0]["message"] and "after 11 s of 170 s" in alerts[0]["message"]
     assert f"left {PUMP} on" in alerts[0]["message"]
 
 
@@ -251,7 +252,7 @@ def test_the_kill_switch_still_wins_and_closes_as_before(rig, monkeypatch, valve
 
     room, st = c.rooms[0], c.rooms[0].state[1]
     assert offs(fake) == [VALVE, MAIN, PUMP]  # the shot's valve, main line and pump, as always
-    assert st["daily_vol"] == pytest.approx(FLOW * 22) and st["shots"] == 1  # to the check that saw it
+    assert st["daily_vol"] == pytest.approx(FLOW * 21) and st["shots"] == 1  # to the check that saw it
     assert [n["title"] for n in notifications(fake)] == ["Zone 1: shot stopped early (CS-305)"]
     assert room.hardware_fault is None and room.shot_inflight is None
 
@@ -269,3 +270,63 @@ def test_a_hold_that_goes_unavailable_mid_shot_ends_nothing(rig, monkeypatch):
                               ("turn_off", VALVE), ("turn_off", MAIN), ("turn_off", PUMP)]
     assert st["daily_vol"] == pytest.approx(FLOW * 60) and notifications(fake) == []
     assert c._blocked(c.rooms[0], 1) == f"external hold {HOLD} unreadable (reads neither on nor off)"
+
+
+def test_a_hold_that_comes_on_during_the_pumps_prime_stops_the_shot_before_its_valve(rig, monkeypatch):
+    """CTL-002 final review: the holds are read while a shot opens too. Dosing takes the tank during the
+    pump's prime: the valve is never opened, the pump is left to the hold, nothing is counted, no backoff."""
+    c, fake, clock = rig
+    fake.set_state("number.crop_steering_pump_prime_time", "8")
+    real = controller.ha_call
+
+    def call(domain, service, **data):
+        ok = real(domain, service, **data)
+        if (service, data.get("entity_id")) == ("turn_on", PUMP):
+            clock.at(clock.seconds + 0.5, lambda: fake.set_state(HOLD, "on"))
+        return ok
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    c._execute_shot(c.rooms[0], 1, 170, 2.8, flow_lps=FLOW)
+    room, st = c.rooms[0], c.rooms[0].state[1]
+    assert ("turn_on", VALVE) not in switched(fake) and ("turn_on", MAIN) not in switched(fake)
+    assert fake.states[PUMP][0] == "on"  # the dose's now
+    assert clock.seconds <= 0.5 + 2 + 1  # seen at the next check inside the prime
+    assert st["daily_vol"] == 0 and st["shots"] == 0 and st["on_failures"] is None
+    assert room.hardware_fault is None and room.shot_inflight is None
+    assert [n["title"] for n in notifications(fake)] == [CUT]
+
+
+@pytest.mark.parametrize("stage, trigger", [
+    ("main-line read-back", "hold"),
+    ("valve read-back", "hold"),
+    ("pump read-back", "waste"),
+])
+def test_a_switch_cut_short_while_it_opens_is_sent_off_though_it_still_reads_its_old_off(rig, monkeypatch,
+                                                                                          stage, trigger):
+    """CTL-002 re-review: a hold (or the waste valve) that comes on while a shot opens closes it as mid-shot,
+    but the switch just sent ON often still reads its old OFF. It is sent OFF all the same, and read back,
+    so its late ON cannot leave it open with nobody owning it. Only a hold keeps the pump."""
+    c, fake, clock = rig
+    room = c.rooms[0]
+    if trigger == "waste":
+        room.waste = "switch.waste"
+        fake.set_state("switch.waste", "off")
+        fake.set_state("select.crop_steering_waste_valve_rule", "Check closed")
+    stuck = {"main-line read-back": MAIN, "valve read-back": VALVE, "pump read-back": PUMP}[stage]
+    real = controller.ha_call
+
+    def call(domain, service, **data):
+        if (service, data.get("entity_id")) == ("turn_on", stuck):
+            fake.calls.append((domain, service, data))  # taken; its ON report has not landed yet
+            clock.at(clock.seconds + 1.5, lambda: fake.set_state(HOLD if trigger == "hold" else "switch.waste", "on"))
+            return True
+        return real(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    c._execute_shot(room, 1, 170, 2.8, flow_lps=FLOW)
+    assert stuck in offs(fake) and fake.states[stuck][0] == "off"
+    assert fake.states[PUMP][0] == ("on" if trigger == "hold" else "off")  # a hold keeps the pump, nothing else
+    assert (PUMP in offs(fake)) == (trigger == "waste")
+    assert room.hardware_fault is None and room.shot_inflight is None
+    assert room.state[1]["on_failures"] is None
+    assert [n["title"] for n in notifications(fake)] == [CUT]

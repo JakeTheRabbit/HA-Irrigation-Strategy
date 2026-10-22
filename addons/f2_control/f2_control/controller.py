@@ -454,24 +454,47 @@ _PROBE_ALERTS = {
     ),
 }
 
-# What follows a shot cancelled before its water started (CS-302, CS-303, CS-304): _execute_shot's
+# What follows a shot cancelled because a switch did not switch on (CS-302, CS-303, CS-304): _execute_shot's
 # error cleanup switches off everything the shot may have opened and latches a hardware hold unless
 # it all reads back OFF, which it can't while Home Assistant is unreachable.
 _CANCELLED_SHOT_CLEANUP = (
     "The controller sets the pump, the main-line valve and the zone valve to off, and checks that "
     "they read off. If it cannot confirm this (Home Assistant cannot be reached, or a switch is "
     "offline), it latches a hardware hold (CS-301). Then no shot starts on this hardware until the "
-    "hold clears. If the check passes, the controller tries the next shot as usual."
+    "hold clears. If the check passes, the controller tries the next shot as usual: after 3 such "
+    "shots of a zone in a row, at most once every 30 min (rescue shots too, a Test Shot not)."
 )
 
 # Switch read-back after a close: see Controller._confirm_switches.
 CONFIRM_FIRST_READ_S, CONFIRM_POLL_S, CONFIRM_TIMEOUT_S = 1.0, 0.5, 6.0
 CONFIRM_RETRY_S = 10.0  # a second read-back, after OFF is sent again to what still reads on
+# The whole read-back, ON or OFF (CLOSE_FAILURES words it). A pump, main line or zone valve that took its
+# turn_on and does not read ON within it never started (CS-302 to CS-304; a zone valve within its shot, when
+# shorter). After this many such shots in a row a zone is tried at most once every SWITCH_ON_BACKOFF_MIN,
+# until its switches read on again.
+SWITCH_ON_S = CONFIRM_TIMEOUT_S + CONFIRM_RETRY_S
+SWITCH_ON_BACKOFF_AFTER, SWITCH_ON_BACKOFF_MIN = 3, 30
+
+
+def _switch_on_retry_at(st):
+    """When a zone backed off for switches that did not switch on may be tried again, or None: not backed off."""
+    record = st.get("on_failures")
+    if not record or record["count"] < SWITCH_ON_BACKOFF_AFTER:
+        return None
+    return datetime.fromisoformat(record["last"]) + timedelta(minutes=SWITCH_ON_BACKOFF_MIN)
 
 # The safe-off on SIGTERM (Controller._safe_exit) runs inside runtime_env.stop_budget(). Dosing keeps
 # STOP_DOSING_S of it (a fifth at most) for its own offs while a dose or batch has anything recorded.
 # Each room with a shot recorded gets an equal share of the rest (see _Stop).
 STOP_DOSING_S = 5.0
+
+
+class _ShotStopped(Exception):
+    """The operator stopped a shot while it was still opening (Controller._operator_stop's answer, `by`)."""
+
+    def __init__(self, by):
+        super().__init__(by)
+        self.by = by
 
 
 class _Stop:
@@ -549,11 +572,11 @@ def _pause(seconds, deadline=None):
 # hardware fault (CS-301) names it with: in its notification, its log line and the zone's status.
 CLOSE_FAILURES = {
     "refused": "was not switched off: Home Assistant returned an error",
-    "on": f"still read ON {CONFIRM_TIMEOUT_S + CONFIRM_RETRY_S:g} s after it was switched off",
+    "on": f"still read ON {SWITCH_ON_S:g} s after it was switched off",
     "unavailable": "read unavailable: Home Assistant could not reach it",
     "unknown": "read unknown instead of OFF",
     "unreadable": "could not be read from Home Assistant",
-    "late": f"reported OFF only after the {CONFIRM_TIMEOUT_S + CONFIRM_RETRY_S:g} s check",
+    "late": f"reported OFF only after the {SWITCH_ON_S:g} s check",
 }
 
 # The shortest shot the controller runs, in seconds (a shot sized shorter is lengthened to this).
@@ -1454,6 +1477,8 @@ class Controller:
             "vmax_wetup": [],  # this grow-day's P1 wet-up VWC readings, for the Vmax advisory (resets each P0)
             "rescue_misses": 0,  # CS-315: rescue shots in a row that did not raise the moisture (safety_ops)
             "rescue_check": None,  # ...and the last rescue waiting to be judged: {"before", "at"}
+            # CS-302 to CS-304: shots in a row whose switches did not switch on, {"count", "last"} (_switch_on_retry_at)
+            "on_failures": None,
             **zone_history.fresh(),
             **sensing.fresh(),  # the water-and-VPD record (sensing.py), kept only while its switch is on
             **day_summary.fresh(),  # the grow-day summary being measured, and those not yet sent (day_summary)
@@ -1577,6 +1602,14 @@ class Controller:
             s["vmax_wetup"] = [float(v) for v in series
                                if isinstance(v, (int, float)) and not isinstance(v, bool)
                                and math.isfinite(v) and 0.0 <= v <= 100.0][-VMAX_SERIES_MAX:]
+        failures = d.get("on_failures")  # absent before the switch-on backoff: None
+        try:
+            if isinstance(failures, dict) and type(failures.get("count")) is int and failures["count"] > 0:
+                if datetime.fromisoformat(failures["last"]).tzinfo is not None:
+                    raise ValueError("an aware time: _switch_on_retry_at compares with a naive now")
+                s["on_failures"] = {"count": failures["count"], "last": failures["last"]}
+        except (KeyError, TypeError, ValueError):
+            pass
         s.update(zone_history.restore(d))
         s.update(safety_ops.restore_zone(d))
         s.update(sensing.restore(d))
@@ -1976,6 +2009,7 @@ class Controller:
             "vmax_wetup": list(s.get("vmax_wetup") or []),
             "rescue_misses": int(s.get("rescue_misses") or 0),
             "rescue_check": s.get("rescue_check"),
+            "on_failures": s.get("on_failures"),
             "water_vpd": s.get("water_vpd"),
             "day_hist": s.get("day_hist") or [],
             "day_acc": s.get("day_acc"),
@@ -5450,6 +5484,44 @@ class Controller:
         if self._alerted.pop(f"inflight_{room.slug}", None):
             ha_call("persistent_notification", "dismiss", notification_id=f"f2_inflight_{room.slug}")
 
+    def _operator_stop(self, room, zone, step, until=None, holds=False):
+        """The operator's own switches for a shot, read in turn, each read bounded by `step` and by what
+        is left to the monotonic `until` (none starts once it has passed): ("refused", None) when Home
+        Assistant refuses this controller's token, ("abort", entity) for a definitive kill OFF / room
+        OFF / zone OFF / override ON, else None. With `holds` (a shot still opening; _wait_shot reads
+        them itself, with the valve) also ("external", entity) for a hold, or under a waste-valve rule
+        the waste valve, that reads ON, as in _wait_shot."""
+        for entity, stop_state in (
+            (room_gate(room), "off"),
+            (f"switch.crop_steering_{room.prefix}room_active", "off"),
+            (f"switch.crop_steering_{room.prefix}zone_{zone}_enabled", "off"),
+            (
+                f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override",
+                "on",
+            ),
+        ):
+            remaining = step if until is None else until - time.monotonic()
+            if remaining <= 0:
+                return None
+            if _GATE.state == "all":
+                return ("refused", None)
+            # Account for network time, and never start a read longer than what remains.
+            # HTTP/socket scheduling can still overshoot; the caller measures time rather
+            # than pretending sleep time was delivery.
+            state = ha_get(entity, timeout=min(step, remaining))[0]
+            if state == stop_state:
+                return ("abort", entity)
+        waste = (room.waste,) if holds and self._waste_rule(room) != "Off" else ()
+        for entity in [e for e in (*(self.hold_entities if holds else ()), *waste) if e]:
+            remaining = step if until is None else until - time.monotonic()
+            if remaining <= 0:
+                return None
+            if _GATE.state == "all":
+                return ("refused", None)
+            if str(hw_get(entity, timeout=min(step, remaining))[0]).lower() in ON_STATES:
+                return ("external", entity)
+        return None
+
     def _wait_shot(self, room, zone, duration_s, started=None):
         """Wait to a monotonic deadline, including HA latency and valve-open command time.
 
@@ -5473,26 +5545,9 @@ class Controller:
         # The waste valve, under a waste-valve rule: opened during the shot, it ends it (CS-307).
         waste = (room.waste,) if self._waste_rule(room) != "Off" else ()
         while time.monotonic() < deadline:
-            for entity, stop_state in (
-                (room_gate(room), "off"),
-                (f"switch.crop_steering_{room.prefix}room_active", "off"),
-                (f"switch.crop_steering_{room.prefix}zone_{zone}_enabled", "off"),
-                (
-                    f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override",
-                    "on",
-                ),
-            ):
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    break
-                if _GATE.state == "all":
-                    return time.monotonic() - started, ("refused", None)
-                # Account for network time, and never start an eight-second read when
-                # less than that remains. HTTP/socket scheduling can still overshoot;
-                # return measured time rather than pretending sleep time was delivery.
-                state = ha_get(entity, timeout=min(step, remaining))[0]
-                if state == stop_state:
-                    return time.monotonic() - started, ("abort", entity)
+            stop = self._operator_stop(room, zone, step, deadline)
+            if stop:
+                return time.monotonic() - started, stop
             for entity in [e for e in (*self.hold_entities, *waste, valve) if e]:
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
@@ -5521,7 +5576,7 @@ class Controller:
                     time.sleep(min(step, remaining))
         return time.monotonic() - started, None
 
-    def _close_cut_short(self, room, zone, by, elapsed, duration_s, valve_opened):
+    def _close_cut_short(self, room, zone, by, elapsed, duration_s, valve_opened, unconfirmed=None):
         """Close a shot that something else cut short (see _wait_shot) -> seconds its valve was open.
 
         The shot's valve and main line are its own: each is switched off unless it already reads OFF
@@ -5535,12 +5590,15 @@ class Controller:
         change falls between this shot opening it and the interruption being seen: it closed before
         the controller looked. Otherwise (still open, or no usable change time) they run to when the
         interruption was seen.
+
+        `unconfirmed` (a shot cut short while it opened): the switch it had sent ON and not yet read back
+        ON. Its OFF may only be its old state, the ON still to land, so it is switched off whatever it reads.
         """
         valve, mainline, pump = room.hw["valves"].get(zone), room.hw.get("mainline"), room.hw.get("pump")
         reads = {e: hw_get(e) for e in (valve, mainline, pump) if e}
-        close = [e for e in (valve, mainline) if e and reads[e][0] != "off"]
+        close = [e for e in (valve, mainline) if e and (e == unconfirmed or reads[e][0] != "off")]
         left = []
-        if pump and reads[pump][0] != "off":
+        if pump and (pump == unconfirmed or reads[pump][0] != "off"):
             (left if any(self._on(f, False) for f in self.hold_entities) else close).append(pump)
         failures = self._switch_off_failures(close) if close else []
         if failures:
@@ -5570,8 +5628,14 @@ class Controller:
         return open_s
 
     @staticmethod
-    def _confirm_switches(entities, want, deadline=None):
-        """True only when every switch reads back `want`.
+    def _confirm_switches(entities, want, deadline=None, reads=None, stop=None, until=None,
+                          first=CONFIRM_FIRST_READ_S):
+        """True only when every switch reads back `want`. Each state read is added to `reads` when given.
+
+        With `stop` (a shot opening: _operator_stop for it), `stop(end of this stage)` is asked at most every
+        2 s before a pause, and an answer raises _ShotStopped; each read is then also bounded by what is left of the
+        read-back, so a hanging Home Assistant cannot stretch it while the shot's switches are on. With
+        `until` (the monotonic clock) the read-back gives up then, whatever is left of its 16 s.
 
         Zigbee/MQTT plugs accept a command at once but report the new state later
         (a pump's OFF report: usually under 1 s; 1.6 s on 15 Sep and about 10 s on 28 Sep 2026 on a
@@ -5580,33 +5644,58 @@ class Controller:
         On the way out (SIGTERM) it gives up when the stop's `deadline` (a _Stop) runs out.
         """
 
+        asked = [None]  # when stop() was last asked
+
+        def check(end):
+            if stop is not None and (asked[0] is None or time.monotonic() - asked[0] >= 2.0):
+                asked[0] = time.monotonic()
+                by = stop(end)
+                if by:
+                    raise _ShotStopped(by)
+
+        def read(ent, end):
+            if stop is not None:
+                state = hw_get(ent, timeout=min(8.0, max(CONFIRM_POLL_S, end - time.monotonic())))[0]
+            else:
+                state = _read(ent, deadline)[0]
+            if reads is not None:
+                reads.append(state)
+            return state
+
         def settled(window, first):
             end = time.monotonic() + window
             if deadline is not None:
                 end = min(end, deadline.until)
+            if until is not None:
+                end = min(end, until)
+            check(end)
             _pause(first, deadline)
             while True:
                 if deadline is not None and deadline.timeout(8) is None:
                     return False  # no read-back fits in what is left of the stop
-                if all(_read(ent, deadline)[0] == want for ent in entities):
+                if all(read(ent, end) == want for ent in entities):
                     return True
                 if time.monotonic() >= end:
                     return False
+                check(end)
                 _pause(CONFIRM_POLL_S, deadline)
 
-        # First read at 1 s, exactly as before, so a plug that reports promptly costs nothing extra.
-        # A late report is then re-read every 0.5 s up to 6 s. The pump has already been commanded
-        # OFF by the time this runs.
-        if settled(CONFIRM_TIMEOUT_S, CONFIRM_FIRST_READ_S):
+        # First read at 1 s (`first`: sooner inside a shorter prime or lead), exactly as before, so a plug
+        # that reports promptly costs nothing extra. A late report is then re-read every 0.5 s up to 6 s.
+        # The pump has already been commanded OFF by the time this runs.
+        if settled(CONFIRM_TIMEOUT_S, first):
             return True
-        if want != "off" or (deadline is not None and deadline.timeout(8) is None):
+        if deadline is not None and deadline.timeout(8) is None:
             return False
-        # Whatever still does not read OFF is sent OFF again (a plug may have missed the first) and
-        # read back for 10 s more: 16 s in all, still inside the minute's loop for a genuinely
-        # stuck-open valve.
-        for ent in entities:
-            if _read(ent, deadline)[0] != "off":
-                _switch_off(ent, deadline)
+        if until is not None and time.monotonic() >= until:
+            return False
+        # Then 10 s more: 16 s in all (a report about 10 s late was seen on a live install), still inside
+        # the minute's loop for a genuinely stuck switch. Whatever still does not read OFF is first sent
+        # OFF again (a plug may have missed the first); an ON is not sent again.
+        if want == "off":
+            for ent in entities:
+                if _read(ent, deadline)[0] != "off":
+                    _switch_off(ent, deadline)
         return settled(CONFIRM_RETRY_S, CONFIRM_POLL_S)
 
     def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None, plan_exempt=False, steering=True):
@@ -5631,6 +5720,15 @@ class Controller:
         if strategy_hold:
             log(f"[{room.slug}] Z{zone} shot held: {strategy_hold}")
             return
+        # A zone whose pump, main line or valve has not switched on for several shots in a row is tried at
+        # most once every SWITCH_ON_BACKOFF_MIN, rescue shots too: a dead valve delivers no rescue water,
+        # and retrying it each pass would short-cycle the pump. An operator's Test Shot (the only shot with
+        # steering off) is not held: it is how a repair is checked.
+        retry_at = _switch_on_retry_at(room.state[zone]) if steering else None
+        if retry_at is not None and datetime.now() < retry_at:
+            log(f"[{room.slug}] Z{zone} shot held: its pump, main line or valve did not switch on "
+                f"{room.state[zone]['on_failures']['count']} shots in a row; next try at {retry_at:%H:%M}")
+            return
         # Freeze hydraulic sizing before opening hardware. Editing plant count,
         # substrate or dripper configuration mid-shot must not rewrite its litres.
         nominal_l = (flow_lps * duration_s if flow_lps is not None
@@ -5651,7 +5749,7 @@ class Controller:
             log(f"[{room.slug}] Z{zone} shot held: {making}")
             return
         shutdown_checked = False
-        valve_started = None
+        valve_started = valve_opened = None
         counted = False
         stopping = False
         commanded = False  # a switch has been sent ON: from here an error must close what may be open
@@ -5666,6 +5764,104 @@ class Controller:
                 run = (time.monotonic() - valve_started) / duration_s if duration_s > 0 else 1.0
                 self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
                                             steering=steering)
+
+        pending = [None]  # the switch sent ON and not yet read back ON
+
+        def switch_on(ent, what, lead_s=0.0, until=None):
+            """Switch `ent` on and read it back ON, then let what is left of `lead_s` from its ack run out
+            -> (None, _, _) or (why not in the words of its alert, whether it may have been on all the same,
+            what it does to the zone's run of failed shots: "count", "reset" (it read ON just too late) or
+            "keep" (the shot's own time cut the read-back short: not a definite failure)). A relay that takes the command and stays off must not be counted as a shot. The read-back runs
+            inside the lead time, so a switch that reports promptly costs a normal shot nothing; one that
+            reports late stretches the pump's prime or the main line's lead by the difference. A read-back
+            cut short by `until` (the monotonic clock) may have been on: nothing proved it off in time."""
+            pending[0] = ent  # sent ON, not yet read back ON (_close_cut_short)
+            if not hw_call(ent, True):
+                if _GATE.state == "all":  # the token refused: not a switch that failed (no CS-302 to CS-304)
+                    raise _ShotStopped(("refused", None))
+                return f"Home Assistant returned an error when the controller tried to {what}.", False, "count"
+            acked, reads = time.monotonic(), []
+            # The operator's switches are read through the read-back and the lead time too (_ShotStopped),
+            # each check bounded by the end of its stage.
+            def stop(end):
+                return self._operator_stop(room, zone, 2.0, end, holds=True)
+
+            # inside a prime or lead under 1 s, the first read comes at its end: a prompt report costs nothing
+            first = min(lead_s, CONFIRM_FIRST_READ_S) if lead_s > 0 else CONFIRM_FIRST_READ_S
+            if not self._confirm_switches((ent,), "on", reads=reads, stop=stop, until=until, first=first):
+                # once more as it is switched off: an ON just after the window
+                reads.append(hw_get(ent, timeout=2.0)[0])
+                if _GATE.state == "all":  # refused late in the read-back: not a switch that failed either
+                    raise _ShotStopped(("refused", None))
+                cut = until is not None and time.monotonic() >= until
+                waited = min(SWITCH_ON_S, until - acked) if until is not None else SWITCH_ON_S
+                # "opening" (a valve. entity on its way) or anything but a definite OFF may be open
+                tally = "reset" if reads[-1] == "on" else "keep" if cut else "count"
+                return (f"Home Assistant took the command to {what}, but it did not read on within "
+                        f"{waited:.0f} s."), cut or any(state != "off" for state in reads), tally
+            pending[0] = None
+            while (left := lead_s - (time.monotonic() - acked)) > 0:
+                by = stop(acked + lead_s)
+                if by:
+                    raise _ShotStopped(by)
+                time.sleep(min(2.0, left))
+            return None, False, None
+
+        def cancelled(why, named, delivered_s=None, tally="count"):
+            """The shot cancelled because a switch did not read on (`delivered_s`: the valve may have been
+            open that long, and is counted). A definite failure (`tally` "count") is one more such shot in a
+            row for this zone (_switch_on_retry_at); a switch that read ON just too late ("reset") ends the
+            run; one whose read-back the shot's own time cut short ("keep") leaves it as it is
+            -> its alert's message and quiet."""
+            st = room.state[zone]
+            failures = (st.get("on_failures") or {}).get("count", 0)
+            if tally == "count":
+                failures += 1
+                st["on_failures"] = {"count": failures, "last": datetime.now().isoformat()}
+            elif tally == "reset":
+                st["on_failures"], failures = None, 0
+            water = (
+                "No water went to the zone, and the controller did not count the shot."
+                if delivered_s is None
+                else "The controller cannot tell whether water went to the zone, so it counts the "
+                f"{delivered_s:.0f} s from opening the valve to closing it as delivered."
+            )
+            backoff = (
+                f" The last {failures} shots of this zone in a row could not start, so the controller "
+                f"now tries this zone at most once every {SWITCH_ON_BACKOFF_MIN} min, rescue shots too, until "
+                "its switches read on again."
+                if tally == "count" and failures >= SWITCH_ON_BACKOFF_AFTER
+                else ""
+            )
+            # the zone backing off is news: never held back
+            quiet = not (tally == "count" and failures == SWITCH_ON_BACKOFF_AFTER)
+            return f"{why} {water} {_CANCELLED_SHOT_CLEANUP}{backoff}\n\n{named}", quiet
+
+        def stopped_early(aborted, elapsed):
+            """A shot the operator's switches (or a refused token) ended early: CS-305, or a log line.
+            `elapsed` None: it stopped before its valve was sent ON."""
+            when = (f"after {elapsed:.0f} s of {duration_s:.0f} s" if elapsed is not None
+                    else f"before its valve opened (a {duration_s:.0f} s shot)")
+            if aborted[0] == "refused":
+                log(f"[{room.slug}] Z{zone} shot ended {when}: Home Assistant refused this controller's token")
+                return
+            by = aborted[1]
+            why = {
+                room_gate(room): "the kill switch was set to off",
+                f"switch.crop_steering_{room.prefix}room_active": "Room Active was set to off",
+                f"switch.crop_steering_{room.prefix}zone_{zone}_enabled": "this zone was set to off",
+            }.get(by, "manual override was set to on")
+            self._alert(
+                f"killshot_{room.slug}_z{zone}",
+                "CS-305",
+                "shot stopped early",
+                f"The shot stopped {when}, because "
+                f"{why} ({by}). The controller set the valve and the hardware upstream of it to off. "
+                "It counts the water of the shot up to the stop.",
+
+                room=room,
+                zone=zone,
+            )
 
         try:  # from the moment _busy is set: an error before any valve opens must not leave it set
             hw = room.hw
@@ -5699,54 +5895,48 @@ class Controller:
             # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
             # Pump and mainline are optional (a one-switch tent has neither): each is sequenced when
             # mapped and skipped, with its lead time, when not. The valve is always required.
-            if pump and not hw_call(pump, True):
+            why, _maybe, tally = switch_on(pump, "start the pump", prime) if pump else (None, False, None)
+            if why:
                 hw_call(pump, False)  # it may be on all the same: off before the alert
-                self._alert(
-                    f"hw_{room.slug}_z{zone}",
-                    "CS-302",
-                    "shot cancelled, the pump did not start",
-                    "Home Assistant returned an error when the controller tried to start the pump. No water "
-                    f"went to the zone, and the controller did not count the shot. {_CANCELLED_SHOT_CLEANUP}"
-                    f"\n\nPump: {pump}",
-                    room=room,
-                    zone=zone,
-                )
+                message, quiet = cancelled(why, f"Pump: {pump}", tally=tally)
+                self._alert(f"hw_{room.slug}_z{zone}", "CS-302", "shot cancelled, the pump did not start",
+                            message, room=room, zone=zone, quiet=quiet)
                 return
-            if pump:
-                time.sleep(prime)
-            if mainline and not hw_call(mainline, True):
+            why, _maybe, tally = (switch_on(mainline, "open the main-line valve", lead) if mainline
+                                  else (None, False, None))
+            if why:
+                hw_call(mainline, False)  # it may open all the same
                 if pump:
                     hw_call(pump, False)
-                self._alert(
-                    f"hw_{room.slug}_z{zone}",
-                    "CS-303",
-                    "shot cancelled, the main-line valve did not open",
-                    "Home Assistant returned an error when the controller tried to open the main-line valve. "
-                    f"No water went to the zone, and the controller did not count the shot. {_CANCELLED_SHOT_CLEANUP}"
-                    f"\n\nMain-line valve: {mainline}",
-                    room=room,
-                    zone=zone,
-                )
+                message, quiet = cancelled(why, f"Main-line valve: {mainline}", tally=tally)
+                self._alert(f"hw_{room.slug}_z{zone}", "CS-303", "shot cancelled, the main-line valve did not open",
+                            message, room=room, zone=zone, quiet=quiet)
                 return
-            if mainline:
-                time.sleep(lead)
+            # The valve's read-back runs inside the shot's own time, counted from its turn_on. A valve that
+            # reports late enough can hold a very short shot open past its nominal length: that time is
+            # counted too, so such a shot is over-counted, never under-counted (the safe direction).
+            # And it ends with the shot: a valve not read ON once the shot's time (or, for a shot shorter
+            # than it, the first read-back stage) is up may be open, and is closed and counted, so a late
+            # report cannot run a short shot to several times its length.
             valve_started = time.monotonic()
             valve_opened = datetime.now(timezone.utc)  # on Home Assistant's clock too: see _close_cut_short
-            if not hw_call(valve, True):
+            why, maybe_open, tally = switch_on(valve, "open the valve of this zone",
+                                        until=valve_started + max(duration_s, CONFIRM_TIMEOUT_S))
+            if why:
+                hw_call(valve, False)  # it may open all the same
                 for upstream in (mainline, pump):
                     if upstream:
                         hw_call(upstream, False)
-                self._alert(
-                    f"hw_{room.slug}_z{zone}",
-                    "CS-304",
-                    "shot cancelled, the zone valve did not open",
-                    "Home Assistant returned an error when the controller tried to open the valve of this zone. "
-                    f"No water went to the zone, and the controller did not count the shot. {_CANCELLED_SHOT_CLEANUP}"
-                    f"\n\nValve: {valve}",
-                    room=room,
-                    zone=zone,
-                )
+                delivered_s = None
+                if maybe_open:
+                    # Unreadable, or ON too late: water may have flowed. Count it to the off, as a stop does.
+                    delivered_s = time.monotonic() - valve_started
+                    count_water_so_far()
+                message, quiet = cancelled(why, f"Valve: {valve}", delivered_s, tally)
+                self._alert(f"hw_{room.slug}_z{zone}", "CS-304", "shot cancelled, the zone valve did not open",
+                            message, room=room, zone=zone, quiet=quiet)
                 return
+            room.state[zone]["on_failures"] = None  # pump, main line and valve all read on
             elapsed, aborted = self._wait_shot(
                 room, zone, duration_s, started=valve_started
             )
@@ -5804,27 +5994,29 @@ class Controller:
                 delivered_l=nominal_l * (elapsed / duration_s if duration_s > 0 else 1.0),
                 steering=steering,
             )
-            if aborted and aborted[0] == "refused":
-                log(f"[{room.slug}] Z{zone} shot ended after {elapsed:.0f}/{duration_s:.0f}s: Home Assistant "
-                    "refused this controller's token")
-            elif aborted:
-                by = aborted[1]
-                why = {
-                    room_gate(room): "the kill switch was set to off",
-                    f"switch.crop_steering_{room.prefix}room_active": "Room Active was set to off",
-                    f"switch.crop_steering_{room.prefix}zone_{zone}_enabled": "this zone was set to off",
-                }.get(by, "manual override was set to on")
-                self._alert(
-                    f"killshot_{room.slug}_z{zone}",
-                    "CS-305",
-                    "shot stopped early",
-                    f"The shot stopped after {elapsed:.0f} s of {duration_s:.0f} s, because "
-                    f"{why} ({by}). The controller set the valve and the hardware upstream of it to off. "
-                    "It counts the water of the shot up to the stop.",
-
-                    room=room,
-                    zone=zone,
-                )
+            if aborted:
+                stopped_early(aborted, elapsed)
+        except _ShotStopped as stopped:
+            # The operator (or a refused token, or a hold) stopped the shot while it was opening. Not a switch
+            # that failed to switch on, so no backoff. Water counts only from the valve's turn_on, to the stop.
+            # A failure in here is logged, and the cleanup below runs as after any shot error.
+            try:
+                elapsed = None if valve_started is None else time.monotonic() - valve_started
+                if stopped.by[0] == "external":
+                    # As _wait_shot's: only what is still this shot's is closed, never a pump a hold now owns.
+                    elapsed = self._close_cut_short(room, zone, stopped.by[1], elapsed or 0.0, duration_s,
+                                                    valve_opened or datetime.now(timezone.utc), pending[0])
+                    shutdown_checked = True
+                if valve_started is not None and not counted:
+                    counted = True
+                    run = elapsed / duration_s if duration_s > 0 else 1.0
+                    self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
+                                                steering=steering)
+                if stopped.by[0] != "external":  # _close_cut_short raised its CS-307
+                    stopped_early(stopped.by, elapsed)
+            except Exception as e:
+                log("shot error", room.slug, zone, e)
+                errored = True  # its water is still counted, after the cleanup below (count_water_so_far)
         except SystemExit:
             # SIGTERM/SIGINT mid-shot (the app stopped or updated): _safe_exit has already closed what this
             # shot has open, by the reconciler's rules, so the cleanup below must not switch the rest off.
@@ -5863,7 +6055,11 @@ class Controller:
                     # Read back as patiently as after a normal close: a plug that reports OFF 1.6 s
                     # late is not a stuck pump (the 15 Sep false hold, on this very path).
                     closed = self._confirm_switches(closing, "off")
-                    if refused or not closed:
+                    if (refused or not closed) and _GATE.state == "all":
+                        # Refused, not stuck (as after a normal close): left recorded for the reconciler.
+                        log(f"[{room.slug}] Z{zone} shot cleanup with Home Assistant refusing: its offs were "
+                            "sent, not read back; left recorded")
+                    elif refused or not closed:
                         self._latch_hardware_fault(
                             room,
                             f"zone {zone} shot error cleanup",
