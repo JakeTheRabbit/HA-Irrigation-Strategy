@@ -112,6 +112,15 @@ class Outbox:
             fh.writelines(json.dumps(r, default=str) + "\n" for r in rows)
         os.replace(tmp, path)
 
+    def count(self) -> int:
+        """How many lines the outbox holds (torn ones too), counted without reading them as events."""
+        with self._lock:
+            try:
+                with open(self.path, "rb") as fh:
+                    return sum(1 for _ in fh)
+            except FileNotFoundError:
+                return 0
+
     def pending(self) -> list[dict]:
         with self._lock:
             return [e for e in self._read() if e.get("id")]

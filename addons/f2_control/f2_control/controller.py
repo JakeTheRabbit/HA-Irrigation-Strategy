@@ -755,6 +755,10 @@ EVENTS_BUDGET_S = 10.0
 JOURNAL_BACKOFF_PASSES = 5
 HELD_REEMIT_S = 1800
 JOURNAL_FLUSH_BUDGET_S = 1.5  # no flush batch starts later than this into the flush
+# The backfill (_journal_backfill) queues at most this many events a pass, and only into the first half of the
+# outbox's cap, so it never pushes a live event out and never holds one up for long.
+JOURNAL_BACKFILL_CHUNK = 200
+JOURNAL_BACKFILL_SHARE = 0.5
 _HELD_NUMBERS = re.compile(r"\d{1,2}:\d{2}|[-+]?\d+(?:\.\d+)?")  # a hold's times and numbers (_journal_held)
 # The codes whose severity is critical in docs/error-codes.json (tests/test_error_codes.py keeps the two equal):
 # their push is urgent, a high-priority one on a phone whose row asks for that.
@@ -1289,7 +1293,6 @@ class Controller:
         # state for all rooms (nested by slug; old flat single-room files load as 'default')
         self._load_state()
         self._apply_setup_descriptors()  # Gate tombstones/revisions before the very first shot.
-        self._journal_backfill()  # before the dosing thread and the first pass: nothing of theirs is in it yet
         # The guard's first read, before run() starts the dosing thread: a room counts as held until its
         # heartbeat has been read.
         for room in self.rooms:
@@ -6996,7 +6999,8 @@ class Controller:
         self._check_defaulted_setpoints()
         self._maybe_notify(all_pub, now)
         self._send_events()
-        self._journal_backfill()  # a room discovered since the start: after the pass, never before a shot
+        self._journal_backfill()  # after the pass, never before a shot
+        self._journal_recovered()
         self._flush_journal()
 
     def _journal(self, room_prefix, kind, **kw):
@@ -7006,51 +7010,91 @@ class Controller:
         return journal.emit(room_prefix, kind, **kw) if journal is not None else None
 
     def _journal_backfill(self):
-        """Once per room (its state block's `_journal_backfill: 1`): the room's dosing history (dosing_state.json) and
-        the AI assistant's ledger rows for it (jev_ledger.jsonl) from before the journal, as journal events with ids
-        derived from each row (dosing_runner.history_events, brain_bridge.ledger_events), so a backfill that runs
-        again (the app stopped before its state was saved) sends the same ids, and journal_append keeps one of each.
-        Local file reads and outbox appends only; a row it cannot read is left out, and an error leaves the flag
-        unset for the next start."""
+        """A room's history from before the journal, queued over the passes after them, never at start: its dosing
+        history (dosing_state.json) and the AI assistant's ledger rows for it (jev_ledger.jsonl), as journal events with
+        ids derived from each row (dosing_runner.history_events, brain_bridge.ledger_events).
+        - At most JOURNAL_BACKFILL_CHUNK events a pass, and only while the outbox holds under JOURNAL_BACKFILL_SHARE of
+          its cap, so the cap never drops a live event for it.
+        - What is left is kept in memory per room. After a restart it starts again from the files: the same ids, which
+          journal_append keeps once.
+        - The room's `_journal_backfill: 1` is set once all of it is queued.
+        - A file that cannot be read (torn, or not what it should be) is tried again JOURNAL_BACKOFF_PASSES passes
+          later, logged once for each run of failures, and never sets the flag."""
         journal = getattr(self, "journal", None)
         todo = [r for r in self.rooms if not getattr(r, "journal_backfill", False)]
         if journal is None or not todo:
             return
+        if getattr(self, "_backfill_skip", 0) > 0:
+            self._backfill_skip -= 1
+            return
+        queues = self.__dict__.setdefault("_backfill_queue", {})
+        try:
+            missing = [r for r in todo if r.slug not in queues]
+            if missing:
+                dosing, rows = self._backfill_sources()
+                for room in missing:
+                    queues[room.slug] = self._backfill_events(room, dosing, rows)
+            budget = min(JOURNAL_BACKFILL_CHUNK, int(journal.cap * JOURNAL_BACKFILL_SHARE) - journal.count())
+            for room in todo:
+                queue = queues[room.slug]
+                take = queue[:max(0, budget)]
+                for _at, kind, kw in take:
+                    journal.emit(room.prefix, kind, **kw)
+                budget -= len(take)
+                queues[room.slug] = queue = queue[len(take):]
+                if not queue:
+                    del queues[room.slug]
+                    room.journal_backfill = True
+            self._backfill_failing = False
+        except Exception as e:
+            if not getattr(self, "_backfill_failing", False):
+                log("journal backfill error, tried again later:", e)
+            self._backfill_failing = True
+            self._backfill_skip = JOURNAL_BACKOFF_PASSES
+
+    def _backfill_sources(self):
+        """(dosing_state.json's rooms, jev_ledger.jsonl's rows); a missing file is empty, one that cannot be read
+        raises (both are written through a tmp file and os.replace, so that is a damaged file, not a torn write)."""
         data = os.path.dirname(self._state_path) or "."
         try:
             with open(os.path.join(data, "dosing_state.json"), encoding="utf-8") as fh:
-                dosing = (json.load(fh).get("rooms") or {})
-        except (OSError, ValueError, AttributeError):
+                dosing = json.load(fh).get("rooms") or {}
+            if not isinstance(dosing, dict):
+                raise ValueError("dosing_state.json has no rooms")
+        except FileNotFoundError:
             dosing = {}
         rows = []
         try:
             with open(os.path.join(data, "jev_ledger.jsonl"), encoding="utf-8") as fh:
-                for line in fh:
-                    try:
-                        rows.append(json.loads(line))
-                    except ValueError:
-                        continue
-        except OSError:
+                rows = [json.loads(line) for line in fh if line.strip()]
+        except FileNotFoundError:
             pass
-        for room in todo:
-            try:
-                block = dosing.get(room.slug) if isinstance(dosing, dict) else None
-                history = block.get("history") if isinstance(block, dict) else None
-                events = [(kw["now"], kind, kw) for kind, kw in
-                          dosing_runner.history_events(room.slug, history if isinstance(history, list) else [])]
-                for row in rows:
-                    if isinstance(row, dict) and row.get("room") == room.slug:
-                        try:
-                            events += [(kw["now"], kind, kw) for kind, kw in brain_bridge.ledger_events(row)]
-                        except (KeyError, TypeError, ValueError):
-                            continue
-                for _at, kind, kw in sorted(events, key=lambda e: e[0].timestamp()):
-                    journal.emit(room.prefix, kind, **kw)
-                room.journal_backfill = True
-                if events:
-                    log(f"[{room.slug}] journal: {len(events)} events of its dosing and AI history queued once")
-            except Exception as e:
-                log(f"[{room.slug}] journal backfill error", e)
+        return dosing, rows
+
+    @staticmethod
+    def _backfill_events(room, dosing, rows):
+        """The room's backfill, oldest first: [(when, kind, Outbox.emit keywords)]. A row it cannot read is left out."""
+        block = dosing.get(room.slug)
+        history = block.get("history") if isinstance(block, dict) else None
+        events = [(kw["now"], kind, kw) for kind, kw in
+                  dosing_runner.history_events(room.slug, history if isinstance(history, list) else [])]
+        for row in rows:
+            if isinstance(row, dict) and row.get("room") == room.slug:
+                try:
+                    events += [(kw["now"], kind, kw) for kind, kw in brain_bridge.ledger_events(row)]
+                except (KeyError, TypeError, ValueError):
+                    continue
+        return sorted(events, key=lambda e: e[0].timestamp())
+
+    def _journal_recovered(self):
+        """What a restart interrupted (dosing_runner.DosingRunner.journal_recovered), to the journal after the pass."""
+        dosing = getattr(self, "dosing", None)
+        if dosing is None:
+            return
+        try:
+            dosing.journal_recovered()
+        except Exception as e:
+            log("journal: interrupted dosing not journaled", e)
 
     def _flush_journal(self):
         """The outbox to the integration (crop_steering.journal_append), once, after every room's pass and never

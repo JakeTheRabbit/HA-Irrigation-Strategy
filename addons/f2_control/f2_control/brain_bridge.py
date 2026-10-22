@@ -9,7 +9,7 @@ import dataclasses
 import json
 import os
 import sys
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from functools import partial
 
 from brain import client as jev_client
@@ -738,12 +738,16 @@ def ledger_events(entry, what=None):
     row, so a row is the same event live or backfilled, and correlation.ledger_id is the row's id."""
     out = []
     ledger_id = str(entry["id"])
+
+    def utc(at):  # a ledger time is the pass's wall clock with no zone: its id never depends on the box's zone
+        return at if at.tzinfo else at.replace(tzinfo=timezone.utc)
+
     common = {"zone": entry.get("zone"), "actor": "ai", "detail": entry.get("judge"),
               "correlation": {"ledger_id": ledger_id}}
     if what in (None, "record"):
         at = datetime.fromisoformat(entry["at"])
         out.append(("ai.judgement", {
-            **common, "now": at, "event_id": derived_id(at, f"ledger:{ledger_id}"),
+            **common, "now": at, "event_id": derived_id(utc(at), f"ledger:{ledger_id}"),
             "outcome": "refused" if entry.get("action") == "refused" else "ok",
             "data": {"judge": entry.get("judge"), "label": entry.get("label"), "action": entry.get("action"),
                      "power": JUDGE_POWER.get(entry.get("judge")), "evidence": entry.get("evidence") or {}}}))
@@ -751,7 +755,7 @@ def ledger_events(entry, what=None):
     if what in (None, "resolve") and isinstance(result, dict):
         known = datetime.fromisoformat(result.get("at") or entry.get("check_at") or entry["at"])
         out.append(("ai.outcome", {
-            **common, "now": known, "event_id": derived_id(known, f"ledger:{ledger_id}:outcome"),
+            **common, "now": known, "event_id": derived_id(utc(known), f"ledger:{ledger_id}:outcome"),
             "data": {"what": result.get("what"), "good": bool(result.get("good"))}}))
     return out
 

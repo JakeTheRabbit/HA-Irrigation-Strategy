@@ -259,6 +259,7 @@ class DosingRunner:
         self._refused = refused or (lambda: False)  # Home Assistant refuses the token (_Refused)
         self._sleep, self._mono = sleep, monotonic
         self._now = now or (lambda: datetime.now(timezone.utc))
+        self._recovered_rows = []  # (slug, history entry) _recover_record wrote, for the journal (journal_recovered)
         self.path = state_path
         # Guards everything below; never held across a Home Assistant call. Re-entrant: the stop signal
         # runs exit() on the main loop, which may be in the middle of a step.
@@ -1975,6 +1976,7 @@ class DosingRunner:
             if kind == "batch":
                 entry["name"] = record.get("name") or ""
             self._add_history(block, entry)
+            self._recovered_rows.append((slug, entry))
             block["inflight"] = {**record, "recovered": True}  # its history is written once
         dose = record.get("dose")
         if isinstance(dose, dict) and dose.get("old_volume") is not None and dose.get("volume_entity"):
@@ -2094,10 +2096,10 @@ class DosingRunner:
         Assistant has it: tried now, and again with the chores until it is created. A newer one for
         the same event replaces one still waiting."""
         item = {"slug": slug, "code": code, "title": title, "message": message, "event": event}
-        job = self._job
-        if job is not None and job.room.slug == slug:
-            job.codes.append(code)  # for its batch.failed
         with self._lock:
+            job = self._job
+            if job is not None and job.room.slug == slug:
+                job.codes.append(code)  # for its batch.failed
             outbox = [a for a in self._doc["outbox"]
                       if (a.get("slug"), a.get("code"), a.get("event")) != (slug, code, event)]
             self._doc["outbox"] = [*outbox, item][-OUTBOX:]
@@ -2129,6 +2131,7 @@ class DosingRunner:
             view = self._live_of(job.room)["batch"]
             view.update(step=step, step_started_at=now)
             view["steps"].append({"step": step, "state": "running", "at": now, "note": None})
+        # A local append: it can wait briefly on Outbox._lock while a flush rewrites the outbox, never longer.
         self._journal_step(job, step, "running")
         self._show(job.room, job.config)
         self._check(job, catch=True)  # a stop is looked for at every step
@@ -2137,7 +2140,7 @@ class DosingRunner:
         with self._lock:
             last = self._live_of(job.room)["batch"]["steps"][-1]
             last["state"] = "done"
-        self._journal_step(job, last["step"], "done")
+        self._journal_step(job, last["step"], "done")  # may wait briefly on Outbox._lock during a flush
         self._show(job.room, job.config)
 
     def _skip(self, job, step, note):
@@ -2145,7 +2148,7 @@ class DosingRunner:
         with self._lock:
             self._live_of(job.room)["batch"]["steps"].append(
                 {"step": step, "state": "skipped", "at": self._now().isoformat(), "note": note})
-        self._journal_step(job, step, "skipped")
+        self._journal_step(job, step, "skipped")  # may wait briefly on Outbox._lock during a flush
         self._show(job.room, job.config)
         self._check(job, catch=True)
 
@@ -2162,6 +2165,23 @@ class DosingRunner:
             journal.emit(getattr(room, "prefix", ""), kind, **kw)
         except Exception as e:
             self._log("dosing: journal error", repr(e))
+
+    def journal_recovered(self):
+        """The rows a restart interrupted (_recover_record), to the journal, on every start that finds one, once its
+        room is known (the controller calls this after each pass). Ids derived as the backfill's: one event each."""
+        with self._lock:
+            rows, self._recovered_rows = self._recovered_rows, []
+        keep = []
+        for slug, entry in rows:
+            room = next((r for r in list(self.c.rooms) if r.slug == slug), None)
+            if room is None:
+                keep.append((slug, entry))
+                continue
+            for kind, kw in history_events(slug, [entry]):
+                self._journal(room, lambda kind=kind, kw=kw: (kind, kw))
+        if keep:
+            with self._lock:
+                self._recovered_rows = (keep + self._recovered_rows)[-HISTORY:]
 
     def _journal_step(self, job, step, state):
         """batch.step for a batch's (or pH correction's) step, with the job's id as its batch_id."""

@@ -7,7 +7,11 @@ in its claim, so the integration's target.changed can be matched to its outcome.
 dose, a batch or a verdict.
 """
 import json
-from datetime import datetime, timedelta
+import os
+import subprocess
+import sys
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -19,7 +23,7 @@ import journal_out
 from brain.envelope import Directive
 from brain.ledger import Ledger
 from crop_steering_engine.ids import derived_id
-from test_dosing_runner import BALANCE, BATCH, _full_batch, make_rig
+from test_dosing_runner import BALANCE, BASE, BATCH, _full_batch, _interrupted, make_rig
 
 STEPS = ("hold", "close", "fill", "mix", "premix", "dose", "postmix", "finish")
 AT = datetime(2026, 10, 20, 23, 0)
@@ -160,6 +164,34 @@ def test_an_event_that_cannot_be_built_never_changes_a_dose_or_a_failed_batch(ri
     assert {e["kind"] for e in _events(r.c.journal)} == {"alert.raised"}  # the controller's own alerts only
 
 
+def test_a_dose_and_batch_a_restart_interrupted_are_journaled_on_every_start(rig, tmp_path):
+    dosed = [{"pump": "balance", "name": "Balance", "ml": 300, "given": 300, "result": "finished",
+              "at": BASE.isoformat()}]
+    cut = {"pump": "bloom", "name": "Bloom", "ml": 150, "at": (BASE + timedelta(minutes=1)).isoformat()}
+    _interrupted(tmp_path, dosed=dosed, dose=cut, name="Week 3")
+    r = rig()
+    assert r.runner.recover() is True
+    r.runner.journal_recovered()
+    events = _events(r.c.journal)
+    assert [(e["kind"], e["outcome"], e["code"]) for e in events] == [
+        ("dose.completed", "ok", None), ("dose.completed", "failed", "CS-803"), ("batch.failed", "failed", None)]
+    assert events[2]["data"] == {"step": None, "reason": "interrupted by a restart", "recipe": "Week 3"}
+    assert len({e["correlation"]["batch_id"] for e in events}) == 1
+    r.runner.journal_recovered()
+    assert len(_events(r.c.journal)) == 3  # each once
+    # The next start finds another one: it is journaled too, not only on the first start after the upgrade.
+    later = (BASE + timedelta(days=1)).isoformat()
+    _interrupted(tmp_path, kind="dose", at=later, dosed=[],
+                 dose={"pump": "balance", "name": "Balance", "ml": 20, "at": later})
+    runner = r.build(tmp_path / "dosing_state.json")
+    r.c.dosing = runner
+    assert runner.recover() is True
+    runner.journal_recovered()
+    (cut,) = _events(r.c.journal)[3:]
+    assert (cut["kind"], cut["code"], cut["data"]["pump"]) == ("dose.completed", "CS-803", "balance")
+    assert cut["id"] == derived_id(datetime.fromisoformat(later), f"dosing:default:{later}:dose.completed")
+
+
 # ------------------------------------------------------------------ the AI assistant's ledger
 def _brain_rig(tmp_path, rooms=(("default", ""), ("f2", "f2_"))):
     outbox = journal_out.Outbox(str(tmp_path / "journal_outbox.jsonl"))
@@ -179,13 +211,13 @@ def test_a_ledger_record_and_resolve_mirror_as_judgement_and_outcome(tmp_path):
     assert judged["data"] == {"judge": "setpoints", "label": "smaller_shots", "action": "setpoint",
                               "power": "nudge_setpoints", "evidence": {"tomorrow": "smaller_shots"}}
     assert (judged["room_id"], judged["zone"], judged["source"]["actor"]) == ("room:", 1, "ai")
-    assert judged["id"] == derived_id(AT, f"ledger:{row}")
+    assert judged["id"] == derived_id(AT.replace(tzinfo=timezone.utc), f"ledger:{row}")
     assert datetime.fromisoformat(judged["ts"]).replace(tzinfo=None) == AT
     ledger.resolve(row, "VWC held its target", True, at=CHECKED)
     outcome = _events(outbox, "ai.outcome")[0]
     assert outcome["data"] == {"what": "VWC held its target", "good": True}
     assert outcome["correlation"]["ledger_id"] == str(row)
-    assert outcome["id"] == derived_id(CHECKED, f"ledger:{row}:outcome")
+    assert outcome["id"] == derived_id(CHECKED.replace(tzinfo=timezone.utc), f"ledger:{row}:outcome")
 
 
 def test_a_refused_move_is_a_refused_judgement(tmp_path):
@@ -328,14 +360,21 @@ def _expected_ids():
         derived_id(at("2026-10-20T08:00:00+00:00"), "dosing:default:2026-10-20T08:00:00+00:00:batch.step"),
         derived_id(at("2026-10-19T08:00:00+00:00"), "dosing:default:2026-10-19T08:00:00+00:00:dose.completed"),
         derived_id(at("2026-10-18T08:00:00+00:00"), "dosing:default:2026-10-18T08:00:00+00:00:batch.failed"),
-        derived_id(at("2026-10-19T23:00:00"), "ledger:4"),
-        derived_id(at("2026-10-20T23:00:00"), "ledger:4:outcome"),
+        derived_id(at("2026-10-19T23:00:00+00:00"), "ledger:4"),
+        derived_id(at("2026-10-20T23:00:00+00:00"), "ledger:4:outcome"),
     }
+
+
+def _pass(c):
+    """What a pass does for the backfill, after its rooms and before its flush (Controller.loop_once)."""
+    c._journal_backfill()
 
 
 def test_backfill_runs_once_and_ids_are_stable(start, tmp_path):
     _seed(tmp_path)
     c = start()
+    assert _events(c.journal) == []  # never at start: the first pass acts first
+    _pass(c)
     events = _events(c.journal)
     assert {e["id"] for e in events} == _expected_ids()
     by_kind = {e["kind"]: e for e in events}
@@ -347,25 +386,28 @@ def test_backfill_runs_once_and_ids_are_stable(start, tmp_path):
     assert {e["source"]["detail"] for e in events if e["kind"] == "dose.completed"} == {"Ben", None}
     assert [e["kind"] for e in events][:2] == ["batch.failed", "dose.completed"]  # oldest first
     # The flag is in the room's block once the state is saved; a second start sends nothing.
-    assert c._save_state()
+    assert c.rooms[0].journal_backfill is True and c._save_state()
     assert json.loads((tmp_path / "state.json").read_text())["default"]["_journal_backfill"] == 1
     c.journal.flush(lambda room_id, chunk: ([e["id"] for e in chunk], []))
-    assert _events(c.journal) == []
     again = start()
+    _pass(again)
     assert _events(again.journal) == []
-    again.loop_once(datetime(2026, 10, 22, 12, 0))
-    assert not [e for e in _events(again.journal) if e["kind"] in ("ai.judgement", "dose.completed")]
 
 
 def test_a_backfill_that_runs_again_sends_the_same_ids(start, tmp_path):
     _seed(tmp_path)
-    first = {e["id"] for e in _events(start().journal)}  # never saved: as if the app stopped before its save
+    c = start()
+    _pass(c)
+    first = {e["id"] for e in _events(c.journal)}  # never saved: as if the app stopped before its save
     (tmp_path / "journal_outbox.jsonl").unlink()
-    assert {e["id"] for e in _events(start().journal)} == first
+    again = start()
+    _pass(again)
+    assert {e["id"] for e in _events(again.journal)} == first
 
 
 def test_backfill_flag_is_not_read_back_as_a_room(start, tmp_path):
     c = start()
+    _pass(c)
     assert c._save_state()
     saved = json.loads((tmp_path / "state.json").read_text())
     assert set(saved) == {"default"} and saved["default"]["_journal_backfill"] == 1
@@ -376,7 +418,143 @@ def test_backfill_flag_is_not_read_back_as_a_room(start, tmp_path):
 
 def test_a_room_with_no_history_is_flagged_and_sends_nothing(start):
     c = start()
+    _pass(c)
     assert _events(c.journal) == [] and c.rooms[0].journal_backfill is True
+
+
+def test_the_first_pass_acts_before_any_backfill(start, tmp_path):
+    _seed(tmp_path)
+    c = start()
+    assert c.rooms[0].journal_backfill is False and _events(c.journal) == []
+    seen = []
+    real = c._loop_room
+
+    def loop_room(room, now):
+        seen.append(len(_events(c.journal)))  # what the outbox holds while the room acts
+        return real(room, now)
+
+    c._loop_room = loop_room
+    c.loop_once(datetime(2026, 10, 22, 12, 0))
+    assert seen == [0]
+    assert {e["id"] for e in _events(c.journal)} >= _expected_ids()  # queued after the room's pass
+
+
+def _big_ledger(tmp_path, n):
+    rows = [{"id": i, "at": (AT + timedelta(minutes=i)).isoformat(), "judge": "setpoints", "room": "default",
+             "zone": 1, "label": "keep", "action": "setpoint", "evidence": {}, "check_at": None, "check": None,
+             "outcome": {"what": "held", "good": True, "at": (CHECKED + timedelta(minutes=i)).isoformat()}}
+            for i in range(1, n + 1)]
+    (tmp_path / "jev_ledger.jsonl").write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    return {e for r in rows for _k, kw in brain_bridge.ledger_events(r) for e in [kw["event_id"]]}
+
+
+def test_a_backfill_never_drops_a_live_event_and_finishes_over_several_passes(start, tmp_path):
+    expected = _big_ledger(tmp_path, 60)  # 120 events
+    c = start()
+    c.journal = journal_out.Outbox(str(tmp_path / "small_outbox.jsonl"), cap=50)
+    live = {c.journal.emit("", "alert.raised", data={"key": f"k{i}"}) for i in range(20)}
+    down = {"value": True}
+
+    def append(data, timeout):
+        if down["value"]:
+            return 500, None
+        return 200, {"accepted": [e["id"] for e in data["events"]], "duplicate": [], "rejected": []}
+
+    c.fake.responses[("crop_steering", "journal_append")] = append
+    sent = []
+    for _ in range(10):  # the integration is down: nothing leaves, the backfill waits for room
+        _pass(c)
+        c._journal_skip = 0
+        c._flush_journal()
+        pending = {e["id"] for e in _events(c.journal)}
+        assert live <= pending and len(pending) <= 25
+    assert c.rooms[0].journal_backfill is False
+    down["value"] = False
+    passes = 0
+    while not c.rooms[0].journal_backfill:
+        passes += 1
+        assert passes < 50
+        _pass(c)
+        c._flush_journal()
+        sent += [e["id"] for dom, svc, data in c.fake.calls if svc == "journal_append" for e in data["events"]]
+        c.fake.calls.clear()
+    c._flush_journal()
+    sent += [e["id"] for dom, svc, data in c.fake.calls if svc == "journal_append" for e in data["events"]]
+    assert passes > 1 and live <= set(sent) and expected <= set(sent)
+
+
+def test_at_most_200_backfill_events_a_pass(start, tmp_path):
+    _big_ledger(tmp_path, 150)  # 300 events
+    c = start()
+    _pass(c)
+    assert len(_events(c.journal)) == 200 and c.rooms[0].journal_backfill is False
+    _pass(c)
+    assert len(_events(c.journal)) == 300 and c.rooms[0].journal_backfill is True
+
+
+def test_a_torn_read_is_tried_again_later_and_never_sets_the_flag(start, tmp_path, monkeypatch):
+    lines = []
+    monkeypatch.setattr(controller, "log", lambda *a: lines.append(" ".join(str(x) for x in a)))
+    c = start()
+    (tmp_path / "dosing_state.json").write_text('{"rooms": {"default": {"hist', encoding="utf-8")  # torn
+    for _ in range(12):
+        _pass(c)
+    assert c.rooms[0].journal_backfill is False and _events(c.journal) == []
+    assert len([x for x in lines if "journal backfill" in x]) == 1  # one line for the run of failures
+    _seed(tmp_path)
+    for _ in range(controller.JOURNAL_BACKOFF_PASSES + 1):
+        _pass(c)
+    assert c.rooms[0].journal_backfill is True
+    assert {e["id"] for e in _events(c.journal)} == _expected_ids()
+
+
+def test_a_torn_ledger_line_is_tried_again_later(start, tmp_path):
+    _seed(tmp_path)
+    with open(tmp_path / "jev_ledger.jsonl", "a", encoding="utf-8") as fh:
+        fh.write('{"id": 6, "at": "2026-')
+    c = start()
+    _pass(c)
+    assert c.rooms[0].journal_backfill is False and _events(c.journal) == []
+
+
+def test_live_and_backfilled_ledger_ids_match_in_every_time_zone(tmp_path):
+    script = tmp_path / "ids.py"
+    script.write_text(f"""
+import json, sys
+from datetime import datetime
+from types import SimpleNamespace
+sys.path.insert(0, {str(Path(brain_bridge.__file__).parent)!r})
+import brain_bridge, journal_out
+from brain.ledger import Ledger
+outbox = journal_out.Outbox(sys.argv[1] + "/out.jsonl")
+ledger = Ledger(sys.argv[1] + "/ledger.jsonl")
+c = SimpleNamespace(journal=outbox, jev=SimpleNamespace(ledger=ledger), rooms=[SimpleNamespace(slug="d", prefix="")])
+brain_bridge.journal_ledger(c)
+row = ledger.record("setpoints", "d", 1, "keep", "setpoint", at=datetime(2026, 10, 20, 23, 0))
+ledger.resolve(row, "held", True, at=datetime(2026, 10, 21, 23, 0))
+live = [e["id"] for e in outbox.pending()]
+back = [kw["event_id"] for _k, kw in brain_bridge.ledger_events(ledger.entries[0])]
+print(json.dumps([live, back]))
+""", encoding="utf-8")
+    seen = []
+    for tz in ("UTC0", "NZST-13", "PST8PDT"):
+        folder = tmp_path / tz
+        folder.mkdir()
+        out = subprocess.run([sys.executable, str(script), str(folder)], capture_output=True, text=True,
+                             env={**os.environ, "TZ": tz}, check=True).stdout
+        live, back = json.loads(out.strip().splitlines()[-1])
+        assert live == back
+        seen.append(tuple(live))
+    assert len(set(seen)) == 1
+    assert seen[0][0] == derived_id(datetime(2026, 10, 20, 23, 0, tzinfo=timezone.utc), "ledger:1")
+
+
+def test_the_pass_journals_what_a_restart_interrupted(start):
+    c = start()
+    called = []
+    c.dosing.journal_recovered = lambda: called.append(True)
+    c.loop_once(datetime(2026, 10, 22, 12, 0))
+    assert called == [True]
 
 
 def test_the_controllers_claim_carries_the_ledger_id(start):
