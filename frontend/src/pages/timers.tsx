@@ -115,6 +115,7 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
   const perPlantMax: Record<number, number | null> = {};
   const zoneLph: Record<number, number | null> = {};
   // Today's water so far, in litres a plant (the zone's Water today reading); null without it.
+  // daily_water_app resets at the grow-day's lights-on (the controller's P3 -> P0 rollover), not at midnight.
   const usedToday: Record<number, number | null> = {};
   for (const z of room.zones) {
     const p = waterParameters(controller, z.id);

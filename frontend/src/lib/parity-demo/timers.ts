@@ -60,7 +60,7 @@ const finite = (value: unknown, what: string) => {
 function pyInt(value: unknown, what: string): number {
   if (typeof value === "boolean") return value ? 1 : 0;
   if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
-  if (typeof value === "string" && /^s*[+-]?d+s*$/.test(value)) return Number(value);
+  if (typeof value === "string" && /^\s*[+-]?\d+\s*$/.test(value)) return Number(value);
   throw new Error(what);
 }
 /** Python truthiness, for `p.get("window") or {...}`. */
@@ -115,7 +115,10 @@ function validate(raw: Record<string, unknown>, room: string): Stored {
     if (!Number.isFinite(Date.parse(String(p.start_at)))) throw new Error("start_at must be an ISO datetime");
     out.start_at = String(p.start_at);
   }
-  for (const zone of zones) if (zone < 1 || zone > ZONES) throw new Error(`Zone ${zone} is not in this room`);
+  for (const zone of zones) {
+    if (!Number.isInteger(zone)) throw new Error("zones must be integers");
+    if (zone < 1 || zone > ZONES) throw new Error(`Zone ${zone} is not in this room`);
+  }
   return out;
 }
 

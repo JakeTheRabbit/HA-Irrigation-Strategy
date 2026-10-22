@@ -233,12 +233,16 @@ export function consequence(
   const at = (stop: { day: number; after: number }) =>
     stop.after ? `after shot ${stop.after}` : "before its first shot";
   const unknown = walks.find((w) => w.todayUnknown && w.limit !== null);
-  const stopped = walks.find((w) => w.stop);
+  // The unknown zone's own stop can only be a later grow-day's (it starts from nothing); another
+  // zone's may be today's.
+  const stopped = walks.find((w) => w.stop && w.zone === unknown?.zone) ?? walks.find((w) => w.stop);
   if (unknown) {
-    text += ` Stops when a zone reaches ${litres(unknown.limit!)} per plant in a day`;
-    // A later grow-day starts from nothing, so its stop can still be named.
-    text += stopped ? `; ${zones.length > 1 ? `zone ${stopped.zone} ` : ""}in the next grow-day ${at(stopped.stop!)}.` : ".";
-  } else if (stopped) {
+    const reaches = zones.length > 1 ? `Zone ${unknown.zone} stops when it reaches` : "Stops when a zone reaches";
+    text += ` ${reaches} ${litres(unknown.limit!)} per plant in a day`;
+    if (stopped?.zone === unknown.zone) return `${text}; in the next grow-day ${at(stopped.stop!)}.`;
+    text += ".";
+  }
+  if (stopped) {
     const stop = stopped.stop!;
     const used = days?.usedToday[stopped.zone] ?? 0;
     text +=

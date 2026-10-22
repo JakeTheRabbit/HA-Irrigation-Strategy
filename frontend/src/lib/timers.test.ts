@@ -345,3 +345,28 @@ describe("fix round 1", () => {
     expect(new Date(synced.data.preview[0].at).getHours()).toBe(9);
   });
 });
+
+describe("fix round 2", () => {
+  const ask = (program: Record<string, unknown>) =>
+    parityDemo("timer_program_preview", { room_id: "room:", program }, Date.parse("2026-10-23T14:10:00+13:00"), "3.18") as Promise<Record<string, any>>;
+  const simple = (zones: unknown[], frequency: unknown = 2) => ({ type: "simple", zones, duration_s: 60, frequency_per_day: frequency, window: { kind: "all" } });
+  test("the demo reads zones and frequency as Python's int() does", async () => {
+    expect((await ask(simple(["3"]))).data.preview.every((s: { zone: number }) => s.zone === 3)).toBe(true);
+    expect((await ask(simple([" 3 "]))).data.preview.every((s: { zone: number }) => s.zone === 3)).toBe(true);
+    expect((await ask(simple(["d"]))).error.message).toBe("zones must be integers");
+    expect((await ask(simple(["2.5"]))).error.message).toBe("zones must be integers");
+    expect((await ask(simple([Number.NaN]))).error.message).toBe("zones must be integers");
+    expect((await ask(simple([3], " 4 "))).data.shots).toBe(4);
+    expect((await ask(simple([3], "d"))).error.message).toBe("frequency must be a whole number per day");
+    expect((await ask(simple([3], "2.5"))).error.message).toBe("frequency must be a whole number per day");
+  });
+  test("a zone without a reading and another that stops today are each named right", () => {
+    const shots = (n: number, zone: number) =>
+      Array.from({ length: n }, (_, i) => ({ zone, at: new Date(Date.UTC(2026, 9, 23, 8, i * 30)).toISOString(), duration_s: 120 }));
+    const list = [...shots(8, 1), ...shots(8, 2)];
+    const preview = { preview: list, shots: list.length, total_s: list.length * 120 };
+    expect(consequence(preview, { 1: 0.00125, 2: 0.00125 }, 1.5, { resets: [], usedToday: { 1: null, 2: 1.2 } })).toBe(
+      "16 shots · 32 min · about 1.2 L per plant. Zone 1 stops when it reaches 1.5 L per plant in a day. Zone 2 stops after shot 2 today: daily limit 1.5 L per plant, 1.2 L used already.",
+    );
+  });
+});
