@@ -297,16 +297,26 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the highlights
         _LOGGER.warning("What's new unavailable: %s", err)
 
+    # System status (G17): one system_health sensor for the site and system_status_get.
+    try:
+        from .system_status import async_setup_system_status
+
+        async_setup_system_status(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the status
+        _LOGGER.warning("System status unavailable: %s", err)
+
     # Setup health checks -> Home Assistant Repairs (read-only diagnostics)
     from datetime import timedelta
 
     from homeassistant.helpers.event import async_call_later, async_track_time_interval
 
     from .health import run_health_check
+    from .system_status import tick as system_status_tick
 
     @callback
     def _hc(_now=None):
         run_health_check(hass, entry)
+        system_status_tick(hass, entry)
 
     hass.data[DOMAIN].setdefault("_hc_unsubs", {})[entry.entry_id] = [
         async_call_later(hass, 60, _hc),  # first check once the add-on has booted
@@ -468,6 +478,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .journal_api import async_leave_journal
 
     async_leave_journal(hass, entry)
+    from .system_status import async_unload_system_status
+
+    async_unload_system_status(hass, entry)
     from .dashboards import async_unload_dashboards
 
     await async_unload_dashboards(hass, entry)

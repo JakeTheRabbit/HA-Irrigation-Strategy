@@ -269,14 +269,19 @@ def room_of(hass, room_id: str) -> dict:
     }
 
 
-def _dashboards(hass):
-    """{url_path: LovelaceConfig} of Home Assistant's dashboards, or None while they are not loaded.
+def lovelace_part(hass, name):
+    """hass.data["lovelace"]'s `name` (dashboards, resources), or None while it is not loaded.
     hass.data["lovelace"] is a dict on Home Assistant 2024.10 and a LovelaceData dataclass on 2026.9.
     """
     data = hass.data.get("lovelace")
     if isinstance(data, dict):
-        return data.get("dashboards")
-    return getattr(data, "dashboards", None)
+        return data.get(name)
+    return getattr(data, name, None)
+
+
+def _dashboards(hass):
+    """{url_path: LovelaceConfig} of Home Assistant's dashboards, or None while they are not loaded."""
+    return lovelace_part(hass, "dashboards")
 
 
 def _lovelace(hass):

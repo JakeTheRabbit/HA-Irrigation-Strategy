@@ -1597,6 +1597,20 @@ display_save:
       required: true
       selector:
         object:
+
+system_status_get:
+  name: Read system status
+  description: >-
+    Returns the site's health: for each room every entity its setup maps (the zones' probes and
+    valves, the pump, the main line, the feed probes, the tank sensors and the zones' flow meters),
+    each with its kind, name, zone, last seen, last change, whether it is online and its share of the
+    last 7 days online (from the recorder; null without one), grouped by kind; the room's percent
+    online, open alerts and controller heartbeat (its last 120 beats, a missed beat marked). Also the
+    controller (running, stale or absent), the controller app's and Home Assistant's versions, the AI
+    assistant's calls today against its daily budget, and the version of the dashboard card Home
+    Assistant loads. A probe is online while it reports within 3 times its usual interval (at least
+    180 s). Changes nothing. It has no administrator check.
+
 supply_get:
   name: Read supply settings
   description: >-

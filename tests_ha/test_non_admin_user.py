@@ -137,6 +137,7 @@ READS = {
                      "end": "2026-01-02T00:00:00+00:00"},
     "timeline_summary": {"rooms": [ROOM], "days": ["2026-01-01"]},
     "alert_rule_list": {},
+    "system_status_get": {},
     "alert_rule_preview": {"rule": {"room_id": ROOM, "source": "tank.level", "op": "below",
                                     "threshold": 30}},
 }

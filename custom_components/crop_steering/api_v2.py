@@ -235,6 +235,7 @@ NEVER_ANSWERS_REFUSAL = frozenset(
         "strategy_save",
         "supply_get",
         "supply_save",
+        "system_status_get",
         "test_shot",
         "timer_program_delete",
         "timer_program_list",
