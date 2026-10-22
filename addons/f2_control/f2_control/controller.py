@@ -2077,17 +2077,33 @@ class Controller:
         return None if default is None else float(default)
 
     def _room_duration_cap(self, room):
-        """Read the canonical room cap, or its same-room legacy entity if absent."""
+        """Read the canonical room cap, or its same-room legacy entity if absent. A read that fails
+        (no answer, an HA error) is not "absent": it keeps the cap read earlier this run, or holds."""
         for suffix in ("max_shot_duration", "maximum_shot_duration"):
             entity = f"number.crop_steering_{room.prefix}{suffix}"
-            raw, attributes, updated = ha_get(entity)
-            if raw is None and not attributes and updated is None:
+            status, (raw, _attributes, _updated) = ha_get_status(entity)
+            if status == 404:
                 continue
+            if status != 200:
+                last = room.__dict__.get("_cap_seen")
+                if last is not None:
+                    return last
+                self._alert(
+                    f"duration_config_{room.slug}",
+                    "CS-203",
+                    "maximum shot length not valid, no shots",
+                    "The controller could not read the maximum shot length of the room from Home Assistant, "
+                    "and it has read no value since it started, so it starts no shot. The controller does "
+                    f"not replace the value with a default.\n\nSetting: {entity}",
+                    room=room,
+                )
+                return None
             try:
                 value = float(raw)
             except (TypeError, ValueError):
                 value = None
             if value is not None and math.isfinite(value) and value >= 5:
+                room._cap_seen = value
                 return value
             self._alert(
                 f"duration_config_{room.slug}",
