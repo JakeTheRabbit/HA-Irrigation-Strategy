@@ -570,6 +570,69 @@ def test_switches_that_read_on_add_no_time_before_the_valve_opens(rig, monkeypat
     assert room.shot_inflight is None
 
 
+def _turn_on_times(c, fake, clock, monkeypatch, prime, lead):
+    room = c.rooms[0]
+    fake.set_state("number.crop_steering_pump_prime_time", str(prime))
+    fake.set_state("number.crop_steering_main_line_lead_time", str(lead))
+    opened = {}
+
+    def call(domain, service, **data):
+        if service == "turn_on":
+            opened[data.get("entity_id")] = clock.seconds
+        return fake.ha_call(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    return room, opened
+
+
+@pytest.mark.parametrize("prime, lead", [(4, 0.5), (0.5, 0.5)])
+def test_a_lead_under_the_first_read_back_is_not_stretched(rig, monkeypatch, prime, lead):
+    """CTL-002 CI: a switch that reads ON at once is read back within a prime or lead shorter than 1 s,
+    so a 0.5 s main-line lead still opens the valve 0.5 s after the main line, not 1 s."""
+    c, fake, clock = rig
+    room, opened = _turn_on_times(c, fake, clock, monkeypatch, prime, lead)
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    assert opened["switch.m"] - opened["switch.p"] == pytest.approx(prime)
+    assert opened["switch.v1"] - opened["switch.m"] == pytest.approx(lead)
+    assert room.state[1]["shots"] == 1
+
+
+@pytest.mark.parametrize("on_at", [2.0, None])
+def test_a_main_line_still_off_at_its_short_lead_keeps_the_valve_shut(rig, monkeypatch, on_at):
+    """CTL-002 CI: with a 0.5 s lead the main line's first read comes at 0.5 s; if it still reads off then,
+    the valve waits for a confirmed ON (here at 2 s), and never opens if it never reads ON."""
+    c, fake, clock = rig
+    room, opened = _turn_on_times(c, fake, clock, monkeypatch, 2, 0.5)
+    real_call, real_get = controller.ha_call, controller.ha_get
+    closed = []
+
+    def call(domain, service, **data):
+        if (service, data.get("entity_id")) == ("turn_on", "switch.m"):
+            opened["switch.m"] = clock.seconds
+            fake.calls.append((domain, service, data))
+            return True  # taken; its state follows `on_at`
+        if (service, data.get("entity_id")) == ("turn_off", "switch.m"):
+            closed.append(clock.seconds)
+        return real_call(domain, service, **data)
+
+    def get(entity, timeout=8):
+        if entity == "switch.m" and "switch.m" in opened and not closed:
+            late = on_at is not None and clock.seconds - opened["switch.m"] >= on_at
+            if "switch.v1" in opened:
+                assert late  # the valve opened only after the main line read ON
+            return controller.HAState("on" if late else "off", {}, None)
+        return real_get(entity, timeout=timeout)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller, "ha_get", get)
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    if on_at is None:
+        assert "switch.v1" not in opened and room.state[1]["shots"] == 0
+    else:
+        assert opened["switch.v1"] - opened["switch.m"] >= on_at
+        assert room.state[1]["shots"] == 1
+
+
 def _valve_reads(c, fake, clock, monkeypatch, state_at):
     """The valve's state as Home Assistant reports it: `state_at(seconds since its turn_on, window_over)`.
     `window_over` turns True once the controller's ON read-back has given up. Returns the seconds of the

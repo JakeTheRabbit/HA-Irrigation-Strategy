@@ -5554,7 +5554,8 @@ class Controller:
         return open_s
 
     @staticmethod
-    def _confirm_switches(entities, want, deadline=None, reads=None, stop=None, until=None):
+    def _confirm_switches(entities, want, deadline=None, reads=None, stop=None, until=None,
+                          first=CONFIRM_FIRST_READ_S):
         """True only when every switch reads back `want`. Each state read is added to `reads` when given.
 
         With `stop` (a shot opening: _operator_stop for it), `stop(end of this stage)` is asked at most every
@@ -5605,10 +5606,10 @@ class Controller:
                 check(end)
                 _pause(CONFIRM_POLL_S, deadline)
 
-        # First read at 1 s, exactly as before, so a plug that reports promptly costs nothing extra.
-        # A late report is then re-read every 0.5 s up to 6 s. The pump has already been commanded
-        # OFF by the time this runs.
-        if settled(CONFIRM_TIMEOUT_S, CONFIRM_FIRST_READ_S):
+        # First read at 1 s (`first`: sooner inside a shorter prime or lead), exactly as before, so a plug
+        # that reports promptly costs nothing extra. A late report is then re-read every 0.5 s up to 6 s.
+        # The pump has already been commanded OFF by the time this runs.
+        if settled(CONFIRM_TIMEOUT_S, first):
             return True
         if deadline is not None and deadline.timeout(8) is None:
             return False
@@ -5720,7 +5721,9 @@ class Controller:
             def stop(end):
                 return self._operator_stop(room, zone, 2.0, end, holds=True)
 
-            if not self._confirm_switches((ent,), "on", reads=reads, stop=stop, until=until):
+            # inside a prime or lead under 1 s, the first read comes at its end: a prompt report costs nothing
+            first = min(lead_s, CONFIRM_FIRST_READ_S) if lead_s > 0 else CONFIRM_FIRST_READ_S
+            if not self._confirm_switches((ent,), "on", reads=reads, stop=stop, until=until, first=first):
                 # once more as it is switched off: an ON just after the window
                 reads.append(hw_get(ent, timeout=2.0)[0])
                 if _GATE.state == "all":  # refused late in the read-back: not a switch that failed either
