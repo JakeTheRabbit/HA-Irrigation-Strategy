@@ -6,6 +6,8 @@ reads them back. Every stored event is re-fired on the bus as `crop_steering_eve
 writes through `emit()`. A signed-in user who may not call `subscribe_events` for a custom event type can follow
 the feed with the `crop_steering/subscribe` websocket command. `history_changes` reads who changed what
 (changes.py folds the journal) and `history_revert` puts one change back (an administrator only).
+`timeline_get` and `timeline_summary` read what each zone did and is planned to do (timeline.py folds the
+journal and the controller's projection_app).
 
 Nothing here is needed for watering: a journal that cannot open only logs, `emit()` then does nothing, and the
 two services answer "unavailable".
@@ -27,7 +29,14 @@ from .journal import validate_event
 
 _LOGGER = logging.getLogger(__name__)
 
-SERVICES = ("journal_append", "journal_query", "history_changes", "history_revert")
+SERVICES = (
+    "journal_append",
+    "journal_query",
+    "history_changes",
+    "history_revert",
+    "timeline_get",
+    "timeline_summary",
+)
 MAX_APPEND = 50
 # history_changes answers at most this many rows, the newest (`truncated: true` when it cut).
 MAX_CHANGES = 2000
@@ -619,6 +628,162 @@ async def _put_back_setup(hass, entry, old, new, who, call, check) -> dict:
         return _read_back(setup_api._owned(setup_api.setup_room(hass, entry)) == old)
 
 
+# ------------------------------------------------------------------ Timeline (G5)
+PROJECTION = f"sensor.{DOMAIN}_{{}}projection_app"
+
+
+async def _all_events(hub, **kw) -> list:
+    events, cursor = [], None
+    while True:
+        page = await hub.query(**kw, cursor=cursor)
+        events += page["events"]
+        cursor = page["cursor"]
+        if cursor is None:
+            return events
+
+
+def _local_tz():
+    from homeassistant.util import dt as dt_util
+
+    return dt_util.get_default_time_zone()
+
+
+def _rooms_of(args) -> list[str]:
+    rooms = list(dict.fromkeys(args["rooms"]))
+    if not rooms or not all(
+        isinstance(r, str) and r.startswith("room:") for r in rooms
+    ):
+        raise _hub_error("rooms are one or more canonical room ids such as room:f2_")
+    return rooms
+
+
+def _timeline_room(hass, room_id) -> tuple[dict, list]:
+    """What timeline.build needs of one room, and its projection_app intents (the only planned source)."""
+    from . import timers_api
+    from .room import room_prefix
+    from .setup_api import effective
+    from .site_api import SENSOR as SUPPLY
+
+    prefix = room_id[len("room:") :]
+    state = hass.states.get(PROJECTION.format(prefix))
+    intents = getattr(state, "attributes", {}).get("intents") if state else None
+    if (
+        state is None
+        or state.state in ("unavailable", "unknown")
+        or not isinstance(intents, list)
+    ):
+        intents, source = [], "unavailable"
+    else:
+        source = "projection_app"
+    timers = next(
+        (r for r in timers_api._rooms(hass).values() if r.room_id == room_id), None
+    )
+    entry = next(
+        (
+            e
+            for e in hass.config_entries.async_entries(DOMAIN)
+            if room_prefix(e) == prefix
+        ),
+        None,
+    )
+    supply = hass.states.get(SUPPLY)
+    attrs = supply.attributes if supply is not None else {}
+    pump = (
+        (effective(entry).get("hardware") or {}).get("pump_switch") if entry else None
+    )
+    capacity = next(
+        (
+            p.get("max_flow_lph")
+            for p in attrs.get("irrigation_pumps") or ()
+            if pump and p.get("entity_id") == pump
+        ),
+        None,
+    )
+    room = {
+        "room_id": room_id,
+        "lights_hours": timers.lights() if timers is not None else None,
+        "demand": dict((attrs.get("zone_demand_lph") or {}).get(room_id) or {}),
+        "capacity_lph": capacity,
+        "planned_source": source,
+    }
+    return room, [{**i, "room_id": room_id} for i in intents if isinstance(i, dict)]
+
+
+async def timeline_get(hass, hub, args: dict) -> dict:
+    """{rooms, errors, truncated?}: timeline.build over each room's shot, hold, queue, alert and flow events in
+    [start, end) and its projection_app intents, in HA local time. The fold runs in the executor.
+    """
+    from homeassistant.util import dt as dt_util
+
+    from . import timeline
+
+    tz = _local_tz()
+    start, end = timeline.at(args["start"], tz), timeline.at(args["end"], tz)
+    if start is None or end is None:
+        raise _hub_error("start and end are ISO times")
+    try:
+        timeline.check_span(start, end)
+    except ValueError as err:
+        raise _hub_error(str(err)) from err
+    rooms, events, planned = [], [], []
+    for room_id in _rooms_of(args):
+        events += await _all_events(
+            hub,
+            room_id=room_id,
+            since=start.isoformat(),
+            until=end.isoformat(),
+            kinds=list(timeline.KINDS),
+            zones=args.get("zones"),
+        )
+        room, intents = _timeline_room(hass, room_id)
+        rooms.append(room)
+        planned += intents
+    return await hass.async_add_executor_job(
+        lambda: timeline.build(
+            rooms,
+            events,
+            planned,
+            start,
+            end,
+            now=dt_util.now(),
+            tz=tz,
+            zones=args.get("zones"),
+        )
+    )
+
+
+async def timeline_summary(hass, hub, args: dict) -> dict:
+    """{days: [{date, rooms: [{room_id, shots, failed, warnings, held, queued}]}]}, each local day of each room
+    read from local midnight to the next."""
+    from datetime import datetime as dt
+    from datetime import time as dtime
+
+    from . import timeline
+
+    tz = _local_tz()
+    try:
+        days = timeline.check_days(args["days"])
+    except ValueError as err:
+        raise _hub_error(str(err)) from err
+    rooms = _rooms_of(args)
+    events = []
+    for room_id in rooms:
+        for day in sorted(set(days)):
+            since = dt.combine(day, dtime(), tz)
+            until = dt.combine(day + timedelta(days=1), dtime(), tz)
+            events += await _all_events(
+                hub,
+                room_id=room_id,
+                since=since.isoformat(),
+                until=until.isoformat(),
+                kinds=list(timeline.KINDS),
+            )
+    out = await hass.async_add_executor_job(
+        lambda: timeline.summarise(events, args["days"], rooms=rooms, tz=tz)
+    )
+    return {"days": out}
+
+
 def _not_put_back(call, result):
     """API v2: a put back whose setting did not read back as the old value."""
     from .api_v2 import failure
@@ -756,6 +921,10 @@ async def async_setup_journal(hass) -> None:
             )
         if call.service == "history_changes":
             return await history_changes(hass, hub, call.data)
+        if call.service == "timeline_get":
+            return await timeline_get(hass, hub, call.data)
+        if call.service == "timeline_summary":
+            return await timeline_summary(hass, hub, call.data)
         args = {
             k: v for k, v in call.data.items() if k not in ("client", "proposal_token")
         }
@@ -789,6 +958,16 @@ async def async_setup_journal(hass) -> None:
         "history_revert": {
             vol.Required("event_id"): str,
             vol.Optional("expected_revision"): vol.All(int, vol.Range(min=0)),
+        },
+        "timeline_get": {
+            vol.Required("rooms"): [str],
+            vol.Required("start"): str,
+            vol.Required("end"): str,
+            vol.Optional("zones"): [vol.Coerce(int)],
+        },
+        "timeline_summary": {
+            vol.Required("rooms"): [str],
+            vol.Required("days"): [str],
         },
     }
     for service in SERVICES:

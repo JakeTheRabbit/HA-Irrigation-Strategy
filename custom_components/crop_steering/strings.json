@@ -1046,6 +1046,42 @@
         }
       }
     },
+    "timeline_get": {
+      "name": "Read the timeline",
+      "description": "Returns what each zone did and is planned to do, at most 48 hours: shots, holds, queued shots, alerts and planned timer and engine shots, with lights windows, pump load and error markers. Changes nothing. Any signed-in user can call it.",
+      "fields": {
+        "rooms": {
+          "name": "Rooms",
+          "description": "The rooms to read: each `room:` followed by the room prefix."
+        },
+        "start": {
+          "name": "Start",
+          "description": "The first moment to include, as an ISO time with its offset."
+        },
+        "end": {
+          "name": "End",
+          "description": "The first moment to leave out, as an ISO time with its offset. At most 48 hours after the start."
+        },
+        "zones": {
+          "name": "Zones",
+          "description": "Return only these zone numbers. Empty: all zones."
+        }
+      }
+    },
+    "timeline_summary": {
+      "name": "Read the timeline summary",
+      "description": "Returns, per room per local day, how many shots ran, failed or warned and how many were held or queued. Changes nothing. Any signed-in user can call it.",
+      "fields": {
+        "rooms": {
+          "name": "Rooms",
+          "description": "The rooms to read: each `room:` followed by the room prefix."
+        },
+        "days": {
+          "name": "Days",
+          "description": "The local dates to count, as YYYY-MM-DD. At most 14."
+        }
+      }
+    },
     "notify_get": {
       "name": "Read notifications",
       "description": "Returns who gets which alerts: the row of each phone, the alert types, and the phones of the site with their owners. Changes nothing. It has no administrator check. The answer also shows if the caller can change every row. Use it to read the revision before `notify_save`."

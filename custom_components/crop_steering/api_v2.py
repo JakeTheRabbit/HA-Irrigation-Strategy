@@ -236,6 +236,8 @@ NEVER_ANSWERS_REFUSAL = frozenset(
         "timer_program_preview",
         "timer_program_set",
         "timer_skip",
+        "timeline_get",
+        "timeline_summary",
         "whats_new_get",
         "whats_new_seen",
     }

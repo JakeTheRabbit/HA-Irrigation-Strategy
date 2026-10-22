@@ -129,6 +129,9 @@ READS = {
     "whats_new_get": {},
     "journal_query": {"room_id": ROOM, "since": "2026-01-01T00:00:00+00:00"},
     "history_changes": {"since": "2026-01-01T00:00:00+00:00"},
+    "timeline_get": {"rooms": [ROOM], "start": "2026-01-01T00:00:00+00:00",
+                     "end": "2026-01-02T00:00:00+00:00"},
+    "timeline_summary": {"rooms": [ROOM], "days": ["2026-01-01"]},
 }
 # Changes nothing but whether the dashboard's What's new window shows again: whoever opens the
 # dashboard first after an update may dismiss it, administrator or not.

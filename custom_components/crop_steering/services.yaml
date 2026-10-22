@@ -2207,6 +2207,58 @@ history_revert:
           min: 0
           mode: box
 
+timeline_get:
+  name: Timeline
+  description: >-
+    What each zone did and is planned to do, at most 48 h: shots (done or failed), holds, queued
+    shots and alerts from the journal, and planned timer and engine shots from the controller
+    app's projection, with each room's lights windows, pump load and the error markers. Times in
+    Home Assistant's local time. Any signed-in user.
+  fields:
+    rooms:
+      name: Rooms
+      description: Canonical room ids, "room:" plus the room prefix.
+      required: true
+      selector:
+        object:
+    start:
+      name: Start
+      description: ISO-8601 start time, inclusive.
+      required: true
+      selector:
+        text:
+    end:
+      name: End
+      description: ISO-8601 end time, exclusive. At most 48 h after the start.
+      required: true
+      selector:
+        text:
+    zones:
+      name: Zones
+      description: Only these zone numbers.
+      required: false
+      selector:
+        object:
+
+timeline_summary:
+  name: Timeline summary
+  description: >-
+    Per room per local day: shots, failed, warnings, held and queued counts, from the journal.
+    Any signed-in user.
+  fields:
+    rooms:
+      name: Rooms
+      description: Canonical room ids, "room:" plus the room prefix.
+      required: true
+      selector:
+        object:
+    days:
+      name: Days
+      description: Local dates as YYYY-MM-DD, at most 14.
+      required: true
+      selector:
+        object:
+
 timer_program_set:
   name: Save a timer program
   description: >-
