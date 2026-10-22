@@ -50,7 +50,8 @@ class SetpointLog:
         )  # entity_id -> (reason, expected) the last named write gave, for record()
         self.changes = []
         self.error = None
-        # entity_ids whose write a caller journals itself, with its readback (presets.write_numbers)
+        # ids of the contexts whose writes a caller journals itself, with their readback
+        # (presets.write_numbers); a write in any other context is journaled here as always
         self.quiet = set()
 
     async def async_init(self):
@@ -143,7 +144,7 @@ class SetpointLog:
             self.changes.append(row)
             del self.changes[:-MAX_CHANGES]
             await self._store.async_save({"changes": self.changes})
-        if entity_id in self.quiet:
+        if getattr(context, "id", None) in self.quiet:
             return who, expires
         note(
             self.hass,

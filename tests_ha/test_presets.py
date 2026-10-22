@@ -32,7 +32,9 @@ async def _three_zones(hass):
     for z in (1, 2, 3):
         hass.states.async_set(f"switch.valve_{z}", "off")
     flow = hass.config_entries.flow
-    result = await flow.async_init(DOMAIN, context={"source": config_entries.SOURCE_USER})
+    result = await flow.async_init(
+        DOMAIN, context={"source": config_entries.SOURCE_USER}
+    )
     result = await flow.async_configure(result["flow_id"], {"name": "Room"})
     result = await flow.async_configure(result["flow_id"], {"num_zones": 3})
     answers = {"zone_1_vwc": ["sensor.vwc"]}
@@ -66,11 +68,17 @@ async def _call(hass, user, service, **data):
 async def _set(hass, entity_id, value):
     if entity_id.startswith("select."):
         await hass.services.async_call(
-            "select", "select_option", {"entity_id": entity_id, "option": value}, blocking=True
+            "select",
+            "select_option",
+            {"entity_id": entity_id, "option": value},
+            blocking=True,
         )
     else:
         await hass.services.async_call(
-            "number", "set_value", {"entity_id": entity_id, "value": value}, blocking=True
+            "number",
+            "set_value",
+            {"entity_id": entity_id, "value": value},
+            blocking=True,
         )
 
 
@@ -79,7 +87,9 @@ async def test_copy_zone_3_to_zones_1_2_writes_and_reads_back(hass, hass_admin_u
     await _set(hass, number(3, "p2_shot_size"), 6.5)
     await _set(hass, number(3, "p2_time_between_shots"), 45)
     await _set(hass, p2_mode(3), "Timed")
-    await _set(hass, number(2, "p2_shot_size"), 6.5)  # zone 2 already has zone 3's shot size
+    await _set(
+        hass, number(2, "p2_shot_size"), 6.5
+    )  # zone 2 already has zone 3's shot size
     program = {
         "name": "Mothers AM",
         "type": "recycle",
@@ -89,7 +99,12 @@ async def test_copy_zone_3_to_zones_1_2_writes_and_reads_back(hass, hass_admin_u
         "window": {"kind": "custom", "from": "08:00", "to": "12:00"},
     }
     await _call(
-        hass, hass_admin_user, "timer_program_set", room_id=ROOM, expected_revision=0, program=program
+        hass,
+        hass_admin_user,
+        "timer_program_set",
+        room_id=ROOM,
+        expected_revision=0,
+        program=program,
     )
     before = {
         z: float(hass.states.get(number(z, "p2_shot_size")).state) for z in (1, 2)
@@ -103,12 +118,16 @@ async def test_copy_zone_3_to_zones_1_2_writes_and_reads_back(hass, hass_admin_u
 
     preview = await _call(hass, hass_admin_user, "copy_config", preview=True, **args)
     assert "applied" not in preview
-    rows = {(r["target"]["zone"], r["key"]): (r["old"], r["new"]) for r in preview["diff"]}
+    rows = {
+        (r["target"]["zone"], r["key"]): (r["old"], r["new"]) for r in preview["diff"]
+    }
     assert rows[(1, "p2_shot_size")] == (before[1], 6.5)
     assert (2, "p2_shot_size") not in rows  # unchanged rows are not listed
     assert rows[(1, "p2_mode")] == ("Moisture", "Timed")
     assert rows[(2, "p2_time_between_shots")][1] == 45
-    assert rows[(1, "timer")][0] is None and rows[(1, "timer")][1]["name"] == "Mothers AM"
+    assert (
+        rows[(1, "timer")][0] is None and rows[(1, "timer")][1]["name"] == "Mothers AM"
+    )
     assert float(hass.states.get(number(1, "p2_shot_size")).state) == before[1]
 
     done = await _call(hass, hass_admin_user, "copy_config", preview=False, **args)
@@ -121,7 +140,9 @@ async def test_copy_zone_3_to_zones_1_2_writes_and_reads_back(hass, hass_admin_u
         assert float(hass.states.get(number(z, "p2_time_between_shots")).state) == 45
         assert hass.states.get(p2_mode(z)).state == "Timed"
     # The zones joined zone 3's timer program rather than getting copies of it.
-    (timer,) = (await _call(hass, hass_admin_user, "timer_program_list", room_id=ROOM))["programs"]
+    (timer,) = (await _call(hass, hass_admin_user, "timer_program_list", room_id=ROOM))[
+        "programs"
+    ]
     assert (timer["name"], timer["zones"]) == ("Mothers AM", [1, 2, 3])
     # Read back: the same copy now changes nothing.
     again = await _call(hass, hass_admin_user, "copy_config", preview=True, **args)
@@ -141,7 +162,9 @@ async def test_copy_zone_3_to_zones_1_2_writes_and_reads_back(hass, hass_admin_u
             kinds=["target.changed"],
         )
     )["events"]
-    copied = [e for e in events if e["source"]["detail"] == "copy from room:room_ zone 3"]
+    copied = [
+        e for e in events if e["source"]["detail"] == "copy from room:room_ zone 3"
+    ]
     # (the timer rows journal config.changed in the timer store instead)
     assert len(copied) == len([a for a in done["applied"] if a["key"] != "timer"])
     assert {e["source"]["actor"] for e in copied} == {"manual"}
@@ -150,8 +173,10 @@ async def test_copy_zone_3_to_zones_1_2_writes_and_reads_back(hass, hass_admin_u
     assert not [
         e
         for e in events
-        if e["source"]["detail"] is None and e["data"]["entity_id"] in copied_ids
-        and e["data"]["new"] == 6.5 and e["zone"] in (1, 2)
+        if e["source"]["detail"] is None
+        and e["data"]["entity_id"] in copied_ids
+        and e["data"]["new"] == 6.5
+        and e["zone"] in (1, 2)
     ]
 
 
@@ -171,6 +196,7 @@ async def test_a_preset_saved_once_is_listed_for_every_caller(hass, hass_admin_u
         **{"from": {"room_id": ROOM, "zone": 3}},
     )
     assert saved["preset"]["values"]["targets"]["p2_shot_size"] == 6.5
+    assert saved["skipped"] == []  # every setting of the zone read
     users = await hass.auth.async_get_group(GROUP_ID_USER)
     staff = MockUser(name="Staff phone", groups=[users]).add_to_hass(hass)
     listed = await _call(hass, staff, "preset_list")
@@ -183,9 +209,27 @@ async def test_a_preset_saved_once_is_listed_for_every_caller(hass, hass_admin_u
         preset_id=saved["preset"]["id"],
         to=[{"room_id": ROOM, "zone": 1}],
     )
-    assert {a["key"]: a["readback"] for a in applied["applied"]}["p2_shot_size"] == "verified"
+    assert {a["key"]: a["readback"] for a in applied["applied"]}[
+        "p2_shot_size"
+    ] == "verified"
     assert float(hass.states.get(number(1, "p2_shot_size")).state) == 6.5
     await _call(
-        hass, hass_admin_user, "preset_delete", id=saved["preset"]["id"], expected_revision=1
+        hass,
+        hass_admin_user,
+        "preset_delete",
+        id=saved["preset"]["id"],
+        expected_revision=1,
     )
     assert (await _call(hass, staff, "preset_list"))["presets"] == []
+
+
+async def test_all_covers_every_per_zone_number(hass):
+    """Every number a zone has is in a section `all` copies, or named as never copied: a new zone
+    number that no section covers fails here instead of being left behind by a copy."""
+    from custom_components.crop_steering import presets
+
+    await _three_zones(hass)
+    (numbers,) = hass.data[DOMAIN]["_numbers"].values()
+    zone_keys = {k.removeprefix("zone_1_") for k in numbers if k.startswith("zone_1_")}
+    covered = {k for s in presets.SCOPES["all"] for k in presets.SECTIONS[s]}
+    assert zone_keys and zone_keys - covered - set(presets.NOT_COPIED) == set()

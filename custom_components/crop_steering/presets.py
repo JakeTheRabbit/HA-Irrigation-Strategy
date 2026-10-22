@@ -33,6 +33,7 @@ TARGETS = tuple(
 PHASE_TIMING = (
     "p0_minimum_wait",
     "p0_dryback_drop_percent",
+    "p0_additional_dryback",
     "p1_minimum_shots",
     "p1_rise_pts",
     "p1_maximum_extra_shots",
@@ -43,8 +44,18 @@ PHASE_TIMING = (
     "p2_end_hours_before_off",
     "p3_time_between_shots",
     "ec_min_interval",
+    "ec_flush_target",
+    "p2_dilute_ratio",
 )
 WATER_LIMITS = ("min_daily_ml_per_plant", "max_shot_duration")
+# The zone numbers no section copies: its size and dripper layout, and the manual shot button's length.
+NOT_COPIED = (
+    "plant_count",
+    "substrate_volume",
+    "drippers_per_plant",
+    "dripper_flow_rate",
+    "manual_shot_seconds",
+)
 # A room's timer programs (`timers`) and the program a zone is in (`timer`).
 SECTIONS = {
     "targets": TARGETS,
@@ -56,6 +67,12 @@ SCOPES = {"targets": ("targets",), "timers": ("timers",), "all": tuple(SECTIONS)
 SELECTS = ("p2_mode",)
 # What a timer program is without where it is stored.
 _STORED = ("id", "created_at", "updated_at", "deleted_at")
+# A copy never takes a zone or a room out of its timer programs (review ruling): when the source has
+# none, the target keeps its own and the row is refused with this reason.
+NO_TIMER = {
+    "timer": "source zone has no timer program",
+    "timers": "source room has no timer programs",
+}
 
 
 # ---------------------------------------------------------------------- pure
@@ -234,13 +251,27 @@ def read_values(hass, target) -> dict:
     return _values(hass, *_resolve(hass, target))
 
 
+def read_source(hass, target, sections) -> tuple[dict, list]:
+    """(capture of the target's `sections`, [key]) where the keys are the settings of those
+    sections the target has but that cannot be read now (unavailable, or timers not loaded).
+    """
+    entry, zone, entities = _resolve(hass, target)
+    values = _values(hass, entry, zone, entities)
+    keys = [k for s in sections for k in SECTIONS[s]]
+    timer = "timers" if zone is None else "timer"
+    skipped = [k for k in entities if k in keys and k not in values]
+    if timer in keys and timer not in values:
+        skipped.append(timer)
+    return capture(values, sections), skipped
+
+
 async def write_numbers(
     hass, entry_id: str, writes: list[dict], actor: dict
 ) -> list[dict]:
     """Write [{entity_id, key, value, zone?}] in the room of `entry_id` and read each back.
 
-    -> [{entity_id, key, old, new, readback: verified|refused}], `new` being the state read after
-    the write. A write the entity refuses (a moisture level waiting for its neighbour) is tried
+    -> [{entity_id, key, old, new, readback: verified|refused, error}], `new` being the state read
+    after the write and `error` what the entity said when it refused one (else None). A write the entity refuses (a moisture level waiting for its neighbour) is tried
     again after the others while any of them lands; a refused one never stops the rest. Each write
     journals target.changed with `actor` ({actor, user_id, client}, optional detail,
     causation_id and proposal_token).
@@ -254,36 +285,15 @@ async def write_numbers(
     context = Context(user_id=actor.get("user_id"))
     old = [_state(hass, w["entity_id"]) for w in writes]
     errors, pending = {}, list(range(len(writes)))
-    while pending:
-        failed = []
-        for i in pending:
-            entity_id, value = writes[i]["entity_id"], writes[i]["value"]
-            if log is not None:
-                log.quiet.add(
-                    entity_id
-                )  # this write is journaled here, with its readback
-            try:
-                if entity_id.startswith("select."):
-                    domain, service, data = "select", "select_option", {"option": value}
-                else:
-                    domain, service, data = "number", "set_value", {"value": value}
-                await hass.services.async_call(
-                    domain,
-                    service,
-                    {"entity_id": entity_id, **data},
-                    blocking=True,
-                    context=context,
-                )
-                errors.pop(i, None)
-            except Exception as error:  # noqa: BLE001 - reported as refused
-                errors[i] = str(error)
-                failed.append(i)
-            finally:
-                if log is not None:
-                    log.quiet.discard(entity_id)
-        if len(failed) == len(pending):
-            break
-        pending = failed
+    if log is not None:
+        log.quiet.add(
+            context.id
+        )  # these writes are journaled here, with their readback
+    try:
+        await _write_all(hass, writes, pending, errors, context)
+    finally:
+        if log is not None:
+            log.quiet.discard(context.id)
     results = []
     for i, write in enumerate(writes):
         now = _state(hass, write["entity_id"])
@@ -296,6 +306,7 @@ async def write_numbers(
                 "old": old[i],
                 "new": now,
                 "readback": readback,
+                "error": errors.get(i),
             }
         )
         zone = write.get("zone")
@@ -328,10 +339,39 @@ async def write_numbers(
     return results
 
 
-async def _write_timers(hass, entry, zone, wanted, actor) -> str:
+async def _write_all(hass, writes, pending, errors, context):
+    """Each write in turn; the ones refused again while any other lands."""
+    while pending:
+        failed = []
+        for i in pending:
+            entity_id, value = writes[i]["entity_id"], writes[i]["value"]
+            try:
+                if entity_id.startswith("select."):
+                    domain, service, data = "select", "select_option", {"option": value}
+                else:
+                    domain, service, data = "number", "set_value", {"value": value}
+                await hass.services.async_call(
+                    domain,
+                    service,
+                    {"entity_id": entity_id, **data},
+                    blocking=True,
+                    context=context,
+                )
+                errors.pop(i, None)
+            except Exception as error:  # noqa: BLE001 - reported as refused
+                errors[i] = str(error)
+                failed.append(i)
+        if len(failed) == len(pending):
+            return
+        pending = failed
+
+
+async def _write_timers(hass, entry, zone, wanted, actor) -> tuple[str, str | None]:
+    """-> (readback, error)."""
     from . import timers_api
 
     key = "timers" if zone is None else "timer"
+    error = None
     try:
         room_id = "room:" + room_prefix(entry)
         revision = timers_api.list_programs(hass, room_id)["revision"]
@@ -340,27 +380,44 @@ async def _write_timers(hass, entry, zone, wanted, actor) -> str:
             deepcopy(wanted) if zone is None else zone_programs(current, zone, wanted)
         )
         await timers_api.set_programs(hass, entry.entry_id, programs, revision, actor)
-    except Exception as error:  # noqa: BLE001 - reported as refused
+    except Exception as failed:  # noqa: BLE001 - reported as refused
+        error = str(failed)
         _LOGGER.warning("Crop Steering presets: timers not written: %s", error)
-    return (
-        "verified" if _timers(hass, entry, zone).get(key, ...) == wanted else "refused"
-    )
+    if _timers(hass, entry, zone).get(key, ...) == wanted:
+        return "verified", None
+    return "refused", error or "the timer programs read back different"
 
 
 async def apply(hass, wanted: dict, targets: list, preview: bool, actor: dict) -> dict:
     """Write `wanted` ({section: {key: value}}) to each target, or (preview) only say what would
-    change. -> {diff: [{target, key, old, new}], missing: [{target, key}], applied?: [{target,
-    key, readback}]}. Every target is resolved before anything is written."""
+    change. -> {diff: [{target, key, old, new}], missing: [{target, key, reason?}], applied?:
+    [{target, key, readback, error}]}. Every target is resolved before anything is written. A
+    target is never taken out of its timer programs by a source that has none (NO_TIMER).
+    """
     if not isinstance(targets, list) or not targets:
         raise ValueError("Give at least one target")
     resolved = [(ref(t), *_resolve(hass, t)) for t in targets]
-    out, plans = {"diff": [], "missing": []}, []
+    out, plans, refused = {"diff": [], "missing": []}, [], []
     for target, entry, zone, entities in resolved:
         current = capture(_values(hass, entry, zone, entities), wanted)
         rows = []
         for row in diff(current, wanted):
             if row.get("missing"):
                 out["missing"].append({"target": target, "key": row["key"]})
+                continue
+            if row["section"] == "timers" and not row["new"]:
+                reason = NO_TIMER[row["key"]]
+                out["missing"].append(
+                    {"target": target, "key": row["key"], "reason": reason}
+                )
+                refused.append(
+                    {
+                        "target": target,
+                        "key": row["key"],
+                        "readback": "refused",
+                        "error": reason,
+                    }
+                )
                 continue
             rows.append(row)
             out["diff"].append(
@@ -389,13 +446,25 @@ async def apply(hass, wanted: dict, targets: list, preview: bool, actor: dict) -
         ]
         for result in await write_numbers(hass, entry.entry_id, writes, actor):
             applied.append(
-                {"target": target, "key": result["key"], "readback": result["readback"]}
+                {
+                    "target": target,
+                    "key": result["key"],
+                    "readback": result["readback"],
+                    "error": result["error"],
+                }
             )
         for row in rows:
             if row["section"] == "timers":
-                readback = await _write_timers(hass, entry, zone, row["new"], actor)
-                applied.append(
-                    {"target": target, "key": row["key"], "readback": readback}
+                readback, error = await _write_timers(
+                    hass, entry, zone, row["new"], actor
                 )
-    out["applied"] = applied
+                applied.append(
+                    {
+                        "target": target,
+                        "key": row["key"],
+                        "readback": readback,
+                        "error": error,
+                    }
+                )
+    out["applied"] = applied + refused
     return out

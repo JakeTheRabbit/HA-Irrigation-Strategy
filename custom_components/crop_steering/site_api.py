@@ -275,7 +275,10 @@ class SiteStore:
 
     async def delete_preset(self, data, who=None) -> dict:
         """Soft: the preset leaves the list and stays in the store with deleted_at."""
-        room_id = self.preset(data["id"])["from"]["room_id"]
+        source = self.preset(data["id"]).get("from")
+        if not isinstance(source, dict) or not isinstance(source.get("room_id"), str):
+            raise ValueError(f"Preset {data['id']} has no source room")
+        room_id = source["room_id"]
 
         def change(stored):
             for preset in stored:
@@ -390,7 +393,7 @@ async def async_setup_site(hass, entry) -> None:
     site.publish()
 
     async def handle(call):
-        data = call.data
+        args = call.data
         try:
             if call.service == "supply_get":
                 return await site.response()
@@ -399,39 +402,39 @@ async def async_setup_site(hass, entry) -> None:
             await async_require_admin(hass, call, f"{DOMAIN}.{call.service}")
             who = attribution(hass, call)
             if call.service == "supply_save":
-                return await site.save(data, who)
+                return await site.save(args, who)
             if call.service == "preset_save":
-                values = presets.read_values(hass, data["from"])
-                sections = presets.SCOPES.get(data["scope"], ())
-                return await site.save_preset(
-                    data, presets.capture(values, sections), who
-                )
+                sections = presets.SCOPES.get(args["scope"], ())
+                values, skipped = presets.read_source(hass, args["from"], sections)
+                saved = await site.save_preset(args, values, who)
+                return {**saved, "skipped": skipped}
             if call.service == "preset_delete":
-                return await site.delete_preset(data, who)
-            preview = data.get("preview", False)
+                return await site.delete_preset(args, who)
+            preview = args.get("preview", False)
             if call.service == "preset_apply":
-                preset = site.preset(data["preset_id"])
+                preset = site.preset(args["preset_id"])
                 detail = f"preset {preset['name']}"
                 return await presets.apply(
                     hass,
                     preset["values"],
-                    data["to"],
+                    args["to"],
                     preview,
                     {**who, "detail": detail},
                 )
-            sections = list(data["sections"])
+            sections = list(args["sections"])
             if not sections or not set(sections) <= set(presets.SECTIONS):
                 raise ValueError(
                     "sections must name one or more of " + ", ".join(presets.SECTIONS)
                 )
-            source = presets.ref(data["from"])
-            wanted = presets.capture(presets.read_values(hass, source), sections)
+            source = presets.ref(args["from"])
+            wanted, skipped = presets.read_source(hass, source, sections)
             detail = "copy from " + source["room_id"]
             if "zone" in source:
                 detail += f" zone {source['zone']}"
-            return await presets.apply(
-                hass, wanted, data["to"], preview, {**who, "detail": detail}
+            copied = await presets.apply(
+                hass, wanted, args["to"], preview, {**who, "detail": detail}
             )
+            return {**copied, "skipped": skipped}
         except (ValueError, OSError) as error:
             raise HomeAssistantError(str(error)) from error
 

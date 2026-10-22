@@ -21,7 +21,15 @@ from custom_components.crop_steering.const import DOMAIN  # noqa: E402
 
 core = sys.modules["homeassistant.core"]
 if not hasattr(core, "Context"):
-    core.Context = lambda user_id=None: SimpleNamespace(user_id=user_id)
+
+    class Context:
+        made = 0
+
+        def __init__(self, user_id=None):
+            Context.made += 1
+            self.user_id, self.id = user_id, f"context-{Context.made}"
+
+    core.Context = Context
 
 ROOM = "room:f2_"
 WHO = {"actor": "manual", "user_id": "admin", "client": None}
@@ -150,8 +158,13 @@ def test_apply_reads_back_each_target_and_reports_refused_ones():
     to = [{"room_id": ROOM, "zone": 1}]
     out = run(presets.apply(hass, wanted, to, False, WHO))
     assert out["applied"] == [
-        {"target": to[0], "key": "p2_shot_size", "readback": "refused"},
-        {"target": to[0], "key": "p2_time_between_shots", "readback": "verified"},
+        {"target": to[0], "key": "p2_shot_size", "readback": "refused", "error": None},
+        {
+            "target": to[0],
+            "key": "p2_time_between_shots",
+            "readback": "verified",
+            "error": None,
+        },
     ]
     assert hass.states.get(shot_1).state == "4.0"
     # The re-preview still shows the refused row, and only that one.
@@ -183,6 +196,7 @@ def test_write_numbers_reports_old_new_and_readback_for_each_write():
             "old": 3.0,
             "new": 4.0,
             "readback": "refused",
+            "error": None,
         },
         {
             "entity_id": wait,
@@ -190,6 +204,7 @@ def test_write_numbers_reports_old_new_and_readback_for_each_write():
             "old": 10.0,
             "new": 12.0,
             "readback": "verified",
+            "error": None,
         },
     ]
 
@@ -309,3 +324,128 @@ def test_a_preset_saved_once_is_listed_for_every_client():
         desk.preset(preset["id"])
     # The supply keeps its own revision.
     assert backing.value["revision"] == 0 and backing.value["presets_revision"] == 2
+
+
+# ------------------------------------------------------------------ review round 1
+def test_a_write_to_the_same_entity_in_another_context_is_still_journaled(monkeypatch):
+    from unittest.mock import AsyncMock
+
+    from custom_components.crop_steering import setpoint_log
+
+    shot = number("zone_1_p2_shot_size")
+    hass = rig({"zone_1_p2_shot_size": 3.0})
+    hass.auth = SimpleNamespace(
+        async_get_user=AsyncMock(return_value=SimpleNamespace(system_generated=False))
+    )
+    entry = hass.config_entries.async_entries(DOMAIN)[0]
+    log = setpoint_log.SetpointLog(hass, entry, MemoryStore())
+    hass.data[DOMAIN]["_setpoint_log"] = {"f2": log}
+    journaled = []
+    monkeypatch.setattr(
+        setpoint_log,
+        "note",
+        lambda hass, room, kind, **kw: journaled.append(("log", kw["data"]["new"])),
+    )
+    monkeypatch.setattr(
+        presets,
+        "note",
+        lambda hass, room, kind, **kw: journaled.append(("preset", kw["data"]["new"])),
+    )
+
+    async def call(domain, service, data, blocking=False, context=None):
+        old, new = float(hass.states.get(shot).state), float(data["value"])
+        hass.states.set(shot, str(new))
+        await log.record(shot, "p2_shot_size", 1, old, new, context)
+        # Meanwhile an automation moves the same number, in its own context.
+        await log.record(shot, "p2_shot_size", 1, new, 7.0, core.Context())
+
+    hass.services.async_call = call
+
+    async def go():
+        await log.async_init()
+        write = {"entity_id": shot, "key": "p2_shot_size", "value": 5.0}
+        return await presets.write_numbers(hass, "f2", [write], WHO)
+
+    run(go())
+    assert journaled == [("log", 7.0), ("preset", 5.0)]
+
+
+def _timer_rig(monkeypatch, programs, set_programs=None):
+    from custom_components.crop_steering import timers_api
+
+    hass = rig({"zone_1_p2_shot_size": 3.0})
+    hass.data[DOMAIN]["_timers"] = {"f2": SimpleNamespace(error=None)}
+    monkeypatch.setattr(timers_api, "get_programs", lambda hass, entry_id: programs)
+    monkeypatch.setattr(
+        timers_api, "list_programs", lambda hass, room_id: {"revision": 3}
+    )
+
+    async def refuse(*args):
+        raise AssertionError("set_programs must not be called")
+
+    monkeypatch.setattr(timers_api, "set_programs", set_programs or refuse)
+    return hass
+
+
+AM = {
+    "id": "A",
+    "name": "AM",
+    "type": "recycle",
+    "zones": [1],
+    "duration_s": 120,
+    "active": True,
+}
+
+
+def test_a_source_zone_with_no_timer_program_never_pulls_the_target_from_its_own(
+    monkeypatch,
+):
+    hass = _timer_rig(monkeypatch, [AM])
+    wanted = {"timers": {"timer": None}}
+    to = [{"room_id": ROOM, "zone": 1}]
+    reason = "source zone has no timer program"
+    preview = run(presets.apply(hass, wanted, to, True, WHO))
+    assert preview["diff"] == []
+    assert preview["missing"] == [{"target": to[0], "key": "timer", "reason": reason}]
+    out = run(presets.apply(hass, wanted, to, False, WHO))
+    assert out["applied"] == [
+        {"target": to[0], "key": "timer", "readback": "refused", "error": reason}
+    ]
+
+
+def test_a_timer_write_that_fails_names_its_error_in_the_applied_row(monkeypatch):
+    async def fail(hass, entry_id, programs, revision, actor):
+        raise ValueError("Zone 1 is already in timer 'PM'")
+
+    hass = _timer_rig(monkeypatch, [], fail)
+    shape = {k: v for k, v in AM.items() if k not in ("id", "zones")}
+    to = [{"room_id": ROOM, "zone": 1}]
+    out = run(presets.apply(hass, {"timers": {"timer": shape}}, to, False, WHO))
+    assert out["applied"] == [
+        {
+            "target": to[0],
+            "key": "timer",
+            "readback": "refused",
+            "error": "Zone 1 is already in timer 'PM'",
+        }
+    ]
+
+
+def test_a_stored_preset_without_its_source_is_refused_with_a_value_error():
+    backing = MemoryStore(
+        {"revision": 0, "presets_revision": 1, "presets": [{"id": "P", "name": "old"}]}
+    )
+    with pytest.raises(ValueError, match="no source"):
+        run(site(backing).delete_preset({"id": "P", "expected_revision": 1}, WHO))
+
+
+def test_a_source_setting_that_cannot_be_read_is_named_as_skipped():
+    hass = rig({"zone_3_p2_shot_size": 5.0, "zone_3_p2_time_between_shots": 30.0})
+    hass.states.set(number("zone_3_p2_time_between_shots"), "unavailable")
+    captured, skipped = presets.read_source(
+        hass, {"room_id": ROOM, "zone": 3}, presets.SCOPES["all"]
+    )
+    assert captured["targets"] == {"p2_shot_size": 5.0}
+    assert captured["phase_timing"] == {}
+    # The room's timer programs are not loaded here either.
+    assert skipped == ["p2_time_between_shots", "timer"]

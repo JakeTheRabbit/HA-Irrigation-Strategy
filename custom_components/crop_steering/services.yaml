@@ -1666,7 +1666,8 @@ preset_save:
     apply. The scope picks what it holds: targets, timers, or all (targets, phase timing, water
     limits and timers). When a signed-in user calls it, that user must be a Home Assistant
     administrator. Give the revision that preset_list returned; the save is refused when the
-    presets changed after you read them.
+    presets changed after you read them. It answers with the preset and `skipped`, the settings
+    that could not be read and are not in it.
   fields:
     name:
       name: Name
@@ -1732,8 +1733,9 @@ preset_apply:
   description: >-
     Writes a preset's settings to rooms or zones, then reads each one back. It answers with the
     rows that change (diff), the settings a target has no entity for (missing, never written)
-    and, unless previewed, each write's readback, verified or refused. A refused write does not
-    stop the others. When a signed-in user calls it, that user must be a Home Assistant
+    and, unless previewed, each write's readback, verified or refused, with the error of a
+    refused one. A refused write does not stop the others. A zone or room is never taken out of
+    its timer programs by a source that has none: that row is refused with the reason. When a signed-in user calls it, that user must be a Home Assistant
     administrator.
   fields:
     preset_id:
