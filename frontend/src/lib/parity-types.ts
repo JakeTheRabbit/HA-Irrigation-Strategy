@@ -68,15 +68,28 @@ export interface TimelineBlock {
   skippable: boolean;
   /** An engine expectation, not a fixed timer slot. */
   expected?: boolean;
+  /** A shot still open inside its expected window (status "done"). */
+  running?: boolean;
+  /** A planned slot already skipped (no longer skippable). */
+  skipped?: boolean;
 }
 export interface TimelineRoom {
   room_id: string;
   lights: { on: string; off: string }[];
   rows: { zone: number; blocks: TimelineBlock[] }[];
-  pump_load: { t: string; pct: number }[];
+  /** The room's irrigation pump (switch entity), else null. */
+  pump: string | null;
+  /** Every room on that pump; its `pump_load` is their total. */
+  pump_rooms: string[];
+  /** pct is null when the pump's capacity or a running zone's demand is unknown. */
+  pump_load: { t: string; pct: number | null }[];
+  /** "unavailable": the controller gave no planned shots, so the room has no planned blocks. */
+  planned_source: "projection_app" | "unavailable";
 }
 export interface TimelineGetData {
   rooms: TimelineRoom[];
+  /** True when the answer was cut to the newest blocks. */
+  truncated?: boolean;
   /** The backend plan fixes `count` only; a marker's fields are not specified yet. */
   errors: { count: number; markers: Record<string, unknown>[] };
 }

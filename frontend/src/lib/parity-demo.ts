@@ -102,6 +102,9 @@ function timeline(data: Record<string, unknown>, now: number): TimelineGetData {
         room_id,
         lights: [{ on: iso(lightsOn), off: iso(lightsOn + 12 * 3_600_000) }],
         rows: [...rows].sort(([a], [b]) => a - b).map(([zone, blocks]) => ({ zone, blocks })),
+        pump: null,
+        pump_rooms: [],
+        planned_source: "projection_app",
         pump_load: [{ t: iso(now - 3_600_000), pct: 48 }, { t: iso(now), pct: 0 }],
       };
     }),

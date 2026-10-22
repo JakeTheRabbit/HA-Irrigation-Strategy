@@ -361,9 +361,7 @@
   transform-origin: left;
   background: color-mix(in srgb, var(--background) 30%, transparent);
 }
-.hold-button[data-state="holding"] /* Functional progress, not decoration: it shows how much longer to hold, so it stays under
-   prefers-reduced-motion. */
-.hold-button-fill {
+.hold-button[data-state="holding"] .hold-button-fill {
   transform: scaleX(1);
   transition: transform var(--confirm-ms, 1500ms) linear;
 }
