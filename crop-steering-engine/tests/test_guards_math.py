@@ -40,3 +40,40 @@ def test_rescue_jumps_the_queue_fifo_within_priority():
     assert [i["id"] for i in order(intents)] == ["c", "e", "d", "a", "b"]
     assert [i["id"] for i in intents][0] == "a"  # input untouched
     assert PRIORITY == {"rescue": 0, "steering": 1, "timer": 2, "manual": 3}
+
+
+def _brute_force(zones, groups, max_concurrent):
+    """The definition, by trying every set of zones: the oracle for worst_case_lph."""
+    from itertools import combinations
+
+    best = 0.0
+    for size in range(1, min(max_concurrent, len(zones)) + 1):
+        for combo in combinations(zones, size):
+            named = [groups.get(z) for z in combo if groups.get(z) is not None]
+            if len(named) == len(set(named)):
+                best = max(best, sum(zones[z] for z in combo))
+    return best
+
+
+def test_worst_case_equals_the_brute_force_definition():
+    import random
+
+    rnd = random.Random(7)
+    for _ in range(200):
+        n = rnd.randint(1, 9)
+        zones = {i: rnd.choice([50.0, 120.0, 240.0, 333.0]) for i in range(n)}
+        groups = {i: rnd.choice([None, None, "a", "b"]) for i in range(n)}
+        count = rnd.randint(0, n + 2)
+        assert worst_case_lph(zones, groups, count) == _brute_force(zones, groups, count)
+    zones = {i: float(10 + i) for i in range(16)}
+    groups = {i: (None if i % 2 else "a") for i in range(16)}
+    assert worst_case_lph(zones, groups, 5) == _brute_force(zones, groups, 5)
+
+
+def test_worst_case_of_a_big_pump_is_instant():
+    import time
+
+    zones = {i: 100.0 + i for i in range(40)}
+    started = time.monotonic()
+    assert worst_case_lph(zones, {i: "g" for i in range(10)}, 40) == 100.0 + 9 + sum(zones[i] for i in range(10, 40))
+    assert time.monotonic() - started < 0.1

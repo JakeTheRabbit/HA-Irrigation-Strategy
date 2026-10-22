@@ -308,26 +308,6 @@ def test_twenty_zones_on_one_pump_answer_quickly():
     assert time.monotonic() - started < 1.0
 
 
-def test_the_fast_worst_case_equals_the_vendored_guard():
-    import random
-
-    from custom_components.crop_steering.generated.guards import worst_case_lph
-
-    rnd = random.Random(7)
-    for _ in range(200):
-        n = rnd.randint(1, 9)
-        demands = {i: rnd.choice([50.0, 120.0, 240.0, 333.0]) for i in range(n)}
-        groups = {i: rnd.choice([None, None, "a", "b"]) for i in range(n)}
-        count = rnd.randint(1, n)
-        assert site_store._worst(demands, groups, count) == worst_case_lph(
-            demands, groups, count
-        )
-    # Above the enumeration limit the shortcut still equals it.
-    demands = {i: float(10 + i) for i in range(16)}
-    groups = {i: (None if i % 2 else "a") for i in range(16)}
-    assert site_store._worst(demands, groups, 5) == worst_case_lph(demands, groups, 5)
-
-
 def test_an_unreadable_stored_section_is_named_and_not_lost_by_the_next_save(caplog):
     stored = {
         "revision": 3,

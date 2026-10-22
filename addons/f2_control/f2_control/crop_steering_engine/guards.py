@@ -1,7 +1,5 @@
 """Pump-capacity and queue-order arithmetic. Pure, stdlib only."""
 
-from itertools import combinations
-
 PRIORITY = {"rescue": 0, "steering": 1, "timer": 2, "manual": 3}
 
 
@@ -27,14 +25,21 @@ def capacity_ok(
 def worst_case_lph(
     zones: dict[int, float], groups: dict[int, str | None], max_concurrent: int
 ) -> float:
-    """Largest total over any max_concurrent zones, no two from the same exclusive group."""
-    best = 0.0
-    for size in range(1, min(max_concurrent, len(zones)) + 1):
-        for combo in combinations(zones, size):
-            named = [groups.get(z) for z in combo if groups.get(z) is not None]
-            if len(named) == len(set(named)):
-                best = max(best, sum(zones[z] for z in combo))
-    return best
+    """Largest total over any max_concurrent zones, no two from the same exclusive group.
+
+    At most one zone per group can run, so only each group's largest zone competes with the zones
+    in no group; the answer is the sum of the max_concurrent largest of those.
+    """
+    candidates, largest = [], {}
+    for zone, lph in zones.items():
+        group = groups.get(zone)
+        if group is None:
+            candidates.append(lph)
+        elif group not in largest or lph > largest[group]:
+            largest[group] = lph
+    candidates.extend(largest.values())
+    candidates.sort(reverse=True)
+    return float(sum(candidates[: max(max_concurrent, 0)]))
 
 
 def order(intents: list[dict]) -> list[dict]:

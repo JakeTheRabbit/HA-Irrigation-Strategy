@@ -160,40 +160,13 @@ def from_store(value) -> dict:
     return load(value)[0]
 
 
-# Up to this many candidates the vendored guard enumerates directly (2**12 subsets at most).
-_ENUMERATE = 12
-
-
-def _worst(demands, groups, count):
-    """worst_case_lph(demands, groups, count), fast for a big pump.
-
-    Only the largest zone of each exclusive group can be in the worst mix, and of the zones in no
-    group only the `count` largest. What is left has no group in common, so beyond _ENUMERATE
-    candidates the answer is the sum of the `count` largest; below it the vendored guard is asked.
-    """
-    top, loose = {}, []
-    for zone, lph in demands.items():
-        group = groups.get(zone)
-        if group is None:
-            loose.append(zone)
-        elif group not in top or lph > demands[top[group]]:
-            top[group] = zone
-    loose = sorted(loose, key=lambda z: demands[z], reverse=True)[:count]
-    keep = [*top.values(), *loose]
-    if len(keep) <= _ENUMERATE:
-        return worst_case_lph(
-            {z: demands[z] for z in keep}, {z: groups.get(z) for z in keep}, count
-        )
-    return sum(sorted((demands[z] for z in keep), reverse=True)[:count])
-
-
 def _suggest(demands, groups, max_flow):
     """The most zones the pump can feed at once with the worst mix, or None when it cannot be said."""
     if max_flow is None or not demands:
         return None
     best = 1
     for count in range(2, len(demands) + 1):
-        if _worst(demands, groups, count) > max_flow:
+        if worst_case_lph(demands, groups, count) > max_flow:
             break  # the worst mix only grows with the count
         best = count
     return best
@@ -207,7 +180,7 @@ def _pump_check(pump, members, zone_groups):
         for i, (room_id, zone, _) in enumerate(members)
     }
     max_flow, concurrent = pump["max_flow_lph"], pump["max_concurrent_zones"]
-    worst = _worst(demands, groups, concurrent)
+    worst = worst_case_lph(demands, groups, concurrent)
     row = {
         "entity_id": pump["entity_id"],
         "worst_case_lph": worst,
