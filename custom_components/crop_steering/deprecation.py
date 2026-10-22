@@ -23,13 +23,21 @@ ISSUE = "deprecated_entities"
 
 
 def _users(hass: HomeAssistant, entity_id: str) -> list[str]:
-    """The automations and scripts that name `entity_id`; none while either is not loaded."""
+    """The automations and scripts that name `entity_id`, as an entity or anywhere in their
+    configuration (a template included); none while either is not loaded. Dashboards are not
+    checked."""
     from homeassistant.components.automation import automations_with_entity
     from homeassistant.components.script import scripts_with_entity
+    from homeassistant.helpers.entity_component import DATA_INSTANCES
 
-    return automations_with_entity(hass, entity_id) + scripts_with_entity(
-        hass, entity_id
-    )
+    users = set(automations_with_entity(hass, entity_id))
+    users.update(scripts_with_entity(hass, entity_id))
+    for domain in ("automation", "script"):
+        component = hass.data.get(DATA_INSTANCES, {}).get(domain)
+        for entity in getattr(component, "entities", ()):
+            if entity_id in str(getattr(entity, "raw_config", None) or ""):
+                users.add(entity.entity_id)
+    return sorted(users)
 
 
 @callback
@@ -43,7 +51,7 @@ def check_in_use(hass: HomeAssistant, entry: ConfigEntry) -> None:
             continue
         users = _users(hass, item.entity_id)
         if users:
-            used.append(f"- `{item.entity_id}`: used by {', '.join(sorted(users))}")
+            used.append(f"- `{item.entity_id}`: used by {', '.join(users)}")
     _issue(
         hass,
         bool(used),

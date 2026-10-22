@@ -214,6 +214,23 @@ def test_hydraulics_are_zone_total_with_per_plant_substrate_units():
         hydraulic_preview({"plant_count": 0}, {})
 
 
+def test_hydraulics_time_a_shot_as_the_controller_does():
+    sizing = {
+        "substrate_l_per_plant": 6,
+        "plant_count": 36,
+        "drippers_per_plant": 1,
+        "dripper_flow_lph": 4,
+        "max_shot_duration": 300,
+    }
+    shot = hydraulic_preview(sizing, {"p1_initial_shot_size": 6})["shots"]
+    assert shot["p1_initial_shot_size"]["capped_duration_s"] == 300
+    # A limit under 5 s is not one: the controller starts no shot (CS-203), never a 5 s one.
+    shot = hydraulic_preview(
+        {**sizing, "max_shot_duration": 3}, {"p1_initial_shot_size": 6}
+    )
+    assert shot["shots"]["p1_initial_shot_size"]["capped_duration_s"] is None
+
+
 def test_plan_does_not_mutate_input_and_has_no_implicit_activation():
     draft = plan()
     original = copy.deepcopy(draft)

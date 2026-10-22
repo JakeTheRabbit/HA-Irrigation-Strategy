@@ -801,6 +801,8 @@ class CropSteeringSensor(SensorEntity):
             # Zone totals, as the controller's _substrate_l and _zone_flow_lps make them.
             plants = self._zone_setting(zone, "plant_count")
             plants = CONTROLLER_FALLBACKS["plant_count"] if plants is None else plants
+            if plants < 0:
+                continue  # the controller's flow is negative: it starts no shot (CS-204)
             substrate_l = substrate * plants if plants > 0 else substrate
             flow_lps = (plants or 1) * drippers * flow / 3600.0
             seconds[zone] = shot_seconds(raw_seconds(size, substrate_l, flow_lps), cap)
@@ -1062,21 +1064,25 @@ class CropSteeringSensor(SensorEntity):
 
     def _active_zone_mean(self, kind: str) -> float | None:
         """The mean of the room's active zones' `kind` readings: each zone's own vwc_zone_N or
-        ec_zone_N, so only the probes it counts, fused as the controller reads them. Unknown when no
-        active zone has a reading."""
+        ec_zone_N, so only the probes it counts, fused as the controller reads them. A room set up
+        before that name keeps its zone_N_vwc / zone_N_ec id, and is read under it, as the
+        controller's _fused_id does. Unknown when no active zone has a reading."""
         values = []
         for zone, config in self._zones_config.items():
             if not str(zone).isdigit() or not (config or {}).get("active", True):
                 continue
-            state = self.hass.states.get(
-                f"sensor.{DOMAIN}_{self._prefix}{kind}_zone_{zone}"
-            )
-            try:
-                value = float(state.state)
-            except (AttributeError, TypeError, ValueError):
-                continue
-            if math.isfinite(value):
-                values.append(value)
+            for entity_id in (
+                f"sensor.{DOMAIN}_{self._prefix}{kind}_zone_{zone}",
+                f"sensor.{DOMAIN}_{self._prefix}zone_{zone}_{kind}",
+            ):
+                state = self.hass.states.get(entity_id)
+                try:
+                    value = float(state.state)
+                except (AttributeError, TypeError, ValueError):
+                    continue
+                if math.isfinite(value):
+                    values.append(value)
+                    break
         return round(sum(values) / len(values), 2) if values else None
 
     @property

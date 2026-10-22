@@ -196,6 +196,21 @@ def test_the_room_mean_is_of_its_active_zones_own_readings_only():
     assert entity.native_value == 42.0
 
 
+def test_the_room_mean_reads_a_room_set_up_under_the_older_zone_sensor_names():
+    """A room set up before vwc_zone_N keeps zone_N_vwc for good (the controller's _fused_id)."""
+    entity = _room(
+        {
+            "sensor.crop_steering_zone_1_vwc": "40",
+            "sensor.crop_steering_zone_2_vwc": "46",
+            "sensor.crop_steering_zone_1_ec": "3.2",
+            "sensor.crop_steering_ec_zone_2": "2.8",  # either name, zone by zone
+        },
+        {"1": {}, "2": {}},
+    )
+    assert entity._active_zone_mean("vwc") == 43.0
+    assert entity._active_zone_mean("ec") == 3.0
+
+
 def test_the_room_mean_skips_readings_that_are_not_numbers_and_is_unknown_without_any():
     zones = {"1": {}, "2": {}, "3": {}}
     entity = _room(
@@ -276,6 +291,13 @@ def test_a_shot_limit_that_is_not_one_shows_no_duration_as_the_controller_runs_n
 ):
     """CTL-010: the controller starts no shot (CS-203); the sensor showed the uncapped length."""
     entity = _sized(cap)
+    assert entity._shot_seconds_by_zone("p2_shot_duration_seconds") == {}
+    assert entity.native_value is None
+
+
+def test_a_negative_plant_count_shows_no_duration_as_the_controller_runs_none():
+    """The controller's flow comes out negative: it starts no shot (CS-204)."""
+    entity = _sized("900", **{"number.crop_steering_zone_1_plant_count": "-2"})
     assert entity._shot_seconds_by_zone("p2_shot_duration_seconds") == {}
     assert entity.native_value is None
 

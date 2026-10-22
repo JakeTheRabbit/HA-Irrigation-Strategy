@@ -76,6 +76,29 @@ async def test_an_automation_that_uses_a_retired_entity_gets_a_repairs_card(hass
     assert issue.translation_placeholders["count"] == "1"
 
 
+async def test_a_retired_entity_named_only_inside_a_template_is_found_too(hass):
+    used = f"sensor.{DOMAIN}_tent_ec_ratio"
+    assert await async_setup_component(
+        hass,
+        "script",
+        {
+            "script": {
+                "ec_note": {
+                    "sequence": [
+                        {"event": "ec_note", "event_data": {"ratio": "{{ states('%s') }}" % used}}
+                    ]
+                }
+            }
+        },
+    )
+    await _install(hass)
+    await hass.async_block_till_done()
+    issue = ir.async_get(hass).async_get_issue(DOMAIN, "deprecated_entities_tent")
+    assert issue is not None
+    assert "script.ec_note" in issue.translation_placeholders["entities"]
+    assert used in issue.translation_placeholders["entities"]
+
+
 async def test_a_room_limit_that_is_not_one_shows_no_shot_length_as_the_controller_runs_none(
     hass, controller_for
 ):
