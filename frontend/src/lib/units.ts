@@ -106,3 +106,23 @@ export const rememberedUnitSystem = (stored: string | null): UnitSystem | null =
 /** Home Assistant's unit system when known, else this browser's last choice, else metric. */
 export const initialUnitSystem = (ha: UnitSystem | null, stored: string | null): UnitSystem =>
   ha ?? rememberedUnitSystem(stored) ?? "metric";
+
+/** Litres in one of Home Assistant's volume units; the entity's own `unit_of_measurement` decides. */
+const LITRES_PER_UNIT: Record<string, number> = {
+  l: 1,
+  ml: 0.001,
+  gal: LITRES_PER_US_GALLON,
+  "fl. oz.": LITRES_PER_US_GALLON / 128,
+  "m³": 1000,
+  m3: 1000,
+  "ft³": 28.316846592,
+  ft3: 28.316846592,
+};
+/** A volume reading in litres. An entity naming no unit is taken as litres (as the dashboard always
+ * has); a unit not known here gives null rather than a wrong number. */
+export function volumeToLitres(value: number | null, unit: string): number | null {
+  if (value === null || !Number.isFinite(value)) return null;
+  const key = unit.trim().toLowerCase();
+  const factor = key === "" ? 1 : LITRES_PER_UNIT[key];
+  return factor === undefined ? null : value * factor;
+}

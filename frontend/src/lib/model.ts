@@ -17,6 +17,7 @@ import { readWaiting } from "./waiting-for";
 import { PHASE_GROUPS, settingWords } from "./setting-words";
 import { growerWords } from "./words";
 import { roomDisplay } from "./display";
+import { volumeToLitres } from "./units";
 import { numberLimits, registeredControl } from "./features";
 import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
 
@@ -280,6 +281,12 @@ function metric(entity: EntityState | undefined, label: string, unit: string): M
     unit: String(entity?.attributes.unit_of_measurement || unit),
     value: numeric(entity),
   };
+}
+/** A zone's water today in litres, from whatever volume unit the entity reports (Home Assistant can
+ * display the integration's sensor in gallons); a unit it cannot convert reads as unavailable. */
+function waterToday(entity: EntityState | undefined): Metric {
+  const read = metric(entity, "Water today", "");
+  return { ...read, unit: "L", value: volumeToLitres(read.value, read.unit) };
 }
 function telemetryIssue(
   entity: EntityState | undefined,
@@ -630,10 +637,8 @@ export function buildRoom(states: States, room: Room): RoomView {
           "mS/cm",
         ),
       ),
-      water: metric(
+      water: waterToday(
         resolve(states, room, "sensor", `${z}daily_water_app`, `${z}daily_water_usage`),
-        "Water today",
-        "L",
       ),
       shots: metric(
         resolve(states, room, "sensor", `${z}irrigation_count_app`, `${z}irrigations_today`),

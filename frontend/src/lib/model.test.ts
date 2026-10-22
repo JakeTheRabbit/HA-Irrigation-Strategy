@@ -552,3 +552,31 @@ describe("every new room has a slug", () => {
     expect(both.map((r) => r.id)).toEqual(["room:", "room:tent_"]);
   });
 });
+
+describe("water today units", () => {
+  const roomWith = (unit: string | undefined, state: string) => {
+    const states = fixture();
+    const id = "sensor.crop_steering_zone_1_daily_water_usage";
+    states[id] = entity(id, state, unit === undefined ? {} : { unit_of_measurement: unit });
+    return buildRoom(states, discoverRooms(states)[0]);
+  };
+  it("shows a zone's water in litres whatever unit Home Assistant displays it in", () => {
+    for (const [unit, state, litres] of [
+      ["L", "10", 10],
+      ["mL", "10000", 10],
+      ["m³", "0.01", 10],
+      ["gal", "2", 2 * 3.785411784],
+    ] as const) {
+      const room = roomWith(unit, state);
+      expect(room.zones[0].water.unit).toBe("L");
+      expect(room.zones[0].water.value).toBeCloseTo(litres, 9);
+      const total = room.metrics.find((m) => m.key === "water")!;
+      expect(total.unit).toBe("L");
+      expect(total.value).toBeCloseTo(litres, 9);
+    }
+  });
+  it("keeps litres when the entity names no unit, and shows nothing for a unit it cannot convert", () => {
+    expect(roomWith(undefined, "10").zones[0].water.value).toBe(10);
+    expect(roomWith("bushels", "10").zones[0].water.value).toBeNull();
+  });
+});
