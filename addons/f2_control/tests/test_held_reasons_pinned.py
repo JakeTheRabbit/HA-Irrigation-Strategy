@@ -277,6 +277,73 @@ def test_source_water_ph_out_of_band_holds():
     assert c._blocked(room, 1) == "source-water pH 7.00 out of [5.5,6.5]"
 
 
+# ---- the reasons the fold-in of #202 (feed band unreadable), #216 (blind floor) and the waste/settings variants add
+@pytest.mark.parametrize("bound", ["min", "max"])
+@pytest.mark.parametrize("state", ["unavailable", "unknown", "nonsense"])
+def test_source_water_ec_band_unreadable_holds_fail_closed(bound, state):
+    c, fake, room = _room()
+    room.feed_ec_sensor = FEED_EC
+    fake.set_state(FEED_EC, "1.0")
+    fake.set_state("number.crop_steering_irrigation_ec_min", "0.5")
+    fake.set_state("number.crop_steering_irrigation_ec_max", "2")
+    entity = f"number.crop_steering_irrigation_ec_{bound}"
+    fake.set_state(entity, state)
+    assert c._blocked(room, 1) == f"source-water EC band unreadable ({entity}) — holding (fail-closed)"
+
+
+@pytest.mark.parametrize("bound", ["min", "max"])
+@pytest.mark.parametrize("state", ["unavailable", "unknown", "nonsense"])
+def test_source_water_ph_band_unreadable_holds_fail_closed(bound, state):
+    c, fake, room = _room()
+    room.feed_ph_sensor = FEED_PH
+    fake.set_state(FEED_PH, "6.0")
+    fake.set_state("number.crop_steering_irrigation_ph_min", "5.5")
+    fake.set_state("number.crop_steering_irrigation_ph_max", "6.5")
+    entity = f"number.crop_steering_irrigation_ph_{bound}"
+    fake.set_state(entity, state)
+    assert c._blocked(room, 1) == f"source-water pH band unreadable ({entity}) — holding (fail-closed)"
+
+
+def test_the_waste_valve_variants_are_pinned():
+    c, fake, room = _room()
+    room.waste = WASTE
+    rule = "select.crop_steering_waste_valve_rule"
+    fake.set_state(rule, controller.WASTE_CHECK)
+    fake.set_state(WASTE, "unavailable")
+    assert c._blocked(room, 1) == f"waste valve {WASTE} offline (reads neither on nor off)"
+    fake.set_state(WASTE, "off")
+    fake.set_state(rule, "unavailable")
+    assert c._blocked(room, 1) == "waste valve rule unreadable (no shot until its policy can be confirmed)"
+    room.waste = "light.waste"
+    fake.set_state("light.waste", "on")
+    fake.set_state(rule, controller.WASTE_CLOSE)
+    assert c._blocked(room, 1) == "waste valve light.waste can't be switched by the controller"
+
+
+def test_a_water_sizing_setting_never_read_holds_in_these_words(monkeypatch):
+    c, _fake, room = _room()
+    monkeypatch.setattr(controller, "WATER_SIZING", ("max_daily_volume",))
+    assert c._blocked(room, 1) == ("not watering: number.crop_steering_max_daily_volume not read since "
+                                   "the controller started, and it sizes this zone's water (CS-402)")
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+def test_a_blind_zone_behind_its_daily_minimum_is_given_the_floor_in_these_words(monkeypatch):
+    """#216: no live probe, lights on, past P0, behind the day's line: the reason the shot gives, word for word."""
+    c, fake, room = _room()
+    now = controller.datetime(2026, 9, 7, 14, 0)  # lights 10-22 in this room: 4 h in, the line at 4/9 of 4 L
+    monkeypatch.setattr(controller, "datetime", _Clock)
+    _Clock.current = now
+    fake.set_state("number.crop_steering_zone_1_min_daily_ml_per_plant", "1000")
+    fake.set_state("number.crop_steering_zone_1_plant_count", "4")
+    st = room.state[1]
+    st.update(phase="P2", last_shot=now - controller.timedelta(minutes=30), daily_vol=0.0,
+              last_phase_change=now - controller.timedelta(minutes=10), last_daily_reset=now.date())
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] is True
+    assert pub[1]["reason"] == "MIN-DAILY floor 0.0<1.8 of 4.0L (no live probe)"
+
+
 # ---------------------------------------------------------------- the pre-open stage (_execute_shot)
 def _x_fault(c, fake, room):
     _fault(c, fake, room, None)

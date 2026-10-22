@@ -798,6 +798,47 @@ def test_the_kill_switch_stops_a_shot_while_it_opens(rig, monkeypatch, stage):
         assert ("turn_on", "switch.v1") not in at and room.state[1]["daily_vol"] == 0
 
 
+def test_an_error_in_the_stopped_while_opening_handler_still_counts_the_water_already_given(rig, monkeypatch):
+    """#197 x #208: a hold stops a shot whose valve was sent ON and is still reading back. Closing it cut short
+    raises (its CS-307 alert fails): the shot's water so far is counted all the same, once, after the cleanup."""
+    c, fake, clock = rig
+    room = c.rooms[0]
+    c.hold_entities = ["input_boolean.hold"]
+    fake.set_state("input_boolean.hold", "off")
+    at, real_call, real_alert, counted = {}, controller.ha_call, c._alert, []
+
+    def call(domain, service, **data):
+        entity = data.get("entity_id")
+        at.setdefault((service, entity), clock.seconds)
+        if (service, entity) == ("turn_on", "switch.v1"):
+            fake.calls.append((domain, service, data))
+            return True  # reports ON late: the valve is sent ON and still reads off while the hold goes on
+        return real_call(domain, service, **data)
+
+    def sleep(seconds):
+        clock.sleep(seconds)
+        on = at.get(("turn_on", "switch.v1"))
+        if on is not None and clock.seconds - on >= 3.0:
+            fake.set_state("input_boolean.hold", "on")
+
+    def alert(key, code, *args, **kwargs):
+        if code == "CS-307":
+            raise RuntimeError("notify failed")
+        return real_alert(key, code, *args, **kwargs)
+
+    real_advance = c._advance_shot_counters
+    monkeypatch.setattr(c, "_advance_shot_counters", lambda *a, **k: (counted.append(a[2]), real_advance(*a, **k))[1])
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller.time, "sleep", sleep)
+    monkeypatch.setattr(c, "_alert", alert)
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    assert ("turn_off", "switch.v1") in at  # the handler did stop the shot while it opened
+    assert len(counted) == 1  # counted once
+    assert room.state[1]["daily_vol"] > 0 and room.state[1]["shots"] == 1
+    assert all(fake.states[e][0] == "off" for e in ("switch.p", "switch.m", "switch.v1"))
+    assert room.shot_inflight is None and c._hardware_fault_block(room) is None
+
+
 def test_a_hanging_read_cannot_stretch_the_valve_read_back(rig, monkeypatch):
     """CTL-002 review: each ON read is bounded by what is left of the read-back, not the 8 s a read may take."""
     c, fake, clock = rig
