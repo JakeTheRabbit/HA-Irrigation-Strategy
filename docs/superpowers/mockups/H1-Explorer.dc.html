@@ -1,0 +1,354 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>History — Explorer</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 2px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 15px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; margin-top: 18px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 22px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 8px 28px 16px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: center; gap: 12px; border-bottom: 1px solid #2e2e2e">
+<nav aria-label="History views" style="display: flex; align-items: stretch; gap: 4px; height: 44px">
+<a href="H1-Explorer.dc.html" aria-current="page" style="display: flex; align-items: center; padding: 0 14px; color: #4fc3f7; font-size: 15px; font-weight: 600; box-shadow: inset 0 -2px 0 #03a9f4">Explorer</a>
+<a href="H2-WaterFlow.dc.html" style="display: flex; align-items: center; padding: 0 14px; color: #b8b8b8; font-size: 15px; font-weight: 500">Water &amp; flow</a>
+<a href="H3-Compare.dc.html" style="display: flex; align-items: center; padding: 0 14px; color: #b8b8b8; font-size: 15px; font-weight: 500">Compare runs</a>
+<a href="H4-Changes.dc.html" style="display: flex; align-items: center; padding: 0 14px; color: #b8b8b8; font-size: 15px; font-weight: 500">Changes</a>
+</nav>
+<span style="margin-left: auto; font-size: 13px; color: #a4a4a4">F2 · Flower bulk · day 38 of 63</span>
+<button type="button" aria-pressed="{{cmpPressed}}" onClick="{{toggleCompare}}" style="display: flex; align-items: center; gap: 10px; height: 36px; padding: 0 14px; border: 1px solid {{cmpEdge}}; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 500"><span style="position: relative; width: 30px; height: 16px; border-radius: 8px; background: {{cmpTrack}}"><span style="position: absolute; top: 2px; left: {{cmpKnob}}; width: 12px; height: 12px; border-radius: 6px; background: #ffffff"></span></span>Compare with last run <span style="color: #a4a4a4">{{cmpName}}</span></button>
+<button type="button" onClick="{{exportCsv}}" style="display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 14px; margin-bottom: 4px; margin-top: 4px; border: 0; border-radius: 8px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 14px; font-weight: 600"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"></path><polyline points="7 10 12 15 17 10"></polyline><path d="M4 19h16"></path></svg>{{csvLabel}}</button>
+</div>
+
+<div style="display: flex; align-items: center; gap: 14px">
+<div role="group" aria-label="Time range" style="display: flex; border: 1px solid #2e2e2e; border-radius: 8px; overflow: hidden">
+<sc-for list="{{ranges}}" as="rg" hint-placeholder-count="4"><button type="button" aria-pressed="{{rg.pressed}}" onClick="{{rg.onClick}}" style="height: 34px; padding: 0 16px; border: 0; border-right: 1px solid #2e2e2e; background: {{rg.bg}}; color: {{rg.ink}}; font: inherit; font-size: 14px; font-weight: 600">{{rg.label}}</button></sc-for>
+</div>
+<sc-if value="{{isCustom}}" hint-placeholder-val="{{false}}">
+<span style="display: flex; align-items: center; gap: 10px; font-size: 13px; color: #a4a4a4">
+<label for="h1-from">From</label><input id="h1-from" type="date" value="2026-10-16" style="height: 32px; padding: 0 8px; border: 1px solid #3a3a3a; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 13px; color-scheme: dark">
+<label for="h1-to">to</label><input id="h1-to" type="date" value="2026-10-22" style="height: 32px; padding: 0 8px; border: 1px solid #3a3a3a; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 13px; color-scheme: dark">
+</span>
+</sc-if>
+<span style="font-size: 13px; color: #a4a4a4">{{rangeNote}}</span>
+<span style="margin-left: auto; display: flex; align-items: center; gap: 6px; font-size: 13px; color: #a4a4a4"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="12" y1="3" x2="12" y2="21"></line><line x1="3" y1="12" x2="21" y2="12"></line></svg>Move across the charts to read every line at that moment</span>
+</div>
+
+<div role="group" aria-label="Data points" style="display: flex; flex-wrap: wrap; gap: 8px">
+<sc-for list="{{groups}}" as="g" hint-placeholder-count="5">
+<div role="group" aria-label="{{g.name}}" style="display: flex; align-items: center; gap: 6px; padding: 5px 6px 5px 10px; border: 1px solid #2e2e2e; border-radius: 10px; background: #1c1c1c">
+<span style="display: flex; align-items: center; gap: 6px; padding-right: 4px; font-size: 13px; font-weight: 600; color: #e1e1e1"><span style="width: 10px; height: 10px; border-radius: 5px; background: {{g.col}}"></span>{{g.name}}</span>
+<sc-for list="{{g.chips}}" as="c" hint-placeholder-count="3"><button type="button" aria-pressed="{{c.pressed}}" onClick="{{c.onClick}}" style="display: flex; align-items: center; gap: 5px; height: 30px; padding: 0 10px; border-radius: 15px; border: 1px solid {{c.edge}}; background: {{c.bg}}; color: {{c.ink}}; font: inherit; font-size: 13px; font-weight: 500"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display: {{c.tick}}"><polyline points="5 12 10 17 19 7"></polyline></svg>{{c.label}}</button></sc-for>
+</div>
+</sc-for>
+</div>
+
+<sc-if value="{{empty}}" hint-placeholder-val="{{false}}">
+<div style="flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; border: 1px dashed #3a3a3a; border-radius: 12px; color: #a4a4a4; font-size: 15px"><b style="color: #e1e1e1; font-size: 17px; font-weight: 600">Nothing picked</b>Turn on at least one data point above to draw a chart.</div>
+</sc-if>
+
+<sc-if value="{{hasCharts}}" hint-placeholder-val="{{true}}">
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 200px minmax(0, 1fr); grid-template-rows: 24px 16px minmax(0, 1fr) 20px; column-gap: 12px; row-gap: 6px">
+<span style="display: flex; align-items: center; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">{{stripName}}</span>
+<div style="position: relative; border-radius: 6px; overflow: hidden; background: #1c1c1c">
+<sc-for list="{{segs}}" as="sg" hint-placeholder-count="5"><span style="position: absolute; top: 0; bottom: 0; left: {{sg.left}}; width: {{sg.width}}; background: {{sg.col}}; opacity: {{sg.op}}; border-right: 1px solid #111111; display: flex; align-items: center; padding-left: 6px; box-sizing: border-box; overflow: hidden; white-space: nowrap; color: #ffffff; font-size: 12px; font-weight: 600">{{sg.label}}</span></sc-for>
+</div>
+<span style="display: flex; align-items: center; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">{{rugName}}</span>
+<div style="position: relative">
+<sc-for list="{{rug}}" as="rk" hint-placeholder-count="7"><span title="{{rk.title}}" style="position: absolute; top: 1px; bottom: 1px; left: {{rk.left}}; width: 3px; margin-left: -1px; border-radius: 2px; background: {{rk.col}}"></span></sc-for>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px; min-height: 0">
+<sc-for list="{{charts}}" as="ch" hint-placeholder-count="4">
+<div style="flex: 1; min-height: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; padding: 0 4px; overflow: hidden">
+<span style="display: flex; align-items: baseline; gap: 8px"><b style="font-size: 15px; font-weight: 600">{{ch.label}}</b><span style="font-size: 12px; color: #a4a4a4">{{ch.bandTxt}}</span></span>
+<sc-for list="{{ch.rows}}" as="rw" hint-placeholder-count="3"><span style="display: flex; align-items: center; gap: 6px; font-size: 13px"><span style="width: 12px; height: 3px; border-radius: 2px; background: {{rw.col}}"></span><span style="color: #b8b8b8">{{rw.name}}</span><b style="margin-left: auto; font-weight: 600; color: {{rw.ink}}">{{rw.val}}</b><span style="min-width: 64px; text-align: right; color: #8a8a8a; display: {{rw.ghostShow}}">{{rw.ghost}}</span></span></sc-for>
+</div>
+</sc-for>
+</div>
+
+<div style="position: relative; display: flex; flex-direction: column; gap: 8px; min-height: 0">
+<sc-for list="{{charts}}" as="ch" hint-placeholder-count="4">
+<div style="flex: 1; min-height: 0; position: relative; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 8px; overflow: hidden">
+<span style="position: absolute; left: 0; right: 0; top: {{ch.bandTop}}; height: {{ch.bandH}}; background: rgba(129,201,149,.10); border-top: 1px dashed rgba(129,201,149,.45); border-bottom: 1px dashed rgba(129,201,149,.45)"></span>
+<sc-for list="{{ch.lines}}" as="ln" hint-placeholder-count="3"><svg viewBox="0 0 1000 100" preserveAspectRatio="none" aria-hidden="true" style="position: absolute; left: 0; top: 0; width: 100%; height: 100%; overflow: visible"><path d="{{ln.d}}" fill="none" stroke="{{ln.col}}" stroke-width="{{ln.w}}" stroke-dasharray="{{ln.dash}}" opacity="{{ln.op}}" stroke-linejoin="round" vector-effect="non-scaling-stroke"></path></svg></sc-for>
+<span style="position: absolute; left: 6px; top: 3px; font-size: 11px; color: #8a8a8a">{{ch.maxTxt}}</span>
+<span style="position: absolute; left: 6px; bottom: 3px; font-size: 11px; color: #8a8a8a">{{ch.minTxt}}</span>
+<sc-if value="{{ch.hasNote}}" hint-placeholder-val="{{false}}"><span style="position: absolute; right: {{ch.noteRight}}; top: 6px; display: flex; align-items: center; gap: 6px; padding: 3px 8px; border-radius: 6px; background: {{ch.noteBg}}; color: {{ch.noteInk}}; font-size: 12px; font-weight: 600"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><line x1="12" y1="7" x2="12" y2="13"></line><line x1="12" y1="16.5" x2="12" y2="17"></line></svg>{{ch.note}}</span></sc-if>
+</div>
+</sc-for>
+<span style="position: absolute; top: 0; bottom: 0; left: {{nowLeft}}; right: 0; background: repeating-linear-gradient(-45deg, rgba(17,17,17,.0), rgba(17,17,17,.0) 6px, rgba(17,17,17,.55) 6px, rgba(17,17,17,.55) 12px); pointer-events: none"></span>
+<sc-for list="{{markers}}" as="mk" hint-placeholder-count="3"><span style="position: absolute; top: 0; bottom: 0; left: {{mk.left}}; border-left: 1px dashed #8a8a8a; pointer-events: none"><span style="position: absolute; top: 4px; left: 4px; padding: 1px 6px; border-radius: 4px; background: #2a2a2a; color: #e1e1e1; font-size: 11px; font-weight: 600; white-space: nowrap">{{mk.label}}</span></span></sc-for>
+<span style="position: absolute; top: 0; bottom: 0; left: {{nowLeft}}; border-left: 2px solid #e1e1e1; pointer-events: none"><span style="position: absolute; bottom: 4px; left: 5px; font-size: 11px; font-weight: 600; color: #e1e1e1; white-space: nowrap">{{nowLabel}}</span></span>
+<span style="position: absolute; top: 0; bottom: 0; left: {{hoverLeft}}; border-left: 1px solid #4fc3f7; pointer-events: none"><span style="position: absolute; bottom: 4px; left: 0; transform: translateX(-50%); padding: 2px 8px; border-radius: 10px; background: #03a9f4; color: #0b1d27; font-size: 12px; font-weight: 700; white-space: nowrap">{{hoverLabel}}</span></span>
+<sc-for list="{{hits}}" as="ht" hint-placeholder-count="60"><span onMouseEnter="{{ht.on}}" onClick="{{ht.on}}" style="position: absolute; top: 0; bottom: 0; left: {{ht.left}}; width: {{ht.width}}"></span></sc-for>
+</div>
+
+<span></span>
+<div style="position: relative; font-size: 12px; color: #a4a4a4">
+<sc-for list="{{axis}}" as="ax" hint-placeholder-count="9"><span style="position: absolute; top: 2px; left: {{ax.left}}; transform: {{ax.tf}}; white-space: nowrap">{{ax.label}}</span></sc-for>
+</div>
+</div>
+</sc-if>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%' }; }
+var TREE = [
+  { name: 'F2', dot: '#03a9f4', state: 'Watering', zones: [tz('Zone 1', 'P2', 59.4), tz('Zone 2', 'P2', 58.1), tz('Zone 3', 'P2', 60.2)] },
+  { name: 'F1', dot: '#81c995', state: 'Holding', zones: [tz('Zone 1', 'P1', 63.8), tz('Zone 2', 'P1', 62.9), tz('Zone 3', 'P1', 64.4)] }
+];
+function clamp(x, a, b) { return Math.max(a, Math.min(b, x)); }
+var NOW = 845, HITS = 60;
+var SHOTS = [450, 480, 510, 540, 650, 740, 825, 910, 1000];
+var ZONES = [
+  { k: 'z1', name: 'Zone 1', col: '#4fc3f7', o: -0.2, eb: 5.15, rt: 0 },
+  { k: 'z2', name: 'Zone 2', col: '#f48fb1', o: -1.5, eb: 6.25, rt: 0.4 },
+  { k: 'z3', name: 'Zone 3', col: '#aed581', o: 0.6, eb: 5.0, rt: -0.3 }
+];
+var METRICS = [
+  { k: 'vwc', label: 'VWC', unit: '%', min: 45, max: 68, band: [55, 62], bandTxt: 'target 55–62%', dp: 1 },
+  { k: 'ec', label: 'Pore EC', unit: '', min: 3.5, max: 7.5, band: [4.5, 6.0], bandTxt: 'band 4.5–6.0 mS/cm', dp: 1 },
+  { k: 'root', label: 'Root temp', unit: ' °C', min: 18, max: 24, band: [19, 23], bandTxt: 'band 19–23 °C', dp: 1 },
+  { k: 'fph', label: 'Feed pH', unit: '', min: 5.5, max: 6.3, band: [5.7, 6.1], bandTxt: 'band 5.7–6.1', dp: 2 },
+  { k: 'fec', label: 'Feed EC', unit: '', min: 1.6, max: 2.8, band: [2.3, 2.5], bandTxt: 'recipe 2.3–2.5 mS/cm', dp: 2 },
+  { k: 'tank', label: 'Tank level', unit: '%', min: 0, max: 100, band: [20, 100], bandTxt: 'refill call under 20%', dp: 0 }
+];
+var CHIP = { vwc: 'VWC', ec: 'Pore EC', root: 'Root temp', fph: 'pH', fec: 'EC', tank: 'Level' };
+var SERIES = [];
+ZONES.forEach(function (z, i) { ['vwc', 'ec', 'root'].forEach(function (m) { SERIES.push({ id: z.k + '.' + m, m: m, name: z.name, col: z.col, zi: i }); }); });
+SERIES.push({ id: 'feed.fph', m: 'fph', name: 'Feed', col: '#80cbc4', zi: -1 });
+SERIES.push({ id: 'feed.fec', m: 'fec', name: 'Feed', col: '#80cbc4', zi: -1 });
+SERIES.push({ id: 'tank.tank', m: 'tank', name: 'Tank', col: '#90caf9', zi: -1 });
+var GROUPS = [
+  { name: 'Zone 1', col: '#4fc3f7', ids: ['z1.vwc', 'z1.ec', 'z1.root'] },
+  { name: 'Zone 2', col: '#f48fb1', ids: ['z2.vwc', 'z2.ec', 'z2.root'] },
+  { name: 'Zone 3', col: '#aed581', ids: ['z3.vwc', 'z3.ec', 'z3.root'] },
+  { name: 'Feed', col: '#80cbc4', ids: ['feed.fph', 'feed.fec'] },
+  { name: 'Tank', col: '#90caf9', ids: ['tank.tank'] }
+];
+var DAYS = ['Fri 16', 'Sat 17', 'Sun 18', 'Mon 19', 'Tue 20', 'Wed 21', 'Thu 22'];
+
+var cache = {};
+function simDay(o) {
+  var key = o.toFixed(2);
+  if (cache[key]) return cache[key];
+  var v = 54.7 + o, out = [];
+  for (var i = 0; i <= 144; i++) {
+    var t = i * 10;
+    if (i > 0) {
+      v -= t <= 360 ? 0.075 : t <= 450 ? 0.09 : t <= 1080 ? 0.3 : 0.075;
+      for (var s = 0; s < SHOTS.length; s++) if (SHOTS[s] > t - 10 && SHOTS[s] <= t) v += SHOTS[s] < 600 ? 2.8 : 3.0;
+    }
+    out.push(v + Math.sin(i * 1.7 + o * 3) * 0.08);
+  }
+  cache[key] = out;
+  return out;
+}
+function shotsBy(t) { var n = 0; for (var s = 0; s < SHOTS.length; s++) if (SHOTS[s] <= t) n++; return n; }
+function hm(t) { var h = Math.floor(t / 60), m = t % 60; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
+function phaseAt(t) { return t < 360 ? 'P3' : t < 450 ? 'P0' : t < 600 ? 'P1' : t < 1080 ? 'P2' : 'P3'; }
+function val(sr, d, t, alt) {
+  var z = ZONES[sr.zi], j = Math.sin(d * 2.1) * 0.6 + (alt ? -0.8 : 0), idx = Math.min(144, Math.round(t / 10));
+  if (sr.m === 'vwc') return simDay(z.o + j)[idx];
+  if (sr.m === 'ec') {
+    var vw = simDay(z.o + j)[idx] - z.o - j;
+    var drift = sr.zi === 1 ? 0.2 * Math.min(t, NOW) / NOW - 0.25 * Math.min(d, 3) : 0;
+    return z.eb + 0.09 * (60 - vw) + drift - 0.03 * d + (alt ? -0.5 : 0);
+  }
+  if (sr.m === 'root') return 20.6 + z.rt + 0.8 * clamp((t - 360) / 480, 0, 1) - 0.8 * clamp((t - 1080) / 360, 0, 1) + Math.sin(d) * 0.1 + (alt ? 0.3 : 0);
+  if (sr.m === 'fph') return (t < 370 ? 5.9 + 0.05 * t / 370 : 5.8 + 0.04 * (t - 370) / 475) + (alt ? 0.03 : 0);
+  if (sr.m === 'fec') return (t < 370 ? 2.31 : 2.4) + Math.sin(t / 37) * 0.008 + (alt ? -0.1 : 0);
+  return t < 370 ? 40 : 74 - 0.86 * shotsBy(t) - (alt ? 6 : 0);
+}
+function runVal(sr, day, alt) {
+  var z = sr.zi >= 0 ? ZONES[sr.zi] : null, f = day / 38;
+  if (sr.m === 'vwc') return 60.5 - 4 * f + z.o + Math.sin(day * 1.3) * 0.5 + (alt ? -0.8 : 0);
+  if (sr.m === 'ec') return 3.2 + 2.0 * f + (z.eb - 5.15) * clamp((day - 30) / 8, 0, 1) + Math.sin(day * 0.9) * 0.12 + (alt ? -0.4 : 0);
+  if (sr.m === 'root') return 21 + z.rt + Math.sin(day * 0.7) * 0.3 + (alt ? 0.3 : 0);
+  if (sr.m === 'fph') return 5.86 + Math.sin(day * 1.1) * 0.05 + (alt ? 0.03 : 0);
+  if (sr.m === 'fec') return (day < 15 ? 2.0 : day < 29 ? 2.2 : 2.4) + (alt ? -0.1 : 0);
+  return 55 + Math.sin(day * 0.8) * 12 + (alt ? -5 : 0);
+}
+function sampleVal(sr, s, alt) { return s.day ? runVal(sr, s.day, alt) : val(sr, s.d, s.t, alt); }
+
+function samples(range, full) {
+  var out = [], t, k;
+  if (range === 'today') {
+    var end = full ? 1440 : NOW;
+    for (t = 0; t <= end; t += 10) out.push({ x: t / 1440, d: 0, t: t, label: hm(t) + ' · ' + phaseAt(t) });
+    if (!full) out.push({ x: NOW / 1440, d: 0, t: NOW, label: hm(NOW) + ' · P2' });
+  } else if (range === 'run') {
+    var last = full ? 63 : 38;
+    for (k = 1; k <= last; k++) out.push({ x: (k - 1) / 62, day: k, label: 'Day ' + k });
+  } else {
+    for (k = 6; k >= 0; k--) for (t = 0; t < 1440; t += 30) {
+      if (k === 0 && t > NOW && !full) break;
+      out.push({ x: ((6 - k) * 1440 + t) / 10080, d: k, t: t, label: DAYS[6 - k] + ' ' + hm(t) });
+    }
+  }
+  return out;
+}
+function nearest(S, fx) { var b = S[0]; for (var i = 1; i < S.length; i++) if (Math.abs(S[i].x - fx) < Math.abs(b.x - fx)) b = S[i]; return b; }
+function yOf(m, v) { return 100 - clamp((v - m.min) / (m.max - m.min), 0, 1) * 100; }
+function pathOf(m, sr, S, alt) {
+  var d = '';
+  for (var i = 0; i < S.length; i++) d += (i ? 'L' : 'M') + (S[i].x * 1000).toFixed(1) + ' ' + yOf(m, sampleVal(sr, S[i], alt)).toFixed(2);
+  return d;
+}
+function pct(x) { return (x * 100).toFixed(3) + '%'; }
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { range: 'today', compare: false, hover: 28, exported: false,
+      sel: { 'z1.vwc': true, 'z2.vwc': true, 'z3.vwc': true, 'z1.ec': true, 'z2.ec': true, 'z3.ec': true, 'feed.fec': true, 'tank.tank': true } };
+  }
+  renderVals() {
+    var self = this, st = this.state, range = st.range, cmp = st.compare;
+    var S = samples(range, false), G = samples(range, true);
+    var sel = SERIES.filter(function (s) { return st.sel[s.id]; });
+    var hs = nearest(S, (st.hover + 0.5) / HITS);
+    var nowX = range === 'today' ? NOW / 1440 : range === 'run' ? 37 / 62 : (6 * 1440 + NOW) / 10080;
+
+    var charts = METRICS.filter(function (m) { return sel.some(function (s) { return s.m === m.k; }); }).map(function (m) {
+      var mine = sel.filter(function (s) { return s.m === m.k; });
+      var lines = [], rows = [];
+      mine.forEach(function (s) {
+        if (cmp) lines.push({ d: pathOf(m, s, G, true), col: s.col, w: 1.5, dash: '5 4', op: 0.6 });
+      });
+      mine.forEach(function (s) {
+        lines.push({ d: pathOf(m, s, S, false), col: s.col, w: 2, dash: 'none', op: 1 });
+        var v = sampleVal(s, hs, false), out = v < m.band[0] || v > m.band[1];
+        rows.push({ name: s.name, col: s.col, val: v.toFixed(m.dp) + m.unit, ink: out ? '#ffca5b' : '#e1e1e1',
+          ghost: cmp ? 'R14 ' + sampleVal(s, hs, true).toFixed(m.dp) : '', ghostShow: cmp ? 'inline' : 'none' });
+      });
+      var note = '', bad = false;
+      if (m.k === 'ec' && st.sel['z2.ec']) { note = range === 'today' ? 'Zone 2 over the band since 09:40' : range === 'run' ? 'Zone 2 climbing since day 31' : 'Zone 2 creeping up since Mon 19'; bad = true; }
+      if (m.k === 'tank' && range === 'today') note = 'Refilled 06:10 · 40% to 74%';
+      return { label: m.label, bandTxt: m.bandTxt, rows: rows, lines: lines,
+        bandTop: yOf(m, m.band[1]) + '%', bandH: (yOf(m, m.band[0]) - yOf(m, m.band[1])) + '%',
+        maxTxt: m.max + m.unit, minTxt: m.min + m.unit,
+        hasNote: !!note, note: note, noteBg: bad ? 'rgba(255,202,91,.16)' : '#2a2a2a', noteInk: bad ? '#ffca5b' : '#b8b8b8',
+        noteRight: pct(1 - nowX + 0.01) };
+    });
+
+    var segs = [], rug = [], markers = [], axis = [], k;
+    if (range === 'run') {
+      [[1, 21, 'Stretch · days 1–21', '#2f6fb5'], [22, 49, 'Bulk · days 22–49', '#6450b0'], [50, 63, 'Ripen · days 50–63', '#34405a']].forEach(function (g) {
+        segs.push({ left: pct((g[0] - 1) / 62), width: pct((g[1] - g[0] + 1) / 62), col: g[3], op: g[0] > 38 ? 0.45 : 1, label: g[2] });
+      });
+      [[15, 'Feed EC 2.0 to 2.2'], [22, 'Bulk stage'], [29, 'Feed EC 2.2 to 2.4']].forEach(function (p) {
+        markers.push({ left: pct((p[0] - 1) / 62), label: 'Day ' + p[0] + ' · ' + p[1] });
+        rug.push({ left: pct((p[0] - 1) / 62), col: '#ffca5b', title: p[1] });
+      });
+      [1, 8, 15, 22, 29, 36, 43, 50, 57, 63].forEach(function (d) { axis.push({ left: pct((d - 1) / 62), tf: d === 1 ? 'none' : d === 63 ? 'translateX(-100%)' : 'translateX(-50%)', label: 'Day ' + d }); });
+    } else {
+      var nd = range === 'today' ? 1 : 7, span = nd * 1440, cut = range === 'today' ? NOW : 6 * 1440 + NOW;
+      for (k = 0; k < nd; k++) {
+        [[0, 360, 'P3'], [360, 450, 'P0'], [450, 600, 'P1'], [600, 1080, 'P2'], [1080, 1440, 'P3']].forEach(function (p) {
+          var a = k * 1440 + p[0], b = k * 1440 + p[1];
+          var pieces = a < cut && b > cut ? [[a, cut, 1], [cut, b, 0.4]] : [[a, b, a >= cut ? 0.4 : 1]];
+          pieces.forEach(function (q) {
+            var lab = nd === 1 && q[1] - q[0] > 40 ? (q[2] < 1 ? p[2] + ' planned' : { P3: 'P3 dryback', P0: 'P0', P1: 'P1 ramp', P2: 'P2 maintain' }[p[2]]) : '';
+            segs.push({ left: pct(q[0] / span), width: pct((q[1] - q[0]) / span), col: PH[p[2]], op: q[2], label: lab });
+          });
+        });
+        SHOTS.forEach(function (s) { var a = k * 1440 + s; rug.push({ left: pct(a / span), col: a <= cut ? '#03a9f4' : '#3a5a6e', title: (a <= cut ? 'Shot ' : 'Planned shot ') + hm(s) }); });
+      }
+      if (range === 'today') {
+        [[360, 'Lights on 06:00'], [450, 'P1 07:30'], [600, 'P2 10:00'], [1080, 'P3 18:00 planned']].forEach(function (p) { markers.push({ left: pct(p[0] / 1440), label: p[1] }); });
+        for (k = 0; k <= 8; k++) axis.push({ left: pct(k / 8), tf: k === 0 ? 'none' : k === 8 ? 'translateX(-100%)' : 'translateX(-50%)', label: hm(k * 180) });
+      } else {
+        for (k = 0; k < 7; k++) {
+          axis.push({ left: pct((k + 0.5) / 7), tf: 'translateX(-50%)', label: DAYS[k] + ' · day ' + (32 + k) });
+        }
+      }
+    }
+
+    var hits = [];
+    for (k = 0; k < HITS; k++) hits.push({ left: pct(k / HITS), width: pct(1 / HITS), on: (function (i) { return function () { self.setState({ hover: i }); }; })(k) });
+
+    var ranges = [['today', 'Today'], ['7d', '7 d'], ['run', 'This run'], ['custom', 'Custom']].map(function (r) {
+      var on = r[0] === range;
+      return { label: r[1], pressed: on ? 'true' : 'false', bg: on ? '#2a3b47' : '#1c1c1c', ink: on ? '#4fc3f7' : '#b8b8b8',
+        onClick: function () { self.setState({ range: r[0], exported: false }); } };
+    });
+    var groups = GROUPS.map(function (g) {
+      return { name: g.name, col: g.col, chips: g.ids.map(function (id) {
+        var on = !!st.sel[id], m = id.split('.')[1];
+        return { label: CHIP[m], pressed: on ? 'true' : 'false', tick: on ? 'block' : 'none',
+          edge: on ? g.col : '#3a3a3a', bg: on ? 'rgba(255,255,255,.06)' : 'transparent', ink: on ? '#e1e1e1' : '#a4a4a4',
+          onClick: function () { var n = Object.assign({}, st.sel); n[id] = !n[id]; self.setState({ sel: n }); } };
+      }) };
+    });
+    var rangeName = { today: 'today', '7d': '7d', run: 'run15', custom: '16-22oct' }[range];
+    var rangeNote = { today: 'Thu 22 Oct, 00:00 to now', '7d': 'Fri 16 to Thu 22 Oct', run: 'Run 15, day 1 to 38 of 63 (daily means)', custom: '' }[range];
+
+    return {
+      rooms: TREE, ranges: ranges, groups: groups, isCustom: range === 'custom', rangeNote: rangeNote,
+      empty: sel.length === 0, hasCharts: sel.length > 0, charts: charts,
+      stripName: range === 'run' ? 'STAGE' : 'PHASE', rugName: range === 'run' ? 'PLAN' : 'SHOTS',
+      segs: segs, rug: rug, markers: markers, axis: axis, hits: hits,
+      nowLeft: pct(nowX), nowLabel: range === 'run' ? 'Today · day 38' : 'Now 14:05',
+      hoverLeft: pct(hs.x), hoverLabel: hs.label,
+      cmpPressed: cmp ? 'true' : 'false', cmpEdge: cmp ? '#03a9f4' : '#2e2e2e', cmpTrack: cmp ? '#03a9f4' : '#4a4a4a', cmpKnob: cmp ? '16px' : '2px',
+      cmpName: range === 'run' ? '(Run 14, full run)' : '(Run 14, same day 38)',
+      toggleCompare: function () { self.setState({ compare: !cmp }); },
+      csvLabel: st.exported ? 'Saved F2-' + rangeName + '.csv' : 'Export CSV · ' + sel.length + ' series',
+      exportCsv: function () { self.setState({ exported: true }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

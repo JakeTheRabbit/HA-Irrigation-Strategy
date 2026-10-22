@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone — New alert rule</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+select,input{color-scheme:dark}
+button{cursor:pointer}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- PHONE SHELL: 390x844. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto. Radius 12. -->
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+<header style="height: 56px; flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-bottom: 1px solid #2e2e2e; background: #1c1c1c">
+<button type="button" aria-label="Open menu" style="width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></button>
+<span style="display: flex; flex-direction: column; min-width: 0"><b style="font-size: 17px; font-weight: 600">New alert rule</b><span style="font-size: 12px; color: #a4a4a4">Settings · Alert rules</span></span>
+<a href="T1-AlertRules.dc.html" style="margin-left: auto; display: flex; align-items: center; min-height: 44px; padding: 0 10px; font-size: 14px; font-weight: 600">All rules</a>
+</header>
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 14px 16px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: grid; grid-template-columns: 50px minmax(0, 1fr); gap: 8px 10px; align-items: center">
+<span style="font-size: 15px; color: #a4a4a4">Tell</span><select aria-label="Who to tell" value="{{phone}}" onChange="{{setPhone}}" style="width: 100%; min-width: 0; height: 48px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 16px; font-weight: 600; box-sizing: border-box"><option value="ben">Ben's phone</option><option value="sam">Sam's phone</option><option value="crew">Night crew</option><option value="tab">Office tablet</option></select>
+<span style="font-size: 15px; color: #a4a4a4">when</span><select aria-label="What to watch" value="{{source}}" onChange="{{setSource}}" style="width: 100%; min-width: 0; height: 48px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 16px; font-weight: 600; box-sizing: border-box"><optgroup label="Irrigation"><option value="z1vwc">F2 Zone 1 moisture</option><option value="flow3">F2 Zone 3 delivered vs asked</option><option value="tank">F2 feed tank level</option><option value="f1tank">F1 feed tank level</option></optgroup>
+<optgroup label="Dosing"><option value="feedph">F2 feed pH</option><option value="partb">F2 Part B stock</option></optgroup>
+<optgroup label="Sensors"><option value="z2ec">F2 Zone 2 pore EC</option></optgroup>
+<optgroup label="Offline"><option value="f1beat">F1 controller heartbeat age</option><option value="f1back">F1 Zone 2 back probe silence</option></optgroup></select>
+<span style="font-size: 15px; color: #a4a4a4">is</span><span style="display: flex; align-items: center; gap: 8px; min-width: 0"><select aria-label="Below or above" value="{{dir}}" onChange="{{setDir}}" style="width: 100%; min-width: 0; height: 48px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 16px; font-weight: 600; box-sizing: border-box; width: 104px; flex: none"><option value="below">below</option><option value="above">above</option></select><input type="text" inputmode="decimal" aria-label="Threshold" aria-invalid="{{thrInvalid}}" value="{{thr}}" onChange="{{setThr}}" style="width: 100%; min-width: 0; height: 48px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 16px; font-weight: 600; box-sizing: border-box; flex: 1; width: 0; text-align: right; border-color: {{thrEdge}}"><span style="min-width: 44px; font-size: 15px">{{unit}}</span></span>
+<span style="font-size: 15px; color: #a4a4a4">for</span><span style="display: flex; align-items: center; gap: 8px"><input type="text" inputmode="numeric" aria-label="Minutes it must last" aria-invalid="{{durInvalid}}" value="{{dur}}" onChange="{{setDur}}" style="width: 100%; min-width: 0; height: 48px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 16px; font-weight: 600; box-sizing: border-box; width: 104px; text-align: right; border-color: {{durEdge}}"><span style="font-size: 15px">minutes</span></span>
+<span></span><select aria-label="When the rule watches" value="{{win}}" onChange="{{setWin}}" style="width: 100%; min-width: 0; height: 48px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 16px; font-weight: 600; box-sizing: border-box"><option value="any">at any time</option><option value="on">while lights are on</option><option value="off">while lights are off</option></select>
+</div>
+<sc-if value="{{hasErr}}" hint-placeholder-val="{{false}}"><span role="alert" style="font-size: 14px; color: #f28b82">{{err}}</span></sc-if>
+<div style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 12px 12px 10px; display: flex; flex-direction: column; gap: 6px">
+<b style="font-size: 14px; font-weight: 600">Yesterday, as this rule would have seen it</b>
+<svg width="334" height="142" viewBox="0 0 334 142" role="img" aria-label="{{c.aria}}" style="display: block">
+<rect x="40" y="6" width="72.5" height="106" fill="#ffffff" fill-opacity="0.035"></rect>
+<rect x="257.5" y="6" width="72.5" height="106" fill="#ffffff" fill-opacity="0.035"></rect>
+<text x="44" y="19" fill="#8a8a8a" font-size="10" font-family="Roboto, Arial, sans-serif">Lights off</text>
+<text x="261.5" y="19" fill="#8a8a8a" font-size="10" font-family="Roboto, Arial, sans-serif">Lights off</text>
+<line x1="40" x2="330" y1="6" y2="6" stroke="#2e2e2e" stroke-width="1"></line>
+<line x1="40" x2="330" y1="59.0" y2="59.0" stroke="#2e2e2e" stroke-width="1"></line>
+<line x1="40" x2="330" y1="112" y2="112" stroke="#2e2e2e" stroke-width="1"></line>
+<text x="40.0" y="132" fill="#a4a4a4" font-size="11" text-anchor="start" font-family="Roboto, Arial, sans-serif">00:00</text>
+<text x="112.5" y="132" fill="#a4a4a4" font-size="11" text-anchor="middle" font-family="Roboto, Arial, sans-serif">06:00</text>
+<text x="185.0" y="132" fill="#a4a4a4" font-size="11" text-anchor="middle" font-family="Roboto, Arial, sans-serif">12:00</text>
+<text x="257.5" y="132" fill="#a4a4a4" font-size="11" text-anchor="middle" font-family="Roboto, Arial, sans-serif">18:00</text>
+<text x="330.0" y="132" fill="#a4a4a4" font-size="11" text-anchor="end" font-family="Roboto, Arial, sans-serif">24:00</text>
+<text x="34" y="15" fill="#a4a4a4" font-size="10" text-anchor="end" font-family="Roboto, Arial, sans-serif">{{c.yTop}}</text>
+<text x="34" y="112" fill="#a4a4a4" font-size="10" text-anchor="end" font-family="Roboto, Arial, sans-serif">{{c.yBot}}</text>
+<rect x="{{c.s0.x}}" y="6" width="{{c.s0.w}}" height="106" fill="#a4a4a4" fill-opacity="0.18"></rect>
+<rect x="{{c.s1.x}}" y="6" width="{{c.s1.w}}" height="106" fill="#a4a4a4" fill-opacity="0.18"></rect>
+<rect x="{{c.s2.x}}" y="6" width="{{c.s2.w}}" height="106" fill="#a4a4a4" fill-opacity="0.18"></rect>
+<rect x="{{c.s3.x}}" y="6" width="{{c.s3.w}}" height="106" fill="#a4a4a4" fill-opacity="0.18"></rect>
+<rect x="{{c.f0.x}}" y="6" width="{{c.f0.w}}" height="106" fill="#f28b82" fill-opacity="0.22"></rect>
+<rect x="{{c.f1.x}}" y="6" width="{{c.f1.w}}" height="106" fill="#f28b82" fill-opacity="0.22"></rect>
+<rect x="{{c.f2.x}}" y="6" width="{{c.f2.w}}" height="106" fill="#f28b82" fill-opacity="0.22"></rect>
+<rect x="{{c.f3.x}}" y="6" width="{{c.f3.w}}" height="106" fill="#f28b82" fill-opacity="0.22"></rect>
+<line x1="40" x2="330" y1="{{c.thrY}}" y2="{{c.thrY}}" stroke="#ffca5b" stroke-width="1.5" stroke-dasharray="6 4"></line>
+<path d="{{c.d}}" fill="none" stroke="#4fc3f7" stroke-width="2" stroke-linejoin="round"></path>
+<text x="330" y="{{c.thrLabelY}}" fill="#ffca5b" font-size="11" font-weight="600" text-anchor="end" font-family="Roboto, Arial, sans-serif">{{c.thrLabel}}</text>
+<circle cx="{{c.f0.mx}}" cy="{{c.thrY}}" r="5" fill="#f28b82" stroke="#1c1c1c" stroke-width="2" opacity="{{c.f0.op}}"></circle>
+<text x="{{c.f0.mx}}" y="36" fill="#f28b82" font-size="11" font-weight="600" text-anchor="middle" opacity="{{c.f0.op}}" font-family="Roboto, Arial, sans-serif">{{c.f0.t}}</text>
+<circle cx="{{c.f1.mx}}" cy="{{c.thrY}}" r="5" fill="#f28b82" stroke="#1c1c1c" stroke-width="2" opacity="{{c.f1.op}}"></circle>
+<text x="{{c.f1.mx}}" y="36" fill="#f28b82" font-size="11" font-weight="600" text-anchor="middle" opacity="{{c.f1.op}}" font-family="Roboto, Arial, sans-serif">{{c.f1.t}}</text>
+<circle cx="{{c.f2.mx}}" cy="{{c.thrY}}" r="5" fill="#f28b82" stroke="#1c1c1c" stroke-width="2" opacity="{{c.f2.op}}"></circle>
+<text x="{{c.f2.mx}}" y="36" fill="#f28b82" font-size="11" font-weight="600" text-anchor="middle" opacity="{{c.f2.op}}" font-family="Roboto, Arial, sans-serif">{{c.f2.t}}</text>
+<circle cx="{{c.f3.mx}}" cy="{{c.thrY}}" r="5" fill="#f28b82" stroke="#1c1c1c" stroke-width="2" opacity="{{c.f3.op}}"></circle>
+<text x="{{c.f3.mx}}" y="36" fill="#f28b82" font-size="11" font-weight="600" text-anchor="middle" opacity="{{c.f3.op}}" font-family="Roboto, Arial, sans-serif">{{c.f3.t}}</text>
+</svg>
+<div aria-live="polite" style="display: flex; flex-direction: column; gap: 3px"><b style="font-size: 16px; font-weight: 600; color: {{c.headInk}}">{{c.head}}</b><span style="font-size: 13px; color: #b8b8b8">{{c.detail}}</span></div>
+</div>
+<span aria-live="polite" style="font-size: 13px; color: #81c995; min-height: 18px">{{msg}}</span>
+<div style="margin-top: auto; display: flex; gap: 10px">
+<button type="button" onClick="{{sendTest}}" style="height: 40px; padding: 0 16px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600; height: 48px; flex: 1">Send test</button>
+<sc-if value="{{canUndo}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{undo}}" style="height: 40px; padding: 0 16px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600; height: 48px; flex: 1">Undo save</button></sc-if>
+<button type="button" aria-disabled="{{saveDisabled}}" onClick="{{save}}" style="height: 40px; padding: 0 18px; border: 0; border-radius: 8px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 14px; font-weight: 700; height: 48px; flex: 1.4; opacity: {{saveOpacity}}">{{saveLabel}}</button>
+</div>
+</main>
+<nav aria-label="Sections" style="height: 64px; flex-shrink: 0; display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid #2e2e2e; background: #1c1c1c">
+<a href="P1-AllRooms.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #4fc3f7; font-size: 11px; font-weight: 600; box-shadow: inset 0 2px 0 #03a9f4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+
+var PHONES = { ben: "Ben's phone", sam: "Sam's phone", crew: 'Night crew', tab: 'Office tablet' };
+var WIN = { any: 'at any time', on: 'while lights are on', off: 'while lights are off' };
+var SRC = {
+  tank:   { label: 'F2 feed tank level', unit: '%', dir: 'below', thr: '30', lo: 0, hi: 100, ylo: 0, yhi: 100, keys: [[0, 52], [6.1, 27], [6.17, 95], [15.3, 29.2], [15.75, 28.4], [15.8, 90], [24, 66]], spikes: [[11, 29.5, 1]], wob: 0.6 },
+  f1tank: { label: 'F1 feed tank level', unit: '%', dir: 'below', thr: '25', lo: 0, hi: 100, ylo: 0, yhi: 100, keys: [[0, 61], [5.9, 31], [6.0, 94], [18, 48], [24, 40]], spikes: [], wob: 0.5 },
+  z1vwc:  { label: 'F2 Zone 1 moisture', unit: '% VWC', dir: 'below', thr: '50', lo: 0, hi: 100, ylo: 40, yhi: 70, keys: [[0, 56], [5.95, 49.2], [6.6, 52], [8.5, 61], [18, 59], [24, 55.5]], spikes: [], wob: 0.5 },
+  z2ec:   { label: 'F2 Zone 2 pore EC', unit: 'mS/cm', dir: 'above', thr: '6.0', lo: 0, hi: 20, ylo: 3, yhi: 8, keys: [[0, 5.6], [6, 5.8], [9, 6.1], [13, 6.6], [18, 6.5], [21, 5.9], [24, 5.7]], spikes: [], wob: 0.05 },
+  feedph: { label: 'F2 feed pH', unit: 'pH', dir: 'above', thr: '6.2', lo: 0, hi: 14, ylo: 5.4, yhi: 6.8, keys: [[0, 5.86], [24, 5.9]], spikes: [[9, 6.38, 3], [14, 6.31, 1]], wob: 0.03 },
+  partb:  { label: 'F2 Part B stock', unit: 'L', dir: 'below', thr: '6', lo: 0, hi: 20, ylo: 0, yhi: 10, keys: [[0, 7.1], [6.1, 7.0], [6.2, 6.4], [15.8, 6.3], [15.9, 5.7], [24, 5.6]], spikes: [], wob: 0 },
+  flow3:  { label: 'F2 Zone 3 delivered vs asked', unit: '%', dir: 'below', thr: '80', lo: 0, hi: 200, ylo: 50, yhi: 120, keys: [[0, 98], [24, 97]], spikes: [[13, 74, 4]], wob: 1.2 },
+  f1beat: { label: 'F1 controller heartbeat age', unit: 's', dir: 'above', thr: '120', lo: 5, hi: 3600, ylo: 0, yhi: 700, keys: [[0, 6], [24, 6]], spikes: [[2.67, 610, 3]], wob: 2 },
+  f1back: { label: 'F1 Zone 2 back probe silence', unit: 'min', dir: 'above', thr: '30', lo: 1, hi: 1440, ylo: 0, yhi: 240, keys: [[0, 1], [24, 1]], spikes: [], wob: 0 }
+};
+function series(s) {
+  var v = [];
+  for (var i = 0; i < 288; i++) {
+    var h = i / 12, k = s.keys, j = 0;
+    while (j < k.length - 2 && h > k[j + 1][0]) j++;
+    var a = k[j], b = k[j + 1], t = Math.max(0, Math.min(1, (h - a[0]) / (b[0] - a[0])));
+    v.push(a[1] + (b[1] - a[1]) * t + s.wob * Math.sin(h * 2.3 + 1));
+  }
+  s.spikes.forEach(function (p) { var i0 = Math.round(p[0] * 12); for (var n = 0; n < p[2]; n++) v[i0 + n] = p[1]; });
+  return v;
+}
+function inWin(h, w) { return w === 'any' || (w === 'on' ? (h >= 6 && h < 18) : (h < 6 || h >= 18)); }
+function hhmm(min) { min = Math.round(min) % 1440; var h = Math.floor(min / 60), m = min % 60; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
+function slug(t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''); }
+function evaluate(st) {
+  var s = SRC[st.source], thr = parseFloat(st.thr), dur = Number(st.dur), err = '', thrErr = false, durErr = false;
+  if (st.thr === '' || isNaN(thr) || thr < s.lo || thr > s.hi) { err = 'Enter a value from ' + s.lo + ' to ' + s.hi + ' ' + s.unit + '.'; thrErr = true; }
+  else if (!(dur >= 1 && dur <= 1440) || Math.round(dur) !== dur) { err = 'Enter whole minutes from 1 to 1440.'; durErr = true; }
+  var v = series(s), spans = [], cur = null;
+  if (!thrErr) {
+    for (var i = 0; i < 288; i++) {
+      var on = (st.dir === 'below' ? v[i] < thr : v[i] > thr) && inWin(i / 12, st.win);
+      if (on) { if (!cur) cur = { a: i }; cur.b = i; } else if (cur) { spans.push(cur); cur = null; }
+    }
+    if (cur) spans.push(cur);
+  }
+  var fired = [], short = [];
+  spans.forEach(function (sp) { sp.len = (sp.b - sp.a + 1) * 5; if (!durErr && sp.len >= dur) fired.push(sp); else short.push(sp); });
+  return { s: s, v: v, thr: thr, dur: dur, err: err, thrErr: thrErr, durErr: durErr, fired: fired, short: short };
+}
+function chart(st, ev, g) {
+  var s = ev.s, W = g.x1 - g.x0;
+  var X = function (i) { return +(g.x0 + W * i / 288).toFixed(1); };
+  var Y = function (val) { var c = Math.max(s.ylo, Math.min(s.yhi, val)); return +(g.y1 - (c - s.ylo) / (s.yhi - s.ylo) * (g.y1 - g.y0)).toFixed(1); };
+  var d = ev.v.map(function (val, i) { return (i ? 'L' : 'M') + X(i) + ' ' + Y(val); }).join('');
+  var thrY = ev.thrErr ? -20 : Y(ev.thr);
+  var slot = function (list, k, isFired) {
+    var sp = list[k];
+    if (!sp) return { x: 0, w: 0, mx: -20, op: 0, t: '' };
+    var at = sp.a + ev.dur / 5;
+    return { x: X(sp.a), w: +(X(sp.b + 1) - X(sp.a)).toFixed(1), mx: isFired ? X(at) : -20, op: isFired ? 1 : 0, t: isFired ? hhmm(at * 5) : '' };
+  };
+  var word = st.dir === 'below' ? 'under' : 'over', n = ev.fired.length;
+  var head = ev.err ? 'Fix the box in red to see the preview' : n === 0 ? 'Would not have alerted yesterday' : 'Would have alerted ' + (n === 1 ? 'once' : n + ' times') + ' yesterday';
+  var detail = ev.err ? '' : ev.fired.map(function (sp) { return hhmm(sp.a * 5 + ev.dur) + ' (' + word + ' ' + st.thr + ' ' + s.unit + ' for ' + sp.len + ' min)'; }).join(' · ');
+  if (!ev.err && ev.short.length) detail += (detail ? ' · ' : '') + ev.short.length + ' shorter ' + (st.dir === 'below' ? 'dip' : 'rise') + (ev.short.length > 1 ? 's' : '') + ' ignored';
+  if (!ev.err && !detail) detail = 'Yesterday it never went ' + word + ' ' + st.thr + ' ' + s.unit + '.';
+  return {
+    d: d, thrY: thrY, thrLabelY: thrY - 6, thrLabel: ev.thrErr ? '' : st.thr + ' ' + s.unit,
+    f0: slot(ev.fired, 0, true), f1: slot(ev.fired, 1, true), f2: slot(ev.fired, 2, true), f3: slot(ev.fired, 3, true),
+    s0: slot(ev.short, 0, false), s1: slot(ev.short, 1, false), s2: slot(ev.short, 2, false), s3: slot(ev.short, 3, false),
+    yTop: s.yhi + ' ' + s.unit, yBot: s.ylo + ' ' + s.unit,
+    head: head, headInk: ev.err ? '#f28b82' : n ? '#ffca5b' : '#81c995', detail: detail,
+    aria: 'Yesterday\'s ' + s.label + ' with the threshold line. ' + head + '.'
+  };
+}
+
+var G = { x0: 40, x1: 330, y0: 6, y1: 112 };
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { phone: 'ben', source: 'tank', dir: 'below', thr: '30', dur: '10', win: 'any', saved: false, test: '' }; }
+  renderVals() {
+    var self = this, st = this.state, s = SRC[st.source], ev = evaluate(st), c = chart(st, ev, G);
+    var set = function (k) { return function (e) { var o = { test: '', saved: false }; o[k] = e.target.value; if (k === 'source') { o.dir = SRC[e.target.value].dir; o.thr = SRC[e.target.value].thr; } self.setState(o); }; };
+    return {
+      c: c, phone: st.phone, source: st.source, dir: st.dir, thr: st.thr, dur: st.dur, win: st.win, unit: s.unit,
+      setPhone: set('phone'), setSource: set('source'), setDir: set('dir'), setThr: set('thr'), setDur: set('dur'), setWin: set('win'),
+      hasErr: !!ev.err, err: ev.err, thrInvalid: ev.thrErr ? 'true' : 'false', durInvalid: ev.durErr ? 'true' : 'false',
+      thrEdge: ev.thrErr ? '#f28b82' : '#3a3a3a', durEdge: ev.durErr ? '#f28b82' : '#3a3a3a',
+      msg: st.saved ? 'Saved and read back 14:02 · watching now' : st.test,
+      canUndo: st.saved, saveDisabled: ev.err ? 'true' : 'false', saveOpacity: ev.err ? 0.45 : 1, saveLabel: st.saved ? 'Saved' : 'Save rule',
+      sendTest: function () { self.setState({ test: 'Test push accepted 14:02 · check ' + PHONES[st.phone] }); },
+      save: function () { if (!ev.err) self.setState({ saved: true, test: '' }); },
+      undo: function () { self.setState({ saved: false }); }
+    };
+  }
+}
+
+</script>
+</body>
+</html>

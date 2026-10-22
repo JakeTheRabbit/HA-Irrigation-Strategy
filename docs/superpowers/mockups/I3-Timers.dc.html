@@ -1,0 +1,394 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Irrigation — Timer programs</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 2px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 15px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; margin-top: 18px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 22px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 16px 28px 22px; display: flex; flex-direction: column; gap: 14px">
+<nav aria-label="Irrigation pages" style="display: flex; align-items: flex-end; gap: 6px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e">
+<a href="I1-Timeline.dc.html" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b8b8b8">Timeline</a>
+<a href="I2-CurrentDay.dc.html" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b8b8b8">Current day</a>
+<a href="I3-Timers.dc.html" aria-current="page" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 600; color: #4fc3f7; box-shadow: inset 0 -2px 0 #03a9f4">Timer programs</a>
+<a href="I4-GrowPlan.dc.html" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b8b8b8">Grow plan &amp; presets</a>
+</nav>
+
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: 372px minmax(0, 1fr); gap: 18px">
+
+<!-- Left: programs + modes -->
+<div style="display: flex; flex-direction: column; gap: 14px; min-height: 0">
+<section aria-label="Timer programs" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 14px 12px; display: flex; flex-direction: column; gap: 8px">
+<div style="display: flex; align-items: center; padding: 0 4px 4px"><b style="font-size: 17px; font-weight: 600">Programs</b><span style="margin-left: 8px; font-size: 13px; color: #a4a4a4">for zones without probes</span>
+<button type="button" onClick="{{newProg}}" style="margin-left: auto; height: 32px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 13px; font-weight: 600">New program</button></div>
+<sc-for list="{{progList}}" as="p" hint-placeholder-count="3">
+<button type="button" onClick="{{p.pick}}" aria-pressed="{{p.pressed}}" style="display: flex; flex-direction: column; align-items: flex-start; gap: 5px; padding: 10px 12px; border: 1px solid {{p.edge}}; border-radius: 10px; background: {{p.bg}}; color: #e1e1e1; font: inherit; text-align: left">
+<span style="font-size: 14px; font-weight: 500; line-height: 1.35">{{p.sentence}}</span>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: {{p.statusInk}}"><span style="width: 7px; height: 7px; border-radius: 4px; background: {{p.statusDot}}"></span>{{p.status}}</span>
+</button>
+</sc-for>
+</section>
+
+<section aria-label="Irrigation mode per zone" style="flex: 1; min-height: 0; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 14px 10px; display: flex; flex-direction: column; gap: 2px">
+<div style="padding: 0 4px 6px"><b style="font-size: 17px; font-weight: 600">Irrigation mode</b><span style="margin-left: 8px; font-size: 13px; color: #a4a4a4">who waters each zone</span></div>
+<sc-for list="{{modeRows}}" as="m" hint-placeholder-count="8">
+<div style="display: flex; flex-direction: column; gap: 2px; padding: 3px 4px">
+<div style="display: flex; align-items: center; gap: 8px">
+<span style="width: 84px; font-size: 13px; font-weight: 500">{{m.name}}</span>
+<div role="radiogroup" aria-label="{{m.aria}}" style="margin-left: auto; display: flex; border: 1px solid #3a3a3a; border-radius: 8px; overflow: hidden">
+<sc-for list="{{m.opts}}" as="o" hint-placeholder-count="3">
+<button type="button" role="radio" aria-checked="{{o.checked}}" aria-disabled="{{o.disabled}}" title="{{o.title}}" onClick="{{o.pick}}" style="width: 78px; height: 30px; border: 0; border-left: 1px solid #3a3a3a; background: {{o.bg}}; color: {{o.ink}}; font: inherit; font-size: 12px; font-weight: 600; text-decoration: {{o.strike}}">{{o.label}}</button>
+</sc-for>
+</div>
+</div>
+<sc-if value="{{m.hasNote}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: {{m.noteInk}}; padding-left: 92px">{{m.note}}</span></sc-if>
+</div>
+</sc-for>
+</section>
+</div>
+
+<!-- Right: editor -->
+<section aria-label="Edit timer program" style="min-height: 0; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 18px 20px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: flex-start; gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 4px; min-width: 0">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">{{editorKicker}}</span>
+<h1 style="margin: 0; font-size: 22px; font-weight: 600; line-height: 1.3">{{sentence}}</h1>
+</div>
+<sc-if value="{{dirty}}" hint-placeholder-val="{{true}}"><span style="margin-left: auto; flex: none; height: 26px; padding: 0 10px; border-radius: 13px; border: 1px solid #4fc3f7; color: #4fc3f7; font-size: 12px; font-weight: 600; line-height: 24px">Unsaved edits</span></sc-if>
+<sc-if value="{{savedNote}}" hint-placeholder-val="{{false}}"><span style="margin-left: auto; flex: none; display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; color: #81c995"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12 10 17 19 7"></polyline></svg>Written and read back 14:10</span></sc-if>
+</div>
+
+<div style="display: grid; grid-template-columns: 120px minmax(0, 1fr); gap: 12px 16px; align-items: center; font-size: 14px">
+<span style="color: #a4a4a4">Type</span>
+<div style="display: flex; align-items: center; gap: 12px">
+<div role="radiogroup" aria-label="Program type" style="display: flex; border: 1px solid #3a3a3a; border-radius: 8px; overflow: hidden">
+<sc-for list="{{types}}" as="t" hint-placeholder-count="3"><button type="button" role="radio" aria-checked="{{t.checked}}" onClick="{{t.pick}}" style="height: 36px; padding: 0 16px; border: 0; border-left: 1px solid #3a3a3a; background: {{t.bg}}; color: {{t.ink}}; font: inherit; font-size: 14px; font-weight: 600">{{t.label}}</button></sc-for>
+</div>
+<span style="font-size: 13px; color: #a4a4a4">{{typeHelp}}</span>
+</div>
+
+<span style="color: #a4a4a4">Zones</span>
+<div style="display: flex; align-items: center; gap: 16px">
+<sc-for list="{{zoneChecks}}" as="zc" hint-placeholder-count="2">
+<label style="display: flex; align-items: center; gap: 8px; height: 36px; cursor: pointer"><input type="checkbox" checked="{{zc.checked}}" onClick="{{zc.toggle}}" style="width: 18px; height: 18px; accent-color: #03a9f4">{{zc.label}}</label>
+</sc-for>
+<span style="font-size: 12px; color: #a4a4a4">Only zones set to Timer are listed</span>
+</div>
+
+<span style="color: #a4a4a4">{{amountLabel}}</span>
+<div style="display: flex; align-items: center; gap: 20px">
+<sc-for list="{{steppers}}" as="st" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 8px"><span style="font-size: 13px; color: #b8b8b8">{{st.label}}</span>
+<div style="display: flex; align-items: center; border: 1px solid #3a3a3a; border-radius: 8px">
+<button type="button" onClick="{{st.dec}}" aria-label="{{st.decLabel}}" style="width: 36px; height: 36px; border: 0; background: transparent; color: #e1e1e1; font: inherit; font-size: 18px">−</button>
+<b style="min-width: 64px; text-align: center; font-size: 15px; font-weight: 600">{{st.value}}</b>
+<button type="button" onClick="{{st.inc}}" aria-label="{{st.incLabel}}" style="width: 36px; height: 36px; border: 0; background: transparent; color: #e1e1e1; font: inherit; font-size: 18px">+</button>
+</div></div>
+</sc-for>
+</div>
+
+<span style="color: #a4a4a4">When</span>
+<div style="display: flex; align-items: center; gap: 12px">
+<div role="radiogroup" aria-label="Time window" style="display: flex; border: 1px solid #3a3a3a; border-radius: 8px; overflow: hidden">
+<sc-for list="{{wins}}" as="w" hint-placeholder-count="4"><button type="button" role="radio" aria-checked="{{w.checked}}" onClick="{{w.pick}}" style="height: 36px; padding: 0 14px; border: 0; border-left: 1px solid #3a3a3a; background: {{w.bg}}; color: {{w.ink}}; font: inherit; font-size: 14px; font-weight: 600">{{w.label}}</button></sc-for>
+</div>
+<span style="font-size: 13px; color: #b8b8b8">{{winHelp}}</span>
+</div>
+</div>
+
+<!-- Live preview -->
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 14px 16px 12px; border: 1px solid #2e2e2e; border-radius: 12px; background: #161616">
+<div style="display: flex; align-items: baseline; gap: 12px"><b style="font-size: 15px; font-weight: 600">Next 24 hours</b><span style="font-size: 13px; color: #a4a4a4">{{previewSummary}}</span><span style="margin-left: auto; font-size: 12px; color: #a4a4a4">Same strip as Irrigation › Timeline</span></div>
+<div style="display: flex; height: 22px">
+<span style="width: 120px; flex: none"></span>
+<div style="position: relative; width: 520px; flex: none">
+<sc-for list="{{pTicks}}" as="t" hint-placeholder-count="6"><span style="position: absolute; left: {{t.left}}; top: 3px; transform: translateX(-50%); font-size: 12px; color: {{t.ink}}; font-weight: {{t.weight}}; white-space: nowrap">{{t.label}}</span></sc-for>
+</div>
+</div>
+<sc-for list="{{pRows}}" as="row" hint-placeholder-count="2">
+<div style="display: flex; height: 50px; border-top: 1px solid #262626">
+<span style="width: 120px; flex: none; display: flex; flex-direction: column; justify-content: center; font-size: 13px"><b style="font-weight: 600">{{row.name}}</b><span style="font-size: 12px; color: #a4a4a4">{{row.sub}}</span></span>
+<div style="position: relative; width: 520px; flex: none">
+<span aria-hidden="true" style="position: absolute; left: {{lightsA.left}}; width: {{lightsA.w}}; top: 0; bottom: 0; background: rgba(255,214,102,.08)"></span>
+<span aria-hidden="true" style="position: absolute; left: {{lightsB.left}}; width: {{lightsB.w}}; top: 0; bottom: 0; background: rgba(255,214,102,.08)"></span>
+<sc-for list="{{row.others}}" as="ob" hint-placeholder-count="1"><span title="{{ob.title}}" style="position: absolute; left: {{ob.left}}; width: {{ob.w}}; top: 17px; height: 16px; box-sizing: border-box; border: 1px dashed #6a6a6a; border-radius: 3px"></span></sc-for>
+<sc-for list="{{row.queues}}" as="q" hint-placeholder-count="2"><span aria-hidden="true" style="position: absolute; left: {{q.left}}; width: {{q.w}}; top: 13px; height: 24px; box-sizing: border-box; border: 1px solid #ffca5b; border-radius: 3px; background: repeating-linear-gradient(45deg, rgba(255,202,91,.55) 0 2px, transparent 2px 5px)"></span></sc-for>
+<sc-for list="{{row.blocks}}" as="b" hint-placeholder-count="8"><span title="{{b.title}}" style="position: absolute; left: {{b.left}}; width: {{b.w}}; top: 13px; height: 24px; box-sizing: border-box; border: {{b.border}}; border-radius: 3px; background: {{b.bg}}"></span></sc-for>
+<sc-if value="{{row.hasCap}}" hint-placeholder-val="{{false}}"><span style="position: absolute; left: {{row.capLeft}}; top: 15px; padding: 2px 6px; border-radius: 4px; background: #2a1d1c; border: 1px solid #f28b82; font-size: 12px; font-weight: 600; color: #f28b82; white-space: nowrap">{{row.capText}}</span></sc-if>
+<span aria-hidden="true" style="position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: #03a9f4"></span>
+</div>
+</div>
+</sc-for>
+<sc-if value="{{noZones}}" hint-placeholder-val="{{false}}"><span style="padding: 12px 0; font-size: 14px; color: #ffca5b">Pick at least one zone to see the shots.</span></sc-if>
+<div style="display: flex; gap: 18px; padding-top: 4px; font-size: 12px; color: #a4a4a4">
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 14px; box-sizing: border-box; border-radius: 3px; border: 1.5px dashed #4fc3f7; background: rgba(3,169,244,.14)"></span>This program</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 14px; box-sizing: border-box; border-radius: 3px; border: 1px dashed #6a6a6a"></span>Other programs, drafts too</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 14px; box-sizing: border-box; border-radius: 3px; border: 1px solid #ffca5b; background: repeating-linear-gradient(45deg, rgba(255,202,91,.55) 0 2px, transparent 2px 5px)"></span>Waiting for pump</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 14px; box-sizing: border-box; border-radius: 3px; border: 1.5px solid #f28b82; background: repeating-linear-gradient(-45deg, rgba(242,139,130,.35) 0 2px, transparent 2px 5px)"></span>Blocked by daily max</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 14px; border-radius: 3px; background: rgba(255,214,102,.16)"></span>Veg lights on 04:00–22:00</span>
+</div>
+</div>
+
+<!-- Guards -->
+<div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px">
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid {{maxEdge}}; border-radius: 12px">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">DAILY MAX PER ZONE</span>
+<span style="position: relative; height: 10px; border-radius: 5px; background: #333333"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: {{maxPct}}; border-radius: 5px; background: {{maxFill}}"></span><span style="position: absolute; left: 100%; top: -4px; bottom: -4px; width: 2px; margin-left: -2px; background: #e1e1e1"></span></span>
+<span style="font-size: 13px"><b style="font-weight: 600">{{maxUsed}}</b> <span style="color: #a4a4a4">of 24 min a day</span></span>
+<span style="font-size: 12px; color: {{maxInk}}">{{maxNote}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid #2e2e2e; border-radius: 12px">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">PUMP CAPACITY</span>
+<span style="display: flex; gap: 4px"><span style="flex: 1; height: 10px; border-radius: 3px; background: #4fc3f7"></span><span style="flex: 1; height: 10px; border-radius: 3px; background: #333333"></span></span>
+<span style="font-size: 13px">Veg pump runs <b style="font-weight: 600">one zone at a time</b></span>
+<span style="font-size: 12px; color: #a4a4a4">{{pumpNote}}</span>
+</div>
+<div style="display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; border: 1px solid #2e2e2e; border-radius: 12px; font-size: 13px">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">SAME SAFETY AS STEERING</span>
+<span style="display: flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12 10 17 19 7"></polyline></svg>Stop all / room stop</span>
+<span style="display: flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12 10 17 19 7"></polyline></svg>Source-water pH/EC check</span>
+<span style="display: flex; align-items: center; gap: 6px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12 10 17 19 7"></polyline></svg>Feed tank level guard</span>
+</div>
+</div>
+
+<div style="margin-top: auto; display: flex; align-items: center; gap: 10px">
+<sc-if value="{{canDelete}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{delProg}}" style="height: 40px; padding: 0 14px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Delete program</button></sc-if>
+<sc-if value="{{hasUndoDelete}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 10px; font-size: 14px; color: #b8b8b8">Program deleted.<button type="button" onClick="{{undoDelete}}" style="height: 36px; padding: 0 12px; border: 1px solid #4fc3f7; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 14px; font-weight: 600">Undo</button></span></sc-if>
+<button type="button" onClick="{{revert}}" style="margin-left: auto; height: 40px; padding: 0 14px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600">Discard edits</button>
+<button type="button" onClick="{{save}}" aria-disabled="{{saveDisabled}}" style="height: 40px; padding: 0 18px; border: 0; border-radius: 8px; background: {{saveBg}}; color: {{saveInk}}; font: inherit; font-size: 14px; font-weight: 700">{{saveLabel}}</button>
+</div>
+</section>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph] || '#4a4a4a', vwc: vwc }; }
+var TREE = [
+  { name: 'F2', dot: '#03a9f4', state: 'Watering', zones: [tz('Zone 1', 'P2', '59.4%'), tz('Zone 2', 'P2', '58.1%'), tz('Zone 3', 'P2', '60.2%')] },
+  { name: 'F1', dot: '#81c995', state: 'Holding', zones: [tz('Zone 1', 'P1', '63.8%'), tz('Zone 2', 'P1', '62.9%'), tz('Zone 3', 'P1', '64.4%')] },
+  { name: 'Veg', dot: '#b39ddb', state: 'Timers', zones: [tz('Zone 1', 'T', 'timer'), tz('Zone 2', 'T', 'timer')] }
+];
+
+var NOW = 14 + 10 / 60;
+var PW = 520;
+var DMAX = 24;
+var ZONES = [
+  { key: 'F2-1', name: 'F2 Zone 1', room: 'F2', probe: true }, { key: 'F2-2', name: 'F2 Zone 2', room: 'F2', probe: true }, { key: 'F2-3', name: 'F2 Zone 3', room: 'F2', probe: true },
+  { key: 'F1-1', name: 'F1 Zone 1', room: 'F1', probe: true }, { key: 'F1-2', name: 'F1 Zone 2', room: 'F1', probe: true }, { key: 'F1-3', name: 'F1 Zone 3', room: 'F1', probe: true },
+  { key: 'V-1', name: 'Veg Zone 1', room: 'Veg', probe: false, sub: 'mothers' }, { key: 'V-2', name: 'Veg Zone 2', room: 'Veg', probe: false, sub: 'clones' }
+];
+var DURS = [30, 60, 90, 120, 180, 240, 300];
+var EVERY = [10, 15, 20, 30, 45, 60, 90, 120];
+var WINS = { all: ['All day', 0, 24], on: ['Lights on', 4, 22], off: ['Lights off', 22, 28], custom: ['Custom', 8, 12] };
+function hm(h) { var m = Math.round((((h % 24) + 24) % 24) * 60); var H = Math.floor(m / 60) % 24, M = m % 60; return (H < 10 ? '0' : '') + H + ':' + (M < 10 ? '0' : '') + M; }
+function durText(s) { return s < 60 || s % 60 ? s + ' s' : (s / 60) + ' min'; }
+function px(v) { return Math.round(v * 10) / 10 + 'px'; }
+function zoneText(zs) {
+  var keys = Object.keys(zs).filter(function (k) { return zs[k]; });
+  if (!keys.length) return 'no zones yet';
+  if (keys.length === 2 && zs['V-1'] && zs['V-2']) return 'Veg zones 1–2';
+  return keys.map(function (k) { var z = ZONES.filter(function (q) { return q.key === k; })[0]; return z.name.replace(' Zone', ' zone') + (z.sub ? ' (' + z.sub + ')' : ''); }).join(', ');
+}
+function winText(p) { return p.win === 'all' ? 'all day' : p.win === 'on' ? 'while lights are on' : p.win === 'off' ? 'while lights are off' : hm(p.from) + '–' + hm(p.to); }
+function sentence(p) {
+  var z = zoneText(p.zones);
+  if (p.type === 'oneoff') return 'Once at ' + hm(p.at) + ' for ' + durText(p.dur) + ', Fri 23 Oct, ' + z;
+  if (p.type === 'simple') return p.times + ' times a day for ' + durText(p.dur) + ', ' + winText(p) + ', ' + z;
+  return 'Every ' + p.every + ' min for ' + durText(p.dur) + ', ' + winText(p) + ', ' + z;
+}
+function shotTimes(p) {
+  var out = [], d = p.dur / 3600;
+  if (p.type === 'oneoff') return [p.at];
+  var a = p.win === 'custom' ? p.from : WINS[p.win][1], b = p.win === 'custom' ? p.to : WINS[p.win][2];
+  if (p.type === 'simple') { for (var k = 0; k < p.times; k++) out.push(a + (k + 0.5) * (b - a) / p.times - d / 2); return out; }
+  for (var t = a; t + d <= b + 1e-6; t += p.every / 60) out.push(t);
+  return out;
+}
+var PROGS = [
+  { id: 1, type: 'recycle', dur: 120, every: 30, times: 6, win: 'custom', from: 8, to: 12, at: 20, zones: { 'V-1': true, 'V-2': true }, on: true },
+  { id: 2, type: 'simple', dur: 90, every: 30, times: 6, win: 'on', from: 8, to: 12, at: 20, zones: { 'V-2': true }, on: false },
+  { id: 3, type: 'oneoff', dur: 180, every: 30, times: 6, win: 'custom', from: 8, to: 12, at: 20, zones: { 'V-1': true }, on: true }
+];
+function clone(p) { var c = Object.assign({}, p); c.zones = Object.assign({}, p.zones); return c; }
+function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { progs: PROGS.map(clone), sel: 1, draft: clone(PROGS[0]), saved: false, deleted: null,
+      modes: { 'F2-1': 'steer', 'F2-2': 'steer', 'F2-3': 'steer', 'F1-1': 'steer', 'F1-2': 'steer', 'F1-3': 'steer', 'V-1': 'timer', 'V-2': 'timer' } };
+  }
+  renderVals() {
+    var s = this.state, self = this, p = s.draft;
+    var orig = s.progs.filter(function (q) { return q.id === s.sel; })[0];
+    var dirty = !orig || !same(orig, p);
+    var upd = function (k, v) { var d = clone(s.draft); d[k] = v; self.setState({ draft: d, saved: false }); };
+    var nextShot = function (q) {
+      if (q.type === 'oneoff') return 'Fri 20:00';
+      var ts = shotTimes(q); if (!ts.length) return '';
+      var best = ts.map(function (t) { return ((t - NOW) % 24 + 24) % 24; }).sort(function (a, b) { return a - b; })[0];
+      return (NOW + best >= 24 ? 'tomorrow ' : 'today ') + hm(NOW + best);
+    };
+
+    var progList = s.progs.map(function (q) {
+      var on = q.id === s.sel;
+      return { sentence: sentence(q), pressed: on ? 'true' : 'false', edge: on ? '#03a9f4' : '#2e2e2e', bg: on ? '#1d2a33' : '#161616',
+        status: q.on ? 'On · next shot ' + nextShot(q) : 'Draft · not running', statusDot: q.on ? '#81c995' : '#8a8a8a', statusInk: q.on ? '#b8b8b8' : '#a4a4a4',
+        pick: function () { self.setState({ sel: q.id, draft: clone(q), saved: false }); } };
+    });
+
+    var covered = {};
+    s.progs.forEach(function (q) { if (q.on) Object.keys(q.zones).forEach(function (k) { if (q.zones[k]) covered[k] = true; }); });
+    var modeRows = ZONES.map(function (z) {
+      var mode = s.modes[z.key];
+      var opts = [['steer', 'Steering'], ['timer', 'Timer'], ['off', 'Off']].map(function (o) {
+        var on = mode === o[0], dis = o[0] === 'steer' && !z.probe;
+        return { label: o[1], checked: on ? 'true' : 'false', disabled: dis ? 'true' : 'false', title: dis ? 'Needs a probe in this zone' : o[1],
+          bg: on ? (o[0] === 'off' ? '#5a2f2c' : '#03a9f4') : 'transparent', ink: on ? (o[0] === 'off' ? '#ffd6d2' : '#06141c') : dis ? '#6a6a6a' : '#b8b8b8', strike: dis ? 'line-through' : 'none',
+          pick: function () { if (dis) return; var m = Object.assign({}, s.modes); m[z.key] = o[0]; self.setState({ modes: m }); } };
+      });
+      var note = '', ink = '#a4a4a4';
+      if (mode === 'timer' && !covered[z.key]) { note = 'No running program covers this zone: it will not be watered.'; ink = '#ffca5b'; }
+      else if (mode === 'off') { note = 'Off: no shots at all, rescue floor included.'; ink = '#f28b82'; }
+      else if (!z.probe) { note = 'No probe, so steering is not offered.'; }
+      return { name: z.name, aria: 'Irrigation mode for ' + z.name, opts: opts, hasNote: !!note, note: note, noteInk: ink };
+    });
+
+    // preview: next 24 h from now
+    var X = function (h) { return (((h - NOW) % 24) + 24) % 24 / 24 * PW; };
+    // Veg lights 04:00-22:00 seen from now (14:10): on until 22:00, then again from 04:00
+    var lightsA = { left: '0px', w: px(X(22)) }, lightsB = { left: px(X(4)), w: px(PW - X(4)) };
+    var times = shotTimes(p), wpx = Math.max(5, p.dur / 3600 / 24 * PW);
+    var keys = ZONES.filter(function (z) { return p.zones[z.key] && s.modes[z.key] === 'timer'; });
+    var maxUsedMin = 0, blockedCount = 0;
+    var pRows = keys.map(function (z, zi) {
+      var row = { name: z.name, sub: z.sub ? z.sub : 'timer', blocks: [], queues: [], others: [], hasCap: false, capLeft: '0px', capText: '' };
+      var used = 0, capAt = null;
+      var sorted = times.map(function (t) { return t + zi * p.dur / 3600; }).sort(function (a, b) { return X(a) - X(b); });
+      sorted.forEach(function (t) {
+        used += p.dur / 60;
+        var blocked = used > DMAX + 1e-6;
+        if (blocked) { blockedCount++; if (capAt == null) capAt = X(t); }
+        if (zi > 0) row.queues.push({ left: px(X(t - zi * p.dur / 3600)), w: px(Math.max(4, zi * p.dur / 3600 / 24 * PW)) });
+        row.blocks.push({ left: px(X(t)), w: px(wpx), title: hm(t) + (blocked ? ' blocked: daily max reached' : ' for ' + durText(p.dur)),
+          border: blocked ? '1.5px solid #f28b82' : '1.5px dashed #4fc3f7', bg: blocked ? 'repeating-linear-gradient(-45deg, rgba(242,139,130,.35) 0 2px, transparent 2px 5px)' : 'rgba(3,169,244,.22)' });
+      });
+      maxUsedMin = Math.max(maxUsedMin, Math.min(used, DMAX));
+      if (capAt != null) { row.hasCap = true; row.capLeft = px(Math.min(capAt + 4, PW - 190)); row.capText = 'Stops here: 24 min daily max'; }
+      s.progs.forEach(function (q) {
+        if (q.id === s.sel || !q.zones[z.key]) return;
+        shotTimes(q).forEach(function (t) { if (q.type === 'oneoff') return; row.others.push({ left: px(X(t)), w: px(Math.max(5, q.dur / 3600 / 24 * PW)), title: sentence(q) }); });
+      });
+      return row;
+    });
+    var pTicks = [{ left: '0px', label: 'Now 14:10', ink: '#4fc3f7', weight: 700 }].concat([18, 22, 2, 6, 10].map(function (h) {
+      return { left: px(X(h)), label: h === 2 ? 'Fri 02:00' : hm(h), ink: '#a4a4a4', weight: 400 };
+    }));
+    pTicks[0].left = '30px';
+    var total = times.length * keys.length;
+    var first = nextShot(p);
+
+    var types = [['oneoff', 'One-off'], ['recycle', 'Recycle'], ['simple', 'Simple']].map(function (t) {
+      var on = p.type === t[0];
+      return { label: t[1], checked: on ? 'true' : 'false', bg: on ? '#03a9f4' : 'transparent', ink: on ? '#06141c' : '#e1e1e1', pick: function () { upd('type', t[0]); } };
+    });
+    var wins = ['all', 'on', 'off', 'custom'].map(function (k) {
+      var on = p.win === k;
+      return { label: WINS[k][0], checked: on ? 'true' : 'false', bg: on ? '#03a9f4' : 'transparent', ink: on ? '#06141c' : '#e1e1e1', pick: function () { upd('win', k); } };
+    });
+    var step = function (arr, k, dir) { var i = arr.indexOf(p[k]); i = Math.max(0, Math.min(arr.length - 1, i + dir)); upd(k, arr[i]); };
+    var steppers = [{ label: 'Run for', value: durText(p.dur), dec: function () { step(DURS, 'dur', -1); }, inc: function () { step(DURS, 'dur', 1); }, decLabel: 'Shorter shot', incLabel: 'Longer shot' }];
+    if (p.type === 'recycle') steppers.push({ label: 'Every', value: p.every + ' min', dec: function () { step(EVERY, 'every', -1); }, inc: function () { step(EVERY, 'every', 1); }, decLabel: 'Water more often', incLabel: 'Water less often' });
+    if (p.type === 'simple') steppers.push({ label: 'Times a day', value: p.times + '', dec: function () { upd('times', Math.max(1, p.times - 1)); }, inc: function () { upd('times', Math.min(24, p.times + 1)); }, decLabel: 'Fewer shots a day', incLabel: 'More shots a day' });
+    if (p.type === 'oneoff') steppers.push({ label: 'Start at', value: hm(p.at), dec: function () { upd('at', (p.at + 23.5) % 24); }, inc: function () { upd('at', (p.at + 0.5) % 24); }, decLabel: 'Start 30 min earlier', incLabel: 'Start 30 min later' });
+    if (p.type !== 'oneoff' && p.win === 'custom') {
+      steppers.push({ label: 'From', value: hm(p.from), dec: function () { upd('from', Math.max(0, p.from - 0.5)); }, inc: function () { upd('from', Math.min(p.to - 0.5, p.from + 0.5)); }, decLabel: 'Start window 30 min earlier', incLabel: 'Start window 30 min later' });
+      steppers.push({ label: 'To', value: hm(p.to), dec: function () { upd('to', Math.max(p.from + 0.5, p.to - 0.5)); }, inc: function () { upd('to', Math.min(24, p.to + 0.5)); }, decLabel: 'End window 30 min earlier', incLabel: 'End window 30 min later' });
+    }
+    var zoneChecks = ZONES.filter(function (z) { return s.modes[z.key] === 'timer'; }).map(function (z) {
+      return { label: z.name + (z.sub ? ' · ' + z.sub : ''), checked: !!p.zones[z.key], toggle: function () { var zz = Object.assign({}, p.zones); zz[z.key] = !zz[z.key]; upd('zones', zz); } };
+    });
+    var noZones = keys.length === 0;
+    var usedPct = Math.min(100, maxUsedMin / DMAX * 100);
+    return {
+      rooms: TREE, progList: progList, modeRows: modeRows, types: types, wins: wins, steppers: steppers, zoneChecks: zoneChecks,
+      editorKicker: (orig ? 'PROGRAM ' + s.sel : 'NEW PROGRAM') + ' · ' + (orig && orig.on ? 'RUNNING' : 'NOT RUNNING YET'),
+      sentence: sentence(p), dirty: dirty, savedNote: !dirty && s.saved,
+      typeHelp: p.type === 'oneoff' ? 'Runs once at a set time.' : p.type === 'recycle' ? 'Repeats on an interval inside the window.' : 'Spreads a number of shots evenly across the window.',
+      amountLabel: 'Amount',
+      winHelp: p.type === 'oneoff' ? 'Not used for one-off shots' : p.win === 'on' ? 'Veg lights 04:00–22:00, follows the lights if they move' : p.win === 'off' ? 'Veg lights off 22:00–04:00' : p.win === 'all' ? 'Around the clock' : 'Only between the From and To times',
+      pRows: pRows, pTicks: pTicks, lightsA: lightsA, lightsB: lightsB, noZones: noZones,
+      previewSummary: noZones ? '' : total + ' shots · ' + (total * p.dur / 60) + ' min of watering' + (first ? ' · first ' + first : '') + (blockedCount ? ' · ' + blockedCount + ' blocked' : ''),
+      maxPct: usedPct + '%', maxUsed: Math.round(maxUsedMin * 10) / 10 + ' min', maxFill: blockedCount ? '#f28b82' : usedPct > 80 ? '#ffca5b' : '#4fc3f7',
+      maxEdge: blockedCount ? '#f28b82' : '#2e2e2e', maxInk: blockedCount ? '#f28b82' : '#a4a4a4',
+      maxNote: blockedCount ? blockedCount + ' shots would be blocked. Shorten the shots or the window.' : 'Per zone, all programs together. Shots past it are skipped and logged.',
+      pumpNote: keys.length > 1 ? 'Zone 2 starts when zone 1 finishes, ' + durText(p.dur) + ' later each time.' : 'Only one zone in this program, no waiting.',
+      canDelete: !!orig, hasUndoDelete: !!s.deleted,
+      delProg: function () { var rest = s.progs.filter(function (q) { return q.id !== s.sel; }); if (!rest.length) return; self.setState({ deleted: orig, progs: rest, sel: rest[0].id, draft: clone(rest[0]), saved: false }); },
+      undoDelete: function () { var d = s.deleted; self.setState({ progs: s.progs.concat([d]).sort(function (a, b) { return a.id - b.id; }), sel: d.id, draft: clone(d), deleted: null }); },
+      newProg: function () { self.setState({ sel: 99, draft: { id: 99, type: 'recycle', dur: 60, every: 60, times: 6, win: 'on', from: 8, to: 12, at: 20, zones: {}, on: false }, saved: false }); },
+      revert: function () { if (orig) self.setState({ draft: clone(orig) }); },
+      saveDisabled: noZones || !dirty ? 'true' : 'false', saveBg: noZones || !dirty ? '#333333' : '#03a9f4', saveInk: noZones || !dirty ? '#a4a4a4' : '#06141c',
+      saveLabel: noZones ? 'Pick a zone to save' : !dirty ? 'Saved' : 'Save and run · first shot ' + first,
+      save: function () {
+        if (noZones || !dirty) return;
+        var d = clone(p); d.on = true; var list = s.progs.filter(function (q) { return q.id !== d.id; });
+        if (d.id === 99) { d.id = 4; }
+        list.push(d); list.sort(function (a, b) { return a.id - b.id; });
+        self.setState({ progs: list, sel: d.id, draft: clone(d), saved: true });
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

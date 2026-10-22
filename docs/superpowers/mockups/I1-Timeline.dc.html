@@ -1,0 +1,368 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Irrigation — Timeline</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+[data-tip]{display:none}
+[data-tw]:hover [data-tip],[data-tw]:focus [data-tip],[data-tw]:focus-within [data-tip]{display:block}
+[data-tw]:focus-visible{outline:2px solid #e1e1e1;outline-offset:2px}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 2px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 15px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; margin-top: 18px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 22px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 16px 28px 22px; display: flex; flex-direction: column; gap: 14px">
+<nav aria-label="Irrigation pages" style="display: flex; align-items: flex-end; gap: 6px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e">
+<a href="I1-Timeline.dc.html" aria-current="page" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 600; color: #4fc3f7; box-shadow: inset 0 -2px 0 #03a9f4">Timeline</a>
+<a href="I2-CurrentDay.dc.html" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b8b8b8">Current day</a>
+<a href="I3-Timers.dc.html" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b8b8b8">Timer programs</a>
+<a href="I4-GrowPlan.dc.html" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b8b8b8">Grow plan &amp; presets</a>
+</nav>
+
+<!-- Day picker + zoom -->
+<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0">
+<button type="button" onClick="{{prevDay}}" aria-label="Previous day" style="width: 36px; height: 52px; border: 1px solid #2e2e2e; border-radius: 10px; background: #1c1c1c; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 6 9 12 15 18"></polyline></svg></button>
+<div role="group" aria-label="Pick a day" style="display: flex; gap: 6px">
+<sc-for list="{{week}}" as="d" hint-placeholder-count="7">
+<button type="button" onClick="{{d.pick}}" aria-pressed="{{d.pressed}}" style="width: 104px; height: 52px; box-sizing: border-box; border: 1px solid {{d.edge}}; border-radius: 10px; background: {{d.bg}}; color: #e1e1e1; font: inherit; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px"><span style="font-size: 14px; font-weight: {{d.weight}}">{{d.label}}</span><span style="font-size: 12px; color: {{d.ink}}">{{d.note}}</span></button>
+</sc-for>
+</div>
+<button type="button" onClick="{{nextDay}}" aria-label="Next day" style="width: 36px; height: 52px; border: 1px solid #2e2e2e; border-radius: 10px; background: #1c1c1c; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<button type="button" onClick="{{goToday}}" style="height: 36px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 500">Today</button>
+<div role="group" aria-label="Zoom" style="margin-left: auto; display: flex; border: 1px solid #2e2e2e; border-radius: 8px; overflow: hidden">
+<sc-for list="{{zooms}}" as="zm" hint-placeholder-count="3">
+<button type="button" onClick="{{zm.pick}}" aria-pressed="{{zm.pressed}}" style="height: 36px; min-width: 56px; padding: 0 10px; border: 0; border-left: 1px solid #2e2e2e; background: {{zm.bg}}; color: {{zm.ink}}; font: inherit; font-size: 14px; font-weight: 600">{{zm.label}}</button>
+</sc-for>
+</div>
+</div>
+
+<!-- Filters + legend -->
+<div style="display: flex; align-items: center; gap: 8px; flex-shrink: 0">
+<sc-for list="{{chips}}" as="c" hint-placeholder-count="3">
+<button type="button" onClick="{{c.toggle}}" aria-pressed="{{c.pressed}}" style="display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border: 1px solid {{c.edge}}; border-radius: 16px; background: {{c.bg}}; color: {{c.ink}}; font: inherit; font-size: 13px; font-weight: 600"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="opacity: {{c.tickOp}}"><polyline points="5 12 10 17 19 7"></polyline></svg>{{c.label}}</button>
+</sc-for>
+<div aria-label="Legend" style="margin-left: auto; display: flex; align-items: center; gap: 14px; font-size: 12px; color: #a4a4a4">
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 16px; border-radius: 3px; background: #6f7378"></span>Done</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 16px; box-sizing: border-box; border-radius: 3px; border: 1.5px dashed #4fc3f7; background: rgba(3,169,244,.14)"></span>Planned</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 16px; border-radius: 3px; background: #f28b82"></span>Failed</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 12px; height: 16px; border-radius: 3px; background: #ffca5b"></span>Warning</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 16px; height: 16px; box-sizing: border-box; border-radius: 3px; border: 1px solid #ffca5b; background: repeating-linear-gradient(45deg, rgba(255,202,91,.55) 0 3px, transparent 3px 7px)"></span>Waiting for pump</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 16px; height: 16px; border-radius: 3px; background: rgba(255,214,102,.16)"></span>Lights on</span>
+<span>Bar height = water per plant</span>
+</div>
+</div>
+
+<!-- Timeline -->
+<section aria-label="Irrigation timeline" style="position: relative; flex: 1; min-height: 0; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding-right: 16px">
+<div style="display: flex; height: 30px; border-bottom: 1px solid #2e2e2e">
+<div style="width: 200px; flex: none; box-sizing: border-box; padding-left: 16px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: #a4a4a4">{{rangeLabel}}</div>
+<div style="position: relative; width: 916px; flex: none">
+<sc-for list="{{ticks}}" as="t" hint-placeholder-count="12"><span style="position: absolute; left: {{t.left}}; top: 8px; transform: translateX(-50%); font-size: 12px; color: {{t.ink}}; font-weight: {{t.weight}}; white-space: nowrap">{{t.label}}</span></sc-for>
+<sc-for list="{{marks}}" as="m" hint-placeholder-count="3"><span aria-hidden="true" style="position: absolute; left: {{m.left}}; bottom: 0; margin-left: -5px; width: 0; height: 0; border-left: 5px solid transparent; border-right: 5px solid transparent; border-bottom: 7px solid {{m.color}}"></span></sc-for>
+<sc-if value="{{nowOn}}" hint-placeholder-val="{{true}}"><span style="position: absolute; left: {{nowLeft}}; top: 5px; transform: translateX(-50%); padding: 1px 7px; border-radius: 4px; background: #03a9f4; color: #06141c; font-size: 12px; font-weight: 700; white-space: nowrap">Now 14:10</span></sc-if>
+</div>
+</div>
+<sc-for list="{{rows}}" as="row" hint-placeholder-count="8">
+<div style="display: flex; height: {{row.h}}; border-bottom: 1px solid {{row.rule}}; background: {{row.bg}}">
+<div style="width: 200px; flex: none; box-sizing: border-box; padding-left: {{row.indent}}; padding-right: 8px; display: flex; align-items: center; gap: 8px">
+<sc-if value="{{row.isRoom}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{row.toggle}}" aria-expanded="{{row.expanded}}" aria-label="{{row.toggleLabel}}" style="width: 30px; height: 30px; flex: none; border: 1px solid #2e2e2e; border-radius: 8px; background: #232323; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="transform: {{row.chev}}"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+<span style="display: flex; flex-direction: column; min-width: 0"><b style="font-size: 15px; font-weight: 600">{{row.name}}</b><span style="font-size: 12px; color: #a4a4a4; white-space: nowrap">{{row.sub}}</span></span>
+</sc-if>
+<sc-if value="{{row.isZone}}" hint-placeholder-val="{{false}}">
+<span style="display: flex; flex-direction: column; min-width: 0"><a href="S3-Zone.dc.html" style="color: #e1e1e1; font-size: 14px; font-weight: 500; white-space: nowrap">{{row.name}}</a><span style="font-size: 12px; color: {{row.modeInk}}">{{row.mode}}</span></span>
+</sc-if>
+</div>
+<div style="position: relative; width: 916px; flex: none">
+<sc-for list="{{row.grid}}" as="g" hint-placeholder-count="12"><span aria-hidden="true" style="position: absolute; left: {{g.left}}; top: 0; bottom: 0; width: 1px; background: {{g.color}}"></span></sc-for>
+<sc-for list="{{row.lights}}" as="l" hint-placeholder-count="1"><span aria-hidden="true" style="position: absolute; left: {{l.left}}; width: {{l.w}}; top: 0; bottom: -1px; background: rgba(255,214,102,.07)"></span></sc-for>
+<sc-for list="{{row.lightLabels}}" as="ll" hint-placeholder-count="1"><span style="position: absolute; left: {{ll.left}}; top: 4px; display: flex; align-items: center; gap: 4px; font-size: 11px; color: #d9c27e; white-space: nowrap"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4"></circle><line x1="12" y1="2" x2="12" y2="4"></line><line x1="12" y1="20" x2="12" y2="22"></line><line x1="2" y1="12" x2="4" y2="12"></line><line x1="20" y1="12" x2="22" y2="12"></line></svg>{{ll.text}}</span></sc-for>
+<sc-for list="{{row.paused}}" as="p" hint-placeholder-count="1"><span style="position: absolute; left: {{p.left}}; width: {{p.w}}; top: 9px; bottom: 9px; box-sizing: border-box; border: 1px solid #4a4a4a; border-radius: 6px; background: repeating-linear-gradient(-45deg, #1c1c1c 0 6px, #262626 6px 12px); display: flex; align-items: center; gap: 8px; padding-left: 10px; font-size: 12px; color: #e1e1e1; white-space: nowrap; overflow: hidden">{{p.label}}<a href="S3-Zone.dc.html" style="font-weight: 600">Resume on zone page</a></span></sc-for>
+<sc-for list="{{row.ticks}}" as="k" hint-placeholder-count="10"><span aria-hidden="true" style="position: absolute; left: {{k.left}}; top: 22px; width: 3px; height: 14px; border-radius: 1px; background: {{k.color}}; opacity: {{k.op}}"></span></sc-for>
+<sc-for list="{{row.hatches}}" as="q" hint-placeholder-count="1">
+<span tabindex="0" data-tw="1" aria-label="{{q.tip}}" style="position: absolute; left: {{q.left}}; width: {{q.w}}; top: 12px; height: 28px; box-sizing: border-box; border: 1px solid #ffca5b; border-radius: 4px; background: repeating-linear-gradient(45deg, rgba(255,202,91,.55) 0 3px, transparent 3px 7px)"><span data-tip="1" style="position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: 260px; padding: 8px 10px; border: 1px solid #ffca5b; border-radius: 8px; background: #2a2a2a; color: #e1e1e1; font-size: 12px; line-height: 1.45; z-index: 25; box-shadow: 0 6px 18px rgba(0,0,0,.5)">{{q.tip}}</span></span>
+</sc-for>
+<sc-for list="{{row.blocks}}" as="b" hint-placeholder-count="8">
+<button type="button" data-tw="1" onClick="{{b.onClick}}" aria-label="{{b.aria}}" style="position: absolute; left: {{b.left}}; top: {{b.top}}; width: {{b.w}}; height: {{b.h}}; box-sizing: border-box; padding: 0; border: {{b.border}}; border-radius: 4px; background: {{b.bg}}; opacity: {{b.op}}; box-shadow: {{b.ring}}; display: flex; align-items: center; justify-content: center; cursor: pointer; font: inherit">
+<sc-if value="{{b.hasIcon}}" hint-placeholder-val="{{false}}"><svg width="12" height="14" viewBox="0 0 12 14" aria-hidden="true"><line x1="6" y1="2" x2="6" y2="8.5" stroke="#2b1200" stroke-width="2.4" stroke-linecap="round"></line><circle cx="6" cy="12" r="1.4" fill="#2b1200"></circle></svg></sc-if>
+<sc-if value="{{b.hasTip}}" hint-placeholder-val="{{false}}"><span data-tip="1" style="position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%); width: 250px; padding: 8px 10px; border: 1px solid {{b.tipEdge}}; border-radius: 8px; background: #2a2a2a; color: #e1e1e1; font-size: 12px; line-height: 1.45; text-align: left; white-space: normal; z-index: 25; box-shadow: 0 6px 18px rgba(0,0,0,.5)"><b style="color: {{b.tipEdge}}">{{b.tipHead}}</b> {{b.tip}}</span></sc-if>
+</button>
+<sc-if value="{{b.hasShort}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="position: absolute; left: {{b.shortLeft}}; top: 18px; font-size: 12px; font-weight: 600; color: {{b.tipEdge}}; white-space: nowrap">{{b.short}}</span></sc-if>
+</sc-for>
+<sc-if value="{{row.nowOn}}" hint-placeholder-val="{{true}}"><span aria-hidden="true" style="position: absolute; left: {{row.nowLeft}}; top: 0; bottom: -1px; width: 2px; margin-left: -1px; background: #03a9f4"></span></sc-if>
+</div>
+</div>
+</sc-for>
+
+<!-- Shot popover -->
+<sc-if value="{{pop.open}}" hint-placeholder-val="{{false}}">
+<div role="dialog" aria-label="Shot details" style="position: absolute; left: {{pop.left}}; top: {{pop.top}}; width: 330px; box-sizing: border-box; padding: 14px 16px 16px; border: 1px solid #3a3a3a; border-radius: 12px; background: #232323; box-shadow: 0 12px 32px rgba(0,0,0,.6); z-index: 30; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: flex-start; gap: 8px">
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #a4a4a4">{{pop.where}}</span><b style="font-size: 20px; font-weight: 600">{{pop.time}}</b></span>
+<button type="button" onClick="{{closePop}}" aria-label="Close shot details" style="margin-left: auto; width: 32px; height: 32px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" aria-hidden="true"><line x1="6" y1="6" x2="18" y2="18"></line><line x1="18" y1="6" x2="6" y2="18"></line></svg></button>
+</div>
+<span style="align-self: flex-start; display: flex; align-items: center; gap: 6px; height: 24px; padding: 0 10px; border-radius: 12px; border: 1px solid {{pop.statusEdge}}; font-size: 12px; font-weight: 600; color: {{pop.statusInk}}"><span style="width: 7px; height: 7px; border-radius: 4px; background: {{pop.statusEdge}}"></span>{{pop.status}}</span>
+<sc-if value="{{pop.hasReason}}" hint-placeholder-val="{{false}}"><span style="padding: 8px 10px; border-left: 3px solid {{pop.statusEdge}}; border-radius: 4px; background: #1c1c1c; font-size: 13px; line-height: 1.45">{{pop.reason}}</span></sc-if>
+<div style="display: grid; grid-template-columns: 64px 1fr; gap: 8px 10px; align-items: center; font-size: 13px">
+<span style="color: #a4a4a4">Water</span><span>{{pop.water}}</span>
+<span style="color: #a4a4a4">VWC</span>
+<span style="display: flex; flex-direction: column; gap: 5px">
+<span>{{pop.vwc}}</span>
+<sc-if value="{{pop.hasVwc}}" hint-placeholder-val="{{true}}"><span style="position: relative; height: 8px; border-radius: 4px; background: #333333"><span style="position: absolute; left: {{pop.vb}}; width: {{pop.vw}}; top: 0; bottom: 0; border-radius: 4px; background: {{pop.vwcFill}}"></span><span style="position: absolute; left: {{pop.vb}}; top: -3px; bottom: -3px; width: 2px; background: #a4a4a4"></span><span style="position: absolute; left: {{pop.va}}; top: -3px; bottom: -3px; width: 3px; border-radius: 2px; background: #e1e1e1"></span></span></sc-if>
+</span>
+<span style="color: #a4a4a4">Source</span>
+<span style="display: flex; flex-direction: column; gap: 3px"><span style="align-self: flex-start; padding: 1px 8px; border-radius: 4px; background: {{pop.srcBg}}; color: #e1e1e1; font-size: 12px; font-weight: 700">{{pop.source}}</span><span style="color: #b8b8b8">{{pop.why}}</span></span>
+</div>
+<div style="display: flex; align-items: center; gap: 10px; padding-top: 4px; border-top: 1px solid #2e2e2e">
+<a href="S3-Zone.dc.html" style="font-size: 14px; font-weight: 600">Open {{pop.zoneName}}</a>
+<sc-if value="{{pop.canSkip}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{skipShot}}" style="margin-left: auto; height: 34px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600">Skip this shot</button></sc-if>
+<sc-if value="{{pop.isSkipped}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{unskipShot}}" style="margin-left: auto; height: 34px; padding: 0 12px; border: 1px solid #4fc3f7; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 14px; font-weight: 600">Undo skip</button></sc-if>
+</div>
+</div>
+</sc-if>
+</section>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph] || '#4a4a4a', vwc: vwc }; }
+var TREE = [
+  { name: 'F2', dot: '#03a9f4', state: 'Watering', zones: [tz('Zone 1', 'P2', '59.4%'), tz('Zone 2', 'P2', '58.1%'), tz('Zone 3', 'P2', '60.2%')] },
+  { name: 'F1', dot: '#81c995', state: 'Holding', zones: [tz('Zone 1', 'P1', '63.8%'), tz('Zone 2', 'P1', '62.9%'), tz('Zone 3', 'P1', '64.4%')] },
+  { name: 'Veg', dot: '#b39ddb', state: 'Timers', zones: [tz('Zone 1', 'T', 'timer'), tz('Zone 2', 'T', 'timer')] }
+];
+
+var NOW = 14 + 10 / 60;
+var TODAY = 3;
+var W = 916;
+var WEEK = [['Mon', 19], ['Tue', 20], ['Wed', 21], ['Thu', 22], ['Fri', 23], ['Sat', 24], ['Sun', 25], ['Mon', 26], ['Tue', 27]];
+var SRC = { engine: ['Steering engine', '#2f6fb5'], timer: ['Timer program', '#5d6b78'], plan: ['Grow plan', '#6450b0'], manual: ['Manual', '#7a5a2a'], ai: ['AI judge', '#2e7d5b'] };
+var STYLE = {
+  done: { bg: '#6f7378', border: '1px solid #6f7378', tick: '#8a8a8a', label: 'Done', edge: '#8a8a8a', ink: '#e1e1e1' },
+  running: { bg: '#03a9f4', border: '1px solid #03a9f4', tick: '#03a9f4', label: 'Running now', edge: '#03a9f4', ink: '#4fc3f7' },
+  planned: { bg: 'rgba(3,169,244,.14)', border: '1.5px dashed #4fc3f7', tick: '#4fc3f7', label: 'Planned', edge: '#4fc3f7', ink: '#4fc3f7' },
+  skipped: { bg: 'transparent', border: '1.5px dashed #6a6a6a', tick: '#6a6a6a', label: 'Skipped by you', edge: '#8a8a8a', ink: '#b8b8b8' },
+  err: { bg: '#f28b82', border: '1px solid #f28b82', tick: '#f28b82', label: 'Failed', edge: '#f28b82', ink: '#f28b82' },
+  warn: { bg: '#ffca5b', border: '1px solid #ffca5b', tick: '#ffca5b', label: 'Done with a warning', edge: '#ffca5b', ink: '#ffca5b' }
+};
+var RDEF = [
+  { key: 'F2', name: 'F2', sub: 'Flower · day 38', stage: 'flower', lights: [6, 18], plants: 40, base: 57.4,
+    zones: [{ key: 'F2-1', name: 'Zone 1', mode: 'Steering · P2', i: 0, steer: true }, { key: 'F2-2', name: 'Zone 2', mode: 'Steering · P2', i: 1, steer: true }, { key: 'F2-3', name: 'Zone 3', mode: 'Steering · P2', i: 2, steer: true }] },
+  { key: 'F1', name: 'F1', sub: 'Flower · day 12', stage: 'flower', lights: [7, 19], plants: 36, base: 61.2,
+    zones: [{ key: 'F1-1', name: 'Zone 1', mode: 'Steering · P1', i: 0, steer: true }, { key: 'F1-2', name: 'Zone 2', mode: 'Steering · P1', i: 1, steer: true }, { key: 'F1-3', name: 'Zone 3', mode: 'Paused', i: 2, steer: true }] },
+  { key: 'Veg', name: 'Veg', sub: 'Veg · day 9 · no probes', stage: 'veg', lights: [4, 22], plants: 30,
+    zones: [{ key: 'V-1', name: 'Zone 1 · mothers', mode: 'Timer', i: 0 }, { key: 'V-2', name: 'Zone 2 · clones', mode: 'Timer', i: 1 }] }
+];
+function hm(h) { var m = Math.round((((h % 24) + 24) % 24) * 60); var H = Math.floor(m / 60) % 24, M = m % 60; return (H < 10 ? '0' : '') + H + ':' + (M < 10 ? '0' : '') + M; }
+function near(a, b) { return Math.abs(a - b) < 0.02; }
+function px(v) { return Math.round(v * 10) / 10 + 'px'; }
+function baseShots(room, z) {
+  var out = [], st = z.i * 4 / 60, L = room.lights[0];
+  if (!z.steer) {
+    for (var k = 0; k < 8; k++) out.push({ h: 8 + k * 0.5 + z.i * 2 / 60, ml: 40, dur: 2, src: 'timer', why: 'Every 30 min for 2 min, 08:00–12:00' });
+    return out;
+  }
+  var p1 = room.key === 'F2' ? [1, 1.3333, 1.6667, 2, 2.3333] : [1, 1.5, 2, 2.5];
+  var p2 = room.key === 'F2' ? [4.5, 6, 7.5, 9, 10.25] : [4, 5.5, 7, 8.5, 10];
+  p1.forEach(function (o, n) { out.push({ h: L + o + st, ml: room.key === 'F2' ? 120 : 100, dur: 3, src: 'engine', why: 'P1 ramp-up, shot ' + (n + 1) + ' of ' + p1.length }); });
+  p2.forEach(function (o) { out.push({ h: L + o + st, ml: room.key === 'F2' ? 80 : 70, dur: 2, src: 'engine', why: 'P2: VWC reached the re-water point' }); });
+  return out;
+}
+function dayShots(room, z, rel) {
+  var s = baseShots(room, z);
+  if (rel === -1 && z.key === 'F2-1') s.forEach(function (x) { if (near(x.h, 13.5)) { x.flag = 'warn'; x.short = 'Short shot'; x.ml = 70; x.reason = 'Ran short: 70 of 80 mL reached the plants. Line pressure dropped to 1.2 bar.'; } });
+  if (rel !== 0) return (z.key === 'F1-3' && rel > 0) ? [] : s;
+  if (z.key === 'F2-2') s.forEach(function (x) {
+    if (near(x.h, 12.0667)) { x.flag = 'warn'; x.short = 'Short shot'; x.ml = 64; x.reason = 'Ran short: 64 of 80 mL reached the plants. Line pressure dropped to 1.1 bar.'; }
+    if (near(x.h, 15.0667)) { x.ml = 240; x.dur = 16; x.why = 'EC dilution: pore EC 6.6 is over the 4.5–6.0 band'; }
+  });
+  if (z.key === 'F2-3') {
+    s.forEach(function (x) { if (near(x.h, 15.1333)) { x.queuedFrom = x.h; x.h = 15.3333; } });
+    s.push({ h: 9.6667, ml: 100, dur: 3, src: 'manual', why: 'Test shot started by Ben from the zone page' });
+  }
+  if (z.key === 'F1-1') s.push({ h: 13.3333, ml: 60, dur: 2, src: 'ai', why: 'Extra 60 mL: dryback ran 2 pts faster than plan' });
+  if (z.key === 'F1-2') s.forEach(function (x) { if (near(x.h, 11.0667)) { x.flag = 'warn'; x.short = 'One sensor'; x.reason = 'Back sensor silent for 3 h: this shot was sized from the front sensor only.'; } });
+  if (z.key === 'F1-3') {
+    s = s.filter(function (x) { return x.h < 12.65; });
+    s.forEach(function (x) { if (near(x.h, 12.6333)) { x.flag = 'err'; x.planned = x.ml; x.ml = 0; x.reason = "Valve didn't open: no flow seen in 30 s. Zone paused at 12:40."; } });
+  }
+  if (z.key === 'F1-1' || z.key === 'F1-2') s.push({ h: 18.5 + z.i * 4 / 60, ml: 60, dur: 2, src: 'plan', why: 'Day 12 exception: top-up 30 min before lights off' });
+  s.sort(function (a, b) { return a.h - b.h; });
+  return s;
+}
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { day: TODAY, zoom: 24, open: { F2: true, F1: true, Veg: false }, showFlower: true, showVeg: true, problemsOnly: false, sel: 'F2-3@0@15.333', skipped: {} };
+  }
+  renderVals() {
+    var s = this.state, self = this;
+    var rel = s.day - TODAY, span = s.zoom;
+    var start = rel * 24 + (span === 12 ? 6 : 0), end = start + span;
+    var x = function (T) { return (T - start) / span * W; };
+    var days = span === 48 ? [rel, rel + 1] : [rel];
+    var nowOn = NOW >= start && NOW <= end, nowLeft = px(x(NOW));
+
+    var step = span === 12 ? 1 : span === 24 ? 2 : 4, ticks = [], grid = [];
+    for (var T = start; T <= end + 0.001; T += step) {
+      var lx = x(T), mid = (((T % 24) + 24) % 24) === 0 && T > start;
+      var label = mid ? WEEK[TODAY + T / 24][0] + ' ' + WEEK[TODAY + T / 24][1] : hm(T);
+      var hide = nowOn && Math.abs(lx - x(NOW)) < 40;
+      ticks.push({ left: px(Math.min(Math.max(lx, 18), W - 18)), label: hide ? '' : label, ink: mid ? '#e1e1e1' : '#a4a4a4', weight: mid ? 700 : 400 });
+      grid.push({ left: px(lx), color: mid ? '#4a4a4a' : '#262626' });
+    }
+
+    var rows = [], marks = [], top = 0, sel = null;
+    RDEF.forEach(function (room) {
+      if (room.stage === 'flower' && !s.showFlower) return;
+      if (room.stage === 'veg' && !s.showVeg) return;
+      var open = !!s.open[room.key], lights = [], lightLabels = [];
+      days.forEach(function (d) {
+        var a = Math.max(start, d * 24 + room.lights[0]), b = Math.min(end, d * 24 + room.lights[1]);
+        if (b > a) { lights.push({ left: px(x(a)), w: px(x(b) - x(a)) }); lightLabels.push({ left: px(x(a) + 6), text: 'Lights on ' + hm(room.lights[0]) + '–' + hm(room.lights[1]) }); }
+      });
+      var roomRow = { isRoom: true, isZone: false, h: '44px', indent: '12px', rule: '#2e2e2e', bg: '#202020', name: room.name, sub: room.sub,
+        expanded: open ? 'true' : 'false', chev: open ? 'rotate(90deg)' : 'none', toggleLabel: (open ? 'Hide ' : 'Show ') + room.name + ' zones',
+        toggle: function () { var o = Object.assign({}, s.open); o[room.key] = !o[room.key]; self.setState({ open: o }); },
+        grid: grid, lights: lights, lightLabels: lightLabels, blocks: [], ticks: [], hatches: [], paused: [], nowOn: nowOn, nowLeft: nowLeft };
+      rows.push(roomRow); top += 45;
+      var ticksAll = [];
+      room.zones.forEach(function (z) {
+        var zr = { isRoom: false, isZone: true, h: '52px', indent: '50px', rule: '#262626', bg: 'transparent', name: z.name, mode: z.mode,
+          modeInk: z.mode === 'Paused' ? '#ffca5b' : '#a4a4a4', grid: grid, lights: lights, lightLabels: [], blocks: [], ticks: [], hatches: [], paused: [], nowOn: nowOn, nowLeft: nowLeft };
+        days.forEach(function (d) {
+          dayShots(room, z, d).forEach(function (e) {
+            var T0 = d * 24 + e.h, T1 = T0 + e.dur / 60;
+            if (T1 < start || T0 > end) return;
+            var id = z.key + '@' + d + '@' + e.h.toFixed(3);
+            var status = e.flag || (T1 <= NOW ? 'done' : T0 <= NOW ? 'running' : 'planned');
+            if (status === 'planned' && s.skipped[id]) status = 'skipped';
+            var problem = status === 'err' || status === 'warn', st = STYLE[status];
+            var op = s.problemsOnly && !problem ? 0.18 : 1;
+            var l = x(T0), w = Math.max(problem ? 18 : 9, x(T1) - x(T0));
+            var bh = problem ? 30 : Math.round(12 + Math.min(e.ml, 240) / 240 * 24);
+            var edge = status === 'err' ? '#f28b82' : '#ffca5b';
+            zr.blocks.push({ left: px(l), w: px(w), h: bh + 'px', top: ((52 - bh) / 2) + 'px', bg: st.bg, border: st.border, op: op,
+              ring: s.sel === id ? '0 0 0 2px #1c1c1c, 0 0 0 4px #e1e1e1' : 'none', hasIcon: problem, hasTip: problem, tipEdge: edge,
+              tipHead: status === 'err' ? 'Failed ' + hm(e.h) + '.' : 'Warning ' + hm(e.h) + '.', tip: e.reason || '',
+              hasShort: problem && !!e.short && span !== 48, short: e.short || '', shortLeft: px(l + w + 5),
+              aria: room.name + ' ' + z.name + ', ' + hm(e.h) + ', ' + st.label + (e.reason ? ': ' + e.reason : ', ' + e.ml + ' mL per plant'),
+              onClick: function () { self.setState({ sel: id }); } });
+            ticksAll.push({ left: px(l), color: st.tick, op: op });
+            if (problem) marks.push({ left: px(l + w / 2), color: edge });
+            if (e.queuedFrom != null) {
+              var qa = x(d * 24 + e.queuedFrom);
+              zr.hatches.push({ left: px(qa), w: px(Math.max(10, l - qa - 1)), tip: 'Waiting for pump ' + Math.round((e.h - e.queuedFrom) * 60) + ' min: F2 pump runs one zone at a time and Zone 2 dilution shot is on it. Moved from ' + hm(e.queuedFrom) + ' to ' + hm(e.h) + '.' });
+            }
+            if (s.sel === id && open) sel = { e: e, room: room, z: z, d: d, status: status, l: l, w: w, top: top };
+          });
+        });
+        if (z.key === 'F1-3') {
+          var pa = Math.max(start, 12.6667);
+          if (end > pa) zr.paused.push({ left: px(x(pa) + 22), w: px(W - x(pa) - 22), label: 'Paused since 12:40 · valve didn’t open · no shots planned' });
+        }
+        if (open) { rows.push(zr); top += 53; }
+      });
+      if (!open) roomRow.ticks = ticksAll;
+    });
+
+    var pop = { open: false, left: '0px', top: '0px', where: '', time: '', status: '', statusEdge: '#8a8a8a', statusInk: '#e1e1e1', hasReason: false, reason: '', water: '', vwc: '', hasVwc: false, vb: '0%', vw: '0%', va: '0%', vwcFill: '#2f86c4', source: '', srcBg: '#333', why: '', zoneName: '', canSkip: false, isSkipped: false };
+    if (sel) {
+      var e = sel.e, st2 = STYLE[sel.status], dayName = sel.d === 0 ? 'Today' : WEEK[TODAY + sel.d].join(' ');
+      var rowTop = 31 + sel.top, popTop = rowTop + 56;
+      if (popTop + 300 > 720) popTop = rowTop - 306;
+      var steer = !!sel.z.steer, vb = steer ? sel.room.base - (e.ml >= 100 ? 4.6 : 0) + (Math.round(e.h * 7) % 5) * 0.3 : 0;
+      var gain = e.ml / 36, va = vb + gain, done = sel.status === 'done' || sel.status === 'warn';
+      var sc = function (v) { return Math.max(0, Math.min(100, (v - 40) / 30 * 100)); };
+      pop = { open: true, left: (200 + Math.max(0, Math.min(W - 330, sel.l + sel.w / 2 - 165))) + 'px', top: popTop + 'px',
+        where: sel.room.name + ' · ' + sel.z.name + ' · ' + dayName,
+        time: hm(e.h) + ' – ' + hm(e.h + e.dur / 60),
+        status: st2.label + (e.queuedFrom != null ? ' · waited ' + Math.round((e.h - e.queuedFrom) * 60) + ' min for pump' : ''), statusEdge: st2.edge, statusInk: st2.ink,
+        hasReason: !!e.reason || e.queuedFrom != null, reason: e.reason || ('Due at ' + hm(e.queuedFrom) + '. F2 pump runs one zone at a time and Zone 2 dilution shot (15:04–15:20) is on it, so this shot starts when it ends.'),
+        water: sel.status === 'err' ? 'None delivered · ' + e.planned + ' mL per plant was due' : e.ml + ' mL per plant · ' + (e.ml * sel.room.plants / 1000).toFixed(1) + ' L for the zone',
+        vwc: !steer ? 'No probes in this zone (timer only)' : sel.status === 'err' ? vb.toFixed(1) + '% → no change' : done ? vb.toFixed(1) + '% → ' + va.toFixed(1) + '%' : 'now ' + vb.toFixed(1) + '% → expected ' + va.toFixed(1) + '%',
+        hasVwc: steer && sel.status !== 'err', vb: sc(vb) + '%', vw: (sc(va) - sc(vb)) + '%', va: sc(va) + '%', vwcFill: done ? '#2f86c4' : 'rgba(79,195,247,.45)',
+        source: SRC[e.src][0], srcBg: SRC[e.src][1], why: e.why, zoneName: sel.room.name + ' ' + sel.z.name,
+        canSkip: sel.status === 'planned', isSkipped: sel.status === 'skipped' };
+    }
+
+    var probs = { 2: ['1 problem', '#ffca5b'], 3: ['3 problems', '#f28b82'] };
+    var week = WEEK.slice(0, 7).map(function (d, i) {
+      var r = i - TODAY, on = i === s.day, p = probs[i];
+      return { label: d[0] + ' ' + d[1], note: p ? p[0] : r < 0 ? 'Done' : r === 0 ? 'Today' : 'Planned', ink: p ? p[1] : '#a4a4a4',
+        pressed: on ? 'true' : 'false', edge: on ? '#03a9f4' : '#2e2e2e', bg: on ? '#1d2a33' : '#1c1c1c', weight: r === 0 ? 700 : 500,
+        pick: function () { self.setState({ day: i }); } };
+    });
+    var zooms = [12, 24, 48].map(function (z) {
+      var on = s.zoom === z;
+      return { label: z + ' h', pressed: on ? 'true' : 'false', bg: on ? '#03a9f4' : '#1c1c1c', ink: on ? '#06141c' : '#e1e1e1', pick: function () { self.setState({ zoom: z }); } };
+    });
+    var chip = function (label, key) {
+      var on = !!s[key];
+      return { label: label, pressed: on ? 'true' : 'false', edge: on ? '#4fc3f7' : '#3a3a3a', bg: on ? '#1d2a33' : 'transparent', ink: on ? '#e1e1e1' : '#a4a4a4', tickOp: on ? 1 : 0,
+        toggle: function () { var o = {}; o[key] = !s[key]; self.setState(o); } };
+    };
+    var dl = WEEK[s.day], dn = WEEK[s.day + 1];
+    return {
+      rooms: TREE, week: week, zooms: zooms, ticks: ticks, marks: marks, rows: rows, pop: pop, nowOn: nowOn, nowLeft: nowLeft,
+      chips: [chip('Flower rooms', 'showFlower'), chip('Veg room', 'showVeg'), chip('Problems only', 'problemsOnly')],
+      rangeLabel: span === 48 ? dl.join(' ') + ' – ' + dn.join(' ') + ' Oct' : dl.join(' ') + ' Oct · ' + (span === 12 ? '06:00–18:00' : '24 h'),
+      prevDay: function () { self.setState({ day: Math.max(0, s.day - 1) }); },
+      nextDay: function () { self.setState({ day: Math.min(6, s.day + 1) }); },
+      goToday: function () { self.setState({ day: TODAY }); },
+      closePop: function () { self.setState({ sel: null }); },
+      skipShot: function () { var k = Object.assign({}, s.skipped); k[s.sel] = true; self.setState({ skipped: k }); },
+      unskipShot: function () { var k = Object.assign({}, s.skipped); delete k[s.sel]; self.setState({ skipped: k }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

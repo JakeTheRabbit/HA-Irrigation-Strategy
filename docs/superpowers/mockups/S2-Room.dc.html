@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Status — Room F1</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 2px">
+<a href="S1-AllRooms.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 15px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; margin-top: 18px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 22px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{tree}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" aria-current="{{r.current}}" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; background: {{r.bg}}; color: {{r.ink}}; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker). Room kill switch lives here only. -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F1</span>
+<button type="button" style="display: flex; align-items: center; gap: 7px; height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 20px 28px; display: grid; grid-template-columns: minmax(0, 1fr) 270px; gap: 16px 20px; align-content: start">
+
+<!-- Room head: run strip + day, water today, climate readings as context -->
+<section style="grid-column: 1 / 3; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: baseline; gap: 12px">
+<span style="width: 10px; height: 10px; border-radius: 5px; background: #81c995; align-self: center"></span>
+<h1 style="margin: 0; font-size: 24px; font-weight: 600">F1</h1>
+<span style="font-size: 15px; color: #a4a4a4">Holding · Flower stretch · 120 plants in 3 zones</span>
+<span style="margin-left: auto; font-size: 15px">Day <b>12</b> of 63 <span style="color: #a4a4a4">· 51 days left · harvest 11 Dec</span></span>
+</div>
+<div style="position: relative; height: 10px; border-radius: 5px; background: #333333"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: 19%; border-radius: 5px; background: #03a9f4"></span><span style="position: absolute; top: -5px; bottom: -5px; left: 19%; width: 2px; background: #e1e1e1"></span><span style="position: absolute; left: 33%; top: 14px; font-size: 12px; color: #8a8a8a">Stretch ends day 21</span></div>
+<div style="display: flex; gap: 32px; margin-top: 8px; font-size: 13px; color: #a4a4a4; align-items: flex-end">
+<span style="display: flex; flex-direction: column; gap: 2px">Water today<b style="font-size: 20px; color: #e1e1e1; font-weight: 600">12.7 L <span style="font-size: 14px; font-weight: 500; color: #a4a4a4">room · 0.16 L per watered plant</span></b></span>
+<span style="display: flex; flex-direction: column; gap: 2px">Lights<b style="font-size: 15px; color: #e1e1e1; font-weight: 500">On 10:00 – 22:00</b></span>
+<span style="width: 1px; height: 34px; background: #2e2e2e"></span>
+<span style="display: flex; flex-direction: column; gap: 2px">Air (reading)<b style="font-size: 15px; color: #e1e1e1; font-weight: 500">27.5 °C</b></span>
+<span style="display: flex; flex-direction: column; gap: 2px">RH<b style="font-size: 15px; color: #e1e1e1; font-weight: 500">66%</b></span>
+<span style="display: flex; flex-direction: column; gap: 2px">VPD<b style="font-size: 15px; color: #e1e1e1; font-weight: 500">1.08 kPa</b></span>
+</div>
+</section>
+
+<!-- Left column: timeline + zones -->
+<div style="display: flex; flex-direction: column; gap: 12px; min-width: 0">
+
+<!-- 24 h room timeline strip -->
+<section aria-label="Today, 24 hour shot timeline" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 12px 16px 10px">
+<div style="display: flex; align-items: center; gap: 16px; font-size: 12px; color: #a4a4a4; margin-bottom: 8px">
+<b style="font-size: 14px; color: #e1e1e1; font-weight: 600">Today</b>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 3px; height: 12px; background: #4fc3f7"></span>Shot done</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 3px; height: 12px; box-sizing: border-box; border: 1px solid #4fc3f7"></span>Planned</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 10px; background: rgba(255,202,91,.16)"></span>Lights on</span>
+<a href="I1-Timeline.dc.html" style="margin-left: auto; font-size: 13px">Open full timeline →</a>
+</div>
+<div style="display: grid; grid-template-columns: 62px 1fr; row-gap: 4px; align-items: center">
+<sc-for list="{{lanes}}" as="ln" hint-placeholder-count="3">
+<span style="font-size: 12px; color: #b8b8b8">{{ln.name}}</span>
+<span style="position: relative; height: 22px; background: #151515; border-radius: 4px; overflow: hidden">
+<span style="position: absolute; top: 0; bottom: 0; left: 41.67%; width: 50%; background: rgba(255,202,91,.10)"></span>
+<sc-if value="{{ln.paused}}" hint-placeholder-val="{{false}}"><span style="position: absolute; top: 0; bottom: 0; left: {{ln.pauseFrom}}; width: {{ln.pauseW}}; background: repeating-linear-gradient(-45deg,#2a2a2a,#2a2a2a 4px,#1c1c1c 4px,#1c1c1c 8px)"></span></sc-if>
+<sc-for list="{{ln.ticks}}" as="t" hint-placeholder-count="6"><span style="position: absolute; top: 3px; bottom: 3px; left: {{t.x}}; width: 3px; box-sizing: border-box; background: {{t.bg}}; border: 1px solid #4fc3f7"></span></sc-for>
+<span style="position: absolute; top: 0; bottom: 0; left: 59.03%; width: 2px; background: #e1e1e1"></span>
+</span>
+</sc-for>
+<span></span>
+<span style="position: relative; height: 16px; font-size: 11px; color: #8a8a8a">
+<sc-for list="{{hours}}" as="h" hint-placeholder-count="5"><span style="position: absolute; left: {{h.x}}; transform: translateX(-50%)">{{h.t}}</span></sc-for>
+<span style="position: absolute; left: 59.03%; transform: translateX(-50%); color: #e1e1e1; font-weight: 600">now 14:10</span>
+</span>
+</div>
+</section>
+
+<!-- Zones -->
+<sc-for list="{{zones}}" as="z" hint-placeholder-count="3">
+<section style="background: #1c1c1c; border: 1px solid {{z.edge}}; border-radius: 12px; padding: 12px 16px; display: grid; grid-template-columns: 92px 176px minmax(0, 1fr) 236px; gap: 16px; align-items: start; opacity: {{z.op}}">
+<svg width="92" height="92" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 30 V14" stroke="#4c8c3a" stroke-width="2.5" stroke-linecap="round" fill="none"></path><path d="M50 18 C40 10 36 12 34 6 C42 6 48 10 50 18 Z" fill="#64a548"></path><path d="M50 15 C58 7 63 8 66 3 C58 3 52 7 50 15 Z" fill="#64a548"></path><rect x="31" y="22" width="38" height="16" rx="2" fill="#e8dfc8" stroke="#b5a684" stroke-width="1.5"></rect><rect x="4" y="36" width="92" height="56" rx="5" fill="#efe7d2"></rect><rect x="4" y="{{z.waterY}}" width="92" height="{{z.waterH}}" fill="#2f86c4" fill-opacity="0.6"></rect><rect x="4" y="36" width="92" height="56" rx="5" fill="none" stroke="#b5a684" stroke-width="2"></rect><circle cx="30" cy="48" r="6" fill="{{z.fDot}}" stroke="#fff" stroke-width="1.5"></circle><circle cx="70" cy="48" r="6" fill="{{z.bDot}}" stroke="{{z.bRing}}" stroke-width="1.5" stroke-dasharray="{{z.bDash}}"></circle><text x="30" y="68" text-anchor="middle" font-size="9" fill="#5a4f3a" font-family="Roboto, Arial">F</text><text x="70" y="68" text-anchor="middle" font-size="9" fill="#5a4f3a" font-family="Roboto, Arial">B</text></svg>
+
+<div style="display: flex; flex-direction: column; gap: 8px; min-width: 0">
+<a href="S3-Zone.dc.html" style="color: #e1e1e1; font-size: 17px; font-weight: 600">{{z.name}} →</a>
+<span style="display: flex; gap: 6px; flex-wrap: wrap"><span style="padding: 1px 7px; border-radius: 4px; background: #2f6fb5; color: #fff; font-size: 12px; font-weight: 700">P1 Ramp</span><span style="display: flex; align-items: center; gap: 5px; padding: 0 8px; border: 1px solid #3a3a3a; border-radius: 10px; font-size: 12px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: {{z.modeDot}}"></span>{{z.mode}}</span></span>
+<span style="font-size: 12px; color: #a4a4a4">Water per plant vs room median</span>
+<span style="display: flex; flex-direction: column; gap: 4px"><span style="font-size: 14px"><b style="font-size: 17px; font-weight: 600">{{z.ml}}</b> <span style="color: #a4a4a4">· {{z.l}} · {{z.shots}}</span></span><span style="position: relative; height: 8px; border-radius: 4px; background: #333333"><span style="position: absolute; left: 0; top: 0; bottom: 0; width: {{z.drinkPct}}; border-radius: 4px; background: #2f86c4"></span><span style="position: absolute; top: -3px; bottom: -3px; left: 64%; width: 2px; background: #b8b8b8"></span></span><span style="font-size: 12px; color: #a4a4a4">{{z.vsMedian}}</span></span>
+</div>
+
+<div style="display: grid; grid-template-columns: 112px minmax(0, 1fr) 52px; gap: 9px 10px; align-items: center; font-size: 13px; padding-top: 4px">
+<sc-for list="{{z.gauges}}" as="g" hint-placeholder-count="3">
+<span style="color: #a4a4a4">{{g.label}}<span style="display: block; font-size: 11px; color: #8a8a8a">{{g.band}}</span></span>
+<span style="position: relative; height: 8px; border-radius: 4px; background: #333333"><span style="position: absolute; left: {{g.bandL}}; width: {{g.bandW}}; top: 0; bottom: 0; background: rgba(129,201,149,.45); border-radius: 4px"></span><span style="position: absolute; left: {{g.pos}}; top: -5px; bottom: -5px; width: 3px; background: #e1e1e1; border-radius: 2px"></span></span>
+<b style="text-align: right; font-size: 15px; font-weight: 600">{{g.val}}</b>
+</sc-for>
+<sc-if value="{{z.paused}}" hint-placeholder-val="{{false}}">
+<span style="grid-column: 1 / 4; display: flex; align-items: center; gap: 10px; font-size: 13px; color: #b8b8b8">{{z.pauseNote}}<button type="button" onClick="{{z.onToggle}}" style="margin-left: auto; height: 32px; padding: 0 12px; border: 1px solid #03a9f4; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 13px; font-weight: 600">{{z.pauseBtn}}</button></span>
+</sc-if>
+</div>
+
+<div style="display: flex; flex-direction: column; gap: 8px">
+<span style="font-size: 12px; color: #a4a4a4">Sensors</span>
+<sc-for list="{{z.sensors}}" as="s" hint-placeholder-count="2">
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border: 1px solid {{s.edge}}; border-radius: 8px; background: {{s.bg}}">
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{s.dot}}"></span><b style="font-weight: 600">{{s.name}}</b><span style="margin-left: auto; color: {{s.ink}}">{{s.reading}}</span></span>
+<sc-if value="{{s.problem}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 12px; color: #e1e1e1; line-height: 1.4">Last heard 11:08. Left out: the zone reads the front sensor only.</span>
+<a href="E1-Probes.dc.html" style="font-size: 12px; font-weight: 600">Check back probe →</a>
+</sc-if>
+</div>
+</sc-for>
+</div>
+</section>
+</sc-for>
+</div>
+
+<!-- Right column: feed tank + stock -->
+<aside aria-label="Feed" style="display: flex; flex-direction: column; gap: 12px">
+<a href="E2-Dosing.dc.html" style="display: flex; flex-direction: column; gap: 12px; padding: 16px; border: 1px solid #2e2e2e; border-radius: 12px; background: #1c1c1c; color: #e1e1e1">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">FEED TANK</span>
+<span style="display: flex; gap: 16px; align-items: center">
+<svg width="96" height="120" viewBox="0 0 80 100" aria-hidden="true" style="flex: none"><rect x="12" y="14" width="56" height="78" rx="8" fill="#26343c"></rect><rect x="12" y="55" width="56" height="37" fill="#2f86c4" fill-opacity="0.75"></rect><rect x="12" y="14" width="56" height="78" rx="8" fill="none" stroke="#8a8a8a" stroke-width="1.5"></rect><line x1="12" x2="68" y1="86" y2="86" stroke="#e1e1e1" stroke-width="1.5" stroke-dasharray="3 3"></line><rect x="8" y="8" width="64" height="8" rx="3" fill="#5a5a5a"></rect></svg>
+<span style="display: flex; flex-direction: column; gap: 4px; font-size: 13px">
+<b style="font-size: 24px; font-weight: 600">47%</b>
+<span style="color: #a4a4a4">188 L usable</span>
+<span style="color: #a4a4a4">Dashed line: pump stop 8%</span>
+</span>
+</span>
+<span style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 12px; color: #a4a4a4">
+<span style="display: flex; flex-direction: column; gap: 2px">pH<b style="font-size: 15px; color: #e1e1e1; font-weight: 600">6.02</b></span>
+<span style="display: flex; flex-direction: column; gap: 2px">EC<b style="font-size: 15px; color: #e1e1e1; font-weight: 600">1.9</b></span>
+<span style="display: flex; flex-direction: column; gap: 2px">Temp<b style="font-size: 15px; color: #e1e1e1; font-weight: 600">20.4°</b></span>
+</span>
+<span style="font-size: 13px; color: #a4a4a4">Pump off · filled 06:10 · lasts to about 03:00</span>
+</a>
+<a href="E5-Stock.dc.html" style="display: flex; flex-direction: column; gap: 10px; padding: 16px; border: 1px solid #2e2e2e; border-radius: 12px; background: #1c1c1c; color: #e1e1e1">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">STOCK</span>
+<span style="display: flex; justify-content: space-between">
+<sc-for list="{{stock}}" as="s" hint-placeholder-count="3"><span style="display: flex; flex-direction: column; align-items: center; gap: 4px; font-size: 12px"><svg width="32" height="48" viewBox="0 0 40 60" aria-hidden="true"><rect x="6" y="14" width="28" height="44" rx="5" fill="#26343c" stroke="#8a8a8a" stroke-width="1.5"></rect><rect x="6" y="{{s.y}}" width="28" height="{{s.h}}" fill="#2f86c4"></rect><rect x="13" y="6" width="14" height="8" rx="2" fill="#5a5a5a"></rect></svg><b style="font-weight: 600; font-size: 13px">{{s.name}}</b><span style="color: #a4a4a4">{{s.level}}</span></span></sc-for>
+</span>
+<span style="font-size: 13px; color: #a4a4a4">Enough for about 9 batches</span>
+</a>
+</aside>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%' }; }
+function treeRoom(name, dot, state, cur, zones) {
+  return { name: name, dot: dot, state: state, zones: zones, current: cur ? 'page' : 'false', bg: cur ? '#2a2a2a' : 'transparent', ink: cur ? '#4fc3f7' : '#e1e1e1' };
+}
+var TREE = [
+  treeRoom('F2', '#03a9f4', 'Watering', false, [tz('Zone 1', 'P2', 59.4), tz('Zone 2', 'P2', 59.4), tz('Zone 3', 'P2', 60.2)]),
+  treeRoom('F1', '#81c995', 'Holding', true, [tz('Zone 1', 'P1', 63.8), tz('Zone 2', 'P1', 62.9), tz('Zone 3', 'P1', 64.4)])
+];
+function hx(h) { return (h / 24 * 100).toFixed(2) + '%'; }
+function ticks(done, planned) {
+  return done.map(function (h) { return { x: hx(h), bg: '#4fc3f7' }; })
+    .concat(planned.map(function (h) { return { x: hx(h), bg: 'transparent' }; }));
+}
+function pct(v, lo, hi) { return Math.max(1, Math.min(98, (v - lo) / (hi - lo) * 100)).toFixed(1) + '%'; }
+function gauge(label, band, v, lo, hi, bLo, bHi, unit) {
+  return { label: label, band: band, val: v + unit, pos: pct(v, lo, hi), bandL: pct(bLo, lo, hi), bandW: ((bHi - bLo) / (hi - lo) * 100).toFixed(1) + '%' };
+}
+function sensor(name, vwc, ec) {
+  return { name: name, reading: vwc + '% · EC ' + ec, dot: '#81c995', ink: '#a4a4a4', edge: '#2e2e2e', bg: '#151515', problem: false };
+}
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { z3resumed: false }; }
+  renderVals() {
+    var self = this, resumed = this.state.z3resumed;
+    var y = function (v) { return 92 - v / 80 * 56; };
+    function zone(name, vwc, dry, ec, ml, l, shots, drink, vsMed, sensors, o) {
+      o = o || {};
+      return {
+        name: name, ml: ml, l: l, shots: shots, drinkPct: drink, vsMedian: vsMed, sensors: sensors,
+        waterY: y(vwc), waterH: 92 - y(vwc),
+        gauges: [gauge('VWC', 'target 62–68%', vwc, 40, 80, 62, 68, '%'), gauge('Overnight dryback', 'target 8–12%', dry, 0, 20, 8, 12, '%'), gauge('Pore EC', 'target 3.5–5.0', ec, 2, 8, 3.5, 5.0, '')],
+        fDot: '#81c995', bDot: o.backSilent ? 'transparent' : '#81c995', bRing: o.backSilent ? '#ffca5b' : '#fff', bDash: o.backSilent ? '3 2' : 'none',
+        edge: o.backSilent ? '#ffca5b' : '#2e2e2e',
+        mode: o.mode || 'Automated', modeDot: o.mode === 'Paused' ? '#a4a4a4' : '#81c995',
+        paused: !!o.pausable, pauseNote: o.pauseNote || '', pauseBtn: o.pauseBtn || '', onToggle: o.onToggle, op: o.mode === 'Paused' ? 0.8 : 1
+      };
+    }
+    var z2back = { name: 'Back', reading: 'silent 3 h', dot: '#ffca5b', ink: '#ffca5b', edge: '#ffca5b', bg: 'rgba(255,202,91,.08)', problem: true };
+    var toggle = function () { self.setState({ z3resumed: !self.state.z3resumed }); };
+    var zones = [
+      zone('Zone 1', 63.8, 9.4, 4.1, '161 mL', '6.4 L', '4 shots', '64.4%', '+1 mL vs median 160 mL', [sensor('Front', 63.6, 4.1), sensor('Back', 64.0, 4.1)]),
+      zone('Zone 2', 62.9, 10.1, 4.0, '158 mL', '6.3 L', '4 shots', '63.2%', '−2 mL vs median 160 mL', [sensor('Front', 62.9, 4.0), z2back], { backSilent: true }),
+      zone('Zone 3', 64.4, 8.8, 4.2, '0 mL', '0 L', 'no shots', '0%', 'Not watered today', [sensor('Front', 64.2, 4.2), sensor('Back', 64.6, 4.2)],
+        resumed
+          ? { pausable: true, pauseNote: 'Resumed 14:12, written and read back. First shot 14:24.', pauseBtn: 'Undo', onToggle: toggle }
+          : { mode: 'Paused', pausable: true, pauseNote: 'Paused by Ben at 09:52 (slab change).', pauseBtn: 'Resume zone 3', onToggle: toggle })
+    ];
+    var lanes = [
+      { name: 'Zone 1', paused: false, ticks: ticks([11.33, 12.0, 12.67, 13.33], [14.33, 15.0, 15.67]) },
+      { name: 'Zone 2', paused: false, ticks: ticks([11.37, 12.03, 12.7, 13.37], [14.37, 15.03, 15.7]) },
+      { name: 'Zone 3', paused: !resumed, pauseFrom: hx(9.87), pauseW: hx(14.17 - 9.87), ticks: resumed ? ticks([], [14.4, 15.07, 15.73]) : [] }
+    ];
+    var hours = [0, 6, 10, 18, 22, 24].map(function (h) { return { x: hx(h), t: (h < 10 ? '0' : '') + h + ':00' }; });
+    var stock = [{ name: 'Part A', level: '15.2/20 L', y: 25, h: 33 }, { name: 'Part B', level: '14.8/20 L', y: 26, h: 32 }, { name: 'Silica', level: '8.0/10 L', y: 23, h: 35 }];
+    return { tree: TREE, zones: zones, lanes: lanes, hours: hours, stock: stock };
+  }
+}
+</script>
+</body>
+</html>

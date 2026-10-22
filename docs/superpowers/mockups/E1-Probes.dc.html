@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Probes & offsets</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 2px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 15px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; margin-top: 18px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 22px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; background: {{r.bg}}; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 22px 28px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: center; gap: 16px; height: 40px; flex-shrink: 0">
+<h1 style="margin: 0; font-size: 24px; font-weight: 600">Probes &amp; offsets</h1>
+<span style="font-size: 14px; color: #a4a4a4">9 probes · 7 in zone values · raw readings always kept</span>
+<nav aria-label="Equipment pages" style="margin-left: auto; display: flex; gap: 4px; padding: 3px; border: 1px solid #2e2e2e; border-radius: 10px; background: #1c1c1c">
+<a href="E1-Probes.dc.html" aria-current="page" style="display: flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 7px; background: #2a2a2a; color: #4fc3f7; font-size: 14px; font-weight: 600">Probes</a>
+<a href="E2-Dosing.dc.html" style="display: flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 7px; color: #b8b8b8; font-size: 14px; font-weight: 500">Feed &amp; dosing</a>
+<a href="E5-Stock.dc.html" style="display: flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 7px; color: #b8b8b8; font-size: 14px; font-weight: 500">Stock</a>
+<a href="E6-Setup.dc.html" style="display: flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 7px; color: #b8b8b8; font-size: 14px; font-weight: 500">Setup</a>
+</nav>
+</div>
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 18px">
+
+<section aria-label="Probes by room and zone" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 10px 16px 12px; display: flex; flex-direction: column; min-height: 0; overflow: hidden">
+<div style="display: grid; grid-template-columns: 138px minmax(0, 1fr); gap: 12px; padding: 4px 0 8px; font-size: 12px; font-weight: 600; letter-spacing: .04em; color: #a4a4a4">
+<span>ZONE VALUE</span>
+<span style="display: grid; grid-template-columns: 104px 74px 96px 64px 82px 48px minmax(0, 1fr); gap: 8px"><span>HEALTH</span><span>PROBE</span><span>LAST 24 H</span><span style="text-align: right">VWC</span><span style="text-align: right">EC · TEMP</span><span style="text-align: right">OFFSET</span><span></span></span>
+</div>
+<sc-for list="{{rooms2}}" as="r" hint-placeholder-count="2">
+<div style="display: flex; align-items: center; gap: 10px; padding: 8px 0 6px; border-top: 1px solid #3a3a3a">
+<span style="width: 10px; height: 10px; border-radius: 5px; background: {{r.dot}}"></span>
+<b style="font-size: 17px; font-weight: 600">{{r.name}}</b>
+<span style="font-size: 13px; color: #a4a4a4">{{r.stage}} · {{r.note}} · {{r.curve}} curve</span>
+<span style="margin-left: auto; font-size: 13px; color: {{r.healthInk}}">{{r.health}}</span>
+</div>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<div style="display: grid; grid-template-columns: 138px minmax(0, 1fr); gap: 12px; padding: 6px 0; border-top: 1px solid #262626">
+<div style="display: flex; flex-direction: column; gap: 3px; padding-top: 4px">
+<span style="font-size: 13px; color: #b8b8b8">{{z.name}}</span>
+<b style="font-size: 20px; font-weight: 600">{{z.fused}}</b>
+<span style="position: relative; height: 6px; width: 120px; border-radius: 3px; background: #333333"><span style="position: absolute; top: 0; bottom: 0; left: {{z.bandL}}; width: {{z.bandW}}; border-radius: 3px; background: rgba(129,201,149,.45)"></span><span style="position: absolute; top: -3px; bottom: -3px; left: {{z.tick}}; width: 3px; border-radius: 2px; background: #e1e1e1"></span></span>
+<span style="font-size: 12px; color: {{z.subInk}}">{{z.sub}}</span>
+</div>
+<div style="display: flex; flex-direction: column; min-width: 0">
+<sc-for list="{{z.sensors}}" as="s" hint-placeholder-count="2">
+<div style="display: grid; grid-template-columns: 104px 74px 96px 64px 82px 48px minmax(0, 1fr); gap: 8px; align-items: center; min-height: 42px; border-radius: 8px; background: {{s.rowBg}}">
+<span style="display: flex; flex-direction: column; gap: 2px; align-items: flex-start"><span style="padding: 1px 8px; border: 1px solid {{s.chipEdge}}; border-radius: 10px; font-size: 12px; font-weight: 600; color: {{s.chipInk}}">{{s.chip}}</span><sc-if value="{{s.leftOut}}" hint-placeholder-val="{{false}}"><span style="font-size: 11px; color: #a4a4a4">left out of zone</span></sc-if></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 14px; font-weight: 500">{{s.name}}</b><span style="font-size: 11px; color: #a4a4a4">{{s.ch}}</span></span>
+<svg width="96" height="28" viewBox="0 0 96 28" role="img" aria-label="{{s.sparkLabel}}"><rect x="0" y="{{s.bandY}}" width="96" height="{{s.bandH}}" fill="rgba(129,201,149,.14)"></rect><polyline points="{{s.pts}}" fill="none" stroke="{{s.line}}" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"></polyline></svg>
+<span style="display: flex; flex-direction: column; align-items: flex-end"><b style="font-size: 15px; font-weight: 600; color: {{s.vwcInk}}">{{s.vwc}}</b><span style="font-size: 11px; color: #a4a4a4">{{s.raw}}</span></span>
+<span style="font-size: 13px; text-align: right"><span style="color: {{s.ecInk}}">{{s.ec}}</span><span style="color: #a4a4a4"> · {{s.t}}</span></span>
+<span style="font-size: 13px; text-align: right; color: {{s.offInk}}">{{s.off}}</span>
+<span style="display: flex; justify-content: flex-end; padding-right: 6px">
+<sc-if value="{{s.canMatch}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{s.pick}}" aria-expanded="{{s.open}}" style="height: 32px; padding: 0 12px; border: 1px solid {{s.btnEdge}}; border-radius: 8px; background: #232323; color: #4fc3f7; font: inherit; font-size: 13px; font-weight: 600">Match handheld</button></sc-if>
+<sc-if value="{{s.isOor}}" hint-placeholder-val="{{false}}"><a href="#placement" style="font-size: 13px; font-weight: 600">Check placement →</a></sc-if>
+<sc-if value="{{s.hasNote}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: {{s.noteInk}}; text-align: right">{{s.note}}</span></sc-if>
+</span>
+</div>
+<sc-if value="{{s.open}}" hint-placeholder-val="{{false}}">
+<div style="margin: 4px 6px 8px 0; padding: 12px 14px; border: 1px solid #03a9f4; border-radius: 10px; background: #14212a; display: grid; grid-template-columns: 170px 120px minmax(0, 1fr); gap: 10px 20px; align-items: center">
+<label style="display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: #b8b8b8">Handheld reading, same spot
+<span style="display: flex; align-items: center; gap: 6px"><input type="text" inputmode="decimal" value="{{s.hp.handheld}}" onChange="{{s.hp.onHandheld}}" style="width: 76px; height: 36px; box-sizing: border-box; padding: 0 10px; border: 1px solid {{s.hp.inputEdge}}; border-radius: 8px; background: #111111; color: #e1e1e1; font: inherit; font-size: 17px; font-weight: 600"><span style="font-size: 15px; color: #e1e1e1">%</span></span>
+</label>
+<span style="display: flex; flex-direction: column; gap: 2px"><span style="font-size: 12px; color: #b8b8b8">Probe reads {{s.hp.probeNow}}</span><b style="font-size: 22px; font-weight: 600; color: #4fc3f7">{{s.hp.offTxt}}</b><span style="font-size: 12px; color: #b8b8b8">offset, VWC points</span></span>
+<span style="display: flex; flex-direction: column; gap: 6px">
+<span style="font-size: 13px">{{s.hp.zoneLabel}} value <b>{{s.hp.before}}</b> → <b style="color: #4fc3f7">{{s.hp.after}}</b> <span style="color: #a4a4a4">· spread {{s.hp.spreadBefore}} → {{s.hp.spreadAfter}}</span></span>
+<span style="position: relative; height: 8px; border-radius: 4px; background: #333333"><span style="position: absolute; top: 0; bottom: 0; left: {{s.hp.pBandL}}; width: {{s.hp.pBandW}}; border-radius: 4px; background: rgba(129,201,149,.4)"></span><span style="position: absolute; top: -4px; bottom: -4px; left: {{s.hp.pBefore}}; width: 3px; border-radius: 2px; background: #8a8a8a"></span><span style="position: absolute; top: -5px; bottom: -5px; left: {{s.hp.pAfter}}; width: 3px; border-radius: 2px; background: #4fc3f7"></span></span>
+<span style="font-size: 12px; color: #a4a4a4">Grey = now, blue = after. Fusion re-baselines, so no step alert fires.</span>
+</span>
+<div style="grid-column: 1 / -1; display: flex; align-items: center; gap: 10px; min-height: 36px">
+<sc-if value="{{s.hp.hasErr}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #f28b82"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f28b82" stroke-width="3" stroke-linecap="round" aria-hidden="true" style="flex: none"><line x1="5" y1="5" x2="19" y2="19"></line><line x1="19" y1="5" x2="5" y2="19"></line></svg>{{s.hp.err}}</span></sc-if>
+<sc-if value="{{s.hp.canApply}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{s.hp.apply}}" style="height: 36px; padding: 0 16px; border: 0; border-radius: 8px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 14px; font-weight: 600">{{s.hp.applyLabel}}</button><button type="button" onClick="{{s.hp.close}}" style="height: 36px; padding: 0 14px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 14px">Cancel</button><span style="font-size: 12px; color: #a4a4a4">Raw value kept · logged in History › Changes</span></sc-if>
+<sc-if value="{{s.hp.applied}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 8px; font-size: 13px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg>Written and read back 14:02 · {{s.hp.appliedTxt}}</span><button type="button" onClick="{{s.hp.undo}}" style="height: 32px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 13px; font-weight: 600">Undo</button><button type="button" onClick="{{s.hp.close}}" style="height: 32px; padding: 0 12px; border: 0; background: transparent; color: #b8b8b8; font: inherit; font-size: 13px">Close</button></sc-if>
+</div>
+</div>
+</sc-if>
+</sc-for>
+</div>
+</div>
+</sc-for>
+</sc-for>
+</section>
+
+<div style="display: flex; flex-direction: column; gap: 14px; min-height: 0">
+<section aria-label="Substrate curve" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600">Substrate curve · F1</h2>
+<span style="font-size: 13px; color: #a4a4a4; line-height: 1.4">Turns each probe's raw reading into VWC. Applies to all 6 F1 probes.</span>
+<div role="radiogroup" aria-label="Substrate curve" style="display: flex; border: 1px solid #3a3a3a; border-radius: 8px; overflow: hidden">
+<sc-for list="{{curves}}" as="c" hint-placeholder-count="3"><button type="button" role="radio" aria-checked="{{c.on}}" onClick="{{c.pick}}" style="{{c.style}}">{{c.name}}</button></sc-for>
+</div>
+<svg width="286" height="118" viewBox="0 0 286 118" role="img" aria-label="Raw reading to VWC curves">
+<line x1="22" y1="104" x2="282" y2="104" stroke="#3a3a3a"></line><line x1="22" y1="6" x2="22" y2="104" stroke="#3a3a3a"></line>
+<text x="2" y="12" fill="#a4a4a4" font-size="10" font-family="Roboto, Arial">80%</text><text x="6" y="104" fill="#a4a4a4" font-size="10" font-family="Roboto, Arial">0</text><text x="240" y="116" fill="#a4a4a4" font-size="10" font-family="Roboto, Arial">raw →</text>
+<path d="M22 102 C 100 76, 180 42, 280 14" fill="none" stroke="{{rwStroke}}" stroke-width="{{rwW}}"></path>
+<path d="M22 102 C 92 64, 170 38, 280 28" fill="none" stroke="{{cocoStroke}}" stroke-width="{{cocoW}}"></path>
+<path d="M22 100 L 120 72 L 280 20" fill="none" stroke="{{cuStroke}}" stroke-width="{{cuW}}" stroke-dasharray="5 3"></path>
+<circle cx="120" cy="72" r="3.5" fill="{{cuStroke}}"></circle><circle cx="280" cy="20" r="3.5" fill="{{cuStroke}}"></circle>
+<text x="228" y="12" fill="#b8b8b8" font-size="10" font-family="Roboto, Arial">Rockwool</text><text x="240" y="42" fill="#b8b8b8" font-size="10" font-family="Roboto, Arial">Coco</text>
+</svg>
+<sc-if value="{{curveIdle}}" hint-placeholder-val="{{true}}"><span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: #b8b8b8"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg>{{curveIdleTxt}}</span></sc-if>
+<sc-if value="{{curveChanged}}" hint-placeholder-val="{{false}}">
+<span style="font-size: 13px; line-height: 1.45">{{curvePreview}}</span>
+<span style="display: flex; gap: 8px"><button type="button" onClick="{{applyCurve}}" style="height: 36px; padding: 0 14px; border: 0; border-radius: 8px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 14px; font-weight: 600">{{curveApplyLabel}}</button><button type="button" onClick="{{keepCurve}}" style="height: 36px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 14px">Keep {{savedCurve}}</button></span>
+</sc-if>
+<sc-if value="{{curveDone}}" hint-placeholder-val="{{false}}"><span style="display: flex; align-items: center; gap: 8px; font-size: 13px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg>Written and read back 14:03 · F1 now uses {{savedCurve}}<button type="button" onClick="{{undoCurve}}" style="margin-left: auto; height: 30px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 13px; font-weight: 600">Undo</button></span></sc-if>
+</section>
+
+<section id="placement" aria-label="Where to put a probe" style="flex: 1; min-height: 0; background: #1c1c1c; border: 1px solid #ffca5b; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px">
+<h2 style="margin: 0; font-size: 15px; font-weight: 600">Where to put a probe</h2>
+<span style="display: flex; gap: 8px; padding: 8px 10px; border-radius: 8px; background: rgba(255,202,91,.12); font-size: 13px; line-height: 1.4"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffca5b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M12 3l10 18H2z"></path><line x1="12" y1="10" x2="12" y2="14"></line><line x1="12" y1="17.5" x2="12" y2="17.6"></line></svg><span>F1 Zone 3 Back reads 91.4% all day: probably right under a dripper. Move it, and it rejoins the zone value after 30 min of normal readings.</span></span>
+<svg width="286" height="168" viewBox="0 0 286 168" role="img" aria-label="Side view of a slab with the probe 5 to 8 cm from the dripper">
+<rect x="8" y="88" width="270" height="56" rx="4" fill="#efe7d2"></rect>
+<ellipse cx="112" cy="94" rx="30" ry="26" fill="#2f86c4" fill-opacity="0.45"></ellipse>
+<rect x="84" y="60" width="56" height="30" rx="2" fill="#e8dfc8" stroke="#b5a684" stroke-width="1.5"></rect>
+<path d="M112 60 V26" stroke="#4c8c3a" stroke-width="2.5" stroke-linecap="round" fill="none"></path>
+<path d="M112 34 C100 24 96 26 92 18 C102 18 110 24 112 34 Z" fill="#64a548"></path><path d="M112 30 C122 20 128 21 132 14 C122 14 114 20 112 30 Z" fill="#64a548"></path>
+<path d="M150 20 C140 26 132 40 128 66" fill="none" stroke="#8a8a8a" stroke-width="2"></path><circle cx="128" cy="68" r="3" fill="#4fc3f7"></circle>
+<rect x="186" y="62" width="14" height="26" rx="2" fill="#5a5a5a" stroke="#b8b8b8" stroke-width="1"></rect>
+<line x1="189" y1="88" x2="189" y2="134" stroke="#5a5a5a" stroke-width="2.5"></line><line x1="193" y1="88" x2="193" y2="134" stroke="#5a5a5a" stroke-width="2.5"></line><line x1="197" y1="88" x2="197" y2="134" stroke="#5a5a5a" stroke-width="2.5"></line>
+<line x1="128" y1="156" x2="193" y2="156" stroke="#4fc3f7" stroke-width="1.5"></line><line x1="128" y1="150" x2="128" y2="162" stroke="#4fc3f7" stroke-width="1.5"></line><line x1="193" y1="150" x2="193" y2="162" stroke="#4fc3f7" stroke-width="1.5"></line>
+<text x="140" y="152" fill="#4fc3f7" font-size="11" font-weight="600" font-family="Roboto, Arial">5–8 cm</text>
+<line x1="214" y1="88" x2="214" y2="134" stroke="#4fc3f7" stroke-width="1.5"></line><line x1="208" y1="88" x2="220" y2="88" stroke="#4fc3f7" stroke-width="1.5"></line><line x1="208" y1="134" x2="220" y2="134" stroke="#4fc3f7" stroke-width="1.5"></line>
+<text x="224" y="108" fill="#4fc3f7" font-size="11" font-weight="600" font-family="Roboto, Arial">prongs</text><text x="224" y="121" fill="#4fc3f7" font-size="11" font-weight="600" font-family="Roboto, Arial">fully in</text>
+<line x1="104" y1="104" x2="120" y2="120" stroke="#f28b82" stroke-width="2.5"></line><line x1="120" y1="104" x2="104" y2="120" stroke="#f28b82" stroke-width="2.5"></line>
+<text x="40" y="132" fill="#7a2f2a" font-size="11" font-weight="600" font-family="Roboto, Arial">not in the wet cone</text>
+</svg>
+<ul style="margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13px; line-height: 1.4; color: #e1e1e1">
+<li>Push straight down, prongs fully in, not touching the slab bottom.</li>
+<li>5–8 cm from the dripper, towards the middle of the slab.</li>
+<li>Not at a slab end, a drain slit or a cube edge.</li>
+<li>Front and back probes: same distance from their drippers.</li>
+</ul>
+</section>
+</div>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%' }; }
+function treeRooms(sel, f2state, f2dot) {
+  return [
+    { name: 'F2', dot: f2dot || '#03a9f4', state: f2state || 'Watering', bg: sel === 'F2' ? '#2a2a2a' : 'transparent', zones: [tz('Zone 1', 'P2', 59.4), tz('Zone 2', 'P2', 58.1), tz('Zone 3', 'P2', 60.2)] },
+    { name: 'F1', dot: '#81c995', state: 'Holding', bg: sel === 'F1' ? '#2a2a2a' : 'transparent', zones: [tz('Zone 1', 'P1', 63.8), tz('Zone 2', 'P1', 62.9), tz('Zone 3', 'P1', 64.4)] }
+  ];
+}
+var ROOMDEF = [
+  { key: 'F2', name: 'F2', dot: '#03a9f4', stage: 'Flower · bulk', note: '1 probe per zone', band: [55, 65],
+    zones: [
+      [{ id: 'F2-1', name: 'Probe', ch: 'ch 1 · TEROS 12', vwc: 59.4, ec: 5.2, t: 21.4, state: 'ok', seed: 1 }],
+      [{ id: 'F2-2', name: 'Probe', ch: 'ch 2 · TEROS 12', vwc: 58.1, ec: 6.6, ecWarn: true, t: 21.8, state: 'ok', seed: 2 }],
+      [{ id: 'F2-3', name: 'Probe', ch: 'ch 3 · TEROS 12', vwc: 60.2, ec: 5.0, t: 21.1, state: 'stuck', seed: 3 }]
+    ] },
+  { key: 'F1', name: 'F1', dot: '#81c995', stage: 'Flower · stretch', note: '2 per zone, front and back', band: [58, 68],
+    zones: [
+      [{ id: 'F1-1f', name: 'Front', ch: 'ch 1 · TEROS 12', vwc: 66.6, ec: 4.2, t: 22.0, state: 'ok', seed: 4 }, { id: 'F1-1b', name: 'Back', ch: 'ch 2 · TEROS 12', vwc: 61.0, ec: 4.0, t: 22.2, state: 'ok', seed: 5 }],
+      [{ id: 'F1-2f', name: 'Front', ch: 'ch 3 · TEROS 12', vwc: 62.9, ec: 4.0, t: 22.4, state: 'ok', seed: 6 }, { id: 'F1-2b', name: 'Back', ch: 'ch 4 · TEROS 12', vwc: 61.7, ec: 3.9, t: 22.3, state: 'silent', seed: 7 }],
+      [{ id: 'F1-3f', name: 'Front', ch: 'ch 5 · TEROS 12', vwc: 64.4, ec: 4.2, t: 21.9, state: 'ok', seed: 8 }, { id: 'F1-3b', name: 'Back', ch: 'ch 6 · TEROS 12', vwc: 91.4, ec: 4.6, t: 22.0, state: 'oor', seed: 9 }]
+    ] }
+];
+var LO = 50, HI = 72;
+var CHIP = {
+  ok: ['OK', '#81c995', 'rgba(129,201,149,.5)'], stuck: ['Stuck 4 h', '#ffca5b', 'rgba(255,202,91,.6)'],
+  silent: ['Silent 3 h', '#f28b82', 'rgba(242,139,130,.6)'], oor: ['Out of range', '#f28b82', 'rgba(242,139,130,.6)']
+};
+var LINE = { ok: '#4fc3f7', stuck: '#ffca5b', silent: '#8a8a8a', oor: '#f28b82' };
+function y(v) { v = Math.max(LO, Math.min(HI, v)); return 26 - (v - LO) / (HI - LO) * 24; }
+function series(s) {
+  var out = [];
+  var n = s.state === 'silent' ? 21 : 24;
+  for (var i = 0; i < n; i++) {
+    var v = s.state === 'oor' ? 90 + Math.sin(i * 0.9) : s.vwc - 2 + 3 * Math.sin((i - 6) / 24 * 6.283) + ((i + s.seed) % 3) * 0.6;
+    if (s.state === 'stuck' && i >= 20) v = s.vwc;
+    out.push(v);
+  }
+  out[n - 1] = s.vwc;
+  return out.map(function (v, i) { return (i * 95 / 23).toFixed(1) + ',' + y(v).toFixed(1); }).join(' ');
+}
+var EMPTY = { handheld: '', inputEdge: '#3a3a3a', probeNow: '', offTxt: '', zoneLabel: '', before: '', after: '', spreadBefore: '', spreadAfter: '',
+  pBandL: '0%', pBandW: '0%', pBefore: '0%', pAfter: '0%', hasErr: false, err: '', canApply: false, applyLabel: '', applied: false, appliedTxt: '',
+  onHandheld: function () {}, close: function () {}, apply: function () {}, undo: function () {} };
+function used(s) { return s.state === 'ok' || s.state === 'stuck'; }
+function signed(v) { return (v > 0 ? '+' : v < 0 ? '−' : '') + Math.abs(v).toFixed(1); }
+function pct(v) { return Math.max(0, Math.min(98, (v - LO) / (HI - LO) * 100)).toFixed(1) + '%'; }
+function fuse(list, offs, swapId, swapVal) {
+  var vals = list.filter(used).map(function (s) { return s.id === swapId ? swapVal : s.vwc + (offs[s.id] || 0); });
+  var avg = vals.reduce(function (a, b) { return a + b; }, 0) / vals.length;
+  var spread = vals.length > 1 ? Math.max.apply(null, vals) - Math.min.apply(null, vals) : null;
+  return { avg: avg, spread: spread };
+}
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { open: 'F1-1b', handheld: '64.0', offsets: {}, applied: false, prevOff: 0, curve: 'Rockwool', savedCurve: 'Rockwool', curveDone: false, prevCurve: 'Rockwool' };
+  }
+  renderVals() {
+    var self = this, st = this.state;
+    function set(p) { self.setState(p); }
+    var rooms2 = ROOMDEF.map(function (r) {
+      var bad = 0;
+      var zones = r.zones.map(function (list, zi) {
+        var f = fuse(list, st.offsets);
+        var nUsed = list.filter(used).length;
+        var stuck = list.some(function (s) { return s.state === 'stuck'; });
+        var sub = f.spread !== null ? 'spread ' + f.spread.toFixed(1) + ' points' : list.length > 1 ? '1 of 2 probes used' : stuck ? '1 probe · stuck' : '1 probe';
+        var subInk = (f.spread !== null && f.spread > 4) || stuck ? '#ffca5b' : '#a4a4a4';
+        var zoneName = 'Zone ' + (zi + 1);
+        var sensors = list.map(function (s) {
+          var off = st.offsets[s.id] || 0, cor = s.vwc + off, c = CHIP[s.state];
+          if (!used(s) || s.state === 'stuck') bad++;
+          var open = st.open === s.id, helper = EMPTY;
+          if (open) {
+            var h = parseFloat(st.handheld), valid = !isNaN(h) && h >= 0 && h <= 100;
+            var newOff = valid ? h - s.vwc : 0;
+            var after = fuse(list, st.offsets, s.id, valid ? h : cor);
+            var err = !valid ? 'Enter the handheld reading as a number from 0 to 100.' : Math.abs(newOff) > 8 ? 'That is a ' + signed(newOff) + ' point offset. Over 8 points is usually placement or a cable: check the probe first.' : '';
+            var same = valid && Math.abs(h - cor) < 0.05;
+            helper = {
+              handheld: st.handheld, inputEdge: err ? '#f28b82' : '#3a3a3a', probeNow: s.vwc.toFixed(1) + '%' + (off ? ' raw' : ''),
+              offTxt: valid ? signed(newOff) : '—', zoneLabel: r.name + ' ' + zoneName,
+              before: f.avg.toFixed(1) + '%', after: after.avg.toFixed(1) + '%',
+              spreadBefore: f.spread !== null ? f.spread.toFixed(1) : '—', spreadAfter: after.spread !== null ? after.spread.toFixed(1) : '—',
+              pBandL: pct(r.band[0]), pBandW: ((r.band[1] - r.band[0]) / (HI - LO) * 100).toFixed(1) + '%', pBefore: pct(f.avg), pAfter: pct(after.avg),
+              hasErr: !!err && !st.applied, err: err,
+              canApply: valid && !err && !same && !st.applied, applyLabel: 'Apply ' + signed(newOff) + ' offset to ' + zoneName + ' ' + s.name,
+              applied: st.applied, appliedTxt: r.name + ' ' + zoneName + ' ' + s.name + ' offset ' + signed(off) + ' · logged in History › Changes',
+              onHandheld: function (e) { set({ handheld: e.target.value, applied: false }); },
+              close: function () { set({ open: '', applied: false }); },
+              apply: function () { var o = Object.assign({}, st.offsets); o[s.id] = Math.round(newOff * 10) / 10; set({ offsets: o, applied: true, prevOff: off }); },
+              undo: function () { var o = Object.assign({}, st.offsets); o[s.id] = st.prevOff; set({ offsets: o, applied: false, handheld: (s.vwc + st.prevOff).toFixed(1) }); }
+            };
+          }
+          return {
+            name: s.name, ch: s.ch, chip: c[0], chipInk: c[1], chipEdge: c[2], leftOut: !used(s),
+            sparkLabel: s.name + ' probe, last 24 hours', bandY: y(r.band[1]).toFixed(1), bandH: (y(r.band[0]) - y(r.band[1])).toFixed(1), pts: series(s), line: LINE[s.state],
+            vwc: s.state === 'silent' ? '—' : cor.toFixed(1) + '%', raw: s.state === 'silent' ? 'last 61.7 · 11:02' : off ? 'raw ' + s.vwc.toFixed(1) : '',
+            vwcInk: s.state === 'oor' ? '#f28b82' : '#e1e1e1',
+            ec: s.state === 'silent' ? '—' : s.ec.toFixed(1) + (s.ecWarn ? ' ▲' : ''), ecInk: s.ecWarn ? '#ffca5b' : '#e1e1e1', t: s.state === 'silent' ? '—' : s.t.toFixed(1) + '°',
+            off: off ? signed(off) : '0.0', offInk: off ? '#4fc3f7' : '#8a8a8a',
+            canMatch: s.state === 'ok', isOor: s.state === 'oor', open: open,
+            hasNote: s.state === 'stuck' || s.state === 'silent', note: s.state === 'stuck' ? 'Only probe here, still used' : 'Check cable', noteInk: s.state === 'stuck' ? '#ffca5b' : '#b8b8b8',
+            rowBg: open ? '#232323' : 'transparent', btnEdge: open ? '#03a9f4' : '#3a3a3a',
+            pick: function () { set({ open: s.id, handheld: cor.toFixed(1), applied: false }); }, hp: helper
+          };
+        });
+        return { name: zoneName, fused: f.avg.toFixed(1) + '%', sub: sub, subInk: subInk, bandL: pct(r.band[0]), bandW: ((r.band[1] - r.band[0]) / (HI - LO) * 100).toFixed(1) + '%', tick: pct(f.avg), sensors: sensors };
+      });
+      var total = r.zones.reduce(function (a, l) { return a + l.length; }, 0);
+      return { name: r.name, dot: r.dot, stage: r.stage, note: r.note, curve: r.key === 'F1' ? st.savedCurve : 'Rockwool', zones: zones,
+        health: bad ? (total - bad) + ' of ' + total + ' probes healthy' : 'All ' + total + ' probes healthy', healthInk: bad ? '#ffca5b' : '#81c995' };
+    });
+    var SHIFT = { Rockwool: 0, Coco: -2.1, Custom: 0.8 };
+    var z1 = fuse(ROOMDEF[1].zones[0], st.offsets).avg;
+    var delta = SHIFT[st.curve] - SHIFT[st.savedCurve];
+    var curves = ['Rockwool', 'Coco', 'Custom'].map(function (n) {
+      var on = st.curve === n;
+      return { name: n, on: on ? 'true' : 'false', pick: function () { set({ curve: n, curveDone: false }); },
+        style: 'flex: 1; height: 36px; border: 0; background: ' + (on ? '#03a9f4' : 'transparent') + '; color: ' + (on ? '#0b1d27' : '#b8b8b8') + '; font: inherit; font-size: 14px; font-weight: ' + (on ? 600 : 500) };
+    });
+    function stroke(n) { return st.curve === n ? '#4fc3f7' : '#5a5a5a'; }
+    function width(n) { return st.curve === n ? 3 : 1.5; }
+    var changed = st.curve !== st.savedCurve;
+    return {
+      rooms: treeRooms(''), rooms2: rooms2, curves: curves,
+      rwStroke: stroke('Rockwool'), rwW: width('Rockwool'), cocoStroke: stroke('Coco'), cocoW: width('Coco'), cuStroke: stroke('Custom'), cuW: width('Custom'),
+      curveIdle: !changed && !st.curveDone, curveIdleTxt: st.savedCurve + ' in use since 02 Sep · written and read back',
+      curveChanged: changed,
+      curvePreview: (st.curve === 'Custom' ? 'Your dry-down points: raw 1.20 → 22%, raw 3.40 → 70%. ' : '') + 'Switching F1 to ' + st.curve + ' moves its readings about ' + signed(delta) + ' points. Zone 1: ' + z1.toFixed(1) + '% → ' + (z1 + delta).toFixed(1) + '%.',
+      curveApplyLabel: 'Apply ' + st.curve + ' to 6 probes', savedCurve: st.savedCurve, curveDone: st.curveDone,
+      applyCurve: function () { set({ prevCurve: st.savedCurve, savedCurve: st.curve, curveDone: true }); },
+      keepCurve: function () { set({ curve: st.savedCurve }); },
+      undoCurve: function () { set({ savedCurve: st.prevCurve, curve: st.prevCurve, curveDone: false }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,274 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Feed & dosing</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 2px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 15px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; margin-top: 18px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 22px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; background: {{r.bg}}; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 22px 28px; display: flex; flex-direction: column; gap: 14px">
+<div style="display: flex; align-items: center; gap: 16px; height: 40px; flex-shrink: 0">
+<h1 style="margin: 0; font-size: 24px; font-weight: 600">Feed &amp; dosing · F2</h1>
+<span style="font-size: 14px; color: #a4a4a4">Batch tank, 4 dosing pumps, 3 zones · protections armed 5 of 5</span>
+<nav aria-label="Equipment pages" style="margin-left: auto; display: flex; gap: 4px; padding: 3px; border: 1px solid #2e2e2e; border-radius: 10px; background: #1c1c1c">
+<a href="E1-Probes.dc.html" style="display: flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 7px; color: #b8b8b8; font-size: 14px; font-weight: 500">Probes</a>
+<a href="E2-Dosing.dc.html" aria-current="page" style="display: flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 7px; background: #2a2a2a; color: #4fc3f7; font-size: 14px; font-weight: 600">Feed &amp; dosing</a>
+<a href="E5-Stock.dc.html" style="display: flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 7px; color: #b8b8b8; font-size: 14px; font-weight: 500">Stock</a>
+<a href="E6-Setup.dc.html" style="display: flex; align-items: center; height: 32px; padding: 0 14px; border-radius: 7px; color: #b8b8b8; font-size: 14px; font-weight: 500">Setup</a>
+</nav>
+</div>
+
+<section aria-label="Dosing loop, live" style="flex-shrink: 0; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 12px 16px 14px">
+<div style="position: relative; width: 1100px; height: 500px">
+<svg width="1100" height="500" viewBox="0 0 1100 500" aria-hidden="true" style="position: absolute; left: 0; top: 0">
+<g stroke="#5a5a5a" stroke-width="3" fill="none" stroke-linejoin="round">
+<path d="M200 96 V115 M200 141 V170 L320 192 V210"></path>
+<path d="M330 96 V115 M330 141 V170 L360 192 V210"></path>
+<path d="M460 96 V115 M460 141 V170 L400 192 V210"></path>
+<path d="M590 96 V115 M590 141 V170 L440 192 V210"></path>
+</g>
+<path d="M130 380 H290" stroke="#2f86c4" stroke-width="5" fill="none"></path>
+<path d="M188 370 L200 380 L188 390 Z M212 370 L200 380 L212 390 Z" fill="#232323" stroke="#e1e1e1" stroke-width="1.5"></path>
+<line x1="200" y1="380" x2="200" y2="362" stroke="#e1e1e1" stroke-width="1.5"></line><rect x="192" y="354" width="16" height="9" rx="2" fill="#5a5a5a"></rect>
+<path d="M470 440 H500" stroke="{{pipeOut}}" stroke-width="5" fill="none"></path>
+<path d="M760 330 H788 M832 330 H870 M870 250 V430 M870 250 H890 M870 340 H890 M870 430 H890" stroke="{{pipeOut}}" stroke-width="5" fill="none" stroke-linejoin="round"></path>
+<circle cx="810" cy="330" r="22" fill="#232323" stroke="{{feedPumpEdge}}" stroke-width="2.5"></circle><path d="M800 320 L822 330 L800 340 Z" fill="{{feedPumpEdge}}"></path>
+<rect x="290" y="210" width="180" height="260" rx="10" fill="#26343c"></rect>
+<rect x="290" y="{{tankY}}" width="180" height="{{tankH}}" fill="#2f86c4" fill-opacity="0.6"></rect>
+<rect x="290" y="210" width="180" height="260" rx="10" fill="none" stroke="#8a8a8a" stroke-width="2"></rect>
+<line x1="282" y1="220" x2="478" y2="220" stroke="#e1e1e1" stroke-width="1.5" stroke-dasharray="5 4"></line>
+<line x1="282" y1="450" x2="478" y2="450" stroke="#e1e1e1" stroke-width="1.5" stroke-dasharray="5 4"></line>
+<text x="380" y="356" text-anchor="middle" fill="#ffffff" font-size="30" font-weight="700" font-family="Roboto, Arial">{{tankPct}}</text>
+<text x="380" y="380" text-anchor="middle" fill="#e1e1e1" font-size="13" font-family="Roboto, Arial">{{tankL}}</text>
+<text x="380" y="400" text-anchor="middle" fill="#e1e1e1" font-size="13" font-family="Roboto, Arial">{{tankRead}}</text>
+<line x1="380" y1="414" x2="380" y2="440" stroke="#b8b8b8" stroke-width="2"></line><ellipse cx="368" cy="440" rx="12" ry="4" fill="#b8b8b8"></ellipse><ellipse cx="392" cy="440" rx="12" ry="4" fill="#b8b8b8"></ellipse>
+<rect x="{{b0.cap}}" y="22" width="16" height="9" rx="2" fill="#5a5a5a"></rect>
+<rect x="{{b0.x}}" y="30" width="40" height="66" rx="6" fill="#26343c"></rect>
+<rect x="{{b0.x}}" y="{{b0.fy}}" width="40" height="{{b0.fh}}" fill="{{b0.fill}}"></rect>
+<rect x="{{b0.x}}" y="30" width="40" height="66" rx="6" fill="none" stroke="#8a8a8a" stroke-width="1.5"></rect>
+<line x1="{{b0.x}}" y1="76" x2="{{b0.x2}}" y2="76" stroke="#e1e1e1" stroke-width="1" stroke-dasharray="3 3"></line>
+<circle cx="{{b0.c}}" cy="128" r="13" fill="#232323" stroke="{{b0.pumpEdge}}" stroke-width="2"></circle>
+<path d="{{b0.arrow}}" fill="{{b0.pumpEdge}}"></path>
+<rect x="{{b1.cap}}" y="22" width="16" height="9" rx="2" fill="#5a5a5a"></rect>
+<rect x="{{b1.x}}" y="30" width="40" height="66" rx="6" fill="#26343c"></rect>
+<rect x="{{b1.x}}" y="{{b1.fy}}" width="40" height="{{b1.fh}}" fill="{{b1.fill}}"></rect>
+<rect x="{{b1.x}}" y="30" width="40" height="66" rx="6" fill="none" stroke="#8a8a8a" stroke-width="1.5"></rect>
+<line x1="{{b1.x}}" y1="76" x2="{{b1.x2}}" y2="76" stroke="#e1e1e1" stroke-width="1" stroke-dasharray="3 3"></line>
+<circle cx="{{b1.c}}" cy="128" r="13" fill="#232323" stroke="{{b1.pumpEdge}}" stroke-width="2"></circle>
+<path d="{{b1.arrow}}" fill="{{b1.pumpEdge}}"></path>
+<rect x="{{b2.cap}}" y="22" width="16" height="9" rx="2" fill="#5a5a5a"></rect>
+<rect x="{{b2.x}}" y="30" width="40" height="66" rx="6" fill="#26343c"></rect>
+<rect x="{{b2.x}}" y="{{b2.fy}}" width="40" height="{{b2.fh}}" fill="{{b2.fill}}"></rect>
+<rect x="{{b2.x}}" y="30" width="40" height="66" rx="6" fill="none" stroke="#8a8a8a" stroke-width="1.5"></rect>
+<line x1="{{b2.x}}" y1="76" x2="{{b2.x2}}" y2="76" stroke="#e1e1e1" stroke-width="1" stroke-dasharray="3 3"></line>
+<circle cx="{{b2.c}}" cy="128" r="13" fill="#232323" stroke="{{b2.pumpEdge}}" stroke-width="2"></circle>
+<path d="{{b2.arrow}}" fill="{{b2.pumpEdge}}"></path>
+<rect x="{{b3.cap}}" y="22" width="16" height="9" rx="2" fill="#5a5a5a"></rect>
+<rect x="{{b3.x}}" y="30" width="40" height="66" rx="6" fill="#26343c"></rect>
+<rect x="{{b3.x}}" y="{{b3.fy}}" width="40" height="{{b3.fh}}" fill="{{b3.fill}}"></rect>
+<rect x="{{b3.x}}" y="30" width="40" height="66" rx="6" fill="none" stroke="#8a8a8a" stroke-width="1.5"></rect>
+<line x1="{{b3.x}}" y1="76" x2="{{b3.x2}}" y2="76" stroke="#e1e1e1" stroke-width="1" stroke-dasharray="3 3"></line>
+<circle cx="{{b3.c}}" cy="128" r="13" fill="#232323" stroke="{{b3.pumpEdge}}" stroke-width="2"></circle>
+<path d="{{b3.arrow}}" fill="{{b3.pumpEdge}}"></path>
+</svg>
+
+<sc-for list="{{bottles}}" as="b" hint-placeholder-count="4">
+<a href="E5-Stock.dc.html" style="position: absolute; left: {{b.labelX}}; top: 24px; width: 84px; display: flex; flex-direction: column; gap: 1px; color: #e1e1e1; font-size: 12px">
+<b style="font-size: 13px; font-weight: 600">{{b.name}}</b><span style="color: {{b.levelInk}}">{{b.level}}</span><span style="color: #a4a4a4">{{b.flow}}</span>
+</a>
+</sc-for>
+<span style="position: absolute; left: 200px; top: 150px; display: flex; align-items: center; gap: 6px; font-size: 12px; color: #b8b8b8; white-space: nowrap; transform: translateX(-100%); padding-right: 22px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg>Read-back on every dose</span>
+
+<div style="position: absolute; left: 0; top: 343px; width: 130px; height: 74px; box-sizing: border-box; padding: 8px 10px; border: 1px solid #2e2e2e; border-radius: 10px; background: #111111; display: flex; flex-direction: column; gap: 2px; font-size: 12px">
+<b style="font-size: 14px; font-weight: 600">Water in</b><span style="color: #b8b8b8">RO · EC 0.02</span><span style="color: #b8b8b8">16.4 °C · 2.1 bar</span>
+</div>
+<div style="position: absolute; left: 146px; top: 292px; width: 116px; display: flex; flex-direction: column; gap: 1px; font-size: 12px; text-align: center; align-items: center">
+<b style="font-size: 13px; font-weight: 600">Fill valve</b><span style="color: #b8b8b8">Closed · 13:56</span><span style="display: flex; align-items: center; gap: 4px; color: #b8b8b8"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg>Timeout 12 min</span>
+</div>
+<span style="position: absolute; left: 112px; top: 210px; width: 166px; display: flex; justify-content: flex-end; align-items: center; gap: 5px; font-size: 12px; color: #b8b8b8"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg>Overfill cut 102%</span>
+<span style="position: absolute; left: 112px; top: 440px; width: 166px; display: flex; justify-content: flex-end; align-items: center; gap: 5px; font-size: 12px; color: #b8b8b8"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg>Minimum 8%</span>
+<span style="position: absolute; left: 290px; top: 478px; width: 180px; display: flex; justify-content: center; align-items: center; gap: 5px; font-size: 12px; color: #b8b8b8"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><polyline points="4 12 10 18 20 6"></polyline></svg>Mix pump on · 0.42 kW</span>
+
+<div style="position: absolute; left: 720px; top: 0; width: 380px; box-sizing: border-box; padding: 10px 14px; border: 1px solid #2e2e2e; border-radius: 10px; background: #111111; display: flex; flex-direction: column; gap: 6px; font-size: 13px">
+<span style="display: flex; align-items: baseline; gap: 8px"><b style="font-size: 15px; font-weight: 600">Batch 214</b><span style="color: #a4a4a4">Bloom bulk · week 6 · started 13:48</span></span>
+<span style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px">
+<sc-for list="{{doses}}" as="d" hint-placeholder-count="4"><span style="display: flex; flex-direction: column; padding: 6px 8px; border-radius: 8px; background: #1c1c1c"><span style="font-size: 11px; color: #a4a4a4">{{d.name}}</span><b style="font-size: 15px; font-weight: 600">{{d.ml}}</b><span style="font-size: 11px; color: #a4a4a4">{{d.rate}}</span></span></sc-for>
+</span>
+<span style="color: #b8b8b8">Target EC 2.40 · pH 5.8 · water planned 310 L</span>
+</div>
+
+<div style="position: absolute; left: 500px; top: 266px; width: 260px; box-sizing: border-box; padding: 10px 12px; border: 2px solid {{mixEdge}}; border-radius: 10px; background: {{mixBg}}; display: flex; flex-direction: column; gap: 7px; font-size: 13px">
+<b style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: {{mixInk}}">{{mixTitle}}</b>
+<span style="display: grid; grid-template-columns: 62px 1fr; gap: 6px 8px; align-items: center">
+<span>EC <b>{{ec}}</b></span><span style="position: relative; height: 7px; border-radius: 4px; background: #333333"><span style="position: absolute; left: 30%; width: 20%; top: 0; bottom: 0; border-radius: 4px; background: rgba(129,201,149,.45)"></span><span style="position: absolute; left: {{ecTick}}; top: -4px; bottom: -4px; width: 3px; border-radius: 2px; background: {{ecTickInk}}"></span></span>
+<span>pH <b>{{ph}}</b></span><span style="position: relative; height: 7px; border-radius: 4px; background: #333333"><span style="position: absolute; left: 30%; width: 40%; top: 0; bottom: 0; border-radius: 4px; background: rgba(129,201,149,.45)"></span><span style="position: absolute; left: {{phTick}}; top: -4px; bottom: -4px; width: 3px; border-radius: 2px; background: #e1e1e1"></span></span>
+</span>
+<span style="line-height: 1.4; color: #e1e1e1">{{mixBody}}</span>
+<sc-if value="{{failed}}" hint-placeholder-val="{{true}}">
+<span style="display: flex; gap: 6px"><button type="button" onClick="{{topUp}}" style="height: 34px; padding: 0 10px; border: 0; border-radius: 8px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 13px; font-weight: 600">Top up 22 L, re-check</button><button type="button" onClick="{{useAnyway}}" style="height: 34px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 13px">Use once anyway</button></span>
+</sc-if>
+<span style="font-size: 11px; color: #a4a4a4">Feed EC probe calibrated 9 days ago · <a href="E4-FeedCal.dc.html">calibrate</a></span>
+</div>
+
+<div style="position: absolute; left: 764px; top: 358px; width: 92px; display: flex; flex-direction: column; align-items: center; gap: 1px; font-size: 12px; text-align: center">
+<b style="font-size: 13px; font-weight: 600">Feed pump</b><span style="color: {{feedInk}}; font-weight: 600">{{feedState}}</span>
+</div>
+
+<sc-for list="{{zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="position: absolute; left: 890px; top: {{z.top}}; width: 210px; height: 62px; box-sizing: border-box; padding: 8px 12px; border: 1px solid {{z.edge}}; border-radius: 10px; background: #111111; color: #e1e1e1; display: flex; flex-direction: column; justify-content: center; gap: 2px">
+<span style="display: flex; align-items: center; gap: 8px"><b style="font-size: 14px; font-weight: 600">{{z.name}}</b><span style="padding: 0 6px; border-radius: 4px; background: #6450b0; color: #fff; font-size: 11px; font-weight: 700">P2</span><span style="margin-left: auto; font-size: 12px; color: {{z.ink}}; font-weight: 600">{{z.state}}</span></span>
+<span style="font-size: 12px; color: #b8b8b8">{{z.note}}</span>
+</a>
+</sc-for>
+</div>
+</section>
+
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 420px; gap: 14px">
+<section aria-label="Feed recipes" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px; min-height: 0">
+<div style="display: flex; align-items: baseline; gap: 10px"><h2 style="margin: 0; font-size: 17px; font-weight: 600">Feed recipes</h2><span style="font-size: 13px; color: #a4a4a4">by flower week · F2 is in week 6</span><a href="I4-GrowPlan.dc.html" style="margin-left: auto; font-size: 14px; font-weight: 600">Edit recipes</a></div>
+<div style="display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px">
+<sc-for list="{{weeks}}" as="w" hint-placeholder-count="9"><span style="display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 5px 0; border-radius: 6px; background: {{w.bg}}; box-shadow: {{w.ring}}; font-size: 12px; color: {{w.ink}}"><b style="font-weight: 600">Wk {{w.n}}</b><span style="width: 70%; height: 4px; border-radius: 2px; background: {{w.color}}"></span></span></sc-for>
+</div>
+<div style="display: flex; flex-direction: column">
+<sc-for list="{{recipes}}" as="rc" hint-placeholder-count="4">
+<div style="display: grid; grid-template-columns: 12px 150px 80px minmax(0, 1fr) 90px; gap: 10px; align-items: center; min-height: 34px; padding: 0 8px; border-radius: 8px; background: {{rc.bg}}; font-size: 13px">
+<span style="width: 10px; height: 10px; border-radius: 3px; background: {{rc.color}}"></span><b style="font-weight: {{rc.weight}}">{{rc.name}}</b><span style="color: #a4a4a4">{{rc.weeks}}</span><span style="color: #e1e1e1">{{rc.mix}}</span><span style="text-align: right; font-size: 12px; font-weight: 600; color: #4fc3f7">{{rc.tag}}</span>
+</div>
+</sc-for>
+</div>
+</section>
+
+<section aria-label="Next batch" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; gap: 9px">
+<div style="display: flex; align-items: baseline; gap: 10px"><h2 style="margin: 0; font-size: 17px; font-weight: 600">Next batch</h2><span style="font-size: 13px; color: #a4a4a4">when the tank reaches 20%</span></div>
+<b style="font-size: 20px; font-weight: 600">Sat 25 Oct, about 09:00</b>
+<span style="font-size: 13px; color: #b8b8b8">310 L · A 744 mL · B 744 mL · Cal-Mag 248 mL · pH down about 40 mL, dosed to target</span>
+<span style="display: flex; height: 10px; border-radius: 5px; overflow: hidden; background: #333333"><span style="width: 36%; background: #2f86c4"></span><span style="width: 18%; background: #4a7fa8"></span><span style="width: 14%; background: #6450b0"></span><span style="width: 22%; background: #4a7fa8"></span><span style="width: 10%; background: #81c995"></span></span>
+<span style="font-size: 12px; color: #a4a4a4">Fill 8 min · premix 4 · dose 3 · postmix 5 · check 2 · ready about 09:22</span>
+<span style="display: flex; align-items: center; gap: 6px; font-size: 13px"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#ffca5b" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="flex: none"><path d="M12 3l10 18H2z"></path><line x1="12" y1="10" x2="12" y2="14"></line><line x1="12" y1="17.5" x2="12" y2="17.6"></line></svg>Part B after this batch: 4.7 L, 6 batches left</span>
+<span style="display: flex; gap: 8px; margin-top: auto">
+<a href="E3-PumpWizard.dc.html" style="display: flex; align-items: center; height: 36px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; font-size: 14px; font-weight: 600">Calibrate a pump</a>
+<a href="E4-FeedCal.dc.html" style="display: flex; align-items: center; height: 36px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; font-size: 14px; font-weight: 600">Calibrate feed pH/EC</a>
+</span>
+</section>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%' }; }
+function treeRooms(sel, f2state, f2dot) {
+  return [
+    { name: 'F2', dot: f2dot || '#03a9f4', state: f2state || 'Watering', bg: sel === 'F2' ? '#2a2a2a' : 'transparent', zones: [tz('Zone 1', 'P2', 59.4), tz('Zone 2', 'P2', 58.1), tz('Zone 3', 'P2', 60.2)] },
+    { name: 'F1', dot: '#81c995', state: 'Holding', bg: sel === 'F1' ? '#2a2a2a' : 'transparent', zones: [tz('Zone 1', 'P1', 63.8), tz('Zone 2', 'P1', 62.9), tz('Zone 3', 'P1', 64.4)] }
+  ];
+}
+var STOCK = [
+  { name: 'Part A', cur: 12.9, cap: 20, flow: '298 mL/min · idle' },
+  { name: 'Part B', cur: 5.4, cap: 20, flow: '305 mL/min · idle', low: true },
+  { name: 'Cal-Mag', cur: 6.1, cap: 10, flow: '151 mL/min · idle' },
+  { name: 'pH down', cur: 3.8, cap: 5, flow: '62 mL/min · idle' }
+];
+var RECIPES = [
+  { name: 'Bloom stretch', weeks: 'Wk 1–4', mix: 'EC 1.9 · pH 5.9 · A 1.9 · B 1.9 · Cal-Mag 1.0 mL/L', color: '#2f6fb5', from: 1, to: 4 },
+  { name: 'Bloom bulk', weeks: 'Wk 5–7', mix: 'EC 2.4 · pH 5.8 · A 2.4 · B 2.4 · Cal-Mag 0.8 mL/L', color: '#6450b0', from: 5, to: 7, now: true },
+  { name: 'Ripen', weeks: 'Wk 8', mix: 'EC 1.6 · pH 6.0 · A 1.2 · B 2.0 mL/L', color: '#c58a3a', from: 8, to: 8 },
+  { name: 'Flush', weeks: 'Wk 9', mix: 'EC 0.2 · pH 6.0 · water only', color: '#6b7580', from: 9, to: 9 }
+];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { mix: 'failed' }; }
+  renderVals() {
+    var self = this, st = this.state;
+    function set(p) { self.setState(p); }
+    var failed = st.mix === 'failed', busy = st.mix === 'busy', passed = st.mix === 'passed' || st.mix === 'forced';
+    var level = st.mix === 'failed' ? 0.64 : 0.689;
+    var bottles = STOCK.map(function (s, i) {
+      var c = 200 + i * 130, f = s.cur / s.cap;
+      return { name: s.name, c: c, x: c - 20, x2: c + 20, cap: c - 8, fy: (96 - 66 * f).toFixed(1), fh: (66 * f).toFixed(1), fill: s.low ? '#ffca5b' : '#2f86c4',
+        pumpEdge: '#8a8a8a', arrow: 'M' + (c - 5) + ' 122 L' + (c + 6) + ' 128 L' + (c - 5) + ' 134 Z', labelX: (c + 26) + 'px',
+        level: s.cur.toFixed(1) + ' / ' + s.cap + ' L' + (s.low ? ' · low' : ''), levelInk: s.low ? '#ffca5b' : '#b8b8b8', flow: s.flow };
+    });
+    var zoneNames = ['Zone 1', 'Zone 2', 'Zone 3'], notes = ['Next shot 14:20', 'Next shot 14:32', 'Next shot 14:26'];
+    var zones = zoneNames.map(function (n, i) {
+      return { name: n, top: (219 + i * 90) + 'px', edge: failed || busy ? '#f28b82' : '#2e2e2e', state: failed ? 'Held' : busy ? 'Held' : 'Ready', ink: failed || busy ? '#f28b82' : '#81c995',
+        note: failed || busy ? notes[i] + ' waits for feed' : notes[i] };
+    });
+    var weeks = [];
+    for (var w = 1; w <= 9; w++) {
+      var rc = RECIPES.filter(function (r) { return w >= r.from && w <= r.to; })[0];
+      weeks.push({ n: w, color: rc.color, bg: w === 6 ? '#2a2a2a' : 'transparent', ring: w === 6 ? 'inset 0 0 0 1px #03a9f4' : 'none', ink: w === 6 ? '#4fc3f7' : w < 6 ? '#8a8a8a' : '#b8b8b8' });
+    }
+    var mixTitle = failed ? 'Mix check failed 14:06' : busy ? 'Topping up 22 L, then re-check' : st.mix === 'forced' ? 'Used once anyway 14:07' : 'Mix check passed 14:19';
+    return {
+      rooms: treeRooms('F2', failed || busy ? 'Feed held' : 'Watering'),
+      bottles: bottles, b0: bottles[0], b1: bottles[1], b2: bottles[2], b3: bottles[3], zones: zones, weeks: weeks,
+      recipes: RECIPES.map(function (r) { return { name: r.name, weeks: r.weeks, mix: r.mix, color: r.color, bg: r.now ? '#232323' : 'transparent', weight: r.now ? 600 : 500, tag: r.now ? 'This week' : '' }; }),
+      doses: [{ name: 'Part A', ml: '744 mL', rate: '2.4 mL/L' }, { name: 'Part B', ml: '744 mL', rate: '2.4 mL/L' }, { name: 'Cal-Mag', ml: '248 mL', rate: '0.8 mL/L' }, { name: 'pH down', ml: '38 mL', rate: 'to pH 5.8' }],
+      tankY: (470 - level * 245).toFixed(1), tankH: (level * 245).toFixed(1), tankPct: Math.round(level * 100) + '%', tankL: failed ? '288 L of 450 L' : '310 L of 450 L',
+      tankRead: failed ? 'EC 2.71 · pH 5.82' : 'EC 2.41 · pH 5.84',
+      failed: failed, mixTitle: mixTitle,
+      mixEdge: failed ? '#f28b82' : busy ? '#03a9f4' : '#81c995', mixBg: failed ? '#2a1715' : '#111111', mixInk: failed ? '#f28b82' : busy ? '#4fc3f7' : '#81c995',
+      ec: failed || busy ? '2.71' : st.mix === 'forced' ? '2.71' : '2.41', ecTick: failed || busy || st.mix === 'forced' ? '71%' : '41%', ecTickInk: failed || busy || st.mix === 'forced' ? '#f28b82' : '#e1e1e1',
+      ph: failed || busy ? '5.82' : '5.84', phTick: failed || busy ? '55.5%' : '58.5%',
+      mixBody: failed ? 'Want EC 2.30–2.50. The fill stopped 22 L short (288 of 310 L) on low inlet pressure. Feed is held: zones get no water from this batch.'
+        : busy ? 'Fill valve open, 9 of 22 L in. Mix and re-check follow automatically; zones stay held until it passes.'
+        : st.mix === 'forced' ? 'This batch only, logged in History › Changes. The next batch gets the normal check.'
+        : 'EC 2.41, pH 5.84, both in band. Written and read back 14:19. Feed released to zones.',
+      pipeOut: failed || busy ? '#5a5a5a' : '#2f86c4', feedPumpEdge: failed || busy ? '#f28b82' : '#81c995',
+      feedState: failed || busy ? 'Held' : 'Ready', feedInk: failed || busy ? '#f28b82' : '#81c995',
+      topUp: function () { set({ mix: 'busy' }); setTimeout(function () { set({ mix: 'passed' }); }, 2200); },
+      useAnyway: function () { set({ mix: 'forced' }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

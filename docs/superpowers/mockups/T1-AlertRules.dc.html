@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Settings — Alert rules</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+select,input{color-scheme:dark}
+button{cursor:pointer}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 2px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; margin-top: 18px; border-radius: 8px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 15px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 22px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 18px 28px 22px; display: flex; flex-direction: column; gap: 16px">
+<div style="display: flex; align-items: stretch; gap: 22px; height: 44px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e">
+<h1 style="margin: 0; align-self: center; font-size: 20px; font-weight: 600">Settings</h1>
+<nav aria-label="Settings pages" style="display: flex; gap: 2px">
+<a href="T1-AlertRules.dc.html" aria-current="page" style="display: flex; align-items: center; padding: 0 14px; font-size: 14px; font-weight: 600; color: #4fc3f7; box-shadow: inset 0 -2px 0 #03a9f4">Alert rules</a>
+<a href="T2-Notifications.dc.html" style="display: flex; align-items: center; padding: 0 14px; font-size: 14px; font-weight: 500; color: #b8b8b8">Notifications</a>
+<a href="T3-System.dc.html" style="display: flex; align-items: center; padding: 0 14px; font-size: 14px; font-weight: 500; color: #b8b8b8">System</a>
+<a href="T4-AI.dc.html" style="display: flex; align-items: center; padding: 0 14px; font-size: 14px; font-weight: 500; color: #b8b8b8">AI assistant</a>
+<a href="T5-Dashboards.dc.html" style="display: flex; align-items: center; padding: 0 14px; font-size: 14px; font-weight: 500; color: #b8b8b8">Dashboards &amp; display</a>
+</nav></div>
+<section aria-labelledby="rule-h" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 16px 20px 16px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; align-items: baseline; gap: 12px">
+<h2 id="rule-h" style="margin: 0; font-size: 17px; font-weight: 600">{{builderTitle}}</h2>
+<span style="font-size: 13px; color: #a4a4a4">Your own lines on irrigation, dosing, sensors and offline devices. Coded CS alerts keep running whatever you set here.</span>
+<sc-if value="{{editing}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{cancelEdit}}" style="margin-left: auto; height: 32px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 13px">Stop editing, start a new rule</button></sc-if>
+</div>
+<div style="display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; font-size: 20px; color: #e1e1e1">
+<span>Tell</span>
+<select aria-label="Who to tell" value="{{phone}}" onChange="{{setPhone}}" style="height: 44px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 18px; font-weight: 600"><option value="ben">Ben's phone</option><option value="sam">Sam's phone</option><option value="crew">Night crew</option><option value="tab">Office tablet</option></select>
+<span>when</span>
+<select aria-label="What to watch" value="{{source}}" onChange="{{setSource}}" style="height: 44px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 18px; font-weight: 600"><optgroup label="Irrigation"><option value="z1vwc">F2 Zone 1 moisture</option><option value="flow3">F2 Zone 3 delivered vs asked</option><option value="tank">F2 feed tank level</option><option value="f1tank">F1 feed tank level</option></optgroup>
+<optgroup label="Dosing"><option value="feedph">F2 feed pH</option><option value="partb">F2 Part B stock</option></optgroup>
+<optgroup label="Sensors"><option value="z2ec">F2 Zone 2 pore EC</option></optgroup>
+<optgroup label="Offline"><option value="f1beat">F1 controller heartbeat age</option><option value="f1back">F1 Zone 2 back probe silence</option></optgroup></select>
+<span>is</span>
+<select aria-label="Below or above" value="{{dir}}" onChange="{{setDir}}" style="height: 44px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 18px; font-weight: 600"><option value="below">below</option><option value="above">above</option></select>
+<span style="display: inline-flex; align-items: center; gap: 6px"><input type="text" inputmode="decimal" aria-label="Threshold" aria-invalid="{{thrInvalid}}" value="{{thr}}" onChange="{{setThr}}" style="height: 44px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 18px; font-weight: 600; width: 84px; text-align: right; border-color: {{thrEdge}}"><span style="font-size: 18px">{{unit}}</span></span>
+<span>for</span>
+<span style="display: inline-flex; align-items: center; gap: 6px"><input type="text" inputmode="numeric" aria-label="Minutes it must last" aria-invalid="{{durInvalid}}" value="{{dur}}" onChange="{{setDur}}" style="height: 44px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 18px; font-weight: 600; width: 70px; text-align: right; border-color: {{durEdge}}"><span style="font-size: 18px">min</span></span>
+<select aria-label="When the rule watches" value="{{win}}" onChange="{{setWin}}" style="height: 44px; padding: 0 10px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 18px; font-weight: 600"><option value="any">at any time</option><option value="on">while lights are on</option><option value="off">while lights are off</option></select>
+<span>.</span>
+</div>
+<sc-if value="{{hasErr}}" hint-placeholder-val="{{false}}"><span role="alert" style="font-size: 14px; color: #f28b82">{{err}}</span></sc-if>
+<div style="display: flex; flex-direction: column; gap: 4px; padding: 12px 14px 8px; border-radius: 10px; background: #111111">
+<div style="display: flex; align-items: baseline; gap: 16px; font-size: 12px; color: #a4a4a4">
+<b style="font-size: 14px; color: #e1e1e1; font-weight: 600">Yesterday, as this rule would have seen it</b><span>{{srcLabel}} · 5-minute readings · lights 06:00–18:00</span>
+<span style="margin-left: auto; display: flex; gap: 16px"><span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 10px; border-radius: 2px; background: rgba(242,139,130,.35)"></span>would alert</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 10px; border-radius: 2px; background: rgba(164,164,164,.3)"></span>too short to alert</span>
+<span style="display: flex; align-items: center; gap: 6px"><span style="width: 14px; height: 0; border-top: 2px dashed #ffca5b"></span>your threshold</span></span>
+</div>
+<svg width="1066" height="178" viewBox="0 0 1066 178" role="img" aria-label="{{c.aria}}" style="display: block">
+<rect x="52" y="8" width="252.0" height="144" fill="#ffffff" fill-opacity="0.035"></rect>
+<rect x="808.0" y="8" width="252.0" height="144" fill="#ffffff" fill-opacity="0.035"></rect>
+<text x="56" y="22" fill="#8a8a8a" font-size="11" font-family="Roboto, Arial, sans-serif">Lights off</text>
+<text x="812.0" y="22" fill="#8a8a8a" font-size="11" font-family="Roboto, Arial, sans-serif">Lights off</text>
+<line x1="52" x2="1060" y1="8" y2="8" stroke="#2e2e2e" stroke-width="1"></line>
+<line x1="52" x2="1060" y1="80.0" y2="80.0" stroke="#2e2e2e" stroke-width="1"></line>
+<line x1="52" x2="1060" y1="152" y2="152" stroke="#2e2e2e" stroke-width="1"></line>
+<text x="52.0" y="172" fill="#a4a4a4" font-size="12" text-anchor="start" font-family="Roboto, Arial, sans-serif">00:00</text>
+<text x="178.0" y="172" fill="#a4a4a4" font-size="12" text-anchor="middle" font-family="Roboto, Arial, sans-serif">03:00</text>
+<text x="304.0" y="172" fill="#a4a4a4" font-size="12" text-anchor="middle" font-family="Roboto, Arial, sans-serif">06:00</text>
+<text x="430.0" y="172" fill="#a4a4a4" font-size="12" text-anchor="middle" font-family="Roboto, Arial, sans-serif">09:00</text>
+<text x="556.0" y="172" fill="#a4a4a4" font-size="12" text-anchor="middle" font-family="Roboto, Arial, sans-serif">12:00</text>
+<text x="682.0" y="172" fill="#a4a4a4" font-size="12" text-anchor="middle" font-family="Roboto, Arial, sans-serif">15:00</text>
+<text x="808.0" y="172" fill="#a4a4a4" font-size="12" text-anchor="middle" font-family="Roboto, Arial, sans-serif">18:00</text>
+<text x="934.0" y="172" fill="#a4a4a4" font-size="12" text-anchor="middle" font-family="Roboto, Arial, sans-serif">21:00</text>
+<text x="1060.0" y="172" fill="#a4a4a4" font-size="12" text-anchor="end" font-family="Roboto, Arial, sans-serif">24:00</text>
+<text x="46" y="18" fill="#a4a4a4" font-size="11" text-anchor="end" font-family="Roboto, Arial, sans-serif">{{c.yTop}}</text>
+<text x="46" y="152" fill="#a4a4a4" font-size="11" text-anchor="end" font-family="Roboto, Arial, sans-serif">{{c.yBot}}</text>
+<rect x="{{c.s0.x}}" y="8" width="{{c.s0.w}}" height="144" fill="#a4a4a4" fill-opacity="0.18"></rect>
+<rect x="{{c.s1.x}}" y="8" width="{{c.s1.w}}" height="144" fill="#a4a4a4" fill-opacity="0.18"></rect>
+<rect x="{{c.s2.x}}" y="8" width="{{c.s2.w}}" height="144" fill="#a4a4a4" fill-opacity="0.18"></rect>
+<rect x="{{c.s3.x}}" y="8" width="{{c.s3.w}}" height="144" fill="#a4a4a4" fill-opacity="0.18"></rect>
+<rect x="{{c.f0.x}}" y="8" width="{{c.f0.w}}" height="144" fill="#f28b82" fill-opacity="0.22"></rect>
+<rect x="{{c.f1.x}}" y="8" width="{{c.f1.w}}" height="144" fill="#f28b82" fill-opacity="0.22"></rect>
+<rect x="{{c.f2.x}}" y="8" width="{{c.f2.w}}" height="144" fill="#f28b82" fill-opacity="0.22"></rect>
+<rect x="{{c.f3.x}}" y="8" width="{{c.f3.w}}" height="144" fill="#f28b82" fill-opacity="0.22"></rect>
+<line x1="52" x2="1060" y1="{{c.thrY}}" y2="{{c.thrY}}" stroke="#ffca5b" stroke-width="1.5" stroke-dasharray="6 4"></line>
+<path d="{{c.d}}" fill="none" stroke="#4fc3f7" stroke-width="2" stroke-linejoin="round"></path>
+<text x="1060" y="{{c.thrLabelY}}" fill="#ffca5b" font-size="12" font-weight="600" text-anchor="end" font-family="Roboto, Arial, sans-serif">{{c.thrLabel}}</text>
+<circle cx="{{c.f0.mx}}" cy="{{c.thrY}}" r="5" fill="#f28b82" stroke="#1c1c1c" stroke-width="2" opacity="{{c.f0.op}}"></circle>
+<text x="{{c.f0.mx}}" y="40" fill="#f28b82" font-size="12" font-weight="600" text-anchor="middle" opacity="{{c.f0.op}}" font-family="Roboto, Arial, sans-serif">{{c.f0.t}}</text>
+<circle cx="{{c.f1.mx}}" cy="{{c.thrY}}" r="5" fill="#f28b82" stroke="#1c1c1c" stroke-width="2" opacity="{{c.f1.op}}"></circle>
+<text x="{{c.f1.mx}}" y="40" fill="#f28b82" font-size="12" font-weight="600" text-anchor="middle" opacity="{{c.f1.op}}" font-family="Roboto, Arial, sans-serif">{{c.f1.t}}</text>
+<circle cx="{{c.f2.mx}}" cy="{{c.thrY}}" r="5" fill="#f28b82" stroke="#1c1c1c" stroke-width="2" opacity="{{c.f2.op}}"></circle>
+<text x="{{c.f2.mx}}" y="40" fill="#f28b82" font-size="12" font-weight="600" text-anchor="middle" opacity="{{c.f2.op}}" font-family="Roboto, Arial, sans-serif">{{c.f2.t}}</text>
+<circle cx="{{c.f3.mx}}" cy="{{c.thrY}}" r="5" fill="#f28b82" stroke="#1c1c1c" stroke-width="2" opacity="{{c.f3.op}}"></circle>
+<text x="{{c.f3.mx}}" y="40" fill="#f28b82" font-size="12" font-weight="600" text-anchor="middle" opacity="{{c.f3.op}}" font-family="Roboto, Arial, sans-serif">{{c.f3.t}}</text>
+</svg>
+<div aria-live="polite" style="display: flex; align-items: baseline; gap: 12px; font-size: 13px; color: #b8b8b8"><b style="font-size: 17px; font-weight: 600; color: {{c.headInk}}">{{c.head}}</b><span>{{c.detail}}</span></div>
+</div>
+<div style="display: flex; align-items: center; gap: 12px">
+<button type="button" onClick="{{sendTest}}" style="height: 40px; padding: 0 16px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600">Send a test push to {{phoneName}}</button>
+<span aria-live="polite" style="font-size: 13px; color: #81c995">{{testMsg}}</span>
+<span aria-live="polite" style="margin-left: auto; font-size: 13px; color: #81c995">{{saveMsg}}</span>
+<sc-if value="{{canUndo}}" hint-placeholder-val="{{false}}"><button type="button" onClick="{{undo}}" style="height: 40px; padding: 0 16px; border: 1px solid #3a3a3a; border-radius: 8px; background: #232323; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600">Undo</button></sc-if>
+<button type="button" aria-disabled="{{saveDisabled}}" onClick="{{save}}" style="height: 40px; padding: 0 18px; border: 0; border-radius: 8px; background: #03a9f4; color: #0b1d27; font: inherit; font-size: 14px; font-weight: 700; opacity: {{saveOpacity}}">{{saveLabel}}</button>
+</div>
+</section>
+<section aria-labelledby="list-h" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 12px 20px 6px; flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column">
+<div style="display: flex; align-items: baseline; gap: 12px; padding-bottom: 8px"><h2 id="list-h" style="margin: 0; font-size: 17px; font-weight: 600">Your rules</h2><span style="font-size: 13px; color: #a4a4a4">{{countLine}}</span><span style="margin-left: auto; font-size: 13px; color: #a4a4a4">Each rule is also binary_sensor.crop_steering_rule_… in Home Assistant</span></div>
+<sc-for list="{{rules}}" as="rl" hint-placeholder-count="5">
+<div style="display: grid; grid-template-columns: minmax(0, 1fr) 270px 64px 44px; align-items: center; gap: 16px; min-height: 46px; padding: 0 10px; margin: 0 -10px; border-top: 1px solid #2e2e2e; border-radius: 8px; background: {{rl.bg}}">
+<span style="font-size: 15px; color: {{rl.ink}}">Tell <b style="font-weight: 600">{{rl.phone}}</b> when <b style="font-weight: 600">{{rl.src}}</b> is <b style="font-weight: 600">{{rl.cond}}</b> for <b style="font-weight: 600">{{rl.dur}}</b>, {{rl.win}}.</span>
+<span style="display: flex; align-items: center; gap: 8px; font-size: 13px; color: {{rl.statusInk}}"><span style="width: 8px; height: 8px; flex-shrink: 0; border-radius: 4px; background: {{rl.statusInk}}"></span>{{rl.status}}</span>
+<button type="button" onClick="{{rl.edit}}" aria-label="{{rl.editLbl}}" style="height: 32px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 13px; font-weight: 600">Edit</button>
+<button type="button" role="switch" aria-checked="{{rl.onStr}}" aria-label="{{rl.lbl}}" onClick="{{rl.toggle}}" style="width: 44px; height: 24px; flex-shrink: 0; border: 0; border-radius: 12px; padding: 2px; background: {{rl.track}}; display: flex"><span style="width: 20px; height: 20px; border-radius: 10px; background: #ffffff; margin-left: {{rl.knob}}"></span></button>
+</div>
+</sc-for>
+</section>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph], vwc: vwc + '%' }; }
+var ROOMS = [
+  { name: 'F2', dot: '#03a9f4', state: 'Watering', zones: [tz('Zone 1', 'P2', 59.4), tz('Zone 2', 'P2', 58.1), tz('Zone 3', 'P2', 60.2)] },
+  { name: 'F1', dot: '#81c995', state: 'Holding', zones: [tz('Zone 1', 'P1', 63.8), tz('Zone 2', 'P1', 62.9), tz('Zone 3', 'P1', 64.4)] }
+];
+function sw(on) { return { onStr: on ? 'true' : 'false', track: on ? '#03a9f4' : '#4a4a4a', knob: on ? '20px' : '0px' }; }
+
+var PHONES = { ben: "Ben's phone", sam: "Sam's phone", crew: 'Night crew', tab: 'Office tablet' };
+var WIN = { any: 'at any time', on: 'while lights are on', off: 'while lights are off' };
+var SRC = {
+  tank:   { label: 'F2 feed tank level', unit: '%', dir: 'below', thr: '30', lo: 0, hi: 100, ylo: 0, yhi: 100, keys: [[0, 52], [6.1, 27], [6.17, 95], [15.3, 29.2], [15.75, 28.4], [15.8, 90], [24, 66]], spikes: [[11, 29.5, 1]], wob: 0.6 },
+  f1tank: { label: 'F1 feed tank level', unit: '%', dir: 'below', thr: '25', lo: 0, hi: 100, ylo: 0, yhi: 100, keys: [[0, 61], [5.9, 31], [6.0, 94], [18, 48], [24, 40]], spikes: [], wob: 0.5 },
+  z1vwc:  { label: 'F2 Zone 1 moisture', unit: '% VWC', dir: 'below', thr: '50', lo: 0, hi: 100, ylo: 40, yhi: 70, keys: [[0, 56], [5.95, 49.2], [6.6, 52], [8.5, 61], [18, 59], [24, 55.5]], spikes: [], wob: 0.5 },
+  z2ec:   { label: 'F2 Zone 2 pore EC', unit: 'mS/cm', dir: 'above', thr: '6.0', lo: 0, hi: 20, ylo: 3, yhi: 8, keys: [[0, 5.6], [6, 5.8], [9, 6.1], [13, 6.6], [18, 6.5], [21, 5.9], [24, 5.7]], spikes: [], wob: 0.05 },
+  feedph: { label: 'F2 feed pH', unit: 'pH', dir: 'above', thr: '6.2', lo: 0, hi: 14, ylo: 5.4, yhi: 6.8, keys: [[0, 5.86], [24, 5.9]], spikes: [[9, 6.38, 3], [14, 6.31, 1]], wob: 0.03 },
+  partb:  { label: 'F2 Part B stock', unit: 'L', dir: 'below', thr: '6', lo: 0, hi: 20, ylo: 0, yhi: 10, keys: [[0, 7.1], [6.1, 7.0], [6.2, 6.4], [15.8, 6.3], [15.9, 5.7], [24, 5.6]], spikes: [], wob: 0 },
+  flow3:  { label: 'F2 Zone 3 delivered vs asked', unit: '%', dir: 'below', thr: '80', lo: 0, hi: 200, ylo: 50, yhi: 120, keys: [[0, 98], [24, 97]], spikes: [[13, 74, 4]], wob: 1.2 },
+  f1beat: { label: 'F1 controller heartbeat age', unit: 's', dir: 'above', thr: '120', lo: 5, hi: 3600, ylo: 0, yhi: 700, keys: [[0, 6], [24, 6]], spikes: [[2.67, 610, 3]], wob: 2 },
+  f1back: { label: 'F1 Zone 2 back probe silence', unit: 'min', dir: 'above', thr: '30', lo: 1, hi: 1440, ylo: 0, yhi: 240, keys: [[0, 1], [24, 1]], spikes: [], wob: 0 }
+};
+function series(s) {
+  var v = [];
+  for (var i = 0; i < 288; i++) {
+    var h = i / 12, k = s.keys, j = 0;
+    while (j < k.length - 2 && h > k[j + 1][0]) j++;
+    var a = k[j], b = k[j + 1], t = Math.max(0, Math.min(1, (h - a[0]) / (b[0] - a[0])));
+    v.push(a[1] + (b[1] - a[1]) * t + s.wob * Math.sin(h * 2.3 + 1));
+  }
+  s.spikes.forEach(function (p) { var i0 = Math.round(p[0] * 12); for (var n = 0; n < p[2]; n++) v[i0 + n] = p[1]; });
+  return v;
+}
+function inWin(h, w) { return w === 'any' || (w === 'on' ? (h >= 6 && h < 18) : (h < 6 || h >= 18)); }
+function hhmm(min) { min = Math.round(min) % 1440; var h = Math.floor(min / 60), m = min % 60; return (h < 10 ? '0' : '') + h + ':' + (m < 10 ? '0' : '') + m; }
+function slug(t) { return t.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''); }
+function evaluate(st) {
+  var s = SRC[st.source], thr = parseFloat(st.thr), dur = Number(st.dur), err = '', thrErr = false, durErr = false;
+  if (st.thr === '' || isNaN(thr) || thr < s.lo || thr > s.hi) { err = 'Enter a value from ' + s.lo + ' to ' + s.hi + ' ' + s.unit + '.'; thrErr = true; }
+  else if (!(dur >= 1 && dur <= 1440) || Math.round(dur) !== dur) { err = 'Enter whole minutes from 1 to 1440.'; durErr = true; }
+  var v = series(s), spans = [], cur = null;
+  if (!thrErr) {
+    for (var i = 0; i < 288; i++) {
+      var on = (st.dir === 'below' ? v[i] < thr : v[i] > thr) && inWin(i / 12, st.win);
+      if (on) { if (!cur) cur = { a: i }; cur.b = i; } else if (cur) { spans.push(cur); cur = null; }
+    }
+    if (cur) spans.push(cur);
+  }
+  var fired = [], short = [];
+  spans.forEach(function (sp) { sp.len = (sp.b - sp.a + 1) * 5; if (!durErr && sp.len >= dur) fired.push(sp); else short.push(sp); });
+  return { s: s, v: v, thr: thr, dur: dur, err: err, thrErr: thrErr, durErr: durErr, fired: fired, short: short };
+}
+function chart(st, ev, g) {
+  var s = ev.s, W = g.x1 - g.x0;
+  var X = function (i) { return +(g.x0 + W * i / 288).toFixed(1); };
+  var Y = function (val) { var c = Math.max(s.ylo, Math.min(s.yhi, val)); return +(g.y1 - (c - s.ylo) / (s.yhi - s.ylo) * (g.y1 - g.y0)).toFixed(1); };
+  var d = ev.v.map(function (val, i) { return (i ? 'L' : 'M') + X(i) + ' ' + Y(val); }).join('');
+  var thrY = ev.thrErr ? -20 : Y(ev.thr);
+  var slot = function (list, k, isFired) {
+    var sp = list[k];
+    if (!sp) return { x: 0, w: 0, mx: -20, op: 0, t: '' };
+    var at = sp.a + ev.dur / 5;
+    return { x: X(sp.a), w: +(X(sp.b + 1) - X(sp.a)).toFixed(1), mx: isFired ? X(at) : -20, op: isFired ? 1 : 0, t: isFired ? hhmm(at * 5) : '' };
+  };
+  var word = st.dir === 'below' ? 'under' : 'over', n = ev.fired.length;
+  var head = ev.err ? 'Fix the box in red to see the preview' : n === 0 ? 'Would not have alerted yesterday' : 'Would have alerted ' + (n === 1 ? 'once' : n + ' times') + ' yesterday';
+  var detail = ev.err ? '' : ev.fired.map(function (sp) { return hhmm(sp.a * 5 + ev.dur) + ' (' + word + ' ' + st.thr + ' ' + s.unit + ' for ' + sp.len + ' min)'; }).join(' · ');
+  if (!ev.err && ev.short.length) detail += (detail ? ' · ' : '') + ev.short.length + ' shorter ' + (st.dir === 'below' ? 'dip' : 'rise') + (ev.short.length > 1 ? 's' : '') + ' ignored';
+  if (!ev.err && !detail) detail = 'Yesterday it never went ' + word + ' ' + st.thr + ' ' + s.unit + '.';
+  return {
+    d: d, thrY: thrY, thrLabelY: thrY - 6, thrLabel: ev.thrErr ? '' : st.thr + ' ' + s.unit,
+    f0: slot(ev.fired, 0, true), f1: slot(ev.fired, 1, true), f2: slot(ev.fired, 2, true), f3: slot(ev.fired, 3, true),
+    s0: slot(ev.short, 0, false), s1: slot(ev.short, 1, false), s2: slot(ev.short, 2, false), s3: slot(ev.short, 3, false),
+    yTop: s.yhi + ' ' + s.unit, yBot: s.ylo + ' ' + s.unit,
+    head: head, headInk: ev.err ? '#f28b82' : n ? '#ffca5b' : '#81c995', detail: detail,
+    aria: 'Yesterday\'s ' + s.label + ' with the threshold line. ' + head + '.'
+  };
+}
+
+var G = { x0: 52, x1: 1060, y0: 8, y1: 152 };
+var RULES0 = [
+  { id: 'a', phone: 'crew', source: 'z2ec', dir: 'above', thr: '6.0', dur: '120', win: 'on', on: true, status: 'Firing now · since 12:42', statusInk: '#f28b82' },
+  { id: 'b', phone: 'sam', source: 'f1back', dir: 'above', thr: '30', dur: '5', win: 'any', on: true, status: 'Fired 11:31 today', statusInk: '#ffca5b' },
+  { id: 'c', phone: 'ben', source: 'f1tank', dir: 'below', thr: '25', dur: '15', win: 'any', on: true, status: 'Last fired Tue 03:40', statusInk: '#a4a4a4' },
+  { id: 'd', phone: 'ben', source: 'f1beat', dir: 'above', thr: '120', dur: '5', win: 'any', on: true, status: 'Never fired', statusInk: '#a4a4a4' },
+  { id: 'e', phone: 'sam', source: 'partb', dir: 'below', thr: '6', dur: '30', win: 'any', on: false, status: 'Off since 18 Oct · would fire now (5.4 L)', statusInk: '#ffca5b' }
+];
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { phone: 'ben', source: 'tank', dir: 'below', thr: '30', dur: '10', win: 'any', editId: null, saved: null, prev: null, test: '', rules: RULES0 }; }
+  renderVals() {
+    var self = this, st = this.state, s = SRC[st.source], ev = evaluate(st), c = chart(st, ev, G);
+    var set = function (k) { return function (e) { var o = { test: '' }; o[k] = e.target.value; if (k === 'source') { o.dir = SRC[e.target.value].dir; o.thr = SRC[e.target.value].thr; } self.setState(o); }; };
+    var rules = st.rules.map(function (r, i) {
+      var rs = SRC[r.source], v = sw(r.on);
+      v.phone = PHONES[r.phone]; v.src = rs.label; v.cond = r.dir + ' ' + r.thr + ' ' + rs.unit; v.dur = r.dur + ' min'; v.win = WIN[r.win];
+      v.status = r.status; v.statusInk = r.statusInk; v.ink = r.on ? '#e1e1e1' : '#a4a4a4';
+      v.bg = (st.saved && st.saved.id === r.id) || st.editId === r.id ? 'rgba(3,169,244,.10)' : 'transparent';
+      v.lbl = 'Rule ' + (i + 1) + (r.on ? ' is on' : ' is off'); v.editLbl = 'Edit rule ' + (i + 1);
+      v.edit = function () { self.setState({ phone: r.phone, source: r.source, dir: r.dir, thr: r.thr, dur: r.dur, win: r.win, editId: r.id, saved: null, test: '' }); };
+      v.toggle = function () { self.setState({ rules: self.state.rules.map(function (x) { return x.id !== r.id ? x : Object.assign({}, x, { on: !x.on, status: x.on ? 'Off since 14:02' : 'Watching since 14:02', statusInk: x.on ? '#a4a4a4' : '#81c995' }); }) }); };
+      return v;
+    });
+    var onCount = st.rules.filter(function (r) { return r.on; }).length;
+    return {
+      rooms: ROOMS, c: c, rules: rules,
+      phone: st.phone, source: st.source, dir: st.dir, thr: st.thr, dur: st.dur, win: st.win, unit: s.unit, srcLabel: s.label, phoneName: PHONES[st.phone],
+      setPhone: set('phone'), setSource: set('source'), setDir: set('dir'), setThr: set('thr'), setDur: set('dur'), setWin: set('win'),
+      hasErr: !!ev.err, err: ev.err, thrInvalid: ev.thrErr ? 'true' : 'false', durInvalid: ev.durErr ? 'true' : 'false',
+      thrEdge: ev.thrErr ? '#f28b82' : '#3a3a3a', durEdge: ev.durErr ? '#f28b82' : '#3a3a3a',
+      editing: !!st.editId, builderTitle: st.editId ? 'Editing a rule' : 'New rule',
+      cancelEdit: function () { self.setState({ editId: null, phone: 'ben', source: 'tank', dir: 'below', thr: '30', dur: '10', win: 'any' }); },
+      countLine: st.rules.length + ' rules · ' + onCount + ' on',
+      testMsg: st.test, saveMsg: st.saved ? st.saved.msg : '', canUndo: !!st.saved,
+      saveDisabled: ev.err ? 'true' : 'false', saveOpacity: ev.err ? 0.45 : 1,
+      saveLabel: st.editId ? 'Save changes to this rule' : 'Save rule and start watching',
+      sendTest: function () { self.setState({ test: 'Accepted by Home Assistant 14:02 · check ' + PHONES[st.phone] }); },
+      save: function () {
+        if (ev.err) return;
+        var id = st.editId || ('n' + st.rules.length + Date.now());
+        var nr = { id: id, phone: st.phone, source: st.source, dir: st.dir, thr: st.thr, dur: st.dur, win: st.win, on: true, status: 'Watching since 14:02', statusInk: '#81c995' };
+        var list = st.editId ? st.rules.map(function (x) { return x.id === id ? nr : x; }) : [nr].concat(st.rules);
+        self.setState({ prev: st.rules, rules: list, editId: null, saved: { id: id, msg: (st.editId ? 'Updated' : 'Saved') + ' and read back 14:02 · binary_sensor.crop_steering_rule_' + slug(s.label) } });
+      },
+      undo: function () { self.setState({ rules: self.state.prev, prev: null, saved: null }); }
+    };
+  }
+}
+
+</script>
+</body>
+</html>

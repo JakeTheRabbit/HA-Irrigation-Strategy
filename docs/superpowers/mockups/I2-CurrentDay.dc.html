@@ -1,0 +1,303 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Irrigation — Current day</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 2px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 15px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; margin-top: 18px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 22px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 16px 28px 22px; display: flex; flex-direction: column; gap: 14px">
+<nav aria-label="Irrigation pages" style="display: flex; align-items: flex-end; gap: 6px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e">
+<a href="I1-Timeline.dc.html" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b8b8b8">Timeline</a>
+<a href="I2-CurrentDay.dc.html" aria-current="page" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 600; color: #4fc3f7; box-shadow: inset 0 -2px 0 #03a9f4">Current day</a>
+<a href="I3-Timers.dc.html" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b8b8b8">Timer programs</a>
+<a href="I4-GrowPlan.dc.html" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b8b8b8">Grow plan &amp; presets</a>
+</nav>
+
+<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0">
+<h1 style="margin: 0; font-size: 24px; font-weight: 600">F2 · Zone 1</h1>
+<span style="padding: 0 8px; border-radius: 4px; background: #6450b0; color: #fff; font-size: 13px; font-weight: 700; line-height: 22px">P2</span>
+<span style="font-size: 14px; color: #a4a4a4">Today's targets · Thu 22 Oct · flower day 38 of 63 · lights 06:00–18:00</span>
+<span style="margin-left: auto; font-size: 13px; color: #a4a4a4">Nothing is sent to the controller until you apply</span>
+</div>
+
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px">
+
+<!-- Day chart with target handles -->
+<section aria-label="Today's VWC and targets" style="position: relative; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 18px">
+<div style="display: flex; align-items: center; gap: 16px; height: 30px; font-size: 13px; color: #a4a4a4">
+<b style="font-size: 17px; font-weight: 600; color: #e1e1e1">Substrate moisture today</b>
+<span style="display: flex; align-items: center; gap: 6px"><svg width="22" height="8" aria-hidden="true"><line x1="0" y1="4" x2="22" y2="4" stroke="#4fc3f7" stroke-width="2.5"></line></svg>Measured</span>
+<span style="display: flex; align-items: center; gap: 6px"><svg width="22" height="8" aria-hidden="true"><line x1="0" y1="4" x2="22" y2="4" stroke="#4fc3f7" stroke-width="2" stroke-dasharray="4 3"></line></svg>Expected with these targets</span>
+<span style="margin-left: auto">Drag a handle, or use its arrows</span>
+</div>
+<svg width="570" height="436" viewBox="0 0 570 436" role="img" aria-label="VWC from 00:00 to now, expected curve to midnight, and four target lines" style="display: block; margin-top: 6px">
+<rect x="{{lightsX}}" y="20" width="{{lightsW}}" height="380" fill="rgba(255,214,102,.07)"></rect>
+<text x="{{lightsLabelX}}" y="14" font-size="11" fill="#d9c27e" font-family="Roboto, Arial, sans-serif">Lights on 06:00–18:00</text>
+<sc-for list="{{yTicks}}" as="t" hint-placeholder-count="6">
+<line x1="36" x2="564" y1="{{t.y}}" y2="{{t.y}}" stroke="#262626"></line>
+<text x="30" y="{{t.ty}}" font-size="11" fill="#a4a4a4" text-anchor="end" font-family="Roboto, Arial, sans-serif">{{t.label}}</text>
+</sc-for>
+<sc-for list="{{xTicks}}" as="t" hint-placeholder-count="7">
+<text x="{{t.x}}" y="420" font-size="11" fill="#a4a4a4" text-anchor="middle" font-family="Roboto, Arial, sans-serif">{{t.label}}</text>
+</sc-for>
+<sc-for list="{{targets}}" as="g" hint-placeholder-count="4">
+<sc-if value="{{g.changed}}" hint-placeholder-val="{{false}}"><line x1="36" x2="564" y1="{{g.oldY}}" y2="{{g.oldY}}" stroke="{{g.color}}" stroke-width="1" stroke-dasharray="2 4" opacity="0.6"></line></sc-if>
+<line x1="36" x2="564" y1="{{g.y}}" y2="{{g.y}}" stroke="{{g.color}}" stroke-width="{{g.width}}" stroke-dasharray="{{g.dash}}"></line>
+</sc-for>
+<path d="{{projPath}}" fill="none" stroke="#4fc3f7" stroke-width="2" stroke-dasharray="5 4" stroke-linejoin="round"></path>
+<path d="{{actualPath}}" fill="none" stroke="#4fc3f7" stroke-width="2.5" stroke-linejoin="round"></path>
+<sc-for list="{{shots}}" as="s" hint-placeholder-count="12">
+<path d="{{s.d}}" fill="{{s.fill}}" stroke="{{s.stroke}}" stroke-width="1.2" stroke-dasharray="{{s.dash}}"></path>
+</sc-for>
+<line x1="{{nowX}}" x2="{{nowX}}" y1="20" y2="400" stroke="#03a9f4" stroke-width="2"></line>
+<rect x="{{nowLabelX}}" y="22" width="76" height="18" rx="4" fill="#03a9f4"></rect>
+<text x="{{nowTextX}}" y="35" font-size="11" font-weight="700" fill="#06141c" text-anchor="middle" font-family="Roboto, Arial, sans-serif">Now 14:10</text>
+<circle cx="{{nowX}}" cy="{{nowY}}" r="5" fill="#4fc3f7" stroke="#1c1c1c" stroke-width="2"></circle>
+<text x="{{nowValX}}" y="{{nowValY}}" font-size="13" font-weight="700" fill="#e1e1e1" font-family="Roboto, Arial, sans-serif">59.4%</text>
+</svg>
+<sc-for list="{{targets}}" as="g" hint-placeholder-count="4">
+<div style="position: absolute; left: 594px; top: {{g.top}}; width: 150px; display: flex; flex-direction: column; gap: 2px">
+<div style="display: flex; align-items: stretch; height: 40px; box-sizing: border-box; border: 1.5px solid {{g.color}}; border-radius: 10px; background: #232323; box-shadow: {{g.glow}}">
+<span role="slider" tabindex="0" aria-label="{{g.label}}" aria-valuenow="{{g.v}}" aria-valuemin="40" aria-valuemax="70" aria-valuetext="{{g.valueText}}" style="flex: 1; display: flex; align-items: center; gap: 6px; padding: 0 6px; cursor: ns-resize">
+<svg width="8" height="16" viewBox="0 0 8 16" aria-hidden="true"><circle cx="2" cy="3" r="1.3" fill="#8a8a8a"></circle><circle cx="6" cy="3" r="1.3" fill="#8a8a8a"></circle><circle cx="2" cy="8" r="1.3" fill="#8a8a8a"></circle><circle cx="6" cy="8" r="1.3" fill="#8a8a8a"></circle><circle cx="2" cy="13" r="1.3" fill="#8a8a8a"></circle><circle cx="6" cy="13" r="1.3" fill="#8a8a8a"></circle></svg>
+<span style="display: flex; flex-direction: column; line-height: 1.1"><span style="font-size: 11px; color: #b8b8b8">{{g.short}}</span><b style="font-size: 15px; font-weight: 700; color: #e1e1e1">{{g.valueText}}</b></span>
+</span>
+<span style="display: flex; flex-direction: column; border-left: 1px solid #3a3a3a">
+<button type="button" onClick="{{g.up}}" aria-label="{{g.upLabel}}" style="flex: 1; width: 28px; padding: 0; border: 0; border-radius: 0 9px 0 0; background: transparent; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 15 12 9 18 15"></polyline></svg></button>
+<button type="button" onClick="{{g.down}}" aria-label="{{g.downLabel}}" style="flex: 1; width: 28px; padding: 0; border: 0; border-top: 1px solid #3a3a3a; border-radius: 0 0 9px 0; background: transparent; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg></button>
+</span>
+</div>
+<sc-if value="{{g.changed}}" hint-placeholder-val="{{false}}"><span style="font-size: 12px; color: #b8b8b8; padding-left: 4px">was {{g.oldText}} · not applied</span></sc-if>
+<sc-if value="{{g.hasError}}" hint-placeholder-val="{{false}}"><span role="alert" style="font-size: 12px; line-height: 1.3; color: #f28b82; padding-left: 4px">{{g.error}}</span></sc-if>
+</div>
+</sc-for>
+</section>
+
+<!-- Right column -->
+<div style="display: flex; flex-direction: column; gap: 14px; min-height: 0">
+<section aria-label="Steering" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+<div style="display: flex; align-items: baseline"><b style="font-size: 17px; font-weight: 600">Steering</b><span style="margin-left: auto; font-size: 15px; font-weight: 700; color: {{steerInk}}">{{steerName}}</span></div>
+<div style="position: relative; height: 12px; border-radius: 6px; background: linear-gradient(90deg, #81c995, #6b7580 50%, #b39ddb)">
+<sc-if value="{{steerChanged}}" hint-placeholder-val="{{false}}"><span aria-hidden="true" style="position: absolute; left: {{steerOldPos}}; top: -4px; width: 14px; height: 20px; margin-left: -7px; box-sizing: border-box; border: 2px dashed #a4a4a4; border-radius: 7px"></span></sc-if>
+<span aria-hidden="true" style="position: absolute; left: {{steerPos}}; top: -6px; width: 22px; height: 24px; margin-left: -11px; border-radius: 8px; background: #e1e1e1; box-shadow: 0 0 0 3px #1c1c1c"></span>
+</div>
+<div role="radiogroup" aria-label="Steering, vegetative to generative" style="display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px">
+<sc-for list="{{detents}}" as="dt" hint-placeholder-count="5">
+<button type="button" role="radio" aria-checked="{{dt.checked}}" onClick="{{dt.pick}}" style="height: 44px; padding: 0 2px; border: 1px solid {{dt.edge}}; border-radius: 8px; background: {{dt.bg}}; color: {{dt.ink}}; font: inherit; font-size: 12px; font-weight: 600; line-height: 1.2">{{dt.label}}</button>
+</sc-for>
+</div>
+<p style="margin: 0; font-size: 13px; line-height: 1.5; color: #b8b8b8">{{steerHelp}}</p>
+</section>
+
+<section aria-label="What changes this afternoon" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px">
+<b style="font-size: 17px; font-weight: 600">This afternoon, 14:10–18:00</b>
+<div style="display: grid; grid-template-columns: 70px 1fr; gap: 10px 10px; align-items: center; font-size: 13px">
+<span style="color: #a4a4a4">Saved</span>
+<span style="display: flex; align-items: center; gap: 5px"><sc-for list="{{beforeDots}}" as="o" hint-placeholder-count="3"><span style="width: 14px; height: 22px; border-radius: 3px; background: #6f7378"></span></sc-for><span style="margin-left: 6px">{{beforeText}}</span></span>
+<span style="color: #a4a4a4">With edits</span>
+<span style="display: flex; align-items: center; gap: 5px"><sc-for list="{{afterDots}}" as="o" hint-placeholder-count="2"><span style="width: 14px; height: 22px; box-sizing: border-box; border-radius: 3px; border: 1.5px dashed #4fc3f7; background: rgba(3,169,244,.14)"></span></sc-for><b style="margin-left: 6px; font-weight: 600">{{afterText}}</b></span>
+</div>
+<p style="margin: 0; font-size: 13px; line-height: 1.5; color: #b8b8b8">{{previewNote}}</p>
+</section>
+</div>
+</div>
+
+<!-- Pending changes tray -->
+<section aria-label="Pending changes" style="flex-shrink: 0; background: #1c1c1c; border: 1px solid {{trayEdge}}; border-radius: 12px; padding: 14px 18px; display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 22px">
+<div style="display: flex; flex-direction: column; gap: 10px; min-width: 0">
+<div style="display: flex; align-items: center; gap: 12px">
+<b style="font-size: 17px; font-weight: 600">{{trayTitle}}</b>
+<sc-if value="{{hasPending}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{discardAll}}" style="margin-left: auto; height: 38px; padding: 0 14px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600">Discard edits</button>
+<button type="button" onClick="{{applyAll}}" aria-disabled="{{applyDisabled}}" style="height: 38px; padding: 0 16px; border: 0; border-radius: 8px; background: {{applyBg}}; color: {{applyInk}}; font: inherit; font-size: 14px; font-weight: 700">{{applyLabel}}</button>
+</sc-if>
+</div>
+<sc-for list="{{diffs}}" as="df" hint-placeholder-count="2">
+<div style="display: grid; grid-template-columns: 12px 190px 160px 1fr auto; gap: 12px; align-items: center; min-height: 36px; padding: 0 10px; border-radius: 8px; background: #232323; font-size: 14px">
+<span style="width: 10px; height: 10px; border-radius: 3px; background: {{df.color}}"></span>
+<span>{{df.label}}</span>
+<span><s style="color: #a4a4a4">{{df.old}}</s> <span style="color: #a4a4a4">→</span> <b style="font-weight: 700">{{df.now}}</b></span>
+<span style="font-size: 13px; color: #b8b8b8">{{df.effect}}</span>
+<button type="button" onClick="{{df.undo}}" aria-label="{{df.undoLabel}}" style="height: 30px; padding: 0 10px; border: 0; background: transparent; color: #4fc3f7; font: inherit; font-size: 13px; font-weight: 600">Undo</button>
+</div>
+</sc-for>
+<sc-if value="{{noPending}}" hint-placeholder-val="{{false}}"><span style="font-size: 14px; color: #a4a4a4">Targets match the controller. Change a handle or the steering to start a new edit.</span></sc-if>
+</div>
+<div style="display: flex; flex-direction: column; gap: 8px; padding-left: 20px; border-left: 1px solid #2e2e2e">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">LAST APPLIED</span>
+<div style="display: flex; align-items: flex-start; gap: 10px">
+<span style="width: 28px; height: 28px; flex: none; border-radius: 14px; background: rgba(129,201,149,.18); display: flex; align-items: center; justify-content: center"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12 10 17 19 7"></polyline></svg></span>
+<span style="display: flex; flex-direction: column; gap: 3px; font-size: 14px"><b style="color: #81c995; font-weight: 600">Written and read back {{lastTime}}</b><span style="color: #e1e1e1">{{lastText}}</span><span style="font-size: 12px; color: #a4a4a4">Controller confirmed every value · by Ben</span></span>
+</div>
+<sc-if value="{{canUndo}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{undoLast}}" style="align-self: flex-start; height: 34px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600">Undo: write back the previous values</button></sc-if>
+</div>
+</section>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph] || '#4a4a4a', vwc: vwc }; }
+var TREE = [
+  { name: 'F2', dot: '#03a9f4', state: 'Watering', zones: [tz('Zone 1', 'P2', '59.4%'), tz('Zone 2', 'P2', '58.1%'), tz('Zone 3', 'P2', '60.2%')] },
+  { name: 'F1', dot: '#81c995', state: 'Holding', zones: [tz('Zone 1', 'P1', '63.8%'), tz('Zone 2', 'P1', '62.9%'), tz('Zone 3', 'P1', '64.4%')] },
+  { name: 'Veg', dot: '#b39ddb', state: 'Timers', zones: [tz('Zone 1', 'T', 'timer'), tz('Zone 2', 'T', 'timer')] }
+];
+
+var NOW = 14 + 10 / 60;
+function X(h) { return 36 + h / 24 * 528; }
+function Y(v) { return 20 + (68 - v) / 24 * 380; }
+function r1(v) { return Math.round(v * 10) / 10; }
+function path(pts) { return pts.map(function (p, i) { return (i ? 'L' : 'M') + r1(X(p[0])) + ' ' + r1(Y(p[1])); }).join(' '); }
+var TDEF = [
+  { key: 'peak', label: 'Peak target', short: 'Peak', color: '#4fc3f7', effect: 'P1 stops ramping at this level' },
+  { key: 'rewater', label: 'Re-water point', short: 'Re-water at', color: '#81c995', effect: 'P2 waters when VWC falls to this' },
+  { key: 'dryback', label: 'Dryback by lights-on', short: 'Dry back to', color: '#b39ddb', effect: 'Overnight low the engine aims for' },
+  { key: 'floor', label: 'Rescue floor', short: 'Rescue floor', color: '#f28b82', effect: 'Emergency shot below this, day or night' }
+];
+var STEER = [
+  ['Strong veg', 'Small dryback, many small shots. Pushes leaf and stem growth.'],
+  ['Veg lean', 'Gentle dryback, frequent shots. Good for recovery days.'],
+  ['Balanced', 'Middle of the road: moderate dryback and shot size.'],
+  ['Gen lean', 'Bigger dryback, fewer and larger shots, EC climbs a little. Moves the dryback and re-water defaults; values you set by hand stay.'],
+  ['Strong gen', 'Hard dryback and high EC. Use for short pushes only; watch the rescue floor.']
+];
+var ACTUAL = [[0, 57.0], [2, 55.6], [4, 54.1], [6, 52.6], [7, 52.1], [7.05, 54.3], [7.33, 54.0], [7.38, 56.2], [7.67, 55.9], [7.72, 58.1], [8, 57.8], [8.05, 60.0], [8.33, 59.7], [8.38, 62.4], [9, 62.6], [9.6, 61.2], [10.5, 57.1], [10.55, 59.4], [12, 57.0], [12.05, 58.8], [13.5, 57.1], [13.55, 59.7], [NOW, 59.4]];
+var SAVED = { peak: 63, rewater: 57, dryback: 50, floor: 48 };
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { vals: { peak: 63, rewater: 56, dryback: 52, floor: 48 }, saved: Object.assign({}, SAVED), steer: 3, savedSteer: 3,
+      last: { time: '14:02', text: 'Peak target 62% → 63%', prev: { vals: { peak: 62, rewater: 57, dryback: 50, floor: 48 }, steer: 3 } } };
+  }
+  renderVals() {
+    var s = this.state, self = this, v = s.vals, sv = s.saved;
+    var errs = {};
+    if (v.rewater > v.peak - 3) errs.rewater = 'Keep at least 3 pts below the peak (' + (v.peak - 3) + '%)';
+    if (v.dryback > v.rewater - 2) errs.dryback = 'Keep at least 2 pts below re-water (' + (v.rewater - 2) + '%)';
+    if (v.floor > v.dryback - 2) errs.floor = 'Keep at least 2 pts below the dryback target (' + (v.dryback - 2) + '%)';
+    var bad = Object.keys(errs).length > 0;
+    var set = function (key, dv) { var n = Object.assign({}, s.vals); n[key] = Math.max(40, Math.min(70, n[key] + dv)); self.setState({ vals: n }); };
+    var targets = TDEF.map(function (t) {
+      var val = v[t.key], old = sv[t.key], changed = val !== old;
+      return { label: t.label, short: t.short, color: t.color, v: val, valueText: val.toFixed(1).replace('.0', '') + '%', oldText: old.toFixed(1).replace('.0', '') + '%',
+        y: r1(Y(val)), oldY: r1(Y(old)), top: (50 + Y(val) - 20) + 'px', changed: changed, width: changed ? 2.5 : 1.5, dash: t.key === 'floor' ? '6 4' : 'none',
+        glow: changed ? '0 0 0 3px rgba(79,195,247,.22)' : 'none',
+        hasError: !!errs[t.key], error: errs[t.key] || '',
+        up: function () { set(t.key, 0.5); }, down: function () { set(t.key, -0.5); },
+        upLabel: 'Raise ' + t.label.toLowerCase() + ' by 0.5 pt', downLabel: 'Lower ' + t.label.toLowerCase() + ' by 0.5 pt' };
+    });
+
+    // expected curve from now: sawtooth between re-water point and re-water + 3, then overnight dryback to the dryback target
+    var proj = [[NOW, 59.4]], t = NOW, lvl = 59.4, shotsAfter = [], rate = 1.6;
+    while (true) {
+      var tHit = t + (lvl - v.rewater) / rate;
+      if (tHit >= 18) { lvl = lvl - (18 - t) * rate; t = 18; proj.push([18, lvl]); break; }
+      proj.push([tHit, v.rewater]); shotsAfter.push(tHit); t = tHit + 0.05; lvl = v.rewater + 3.0; proj.push([t, lvl]);
+    }
+    proj.push([24, Math.max(v.dryback + 2.5, lvl - 3.6)]);
+    var savedShots = 0, tl = NOW, ll = 59.4;
+    while (true) { var th = tl + (ll - sv.rewater) / rate; if (th >= 18) break; savedShots++; tl = th + 0.05; ll = sv.rewater + 3.0; }
+
+    var shotTimes = [7, 7.33, 7.67, 8, 8.33, 10.5, 12, 13.5];
+    var tri = function (h, y) { var x = r1(X(h)); return 'M' + (x - 5) + ' ' + (y + 8) + ' L' + (x + 5) + ' ' + (y + 8) + ' L' + x + ' ' + y + ' Z'; };
+    var shots = shotTimes.map(function (h) { return { d: tri(h, 388), fill: '#8a8a8a', stroke: '#8a8a8a', dash: 'none' }; })
+      .concat(shotsAfter.map(function (h) { return { d: tri(h, 388), fill: 'rgba(3,169,244,.2)', stroke: '#4fc3f7', dash: '2 2' }; }));
+
+    var diffs = [];
+    TDEF.forEach(function (td) {
+      if (v[td.key] === sv[td.key]) return;
+      var d = v[td.key] - sv[td.key];
+      diffs.push({ color: td.color, label: td.label, old: sv[td.key] + '%', now: v[td.key] + '%', effect: (d > 0 ? '+' : '') + d.toFixed(1) + ' pts · ' + td.effect,
+        undoLabel: 'Undo ' + td.label.toLowerCase() + ' change', undo: function () { var n = Object.assign({}, s.vals); n[td.key] = sv[td.key]; self.setState({ vals: n }); } });
+    });
+    if (s.steer !== s.savedSteer) diffs.push({ color: '#e1e1e1', label: 'Steering', old: STEER[s.savedSteer][0], now: STEER[s.steer][0], effect: 'Shifts the defaults behind every target above',
+      undoLabel: 'Undo steering change', undo: function () { self.setState({ steer: s.savedSteer }); } });
+    var n = diffs.length;
+    var detents = STEER.map(function (d, i) {
+      var on = i === s.steer;
+      return { label: d[0], checked: on ? 'true' : 'false', edge: on ? '#e1e1e1' : '#3a3a3a', bg: on ? '#2a2a2a' : 'transparent', ink: on ? '#e1e1e1' : '#b8b8b8', pick: function () { self.setState({ steer: i }); } };
+    });
+    var dots = function (k) { var a = []; for (var i = 0; i < k; i++) a.push({ i: i }); return a; };
+    var beforeL = savedShots * 0.08, afterL = shotsAfter.length * 0.08;
+    return {
+      rooms: TREE, targets: targets, shots: shots,
+      actualPath: path(ACTUAL), projPath: path(proj),
+      lightsX: r1(X(6)), lightsW: r1(X(18) - X(6)), lightsLabelX: r1(X(6) + 4),
+      nowX: r1(X(NOW)), nowY: r1(Y(59.4)), nowLabelX: r1(X(NOW) - 38), nowTextX: r1(X(NOW)), nowValX: r1(X(NOW) - 46), nowValY: r1(Y(59.4) - 10),
+      yTicks: [46, 50, 54, 58, 62, 66].map(function (k) { return { y: r1(Y(k)), ty: r1(Y(k) + 4), label: k + '%' }; }),
+      xTicks: [0, 4, 8, 12, 16, 20, 24].map(function (h) { return { x: r1(X(h)), label: (h < 10 ? '0' : '') + h + ':00' }; }),
+      steerName: STEER[s.steer][0], steerHelp: STEER[s.steer][1], steerInk: s.steer < 2 ? '#81c995' : s.steer > 2 ? '#b39ddb' : '#e1e1e1',
+      steerPos: (s.steer * 25) + '%', steerOldPos: (s.savedSteer * 25) + '%', steerChanged: s.steer !== s.savedSteer, detents: detents,
+      beforeDots: dots(savedShots), afterDots: dots(shotsAfter.length),
+      beforeText: savedShots + (savedShots === 1 ? ' shot · ' : ' shots · ') + beforeL.toFixed(2) + ' L per plant',
+      afterText: shotsAfter.length + (shotsAfter.length === 1 ? ' shot · ' : ' shots · ') + afterL.toFixed(2) + ' L per plant',
+      previewNote: shotsAfter.length < savedShots ? 'Lower re-water point means a longer dryback between shots. The plan still lands above the ' + v.dryback + '% dryback target by lights-on.' : 'Same number of shots as the saved targets.',
+      diffs: diffs, hasPending: n > 0, noPending: n === 0,
+      trayTitle: n ? n + (n === 1 ? ' change' : ' changes') + ' · Review & apply' : 'No pending changes',
+      trayEdge: n ? (bad ? '#f28b82' : '#4fc3f7') : '#2e2e2e',
+      applyLabel: bad ? 'Fix the red value first' : 'Apply ' + n + (n === 1 ? ' change' : ' changes'), applyDisabled: bad ? 'true' : 'false',
+      applyBg: bad ? '#333333' : '#03a9f4', applyInk: bad ? '#a4a4a4' : '#06141c',
+      applyAll: function () {
+        if (bad) return;
+        var text = diffs.map(function (d) { return d.label + ' ' + d.old + ' → ' + d.now; }).join(' · ');
+        self.setState({ saved: Object.assign({}, s.vals), savedSteer: s.steer, last: { time: '14:10', text: text, prev: { vals: Object.assign({}, s.saved), steer: s.savedSteer } } });
+      },
+      discardAll: function () { self.setState({ vals: Object.assign({}, s.saved), steer: s.savedSteer }); },
+      lastTime: s.last ? s.last.time : '', lastText: s.last ? s.last.text : '',
+      canUndo: !!(s.last && s.last.prev),
+      undoLast: function () { if (!s.last || !s.last.prev) return; var p = s.last.prev; self.setState({ saved: Object.assign({}, p.vals), savedSteer: p.steer, vals: Object.assign({}, p.vals), steer: p.steer, last: { time: '14:10', text: 'Undone: ' + s.last.text, prev: null } }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

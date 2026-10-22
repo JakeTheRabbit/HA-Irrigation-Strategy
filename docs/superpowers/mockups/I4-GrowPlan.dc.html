@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Irrigation — Grow plan</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- SHELL: 1440x1000 frame. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto; sizes 12/14/15/17/20/24. Radius 12. -->
+<div style="width: 1440px; height: 1000px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; overflow: hidden">
+
+<!-- SHELL: menu (sections + live room tree) -->
+<aside style="width: 248px; flex-shrink: 0; background: #1c1c1c; border-right: 1px solid #2e2e2e; padding: 22px 12px 16px; box-sizing: border-box; display: flex; flex-direction: column; gap: 4px">
+<div style="display: flex; align-items: center; gap: 10px; padding: 0 8px 18px">
+<span style="width: 36px; height: 36px; border-radius: 10px; background: #03a9f4; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#0b1d27" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg></span>
+<span style="display: flex; flex-direction: column"><b style="font-size: 16px; font-weight: 600">Crop Steering</b><span style="font-size: 12px; color: #a4a4a4">Irrigation control</span></span>
+</div>
+<nav aria-label="Main navigation" style="display: flex; flex-direction: column; gap: 2px">
+<a href="S1-AllRooms.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="I1-Timeline.dc.html" aria-current="page" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; background: #2a2a2a; box-shadow: inset 2px 0 0 #03a9f4; color: #4fc3f7; font-size: 15px; font-weight: 600"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" style="display: flex; align-items: center; gap: 12px; min-height: 42px; padding: 0 12px; margin-top: 18px; border-radius: 8px; color: #b8b8b8; font-size: 15px; font-weight: 500"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+<nav aria-label="Rooms" style="display: flex; flex-direction: column; gap: 1px; margin-top: 22px">
+<span style="padding: 0 12px 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">ROOMS</span>
+<sc-for list="{{rooms}}" as="r" hint-placeholder-count="3">
+<a href="S2-Room.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 36px; padding: 0 10px; margin-top: 6px; border-radius: 8px; color: #e1e1e1; font-size: 14px; font-weight: 500"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{r.dot}}"></span>{{r.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4; font-weight: 400">{{r.state}}</span></a>
+<sc-for list="{{r.zones}}" as="z" hint-placeholder-count="3">
+<a href="S3-Zone.dc.html" style="display: flex; align-items: center; gap: 8px; min-height: 30px; padding: 0 10px 0 24px; border-radius: 8px; color: #b8b8b8; font-size: 13px"><span style="min-width: 22px; padding: 0 4px; border-radius: 4px; background: {{z.phColor}}; color: #fff; font-size: 11px; font-weight: 700; text-align: center">{{z.ph}}</span>{{z.name}}<span style="margin-left: auto; font-size: 12px; color: #a4a4a4">{{z.vwc}}</span></a>
+</sc-for>
+</sc-for>
+</nav>
+<div style="margin-top: auto; padding: 0 8px; font-size: 12px; color: #8a8a8a">Integration 3.17.1 · Controller 3.17.1</div>
+</aside>
+
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column">
+<!-- SHELL: top bar (no room chips on desktop: the tree is the picker) -->
+<header style="height: 56px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e; display: flex; align-items: center; justify-content: flex-end; gap: 12px; padding: 0 24px">
+<span style="font-size: 13px; color: #a4a4a4">Updated 12 s ago</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 30px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 15px; font-size: 13px; font-weight: 600"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>AI acting</span>
+<button type="button" aria-label="Search, Ctrl K" style="display: flex; align-items: center; gap: 8px; height: 32px; padding: 0 12px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #a4a4a4; font: inherit; font-size: 13px">Jump to… <span style="border: 1px solid #3a3a3a; border-radius: 4px; padding: 0 5px; font-size: 11px">Ctrl K</span></button>
+<span style="font-size: 13px; color: #a4a4a4">F2</span>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #2e2e2e; border-radius: 8px; background: #1c1c1c; color: #e1e1e1; font: inherit; font-size: 14px; font-weight: 600"><span style="display: inline-block; width: 8px; height: 8px; margin-right: 6px; border-radius: 4px; background: #81c995"></span>Watering on</button>
+<button type="button" style="height: 34px; padding: 0 14px; border: 1px solid #f28b82; border-radius: 8px; background: transparent; color: #f28b82; font: inherit; font-size: 14px; font-weight: 600">Stop all</button>
+</header>
+<main style="flex: 1; min-height: 0; overflow: hidden; padding: 16px 28px 22px; display: flex; flex-direction: column; gap: 14px">
+<nav aria-label="Irrigation pages" style="display: flex; align-items: flex-end; gap: 6px; flex-shrink: 0; border-bottom: 1px solid #2e2e2e">
+<a href="I1-Timeline.dc.html" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b8b8b8">Timeline</a>
+<a href="I2-CurrentDay.dc.html" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b8b8b8">Current day</a>
+<a href="I3-Timers.dc.html" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 500; color: #b8b8b8">Timer programs</a>
+<a href="I4-GrowPlan.dc.html" aria-current="page" style="display: flex; align-items: center; height: 40px; padding: 0 14px; font-size: 15px; font-weight: 600; color: #4fc3f7; box-shadow: inset 0 -2px 0 #03a9f4">Grow plan &amp; presets</a>
+</nav>
+
+<!-- Plan header: armed / draft -->
+<div style="display: flex; align-items: center; gap: 12px; flex-shrink: 0; min-height: 44px">
+<h1 style="margin: 0; font-size: 22px; font-weight: 600">F2 grow plan</h1>
+<span style="font-size: 14px; color: #a4a4a4">Gelato 63-day bulk · day 38 of 63</span>
+<span style="display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: 1px solid #81c995; border-radius: 14px; font-size: 13px; font-weight: 600; color: #81c995"><span style="width: 7px; height: 7px; border-radius: 4px; background: #81c995"></span>Armed · running</span>
+<div style="margin-left: auto; display: flex; align-items: center; gap: 10px; height: 44px; padding: 0 6px 0 14px; border: 1px solid {{draftEdge}}; border-radius: 10px; background: #1c1c1c">
+<span style="font-size: 14px; color: {{draftInk}}">{{draftText}}</span>
+<sc-if value="{{hasDraft}}" hint-placeholder-val="{{true}}">
+<button type="button" onClick="{{discardDraft}}" style="height: 34px; padding: 0 12px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #e1e1e1; font: inherit; font-size: 13px; font-weight: 600">Discard draft</button>
+<button type="button" onClick="{{armDraft}}" style="height: 34px; padding: 0 14px; border: 0; border-radius: 8px; background: #03a9f4; color: #06141c; font: inherit; font-size: 13px; font-weight: 700">Arm at lights-on, Fri 06:00</button>
+</sc-if>
+<sc-if value="{{isArmedPending}}" hint-placeholder-val="{{false}}">
+<button type="button" onClick="{{unarm}}" style="height: 34px; padding: 0 12px; border: 1px solid #4fc3f7; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 13px; font-weight: 600">Undo</button>
+</sc-if>
+</div>
+</div>
+
+<div style="flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 18px">
+<div style="display: flex; flex-direction: column; gap: 14px; min-width: 0">
+
+<!-- Endpoint profiles -->
+<section aria-label="Endpoint profiles across the run" style="background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 18px 10px">
+<div style="display: flex; align-items: center; gap: 16px; font-size: 13px; color: #a4a4a4">
+<b style="font-size: 17px; font-weight: 600; color: #e1e1e1">Endpoint profiles</b>
+<span>Each stage ramps from its start value to its end value</span>
+<span style="margin-left: auto; display: flex; align-items: center; gap: 6px"><svg width="22" height="8" aria-hidden="true"><line x1="0" y1="4" x2="22" y2="4" stroke="#4fc3f7" stroke-width="1.5" stroke-dasharray="3 3"></line></svg>Armed, where the draft differs</span>
+</div>
+<svg width="736" height="214" viewBox="0 0 736 214" role="img" aria-label="Dryback target and pore EC target by day, days 1 to 63, with stage bands" style="display: block; margin-top: 6px">
+<sc-for list="{{stages}}" as="st" hint-placeholder-count="4">
+<rect x="{{st.x}}" y="0" width="{{st.w}}" height="196" fill="{{st.tint}}"></rect>
+<rect x="{{st.x}}" y="0" width="{{st.w}}" height="4" fill="{{st.color}}"></rect>
+<text x="{{st.tx}}" y="18" font-size="12" font-weight="600" fill="#e1e1e1" font-family="Roboto, Arial, sans-serif">{{st.name}}</text>
+<text x="{{st.tx}}" y="32" font-size="11" fill="#a4a4a4" font-family="Roboto, Arial, sans-serif">days {{st.range}}</text>
+</sc-for>
+<text x="40" y="58" font-size="11" fill="#a4a4a4" text-anchor="end" font-family="Roboto, Arial, sans-serif">Dryback</text>
+<text x="40" y="146" font-size="11" fill="#a4a4a4" text-anchor="end" font-family="Roboto, Arial, sans-serif">Pore EC</text>
+<line x1="44" x2="730" y1="114" y2="114" stroke="#2e2e2e"></line>
+<path d="{{dbOld}}" fill="none" stroke="#4fc3f7" stroke-width="1.5" stroke-dasharray="3 3" opacity="{{oldOp}}"></path>
+<path d="{{dbPath}}" fill="none" stroke="#b39ddb" stroke-width="2.5" stroke-linejoin="round"></path>
+<path d="{{ecPath}}" fill="none" stroke="#ffca5b" stroke-width="2.5" stroke-linejoin="round"></path>
+<sc-for list="{{dots}}" as="d" hint-placeholder-count="12">
+<circle cx="{{d.x}}" cy="{{d.y}}" r="5" fill="#1c1c1c" stroke="{{d.color}}" stroke-width="2.5"></circle>
+<text x="{{d.tx}}" y="{{d.ty}}" font-size="11" font-weight="600" fill="{{d.ink}}" text-anchor="middle" font-family="Roboto, Arial, sans-serif">{{d.label}}</text>
+</sc-for>
+<sc-for list="{{exMarks}}" as="m" hint-placeholder-count="4">
+<path d="{{m.d}}" fill="{{m.fill}}" stroke="{{m.stroke}}" stroke-width="1.5" stroke-dasharray="{{m.dash}}"></path>
+</sc-for>
+<line x1="{{todayX}}" x2="{{todayX}}" y1="0" y2="196" stroke="#03a9f4" stroke-width="2"></line>
+<rect x="{{todayLX}}" y="196" width="64" height="17" rx="4" fill="#03a9f4"></rect>
+<text x="{{todayX}}" y="208" font-size="11" font-weight="700" fill="#06141c" text-anchor="middle" font-family="Roboto, Arial, sans-serif">Today · 38</text>
+</svg>
+</section>
+
+<!-- Week grid -->
+<section aria-label="Plan calendar, days 1 to 63" style="flex: 1; min-height: 0; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 14px 18px; display: flex; gap: 16px">
+<div style="display: flex; flex-direction: column; gap: 4px">
+<div style="display: grid; grid-template-columns: 52px repeat(7, 62px); gap: 4px; font-size: 12px; color: #a4a4a4; height: 18px">
+<span></span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span><span>Mon</span>
+</div>
+<sc-for list="{{weeks}}" as="w" hint-placeholder-count="9">
+<div style="display: grid; grid-template-columns: 52px repeat(7, 62px); gap: 4px">
+<span style="display: flex; align-items: center; font-size: 12px; color: #a4a4a4">Week {{w.n}}</span>
+<sc-for list="{{w.days}}" as="c" hint-placeholder-count="7">
+<button type="button" onClick="{{c.pick}}" aria-pressed="{{c.pressed}}" aria-label="{{c.aria}}" style="position: relative; height: 40px; box-sizing: border-box; padding: 0 6px; border: {{c.border}}; border-radius: 6px; background: {{c.bg}}; color: {{c.ink}}; font: inherit; display: flex; align-items: center; gap: 4px; overflow: hidden">
+<span aria-hidden="true" style="position: absolute; left: 0; right: 0; top: 0; height: 4px; background: {{c.stage}}"></span>
+<span style="font-size: 13px; font-weight: {{c.weight}}">{{c.n}}</span>
+<sc-if value="{{c.hasEx}}" hint-placeholder-val="{{false}}"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true" style="margin-left: auto"><path d="M6 1 L11 6 L6 11 L1 6 Z" fill="{{c.exFill}}" stroke="{{c.exStroke}}" stroke-width="1.5" stroke-dasharray="{{c.exDash}}"></path></svg></sc-if>
+</button>
+</sc-for>
+</div>
+</sc-for>
+<div style="display: flex; gap: 14px; padding-top: 6px; font-size: 12px; color: #a4a4a4">
+<span style="display: flex; align-items: center; gap: 5px"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1 L11 6 L6 11 L1 6 Z" fill="#b39ddb" stroke="#b39ddb" stroke-width="1.5"></path></svg>Exception</span>
+<span style="display: flex; align-items: center; gap: 5px"><svg width="12" height="12" viewBox="0 0 12 12" aria-hidden="true"><path d="M6 1 L11 6 L6 11 L1 6 Z" fill="none" stroke="#4fc3f7" stroke-width="1.5" stroke-dasharray="2 1.5"></path></svg>Exception in draft</span>
+<span style="display: flex; align-items: center; gap: 5px"><span style="width: 14px; height: 14px; box-sizing: border-box; border: 2px solid #03a9f4; border-radius: 4px"></span>Today</span>
+</div>
+</div>
+
+<!-- Selected day -->
+<div style="flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; padding-left: 16px; border-left: 1px solid #2e2e2e">
+<span style="font-size: 12px; font-weight: 600; letter-spacing: .06em; color: #a4a4a4">{{sel.kicker}}</span>
+<b style="font-size: 17px; font-weight: 600">{{sel.title}}</b>
+<span style="align-self: flex-start; padding: 2px 8px; border-radius: 4px; background: {{sel.stageColor}}; color: #fff; font-size: 12px; font-weight: 700">{{sel.stage}}</span>
+<div style="display: grid; grid-template-columns: 1fr auto; gap: 6px 10px; font-size: 13px">
+<span style="color: #a4a4a4">Peak</span><b style="font-weight: 600">{{sel.peak}}</b>
+<span style="color: #a4a4a4">Re-water at</span><b style="font-weight: 600">{{sel.rewater}}</b>
+<span style="color: #a4a4a4">Dryback</span><b style="font-weight: 600">{{sel.dryback}}</b>
+<span style="color: #a4a4a4">Pore EC</span><b style="font-weight: 600">{{sel.ec}}</b>
+</div>
+<sc-for list="{{sel.ex}}" as="x" hint-placeholder-count="1">
+<div style="display: flex; flex-direction: column; gap: 3px; padding: 8px 10px; border: 1px {{x.style}} {{x.edge}}; border-radius: 8px; font-size: 13px">
+<span style="font-size: 11px; font-weight: 700; letter-spacing: .05em; color: {{x.edge}}">{{x.tag}}</span>
+<span style="line-height: 1.4">{{x.text}}</span>
+</div>
+</sc-for>
+<button type="button" style="margin-top: auto; height: 36px; border: 1px solid #3a3a3a; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 13px; font-weight: 600">Add exception on day {{sel.n}}</button>
+</div>
+</section>
+</div>
+
+<!-- Presets -->
+<section aria-label="Presets" style="min-height: 0; background: #1c1c1c; border: 1px solid #2e2e2e; border-radius: 12px; padding: 16px; display: flex; flex-direction: column; gap: 10px">
+<div style="display: flex; flex-direction: column; gap: 2px"><b style="font-size: 17px; font-weight: 600">Presets</b><span style="font-size: 12px; color: #a4a4a4">Stored on the controller: the same list on every phone and PC</span></div>
+<sc-for list="{{presets}}" as="p" hint-placeholder-count="4">
+<button type="button" onClick="{{p.pick}}" aria-pressed="{{p.pressed}}" style="display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 9px 12px; border: 1px solid {{p.edge}}; border-radius: 10px; background: {{p.bg}}; color: #e1e1e1; font: inherit; text-align: left">
+<span style="font-size: 14px; font-weight: 600">{{p.name}}</span>
+<span style="font-size: 12px; color: #a4a4a4">{{p.meta}}</span>
+</button>
+</sc-for>
+<button type="button" style="height: 34px; border: 1px dashed #3a3a3a; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 13px; font-weight: 600">Save F2 plan as a new preset</button>
+
+<div style="display: flex; flex-direction: column; gap: 10px; padding-top: 12px; border-top: 1px solid #2e2e2e">
+<b style="font-size: 15px; font-weight: 600">Copy “{{presetName}}” to room…</b>
+<div role="radiogroup" aria-label="Copy to room" style="display: flex; gap: 6px">
+<sc-for list="{{targets}}" as="t" hint-placeholder-count="2"><button type="button" role="radio" aria-checked="{{t.checked}}" onClick="{{t.pick}}" style="flex: 1; height: 36px; border: 1px solid {{t.edge}}; border-radius: 8px; background: {{t.bg}}; color: {{t.ink}}; font: inherit; font-size: 14px; font-weight: 600">{{t.label}}</button></sc-for>
+</div>
+<span style="font-size: 12px; color: #a4a4a4">{{copyContext}}</span>
+<div style="display: flex; flex-direction: column; gap: 4px">
+<sc-for list="{{diff}}" as="d" hint-placeholder-count="4">
+<div style="display: flex; flex-direction: column; gap: 1px; padding: 6px 10px; border-radius: 6px; background: #232323; font-size: 13px">
+<span style="color: #b8b8b8">{{d.what}}</span>
+<span><s style="color: #a4a4a4">{{d.old}}</s> <span style="color: #a4a4a4">→</span> <b style="font-weight: 600">{{d.now}}</b></span>
+</div>
+</sc-for>
+</div>
+<sc-if value="{{notCopied}}" hint-placeholder-val="{{true}}"><button type="button" onClick="{{doCopy}}" style="height: 40px; border: 0; border-radius: 8px; background: #03a9f4; color: #06141c; font: inherit; font-size: 14px; font-weight: 700">{{copyLabel}}</button></sc-if>
+<sc-if value="{{copied}}" hint-placeholder-val="{{false}}">
+<div style="display: flex; align-items: center; gap: 8px; font-size: 13px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#81c995" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="5 12 10 17 19 7"></polyline></svg><span style="color: #81c995; font-weight: 600">{{copiedText}}</span>
+<button type="button" onClick="{{undoCopy}}" style="margin-left: auto; height: 32px; padding: 0 10px; border: 1px solid #4fc3f7; border-radius: 8px; background: transparent; color: #4fc3f7; font: inherit; font-size: 13px; font-weight: 600">Undo</button></div>
+</sc-if>
+</div>
+</section>
+</div>
+</main>
+</div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":1000}}'>
+var PH = { P0: '#6b7580', P1: '#2f6fb5', P2: '#6450b0', P3: '#34405a' };
+function tz(name, ph, vwc) { return { name: name, ph: ph, phColor: PH[ph] || '#4a4a4a', vwc: vwc }; }
+var TREE = [
+  { name: 'F2', dot: '#03a9f4', state: 'Watering', zones: [tz('Zone 1', 'P2', '59.4%'), tz('Zone 2', 'P2', '58.1%'), tz('Zone 3', 'P2', '60.2%')] },
+  { name: 'F1', dot: '#81c995', state: 'Holding', zones: [tz('Zone 1', 'P1', '63.8%'), tz('Zone 2', 'P1', '62.9%'), tz('Zone 3', 'P1', '64.4%')] },
+  { name: 'Veg', dot: '#b39ddb', state: 'Timers', zones: [tz('Zone 1', 'T', 'timer'), tz('Zone 2', 'T', 'timer')] }
+];
+
+var TODAY_DAY = 38;
+var STAGES = [
+  { name: 'Stretch', a: 1, b: 21, color: '#3f7a30', db: [12, 15], ec: [3.5, 4.6], peak: 64, rw: 58 },
+  { name: 'Bulk', a: 22, b: 49, color: '#2f6fb5', db: [15, 18], ec: [4.8, 5.6], peak: 63, rw: 57 },
+  { name: 'Ripen', a: 50, b: 56, color: '#6450b0', db: [20, 22], ec: [5.6, 6.0], peak: 61, rw: 55 },
+  { name: 'Flush', a: 57, b: 63, color: '#6b7580', db: [22, 25], ec: [3.0, 1.5], peak: 60, rw: 56 }
+];
+var EXC = [
+  { day: 30, text: 'Defoliation day: hold P1 for 1 h after lights-on.', draft: false },
+  { day: 45, text: 'Dryback +2 pts for one night (gen push).', draft: false },
+  { day: 56, text: 'Last feed. Switch the batch tank to plain water from day 57.', draft: false },
+  { day: 40, text: 'EC dilution shot at 10:00, 250 mL per plant (pore EC trending over band).', draft: true }
+];
+function X(d) { return 44 + (d - 1) / 62 * 680; }
+function Ydb(v) { return 48 + (26 - v) / 16 * 60; }
+function Yec(v) { return 128 + (7 - v) / 7 * 62; }
+function r1(v) { return Math.round(v * 10) / 10; }
+function stageOf(d) { return STAGES.filter(function (s) { return d >= s.a && d <= s.b; })[0]; }
+function lerp(s, key, d) { var t = s.b === s.a ? 0 : (d - s.a) / (s.b - s.a); return s[key][0] + (s[key][1] - s[key][0]) * t; }
+function dateOf(d) { var dt = new Date(2026, 9, 22 + (d - TODAY_DAY)); return ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dt.getDay()] + ' ' + dt.getDate() + ' ' + ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'][dt.getMonth()]; }
+var PRESETS = [
+  { id: 'gelato', name: 'Gelato 63-day bulk', meta: 'Running in F2 · 4 stages · 3 exceptions' },
+  { id: 'short', name: 'Short flower 56-day', meta: 'Not in use · 4 stages · 1 exception' },
+  { id: 'genpush', name: 'Gen push, weeks 3–5', meta: 'Not in use · overlay for days 15–35' },
+  { id: 'mother', name: 'Mother room steady', meta: 'Not in use · 1 stage, timer friendly' }
+];
+var DIFFS = {
+  F1: [
+    { what: 'Stretch, days 1–21 · dryback', old: '10% → 13%', now: '12% → 15%' },
+    { what: 'Bulk, days 22–49 · pore EC', old: '4.4 → 5.2', now: '4.8 → 5.6' },
+    { what: 'Exceptions', old: '1', now: '3 (adds day 30 defoliation hold, day 45 gen push)' },
+    { what: 'Plan length', old: '63 days', now: '63 days (no change)' }
+  ],
+  Veg: [
+    { what: 'Stages', old: 'Veg, 1 stage', now: '4 flower stages' },
+    { what: 'Irrigation mode', old: 'Timer (no probes)', now: 'Needs probes: plan targets will not run' }
+  ]
+};
+
+class Component extends DCLogic {
+  constructor(props) {
+    super(props);
+    this.state = { sel: 40, hasDraft: true, armed: false, preset: 'gelato', target: 'F1', copied: false };
+  }
+  renderVals() {
+    var s = this.state, self = this;
+    var draftBulkEnd = s.hasDraft || s.armed ? 19 : 18;
+    var stages = STAGES.map(function (st) {
+      return { name: st.name, range: st.a + '–' + st.b, x: r1(X(st.a) - (st.a === 1 ? 0 : 5.6)), w: r1(X(st.b) - X(st.a) + (st.a === 1 ? 5.6 : 11.2)), tx: r1(X(st.a) + 6), color: st.color, tint: st.color + '1f' };
+    });
+    var dbPts = [], ecPts = [], dots = [];
+    STAGES.forEach(function (st) {
+      var dbEnd = st.name === 'Bulk' ? draftBulkEnd : st.db[1];
+      dbPts.push([st.a, st.db[0]], [st.b, dbEnd]); ecPts.push([st.a, st.ec[0]], [st.b, st.ec[1]]);
+      dots.push({ x: r1(X(st.b)), y: r1(Ydb(dbEnd)), color: '#b39ddb', tx: r1(X(st.b)), ty: r1(Ydb(dbEnd) - 9), label: dbEnd + '%', ink: st.name === 'Bulk' && s.hasDraft ? '#4fc3f7' : '#d7ccf0' });
+      dots.push({ x: r1(X(st.b)), y: r1(Yec(st.ec[1])), color: '#ffca5b', tx: r1(X(st.b)), ty: r1(Yec(st.ec[1]) - 9), label: st.ec[1].toFixed(1), ink: '#ffe3a3' });
+    });
+    var toPath = function (pts, Y) { return pts.map(function (p, i) { return (i ? 'L' : 'M') + r1(X(p[0])) + ' ' + r1(Y(p[1])); }).join(' '); };
+    var bulk = STAGES[1];
+    var exList = EXC.filter(function (e) { return !e.draft || s.hasDraft || s.armed; });
+    var exMarks = exList.map(function (e) { var x = r1(X(e.day)); return { d: 'M' + x + ' 186 L' + (x + 6) + ' 192 L' + x + ' 198 L' + (x - 6) + ' 192 Z', fill: e.draft && s.hasDraft ? '#1c1c1c' : '#b39ddb', stroke: e.draft && s.hasDraft ? '#4fc3f7' : '#b39ddb', dash: e.draft && s.hasDraft ? '2 1.5' : 'none' }; });
+
+    var weeks = [];
+    for (var w = 0; w < 9; w++) {
+      var days = [];
+      for (var k = 0; k < 7; k++) {
+        (function (n) {
+          var st = stageOf(n), ex = exList.filter(function (e) { return e.day === n; })[0], on = s.sel === n, today = n === TODAY_DAY, past = n < TODAY_DAY;
+          var draftEx = ex && ex.draft && s.hasDraft;
+          days.push({ n: n, stage: st.color, pressed: on ? 'true' : 'false', weight: today || on ? 700 : 500,
+            aria: 'Day ' + n + ', ' + dateOf(n) + ', ' + st.name + (ex ? ', exception' + (draftEx ? ' in draft' : '') : '') + (today ? ', today' : ''),
+            border: today ? '2px solid #03a9f4' : on ? '2px solid #e1e1e1' : '1px solid #2e2e2e', bg: on ? '#2a2a2a' : past ? '#161616' : '#202020', ink: past && !on ? '#a4a4a4' : '#e1e1e1',
+            hasEx: !!ex, exFill: draftEx ? 'none' : '#b39ddb', exStroke: draftEx ? '#4fc3f7' : '#b39ddb', exDash: draftEx ? '2 1.5' : 'none',
+            pick: function () { self.setState({ sel: n }); } });
+        })(w * 7 + k + 1);
+      }
+      weeks.push({ n: w + 1, days: days });
+    }
+    var sst = stageOf(s.sel), dbV = s.sel >= bulk.a && s.sel <= bulk.b ? bulk.db[0] + (draftBulkEnd - bulk.db[0]) * (s.sel - bulk.a) / (bulk.b - bulk.a) : lerp(sst, 'db', s.sel);
+    var sel = { n: s.sel, kicker: s.sel === TODAY_DAY ? 'TODAY' : s.sel < TODAY_DAY ? 'DONE' : 'COMING UP', title: 'Day ' + s.sel + ' · ' + dateOf(s.sel), stage: sst.name, stageColor: sst.color,
+      peak: sst.peak + '%', rewater: sst.rw + '%', dryback: dbV.toFixed(1) + '%', ec: lerp(sst, 'ec', s.sel).toFixed(1) + ' mS/cm',
+      ex: exList.filter(function (e) { return e.day === s.sel; }).map(function (e) { var d = e.draft && s.hasDraft; return { tag: d ? 'EXCEPTION · IN DRAFT' : 'EXCEPTION', text: e.text, edge: d ? '#4fc3f7' : '#b39ddb', style: d ? 'dashed' : 'solid' }; }) };
+
+    var presets = PRESETS.map(function (p) { var on = s.preset === p.id; return { name: p.name, meta: p.meta, pressed: on ? 'true' : 'false', edge: on ? '#03a9f4' : '#2e2e2e', bg: on ? '#1d2a33' : '#161616', pick: function () { self.setState({ preset: p.id, copied: false }); } }; });
+    var pname = PRESETS.filter(function (p) { return p.id === s.preset; })[0].name;
+    var targets = ['F1', 'Veg'].map(function (r) { var on = s.target === r; return { label: r, checked: on ? 'true' : 'false', edge: on ? '#03a9f4' : '#3a3a3a', bg: on ? '#03a9f4' : 'transparent', ink: on ? '#06141c' : '#e1e1e1', pick: function () { self.setState({ target: r, copied: false }); } }; });
+    var diff = DIFFS[s.target];
+    return {
+      rooms: TREE, stages: stages, dots: dots, exMarks: exMarks, weeks: weeks, sel: sel, presets: presets, targets: targets, diff: diff, presetName: pname,
+      dbPath: toPath(dbPts, Ydb), ecPath: toPath(ecPts, Yec),
+      dbOld: toPath([[bulk.a, bulk.db[0]], [bulk.b, bulk.db[1]]], Ydb), oldOp: s.hasDraft ? 1 : 0,
+      todayX: r1(X(TODAY_DAY)), todayLX: r1(X(TODAY_DAY) - 32),
+      hasDraft: s.hasDraft, isArmedPending: s.armed,
+      draftText: s.hasDraft ? 'Draft · 2 edits, not live yet' : s.armed ? 'Armed · goes live Fri 06:00' : 'No draft: the plan matches the controller',
+      draftEdge: s.hasDraft ? '#4fc3f7' : s.armed ? '#81c995' : '#2e2e2e', draftInk: s.hasDraft ? '#e1e1e1' : s.armed ? '#81c995' : '#a4a4a4',
+      discardDraft: function () { self.setState({ hasDraft: false, armed: false }); },
+      armDraft: function () { self.setState({ hasDraft: false, armed: true }); },
+      unarm: function () { self.setState({ hasDraft: true, armed: false }); },
+      copyContext: s.target === 'F1' ? 'F1 is on day 12 of 63. Changes from day 12 on take effect at F1 lights-on, 07:00, once you arm them.' : 'Veg has no probes and runs on timers. Copying a flower plan here is allowed but will not water anything.',
+      copyLabel: s.target === 'F1' ? 'Copy ' + diff.length + ' changes to F1 as a draft' : 'Copy to Veg as a draft anyway',
+      notCopied: !s.copied, copied: s.copied,
+      copiedText: 'Copied to ' + s.target + ' as a draft · written and read back 14:10',
+      doCopy: function () { self.setState({ copied: true }); },
+      undoCopy: function () { self.setState({ copied: false }); }
+    };
+  }
+}
+</script>
+</body>
+</html>

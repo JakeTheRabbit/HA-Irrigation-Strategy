@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Phone — Timeline</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;600;700&amp;display=swap">
+<style>
+body{margin:0}
+a{color:#4fc3f7;text-decoration:none}a:hover{color:#b3e5fc}
+</style>
+</helmet>
+<!-- PHONE SHELL: 390x844. Tokens: canvas #111111, surface #1c1c1c, raised #232323, border #2e2e2e, text #e1e1e1, muted #a4a4a4, faint #8a8a8a, primary #03a9f4, link #4fc3f7, success #81c995, warning #ffca5b, danger #f28b82. Phase P0 #6b7580, P1 #2f6fb5, P2 #6450b0, P3 #34405a. Font Roboto. Radius 12. -->
+<div style="width: 390px; height: 844px; box-sizing: border-box; background: #111111; color: #e1e1e1; font-family: Roboto, Arial, sans-serif; display: flex; flex-direction: column; overflow: hidden">
+
+<header style="height: 56px; flex-shrink: 0; display: flex; align-items: center; gap: 6px; padding: 0 8px; border-bottom: 1px solid #2e2e2e; background: #1c1c1c">
+<button type="button" aria-label="Open menu" style="width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="6" x2="20" y2="6"></line><line x1="4" y1="12" x2="20" y2="12"></line><line x1="4" y1="18" x2="20" y2="18"></line></svg></button>
+<span style="display: flex; flex-direction: column"><b style="font-size: 17px; font-weight: 600">Timeline</b><span style="font-size: 12px; color: #a4a4a4">All rooms · swipe for more</span></span>
+<div role="group" aria-label="Zoom" style="margin-left: auto; display: flex; border: 1px solid #3a3a3a; border-radius: 8px; overflow: hidden">
+<sc-for list="{{zooms}}" as="zm" hint-placeholder-count="2"><button type="button" onClick="{{zm.pick}}" aria-pressed="{{zm.pressed}}" style="width: 52px; height: 44px; border: 0; border-left: 1px solid #3a3a3a; background: {{zm.bg}}; color: {{zm.ink}}; font: inherit; font-size: 14px; font-weight: 600">{{zm.label}}</button></sc-for>
+</div>
+</header>
+
+<main style="flex: 1; min-height: 0; overflow: hidden; display: flex; flex-direction: column">
+<!-- Day picker -->
+<div style="height: 52px; flex-shrink: 0; display: flex; align-items: center; gap: 4px; padding: 0 4px">
+<button type="button" aria-label="Previous day, Wed 21 Oct" style="width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="15 6 9 12 15 18"></polyline></svg></button>
+<span style="flex: 1; display: flex; flex-direction: column; align-items: center"><b style="font-size: 15px; font-weight: 600">Today, Thu 22 Oct</b><span style="font-size: 12px; color: #f28b82">1 failed · 2 warnings</span></span>
+<button type="button" aria-label="Next day, Fri 23 Oct" style="width: 44px; height: 44px; border: 0; border-radius: 8px; background: transparent; color: #e1e1e1; display: flex; align-items: center; justify-content: center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="9 6 15 12 9 18"></polyline></svg></button>
+</div>
+
+<!-- Room headers (columns swipe sideways) -->
+<div style="position: relative; height: 50px; flex-shrink: 0; border-top: 1px solid #2e2e2e; border-bottom: 1px solid #2e2e2e; background: #1c1c1c">
+<sc-for list="{{cols}}" as="c" hint-placeholder-count="3">
+<a href="P3-Zone.dc.html" style="position: absolute; left: {{c.left}}; width: {{c.w}}; top: 0; bottom: 0; display: flex; flex-direction: column; justify-content: center; gap: 3px; color: #e1e1e1">
+<span style="display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600"><span style="width: 8px; height: 8px; border-radius: 4px; background: {{c.dot}}"></span>{{c.name}}<span style="font-size: 11px; font-weight: 400; color: #a4a4a4">{{c.sub}}</span></span>
+<span style="display: flex"><sc-for list="{{c.lanes}}" as="ln" hint-placeholder-count="3"><span style="width: 46px; text-align: center; font-size: 11px; color: #a4a4a4">{{ln.label}}</span></sc-for></span>
+</a>
+</sc-for>
+</div>
+
+<!-- Vertical timeline -->
+<div style="position: relative; flex: 1; min-height: 0; overflow: hidden">
+<sc-for list="{{hours}}" as="h" hint-placeholder-count="13">
+<span aria-hidden="true" style="position: absolute; left: 44px; right: 0; top: {{h.top}}; height: 1px; background: {{h.line}}"></span>
+<span style="position: absolute; left: 6px; top: {{h.labelTop}}; font-size: 11px; color: #a4a4a4">{{h.label}}</span>
+</sc-for>
+<sc-for list="{{cols}}" as="c" hint-placeholder-count="3">
+<div style="position: absolute; left: {{c.left}}; width: {{c.w}}; top: 0; bottom: 0">
+<span aria-hidden="true" style="position: absolute; left: 0; right: 0; top: {{c.lightTop}}; height: {{c.lightH}}; background: rgba(255,214,102,.07)"></span>
+<sc-for list="{{c.lanes}}" as="ln" hint-placeholder-count="3">
+<span aria-hidden="true" style="position: absolute; left: {{ln.left}}; width: 1px; top: 0; bottom: 0; background: #232323"></span>
+</sc-for>
+<sc-for list="{{c.paused}}" as="p" hint-placeholder-count="1"><span aria-hidden="true" style="position: absolute; left: {{p.left}}; width: 42px; top: {{p.top}}; bottom: 0; border-radius: 4px; background: repeating-linear-gradient(-45deg, #1c1c1c 0 5px, #2a2a2a 5px 10px)"></span></sc-for>
+<sc-for list="{{c.hatches}}" as="q" hint-placeholder-count="1"><span aria-hidden="true" style="position: absolute; left: {{q.left}}; width: {{q.w}}; top: {{q.top}}; height: {{q.h}}; box-sizing: border-box; border: 1px solid #ffca5b; border-radius: 3px; background: repeating-linear-gradient(45deg, rgba(255,202,91,.6) 0 2px, transparent 2px 5px)"></span></sc-for>
+<sc-for list="{{c.blocks}}" as="b" hint-placeholder-count="10"><span title="{{b.title}}" style="position: absolute; left: {{b.left}}; width: {{b.w}}; top: {{b.top}}; height: {{b.h}}; box-sizing: border-box; border: {{b.border}}; border-radius: 3px; background: {{b.bg}}"></span></sc-for>
+<sc-for list="{{c.pills}}" as="pl" hint-placeholder-count="1">
+<a href="P3-Zone.dc.html" aria-label="{{pl.aria}}" style="position: absolute; left: 0; right: 0; top: {{pl.top}}; height: 44px; display: flex; align-items: center; z-index: 3">
+<span style="display: flex; align-items: center; gap: 5px; max-width: 100%; box-sizing: border-box; padding: 3px 7px; border: 1px solid {{pl.color}}; border-radius: 6px; background: #1f1f1f; color: #e1e1e1; font-size: 11px; font-weight: 600; line-height: 1.25; box-shadow: 0 2px 8px rgba(0,0,0,.5)"><svg width="10" height="12" viewBox="0 0 12 14" aria-hidden="true" style="flex: none"><line x1="6" y1="2" x2="6" y2="8.5" stroke="{{pl.color}}" stroke-width="2.4" stroke-linecap="round"></line><circle cx="6" cy="12" r="1.4" fill="{{pl.color}}"></circle></svg>{{pl.text}}</span>
+</a>
+</sc-for>
+</div>
+</sc-for>
+<span aria-hidden="true" style="position: absolute; right: 0; top: 0; bottom: 0; width: 36px; background: linear-gradient(90deg, rgba(17,17,17,0), #111111)"></span>
+<span aria-hidden="true" style="position: absolute; left: 40px; right: 0; top: {{nowTop}}; height: 2px; background: #03a9f4; z-index: 2"></span>
+<span style="position: absolute; left: 2px; top: {{nowLabelTop}}; padding: 1px 4px; border-radius: 4px; background: #03a9f4; color: #06141c; font-size: 11px; font-weight: 700; z-index: 2">14:10</span>
+</div>
+<div style="height: 30px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; gap: 12px; border-top: 1px solid #2e2e2e; font-size: 11px; color: #a4a4a4">
+<span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 10px; border-radius: 2px; background: #6f7378"></span>Done</span>
+<span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 10px; box-sizing: border-box; border-radius: 2px; border: 1.5px dashed #4fc3f7"></span>Planned</span>
+<span style="display: flex; align-items: center; gap: 4px"><span style="width: 10px; height: 10px; box-sizing: border-box; border-radius: 2px; border: 1px solid #ffca5b; background: repeating-linear-gradient(45deg, rgba(255,202,91,.6) 0 2px, transparent 2px 4px)"></span>Waits for pump</span>
+<span>Width = water</span>
+</div>
+</main>
+
+<nav aria-label="Sections" style="height: 64px; flex-shrink: 0; display: grid; grid-template-columns: repeat(5, 1fr); border-top: 1px solid #2e2e2e; background: #1c1c1c">
+<a href="P1-AllRooms.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>Status</a>
+<a href="P2-Timeline.dc.html" aria-current="page" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #4fc3f7; font-size: 11px; font-weight: 600; box-shadow: inset 0 2px 0 #03a9f4"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 2.7l5.7 5.7a8 8 0 1 1-11.3 0z"></path></svg>Irrigation</a>
+<a href="H1-Explorer.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15 14"></polyline></svg>History</a>
+<a href="E1-Probes.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-.6-.6-2.4z"></path></svg>Equipment</a>
+<a href="T1-AlertRules.dc.html" style="display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; color: #b8b8b8; font-size: 11px; font-weight: 500"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><line x1="4" y1="7" x2="20" y2="7"></line><line x1="4" y1="17" x2="20" y2="17"></line><circle cx="9" cy="7" r="2.5"></circle><circle cx="15" cy="17" r="2.5"></circle></svg>Settings</a>
+</nav>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+var NOW = 14 + 10 / 60;
+var STYLE = {
+  done: { bg: '#6f7378', border: '1px solid #6f7378' },
+  planned: { bg: 'rgba(3,169,244,.16)', border: '1.5px dashed #4fc3f7' },
+  err: { bg: '#f28b82', border: '1px solid #f28b82' },
+  warn: { bg: '#ffca5b', border: '1px solid #ffca5b' }
+};
+var ROOMS = [
+  { key: 'F2', name: 'F2', sub: 'day 38', dot: '#03a9f4', lights: [6, 18], left: 46, zones: ['F2-1', 'F2-2', 'F2-3'] },
+  { key: 'F1', name: 'F1', sub: 'day 12', dot: '#81c995', lights: [7, 19], left: 194, zones: ['F1-1', 'F1-2', 'F1-3'] },
+  { key: 'Veg', name: 'Veg', sub: 'timers', dot: '#b39ddb', lights: [4, 22], left: 342, zones: ['V-1', 'V-2'] }
+];
+function hm(h) { var m = Math.round(h * 60); var H = Math.floor(m / 60) % 24, M = m % 60; return (H < 10 ? '0' : '') + H + ':' + (M < 10 ? '0' : '') + M; }
+function near(a, b) { return Math.abs(a - b) < 0.02; }
+function shots(room, zk, i) {
+  var out = [], st = i * 4 / 60, L = room.lights[0];
+  if (room.key === 'Veg') { for (var k = 0; k < 8; k++) out.push({ h: 8 + k * 0.5 + i * 2 / 60, ml: 40, dur: 2 }); return out; }
+  var p1 = room.key === 'F2' ? [1, 1.3333, 1.6667, 2, 2.3333] : [1, 1.5, 2, 2.5];
+  var p2 = room.key === 'F2' ? [4.5, 6, 7.5, 9, 10.25] : [4, 5.5, 7, 8.5, 10];
+  p1.forEach(function (o) { out.push({ h: L + o + st, ml: room.key === 'F2' ? 120 : 100, dur: 3 }); });
+  p2.forEach(function (o) { out.push({ h: L + o + st, ml: room.key === 'F2' ? 80 : 70, dur: 2 }); });
+  if (zk === 'F2-2') out.forEach(function (x) {
+    if (near(x.h, 12.0667)) { x.flag = 'warn'; x.ml = 64; x.text = 'Zone 2 short shot: 64 of 80 mL'; }
+    if (near(x.h, 15.0667)) { x.ml = 240; x.dur = 16; }
+  });
+  if (zk === 'F2-3') { out.forEach(function (x) { if (near(x.h, 15.1333)) { x.queuedFrom = x.h; x.h = 15.3333; } }); out.push({ h: 9.6667, ml: 100, dur: 3 }); }
+  if (zk === 'F1-1') out.push({ h: 13.3333, ml: 60, dur: 2 }, { h: 18.5, ml: 60, dur: 2 });
+  if (zk === 'F1-2') { out.forEach(function (x) { if (near(x.h, 11.0667)) { x.flag = 'warn'; x.text = 'Zone 2 back sensor silent: sized from front only'; } }); out.push({ h: 18.5667, ml: 60, dur: 2 }); }
+  if (zk === 'F1-3') { out = out.filter(function (x) { return x.h < 12.65; }); out.forEach(function (x) { if (near(x.h, 12.6333)) { x.flag = 'err'; x.text = "Zone 3 valve didn't open · paused 12:40"; } }); }
+  return out;
+}
+class Component extends DCLogic {
+  constructor(props) { super(props); this.state = { zoom: 12 }; }
+  renderVals() {
+    var s = this.state, self = this;
+    var start = s.zoom === 12 ? 7 : 0, span = s.zoom, H = 586, Y = function (h) { return (h - start) / span * H; };
+    var px = function (v) { return Math.round(v * 10) / 10 + 'px'; };
+    var hours = [];
+    for (var h = start; h <= start + span; h += 1) {
+      var lab = s.zoom === 12 || h % 2 === 0;
+      hours.push({ top: px(Y(h)), labelTop: px(Math.max(2, Y(h) - 7)), label: lab && Math.abs(Y(h) - Y(NOW)) > 14 ? hm(h) : '', line: lab ? '#2a2a2a' : '#1c1c1c' });
+    }
+    var cols = ROOMS.map(function (room) {
+      var c = { name: room.name, sub: room.sub, dot: room.dot, left: room.left + 'px', w: (room.zones.length * 46) + 'px', blocks: [], hatches: [], paused: [], pills: [],
+        lanes: room.zones.map(function (z, i) { return { label: 'Z' + (i + 1), left: (i * 46) + 'px' }; }),
+        lightTop: px(Math.max(0, Y(room.lights[0]))), lightH: px(Math.min(H, Y(room.lights[1])) - Math.max(0, Y(room.lights[0]))) };
+      room.zones.forEach(function (zk, i) {
+        shots(room, zk, i).forEach(function (e) {
+          if (e.h + e.dur / 60 < start || e.h > start + span) return;
+          var st = e.flag || (e.h + e.dur / 60 <= NOW ? 'done' : 'planned');
+          var w = e.flag ? 40 : Math.round(14 + Math.min(e.ml, 240) / 240 * 26), hgt = Math.max(e.flag ? 10 : 6, e.dur / 60 / span * H);
+          c.blocks.push({ left: px(i * 46 + (46 - w) / 2), w: px(w), top: px(Y(e.h)), h: px(hgt), bg: STYLE[st].bg, border: STYLE[st].border, title: room.name + ' Z' + (i + 1) + ' ' + hm(e.h) + ' · ' + e.ml + ' mL' });
+          if (e.flag) c.pills.push({ top: px(Y(e.h) + hgt - 8), text: e.text, color: e.flag === 'err' ? '#f28b82' : '#ffca5b', aria: room.name + ' ' + e.text + ', at ' + hm(e.h) + '. Open zone.' });
+          if (e.queuedFrom != null) c.hatches.push({ left: px(i * 46 + 6), w: '34px', top: px(Y(e.queuedFrom)), h: px(Math.max(6, Y(e.h) - Y(e.queuedFrom))) });
+        });
+        if (zk === 'F1-3') c.paused.push({ left: px(i * 46 + 2), top: px(Y(12.6667) + 12) });
+      });
+      return c;
+    });
+    var zooms = [12, 24].map(function (z) { var on = s.zoom === z; return { label: z + ' h', pressed: on ? 'true' : 'false', bg: on ? '#03a9f4' : 'transparent', ink: on ? '#06141c' : '#e1e1e1', pick: function () { self.setState({ zoom: z }); } }; });
+    return { zooms: zooms, hours: hours, cols: cols, nowTop: px(Y(NOW)), nowLabelTop: px(Y(NOW) - 8) };
+  }
+}
+</script>
+</body>
+</html>
