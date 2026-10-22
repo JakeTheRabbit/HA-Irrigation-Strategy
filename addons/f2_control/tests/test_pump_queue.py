@@ -312,3 +312,46 @@ def test_the_tank_hold_names_its_own_code(rig):
     room.tank = {"distance": "sensor.tank_distance"}
     c._tank_level = lambda room: (None, None)
     assert c._tank_hold(room) == ("tank level unknown (sensor.tank_distance)", "CS-902")
+
+
+# ------------------------------------------------------------------------------------------------------ fix round 1
+def test_a_blind_copy_rescue_goes_before_a_steering_top_up(rig, fires):
+    c, fake = rig
+    fires[2] = Reason("COPY Z1 (VWC probe dead)", kind="blind_copy_rescue")
+    _supply(fake)
+    _pass(c)
+    assert _valves(fake) == TWO_THEN_ONE
+    queued, = _events(c, "intent.queued")
+    assert queued["zone"] == 1 and queued["data"]["priority"] == "steering"
+
+
+@pytest.mark.parametrize("stage", ["sized", "preopen"])
+def test_a_shot_held_after_its_turn_is_not_queued_and_adds_no_pump_load(rig, fires, stage):
+    c, fake = rig
+    _supply(fake, demand=(600.0, 300.0))
+    if stage == "sized":  # zone 2 has spent its day's budget
+        c.rooms[0].state[2]["daily_vol"] = 1e6
+    else:  # the plan holds zone 2 just before anything opens
+        real = c._strategy_preflight
+        c._strategy_preflight = lambda room, zone, now: "plan changed" if zone == 2 else real(room, zone, now)
+    _pass(c)
+    assert _valves(fake) == [("turn_on", V1), ("turn_off", V1)]
+    assert _events(c, "intent.queued") == []
+    assert [e["zone"] for e in _events(c, "intent.held")] == [2]
+    assert [s for e, s, _a in fake.writes if e == LOAD] == [60.0, 0.0]  # zone 2's 30 % never shown
+
+
+def test_a_room_error_mid_loop_clears_shot_queued(rig, fires, monkeypatch):
+    c, fake = rig
+    _supply(fake)
+    real = c._sweep_held
+
+    def sweep(room, zone):
+        real(room, zone)
+        if zone == 1:
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(c, "_sweep_held", sweep)
+    _pass(c)
+    queued = [(s, a["queue"]) for e, s, a in fake.writes if e == QUEUED]
+    assert queued[0][0] == "on" and queued[-1] == ("off", [])

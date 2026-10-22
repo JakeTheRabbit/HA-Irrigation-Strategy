@@ -1112,10 +1112,11 @@ def room_gate(room):
 
 
 def shot_priority(reason):
-    """A firing zone's priority at its pump (crop_steering_engine.guards.PRIORITY): the rescues and the minimum-daily
-    floor first, an operator's test shot last, every other shot steering."""
+    """A firing zone's priority at its pump (crop_steering_engine.guards.PRIORITY): every shot a plan hold never stops
+    (PLAN_HOLD_EXEMPT: the rescues, the minimum-daily floor, the blind fallback and copy) first, an operator's test
+    shot last, every other shot steering."""
     kind = getattr(reason, "kind", None)
-    if kind in safety_ops.RESCUE_KINDS or kind == "min_daily":
+    if kind in PLAN_HOLD_EXEMPT and kind != "test_shot":
         return "rescue"
     return "manual" if kind == "test_shot" else "steering"
 
@@ -5800,6 +5801,7 @@ class Controller:
         # What _act_zone kept of the decision for shot.started (its snapshot and the shot's kind), taken now so
         # it never outlives this call.
         intent = room.__dict__.get("_shot_intent", {}).pop(zone, None) or {}
+        turn = room.__dict__.get("_turn", {}).pop(zone, None)  # its turn at the pump (_take_turn), likewise
 
         # Before anything opens: guards.PREOPEN, in order. Passing its last check marks the shot in flight (_busy).
         ctx = {"duration_s": duration_s, "size_pct": size_pct, "flow_lps": flow_lps, "plan_exempt": plan_exempt,
@@ -5812,6 +5814,8 @@ class Controller:
                 self._journal_held(room, zone, why, guard=g.guard, code=code, now=datetime.now(),
                                    would=reason_text, actor=actor)
             return
+        if turn:  # it runs: its wait and its pump load are given now
+            self._turn_runs(room, zone, turn)
         nominal_l = ctx["litres"]  # frozen before anything opens (guards._pre_tank_short)
         shutdown_checked = False
         valve_started = valve_opened = None
@@ -6912,6 +6916,7 @@ class Controller:
                     del self._alerted[f"room_error_{room.slug}"]
             except Exception as e:  # only Exception: a stop (SystemExit, KeyboardInterrupt) still stops
                 self._room_error(room, now, e)
+                self._clear_queue(room)
         self._check_defaulted_setpoints()
         self._maybe_notify(all_pub, now)
         self._send_events()
@@ -7125,6 +7130,7 @@ class Controller:
         controller opens one zone at a time whatever the supply says, so the line only orders, journals and shows:
         a zone held is held by its own guards, never by the line. Whatever goes wrong here, None: as before."""
         room.__dict__.pop("_requested_at", None)  # an earlier pass's, should one have been left by an error
+        room.__dict__.pop("_turn", None)
         supply = getattr(self, "_supply", None)
         if not supply:
             return None
@@ -7153,19 +7159,20 @@ class Controller:
         """A zone about to water with a supply saved (_loop_room, once nothing holds it): when a zone watered before
         it this pass it waited (intent.queued, the first QUEUE guard that says why, pump_capacity when none: the
         controller opens one zone at a time); CS-214 when it alone needs more than its pump, or waited longer than
-        QUEUE_ALERT_S; then who waits after it and its pump load are shown. It waters whatever this finds."""
+        QUEUE_ALERT_S; then who waits after it is shown. Its intent.queued and pump load are kept for _execute_shot,
+        which gives them once the shot passed every check before it opens (_turn_runs). It waters whatever this
+        finds."""
         try:
             turns, ahead, lph = line["turns"], line["ran"], line["demand"].get(zone)
             turn = next(t for t in turns if t["zone"] == zone)
             asked = turn["requested_at"].isoformat(timespec="milliseconds")
             pump, most = line["pump_id"], line["pump"].get("max_flow_lph")
+            queued = None
             if ahead:
                 hit = guards.first(self, guards.QUEUE, room, zone,
                                    {"lph": lph, "ahead": ahead, "pump": line["pump"], "groups": line["groups"]})
-                self._journal(room.prefix, "intent.queued", zone=zone, outcome="queued",
-                              actor="manual" if getattr(reason, "kind", None) == "test_shot" else "engine",
-                              data={"position": len(ahead), "priority": turn["priority"], "requested_at": asked,
-                                    "guard": hit[0].guard if hit else "pump_capacity"})
+                queued = {"position": len(ahead), "priority": turn["priority"], "requested_at": asked,
+                          "guard": hit[0].guard if hit else "pump_capacity"}
             waited = (datetime.now().astimezone() - turn["requested_at"]).total_seconds()
             if ahead and waited > QUEUE_ALERT_S:
                 self._alert(
@@ -7193,28 +7200,55 @@ class Controller:
             else:
                 self._dismiss(f"pump_short_{room.slug}_z{zone}")
             after = turns[turns.index(turn) + 1:]
-            self._publish_line(room, line, [{"zone": t["zone"], "position": n, "priority": t["priority"],
-                                             "requested_at": t["requested_at"].isoformat(timespec="milliseconds")}
-                                            for n, t in enumerate(after, 1)],
-                               lph / most * 100 if lph is not None and most else None)
+            self._publish_queue(room, [{"zone": t["zone"], "position": n, "priority": t["priority"],
+                                        "requested_at": t["requested_at"].isoformat(timespec="milliseconds")}
+                                       for n, t in enumerate(after, 1)])
+            room.__dict__.setdefault("_turn", {})[zone] = {
+                "queued": queued, "actor": "manual" if getattr(reason, "kind", None) == "test_shot" else "engine",
+                "pump": pump, "load": lph / most * 100 if lph is not None and most else None}
         except Exception as e:
             log("pump turn error", room.slug, zone, e)
 
-    def _publish_line(self, room, line, queue, load):
-        """binary_sensor.crop_steering_<px>shot_queued (attribute queue: [{zone, position, requested_at, priority}],
-        who waits after the zone watering now) and sensor.crop_steering_<px>pump_load_pct (that zone's demand against
-        its pump's max_flow_lph, 0 between shots, unknown without both), each written only when it changes."""
+    def _turn_runs(self, room, zone, turn):
+        """_execute_shot, once its shot passed every check before it opens: the shot's intent.queued, when it waited
+        (_take_turn), and its pump load. A problem here never stops the shot."""
+        try:
+            if turn["queued"]:
+                self._journal(room.prefix, "intent.queued", zone=zone, outcome="queued", actor=turn["actor"],
+                              data=turn["queued"])
+            self._publish_load(room, turn["pump"], turn["load"])
+        except Exception as e:
+            log("pump turn error", room.slug, zone, e)
+
+    def _show_line(self, entity, state, attrs):
+        """Write one of the pump line's states, only when it changes."""
         shown = self.__dict__.setdefault("_line_shown", {})
-        room_id = "room:" + room.prefix
-        for entity, state, attrs in (
-            (f"binary_sensor.crop_steering_{room.prefix}shot_queued", "on" if queue else "off",
-             {"room_id": room_id, "queue": queue, "friendly_name": "Shot queued"}),
-            (f"sensor.crop_steering_{room.prefix}pump_load_pct", "unknown" if load is None else round(load, 1),
-             {"room_id": room_id, "pump": line["pump_id"], "unit_of_measurement": "%", "friendly_name": "Pump load"}),
-        ):
-            if shown.get(entity) != (state, attrs):
-                shown[entity] = (state, attrs)
-                ha_set(entity, state, attrs, timeout=LINE_SET_TIMEOUT_S)
+        if shown.get(entity) != (state, attrs):
+            shown[entity] = (state, attrs)
+            ha_set(entity, state, attrs, timeout=LINE_SET_TIMEOUT_S)
+
+    def _publish_queue(self, room, queue):
+        """binary_sensor.crop_steering_<px>shot_queued, attribute queue: [{zone, position, requested_at, priority}],
+        who waits after the zone watering now."""
+        self._show_line(f"binary_sensor.crop_steering_{room.prefix}shot_queued", "on" if queue else "off",
+                        {"room_id": "room:" + room.prefix, "queue": queue, "friendly_name": "Shot queued"})
+
+    def _publish_load(self, room, pump, load):
+        """sensor.crop_steering_<px>pump_load_pct: the demand of the zone watering now against its pump's max_flow_lph,
+        0 between shots, unknown without both."""
+        self._show_line(f"sensor.crop_steering_{room.prefix}pump_load_pct",
+                        "unknown" if load is None else round(load, 1),
+                        {"room_id": "room:" + room.prefix, "pump": pump, "unit_of_measurement": "%",
+                         "friendly_name": "Pump load"})
+
+    def _clear_queue(self, room):
+        """A room's pass raised mid-loop (loop_once): a queue it showed is taken down, not left on until its next pass."""
+        try:
+            entity = f"binary_sensor.crop_steering_{room.prefix}shot_queued"
+            if self.__dict__.get("_line_shown", {}).get(entity, ("off",))[0] == "on":
+                self._publish_queue(room, [])
+        except Exception as e:
+            log("pump queue error", room.slug, e)
 
     def _room_error(self, room, now, err):
         """A room's pass raised (loop_once). The room says so: its heartbeat and its status read error,
@@ -8031,8 +8065,10 @@ class Controller:
                 now,
             )
             self._sweep_held(room, zone)
-            if line and room.state[zone].get("last_shot") is not shot_before:  # it watered: the next one waits on it
-                line["ran"].append((zone, line["demand"].get(zone)))
+            if line:
+                room.__dict__.get("_turn", {}).pop(zone, None)  # a turn its shot never took (held after it)
+                if room.state[zone].get("last_shot") is not shot_before:  # it watered: the next one waits on it
+                    line["ran"].append((zone, line["demand"].get(zone)))
             self._grow_day_shot(room, zone, getattr(reason, "kind", None), room.state[zone]["daily_vol"] - fed_before, now)
             if acted is not None:  # held back at the daily budget after all: publish what happened
                 fire, size, reason = decisions[zone] = acted
@@ -8065,7 +8101,8 @@ class Controller:
                             snap.minutes_since_shot) if snap else None,
             }
         if line:  # the pass's turns are over: nobody waits, the pump is idle
-            self._publish_line(room, line, [], 0.0 if line["pump"].get("max_flow_lph") else None)
+            self._publish_queue(room, [])
+            self._publish_load(room, line["pump_id"], 0.0 if line["pump"].get("max_flow_lph") else None)
         for z, why in cross_zone_outliers(snaps):
             self._alert(
                 f"xzone_{room.slug}_{z}",
