@@ -2077,10 +2077,12 @@ pump_stop:
   name: Stop a dosing pump's prime or calibration
   description: >-
     Leaves a request for the controller to end the prime or the calibration run of this pump now. It
-    is always taken: it replaces any request that still waits (the answer names it in `replaced`),
-    except a waiting room stop, which stops this pump too and is kept. It never touches a running
-    batch or another pump's running job. To stop all dosing in the room, use dosing_request with the
-    action stop. Any signed-in user may call it.
+    replaces any request that still waits (the answer names it in `replaced`), except a waiting room
+    stop, which stops this pump too and is kept. Any signed-in user may call it, but only an
+    administrator (or an automation) may replace a waiting dose or batch; anyone else is refused
+    with "A dose or batch is waiting — an admin, or the room Stop, can cancel it." It never touches
+    a running batch or another pump's running job. To stop all dosing in the room, use
+    dosing_request with the action stop.
   fields:
     room_id:
       name: Room ID

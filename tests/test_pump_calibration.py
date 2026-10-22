@@ -276,16 +276,24 @@ def test_pump_stop_replaces_a_pending_prime_request(monkeypatch):
     assert rig.dosing.pump_hold() is None and rig.dosing._primes == {}
     with pytest.raises(ValueError, match="unknown pump"):
         rig.run(rig.dosing.pump_stop("nope", "Staff"))
-    # A stop is always taken: a waiting batch never ran, and the answer says it was replaced.
-    rig.dosing.data["request"] = {
-        "id": "b1",
-        "action": "batch",
-        "pump": None,
-        "ml": None,
-        "at": NOW.isoformat(),
-        "by": "Alex",
-    }
-    stop = rig.run(rig.dosing.pump_stop("balance", "Staff"))
+    # A waiting dose or batch, which only an administrator could ask for: a non-administrator's pump
+    # stop is refused and changes nothing; an administrator's replaces it and says so.
+    for action in ("dose", "batch"):
+        rig.dosing.data["request"] = {
+            "id": "b1",
+            "action": action,
+            "pump": "balance" if action == "dose" else None,
+            "ml": 5 if action == "dose" else None,
+            "at": NOW.isoformat(),
+            "by": "Alex",
+        }
+        with pytest.raises(ValueError) as refused:
+            rig.run(rig.dosing.pump_stop("balance", "Staff", admin=False))
+        assert str(refused.value) == (
+            "A dose or batch is waiting — an admin, or the room Stop, can cancel it."
+        )
+        assert rig.dosing.data["request"]["id"] == "b1"
+    stop = rig.run(rig.dosing.pump_stop("balance", "Alex", admin=True))
     assert stop["replaced"]["action"] == "batch"
     assert rig.dosing.data["request"]["action"] == "stop_pump"
     # A waiting room stop already stops this pump: it is kept, and is the answer.

@@ -54,6 +54,7 @@ CALIBRATE_SECONDS = dosing.TIMED["calibrate"]
 OFFLINE_S = 600  # a controller heartbeat older than this: the controller is offline
 BUSY = "Another dosing request is still waiting for the controller"
 HELD = "A dosing pump is being calibrated or primed: doses and batches wait until it is done"
+WAITING = "A dose or batch is waiting — an admin, or the room Stop, can cancel it."
 PRIME_HOLD_S = 60  # a prime holds room dosing for its run and this long after it
 # Fields of a pump only the store sets (a calibration commit, a prime): a save keeps the stored ones.
 OWNED = ("calibrated_ml_min", "calibrations", "primed_at")
@@ -482,11 +483,13 @@ class DosingStore:
             "blockers": [],
         }
 
-    async def pump_stop(self, pump_id, by) -> dict:
-        """End a prime or a calibration of the pump: always taken. The stop_pump replaces whatever
-        request still waits (it never ran, and the answer names it in `replaced`), except a room stop,
-        which already stops this pump too: that one stays and its id is the answer. A running batch
-        or another pump's running job is never touched (the controller stops only this pump).
+    async def pump_stop(self, pump_id, by, admin=True) -> dict:
+        """End a prime or a calibration of the pump. The stop_pump replaces whatever request still
+        waits (it never ran, and the answer names it in `replaced`), except a room stop, which already
+        stops this pump too: that one stays and its id is the answer. A waiting dose or batch, which
+        only an administrator could ask for, only an administrator (`admin`: an administrator or an
+        automation) may replace. A running batch or another pump's running job is never touched (the
+        controller stops only this pump).
         """
         async with self._lock:
             if self.error:
@@ -495,6 +498,8 @@ class DosingStore:
             waiting = self.data["request"] if self.pending() else None
             if waiting and waiting.get("action") == "stop":
                 return {"request_id": waiting["id"], "replaced": None}
+            if waiting and waiting.get("action") in ("dose", "batch") and not admin:
+                raise ValueError(WAITING)
             request = {
                 "id": uuid.uuid4().hex,
                 "action": "stop_pump",
@@ -857,9 +862,12 @@ async def _handle_pump(hass, call):
         target = resolve_dosing(hass, data["room_id"])
         if service == "pump_precheck":
             return target.precheck(data["pump"])
-        by = getattr(await _caller(hass, call), "name", None)
+        user = await _caller(hass, call)
+        by = getattr(user, "name", None)
         if service == "pump_stop":
-            return await target.pump_stop(data["pump"], by)
+            # An automation (no user) is trusted as the administrator checks trust it.
+            admin = user is None or bool(getattr(user, "is_admin", False))
+            return await target.pump_stop(data["pump"], by, admin)
         who = attribution(hass, call)
         if service == "pump_prime":
             return await target.pump_prime(data["pump"], data["seconds"], by, who)

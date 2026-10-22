@@ -190,6 +190,16 @@ async def test_a_prime_is_capped_at_30_s_and_only_an_administrator_primes(
         "balance",
         "Staff phone",
     )
+    # A waiting batch: only an administrator's pump stop may replace it.
+    hass.states.async_set(STATUS, "idle", {"handled": request["id"]})
+    batch = await _call(hass, hass_admin_user, "dosing_request", action="batch")
+    assert batch["error"] is None
+    with pytest.raises(HomeAssistantError, match="an admin, or the room Stop"):
+        await _call(hass, staff, "pump_stop", pump="balance")
+    await hass.async_block_till_done()
+    assert hass.states.get(CONFIG).attributes["request"]["action"] == "batch"
+    stop = await _call(hass, hass_admin_user, "pump_stop", pump="balance")
+    assert stop["replaced"]["action"] == "batch"
 
 
 async def test_calibration_abandon_releases_a_pump_calibration_hold(
