@@ -81,9 +81,6 @@ REMIND_CLEAR_PCT = 5.0
 _RUNNING = {"dose": "dosing", "batch": "making a batch"}  # handled_result until it ends
 _KIND = {"dose": "dose", "batch": "batch", "correct": "pH correction"}  # how a job is named to people
 _PUT_BACK = ("name", "volume_entity", "dosing_entity", "dosing_prefix", "power_entity")
-# The guards whose refusals and holds are journaled: 18-19 (spec 2.7). The others the dosing chains name (the amount,
-# the recipe, the full sensor, a hardware fault, another controller) are not: a refused dose's amount journals nothing.
-JOURNALED = ("calibration_valid", "dosing_lockout")
 INTENT_REEMIT_S = 1800.0  # a refusal or hold that stands is journaled again this often (controller.HELD_REEMIT_S)
 _NUMBERS = re.compile(r"\d{1,2}:\d{2}|[-+]?\d+(?:\.\d+)?")  # its numbers and times (controller._HELD_NUMBERS)
 
@@ -2121,11 +2118,11 @@ class DosingRunner:
 
     def _journal_intent(self, room, kind, why, job=None):
         """intent.refused / intent.held {guard, reason} for a dose, batch or pH correction a guard stopped (`why` a
-        guards.Why; only a guard in JOURNALED is journaled), with the guard's code. Once per (room, guard, words without
+        guards.Why; words with no guard are not journaled), with the guard's code. Once per (room, guard, words without
         their numbers, job) and again each INTENT_REEMIT_S while it stands, as the controller's _journal_held: each
         request refused is journaled, a refusal the pH tick meets each minute every 30 min. An error is only logged."""
         guard = getattr(why, "guard", None)
-        if guard not in JOURNALED:
+        if guard is None:
             return
         try:
             now, seen = self._mono(), self._intents

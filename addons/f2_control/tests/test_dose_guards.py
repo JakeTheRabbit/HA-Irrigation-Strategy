@@ -152,6 +152,25 @@ def test_a_standing_ph_refusal_is_journaled_again_each_30_min(build):  # noqa: F
     assert len(_intents(r)) == 2
 
 
+def test_a_batch_refused_by_a_guard_outside_18_19_is_journaled_too(rig):
+    r = rig()
+    _full_batch(r)
+    r.set("binary_sensor.tank_full", "unavailable")
+    r.ask("batch")
+    r.poll()
+    assert r.status()[1]["handled_result"] == "refused: the tank's full sensor can't be read"
+    assert [(e["data"]["guard"], e["code"]) for e in _intents(r)] == [("tank_overfill", None)]
+
+
+def test_a_ph_correction_held_by_a_hardware_fault_is_journaled_with_cs_301(build):  # noqa: F811
+    p = build()
+    p.c.rooms[0].hardware_fault = {"reason": "valve stuck", "entities": ["switch.row1"]}
+    minutes(p, 7)
+    (held,) = _intents(p)
+    assert (held["kind"], held["data"]["guard"], held["code"]) == ("intent.held", "hardware_latch", "CS-301")
+    assert held["data"]["reason"].startswith("hardware fault (CS-301)")
+
+
 def test_a_broken_journal_never_changes_a_refusal(rig, monkeypatch):
     r = rig()
     r.config()

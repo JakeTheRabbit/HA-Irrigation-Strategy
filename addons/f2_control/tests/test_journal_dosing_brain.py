@@ -96,12 +96,14 @@ def test_a_dose_that_did_not_finish_journals_its_outcome_and_code(rig, how, outc
     assert (done["outcome"], done["code"]) == (outcome, code)
 
 
-def test_a_refused_dose_journals_nothing(rig):
+def test_a_refused_dose_journals_only_its_refusal(rig):
     r = rig()
     r.config()
     r.ask(ml=999999)
     r.poll()
-    assert _events(r.c.journal) == []
+    (refused,) = _events(r.c.journal)  # no dose.completed: nothing was pressed
+    assert (refused["kind"], refused["outcome"], refused["code"]) == ("intent.refused", "refused", None)
+    assert refused["data"] == {"guard": "dose_amount", "reason": "999999 mL is not more than 0 and at most 2000 mL"}
 
 
 def test_a_failed_batch_is_batch_failed_with_its_own_code(rig):
