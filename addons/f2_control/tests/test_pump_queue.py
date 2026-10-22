@@ -32,7 +32,13 @@ FLOOR = Reason("MIN-DAILY floor 0.0<1.0 of 2.0L", kind="min_daily")
 @pytest.fixture
 def rig(monkeypatch, tmp_path):
     """Two zones on one pump. The wall clock moves with the controller's sleeps, so a shot takes its time."""
-    monkeypatch.setenv("F2_STATE_PATH", str(tmp_path / "state.json"))
+    return _build(monkeypatch, tmp_path)
+
+
+def _build(monkeypatch, folder, zones=2):
+    """A controller with `zones` zones on one pump (zone N reads VWC 39 + N), on its own state file and fake HA."""
+    folder.mkdir(parents=True, exist_ok=True)
+    monkeypatch.setenv("F2_STATE_PATH", str(folder / "state.json"))
     _Wall.current = _Wall(2026, 10, 22, 12, 0)  # lights 10-22: on
     monkeypatch.setattr(controller, "datetime", _Wall)
     monkeypatch.setattr(fake_ha, "datetime", _Wall)
@@ -54,9 +60,10 @@ def rig(monkeypatch, tmp_path):
         return real_set(entity, state, attributes, timeout)
 
     fake.ha_set = ha_set
+    valves = {str(z): f"switch.v{z}" for z in range(1, zones + 1)}
     options = {
-        "num_zones": 2,
-        "hardware": {"pump": PUMP, "mainline": MAIN, "valves": {"1": V1, "2": V2}},
+        "num_zones": zones,
+        "hardware": {"pump": PUMP, "mainline": MAIN, "valves": valves},
         "enable_flag": KILL,
         "hold_entities": [],
     }
@@ -65,16 +72,15 @@ def rig(monkeypatch, tmp_path):
         monkeypatch.setattr(controller, name, getattr(fake, name))
     for eid in (KILL, "switch.crop_steering_room_active"):
         fake.set_state(eid, "on")
-    for eid in (PUMP, MAIN, V1, V2):
+    for eid in (PUMP, MAIN, *valves.values()):
         fake.set_state(eid, "off")
-    for zone, vwc in ((1, "40"), (2, "41")):
+    for zone in range(1, zones + 1):
         fake.set_state(f"switch.crop_steering_zone_{zone}_enabled", "on")
         fake.set_state(f"switch.crop_steering_zone_{zone}_manual_override", "off")
-        fake.set_state(f"sensor.crop_steering_vwc_zone_{zone}", vwc)
-        fake.set_state(f"sensor.crop_steering_ec_zone_{zone}", "3")
+    _probes(fake, zones)
     c = controller.Controller()
     c.journal.flush = lambda *a, **k: 0  # keep the events in the outbox to read
-    for zone in (1, 2):
+    for zone in range(1, zones + 1):
         c.rooms[0].state[zone]["phase"] = "P2"
         c.rooms[0].state[zone]["last_phase_change"] = _Wall.current - timedelta(hours=1)
     return c, fake
@@ -82,11 +88,11 @@ def rig(monkeypatch, tmp_path):
 
 @pytest.fixture
 def fires(monkeypatch):
-    """decide() fires both zones each pass: zone 1 (VWC 40) and zone 2 (VWC 41) each with its own reason."""
-    reasons = {1: TOPUP, 2: TOPUP}
+    """decide() fires every zone each pass, zone N (VWC 39 + N) with its own reason."""
+    reasons = {1: TOPUP, 2: TOPUP, 3: TOPUP}
 
     def decide(snap, p):
-        return snap.phase, p.p2_threshold, True, 2.0, reasons[1 if snap.vwc < 40.5 else 2]
+        return snap.phase, p.p2_threshold, True, 2.0, reasons[round(snap.vwc) - 39]
 
     monkeypatch.setattr(controller, "decide", decide)
     return reasons
@@ -98,14 +104,14 @@ def _supply(fake, demand=(600.0, 600.0), max_flow=1000.0, concurrent=2, groups=N
                               "flow_meter": None}],
         "zone_groups": {"room:": groups} if groups else {},
         "zone_meters": {},
-        "zone_demand_lph": {"room:": {"1": demand[0], "2": demand[1]}},
+        "zone_demand_lph": {"room:": {str(z): lph for z, lph in enumerate(demand, 1)}},
     })
 
 
-def _probes(fake):
-    """Fresh readings for both zones (a probe read an hour ago is stale)."""
-    for zone, vwc in ((1, "40"), (2, "41")):
-        fake.set_state(f"sensor.crop_steering_vwc_zone_{zone}", vwc)
+def _probes(fake, zones=2):
+    """Fresh readings for the zones (a probe read an hour ago is stale)."""
+    for zone in range(1, zones + 1):
+        fake.set_state(f"sensor.crop_steering_vwc_zone_{zone}", str(39 + zone))
         fake.set_state(f"sensor.crop_steering_ec_zone_{zone}", "3")
 
 
@@ -231,18 +237,19 @@ def test_exclusive_group_is_recorded_but_changes_nothing(rig, fires):
     assert _switches(fake) == grouped and _valves(fake) == ONE_THEN_TWO
 
 
-def test_shot_queued_and_pump_load_are_published(rig, fires):
-    c, fake = rig
-    _supply(fake)
+def test_shot_queued_and_pump_load_are_published(monkeypatch, tmp_path, fires):
+    c, fake = _build(monkeypatch, tmp_path, zones=3)
+    _supply(fake, demand=(600.0, 600.0, 600.0))
     _pass(c)
     queued = [(s, a) for e, s, a in fake.writes if e == QUEUED]
     loads = [(s, a) for e, s, a in fake.writes if e == LOAD]
     requested = _events(c, "intent.queued")[0]["data"]["requested_at"]
-    assert queued[0] == ("on", {"room_id": "room:", "queue": [
-        {"zone": 2, "position": 1, "requested_at": requested, "priority": "steering"}],
-        "friendly_name": "Shot queued"})
-    assert queued[-1][0] == "off" and queued[-1][1]["queue"] == []
-    assert [s for s, _a in loads] == [60.0, 0.0]  # zone 1 at 600 of 1000 L/h; zone 2 too (unchanged); idle
+    # after zone 1's shot: zone 2 takes its turn next, zone 3 waits behind it; after zone 2's, nobody waits
+    assert queued == [
+        ("on", {"room_id": "room:", "queue": [{"zone": 3, "position": 1, "requested_at": requested,
+                                               "priority": "steering"}], "friendly_name": "Shot queued"}),
+        ("off", {"room_id": "room:", "queue": [], "friendly_name": "Shot queued"})]
+    assert [s for s, _a in loads] == [60.0, 0.0]  # the last shot's 600 of 1000 L/h (unchanged for 2 and 3); idle
     assert loads[0][1]["unit_of_measurement"] == "%" and loads[0][1]["pump"] == PUMP
     fake.writes.clear()
     _Wall.current += timedelta(hours=1)
@@ -314,6 +321,48 @@ def test_the_tank_hold_names_its_own_code(rig):
     assert c._tank_hold(room) == ("tank level unknown (sensor.tank_distance)", "CS-902")
 
 
+# ------------------------------------------------------------------------------------------------------ fix round 2
+def _ha_log(monkeypatch, fake):
+    """Every Home Assistant call the controller makes, in order: (kind, entity or service)."""
+    seen = []
+    monkeypatch.setattr(controller, "ha_get", lambda e, timeout=8: (seen.append(("get", e)), fake.ha_get(e))[1])
+    monkeypatch.setattr(controller, "ha_set", lambda e, st, a=None, timeout=None: (
+        seen.append(("set", e)), fake.ha_set(e, st, a, timeout))[1])
+    monkeypatch.setattr(controller, "ha_call", lambda d, svc, **data: (
+        seen.append(("call", d, svc, data.get("entity_id") or data.get("notification_id"))),
+        fake.ha_call(d, svc, **data))[1])
+    return seen
+
+
+def test_a_saved_supply_adds_no_home_assistant_call_before_any_pump_opens(monkeypatch, tmp_path, fires):
+    """R5's spirit: nothing new slows watering. With a supply saved, the calls from the pass's decision to each pump
+    ON are the calls made with none; the queue and pump load are written only after a shot and after the pass."""
+    runs = {}
+    for name in ("none", "supply"):
+        _Wall.current = _Wall(2026, 10, 22, 12, 0)
+        c, fake = _build(monkeypatch, tmp_path / name, zones=3)
+        if name == "supply":
+            _supply(fake, demand=(600.0, 600.0, 600.0))
+        seen = _ha_log(monkeypatch, fake)
+        _pass(c)
+        runs[name] = seen
+    pump_on, pump_off = ("call", "switch", "turn_on", PUMP), ("call", "switch", "turn_off", PUMP)
+    new = [i for i, x in enumerate(runs["supply"]) if x in (("set", QUEUED), ("set", LOAD))]
+    assert runs["supply"].count(pump_on) == runs["none"].count(pump_on) == 3
+
+    def shots(seen):  # from the pass's start to its last shot's close (what follows the pass is not watering)
+        return seen[:len(seen) - seen[::-1].index(pump_off)]
+
+    # take the queue and pump load writes away: every other call is the same, in the same order
+    assert shots([x for i, x in enumerate(runs["supply"]) if i not in new]) == shots(runs["none"])
+    # and none of the writes lies inside a zone's turn: each comes before the next zone's own checks start
+    for i in new:
+        later = runs["supply"][i:]
+        if pump_on in later:
+            before_pump = later[:later.index(pump_on)]
+            assert any(x[0] == "get" and x[1].endswith("_enabled") for x in before_pump), runs["supply"][i]
+
+
 # ------------------------------------------------------------------------------------------------------ fix round 1
 def test_a_blind_copy_rescue_goes_before_a_steering_top_up(rig, fires):
     c, fake = rig
@@ -341,14 +390,14 @@ def test_a_shot_held_after_its_turn_is_not_queued_and_adds_no_pump_load(rig, fir
     assert [s for e, s, _a in fake.writes if e == LOAD] == [60.0, 0.0]  # zone 2's 30 % never shown
 
 
-def test_a_room_error_mid_loop_clears_shot_queued(rig, fires, monkeypatch):
-    c, fake = rig
-    _supply(fake)
+def test_a_room_error_mid_loop_clears_shot_queued(monkeypatch, tmp_path, fires):
+    c, fake = _build(monkeypatch, tmp_path, zones=3)
+    _supply(fake, demand=(600.0, 600.0, 600.0))
     real = c._sweep_held
 
-    def sweep(room, zone):
+    def sweep(room, zone):  # after zone 1's turn showed zone 3 waiting, zone 2's act raises
         real(room, zone)
-        if zone == 1:
+        if zone == 2:
             raise RuntimeError("boom")
 
     monkeypatch.setattr(c, "_sweep_held", sweep)
