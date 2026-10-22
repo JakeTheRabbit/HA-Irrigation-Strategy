@@ -53,10 +53,15 @@ export function draftStore(storage: () => Storage | null | undefined) {
 
 const session = draftStore(() => sessionStorage);
 
-/** Discards this tab's drafts under `prefix` (e.g. "targets:", every Current day zone) and tells
- * the other tabs: the app's discard and room switch, so a reload never brings them back. */
-export function discardDrafts(prefix: string) {
-  for (const key of session.clearAll(prefix)) publishDraft(key, undefined);
+/** Discards this tab's drafts under `prefix` (e.g. "targets:", every Current day zone), so a
+ * reload never brings them back. `broadcast` also discards them in this browser's other tabs: an
+ * explicit "Discard edits", not a room switch in this tab. */
+export function discardDrafts(
+  prefix: string,
+  broadcast: boolean,
+  store: ReturnType<typeof draftStore> = session,
+) {
+  for (const key of store.clearAll(prefix)) if (broadcast) publishDraft(key, undefined);
 }
 
 /** How a page's own draft and the stored copy meet, from their JSON: `store` the page's edit,
@@ -69,7 +74,8 @@ export function draftSync(
   kept: string,
 ): "store" | "restore" | "none" {
   const empty = (json: string) => json === "{}";
-  if (first) return !empty(local) ? (local === kept ? "none" : "store") : empty(kept) ? "none" : "restore";
+  if (first)
+    return !empty(local) ? (local === kept ? "none" : "store") : empty(kept) ? "none" : "restore";
   if (local !== lastLocal) return local === kept ? "none" : "store";
   return kept === local ? "none" : "restore";
 }
@@ -105,12 +111,18 @@ export function useDraft<T>(
   saved: T,
   onDirtyChange?: (dirty: boolean) => void,
 ): { draft: T; set(next: T): void; dirty: boolean; discard(): void } {
-  const [held, setHeld] = useState<{ key: string; value: T | undefined }>(() => ({ key, value: session.read<T>(key) }));
+  const [held, setHeld] = useState<{ key: string; value: T | undefined }>(() => ({
+    key,
+    value: session.read<T>(key),
+  }));
   const value = held.key === key ? held.value : session.read<T>(key);
   if (held.key !== key) setHeld({ key, value });
   const dirty = value !== undefined && !isSameDraft(value, saved);
 
-  useEffect(() => subscribeDrafts(key, (next) => setHeld({ key, value: next as T | undefined })), [key]);
+  useEffect(
+    () => subscribeDrafts(key, (next) => setHeld({ key, value: next as T | undefined })),
+    [key],
+  );
 
   const report = useRef(onDirtyChange);
   report.current = onDirtyChange;

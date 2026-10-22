@@ -176,7 +176,8 @@ export default function App() {
   /** Drops Current day's drafts, with their stored copies, so a reload never brings them back. */
   function dropDrafts() {
     setDrafts({});
-    discardDrafts("targets:");
+    // This tab's copies only: another tab may be editing another room.
+    discardDrafts("targets:", false);
   }
   function selectRoom(id: string) {
     confirmNavigation(() => {

@@ -143,6 +143,13 @@ describe("afternoon", () => {
     });
     expect(lowered.edited.shots).toBeGreaterThanOrEqual(0);
     expect(lowered.edited.lPerPlant).toBeGreaterThanOrEqual(0);
+    expect(lowered.edited.lPerPlant).toBeLessThan(lowered.saved.lPerPlant);
+    // No shots left means no water: shots and litres reach none together.
+    const one = afternoon([intent(at(14, 30))], EDITED, at(14, 10), at(22), {
+      lightsOnAt: ON,
+      baseline: SAVED_STATE,
+    });
+    expect(one.edited).toEqual({ shots: 0, lPerPlant: 0 });
   });
   test("with no edit, With edits is exactly Saved, whatever the projection says", () => {
     const saved = [intent(at(14, 30)), intent(at(16))];
@@ -323,6 +330,36 @@ describe("apply and undo", () => {
     ).toEqual({ backend: "3.17", ids: [] });
   });
 
+  test("a select-only apply finds the backend once: 3.17 has no Journal", async () => {
+    const operator = vi.fn(async () => {
+      throw new Error("Action crop_steering.history_changes not found");
+    });
+    const found = await appliedEventIds(
+      fakeController({ operator }),
+      "room:",
+      "",
+      [{ entityId: MODE, value: "Generative" }],
+      [{ entityId: MODE, value: "Vegetative" }],
+      at(14),
+    );
+    expect(found).toEqual({ backend: "3.17", ids: [] });
+    expect(operator).toHaveBeenCalledOnce();
+  });
+  test("undo of a select-only apply on 3.17 re-writes the previous choice", async () => {
+    const write = vi.fn(async () => ({ applied: [MODE], failed: [] }));
+    const states = { ...STATES, [MODE]: { ...STATES[MODE], state: "Generative" } };
+    await undoApply(
+      {
+        at: at(14, 2),
+        backend: "3.17",
+        eventIds: [],
+        before: [{ entityId: MODE, value: "Vegetative" }],
+        after: [{ entityId: MODE, value: "Generative" }],
+      },
+      { controller: fakeController({}), states, write },
+    );
+    expect(write).toHaveBeenCalledWith([{ entityId: MODE, value: "Vegetative" }]);
+  });
   const last17: LastApply = {
     at: at(14, 2),
     backend: "3.17",

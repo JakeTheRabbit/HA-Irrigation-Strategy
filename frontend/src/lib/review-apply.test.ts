@@ -64,24 +64,52 @@ describe("review & apply", () => {
     expect(html).toContain("Controller confirmed every value · by Ben");
     expect(html).toContain("Undo: write back the previous values");
   });
-  test("a write the controller did not read back is unconfirmed, never 'still holds'", () => {
+  test("a mixed write: read-back rows written, unconfirmed rows named, refused rows still held", () => {
+    const rows = [...ROWS, row("peak", "Peak target", "63%", "64%")];
+    const rowOf = (entityId: string) => entityId.split("_").at(-1)!;
     for (const reason of [
       "Readback did not confirm the requested value. Refresh and review before retrying.",
       "Room or connection changed during write; result is unconfirmed.",
     ]) {
       const receipt = receiptFromWrite(
-        { applied: ["number.f2_z1_rewater"], failed: [{ entityId: "number.f2_z1_dryback", reason }] },
-        ROWS,
-        (entityId) => (entityId.endsWith("dryback") ? "dryback" : "rewater"),
-        () => "50%",
+        {
+          applied: ["number.f2_z1_rewater"],
+          failed: [
+            { entityId: "number.f2_z1_dryback", reason },
+            { entityId: "number.f2_z1_peak", reason: "Use a value between 40 and 63." },
+          ],
+        },
+        rows,
+        rowOf,
+        (entityId) => rows.find((r) => r.id === rowOf(entityId))!.before,
         AT,
       );
-      expect(receipt).toMatchObject({ ok: false, unconfirmed: true });
-      const html = render(props(), { phase: "done", result: receipt });
-      expect(html).toContain("The controller did not confirm the values. Reload and check before trying again.");
-      expect(html).not.toContain("still holds");
+      expect(receipt).toMatchObject({
+        ok: false,
+        failed: [{ id: "peak", holds: "63%" }],
+        notConfirmed: ["dryback"],
+        summary: "Re-water point 57% → 56%",
+      });
+      expect(receipt.unconfirmed).toBeUndefined();
+      const html = render(props({ rows: [rows[1], rows[2]] }), { phase: "done", result: receipt });
+      expect(html).toContain("Controller still holds 63%.");
+      expect(html).toContain("The controller did not confirm: Dryback by lights-on.");
+      expect(html).toContain("Re-water point 57% → 56%: written and read back.");
+      expect(html).not.toContain("Nothing else was changed");
       expect(html).not.toContain("Written and read back");
     }
+    // Only unconfirmed beside a read-back row: no green receipt either.
+    const unsure = receiptFromWrite(
+      { applied: ["number.f2_z1_rewater"], failed: [{ entityId: "number.f2_z1_dryback", reason: "Readback did not confirm" }] },
+      ROWS,
+      rowOf,
+      () => "50%",
+      AT,
+    );
+    expect(unsure).toMatchObject({ ok: false, failed: [], notConfirmed: ["dryback"] });
+    const html = render(props({ rows: [ROWS[1]] }), { phase: "done", result: unsure });
+    expect(html).toContain("The controller did not confirm: Dryback by lights-on. Re-water point 57% → 56%: written and read back.");
+    expect(html).not.toContain("still holds");
   });
   test("partial apply keeps failed rows in the draft", () => {
     const fromWrite = receiptFromWrite(

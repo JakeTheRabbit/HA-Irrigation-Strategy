@@ -537,7 +537,7 @@ export function Strategy({
         apply={apply}
         onDiscard={() => {
           setDrafts({});
-          discardDrafts("targets:");
+          discardDrafts("targets:", true);
           setLoaded(null);
         }}
         undo={undo}

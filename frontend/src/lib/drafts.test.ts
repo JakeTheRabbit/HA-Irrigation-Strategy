@@ -2,6 +2,7 @@ import { describe, expect, test } from "vitest";
 import {
   DRAFT_PREFIX,
   draftStore,
+  discardDrafts,
   draftSync,
   isSameDraft,
   publishDraft,
@@ -106,4 +107,22 @@ describe("discard clears what a reload would restore", () => {
     expect(draftSync(false, "{}", "{}", edit)).toBe("restore");
     expect(draftSync(false, edit, edit, edit)).toBe("none");
   });
+});
+
+test("a room switch clears this tab's drafts quietly; Discard edits tells the other tabs", async () => {
+  const storage = memoryStorage();
+  const store = draftStore(() => storage);
+  const seen: unknown[] = [];
+  const stop = subscribeDrafts("targets:room::1", (value) => seen.push(value ?? "discarded"));
+  store.write("targets:room::1", { a: 1 });
+  discardDrafts("targets:", false, store);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  expect(store.read("targets:room::1")).toBeUndefined();
+  expect(seen).toEqual([]);
+  store.write("targets:room::1", { a: 1 });
+  discardDrafts("targets:", true, store);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  stop();
+  expect(store.read("targets:room::1")).toBeUndefined();
+  expect(seen).toEqual(["discarded"]);
 });

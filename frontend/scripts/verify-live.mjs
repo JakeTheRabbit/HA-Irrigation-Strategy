@@ -372,13 +372,11 @@ try {
     await field("p1_target_vwc").fill("66");
     const bar = page.getByRole("region", { name: "Review and apply" });
     await bar.getByRole("button", { name: "Apply 1 change", exact: true }).click();
-    // Not read back is not a refusal: nothing is claimed about what the controller holds.
-    await visible(
-      bar.getByText(
-        "The controller did not confirm the values. Reload and check before trying again.",
-        { exact: true },
-      ),
-    );
+    // Not read back is not a refusal: the row is named, nothing is claimed about what the
+    // controller holds, and the draft keeps it.
+    await visible(bar.getByText("The controller did not confirm: Peak target.", { exact: true }));
+    assert.equal(await bar.getByText(/still holds/).count(), 0);
+    assert.deepEqual(await bar.locator(".review-apply-label").allInnerTexts(), ["Peak target"]);
     assert.equal(states[ignoreWrite].state, "65");
     await bar.getByRole("button", { name: "Discard edits" }).click();
     ignoreWrite = "";

@@ -28,6 +28,9 @@ export interface ApplyReceipt {
   ok: boolean;
   unconfirmed?: boolean;
   failed: { id: string; holds: string }[];
+  /** Rows written but not read back (a 3.17 write, row by row): they may have taken, so the
+   * receipt names them without saying what the controller holds. */
+  notConfirmed?: string[];
   summary: string;
   by?: string;
   eventIds: string[];
@@ -45,8 +48,9 @@ const summaryOf = (rows: ReviewRow[], failed: Set<string>) =>
  * not a refusal, so nothing says what the controller holds. */
 const UNCONFIRMED = /did not confirm|unconfirmed/i;
 
-/** A 3.17 write (`controller.write`, which reads each entity back). A failure that was not read
- * back makes the whole receipt unconfirmed; "still holds" is only for a definite refusal. */
+/** A 3.17 write (`controller.write`, which reads each entity back, row by row). Rows read back are
+ * written; a row not read back is named as not confirmed; "still holds" is only for a definite
+ * refusal. The receipt is green only when every row was read back. */
 export function receiptFromWrite(
   result: WriteResult,
   rows: ReviewRow[],
@@ -54,17 +58,19 @@ export function receiptFromWrite(
   holds: (entityId: string) => string,
   now: number,
 ): ApplyReceipt {
-  if (result.failed.some((f) => UNCONFIRMED.test(f.reason)))
-    return {
-      at: now,
-      ok: false,
-      unconfirmed: true,
-      failed: rows.map((r) => ({ id: r.id, holds: r.before })),
-      summary: "",
-      eventIds: [],
-    };
-  const failed = result.failed.map((f) => ({ id: rowOf(f.entityId), holds: holds(f.entityId) }));
-  return { at: now, ok: !failed.length, failed, summary: summaryOf(rows, new Set(failed.map((f) => f.id))), eventIds: [] };
+  const unsure = result.failed.filter((f) => UNCONFIRMED.test(f.reason));
+  const failed = result.failed
+    .filter((f) => !unsure.includes(f))
+    .map((f) => ({ id: rowOf(f.entityId), holds: holds(f.entityId) }));
+  const notConfirmed = unsure.map((f) => rowOf(f.entityId));
+  return {
+    at: now,
+    ok: !failed.length && !notConfirmed.length,
+    failed,
+    ...(notConfirmed.length ? { notConfirmed } : {}),
+    summary: summaryOf(rows, new Set([...failed.map((f) => f.id), ...notConfirmed])),
+    eventIds: [],
+  };
 }
 
 type Applied = { target: string; key: string; readback: "verified" | "refused" };
@@ -362,13 +368,28 @@ export function ReviewApplyView(
           </div>
         );
       const holds =
-        result.failed.length === 1
-          ? `Controller still holds ${result.failed[0].holds}.`
-          : result.failed.map((f) => `${labelOf(f.id)} is still ${f.holds}.`).join(" ");
+        result.failed.length === 0
+          ? ""
+          : result.failed.length === 1
+            ? `Controller still holds ${result.failed[0].holds}.`
+            : result.failed.map((f) => `${labelOf(f.id)} is still ${f.holds}.`).join(" ");
+      const unsure = result.notConfirmed?.length
+        ? `The controller did not confirm: ${result.notConfirmed.map(labelOf).join(", ")}.`
+        : "";
       return (
         <div role="alert" className="review-apply-error">
           <span>
-            {holds} {result.summary ? `${result.summary}: written and read back.` : "Nothing else was changed."}
+            {[
+              holds,
+              unsure,
+              result.summary
+                ? `${result.summary}: written and read back.`
+                : unsure
+                  ? ""
+                  : "Nothing else was changed.",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           </span>
           {n ? (
             <Button variant="outline" size="sm" onClick={props.onApply} disabled={busy}>

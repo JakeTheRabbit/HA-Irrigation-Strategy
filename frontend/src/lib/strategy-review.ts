@@ -204,14 +204,17 @@ export function afternoon(
     shots: planned.length,
     lPerPlant: planned.reduce((sum, intent) => sum + intent.duration_s * flow, 0),
   };
-  if (JSON.stringify(edited) === JSON.stringify(options.baseline)) return { saved: plan, edited: plan };
+  if (JSON.stringify(edited) === JSON.stringify(options.baseline))
+    return { saved: plan, edited: plan };
   const after = projected(edited),
     before = projected(options.baseline);
+  // Shots and water reach none together: no shots left is no water.
+  const shots = Math.max(0, plan.shots + after.shots - before.shots);
   return {
     saved: plan,
     edited: {
-      shots: Math.max(0, plan.shots + after.shots - before.shots),
-      lPerPlant: Math.max(0, plan.lPerPlant + after.lPerPlant - before.lPerPlant),
+      shots,
+      lPerPlant: shots ? Math.max(0, plan.lPerPlant + after.lPerPlant - before.lPerPlant) : 0,
     },
   };
 }
@@ -265,7 +268,8 @@ export interface LastApply {
 /** The `target.changed` events this apply journalled (3.18): per written value, the newest
  * manual setpoint change of its key and zone since `since` from the value it had (`before`) to the
  * written one, never a put-back. A learner's or the AI's write of the same value is not this apply's.
- * A 3.17 integration has no Journal. */
+ * A 3.17 integration has no Journal: the first call says so, or one call when only choices were
+ * written (a choice has no setpoint event, so its 3.18 Undo refuses: no record). */
 export async function appliedEventIds(
   controller: Pick<Controller, "operator">,
   roomId: string,
@@ -276,20 +280,25 @@ export async function appliedEventIds(
 ): Promise<{ backend: "3.18" | "3.17"; ids: string[] }> {
   const root = `number.crop_steering_${prefix}`;
   const ids: string[] = [];
+  const query = { room_id: roomId, since: new Date(since).toISOString(), kinds: ["setpoint"] };
+  let asked = false;
   for (const change of after) {
     const was = before.find((b) => b.entityId === change.entityId)?.value;
-    if (!change.entityId.startsWith(root) || typeof change.value !== "number" || typeof was !== "number")
+    if (
+      !change.entityId.startsWith(root) ||
+      typeof change.value !== "number" ||
+      typeof was !== "number"
+    )
       continue;
     const rest = change.entityId.slice(root.length);
     const zone = rest.match(/^zone_(\d+)_/)?.[1];
     const key = rest.replace(/^zone_\d+_/, "");
     const outcome = await callV2<{ changes?: HistoryChange[] }>(controller, "history_changes", {
-      room_id: roomId,
-      since: new Date(since).toISOString(),
+      ...query,
       ...(zone ? { zone: Number(zone) } : {}),
       key,
-      kinds: ["setpoint"],
     });
+    asked = true;
     if (outcome.kind === "missing") return { backend: "3.17", ids: [] };
     if (outcome.kind !== "ok") continue;
     const found = (outcome.data?.changes ?? []).find(
@@ -305,6 +314,9 @@ export async function appliedEventIds(
     );
     if (found) ids.push(found.id);
   }
+  // Nothing numeric written (a steering mode alone): one call still says which integration this is.
+  if (!asked && (await callV2(controller, "history_changes", query)).kind === "missing")
+    return { backend: "3.17", ids: [] };
   return { backend: "3.18", ids };
 }
 
