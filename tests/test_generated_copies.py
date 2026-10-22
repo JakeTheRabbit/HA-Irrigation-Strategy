@@ -13,10 +13,15 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 SRC = "crop-steering-engine/src/crop_steering_engine/"
-COPY_DIRS = ["addons/f2_control/f2_control/crop_steering_engine/", "custom_components/crop_steering/generated/"]
-PAIRS: list[tuple[Path, Path]] = [
-    (ROOT / SRC / name, ROOT / d / name) for name in ("defaults.py", "ids.py", "timers.py") for d in COPY_DIRS
+COPY_DIRS = [
+    "addons/f2_control/f2_control/crop_steering_engine/",
+    "custom_components/crop_steering/generated/",
 ]
+PAIRS: list[tuple[Path, Path]] = [
+    (ROOT / SRC / name, ROOT / d / name)
+    for name in ("defaults.py", "ids.py", "timers.py", "guards.py")
+    for d in COPY_DIRS
+] + [(ROOT / SRC / "flow.py", ROOT / COPY_DIRS[0] / "flow.py")]
 
 
 def _same(source: Path, copy: Path) -> bool:
@@ -30,7 +35,9 @@ def _label(pair):
 @pytest.mark.parametrize("pair", PAIRS, ids=_label)
 def test_each_copy_is_its_source_byte_for_byte(pair):
     source, copy = pair
-    assert _same(source, copy), f"{_label(pair)} differs: cp {source.relative_to(ROOT)} {_label(pair)}"
+    assert _same(
+        source, copy
+    ), f"{_label(pair)} differs: cp {source.relative_to(ROOT)} {_label(pair)}"
 
 
 @pytest.mark.parametrize("pair", PAIRS, ids=_label)
