@@ -39,6 +39,11 @@ OPTIONS: dict[str, dict] = {
     # Plan
     "planner_reference_rows": {"default": False},
     "planner_day_curve": {"default": False},
+    # Units and clock: display only, per room. Storage and the API stay canonical.
+    "ec_unit": {"default": "mS/cm", "choices": ("mS/cm", "ppm500", "ppm700")},
+    "temp_unit": {"default": "C", "choices": ("C", "F")},
+    "volume_unit": {"default": "L", "choices": ("L", "gal")},
+    "clock": {"default": 24, "choices": (12, 24)},
 }
 
 
@@ -52,8 +57,12 @@ def clean_option(key, value):
     if spec is None:
         raise ValueError(f"Unknown display option: {key}")
     if "choices" in spec:
-        if value not in spec["choices"]:
-            raise ValueError(f"{key} must be one of: {', '.join(spec['choices'])}")
+        # Same type first: True == 1 and 12.0 == 12 must not pass for a number choice.
+        if type(value) not in {type(c) for c in spec["choices"]} or (
+            value not in spec["choices"]
+        ):
+            choices = ", ".join(str(c) for c in spec["choices"])
+            raise ValueError(f"{key} must be one of: {choices}")
         return value
     if type(value) is not bool:
         raise ValueError(f"{key} must be true or false")
