@@ -34,7 +34,7 @@ import {
   type JevSetpoints,
 } from "@/lib/jev";
 import { numeric } from "@/lib/model";
-import { overlayLabel, undoKept, zoneOverlays, type Overlay, type OverlayDocument } from "@/lib/overlays";
+import { overlayLabel, readsValue, undoKept, zoneOverlays, type Overlay, type OverlayDocument } from "@/lib/overlays";
 import { pagedQuery } from "@/lib/parity-api";
 import { smoothRecorded } from "@/lib/planning-curve";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
@@ -498,10 +498,11 @@ function EcSuggestion({
       const after = await controller.operator<OverlayDocument>("overlay_get");
       reload();
       // Keep writes no value: it ends the AI's change, and the setting must still read the AI's.
-      const reads = Number(latest.current.states[overlay.entity_id]?.state);
+      const entity = latest.current.states[overlay.entity_id];
+      const reads = Number(entity?.state);
       if (after.overlays.some((item) => item.entity_id === overlay.entity_id))
         throw new Error("The controller did not confirm it. Reload and check it before trying again.");
-      if (reads !== overlay.new)
+      if (!readsValue(entity, overlay.new))
         throw new Error(
           `The AI change ended, but ${label} reads ${Number.isFinite(reads) ? ec(reads) : "nothing"}, not ${ec(overlay.new)}. Reload and check it.`,
         );

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayWord, errorText } from "./utils";
+import { dayWord, errorText, sameValue } from "./utils";
 
 describe("errorText", () => {
   it("shows the REST response body from an inherited Home Assistant session", () => {
@@ -70,5 +70,21 @@ describe("dayWord", () => {
     expect(dayWord(at, now)).toBe(
       new Date(at).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" }),
     );
+  });
+});
+
+describe("sameValue", () => {
+  it("accepts a state Home Assistant rounded from the number written", () => {
+    expect(sameValue("3.4", 3.4000000000000004)).toBe(true);
+    expect(sameValue("3.44", 3.4, 0.1)).toBe(true);
+  });
+  it("refuses a value that genuinely moved", () => {
+    expect(sameValue("3.8", 3.4)).toBe(false);
+    expect(sameValue("3.5", 3.4, 0.1)).toBe(false);
+  });
+  it("refuses a state that is not a number", () => {
+    expect(sameValue("unavailable", 3.4)).toBe(false);
+    expect(sameValue(undefined, 3.4)).toBe(false);
+    expect(sameValue("", 0)).toBe(false);
   });
 });

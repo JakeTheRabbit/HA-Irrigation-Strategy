@@ -66,3 +66,22 @@ describe("undoing a kept AI change", () => {
     await expect(undoKept(kept, () => states("4"), write)).rejects.toThrow("Read back 4.");
   });
 });
+
+describe("undoing a kept AI change, as Home Assistant reads it back", () => {
+  const kept = { ...overlay(2, "ec_target_veg_p2"), old: 3.8, new: 3.4000000000000004 };
+  const states = (value: string) => ({
+    [kept.entity_id]: { entity_id: kept.entity_id, state: value, attributes: { step: 0.1 } },
+  });
+  it("takes the rounded state as the AI's value", async () => {
+    const write = vi.fn(async () => ({ applied: [kept.entity_id], failed: [] }));
+    await undoKept(kept, () => states("3.4"), write);
+    expect(write).toHaveBeenCalledOnce();
+  });
+  it("refuses a state that is not a number", async () => {
+    const write = vi.fn(async () => ({ applied: [kept.entity_id], failed: [] }));
+    await expect(undoKept(kept, () => states("unavailable"), write)).rejects.toThrow(
+      "This value has changed since you applied it. Nothing was undone.",
+    );
+    expect(write).not.toHaveBeenCalled();
+  });
+});
