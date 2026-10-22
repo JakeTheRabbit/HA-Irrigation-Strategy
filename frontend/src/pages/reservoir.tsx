@@ -9,9 +9,10 @@ import type { Page } from "@/lib/routes";
 import type { Controller } from "@/lib/types";
 import "./reservoir.css";
 
-/** Equipment › Tank & feed: the tank and pump, what the reservoir minimum is doing, the batch on
- * the tank, and the level charted with the shots, pump runs and fills. */
-export function Reservoir({
+/** The tank on Equipment › Feed & dosing: the tank and pump, what the reservoir minimum is doing,
+ * the batch on the tank, and the level charted with the shots, pump runs and fills. Shown also while
+ * dosing itself is unavailable (an older integration, or offline), with the last readings. */
+export function TankPanels({
   controller,
   navigate,
 }: {
@@ -25,11 +26,6 @@ export function Reservoir({
   const litres = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 1 });
   return (
     <>
-      <div className="page-heading">
-        <div>
-          <h1>Tank and feed</h1>
-        </div>
-      </div>
       <TankStatus controller={controller} onConfigure={configure} />
       <section
         className="panel reservoir-guard"

@@ -49,8 +49,8 @@ try {
   const pages = await tree
     .locator("[data-nav-page]")
     .evaluateAll((els) => els.map((e) => e.getAttribute("data-nav-page")));
-  assert.equal(pages.length, 20);
-  assert.equal(new Set(pages).size, 20);
+  assert.equal(pages.length, 21);
+  assert.equal(new Set(pages).size, 21);
   for (const section of ["plan", "equipment", "settings"])
     await tree.locator(`button[data-nav-section="${section}"]`).click();
   await page.evaluate(() => localStorage.removeItem("crop-steering.nav-open"));
@@ -194,7 +194,7 @@ try {
   await page.screenshot({ path: file("nav-tree-390.png"), animations: "disabled" });
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: tree menu (5 sections, 20 pages), Changes aria-current + address, only the current and grower-opened sections expand (left sections close; opened ones survive navigation and reload), keyboard, tabs hidden at 1440 and shown at 390, 5-button bottom bar, axe clean, all rooms, correct-room details, default preference, direct and old links, history room filter, protected zone drafts, mobile width, zero browser errors",
+    "PASS: tree menu (5 sections, 21 pages), Changes aria-current + address, only the current and grower-opened sections expand (left sections close; opened ones survive navigation and reload), keyboard, tabs hidden at 1440 and shown at 390, 5-button bottom bar, axe clean, all rooms, correct-room details, default preference, direct and old links, history room filter, protected zone drafts, mobile width, zero browser errors",
   );
 } finally {
   await browser.close();

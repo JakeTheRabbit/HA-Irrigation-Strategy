@@ -69,6 +69,7 @@ export const NAV_TREE: readonly NavSection[] = [
       { page: "settings/system", label: "System status" },
       { page: "settings/ai", label: "AI assistant" },
       { page: "settings", label: "Dashboards & display" },
+      { page: "help", label: "Help" },
     ],
   },
 ];

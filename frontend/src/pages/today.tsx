@@ -673,7 +673,23 @@ function ZoneRow({
               <strong>{z.mlPerPlant === null ? "—" : perPlant(z.mlPerPlant)}</strong>
               {z.waterL !== null && <span> · {formatVolume(z.waterL, 1)}</span>}
               {shots !== null && (
-                <span> · {shots === 0 ? "no shots" : `${shots} shot${shots === 1 ? "" : "s"}`}</span>
+                <span>
+                  {" · "}
+                  {zone.lastIrrigation.timestamp && shots > 0 ? (
+                    // The count carries the last shot's time, machine-readable and on hover.
+                    <time
+                      dateTime={zone.lastIrrigation.timestamp}
+                      data-last-irrigation={zone.id}
+                      title={`Last shot ${clock(Date.parse(zone.lastIrrigation.timestamp), timeZone)}`}
+                    >
+                      {shots} shot{shots === 1 ? "" : "s"}
+                    </time>
+                  ) : shots === 0 ? (
+                    "no shots"
+                  ) : (
+                    `${shots} shot${shots === 1 ? "" : "s"}`
+                  )}
+                </span>
               )}
             </>
           }

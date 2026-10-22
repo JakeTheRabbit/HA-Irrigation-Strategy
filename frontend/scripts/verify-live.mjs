@@ -525,13 +525,17 @@ try {
       await page.getByRole("button", { name: "Refresh controller data" }).click();
       await visible(page.getByText("Controller disconnected", { exact: true }));
       assert.equal(await page.locator(".data-age").innerText(), "Offline");
-      // Feed & dosing (where the tank and feed now live) keeps the last readings and says why
-      // nothing can be dosed.
+      // Feed & dosing owns the tank: its card keeps the last readings and says so, and dosing
+      // says why nothing can be dosed.
       await tree("equipment", "Feed & dosing");
       await visible(page.getByRole("heading", { name: "Dosing", exact: true, level: 1 }));
+      await visible(
+        page
+          .locator("[data-tank-status]")
+          .getByText("Disconnected · last received", { exact: true }),
+      );
       await visible(page.getByText("Dosing not available", { exact: true }));
       await visible(page.getByText(/^Connect to Home Assistant before using this action\./));
-      await visible(page.getByText(/Displayed values are the last received readings\./));
       await tree("plan", "Current day");
       assert.equal(await field("p1_target_vwc").isDisabled(), true);
       assert.equal(await page.locator(".demo-pill").count(), 0);
@@ -584,12 +588,7 @@ try {
       await visible(
         page.locator('input[id="setting-number.crop_steering_f2_zone_1_p2_vwc_threshold"]'),
       );
-      // Help has no entry in the tree menu: Settings' section owns it, opened by its address.
-      await tree("settings", "Dashboards & display");
-      await visible(page.getByRole("heading", { name: "Settings", exact: true }));
-      await page.evaluate(() => {
-        location.hash = "#/help";
-      });
+      await tree("settings", "Help");
       await visible(page.getByRole("heading", { name: "Help", exact: true }));
       assert.equal(
         await page.locator('a[href*="f2-classic.html"]').count(),

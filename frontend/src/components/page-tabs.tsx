@@ -19,7 +19,6 @@ const OFF_MENU_LABELS: Partial<Record<Page, string>> = {
   "history/grows": "Grows",
   "history/drivers": "Dryback drivers",
   "settings/features": "Capabilities",
-  help: "Help",
 };
 /** A page's own name, for its tab and the window title. */
 export function pageLabel(page: Page): string {

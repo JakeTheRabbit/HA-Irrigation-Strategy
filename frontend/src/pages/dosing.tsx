@@ -69,6 +69,7 @@ import {
 import { tankTelemetry, type TankReading } from "@/lib/tank-telemetry";
 import type { Controller } from "@/lib/types";
 import { dayWord, errorText } from "@/lib/utils";
+import { TankPanels } from "./reservoir";
 import "./dosing.css";
 
 const mL = (value: number) =>
@@ -1167,6 +1168,7 @@ export function Dosing({
           />
         </details>
       )}
+      <TankPanels controller={controller} navigate={navigate} />
       <RequestDialog controller={controller} review={review} onClose={() => setReview(null)} />
     </div>
   );

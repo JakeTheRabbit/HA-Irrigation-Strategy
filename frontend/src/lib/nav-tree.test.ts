@@ -17,8 +17,10 @@ describe("the tree menu", () => {
       "Settings",
     ]);
     const pages = NAV_TREE.flatMap((s) => s.items.map((i) => i.page));
-    expect(pages).toHaveLength(20);
-    expect(new Set(pages).size).toBe(20);
+    expect(pages).toHaveLength(21);
+    expect(new Set(pages).size).toBe(21);
+    // Help sits last under Settings: every page a grower can open is in the tree.
+    expect(NAV_TREE.at(-1)!.items.at(-1)).toEqual({ page: "help", label: "Help" });
   });
   test("open state survives a throwing localStorage", () => {
     vi.stubGlobal("localStorage", {
