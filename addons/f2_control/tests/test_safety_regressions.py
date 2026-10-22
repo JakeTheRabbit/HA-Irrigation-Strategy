@@ -533,3 +533,63 @@ def test_blind_fallback_does_not_water_at_night(rig):
     assert pub[1]["fire"] is False and pub[2]["fire"] is False
     assert not any(dom == "switch" and svc == "turn_on" for dom, svc, _data in fake.calls)
     assert room.state[1]["daily_vol"] == 0.0 and room.state[2]["daily_vol"] == 0.0
+
+
+def _blind_day(c, fake, now, phase, daily_vol=0.0, since_shot=30):
+    """Both probes dead (no sibling to copy), a 4 L minimum daily water on zone 1 (1000 mL x 4 plants)."""
+    room = c.rooms[0]
+    fake.set_state("number.crop_steering_zone_1_min_daily_ml_per_plant", "1000")
+    fake.set_state("number.crop_steering_zone_1_plant_count", "4")
+    for st in room.state.values():
+        st.update(phase=phase, last_shot=now - timedelta(minutes=since_shot), daily_vol=0.0,
+                  last_phase_change=now - timedelta(minutes=10), last_daily_reset=now.date())
+    room.state[1]["daily_vol"] = daily_vol
+    return room
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+@pytest.mark.parametrize("phase", ["P2", "P3"])
+def test_a_blind_zone_behind_its_minimum_daily_water_gets_the_floor(rig, phase):
+    """CTL-031: the minimum daily water does not need the probe; a blind zone behind it is watered with the lights on,
+    between the timer shots (30 min since the last, under the 90 min timer)."""
+    c, fake, _clock = rig
+    now = datetime(2026, 9, 7, 14, 0)  # lights 10-22: on, 4 h in, the floor's line at 4/9 of 4 L
+    room = _blind_day(c, fake, now, phase)
+    room._was_lights_on = True
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] is True and "MIN-DAILY floor" in str(pub[1]["reason"])
+    assert pub[2]["fire"] is False  # no floor set on zone 2
+    assert room.state[1]["daily_vol"] > 0.0
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+@pytest.mark.parametrize(
+    "hour, phase, daily_vol",
+    [
+        (23, "P3", 0.0),  # lights off: never at night
+        (11, "P0", 0.0),  # the morning dryback comes first, as for a zone with a probe
+        (14, "P2", 2.0),  # already ahead of the line (4/9 of 4 L): the water so far counts
+    ],
+)
+def test_a_blind_zone_gets_no_floor_shot_when_none_is_due(rig, hour, phase, daily_vol):
+    c, fake, _clock = rig
+    now = datetime(2026, 9, 7, hour, 0)
+    room = _blind_day(c, fake, now, phase, daily_vol)
+    room._was_lights_on = hour < 22
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] is False
+    assert room.state[1]["daily_vol"] == daily_vol
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+def test_the_blind_timer_shot_is_not_doubled_by_the_floor(rig):
+    """A timer shot due fires once, as the timer shot; the floor counts it and waits its interval."""
+    c, fake, _clock = rig
+    now = datetime(2026, 9, 7, 14, 0)
+    room = _blind_day(c, fake, now, "P2", since_shot=120)
+    room._was_lights_on = True
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] is True and "FALLBACK" in str(pub[1]["reason"])
+    after = room.state[1]["daily_vol"]
+    pub = c._loop_room(room, now + timedelta(minutes=1))
+    assert pub[1]["fire"] is False and room.state[1]["daily_vol"] == after

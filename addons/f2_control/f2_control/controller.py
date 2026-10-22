@@ -32,6 +32,7 @@ import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
+from types import SimpleNamespace
 
 import requests
 import auto_setpoints
@@ -72,7 +73,7 @@ from crop_steering_engine import (
     zone_status_label,
     settled_reading,
 )
-from crop_steering_engine.core import SETTLED_VWC_MIN, ec_flush_goal, p1_stall, p1_stall_rewater
+from crop_steering_engine.core import SETTLED_VWC_MIN, ec_flush_goal, floor_share, p1_stall, p1_stall_rewater
 # What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
 # controller column of the one defaults table, pinned to the values installed controllers use.
 from crop_steering_engine.defaults import CONTROLLER_FALLBACKS as FALLBACK
@@ -7057,6 +7058,16 @@ class Controller:
                     f"{int(self.blind_fallback_min)} min in P1 and P2 while the lights and the kill switch are "
                     "on, inside its daily water limit. Phase changes that use the moisture reading wait for the probe."
                 )
+            # The minimum daily water needs no probe (decide()'s floor, paced by floor_share): a blind zone behind it
+            # gets it too, with the lights on and past P0, when no other shot fires. Every shot counts toward it.
+            floor_due = p.min_daily_volume * floor_share(SimpleNamespace(
+                hours_since_lights_on=(24.0 - self._hours_to(now, room.lights_on_hour)) % 24.0,
+                hours_to_lights_off=self._hours_to(now, room.lights_off_hour)), p)
+            if (not decisions[zone][0] and p.min_daily_volume > 0 and lights_on and st["phase"] != "P0"
+                    and st["daily_vol"] < floor_due and self._minutes_since_shot(st, now) >= p.p2_min_interval_min):
+                decisions[zone] = (True, p.p2_shot_size, Reason(
+                    f"MIN-DAILY floor {st['daily_vol']:.1f}<{floor_due:.1f} of {p.min_daily_volume:.1f}L "
+                    "(no live probe)", "min_daily"))
             # Re-alert each tick — _alert's 30-min debounce throttles it to a repeating
             # reminder so a dead probe can't sit unnoticed (the silent-freeze lesson). Why it
             # is unusable is read every tick, so a changed cause replaces the card's diagnosis.
