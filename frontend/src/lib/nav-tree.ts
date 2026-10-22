@@ -73,6 +73,19 @@ export const NAV_TREE: readonly NavSection[] = [
   },
 ];
 
+/** The sections drawn open: the ones the grower opened, and the current page's section unless the
+ * grower collapsed it. A section opened only because a page in it was current closes again once
+ * the grower moves to another section. */
+export function expandedSections(
+  current: Section,
+  opened: ReadonlySet<Section>,
+  collapsed: ReadonlySet<Section>,
+): Set<Section> {
+  const expanded = new Set(opened);
+  if (!collapsed.has(current)) expanded.add(current);
+  return expanded;
+}
+
 const OPEN_KEY = "crop-steering.nav-open";
 
 /** The sections the grower left open, or none when storage is blocked or holds nothing usable. */

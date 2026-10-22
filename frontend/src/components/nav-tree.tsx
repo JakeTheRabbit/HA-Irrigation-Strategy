@@ -1,6 +1,6 @@
 import { useEffect, useId, useState, type KeyboardEvent, type MouseEvent } from "react";
 import { ChevronRight } from "lucide-react";
-import { NAV_TREE, readOpenSections, writeOpenSections } from "@/lib/nav-tree";
+import { expandedSections, NAV_TREE, readOpenSections, writeOpenSections } from "@/lib/nav-tree";
 import { routeHash, sectionOf, type Page, type Section } from "@/lib/routes";
 import "./nav-tree.css";
 
@@ -19,16 +19,25 @@ export function NavTree({
 }) {
   const id = useId();
   const current = sectionOf(page);
-  const [open, setOpen] = useState(() => new Set([...readOpenSections(), current]));
-  useEffect(() => {
-    setOpen((now) => (now.has(current) ? now : new Set([...now, current])));
-  }, [current]);
+  /** Sections the grower opened (remembered), and the current section if the grower collapsed it
+   * (forgotten when the current section changes). */
+  const [opened, setOpened] = useState(readOpenSections);
+  const [collapsed, setCollapsed] = useState<Set<Section>>(() => new Set());
+  useEffect(() => setCollapsed(new Set()), [current]);
+  const open = expandedSections(current, opened, collapsed);
   function toggle(section: Section, next = !open.has(section)) {
-    const updated = new Set(open);
-    if (next) updated.add(section);
-    else updated.delete(section);
-    setOpen(updated);
-    writeOpenSections(updated);
+    const nextOpened = new Set(opened);
+    const nextCollapsed = new Set(collapsed);
+    if (next) {
+      nextOpened.add(section);
+      nextCollapsed.delete(section);
+    } else {
+      nextOpened.delete(section);
+      if (section === current) nextCollapsed.add(section);
+    }
+    setOpened(nextOpened);
+    setCollapsed(nextCollapsed);
+    writeOpenSections(nextOpened);
   }
   function follow(event: MouseEvent, target: Page) {
     if (event.metaKey || event.ctrlKey || event.shiftKey || event.button !== 0) return;

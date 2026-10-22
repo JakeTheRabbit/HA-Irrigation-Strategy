@@ -1,4 +1,4 @@
-import { parseRoute, type Page, type Route } from "./routes";
+import { LEGACY_PAGES, parseRoute, type Page, type Route } from "./routes";
 export const LANDING_KEY = "crop-steering-landing-view";
 export const LANDING_VIEWS = [
   { value: "all-zones", label: "Status · all rooms" },
@@ -10,8 +10,10 @@ export const LANDING_VIEWS = [
   { value: "equipment/setup", label: "Equipment · rooms and zones" },
 ] as const satisfies readonly { value: Page; label: string }[];
 export type LandingView = (typeof LANDING_VIEWS)[number]["value"];
+/** A saved choice, moved to its new home if its page moved (`history/timeline` opens Explorer). */
 export function landingView(value: string | null): LandingView {
-  return LANDING_VIEWS.some((item) => item.value === value) ? (value as LandingView) : "all-zones";
+  const moved = value === null ? null : (LEGACY_PAGES[value] ?? value);
+  return LANDING_VIEWS.some((item) => item.value === moved) ? (moved as LandingView) : "all-zones";
 }
 export function readLandingView(storage?: Pick<Storage, "getItem">): LandingView {
   try {

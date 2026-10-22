@@ -105,6 +105,35 @@ try {
   await page.keyboard.press("Home");
   assert.equal(await page.evaluate(() => document.activeElement?.dataset.navSection), "today");
 
+  // Only the current section opens by itself, and it closes again when the grower moves on;
+  // a section the grower opened stays open, across pages and reloads.
+  const expanded = async (section) =>
+    tree.locator(`button[data-nav-section="${section}"]`).getAttribute("aria-expanded");
+  await page.evaluate(() => localStorage.removeItem("crop-steering.nav-open"));
+  await page.reload();
+  await page.getByRole("heading", { name: "Changes", exact: true }).waitFor();
+  assert.equal(await expanded("history"), "true", "the current section opens by itself");
+  await tree.locator('button[data-nav-section="settings"]').click();
+  await tree.locator('button[data-nav-section="equipment"]').click();
+  await tree.getByRole("link", { name: "Stock", exact: true }).click();
+  await page.waitForURL((url) => url.hash === "#/equipment/stock");
+  assert.equal(await expanded("history"), "false", "History closes when the grower leaves it");
+  assert.equal(await expanded("settings"), "true", "an opened section stays open");
+  await tree.getByRole("link", { name: "Probes & offsets", exact: true }).click();
+  await page.waitForURL((url) => url.hash === "#/equipment/probes");
+  assert.equal(await expanded("settings"), "true");
+  await page.reload();
+  await page.locator('[data-nav-page="equipment/probes"][aria-current="page"]').waitFor();
+  assert.deepEqual(
+    await Promise.all(["plan", "history", "equipment", "settings"].map(expanded)),
+    ["false", "false", "true", "true"],
+    "a reload keeps only the sections the grower opened",
+  );
+  // The current section can still be collapsed.
+  await tree.locator('button[data-nav-section="equipment"]').click();
+  assert.equal(await expanded("equipment"), "false");
+  await tree.locator('button[data-nav-section="history"]').click();
+
   // Desktop hides the in-page tabs; axe passes on the tree.
   assert.equal(await page.locator(".page-tabs").isVisible(), false);
   const audit = await new AxeBuilder({ page })
@@ -116,7 +145,7 @@ try {
     "tree menu accessibility",
   );
   await tree.locator('button[data-nav-section="equipment"]').click();
-  await page.screenshot({ path: file("nav-tree-1440.png") });
+  await page.screenshot({ path: file("nav-tree-1440.png"), animations: "disabled" });
 
   // The old checks: all rooms, room address, landing preference, direct links, zone drafts.
   await open("#/all-zones");
@@ -162,10 +191,10 @@ try {
   await page.getByRole("button", { name: "Open navigation" }).click();
   await page.locator('.mobile-sidebar nav[aria-label="Main navigation"]').waitFor();
   await page.waitForTimeout(300);
-  await page.screenshot({ path: file("nav-tree-390.png") });
+  await page.screenshot({ path: file("nav-tree-390.png"), animations: "disabled" });
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: tree menu (5 sections, 20 pages), Changes aria-current + address, open state survives reload, keyboard, tabs hidden at 1440 and shown at 390, 5-button bottom bar, axe clean, all rooms, correct-room details, default preference, direct and old links, history room filter, protected zone drafts, mobile width, zero browser errors",
+    "PASS: tree menu (5 sections, 20 pages), Changes aria-current + address, only the current and grower-opened sections expand (left sections close; opened ones survive navigation and reload), keyboard, tabs hidden at 1440 and shown at 390, 5-button bottom bar, axe clean, all rooms, correct-room details, default preference, direct and old links, history room filter, protected zone drafts, mobile width, zero browser errors",
   );
 } finally {
   await browser.close();

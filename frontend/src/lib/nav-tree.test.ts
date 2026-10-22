@@ -2,8 +2,8 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, describe, expect, test, vi } from "vitest";
 import { NavTree } from "@/components/nav-tree";
-import { NAV_TREE, readOpenSections, writeOpenSections } from "./nav-tree";
-import { RENDERED_PAGES } from "./routes";
+import { expandedSections, NAV_TREE, readOpenSections, writeOpenSections } from "./nav-tree";
+import { RENDERED_PAGES, type Section } from "./routes";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -55,6 +55,36 @@ describe("the tree menu", () => {
     expect(html).toMatch(
       /data-nav-page="history\/changes"[^>]*aria-current="page"|aria-current="page"[^>]*data-nav-page="history\/changes"/,
     );
+  });
+  test("only the current section and explicitly opened ones are expanded", () => {
+    const none = new Set<Section>();
+    // Visiting History opens it; moving on to an Equipment page collapses it again.
+    expect(expandedSections("history", none, none)).toEqual(new Set(["history"]));
+    expect(expandedSections("equipment", none, none)).toEqual(new Set(["equipment"]));
+    // An explicitly opened section stays open wherever the grower goes.
+    expect(expandedSections("history", new Set(["settings"]), none)).toEqual(
+      new Set(["settings", "history"]),
+    );
+    // The current section can still be collapsed.
+    expect(expandedSections("history", none, new Set(["history"]))).toEqual(new Set());
+  });
+  test("a reload renders only the stored explicit toggles plus the current section", () => {
+    const store = new Map([["crop-steering.nav-open", JSON.stringify(["settings"])]]);
+    vi.stubGlobal("localStorage", {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => store.set(key, value),
+    });
+    const html = renderToStaticMarkup(
+      createElement(NavTree, { page: "equipment/probes", navigate: () => {} }),
+    );
+    const expanded = (section: string) =>
+      html.match(new RegExp(`<button[^>]*data-nav-section="${section}"[^>]*>`))?.[0].includes(
+        'aria-expanded="true"',
+      );
+    expect(expanded("settings")).toBe(true);
+    expect(expanded("equipment")).toBe(true);
+    expect(expanded("history")).toBe(false);
+    expect(expanded("plan")).toBe(false);
   });
   test("every tree page has a component in App's render chain", () => {
     for (const s of NAV_TREE) for (const i of s.items) expect(RENDERED_PAGES).toContain(i.page);
