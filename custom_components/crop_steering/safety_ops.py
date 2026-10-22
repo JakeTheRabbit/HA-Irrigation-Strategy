@@ -256,7 +256,7 @@ async def async_setup_stop_all(hass):
     hass.services.async_register(
         DOMAIN,
         "stop_all",
-        wrap(handle, readback_of=stopped, error_of=refusal),
+        wrap(handle, readback_of=stopped, error_of={"stop_all": refusal}),
         schema=vol.Schema(fields({vol.Required("room_id"): str})),
         supports_response=SupportsResponse.OPTIONAL,
     )

@@ -31,7 +31,7 @@ import uuid
 
 from . import calibration as calibration_module, dosing
 from .admin import async_require_admin, forbidden
-from .api_v2 import Unavailable
+from .api_v2 import GuardRefused, Unavailable
 from .const import DOMAIN
 from .journal_api import attribution, note
 from .room import room_prefix
@@ -431,7 +431,7 @@ class DosingStore:
         if blockers:
             return None, blockers
         if self.pending():
-            raise ValueError(BUSY)
+            raise GuardRefused(BUSY)
         request = {
             "id": uuid.uuid4().hex,
             "action": action,
@@ -505,7 +505,7 @@ class DosingStore:
             if action == "stop":
                 return {"request_id": waiting["id"], "replaced": None}
             if action in ("dose", "batch") and not admin:
-                raise ValueError(WAITING)
+                raise GuardRefused(WAITING)
             upgrade = action in ("prime", "calibrate", "stop_pump") and (
                 waiting.get("pump") != pump
             )
@@ -928,8 +928,6 @@ async def async_setup_dosing(hass, entry):
 
     def refusal(call, result):
         """API v2: a request or save this service answered as refused instead of raising."""
-        if call.service not in ("dosing_request", "dosing_save"):
-            return None
         error = result.get("error") if isinstance(result, dict) else None
         if not error or (call.service == "dosing_request" and result.get("request")):
             return None
@@ -949,6 +947,16 @@ async def async_setup_dosing(hass, entry):
         if error == resolve_dosing(hass, call.data["room_id"]).error:
             return failure("unavailable", error)
         return failure("invalid", error)
+
+    def pump_refused(call, result):
+        """API v2: a prime or calibration a blocker refused ({outcome: refused, blockers})."""
+        if not isinstance(result, dict) or result.get("outcome") != "refused":
+            return None
+        return failure(
+            "guard_refused",
+            "The pump cannot run now: "
+            + "; ".join(b["message"] for b in result.get("blockers") or ()),
+        )
 
     schemas = {
         "dosing_get": {vol.Required("room_id"): str},
@@ -994,7 +1002,16 @@ async def async_setup_dosing(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            wrap(handle, revision_of=nested_revision, error_of=refusal),
+            wrap(
+                handle,
+                revision_of=nested_revision,
+                error_of={
+                    "dosing_request": refusal,
+                    "dosing_save": refusal,
+                    "pump_prime": pump_refused,
+                    "pump_calibrate": pump_refused,
+                },
+            ),
             schema=vol.Schema(fields(schemas[service])),
             # Reads answer only; a pump service that leaves a request or stores a flow may answer.
             supports_response=(

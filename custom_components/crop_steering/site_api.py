@@ -381,6 +381,23 @@ class SiteStore:
             _LOGGER.debug("Supply change not journaled: %s", error)
 
 
+def _rows_refused(call, result):
+    """API v2: an apply or copy whose target refused a value (or a timer it may not take out). The
+    other values are written; every row is in `data.applied`."""
+    from .api_v2 import failure
+
+    refused = [
+        row for row in result.get("applied") or () if row.get("readback") == "refused"
+    ]
+    if not refused:
+        return None
+    return failure(
+        "guard_refused",
+        "Not applied: "
+        + "; ".join(f"{row['key']}: {row.get('error')}" for row in refused),
+    )
+
+
 async def async_setup_site(hass, entry) -> None:
     """Once for the site, with the first room that sets up; each room after it only joins (and
     publishes again, as its sizing may have changed)."""
@@ -493,7 +510,10 @@ async def async_setup_site(hass, entry) -> None:
         hass.services.async_register(
             DOMAIN,
             service,
-            wrap(handle),
+            wrap(
+                handle,
+                error_of={"preset_apply": _rows_refused, "copy_config": _rows_refused},
+            ),
             schema=vol.Schema(fields(schemas[service])),
             supports_response=(
                 SupportsResponse.ONLY if service in READS else SupportsResponse.OPTIONAL

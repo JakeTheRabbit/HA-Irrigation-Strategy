@@ -167,8 +167,78 @@ def failure(code: str, message: str, current_revision=None) -> dict:
     return out
 
 
-def _no_error(call, result):
-    return None
+# The response services that never answer a refusal: each says "did not do it" by raising. Every
+# other response service has an `error_of` hook for its own refusal answers. tests_ha/test_api_v2.py
+# holds every registered service to one or the other, so a new service cannot slip through.
+NEVER_ANSWERS_REFUSAL = frozenset(
+    {
+        "brain_ask",
+        "brain_prompt_get",
+        "brain_prompt_publish",
+        "brain_prompt_rebuild",
+        "brain_prompt_rollback",
+        "brain_prompt_save",
+        "calibration_abandon",
+        "calibration_commit",
+        "calibration_get",
+        "calibration_record",
+        "calibration_revert",
+        "calibration_start",
+        "calibration_status",
+        "dashboard_create",
+        "dashboard_list",
+        "display_get",
+        "display_save",
+        "dosing_get",
+        "grow_days_backfill",
+        "grow_days_get",
+        "harvests_get",
+        "history_connection_get",
+        "history_connection_save",
+        "history_long",
+        "journal_append",
+        "journal_query",
+        "notify_get",
+        "overlay_get",
+        "preset_delete",
+        "preset_list",
+        "preset_save",
+        "probe_offset_set",
+        "pump_calibration_commit",
+        "pump_precheck",
+        "pump_stop",
+        "runs_archive",
+        "runs_get",
+        "runs_import",
+        "runs_save",
+        "runs_set_harvest",
+        "setpoint_log_get",
+        "setup_commission",
+        "setup_create",
+        "setup_read",
+        "setup_remove",
+        "setup_save",
+        "stock_get",
+        "stock_record_batch",
+        "stock_refill",
+        "stock_save",
+        "strategy_activate",
+        "strategy_disarm",
+        "strategy_get",
+        "strategy_preview",
+        "strategy_save",
+        "supply_get",
+        "supply_save",
+        "test_shot",
+        "timer_program_delete",
+        "timer_program_list",
+        "timer_program_preview",
+        "timer_program_set",
+        "timer_skip",
+        "whats_new_get",
+        "whats_new_seen",
+    }
+)
 
 
 def wrap(
@@ -177,13 +247,15 @@ def wrap(
     room_of=_room,
     revision_of=_revision,
     readback_of=_readback,
-    error_of=_no_error,
+    error_of=None,
 ):
     """The service handler, answering in the v2 envelope when the call says `api: 2`.
 
-    `error_of(call, result)` -> a failure() for an answer that is a refusal (a service that answers
-    one instead of raising), else None; the answer then stays in `data`.
+    `error_of`: {service: hook(call, result)} for each service of the handler that answers a refusal
+    instead of raising. A hook returns a failure() for an answer that means "did not do it", else
+    None; the answer then stays in `data`. Kept on the wrapper as `.error_of`.
     """
+    refusals = dict(error_of or {})
 
     @functools.wraps(handler)
     async def wrapped(call):
@@ -204,7 +276,8 @@ def wrap(
             return {"api": 2, "ok": False, "error": failed}
         finally:
             EMITTED.reset(token)
-        refused = error_of(call, result)
+        hook = refusals.get(call.service)
+        refused = hook(call, result) if hook is not None else None
         if refused is not None:
             return {"api": 2, "ok": False, "error": refused, "data": result}
         return {
@@ -217,4 +290,5 @@ def wrap(
             "data": result,
         }
 
+    wrapped.error_of = refusals
     return wrapped

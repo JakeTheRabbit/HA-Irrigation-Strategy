@@ -836,3 +836,50 @@ def test_api_v2_a_refusal_answered_instead_of_raised_is_not_ok(services):
     assert stale["error"]["current_revision"] == 0
     gone = v2("notify_test", "someone-deleted", service=PHONE_A)
     assert gone["error"]["code"] == "forbidden"
+
+
+def test_api_v2_a_push_or_test_no_phone_got_is_unavailable(services):
+    def v2(name, **data):
+        request = SimpleNamespace(
+            service=name,
+            data={"api": 2, **data},
+            context=SimpleNamespace(user_id=ADMIN.id),
+            return_response=True,
+        )
+        return asyncio.run(services.hass.services.registered[(DOMAIN, name)](request))
+
+    failing = services.hass.services.failing
+    push = {"key": "k", "title": "T", "message": "M", "room": ""}
+    services.call(
+        "notify_save",
+        ADMIN,
+        expected_revision=0,
+        recipients=[row(PHONE_A, kinds=["stock"]), row(PHONE_B, kinds=["stock"])],
+    )
+    assert v2("notify", code="CS-608", **push)["ok"] is True
+    # Nobody ticks it: nobody gets it, and that is not a failure.
+    nobody = v2("notify", code="CS-705", **push)
+    assert nobody["ok"] is True and nobody["data"]["sent_to"] == []
+    failing[PHONE_A] = failing[PHONE_B] = HomeAssistantError("device not connected")
+    lost = v2("notify", code="CS-608", **push)
+    assert lost["ok"] is False and lost["error"]["code"] == "unavailable"
+    assert lost["data"]["sent_to"] == [] and PHONE_A in lost["error"]["message"]
+    # Several phones tested: ok only when every one sent.
+    del failing[PHONE_A]
+    some = v2("notify_test", services=[PHONE_A, PHONE_B])
+    assert some["ok"] is False and some["error"]["code"] == "unavailable"
+    assert (
+        PHONE_B in some["error"]["message"] and PHONE_A not in some["error"]["message"]
+    )
+    assert [r["sent"] for r in some["data"]["results"]] == [True, False]
+    failing.clear()
+    assert v2("notify_test", services=[PHONE_A, PHONE_B])["ok"] is True
+    # A push held for a phone's digest is not a failure, and the answer says it is held.
+    services.call(
+        "notify_save",
+        ADMIN,
+        expected_revision=1,
+        recipients=[row(PHONE_A, kinds=["stock"], digest=True)],
+    )
+    held = v2("notify", code="CS-608", **push)
+    assert held["ok"] is True and held["data"]["held"] == [PHONE_A]

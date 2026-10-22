@@ -1384,6 +1384,18 @@ def resolve_session(hass, session_id):
     raise ValueError(EXPIRED)
 
 
+def _not_captured(call, result):
+    """API v2: a capture of a reading that is not steady yet stores nothing (unless forced)."""
+    from .api_v2 import failure
+
+    if result.get("stable") or call.data.get("force"):
+        return None
+    return failure(
+        "guard_refused",
+        "The reading is not steady yet: nothing was captured. Wait, or capture it anyway.",
+    )
+
+
 async def async_setup_calibration(hass, entry):
     import voluptuous as vol
     from homeassistant.core import SupportsResponse
@@ -1478,7 +1490,7 @@ async def async_setup_calibration(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            wrap(handle),
+            wrap(handle, error_of={"calibration_capture": _not_captured}),
             schema=vol.Schema(fields(schemas[service])),
             # calibration_record answers only, as it always did.
             supports_response=(

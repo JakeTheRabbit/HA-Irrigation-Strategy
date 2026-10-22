@@ -188,3 +188,37 @@ async def test_a_stop_all_that_leaves_something_on_is_never_ok(
     assert out["ok"] is True, out
     assert out["readback"]["status"] == "verified"
     assert out["data"]["still_on"] == [] and out["data"]["refused"] == []
+
+
+async def test_every_response_service_has_a_refusal_hook_or_never_answers_one(hass):
+    """A service that answers "did not do it" instead of raising must map it (error_of); one that
+    never does is named in NEVER_ANSWERS_REFUSAL. A new service is in neither until someone looks.
+    """
+    from custom_components.crop_steering.api_v2 import NEVER_ANSWERS_REFUSAL
+
+    await _install(hass)
+    services = hass.services.async_services()[DOMAIN]
+    names = {
+        name
+        for name in services
+        if hass.services.supports_response(DOMAIN, name) is not SupportsResponse.NONE
+    }
+    hooked = {name for name in names if name in services[name].job.target.error_of}
+    assert not hooked & NEVER_ANSWERS_REFUSAL
+    assert names - hooked - NEVER_ANSWERS_REFUSAL == set()
+    assert NEVER_ANSWERS_REFUSAL <= names  # no stale name
+    assert hooked == {
+        "calibration_capture",
+        "copy_config",
+        "dosing_request",
+        "dosing_save",
+        "grow_day_record",
+        "notify",
+        "notify_save",
+        "notify_test",
+        "preset_apply",
+        "pump_calibrate",
+        "pump_prime",
+        "stock_draw",
+        "stop_all",
+    }

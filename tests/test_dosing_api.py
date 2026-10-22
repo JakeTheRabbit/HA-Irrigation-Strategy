@@ -630,3 +630,26 @@ def test_api_v2_a_request_held_by_a_pump_being_calibrated_is_guard_refused(
     held = _v2(services, "dosing_request", action="dose", pump="balance", ml=5)
     assert held["ok"] is False
     assert held["error"] == {"code": "guard_refused", "message": dosing_api.HELD}
+
+
+def test_api_v2_a_pump_action_a_blocker_refused_is_never_ok(services):
+    services.call(
+        "dosing_save",
+        expected_revision=0,
+        pumps=[copy.deepcopy(PUMP)],
+        batch=copy.deepcopy(BATCH),
+    )
+    pump = PUMP["id"]
+    # No controller heartbeat in this rig: a prime is refused by its blockers.
+    v1 = services.call("pump_prime", pump=pump, seconds=10)
+    assert v1["outcome"] == "refused" and v1["blockers"]
+    out = _v2(services, "pump_prime", pump=pump, seconds=10)
+    assert out["ok"] is False and out["error"]["code"] == "guard_refused"
+    assert out["data"] == v1
+    assert v1["blockers"][0]["message"] in out["error"]["message"]
+    # A staff pump stop never replaces a waiting dose: refused by the guard, as before in v1.
+    assert _v2(services, "dosing_request", action="dose", pump=pump, ml=5)["ok"]
+    stop = _v2(services, "pump_stop", user="staff", pump=pump)
+    assert stop["ok"] is False and stop["error"]["code"] == "guard_refused"
+    with pytest.raises(HomeAssistantError, match="waiting"):
+        services.call("pump_stop", user="staff", pump=pump)

@@ -539,6 +539,17 @@ def resolve_stock(hass, room_id):
     return matches[0]
 
 
+def _unknown_tanks(call, result):
+    """API v2: a draw that named tanks this room does not have (they are skipped, the others drawn)."""
+    from .api_v2 import failure
+
+    if not result.get("skipped"):
+        return None
+    return failure(
+        "invalid", "Not stock tanks of this room: " + ", ".join(result["skipped"])
+    )
+
+
 async def async_setup_stock(hass, entry):
     import voluptuous as vol
     from homeassistant.core import SupportsResponse
@@ -588,7 +599,7 @@ async def async_setup_stock(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            wrap(handle),
+            wrap(handle, error_of={"stock_draw": _unknown_tanks}),
             schema=vol.Schema(fields(schema)),
             # The controller app calls stock_draw over REST without asking for the answer.
             supports_response=(

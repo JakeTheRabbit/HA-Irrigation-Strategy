@@ -123,7 +123,7 @@ def test_a_refusal_answered_rather_than_raised_comes_from_the_service_s_own_hook
             return api_v2.failure("stale_revision", "changed", 9)
         return None
 
-    out = _run(api_v2.wrap(handler, error_of=error_of)(_call({"api": 2})))
+    out = _run(api_v2.wrap(handler, error_of={"thing": error_of})(_call({"api": 2})))
     assert out == {
         "api": 2,
         "ok": False,
@@ -139,7 +139,7 @@ def test_a_refusal_answered_rather_than_raised_comes_from_the_service_s_own_hook
         api_v2.wrap(handler, revision_of=api_v2.nested_revision)(_call({"api": 2}))
     )
     assert plain["ok"] is True and plain["revision"] == 9
-    assert _run(api_v2.wrap(handler, error_of=error_of)(_call({}))) is answer
+    assert _run(api_v2.wrap(handler, error_of={"thing": error_of})(_call({}))) is answer
 
 
 def test_forbidden_maps_from_the_admin_check():
@@ -322,3 +322,106 @@ def test_common_keeps_a_field_the_service_already_declares():
         "api",
         "client",
     }
+
+
+@pytest.mark.parametrize(
+    "module,hook,service,data,answer,code",
+    [
+        (
+            "grow_day_store",
+            "_rows_refused",
+            "grow_day_record",
+            {},
+            {"taken": 1, "refused": ["date must be YYYY-MM-DD"]},
+            "invalid",
+        ),
+        (
+            "stock_api",
+            "_unknown_tanks",
+            "stock_draw",
+            {},
+            {"counted": True, "duplicate": False, "skipped": ["no_such_tank"]},
+            "invalid",
+        ),
+        (
+            "site_api",
+            "_rows_refused",
+            "preset_apply",
+            {},
+            {
+                "diff": [],
+                "missing": [],
+                "applied": [
+                    {"key": "p1", "readback": "verified", "error": None},
+                    {"key": "p2", "readback": "refused", "error": "out of range"},
+                ],
+            },
+            "guard_refused",
+        ),
+        (
+            "calibration",
+            "_not_captured",
+            "calibration_capture",
+            {},
+            {"reading": 7.1, "raw": 7.1, "stable": False, "drift": 0.2, "stable_s": 3},
+            "guard_refused",
+        ),
+    ],
+)
+def test_each_answered_refusal_hook(module, hook, service, data, answer, code):
+    import importlib
+
+    _, api_v2 = _stubs()
+    hook = getattr(
+        importlib.import_module(f"custom_components.crop_steering.{module}"), hook
+    )
+
+    async def handler(call):
+        return answer
+
+    wrapped = api_v2.wrap(handler, error_of={service: hook})
+    out = _run(wrapped(_call({"api": 2, **data}, service=service)))
+    assert out["ok"] is False and out["error"]["code"] == code
+    assert out["data"] is answer
+    assert _run(wrapped(_call(data, service=service))) is answer  # v1 unchanged
+    # The same service with nothing refused is ok.
+    fine = {
+        "grow_day_record": {"taken": 1, "refused": []},
+        "stock_draw": {"counted": True, "duplicate": True, "skipped": []},
+        "preset_apply": {"diff": [], "missing": [], "applied": []},
+        "calibration_capture": {"stable": True},
+    }[service]
+
+    async def done(call):
+        return fine
+
+    ok = _run(
+        api_v2.wrap(done, error_of={service: hook})(_call({"api": 2}, service=service))
+    )
+    assert ok["ok"] is True
+
+
+def test_a_forced_capture_of_an_unsteady_reading_is_ok():
+    _, api_v2 = _stubs()
+    from custom_components.crop_steering.calibration import _not_captured
+
+    async def handler(call):
+        return {"stable": False}
+
+    wrapped = api_v2.wrap(handler, error_of={"calibration_capture": _not_captured})
+    out = _run(wrapped(_call({"api": 2, "force": True}, service="calibration_capture")))
+    assert out["ok"] is True
+
+
+def test_a_hook_covers_only_the_service_it_names():
+    _, api_v2 = _stubs()
+
+    async def handler(call):
+        return {"error": "busy"}
+
+    wrapped = api_v2.wrap(
+        handler, error_of={"thing": lambda call, result: api_v2.failure("invalid", "x")}
+    )
+    assert wrapped.error_of.keys() == {"thing"}
+    assert _run(wrapped(_call({"api": 2}, service="other")))["ok"] is True
+    assert _run(wrapped(_call({"api": 2}, service="thing")))["ok"] is False
