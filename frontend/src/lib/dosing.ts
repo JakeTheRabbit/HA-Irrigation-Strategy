@@ -261,21 +261,27 @@ export function parseConfig(value: unknown): DosingConfig | null {
     updated_at: text(raw.updated_at),
   };
 }
-/** The integration's bounds for the two limits (`PROFILE` in dosing.py). A profile that is missing or
- * out of range takes the end of its range that refuses more, so the form never allows a dose the
- * controller would refuse. */
-const PROFILE_BOUNDS = {
-  min_flow_ml_s: { low: 0.01, high: 100, safe: 100 },
-  max_dose_s: { low: 60, high: 3600, safe: 60 },
-};
+/** What every room used before it could set its profile (`PROFILE` in dosing.py, `PROFILE` in the
+ * controller's dosing_runner.py). A value that is not a positive number takes its default, as the
+ * controller does. */
+export const PROFILE_DEFAULTS: DosingProfile = { min_flow_ml_s: 0.05, max_dose_s: 1200 };
 export function parseProfile(value: unknown): DosingProfile {
   const raw = (value && typeof value === "object" ? value : {}) as Raw;
-  const limit = (key: keyof typeof PROFILE_BOUNDS) => {
-    const { low, high, safe } = PROFILE_BOUNDS[key];
-    const number = typeof raw[key] === "number" ? (raw[key] as number) : Number.NaN;
-    return number >= low && number <= high ? number : safe;
+  const limit = (key: keyof DosingProfile) => {
+    const number = raw[key];
+    return typeof number === "number" && Number.isFinite(number) && number > 0
+      ? number
+      : PROFILE_DEFAULTS[key];
   };
   return { min_flow_ml_s: limit("min_flow_ml_s"), max_dose_s: limit("max_dose_s") };
+}
+/** A pump's calibrated flow in mL/s: its flow entity's number in its own unit, converted as the
+ * controller does (mL/min, L/h); a unit it does not know is read as mL/s, as the controller does. */
+export function flowMlS(entity: EntityState | undefined): number | null {
+  const flow = numeric(entity);
+  if (flow === null) return null;
+  const unit = String(entity?.attributes?.unit_of_measurement ?? "").trim().toLowerCase();
+  return unit === "ml/min" ? flow / 60 : unit === "l/h" ? (flow * 1000) / 3600 : flow;
 }
 /** The integration's `dosing_config` sensor: its state is the revision. */
 export function readConfig(entity: EntityState | undefined): DosingConfig | null {
@@ -459,7 +465,7 @@ export function pumpView(
 ): PumpView {
   const runtime = status?.pumps[pump.id] ?? null;
   const flowEntity = states[pump.flow_entity];
-  const flow = flowEntity ? numeric(flowEntity) : (runtime?.flow_ml_s ?? null);
+  const flow = flowEntity ? flowMlS(flowEntity) : (runtime?.flow_ml_s ?? null);
   const view = (state: PumpState, reason: string | null = null): PumpView => ({
     pump,
     state,
@@ -635,7 +641,7 @@ export function recipeRows(config: DosingConfig, states: States): RecipeRow[] {
     const reading = line.ml_entity ? numeric(states[line.ml_entity]) : null;
     const unreadable = !!line.ml_entity && reading === null;
     const ml = unreadable ? 0 : Math.max(0, reading ?? line.ml);
-    const flow = pump ? numeric(states[pump.flow_entity]) : null;
+    const flow = pump ? flowMlS(states[pump.flow_entity]) : null;
     return {
       pump: line.pump,
       name: pump?.name ?? line.pump,

@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   STATUS_STALE_MS,
@@ -5,7 +6,9 @@ import {
   batchTime,
   canEdit,
   controllerReach,
+  PROFILE_DEFAULTS,
   deviceDosing,
+  flowMlS,
   doseDeadline,
   exceedsDoseLimit,
   doseProgress,
@@ -177,8 +180,27 @@ describe("the room's dosing limits", () => {
   });
   it("read from the published profile, and fall back to the strictest bound when it is absent or out of range", () => {
     expect(room({ min_flow_ml_s: 0.2, max_dose_s: 900 })).toEqual({ min_flow_ml_s: 0.2, max_dose_s: 900 });
-    expect(room()).toEqual({ min_flow_ml_s: 100, max_dose_s: 60 });
-    expect(room({ min_flow_ml_s: 0, max_dose_s: 99999 })).toEqual({ min_flow_ml_s: 100, max_dose_s: 60 });
+    expect(room()).toEqual(PROFILE_DEFAULTS);
+    expect(room({ min_flow_ml_s: 0, max_dose_s: -5 })).toEqual(PROFILE_DEFAULTS);
+  });
+  it("default to what the integration and the controller default to", () => {
+    const python = readFileSync(
+      new URL("../../../custom_components/crop_steering/dosing.py", import.meta.url),
+      "utf8",
+    );
+    for (const key of ["min_flow_ml_s", "max_dose_s"] as const) {
+      const found = python.match(new RegExp(`"${key}": \\(([0-9.]+),`));
+      expect(Number(found?.[1])).toBe(PROFILE_DEFAULTS[key]);
+    }
+  });
+  it("read a pump's flow in mL/s whatever unit its entity uses", () => {
+    const flow = (state: string, unit?: string) =>
+      flowMlS(entity("number.f", state, unit ? { unit_of_measurement: unit } : {}));
+    expect(flow("1.5", "mL/s")).toBe(1.5);
+    expect(flow("30", "mL/min")).toBe(0.5);
+    expect(flow("3.6", "L/h")).toBe(1);
+    expect(flow("2")).toBe(2);
+    expect(flow("unavailable", "mL/min")).toBeNull();
   });
   it("set the lowest flow a pump counts as calibrated", () => {
     const { states, config, status } = demo("room_b_");

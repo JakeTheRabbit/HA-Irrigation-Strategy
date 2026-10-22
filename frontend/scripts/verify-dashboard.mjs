@@ -1766,6 +1766,7 @@ try {
             filled_at_entity: null,
             recipe: pumps.map((item) => ({ pump: item.id, ml: 100, ml_entity: null })),
           },
+          profile: { min_flow_ml_s: 0.05, max_dose_s: 1200 },
           request: null,
         });
         put(`sensor.crop_steering_${prefix}dosing`, "idle", {
