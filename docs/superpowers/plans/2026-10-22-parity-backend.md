@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Build the backend half of the unified schema: one per-room Journal fed by the integration and the controller, one ordered GuardChain in front of every actuator, the new producers behind G1–G10 and G16–G17, the read projections, the API v2 envelope and the MCP read/preview tools. With no new config, watering does exactly what it does today.
+**Goal:** Build the backend half of the unified schema: one per-room Journal fed by the integration and the controller, one ordered GuardChain in front of every actuator, the new producers behind G1–G11, G15 (display units) and G16–G17, the read projections, the API v2 envelope and the MCP read/preview tools. With no new config, watering does exactly what it does today.
 
 **Architecture:** The integration owns an SQLite Journal (`journal.py`) and every new store and service. The controller writes events to an outbox and flushes them through `crop_steering.journal_append`, as it already flushes `grow_day_record`. It reads new config only from published descriptors and entities: `sensor.crop_steering_supply_config`, `sensor.crop_steering_<px>timers_config`, the `zone_N_irrigation_mode` selects and the `*_corrected` sensors. Each one is absent on an old install, and then the old behaviour applies. Pure arithmetic goes into `crop-steering-engine` (`ids`, `timers`, `flow`, `guards`). The integration gets byte-for-byte copies under `generated/`, the same way `defaults.py` is copied today.
 
@@ -60,7 +60,9 @@ The tasks in a lane are serial. Lanes on one row share no source file, except th
 | K calibration | 17 → 21 | `calibration.py`, `probe_offsets.py`, `sensor.py` (probe readings) |
 | P pumps | 19 | `dosing.py`, `dosing_api.py`, `stock_api.py` (after Task 6) |
 | H health/grow | 28 → 29 | `health.py`, `system_status.py`, `strategy.py` (after Task 6) |
-| X envelope | 23 (after every integration task) | `api_v2.py`, every `*_api.py` schema |
+| W wall/display | 32, 33 | `dashboards.py`, `display.py` |
+| N notify | 34 | `notify_api.py` |
+| X envelope | 23 (run last among integration tasks: after 24–29 and 32–34) | `api_v2.py`, every `*_api.py` schema |
 | M mcp | 30 → 31 (after 23–25) | `mcp-server/src/*`, `mcp-server/tests/*` |
 | **Shared, append-only** | many | `__init__.py` (setup calls), `services.yaml` (append at EOF), `tests/ha_stubs.py`/`tests/conftest.py` (Task 16 only), CS-code files (`tests/test_error_codes.py`, `docs/error-codes.json`, `docs/ERROR_CODES.md`, `notify_catalog.py`, the three `dashboard.html` bundles: Tasks 12, 17, 26). Merge these serially. |
 
@@ -70,6 +72,9 @@ Cross-lane dependencies by interface only (no shared file):
 - 18 (lane C, then D) needs 17's sensor contract.
 - 20 needs 19's descriptor contract.
 - 25 needs 1, 14 and 15's `projection_app`.
+- 24 needs 22's number write-with-readback helper.
+- 32 (dashboards) and 33 (display) are their own lane.
+- 34 (notify) stands alone.
 
 ---
 
@@ -279,6 +284,10 @@ def test_limit_is_capped_at_500(tmp_path): ...
     - `journal_append {room_id, events[≤50]}`: admin, OPTIONAL response.
     - `journal_query {room_id, since, until?, kinds?, zones?, actor?, limit≤500, cursor?}`: signed-in, ONLY response.
   - Each stored event is re-fired as `hass.bus.async_fire(EVENT_JOURNAL, event)`.
+  - Websocket command `crop_steering/subscribe {rooms?: [room_id], kinds?: [str]}`, registered with `websocket_api.async_register_command` in `async_setup_journal`:
+    - It needs any signed-in user, because HA's `subscribe_events` refuses non-admins for custom event types.
+    - It sends `{"type": "event", "event": <§4 event>}` for each stored event that matches the filter.
+    - It unsubscribes on connection close.
 
 - [ ] **Step 1: Write the failing tests.**
 
@@ -291,6 +300,8 @@ def test_attribution_follows_the_setpoint_log_rule(): ...    # client mcp -> mcp
 # tests_ha/test_journal_services.py (real HA)
 async def test_query_round_trips_what_append_stored(hass): ...  # journal_append then journal_query return_response=True; events[0]["seq"] == 1
 async def test_query_needs_a_signed_in_user_and_append_an_admin(hass, hass_read_only_user): ...
+async def test_a_non_admin_websocket_subscriber_gets_only_its_rooms_events(hass, hass_ws_client, hass_read_only_access_token): ...  # 2 rooms appended, filter rooms=["room:f2_"] -> 1 message
+async def test_subscribe_without_a_user_is_refused(hass, hass_ws_client): ...
 ```
 
 - [ ] **Step 2: Run them and see them fail.** Run `PY tests/test_journal_api.py -q`. Expected: FAIL.
@@ -384,7 +395,10 @@ def test_backfill_runs_once_per_room(tmp_path): ...             # meta flag set;
   - `Controller._journal_held(self, room, zone, reason: str, *, guard: str | None = None, code: str | None = None, now) -> None`. Dedupes on `(slug, zone, reason)` and re-emits after `HELD_REEMIT_S = 1800`.
   - `client` in `source` is `f"f2_control/{VERSION}"`.
 - Event points:
-  - `shot.started` is written **before** the pump opens, with data `{phase, kind, size_pct, duration_s, commanded_l}` and a new `correlation.intent_id`.
+  - `shot.started` is written **before** the pump opens, with data `{phase, kind, reason, size_pct, duration_s, commanded_l, vwc_before, vwc_expected, requested_at, pump_wait_s}` and a new `correlation.intent_id`.
+    - `reason` is `log_words` text of the engine `Reason`, the same words as today's FIRE log line.
+    - `vwc_expected` is `vwc_before + size_pct × p1_expected_rise` when the engine snapshot has it, else `None`.
+    - `requested_at` is when this pass decided to fire. `pump_wait_s = started − requested_at`, which is 0 until Task 12 queues.
   - `shot.completed` carries `{elapsed_s, commanded_l, vwc_before, ec_before}` and `readback {status: "verified", entities}`.
   - `shot.aborted` has outcome `aborted` or `failed` and the CS-30x code.
   - `phase.changed {from, to, how}`
@@ -402,6 +416,7 @@ def test_flush_stops_at_the_first_failed_batch(tmp_path): ...       # send retur
 def test_outbox_never_blocks_a_shot_when_the_integration_refuses(): ...  # FakeHA journal_append -> (400, None) every pass; shot still fires, same switch calls as baseline
 def test_shot_started_is_on_disk_before_the_pump_switch_is_called(): ...  # FakeHA hw hook reads outbox file when pump turns on
 def test_a_completed_shot_carries_verified_readback_and_litres(): ...
+def test_shot_started_carries_reason_phase_vwc_before_and_expected(): ...  # data.reason == the FIRE log's "what: why"; pump_wait_s == 0
 def test_a_standing_hold_is_journaled_once_per_reason_and_every_30_min(): ...  # 40 passes, kill switch off -> 2 intent.held
 def test_phase_change_and_alert_are_journaled(): ...
 def test_old_state_file_without_outbox_still_loads(): ...           # no outbox file -> starts empty
@@ -560,6 +575,7 @@ def test_two_zones_at_60_pct_run_one_after_the_other_and_the_second_is_queued():
 def test_a_rescue_runs_before_a_steering_shot_in_the_same_pass(): ...
 def test_a_zone_bigger_than_its_pump_is_held_with_cs_214(): ...
 def test_shot_queued_and_pump_load_are_published(): ...
+def test_a_queued_shot_records_its_pump_wait(): ...  # second zone's shot.started data.pump_wait_s == first shot's elapsed ± 1 s
 ```
 
 - [ ] **Step 2: Run them and see them fail.** Run `PY addons/f2_control/tests/test_pump_queue.py -q`. Expected: FAIL.
@@ -604,8 +620,14 @@ def test_ph_lockout_refusal_names_dosing_lockout(): ...
 - Produces:
   - `timer_program_set {room_id, expected_revision, program}` → `{program, revision, preview: [{zone, at, duration_s}] (next 24 h)}`
   - `timer_program_delete {room_id, expected_revision, id}`, a soft delete (`active: false, deleted_at`)
-  - `timer_program_preview {room_id, program, hours≤48}` (no write)
-  - `timers_config` attrs `{revision, programs: [active only]}`
+  - `timer_program_preview {room_id, program, hours≤48}` → `{preview: [{zone, at, duration_s}], shots, total_s}`. It validates and projects but writes nothing, and works for a draft with no `id`.
+  - `timer_program_list {room_id?}` → `{programs: [program + {next_at, zones_in_timer_mode: [int]}], revision}`. Omitting `room_id` returns every room's programs, each with its `room_id`. Soft-deleted programs are excluded.
+  - `timer_skip {room_id, zone, at, expected_revision}` → `{skip: {zone, at, until}, revision}`.
+    - It adds `{zone, at, until: at + 15 min, by}` to the store's `skips[]`.
+    - Skips expire 24 h after `at` and are pruned on save.
+    - One skip covers the planned timer shot **or** the planned engine shot the timeline showed at that time (Task 15).
+    - It journals `config.changed {store: "timers", section: "skip"}`.
+  - `timers_config` attrs `{revision, programs: [active only], skips: [{zone, at, until}]}`
   - A zone may belong to at most one active program. Otherwise the error is `"Zone 3 is already in timer 'Mothers AM'"`.
   - `config.changed {store: "timers"}`
 
@@ -616,6 +638,9 @@ def test_set_returns_a_24h_preview_of_8_shots(): ...          # 08:00-12:00 recy
 def test_start_equal_end_is_refused_with_plain_words(): ...   # "End must be after start"
 def test_a_zone_in_two_active_programs_is_refused(): ...
 def test_missing_store_publishes_no_programs(): ...
+def test_preview_of_a_draft_writes_nothing(): ...           # store revision unchanged
+def test_list_without_room_returns_every_room_and_hides_deleted(): ...
+def test_skip_is_published_and_expires_after_24h(): ...
 async def test_fresh_install_has_select_zone_1_irrigation_mode_reading_steering(hass): ...  # tests_ha
 async def test_upgraded_install_gains_the_select_at_steering(hass): ...  # _upgrade(hass, "entry_3_11_1_pumped_room") from test_upgrade_in_place
 ```
@@ -636,6 +661,10 @@ async def test_upgraded_install_gains_the_select_at_steering(hass): ...  # _upgr
     - in `off` mode, drop every engine and timer fire
     - publish `sensor.crop_steering_<px>projection_app` (attr `intents`: the next 24 h of timer intents plus the engine's `waiting_for` estimate per zone, marked `expected: true`)
   - `PLAN_HOLD_EXEMPT` += `"timer"`
+  - honour `timers_config.skips`:
+    - A timer intent whose `at` equals a skip's `at` for that zone is dropped.
+    - The first non-rescue engine fire for that zone with `skip.at <= now < skip.until` is dropped and the skip is consumed. Rescues (`safety_ops.RESCUE_KINDS`) are never skipped.
+    - Either case journals `intent.refused {guard: "skipped", reason: "skipped by <by>"}` with `actor` = `timer` or `engine`.
 - Test: `addons/f2_control/tests/test_timer_mode.py`
 
 **Interfaces:**
@@ -653,6 +682,8 @@ def test_timer_zone_still_gets_a_p3_rescue(): ...
 def test_off_zone_gets_nothing_not_even_rescue(): ...
 def test_a_restart_does_not_owe_missed_timer_shots(): ...                  # last_pass unset -> only slots after start
 def test_kill_switch_holds_a_timer_shot(): ...
+def test_a_skipped_timer_slot_does_not_fire(): ...
+def test_a_skip_drops_the_next_engine_top_up_but_never_a_rescue(): ...
 ```
 
 - [ ] **Step 2: Run them and see them fail.** Then implement, then run `PY addons/f2_control/tests -q`. Expected: PASS.
@@ -667,7 +698,7 @@ def test_kill_switch_holds_a_timer_shot(): ...
 - Modify:
   - `__init__.py`: `PLATFORMS += [Platform.BINARY_SENSOR]`, and the rule evaluator in `site_api.py` subscribes to source entities
   - `tests/conftest.py` and `tests/ha_stubs.py`: add `BINARY_SENSOR` to the stub `Platform`
-  - `site_api.py`: services `alert_rule_set`, `alert_rule_delete`, `alert_rule_test`, `alert_rule_preview`, `alert_rules_get`
+  - `site_api.py`: services `alert_rule_set`, `alert_rule_delete`, `alert_rule_test`, `alert_rule_preview`, `alert_rule_list`
   - `services.yaml`
 - Test: `tests/test_alert_rules.py`, `tests_ha/test_alert_rules.py`
 
@@ -684,14 +715,19 @@ def test_kill_switch_holds_a_timer_shot(): ...
     - `stock.pct` → `level_l / capacity_l × 100` from the stock store
     - `zone.flow_ratio` → `sensor.crop_steering_<px>zone_N_flow_ratio` (× 100)
     - `controller.heartbeat` → the age in seconds of `sensor.crop_steering_<px>ai_heartbeat`, evaluated every 60 s
+    - `probe.silence_s` → for one mapped probe (`rule.entity_id`, required for this source), the seconds since its `last_reported`. Evaluated every 60 s; `unavailable` counts as silent since its last numeric report.
+    - `stock.litres` → the tank's `level_l` from the stock store (`rule.tank_id` required)
   - `step(state: dict, value: float | None, now: datetime, rule: dict, lights: tuple[float, float], muted: bool) -> tuple[dict, str | None]`. States are `draft|armed|pending|firing|acknowledged|muted`. The event returned is `"raised"`, `"cleared"` or `None`.
   - `replay(samples: list[tuple[datetime, float]], rule, lights) -> dict`. Returns `{fires: [iso], count, min, max, sentence}`. The sentences are:
     - `"This rule would have fired 3 times yesterday — 06:12, 11:40, 19:05."`
     - `"It wouldn't have fired in the last 24 h. Lowest was 41%."`
     - over 10: `"That's 14 messages a day. Try a longer wait or a lower threshold."`
   - `alert_rule_test {id | rule, hours=24, send=false}`. Returns `{summary_sentence, replay}`. With `send: true` it adds `delivery: [{service, ok, error}]`. Samples come from the recorder (`recorder.history.get_significant_states` through `recorder.get_instance(hass).async_add_executor_job`).
-  - `alert_rule_preview` is `alert_rule_test` with a draft `rule` and no send.
-  - `alert_rules_get {room_id?}` → `{rules: [AlertRule + state]}`, open to any signed-in user.
+  - `alert_rule_preview {rule, hours=24}` (draft rule, no write, no send) → `{summary_sentence, series: [[iso, value]], fires: [{start, fired_at, end}], ignored: [{start, end, reason: "shorter than min_duration"|"outside window"|"muted"}], count, min, max, sentence}`. The series is downsampled to ≤ 1440 points. `replay()` returns all of these fields, so `alert_rule_test` carries them too.
+  - `alert_rule_list {room_id?}` → `{rules: [AlertRule + {state, last_fired, firing_since, current_value, unit}]}`. It is open to any signed-in user, and omitting `room_id` returns every room's rules.
+    - `last_fired` comes from the newest `alert.raised` in the Journal for that `rule_id`.
+    - `firing_since` is set while the rule state is `firing|acknowledged`.
+    - `current_value` is the source's value now, in canonical units.
   - Entities: `binary_sensor.crop_steering_rule_<id>` (on while `firing|acknowledged`).
   - Events: `alert.raised {rule_id, value, threshold, title}` and `alert.cleared`. Push key `rule_<id>`, routed with kind `sensors`.
 
@@ -705,6 +741,10 @@ def test_muted_room_holds_non_emergency_rules(): ...
 def test_replay_counts_yesterdays_fires_and_says_so(): ...
 def test_replay_warns_when_noisy(): ...
 def test_climate_sources_are_refused(): ...                      # source "room.vpd" -> ValueError
+def test_replay_reports_fire_spans_and_ignored_dips(): ...       # 1-min dip -> ignored "shorter than min_duration"; 3-min -> fires[0].fired_at = start + 2 min
+def test_probe_silence_rule_fires_after_its_minutes(): ...       # last_reported 11 min ago, threshold 600 s above -> raised
+def test_stock_litres_rule_reads_the_stock_store(): ...
+def test_list_carries_last_fired_firing_since_and_current_value(): ...
 def test_summary_sentence(): assert summary_sentence(rule) == "Tell when F2 tank level stays below 30% for 10 min during lights-on."
 async def test_rule_entity_appears_and_turns_on_after_min_duration(hass, freezer): ...  # tests_ha
 async def test_old_install_without_rules_loads_with_no_binary_sensors(hass): ...       # tests_ha upgrade
@@ -732,7 +772,11 @@ async def test_old_install_without_rules_loads_with_no_binary_sensors(hass): ...
   - `correct(raw: float, slope_pct: float, offset: float, anchor: float) -> float` = `anchor + (raw − anchor − offset) / (slope_pct / 100)`
   - `stable(samples: list[tuple[float, float]], kind: str, window_s: int = 30) -> tuple[bool, float]`. For pH: span < 0.02. For EC: span < 1 % of the mean. Returns `(stable, drift)`.
   - Services:
-    - `calibration_start {room_id, probe, solutions?}` → `{session_id}`. Solutions default to `[7.0, 4.0]` for pH and `[1.413, 2.77]` for EC. It refuses when the probe has not reported for 120 s: `"No reading from the feed pH probe for 2 min. Check it's plugged in."`
+    - `calibration_start {room_id, probe, solutions?}` → `{session_id, raw_entity_id, temperature_entity_id, dosing_paused: true, expires_at}`. Solutions default to `[7.0, 4.0]` for pH and `[1.413, 2.77]` for EC.
+      - `raw_entity_id` is the descriptor's `feed_<q>_sensor`.
+      - `temperature_entity_id` is the room's `tank_temperature_sensor`, or `None`.
+      - While any session of the room is open, the dosing descriptor `sensor.crop_steering_<px>dosing_config` carries the new attribute `calibrating: {probe, session_id, until}`. Task 18 makes the runner hold batches and pH correction on it.
+      - Commit, revert, abandon or the 30 min expiry clears it. It refuses when the probe has not reported for 120 s: `"No reading from the feed pH probe for 2 min. Check it's plugged in."`
     - `calibration_capture {session_id, point: 0|1, force?: bool}` → `{reading, raw, stable, drift, stable_s}`. An unsteady reading without `force` → `stable: false` and no point is stored.
     - `calibration_commit {session_id}` → `{slope_pct, offset, verdict, applied}`. A verdict of `fail` is kept with `applied: false` and returns `ok:false` with code `invalid`.
     - `calibration_revert {room_id, probe}` re-applies the previous applied record, or none.
@@ -747,7 +791,8 @@ def test_unsteady_reading_is_not_captured_without_force(): ...
 def test_a_failed_verdict_is_kept_but_never_applied(): ...
 def test_revert_restores_the_raw_value(): ...              # corrected sensor removed when nothing applied
 def test_due_after_30_days_raises_cs_612(): ...
-def test_idle_session_expires_after_30_min(): ...
+def test_idle_session_expires_after_30_min(): ...       # and the dosing descriptor's calibrating attribute is gone
+def test_start_returns_raw_and_temperature_entities_and_pauses_dosing(): ...
 async def test_commit_publishes_corrected_sensor_and_reads_back(hass): ...  # tests_ha
 ```
 
@@ -757,7 +802,12 @@ async def test_commit_publishes_corrected_sensor_and_reads_back(hass): ...  # te
 ### Task 18: Controller and runner read corrected feed values
 
 **Files:**
-- Modify: `controller.py` (`_read_feed_ph`, `_read_feed_ec`), `dosing_runner.py` (`_ph_reading`, `_judge_mix`)
+- Modify:
+  - `controller.py` (`_read_feed_ph`, `_read_feed_ec`)
+  - `dosing_runner.py`:
+    - `_ph_reading` and `_judge_mix` read the corrected entity
+    - `_config()` reads the `calibrating` attribute
+    - batch and pH correction start is held with `"feed probe calibration in progress"` (guard `dosing_lockout`); a single manual dose is still allowed
 - Test: `addons/f2_control/tests/test_corrected_feed.py`
 
 **Interfaces:**
@@ -772,6 +822,8 @@ def test_applied_correction_moves_the_source_water_gate(): ...      # raw 5.4 ou
 def test_an_unavailable_corrected_ph_holds_like_a_dead_probe(): ... # "source-water pH probe dead >30min — holding (fail-closed)" after grace
 def test_mix_check_and_ph_autocorrect_use_the_corrected_value(): ...
 def test_a_corrected_sensor_for_another_probe_is_ignored(): ...     # source mismatch -> raw
+def test_an_open_calibration_session_holds_batches_and_ph_correct(): ...
+def test_no_calibrating_attribute_means_dosing_as_before(): ...
 ```
 
 - [ ] **Step 2: Run them and see them fail.** Then implement, then run `PY addons/f2_control/tests -q`. Expected: PASS.
@@ -792,7 +844,21 @@ def test_a_corrected_sensor_for_another_probe_is_ignored(): ...     # source mis
 
 **Interfaces:**
 - Produces:
-  - `pump_prime {room_id, pump, seconds: 1..30}` → `{request_id, outcome: "requested"|"refused", blockers[]}`. The blockers are `"no_power_entity"`, `"batch_running"`, `"mix_pump_on"` and `"tank_filling"`, read from the dosing status sensor and the batch hardware states.
+  - `pump_precheck {room_id, pump}` → `{ok: bool, blockers: [{code, message}]}`. It is read-only and open to signed-in users. The codes are:
+    - `no_power_entity`
+    - `batch_running`
+    - `mix_pump_on`
+    - `tank_filling`
+    - `calibrating` (a probe session is open)
+    - `controller_offline` (heartbeat older than 10 min)
+
+    They are read from the dosing status sensor, the batch hardware states and the heartbeat. The messages are the UX checklist words, for example `"Mix pump is on"`.
+  - `pump_prime {room_id, pump, seconds: 1..30}` → `{request_id, outcome: "requested"|"refused", blockers[]}`.
+    - It uses the same blockers as `pump_precheck`, so any blocker means `refused`.
+    - `seconds > 30` is a schema error. That is the UX cap; the spec's 120 s is not used.
+  - `pump_stop {room_id, pump}` → `{request_id}`.
+    - It stores a request with action `stop_pump` that pre-empts a pending `prime` or `calibrate` request (the stored request is replaced even while `pending()`).
+    - It never touches a running batch or other pumps. The room-wide `dosing_request {action: stop}` is unchanged.
   - `pump_calibrate {room_id, pump, seconds: 5..120}` → `{session_id, outcome}`. `ran_s` arrives later in `dosing_get.pumps[i].calibration_session` once the runner reports it (Task 20).
   - `pump_calibration_commit {room_id, session_id, measured_ml}` → `{ml_min, previous_ml_min, flow_entity_written: bool}`. It refuses until `ran_s` is known. `ml_min = measured_ml / ran_s × 60`. When `flow_entity` is a `number`/`input_number`, it also sets it to `ml_min / 60` mL/s and reads it back.
   - Events: `pump.primed`, `pump.calibrated {ml_min, previous_ml_min}`.
@@ -803,6 +869,9 @@ def test_a_corrected_sensor_for_another_probe_is_ignored(): ...     # source mis
 def test_30s_and_150ml_gives_300_ml_min(): ...                 # G3 accept (integration half)
 def test_commit_before_the_run_is_reported_is_refused(): ...
 def test_prime_without_a_power_switch_names_the_blocker(): ...
+def test_precheck_lists_every_blocker_and_writes_nothing(): ...
+def test_prime_over_30_seconds_is_refused_by_schema(): ...
+def test_pump_stop_replaces_a_pending_prime_request(): ...
 def test_old_pump_dicts_load_with_no_catalog_fields(): ...     # back-compat
 def test_a_calibration_run_is_not_drawn_from_stock(): ...
 def test_flow_entity_number_is_written_and_read_back(): ...
@@ -814,7 +883,7 @@ def test_flow_entity_number_is_written_and_read_back(): ...
 ### Task 20: Runner executes timed prime and calibrate runs, and uses calibrated flow
 
 **Files:**
-- Modify: `dosing_runner.py`. New `_run_timed(job)` for the actions `prime`/`calibrate`: `power_entity` on with read-back, wait `seconds` with the abort checks, off with read-back, then report `{request_id, ran_s}` in the status sensor attribute `handled_result`. The flow read falls back to `calibrated_ml_min / 60` when `flow_entity` is unset.
+- Modify: `dosing_runner.py`. A `stop_pump` request ends a running timed run of that pump within one wait tick (≤ 2 s): power off with read-back, then `result: "stopped"` and the real `ran_s`. New `_run_timed(job)` for the actions `prime`/`calibrate`: `power_entity` on with read-back, wait `seconds` with the abort checks, off with read-back, then report `{request_id, ran_s}` in the status sensor attribute `handled_result`. The flow read falls back to `calibrated_ml_min / 60` when `flow_entity` is unset.
 - Test: `addons/f2_control/tests/test_pump_timed_runs.py`
 
 **Interfaces:**
@@ -829,6 +898,8 @@ def test_prime_is_refused_while_a_shot_is_in_flight(): ...
 def test_a_pump_that_does_not_read_off_latches_and_alerts_cs_801(): ...
 def test_next_dose_uses_calibrated_flow_when_no_flow_entity(): ...   # G3 accept (controller half): 300 ml/min -> 5 mL/s
 def test_flow_entity_still_wins_over_calibrated_flow(): ...
+def test_stop_pump_ends_a_prime_early_and_reports_ran_s(): ...   # stop seen at 4 s of 20 -> power off read back, ran_s ≈ 4
+def test_stop_pump_leaves_a_running_batch_alone(): ...
 ```
 
 - [ ] **Step 2: Run them and see them fail.** Then implement, then run `PY addons/f2_control/tests/test_pump_timed_runs.py addons/f2_control/tests/test_dosing_runner.py addons/f2_control/tests/test_dosing_safety.py -q`. Expected: PASS.
@@ -894,11 +965,99 @@ async def test_copy_zone_3_to_zones_1_2_writes_and_reads_back(hass): ...  # test
 - [ ] **Step 2: Run them and see them fail.** Then implement, then run them. Expected: PASS.
 - [ ] **Step 3: Commit.** Subject: `feat(integration): server-side presets and copy with preview`.
 
+### Task 32: `dashboard_create` and `dashboard_list` (G11) — run before Task 23
+
+**Files:**
+- Create: `custom_components/crop_steering/dashboards.py`. It holds the templates as Python data, plus the services. Created dashboards are tracked in store `crop_steering.dashboards`, version 1, doc `{revision, dashboards: [{url_path, title, template, rooms, created_at, by}]}`.
+- Modify: `__init__.py`, `services.yaml`
+- Test: `tests/test_dashboards.py`, `tests_ha/test_dashboards.py`
+
+**Interfaces:**
+- Produces:
+  - `TEMPLATES = ("facility_wall", "room_tablet", "dosing_station")`
+  - `render(template: str, rooms: list[dict]) -> dict`, a pure Lovelace config of `views[]` using existing entities only.
+  - `dashboard_create {template, rooms[], title?}` → `{url_path, title}`. It is admin only.
+    - It creates the dashboard through the Lovelace dashboards collection (`hass.data["lovelace"].dashboards` / `DashboardsCollection.async_create_item`, mode `storage`) and saves the config with `async_save`.
+    - `url_path` is `crop-steering-<template>-<n>`.
+    - It reads the dashboard back.
+    - It refuses an unknown template with `"Unknown dashboard template"`.
+  - `dashboard_list {}` → `{dashboards: [{url_path, title, template, rooms, created_at, exists: bool}], templates: [{id, name, description}]}`. `exists` is false when the user deleted it in HA.
+
+- [ ] **Step 1: Write the failing tests.**
+
+```python
+def test_each_template_renders_only_entities_the_room_has(): ...
+def test_unknown_template_is_refused(): ...
+async def test_create_then_list_shows_it_and_ha_serves_it(hass): ...   # tests_ha: lovelace dashboard url_path exists, config views non-empty
+async def test_a_dashboard_deleted_in_ha_lists_exists_false(hass): ...
+```
+
+- [ ] **Step 2: Run them and see them fail.** Then implement, then run `PY tests/test_dashboards.py -q` and the Docker test. Expected: PASS.
+- [ ] **Step 3: Commit.** Subject: `feat(integration): wall dashboards from templates`.
+
+### Task 33: Display units and clock (G15) — run before Task 23
+
+**Files:**
+- Modify: `custom_components/crop_steering/display.py` (`OPTIONS`)
+- Test: `tests/test_display_options.py` (extend), `tests_ha/test_display_options.py` (extend)
+
+**Interfaces:**
+- Produces new `OPTIONS` entries. Each default is today's display, so an old store reads as before:
+  - `ec_unit {default: "mS/cm", choices: ("mS/cm", "ppm500", "ppm700")}`
+  - `temp_unit {default: "C", choices: ("C", "F")}`
+  - `volume_unit {default: "L", choices: ("L", "gal")}`
+  - `clock {default: "24", choices: ("12", "24")}`
+
+  Storage and the API stay canonical. These are display-only per room, which is where the existing L/gal toggle lives.
+
+- [ ] **Step 1: Write the failing tests.**
+
+```python
+def test_old_store_reads_units_as_mS_C_L_24(): ...
+def test_save_refuses_an_unknown_unit(): ...
+```
+
+- [ ] **Step 2: Run them and see them fail.** Then implement, then run `PY tests/test_display_options.py -q`. Expected: PASS.
+- [ ] **Step 3: Commit.** Subject: `feat(integration): EC, temperature, volume and clock display units`.
+
+### Task 34: Notification quiet hours — run before Task 23
+
+`notify_api.py` already has these:
+- room mute-until (`mutes`, ≤ 30 days, emergencies still pushed)
+- "Emergencies loud" (per-phone `urgent_high_priority`)
+- per-phone test results (`notify_test` → `{sent, error}`)
+
+It has no quiet hours. This task adds them.
+
+**Files:**
+- Modify: `custom_components/crop_steering/notify_api.py` (`clean_recipient`, `send`, `response`), `services.yaml` (document the new keys)
+- Test: `tests/test_notify_quiet_hours.py`
+
+**Interfaces:**
+- Produces:
+  - Per recipient `quiet_hours: {from: "HH:MM", to: "HH:MM"} | None`. The default is `None`, so an old store keeps no quiet hours. A window may cross midnight, and `from == to` is refused with `"Quiet hours need a start and an end that differ"`.
+  - Inside the window a non-urgent push to that phone is put in its digest queue, even when `digest` is off. It is delivered at the window's end. Urgent (critical) pushes always go.
+  - `notify_get` rows expose `quiet_hours`.
+  - `notify_test {service}` is unchanged. A new optional `notify_test {services: [..]}` answers `{results: [{service, sent, error}]}` for several phones in one call.
+
+- [ ] **Step 1: Write the failing tests.**
+
+```python
+def test_old_recipient_rows_have_no_quiet_hours(): ...
+def test_a_warning_inside_quiet_hours_is_held_until_the_end(): ...
+def test_an_emergency_inside_quiet_hours_is_pushed(): ...
+def test_quiet_hours_crossing_midnight(): ...
+def test_test_several_phones_reports_each(): ...
+```
+
+- [ ] **Step 2: Run them and see them fail.** Then implement, then run `PY tests/test_notify_quiet_hours.py tests/test_notify_api.py tests/test_notify_digest_mute.py -q`. Expected: PASS.
+- [ ] **Step 3: Commit.** Subject: `feat(integration): per-phone quiet hours and multi-phone test`.
+
 ### Task 23: API v2 envelope on every response service
 
 **Files:**
 - Create: `custom_components/crop_steering/api_v2.py`
-- Modify: every response-service schema and handler in `setup_api.py`, `strategy_api.py`, `run_api.py`, `grow_day_store.py`, `harvest_store.py`, `setpoint_log.py`, `overlays.py`, `calibration.py`, `stock_api.py`, `dosing_api.py`, `display.py`, `notify_api.py`, `journal_api.py`, `site_api.py`, `timers_api.py`
+- Modify: every response-service schema and handler in `setup_api.py`, `strategy_api.py`, `run_api.py`, `grow_day_store.py`, `harvest_store.py`, `setpoint_log.py`, `overlays.py`, `calibration.py`, `stock_api.py`, `dosing_api.py`, `display.py`, `notify_api.py`, `journal_api.py`, `site_api.py`, `timers_api.py`, `dashboards.py`, `system_status.py`
 - Test: `tests/test_api_v2.py`, `tests_ha/test_api_v2.py`
 
 **Interfaces:**
@@ -921,26 +1080,41 @@ async def test_every_response_service_accepts_api_2(hass): ...  # tests_ha: iter
 - [ ] **Step 2: Run them and see them fail.** Then implement, then run `PY tests -q` and the Docker test. Expected: PASS.
 - [ ] **Step 3: Commit.** Subject: `feat(integration): API v2 envelope on every response service`.
 
-### Task 24: `history_changes`
+### Task 24: `history_changes` and `history_revert`
 
 **Files:**
-- Create: `custom_components/crop_steering/changes.py` (pure fold), `journal_api.py` (service)
-- Test: `tests/test_changes.py`, `tests_ha/test_history_changes_upgrade.py`
+- Create: `custom_components/crop_steering/changes.py` (pure fold), `journal_api.py` (services)
+- Test: `tests/test_changes.py`, `tests_ha/test_history_changes_upgrade.py`, `tests_ha/test_history_revert.py`
 
 **Interfaces:**
+- Consumes: `presets` number write-with-readback helper (Task 22), and the store `*_save` paths of setup, timers, site and calibration.
 - Produces:
-  - `fold_changes(events: list[dict]) -> list[dict]`. Each item is `{ts, actor, key|section, scope, old, new, reason, event_id, kind}`. It draws on `target.changed`, `config.changed`, `plan.*`, `calibration.committed|reverted`, `pump.calibrated` and preset applies. The newest comes first.
-  - `history_changes {room_id, since, until?, zone?, key?, kinds?}` → `{changes}`.
+  - `fold_changes(events: list[dict], limits: dict[str, dict]) -> list[dict]`. Each item is `{id (= event_id), room_id, ts, actor, kind, key|section, scope, old, new, reason, outcome, limits, revertible}`.
+    - `kind` is one of `setpoint|plan|recipe|setup|calibration|alerts`, mapped from `target.changed`, `plan.*`, preset/recipe `detail`, `config.changed{store: setup|site|timers}`, `calibration.*`/`pump.calibrated` and `config.changed{section: alert_rules}`.
+    - `outcome` is one plain line for learner/AI changes, read from the matching `ai.outcome`, or else from the `expected` field: `"Too soon to judge — check after the next lights-on."` until the next lights-on, then `"Dryback came back to target."` / `"No change in dryback yet."` from `ai.outcome.good`. It is `None` for other actors.
+    - `limits` is `{writer: "learner"|"brain", step, min, max}` for learner/AI rows, from `auto_setpoints` step limits and `ENGINE_BOUNDS`. It renders as `"learner may move ±0.2 % per day"`; `None` otherwise.
+    - The newest comes first.
+  - `history_changes {room_id?, since, until?, zone?, key?, kinds?}` → `{changes}`. When `room_id` is omitted, every room the user can read is queried and the results merged by `ts`.
+  - `history_revert {event_id, expected_revision?}` → `{reverted_event_id, new_event_id, readback}`. It is admin only.
+    - `target.changed` writes `old` back to the entity with read-back.
+    - `config.changed` re-saves the store section's `old` copy with the current revision.
+    - Both journal the new change with `actor: "manual"`, `correlation.causation_id = event_id` and `detail: "put back"`.
+    - It refuses a row that is not `revertible`: a plan activation, a shot or a calibration that was itself superseded. The message is `"This change can't be put back"`.
+    - A stale value is refused with the code `stale_revision`: the entity no longer holds `new`.
 
 - [ ] **Step 1: Write the failing tests.**
 
 ```python
 def test_a_learner_nudge_and_a_manual_edit_both_appear_attributed(): ...   # G8 accept
+def test_rows_carry_id_kind_outcome_and_limits(): ...                       # learner row: kind "setpoint", limits.writer "learner", outcome "Too soon to judge — check after the next lights-on."
+def test_until_bounds_the_range_and_no_room_merges_all_rooms(): ...
+def test_revert_refuses_when_the_value_moved_since(): ...                   # stale_revision
+async def test_revert_writes_the_old_value_back_and_journals_manual_with_causation(hass): ...  # tests_ha: number back to old, new event actor manual, causation_id == event_id
 async def test_upgrade_then_backfill_then_history_changes_equals_the_old_setpoint_log(hass): ...  # spec §7 test; seeded snapshot entry_3_11_1_pumped_room + a seeded setpoint_log store
 ```
 
 - [ ] **Step 2: Run them and see them fail.** Then implement, then run them. Expected: PASS.
-- [ ] **Step 3: Commit.** Subject: `feat(integration): history_changes over the journal`.
+- [ ] **Step 3: Commit.** Subject: `feat(integration): history_changes over the journal, and history_revert`.
 
 ### Task 25: `timeline_get`
 
@@ -952,11 +1126,20 @@ async def test_upgrade_then_backfill_then_history_changes_equals_the_old_setpoin
 - Consumes: the journal query, `generated/timers.project`, `sensor.crop_steering_<px>projection_app` (Task 15), and the room lights hours.
 - Produces:
   - `build(rooms: list[dict], events: list[dict], planned: list[dict], start, end) -> dict`, in the spec §5.2 shape.
-  - Block kinds are `shot|held|queued|planned|alert`. Statuses are `done|planned|error|warning`. Each block carries `litres` (commanded), `metered_l` (from `flow.reconciled`), `source` and `code`.
+  - Block kinds are `shot|held|queued|planned|alert`. Statuses are `done|planned|error|warning`.
+  - Each block carries:
+    - `litres` (commanded)
+    - `metered_l` (from `flow.reconciled`, or `None`)
+    - `reason`, `phase`, `vwc_before`, `vwc_expected`, `requested_at`, `pump_wait_s` (all from `shot.started` data, Task 8)
+    - `source`, `code`, `event_id`
+    - `skippable: bool` (future timer or engine blocks only)
   - Engine-expected blocks have `expected: true`.
   - `errors: {count, markers[]}`.
+  - `pump_load: [{t, pct}]` per room, built from the `shot.started`/`completed` windows and `zone_demand_lph`.
   - The span must be ≤ 48 h, or the call fails with `"timeline span is at most 48 h"`.
   - `timeline_get {rooms[], start, end, zones?}`
+  - `summarise(events, days) -> list[dict]`
+  - `timeline_summary {rooms[], days: [YYYY-MM-DD] (≤ 14)}` → `{days: [{date, rooms: [{room_id, shots, failed, warnings, held, queued}]}]}`, folded over the local day of each room.
 
 - [ ] **Step 1: Write the failing tests.**
 
@@ -966,6 +1149,9 @@ def test_aborted_shot_is_an_error_block_with_its_code(): ...
 def test_timer_program_projects_planned_blocks_after_now_only(): ...
 def test_engine_expectation_is_marked_expected(): ...
 def test_span_over_48h_is_refused(): ...
+def test_block_carries_reason_phase_vwc_and_pump_wait(): ...
+def test_summary_counts_failed_and_warning_blocks_per_local_day(): ...   # an aborted shot at 23:30 NZ lands on that NZ date
+def test_summary_refuses_more_than_14_days(): ...
 async def test_two_rooms_48h_round_trip(hass): ...   # tests_ha
 ```
 
@@ -1041,12 +1227,31 @@ def test_an_alert_whose_notification_is_gone_leaves_the_inbox(): ...
   - `addon_version` comes from heartbeat attr `controller_version`.
   - `sensor.crop_steering_system_health`: state = overall `pct_online`; attrs `pct_online`, `silent[]`, `controller`, `addon_version`.
   - The `system_status_get {}` service.
+  - Its answer also carries:
+    - Per entity:
+      - `kind`, one of `probe_vwc|probe_ec|probe_temp|valve|pump|main_line|feed_probe|tank|flow_meter`
+      - `name`, the friendly name or else the entity id
+      - `zone`, an int or `None`
+      - `last_change`
+      - `uptime_7d_pct`: the share of the last 7 days not `unknown`/`unavailable`, from `recorder.history.state_changes_during_period`. It is cached for 1 h per entity, and is `None` when the recorder is off.
+    - Per room, `groups: [{kind, entities: [...]}]` in that kind order.
+    - `heartbeat: {beats: [{at, missed: bool, readback_ms}], interval_s: 60}`, holding the last 120 beats.
+      - It comes from an in-memory ring filled by `async_track_state_change_event` on each room's `ai_heartbeat`.
+      - A gap above 2 × interval inserts a `missed` beat.
+      - `readback_ms` is the heartbeat attribute `readback_ms` when the controller publishes it, else `None`.
+    - `ha_version` (`homeassistant.const.__version__`)
+    - `ai: {model, calls_today, budget, pct_used}`, from the attributes `brain/meter.py` publishes on `sensor.crop_steering_<px>jev`, with names as pinned by `addons/f2_control/tests/test_brain_meter.py`. It is `None` when the brain is off.
+    - `card_version`: the `?v=` of the registered Lovelace resource whose URL contains `crop_steering`, read from `hass.data["lovelace"].resources`; `None` when there is none.
 
 - [ ] **Step 1: Write the failing tests.**
 
 ```python
 def test_one_silent_probe_drops_pct_online(): ...   # G17 accept: 10 entities, 1 unavailable -> 90
 def test_stale_heartbeat_is_stale_controller(): ...
+def test_entities_are_grouped_by_kind_with_names(): ...
+def test_uptime_7d_from_a_state_history(): ...      # 12 h unavailable in 7 d -> 92.86 (full precision, not rounded)
+def test_a_heartbeat_gap_is_a_missed_beat(): ...
+def test_no_brain_no_lovelace_resource_gives_none_not_an_error(): ...
 ```
 
 - [ ] **Step 2: Run them and see them fail.** Then implement, then run them. Expected: PASS.
@@ -1079,9 +1284,9 @@ def test_no_active_plan_is_unknown(): ...
 
 **Files:**
 - Modify:
-  - `mcp-server/src/ha.ts`: the `Service` allowlist += `journal_query`, `timeline_get`, `history_changes`, `supply_get`, `system_status_get`, `alert_rules_get`
+  - `mcp-server/src/ha.ts`: the `Service` allowlist += `journal_query`, `timeline_get`, `history_changes`, `supply_get`, `system_status_get`, `alert_rule_list`, `timeline_summary`
   - `mcp-server/src/schemas.ts`: zod for each response
-  - `mcp-server/src/server.ts`: tools `get_timeline`, `get_changes`, `get_events`, `get_alert_rules` (calls `alert_rules_get` from Task 16), `get_supply`, `get_system_status`
+  - `mcp-server/src/server.ts`: tools `get_timeline`, `get_changes`, `get_events`, `get_alert_rules` (calls `alert_rule_list` from Task 16), `get_supply`, `get_system_status`
   - `mcp-server/tests/mock-ha.mjs`
 - Test: `mcp-server/tests/read_tools.test.mjs`
 
@@ -1134,12 +1339,29 @@ test("hardware-moving services are not in the allowlist", ...)
   | M1 | 8, 9 (with 6 for the integration-side producers) |
   | M2 | 7, 9 |
   | M3 | 3, 10, 12, 13 |
-  | M4 | 11, 14–22 |
+  | M4 | 11, 14–22, 32–34 |
   | M5 | 23 |
   | M6 | 24–29 (flow in 26) |
   | M8 | 30, 31 |
 
-  Not planned, by scope: M7 (frontend), G11 `dashboard_create`, G12 inline (`dosing_mode`, `inline_status`), G13 `scale_hints`, `intent_submit`, `history_revert`, and the `water_sources` behaviour beyond storage.
+  The frontend plan's "Contract assumptions" are covered as follows:
+
+  | Item | Where |
+  |---|---|
+  | 1 `history_revert` | Task 24 |
+  | 2 `alert_rule_list`/`alert_rule_preview` + `probe.silence_s`/`stock.litres` | Task 16 |
+  | 3 timer list/preview/skip | Tasks 14, 15 |
+  | 4 timeline fields + `timeline_summary` | Tasks 8, 12, 25 |
+  | 5 `history_changes` fields, `until`, all rooms | Task 24 |
+  | 6 `calibration_start` fields + `dosing_paused` | Tasks 17, 18 |
+  | 7 `pump_stop`, 30 s cap, `pump_precheck` | Tasks 19, 20 |
+  | 8 system status detail | Task 28 |
+  | 9 notify | Task 34 (only quiet hours were missing) |
+  | 10 dashboards | Task 32 |
+  | 11 display units | Task 33 |
+  | 12 `crop_steering/subscribe` | Task 5 |
+
+  Not planned, by scope: M7 (frontend), G12 inline (`dosing_mode`, `inline_status`), G13 `scale_hints`, `intent_submit`, and the `water_sources` behaviour beyond storage.
 - **Type consistency:**
   - Every task calls `emit()` / `Outbox.emit` / `attribution()` with the signatures from Tasks 5 and 8.
   - `PlannedIntent` and `project()` from Task 1 are used in 14, 15 and 25.
@@ -1166,13 +1388,15 @@ test("hardware-moving services are not in the allowlist", ...)
    | G2 capture response | returns both shapes, `{reading, raw, stable, drift, stable_s}` |
    | EC stability | 1 % of reading, not 0.01 mS |
    | G3 commit key | `pump_calibration_commit` is keyed by `session_id` |
-   | G6 test vs preview | `alert_rule_test` replays (optional `send`); `alert_rule_preview` is its no-send alias |
+   | G6 test vs preview | `alert_rule_test` (saved rule, optional `send`); `alert_rule_preview` (draft rule, series + spans + ignored dips); `alert_rule_list` |
    | G7 timer field names | schema names (`type: one_off\|recycle\|simple`, `interval_min`) |
    | `shot_queued` | per room, with a `queue[]` attribute |
-   | G15 units | out of the backend plan; when built, per-room `display_save` keys `ec_unit`/`temp_unit` beat a site `units` service |
-   | G8 `history_revert` | not in the schema; not planned |
+   | G15 units | per-room `display_save` keys `ec_unit`/`temp_unit`/`volume_unit`/`clock` (Task 33), not site `units` |
+   | G8 `history_revert` | not in the schema; added on the frontend's request (Task 24) |
+   | Pump prime cap | 30 s (UX), not the spec's 120 s |
+   | Frontend field names | the backend names win: `metered_l` (frontend `litres_metered`), `requested_at` + `pump_wait_s` (frontend `requested_start`), and `probe.silence_s` in seconds, the canonical unit (the coordinator wrote "minutes") |
 7. **`API_VERSION` 1 → 2 would break MCP**, because `schemas.ts` has `api_version: z.literal(1)`. The v1 `setup_read` shape keeps 1, and 2 appears only in the envelope.
-8. **`pump_calibrate` cannot return `ran_s` synchronously.** The runner picks requests up on its own cadence, so `ran_s` arrives via `dosing_get` and the commit waits for it. For the same reason, hold-to-prime in the UX is a fixed-seconds run, not a held button.
+8. **`pump_calibrate` cannot return `ran_s` synchronously.** The runner picks requests up on its own cadence, so `ran_s` arrives via `dosing_get` and the commit waits for it. Hold-to-prime is a prime of at most 30 s ended early by `pump_stop`. The stop is seen within one runner wait tick (≤ 2 s) once the runner has picked the request up, but the pickup itself waits on the runner's poll cadence.
 9. **Dosing pumps dose by volume** (firmware `volume_entity` + `start_entity`). Timed prime and calibrate need a `power_entity`, and a pump without one is refused with blocker `no_power_entity`.
 10. **New CS codes beyond the spec's CS-214:** CS-318, CS-319 and CS-612. Each one needs:
     - a `RESERVED` entry;
