@@ -621,6 +621,20 @@ describe("what a room's timeline reads", () => {
       "sensor.crop_steering_zone_2_dryback_app",
     ]);
   });
+  it("names the decision sensor, so a room without one never reads dryback rows as decisions", () => {
+    const states = createDemo(Date.UTC(2026, 8, 23, 3));
+    const room = buildRoom(
+      states,
+      discoverRooms(states).find((item) => item.prefix === "")!,
+    );
+    expect(timelineEntities(room, states, 2).decision).toBe(
+      "sensor.crop_steering_current_decision",
+    );
+    const { ["sensor.crop_steering_current_decision"]: _gone, ...rest } = states;
+    const read = timelineEntities(room, rest, 2);
+    expect(read.decision).toBeNull();
+    expect(read.attributeIds).toEqual(["sensor.crop_steering_zone_2_dryback_app"]);
+  });
 });
 
 describe("the demo's day", () => {

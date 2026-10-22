@@ -118,7 +118,7 @@ export function waitingText(waiting: Waiting, format: WaitingFormat): string {
     const estimate =
       format.shotEstimate === null || format.shotEstimate === undefined
         ? ""
-        : `, ≈ ${clock(format.shotEstimate)} at this dry-down`;
+        : `, ≈ ${clock(format.shotEstimate)} by the controller's estimate`;
     const dilute = find("p2_dilute");
     // Under the trigger, a maintenance shot may still wait out the time between P2 shots.
     const wait = topup ? when(topup) : null;

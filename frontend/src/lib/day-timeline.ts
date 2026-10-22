@@ -116,6 +116,8 @@ export function timelineEntities(room: RoomView, states: States, zoneId?: number
     zones,
     entityIds: [...new Set(ids.filter(exists))].sort(),
     attributeIds: [decision, dryback].filter(exists),
+    /** The decision sensor's id, null where the room has none: its rows are looked up by it. */
+    decision: exists(decision) ? decision : null,
   };
 }
 

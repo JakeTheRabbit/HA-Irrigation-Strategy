@@ -43,6 +43,8 @@ export interface PublishedDryback {
   peak: number | null;
   /** The same drop in VWC points. */
   points: number | null;
+  /** VWC points lost per hour, as the controller measures it. */
+  rate: number | null;
   /** Why there is no value. */
   reason: string | null;
 }
@@ -56,6 +58,7 @@ function dryback(
     percent: value,
     peak: value === null ? null : finite(attributes.peak_vwc),
     points: value === null ? null : finite(attributes.dryback_points),
+    rate: value === null ? null : finite(attributes.rate_points_per_h),
     reason,
   };
 }
@@ -74,13 +77,14 @@ export function recordedDryback(rows: TimelineRow[] | undefined, at: number): Pu
 }
 
 /** When the controller expects the zone's next P2 top-up, from the hours it published and when it
- * published them; `since` is when this P2 began. */
+ * published them; `since` is when this P2 began, `lastShotEnd` when the zone's last shot ended. */
 export function publishedNextIrrigation(
   states: States,
   prefix: string,
   zone: number,
   phase: string | null,
   since: number | null,
+  lastShotEnd: number | null,
   now: number,
 ): { at: number | null; reason: string | null } {
   if (phase !== "P2")
@@ -91,25 +95,34 @@ export function publishedNextIrrigation(
   const none = "no estimate from the controller in this P2 yet";
   if (!entity || !Number.isFinite(stamp) || (since !== null && stamp < since))
     return { at: null, reason: none };
+  // It publishes 0 h on the tick it fires and nothing while the zone settles: that 0 is the shot's.
+  if (lastShotEnd !== null && stamp < lastShotEnd)
+    return { at: null, reason: "no estimate from the controller since the last shot" };
   const { value, reason } = read(entity, none, none);
   if (value === null) return { at: null, reason };
-  const at = stamp + value * H;
-  if (value <= 0) return { at: now, reason: null };
+  const at = stamp + Math.max(0, value) * H;
   if (at < now - LATE_MS) return { at: null, reason: "the controller's estimate is out of date" };
   return { at: Math.max(now, at), reason: null };
 }
 
-/** The zone's detected ramp ceiling (Vmax) and the controller's confidence in it, 0 to 1. */
+/** The zone's detected ramp ceiling (Vmax), the controller's confidence in it (0 to 1), and when
+ * it was detected: the controller keeps an earlier day's until today's ramp gives a new one. */
 export function publishedVmax(
   states: States,
   prefix: string,
   zone: number,
-): { value: number | null; confidence: number | null; reason: string | null } {
+): {
+  value: number | null;
+  confidence: number | null;
+  detected: number | null;
+  reason: string | null;
+} {
   const entity = states[vmaxId(prefix, zone)];
   const { value, reason } = read(entity, "not detected yet", "not detected yet");
   return {
     value,
     confidence: value === null ? null : finite(entity?.attributes.confidence),
+    detected: value === null ? null : Date.parse(entity?.last_updated ?? "") || null,
     reason,
   };
 }

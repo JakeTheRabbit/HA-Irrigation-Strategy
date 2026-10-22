@@ -100,7 +100,7 @@ describe("saying what a zone waits for", () => {
       "shot when VWC < 70% (now 84.1%) · dilution if pwEC > 3.84 (now 0.5) · P3 by 17:36",
     );
     expect(waitingText(p2, { ...format, shotEstimate: AT + 90 * 60_000 })).toMatch(
-      /^shot when VWC < 70% \(now 84\.1%, ≈ 09:06 at this dry-down\)/,
+      /^shot when VWC < 70% \(now 84\.1%, ≈ 09:06 by the controller's estimate\)/,
     );
     // Under the trigger, the shot waits out the time between P2 shots.
     const spaced = waiting(

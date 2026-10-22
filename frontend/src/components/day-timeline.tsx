@@ -72,7 +72,7 @@ import {
   type TimelineRows,
   type TypicalPoint,
 } from "@/lib/day-timeline";
-import { budgetShare, DRYBACK_WINDOW_H, drybackTrend } from "@/lib/dryback";
+import { budgetShare } from "@/lib/dryback";
 import { jevAnswer, jevResult, readJev, type JevEntry } from "@/lib/jev";
 import { descriptor, numeric } from "@/lib/model";
 import {
@@ -494,7 +494,7 @@ function buildLane(
   const root = `crop_steering_${room.room.prefix}`;
   const jev = readJev(states, room.room.prefix);
   const stage = jev.room?.stage ?? null;
-  const decisions = rows[entities.attributeIds[0]] ?? [];
+  const decisions = (entities.decision && rows[entities.decision]) || [];
   const settings = new Map(room.settings.map((setting) => [setting.entityId, setting]));
   const changes = setpointChanges(rows, [...settings.keys()], day.start, now).map(
     (change): Change => {
@@ -554,7 +554,15 @@ function buildLane(
           held,
           lastShot: shots.at(-1) ?? null,
           vwc: zone.vwc.value,
-          estimate: publishedNextIrrigation(states, room.room.prefix, zone.id, phase, since, now),
+          estimate: publishedNextIrrigation(
+            states,
+            room.room.prefix,
+            zone.id,
+            phase,
+            since,
+            shots.at(-1)?.end ?? null,
+            now,
+          ),
           ceiling,
           interval: planned ? null : water.p1_time_between_shots,
           maxWait: planned ? null : read("p0_maximum_wait_time"),
@@ -751,26 +759,15 @@ function ZoneNumbers({
   const lastShot = zone.lastIrrigation.timestamp ?? null;
   const next = lane && day ? nextWords(lane, day) : null;
   const dryback = lane?.dryback;
-  // How fast it dries since the last shot settled, from today's readings.
-  const rate = lane
-    ? drybackTrend(
-        lane.points.map((point) => ({
-          time: new Date(point.time).toISOString(),
-          value: point.value,
-        })),
-        lastShot,
-        zone.vwc.value,
-        Date.now(),
-      ).rate
-    : null;
+  // The peak, the dryback and its rate are the controller's own (published.ts), never worked out here.
+  const prefix = controller.room.room.prefix;
+  const live = publishedDryback(controller.states, prefix, zone.id);
+  const vmax = publishedVmax(controller.states, prefix, zone.id);
+  const rate = live.rate;
   // The four key values against their targets; water and shots are the facts under them.
   const targets = buildSetpointPreview(controller.room, controller.states, zone.id, {}).saved
     .parameters;
   const phase = lane?.phase ?? (/^P[0-3]$/.test(zone.phase) ? zone.phase : null);
-  // The peak and the dryback are the controller's own (published.ts), never worked out here.
-  const prefix = controller.room.room.prefix;
-  const live = publishedDryback(controller.states, prefix, zone.id);
-  const vmax = publishedVmax(controller.states, prefix, zone.id);
   const gauges = [
     {
       id: "vwc",
@@ -888,31 +885,43 @@ function ZoneNumbers({
           <dd className="zone-sub">
             {vmax.value === null
               ? vmax.reason
-              : vmax.confidence === null
-                ? "detected"
-                : `detected, ${number(vmax.confidence * 100, 0)}% sure`}
+              : [
+                  vmax.detected === null
+                    ? "detected"
+                    : day && vmax.detected >= day.start
+                      ? "detected today"
+                      : `detected ${ageText(Date.now() - vmax.detected)} ago, not yet today`,
+                  vmax.confidence === null ? null : `${number(vmax.confidence * 100, 0)}% sure`,
+                ]
+                  .filter(Boolean)
+                  .join(", ")}
           </dd>
         </div>
-        {rate !== null && (
-          <div
-            title={`Dryback rate. The VWC points that the zone lost each hour since the last shot settled. The calculation uses up to the last ${DRYBACK_WINDOW_H} hours.`}
-          >
-            <dt>Dryback rate</dt>
-            <dd>
-              {Math.abs(rate) < 0.05 ? (
-                "steady"
-              ) : (
-                <>
-                  {number(Math.abs(rate), Math.abs(rate) < 1 ? 2 : 1)}
-                  <span className="unit"> pts/h</span>
-                </>
-              )}
-            </dd>
-            {Math.abs(rate) >= 0.05 && (
-              <dd className="zone-sub">{rate > 0 ? "drying" : "wetting"}</dd>
+        <div
+          title="Dryback rate. The VWC points that the zone loses each hour, as the controller measures it for its decisions."
+          data-dryback-rate={zone.id}
+        >
+          <dt>Dryback rate</dt>
+          <dd>
+            {rate === null ? (
+              "—"
+            ) : Math.abs(rate) < 0.05 ? (
+              "steady"
+            ) : (
+              <>
+                {number(Math.abs(rate), Math.abs(rate) < 1 ? 2 : 1)}
+                <span className="unit"> pts/h</span>
+              </>
             )}
-          </div>
-        )}
+          </dd>
+          {rate === null ? (
+            <dd className="zone-sub">{live.reason ?? "not published by the controller"}</dd>
+          ) : (
+            Math.abs(rate) >= 0.05 && (
+              <dd className="zone-sub">{rate > 0 ? "drying" : "wetting"}</dd>
+            )
+          )}
+        </div>
       </dl>
       {next && (
         <p className="zone-next" title={next.detail} data-tone={next.tone}>

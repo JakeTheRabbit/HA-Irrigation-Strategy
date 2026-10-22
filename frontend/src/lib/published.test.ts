@@ -27,6 +27,7 @@ describe("the controller's published dryback", () => {
     const states = state(drybackId("f1_", 2), "12.345", {
       peak_vwc: 63.2,
       dryback_points: 7.8,
+      rate_points_per_h: 0.42,
       unit_of_measurement: "%",
     });
     expect(drybackId("f1_", 2)).toBe("sensor.crop_steering_f1_zone_2_dryback_app");
@@ -34,6 +35,7 @@ describe("the controller's published dryback", () => {
       percent: 12.345,
       peak: 63.2,
       points: 7.8,
+      rate: 0.42,
       reason: null,
     });
   });
@@ -43,6 +45,7 @@ describe("the controller's published dryback", () => {
       percent: null,
       peak: null,
       points: null,
+      rate: null,
       reason: "the controller does not publish a dryback for this zone",
     });
     expect(publishedDryback(state(drybackId("", 1), "unknown", { peak_vwc: null }), "", 1)).toEqual(
@@ -50,6 +53,7 @@ describe("the controller's published dryback", () => {
         percent: null,
         peak: null,
         points: null,
+        rate: null,
         reason: "no peak since lights-on yet",
       },
     );
@@ -69,6 +73,7 @@ describe("the controller's published dryback", () => {
       percent: 21.25,
       peak: 61,
       points: null,
+      rate: null,
       reason: null,
     });
     expect(recordedDryback(rows.slice(2), start).reason).toBe(
@@ -80,39 +85,66 @@ describe("the controller's published dryback", () => {
 
 describe("the controller's next irrigation estimate", () => {
   const since = NOW - 2 * H;
+  // The zone's last shot ended 40 minutes ago.
+  const shotEnd = NOW - 40 * 60_000;
+  const next = (value: string, published: number, lastShotEnd: number | null = shotEnd) =>
+    publishedNextIrrigation(
+      state(nextIrrigationId("", 1), value, {}, published),
+      "",
+      1,
+      "P2",
+      since,
+      lastShotEnd,
+      NOW,
+    );
   it("is the published hours from when the controller published them", () => {
-    const states = state(nextIrrigationId("", 3), "1.5", {}, NOW - 10 * 60_000);
     expect(nextIrrigationId("", 3)).toBe(
       "sensor.crop_steering_prediction_zone_3_next_irrigation_hours",
     );
-    expect(publishedNextIrrigation(states, "", 3, "P2", since, NOW)).toEqual({
+    expect(next("1.5", NOW - 10 * 60_000)).toEqual({
       at: NOW - 10 * 60_000 + 1.5 * H,
       reason: null,
     });
   });
 
-  it("0 h is due now", () => {
-    const states = state(nextIrrigationId("", 1), "0.0", {}, NOW - 30 * 60_000);
-    expect(publishedNextIrrigation(states, "", 1, "P2", since, NOW)).toEqual({
-      at: NOW,
-      reason: null,
+  it("a fresh 0 h after the last shot is due now", () => {
+    expect(next("0.0", NOW - 60_000)).toEqual({ at: NOW, reason: null });
+  });
+
+  it("the 0 h the controller published as it fired is not due now after that shot", () => {
+    // The controller publishes 0 on the tick it fires, then nothing while the zone settles.
+    expect(next("0.0", shotEnd - 3 * 60_000)).toEqual({
+      at: null,
+      reason: "no estimate from the controller since the last shot",
+    });
+  });
+
+  it("any estimate from before the last shot ended is ignored", () => {
+    expect(next("1.5", shotEnd - 60_000).reason).toBe(
+      "no estimate from the controller since the last shot",
+    );
+  });
+
+  it("a 0 h held long after it was published is out of date", () => {
+    expect(next("0.0", NOW - 20 * 60_000, null)).toEqual({
+      at: null,
+      reason: "the controller's estimate is out of date",
     });
   });
 
   it("outside P2, from before this P2 began, or long past, it is not shown", () => {
     const states = state(nextIrrigationId("", 1), "1", {}, NOW - 30 * 60_000);
-    expect(publishedNextIrrigation(states, "", 1, "P1", since, NOW)).toEqual({
+    expect(publishedNextIrrigation(states, "", 1, "P1", since, null, NOW)).toEqual({
       at: null,
       reason: "the controller estimates the next shot only in P2",
     });
-    expect(publishedNextIrrigation(states, "", 1, "P2", NOW - 10 * 60_000, NOW).reason).toBe(
+    expect(publishedNextIrrigation(states, "", 1, "P2", NOW - 10 * 60_000, null, NOW).reason).toBe(
       "no estimate from the controller in this P2 yet",
     );
-    expect(publishedNextIrrigation({}, "", 1, "P2", since, NOW).reason).toBe(
+    expect(publishedNextIrrigation({}, "", 1, "P2", since, null, NOW).reason).toBe(
       "no estimate from the controller in this P2 yet",
     );
-    const old = state(nextIrrigationId("", 1), "0.25", {}, NOW - 2 * H + 60_000);
-    expect(publishedNextIrrigation(old, "", 1, "P2", since, NOW).reason).toBe(
+    expect(next("0.25", NOW - 2 * H + 60_000, null).reason).toBe(
       "the controller's estimate is out of date",
     );
   });
@@ -124,11 +156,13 @@ describe("the controller's detected ramp ceiling", () => {
     expect(publishedVmax(state(vmaxId("", 1), "66.4", { confidence: 0.8 }), "", 1)).toEqual({
       value: 66.4,
       confidence: 0.8,
+      detected: NOW,
       reason: null,
     });
     expect(publishedVmax({}, "", 1)).toEqual({
       value: null,
       confidence: null,
+      detected: null,
       reason: "not detected yet",
     });
   });
