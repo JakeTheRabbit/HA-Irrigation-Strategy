@@ -310,17 +310,47 @@ def test_pump_stop_replaces_a_pending_prime_request(monkeypatch):
     assert rig.dosing.data["request"]["id"] == "s1"
 
 
-def test_pump_stop_is_taken_while_another_pumps_run_waits(monkeypatch):
+def test_a_staff_stop_with_another_pumps_prime_waiting_becomes_a_room_stop(
+    monkeypatch,
+):
     rig = _bloom_rig(monkeypatch)
     prime = rig.run(rig.dosing.pump_prime("bloom", 20, "Alex", WHO))
-    stop = rig.run(rig.dosing.pump_stop("balance", "Staff"))
-    assert stop["replaced"] == {
-        "id": prime["request_id"],
-        "action": "prime",
-        "pump": "bloom",
-    }
-    assert rig.dosing.data["request"]["pump"] == "balance"
-    assert rig.dosing.pump_hold() is None  # bloom's prime never runs
+    waiting = copy.deepcopy(rig.dosing.data["request"])
+    stop = rig.run(rig.dosing.pump_stop("balance", "Staff", admin=False))
+    assert stop["replaced"] == {"upgraded_to": "stop", "was": waiting}
+    request = rig.dosing.data["request"]
+    assert request["id"] == stop["request_id"]
+    assert (request["action"], request["pump"], request["by"]) == (
+        "stop",
+        None,
+        "Staff",
+    )
+    # Bookkeeping as a room stop: the bloom prime never runs, so its hold and report go.
+    assert prime["request_id"] not in rig.dosing._primes
+    assert rig.dosing.pump_hold() is None
+
+
+def test_two_pumps_stops_in_a_row_stop_both_pumps(monkeypatch):
+    rig = _bloom_rig(monkeypatch)
+    first = rig.run(rig.dosing.pump_stop("balance", "Staff", admin=False))
+    assert first["replaced"] is None
+    assert rig.dosing.data["request"]["action"] == "stop_pump"
+    second = rig.run(rig.dosing.pump_stop("bloom", "Staff", admin=False))
+    assert second["replaced"]["upgraded_to"] == "stop"
+    assert second["replaced"]["was"]["pump"] == "balance"
+    assert rig.dosing.data["request"]["action"] == "stop"  # stops every pump
+    # A third stop finds a room stop waiting: kept, and it is the answer.
+    third = rig.run(rig.dosing.pump_stop("balance", "Staff", admin=False))
+    assert third == {"request_id": second["request_id"], "replaced": None}
+
+
+def test_a_pump_stop_never_drops_another_pumps_calibration_session(monkeypatch):
+    rig = _bloom_rig(monkeypatch)
+    started = rig.calibrate(30)  # balance; its request is taken up by the controller
+    _handled(rig)
+    rig.run(rig.dosing.pump_stop("bloom", "Staff", admin=False))
+    view = rig.dosing.response()["config"]["pumps"][0]["calibration_session"]
+    assert view["session_id"] == started["session_id"]
 
 
 def test_two_primes_hold_the_room_until_the_later_one_ends(monkeypatch):

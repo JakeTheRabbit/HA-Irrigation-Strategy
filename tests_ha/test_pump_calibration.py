@@ -200,6 +200,11 @@ async def test_a_prime_is_capped_at_30_s_and_only_an_administrator_primes(
     assert hass.states.get(CONFIG).attributes["request"]["action"] == "batch"
     stop = await _call(hass, hass_admin_user, "pump_stop", pump="balance")
     assert stop["replaced"]["action"] == "batch"
+    # Balance's own stop still waits: a staff stop of the same pump replaces it in kind.
+    again = await _call(hass, staff, "pump_stop", pump="balance")
+    assert again["replaced"] is None
+    await hass.async_block_till_done()
+    assert hass.states.get(CONFIG).attributes["request"]["action"] == "stop_pump"
 
 
 async def test_calibration_abandon_releases_a_pump_calibration_hold(

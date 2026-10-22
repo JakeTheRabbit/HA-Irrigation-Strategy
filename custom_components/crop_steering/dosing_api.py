@@ -484,26 +484,34 @@ class DosingStore:
         }
 
     async def pump_stop(self, pump_id, by, admin=True) -> dict:
-        """End a prime or a calibration of the pump. The stop_pump replaces whatever request still
-        waits (it never ran, and the answer names it in `replaced`), except a room stop, which already
-        stops this pump too: that one stays and its id is the answer. A waiting dose or batch, which
-        only an administrator could ask for, only an administrator (`admin`: an administrator or an
-        automation) may replace. A running batch or another pump's running job is never touched (the
-        controller stops only this pump).
+        """End a prime or a calibration of the pump. What still waits for the controller decides what
+        is stored (the waiting request never ran; the answer names it in `replaced`):
+        - nothing, or this pump's own prime, calibration or stop_pump: a stop_pump of this pump;
+        - another pump's prime, calibration or stop_pump: a room stop instead, which stops every pump
+          (the safe direction; one request slot cannot hold both), `replaced` {upgraded_to, was};
+        - a room stop: kept, it stops this pump too, and its id is the answer;
+        - a dose or a batch, which only an administrator could ask for: replaced only when `admin`
+          (an administrator or an automation), else refused with WAITING.
+        A running batch or another pump's running job is never touched by a stop_pump (the controller
+        stops only this pump).
         """
         async with self._lock:
             if self.error:
                 raise ValueError(self.error)
             pump = dosing.find_pump(self.data, pump_id)["id"]
             waiting = self.data["request"] if self.pending() else None
-            if waiting and waiting.get("action") == "stop":
+            action = waiting.get("action") if waiting else None
+            if action == "stop":
                 return {"request_id": waiting["id"], "replaced": None}
-            if waiting and waiting.get("action") in ("dose", "batch") and not admin:
+            if action in ("dose", "batch") and not admin:
                 raise ValueError(WAITING)
+            upgrade = action in ("prime", "calibrate", "stop_pump") and (
+                waiting.get("pump") != pump
+            )
             request = {
                 "id": uuid.uuid4().hex,
-                "action": "stop_pump",
-                "pump": pump,
+                "action": "stop" if upgrade else "stop_pump",
+                "pump": None if upgrade else pump,
                 "ml": None,
                 "at": _now().isoformat(),
                 "by": by,
@@ -511,12 +519,13 @@ class DosingStore:
             draft = deepcopy(self.data)
             draft["request"] = request
             await self._commit(draft)
-            self._replaced(waiting)
-        replaced = (
-            {key: waiting.get(key) for key in ("id", "action", "pump")}
-            if waiting and waiting.get("action") != "stop_pump"
-            else None
-        )
+            self._replaced(waiting)  # only the replaced request's own hold or session
+        if upgrade:
+            replaced = {"upgraded_to": "stop", "was": deepcopy(waiting)}
+        elif waiting and action != "stop_pump":
+            replaced = {key: waiting.get(key) for key in ("id", "action", "pump")}
+        else:
+            replaced = None
         return {"request_id": request["id"], "replaced": replaced}
 
     def _replaced(self, request):

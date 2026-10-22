@@ -2046,7 +2046,8 @@ pump_prime:
     Leaves a request for the controller to run the pump's power switch for a number of seconds, to
     fill its line. Doses and batches of the room wait for its run and 60 seconds after it.
     Refused, with the blockers, while any pump_precheck blocker stands; refused while another
-    dosing request still waits for the controller. At most 30 seconds. pump_stop ends it early. When a signed-in user calls it, that user must be a Home Assistant administrator.
+    dosing request still waits for the controller. At most 30 seconds. pump_stop ends it early.
+    When a signed-in user calls it, that user must be a Home Assistant administrator.
   fields:
     room_id:
       name: Room ID
@@ -2077,8 +2078,10 @@ pump_stop:
   name: Stop a dosing pump's prime or calibration
   description: >-
     Leaves a request for the controller to end the prime or the calibration run of this pump now. It
-    replaces any request that still waits (the answer names it in `replaced`), except a waiting room
-    stop, which stops this pump too and is kept. Any signed-in user may call it, but only an
+    replaces this pump's own waiting prime, calibration or stop (the answer names it in `replaced`).
+    When another pump's prime, calibration or stop still waits, it leaves a room stop instead, which
+    stops every pump; `replaced` is then {upgraded_to: stop, was: the waiting request}. A waiting
+    room stop stops this pump too and is kept. Any signed-in user may call it, but only an
     administrator (or an automation) may replace a waiting dose or batch; anyone else is refused
     with "A dose or batch is waiting — an admin, or the room Stop, can cancel it." It never touches
     a running batch or another pump's running job. To stop all dosing in the room, use
