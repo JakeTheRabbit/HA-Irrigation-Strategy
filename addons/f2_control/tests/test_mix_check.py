@@ -165,6 +165,8 @@ def test_a_batch_finished_while_its_band_is_unreadable_is_checked_once_the_band_
     status = _batch(r)
     assert status["handled_result"] == "finished" and status["mix"]["verdict"] is None
     assert _settle(r)["mix"]["verdict"] is None and r.codes() == []
+    _settle(r, 60)
+    assert sum("waits: the room's feed EC or pH band can't be read" in line for line in r.logs) == 1
     assert _batch(r, by=None)["handled_result"] == "refused: the last batch's mix is not checked yet"
     r.fake.set_state("number.crop_steering_irrigation_ec_max", "2.5")
     assert _settle(r, 60)["mix"]["verdict"] == "good"

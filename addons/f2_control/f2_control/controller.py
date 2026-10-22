@@ -2321,9 +2321,8 @@ class Controller:
         # A feed probe in ppm or ppt is read as before (keep_refused): never a new dead-feed hold.
         feed = self._read_sensor(room.feed_ec_sensor, "ec", keep_refused=True)
         if feed is not None:
-            lo = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_min", 0)
-            hi = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_max", 0)
-            if (lo <= 0 or feed >= lo) and (hi <= 0 or feed <= hi):
+            lo, hi, unread = self._feed_band(room, "ec")  # a band that can't be read proves no reading good
+            if not unread and (lo <= 0 or feed >= lo) and (hi <= 0 or feed <= hi):
                 room._feed_last_good_value, room._feed_last_good_time = (
                     feed,
                     datetime.now(),
@@ -2347,9 +2346,8 @@ class Controller:
             return None
         ph = self._read_sensor(room.feed_ph_sensor, "ph")
         if ph is not None:
-            lo = self._num(f"number.crop_steering_{room.prefix}irrigation_ph_min", 0)
-            hi = self._num(f"number.crop_steering_{room.prefix}irrigation_ph_max", 0)
-            if (lo <= 0 or ph >= lo) and (hi <= 0 or ph <= hi):
+            lo, hi, unread = self._feed_band(room, "ph")  # a band that can't be read proves no reading good
+            if not unread and (lo <= 0 or ph >= lo) and (hi <= 0 or ph <= hi):
                 room._feed_ph_last_good, room._feed_ph_last_good_time = (
                     ph,
                     datetime.now(),

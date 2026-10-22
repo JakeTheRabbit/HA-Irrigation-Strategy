@@ -1479,8 +1479,13 @@ class DosingRunner:
         """The tank read through the device-unit table and judged: "good" with every reading inside its band,
         else "off target" or "not read" with CS-808. Neither holds watering."""
         bands = self._mix_bands(room)
-        if bands is None:
-            return  # a band can't be read: judged on a later pass, and until then the batch is not marked good
+        if bands is None:  # a band can't be read: judged on a later pass, and until then the batch is not marked good
+            live = self._live_of(room)
+            if live.get("mix_deferred") != mix.get("batch"):  # said once per batch, not every pass
+                live["mix_deferred"] = mix.get("batch")
+                self._log(f"[{room.slug}] dosing: mix check of the batch that started {mix.get('batch')} waits: "
+                          "the room's feed EC or pH band can't be read")
+            return
         found, off, unread = {}, [], []
         for quantity, probe, lo, hi in bands:
             value, state, unit = self._device(probe, quantity, keep_unknown=False)
