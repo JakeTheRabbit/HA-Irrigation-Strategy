@@ -1,10 +1,10 @@
 """Files that ship as copies are their source, byte for byte.
 
-The one defaults table is written once, in the engine, and ships three times: the engine itself, the
-controller's vendored engine and the integration (which Home Assistant installs on its own, so it
-cannot import the engine). A copy edited by hand, or a source edited without its copies, would let
-the integration offer one value and the controller use another. To fix a failure, edit the source
-and copy it over: cp <source> <copy>.
+The one defaults table, and the one rule for how long a shot runs, are each written once, in the
+engine, and ship three times: the engine itself, the controller's vendored engine and the integration
+(which Home Assistant installs on its own, so it cannot import the engine). A copy edited by hand, or
+a source edited without its copies, would let the integration offer or show one value and the
+controller use another. To fix a failure, edit the source and copy it over: cp <source> <copy>.
 """
 
 from pathlib import Path
@@ -17,15 +17,23 @@ COPIES = [
     "addons/f2_control/f2_control/crop_steering_engine/defaults.py",
     "custom_components/crop_steering/generated/defaults.py",
 ]
+SHOT_SOURCE = "crop-steering-engine/src/crop_steering_engine/shot_length.py"
+SHOT_COPIES = [
+    "addons/f2_control/f2_control/crop_steering_engine/shot_length.py",
+    "custom_components/crop_steering/generated/shot_length.py",
+]
 
 
 def _same(source: Path, copy: Path) -> bool:
     return copy.read_bytes() == source.read_bytes()
 
 
-@pytest.mark.parametrize("copy", COPIES)
-def test_each_copy_is_its_source_byte_for_byte(copy):
-    assert _same(ROOT / SOURCE, ROOT / copy), f"{copy} differs: cp {SOURCE} {copy}"
+@pytest.mark.parametrize(
+    "source, copy",
+    [(SOURCE, c) for c in COPIES] + [(SHOT_SOURCE, c) for c in SHOT_COPIES],
+)
+def test_each_copy_is_its_source_byte_for_byte(source, copy):
+    assert _same(ROOT / source, ROOT / copy), f"{copy} differs: cp {source} {copy}"
 
 
 @pytest.mark.parametrize("position", [0, "middle", -1])
