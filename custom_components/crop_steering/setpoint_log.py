@@ -7,8 +7,10 @@ without the log) reads as an empty log; nothing is written until a setting moves
 
 Who: Home Assistant sees only the controller app's token, so the controller names the writer of
 each of its writes first, with the `crop_steering_setpoint_write` event (the learner, the AI brain,
-or the brain's safety put-back). A write it has not named is the operator's when a signed-in person
-made it, and Home Assistant's own (an automation or a script) otherwise.
+or the brain's safety put-back). A claim names one write: that write consumes it, and the controller
+takes it back (`crop_steering_setpoint_claim_cancel`) when its write did not land. A write it has not
+named is the operator's when a signed-in person made it, and Home Assistant's own (an automation or a
+script) otherwise.
 """
 
 from __future__ import annotations
@@ -23,6 +25,7 @@ from .room import room_prefix
 
 MAX_CHANGES = 2000
 CLAIM_EVENT = f"{DOMAIN}_setpoint_write"
+CANCEL_EVENT = f"{DOMAIN}_setpoint_claim_cancel"
 # A named write lands within seconds; a claim older than this names nothing.
 CLAIM_S = 120
 CONTROLLER_WRITERS = ("learner", "brain", "safety")
@@ -43,7 +46,8 @@ class SetpointLog:
         self.room_id = "room:" + room_prefix(entry)
         self._store = store
         self._lock = asyncio.Lock()
-        # entity_id -> (value, who, monotonic seconds, expires or None, reason or None, expected or None)
+        # entity_id -> (value, who, monotonic seconds, expires or None, reason or None, expected or None,
+        # claim_id or None: a controller from before CTL-035 sends none)
         self._claims = {}
         self._reasons = (
             {}
@@ -97,7 +101,24 @@ class SetpointLog:
                 expires,
                 reason,
                 expected,
+                data.get("claim_id"),
             )
+
+    def cancel(self, data):
+        """The controller's write did not land: drop its claim, when it is still the one named."""
+        try:
+            claim = self._claims.get(data["entity_id"])
+            same = (
+                claim is not None
+                and claim[6] is not None
+                and claim[6] == data.get("claim_id")
+                and claim[1] == data.get("who")
+                and abs(claim[0] - float(data["value"])) < 1e-6
+            )
+        except (KeyError, TypeError, ValueError):
+            return
+        if same:
+            del self._claims[data["entity_id"]]
 
     async def who(self, entity_id, value, context):
         """-> (who, the expiry the controller named with its write, or None)."""
@@ -198,7 +219,12 @@ async def async_setup_setpoint_log(hass, entry):
     def claimed(event):
         log.claim(event.data)
 
+    @callback
+    def cancelled(event):
+        log.cancel(event.data)
+
     entry.async_on_unload(hass.bus.async_listen(CLAIM_EVENT, claimed))
+    entry.async_on_unload(hass.bus.async_listen(CANCEL_EVENT, cancelled))
 
     async def handle(call):
         # Reading only: anyone who may look at the room may read who changed what.
