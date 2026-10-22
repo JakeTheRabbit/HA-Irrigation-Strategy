@@ -17,9 +17,8 @@ REFUSED = "requires an authenticated Home Assistant administrator"
 
 
 @pytest.fixture(autouse=True)
-def _custom_integrations(hass, enable_custom_integrations, tmp_path):
+def _custom_integrations(hass, enable_custom_integrations):
     hass.config.components.add("frontend")
-    hass.config.config_dir = str(tmp_path)  # the journal file is per test, not shared
     yield
 
 
@@ -147,3 +146,22 @@ async def test_subscribe_without_a_user_is_refused(hass):
     connection.send_error.assert_called_once()
     assert connection.send_error.call_args.args[:2] == (7, "unauthorized")
     connection.send_result.assert_not_called()
+
+
+async def test_the_kinds_filter_of_the_websocket_feed(
+    hass, real_api, hass_admin_user, hass_ws_client, hass_read_only_access_token, monkeypatch
+):
+    await _up(hass, real_api, monkeypatch)
+    client = await hass_ws_client(hass, hass_read_only_access_token)
+    await client.send_json(
+        {"id": 1, "type": "crop_steering/subscribe", "kinds": ["phase.changed"]}
+    )
+    assert (await client.receive_json())["success"] is True
+    shot, phase = _event("shot.completed"), _event("phase.changed")
+    await _call(
+        hass, hass_admin_user, "journal_append", room_id=F2, events=[shot, phase]
+    )
+    msg = await asyncio.wait_for(client.receive_json(), 5)
+    assert msg["event"]["id"] == phase["id"]
+    with pytest.raises(asyncio.TimeoutError):
+        await asyncio.wait_for(client.receive_json(), 0.3)

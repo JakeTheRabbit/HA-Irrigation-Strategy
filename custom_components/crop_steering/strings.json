@@ -942,6 +942,58 @@
         }
       }
     },
+    "journal_append": {
+      "name": "Append journal events",
+      "description": "Stores up to 50 events for a room in the event journal and announces each new one on the bus as `crop_steering_event`. An event whose ID is already stored is skipped, so a repeat is safe. One bad event refuses the whole call and stores nothing. Only an administrator can call it.",
+      "fields": {
+        "room_id": {
+          "name": "Room",
+          "description": "The room the events belong to: `room:` followed by the room prefix. Example: `room:f2_`."
+        },
+        "events": {
+          "name": "Events",
+          "description": "Version 1 events, each with an ID, a time, a kind, an outcome and a source actor. Maximum: 50."
+        }
+      }
+    },
+    "journal_query": {
+      "name": "Read the journal",
+      "description": "Returns a room's events in time order, with a cursor for the next page. Changes nothing. Any signed-in user can call it.",
+      "fields": {
+        "room_id": {
+          "name": "Room",
+          "description": "The room to read: `room:` followed by the room prefix. Example: `room:f2_`."
+        },
+        "since": {
+          "name": "Since",
+          "description": "The first moment to include, as an ISO time with its offset."
+        },
+        "until": {
+          "name": "Until",
+          "description": "The first moment to leave out, as an ISO time with its offset. Empty: no end."
+        },
+        "kinds": {
+          "name": "Kinds",
+          "description": "Return only these event kinds. Empty: all kinds."
+        },
+        "zones": {
+          "name": "Zones",
+          "description": "Return only events of these zone numbers. Empty: all zones."
+        },
+        "actor": {
+          "name": "Actor",
+          "description": "Return only events from this actor. Example: `engine`."
+        },
+        "limit": {
+          "name": "Limit",
+          "description": "The most events to return. Default: 500. Range: 1 to 500."
+        },
+        "cursor": {
+          "name": "Cursor",
+          "description": "The cursor that the previous page returned. Empty: the first page."
+        }
+      }
+    },
     "notify_get": {
       "name": "Read notifications",
       "description": "Returns who gets which alerts: the row of each phone, the alert types, and the phones of the site with their owners. Changes nothing. It has no administrator check. The answer also shows if the caller can change every row. Use it to read the revision before `notify_save`."

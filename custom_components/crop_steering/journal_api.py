@@ -12,18 +12,22 @@ two services answer "unavailable".
 
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta
 import logging
+import os
 import time
 
 from .admin import async_require_admin
 from .const import DOMAIN, EVENT_JOURNAL
 from .generated.ids import new_id
+from .journal import validate_event
 
 _LOGGER = logging.getLogger(__name__)
 
 SERVICES = ("journal_append", "journal_query")
 MAX_APPEND = 50
+READY_TIMEOUT_S = 30
 PRUNE_EVERY = timedelta(days=1)
 HUB = "_journal"
 UNSUBS = "_journal_unsubs"
@@ -36,54 +40,82 @@ def _hub_error(message):
 
 
 class JournalHub:
-    """The site's journal, with its asynchronous face. `ok` is false when the file could not be opened."""
+    """The site's journal, with its asynchronous face.
 
-    def __init__(self, hass, path: str) -> None:
+    It is `opening` until the file is open, then `ok`; `failed` when it could not be opened. Events and calls
+    that arrive while it opens wait (at most READY_TIMEOUT_S) and go in, in order, once it is open. All writes
+    take one lock, shared with the hub of a reloaded room, so two connections never race for a sequence number.
+    """
+
+    def __init__(self, hass, path: str, lock: asyncio.Lock | None = None) -> None:
         from .journal import Journal
 
         self.hass = hass
         self.path = path
         self.ok = False
+        self.failed = False
+        self.closed = False
+        self._ready = asyncio.Event()
+        self._lock = lock or asyncio.Lock()
+        self._tasks: set = set()
         self._journal = Journal(path)
+
+    @property
+    def opening(self) -> bool:
+        return not self._ready.is_set()
 
     async def async_init(self) -> None:
         try:
             await self.hass.async_add_executor_job(self._open)
             self.ok = True
         except Exception as err:  # never block setup or watering on the journal
+            self.failed = True
             _LOGGER.warning("Event journal unavailable (%s): %s", self.path, err)
+        finally:
+            self._ready.set()
 
     def _open(self) -> None:
-        import os
-
         os.makedirs(os.path.dirname(self.path) or ".", exist_ok=True)
         self._journal.open()
 
     def close_soon(self) -> None:
-        """Stop using the journal and close its file in the background (a room reload does not wait on it)."""
-        self.ok = False
-        self.hass.async_add_executor_job(self._journal.close)
+        """Stop taking new events and close the file in the background, once the events already accepted are
+        stored (a room reload does not wait on it)."""
+        self.closed = True
+        self.hass.async_create_task(self._close())
 
-    def _need_ok(self) -> None:
+    async def _close(self) -> None:
+        if self._tasks:
+            await asyncio.gather(*self._tasks, return_exceptions=True)
+        self.ok = False
+        await self.hass.async_add_executor_job(self._journal.close)
+
+    async def _wait_ready(self) -> None:
+        if not self._ready.is_set():
+            try:
+                await asyncio.wait_for(self._ready.wait(), READY_TIMEOUT_S)
+            except asyncio.TimeoutError:
+                pass
         if not self.ok:
             raise _hub_error("The event journal is unavailable")
 
     async def append(self, room_id: str, events: list) -> dict:
-        self._need_ok()
         if len(events) > MAX_APPEND:
             raise _hub_error(f"journal_append takes at most {MAX_APPEND} events")
-        try:
-            out = await self.hass.async_add_executor_job(
-                self._journal.append, room_id, events
-            )
-        except ValueError as err:
-            raise _hub_error(str(err)) from err
+        await self._wait_ready()
+        async with self._lock:
+            try:
+                out = await self.hass.async_add_executor_job(
+                    self._journal.append, room_id, events
+                )
+            except ValueError as err:
+                raise _hub_error(str(err)) from err
         for event in out.pop("stored"):
             self.hass.bus.async_fire(EVENT_JOURNAL, event)
         return out
 
     async def query(self, **kw) -> dict:
-        self._need_ok()
+        await self._wait_ready()
         try:
             return await self.hass.async_add_executor_job(
                 lambda: self._journal.query(**kw)
@@ -96,6 +128,12 @@ class JournalHub:
             await self.hass.async_add_executor_job(
                 self._journal.prune, int(time.time() * 1000)
             )
+
+    def schedule(self, room_id: str, event: dict) -> None:
+        """Store one event in the background, behind the ones already waiting."""
+        task = self.hass.async_create_task(self._emit(room_id, event))
+        self._tasks.add(task)
+        task.add_done_callback(self._tasks.discard)
 
     async def _emit(self, room_id: str, event: dict) -> None:
         try:
@@ -120,12 +158,13 @@ def emit(
     correlation=None,
     readback=None,
 ) -> str | None:
-    """Record one event and return its id, or None when there is no working journal. Fire-and-forget: the
-    append is scheduled, never awaited, and nothing here raises. Call it from the event loop.
+    """Record one event and return its id, or None when there is no journal, it could not be opened, or the
+    event is not well formed. Fire-and-forget: the append is scheduled, never awaited (a journal still opening
+    takes it once open), and nothing here raises. Call it from the event loop.
     """
     try:
         hub = hass.data.get(DOMAIN, {}).get(HUB)
-        if hub is None or not hub.ok:
+        if hub is None or hub.failed or hub.closed:
             return None
         event_id = new_id()
         event = {
@@ -158,7 +197,8 @@ def emit(
             "data": data or {},
             "readback": readback,
         }
-        hass.async_create_task(hub._emit(room_id, event))
+        validate_event(event)
+        hub.schedule(room_id, event)
         return event_id
     except Exception as err:
         _LOGGER.warning("Journal event %s not recorded: %s", kind, err)
@@ -244,10 +284,11 @@ def _ws_subscribe_handler(hass, connection, msg) -> None:
 
 def _ws_subscribe_decorated():
     from homeassistant.components import websocket_api
+    from homeassistant.core import callback
 
     @websocket_api.websocket_command(_subscribe_schema())
-    @websocket_api.async_response
-    async def ws_subscribe(hass, connection, msg):
+    @callback
+    def ws_subscribe(hass, connection, msg):
         _ws_subscribe_handler(hass, connection, msg)
 
     return ws_subscribe
@@ -269,9 +310,11 @@ async def async_setup_journal(hass) -> None:
     data = hass.data.setdefault(DOMAIN, {})
     if HUB in data:
         return
-    hub = data[HUB] = JournalHub(hass, hass.config.path(DOMAIN, "journal.db"))
-    # Opened and pruned in the background: setup, and a room reload, never wait on the journal's file.
-    hass.async_create_task(_open_and_prune(hub))
+    hub = JournalHub(
+        hass,
+        hass.config.path(DOMAIN, "journal.db"),
+        data.setdefault("_journal_lock", asyncio.Lock()),
+    )
 
     async def handle(call):
         user_id = getattr(call.context, "user_id", None)
@@ -324,7 +367,15 @@ async def async_setup_journal(hass) -> None:
                 else SupportsResponse.ONLY
             ),
         )
-    data[UNSUBS] = _wire(hass, hub)
+    try:
+        data[UNSUBS] = _wire(hass, hub)
+    except Exception:
+        for service in SERVICES:
+            hass.services.async_remove(DOMAIN, service)
+        raise
+    data[HUB] = hub
+    # Opened and pruned in the background: setup, and a room reload, never wait on the journal's file.
+    hass.async_create_task(_open_and_prune(hub))
 
 
 async def async_unload_journal(hass) -> None:

@@ -181,3 +181,82 @@ def test_attribution_follows_the_setpoint_log_rule():
         "client": "mcp",
         "proposal_token": "tok",
     }
+
+
+def test_an_event_emitted_while_the_journal_opens_is_stored_once_it_is_open(
+    tmp_path, monkeypatch
+):
+    hass, api = _rig(monkeypatch, tmp_path)
+
+    async def go():
+        hub = api.JournalHub(hass, str(tmp_path / "journal.db"))
+        hass.data.setdefault("crop_steering", {})["_journal"] = hub
+        assert hub.opening
+        first = api.emit(hass, ROOM, "phase.changed", zone=1)
+        second = api.emit(hass, ROOM, "phase.changed", zone=2)
+        assert first and second
+        await asyncio.sleep(0)
+        await hub.async_init()
+        await asyncio.sleep(0.05)
+        got = (await hub.query(room_id=ROOM, since="2026-01-01T00:00:00+00:00"))[
+            "events"
+        ]
+        assert [e["id"] for e in got] == [first, second]
+
+    asyncio.run(go())
+
+
+def test_an_event_emitted_just_before_an_unload_and_reload_is_stored(
+    tmp_path, monkeypatch
+):
+    hass, api = _rig(monkeypatch, tmp_path)
+
+    async def go():
+        path = str(tmp_path / "journal.db")
+        lock = asyncio.Lock()
+        old = api.JournalHub(hass, path, lock)
+        await old.async_init()
+        data = hass.data.setdefault("crop_steering", {})
+        data["_journal"] = old
+        eid = api.emit(hass, ROOM, "phase.changed", zone=1)
+        old.close_soon()  # the unload
+        data.pop("_journal")
+        new = api.JournalHub(hass, path, lock)  # the reload
+        data["_journal"] = new
+        await new.async_init()
+        await asyncio.sleep(0.05)
+        got = (await new.query(room_id=ROOM, since="2026-01-01T00:00:00+00:00"))[
+            "events"
+        ]
+        assert [e["id"] for e in got] == [eid]
+
+    asyncio.run(go())
+
+
+def test_emit_refuses_a_malformed_event_synchronously(tmp_path, monkeypatch, caplog):
+    hass, api = _rig(monkeypatch, tmp_path)
+
+    async def go():
+        hub = api.JournalHub(hass, str(tmp_path / "journal.db"))
+        await hub.async_init()
+        hass.data.setdefault("crop_steering", {})["_journal"] = hub
+        with caplog.at_level(logging.WARNING):
+            assert api.emit(hass, ROOM, "shot.completed", actor="nobody") is None
+            assert api.emit(hass, ROOM, "shot.completed", outcome="great") is None
+        assert "not recorded" in caplog.text
+
+    asyncio.run(go())
+
+
+def test_a_failed_wire_leaves_no_hub_and_no_services(tmp_path, monkeypatch):
+    hass, api = _rig(monkeypatch, tmp_path)
+    hass.services.async_remove = lambda d, n: hass.services.registered.pop((d, n), None)
+
+    def boom(hass, hub):
+        raise RuntimeError("no websocket")
+
+    monkeypatch.setattr(api, "_wire", boom)
+    with pytest.raises(RuntimeError):
+        asyncio.run(api.async_setup_journal(hass))
+    assert "_journal" not in hass.data["crop_steering"]
+    assert hass.services.registered == {}
