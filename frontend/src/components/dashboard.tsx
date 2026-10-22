@@ -25,6 +25,7 @@ import type { Page } from "@/lib/routes";
 import { plantAmount } from "@/lib/water-view";
 import { Notice, UiTip } from "@/components/info-tip";
 import { Pill, type PillTone } from "./mini-visuals";
+import { formatClock } from "@/lib/clock";
 
 export type { Page };
 export const number = (value: number | null, digits = 1) =>
@@ -36,10 +37,7 @@ export const time = (value?: string | number | null) =>
     ? value
     : !value || !Number.isFinite(new Date(value).getTime())
       ? "Not reported"
-      : new Date(value).toLocaleTimeString([], {
-          hour: "2-digit",
-          minute: "2-digit",
-        });
+      : formatClock(value);
 export function Heading({
   title,
   description,

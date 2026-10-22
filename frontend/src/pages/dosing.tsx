@@ -69,6 +69,7 @@ import {
 import { tankTelemetry, type TankReading } from "@/lib/tank-telemetry";
 import type { Controller } from "@/lib/types";
 import { dayWord, errorText, unreadableState } from "@/lib/utils";
+import { formatClock } from "@/lib/clock";
 import "./dosing.css";
 
 const mL = (value: number) =>
@@ -83,7 +84,7 @@ const seconds = (value: number) =>
 const when = (iso: string | null, now: number) => {
   const at = Date.parse(iso ?? "");
   if (!Number.isFinite(at)) return "time not reported";
-  const time = new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  const time = formatClock(at);
   const day = dayWord(at, now);
   return day ? `${day} ${time}` : time;
 };

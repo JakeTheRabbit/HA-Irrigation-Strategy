@@ -4,6 +4,7 @@ import type { DailyRanges, HistoryRequest, HistoryWindow, RunsDocument } from ".
 import { demoHistoryWindow } from "./comparison-demo";
 import type { TimelineRequest } from "./day-timeline";
 import { allowedHistoryIds } from "./history-allow";
+import { setClockTimeZone } from "./clock";
 import type { OperatorAction } from "./operator-types";
 import { OperatorDemo } from "./operator-demo";
 import { useEffect, useRef, useSyncExternalStore } from "react";
@@ -127,6 +128,7 @@ export class ControllerStore {
   };
   getSnapshot = () => this.snapshot;
   private publish() {
+    setClockTimeZone(this.timeZone);
     const rooms = discoverRooms(this.states);
     const room = rooms.find((r) => r.id === this.roomId) || emptyRoom;
     this.snapshot = {

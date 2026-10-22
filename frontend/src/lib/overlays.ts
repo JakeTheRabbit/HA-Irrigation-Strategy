@@ -1,5 +1,6 @@
 import { settingWords } from "./setting-words";
 import { dayWord } from "./utils";
+import { formatClock } from "./clock";
 
 /** The room's AI overlays (crop_steering.overlay_get): settings the AI brain moved that go back to
  * the grower's own value (`old`) by themselves at `expires`, the lights-on that ends the grow-day the
@@ -21,8 +22,7 @@ export interface OverlayDocument {
   error: string | null;
 }
 
-const clock = (at: number) =>
-  new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const clock = (at: number) => formatClock(at);
 /** "22:48", or "Yesterday 22:48" / "tomorrow 06:00" when it is not today. */
 function when(at: number, now: number) {
   const days = Math.round(

@@ -3,6 +3,7 @@ import { HEARTBEAT_STALE_MS, parseControllerTime } from "./controller-health";
 import { jevIds } from "./jev";
 import { roomStatus } from "./model";
 import type { Controller, EntityState, States } from "./types";
+import { formatClock } from "./clock";
 
 /** The AI assistant's panel, read from the room's brain sensor `sensor.crop_steering_<prefix>jev` (its id is
  * kept for upgraded installs). The controller publishes it on every provider, under rules too
@@ -261,8 +262,7 @@ export const judgeTitle = (judge: string) =>
 
 /** Money in dollars, never tokens. */
 export const money = (usd: number) => `$${usd.toFixed(2)}`;
-const clock = (time: number) =>
-  new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false });
+const clock = (time: number) => formatClock(time);
 
 /** The panel in grower words (ui-spec 5.2). `stale`: the controller has stopped reporting; `wateringOff`: the
  * room's watering switch is off. Both only matter while the brain could judge. */

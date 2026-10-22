@@ -38,6 +38,7 @@ import {
   type SensorStats,
   type SensorWindow,
 } from "@/lib/sensor-context";
+import { formatClock } from "@/lib/clock";
 import "./sensor-context.css";
 
 interface MetricContext {
@@ -162,13 +163,7 @@ export function useSensorContext(
 const trim = (value: number, digits: number) => String(Number(value.toFixed(digits)));
 const setpointText = (value: number, metric: SensorMetric) =>
   metric === "vwc" ? `${trim(value, 1)}%` : trim(value, 2);
-function clock(time: number, hours: number): string {
-  return new Date(time).toLocaleString([], {
-    ...(hours > 24 ? { weekday: "short" as const } : {}),
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+const clock = (time: number, hours: number) => formatClock(time, { weekday: hours > 24 });
 const METRICS: Record<SensorMetric, { title: string; unit: string; name: string }> = {
   vwc: { title: "VWC", unit: "%", name: "volumetric water content" },
   ec: { title: "Pore EC", unit: "mS/cm", name: "pore EC" },

@@ -2,6 +2,7 @@ import type { HistoryPoint } from "./comparison-types";
 import { descriptor, numeric } from "./model";
 import { mergeSeries, plotPoints, type SensorReading } from "./sensor-context";
 import type { EntityState, Room, Series, States } from "./types";
+import { formatClock } from "./clock";
 
 /** Tank EC and pH over time, and the controller's source-water gate beside them.
  * Everything here is pure: the components only draw what these functions return. */
@@ -261,7 +262,7 @@ export function rangeTicks(start: number, end: number, hours: number): number[] 
 export function tickLabel(time: number, hours: number): string {
   const date = new Date(time);
   return hours <= 24
-    ? date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+    ? formatClock(date)
     : hours <= 168
       ? date.toLocaleDateString([], { weekday: "short", day: "numeric" })
       : date.toLocaleDateString([], { day: "numeric", month: "short" });

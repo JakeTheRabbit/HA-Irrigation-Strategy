@@ -43,6 +43,7 @@ import {
 import type { TankReading } from "@/lib/tank-telemetry";
 import type { Controller, Series } from "@/lib/types";
 import { errorText } from "@/lib/utils";
+import { formatClock } from "@/lib/clock";
 import "./tank-history.css";
 
 const HOUR = 3_600_000;
@@ -59,8 +60,7 @@ const LABEL_AT = {
   ph: { max: "insideBottomRight", min: "insideTopRight" },
 } as const;
 const trim = (value: number) => String(Number(value.toFixed(2)));
-const clock = (time: number) =>
-  new Date(time).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+const clock = (time: number) => formatClock(time);
 const moment = (time: number) =>
   new Date(time).toLocaleString([], {
     weekday: "short",
