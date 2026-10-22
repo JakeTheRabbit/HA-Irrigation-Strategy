@@ -1,5 +1,5 @@
 """Read-only sensing (sensing.py): each zone's live dryback sensor, and the water-and-VPD record behind its switch."""
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -94,3 +94,80 @@ def test_the_fit_finds_the_slope_once_there_are_enough_days_with_spread():
 def test_vpd_from_temperature_and_humidity():
     assert sensing.vpd_from(25.0, 60.0) == pytest.approx(1.2675, abs=1e-3)
     assert sensing.vpd_from(None, 60.0) is None and sensing.vpd_from(25.0, 120.0) is None
+
+
+# ---------------------------------------------------------------- CTL-034: say so when there is no estimate
+NEXT = "sensor.crop_steering_prediction_zone_1_next_irrigation_hours"
+DRYBACK = "sensor.crop_steering_zone_1_dryback_app"
+
+
+def _p2(vwcs, start=datetime(2026, 9, 23, 12, 0), shot_at=None):
+    """A P2 zone read once a minute at these VWCs. -> (controller, fake, [(next sensor, dryback sensor)] per pass)."""
+    c, fake = _room()
+    c.rooms[0].state[1]["phase"] = "P2"
+    seen = []
+    for i, v in enumerate(vwcs):
+        now = start + timedelta(minutes=i)
+        fake.set_state("sensor.crop_steering_vwc_zone_1", str(v))
+        if shot_at == i:
+            c.rooms[0].state[1]["last_shot"] = now
+        c.loop_once(now)
+        seen.append((fake.sets.get(NEXT), fake.sets.get(DRYBACK)))
+    return c, fake, seen
+
+
+def test_next_irrigation_is_unknown_with_a_reason_when_the_controller_has_no_estimate():
+    _, _, seen = _p2([55, 55, 55, 55])  # steady: no falling VWC, no estimate
+    state, attrs = seen[-1][0]
+    assert state == "unknown" and attrs["reason"] and attrs["estimated_at"] is None
+
+
+def test_a_stale_zero_is_replaced_by_unknown_after_the_shot():
+    c, fake = _room()
+    st = c.rooms[0].state[1]
+    st["phase"] = "P2"
+    t0 = datetime(2026, 9, 23, 12, 0)
+    fake.set_state("sensor.crop_steering_vwc_zone_1", "30")  # below the re-water point: due now
+    c.loop_once(t0)
+    assert fake.sets[NEXT][0] == 0.0
+    fake.set_state("sensor.crop_steering_vwc_zone_1", "60")  # the shot has gone in
+    st["last_shot"] = t0
+    for i in (1, 2, 3):
+        c.loop_once(t0 + timedelta(minutes=i))
+    state, attrs = fake.sets[NEXT]
+    assert state == "unknown" and "shot" in attrs["reason"]
+
+
+def test_a_new_estimate_carries_when_it_was_made():
+    now = datetime(2026, 9, 23, 12, 0)
+    c, fake = _room()
+    c.rooms[0].state[1]["phase"] = "P2"
+    for i, v in enumerate([60, 59, 58, 57]):
+        fake.set_state("sensor.crop_steering_vwc_zone_1", str(v))
+        c.loop_once(now + timedelta(minutes=i))
+    state, attrs = fake.sets[NEXT]
+    assert isinstance(state, float) and state > 0 and "reason" not in attrs
+    assert attrs["estimated_at"] == (now + timedelta(minutes=3)).astimezone().isoformat(timespec="seconds")
+
+
+def test_the_dryback_rate_is_null_when_there_is_no_rate_and_a_number_when_steady():
+    assert sensing.dryback(60, 55, None, 60)[1]["rate_points_per_h"] is None
+    assert sensing.dryback(60, 55, None, 60)[1]["drying_back"] is False
+    assert sensing.dryback(60, 55, 0.0, 60)[1]["rate_points_per_h"] == 0.0
+    _, _, seen = _p2([55, 55])  # two readings: not yet a rate
+    assert seen[-1][1][1]["rate_points_per_h"] is None
+    _, _, seen = _p2([55, 55, 55, 55])
+    assert seen[-1][1][1]["rate_points_per_h"] == 0.0  # a real steady reading
+
+
+def test_no_rate_right_after_a_shot_until_a_new_one_exists():
+    _, _, seen = _p2([50, 50, 50, 60, 60, 60], shot_at=3)
+    assert seen[3][1][1]["rate_points_per_h"] is None
+    assert seen[4][1][1]["rate_points_per_h"] is None
+    assert seen[5][1][1]["rate_points_per_h"] is None  # fewer than 3 readings since the shot
+
+
+def test_a_consumer_that_reads_a_number_gets_none_from_unknown_and_null_not_a_crash():
+    for state in ("unknown", "unavailable", None):
+        assert sensing.number(state) is None
+    assert sensing.number(sensing.dryback(60, 55, None, 60)[1]["rate_points_per_h"]) is None
