@@ -7046,15 +7046,16 @@ class Controller:
                 )
             else:
                 mss = self._minutes_since_shot(st, now)
+                # Only in the day's watering phases: a timer cannot tell a P3 rescue from overwatering.
                 decisions[zone] = (
-                    mss >= self.blind_fallback_min,
+                    lights_on and st["phase"] in ("P1", "P2") and mss >= self.blind_fallback_min,
                     p.p2_shot_size,
                     Reason("FALLBACK schedule (no live probe)", "blind_fallback"),
                 )
                 plan = (
                     "Until the reading is normal again, the zone gets a shot every "
-                    f"{int(self.blind_fallback_min)} min while the kill switch is on, inside its daily "
-                    "water limit. Phase changes that use the moisture reading wait for the probe."
+                    f"{int(self.blind_fallback_min)} min in P1 and P2 while the lights and the kill switch are "
+                    "on, inside its daily water limit. Phase changes that use the moisture reading wait for the probe."
                 )
             # Re-alert each tick — _alert's 30-min debounce throttles it to a repeating
             # reminder so a dead probe can't sit unnoticed (the silent-freeze lesson). Why it

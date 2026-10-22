@@ -517,3 +517,19 @@ def test_a_second_hardware_hold_is_announced_after_the_first_is_cleared(rig):
     fake.set_state("input_boolean.kill", "on")
     c._latch_hardware_fault(room, "zone 2 valve/pump/mainline close not confirmed")
     assert len(cards()) == 2 and "zone 2" in cards()[-1]["message"]
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+def test_blind_fallback_does_not_water_at_night(rig):
+    """CTL-001: a dead probe with no healthy sibling must not get the timer shot with the lights off."""
+    c, fake, _clock = rig
+    room = c.rooms[0]
+    now = datetime(2026, 9, 7, 23, 30)  # lights 10-22: off
+    room._was_lights_on = False
+    for st in room.state.values():
+        st.update(phase="P3", last_shot=now - timedelta(hours=2), daily_vol=0.0,
+                  last_phase_change=now - timedelta(hours=1))
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] is False and pub[2]["fire"] is False
+    assert not any(dom == "switch" and svc == "turn_on" for dom, svc, _data in fake.calls)
+    assert room.state[1]["daily_vol"] == 0.0 and room.state[2]["daily_vol"] == 0.0
