@@ -207,6 +207,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the site store
         _LOGGER.warning("Site settings unavailable: %s", err)
 
+    # Wall, tablet and dosing dashboards from templates (G11): one store per site.
+    try:
+        from .dashboards import async_setup_dashboards
+
+        await async_setup_dashboards(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the dashboards
+        _LOGGER.warning("Dashboard templates unavailable: %s", err)
+
     # Timer programs (G7): the room's watering timers, published for the controller app.
     try:
         from .timers_api import async_setup_timers
@@ -455,6 +463,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .site_api import async_unload_site
 
     await async_unload_site(hass, entry)
+    from .dashboards import async_unload_dashboards
+
+    await async_unload_dashboards(hass, entry)
     from .timers_api import async_unload_timers
 
     await async_unload_timers(hass, entry)

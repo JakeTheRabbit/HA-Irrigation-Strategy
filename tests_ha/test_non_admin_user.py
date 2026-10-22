@@ -85,6 +85,8 @@ CHANGES = {
     "preset_delete": {"id": "x", "expected_revision": 0},
     "preset_apply": {"preset_id": "x", "to": [{"room_id": ROOM}]},
     "copy_config": {"from": {"room_id": ROOM}, "to": [{"room_id": ROOM}], "sections": ["targets"]},
+    # A dashboard made from a template, in Home Assistant's own dashboards.
+    "dashboard_create": {"template": "facility_wall", "rooms": [ROOM]},
     # The room's timer programs and skips: what the controller app waters by.
     "timer_program_set": {"room_id": ROOM, "expected_revision": 0, "program": {}},
     "timer_program_delete": {"room_id": ROOM, "expected_revision": 0, "id": "x"},
@@ -119,6 +121,7 @@ READS = {
     "display_get": {"room_id": ROOM},
     "supply_get": {},
     "preset_list": {},
+    "dashboard_list": {},
     "timer_program_list": {},
     "timer_program_preview": {"room_id": ROOM, "program": {}},
     "notify_get": {},

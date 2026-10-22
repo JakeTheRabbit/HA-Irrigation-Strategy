@@ -1798,6 +1798,46 @@ copy_config:
       selector:
         boolean:
 
+dashboard_create:
+  name: Create a dashboard from a template
+  description: >-
+    Creates a Home Assistant dashboard from a template, in Settings > Dashboards, using built-in
+    cards and only the entities the chosen rooms have: facility_wall (every chosen room at a
+    glance), room_tablet (one room's zones) or dosing_station (feed EC and pH, tanks and dosing).
+    Its address is crop-steering-<template>-<n>. Switches nothing. When a signed-in user calls it,
+    that user must be a Home Assistant administrator. It answers with the url_path and the title.
+  fields:
+    template:
+      name: Template
+      description: Which dashboard to make.
+      required: true
+      selector:
+        select:
+          options:
+            - facility_wall
+            - room_tablet
+            - dosing_station
+    rooms:
+      name: Rooms
+      description: >-
+        The room IDs it shows; room_tablet takes exactly one. Example: ["room:f2_"].
+      required: true
+      selector:
+        object:
+    title:
+      name: Title
+      description: >-
+        The dashboard's title in the sidebar. Left out, the template's name and the rooms'.
+      required: false
+      selector:
+        text:
+
+dashboard_list:
+  name: List dashboards made from templates
+  description: >-
+    Returns the dashboards dashboard_create made, each with exists false once it was deleted in Home
+    Assistant, and the templates there are. Changes nothing. It has no administrator check.
+
 harvests_get:
   name: Read harvests
   description: >-
