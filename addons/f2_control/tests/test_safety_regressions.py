@@ -640,3 +640,27 @@ def test_the_blind_alert_names_the_daily_minimum(rig):
     card = next(d for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "create")
                 and d["notification_id"] == "f2_blind_default_z1")
     assert "daily minimum of 4 L" in card["message"]
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+def test_a_blind_zone_copies_every_ramp_shot_even_inside_the_ec_interval(rig):
+    """Only a floor shot makes a copy wait: a P1 ramp every 5 min (under the 10 min EC interval) is copied every time."""
+    c, fake, _clock = rig
+    room = c.rooms[0]
+    now = datetime(2026, 9, 7, 11, 0)
+    room._was_lights_on = True
+    fake.set_state("number.crop_steering_max_daily_volume", "1000")
+    fake.set_state("number.crop_steering_p1_time_between_shots", "5")
+    fake.set_state("number.crop_steering_ec_min_interval", "10")
+    fake.set_state("sensor.crop_steering_vwc_zone_2", "30")  # the sibling: dry, ramping
+    for st in room.state.values():
+        st.update(phase="P1", shots=0, last_shot=now - timedelta(hours=1), daily_vol=0.0,
+                  last_phase_change=now - timedelta(minutes=30), last_daily_reset=now.date())
+    for step in range(3):
+        at = now + timedelta(minutes=5 * step)
+        fake.set_state("sensor.crop_steering_vwc_zone_2", str(30 + 3 * step))  # each ramp shot takes
+        pub = c._loop_room(room, at)
+        assert pub[2]["fire"] is True, (step, pub[2]["reason"], pub[2].get("phase"))
+        assert pub[1]["fire"] is True and "COPY Z2" in str(pub[1]["reason"]), (step, pub[1]["reason"])
+        for st in room.state.values():  # the shots land at the pass's time (the rig's wall clock is real)
+            st["last_shot"] = at

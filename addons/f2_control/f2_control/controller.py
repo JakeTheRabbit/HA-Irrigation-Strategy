@@ -6146,6 +6146,8 @@ class Controller:
             if rescue and snap is not None and st.get("last_shot") is not was:
                 safety_ops.rescue_fired(st, snap.vwc, now)
                 self._save_state()
+            if st.get("last_shot") is not was:  # the kind of the zone's last delivered shot (blind copy gate)
+                room.__dict__.setdefault("_last_shot_kind", {})[zone] = getattr(reason, "kind", None)
             # A test or manual shot cut to the longest shot is not one of CS-312's run (it resets it, as before).
             self._count_capped(room, zone, raw_dur > max_dur and not test)
         else:
@@ -7060,8 +7062,10 @@ class Controller:
                 s_fire, s_size, s_reason = decisions[sib]
                 rescue = getattr(s_reason, "kind", None) in PLAN_HOLD_EXEMPT
                 mss = self._minutes_since_shot(st, now)
-                if s_fire and not rescue and mss < p.p2_min_interval_min:
-                    # this zone's own last shot (a floor shot below) is too recent: no routine copy on top of it
+                floor_last = room.__dict__.get("_last_shot_kind", {}).get(zone) == "min_daily"
+                if s_fire and not rescue and floor_last and mss < p.p2_min_interval_min:
+                    # only after this zone's own floor shot (below): no routine copy lands minutes after it.
+                    # Every other copy follows the sibling exactly, its ramp and EC shots included.
                     decisions[zone] = (False, 0.0, Reason(
                         f"COPY Z{sib} waits: last shot {mss:.0f}/{p.p2_min_interval_min:.0f} min ago", "blind_copy"))
                 else:
