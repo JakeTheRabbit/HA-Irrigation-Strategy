@@ -1653,6 +1653,149 @@ supply_save:
       selector:
         boolean:
 
+preset_list:
+  name: List presets
+  description: >-
+    Returns the site's presets that are not deleted, the same list for every caller, and the
+    revision to save against. Changes nothing. It has no administrator check.
+
+preset_save:
+  name: Save a preset
+  description: >-
+    Saves the current settings of a room or one of its zones as a named preset every client can
+    apply. The scope picks what it holds: targets, timers, or all (targets, phase timing, water
+    limits and timers). When a signed-in user calls it, that user must be a Home Assistant
+    administrator. Give the revision that preset_list returned; the save is refused when the
+    presets changed after you read them.
+  fields:
+    name:
+      name: Name
+      description: >-
+        Up to 60 characters. Example: Flower week 3.
+      required: true
+      selector:
+        text:
+    scope:
+      name: Scope
+      description: What the preset holds.
+      required: true
+      selector:
+        select:
+          options:
+            - targets
+            - timers
+            - all
+    from:
+      name: From
+      description: >-
+        The room, or one zone of it, whose settings to save. Example: {"room_id": "room:f2_",
+        "zone": 3}.
+      required: true
+      selector:
+        object:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that preset_list returned. Example: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+
+preset_delete:
+  name: Delete a preset
+  description: >-
+    Removes a preset from the list. The delete is soft: the preset stays in the store, marked
+    deleted. When a signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    id:
+      name: Preset ID
+      description: The id of the preset, from preset_list.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that preset_list returned. Example: 1.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+
+preset_apply:
+  name: Apply a preset
+  description: >-
+    Writes a preset's settings to rooms or zones, then reads each one back. It answers with the
+    rows that change (diff), the settings a target has no entity for (missing, never written)
+    and, unless previewed, each write's readback, verified or refused. A refused write does not
+    stop the others. When a signed-in user calls it, that user must be a Home Assistant
+    administrator.
+  fields:
+    preset_id:
+      name: Preset ID
+      description: The id of the preset, from preset_list.
+      required: true
+      selector:
+        text:
+    to:
+      name: To
+      description: >-
+        The rooms or zones to write to. Example: [{"room_id": "room:f2_", "zone": 1}].
+      required: true
+      selector:
+        object:
+    preview:
+      name: Preview
+      description: Answer with the difference and write nothing.
+      required: false
+      selector:
+        boolean:
+
+copy_config:
+  name: Copy settings
+  description: >-
+    Copies the settings of a room or zone to other rooms or zones, by section: targets, phase
+    timing, water limits and timers. It answers as preset_apply does, and with preview it writes
+    nothing. When a signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    from:
+      name: From
+      description: >-
+        The room, or one zone of it, to copy from. Example: {"room_id": "room:f2_", "zone": 3}.
+      required: true
+      selector:
+        object:
+    to:
+      name: To
+      description: >-
+        The rooms or zones to copy to. Example: [{"room_id": "room:f2_", "zone": 1}].
+      required: true
+      selector:
+        object:
+    sections:
+      name: Sections
+      description: What to copy.
+      required: true
+      selector:
+        select:
+          multiple: true
+          options:
+            - targets
+            - phase_timing
+            - water_limits
+            - timers
+    preview:
+      name: Preview
+      description: Answer with the difference and write nothing.
+      required: false
+      selector:
+        boolean:
+
 harvests_get:
   name: Read harvests
   description: >-

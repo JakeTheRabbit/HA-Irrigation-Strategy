@@ -80,6 +80,11 @@ CHANGES = {
     # What the dashboard shows in the room, for everyone who opens it.
     "display_save": {"room_id": ROOM, "expected_revision": 0, "options": {"show_climate": True}},
     "supply_save": {"expected_revision": 0, "irrigation_pumps": []},
+    # The site's presets, and the writes a preset or a copy makes to the rooms' settings.
+    "preset_save": {"name": "p", "scope": "all", "from": {"room_id": ROOM}, "expected_revision": 0},
+    "preset_delete": {"id": "x", "expected_revision": 0},
+    "preset_apply": {"preset_id": "x", "to": [{"room_id": ROOM}]},
+    "copy_config": {"from": {"room_id": ROOM}, "to": [{"room_id": ROOM}], "sections": ["targets"]},
     # The room's timer programs and skips: what the controller app waters by.
     "timer_program_set": {"room_id": ROOM, "expected_revision": 0, "program": {}},
     "timer_program_delete": {"room_id": ROOM, "expected_revision": 0, "id": "x"},
@@ -113,6 +118,7 @@ READS = {
     "pump_precheck": {"room_id": ROOM, "pump": "balance"},
     "display_get": {"room_id": ROOM},
     "supply_get": {},
+    "preset_list": {},
     "timer_program_list": {},
     "timer_program_preview": {"room_id": ROOM, "program": {}},
     "notify_get": {},

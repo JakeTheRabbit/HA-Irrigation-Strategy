@@ -1,4 +1,5 @@
-"""The site store and its services: supply_get and supply_save (G1: pump capacity, exclusive groups).
+"""The site store and its services: supply_get and supply_save (G1: pump capacity, exclusive groups),
+and the presets every client shares with preset_list/save/delete/apply and copy_config (G10).
 
 One store for the whole site (crop_steering.site), set up with the first room; each room after it
 only joins, and the store, the sensor and the services stay while any room is loaded. Reading is
@@ -7,7 +8,8 @@ open to any signed-in user; a save needs an administrator.
 sensor.crop_steering_supply_config is what the controller app reads: its state is the revision and
 its attributes the pumps, the groups, the meters and each active zone's demand in L/h. It exists
 only once a supply has been saved, so a site that never saved one reads exactly as before.
-Nothing here switches, presses or sets any hardware.
+Nothing here switches, presses or sets any hardware. A preset apply or a copy writes the rooms'
+own numbers, each read back (presets.py); presets keep their own revision, apart from the supply's.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ import logging
 from copy import deepcopy
 from datetime import datetime, timezone
 
-from . import site_store
+from . import presets, site_store
 from .admin import async_require_admin
 from .const import DOMAIN
 from .generated.guards import zone_demand_lph
@@ -27,7 +29,16 @@ from .room import room_prefix
 
 _LOGGER = logging.getLogger(__name__)
 
-SERVICES = ("supply_get", "supply_save")
+SERVICES = (
+    "supply_get",
+    "supply_save",
+    "preset_list",
+    "preset_save",
+    "preset_delete",
+    "preset_apply",
+    "copy_config",
+)
+READS = ("supply_get", "preset_list")
 SENSOR = f"sensor.{DOMAIN}_supply_config"
 STORAGE_KEY = f"{DOMAIN}.site"
 SIZING_KEYS = ("plant_count", "drippers_per_plant", "dripper_flow_rate")
@@ -213,6 +224,109 @@ class SiteStore:
             }
             return result
 
+    # ------------------------------------------------------------------ presets (G10)
+    def presets_response(self) -> dict:
+        return {
+            "revision": self.document["presets_revision"],
+            "presets": [
+                deepcopy(p) for p in self.document["presets"] if not p.get("deleted_at")
+            ],
+            "error": self.error,
+        }
+
+    def preset(self, preset_id) -> dict:
+        for preset in self.document["presets"]:
+            if preset.get("id") == preset_id and not preset.get("deleted_at"):
+                return deepcopy(preset)
+        raise ValueError(f"No preset {preset_id}")
+
+    async def save_preset(self, data, values, who=None) -> dict:
+        """A new preset of `values` ({section: {key: value}}, captured from data["from"])."""
+        name = str(data.get("name") or "").strip()
+        if not name or len(name) > 60:
+            raise ValueError("A preset needs a name of up to 60 characters")
+        scope = data.get("scope")
+        if scope not in presets.SCOPES:
+            raise ValueError("scope must be targets, timers or all")
+        source = presets.ref(data.get("from"))
+        stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        who = who or {}
+        preset = {
+            "id": new_id(),
+            "name": name,
+            "scope": scope,
+            "sections": list(presets.SCOPES[scope]),
+            "from": source,
+            "values": deepcopy(values),
+            "created_at": stamp,
+            "updated_at": stamp,
+            "deleted_at": None,
+            "by": {"actor": who.get("actor"), "user_id": who.get("user_id")},
+        }
+
+        def change(stored):
+            stored.append(preset)
+            return deepcopy(preset)
+
+        result, revision = await self._save_presets(
+            data["expected_revision"], change, who, source["room_id"]
+        )
+        return {"preset": result, "revision": revision}
+
+    async def delete_preset(self, data, who=None) -> dict:
+        """Soft: the preset leaves the list and stays in the store with deleted_at."""
+        room_id = self.preset(data["id"])["from"]["room_id"]
+
+        def change(stored):
+            for preset in stored:
+                if preset.get("id") == data["id"] and not preset.get("deleted_at"):
+                    stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+                    preset.update(deleted_at=stamp, updated_at=stamp)
+                    return deepcopy(preset)
+            raise ValueError(f"No preset {data['id']}")
+
+        result, revision = await self._save_presets(
+            data["expected_revision"], change, who, room_id
+        )
+        return {"preset": result, "revision": revision}
+
+    async def _save_presets(self, expected_revision, change, who, room_id):
+        """Change a copy of the presets, save, and journal config.changed (never failing the save)."""
+        from .setup_api import setup_diff
+
+        async with self._lock:
+            if self.error:
+                raise ValueError(self.error)
+            if expected_revision != self.document["presets_revision"]:
+                raise ValueError("Presets changed elsewhere. Reload before saving.")
+            old = deepcopy(self.document["presets"])
+            stored = deepcopy(old)
+            result = change(stored)
+            document = {
+                **self.document,
+                "presets": stored,
+                "presets_revision": self.document["presets_revision"] + 1,
+            }
+            await self._store.async_save(deepcopy(document))
+            self.document = document
+        who = who or {}
+        note(
+            self.hass,
+            room_id,
+            "config.changed",
+            actor=who.get("actor", "system"),
+            user_id=who.get("user_id"),
+            client=who.get("client"),
+            data={
+                "store": "site",
+                "section": "presets",
+                "old": old,
+                "new": deepcopy(stored),
+                "diff": setup_diff(old, stored),
+            },
+        )
+        return result, document["presets_revision"]
+
     def _journal(self, old, new, diff, who):
         """config.changed with the whole section before and after, once in the journal of every room
         whose pump or zone is in the old or the new section (all sharing one causation_id so a fold
@@ -276,14 +390,56 @@ async def async_setup_site(hass, entry) -> None:
     site.publish()
 
     async def handle(call):
+        data = call.data
         try:
             if call.service == "supply_get":
                 return await site.response()
-            await async_require_admin(hass, call, f"{DOMAIN}.supply_save")
-            return await site.save(call.data, attribution(hass, call))
+            if call.service == "preset_list":
+                return site.presets_response()
+            await async_require_admin(hass, call, f"{DOMAIN}.{call.service}")
+            who = attribution(hass, call)
+            if call.service == "supply_save":
+                return await site.save(data, who)
+            if call.service == "preset_save":
+                values = presets.read_values(hass, data["from"])
+                sections = presets.SCOPES.get(data["scope"], ())
+                return await site.save_preset(
+                    data, presets.capture(values, sections), who
+                )
+            if call.service == "preset_delete":
+                return await site.delete_preset(data, who)
+            preview = data.get("preview", False)
+            if call.service == "preset_apply":
+                preset = site.preset(data["preset_id"])
+                detail = f"preset {preset['name']}"
+                return await presets.apply(
+                    hass,
+                    preset["values"],
+                    data["to"],
+                    preview,
+                    {**who, "detail": detail},
+                )
+            sections = list(data["sections"])
+            if not sections or not set(sections) <= set(presets.SECTIONS):
+                raise ValueError(
+                    "sections must name one or more of " + ", ".join(presets.SECTIONS)
+                )
+            source = presets.ref(data["from"])
+            wanted = presets.capture(presets.read_values(hass, source), sections)
+            detail = "copy from " + source["room_id"]
+            if "zone" in source:
+                detail += f" zone {source['zone']}"
+            return await presets.apply(
+                hass, wanted, data["to"], preview, {**who, "detail": detail}
+            )
         except (ValueError, OSError) as error:
             raise HomeAssistantError(str(error)) from error
 
+    whole = vol.All(int, vol.Range(min=0))
+    common = {
+        vol.Optional("client"): vol.In(["mcp", "aigrow"]),
+        vol.Optional("proposal_token"): str,
+    }
     schemas = {
         "supply_get": {},
         "supply_save": {
@@ -296,6 +452,32 @@ async def async_setup_site(hass, entry) -> None:
             vol.Optional("client"): vol.In(["mcp", "aigrow"]),
             vol.Optional("proposal_token"): str,
         },
+        "preset_list": {},
+        "preset_save": {
+            vol.Required("name"): str,
+            vol.Required("scope"): vol.In(list(presets.SCOPES)),
+            vol.Required("from"): dict,
+            vol.Required("expected_revision"): whole,
+            **common,
+        },
+        "preset_delete": {
+            vol.Required("id"): str,
+            vol.Required("expected_revision"): whole,
+            **common,
+        },
+        "preset_apply": {
+            vol.Required("preset_id"): str,
+            vol.Required("to"): [dict],
+            vol.Optional("preview"): bool,
+            **common,
+        },
+        "copy_config": {
+            vol.Required("from"): dict,
+            vol.Required("to"): [dict],
+            vol.Required("sections"): [vol.In(list(presets.SECTIONS))],
+            vol.Optional("preview"): bool,
+            **common,
+        },
     }
     for service in SERVICES:
         hass.services.async_register(
@@ -304,9 +486,7 @@ async def async_setup_site(hass, entry) -> None:
             handle,
             schema=vol.Schema(schemas[service]),
             supports_response=(
-                SupportsResponse.ONLY
-                if service == "supply_get"
-                else SupportsResponse.OPTIONAL
+                SupportsResponse.ONLY if service in READS else SupportsResponse.OPTIONAL
             ),
         )
 
