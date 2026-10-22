@@ -193,12 +193,23 @@ export async function skipShot(
   return { kind: "error", message: outcome.message };
 }
 
-/** What the page's body shows: the timeline (also whenever a room has no planned shots from the
- * controller, so its note shows), "No problems on this day." when Problems only hides every row of
- * a day that has blocks, else the empty state. `all` is before Problems only and the search. */
-export function bodyState(rows: TimelineRow[], all: TimelineRow[], problemsOnly: boolean): "timeline" | "no-problems" | "empty" {
-  if (all.some((r) => r.plannedUnavailable) || rows.some((r) => r.blocks.length)) return "timeline";
-  return problemsOnly && all.some((r) => r.blocks.length) ? "no-problems" : "empty";
+/** What the page's body shows. `rows` are the rows drawn, `all` the same before Problems only and
+ * the search `q`:
+ * - the timeline when a drawn row has blocks or is a room without planned shots from the
+ *   controller (so its note shows);
+ * - "no-match" when the search matches no room or zone at all;
+ * - "no-problems" when Problems only hid every row of a day that has something on it;
+ * - else the empty state. */
+export function bodyState(
+  rows: TimelineRow[],
+  all: TimelineRow[],
+  problemsOnly: boolean,
+  q = "",
+): "timeline" | "no-match" | "no-problems" | "empty" {
+  if (rows.some((r) => r.plannedUnavailable || r.blocks.length)) return "timeline";
+  if (q.trim() && !matchQuery(all, q).length) return "no-match";
+  if (problemsOnly && all.some((r) => r.plannedUnavailable || r.blocks.length)) return "no-problems";
+  return "empty";
 }
 
 /** The phone's failed count opens the whole day: 12 h widens to 24 h. */

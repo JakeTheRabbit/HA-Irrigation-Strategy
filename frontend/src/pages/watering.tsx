@@ -56,16 +56,9 @@ const memory: { query: WateringQuery | null; room: string | null; collapsed: Set
 const markTree = (event: Event) => {
   if (event.target instanceof Element && event.target.closest(".room-tree")) memory.treeAt = Date.now();
 };
-/** The page mounted from a room-tree pick of another room. Clears the memory when it did not. */
-function treePicked(roomId: string): boolean {
-  const picked = memory.room !== null && memory.room !== roomId && Date.now() - memory.treeAt < 2000;
-  if (!picked) {
-    memory.query = null;
-    memory.collapsed = new Set();
-  }
-  memory.treeAt = 0;
-  return picked;
-}
+/** Whether the page mounted from a room-tree pick of another room (pure: a render may run twice). */
+const treePicked = (roomId: string) =>
+  memory.room !== null && memory.room !== roomId && Date.now() - memory.treeAt < 2000;
 
 const SOURCES: Record<string, string> = {
   engine: "Steering engine",
@@ -118,6 +111,14 @@ export function Watering({
       picked,
     ),
   );
+  // Any way in but a tree pick starts clean.
+  useEffect(() => {
+    if (!picked) {
+      memory.query = null;
+      memory.collapsed = new Set();
+    }
+    memory.treeAt = 0;
+  }, []);
   useEffect(() => {
     document.addEventListener("click", markTree, true);
     return () => document.removeEventListener("click", markTree, true);
@@ -205,7 +206,7 @@ export function Watering({
 
   // Collapsed rooms; a room chosen in the room tree opens and comes into view.
   const [collapsed, setCollapsed] = useState(() => {
-    const next = new Set(memory.collapsed);
+    const next = new Set(picked ? memory.collapsed : []);
     next.delete(controller.roomId);
     return next;
   });
@@ -258,9 +259,10 @@ export function Watering({
   };
   useEffect(() => {
     // Only once the wider span's answer is in (the old one stays while it loads).
-    if (!failedPending || timeline.state !== "ready" || lastGood.current?.key !== readKey || !markers.length) return;
+    if (!failedPending || timeline.state !== "ready" || lastGood.current?.key !== readKey) return;
     setFailedPending(false);
-    nextFailed();
+    // None in the wider span (the day line counted another span's): nothing to focus.
+    if (markers.length) nextFailed();
   }, [failedPending, timeline.state, timeline.data, readKey, markers.length]);
 
   // The block popover.
@@ -353,7 +355,7 @@ export function Watering({
       </>
     );
 
-  const shows = timeline.state === "ready" ? bodyState(rows, all, q.problemsOnly) : "timeline";
+  const shows = timeline.state === "ready" ? bodyState(rows, all, q.problemsOnly, q.q) : "timeline";
   return (
     <>
       <Heading title="Timeline" description={phone ? "All rooms · swipe for more" : undefined} action={phone ? spanToggle : undefined} />
@@ -479,6 +481,10 @@ export function Watering({
                 Set up a timer
               </Button>
             </div>
+          ) : shows === "no-match" ? (
+            <p className="wt-note" data-watering-no-match>
+              No rooms or zones match
+            </p>
           ) : shows === "no-problems" ? (
             <p className="wt-note" data-watering-no-problems>
               No problems on this day.

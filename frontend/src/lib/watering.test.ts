@@ -12,6 +12,7 @@ import {
   keptData,
   liveMatch,
   loadRevisions,
+  matchQuery,
   shiftDate,
   skipShot,
   spanOf,
@@ -253,13 +254,21 @@ describe("bodyState", () => {
   test("a room without planned shots from the controller draws the timeline (its note), never Empty", () => {
     const head = { ...row("room:", null, []), plannedUnavailable: true };
     expect(bodyState([head, row("room:", 1, [])], [head, row("room:", 1, [])], false)).toBe("timeline");
-    expect(bodyState([], [head], true)).toBe("timeline");
+    // Problems only hid the room: its note goes with it.
+    expect(bodyState([], [head], true)).toBe("no-problems");
   });
   test("problems only with no problems says so; nothing at all is empty", () => {
     expect(bodyState(keepProblems(done), done, true)).toBe("no-problems");
     expect(bodyState(bare, bare, false)).toBe("empty");
     expect(bodyState(bare, bare, true)).toBe("empty");
     expect(bodyState(done, done, false)).toBe("timeline");
+  });
+  test("a search that matches nothing says so, before problems or empty", () => {
+    const head = { ...row("room:", null, []), plannedUnavailable: true };
+    expect(bodyState(matchQuery(done, "z9"), done, false, "z9")).toBe("no-match");
+    expect(bodyState(matchQuery([head], "z9"), [head], true, "z9")).toBe("no-match");
+    expect(bodyState(matchQuery(keepProblems(done), "z1"), done, true, "z1")).toBe("no-problems");
+    expect(bodyState(matchQuery(done, "z1"), done, false, "z1")).toBe("timeline");
   });
 });
 
