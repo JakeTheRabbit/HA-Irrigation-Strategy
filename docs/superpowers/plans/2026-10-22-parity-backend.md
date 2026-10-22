@@ -568,7 +568,11 @@ def test_a_held_intent_names_its_guard_and_code(): ...  # tank_min -> intent.hel
 **Interfaces:**
 - Consumes: `generated/guards.py` (Task 2): `worst_case_lph`, `zone_demand_lph`. No hand copy (ruling R9).
 - Produces:
-  - `supply_get {} -> {revision, irrigation_pumps, water_sources, zone_groups, zone_meters, capacity_check: {worst_case_lph, max_flow_lph, ok, suggest_max_concurrent}}`
+  - `supply_get {} -> {revision, irrigation_pumps, water_sources, zone_groups, zone_meters, capacity_check: {worst_case_lph, max_flow_lph, ok, suggest_max_concurrent, pairs}}`.
+    - `pairs` lists one row per unordered pair of active zones on the same pump: `[{zones: [a, b], lph, pct_of_pump, verdict: "together"|"one_after_another"}]`.
+    - `zones` are int zone numbers within one room. A cross-room pair carries `{room_id, zone}` objects instead.
+    - `lph` is the sum of both zones' demand. `pct_of_pump = lph / max_flow_lph × 100`, unrounded, or `None` without `max_flow_lph`.
+    - `verdict` is `one_after_another` when both share an exclusive group, `max_concurrent_zones < 2`, or `lph > max_flow_lph`; otherwise `together`.
   - `supply_save {expected_revision, irrigation_pumps[], water_sources[], zone_groups{"room:f2_": {"3": "a"}}, zone_meters{"room:f2_": {"3": "sensor.f2_meter_3"}}, preview?: bool}`.
     - It answers with the same shape plus `readback`.
     - With `preview: true` it validates and returns `{diff, capacity_check}` and writes nothing. MCP's `preview_supply` uses this.
@@ -585,6 +589,7 @@ def test_save_refuses_a_stale_revision(): ...
 def test_save_refuses_concurrency_the_pump_cannot_feed(): ...     # 6 zones x 240 L/h, max 1200, concurrent 6 -> "pump_over_capacity: ... Set Zones at once to 5 or less."
 def test_groups_lower_the_worst_case(): ...
 def test_preview_writes_nothing(): ...
+def test_capacity_pairs_say_together_or_one_after_another(): ...  # 1200 L/h pump, concurrent 2: zones 480+480 -> together, pct 80.0; 720+720 -> one_after_another; same group -> one_after_another
 async def test_supply_save_publishes_the_descriptor_and_reads_back(hass): ...  # tests_ha
 ```
 
@@ -863,6 +868,10 @@ async def test_old_install_without_rules_loads_with_no_binary_sensors(hass): ...
       - While any session of the room is open, the dosing descriptor `sensor.crop_steering_<px>dosing_config` carries the new attribute `calibrating: {probe, session_id, until}`. Task 18 makes the runner hold batches and pH correction on it.
       - Commit, revert, abandon or the 30 min expiry clears it. It refuses when the probe has not reported for 120 s: `"No reading from the feed pH probe for 2 min. Check it's plugged in."`
     - `calibration_capture {session_id, point: 0|1, force?: bool}` → `{reading, raw, stable, drift, stable_s}`. An unsteady reading without `force` → `stable: false` and no point is stored.
+    - `calibration_status {session_id}` → `{reading, raw, stable, drift, stable_s, points_captured, expires_at}`.
+      - It is read-only, open to signed-in users, and never stores a point.
+      - It does not reset the 30 min idle expiry.
+      - An unknown or expired session → `invalid` with `"Calibration session expired. Start again."`
     - `calibration_commit {session_id}` → `{slope_pct, offset, verdict, applied}`. A verdict of `fail` is kept with `applied: false` and returns `ok:false` with code `invalid`.
     - `calibration_revert {room_id, probe}` re-applies the previous applied record, or none.
   - `calibration_record` keeps `applied: false`.
@@ -873,6 +882,7 @@ async def test_old_install_without_rules_loads_with_no_binary_sensors(hass): ...
 ```python
 def test_known_offset_corrects_within_005_ph(): ...        # G2 accept: readings 7.12/4.12 -> corrected(4.12) within 4.00±0.05
 def test_unsteady_reading_is_not_captured_without_force(): ...
+def test_status_reports_stability_and_never_stores_a_point(): ...   # 3 status calls -> points_captured stays 0; store revision unchanged
 def test_a_failed_verdict_is_kept_but_never_applied(): ...
 def test_revert_restores_the_raw_value(): ...              # corrected sensor reads unknown, applied false; feed_calibration attr gone
 def test_gain_bias_reproduce_correct(): ...                # raw*gain+bias == correct(raw, slope, offset, anchor) to 1e-9
@@ -1019,7 +1029,7 @@ def test_stop_pump_leaves_a_running_batch_alone(): ...
 
 **Interfaces:**
 - Produces:
-  - `probe_offset_set {room_id, entity_id, expected_revision, offset? | curve? | match_handheld?, preview?: bool}` → `{offset, corrected_now, fused_before, fused_after}`. With `preview: true` nothing is written, and the answer adds `diff`.
+  - `probe_offset_set {room_id, entity_id, expected_revision, offset? | curve? | match_handheld?, preview?: bool}` → `{offset, corrected_now, fused_before, fused_after}`. With `preview: true` it writes nothing: no store save, no `_probe_offsets` shift, no corrected-sensor publish and no event. It returns `{offset, corrected_now, fused_before, fused_after, diff}`, so `match_handheld` previews as `{offset: 3.0, corrected_now: 52.0}`.
   - `match_handheld` sets `offset = handheld − current raw`.
   - A curve on a probe whose unit is already `%` is refused with `"This probe already converts to moisture. A curve only applies to raw readings."`
   - Event `config.changed {store: "calibration", section: "probe_user_offsets", old, new, diff}`.
@@ -1028,6 +1038,7 @@ def test_stop_pump_leaves_a_running_batch_alone(): ...
 
 ```python
 def test_handheld_52_vs_probe_49_sets_plus_3(): ...              # G9 accept
+def test_preview_returns_offset_and_corrected_now_without_writing(): ...  # match_handheld 52 vs 49 preview -> offset 3.0, corrected_now 52.0; store revision, sensors and journal unchanged
 def test_fused_value_moves_and_no_probe_alert_attribute_fires(): ...  # fusion["excluded"] unchanged, quality ok
 def test_no_offsets_publishes_no_corrected_sensors(): ...
 def test_curve_on_a_percent_probe_is_refused(): ...
@@ -1200,6 +1211,8 @@ async def test_every_response_service_accepts_api_2(hass): ...  # tests_ha: iter
     - `limits` is `{writer: "learner"|"brain", min, max, step_scope}` for learner/AI rows. `min`/`max` come from `ENGINE_BOUNDS[key]` and `step_scope` from `const.SETPOINT_STEP_SCOPES`; the integration has no access to the add-on's `auto_setpoints` step sizes. It renders as `"learner may move it between 1.0 and 5.0 %"`; `None` otherwise.
     - The newest comes first.
   - `history_changes {room_id?, since, until?, zone?, key?, kinds?}` → `{changes}`. When `room_id` is omitted, every room the user can read is queried and the results merged by `ts`.
+    - Every row also carries `user_id` (from `source.user_id`, or `None`) and `user_name`.
+    - `user_name` is the HA user's display name from `hass.auth.async_get_user(user_id).name`, cached per call. It falls back to `None` for an unknown or deleted user, or when there is no user.
   - `history_revert {event_id, expected_revision?}` → `{reverted_event_id, new_event_id, readback}`. It is admin only.
     - `target.changed` writes `old` back to the entity with read-back.
     - `config.changed` re-saves the store section's `old` copy with the current revision.
@@ -1211,6 +1224,7 @@ async def test_every_response_service_accepts_api_2(hass): ...  # tests_ha: iter
 
 ```python
 def test_a_learner_nudge_and_a_manual_edit_both_appear_attributed(): ...   # G8 accept
+def test_manual_rows_name_the_user_and_automation_rows_do_not(): ...  # user "Ben" -> user_id + user_name "Ben"; deleted user -> user_name None; no user -> both None
 def test_rows_carry_id_kind_outcome_and_limits(): ...                       # learner row: kind "setpoint", limits.writer "learner", outcome "Too soon to judge — check after the next lights-on."
 def test_until_bounds_the_range_and_no_room_merges_all_rooms(): ...
 def test_revert_refuses_when_the_value_moved_since(): ...                   # stale_revision
@@ -1304,12 +1318,15 @@ def test_a_meter_in_unknown_units_is_ignored_and_logged_once(): ...
 **Interfaces:**
 - Produces:
   - `open_alerts(events: list[dict], live_notifications: set[str]) -> list[dict]`. An alert is open when it has an `alert.raised` with no later `cleared`/`acknowledged` for the same `data.key` or `data.rule_id`. A controller alert (actor ≠ `system`) whose `f2_<key>` persistent notification is gone is closed. This covers the 12 direct `persistent_notification.dismiss` sites in `controller.py`.
-  - `sensor.crop_steering_<px>alerts_open`: state = count; attr `alerts` = `[{event_id, ts, code, title, zone, rule_id?, acknowledged: false}]`.
+  - `sensor.crop_steering_<px>alerts_open`: state = count; attr `alerts` = `[{event_id, ts, code, title, zone, entity_id, rule_id?, acknowledged: false}]`. `entity_id` is the entity the alert concerns, or `None`:
+    - a threshold rule's source entity (Task 16 source map);
+    - a controller alert's `data.entity_id`. Task 8's `alert.raised` adds `entity_id` when `_alert` names a sensor or switch; otherwise it is `None`.
   - `alert_ack {room_id, alert_event_id}` → journals `alert.acknowledged`.
 
 - [ ] **Step 1: Write the failing tests.**
 
 ```python
+def test_each_open_alert_names_its_entity_or_none(): ...   # rule on tank level -> sensor.crop_steering_f2_tank_level; controller alert without entity -> None
 def test_raised_then_cleared_is_not_open(): ...
 def test_acknowledged_leaves_the_inbox(): ...
 def test_an_alert_whose_notification_is_gone_leaves_the_inbox(): ...
@@ -1342,7 +1359,7 @@ def test_an_alert_whose_notification_is_gone_leaves_the_inbox(): ...
       - `last_change`
       - `uptime_7d_pct`: the share of the last 7 days not `unknown`/`unavailable`, from `recorder.history.state_changes_during_period`. It is cached for 1 h per entity, and is `None` when the recorder is off.
     - Per room, `groups: [{kind, entities: [...]}]` in that kind order.
-    - `heartbeat: {beats: [{at, missed: bool, readback_ms}], interval_s: 60}`, holding the last 120 beats. `readback_ms` is not published by today's controller, so it stays `None` until a controller adds it.
+    - Per room: `heartbeat: {last_beat, age_s, controller: running|stale|absent, beats: [{at, missed: bool, readback_ms}], interval_s: 60}`, holding the last 120 beats of **that room's** `ai_heartbeat`. The top-level `controller` is the best of the rooms' states. `readback_ms` is not published by today's controller, so it stays `None` until a controller adds it.
       - It comes from an in-memory ring filled by `async_track_state_change_event` on each room's `ai_heartbeat`.
       - A gap above 2 × interval inserts a `missed` beat.
       - `readback_ms` is the heartbeat attribute `readback_ms` when the controller publishes it, else `None`.
@@ -1362,6 +1379,7 @@ def test_entities_are_grouped_by_kind_with_names(): ...
 def test_uptime_7d_from_a_state_history(): ...      # 12 h unavailable in 7 d -> pytest.approx(92.85714285714286), unrounded
 def test_a_probe_reporting_every_5_min_is_not_silent(): ...
 def test_a_heartbeat_gap_is_a_missed_beat(): ...
+def test_each_room_carries_its_own_heartbeat(): ...   # 2 rooms, one stale: rooms[i].heartbeat differs; rooms[i].controller per room
 def test_no_brain_no_lovelace_resource_gives_none_not_an_error(): ...
 ```
 
@@ -1485,6 +1503,8 @@ test("hardware-moving services are not in the allowlist", ...)
   | 12 `crop_steering/subscribe` | Task 5 |
 
   The journal kinds `run.saved|archived` and `harvest.recorded` are accepted (Task 4) but not yet emitted. Wiring them into `run_api`/`harvest_store` is a follow-up.
+
+  Frontend asks not added, by coordinator ruling: per-rule phone targets or a `rules` notify kind (rules route through the existing kinds via `routing`), and any service that releases a feed held by a failed mix check (a safety bypass).
 
   Not planned, by scope: M7 (frontend), G12 inline (`dosing_mode`, `inline_status`), G13 `scale_hints`, `intent_submit`, and the `water_sources` behaviour beyond storage.
 - **Type consistency:**
