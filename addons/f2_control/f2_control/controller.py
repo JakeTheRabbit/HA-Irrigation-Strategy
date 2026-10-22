@@ -41,6 +41,7 @@ import dosing_runner
 import dry_dim
 import brain_bridge
 import gate_report
+import journal_out
 import log_words
 import phase_options
 import plan_adherence
@@ -73,6 +74,7 @@ from crop_steering_engine import (
     zone_status_label,
     settled_reading,
 )
+from crop_steering_engine.ids import new_id
 from crop_steering_engine.core import SETTLED_VWC_MIN, ec_flush_goal, floor_share, p1_stall, p1_stall_rewater
 # What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
 # controller column of the one defaults table, pinned to the values installed controllers use.
@@ -748,6 +750,10 @@ NOTIFY_CONFIG_S = 60.0
 NOTIFY_TIMEOUT_S = 12
 # The most one loop spends sending its phase changes and the AI assistant's moves: they are only news, and the loop is not.
 EVENTS_BUDGET_S = 10.0
+# The journal (journal_out.py, ruling R5): after a flush that failed, this many passes send nothing; a hold
+# standing on one reason is journaled again (intent.held) after this many seconds.
+JOURNAL_BACKOFF_PASSES = 5
+HELD_REEMIT_S = 1800
 # The codes whose severity is critical in docs/error-codes.json (tests/test_error_codes.py keeps the two equal):
 # their push is urgent, a high-priority one on a phone whose row asks for that.
 CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-211", "CS-212", "CS-301",
@@ -1149,6 +1155,11 @@ class Controller:
         # Who this controller is, in its heartbeat, so the duplicate-controller guard can tell another one
         # apart (duplicate_hold). Beside state.json, as dosing_state.json is: one data folder, one identity.
         self.instance_id = _instance_id(os.path.join(os.path.dirname(self._state_path) or ".", "instance_id"))
+        # The journal's outbox, beside state.json: shots, phases, holds and alerts, for the integration's event
+        # journal. Only ever a local append in the pass; sent after it (_flush_journal).
+        self.journal = journal_out.Outbox(os.path.join(os.path.dirname(self._state_path), "journal_outbox.jsonl"))
+        self.journal.client = f"f2_control/{CONTROLLER_VERSION}"
+        self._journal_skip = 0  # passes the flush still skips after a failure
         self._guard = {}  # room slug -> {"answered", "seen", "until"} (_guard_read)
         self._guard_lock = threading.Lock()
         # Dosing runs in steps on the main loop, which wakes whenever one is due (run, _sleep_for). Like
@@ -2785,6 +2796,7 @@ class Controller:
                         "reports again. Check the pore EC probes in the list below."
                         f"\n\nSensor: {looking}\nLeft out: {left_out}",
                         room=room,
+                        entity_id=looking,
                         zone=zone,
                     )
                 if attrs:
@@ -2803,6 +2815,7 @@ class Controller:
                     "a probe out of its cube or in a puddle. Alternatively, set the zone to Median."
                     f"\n\nSensor: {looking}\nLeft out: {left_out}",
                     room=room,
+                    entity_id=looking,
                     zone=zone,
                 )
 
@@ -2832,6 +2845,7 @@ class Controller:
             f"Probes for the zone. This alert comes once. It clears when the probe reports again.\n\nSensor: {looking}\n"
             f"Primary: {primary}",
             room=room,
+            entity_id=looking,
             zone=zone,
             quiet=False,
         )
@@ -4043,12 +4057,13 @@ class Controller:
             )
         return off
 
-    def _alert(self, key, code, title, message, room=None, zone=None, quiet=True):
+    def _alert(self, key, code, title, message, room=None, zone=None, quiet=True, entity_id=None):
         """Raise notification `f2_{key}` with its error code (docs/error-codes.json; the dashboard's
         Help & tools lists the same catalog). The key, and so the notification id, never changes
         with the wording: an update replaces an old notification instead of adding a second one.
         True once Home Assistant has it; False while it is inside its quiet period (`quiet`: for a
-        condition re-checked every loop) or could not be created."""
+        condition re-checked every loop) or could not be created. Each raise Home Assistant took is
+        journaled (alert.raised), with `entity_id`: the sensor or switch it is about, when it is about one."""
         if room is not None and zone is not None and zone in getattr(room, "state", {}):
             day_summary.alert(room.state[zone], code)  # the code, for the zone's grow-day summary
         if quiet and not self._alert_due(key, code):
@@ -4075,6 +4090,12 @@ class Controller:
         push = self._push_due(key, code, now)
         self._alerted[key] = now
         self._alert_codes[key] = code
+        prefix = getattr(room, "prefix", "") or ""
+        self.__dict__.setdefault("_alert_rooms", {})[key] = prefix  # alert.cleared goes to the same room
+        data = {"key": key, "title": title}
+        if entity_id:
+            data["entity_id"] = entity_id
+        self._journal(prefix, "alert.raised", zone=zone, code=code, data=data)
         if push and self._muted(room, code):
             log("ALERT push held:", key, "its room is muted in Crop Steering")
             push = False
@@ -4314,6 +4335,7 @@ class Controller:
             "Check the sump pump now: its power, its float switch and that it pumps the water out. If the reading "
             f"is unavailable, check its power plug.\n\nSensor: {entity}",
             room=room,
+            entity_id=entity,
         )
 
     def _watch_runoff(self, room, now):
@@ -4496,6 +4518,7 @@ class Controller:
             ha_call("persistent_notification", "dismiss", notification_id=f"f2_{key}")
             self._alerted.pop(key, None)
             self._alert_codes.pop(key, None)
+            self._journal(self.__dict__.get("_alert_rooms", {}).pop(key, ""), "alert.cleared", data={"key": key})
 
     def _tank_marks(self, room, pct):
         """Move the minimum and overfill latches (tank_level.below_minimum, over_full) by a level read now; saved
@@ -4518,6 +4541,7 @@ class Controller:
                     "valve closes. Check the full and empty distances of the tank in Rooms & setup."
                     f"\n\nSensor: {room.tank['distance']}",
                     room=room,
+                    entity_id=room.tank["distance"],
                     quiet=False,
                 )
             else:
@@ -5167,6 +5191,8 @@ class Controller:
             log(f"[{room.slug}] Z{zone} {words}")
             tag = "" if room.prefix == "" else f"{room.slug} "
             self._activity.insert(0, f"{now.strftime('%H:%M')} {tag}Z{zone} {words}"[:120])
+        self._journal(room.prefix, "phase.changed", zone=zone, actor="manual" if how == "set by hand" else "engine",
+                      data={"from": was, "to": new, "how": how})
         try:
             entry = zone_history.phase_changed(st, was, new, day=self._grow_day_start(room, now).isoformat(), how=how)
             if entry is not None:
@@ -5793,27 +5819,36 @@ class Controller:
                     _switch_off(ent, deadline)
         return settled(CONFIRM_RETRY_S, CONFIRM_POLL_S)
 
-    def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None, plan_exempt=False, steering=True):
+    def _execute_shot(self, room, zone, duration_s, size_pct, *, flow_lps=None, plan_exempt=False, steering=True,
+                      actor="engine", program_id=None, reason_text=None, requested_at=None):
+        # What _act_zone kept of the decision for shot.started (its snapshot and the shot's kind), taken now so
+        # it never outlives this call.
+        intent = room.__dict__.get("_shot_intent", {}).pop(zone, None) or {}
+
+        def held(why):
+            log(f"[{room.slug}] Z{zone} shot held: {why}")
+            self._journal_held(room, zone, why, now=datetime.now(), would=reason_text, actor=actor)
+
         if self._hardware_fault_block(room):
             return
         if _GATE.state is not None:
-            log(f"[{room.slug}] Z{zone} shot held: Home Assistant refuses this controller's token")
+            held("Home Assistant refuses this controller's token")
             return
         if getattr(room, "shot_inflight", None):
-            log(f"[{room.slug}] Z{zone} shot held: an interrupted shot's hardware is not accounted for yet")
+            held("an interrupted shot's hardware is not accounted for yet")
             return
         plumbing = plumbing_hold(room.hw)
         if plumbing:  # never open a valve on a room whose declared pump is not there to run
-            log(f"[{room.slug}] Z{zone} shot held: {plumbing}")
+            held(plumbing)
             return
         undrivable = self._undrivable(room, zone)
         if undrivable:  # never sent a command (_blocked raises CS-313 for it)
-            log(f"[{room.slug}] Z{zone} shot held: {', '.join(undrivable)} can't be switched")
+            held(f"{', '.join(undrivable)} can't be switched")
             return
         # A shot a plan hold never stops (PLAN_HOLD_EXEMPT) does not wait on the plan here either.
         strategy_hold = None if plan_exempt else self._strategy_preflight(room, zone, datetime.now())
         if strategy_hold:
-            log(f"[{room.slug}] Z{zone} shot held: {strategy_hold}")
+            held(strategy_hold)
             return
         # A zone whose pump, main line or valve has not switched on for several shots in a row is tried at
         # most once every SWITCH_ON_BACKOFF_MIN, rescue shots too: a dead valve delivers no rescue water,
@@ -5821,8 +5856,8 @@ class Controller:
         # steering off) is not held: it is how a repair is checked.
         retry_at = _switch_on_retry_at(room.state[zone]) if steering else None
         if retry_at is not None and datetime.now() < retry_at:
-            log(f"[{room.slug}] Z{zone} shot held: its pump, main line or valve did not switch on "
-                f"{room.state[zone]['on_failures']['count']} shots in a row; next try at {retry_at:%H:%M}")
+            held(f"its pump, main line or valve did not switch on "
+                 f"{room.state[zone]['on_failures']['count']} shots in a row; next try at {retry_at:%H:%M}")
             return
         # Freeze hydraulic sizing before opening hardware. Editing plant count,
         # substrate or dripper configuration mid-shot must not rewrite its litres.
@@ -5830,10 +5865,10 @@ class Controller:
                      else size_pct / 100.0 * self._substrate_l(room, zone))
         short = self._tank_short(room, zone, nominal_l)
         if short:  # the plan-ahead half of the reservoir minimum: _tank_plan asks for the refill
-            log(f"[{room.slug}] Z{zone} shot held: {short}")
+            held(short)
             return
         if not self._close_waste(room, zone):  # Close for each shot: a waste valve still open, nothing opens
-            log(f"[{room.slug}] Z{zone} shot held: the waste valve did not close")
+            held("the waste valve did not close")
             return
         with self._shot_lock:  # a batch holds rooms under this lock (see _shot_running)
             making = self._dosing_hold(room)
@@ -5841,7 +5876,7 @@ class Controller:
                 self._busy = True
                 self._shot_room = room  # the room whose shot is in flight right now (see _safe_off)
         if making:
-            log(f"[{room.slug}] Z{zone} shot held: {making}")
+            held(making)
             return
         shutdown_checked = False
         valve_started = valve_opened = None
@@ -5849,6 +5884,9 @@ class Controller:
         stopping = False
         commanded = False  # a switch has been sent ON: from here an error must close what may be open
         errored = False
+        # The journal's record of this shot: its shot.started intent id (None until it is written), the switches
+        # sent ON and read back ON (#208), and how it ended (shot.completed, or shot.aborted's outcome and code).
+        journaled = {"intent_id": None, "sent": [], "on": [], "refused": False, "end": None, "elapsed": None}
 
         def count_water_so_far():
             # The shot ended without its close counting it (stopped or errored): count the water given
@@ -5871,7 +5909,9 @@ class Controller:
             reports late stretches the pump's prime or the main line's lead by the difference. A read-back
             cut short by `until` (the monotonic clock) may have been on: nothing proved it off in time."""
             pending[0] = ent  # sent ON, not yet read back ON (_close_cut_short)
+            journaled["sent"].append(ent)
             if not hw_call(ent, True):
+                journaled["refused"] = True
                 if _GATE.state == "all":  # the token refused: not a switch that failed (no CS-302 to CS-304)
                     raise _ShotStopped(("refused", None))
                 return f"Home Assistant returned an error when the controller tried to {what}.", False, "count"
@@ -5895,6 +5935,7 @@ class Controller:
                 return (f"Home Assistant took the command to {what}, but it did not read on within "
                         f"{waited:.0f} s."), cut or any(state != "off" for state in reads), tally
             pending[0] = None
+            journaled["on"].append(ent)
             while (left := lead_s - (time.monotonic() - acked)) > 0:
                 by = stop(acked + lead_s)
                 if by:
@@ -5985,6 +6026,8 @@ class Controller:
             if not saved or unsaved:  # no record on disk, nothing opens (raised below: CS-212)
                 raise RuntimeError(f"Z{zone} shot refused, its in-flight record was not saved: "
                                    f"{unsaved or 'the state file could not be written'}")
+            self._journal_shot_started(room, zone, journaled, intent, duration_s, size_pct, nominal_l,
+                                       actor, program_id, reason_text, requested_at)
             commanded = True
             # OPEN sequence — FAIL CLOSED: if any service call errors, cut what's on, alert, and DO NOT count the shot
             # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
@@ -5994,8 +6037,9 @@ class Controller:
             if why:
                 hw_call(pump, False)  # it may be on all the same: off before the alert
                 message, quiet = cancelled(why, f"Pump: {pump}", tally=tally)
+                journaled["end"] = ("failed", "CS-302")
                 self._alert(f"hw_{room.slug}_z{zone}", "CS-302", "shot cancelled, the pump did not start",
-                            message, room=room, zone=zone, quiet=quiet)
+                            message, room=room, zone=zone, quiet=quiet, entity_id=pump)
                 return
             why, _maybe, tally = (switch_on(mainline, "open the main-line valve", lead) if mainline
                                   else (None, False, None))
@@ -6004,8 +6048,9 @@ class Controller:
                 if pump:
                     hw_call(pump, False)
                 message, quiet = cancelled(why, f"Main-line valve: {mainline}", tally=tally)
+                journaled["end"] = ("failed", "CS-303")
                 self._alert(f"hw_{room.slug}_z{zone}", "CS-303", "shot cancelled, the main-line valve did not open",
-                            message, room=room, zone=zone, quiet=quiet)
+                            message, room=room, zone=zone, quiet=quiet, entity_id=mainline)
                 return
             # The valve's read-back runs inside the shot's own time, counted from its turn_on. A valve that
             # reports late enough can hold a very short shot open past its nominal length: that time is
@@ -6028,8 +6073,9 @@ class Controller:
                     delivered_s = time.monotonic() - valve_started
                     count_water_so_far()
                 message, quiet = cancelled(why, f"Valve: {valve}", delivered_s, tally)
+                journaled["end"] = ("failed", "CS-304")
                 self._alert(f"hw_{room.slug}_z{zone}", "CS-304", "shot cancelled, the zone valve did not open",
-                            message, room=room, zone=zone, quiet=quiet)
+                            message, room=room, zone=zone, quiet=quiet, entity_id=valve)
                 return
             room.state[zone]["on_failures"] = None  # pump, main line and valve all read on
             elapsed, aborted = self._wait_shot(
@@ -6047,6 +6093,7 @@ class Controller:
                 counted = True
                 self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
                                             steering=steering)
+                journaled["end"], journaled["elapsed"] = ("aborted", "CS-307"), elapsed
                 return
             # CLOSE sequence. A failed close (e.g. HA went unreachable mid-shot) leaves the valve
             # OPEN and the SOFTWARE CANNOT fix it — only the hardware fail-safe (NC valve /
@@ -6089,14 +6136,18 @@ class Controller:
                 delivered_l=nominal_l * (elapsed / duration_s if duration_s > 0 else 1.0),
                 steering=steering,
             )
+            journaled["elapsed"] = elapsed
+            journaled["end"] = ("aborted", None if aborted[0] == "refused" else "CS-305") if aborted else "completed"
             if aborted:
                 stopped_early(aborted, elapsed)
         except _ShotStopped as stopped:
             # The operator (or a refused token, or a hold) stopped the shot while it was opening. Not a switch
             # that failed to switch on, so no backoff. Water counts only from the valve's turn_on, to the stop.
             # A failure in here is logged, and the cleanup below runs as after any shot error.
+            journaled["end"] = ("aborted", {"external": "CS-307", "refused": None}.get(stopped.by[0], "CS-305"))
             try:
                 elapsed = None if valve_started is None else time.monotonic() - valve_started
+                journaled["elapsed"] = elapsed
                 if stopped.by[0] == "external":
                     # As _wait_shot's: only what is still this shot's is closed, never a pump a hold now owns.
                     elapsed = self._close_cut_short(room, zone, stopped.by[1], elapsed or 0.0, duration_s,
@@ -6118,11 +6169,13 @@ class Controller:
             # Count the water this shot delivered before the process goes, or the next start would water
             # the zone as if it had had none.
             stopping = True
+            journaled["end"] = ("aborted", None)
             count_water_so_far()
             raise
         except Exception as e:
             log("shot error", room.slug, zone, e)
             errored = True
+            journaled["end"] = ("failed", None)
             if not commanded:  # nothing opened: the room's pass stops here and says so (CS-212)
                 raise
         finally:
@@ -6168,6 +6221,75 @@ class Controller:
             finally:
                 self._busy = False
                 self._shot_room = None
+                if journaled["intent_id"] is not None:  # its end, after its water is counted (#197)
+                    self._journal_shot_end(room, zone, journaled, valve_started)
+
+    def _journal_shot_started(self, room, zone, journaled, intent, duration_s, size_pct, nominal_l, actor,
+                              program_id, reason_text, requested_at):
+        """shot.started, fsynced to the outbox before the pump opens (_execute_shot), with a new intent id that
+        its end carries too. A journal problem never stops the shot."""
+        try:
+            st, snap = room.state[zone], intent.get("snap")
+            started = datetime.now().astimezone()
+            requested = requested_at or started
+            vwc = snap.vwc if snap is not None else None
+            rise = snap.p1_expected_rise if snap is not None else None
+            journaled["intent_id"] = new_id()
+            journaled["vol_before"] = float(st.get("daily_vol") or 0.0)
+            journaled["vwc_before"], journaled["ec_before"] = vwc, snap.ec if snap is not None else None
+            # a shot started: what held this zone before is over, and is journaled again if it comes back
+            seen = self.__dict__.get("_held_journaled", {})
+            for key in [k for k in seen if k[:2] == (room.slug, zone)]:
+                del seen[key]
+            self._journal(
+                room.prefix, "shot.started", zone=zone, actor=actor, program_id=program_id, detail=reason_text,
+                correlation={"intent_id": journaled["intent_id"]}, durable=True, now=started,
+                data={
+                    "phase": st.get("phase"),
+                    "kind": intent.get("kind"),
+                    "reason": reason_text,
+                    "size_pct": size_pct,
+                    "duration_s": duration_s,
+                    "commanded_l": round(nominal_l, 3),
+                    "vwc_before": vwc,
+                    "vwc_expected": (round(vwc + rise, 2) if st.get("phase") == "P1" and vwc is not None
+                                     and rise is not None else None),
+                    "requested_at": requested.isoformat(timespec="milliseconds"),
+                    "pump_wait_s": round(max(0.0, (started - requested).total_seconds())),
+                },
+            )
+        except Exception as e:
+            log("journal shot.started error", room.slug, zone, e)
+
+    def _journal_shot_end(self, room, zone, journaled, valve_started):
+        """shot.completed, or shot.aborted with its outcome and code, with the litres the shot counted (#197) and
+        what read back ON (#208): `verified` only when every switch sent ON read back ON."""
+        try:
+            end = journaled["end"] or ("failed", None)  # an end no path named: not a shot that completed
+            elapsed = journaled["elapsed"]
+            if elapsed is None and valve_started is not None:
+                elapsed = time.monotonic() - valve_started
+            sent, on = journaled["sent"], journaled["on"]
+            status = ("verified" if sent and on == sent
+                      else "refused" if journaled["refused"] or _GATE.state is not None else "unread")
+            litres = float(room.state[zone].get("daily_vol") or 0.0) - journaled["vol_before"]
+            completed = end == "completed"
+            self._journal(
+                room.prefix, "shot.completed" if completed else "shot.aborted", zone=zone,
+                outcome="ok" if completed else end[0], code=None if completed else end[1],
+                correlation={"intent_id": journaled["intent_id"]},
+                data={
+                    "elapsed_s": round(elapsed, 1) if elapsed is not None else 0.0,
+                    "commanded_l": round(max(0.0, litres), 3),
+                    "metered_l": None,
+                    "vwc_before": journaled["vwc_before"],
+                    "ec_before": journaled["ec_before"],
+                },
+                readback={"status": status, "entities": list(on),
+                          "at": datetime.now().astimezone().isoformat(timespec="milliseconds")},
+            )
+        except Exception as e:
+            log("journal shot end error", room.slug, zone, e)
 
     def _safe_off(self, deadline=None):
         """Stopping (SIGTERM: the app stopped, updated or restarted): close only what this controller has
@@ -6447,11 +6569,15 @@ class Controller:
                 room=room,
                 zone=zone,
             )
+        test = getattr(reason, "kind", None) == "test_shot"
+        actor = "manual" if test else "engine"  # a test shot is the operator's
         if fire and block:
             log(
                 f"[{room.slug}] Z{zone} {st['phase']} BLOCKED ({block}): would {reason}"
             )
+            self._journal_held(room, zone, block, now=now, would=reason, actor=actor)
         elif fire:
+            requested_at = datetime.now().astimezone()  # this pass decided to fire
             flow = self._zone_flow_lps(room, zone)
             substrate = self._substrate_l(room, zone)
             if not (
@@ -6471,7 +6597,6 @@ class Controller:
                     zone=zone,
                 )
                 return
-            test = getattr(reason, "kind", None) == "test_shot"
             raw_dur = float(getattr(reason, "seconds", TEST_SHOT_S)) if test else raw_seconds(size, substrate, flow)
             max_dur = self._room_duration_cap(room)
             if max_dur is None:
@@ -6501,6 +6626,7 @@ class Controller:
                     held = f"BLOCK daily-cap ({max(left_l, 0.0):.2f} L left)"
                     self._alert_daily_cap(room, zone, st, snap is None, held)
                     log(f"[{room.slug}] Z{zone} {st['phase']} hold — {held}: would {reason}")
+                    self._journal_held(room, zone, held, now=now, would=reason, actor=actor)
                     return False, 0.0, held
                 if dur > allowed:
                     log(f"[{room.slug}] Z{zone} shot clipped {dur}s -> {allowed}s: {left_l:.2f} L of the daily budget left")
@@ -6514,8 +6640,11 @@ class Controller:
             if rescue and snap is not None:  # the last rescue, judged before this one changes the moisture
                 self._rescue_judged(room, zone, safety_ops.rescue_judge(st, snap.vwc, now, early=True))
             was = st.get("last_shot")
+            # what shot.started journals of this pass's decision (_execute_shot takes it before anything opens)
+            room.__dict__.setdefault("_shot_intent", {})[zone] = {"snap": snap, "kind": getattr(reason, "kind", None)}
             self._execute_shot(room, zone, dur, size, flow_lps=flow,
-                               plan_exempt=getattr(reason, "kind", None) in PLAN_HOLD_EXEMPT, steering=not test)
+                               plan_exempt=getattr(reason, "kind", None) in PLAN_HOLD_EXEMPT, steering=not test,
+                               actor=actor, reason_text=f"{what}: {why}", requested_at=requested_at)
             if rescue and snap is not None and st.get("last_shot") is not was:
                 safety_ops.rescue_fired(st, snap.vwc, now)
                 self._save_state()
@@ -6619,6 +6748,7 @@ class Controller:
             "can be damaged. The controller does not switch it off. CAUTION: Check the pump now. Stop it, or open "
             f"the valve that it should feed.\n\nSensor: {entity}",
             room=room,
+            entity_id=entity,
         )
 
     # ---------- CS-905: the tank level estimated from the water the shots used (alert only) ----------
@@ -6845,6 +6975,57 @@ class Controller:
         self._check_defaulted_setpoints()
         self._maybe_notify(all_pub, now)
         self._send_events()
+        self._flush_journal()
+
+    def _journal(self, room_prefix, kind, **kw):
+        """One event to the journal's outbox (journal_out.Outbox.emit: a local append that never raises)
+        -> its id, or None for a controller built without one."""
+        journal = getattr(self, "journal", None)
+        return journal.emit(room_prefix, kind, **kw) if journal is not None else None
+
+    def _flush_journal(self):
+        """The outbox to the integration (crop_steering.journal_append), once, after every room's pass and never
+        before or during a shot (ruling R5): a 1 s timeout, stopping at the first failure, after which the next
+        JOURNAL_BACKOFF_PASSES passes send nothing. What is not sent stays in the outbox for a later pass."""
+        journal = getattr(self, "journal", None)
+        if journal is None:
+            return
+        if getattr(self, "_journal_skip", 0) > 0:
+            self._journal_skip -= 1
+            return
+        failed = []
+
+        def send(room_id, events):
+            status, answer = ha_service_response(
+                "crop_steering", "journal_append", {"room_id": room_id, "events": events}, timeout=1)
+            if status != 200 or not isinstance(answer, dict):
+                failed.append(status)
+                return None
+            return answer.get("accepted") or [], answer.get("duplicate") or []
+
+        try:
+            journal.flush(send)
+        except Exception as e:
+            log("journal flush error", e)
+            failed.append(e)
+        if failed:
+            self._journal_skip = JOURNAL_BACKOFF_PASSES
+
+    def _journal_held(self, room, zone, reason, *, guard=None, code=None, now, would=None, actor="engine"):
+        """intent.held for a shot the act loop held (_act_zone, and _execute_shot before anything opens), once per
+        (room, zone, reason) and again each HELD_REEMIT_S while it stands. Never from _blocked: it also only
+        describes (_publish_waiting_for's gates)."""
+        seen = self.__dict__.setdefault("_held_journaled", {})
+        key = (room.slug, zone, str(reason))
+        last = seen.get(key)
+        if last is not None and 0 <= (now - last).total_seconds() < HELD_REEMIT_S:
+            return
+        seen[key] = now
+        data = {"reason": str(reason)}
+        if guard:
+            data["guard"] = guard
+        data["would"] = None if would is None else str(would)
+        self._journal(room.prefix, "intent.held", zone=zone, outcome="held", code=code, actor=actor, data=data)
 
     def _room_error(self, room, now, err):
         """A room's pass raised (loop_once). The room says so: its heartbeat and its status read error,
@@ -7459,6 +7640,7 @@ class Controller:
 
                     f"\n\nSensor: {self._fused_id(room.prefix, 'ec', zone, room.zones[zone].get('ec'))}",
                     room=room,
+                    entity_id=self._fused_id(room.prefix, "ec", zone, room.zones[zone].get("ec")),
                     zone=zone,
                 )
             healthy.append((zone, p.p1_target))
@@ -7593,6 +7775,7 @@ class Controller:
                     "position and the wiring of the probe."
                     f"\n\nSensor: {looking}",
                     room=room,
+                    entity_id=looking,
                     zone=zone,
                 )
                 room._blind_zones.add(zone)
@@ -7604,6 +7787,7 @@ class Controller:
                 _PROBE_ALERTS[code][0],
                 f"{what} {plan} {_PROBE_ALERTS[code][1]}\n\nSensor: {looking}",
                 room=room,
+                entity_id=looking,
                 zone=zone,
             )
             room._blind_zones.add(zone)
