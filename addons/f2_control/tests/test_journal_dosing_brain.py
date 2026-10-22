@@ -505,16 +505,69 @@ def test_a_torn_read_is_tried_again_later_and_never_sets_the_flag(start, tmp_pat
     for _ in range(controller.JOURNAL_BACKOFF_PASSES + 1):
         _pass(c)
     assert c.rooms[0].journal_backfill is True
-    assert {e["id"] for e in _events(c.journal)} == _expected_ids()
+    # Its dosing half; its ledger half was read (no file then) on the first pass, and is not held back by dosing.
+    ledger = {derived_id(datetime.fromisoformat("2026-10-19T23:00:00+00:00"), "ledger:4"),
+              derived_id(datetime.fromisoformat("2026-10-20T23:00:00+00:00"), "ledger:4:outcome")}
+    assert {e["id"] for e in _events(c.journal)} == _expected_ids() - ledger
 
 
-def test_a_torn_ledger_line_is_tried_again_later(start, tmp_path):
-    _seed(tmp_path)
+def _two_rooms(c, tmp_path):
+    """A second room beside the default one, and dosing history in both."""
+    c.rooms.append(SimpleNamespace(slug="f2", prefix="f2_", journal_backfill=False))
+    doc = json.loads(json.dumps(DOSING))
+    doc["rooms"]["f2"] = {"history": [dict(DOSING["rooms"]["default"]["history"][1], by="Sam")]}
+    (tmp_path / "dosing_state.json").write_text(json.dumps(doc), encoding="utf-8")
+
+
+def _damage_ledger(tmp_path):
     with open(tmp_path / "jev_ledger.jsonl", "a", encoding="utf-8") as fh:
-        fh.write('{"id": 6, "at": "2026-')
+        fh.write('{"id": 6, "at": "2026-\n')
+
+
+DOSING_IDS = 4  # the default room's dosing events in DOSING
+
+
+def _kinds(c, room_id):
+    return [e["kind"] for e in _events(c.journal) if e["room_id"] == room_id]
+
+
+def test_a_damaged_ledger_never_holds_back_the_dosing_history_of_any_room(start, tmp_path):
+    _seed(tmp_path)
+    _damage_ledger(tmp_path)
     c = start()
+    _two_rooms(c, tmp_path)
     _pass(c)
-    assert c.rooms[0].journal_backfill is False and _events(c.journal) == []
+    assert len([k for k in _kinds(c, "room:") if not k.startswith("ai.")]) == DOSING_IDS
+    assert _kinds(c, "room:f2_") == ["dose.completed"]
+    assert not [k for k in _kinds(c, "room:") if k.startswith("ai.")]
+    # The ledger half waits in both rooms (which room a damaged line was for is not known).
+    assert (c.rooms[0].journal_backfill, c.rooms[1].journal_backfill) == (False, False)
+
+
+def test_after_three_failed_runs_the_readable_ledger_lines_are_queued(start, tmp_path, monkeypatch):
+    lines = []
+    monkeypatch.setattr(controller, "log", lambda *a: lines.append(" ".join(str(x) for x in a)))
+    _seed(tmp_path)
+    _damage_ledger(tmp_path)
+    c = start()
+    passes = 0
+    while not c.rooms[0].journal_backfill:
+        passes += 1
+        assert passes < 40
+        _pass(c)
+    assert passes == 3 * controller.JOURNAL_BACKOFF_PASSES + 4  # 3 failed runs, each backing off, then the 4th
+    assert {e["id"] for e in _events(c.journal)} == _expected_ids()
+    assert [x for x in lines if "unreadable" in x] == ["journal backfill: ledger: 1 unreadable lines skipped"]
+    assert len([x for x in lines if "journal backfill" in x]) == 2  # the failure run, then the skip
+
+
+def test_a_damaged_dosing_state_never_holds_back_the_ledger(start, tmp_path):
+    _seed(tmp_path)
+    c = start()  # (the dosing runner sets a file it cannot read aside at start: damaged after it)
+    (tmp_path / "dosing_state.json").write_text('{"rooms": {"default": {"hist', encoding="utf-8")
+    _pass(c)
+    assert sorted(_kinds(c, "room:")) == ["ai.judgement", "ai.outcome"]
+    assert c.rooms[0].journal_backfill is False  # its dosing half is still to come
 
 
 def test_live_and_backfilled_ledger_ids_match_in_every_time_zone(tmp_path):

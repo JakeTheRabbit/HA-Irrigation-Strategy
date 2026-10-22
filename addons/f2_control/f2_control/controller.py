@@ -759,6 +759,7 @@ JOURNAL_FLUSH_BUDGET_S = 1.5  # no flush batch starts later than this into the f
 # outbox's cap, so it never pushes a live event out and never holds one up for long.
 JOURNAL_BACKFILL_CHUNK = 200
 JOURNAL_BACKFILL_SHARE = 0.5
+BACKFILL_LEDGER_TRIES = 3  # failed runs on a damaged ledger before its readable lines are taken without the rest
 _HELD_NUMBERS = re.compile(r"\d{1,2}:\d{2}|[-+]?\d+(?:\.\d+)?")  # a hold's times and numbers (_journal_held)
 # The codes whose severity is critical in docs/error-codes.json (tests/test_error_codes.py keeps the two equal):
 # their push is urgent, a high-priority one on a phone whose row asks for that.
@@ -7010,80 +7011,115 @@ class Controller:
         return journal.emit(room_prefix, kind, **kw) if journal is not None else None
 
     def _journal_backfill(self):
-        """A room's history from before the journal, queued over the passes after them, never at start: its dosing
-        history (dosing_state.json) and the AI assistant's ledger rows for it (jev_ledger.jsonl), as journal events with
-        ids derived from each row (dosing_runner.history_events, brain_bridge.ledger_events).
+        """A room's history from before the journal, queued over the passes after them, never at start, in two halves
+        with ids derived from each row: its dosing history (dosing_state.json, dosing_runner.history_events) and the AI
+        assistant's ledger rows for it (jev_ledger.jsonl, brain_bridge.ledger_events).
         - At most JOURNAL_BACKFILL_CHUNK events a pass, and only while the outbox holds under JOURNAL_BACKFILL_SHARE of
           its cap, so the cap never drops a live event for it.
-        - What is left is kept in memory per room. After a restart it starts again from the files: the same ids, which
-          journal_append keeps once.
-        - The room's `_journal_backfill: 1` is set once all of it is queued.
-        - A file that cannot be read (torn, or not what it should be) is tried again JOURNAL_BACKOFF_PASSES passes
-          later, logged once for each run of failures, and never sets the flag."""
+        - What is left is kept in memory per room and half. After a restart it starts again from the files: the same
+          ids, which journal_append keeps once.
+        - The room's `_journal_backfill: 1` is set once both its halves are queued.
+        - Each file is read on its own. One that cannot be read holds back only its own half: it is tried again
+          JOURNAL_BACKOFF_PASSES passes later, logged once for each run of failures. After BACKFILL_LEDGER_TRIES failed
+          runs the ledger is read line by line and its unreadable lines are left out (a damaged ledger never stops
+          anything, brain/ledger.py)."""
         journal = getattr(self, "journal", None)
         todo = [r for r in self.rooms if not getattr(r, "journal_backfill", False)]
         if journal is None or not todo:
             return
-        if getattr(self, "_backfill_skip", 0) > 0:
-            self._backfill_skip -= 1
-            return
-        queues = self.__dict__.setdefault("_backfill_queue", {})
-        try:
-            missing = [r for r in todo if r.slug not in queues]
-            if missing:
-                dosing, rows = self._backfill_sources()
+        queues = self.__dict__.setdefault("_backfill_queue", {})  # (slug, half) -> [(when, kind, keywords)]
+        skip = self.__dict__.setdefault("_backfill_skip", {})  # half -> passes it still waits
+        failed = self.__dict__.setdefault("_backfill_failed", {})  # half -> failed runs in a row
+        for half, read in (("dosing", self._backfill_dosing), ("ledger", self._backfill_ledger)):
+            missing = [r for r in todo if (r.slug, half) not in queues]
+            if not missing:
+                continue
+            if skip.get(half, 0) > 0:
+                skip[half] -= 1
+                continue
+            try:
+                source = read(failed.get(half, 0) >= BACKFILL_LEDGER_TRIES)
                 for room in missing:
-                    queues[room.slug] = self._backfill_events(room, dosing, rows)
+                    queues[(room.slug, half)] = self._backfill_events(room, half, source)
+                failed[half] = 0
+            except Exception as e:
+                if not failed.get(half):
+                    log(f"journal backfill: {half}: error, tried again later:", e)
+                failed[half] = failed.get(half, 0) + 1
+                skip[half] = JOURNAL_BACKOFF_PASSES
+        try:
             budget = min(JOURNAL_BACKFILL_CHUNK, int(journal.cap * JOURNAL_BACKFILL_SHARE) - journal.count())
-            for room in todo:
-                queue = queues[room.slug]
+        except OSError as e:
+            log("journal backfill: the outbox could not be counted:", e)
+            return
+        for room in todo:
+            for half in ("dosing", "ledger"):
+                queue = queues.get((room.slug, half))
+                if not queue:
+                    continue
                 take = queue[:max(0, budget)]
                 for _at, kind, kw in take:
                     journal.emit(room.prefix, kind, **kw)
                 budget -= len(take)
-                queues[room.slug] = queue = queue[len(take):]
-                if not queue:
-                    del queues[room.slug]
-                    room.journal_backfill = True
-            self._backfill_failing = False
-        except Exception as e:
-            if not getattr(self, "_backfill_failing", False):
-                log("journal backfill error, tried again later:", e)
-            self._backfill_failing = True
-            self._backfill_skip = JOURNAL_BACKOFF_PASSES
+                queues[(room.slug, half)] = queue[len(take):]
+            if all(queues.get((room.slug, half)) == [] for half in ("dosing", "ledger")):
+                for half in ("dosing", "ledger"):
+                    del queues[(room.slug, half)]
+                room.journal_backfill = True
 
-    def _backfill_sources(self):
-        """(dosing_state.json's rooms, jev_ledger.jsonl's rows); a missing file is empty, one that cannot be read
-        raises (both are written through a tmp file and os.replace, so that is a damaged file, not a torn write)."""
-        data = os.path.dirname(self._state_path) or "."
+    def _backfill_dosing(self, _lenient=False):
+        """dosing_state.json's rooms; a missing file is empty, one that cannot be read raises (DosingRunner._write
+        writes through a tmp file, fsync and os.replace, so that is a damaged file, not a torn write)."""
         try:
-            with open(os.path.join(data, "dosing_state.json"), encoding="utf-8") as fh:
+            with open(os.path.join(os.path.dirname(self._state_path) or ".", "dosing_state.json"),
+                      encoding="utf-8") as fh:
                 dosing = json.load(fh).get("rooms") or {}
-            if not isinstance(dosing, dict):
-                raise ValueError("dosing_state.json has no rooms")
         except FileNotFoundError:
-            dosing = {}
-        rows = []
+            return {}
+        if not isinstance(dosing, dict):
+            raise ValueError("dosing_state.json has no rooms")
+        return dosing
+
+    def _backfill_ledger(self, lenient=False):
+        """jev_ledger.jsonl's rows; a missing file is empty. A line that cannot be read raises (Ledger writes through a
+        tmp file and os.replace, so that is damage, which the ledger's next save heals), unless `lenient`: then it is
+        left out, with one log line."""
+        rows, bad = [], 0
         try:
-            with open(os.path.join(data, "jev_ledger.jsonl"), encoding="utf-8") as fh:
-                rows = [json.loads(line) for line in fh if line.strip()]
+            with open(os.path.join(os.path.dirname(self._state_path) or ".", "jev_ledger.jsonl"),
+                      encoding="utf-8") as fh:
+                for line in fh:
+                    if not line.strip():
+                        continue
+                    try:
+                        rows.append(json.loads(line))
+                    except ValueError:
+                        if not lenient:
+                            raise
+                        bad += 1
         except FileNotFoundError:
-            pass
-        return dosing, rows
+            return []
+        if bad:
+            log(f"journal backfill: ledger: {bad} unreadable lines skipped")
+        return rows
 
     @staticmethod
-    def _backfill_events(room, dosing, rows):
-        """The room's backfill, oldest first: [(when, kind, Outbox.emit keywords)]. A row it cannot read is left out."""
-        block = dosing.get(room.slug)
-        history = block.get("history") if isinstance(block, dict) else None
-        events = [(kw["now"], kind, kw) for kind, kw in
-                  dosing_runner.history_events(room.slug, history if isinstance(history, list) else [])]
-        for row in rows:
-            if isinstance(row, dict) and row.get("room") == room.slug:
-                try:
-                    events += [(kw["now"], kind, kw) for kind, kw in brain_bridge.ledger_events(row)]
-                except (KeyError, TypeError, ValueError):
-                    continue
+    def _backfill_events(room, half, source):
+        """One half of the room's backfill, oldest first: [(when, kind, Outbox.emit keywords)]. A row it cannot read
+        is left out."""
+        events = []
+        if half == "dosing":
+            block = source.get(room.slug)
+            history = block.get("history") if isinstance(block, dict) else None
+            events = [(kw["now"], kind, kw) for kind, kw in
+                      dosing_runner.history_events(room.slug, history if isinstance(history, list) else [])]
+        else:
+            for row in source:
+                if isinstance(row, dict) and row.get("room") == room.slug:
+                    try:
+                        events += [(kw["now"], kind, kw) for kind, kw in brain_bridge.ledger_events(row)]
+                    except (KeyError, TypeError, ValueError):
+                        continue
         return sorted(events, key=lambda e: e[0].timestamp())
 
     def _journal_recovered(self):
