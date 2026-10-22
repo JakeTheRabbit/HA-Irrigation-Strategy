@@ -2,6 +2,7 @@ import { addDays, dateInZone, viewerTimeZone, wallTime } from "./comparison";
 import { ageText } from "./controller-health";
 import { descriptor } from "./model";
 import { smoothRecorded, type RecordedPoint } from "./planning-curve";
+import { drybackId } from "./published";
 import type { RoomView, States } from "./types";
 import { growerWords } from "./words";
 
@@ -58,20 +59,12 @@ export interface Reading {
 export interface Level extends Span {
   value: number;
 }
-export interface DryDown {
-  /** VWC percentage points per hour, positive while the zone dries. */
-  rate: number;
-  /** The fitted reading the projection starts from. */
-  from: Reading;
-  /** When VWC reaches the threshold at that rate. */
-  at: number;
-}
 export interface NextShot {
   /** When the next shot is expected, or null when nothing honest can be said. */
   at: number | null;
   /** How `at` was worked out, or why there is none. */
   basis:
-    | "dry-down"
+    | "controller"
     | "due"
     | "p1-interval"
     | "p0-wait"
@@ -79,24 +72,13 @@ export interface NextShot {
     | "held"
     | "night"
     | "late"
-    | "settling"
-    | "no-dry-down"
+    | "no-estimate"
     | "no-reading"
     | "ramp-done"
     | "unknown";
-  /** The fitted dry-down, drawn as the dashed rest-of-day line even when it misses lights-off. */
-  fit?: DryDown;
+  /** Why the controller has no estimate ("no-estimate"). */
+  reason?: string;
 }
-
-/** Readings used for the dry-down: the last hour, from a quarter of an hour after the last shot
- * ended (the wet-up is still arriving before that), over at least 15 minutes. */
-export const DRY_DOWN = {
-  windowMs: 60 * 60_000,
-  settleMs: 15 * 60_000,
-  minSpanMs: 15 * 60_000,
-  minPoints: 5,
-  minRate: 0.1,
-};
 
 const numberOf = (state: string): number | null => {
   const text = state.trim();
@@ -128,10 +110,14 @@ export function timelineEntities(room: RoomView, states: States, zoneId?: number
       )
       .map((setting) => setting.entityId),
   ];
+  // One zone's: also the controller's dryback, with the peak it was measured from.
+  const dryback = zoneId === undefined ? null : drybackId(room.room.prefix, zoneId);
   return {
     zones,
     entityIds: [...new Set(ids.filter(exists))].sort(),
-    attributeIds: exists(decision) ? [decision] : [],
+    attributeIds: [decision, dryback].filter(exists),
+    /** The decision sensor's id, null where the room has none: its rows are looked up by it. */
+    decision: exists(decision) ? decision : null,
   };
 }
 
@@ -509,19 +495,6 @@ export function openSeconds(shots: readonly Shot[], start: number, hour: number)
   );
 }
 
-/** How far P0 dried the zone, as the engine measures dryback: (peak − VWC) / peak × 100, the peak
- * being the highest reading since P0 began, at its furthest over the band. */
-export function morningDryback(points: readonly Reading[], band: Span): number | null {
-  let peak = -Infinity,
-    dryback: number | null = null;
-  for (const point of points) {
-    if (point.time < band.start || point.time > band.end) continue;
-    peak = Math.max(peak, point.value);
-    if (peak > 0) dryback = Math.max(dryback ?? 0, ((peak - point.value) / peak) * 100);
-  }
-  return dryback;
-}
-
 const quantile = (sorted: readonly number[], q: number) => {
   const at = (sorted.length - 1) * q,
     below = Math.floor(at);
@@ -689,46 +662,10 @@ export function unprojected(
   return `no projection: ${reportedAt === null ? "no report from the controller" : `last report ${ageText(now - reportedAt)} ago`}`;
 }
 
-/** A least-squares line through the readings taken since `since`: when does VWC reach `threshold`?
- * Null without enough recent data to say (fewer than five readings, under 15 minutes of them) or
- * when VWC is not falling measurably. */
-export function dryDown(
-  points: Reading[],
-  threshold: number,
-  since: number,
-  now: number,
-): DryDown | null {
-  const recent = points.filter((point) => point.time >= since && point.time <= now);
-  const first = recent[0],
-    last = recent.at(-1);
-  if (
-    !first ||
-    !last ||
-    recent.length < DRY_DOWN.minPoints ||
-    last.time - first.time < DRY_DOWN.minSpanMs
-  )
-    return null;
-  const meanT = recent.reduce((sum, point) => sum + point.time - first.time, 0) / recent.length;
-  const meanV = recent.reduce((sum, point) => sum + point.value, 0) / recent.length;
-  let covariance = 0,
-    variance = 0;
-  for (const point of recent) {
-    const dt = point.time - first.time - meanT;
-    covariance += dt * (point.value - meanV);
-    variance += dt * dt;
-  }
-  const slope = covariance / variance; // points per ms
-  const rate = -slope * 3_600_000;
-  if (!(rate >= DRY_DOWN.minRate)) return null;
-  const value = meanV + slope * (last.time - first.time - meanT);
-  const at = last.time + (Math.max(0, value - threshold) / rate) * 3_600_000;
-  return { rate, from: { time: last.time, value }, at: Math.max(now, at) };
-}
-
-/** When a zone should fire next, only as far as the engine's own rules and today's data say:
- * P0 ends by its maximum wait, P1 fires every interval until the ramp ceiling, P2 tops up when
- * VWC dries to the threshold. Nothing is estimated while a shot runs, a hold is open, after
- * lights-off, or from too little data. */
+/** When a zone should fire next, only as far as the engine's own rules say: P0 ends by its
+ * maximum wait, P1 fires every interval until the ramp ceiling, and in P2 the controller publishes
+ * its own estimate of the top-up (`estimate`, published.ts), which is shown as it is. Nothing is
+ * estimated while a shot runs, a hold is open, or after lights-off. */
 export function nextShot(
   zone: {
     phase: string | null;
@@ -737,10 +674,10 @@ export function nextShot(
     held: Block | null;
     /** Today's last shot, if any. */
     lastShot: Shot | null;
-    points: Reading[];
     /** The live VWC, null when the probe is unavailable or stale. */
     vwc: number | null;
-    threshold: number | null;
+    /** The controller's P2 estimate (publishedNextIrrigation), or why it has none. */
+    estimate: { at: number | null; reason: string | null };
     ceiling: number | null;
     /** Minutes between P1 shots, and the P0 maximum wait. */
     interval: number | null;
@@ -764,18 +701,11 @@ export function nextShot(
     const at = lastShot ? lastShot.end + zone.interval * 60_000 : now;
     return { at: Math.max(now, at), basis: "p1-interval" };
   }
-  if (phase !== "P2" || zone.threshold === null) return { at: null, basis: "unknown" };
-  if (zone.vwc <= zone.threshold) return { at: now, basis: "due" };
-  const since = Math.max(
-    now - DRY_DOWN.windowMs,
-    lastShot ? lastShot.end + DRY_DOWN.settleMs : -Infinity,
-  );
-  if (now - since < DRY_DOWN.minSpanMs) return { at: null, basis: "settling" };
-  const fit = dryDown(zone.points, zone.threshold, since, now);
-  if (!fit) return { at: null, basis: "no-dry-down" };
-  return fit.at < day.lightsOff
-    ? { at: fit.at, basis: "dry-down", fit }
-    : { at: null, basis: "late", fit };
+  if (phase !== "P2") return { at: null, basis: "unknown" };
+  const { at, reason } = zone.estimate;
+  if (at === null) return { at: null, basis: "no-estimate", reason: reason ?? undefined };
+  if (at <= now) return { at: now, basis: "due" };
+  return at < day.lightsOff ? { at, basis: "controller" } : { at: null, basis: "late" };
 }
 
 const sameAttributes = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
