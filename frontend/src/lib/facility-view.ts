@@ -1,6 +1,8 @@
 import { zoneAttention, type AttentionReason, type ZoneFacts } from "./attention";
+import { formatVolume } from "./display-units";
 import { readJev, jevIds, parseJevSetpoints, type JevStage } from "./jev";
 import { buildRoom, numeric, readable, roomStatus } from "./model";
+import { newestFirst, openAlerts } from "./open-alerts";
 import { reservoirView, type ReservoirView } from "./reservoir";
 import { buildSetpointPreview } from "./setpoint-preview";
 import { stockTanks, stockState, type StockState, type StockTankReading } from "./dosing";
@@ -124,6 +126,16 @@ export interface FacilityZone {
   mode: ZoneMode;
   sensors: ZoneSensor[];
   attention: AttentionReason[];
+  /** Waiting for the pump: its place in the room's queue (binary_sensor shot_queued, attr `queue`). */
+  queued: { position: number } | null;
+  /** The last shot's metered over commanded water (zone_N_flow_ratio, 0–1); null without a meter. */
+  flowRatio: number | null;
+  /** Under 0.8 of the water arrived: the last shot's dot is drawn hollow. */
+  lastShotHollow: boolean;
+  /** "Last shot: 1.9 of 2.4 L arrived (79%)" when the last shot came up short, else null. */
+  lastShotText: string | null;
+  /** The zone's newest open alert, else why its reading is not usable. */
+  problem: string | null;
 }
 export interface FacilityRoom {
   room: Controller["rooms"][number];
@@ -139,6 +151,46 @@ export interface FacilityRoom {
    * know their plant count. */
   waterL: number | null;
   litresPerPlant: number | null;
+  /** The grow plan's day (grow_day, days_to_harvest, stage), else the stage arc's. */
+  growDay: { day: number; of: number; daysLeft: number; stage: string } | null;
+  /** binary_sensor.crop_steering_<prefix>calibration_due: a feed probe is due. */
+  feedCalibrationDue: boolean;
+}
+
+/** An entity's state, with "unknown" and "unavailable" read as absent. */
+const known = (entity: EntityState | undefined) =>
+  entity && entity.state !== "unknown" && entity.state !== "unavailable" ? entity.state : null;
+const numberOf = (state: string | null) => {
+  const value = state === null || state.trim() === "" ? NaN : Number(state);
+  return Number.isFinite(value) ? value : null;
+};
+
+/** The room's water today for its header: per plant (when known) and the room, in the display's
+ * volume unit. */
+export function drinkLine(waterL: number | null, litresPerPlant: number | null) {
+  if (waterL === null) return null;
+  return {
+    perPlant: litresPerPlant === null ? null : formatVolume(litresPerPlant, 2),
+    room: formatVolume(waterL, 1),
+  };
+}
+
+/** Under this share of the commanded water, a shot came up short. */
+const SHORT_FLOW = 0.8;
+function lastShot(entity: EntityState | undefined) {
+  const ratio = numberOf(known(entity));
+  const hollow = ratio !== null && ratio < SHORT_FLOW;
+  let text: string | null = null;
+  if (hollow) {
+    const commanded = finite(entity!.attributes.commanded_l);
+    const metered = finite(entity!.attributes.metered_l);
+    const pct = `${Math.round(ratio * 100)}%`;
+    text =
+      commanded !== null && metered !== null
+        ? `Last shot: ${formatVolume(metered, 1).replace(/\s\S+$/, "")} of ${formatVolume(commanded, 1)} arrived (${pct})`
+        : `Last shot: ${pct} arrived`;
+  }
+  return { flowRatio: ratio, lastShotHollow: hollow, lastShotText: text };
 }
 
 /** Every room read from the one live snapshot, for any room (not only the selected one): nothing
@@ -150,6 +202,7 @@ export function facilityView(
   now = Date.now(),
 ): FacilityRoom[] {
   const { states } = controller;
+  const alerts = openAlerts(controller).sort(newestFirst);
   return controller.rooms.map((room) => {
     const view = buildRoom(states, room);
     const scoped = { ...controller, room: view, roomId: room.id };
@@ -159,6 +212,7 @@ export function facilityView(
     let waterL: number | null = null;
     let plantL = 0;
     let plantCount = 0;
+    const queue = states[`binary_sensor.crop_steering_${prefix}shot_queued`]?.attributes.queue;
     const zones = view.zones.map((zone) => {
       const saved = buildSetpointPreview(view, states, zone.id, {}).saved.parameters;
       const water = dailyWater(zone, plants[zone.id] ?? null);
@@ -172,6 +226,12 @@ export function facilityView(
       }
       const dryback = states[`sensor.crop_steering_${prefix}zone_${zone.id}_dryback_app`];
       const rootId = rootZoneSensor(states, room, zone.id);
+      const vwcIssue = readingIssue(zone.vwc, states);
+      const ecIssue = readingIssue(zone.ec, states);
+      const inQueue = Array.isArray(queue)
+        ? (queue as { zone?: unknown; position?: unknown }[]).find((entry) => entry?.zone === zone.id)
+        : undefined;
+      const position = finite(inQueue?.position);
       const stopped =
         !view.roomActive || zone.stale || view.engine.enabled === false || zone.enabled === false;
       const facts: ZoneFacts = {
@@ -180,8 +240,8 @@ export function facilityView(
         phase: zone.phase,
         vwc: zone.vwc.value,
         ec: zone.ec.value,
-        vwcIssue: readingIssue(zone.vwc, states),
-        ecIssue: readingIssue(zone.ec, states),
+        vwcIssue,
+        ecIssue,
         excluded: [
           ...excludedProbes(zone.vwc.entityId ? states[zone.vwc.entityId] : undefined, "vwc"),
           ...excludedProbes(zone.ec.entityId ? states[zone.ec.entityId] : undefined, "ec"),
@@ -220,6 +280,16 @@ export function facilityView(
                     : "automated") as ZoneMode,
           sensors: zoneSensors(zoneProbes(zone, states, now)),
           attention: [] as AttentionReason[],
+          queued: position === null ? null : { position },
+          ...lastShot(states[`sensor.crop_steering_${prefix}zone_${zone.id}_flow_ratio`]),
+          // Worded as the attention rule words a probe, so the card says it once.
+          problem:
+            alerts.find((alert) => alert.roomId === room.id && alert.zone === zone.id)?.title ??
+            (vwcIssue
+              ? `Moisture probe ${vwcIssue}`
+              : ecIssue
+                ? `Pore EC probe ${ecIssue}`
+                : null),
         } satisfies FacilityZone,
       };
     });
@@ -237,6 +307,24 @@ export function facilityView(
       format,
     });
     for (const z of zones) z.item.attention = attention.get(z.item.zone.id) ?? [];
+    const day = numberOf(known(states[`sensor.crop_steering_${prefix}grow_day`]));
+    const left = numberOf(known(states[`sensor.crop_steering_${prefix}days_to_harvest`]));
+    const growDay =
+      day !== null && left !== null
+        ? {
+            day,
+            of: day + left,
+            daysLeft: left,
+            stage: known(states[`sensor.crop_steering_${prefix}stage`]) ?? stage?.name ?? "",
+          }
+        : stage?.day != null && stage.days != null
+          ? {
+              day: stage.day,
+              of: stage.days,
+              daysLeft: Math.max(0, stage.days - stage.day),
+              stage: stage.name ?? "",
+            }
+          : null;
     return {
       room,
       view,
@@ -249,6 +337,8 @@ export function facilityView(
       stock: stockTanks(states, prefix).map((tank) => ({ ...tank, state: stockState(tank) })),
       waterL,
       litresPerPlant: plantCount > 0 ? plantL / plantCount : null,
+      growDay,
+      feedCalibrationDue: states[`binary_sensor.crop_steering_${prefix}calibration_due`]?.state === "on",
     };
   });
 }

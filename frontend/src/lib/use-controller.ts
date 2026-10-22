@@ -6,6 +6,7 @@ import type { TimelineRequest } from "./day-timeline";
 import { explorerSensors } from "./history-explorer";
 import type { OperatorAction } from "./operator-types";
 import { OperatorDemo } from "./operator-demo";
+import { demoParityStatus } from "./parity-demo/status";
 import { JournalMissing, mergeEvents, startEventFeed } from "./events";
 import { isParityAction, pagedQuery } from "./parity-api";
 import type { CsEvent } from "./parity-types";
@@ -148,6 +149,8 @@ export class ControllerStore {
     const search = query === null ? null : new URLSearchParams(query);
     // ?display=show_climate,today_tank_readout (or all): those display options on in the demo.
     if (demo) this.states = demoDisplay(this.states, search?.get("display") ?? null);
+    // The 3.18 room entities (grow day, pump queue, open alerts...); an older integration has none.
+    if (demo && demoBackend(query ?? "") === "3.18") this.states = demoParityStatus(this.states, Date.now());
     if (demo)
       this.operatorDemo = new OperatorDemo(
         () => this.states,
