@@ -27,6 +27,7 @@ import {
   descriptor,
   discoverRooms,
   emptyRoom,
+  numeric,
   resolveRequestedRoom,
   validateChange,
 } from "./model";
@@ -534,6 +535,14 @@ export class ControllerStore {
             const state =
               typeof change.value === "boolean" ? (change.value ? "on" : "off") : String(change.value);
             const stamp = new Date().toISOString();
+            if (typeof change.value === "number" && change.entityId.startsWith("number."))
+              this.operatorDemo?.journalTarget(
+                roomId,
+                this.snapshot.room.room.prefix,
+                change.entityId,
+                numeric(next[change.entityId]) ?? null,
+                change.value,
+              );
             next[change.entityId] = {
               ...next[change.entityId],
               state,

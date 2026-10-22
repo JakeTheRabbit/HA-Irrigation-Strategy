@@ -1461,10 +1461,8 @@ try {
           await lp.locator('input[id^="setting-"]:visible, select[id^="choice-"]:visible').count(),
           0,
         );
-        assert.equal(
-          await lp.getByRole("button", { name: "Review changes", exact: true }).isDisabled(),
-          true,
-        );
+        // The armed plan owns the targets: there is nothing to review and apply.
+        assert.equal(await lp.locator(".review-apply").count(), 0);
         assert.deepEqual(
           mutations(),
           writesBeforeToday,

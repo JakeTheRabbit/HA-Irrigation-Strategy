@@ -344,12 +344,10 @@ try {
     failWrite = "number.crop_steering_room_b_zone_1_p2_vwc_threshold";
     await field("p1_target_vwc").fill("65");
     await field("p2_vwc_threshold").fill("55");
-    await page.getByRole("button", { name: /^Review 2 changes/ }).click();
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Apply 2 changes", exact: true })
-      .click();
-    await visible(page.getByText("Some changes were not applied.", { exact: true }));
+    const bar = page.getByRole("region", { name: "Review and apply" });
+    await bar.getByRole("button", { name: "Apply 2 changes", exact: true }).click();
+    // The refused row is named with what the controller still holds; the other was read back.
+    await visible(bar.getByText(/^Controller still holds .+: written and read back\.$/));
     assert.equal(states["number.crop_steering_room_b_zone_1_p1_target_vwc"].state, "65");
     assert.equal(states["number.crop_steering_zone_1_p1_target_vwc"].state, "64");
     assert.equal(calls.length, 2);
@@ -362,26 +360,19 @@ try {
       fullPage: true,
     });
     failWrite = "";
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Apply 1 change", exact: true })
-      .click();
-    await page.getByRole("dialog").waitFor({ state: "hidden" });
+    await bar.getByRole("button", { name: "Apply 1 change", exact: true }).click();
+    await visible(bar.getByText(/^Written and read back \d\d:\d\d$/));
     assert.equal(calls.length, 3);
     assert.equal(calls[2].entity_id, "number.crop_steering_room_b_zone_1_p2_vwc_threshold");
   });
   await check("service acknowledgement without readback is a visible failure", async () => {
     ignoreWrite = "number.crop_steering_room_b_zone_1_p1_target_vwc";
     await field("p1_target_vwc").fill("66");
-    await page.getByRole("button", { name: /^Review 1 change/ }).click();
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Apply 1 change", exact: true })
-      .click();
-    await visible(page.getByText("Some changes were not applied.", { exact: true }));
+    const bar = page.getByRole("region", { name: "Review and apply" });
+    await bar.getByRole("button", { name: "Apply 1 change", exact: true }).click();
+    await visible(bar.getByText(/^Controller still holds .+\. Nothing else was changed\.$/));
     assert.equal(states[ignoreWrite].state, "65");
-    await page.getByRole("button", { name: "Back to editing" }).click();
-    await page.getByRole("button", { name: "Discard draft" }).click();
+    await bar.getByRole("button", { name: "Discard edits" }).click();
     ignoreWrite = "";
   });
   await check("missing live sensor stays unavailable and timestamps remain honest", async () => {

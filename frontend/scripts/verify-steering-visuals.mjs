@@ -122,7 +122,7 @@ try {
         curve,
         "Emergency floor must not pretend to reshape daytime moisture",
       );
-      await page.getByRole("button", { name: "Discard draft", exact: true }).waitFor();
+      await page.getByRole("button", { name: "Discard edits", exact: true }).waitFor();
       await noOverflow();
       await axe("manual preview");
       await page.evaluate(() => {
@@ -141,7 +141,7 @@ try {
       );
       await zoneTab(1).click();
       assert.equal(await floor.inputValue(), String(Number(original) + 5));
-      await page.getByRole("button", { name: "Discard draft", exact: true }).click();
+      await page.getByRole("button", { name: "Discard edits", exact: true }).click();
       assert.equal(await floor.inputValue(), original);
       assert.equal(await line("p3-floor").getAttribute("y1"), savedY);
     },
@@ -287,8 +287,8 @@ try {
       assert.notEqual(await rewater.inputValue(), before);
       assert.equal(await target.getAttribute("data-planning-draft"), "");
       assert.equal(await graph.locator(".hmi-check").count(), 0);
-      await shot.getByRole("button", { name: "Review changes", exact: true }).waitFor();
-      await shot.getByRole("button", { name: "Discard draft", exact: true }).click();
+      await shot.getByRole("button", { name: "Apply 1 change", exact: true }).waitFor();
+      await shot.getByRole("button", { name: "Discard edits", exact: true }).click();
       assert.equal(await rewater.inputValue(), before);
       for (const theme of ["light", "dark"]) {
         await shot.evaluate((value) => localStorage.setItem("irrigation-theme", value), theme);
@@ -366,11 +366,8 @@ try {
     assert.equal(await line("baseline-vwc").getAttribute("data-planning-values"), before);
     await target.fill("999");
     assert.equal(await target.getAttribute("aria-invalid"), "true");
-    assert.equal(
-      await page.getByRole("button", { name: "Review changes", exact: true }).isDisabled(),
-      true,
-    );
-    await page.getByRole("button", { name: "Discard draft", exact: true }).click();
+    await page.getByText("Fix the red check to apply", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Discard edits", exact: true }).click();
   });
   await check(
     "Field capacity suggestion names its source, fills only the local draft and is never applied by itself",

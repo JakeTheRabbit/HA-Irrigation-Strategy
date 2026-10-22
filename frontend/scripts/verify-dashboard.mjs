@@ -928,11 +928,8 @@ try {
       assert.deepEqual(chips, ["AI assistant · 59–62 %", "AI assistant · 3–5 %"]);
       // With the AI assistant's Setpoints judge on the room, the Auto switch says what it lets the AI assistant do.
       await expectVisible(page.getByText("AI assistant: P2 shot size, re-water point"));
-      // Edit, Review, Apply & verify: the stepper is on its first step while editing.
-      assert.match(
-        await page.locator('.workflow-steps [aria-current="step"]').innerText(),
-        /Edit draft$/,
-      );
+      // Nothing is written until it is reviewed and applied in the bar.
+      await expectVisible(page.getByText("Nothing is sent to the controller until you apply"));
       // The steering select says what the mode does, with the zone's own overnight dryback.
       assert.match(
         await page.locator(".targets-consequence").innerText(),
@@ -964,7 +961,11 @@ try {
         Number(other.split(" ")[0]),
       );
       await steering.selectOption("Vegetative");
-      assert.equal(await page.locator(".draft-bar").count(), 0, "switching back leaves no draft");
+      assert.equal(
+        await page.locator(".review-apply[data-pending]").count(),
+        0,
+        "switching back leaves no draft",
+      );
       // The hardware is in Setup.
       assert.equal(
         await page
@@ -983,13 +984,7 @@ try {
     const original = Number(await field.inputValue());
     await field.fill("999");
     await expectVisible(page.locator('[id="note-number.crop_steering_zone_1_p1_target_vwc"]'));
-    assert.equal(
-      await page
-        .getByRole("button", { name: /^Review/ })
-        .first()
-        .isDisabled(),
-      true,
-    );
+    await expectVisible(page.getByText("Fix the red check to apply"));
     await field.fill(String(original + 1));
     await page.getByRole("button", { name: "Refresh controller data" }).click();
     assert.equal(await field.inputValue(), String(original + 1));
@@ -1001,15 +996,12 @@ try {
         .innerText(),
       /1$/,
     );
-    await page.getByRole("button", { name: /^Review 1 change/ }).click();
-    await expectVisible(page.getByRole("dialog").getByText(/Room A only/));
+    const bar = page.getByRole("region", { name: "Review and apply" });
+    await expectVisible(bar.getByText("1 change · Review & apply"));
     await axe("targets review");
     await page.screenshot({ path: path.join(out, "dashboard-review.png") });
-    await page
-      .getByRole("dialog")
-      .getByRole("button", { name: "Apply 1 change", exact: true })
-      .click();
-    await expectVisible(page.getByText("Changes applied and verified by controller readback."));
+    await bar.getByRole("button", { name: "Apply 1 change", exact: true }).click();
+    await expectVisible(bar.getByText(/^Written and read back \d\d:\d\d$/));
     assert.equal(await field.inputValue(), String(original + 1));
     await field.fill(String(original + 2));
     await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').click();

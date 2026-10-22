@@ -28,6 +28,8 @@ import { DISPLAY_DEFAULTS, displayEntityId, readDisplay, type DisplayOptions } f
 import type { DemoBackend } from "./demo";
 import { isParityAction } from "./parity-api";
 import { demoEnvelope, parityDemo } from "./parity-demo";
+import { demoTargetWrite, journalDemoTargetWrite, settleDemoTargetWrite } from "./parity-demo/targets";
+import { sameValue } from "./utils";
 
 const clone = <T>(value: T): T => structuredClone(value);
 export class OperatorDemo {
@@ -432,7 +434,32 @@ export class OperatorDemo {
     });
     return response(revision, options);
   }
+  /** A 3.18 integration journals each base setpoint write as a manual `target.changed`. */
+  journalTarget(roomId: string, prefix: string, entityId: string, old: number | null, value: number) {
+    if (this.backend === "3.18") journalDemoTargetWrite(roomId, prefix, entityId, old, value, Date.now());
+  }
+  /** `history_revert` of one of the demo's own setpoint writes: the old value back, read back, and
+   * journalled as a manual "put back"; refused once the entity no longer holds the written value. */
+  private revertTarget(eventId: string, roomId: unknown) {
+    const write = demoTargetWrite(eventId)!;
+    const states = this.getStates();
+    const now = Date.now();
+    if (!write.revertible) return { api: 2, ok: false, error: { code: "invalid", message: "This change can't be put back" } };
+    if (typeof write.old !== "number" || !sameValue(states[write.entity_id]?.state, Number(write.new)))
+      return {
+        api: 2,
+        ok: false,
+        error: { code: "stale_revision", message: "This value has changed since. Reload and check it before trying again." },
+      };
+    this.updateStates({ ...states, [write.entity_id]: { ...states[write.entity_id], state: String(write.old), last_changed: new Date(now).toISOString() } });
+    settleDemoTargetWrite(eventId);
+    const prefix = String(write.room_id).replace(/^room:/, "");
+    const newId = journalDemoTargetWrite(write.room_id, prefix, write.entity_id, Number(write.new), write.old, now, "put back");
+    return demoEnvelope({ reverted_event_id: eventId, new_event_id: newId, readback: "verified" }, now, roomId);
+  }
   async call<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
+    if (action === "history_revert" && this.backend === "3.18" && demoTargetWrite(String(data.event_id)))
+      return this.revertTarget(String(data.event_id), data.room_id) as T;
     if (isParityAction(action)) return (await parityDemo(action, data, Date.now(), this.backend)) as T;
     // An existing service asked for v2: a 3.18 integration wraps its v1 answer in the envelope; a
     // 3.17 one answers v1, which callV2 reads as missing.

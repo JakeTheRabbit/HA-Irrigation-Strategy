@@ -1,11 +1,25 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowRight, Check, Download, Upload } from "lucide-react";
+import { ArrowRight, ChevronDown, ChevronUp, Download, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Empty, ReviewDialog, number, type Page, type ReviewItem } from "@/components/dashboard";
+import { Empty, number, type Page } from "@/components/dashboard";
 import { WorkspaceHeading } from "@/components/irrigation-workspace";
 import { CanonicalControls } from "@/components/canonical-controls";
+import { ReviewApply, receiptFromWrite, type ApplyReceipt } from "@/components/review-apply";
 import type { ReactNode } from "react";
-import type { Choice, Controller, Setting } from "@/lib/types";
+import type { Change, Choice, Controller, Setting } from "@/lib/types";
+import { formatVolume } from "@/lib/display-units";
+import { clock } from "@/lib/time";
+import {
+  afternoon,
+  appliedEventIds,
+  estimatedIntents,
+  growDayWindow,
+  readProjection,
+  targetRows,
+  undoApply,
+  windowTitle,
+  type LastApply,
+} from "@/lib/strategy-review";
 import { PlanningCurve } from "@/components/planning-curve";
 import { buildSetpointPreview, validateSetpoint } from "@/lib/setpoint-preview";
 import { smoothRecorded } from "@/lib/planning-curve";
@@ -43,6 +57,14 @@ function download(text: string, name: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
+/** The levels drawn on the day, in the order the chart stacks them. */
+const HANDLE_KEYS = [
+  "p1_target_vwc",
+  "p2_vwc_threshold",
+  "dryback_target",
+  "p3_emergency_vwc_threshold",
+];
+
 export type Drafts = Record<
   string,
   {
@@ -64,6 +86,7 @@ export function Strategy({
   embedded = false,
   active = true,
   renderCurve,
+  renderReview,
   onCanonicalDirtyChange,
 }: {
   controller: Controller;
@@ -73,6 +96,8 @@ export function Strategy({
   embedded?: boolean;
   active?: boolean;
   renderCurve?: (curve: ReactNode) => ReactNode;
+  /** Where the Review & apply bar goes: under the canvas and the table together, in Irrigation. */
+  renderReview?: (bar: ReactNode) => ReactNode;
   onCanonicalDirtyChange?: (dirty: boolean) => void;
   navigate: (page: Page) => void;
 }) {
@@ -80,8 +105,8 @@ export function Strategy({
   const [zoneId, setZoneId] = useState<string>(
     selectedZone === undefined ? String(room.zones[0]?.id ?? "room") : String(selectedZone),
   );
-  const [review, setReview] = useState(false);
-  const [saved, setSaved] = useState(false);
+  // The last apply, for its Undo.
+  const [last, setLast] = useState<LastApply | null>(null);
   const [expanded, setExpanded] = useState(false);
   const [roomPreviewZone, setRoomPreviewZone] = useState(room.zones[0]?.id);
   // What the last targets file loaded into the draft, or why it could not be read.
@@ -144,7 +169,6 @@ export function Strategy({
   const planSteers = zone
     ? planSteering(states[`sensor.crop_steering_${prefix}strategy_plan`]?.attributes, zone.id)
     : null;
-  const step = review ? 1 : saved && !Object.keys(drafts).length ? 2 : 0;
   const restFields = own.filter(
     (field) =>
       !tableIds.has(field.entityId) &&
@@ -180,35 +204,67 @@ export function Strategy({
           : "A draft setting is no longer available. Discard it before continuing.";
     })
     .filter(Boolean);
-  const items: ReviewItem[] = Object.entries(drafts).flatMap<ReviewItem>(([id, draft]) => {
-    const setting = allSettings.find((s) => s.entityId === id);
-    const choice = room.choices.find((c) => c.entityId === id);
-    if (choice && choice.options.includes(draft.value))
-      return [
-        {
-          change: { entityId: id, value: draft.value },
-          label: `${draft.zone} · ${draft.label}`,
-          before: choice.value || "Unavailable",
-          after: draft.value,
-        },
-      ];
-    return !setting || validateSetpoint(setting, draft.value)
-      ? []
-      : [
-          {
-            change: { entityId: id, value: Number(draft.value) },
-            label: `${draft.zone} · ${draft.label}`,
-            before: `${number(setting.value)} ${setting.unit}`,
-            after: `${number(Number(draft.value))} ${setting.unit}`,
-          },
-        ];
+  // The edits as Review & apply rows (a draft back at the held value is none), and what Apply writes.
+  const discard = (id: string) =>
+    setDrafts((current) =>
+      Object.fromEntries(Object.entries(current).filter(([key]) => key !== id)),
+    );
+  const rows = targetRows(drafts, states, previewZoneId ?? 0, discard);
+  const batch: Change[] = rows.map(({ id }) => ({
+    entityId: id,
+    value: id.startsWith("number.") ? Number(drafts[id].value) : drafts[id].value,
+  }));
+  const held = (entityId: string): Change => ({
+    entityId,
+    value: entityId.startsWith("number.")
+      ? Number(states[entityId]?.state)
+      : (states[entityId]?.state ?? ""),
   });
+  async function apply(): Promise<ApplyReceipt> {
+    const started = Date.now();
+    const before = batch.map((change) => held(change.entityId));
+    const result = await controller.write(batch);
+    const receipt = receiptFromWrite(
+      result,
+      rows,
+      (id) => id,
+      (id) => rows.find((row) => row.id === id)?.before ?? "",
+      Date.now(),
+    );
+    if (!result.applied.length) return receipt;
+    setDrafts((current) =>
+      Object.fromEntries(Object.entries(current).filter(([id]) => !result.applied.includes(id))),
+    );
+    const after = batch.filter((change) => result.applied.includes(change.entityId));
+    // The Journal's record of these writes, for Undo on 3.18; Home Assistant's clock may run a
+    // little behind this browser's.
+    const found = await appliedEventIds(
+      controller,
+      controller.roomId,
+      prefix,
+      after,
+      started - 60_000,
+    );
+    receipt.eventIds = found.ids;
+    setLast({
+      at: receipt.at,
+      backend: found.backend,
+      eventIds: found.ids,
+      before: before.filter((change) => result.applied.includes(change.entityId)),
+      after,
+    });
+    return receipt;
+  }
+  async function undo(receipt: ApplyReceipt) {
+    if (!last || last.at !== receipt.at) throw new Error("Nothing to undo. Nothing was undone.");
+    await undoApply(last, { controller, states: controller.states, write: controller.write });
+    setLast(null);
+  }
   const zoneLabel = (id: number | undefined) =>
     id === undefined
       ? "Room settings"
       : (room.zones.find((item) => item.id === id)?.name ?? `Zone ${id}`);
   function edit(setting: Setting, value: string) {
-    setSaved(false);
     setDrafts((current) => {
       const next = { ...current };
       if (value.trim() && Number(value) === (current[setting.entityId]?.original ?? setting.value))
@@ -224,7 +280,6 @@ export function Strategy({
     });
   }
   function choose(choice: Choice, value: string) {
-    setSaved(false);
     setDrafts((current) => {
       const next = { ...current };
       if (value === (current[choice.entityId]?.original ?? choice.value))
@@ -252,7 +307,6 @@ export function Strategy({
     try {
       const targets = readTargets(await file.text());
       const result = loadTargets(targets, room);
-      setSaved(false);
       setDrafts(result.drafts);
       setLoaded({ from: `${targets.room || "another room"}’s targets`, result });
     } catch (e) {
@@ -286,6 +340,178 @@ export function Strategy({
     const words = param ? settingWords(param) : undefined;
     return row(setting, words?.label ?? setting.label, setting.unit);
   };
+  // The day's four levels, each nudged by its arrows (or arrow keys) a step at a time; an edit
+  // shows what the controller still holds.
+  const level = (setting: Setting, value: number | null) =>
+    value === null || !Number.isFinite(value)
+      ? "—"
+      : setting.unit === "%"
+        ? `${number(value)}%`
+        : `${number(value)} ${setting.unit}`;
+  const handles = (
+    <div className="target-handles" role="group" aria-label="Targets on the chart">
+      {HANDLE_KEYS.map((key) => {
+        const setting = preview.fields[key];
+        if (!setting) return null;
+        const name = settingWords(key)?.short ?? setting.label;
+        const draft = drafts[setting.entityId];
+        const value = draft ? Number(draft.value) : setting.value;
+        const error = draft ? validateSetpoint(setting, draft.value) : "";
+        const nudge = (direction: 1 | -1) => {
+          const from =
+            value !== null && Number.isFinite(value) ? value : (setting.value ?? setting.min);
+          const next = Math.min(
+            setting.max,
+            Math.max(setting.min, from + direction * setting.step),
+          );
+          edit(setting, String(Number(next.toFixed(6))));
+        };
+        return (
+          <div
+            className="target-handle"
+            key={key}
+            data-target-handle={key}
+            data-changed={draft ? "" : undefined}
+            data-invalid={error ? "" : undefined}
+          >
+            <div
+              className="target-handle-value"
+              role="slider"
+              tabIndex={canEdit ? 0 : -1}
+              aria-label={name}
+              aria-disabled={!canEdit || undefined}
+              aria-valuemin={setting.min}
+              aria-valuemax={setting.max}
+              aria-valuenow={value ?? undefined}
+              aria-valuetext={level(setting, value)}
+              aria-orientation="vertical"
+              onKeyDown={(event) => {
+                if (
+                  !canEdit ||
+                  !["ArrowUp", "ArrowDown", "ArrowRight", "ArrowLeft"].includes(event.key)
+                )
+                  return;
+                event.preventDefault();
+                nudge(event.key === "ArrowUp" || event.key === "ArrowRight" ? 1 : -1);
+              }}
+            >
+              <small>{name}</small>
+              <b>{level(setting, value)}</b>
+            </div>
+            <span className="target-handle-arrows">
+              <button
+                type="button"
+                disabled={!canEdit}
+                tabIndex={-1}
+                aria-label={`Raise ${name.toLowerCase()} by ${number(setting.step)}`}
+                onClick={() => nudge(1)}
+              >
+                <ChevronUp size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                disabled={!canEdit}
+                tabIndex={-1}
+                aria-label={`Lower ${name.toLowerCase()} by ${number(setting.step)}`}
+                onClick={() => nudge(-1)}
+              >
+                <ChevronDown size={14} aria-hidden="true" />
+              </button>
+            </span>
+            {draft && (
+              <span className="target-handle-was">
+                was {level(setting, setting.value)} · not applied
+              </span>
+            )}
+            {error && <span className="target-handle-error">{error}</span>}
+          </div>
+        );
+      })}
+    </div>
+  );
+  // What the rest of the lights-on period waters with the saved targets and with these edits. The
+  // saved plan is the controller's (projection_app) where it publishes one, else estimated from the
+  // saved targets as the chart projects them.
+  const span = growDayWindow(
+    Date.now(),
+    preview.saved.lightsOn,
+    preview.saved.lightsOff,
+    controller.timeZone,
+  );
+  const projected =
+    previewZoneId === undefined ? null : readProjection(states, prefix, previewZoneId);
+  const projection = { retention: sensorZone?.auto?.gain };
+  const water =
+    span && previewZoneId !== undefined
+      ? afternoon(
+          projected ?? estimatedIntents(preview.saved, previewZoneId, span.lightsOnAt, projection),
+          preview.draft,
+          span.from,
+          span.to,
+          { ...projection, lightsOnAt: span.lightsOnAt },
+        )
+      : null;
+  const edited = rows.length > 0 && JSON.stringify(preview.draft) !== JSON.stringify(preview.saved);
+  const shotsLine = (plan: { shots: number; lPerPlant: number }) =>
+    `${plan.shots} ${plan.shots === 1 ? "shot" : "shots"}${
+      Number.isFinite(plan.lPerPlant) ? ` · ${formatVolume(plan.lPerPlant, 2)} per plant` : ""
+    }`;
+  const pips = (n: number, dashed = false) => (
+    <span className="water-pips" aria-hidden="true">
+      {Array.from({ length: Math.min(n, 12) }, (_, i) => (
+        <i key={i} data-dashed={dashed ? "" : undefined} />
+      ))}
+    </span>
+  );
+  const day =
+    span && water ? (
+      <section className="targets-afternoon" aria-labelledby="targets-afternoon-title">
+        <h3 id="targets-afternoon-title">
+          {windowTitle(span, controller.timeZone)}, {clock(span.from, controller.timeZone)}–
+          {clock(span.to, controller.timeZone)}
+        </h3>
+        <dl>
+          <div data-afternoon="saved">
+            <dt>{projected ? "Saved" : "Saved (estimated)"}</dt>
+            <dd>
+              {pips(water.saved.shots)}
+              {shotsLine(water.saved)}
+            </dd>
+          </div>
+          {edited && (
+            <div data-afternoon="edited">
+              <dt>With edits</dt>
+              <dd>
+                {pips(water.edited.shots, true)}
+                <b>{shotsLine(water.edited)}</b>
+              </dd>
+            </div>
+          )}
+        </dl>
+      </section>
+    ) : null;
+  const review = planEngaged ? null : (
+    <div className="targets-review" data-pending={rows.length || undefined}>
+      <ReviewApply
+        layout="bar"
+        rows={canEdit ? rows : []}
+        discardLabel="Discard edits"
+        summary={
+          rows.length && canEdit
+            ? undefined
+            : "Targets match the controller. Change a handle or the steering to start a new edit."
+        }
+        checks={errors.length ? errors.map((text) => ({ ok: false, text })) : undefined}
+        apply={apply}
+        onDiscard={() => {
+          setDrafts({});
+          setLoaded(null);
+        }}
+        undo={undo}
+        timeZone={controller.timeZone}
+      />
+    </div>
+  );
   const curve = (
     <aside
       className={`setpoint-preview ${expanded ? "is-expanded" : ""}`}
@@ -360,6 +586,8 @@ export function Strategy({
             : undefined
         }
       />
+      {!preview.readOnly && handles}
+      {!preview.readOnly && day}
       {preview.notes.map((item) => (
         <p className="setpoint-preview-note" key={item}>
           {item}
@@ -407,13 +635,9 @@ export function Strategy({
               <Upload size={16} /> Import
             </Button>
             <UiTip copyKey="import targets" />
-            <Button
-              disabled={!items.length || Boolean(errors.length) || !canEdit}
-              onClick={() => setReview(true)}
-            >
-              Review {Object.keys(drafts).length || ""}{" "}
-              {Object.keys(drafts).length === 1 ? "change" : "changes"} <ArrowRight size={16} />
-            </Button>
+            {!planEngaged && (
+              <p className="targets-not-sent">Nothing is sent to the controller until you apply</p>
+            )}
           </div>
         }
       />
@@ -464,16 +688,6 @@ export function Strategy({
           )}
         </div>
       )}
-      {!planEngaged && (
-        <ol className="workflow-steps" aria-label="Steps to change targets">
-          {["Edit draft", "Review changes", "Apply & verify"].map((label, index) => (
-            <li key={label} aria-current={step === index ? "step" : undefined}>
-              <i>{index + 1}</i>
-              {label}
-            </li>
-          ))}
-        </ol>
-      )}
       {!embedded && (
         <nav className="zone-switcher targets-zones" aria-label="Targets for">
           {room.zones.map((item) => {
@@ -498,12 +712,6 @@ export function Strategy({
             Room
           </button>
         </nav>
-      )}
-      {saved && (
-        <div className="success-banner" role="status">
-          <Check size={18} />
-          Changes applied and verified by controller readback.
-        </div>
       )}
       <div className="setpoint-editor-grid targets-grid">
         <section className="panel targets-panel" aria-labelledby="targets-title">
@@ -665,53 +873,11 @@ export function Strategy({
         </section>
         {renderCurve ? renderCurve(curve) : curve}
       </div>
+      {renderReview ? renderReview(review) : review}
       <CanonicalControls
         controller={controller}
         owner="irrigation"
         onDirtyChange={onCanonicalDirtyChange}
-      />
-      {Object.keys(drafts).length > 0 && (
-        <div className="draft-bar" role="status">
-          <div>
-            <strong>
-              {Object.keys(drafts).length} unsaved{" "}
-              {Object.keys(drafts).length === 1 ? "change" : "changes"}
-            </strong>
-            <span>
-              {errors.length
-                ? "Fix invalid values before review."
-                : "Drafts are local to this tab until applied."}
-            </span>
-          </div>
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setDrafts({});
-              setSaved(false);
-              setLoaded(null);
-            }}
-          >
-            Discard draft
-          </Button>
-          <Button
-            disabled={Boolean(errors.length) || !items.length || !canEdit}
-            onClick={() => setReview(true)}
-          >
-            Review changes <ArrowRight size={16} />
-          </Button>
-        </div>
-      )}
-      <ReviewDialog
-        open={review}
-        onOpenChange={setReview}
-        controller={controller}
-        items={items}
-        onApplied={(applied) => {
-          setDrafts((current) =>
-            Object.fromEntries(Object.entries(current).filter(([id]) => !applied.includes(id))),
-          );
-          if (applied.length) setSaved(true);
-        }}
       />
     </>
   );

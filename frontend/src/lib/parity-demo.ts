@@ -1,6 +1,7 @@
 import { demoBackend, type DemoBackend } from "./demo";
 import { PARITY_ACTIONS, type ParityAction } from "./parity-api";
 import { DEMO_TIMER_PROGRAM_ID, demoId, demoJournal } from "./parity-demo/journal";
+import { demoTargetChanges } from "./parity-demo/targets";
 import type {
   AlertPreview,
   AlertRuleListItem,
@@ -137,12 +138,15 @@ function summary(data: Record<string, unknown>, now: number): TimelineSummary {
 function changes(data: Record<string, unknown>, now: number): { changes: HistoryChange[] } {
   const rooms = typeof data.room_id === "string" ? [data.room_id] : DEMO_ROOMS;
   const kinds = { "target.changed": "setpoint", "config.changed": "setup", "calibration.committed": "calibration" } as const;
+  // The panel's own writes this session (parity-demo/targets.ts), then the Journal's day.
+  const written = demoTargetChanges(rooms).filter((c) => data.zone == null || c.scope === `zone:${Number(data.zone)}`);
   return {
-    changes: dayEvents(rooms, now)
+    changes: [
+      ...written,
+      ...dayEvents(rooms, now)
       .filter((e): e is CsEvent & { kind: keyof typeof kinds } => e.kind in kinds)
       .filter((e) => data.zone == null || e.zone === Number(data.zone))
-      .sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts))
-      .map((e) => ({
+      .map((e): HistoryChange => ({
         id: e.id, room_id: e.room_id, ts: e.ts, actor: e.source.actor, kind: kinds[e.kind],
         ...(e.kind === "target.changed" ? { key: String(e.data.key) } : { section: String(e.data.section ?? e.data.probe) }),
         scope: (e.data.scope as string) ?? null, old: e.data.old ?? null, new: e.data.new ?? null,
@@ -152,6 +156,7 @@ function changes(data: Record<string, unknown>, now: number): { changes: History
         revertible: e.kind !== "calibration.committed",
         user_id: e.source.user_id ?? null, user_name: e.source.actor === "manual" ? "Ben" : null,
       })),
+    ].sort((a, b) => Date.parse(b.ts) - Date.parse(a.ts)),
   };
 }
 

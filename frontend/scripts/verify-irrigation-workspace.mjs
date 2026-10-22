@@ -1,8 +1,20 @@
-/** Isolated demo proof for the consolidated Irrigation editor. No HA requests allowed. */
+/** Isolated demo proof for the consolidated Irrigation editor, against frontend/dist (run after
+ * `vite build`), or IRRIGATION_URL when given. No HA requests allowed. */
 import assert from "node:assert/strict";
-import { mkdir, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
-const origin = process.env.IRRIGATION_URL || "http://127.0.0.1:5178";
+let server;
+let origin = process.env.IRRIGATION_URL;
+if (!origin) {
+  const html = await readFile(new URL("../dist/index.html", import.meta.url));
+  server = createServer((req, res) => {
+    res.writeHead(200, { "Content-Type": "text/html" });
+    res.end(html);
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  origin = `http://127.0.0.1:${server.address().port}`;
+}
 const out = new URL("../../output/ui-implementation-2026-10-18/", import.meta.url);
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({
@@ -51,6 +63,15 @@ try {
   await input.fill("69");
   await input.blur();
   assert.notEqual(await value(), before);
+  // The edit waits in one Review & apply bar under the canvas and the table; nothing is sent.
+  const bar = page.getByRole("region", { name: "Review and apply" });
+  assert.equal(await bar.count(), 1);
+  assert.equal(await bar.locator(".review-apply-head > b").innerText(), "1 change · Review & apply");
+  assert.equal(
+    await page.getByText("Nothing is sent to the controller until you apply", { exact: true }).isVisible(),
+    true,
+  );
+  checks.push("A current-day edit waits in the Review & apply bar");
   await page.getByRole("button", { name: "Calendar", exact: true }).click();
   await page.locator("#steering-balance").waitFor({ state: "visible" });
   await oneCanvas();
@@ -102,4 +123,5 @@ try {
   console.log(JSON.stringify({ checks, errors, requests }, null, 2));
 } finally {
   await browser.close();
+  server?.close();
 }
