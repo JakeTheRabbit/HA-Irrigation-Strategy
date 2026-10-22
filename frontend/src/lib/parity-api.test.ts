@@ -1,0 +1,147 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, test, vi } from "vitest";
+import { NeedsIntegration } from "@/components/needs-integration";
+import { callV2, isMissingService, pagedQuery, PARITY_ACTIONS, PARITY_MIN_VERSION } from "./parity-api";
+import { parityDemo } from "./parity-demo";
+import { demoController, fakeController } from "./test-helpers";
+import type { CsEvent } from "./parity-types";
+
+const ev = (n: number): CsEvent => ({
+  v: 1, id: String(n).padStart(26, "0"), seq: n, ts: "2026-10-22T07:00:00+13:00", room_id: "room:f2_",
+  zone: 1, kind: "shot.completed", outcome: "ok", code: null, source: { actor: "engine" }, data: {},
+});
+
+test("callV2 maps service_not_found to missing", async () => {
+  const c = fakeController({ operator: () => Promise.reject(Object.assign(new Error("Service crop_steering.timeline_get not found."), { code: "not_found" })) });
+  expect(await callV2(c, "timeline_get", {})).toEqual({ kind: "missing" });
+});
+test("callV2 maps a v1-shaped answer to missing", async () => {
+  const c = fakeController({ operator: () => Promise.resolve({ revision: 3, zones: [] }) });
+  expect((await callV2(c, "setup_read", {})).kind).toBe("missing");
+});
+test("callV2 unwraps the v2 envelope", async () => {
+  const c = fakeController({ operator: () => Promise.resolve({ api: 2, ok: true, revision: 42, readback: { status: "verified", at: "2026-10-22T14:02:00+13:00" }, event_ids: ["e1"], data: { x: 1 } }) });
+  expect(await callV2(c, "supply_get", {})).toEqual({ kind: "ok", data: { x: 1 }, revision: 42, readback: { status: "verified", at: "2026-10-22T14:02:00+13:00" }, eventIds: ["e1"] });
+});
+test("callV2 keeps stale_revision and current revision", async () => {
+  const c = fakeController({ operator: () => Promise.resolve({ api: 2, ok: false, error: { code: "stale_revision", message: "m", current_revision: 43 } }) });
+  expect(await callV2(c, "supply_save", {})).toMatchObject({ kind: "error", code: "stale_revision", currentRevision: 43 });
+});
+test("callV2 never sends client or proposal_token", async () => {
+  const op = vi.fn().mockResolvedValue({ api: 2, ok: true, data: {} });
+  await callV2(fakeController({ operator: op }), "supply_save", { client: "mcp", proposal_token: "t", x: 1 });
+  expect(op.mock.calls[0][1]).toEqual({ x: 1, api: 2 });
+});
+test("callV2 reports an unknown thrown error as an error, not missing", async () => {
+  const c = fakeController({ operator: () => Promise.reject(new Error("Home Assistant request timed out.")) });
+  expect(await callV2(c, "supply_get", {})).toEqual({ kind: "error", code: "unknown", message: "Home Assistant request timed out." });
+});
+
+describe("isMissingService", () => {
+  test.each([
+    [{ code: "not_found", message: "x" }],
+    [{ code: "service_not_found", message: "x" }],
+    [new Error("Service crop_steering.timeline_get not found.")],
+    [new Error("Action crop_steering.timeline_get not found.")],
+    [new Error("This action needs the updated Crop Steering integration. Open Setup for installation instructions.")],
+    [new Error("extra keys not allowed @ data['api']")],
+  ])("matches %o", (error) => expect(isMissingService(error)).toBe(true));
+  test("does not match other errors", () => {
+    expect(isMissingService(new Error("Plan changed. Reload before saving."))).toBe(false);
+    expect(isMissingService(null)).toBe(false);
+  });
+});
+
+test("pagedQuery follows cursor until empty", async () => {
+  const pages = [
+    { events: Array.from({ length: 500 }, (_, i) => ev(i)), cursor: "a" },
+    { events: Array.from({ length: 500 }, (_, i) => ev(500 + i)), cursor: "b" },
+    { events: [], cursor: null },
+  ];
+  const op = vi.fn((_a: string, _d: Record<string, unknown>) => Promise.resolve({ api: 2, ok: true, data: pages.shift() }));
+  const out = await pagedQuery(fakeController({ operator: op as never }), { room_id: "room:f2_", since: "2026-10-21T00:00:00Z", kinds: ["shot.completed"] });
+  expect(out.kind).toBe("ok");
+  if (out.kind === "ok") expect(out.data.events).toHaveLength(1000);
+  expect(op).toHaveBeenCalledTimes(3);
+  for (const call of op.mock.calls) expect(call[1]).toMatchObject({ room_id: "room:f2_", limit: 500, kinds: ["shot.completed"] });
+  expect(op.mock.calls[0][1]).not.toHaveProperty("cursor");
+  expect(op.mock.calls[1][1]).toMatchObject({ cursor: "a" });
+  expect(op.mock.calls[2][1]).toMatchObject({ cursor: "b" });
+});
+test("pagedQuery stops at max", async () => {
+  const op = vi.fn().mockImplementation(() => Promise.resolve({ api: 2, ok: true, data: { events: Array.from({ length: 500 }, (_, i) => ev(i)), cursor: "more" } }));
+  const out = await pagedQuery(fakeController({ operator: op }), { room_id: "room:f2_", since: "x" }, 700);
+  expect(op).toHaveBeenCalledTimes(2);
+  if (out.kind === "ok") expect(out.data.events).toHaveLength(700);
+});
+test("pagedQuery passes missing through", async () => {
+  const op = vi.fn().mockRejectedValue({ code: "not_found", message: "Service crop_steering.journal_query not found." });
+  expect(await pagedQuery(fakeController({ operator: op }), { room_id: "room:", since: "x" })).toEqual({ kind: "missing" });
+});
+
+test("demo with backend=3.17 answers every parity action as missing", async () => {
+  for (const a of PARITY_ACTIONS) expect((await callV2(demoController("?demo=1&backend=3.17"), a, {})).kind).toBe("missing");
+});
+test("demo 3.18 answers every parity action ok", async () => {
+  for (const a of PARITY_ACTIONS) expect([a, (await callV2(demoController("?demo=1"), a, {})).kind]).toEqual([a, "ok"]);
+});
+test("demo 3.18 wraps an existing service in the envelope; 3.17 answers it v1", async () => {
+  expect((await callV2(demoController("?demo=1"), "display_get", {})).kind).toBe("ok");
+  expect((await callV2(demoController("?demo=1&backend=3.17"), "display_get", {})).kind).toBe("missing");
+});
+test("a one-room service gets the selected room unless the caller names one; all-rooms reads get none", async () => {
+  const c = demoController("?demo=1");
+  const since = new Date(Date.now() - 86_400_000).toISOString();
+  const own = await callV2<{ events: CsEvent[] }>(c, "journal_query", { since });
+  const other = await callV2<{ events: CsEvent[] }>(c, "journal_query", { since, room_id: "room:room_b_" });
+  const all = await callV2<{ changes: { room_id: string }[] }>(c, "history_changes", { since });
+  if (own.kind !== "ok" || other.kind !== "ok" || all.kind !== "ok") throw new Error("not ok");
+  expect(new Set(own.data.events.map((e) => e.room_id))).toEqual(new Set([c.roomId]));
+  expect(new Set(other.data.events.map((e) => e.room_id))).toEqual(new Set(["room:room_b_"]));
+  expect(new Set(all.data.changes.map((e) => e.room_id))).toEqual(new Set(["room:", "room:room_b_"]));
+});
+test("pump_stop and reads are never refused behind a write in flight", async () => {
+  const c = demoController("?demo=1");
+  // All four start before the prime's answer arrives.
+  const calls = [
+    callV2(c, "pump_prime", { pump: "a", seconds: 10 }),
+    callV2(c, "pump_stop", { pump: "a" }),
+    callV2(c, "supply_get", {}),
+    callV2(c, "supply_save", { expected_revision: 1 }),
+  ];
+  expect((await Promise.all(calls)).map((o) => o.kind)).toEqual(["ok", "ok", "ok", "error"]);
+});
+test("journal fixture filters by kinds and pages by cursor", async () => {
+  const now = Date.parse("2026-10-22T15:00:00+13:00");
+  const ask = (data: Record<string, unknown>) => parityDemo("journal_query", data, now, "3.18") as Promise<{ data: { events: CsEvent[]; cursor: string | null } }>;
+  const since = "2026-10-21T15:00:00+13:00";
+  const all = (await ask({ room_id: "room:", since })).data.events;
+  const kinds = new Set(all.map((e) => e.kind));
+  for (const k of ["shot.started", "shot.completed", "flow.reconciled", "phase.changed", "intent.queued", "intent.held",
+    "alert.raised", "alert.cleared", "target.changed", "config.changed", "calibration.committed", "ai.judgement",
+    "ai.outcome", "stock.refilled"]) expect(kinds).toContain(k);
+  expect(all.every((e) => Date.parse(e.ts) <= now && e.room_id === "room:")).toBe(true);
+  const shots = (await ask({ room_id: "room:", since, kinds: ["shot.completed"] })).data.events;
+  expect(shots.length).toBeGreaterThan(5);
+  expect(new Set(shots.map((e) => e.kind))).toEqual(new Set(["shot.completed"]));
+  const first = (await ask({ room_id: "room:", since, kinds: ["shot.completed"], limit: 5 })).data;
+  expect(first.events).toHaveLength(5);
+  expect(first.cursor).toBeTruthy();
+  const second = (await ask({ room_id: "room:", since, kinds: ["shot.completed"], limit: 5, cursor: first.cursor })).data;
+  expect(second.events[0].id).toBe(shots[5].id);
+  const zone2 = (await ask({ room_id: "room:", since, zones: [2], kinds: ["shot.completed"] })).data.events;
+  expect(zone2.every((e) => e.zone === 2)).toBe(true);
+  // Deterministic: the same instant gives the same ids.
+  expect((await ask({ room_id: "room:", since })).data.events.map((e) => e.id)).toEqual(all.map((e) => e.id));
+});
+
+test("NeedsIntegration says which version and keeps the page working", () => {
+  expect(PARITY_MIN_VERSION).toBe("3.18.0");
+  const html = renderToStaticMarkup(createElement(NeedsIntegration, { feature: "Timer programs" }));
+  expect(html).toContain("Needs integration 3.18");
+  expect(html).toContain("Timer programs needs Crop Steering 3.18 or newer. Update the integration and the controller app together; the rest of this page keeps working.");
+  const compact = renderToStaticMarkup(createElement(NeedsIntegration, { feature: "Timer programs", compact: true }));
+  expect(compact).toContain("Needs integration 3.18");
+  expect(compact).toContain('aria-label="About Needs integration 3.18"');
+});

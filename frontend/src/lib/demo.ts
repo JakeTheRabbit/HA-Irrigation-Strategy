@@ -27,6 +27,11 @@ export function isDemoLocation(location: Pick<Location, "hostname" | "search">):
     new URLSearchParams(location.search).has("demo") || location.hostname.endsWith(".github.io")
   );
 }
+export type DemoBackend = "3.17" | "3.18";
+/** `?backend=3.17`: the demo plays an integration without the parity (v2) services. */
+export function demoBackend(search: string): DemoBackend {
+  return new URLSearchParams(search).get("backend") === "3.17" ? "3.17" : "3.18";
+}
 export function createDemo(now = Date.now()): States {
   const states: States = {};
   function put(

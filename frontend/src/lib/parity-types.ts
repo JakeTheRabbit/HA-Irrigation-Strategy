@@ -1,0 +1,324 @@
+/** The v2 `crop_steering.*` service shapes, with the backend plan's field names exactly
+ * (docs/superpowers/plans/2026-10-22-parity-backend.md). Times are ISO strings with an offset;
+ * compare them as instants, never as text. Values are canonical: %, mS/cm, °C, litres, seconds. */
+
+export type JournalActor =
+  | "engine" | "timer" | "plan" | "manual" | "ai" | "learner" | "safety" | "mcp" | "aigrow"
+  | "automation" | "system";
+export type JournalOutcome = "ok" | "queued" | "held" | "refused" | "aborted" | "failed" | "partial";
+
+/** One Journal event (unified schema §4). `data` is kind-specific. */
+export interface CsEvent {
+  v: 1;
+  id: string;
+  seq?: number;
+  ts: string;
+  room_id: string;
+  zone: number | null;
+  kind: string;
+  outcome: JournalOutcome;
+  code: string | null;
+  source: {
+    actor: JournalActor;
+    detail?: string | null;
+    program_id?: string | null;
+    user_id?: string | null;
+    judge?: string | null;
+    client?: string | null;
+  };
+  correlation?: {
+    intent_id?: string | null;
+    causation_id?: string | null;
+    batch_id?: string | null;
+    run_id?: string | null;
+    ledger_id?: string | null;
+  };
+  data: Record<string, unknown>;
+  readback?: { status: string; entities?: string[]; at?: string } | null;
+}
+
+/** `journal_query` → data. */
+export interface JournalPage {
+  events: CsEvent[];
+  cursor: string | null;
+}
+
+// timeline_get / timeline_summary (backend Task 25)
+export type TimelineBlockKind = "shot" | "held" | "queued" | "planned" | "alert";
+export type TimelineBlockStatus = "done" | "planned" | "error" | "warning";
+export interface TimelineBlock {
+  id: string;
+  kind: TimelineBlockKind;
+  status: TimelineBlockStatus;
+  start: string;
+  end: string;
+  /** Commanded litres. */
+  litres: number | null;
+  /** Metered litres; null without a meter. */
+  metered_l: number | null;
+  reason: string | null;
+  phase: string | null;
+  vwc_before: number | null;
+  vwc_expected: number | null;
+  requested_at: string | null;
+  pump_wait_s: number | null;
+  source: string | null;
+  code: string | null;
+  event_id: string | null;
+  skippable: boolean;
+  /** An engine expectation, not a fixed timer slot. */
+  expected?: boolean;
+}
+export interface TimelineRoom {
+  room_id: string;
+  lights: { on: string; off: string }[];
+  rows: { zone: number; blocks: TimelineBlock[] }[];
+  pump_load: { t: string; pct: number }[];
+}
+export interface TimelineGetData {
+  rooms: TimelineRoom[];
+  /** The backend plan fixes `count` only; a marker's fields are not specified yet. */
+  errors: { count: number; markers: Record<string, unknown>[] };
+}
+export interface TimelineSummary {
+  days: {
+    date: string;
+    rooms: { room_id: string; shots: number; failed: number; warnings: number; held: number; queued: number }[];
+  }[];
+}
+
+// history_changes / history_revert (backend Task 24)
+export interface HistoryChange {
+  id: string;
+  room_id: string;
+  ts: string;
+  actor: JournalActor;
+  kind: "setpoint" | "plan" | "recipe" | "setup" | "calibration" | "alerts";
+  key?: string;
+  section?: string;
+  scope: string | null;
+  old: unknown;
+  new: unknown;
+  reason: string | null;
+  outcome: string | null;
+  limits: { writer: "learner" | "brain"; min: number; max: number; step_scope: string | null } | null;
+  revertible: boolean;
+  user_id: string | null;
+  user_name: string | null;
+}
+export interface HistoryRevertResult {
+  reverted_event_id: string;
+  new_event_id: string;
+  readback: unknown;
+}
+
+// supply_get / supply_save (backend Task 11)
+export interface IrrigationPump {
+  entity_id: string;
+  max_flow_lph?: number | null;
+  max_concurrent_zones: number;
+  flow_meter?: string | null;
+}
+export interface CapacityPair {
+  zones: number[] | { room_id: string; zone: number }[];
+  lph: number;
+  pct_of_pump: number | null;
+  verdict: "together" | "one_after_another";
+}
+export interface SupplyDoc {
+  revision: number;
+  irrigation_pumps: IrrigationPump[];
+  water_sources: Record<string, unknown>[];
+  /** `{"room:f2_": {"3": "a"}}` */
+  zone_groups: Record<string, Record<string, string>>;
+  /** `{"room:f2_": {"3": "sensor.f2_meter_3"}}` */
+  zone_meters: Record<string, Record<string, string>>;
+  capacity_check: {
+    worst_case_lph: number;
+    max_flow_lph: number | null;
+    ok: boolean;
+    suggest_max_concurrent: number | null;
+    pairs: CapacityPair[];
+  };
+}
+
+// timer_program_* / timer_skip (backend Task 14)
+export interface TimerWindow {
+  kind: "all" | "lights_on" | "lights_off" | "custom";
+  from?: string;
+  to?: string;
+}
+export interface TimerProgram {
+  id: string;
+  room_id: string;
+  name: string;
+  zones: number[];
+  type: "one_off" | "recycle" | "simple";
+  duration_s: number;
+  interval_min: number | null;
+  frequency_per_day: number | null;
+  start_at: string | null;
+  window: TimerWindow;
+  sync_time?: string | null;
+  active: boolean;
+  revision?: number;
+}
+export interface TimerProgramListItem extends TimerProgram {
+  next_at: string | null;
+  zones_in_timer_mode: number[];
+}
+export interface TimerPreview {
+  preview: { zone: number; at: string; duration_s: number }[];
+  shots: number;
+  total_s: number;
+}
+
+// alert_rule_* (backend Task 16)
+export type AlertSource =
+  | "zone.vwc" | "zone.ec" | "zone.temperature" | "feed.ph" | "feed.ec" | "tank.level" | "stock.pct"
+  | "zone.flow_ratio" | "controller.heartbeat" | "probe.silence_s" | "stock.litres";
+export interface AlertRule {
+  id: string;
+  kind: "threshold" | "builtin";
+  room_id: string;
+  zones?: number[];
+  source: AlertSource;
+  /** Required for `probe.silence_s`. */
+  entity_id?: string;
+  /** Required for `stock.litres`. */
+  tank_id?: string;
+  op: "above" | "below";
+  threshold: number;
+  unit: string;
+  window: TimerWindow;
+  min_duration_s: number;
+  severity: "info" | "warning" | "emergency";
+  routing: string;
+  active: boolean;
+}
+export interface AlertRuleListItem extends AlertRule {
+  state: "draft" | "armed" | "pending" | "firing" | "acknowledged" | "muted";
+  last_fired: string | null;
+  firing_since: string | null;
+  current_value: number | null;
+}
+export interface AlertPreview {
+  summary_sentence: string;
+  series: [string, number][];
+  fires: { start: string; fired_at: string; end: string | null }[];
+  ignored: { start: string; end: string; reason: "shorter than min_duration" | "outside window" | "muted" }[];
+  count: number;
+  min: number | null;
+  max: number | null;
+  sentence: string;
+  /** `alert_rule_test` with `send: true` only. */
+  delivery?: { service: string; ok: boolean; error: string | null }[];
+}
+
+// preset_* / copy_config (backend Task 22)
+export interface PresetTarget {
+  room_id: string;
+  zone?: number;
+}
+export interface PresetDiff {
+  diff: { target: PresetTarget; key: string; old: unknown; new: unknown }[];
+  applied?: { target: PresetTarget; key: string; readback: "verified" | "refused" }[];
+}
+
+// system_status_get (backend Task 28)
+export interface StatusEntity {
+  entity_id: string;
+  name: string;
+  kind: "probe_vwc" | "probe_ec" | "probe_temp" | "valve" | "pump" | "main_line" | "feed_probe" | "tank" | "flow_meter";
+  zone: number | null;
+  last_seen: string | null;
+  last_change: string | null;
+  ok: boolean;
+  uptime_7d_pct: number | null;
+}
+export type ControllerState = "running" | "stale" | "absent";
+export interface SystemStatus {
+  controller: ControllerState;
+  addon_version: string | null;
+  ha_version: string;
+  ai: { model: string | null; calls_today: number; daily_budget: number; pct_used: number } | null;
+  card_version: string | null;
+  rooms: {
+    room_id: string;
+    pct_online: number;
+    alerts_open: number;
+    entities: { entity_id: string; last_seen: string | null; ok: boolean }[];
+    groups: { kind: StatusEntity["kind"]; entities: StatusEntity[] }[];
+    heartbeat: {
+      last_beat: string | null;
+      age_s: number | null;
+      controller: ControllerState;
+      beats: { at: string; missed: boolean; readback_ms: number | null }[];
+      interval_s: number;
+    };
+  }[];
+}
+
+// calibration_* (backend Task 17)
+export interface CalibrationSession {
+  session_id: string;
+  raw_entity_id: string;
+  temperature_entity_id: string | null;
+  dosing_paused: boolean;
+  expires_at: string;
+}
+export interface CaptureResult {
+  reading: number | null;
+  raw: number | null;
+  stable: boolean;
+  drift: number;
+  stable_s: number;
+}
+export interface CalibrationStatus extends CaptureResult {
+  points_captured: number;
+  expires_at: string;
+}
+export interface CalibrationCommitResult {
+  slope_pct: number;
+  offset: number;
+  verdict: "pass" | "drifting" | "fail";
+  applied: boolean;
+}
+
+// pump_* (backend Tasks 19, 20)
+export type PumpBlockerCode =
+  | "no_power_entity" | "batch_running" | "mix_pump_on" | "tank_filling" | "calibrating" | "controller_offline";
+export interface PumpPrecheck {
+  ok: boolean;
+  blockers: { code: PumpBlockerCode; message: string }[];
+}
+export interface PumpPrimeResult {
+  request_id: string;
+  outcome: "requested" | "refused";
+  blockers: PumpPrecheck["blockers"];
+}
+export interface PumpCalibrateStart {
+  session_id: string;
+  outcome: string;
+}
+export interface PumpCalibrationResult {
+  ml_min: number;
+  previous_ml_min: number | null;
+  flow_entity_written: boolean;
+}
+
+// probe_offset_set (backend Task 21)
+export interface ProbeOffsetResult {
+  offset: number;
+  corrected_now: number | null;
+  fused_before: number | null;
+  fused_after: number | null;
+  /** With `preview: true` only. */
+  diff?: unknown;
+}
+
+// dashboard_* (backend Task 32)
+export interface DashboardList {
+  dashboards: { url_path: string; title: string; template: string; rooms: string[]; created_at: string; exists: boolean }[];
+  templates: { id: string; name: string; description: string }[];
+}

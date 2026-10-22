@@ -25,6 +25,9 @@ import { DEMO_WHATS_NEW } from "./whats-new-demo";
 import { compareVersions } from "./whats-new";
 import { InstructionsDemo } from "./brain-instructions";
 import { DISPLAY_DEFAULTS, displayEntityId, readDisplay, type DisplayOptions } from "./display";
+import type { DemoBackend } from "./demo";
+import { isParityAction } from "./parity-api";
+import { demoEnvelope, parityDemo } from "./parity-demo";
 
 const clone = <T>(value: T): T => structuredClone(value);
 export class OperatorDemo {
@@ -52,6 +55,8 @@ export class OperatorDemo {
     whatsNew: string | null = null,
     /** Whose phone the notifications demo answers as; null: the owner, an administrator. */
     private notifyUser: string | null = null,
+    /** `?backend=3.17`: no v2 services, and no v2 envelope on the existing ones. */
+    private backend: DemoBackend = "3.18",
   ) {
     this.stockDemo = new StockDemo(getStates, updateStates);
     this.whatsNewSeen =
@@ -425,6 +430,14 @@ export class OperatorDemo {
     return response(revision, options);
   }
   async call<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
+    if (isParityAction(action)) return (await parityDemo(action, data, Date.now(), this.backend)) as T;
+    // An existing service asked for v2: a 3.18 integration wraps its v1 answer in the envelope; a
+    // 3.17 one answers v1, which callV2 reads as missing.
+    if (data.api === 2) {
+      const { api: _api, ...v1 } = data;
+      const result = await this.call<unknown>(action, v1);
+      return (this.backend === "3.17" ? result : demoEnvelope(result, Date.now(), data.room_id)) as T;
+    }
     if (action === "stop_all") {
       // The demo's room: its kill switch off, as the integration's Stop all does first.
       const prefix = String(data.room_id).replace(/^room:/, "");
