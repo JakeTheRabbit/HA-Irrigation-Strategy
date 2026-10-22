@@ -6852,30 +6852,63 @@ class Controller:
         """The room's state could not be saved (_save_state): this pass stops with an error (CS-212).
 
         Its last saved block is loaded back, as at start-up, so the next pass runs. What only memory holds
-        and must not be lost stays: a hardware hold, an in-flight record, and a day's water above the
-        saved one (never less water counted, so the daily cap is never lifted). With no saved block to go
-        back to, nothing is reset: the room stays stopped until its state saves or the controller restarts."""
+        and must not be lost stays: a hardware hold, an in-flight record, and, zone by zone, the newer of
+        the shot and water counters (_keep_newer_shots: never less water or an older last shot, so neither
+        the daily cap nor the shot interval is lifted). With no saved block to go back to, or when what
+        memory must keep is itself what cannot be saved, nothing is pretended: the room stays stopped until
+        its state saves or the controller restarts."""
         self._save_state()  # it may save now
         error = self._unsaved_rooms.get(room.slug)
         if not error:
             return
+        stopped = "the room stays stopped until it saves or the controller restarts"
         if not isinstance(getattr(self, "_saved_room_blocks", {}).get(room.slug), dict):
             raise RuntimeError(f"the state of this room cannot be saved ({error}), and there is no saved state "
-                               "to go back to: the room stays stopped until it saves or the controller restarts")
+                               f"to go back to: {stopped}")
         fault, inflight = room.hardware_fault, getattr(room, "shot_inflight", None)
-        days = {z: (s.get("last_daily_reset"), s.get("daily_vol")) for z, s in room.state.items()
-                if isinstance(s, dict)}
+        memory = {z: s for z, s in room.state.items() if isinstance(s, dict)}
         self._load_room_state(room)
         room.hardware_fault = room.hardware_fault or fault
         room.shot_inflight = room.shot_inflight or inflight
-        for z, (reset, vol) in days.items():
-            s = room.state.get(z)
-            if (s is not None and reset == s.get("last_daily_reset") and isinstance(vol, (int, float))
-                    and math.isfinite(vol) and vol > (s.get("daily_vol") or 0)):
-                s["daily_vol"] = vol
+        for z, mem in memory.items():
+            if z in room.state:
+                self._keep_newer_shots(mem, room.state[z])
         self._save_state()
+        if self._unsaved_rooms.get(room.slug):
+            raise RuntimeError(f"the state of this room cannot be saved ({self._unsaved_rooms[room.slug]}), "
+                               f"even on its last saved state: {stopped}")
         raise RuntimeError(f"the state of this room could not be saved ({error}); its last saved state "
                            "was loaded back, and the room runs again next pass")
+
+    @staticmethod
+    def _keep_newer_shots(mem, s):
+        """Into the zone `s` loaded back from the saved block, what memory `mem` has that is newer: the later
+        last shot, and the day's counters (memory's whole, when its day is newer; the larger, on the same
+        day), and each grow-day's larger water. A value of the wrong type in memory is not kept."""
+        def number(v):
+            return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v >= 0
+
+        shot = mem.get("last_shot")
+        if isinstance(shot, datetime) and (not isinstance(s.get("last_shot"), datetime) or shot > s["last_shot"]):
+            s["last_shot"] = shot
+            s["last_shot_is_anchor"] = bool(mem.get("last_shot_is_anchor"))
+        reset, saved_reset = mem.get("last_daily_reset"), s.get("last_daily_reset")
+        if type(reset) is date and (type(saved_reset) is not date or reset > saved_reset):
+            s["last_daily_reset"] = reset  # a new day in memory: its counters, not the saved day's
+            s["daily_vol"] = mem.get("daily_vol") if number(mem.get("daily_vol")) else s["daily_vol"]
+            s["shots"] = mem.get("shots") if number(mem.get("shots")) else s["shots"]
+        elif reset == saved_reset:
+            for key in ("daily_vol", "shots"):
+                if number(mem.get(key)) and mem[key] > (s.get(key) or 0):
+                    s[key] = mem[key]
+        days = {item["grow_day"]: item for item in s.get("water_history") or []}
+        for item in mem.get("water_history") or []:
+            if (isinstance(item, dict) and isinstance(item.get("grow_day"), str) and number(item.get("litres"))
+                    and item["litres"] > days.get(item["grow_day"], {}).get("litres", -1)):
+                days[item["grow_day"]] = {"grow_day": item["grow_day"], "litres": float(item["litres"]),
+                                          "complete": item.get("complete") is True}
+        if days:
+            s["water_history"] = [days[d] for d in sorted(days)[-7:]]
 
     def _loop_room(self, room, now):
         """One room's full control pass: snapshot -> decide -> act -> build the publish dict.

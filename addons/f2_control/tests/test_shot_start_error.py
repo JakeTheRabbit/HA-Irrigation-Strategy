@@ -6,7 +6,7 @@ reconciled, and no room was watered again (CTL-032). And one room's state that c
 not make the save raise for every room, nor let a shot open with no record on disk."""
 import copy
 import json
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -119,6 +119,53 @@ def test_a_room_whose_state_cannot_be_saved_fails_one_pass_then_runs_on_its_last
     c._restore_unsaved_room(room)  # the next pass is not stopped
     c._execute_shot(room, 1, 6, 5)  # and can shoot
     assert ("turn_on", "switch.v1") in switched(fake)
+
+
+def test_a_shot_fired_after_the_last_good_save_still_holds_the_interval(rig):
+    c, _ = rig
+    room = c.rooms[0]
+    today = date.today()
+    st = room.state[1]
+    st.update(last_daily_reset=today, daily_vol=2.0, shots=1, last_shot=datetime.now() - timedelta(hours=3))
+    st["water_history"] = [{"grow_day": today.isoformat(), "litres": 2.0, "complete": False}]
+    assert c._save_state()
+    unsavable(room)  # then the room cannot save, and a shot is counted in memory only
+    st.update(daily_vol=3.0, shots=2, last_shot=datetime.now())
+    st["water_history"] = [{"grow_day": today.isoformat(), "litres": 3.0, "complete": False}]
+    c._save_state()
+    with pytest.raises(RuntimeError, match="loaded back"):
+        c._loop_room(room, NOW)
+    st = room.state[1]
+    assert c._minutes_since_shot(st, datetime.now()) < 1  # the shot interval still counts from that shot
+    assert (st["daily_vol"], st["shots"], st["water_history"][-1]["litres"]) == (3.0, 2, 3.0)
+
+
+def test_a_new_day_in_memory_keeps_its_own_counters(rig):
+    c, _ = rig
+    room = c.rooms[0]
+    today = date.today()
+    st = room.state[1]
+    st.update(last_daily_reset=today - timedelta(days=1), daily_vol=9.0, shots=6)
+    assert c._save_state()
+    unsavable(room)
+    st.update(last_daily_reset=today, daily_vol=1.5, shots=1)  # today's water, less than yesterday's
+    c._save_state()
+    with pytest.raises(RuntimeError, match="loaded back"):
+        c._loop_room(room, NOW)
+    st = room.state[1]
+    assert (st["last_daily_reset"], st["daily_vol"], st["shots"]) == (today, 1.5, 1)
+
+
+def test_a_kept_hold_that_cannot_be_saved_stays_stopped(rig):
+    c, _ = rig
+    room = c.rooms[0]
+    assert c._save_state()
+    room.hardware_fault = {"reason": object(), "entities": [], "switches": []}  # kept from memory, unsaveable
+    c._save_state()
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="stays stopped"):
+            c._loop_room(room, NOW)
+    assert room.hardware_fault is not None  # the hold is never dropped
 
 
 def test_a_room_with_no_saved_state_to_go_back_to_stays_stopped(rig):
