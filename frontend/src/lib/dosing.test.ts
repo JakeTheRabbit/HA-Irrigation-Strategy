@@ -7,6 +7,7 @@ import {
   controllerReach,
   deviceDosing,
   doseDeadline,
+  exceedsDoseLimit,
   doseProgress,
   dosingConfigId,
   dosingError,
@@ -166,6 +167,29 @@ describe("reading the configuration and the controller's status", () => {
   });
 });
 
+describe("the room's dosing limits", () => {
+  const room = (profile?: Record<string, number>) => parseConfig({ profile })!.profile;
+  it("refuse and allow doses against the room's own longest dose", () => {
+    expect(exceedsDoseLimit(700, room({ min_flow_ml_s: 0.05, max_dose_s: 600 }))).toBe(true);
+    expect(exceedsDoseLimit(500, room({ min_flow_ml_s: 0.05, max_dose_s: 600 }))).toBe(false);
+    expect(exceedsDoseLimit(2400, room({ min_flow_ml_s: 0.05, max_dose_s: 3600 }))).toBe(false);
+    expect(exceedsDoseLimit(3700, room({ min_flow_ml_s: 0.05, max_dose_s: 3600 }))).toBe(true);
+  });
+  it("read from the published profile, and fall back to the strictest bound when it is absent or out of range", () => {
+    expect(room({ min_flow_ml_s: 0.2, max_dose_s: 900 })).toEqual({ min_flow_ml_s: 0.2, max_dose_s: 900 });
+    expect(room()).toEqual({ min_flow_ml_s: 100, max_dose_s: 60 });
+    expect(room({ min_flow_ml_s: 0, max_dose_s: 99999 })).toEqual({ min_flow_ml_s: 100, max_dose_s: 60 });
+  });
+  it("set the lowest flow a pump counts as calibrated", () => {
+    const { states, config, status } = demo("room_b_");
+    const pump = config.pumps.find((item) => item.id === "veg_base")!;
+    const reach = controllerReach(states, "room_b_", status, NOW);
+    const flow = pumpView(pump, status, reach, states, NOW, config.profile).flow!;
+    expect(pumpView(pump, status, reach, states, NOW, { ...config.profile, min_flow_ml_s: flow + 1 }).state).toBe("uncalibrated");
+    expect(pumpView(pump, status, reach, states, NOW, { ...config.profile, min_flow_ml_s: flow }).state).toBe("idle");
+  });
+});
+
 describe("a pump's card", () => {
   it("is idle, dosing, not calibrated or unavailable, and a running motor always shows", () => {
     const { states, config, status } = demo("room_b_");
@@ -178,6 +202,7 @@ describe("a pump's card", () => {
         controllerReach(s, "room_b_", st, NOW),
         s,
         NOW,
+        config.profile,
       );
     expect(view("veg_base").state).toBe("idle");
     expect(view("finisher")).toMatchObject({ state: "uncalibrated", flow: 0 });
@@ -276,9 +301,12 @@ describe("a pump's card", () => {
     });
     // Past its expected time: full, and overdue; the controller cuts it at 1.25 × + 20 s.
     expect(doseProgress(running, NOW + 20_000)).toMatchObject({ share: 1, ml: 250, overdue: true });
-    expect(doseDeadline(25)).toBe(51.25);
+    expect(doseDeadline(25, 1200)).toBe(51.25);
     // The controller never lets a dose run past 20 minutes and a minute: nor does the page's clock.
-    expect(doseDeadline(5000)).toBe(1260);
+    expect(doseDeadline(5000, 1200)).toBe(1260);
+    // A room that allows 600 s cuts a dose at 660 s; one that allows 3600 s at 3660 s.
+    expect(doseDeadline(5000, 600)).toBe(660);
+    expect(doseDeadline(5000, 3600)).toBe(3660);
     // Expected from the flow when the controller leaves it out; nothing without a target.
     expect(doseProgress({ ...running, expected_s: null }, NOW)!.expected).toBe(25);
     expect(doseProgress({ ...running, target_ml: null }, NOW)).toBeNull();

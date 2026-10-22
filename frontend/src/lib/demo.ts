@@ -489,6 +489,7 @@ function demoDosing(
     friendly_name: `${room} dosing configuration`,
     pumps,
     batch,
+    profile: { min_flow_ml_s: 0.05, max_dose_s: 1200 },
     request: null,
     updated_at: at(24 * 6),
     // The feed schedule's pick today (Room B has none, so its batch recipe has no name either).

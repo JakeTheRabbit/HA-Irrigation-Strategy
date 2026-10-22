@@ -65,10 +65,16 @@ export interface DosingRequest {
   at: string | null;
   by: string | null;
 }
+/** The room's dosing limits the controller works to (the `profile` the integration publishes). */
+export interface DosingProfile {
+  min_flow_ml_s: number;
+  max_dose_s: number;
+}
 export interface DosingConfig {
   revision: number;
   pumps: DosingPump[];
   batch: DosingBatch;
+  profile: DosingProfile;
   request: DosingRequest | null;
   updated_at: string | null;
 }
@@ -250,9 +256,26 @@ export function parseConfig(value: unknown): DosingConfig | null {
     revision: count(raw.revision) ?? 0,
     pumps: pumps.slice(0, MAX_PUMPS),
     batch: parseBatch(raw.batch),
+    profile: parseProfile(raw.profile),
     request: parseRequest(raw.request),
     updated_at: text(raw.updated_at),
   };
+}
+/** The integration's bounds for the two limits (`PROFILE` in dosing.py). A profile that is missing or
+ * out of range takes the end of its range that refuses more, so the form never allows a dose the
+ * controller would refuse. */
+const PROFILE_BOUNDS = {
+  min_flow_ml_s: { low: 0.01, high: 100, safe: 100 },
+  max_dose_s: { low: 60, high: 3600, safe: 60 },
+};
+export function parseProfile(value: unknown): DosingProfile {
+  const raw = (value && typeof value === "object" ? value : {}) as Raw;
+  const limit = (key: keyof typeof PROFILE_BOUNDS) => {
+    const { low, high, safe } = PROFILE_BOUNDS[key];
+    const number = typeof raw[key] === "number" ? (raw[key] as number) : Number.NaN;
+    return number >= low && number <= high ? number : safe;
+  };
+  return { min_flow_ml_s: limit("min_flow_ml_s"), max_dose_s: limit("max_dose_s") };
 }
 /** The integration's `dosing_config` sensor: its state is the revision. */
 export function readConfig(entity: EntityState | undefined): DosingConfig | null {
@@ -406,12 +429,12 @@ export function doseProgress(runtime: PumpRuntime | null, now: number): DoseProg
   return { target, elapsed, expected, share, ml: target * share, overdue: elapsed > expected };
 }
 /** When the controller switches a pump off that is still dosing: expected × 1.25 + 20 s. */
-/** The controller's limits (DOSING.md): the least flow it trusts, the longest dose it runs, and
- * the latest it lets one go before cutting the power. */
-export const MIN_FLOW_ML_S = 0.05;
-export const MAX_DOSE_S = 20 * 60;
-export const MAX_DEADLINE_S = MAX_DOSE_S + 60;
-export const doseDeadline = (expected: number) => Math.min(expected * 1.25 + 20, MAX_DEADLINE_S);
+/** The latest the controller lets a dose go before cutting the power, from the room's longest dose. */
+/** Whether a dose expected to take this long is longer than the room lets the controller run one. */
+export const exceedsDoseLimit = (expected: number, profile: DosingProfile) =>
+  expected > profile.max_dose_s;
+export const doseDeadline = (expected: number, maxDoseS: number) =>
+  Math.min(expected * 1.25 + 20, maxDoseS + 60);
 
 export interface PumpView {
   pump: DosingPump;
@@ -432,6 +455,7 @@ export function pumpView(
   reach: Reach,
   states: States,
   now: number,
+  profile: DosingProfile,
 ): PumpView {
   const runtime = status?.pumps[pump.id] ?? null;
   const flowEntity = states[pump.flow_entity];
@@ -462,7 +486,7 @@ export function pumpView(
   }
   if (deviceDosing(pump, states) === null)
     return view("unavailable", `${pump.dosing_entity} reports nothing.`);
-  if (!(flow !== null && flow >= MIN_FLOW_ML_S))
+  if (!(flow !== null && flow >= profile.min_flow_ml_s))
     return view(
       "uncalibrated",
       flow === null
@@ -621,7 +645,7 @@ export function recipeRows(config: DosingConfig, states: States): RecipeRow[] {
       fromEntity: reading !== null,
       unreadable,
       flow,
-      seconds: ml > 0 && flow !== null && flow >= MIN_FLOW_ML_S ? ml / flow : null,
+      seconds: ml > 0 && flow !== null && flow >= config.profile.min_flow_ml_s ? ml / flow : null,
       skipped: !unreadable && ml <= 0,
       unknown: !pump,
     };
