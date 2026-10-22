@@ -1,6 +1,6 @@
 """System status in a real Home Assistant: sensor.crop_steering_system_health and system_status_get, through
 Home Assistant's own services, clock, state machine and Lovelace resources. No recorder here (its
-behaviour without one: every probe has the 180 s floor and uptime is None);
+behaviour without one: uptime is None);
 test_system_status_recorder.py has the recorder."""
 
 from datetime import timedelta
@@ -79,8 +79,8 @@ async def test_heartbeats_fill_the_ring_and_a_stale_one_reaches_the_sensor(hass,
     assert [b["readback_ms"] for b in beat["beats"]] == [None, 35, None, None]
     assert beat["controller"] == "running" and out["addon_version"] == "4.2.0"
 
-    # A probe left unreported past the 180 s floor (no recorder) is silent, and no beat for 11 min
-    # leaves the controller stale, both on the owner's 5-min tick.
+    # A probe left unreported past the 900 s fallback (no interval known) is silent, and no beat for
+    # 11 min leaves the controller stale, both on the owner's 5-min tick.
     for _ in range(3):
         await _tick(hass, freezer, 300)
     state = hass.states.get(HEALTH)
@@ -102,7 +102,29 @@ async def test_the_card_version_is_read_from_the_lovelace_resources(hass):
     assert (await _status(hass))["card_version"] == "3171"
 
 
+async def test_a_steady_probe_is_never_silent_and_one_that_stops_is(hass, freezer):
+    """A probe repeating its value is reported, not changed: its report times still count."""
+    await _install(hass)
+    first = hass.states.get("sensor.gt1_vwc").last_changed
+    for _ in range(8):  # 40 min of the same value every 5 min
+        await _tick(hass, freezer, 300)  # the owner's tick publishes first: 300 s since the report
+        assert hass.states.get(HEALTH).attributes["silent"] == []
+        hass.states.async_set("sensor.gt1_vwc", "41", {"unit_of_measurement": "%"})
+        hass.states.async_set("sensor.gt1_ec", "3100", {"unit_of_measurement": "µS/cm"})
+        await hass.async_block_till_done()
+    assert hass.states.get("sensor.gt1_vwc").last_changed == first  # never a state change
+    assert _tracker(hass).median("sensor.gt1_vwc") == 300.0
+
+    # It stops: still online at 10 min, silent past 3 x 5 min.
+    await _tick(hass, freezer, 300)
+    await _tick(hass, freezer, 300)
+    assert hass.states.get(HEALTH).attributes["silent"] == []
+    await _tick(hass, freezer, 301)
+    assert hass.states.get(HEALTH).attributes["silent"] == ["sensor.gt1_ec", "sensor.gt1_vwc"]
+
+
 async def test_the_first_room_owns_the_sensor_until_it_unloads(hass, freezer):
+    listening = dict(hass.bus.async_listeners())
     tent = await _install(hass)
     await _veg_room(hass)
     veg = next(
@@ -132,6 +154,9 @@ async def test_the_first_room_owns_the_sensor_until_it_unloads(hass, freezer):
     assert hass.states.get(HEALTH) is None
     assert _tracker(hass) is None
     assert not hass.services.has_service(DOMAIN, "system_status_get")
+    # The probe and heartbeat listeners went with it.
+    for event in ("state_changed", "state_reported"):
+        assert hass.bus.async_listeners().get(event, 0) <= listening.get(event, 0), event
     hass.states.async_set(BEAT, "ok", {"n": 9})  # no listener left
     await _tick(hass, freezer, 300)
     assert hass.states.get(HEALTH) is None

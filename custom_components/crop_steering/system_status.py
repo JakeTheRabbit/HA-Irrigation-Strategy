@@ -4,15 +4,19 @@ status() reads, for every loaded room, the entities its setup maps (the zones' V
 temperature probes and valves, the pump, the main line, the feed probes, the tank sensors and the
 zones' flow meters from the site store), each online or not, and the controller's heartbeat.
 
-- An entity is ok when it is not unknown/unavailable. A probe (probe_* and feed_probe) must also have
-  reported within max(180 s, 3 x its own median report interval over the last hour), so a probe that
-  reports every 5 min is not called silent. The intervals come from the recorder, read in the
-  executor on the owner's 5-min tick; with no recorder every probe has the 180 s floor. Everything
-  else (valves, pump, main line, tank sensors, flow meters) is ok while available.
+- An entity is ok when it is not unknown/unavailable. A probe (probe_*, feed_probe and the tank's
+  EC, pH, temperature and distance sensors) must also have reported within max(180 s, 3 x the median
+  of its last 12 report intervals), so a probe that reports every 5 min is not called silent. The
+  report times are kept in memory from state-changed and state-reported listeners on the probes (a
+  steady probe repeating its value is reported, not changed); until two are known the limit is
+  900 s. Everything else (valves, pump, main line, the tank's level sensor and low float, flow
+  meters) is ok while available.
+- uptime_7d_pct is read from the recorder in the executor, cached 1 h per entity, one read at a time;
+  None without a recorder or with nothing recorded.
 - The controller of a room is running while its heartbeat is younger than 10 min and not dead (the
   rule of health.py's engine_offline); the site's controller is the best of the rooms'.
 - Each room's heartbeat keeps its last 120 beats in memory (Ring), from a state listener on its
-  ai_heartbeat; a gap above 2 x 60 s inserts a missed beat.
+  ai_heartbeat; a gap above 2 x 60 s inserts a missed beat carrying the gap (gap_s).
 
 ONE sensor for the whole site, published by the room that loaded first (Tracker.owner) on its 5-min
 health tick and whenever a room joins or leaves; when that room unloads, the next one owns it. The
@@ -21,7 +25,7 @@ last room unloading removes the sensor and the service. Nothing here touches irr
 
 from __future__ import annotations
 
-import functools
+import asyncio
 import logging
 import statistics
 from collections import deque
@@ -47,6 +51,15 @@ KINDS = (
     "flow_meter",
 )
 PROBES = frozenset({"probe_vwc", "probe_ec", "probe_temp", "feed_probe"})
+# The tank's sensors held to the silence rule like a probe (a dead dosing probe must show).
+TANK_PROBES = frozenset(
+    {
+        "tank_distance_sensor",
+        "tank_temperature_sensor",
+        "tank_ec_sensor",
+        "tank_ph_sensor",
+    }
+)
 OFF = ("unknown", "unavailable")
 TANK_KEYS = (
     "water_level_sensor",
@@ -57,6 +70,8 @@ TANK_KEYS = (
     "tank_ph_sensor",
 )
 FLOOR_S = 180
+FALLBACK_S = 900  # a probe's limit until two of its reports are known
+REPORTS = 12  # report times kept per probe
 INTERVAL_S = 60
 RING_SIZE = 120
 UPTIME_TTL = timedelta(hours=1)
@@ -72,8 +87,8 @@ def heartbeat_id(prefix: str) -> str:
 
 # ------------------------------------------------------------------ pure parts
 def mapped(cfg: dict, meters: dict | None = None) -> list[tuple]:
-    """[(kind, entity_id, zone)] the room config maps, in KINDS order (zone order within a kind),
-    each entity once."""
+    """[(kind, entity_id, zone, probe)] the room config maps, in KINDS order (zone order within a
+    kind), each entity once; `probe`: held to the silence rule."""
     zones = cfg.get("zones") or {}
     hw = cfg.get("hardware") or {}
     rows = []
@@ -86,11 +101,11 @@ def mapped(cfg: dict, meters: dict | None = None) -> list[tuple]:
             for entity in list(zc.get(many) or []) or [
                 zc[k] for k in pair if zc.get(k)
             ]:
-                rows.append((kind, entity, z))
+                rows.append((kind, entity, z, True))
         if zc.get("substrate_temperature_sensor"):
-            rows.append(("probe_temp", zc["substrate_temperature_sensor"], z))
+            rows.append(("probe_temp", zc["substrate_temperature_sensor"], z, True))
         if zc.get("zone_switch"):
-            rows.append(("valve", zc["zone_switch"], z))
+            rows.append(("valve", zc["zone_switch"], z, False))
     for kind, key in (
         ("pump", "pump_switch"),
         ("main_line", "main_line_switch"),
@@ -99,9 +114,10 @@ def mapped(cfg: dict, meters: dict | None = None) -> list[tuple]:
         *(("tank", key) for key in TANK_KEYS),
     ):
         if hw.get(key):
-            rows.append((kind, hw[key], None))
+            probe = kind in PROBES or key in TANK_PROBES
+            rows.append((kind, hw[key], None, probe))
     for zone, entity in sorted((meters or {}).items(), key=lambda kv: int(kv[0])):
-        rows.append(("flow_meter", entity, int(zone)))
+        rows.append(("flow_meter", entity, int(zone), False))
     seen, out = set(), []
     for row in sorted(rows, key=lambda r: KINDS.index(r[0])):
         if row[1] and row[1] not in seen:
@@ -118,9 +134,12 @@ def median_interval(times) -> float | None:
 
 
 def uptime_pct(states, start, end) -> float | None:
-    """The share of [start, end] in %, unrounded, that `states` (oldest first, each with state and
-    last_changed) spend neither unknown nor unavailable. Time before the first state counts as down.
-    """
+    """The share of [max(start, first state), end] in %, unrounded, that `states` (oldest first, each
+    with state and last_changed) spend neither unknown nor unavailable, so a fresh install reads its
+    real uptime. None with no states."""
+    if not states:
+        return None
+    start = max(start, states[0].last_changed)
     total = (end - start).total_seconds()
     if total <= 0:
         return None
@@ -134,7 +153,7 @@ def uptime_pct(states, start, end) -> float | None:
 
 
 class Ring:
-    """A room's last RING_SIZE heartbeats: {at, missed, readback_ms}."""
+    """A room's last RING_SIZE heartbeats: {at, missed, readback_ms}; a missed one also has gap_s."""
 
     def __init__(self):
         self.beats = deque(maxlen=RING_SIZE)
@@ -144,12 +163,14 @@ class Ring:
             last = self.beats[-1]["at"]
             if at <= last:
                 return
-            if (at - last).total_seconds() > 2 * INTERVAL_S:
+            gap = (at - last).total_seconds()
+            if gap > 2 * INTERVAL_S:
                 self.beats.append(
                     {
                         "at": last + timedelta(seconds=INTERVAL_S),
                         "missed": True,
                         "readback_ms": None,
+                        "gap_s": gap,
                     }
                 )
         self.beats.append({"at": at, "missed": False, "readback_ms": readback_ms})
@@ -182,7 +203,7 @@ def _meters(hass, room_id) -> dict:
     return (document.get("zone_meters") or {}).get(room_id) or {}
 
 
-def _entity(hass, kind, entity_id, zone, now, tracker) -> dict:
+def _entity(hass, kind, entity_id, zone, probe, now, tracker) -> dict:
     state = hass.states.get(entity_id)
     cached = tracker.uptime.get(entity_id) if tracker is not None else None
     row = {
@@ -199,9 +220,10 @@ def _entity(hass, kind, entity_id, zone, now, tracker) -> dict:
         return row
     seen = getattr(state, "last_reported", None) or state.last_updated
     ok = state.state not in OFF
-    if ok and kind in PROBES:
-        median = (tracker.medians.get(entity_id) if tracker is not None else None) or 0
-        ok = (now - seen).total_seconds() <= max(FLOOR_S, 3 * median)
+    if ok and probe:
+        median = tracker.median(entity_id) if tracker is not None else None
+        limit = FALLBACK_S if median is None else max(FLOOR_S, 3 * median)
+        ok = (now - seen).total_seconds() <= limit
     row.update(
         name=(state.attributes or {}).get("friendly_name") or entity_id,
         last_seen=seen.isoformat() if seen else None,
@@ -268,8 +290,8 @@ def status(hass, now, card=None) -> dict:
     for _entry, prefix, cfg in _rooms(hass):
         room_id = "room:" + prefix
         rows = [
-            _entity(hass, kind, entity, zone, now, tracker)
-            for kind, entity, zone in mapped(cfg, _meters(hass, room_id))
+            _entity(hass, kind, entity, zone, probe, now, tracker)
+            for kind, entity, zone, probe in mapped(cfg, _meters(hass, room_id))
         ]
         every += rows
         ring = tracker.rings.get(room_id) if tracker is not None else None
@@ -334,7 +356,7 @@ async def card_version(hass) -> str | None:
 
 # ------------------------------------------------------------------ the tracker
 class Tracker:
-    """The site's heartbeat rings, recorder caches and the system_health sensor."""
+    """The site's heartbeat rings, probe report times, uptime cache and the system_health sensor."""
 
     def __init__(self, hass):
         self.hass = hass
@@ -342,10 +364,12 @@ class Tracker:
             {}
         )  # entry_id -> room_id, in the order the rooms loaded
         self.rings: dict[str, Ring] = {}
-        self.medians: dict[str, float | None] = {}
-        self.medians_at = None
+        self.reports: dict[str, deque] = {}  # probe -> its last REPORTS report times
         self.uptime: dict[str, tuple] = {}  # entity_id -> (read at, %)
+        self._uptime_lock = asyncio.Lock()
         self._unsubs: dict = {}
+        self._watching: tuple = ()
+        self._unwatch: list = []
         self._no_recorder_said = False
 
     @property
@@ -355,6 +379,56 @@ class Tracker:
 
     def ring(self, room_id) -> Ring:
         return self.rings.setdefault(room_id, Ring())
+
+    def report(self, entity_id, at) -> None:
+        times = self.reports.setdefault(entity_id, deque(maxlen=REPORTS))
+        if at is not None and (not times or at > times[-1]):
+            times.append(at)
+
+    def median(self, entity_id) -> float | None:
+        return median_interval(self.reports.get(entity_id, ()))
+
+    def _report_state(self, state) -> None:
+        if state is not None and state.state not in OFF:
+            seen = getattr(state, "last_reported", None) or state.last_updated
+            self.report(state.entity_id, seen)
+
+    def _watch(self) -> None:
+        """Follow the mapped probes' reports (state changed and state reported); the set changes as
+        rooms join and leave and meters or setups change."""
+        from homeassistant.core import callback
+        from homeassistant.helpers.event import (
+            async_track_state_change_event,
+            async_track_state_report_event,
+        )
+
+        wanted = tuple(self._rows(probes_only=True))
+        if wanted == self._watching:
+            return
+        self._stop_watching()
+        self._watching = wanted
+        for entity in list(self.reports):
+            if entity not in wanted:
+                del self.reports[entity]
+        if not wanted:
+            return
+        for entity in wanted:
+            if entity not in self.reports:
+                self._report_state(self.hass.states.get(entity))
+
+        @callback
+        def reported(event):
+            self._report_state(event.data.get("new_state"))
+
+        self._unwatch = [
+            async_track_state_change_event(self.hass, list(wanted), reported),
+            async_track_state_report_event(self.hass, list(wanted), reported),
+        ]
+
+    def _stop_watching(self) -> None:
+        for unsub in self._unwatch:
+            unsub()
+        self._unwatch, self._watching = [], ()
 
     def join(self, entry) -> None:
         from homeassistant.core import callback
@@ -378,6 +452,7 @@ class Tracker:
             self._unsubs[entry.entry_id] = async_track_state_change_event(
                 self.hass, [heartbeat_id(prefix)], beat
             )
+        self._watch()
         self.publish()
 
     def leave(self, entry) -> None:
@@ -388,8 +463,11 @@ class Tracker:
         if room_id not in self.entries.values():
             self.rings.pop(room_id, None)
         if self.entries:
+            self._watch()
             self.publish()
         else:
+            self._stop_watching()
+            self.reports.clear()
             self.hass.states.async_remove(SENSOR)
 
     def publish(self) -> None:
@@ -419,22 +497,21 @@ class Tracker:
         )
 
     async def async_tick(self, entry_id) -> None:
-        """The 5-min health tick of a room: only the owner's refreshes and publishes."""
-        if entry_id != self.owner:
+        """The 5-min health tick of a room: only the owner's publishes."""
+        if entry_id != self.owner or not self.entries:
             return
-        await self.refresh_medians()
-        if self.entries:
-            self.publish()
+        self._watch()
+        self.publish()
 
-    def _rows(self, kinds=None) -> list[str]:
+    def _rows(self, probes_only=False) -> list[str]:
         return sorted(
             {
                 entity
                 for _entry, prefix, cfg in _rooms(self.hass)
-                for kind, entity, _zone in mapped(
+                for _kind, entity, _zone, probe in mapped(
                     cfg, _meters(self.hass, "room:" + prefix)
                 )
-                if kinds is None or kind in kinds
+                if probe or not probes_only
             }
         )
 
@@ -443,53 +520,25 @@ class Tracker:
             return True
         if not self._no_recorder_said:
             self._no_recorder_said = True
-            _LOGGER.info(
-                "System status: no recorder, so every probe is silent after %d s and 7-day uptime is "
-                "not known",
-                FLOOR_S,
-            )
+            _LOGGER.info("System status: no recorder, so 7-day uptime is not known")
         return False
 
-    async def refresh_medians(self) -> None:
-        """Each probe's median report interval over the last hour, read in the executor."""
-        from homeassistant.util import dt as dt_util
-
-        if not self._recorder():
-            return
-        probes = self._rows(PROBES)
-        now = dt_util.utcnow()
-        if probes:
-            from homeassistant.components.recorder import get_instance, history
-
-            try:
-                found = await get_instance(self.hass).async_add_executor_job(
-                    functools.partial(
-                        history.get_significant_states,
-                        self.hass,
-                        now - timedelta(hours=1),
-                        now,
-                        probes,
-                        significant_changes_only=False,
-                        no_attributes=True,
-                        include_start_time_state=False,
-                    )
-                )
-            except Exception as error:  # the 180 s floor then holds
-                _LOGGER.debug("System status: report intervals not read: %s", error)
-                return
-            self.medians = {
-                entity: median_interval(s.last_updated for s in found.get(entity, []))
-                for entity in probes
-            }
-        self.medians_at = now
-
     async def refresh_uptime(self, now) -> None:
-        """uptime_7d of each mapped entity not read in the last hour, in the executor."""
+        """uptime_7d of each mapped entity not read in the last hour, in the executor. One read at a
+        time: a call that waited finds the entities just read. Entities no longer mapped are forgotten.
+        """
         if not self._recorder():
             return
+        async with self._uptime_lock:
+            await self._read_uptime(now)
+
+    async def _read_uptime(self, now) -> None:
+        rows = self._rows()
+        for entity in set(self.uptime) - set(rows):
+            del self.uptime[entity]
         due = [
             entity
-            for entity in self._rows()
+            for entity in rows
             if entity not in self.uptime or now - self.uptime[entity][0] >= UPTIME_TTL
         ]
         if not due:
@@ -528,8 +577,6 @@ async def answer(hass) -> dict:
     now = dt_util.utcnow()
     tracker = hass.data.get(DOMAIN, {}).get(TRACKER)
     if tracker is not None:
-        if tracker.medians_at is None:
-            await tracker.refresh_medians()
         await tracker.refresh_uptime(now)
     return status(hass, now, card=await card_version(hass))
 
@@ -561,7 +608,7 @@ def async_setup_system_status(hass, entry) -> None:
 
 
 def tick(hass, entry) -> None:
-    """A room's 5-min health tick (__init__.py): the owner refreshes and publishes, in a task."""
+    """A room's 5-min health tick (__init__.py): the owner publishes, in a task."""
     tracker = hass.data.get(DOMAIN, {}).get(TRACKER)
     if tracker is not None and tracker.owner == entry.entry_id:
         hass.async_create_task(tracker.async_tick(entry.entry_id))

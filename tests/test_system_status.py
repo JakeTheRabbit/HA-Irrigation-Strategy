@@ -160,36 +160,126 @@ def test_uptime_7d_from_a_state_history():
         SimpleNamespace(state="42", last_changed=down + timedelta(hours=12)),
     ]
     assert uptime_pct(history, start, NOW) == pytest.approx(92.85714285714286)
-    assert uptime_pct([], start, NOW) == 0.0
+    assert uptime_pct([], start, NOW) is None  # nothing recorded: not known
+
+
+def test_a_fresh_install_reads_its_real_uptime():
+    """The share is of the time since the first recorded state, not of 7 days."""
+    start = NOW - timedelta(days=7)
+    first = NOW - timedelta(hours=2)
+    history = [
+        SimpleNamespace(state="41", last_changed=first),
+        SimpleNamespace(
+            state="unavailable", last_changed=first + timedelta(minutes=90)
+        ),
+    ]
+    assert uptime_pct(history, start, NOW) == pytest.approx(75.0)
+
+
+def _joined(hass, **entries):
+    tracker = Tracker(hass)
+    tracker.entries = entries or {
+        "e1": "room:f2_"
+    }  # joined (no listener in a hand-made hass)
+    hass.data[DOMAIN][system_status.TRACKER] = tracker
+    return tracker
+
+
+def _ok(hass, entity_id):
+    room = status(hass, NOW)["rooms"][0]
+    return {e["entity_id"]: e["ok"] for e in room["entities"]}[entity_id]
 
 
 def test_a_probe_reporting_every_5_min_is_not_silent():
     reports = [NOW - timedelta(minutes=5 * i) for i in range(12, 0, -1)]
     assert median_interval(reports) == 300.0
-    probe = _state("sensor.f2_vwc_1", "41", age_s=400, reported_s=400)
+    probe = _state("sensor.f2_vwc_1", "41", age_s=3600, reported_s=880)
     hass = _hass({"e1": _room("f2_", zones=1)}, [probe])
-    tracker = Tracker(hass)
-    tracker.entries = {
-        "e1": "room:f2_"
-    }  # the room joined (no listener in this hand-made hass)
-    hass.data[DOMAIN][system_status.TRACKER] = tracker
-    # No interval known (no recorder): the 180 s floor, so 400 s is silent.
-    room = status(hass, NOW)["rooms"][0]
-    assert {e["entity_id"]: e["ok"] for e in room["entities"]}[
-        "sensor.f2_vwc_1"
-    ] is False
-    tracker.medians["sensor.f2_vwc_1"] = 300.0
-    room = status(hass, NOW)["rooms"][0]
-    assert {e["entity_id"]: e["ok"] for e in room["entities"]}[
-        "sensor.f2_vwc_1"
-    ] is True
+    tracker = _joined(hass)
+    # No interval known yet: the 900 s fallback.
+    assert _ok(hass, "sensor.f2_vwc_1") is True
+    # Its own reports, kept in memory (the last 12): every 5 min, so silent after 3 x 5 min.
+    for at in [NOW - timedelta(minutes=5 * i) for i in range(20, 2, -1)]:
+        tracker.report("sensor.f2_vwc_1", at)
+    assert len(tracker.reports["sensor.f2_vwc_1"]) == 12
+    assert tracker.median("sensor.f2_vwc_1") == 300.0
+    assert _ok(hass, "sensor.f2_vwc_1") is True
+    hass.states.get("sensor.f2_vwc_1").last_reported = NOW - timedelta(seconds=901)
+    assert _ok(hass, "sensor.f2_vwc_1") is False
+    # Fast reports never go below the 180 s floor.
+    for i in range(12):
+        tracker.report("sensor.f2_vwc_1", NOW + timedelta(seconds=10 * i))
+    hass.states.get("sensor.f2_vwc_1").last_reported = NOW - timedelta(seconds=170)
+    assert _ok(hass, "sensor.f2_vwc_1") is True
     # An actuator is ok while available, however long ago it last changed.
     valve = _state("switch.f2_valve_1", "off", age_s=86400)
     hass = _hass({"e1": _room("f2_", zones=1)}, [valve])
+    assert _ok(hass, "switch.f2_valve_1") is True
+
+
+def test_tank_probes_go_silent_but_the_low_float_and_flow_meters_do_not():
+    hardware = {
+        "tank_ec_sensor": "sensor.tank_ec",
+        "tank_ph_sensor": "sensor.tank_ph",
+        "tank_temperature_sensor": "sensor.tank_temp",
+        "tank_distance_sensor": "sensor.tank_distance",
+        "tank_low_float": "binary_sensor.tank_low",
+    }
+    old = 1000  # over the 900 s fallback
+    states = [_state(e, "1", age_s=old, reported_s=old) for e in hardware.values()]
+    states.append(_state("sensor.z1_flow", "0", age_s=old, reported_s=old))
+    hass = _hass({"e1": _room("f2_", zones=1, hardware=hardware)}, states)
+    hass.data[DOMAIN]["_site"] = SimpleNamespace(
+        document={"zone_meters": {"room:f2_": {"1": "sensor.z1_flow"}}}
+    )
     room = status(hass, NOW)["rooms"][0]
-    assert {e["entity_id"]: e["ok"] for e in room["entities"]}[
-        "switch.f2_valve_1"
-    ] is True
+    ok = {e["entity_id"]: e["ok"] for e in room["entities"]}
+    assert [k for k, v in ok.items() if not v] == [
+        "sensor.tank_distance",
+        "sensor.tank_temp",
+        "sensor.tank_ec",
+        "sensor.tank_ph",
+    ]
+    assert ok["binary_sensor.tank_low"] is True and ok["sensor.z1_flow"] is True
+
+
+def test_uptime_reads_are_shared_and_the_cache_forgets_unmapped_entities(monkeypatch):
+    import sys
+    import types
+
+    calls = []
+
+    async def run(job):
+        await asyncio.sleep(0)
+        return job()
+
+    def changes(hass, start, end, entity_id, **_):
+        calls.append(entity_id)
+        return {entity_id: [SimpleNamespace(state="1", last_changed=start)]}
+
+    recorder = types.ModuleType("homeassistant.components.recorder")
+    recorder.get_instance = lambda hass: SimpleNamespace(async_add_executor_job=run)
+    recorder.history = SimpleNamespace(state_changes_during_period=changes)
+    components = types.ModuleType("homeassistant.components")
+    components.__path__ = []
+    monkeypatch.setitem(sys.modules, "homeassistant.components", components)
+    monkeypatch.setitem(sys.modules, "homeassistant.components.recorder", recorder)
+
+    hass = _hass({"e1": _room("f2_", zones=1, hardware={})})
+    hass.config.components.add("recorder")
+    tracker = _joined(hass)
+    tracker.uptime["sensor.no_longer_mapped"] = (NOW, 50.0)
+
+    async def both():
+        await asyncio.gather(tracker.refresh_uptime(NOW), tracker.refresh_uptime(NOW))
+
+    asyncio.run(both())
+    assert sorted(calls) == [
+        "sensor.f2_vwc_1",
+        "switch.f2_valve_1",
+    ]  # one 7-day read each
+    assert set(tracker.uptime) == {"sensor.f2_vwc_1", "switch.f2_valve_1"}
+    assert tracker.uptime["sensor.f2_vwc_1"] == (NOW, 100.0)
 
 
 def test_a_heartbeat_gap_is_a_missed_beat():
@@ -202,6 +292,7 @@ def test_a_heartbeat_gap_is_a_missed_beat():
     assert [b["missed"] for b in beats] == [False, False, True, False]
     assert beats[1]["readback_ms"] == 42 and beats[0]["readback_ms"] is None
     assert beats[2]["at"] == (t0 + timedelta(seconds=120)).isoformat()
+    assert beats[2]["gap_s"] == 240.0  # the gap the missed beat stands for
     for i in range(200):
         ring.add(t0 + timedelta(seconds=360 + 60 * i))
     assert len(ring.rows()) == 120
