@@ -12,7 +12,8 @@ import type { EntityState, States, Zone } from "./types";
  * page does not always see): its "not reporting", or a combined reading the zone no longer uses. */
 export const PROBE_RANGE = { vwc: [0, 100], ec: [0, 20] } as const;
 /** A reading unchanged this long is likely stuck. Pore EC sits still for hours overnight;
- * moisture keeps drying. */
+ * moisture keeps drying. The dashboard's own heuristic: neither the controller nor the integration
+ * judges a probe stuck, so no hold or alert follows from it. */
 export const STUCK_MS = { vwc: 3 * 3_600_000, ec: 6 * 3_600_000 } as const;
 
 export type ProbeKind = "vwc" | "ec";

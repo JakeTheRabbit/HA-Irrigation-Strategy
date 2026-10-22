@@ -522,7 +522,8 @@ export function stockTanks(states: States, prefix: string): StockTankReading[] {
   });
 }
 /** A pump's stock tank, by the Stock tanks page's own rule: amber within half again of its low
- * mark, red at or under it. */
+ * mark, red at or under it. Only "very low" is the integration's (stock.py: a tank at or under its
+ * low mark is in its stock_low list); the amber step is the dashboard's own heuristic. */
 export type StockState = "ok" | "low" | "very-low";
 export function stockState(tank: Pick<StockTankReading, "level_l" | "low_l">): StockState {
   if (tank.level_l <= tank.low_l) return "very-low";

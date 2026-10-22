@@ -61,6 +61,8 @@ export interface AttentionInput {
   };
 }
 
+// The dashboard's own heuristics, not the controller's: it has no such rule, raises no alert and
+// publishes no setting for them, so a zone flagged here can be one the controller is content with.
 /** How long a zone may sit under its re-water point in P2 without a shot before it is flagged. */
 export const DRY_MINUTES = 60;
 /** How far back a rescue shot still flags its zone. */
