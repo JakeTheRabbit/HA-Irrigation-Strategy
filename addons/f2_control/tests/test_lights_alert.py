@@ -84,3 +84,59 @@ def test_one_unreadable_loop_keeps_the_integration_hours():
     fake.set_state("number.crop_steering_lights_on_hour", "unavailable")
     c.loop_once(datetime(2026, 9, 21, 8, 30))
     assert (c.rooms[0].lights_on_hour, c.rooms[0].lights_off_hour) == (7.0, 20.0)
+
+
+def _equal_hours_alerts(fake):
+    return [d for dom, svc, d in fake.calls
+            if (dom, svc) == ("persistent_notification", "create") and "CS-401" in d["message"]
+            and "same hour" in d["message"]]
+
+
+def test_lights_on_and_off_at_the_same_hour_keep_the_last_hours_read():
+    """CTL-030. Both hour entities take any hour from 0 to 23, so lights-on can equal lights-off (a 24 h
+    schedule typed as 0 and 0, or one step of swapping the two hours). Equal hours read as lights never
+    on: every zone was held in its overnight phase all day, and a blind zone got no water at all. Setup
+    refuses equal hours; the controller does not use them, keeps the hours it last read, and says so."""
+    states = dict(_room(1))
+    states["number.crop_steering_lights_on_hour"] = ("7", {})
+    states["number.crop_steering_lights_off_hour"] = ("20", {})
+    c, fake = _build(dict(SHIPPED), states=states)
+    c.loop_once(datetime(2026, 9, 21, 13, 59))
+    fake.set_state("number.crop_steering_lights_on_hour", "20")
+    c.loop_once(NOW)
+    room = c.rooms[0]
+    assert (room.lights_on_hour, room.lights_off_hour) == (7.0, 20.0)
+    assert c._lights_on(room, NOW)
+    (alert,) = _equal_hours_alerts(fake)
+    assert "20:00" in alert["message"] and "7:00-20:00" in alert["message"]
+
+
+def test_the_same_hour_with_no_hours_read_since_start_uses_the_option_hours():
+    """A restart with the two entities already equal: nothing usable read yet, so the option's hours, as
+    for entities that cannot be read, and the alert."""
+    states = dict(_room(1))
+    states["number.crop_steering_lights_on_hour"] = ("0", {})
+    states["number.crop_steering_lights_off_hour"] = ("0", {})
+    c, fake = _build(dict(SHIPPED), states=states)
+    c.loop_once(NOW)
+    room = c.rooms[0]
+    assert (room.lights_on_hour, room.lights_off_hour) == (10.0, 22.0)
+    assert c._lights_on(room, NOW)
+    (alert,) = _equal_hours_alerts(fake)
+    assert "0:00" in alert["message"] and "10:00-22:00" in alert["message"]
+
+
+@pytest.mark.parametrize("on, off, lit", [
+    (10, 22, set(range(10, 22))),
+    (22, 10, set(range(22, 24)) | set(range(0, 10))),
+])
+def test_the_lights_hours_that_differ_read_as_before(on, off, lit):
+    states = dict(_room(1))
+    states["number.crop_steering_lights_on_hour"] = (str(on), {})
+    states["number.crop_steering_lights_off_hour"] = (str(off), {})
+    c, fake = _build(dict(SHIPPED), states=states)
+    c.loop_once(NOW)
+    room = c.rooms[0]
+    assert (room.lights_on_hour, room.lights_off_hour) == (float(on), float(off))
+    assert {h for h in range(24) if c._lights_on(room, datetime(2026, 9, 21, h, 30))} == lit
+    assert _equal_hours_alerts(fake) == []

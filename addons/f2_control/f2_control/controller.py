@@ -2366,12 +2366,18 @@ class Controller:
     def _refresh_lights(self, room):
         """Lights are configured once in the integration, per room. Read them live from
         number.crop_steering_<prefix>lights_on_hour / _off_hour each loop, keeping the hours last
-        read through a loop that can't read them, and falling back to the add-on option only when
-        none have been read since start (an older integration without the entities). Log the
+        read through a loop that can't read them or reads them at the same hour (CS-401), and falling
+        back to the add-on option only when none have been read since start (an older integration
+        without the entities). Log the
         source once per room, and alert once if the integration value disagrees with the
         (now-legacy) add-on option."""
         lon = self._num_or_none(f"number.crop_steering_{room.prefix}lights_on_hour")
         loff = self._num_or_none(f"number.crop_steering_{room.prefix}lights_off_hour")
+        same = lon if lon is not None and lon == loff else None
+        if same is not None:
+            # Equal hours have no lights-off and read as lights never on: every zone held overnight all day
+            # (CTL-030). Setup refuses them, but each entity takes any hour, so they count as unreadable.
+            lon = loff = None
         if lon is not None and loff is not None:
             src = "integration"
             room._lights_last_read = (lon, loff)
@@ -2385,7 +2391,21 @@ class Controller:
             lon, loff, src = (
                 room.opt_lon,
                 room.opt_loff,
-                "add-on option (integration entity missing)",
+                "add-on option (integration entity missing)" if same is None
+                else "add-on option (integration hours the same)",
+            )
+        if same is not None:
+            self._alert(
+                f"lights_same_hour_{room.slug}",
+                "CS-401",
+                "lights-on and lights-off at the same hour",
+                f"Lights on hour and Lights off hour are both {int(same)}:00, the same hour. The controller cannot "
+                "use the same hour for the two: it gives no time for lights-off. The controller continues on "
+                f"{int(lon)}:00-{int(loff)}:00 ({src}). A room lit around the clock is not supported yet. Set the "
+                "hours the lights switch on and off."
+                f"\n\nSettings: number.crop_steering_{room.prefix}lights_on_hour, "
+                f"number.crop_steering_{room.prefix}lights_off_hour",
+                room=room,
             )
         if not room._lights_logged:
             tag = "" if room.prefix == "" else f"[{room.slug}] "
