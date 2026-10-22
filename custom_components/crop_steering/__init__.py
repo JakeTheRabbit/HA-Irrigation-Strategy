@@ -28,6 +28,7 @@ except ImportError:  # pragma: no cover - enables non-HA unit tests
         SELECT = "select"
         NUMBER = "number"
         BUTTON = "button"
+        BINARY_SENSOR = "binary_sensor"
 
 
 from .const import DOMAIN
@@ -56,6 +57,7 @@ PLATFORMS: list[Platform] = [
     Platform.SELECT,
     Platform.NUMBER,
     Platform.BUTTON,
+    Platform.BINARY_SENSOR,
 ]
 
 # Entities earlier versions created that nothing reads or sets any more, by platform and key. A key

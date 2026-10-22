@@ -35,6 +35,7 @@ def empty() -> dict:
         "presets": [],
         "presets_revision": 0,
         "alert_rules": [],
+        "alert_rules_revision": 0,
     }
 
 
@@ -154,8 +155,9 @@ def load(value) -> tuple[dict, list[dict]]:
     for key in ("presets", "alert_rules"):
         if isinstance(value.get(key), list):
             document[key] = value[key]
-    if type(value.get("presets_revision")) is int:
-        document["presets_revision"] = max(value["presets_revision"], 0)
+    for key in ("presets_revision", "alert_rules_revision"):
+        if type(value.get(key)) is int:
+            document[key] = max(value[key], 0)
     return document, warnings
 
 

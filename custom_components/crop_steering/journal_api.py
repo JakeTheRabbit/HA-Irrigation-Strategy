@@ -554,6 +554,15 @@ async def _put_back_section(hass, entry, room_id, data, who, call, check) -> dic
                 out["readback"]["status"] == "ok"
                 and site_store.supply_of(site.document) == old
             )
+        if section == "alert_rules":
+            revision = site.document["alert_rules_revision"]
+            check("The alert rules", site.document["alert_rules"], new, revision)
+
+            def put(stored):
+                stored[:] = deepcopy(old)
+
+            await site._save_alert_rules(revision, put, who, room_id)
+            return _read_back(site.document["alert_rules"] == old)
         revision = site.document["presets_revision"]
         check("The presets", site.document["presets"], new, revision)
 

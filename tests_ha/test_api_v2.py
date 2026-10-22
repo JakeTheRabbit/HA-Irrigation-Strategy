@@ -208,6 +208,7 @@ async def test_every_response_service_has_a_refusal_hook_or_never_answers_one(ha
     assert names - hooked - NEVER_ANSWERS_REFUSAL == set()
     assert NEVER_ANSWERS_REFUSAL <= names  # no stale name
     assert hooked == {
+        "alert_rule_test",
         "calibration_capture",
         "copy_config",
         "dosing_request",

@@ -2571,3 +2571,144 @@ pump_calibration_commit:
           step: 0.1
           unit_of_measurement: mL
           mode: box
+
+# Threshold alert rules (G6). A rule watches one source of a room and, when the value stays above or
+# below its threshold for min_duration_s inside its window, raises alert.raised and pushes to the
+# phones that tick its routing kind; binary_sensor.crop_steering_rule_<id> is on while it fires.
+# Sources: zone.vwc, zone.ec, zone.temperature, feed.ph, feed.ec, tank.level, stock.pct,
+# stock.litres (with tank_id), zone.flow_ratio, controller.heartbeat and probe.silence_s (with
+# entity_id). Climate sources are refused. A room's mute holds every rule not routed to emergency.
+# Rules only notify: they never touch irrigation.
+alert_rule_set:
+  name: Save an alert rule
+  description: >-
+    Adds a threshold alert rule, or changes one when the rule has an id. When a signed-in user calls
+    it, that user must be a Home Assistant administrator. Give the revision that you read with
+    alert_rule_list. Answers with the saved rule, its sentence and the new revision.
+  fields:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The alert rules revision you read. Example: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    rule:
+      name: Rule
+      description: >-
+        The rule: room_id, source, zones (zone sources), op (above or below), threshold in the
+        source's unit, window (all, lights_on, lights_off, or {"kind": "custom", "from": "HH:MM",
+        "to": "HH:MM"}), min_duration_s, severity (info, warning or emergency), routing (a
+        notification kind, default sensors), active, and tank_id or entity_id where the source needs
+        one. Example: {"room_id": "room:f2_", "source": "tank.level", "op": "below", "threshold":
+        30, "min_duration_s": 600, "window": "lights_on"}.
+      required: true
+      selector:
+        object:
+
+alert_rule_delete:
+  name: Delete an alert rule
+  description: >-
+    Removes a threshold alert rule and its binary sensor. When a signed-in user calls it, that user
+    must be a Home Assistant administrator.
+  fields:
+    id:
+      name: Rule ID
+      description: >-
+        The ID of the rule. Example: 01JB2Y3M4N5P6Q7R8S9T0V1W2X.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The alert rules revision you read. Example: 1.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+
+alert_rule_test:
+  name: Test an alert rule
+  description: >-
+    Replays a saved rule (id) or a draft (rule) against the recorder's history and says how often it
+    would have fired. With send, it also sends a test push through the rule's routing and answers
+    with each phone's delivery; sending needs a Home Assistant administrator.
+  fields:
+    id:
+      name: Rule ID
+      description: >-
+        A saved rule. Give either id or rule.
+      required: false
+      selector:
+        text:
+    rule:
+      name: Rule
+      description: >-
+        A draft rule, as for alert_rule_set. Give either id or rule.
+      required: false
+      selector:
+        object:
+    hours:
+      name: Hours
+      description: >-
+        How far back to replay, 1 to 168 hours. Default 24.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 168
+          unit_of_measurement: h
+          mode: box
+    send:
+      name: Send a test push
+      description: >-
+        Send a test push to the phones the rule routes to. Default off.
+      required: false
+      selector:
+        boolean:
+
+alert_rule_preview:
+  name: Preview an alert rule
+  description: >-
+    Replays a draft rule against the recorder's history without saving or sending anything: the
+    series (at most 1440 points), when it would have fired, the breaches it would have ignored and
+    why, and a sentence. Any signed-in user can call it.
+  fields:
+    rule:
+      name: Rule
+      description: >-
+        A draft rule, as for alert_rule_set.
+      required: true
+      selector:
+        object:
+    hours:
+      name: Hours
+      description: >-
+        How far back to replay, 1 to 168 hours. Default 24.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 168
+          unit_of_measurement: h
+          mode: box
+
+alert_rule_list:
+  name: List alert rules
+  description: >-
+    Returns the threshold alert rules with each one's state, when it last fired, since when it fires,
+    the source's value now and its unit. Any signed-in user can call it.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        Only this room's rules. Empty: every room's. Example: `room:f2_`.
+      required: false
+      selector:
+        text:

@@ -172,6 +172,10 @@ def failure(code: str, message: str, current_revision=None) -> dict:
 # holds every registered service to one or the other, so a new service cannot slip through.
 NEVER_ANSWERS_REFUSAL = frozenset(
     {
+        "alert_rule_delete",
+        "alert_rule_list",
+        "alert_rule_preview",
+        "alert_rule_set",
         "brain_ask",
         "brain_prompt_get",
         "brain_prompt_publish",

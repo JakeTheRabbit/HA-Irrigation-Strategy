@@ -645,7 +645,10 @@ class Notifier:
                 "error": None,
                 "muted": True,
             }  # to nobody, on purpose
-        kinds = notify_catalog.kinds_for(data.get("code"), data.get("event"), urgent)
+        # `kinds`: a threshold alert rule's own routing (site_api.py), not a public field of notify.
+        kinds = set(data.get("kinds") or ()) or notify_catalog.kinds_for(
+            data.get("code"), data.get("event"), urgent
+        )
         rows = route(self.data["recipients"], kinds, data.get("room"))
         held = [] if urgent else [row["service"] for row in rows if row["digest"]]
         # Quiet hours hold only a push known not to be critical: a critical code, or a code or event this
@@ -655,6 +658,7 @@ class Notifier:
             code in KNOWN_CODES and code not in notify_catalog.EMERGENCY
             if code
             else data.get("event") in notify_catalog.EVENTS
+            or (bool(data.get("kinds")) and "emergency" not in kinds)
         )
         quiet = []
         if not urgent and known and any(r["quiet_hours"] for r in rows):

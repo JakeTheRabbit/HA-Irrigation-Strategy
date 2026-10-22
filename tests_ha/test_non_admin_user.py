@@ -104,6 +104,10 @@ CHANGES = {
     "overlay_undo": {"room_id": ROOM, "entity_id": "number.crop_steering_zone_1_p2_shot_size"},
     "journal_append": {"room_id": ROOM, "events": []},
     "history_revert": {"event_id": "01JAAAAAAAAAAAAAAAAAAAAAAA"},
+    # The site's threshold alert rules, and a test push through one (a test that sends nothing is a read).
+    "alert_rule_set": {"expected_revision": 0, "rule": {}},
+    "alert_rule_delete": {"id": "x", "expected_revision": 0},
+    "alert_rule_test": {"rule": {}, "send": True},
 }
 READS = {
     "harvests_get": {"room_id": ROOM},
@@ -132,6 +136,9 @@ READS = {
     "timeline_get": {"rooms": [ROOM], "start": "2026-01-01T00:00:00+00:00",
                      "end": "2026-01-02T00:00:00+00:00"},
     "timeline_summary": {"rooms": [ROOM], "days": ["2026-01-01"]},
+    "alert_rule_list": {},
+    "alert_rule_preview": {"rule": {"room_id": ROOM, "source": "tank.level", "op": "below",
+                                    "threshold": 30}},
 }
 # Changes nothing but whether the dashboard's What's new window shows again: whoever opens the
 # dashboard first after an update may dismiss it, administrator or not.
