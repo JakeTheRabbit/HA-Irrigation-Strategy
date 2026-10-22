@@ -269,12 +269,19 @@ def test_a_saved_setup_journals_the_whole_setup_before_and_after(emitted):
         "room_name": "Tent",
         "safety": {"ready": True},
         "commissioning": {"x": 1},
+        "entry_id": "e",
+        "plumbing_inferred": "a",
+        "active_zone_ids": [1],
+        "zones": [{"id": 1, "name": "A", "sizing_generic": ["plant_count"]}],
     }
     room = {
         **before,
         "revision": 2,
         "room_name": "Back room",
         "safety": {"ready": False},
+        "plumbing_inferred": "b",
+        "active_zone_ids": [1, 2],
+        "zones": [{"id": 1, "name": "A", "sizing_generic": []}],
     }
     who = {"actor": "manual", "user_id": "u1", "client": None}
     setup_api._journal(None, "setup_save", before, room, who)
@@ -286,48 +293,37 @@ def test_a_saved_setup_journals_the_whole_setup_before_and_after(emitted):
     )
     assert event.correlation == {"setup_revision": 2}
     assert event.data["store"] == "setup" and event.data["section"] == "room"
-    assert "safety" not in event.data["old"] and "safety" not in event.data["new"]
+    for side in (event.data["old"], event.data["new"]):
+        assert not set(setup_api.DERIVED) & set(side)
+        assert side["zones"] == [{"id": 1, "name": "A"}]
     assert event.data["old"]["room_name"] == "Tent"
     assert event.data["new"]["room_name"] == "Back room"
-    assert [d["path"] for d in event.data["diff"]] == ["revision", "room_name"]
+    assert [d["path"] for d in event.data["diff"]] == ["room_name"]
     emitted.clear()
     setup_api._journal(None, "setup_save", room, room, who)
     setup_api._journal(None, "setup_commission", before, room, who)
     assert emitted == []
+    setup_api._journal(None, "setup_save", {**room, "revision": 3}, room, who)
+    assert emitted == []  # a revision bump alone is not an operator change
+
+
+def test_a_created_setup_has_no_old_and_a_removed_one_is_archived(emitted):
+    who = {"actor": "manual", "user_id": "u1", "client": None}
+    room = {"prefix": "f2_", "revision": 1, "room_name": "Tent", "active": True}
+    setup_api._journal(None, "setup_create", None, room, who)
+    created = emitted.pop()
+    assert (created.kind, created.data["old"]) == ("config.changed", None)
+    assert created.data["new"] == {"prefix": "f2_", "room_name": "Tent", "active": True}
+    assert {"path": "room_name", "old": None, "new": "Tent"} in created.data["diff"]
+    setup_api._journal(
+        None, "setup_remove", room, {**room, "revision": 2, "active": False}, who
+    )
+    (removed,) = emitted
+    assert removed.data["diff"] == [{"path": "active", "old": True, "new": False}]
 
 
 def _call(user_id=None, **data):
     return SimpleNamespace(data=data, context=SimpleNamespace(user_id=user_id))
-
-
-def test_keep_and_undo_on_an_overlay_are_journaled_on_the_overlay_layer(emitted):
-    from custom_components.crop_steering.overlays import Overlays
-
-    held = SimpleNamespace(hass=None, room_id="room:f2_")
-    row = {
-        "entity_id": ENTITY,
-        "zone": 3,
-        "field": "p2_vwc_threshold",
-        "old": 50.0,
-        "new": 47.0,
-        "expires": "2026-10-23T07:00:00+13:00",
-    }
-    Overlays.journal(held, row, _call("u1"), undone=False)
-    Overlays.journal(held, row, _call("u1", client="mcp"), undone=True)
-    kept, undone = emitted
-    assert (kept.kind, kept.zone, kept.actor, kept.user_id) == (
-        "target.changed",
-        3,
-        "manual",
-        "u1",
-    )
-    assert (kept.data["layer"], kept.data["old"], kept.data["new"]) == (
-        "overlay",
-        50.0,
-        47.0,
-    )
-    assert (undone.actor, undone.data["old"], undone.data["new"]) == ("mcp", 47.0, 50.0)
-    assert undone.data["reason"] == "overlay undone"
 
 
 def test_a_calibration_record_is_journaled_as_captured_and_not_applied(emitted):
@@ -356,3 +352,201 @@ def test_a_calibration_record_is_journaled_as_captured_and_not_applied(emitted):
         None, "room:f2_", object(), _call("u1")
     )  # not a response: nothing, no error
     assert len(emitted) == 1
+
+
+async def _done(value):
+    return value
+
+
+class Hub:
+    """A journal that keeps what emit() hands it, after emit's own (real) validate_event."""
+
+    failed = closed = False
+
+    def __init__(self):
+        self.events = []
+
+    def schedule(self, room_id, event):
+        self.events.append((room_id, event))
+
+
+def test_every_kind_the_producers_emit_passes_the_real_validation(monkeypatch):
+    from custom_components.crop_steering.calibration import journal_record
+    from custom_components.crop_steering.journal import validate_event
+
+    hub = Hub()
+    hass = ha_stubs.FakeHass(data={"crop_steering": {"_journal": hub}})
+    hass.auth = SimpleNamespace(
+        async_get_user=lambda uid: _done(SimpleNamespace(system_generated=False))
+    )
+    entry = ha_stubs.FakeEntry(data={"room_prefix": "f2_"}, entry_id="e")
+    log = SetpointLog(hass, entry, MemoryStore())
+    asyncio.run(log.async_init())
+    asyncio.run(
+        log.record(ENTITY, "p2_vwc_threshold", 3, 50.0, 51.0, _call("u1").context)
+    )
+    who = {"actor": "manual", "user_id": "u1", "client": None}
+    setup_api._journal(
+        hass,
+        "setup_save",
+        {"prefix": "f2_", "revision": 1, "a": 1},
+        {"prefix": "f2_", "revision": 2, "a": 2},
+        who,
+    )
+    record = {
+        "id": "x",
+        "probe": "feed_ph",
+        "kind": "ph",
+        "entity_id": None,
+        "slope_pct": 99.0,
+        "offset": 0.0,
+        "verdict": "pass",
+        "points": [],
+        "note": "",
+    }
+    journal_record(hass, "room:f2_", {"records": [record]}, _call("u1"))
+    manager, _, _ = manager_fixture(monkeypatch)
+    manager.hass.data["crop_steering"]["_journal"] = hub
+    asyncio.run(manager.async_init())
+    asyncio.run(manager.save(plan(), 0, who=who))
+    _, store = stock_rig()
+    store.hass.data["crop_steering"]["_journal"] = hub
+    mutate(store, "stock_save", tanks=[{**BLOOM, "level_l": 20}])
+    asyncio.run(store.mutate("stock_record_batch", {"expected_revision": 1}, who))
+    assert [event["kind"] for _, event in hub.events] == [
+        "target.changed",
+        "config.changed",
+        "calibration.captured",
+        "plan.saved",
+        "stock.drawn",
+    ]
+    for _, event in hub.events:
+        assert validate_event(event) is event
+
+
+def _overlay_rig(monkeypatch):
+    """A room with the real SetpointLog, Overlays and keep / undo handlers; the number's `set_value` goes back
+    through the setpoint log, as number.py does."""
+    import sys
+    import types
+
+    store_module = types.ModuleType("homeassistant.helpers.storage")
+    store_module.Store = lambda *a, **k: MemoryStore()
+    monkeypatch.setitem(sys.modules, "homeassistant.helpers.storage", store_module)
+    monkeypatch.setattr(
+        sys.modules["homeassistant.core"],
+        "SupportsResponse",
+        SimpleNamespace(ONLY="only"),
+        raising=False,
+    )
+    from custom_components.crop_steering import overlays
+
+    hass = ha_stubs.FakeHass()
+    hass.auth = SimpleNamespace(
+        async_get_user=lambda uid: _done(
+            SimpleNamespace(is_admin=True, system_generated=False)
+        )
+    )
+    hass.bus.async_listen = lambda *a: lambda: None
+    hass.services.async_register = (
+        lambda d, n, h, schema=None, supports_response=None: (
+            hass.services.registered.__setitem__((d, n), h)
+        )
+    )
+    hass.states.set(ENTITY, "47.0")
+    entry = ha_stubs.FakeEntry(data={"room_prefix": "f2_"}, entry_id="e")
+    log = SetpointLog(hass, entry, MemoryStore())
+    asyncio.run(log.async_init())
+    hass.data["crop_steering"] = {"_setpoint_log": {"e": log}}
+
+    async def set_value(domain, service, data, blocking=False, context=None):
+        old = float(hass.states.get(data["entity_id"]).state)
+        hass.states.set(data["entity_id"], str(data["value"]))
+        await log.record(
+            data["entity_id"], "p2_vwc_threshold", 3, old, data["value"], context
+        )
+
+    hass.services.async_call = set_value
+    asyncio.run(overlays.async_setup_overlays(hass, entry))
+    held = hass.data["crop_steering"]["_overlays"]["e"]
+    held.rows[ENTITY] = {
+        "entity_id": ENTITY,
+        "zone": 3,
+        "field": "p2_vwc_threshold",
+        "old": 50.0,
+        "new": 47.0,
+        "by": "brain",
+        "at": "2026-10-22T07:00:00+13:00",
+        "expires": "2026-10-23T07:00:00+13:00",
+    }
+    return hass, held, log
+
+
+def _serve(hass, name):
+    call = SimpleNamespace(
+        service=name,
+        data={"room_id": "room:f2_", "entity_id": ENTITY},
+        context=SimpleNamespace(user_id="u1"),
+    )
+    asyncio.run(hass.services.registered[("crop_steering", name)](call))
+
+
+def test_an_undo_is_one_value_change_and_one_overlay_removed_marker(
+    monkeypatch, emitted
+):
+    hass, held, log = _overlay_rig(monkeypatch)
+    _serve(hass, "overlay_undo")
+    value, marker = emitted
+    assert (value.kind, value.actor, value.user_id) == (
+        "target.changed",
+        "manual",
+        "u1",
+    )
+    assert (value.data["layer"], value.data["old"], value.data["new"]) == (
+        "base",
+        47.0,
+        50.0,
+    )
+    assert (marker.kind, marker.actor) == ("target.changed", "manual")
+    assert (marker.data["layer"], marker.data["old"], marker.data["new"]) == (
+        "overlay",
+        47.0,
+        None,
+    )
+    assert marker.data["reason"] == "undone" and held.rows == {}
+
+
+def test_a_keep_is_only_the_overlay_marker_and_an_expiry_says_it_ran_out(
+    monkeypatch, emitted
+):
+    hass, held, log = _overlay_rig(monkeypatch)
+    _serve(hass, "overlay_keep")
+    (marker,) = emitted
+    assert (marker.data["layer"], marker.data["old"], marker.data["new"]) == (
+        "overlay",
+        47.0,
+        None,
+    )
+    assert marker.data["reason"] == "kept" and log.changes == []
+    emitted.clear()
+    _, held2, _ = _overlay_rig(monkeypatch)
+    asyncio.run(held2.end(ENTITY, put_back=True))  # it ran out: no caller
+    (back,) = emitted
+    assert (back.actor, back.data["reason"], back.data["new"]) == (
+        "ai",
+        "overlay ran out",
+        50.0,
+    )
+
+
+def test_disarming_a_plan_that_is_already_a_draft_journals_nothing(
+    monkeypatch, emitted
+):
+    manager, _, now = manager_fixture(monkeypatch)
+
+    async def scenario():
+        await manager.async_init()
+        await manager.disarm(now)
+
+    asyncio.run(scenario())
+    assert emitted == []

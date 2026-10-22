@@ -67,7 +67,10 @@ async def test_setup_save_emits_config_changed_with_the_diff(
         data["old"]["room_name"] == "Tent" and data["new"]["room_name"] == "Back room"
     )
     assert {"path": "room_name", "old": "Tent", "new": "Back room"} in data["diff"]
-    assert event["correlation"]["setup_revision"] == data["new"]["revision"]
+    assert event["correlation"]["setup_revision"] == first["revision"] + 1
+    assert [d["path"] for d in data["diff"]] == [
+        "room_name"
+    ]  # only what the operator changed
 
 
 async def test_strategy_activate_emits_plan_armed(hass, hass_admin_user, room):

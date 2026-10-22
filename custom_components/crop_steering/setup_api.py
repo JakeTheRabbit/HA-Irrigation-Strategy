@@ -1045,20 +1045,37 @@ def setup_diff(old, new):
     ]
 
 
-# Read-outs of the room that are not part of the setup a save writes.
-DERIVED = ("safety", "commissioning")
+# Read-outs of `setup_room` (and of read_setup) that are derived, not set by the operator: left out of a
+# journaled setup so its diff shows only what someone chose.
+DERIVED = (
+    "api_version",
+    "capabilities",
+    "entry_id",
+    "revision",
+    "plumbing_inferred",
+    "active_zone_ids",
+    "safety",
+    "commissioning",
+)
+
+
+def _owned(room):
+    """PURE. `setup_room` without its derived read-outs (and each zone's `sizing_generic`)."""
+    out = {k: v for k, v in room.items() if k not in DERIVED}
+    if isinstance(out.get("zones"), list):
+        out["zones"] = [
+            {k: v for k, v in zone.items() if k != "sizing_generic"}
+            for zone in out["zones"]
+        ]
+    return out
 
 
 def _journal(hass, action, before, room, who):
     """A saved setup change -> `config.changed` with the whole setup before and after (a create has no before)."""
     if action not in ("setup_save", "setup_create", "setup_remove"):
         return
-    old = (
-        {k: v for k, v in before.items() if k not in DERIVED}
-        if before is not None
-        else None
-    )
-    new = {k: v for k, v in room.items() if k not in DERIVED}
+    old = _owned(before) if before is not None else None
+    new = _owned(room)
     diff = setup_diff(old, new)
     if not diff:
         return

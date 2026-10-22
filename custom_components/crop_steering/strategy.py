@@ -517,7 +517,10 @@ class StrategyManager:
                 self.document = prior
                 raise
             self._publish(now)
-            self._journal("plan.disarmed", who)
+            if (
+                prior["status"] != "draft"
+            ):  # disarming a plan that is already a draft changes nothing
+                self._journal("plan.disarmed", who)
             return self.response(now)
 
     async def tick(self, now=None):

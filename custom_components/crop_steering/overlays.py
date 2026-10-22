@@ -143,7 +143,14 @@ class Overlays:
             log = setpoint_log.log_for(self.hass, self.entry.entry_id)
             # Running out (no caller): the change log records the AI's change going back.
             if context is None and log is not None:
-                log.claim({"entity_id": entity_id, "value": row["old"], "who": "brain"})
+                log.claim(
+                    {
+                        "entity_id": entity_id,
+                        "value": row["old"],
+                        "who": "brain",
+                        "reason": "overlay ran out",
+                    }
+                )
             await self.hass.services.async_call(
                 "number",
                 "set_value",
@@ -154,11 +161,11 @@ class Overlays:
         return row
 
     def journal(self, row, call, *, undone):
-        """Keep or Undo on an overlay -> a `target.changed` on the overlay layer: Keep makes the AI's value
-        the operator's, Undo takes the operator's value back."""
+        """Keep or Undo on an overlay -> a `target.changed` on the overlay layer that says the overlay is gone
+        (`new` is None). It is not a value change: Undo's put-back is the base layer's own row (setpoint_log),
+        and Keep moves no value."""
         try:
             who = attribution(self.hass, call)
-            old, new = (row["new"], row["old"]) if undone else (row["old"], row["new"])
             zone = row.get("zone")
             note(
                 self.hass,
@@ -173,10 +180,10 @@ class Overlays:
                     "key": row.get("field"),
                     "scope": "room" if zone is None else f"zone:{zone}",
                     "layer": "overlay",
-                    "old": old,
-                    "new": new,
+                    "old": row["new"],
+                    "new": None,
                     "expires": row.get("expires"),
-                    "reason": "overlay undone" if undone else "overlay kept",
+                    "reason": "undone" if undone else "kept",
                     "expected": None,
                     "entity_id": row["entity_id"],
                 },
