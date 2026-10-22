@@ -282,7 +282,7 @@ try {
     },
   );
   await check(
-    "an open dropdown can be read on a dark Home Assistant theme (targets, timeline, capability directory, compare)",
+    "an open dropdown can be read on a dark Home Assistant theme (targets, explorer, capability directory, compare)",
     async () => {
       // Home Assistant's input fill is a translucent rgba of the text colour. The browser cannot
       // paint an option list with it and fell back to white under light text.
@@ -298,7 +298,8 @@ try {
         };
         for (const route of [
           "plan/targets",
-          "history/timeline",
+          // The explorer's zone detail: its probe comparison pickers.
+          "history/explorer?zone=1",
           "settings/features",
           "history/compare",
         ]) {

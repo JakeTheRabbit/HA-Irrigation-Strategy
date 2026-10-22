@@ -219,7 +219,7 @@ try {
     await go("today");
     await expectVisible(page.getByRole("heading", { name: "Room A", exact: true, level: 1 }));
     await page.goto(`${base}/dashboard.html?demo&room=f2&view=logs`, { waitUntil: "networkidle" });
-    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Explorer", exact: true }));
     await go("settings");
     await landing.selectOption("all-zones");
   });
@@ -231,13 +231,13 @@ try {
       ["grow-plan", "plan/schedule", "Irrigation"],
       ["compare", "history/compare", "Compare runs"],
       ["insights", "equipment/probes", "Probes"],
-      ["activity", "history/explorer", "History"],
+      ["activity", "history/explorer", "Explorer"],
       ["sensors", "equipment/probes", "Probes"],
       ["stock", "equipment/stock", "Stock tanks"],
       ["setup", "equipment/setup", "Rooms and setup"],
       ["plan", "plan/watering", "Timeline"],
-      ["history", "history/explorer", "History"],
-      ["history/timeline", "history/explorer", "History"],
+      ["history", "history/explorer", "Explorer"],
+      ["history/timeline", "history/explorer", "Explorer"],
       ["equipment/feed", "equipment/dosing", "Dosing"],
       ["equipment", "equipment/probes", "Probes"],
     ];
@@ -250,7 +250,7 @@ try {
     await go("help?code=CS-605");
     await expectVisible(page.locator("details#cs-605[open]"));
     await page.goto(`${base}/dashboard.html?demo&room=f2&view=logs`, { waitUntil: "networkidle" });
-    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Explorer", exact: true }));
     // Rewritten in place: Back returns to the page before, not to the old address.
     await go("today");
     const before = await page.evaluate(() => history.length);
@@ -270,7 +270,7 @@ try {
     ["plan/schedule", "Irrigation"],
     ["plan/watering", "Timeline"],
     ["plan/timers", "Timer programs"],
-    ["history/explorer", "History"],
+    ["history/explorer", "Explorer"],
     ["history/water", "Water use"],
     ["history/compare", "Compare runs"],
     ["history/changes", "Changes"],
@@ -348,7 +348,7 @@ try {
       await page.goBack();
       await expectVisible(page.getByRole("heading", { name: "Irrigation", exact: true }));
       await page.goForward();
-      await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
+      await expectVisible(page.getByRole("heading", { name: "Explorer", exact: true }));
     },
   );
   await check(
@@ -472,7 +472,7 @@ try {
     await page.getByRole("button", { name: "Recent activity", exact: true }).click();
     await expectVisible(panel);
     await panel.getByRole("button", { name: "Open the timeline" }).click();
-    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Explorer", exact: true }));
     assert.equal(await page.getByRole("dialog").count(), 0, "the panel closes when the log opens");
   });
   await check("today: a laptop view says which zone needs you and why, in place", async () => {
@@ -1075,76 +1075,59 @@ try {
       await axe("schedule, advanced open");
     },
   );
-  await check("timeline: one list with Jev in it, filtered, with its outcome checks", async () => {
+  await check("explorer: the room's charts under its phase and shot lanes, chips and CSV export", async () => {
     await go("history/explorer");
-    const rows = page.locator(".timeline-row");
-    await expectVisible(rows.first());
-    const all = await rows.count();
-    assert.ok(all > 10, `the demo's records and Jev's journal, ${all}`);
-    assert.deepEqual(await page.locator(".timeline-day h2").allInnerTexts(), [
-      "TODAY",
-      "YESTERDAY",
+    const explorer = page.locator("[data-room-explorer]");
+    await expectVisible(explorer);
+    await page.waitForFunction(
+      () => Number(document.querySelector("[data-room-explorer]")?.dataset.explorerLoads) > 0,
+      null,
+      { timeout: 20_000 },
+    );
+    // The lanes and the charts: every zone's VWC and EC, the feed EC and the tank level.
+    await expectVisible(page.locator("[data-phase-lane] [data-phase]").first());
+    assert.deepEqual(await page.locator("[data-chart]").evaluateAll((all) => all.map((el) => el.dataset.chart)), [
+      "VWC",
+      "Pore EC",
+      "Feed EC",
+      "Tank level",
     ]);
-    // The AI assistant's actions by default; every decision on request.
-    const toggle = page.getByLabel("All AI assistant decisions");
-    await toggle.check();
-    assert.ok((await rows.count()) > all, "every decision shows more rows");
-    await toggle.uncheck();
-    assert.equal(await rows.count(), all);
-    // An outcome is a tick or a cross on the decision it checks.
-    assert.ok((await page.locator(".timeline-outcome").count()) > 0);
-    // Water only; one zone; the room only.
-    const types = page.getByRole("group", { name: "Record type" });
-    await types.getByRole("button", { name: "Water", exact: true }).click();
-    const kinds = await rows.evaluateAll((all) => [...new Set(all.map((row) => row.dataset.kind))]);
-    assert.deepEqual(kinds, ["water"]);
-    await types.getByRole("button", { name: "All", exact: true }).click();
-    const zone = page.getByLabel("Timeline zone");
-    await zone.selectOption("2");
-    const zones = await rows.locator(".timeline-zone").allInnerTexts();
-    assert.ok(zones.length > 0 && zones.every((name) => name === "Zone 2"), zones.join());
-    await zone.selectOption("room");
-    assert.deepEqual([...new Set(await rows.locator(".timeline-zone").allInnerTexts())], ["Room"]);
-    await zone.selectOption("all");
-    // A setpoint changed by hand is yours; the AI assistant only noted it.
-    await types.getByRole("button", { name: "Setpoints", exact: true }).click();
-    await expectVisible(page.locator('.timeline-jev-tag[data-by="you"]').first());
-    await expectVisible(page.getByText("Noted by the AI assistant").first());
-    await types.getByRole("button", { name: "All", exact: true }).click();
-    await inBothThemes("timeline", async () => {
+    // The old list, its filters and the setpoint log are gone: changes live on History › Changes.
+    assert.equal(await page.locator(".timeline-row").count(), 0);
+    // A chip adds its chart; the export counts what is charted.
+    const exportButton = page.locator("[data-export-csv]");
+    assert.equal((await exportButton.innerText()).trim(), "Export CSV · 8 series");
+    await page.getByRole("button", { name: "Room VPD", exact: true }).click();
+    await expectVisible(page.locator('[data-chart="VPD"]'));
+    assert.equal((await exportButton.innerText()).trim(), "Export CSV · 9 series");
+    await page.getByRole("button", { name: "Room VPD", exact: true }).click();
+    await inBothThemes("explorer", async () => {
       await go("history/explorer");
-      await expectVisible(page.locator(".timeline-row").first());
+      await expectVisible(page.locator("[data-chart]").first());
     });
-    // A room without the AI assistant: its controller records, without the AI assistant's toggle.
+    // Room B: the same page on its own zones.
     await go("history/explorer", "room_b");
-    await expectVisible(page.locator(".timeline-row").first());
-    assert.equal(await page.getByLabel("All AI assistant decisions").count(), 0);
-    assert.equal(await page.locator('.timeline-row[data-source="jev"]').count(), 0);
-    // Every kind of record is coloured the way the pills are: water blue, phase violet, alerts amber.
-    const colours = await page
-      .locator(".timeline-kind")
-      .evaluateAll((all) => [...new Set(all.map((kind) => kind.dataset.kind))].sort());
-    assert.deepEqual(colours, ["alert", "phase", "water"]);
-  });
-  await check("timeline: search, clear and CSV export", async () => {
+    await expectVisible(page.locator('[data-chart="VWC"]'));
     await go("history/explorer");
-    await page.getByRole("textbox", { name: "Search the timeline" }).fill("no-such-event");
-    await expectVisible(page.getByRole("heading", { name: "Nothing matches this view" }));
-    await page.getByRole("button", { name: "Clear filters" }).click();
+    await page.waitForFunction(
+      () => Number(document.querySelector("[data-room-explorer]")?.dataset.explorerLoads) > 0,
+      null,
+      { timeout: 20_000 },
+    );
     const downloadPromise = page.waitForEvent("download");
-    await page.getByRole("button", { name: "Export CSV" }).click();
+    await exportButton.click();
     const download = await downloadPromise;
-    assert.match(download.suggestedFilename(), /room-a-timeline-.+\.csv/);
-    await download.saveAs(path.join(out, "timeline-export.csv"));
-    const csv = await readFile(path.join(out, "timeline-export.csv"), "utf8");
-    assert.match(csv, /Timestamp.*Room.*Zone.*Type.*Message.*Result/);
-    assert.match(csv, /"AI assistant · /);
+    assert.match(download.suggestedFilename(), /room-a-explorer-.+\.csv/);
+    await download.saveAs(path.join(out, "explorer-export.csv"));
+    const csv = await readFile(path.join(out, "explorer-export.csv"), "utf8");
+    assert.match(csv, /^\uFEFF?Time,Zone 1 VWC \(%\),Zone 1 Pore EC \(mS\/cm\),/);
   });
-  await check("a zone page's Jev history opens the timeline on that zone", async () => {
+  await check("a zone page's history opens the explorer on that zone", async () => {
     await go("zone/2");
     await page.getByRole("button", { name: "Explore recorded history and comparisons" }).click();
-    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
-    assert.equal(await page.getByLabel("Timeline zone").inputValue(), "2");
+    await expectVisible(page.getByRole("heading", { name: "Explorer", exact: true }));
+    await expectVisible(page.locator('[data-zone-detail="2"] [data-history-explorer]'));
+    assert.match(await page.locator(".explorer-lane-name").first().innerText(), /Zone 2/i);
   });
   await check(
     "water use: every zone's litres, its grow weeks, and water per plant today",

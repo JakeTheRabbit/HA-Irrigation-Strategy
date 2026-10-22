@@ -352,28 +352,7 @@ export default function App() {
           />
         );
       case "history/explorer":
-        return (
-          <Explorer
-            key={pageKey}
-            controller={controller}
-            zone={focusZone}
-            onZoneChange={(zone) => {
-              setFocusZone(zone);
-              const query = new URLSearchParams(window.location.hash.split("?")[1] ?? "");
-              if (zone) query.set("zone", String(zone));
-              else query.delete("zone");
-              const target: Route = zone
-                ? { page: "history/explorer", zone }
-                : { page: "history/explorer" };
-              setRoute(target);
-              window.history.replaceState(
-                null,
-                "",
-                "#/history/explorer" + (query.size ? "?" + query.toString() : ""),
-              );
-            }}
-          />
-        );
+        return <Explorer key={pageKey} controller={controller} zone={focusZone} />;
       case "history/water":
         return <WaterUsePage key={pageKey} controller={controller} />;
       case "history/drivers":

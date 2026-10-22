@@ -1,23 +1,34 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { RunRecord } from "./comparison-types";
 import { createDemo } from "./demo";
 import {
   alignGrid,
   alignToCurrent,
+  chartNotes,
   chunks,
   DEFAULT_CHOICE,
+  defaultExplorerSeries,
   drybackMarkers,
+  explorerCsv,
   explorerSensors,
+  explorerSeries,
+  loadExplorerEvents,
+  phaseLane,
   pickRuns,
   previousWindow,
   readChoice,
+  readExplorerChoice,
   resolveRange,
   runDayAt,
   runDayStart,
   SeriesGrid,
   stepFor,
   writeChoice,
+  writeExplorerChoice,
+  type NoteReading,
 } from "./history-explorer";
+import type { CsEvent } from "./parity-types";
+import type { ProjectionIntent } from "./strategy-review";
 import { buildRoom, discoverRooms } from "./model";
 
 const MIN = 60_000,
@@ -269,5 +280,165 @@ describe("the 30 d range and the dryback markers", () => {
     ]);
     expect(markers[0].percent).toBeCloseTo(20, 6);
     expect(drybackMarkers(times, values.map(() => null), [0])).toEqual([]);
+  });
+});
+
+describe("H1 explorer: lanes, notes, CSV and the event read", () => {
+  const T0 = Date.parse("2026-10-22T00:00:00Z");
+  const at = (h: number, m = 0) => T0 + h * HOUR + m * MIN;
+  const iso = (ms: number) => new Date(ms).toISOString();
+  const event = (kind: string, ms: number, data: Record<string, unknown>, zone: number | null = null): CsEvent => ({
+    v: 1,
+    id: `${kind}-${ms}`,
+    ts: iso(ms),
+    room_id: "room:",
+    zone,
+    kind,
+    outcome: "ok",
+    code: null,
+    source: { actor: "engine" },
+    data,
+  });
+
+  it("phaseLane splits on phase.changed and marks projection planned", () => {
+    const events = [
+      event("phase.changed", at(6), { from: "P3", to: "P0", how: "lights on" }),
+      event("phase.changed", at(7, 30), { from: "P0", to: "P1", how: "dryback reached" }, 1),
+      event("phase.changed", at(10), { from: "P1", to: "P2", how: "field capacity reached" }, 1),
+      // Another zone's change is not this lane's.
+      event("phase.changed", at(9), { from: "P1", to: "P2", how: "field capacity reached" }, 2),
+    ];
+    const span = { start: at(0), end: at(24) };
+    const now = at(14, 5);
+    const projection: ProjectionIntent[] = [
+      { zone: 1, at: iso(at(15)), duration_s: 60, source: "engine", expected: true },
+      { zone: 1, at: iso(at(16, 30)), duration_s: 60, source: "timer", expected: false },
+    ];
+    const lane = phaseLane(events, span, projection, { now, zone: 1 });
+    expect(lane).toEqual([
+      { from: at(0), to: at(6), phase: "P3", planned: false },
+      { from: at(6), to: at(7, 30), phase: "P0", planned: false },
+      { from: at(7, 30), to: at(10), phase: "P1", planned: false },
+      { from: at(10), to: now, phase: "P2", planned: false },
+      { from: now, to: at(16, 31), phase: "P2", planned: true },
+    ]);
+    // No projection, no planned segment: the lane ends now.
+    expect(phaseLane(events, span, null, { now, zone: 1 }).some((s) => s.planned)).toBe(false);
+    expect(phaseLane(events, span, [], { now, zone: 1 }).at(-1)?.to).toBe(now);
+  });
+
+  it("chartNotes reports band excursion start once", () => {
+    const points = [8, 9, 9.5, 9.6, 9.7, 9.8, 10, 10.2].map((h, i) => ({ t: at(h), v: [5.4, 5.8, 6.2, 6.5, 6.6, 6.4, 6.3, 6.6][i] }));
+    const readings: NoteReading[] = [
+      { key: "ec2", label: "Zone 2", entityId: "sensor.ec_2", points, band: [4.5, 6.0], kind: "value" },
+      // Not selected: no note.
+      { key: "ec3", label: "Zone 3", entityId: "sensor.ec_3", points, band: [4.5, 6.0], kind: "value" },
+    ];
+    const notes = chartNotes([], ["ec2"], readings, "UTC");
+    expect(notes).toEqual([{ at: at(9, 30), series: "ec2", text: "Zone 2 over the band since 09:30" }]);
+    // Out of the band from the range's first reading: it left before, so no start time is claimed.
+    const early = [{ t: at(0), v: 3 }, { t: at(1), v: 3.1 }, { t: at(2), v: 4.6 }];
+    expect(chartNotes([], ["ec2"], [{ ...readings[0], points: early }], "UTC")[0].text).toBe("Zone 2 under the band until 02:00");
+    expect(chartNotes([], ["ec2"], [{ ...readings[0], points: early.slice(0, 2) }], "UTC")[0].text).toBe(
+      "Zone 2 under the band all through this range",
+    );
+    // An excursion that ended says when; a refill on a level reads its rise; an alert on a series is
+    // said once (the band note already says it).
+    const back = [...points, { t: at(11), v: 5.5 }];
+    const level: NoteReading = {
+      key: "tank",
+      label: "Tank",
+      entityId: "sensor.tank",
+      kind: "level",
+      band: null,
+      points: [
+        { t: at(6), v: 40 },
+        { t: at(6, 10), v: 41 },
+        { t: at(6, 20), v: 74 },
+        { t: at(7), v: 73 },
+      ],
+    };
+    const alert = event("alert.raised", at(9, 40), { title: "Pore EC 6.6 is over the band", entity_id: "sensor.ec_2" }, 2);
+    const other = event("alert.raised", at(6, 30), { title: "Tank low", entity_id: "sensor.tank" });
+    expect(
+      chartNotes([alert, other], ["ec2", "tank"], [{ ...readings[0], points: back }, level], "UTC"),
+    ).toEqual([
+      { at: at(6, 20), series: "tank", text: "Refilled 06:20 · 41% to 74%" },
+      { at: at(6, 30), series: "tank", text: "Tank low" },
+      { at: at(9, 30), series: "ec2", text: "Zone 2 over the band 09:30 to 11:00" },
+    ]);
+  });
+
+  it("csv header counts selected series", () => {
+    const csv = explorerCsv(
+      [at(10), at(10, 5)],
+      [
+        { label: "Zone 1 VWC", unit: "%", values: [58.42, null] },
+        { label: "Zone 1, pore EC", unit: "mS/cm", values: [5.3, 5.31] },
+      ],
+      "UTC",
+    );
+    const [head, first, second] = csv.trim().split("\n");
+    expect(head).toBe('Time,Zone 1 VWC (%),"Zone 1, pore EC (mS/cm)"');
+    expect(head.split(/,(?=(?:[^"]*"[^"]*")*[^"]*$)/)).toHaveLength(3);
+    expect(first).toBe("2026-10-22 10:00,58.42,5.3");
+    expect(second).toBe("2026-10-22 10:05,,5.31");
+  });
+
+  it("7-day range uses pagedQuery", async () => {
+    const query = vi.fn(async (_c: unknown, q: { since: string; until?: string }) => ({
+      kind: "ok" as const,
+      data: { events: [event("shot.completed", Date.parse(q.since) + HOUR, {}, 1)] },
+      revision: null,
+      readback: { status: "verified" as const, at: null },
+      eventIds: [],
+    }));
+    const span = { start: at(0) - 7 * DAY, end: at(0) };
+    const read = await loadExplorerEvents({ operator: vi.fn() } as never, "room:", span, query);
+    expect(query).toHaveBeenCalledTimes(7);
+    for (const [, q] of query.mock.calls)
+      expect(q).toMatchObject({ room_id: "room:", kinds: ["phase.changed", "shot.completed", "alert.raised"] });
+    expect(query.mock.calls[0][1].until).toBe(iso(span.end));
+    expect(read).toMatchObject({ kind: "ok", truncated: false });
+    if (read.kind === "ok") expect(read.events.map((e) => Date.parse(e.ts))).toEqual([...read.events.map((e) => Date.parse(e.ts))].sort((a, b) => a - b));
+    // Over the cap: the newest whole days only, and it says so.
+    const many = vi.fn(async (_c: unknown, q: { since: string }, max?: number) => ({
+      kind: "ok" as const,
+      data: { events: Array.from({ length: Math.min(max ?? 5000, 3) }, (_, i) => event("shot.completed", Date.parse(q.since) + i * MIN, {}, 1)) },
+      revision: null,
+      readback: { status: "verified" as const, at: null },
+      eventIds: [],
+    }));
+    const capped = await loadExplorerEvents({ operator: vi.fn() } as never, "room:", span, many, 7);
+    expect(capped).toMatchObject({ kind: "ok", truncated: true });
+    if (capped.kind === "ok") expect(capped.events).toHaveLength(6);
+  });
+});
+
+describe("H1 explorer: series chips", () => {
+  it("groups a room's series by zone, feed, tank and room, and opens on eight", () => {
+    const states = createDemo(Date.parse("2026-09-28T16:00:00"));
+    const room = buildRoom(states, discoverRooms(states)[0]);
+    const series = explorerSeries(room, explorerSensors(room, states));
+    const zone1 = series.filter((s) => s.group === "zone:1").map((s) => s.chip);
+    expect(zone1).toEqual(["VWC", "Pore EC", "Root temp"]);
+    expect(series.filter((s) => s.group === "feed").map((s) => s.chip)).toEqual(["EC", "pH"]);
+    expect(series.find((s) => s.chart === "Tank level")?.chip).toBe("Level");
+    // One colour per zone on every chart.
+    expect(new Set(series.filter((s) => s.zone === 2).map((s) => s.color)).size).toBe(1);
+    expect(defaultExplorerSeries(series)).toHaveLength(8);
+  });
+  it("keeps the range, the series and the comparison in the address", () => {
+    const hash = writeExplorerChoice("#/history/explorer?zone=2", {
+      range: "7d",
+      from: null,
+      to: null,
+      series: ["sensor.a_b", "sensor.c"],
+      last: true,
+    });
+    expect(hash).toBe("#/history/explorer?zone=2&range=7d&series=sensor.a_b,sensor.c&last=1");
+    expect(readExplorerChoice(hash)).toEqual({ range: "7d", from: null, to: null, series: ["sensor.a_b", "sensor.c"], last: true });
+    expect(readExplorerChoice("#/history/explorer?range=3d").range).toBe("today");
+    expect(readExplorerChoice("#/history/explorer?range=custom").range).toBe("today");
   });
 });

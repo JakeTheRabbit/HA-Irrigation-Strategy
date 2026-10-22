@@ -2,8 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createDemo, demoDay } from "./demo";
 import { growDay, timelineEntities, valveShots } from "./day-timeline";
 import { jevAnswer, parseJevSetpoints, parseJevZone, readJev } from "./jev";
-import { buildRoom, discoverRooms, eventsForRoom } from "./model";
-import { mergeTimeline, timelineResult, timelineText } from "./timeline";
+import { buildRoom, discoverRooms } from "./model";
 import { growerWords } from "./words";
 
 /** The controller's and the brain's own tokens, which must never reach a grower's screen. */
@@ -46,14 +45,12 @@ describe("no engine token reaches the demo's screens", () => {
   const now = new Date(2026, 8, 23, 17, 0).getTime();
   const states = createDemo(now);
   const rooms = discoverRooms(states);
-  it("on the Timeline, Today's changes and a zone's decisions", () => {
+  it("in the AI assistant's entries, Today's changes and a zone's decisions", () => {
     const shown: string[] = [];
     for (const room of rooms) {
       const view = buildRoom(states, room);
       const jev = readJev(states, room.prefix);
       const entries = jev.log?.entries ?? [];
-      for (const item of mergeTimeline(eventsForRoom(states, room), entries, now))
-        shown.push(timelineText(item), timelineResult(item), item.jev?.reason ?? "");
       for (const entry of entries)
         shown.push(jevAnswer(entry), entry.action, entry.reason);
       for (const zone of view.zones) {

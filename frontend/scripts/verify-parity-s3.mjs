@@ -1,6 +1,9 @@
 /** S3 Zone (mockup 04) and P3 phone zone (mockup 26), against frontend/dist: run after `vite build`.
  * Opens Room A's zone 2 (the demo's F2 zone 2, day 38 of 63) at #/zone/2.
  *
+ * The clock is pinned to today 14:10 local, so the demo day is the same at any real hour (Room A's
+ * lights come on at 10:00 and its first shot is at 11:10: earlier, the shot log is empty).
+ *
  * Interactions asserted, at 1440 and 390 on both backends:
  * - the header: "Room A / Zone 2", the phase chip, the mode chip and "… plants · … sensors" (with
  *   "Day 38 of 63" on 3.18; 3.17 has the stage arc's day, where there is one);
@@ -34,6 +37,12 @@ await runParity({
     const label = `${width}px ${backend}`;
     const v318 = backend === "3.18";
     const phone = width <= 720;
+    // The demo follows the clock: pin it to today 14:10 local, as verify-parity-i1 does, so the
+    // result does not depend on the hour the check runs.
+    const pinned = new Date();
+    pinned.setHours(14, 10, 0, 0);
+    await page.clock.setFixedTime(pinned);
+    await page.reload();
     await page.getByRole("heading", { level: 1, name: "Zone 2", exact: true }).waitFor();
 
     // Header.

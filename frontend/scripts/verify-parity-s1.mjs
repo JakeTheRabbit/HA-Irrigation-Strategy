@@ -1,5 +1,7 @@
 /** S1 All rooms (mockup 02) and P1 (mockup 24), against frontend/dist: run after `vite build`.
  *
+ * The clock is pinned to today 14:10 local, so the demo day is the same at any real hour.
+ *
  * Interactions asserted, at 1440 and 390 on both backends:
  * - the room headings (Room A, Room B) and each room's grow day: the room entities on 3.18 (day 38
  *   of 63), the AI assistant's stage arc on 3.17 (day 37 of 56);
@@ -28,6 +30,12 @@ await runParity({
     const label = `${width}px ${backend}`;
     const v318 = backend === "3.18";
     const desktop = width > 720;
+    // The demo follows the clock: pin it to today 14:10 local, as verify-parity-i1 does, so the
+    // result does not depend on the hour the check runs.
+    const pinned = new Date();
+    pinned.setHours(14, 10, 0, 0);
+    await page.clock.setFixedTime(pinned);
+    await page.reload();
     const roomA = page.locator('[data-facility-room="room:"]');
     const roomB = page.locator('[data-facility-room="room:room_b_"]');
     const zone = (room, n) => page.locator(`[data-facility-zone="${room}/${n}"]`);
