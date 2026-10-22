@@ -38,6 +38,7 @@ import time
 from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 
+import guards
 import ph_correct
 from crop_steering_engine.ids import derived_id, new_id
 
@@ -80,6 +81,11 @@ REMIND_CLEAR_PCT = 5.0
 _RUNNING = {"dose": "dosing", "batch": "making a batch"}  # handled_result until it ends
 _KIND = {"dose": "dose", "batch": "batch", "correct": "pH correction"}  # how a job is named to people
 _PUT_BACK = ("name", "volume_entity", "dosing_entity", "dosing_prefix", "power_entity")
+# The guards whose refusals and holds are journaled: 18-19 (spec 2.7). The others the dosing chains name (the amount,
+# the recipe, the full sensor, a hardware fault, another controller) are not: a refused dose's amount journals nothing.
+JOURNALED = ("calibration_valid", "dosing_lockout")
+INTENT_REEMIT_S = 1800.0  # a refusal or hold that stands is journaled again this often (controller.HELD_REEMIT_S)
+_NUMBERS = re.compile(r"\d{1,2}:\d{2}|[-+]?\d+(?:\.\d+)?")  # its numbers and times (controller._HELD_NUMBERS)
 
 
 class _Ended(Exception):
@@ -260,6 +266,7 @@ class DosingRunner:
         self._sleep, self._mono = sleep, monotonic
         self._now = now or (lambda: datetime.now(timezone.utc))
         self._recovered_rows = []  # (slug, history entry) _recover_record wrote, for the journal (journal_recovered)
+        self._intents = {}  # what _journal_intent journaled lately -> when, on the runner's clock
         self.path = state_path
         # Guards everything below; never held across a Home Assistant call. Re-entrant: the stop signal
         # runs exit() on the main loop, which may be in the middle of a step.
@@ -714,6 +721,7 @@ class DosingRunner:
         job.left, job.pressed, job.cut_at = [], None, None
         why, flow = self._dose_check(pump, ml, job.profile)
         if why:
+            self._journal_intent(job.room, "intent.refused", why, job)
             return f"refused: {why}"
         volume = pump["volume_entity"]
         old = None
@@ -917,24 +925,13 @@ class DosingRunner:
                 f"{_fmt(flow)} mL/s, more than {profile['max_dose_s'] / 60:g} min")
 
     def _dose_check(self, pump, ml, profile=PROFILE):
-        """Why this dose must not start (docs/DOSING.md, One dose, step 1) and the pump's flow."""
-        why = self._uncalibrated(pump, profile)
-        if why:
-            return why, None
-        flow = self._device(pump["flow_entity"], "flow")[0]
-        if (isinstance(ml, bool) or not isinstance(ml, (int, float)) or not math.isfinite(ml)
-                or not 0 < ml <= float(pump.get("max_ml") or 0)):
-            return f"{_fmt(ml)} mL is not more than 0 and at most {_fmt(pump.get('max_ml'))} mL", None
-        if ml / flow > profile["max_dose_s"]:
-            return self._too_long(pump, ml, flow, profile), None
-        dosing = self._dosing(pump)[0]
-        if dosing is True:
-            return f"{pump['name']} already reads dosing", None
-        if dosing is None:  # it could not be watched
-            return f"{pump['name']}'s dosing state ({pump['dosing_entity']}) can't be read", None
-        if str(self._hw_state(pump["power_entity"])).strip().lower() == "on":
-            return f"{pump['name']} is running by hand", None  # its power is its motor's own switch
-        return None, flow
+        """Why this dose must not start (docs/DOSING.md, One dose, step 1; guards.DOSE, its words a guards.Why) and
+        the pump's flow."""
+        ctx = {"pump": pump, "ml": ml, "profile": profile}
+        hit = guards.first(self, guards.DOSE, None, None, ctx)
+        if hit:
+            return guards.Why(hit), None
+        return None, ctx["flow"]
 
     def _run_one(self, job, pump, ml, flow, expected):
         """Set the volume, read it back, press start, and watch the pump dose and stop."""
@@ -1067,6 +1064,7 @@ class DosingRunner:
             self._log(f"[{room.slug}] dosing: batch check error", repr(e))
             why = f"an error in the controller ({e!r})"
         if why:
+            self._journal_intent(room, "intent.refused", why, job)
             return self._settle(room, config, request, f"refused: {why}")
         job.started_at = self._now().isoformat()
         record = {"kind": "batch", "at": job.started_at, "request": request["id"],
@@ -1141,43 +1139,24 @@ class DosingRunner:
         recipe mL entity read now (it wins over the recipe's mL; 0 skips the pump), in whole mL."""
         room, config = job.room, job.config
         batch = config["batch"]
-        if self.c._hardware_fault_block(room):
-            return "the room has a hardware fault latched", None
-        hold = batch.get("hold_entity")
-        if hold:
-            state = self._state(hold)
-            if _dead(state):
-                return f"{hold} can't be read", None
-            if state.strip().lower() == "on":
-                return f"{hold} is on already: something else is dosing", None
-        if batch.get("fill_valve") and self._full(batch) is None:
-            return "the tank's full sensor can't be read", None
-        if (batch.get("mix_pump") and float(batch.get("mix_min_w") or 0) > 0
-                and not batch.get("mix_power_sensor")):
-            return "the mix pump has a minimum power but no power sensor to read it", None
+        hit = guards.first(self, guards.BATCH, room, None, {"batch": batch})
+        if hit:
+            return guards.Why(hit), None
         pumps = {p["id"]: p for p in config["pumps"]}
         plan = []
         for item in batch.get("recipe") or []:
-            pump = pumps.get(item.get("pump"))
-            if pump is None:
-                return f"the recipe doses {item.get('pump')}, which is not set up", None
-            ml = item.get("ml") or 0
-            if item.get("ml_entity"):  # it wins over the fixed mL, and is never replaced by it
-                ml = self._device(item["ml_entity"], "volume")[0]
-                if ml is None:
-                    return f"the recipe amount for {pump['name']} can't be read", None
-            ml = _whole_ml(ml)
+            line = {"item": item, "pumps": pumps}
+            hit = guards.first(self, guards.RECIPE, room, None, line)
+            if hit:
+                return guards.Why(hit), None
+            ml = _whole_ml(line["ml"])
             if ml <= 0:
                 continue
-            if ml > float(pump.get("max_ml") or 0):
-                return f"{_fmt(ml)} mL of {pump['name']} is more than its {_fmt(pump['max_ml'])} mL", None
-            why = self._uncalibrated(pump, job.profile)
-            if why:
-                return why, None
-            flow = self._device(pump["flow_entity"], "flow")[0]
-            if ml / flow > job.profile["max_dose_s"]:
-                return self._too_long(pump, ml, flow, job.profile), None
-            plan.append((pump, ml, flow))
+            dose = {"pump": line["pump"], "ml": ml, "profile": job.profile}
+            hit = guards.first(self, guards.RECIPE_DOSE, room, None, dose)
+            if hit:
+                return guards.Why(hit), None
+            plan.append((dose["pump"], ml, dose["flow"]))
         return None, plan
 
     def _held_rooms(self, room, batch):
@@ -1698,45 +1677,19 @@ class DosingRunner:
         way = watch.read(ph, lo, hi, now)
         if way is None:
             return
-        fill = self._ph_fill(config)
-        with self._lock:
-            latch = deepcopy(self._ph_block(room)["latch"])
-        if latch:
-            if fill is None or _dead(fill) or fill == latch.get("fill"):
-                return  # locked until a person switches it off, or the tank is filled again
-            self._ph_unlatch(room, "the tank was filled again")
-        batch = config["batch"]
-        pump = next((p for p in config["pumps"] if p.get("ph_role") == ph_correct.ROLES[way]), None)
-        why = None
-        if pump is None:
-            why = f"no dosing pump has the pH {way} role (Equipment > Dosing, Dosing setup)"
-        elif not batch.get("mix_pump"):
-            why = "the batch tank has no mixing pump set up, and a dose is never made into a tank that is not mixed"
-        elif float(batch.get("mix_min_w") or 0) > 0 and not batch.get("mix_power_sensor"):
-            why = "the mixing pump has a minimum power but no power sensor to read it"
-        if why is None:
-            why = self._uncalibrated(pump, _profile(config))
-        if why is not None:
-            return self._ph_refuse(room, ph, lo, hi, why)
-        hold = batch.get("hold_entity")
-        if hold and str(self._state(hold)).strip().lower() != "off":
-            return  # something else is dosing, or the hold can't be read: wait
-        if self._hw_state(batch["mix_pump"]) != "off":
-            return  # the tank is being mixed or pumped already: wait
-        if self.c._hardware_fault_block(room) or self.c.duplicate_hold(room):
-            return
-        s = self._ph_settings(room)
-        with self._lock:
-            block = self._ph_block(room)
-            used = block["doses"] if block["day"] == self._today() else 0
-        left = int(s["daily_max"]) - used
-        if left <= 0:
-            return self._ph_refuse(room, ph, lo, hi, f"the {int(s['daily_max'])} doses a day it may give are used")
-        flow = self._device(pump["flow_entity"], "flow")[0]
-        ml = ph_correct.dose_ml(s["dose_s"], flow, float(pump.get("max_ml") or 0))
-        if ml <= 0:
-            return self._ph_refuse(room, ph, lo, hi, f"a {s['dose_s']:g} s dose of {pump['name']} is less than 1 mL")
-        tries = min(int(s["max_tries"]), left)
+        # Locked until a person switches it off or the tank is filled again (PH_LOCK); what can't correct it is said
+        # (PH_SETUP, PH_DOSE: _ph_refuse, CS-809); what is in the way is waited out without a word (PH_WAIT).
+        ctx = {"config": config, "way": way}
+        for stage, refuses in ((guards.PH_LOCK, False), (guards.PH_SETUP, True), (guards.PH_WAIT, False),
+                               (guards.PH_DOSE, True)):
+            hit = guards.first(self, stage, room, None, ctx)
+            if hit:
+                if refuses:
+                    self._ph_refuse(room, ph, lo, hi, hit[1])
+                self._journal_intent(room, "intent.refused" if refuses else "intent.held", guards.Why(hit))
+                return
+        pump, fill, s, flow, ml = ctx["pump"], ctx["fill"], ctx["s"], ctx["flow"], ctx["ml"]
+        tries = min(int(s["max_tries"]), ctx["left"])
         watch.reset()
         self._log(f"[{room.slug}] dosing: tank pH {ph:g} is off its band ({lo:g} to {hi:g}): correcting with "
                   f"{pump['name']}, {ml} mL at most {tries} times")
@@ -2165,6 +2118,36 @@ class DosingRunner:
             journal.emit(getattr(room, "prefix", ""), kind, **kw)
         except Exception as e:
             self._log("dosing: journal error", repr(e))
+
+    def _journal_intent(self, room, kind, why, job=None):
+        """intent.refused / intent.held {guard, reason} for a dose, batch or pH correction a guard stopped (`why` a
+        guards.Why; only a guard in JOURNALED is journaled), with the guard's code. Once per (room, guard, words without
+        their numbers, job) and again each INTENT_REEMIT_S while it stands, as the controller's _journal_held: each
+        request refused is journaled, a refusal the pH tick meets each minute every 30 min. An error is only logged."""
+        guard = getattr(why, "guard", None)
+        if guard not in JOURNALED:
+            return
+        try:
+            now, seen = self._mono(), self._intents
+            for key in [k for k, at in seen.items() if not 0 <= now - at < INTENT_REEMIT_S]:
+                del seen[key]  # a stale one, and so the keys never grow
+            key = (room.slug, kind, guard, _NUMBERS.sub("#", str(why)), job.id if job is not None else None)
+            if key in seen:
+                return
+            seen[key] = now
+        except Exception as e:
+            self._log("dosing: journal error", repr(e))
+            return
+
+        def make():
+            by = job.request.get("by") if job is not None else None
+            batch_id = job.id if job is not None and job.kind != "dose" else None
+            return kind, {"outcome": "refused" if kind == "intent.refused" else "held", "code": why.code,
+                          "actor": _actor(by), "detail": by,
+                          "correlation": {"batch_id": batch_id} if batch_id else None,
+                          "data": {"guard": guard, "reason": str(why)}}
+
+        self._journal(room, make)
 
     def journal_recovered(self):
         """The rows a restart interrupted (_recover_record), to the journal, on every start that finds one, once its

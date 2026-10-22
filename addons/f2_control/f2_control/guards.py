@@ -9,6 +9,9 @@ section 2.7). The first check that holds wins, as it always did.
   QUEUE    Controller._loop_room, with a supply saved in the integration (sensor.crop_steering_supply_config): why a
            zone about to water waited for the zones watered before it this pass. These never hold (ruling R1): a
            check answers Queued or None, the zone waters either way, and the answer is only journaled and shown.
+  DOSE, BATCH, RECIPE, RECIPE_DOSE, PH_*   the dosing runner's checks (guards 18-19, calibration_valid and
+           dosing_lockout, with the checks they stand among): `owner` is the DosingRunner, `zone` None. See below.
+  DOSE_RUN a timed pump run (prime, calibrate; Task 20). Nothing asks it yet.
 
 Each check is the code that stood inline in those methods, moved word for word: the same reads in the same order,
 the same alerts, releases and log lines. A check that raises an alert calls the controller method that holds it
@@ -21,7 +24,9 @@ raises or names; None when it has none. A check whose hold has a code of its own
 """
 from __future__ import annotations
 
+import math
 import sys
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Callable
 
@@ -395,4 +400,281 @@ def _exclusive_group(c, room, zone, ctx):
 QUEUE = (
     Guard("pump_capacity", "pump_capacity", "queue", None, _pump_capacity),
     Guard("exclusive_group", "exclusive_group", "queue", None, _exclusive_group),  # recorded only (R1)
+)
+
+
+# ------------------------------------------------------------------------------------------- DOSING (dosing_runner)
+# `owner` is the DosingRunner (its controller is owner.c), `zone` None; _m(owner) is dosing_runner. Each stage is the
+# checks one runner method made inline, moved word for word, in their order: the same reads, the same words.
+class Why(str):
+    """A refusal's words, which also name the guard and code that refused (`hit` is first()'s answer). A runner check
+    that answers in words (_dose_check, _batch_check) still answers a string; the caller that journals reads
+    .guard and .code."""
+
+    def __new__(cls, hit):
+        g, why, code = hit
+        words = super().__new__(cls, why)
+        words.guard, words.code = g.guard, code
+        return words
+
+
+# DOSE (DosingRunner._dose_check), every dose: ctx pump, ml, profile. Leaves flow.
+def _dose_calibrated(r, room, zone, ctx):
+    return r._uncalibrated(ctx["pump"], ctx["profile"])
+
+
+def _dose_amount(r, room, zone, ctx):
+    pump, ml = ctx["pump"], ctx["ml"]
+    ctx["flow"] = r._device(pump["flow_entity"], "flow")[0]
+    if (isinstance(ml, bool) or not isinstance(ml, (int, float)) or not math.isfinite(ml)
+            or not 0 < ml <= float(pump.get("max_ml") or 0)):
+        fmt = _m(r)._fmt
+        return f"{fmt(ml)} mL is not more than 0 and at most {fmt(pump.get('max_ml'))} mL"
+    return None
+
+
+def _dose_too_long(r, room, zone, ctx):
+    pump, ml, flow, profile = ctx["pump"], ctx["ml"], ctx["flow"], ctx["profile"]
+    if ml / flow > profile["max_dose_s"]:
+        return r._too_long(pump, ml, flow, profile)
+    return None
+
+
+def _dose_pump_dosing(r, room, zone, ctx):
+    pump = ctx["pump"]
+    dosing = r._dosing(pump)[0]
+    if dosing is True:
+        return f"{pump['name']} already reads dosing"
+    if dosing is None:  # it could not be watched
+        return f"{pump['name']}'s dosing state ({pump['dosing_entity']}) can't be read"
+    return None
+
+
+def _dose_by_hand(r, room, zone, ctx):
+    pump = ctx["pump"]
+    if str(r._hw_state(pump["power_entity"])).strip().lower() == "on":
+        return f"{pump['name']} is running by hand"  # its power is its motor's own switch
+    return None
+
+
+DOSE = (
+    Guard("calibrated", "calibration_valid", "dose", None, _dose_calibrated),
+    Guard("amount", "dose_amount", "dose", None, _dose_amount),  # not in spec
+    Guard("too_long", "dose_amount", "dose", None, _dose_too_long),  # not in spec
+    Guard("pump_dosing", "dosing_lockout", "dose", None, _dose_pump_dosing),
+    Guard("by_hand", "dosing_lockout", "dose", None, _dose_by_hand),
+)
+
+
+# BATCH (DosingRunner._batch_check, before its recipe): ctx batch.
+def _batch_fault(r, room, zone, ctx):
+    if r.c._hardware_fault_block(room):
+        return "the room has a hardware fault latched"
+    return None
+
+
+def _batch_hold(r, room, zone, ctx):
+    hold = ctx["batch"].get("hold_entity")
+    if hold:
+        state = r._state(hold)
+        if _m(r)._dead(state):
+            return f"{hold} can't be read"
+        if state.strip().lower() == "on":
+            return f"{hold} is on already: something else is dosing"
+    return None
+
+
+def _batch_full_sensor(r, room, zone, ctx):
+    batch = ctx["batch"]
+    if batch.get("fill_valve") and r._full(batch) is None:
+        return "the tank's full sensor can't be read"
+    return None
+
+
+def _batch_mix_power(r, room, zone, ctx):
+    batch = ctx["batch"]
+    if (batch.get("mix_pump") and float(batch.get("mix_min_w") or 0) > 0
+            and not batch.get("mix_power_sensor")):
+        return "the mix pump has a minimum power but no power sensor to read it"
+    return None
+
+
+BATCH = (
+    Guard("hardware_fault", "hardware_latch", "batch", "CS-301", _batch_fault),
+    Guard("hold", "dosing_lockout", "batch", None, _batch_hold),
+    Guard("full_sensor", "tank_overfill", "batch", None, _batch_full_sensor),
+    Guard("mix_power", "dosing_lockout", "batch", None, _batch_mix_power),
+)
+
+
+# RECIPE (each recipe line): ctx item, pumps. Leaves pump, and ml as read (before it is made whole).
+def _recipe_pump(r, room, zone, ctx):
+    item = ctx["item"]
+    ctx["pump"] = pump = ctx["pumps"].get(item.get("pump"))
+    if pump is None:
+        return f"the recipe doses {item.get('pump')}, which is not set up"
+    return None
+
+
+def _recipe_ml(r, room, zone, ctx):
+    item, pump = ctx["item"], ctx["pump"]
+    ml = item.get("ml") or 0
+    if item.get("ml_entity"):  # it wins over the fixed mL, and is never replaced by it
+        ml = r._device(item["ml_entity"], "volume")[0]
+        if ml is None:
+            return f"the recipe amount for {pump['name']} can't be read"
+    ctx["ml"] = ml
+    return None
+
+
+RECIPE = (
+    Guard("recipe_pump", "recipe", "batch", None, _recipe_pump),  # not in spec
+    Guard("recipe_ml", "recipe", "batch", None, _recipe_ml),  # not in spec
+)
+
+
+# RECIPE_DOSE (each recipe line not skipped): ctx pump, ml (whole), profile. Leaves flow.
+def _recipe_max_ml(r, room, zone, ctx):
+    pump, ml = ctx["pump"], ctx["ml"]
+    if ml > float(pump.get("max_ml") or 0):
+        fmt = _m(r)._fmt
+        return f"{fmt(ml)} mL of {pump['name']} is more than its {fmt(pump['max_ml'])} mL"
+    return None
+
+
+def _recipe_too_long(r, room, zone, ctx):
+    pump, ml, profile = ctx["pump"], ctx["ml"], ctx["profile"]
+    ctx["flow"] = flow = r._device(pump["flow_entity"], "flow")[0]
+    if ml / flow > profile["max_dose_s"]:
+        return r._too_long(pump, ml, flow, profile)
+    return None
+
+
+RECIPE_DOSE = (
+    Guard("max_ml", "dose_amount", "batch", None, _recipe_max_ml),  # not in spec
+    Guard("calibrated", "calibration_valid", "batch", None, _dose_calibrated),
+    Guard("too_long", "dose_amount", "batch", None, _recipe_too_long),  # not in spec
+)
+
+
+# pH auto-correct (DosingRunner._ph_tick, once the tank needs correcting), four stages in this order: PH_LOCK holds,
+# PH_SETUP refuses (_ph_refuse, CS-809), PH_WAIT holds (it waits, without a word), PH_DOSE refuses (CS-809).
+# ctx config, way. Leaves fill, pump, s, left, flow, ml.
+def _ph_latch(r, room, zone, ctx):
+    ctx["fill"] = fill = r._ph_fill(ctx["config"])
+    with r._lock:
+        latch = deepcopy(r._ph_block(room)["latch"])
+    if latch:
+        if fill is None or _m(r)._dead(fill) or fill == latch.get("fill"):
+            return "pH auto-correct is locked until a person switches it off or the tank is filled again"
+        r._ph_unlatch(room, "the tank was filled again")
+    return None
+
+
+def _ph_pump(r, room, zone, ctx):
+    way = ctx["way"]
+    ctx["pump"] = next((p for p in ctx["config"]["pumps"] if p.get("ph_role") == _m(r).ph_correct.ROLES[way]), None)
+    if ctx["pump"] is None:
+        return f"no dosing pump has the pH {way} role (Equipment > Dosing, Dosing setup)"
+    return None
+
+
+def _ph_mix_pump(r, room, zone, ctx):
+    if not ctx["config"]["batch"].get("mix_pump"):
+        return "the batch tank has no mixing pump set up, and a dose is never made into a tank that is not mixed"
+    return None
+
+
+def _ph_mix_power(r, room, zone, ctx):
+    batch = ctx["config"]["batch"]
+    if float(batch.get("mix_min_w") or 0) > 0 and not batch.get("mix_power_sensor"):
+        return "the mixing pump has a minimum power but no power sensor to read it"
+    return None
+
+
+def _ph_calibrated(r, room, zone, ctx):
+    return r._uncalibrated(ctx["pump"], _m(r)._profile(ctx["config"]))
+
+
+def _ph_hold(r, room, zone, ctx):
+    hold = ctx["config"]["batch"].get("hold_entity")
+    if hold and str(r._state(hold)).strip().lower() != "off":
+        return f"{hold} does not read off: something else is dosing, or it can't be read"
+    return None
+
+
+def _ph_mixing(r, room, zone, ctx):
+    mix = ctx["config"]["batch"]["mix_pump"]
+    if r._hw_state(mix) != "off":
+        return f"{mix} does not read off: the tank is being mixed or pumped already"
+    return None
+
+
+def _ph_fault(r, room, zone, ctx):
+    return r.c._hardware_fault_block(room)
+
+
+def _ph_duplicate(r, room, zone, ctx):
+    if r.c.duplicate_hold(room):
+        return "another controller is driving this room"
+    return None
+
+
+def _ph_daily_max(r, room, zone, ctx):
+    ctx["s"] = s = r._ph_settings(room)
+    with r._lock:
+        block = r._ph_block(room)
+        used = block["doses"] if block["day"] == r._today() else 0
+    ctx["left"] = left = int(s["daily_max"]) - used
+    if left <= 0:
+        return f"the {int(s['daily_max'])} doses a day it may give are used"
+    return None
+
+
+def _ph_dose_ml(r, room, zone, ctx):
+    pump, s = ctx["pump"], ctx["s"]
+    ctx["flow"] = flow = r._device(pump["flow_entity"], "flow")[0]
+    ctx["ml"] = ml = _m(r).ph_correct.dose_ml(s["dose_s"], flow, float(pump.get("max_ml") or 0))
+    if ml <= 0:
+        return f"a {s['dose_s']:g} s dose of {pump['name']} is less than 1 mL"
+    return None
+
+
+PH_LOCK = (Guard("latch", "dosing_lockout", "ph", "CS-809", _ph_latch),)
+PH_SETUP = (
+    Guard("ph_pump", "dosing_lockout", "ph", "CS-809", _ph_pump),
+    Guard("mix_pump", "dosing_lockout", "ph", "CS-809", _ph_mix_pump),
+    Guard("mix_power", "dosing_lockout", "ph", "CS-809", _ph_mix_power),
+    Guard("calibrated", "calibration_valid", "ph", "CS-809", _ph_calibrated),
+)
+PH_WAIT = (
+    Guard("hold", "dosing_lockout", "ph", None, _ph_hold),
+    Guard("mixing", "dosing_lockout", "ph", None, _ph_mixing),
+    Guard("hardware_fault", "hardware_latch", "ph", "CS-301", _ph_fault),
+    Guard("duplicate", "duplicate_controller", "ph", None, _ph_duplicate),  # not in spec
+)
+PH_DOSE = (
+    Guard("daily_max", "dosing_lockout", "ph", "CS-809", _ph_daily_max),
+    Guard("dose_ml", "dose_amount", "ph", "CS-809", _ph_dose_ml),  # not in spec
+)
+
+
+# DOSE_RUN: a timed run of one pump's power (Task 20's prime and calibrate). ctx pump, profile, action, batch.
+def _run_inflight(r, room, zone, ctx):
+    if getattr(room, "shot_inflight", None):
+        return "a shot is in flight in this room"
+    return None
+
+
+def _run_calibrated(r, room, zone, ctx):
+    if ctx["action"] == "calibrate":  # the calibration run is how a pump gets its flow
+        return None
+    return r._uncalibrated(ctx["pump"], ctx["profile"])
+
+
+DOSE_RUN = (
+    Guard("hardware_fault", "hardware_latch", "dose_run", "CS-301", _ph_fault),
+    Guard("inflight", "inflight", "dose_run", None, _run_inflight),
+    Guard("calibrated", "calibration_valid", "dose_run", None, _run_calibrated),
+    Guard("hold", "dosing_lockout", "dose_run", None, _batch_hold),
 )
