@@ -7666,14 +7666,12 @@ class Controller:
             # (EC-adjusted) re-water threshold at the current dryback rate. Only meaningful in P2;
             # 0 = due now, None elsewhere. Drives the dashboard's "next" on the frequency card.
             pz = params[zone]
-            next_h = None
-            if snap is not None and room.state[zone]["phase"] == "P2":
-                if snap.vwc <= pz.p2_threshold:
-                    next_h = 0.0
-                elif snap.dryback_rate and snap.dryback_rate > 0:
-                    next_h = round(
-                        min((snap.vwc - pz.p2_threshold) / snap.dryback_rate, 48.0), 2
-                    )
+            zst = room.state[zone]
+            rate = sensing.post_shot_rate(zst["win"], zst["last_shot"])
+            next_h, next_reason = sensing.next_irrigation(
+                zst["phase"], snap.vwc if snap else None, pz.p2_threshold,
+                rate, zst["last_shot"] is not None and not zst.get("last_shot_is_anchor"),
+            )
             pub[zone] = {
                 "phase": room.state[zone]["phase"],
                 "vwc": snap.vwc if snap else None,
@@ -7686,8 +7684,10 @@ class Controller:
                 "p": params[zone],
                 "vmax": room._vmax.get(zone),
                 "next_h": next_h,
+                "next_reason": next_reason,
                 # the zone's live dryback (sensing.dryback): the numbers decide() used this pass
-                "dryback": (snap.peak_vwc, snap.vwc, snap.dryback_rate, snap.minutes_since_shot) if snap else None,
+                "dryback": (snap.peak_vwc, snap.vwc, rate,
+                            snap.minutes_since_shot) if snap else None,
             }
         for z, why in cross_zone_outliers(snaps):
             self._alert(
@@ -7944,19 +7944,19 @@ class Controller:
                         "engine": PRODUCT,
                     },
                 )
-                # Estimated hours to the next P2 shot (drives the dashboard "next"). Only published
-                # when computable (P2 + a real dryback rate); skipped otherwise so the card shows "—".
+                # Estimated hours to the next P2 shot (drives the dashboard "next"). Always published: "unknown" with
+                # the reason when the controller has no current estimate, so an old one never stands.
                 nh = d.get("next_h")
-                if nh is not None:
-                    ha_set(
-                        f"sensor.crop_steering_{px}prediction_zone_{zone}_next_irrigation_hours",
-                        nh,
-                        {
-                            "unit_of_measurement": "h",
-                            "friendly_name": f"Zone {zone} next irrigation",
-                            "engine": PRODUCT,
-                        },
-                    )
+                ha_set(
+                    f"sensor.crop_steering_{px}prediction_zone_{zone}_next_irrigation_hours",
+                    "unknown" if nh is None else nh,
+                    {
+                        "unit_of_measurement": "h",
+                        "friendly_name": f"Zone {zone} next irrigation",
+                        "engine": PRODUCT,
+                        **({"reason": d.get("next_reason")} if nh is None else {}),
+                    },
+                )
             sys_stat, unsafe, warn, safe = system_safety_status(labels)
             ha_set(
                 f"sensor.crop_steering_{px}system_safety_status",
