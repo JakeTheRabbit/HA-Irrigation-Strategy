@@ -554,6 +554,19 @@
   .today-zone-flags {
     grid-column: 1 / -1;
   }
+  .today-zone-gauges {
+    gap: 8px;
+  }
+  /* Two sensors side by side; a silent one's card takes the row. */
+  .today-sensors ul {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .today-sensors li {
+    padding: 6px 10px;
+  }
+  .today-sensors li:not([data-health="ok"]):not([data-health="not-counted"]) {
+    grid-column: 1 / -1;
+  }
 }
 @media (max-width: 720px) {
   .today {

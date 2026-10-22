@@ -6,7 +6,7 @@ import { Empty, number, type Page } from "@/components/dashboard";
 import { RoomOffBanner } from "@/components/room-controls";
 import { BrainCard } from "@/components/brain";
 import { NeedsIntegration } from "@/components/needs-integration";
-import { RunProgress } from "@/components/run-progress";
+import { PlanAndFeed } from "@/components/run-progress";
 import { PlantStressStrip } from "@/components/sensing";
 import { ShotTimeline } from "@/components/shot-timeline";
 import { DrinkBar } from "@/components/zone-gauges";
@@ -160,7 +160,8 @@ export function Today({
     <div className="today" data-today>
       <RoomHead controller={controller} view={view} day={day} now={now} navigate={navigate} />
       <TodayStrip controller={controller} view={view} day={day} now={now} navigate={navigate} />
-      <RunProgress controller={controller} navigate={navigate} />
+      {/* The header owns the run's day; the grow plan and today's feed stay here. */}
+      <PlanAndFeed controller={controller} />
       <TankLine controller={controller} navigate={navigate} />
       <PlantStressStrip controller={controller} />
       <section className="today-zones" aria-label="Zones">
@@ -610,7 +611,8 @@ function ZoneRow({
     offerUndo({
       message: `${zone.name} resumed. Written and read back ${clock(Date.now(), timeZone)}.`,
       undo: async () => {
-        const back = await write(false);
+        setBusy(true);
+        const back = await write(false).finally(() => setBusy(false));
         if (back) throw new Error(`${zone.name} was not paused again: ${back}`);
         toast(`${zone.name} paused again. Written and read back ${clock(Date.now(), timeZone)}.`);
       },

@@ -104,3 +104,13 @@ describe("the room page's zone rows", () => {
     expect(rows[0].sensors.every((sensor) => sensor.silent === null)).toBe(true);
   });
 });
+
+describe("the demo's paused zone", () => {
+  it("has no water or shots today on 3.17 too, as its row says (Not watered today)", () => {
+    const states = createDemo(NOW);
+    expect(states["switch.crop_steering_room_b_zone_3_enabled"].state).toBe("off");
+    expect(Number(states["sensor.crop_steering_room_b_zone_3_daily_water_app"].state)).toBe(0);
+    expect(Number(states["sensor.crop_steering_room_b_zone_3_irrigation_count_app"].state)).toBe(0);
+    expect(drinkDelta(roomZoneRows(roomB(), NOW)[2].drink!)).toBe("Not watered today");
+  });
+});

@@ -47,7 +47,9 @@ export interface DisplayRow {
   choice?: { value: string; label: string }[];
 }
 
-/** The rows Settings › Display offers, in page order. A row is listed once its panel exists. */
+/** The rows Settings › Display offers, in page order. A row is listed once its panel exists, and no
+ * longer once its panel is gone: `today_zone_layout` (Zones as) stays stored but is not offered, since
+ * the room page has no zone table. */
 export const DISPLAY_ROWS: DisplayRow[] = [
   {
     key: "today_tank_readout",
@@ -60,23 +62,6 @@ export const DISPLAY_ROWS: DisplayRow[] = [
         "Off: Today shows the tank only when a value is low or out of range. On: the room line always shows the tank values. A value that is low or out of range gives the same warning line as before.",
       guidance:
         "The room must have tank sensors in Equipment › Setup. Without them, Today shows no tank values. A phone does not show the tank values on Today. Use Equipment › Feed.",
-    },
-  },
-  {
-    key: "today_zone_layout",
-    group: "Today",
-    label: "Zones as",
-    choice: [
-      { value: "cards", label: "Cards" },
-      { value: "table", label: "Table" },
-    ],
-    copy: {
-      tooltip:
-        "Shows the zones on Today as cards, or as one table with a row for each zone: phase, VWC, EC, dryback, water, shots and the next action.",
-      impact:
-        "Cards: each zone has a card, as before. Table: a laptop shows one table. A phone always shows the cards.",
-      guidance:
-        "A table is easier to read in a room with many zones. Select a row to open its zone.",
     },
   },
   {

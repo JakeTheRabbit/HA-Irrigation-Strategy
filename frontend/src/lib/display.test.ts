@@ -42,6 +42,10 @@ describe("room display options", () => {
       expect(row.copy.tooltip.length).toBeGreaterThan(0);
     }
   });
+  it("does not offer Zones as, which the room page no longer reads (the stored key stays)", () => {
+    expect(DISPLAY_ROWS.some((row) => row.key === "today_zone_layout")).toBe(false);
+    expect("today_zone_layout" in DISPLAY_DEFAULTS).toBe(true);
+  });
   it("turns on the demo's options from ?display=", () => {
     const states = { [displayEntityId("f2_")]: entity("0", { ...DISPLAY_DEFAULTS }) };
     const on = demoDisplay(states, "today_tank_readout,nonsense");

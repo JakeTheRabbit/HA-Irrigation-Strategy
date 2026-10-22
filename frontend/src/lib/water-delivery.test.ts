@@ -192,7 +192,10 @@ it("every demo zone has explicit usable runtime and P1 budget inputs", () => {
       const parameters = waterParameters(c, zone.id);
       expect(estimatePercent(parameters, parameters.p1_initial_shot_size).effective).not.toBeNull();
       expect(p1WaterBudget(parameters)).not.toBeNull();
-      expect(dailyWater(zone, parameters.plant_count).mlPerPlant).toBeGreaterThan(0);
+      // A paused zone (Room B zone 3) drank nothing today; its reading is still usable.
+      const ml = dailyWater(zone, parameters.plant_count).mlPerPlant;
+      if (zone.enabled === false) expect(ml).toBe(0);
+      else expect(ml).toBeGreaterThan(0);
     }
   }
 });

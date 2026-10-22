@@ -260,10 +260,12 @@ export function createDemo(now = Date.now()): States {
           toLightsOff: minutesUntil(now, index ? 20 : 22),
         }),
       });
-      put(`${base}${key}daily_water_app`, (4.4 + id * 0.9 + index).toFixed(1), {
+      // Room B's zone 3 is paused: no water and no shots today.
+      const paused = index && id === 3;
+      put(`${base}${key}daily_water_app`, paused ? "0.0" : (4.4 + id * 0.9 + index).toFixed(1), {
         unit_of_measurement: "L",
       });
-      put(`${base}${key}irrigation_count_app`, 5 + id + index);
+      put(`${base}${key}irrigation_count_app`, paused ? 0 : 5 + id + index);
       put(`switch.crop_steering_${prefix}${key}enabled`, index && id === 3 ? "off" : "on");
       put(`switch.crop_steering_${prefix}${key}manual_override`, "off");
       put(

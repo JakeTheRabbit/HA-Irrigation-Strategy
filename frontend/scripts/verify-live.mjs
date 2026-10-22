@@ -187,7 +187,8 @@ const connected = (target = page) =>
 const menu = async (name) => {
   await page
     .getByRole("navigation", { name: "Main navigation" })
-    .getByRole("button", { name: name === "Today" ? "Status" : name, exact: true })
+    // Status is a link to its page; the other sections are disclosures.
+    .getByRole(name === "Today" ? "link" : "button", { name: name === "Today" ? "Status" : name, exact: true })
     .click();
   if (name === "Today")
     // The Status tabs give way to the room tree on a desktop; open the room page directly.
@@ -255,7 +256,7 @@ try {
         assert.ok((await drawer.evaluate((el) => el.scrollTop)) > 0, "it really scrolled");
         // and the first item is still reachable on the way back
         await drawer
-          .getByRole("button", { name: "Status", exact: true })
+          .getByRole("link", { name: "Status", exact: true })
           .scrollIntoViewIfNeeded();
       } finally {
         await phone.close();
@@ -380,7 +381,7 @@ try {
     states["sensor.crop_steering_room_b_ec_zone_1"].state = "unavailable";
     await page.getByRole("button", { name: "Refresh controller data" }).click();
     await menu("Today");
-    await visible(page.getByRole("heading", { name: "Room B today", exact: true }));
+    await visible(page.getByRole("heading", { name: "Room B", exact: true, level: 1 }));
     // The room's line counts the alert; opened, it says which zone and why.
     await page.locator(".today-alerts").click();
     await visible(
@@ -390,13 +391,14 @@ try {
     );
     assert.equal(await page.getByText("Invalid Date", { exact: false }).count(), 0);
     assert.equal(await page.locator(".demo-pill").count(), 0);
-    // The room's line first, then a card per zone.
+    // The room's line first, then today's strip, then a row per zone; the AI assistant's changes
+    // are not repeated on the room page.
     const order = await page.evaluate(() =>
-      [...document.querySelectorAll(".today-head, .today-zones, [data-jev-today]")].map(
-        (el) => el.classList[0],
+      [...document.querySelectorAll(".today-head, [data-today-strip], .today-zones, [data-jev-today]")].map(
+        (el) => (el.matches("[data-today-strip]") ? "today-strip" : el.classList[0]),
       ),
     );
-    assert.deepEqual(order, ["today-head", "today-zones"]);
+    assert.deepEqual(order, ["today-head", "today-strip", "today-zones"]);
     assert.equal(await page.locator("article.today-zone").count(), 2);
   });
   await check(

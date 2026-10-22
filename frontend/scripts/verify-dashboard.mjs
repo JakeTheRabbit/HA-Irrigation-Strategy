@@ -215,7 +215,7 @@ try {
       "room:room_b_",
     );
     await go("today");
-    await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room A", exact: true, level: 1 }));
     await page.goto(`${base}/dashboard.html?demo&room=f2&view=logs`, { waitUntil: "networkidle" });
     await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
     await go("settings");
@@ -223,7 +223,7 @@ try {
   });
   await check("every old address lands where its content lives now", async () => {
     const moved = [
-      ["overview", "today", "Room A today"],
+      ["overview", "today", "Room A"],
       ["zones", "all-zones", "All rooms"],
       ["strategy", "plan/targets", "Irrigation"],
       ["grow-plan", "plan/schedule", "Irrigation"],
@@ -257,11 +257,11 @@ try {
     assert.equal(new URL(page.url()).hash, "#/equipment/probes");
     assert.equal(await page.evaluate(() => history.length), before + 1);
     await page.goBack();
-    await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room A", exact: true, level: 1 }));
   });
   const routes = [
     ["all-zones", "All rooms"],
-    ["today", "Room A today"],
+    ["today", "Room A"],
     ["zone/1", "Zone 1"],
     ["today/ai", "AI assistant"],
     ["plan/targets", "Irrigation"],
@@ -380,7 +380,7 @@ try {
         assert.equal(await page.locator(gone).count(), 0, `no ${gone}`);
       // Another room's chip opens it.
       await chip("room:room_b_").click();
-      await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
+      await expectVisible(page.getByRole("heading", { name: "Room B", exact: true, level: 1 }));
       assert.equal(await chip("room:room_b_").getAttribute("aria-current"), "page");
       // Watering switched off from the header, through its review.
       await page
@@ -415,7 +415,7 @@ try {
     await page.evaluate(() => {
       location.hash = "#/today";
     });
-    await expectVisible(page.getByRole("heading", { name: "Room B today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room B", exact: true, level: 1 }));
     const stopped = page.locator(".today-stopped");
     assert.match(
       await stopped.innerText(),
@@ -425,7 +425,8 @@ try {
       await page.locator('.desktop-sidebar .room-tree-row[data-room="room:room_b_"]').innerText(),
       /Not watering/,
     );
-    assert.match(await page.locator("[data-today-line]").innerText(), /Watering off/);
+    // The room's own line says it is not watering, beside the header control that says why.
+    assert.match(await page.locator("[data-today-sub]").innerText(), /^Not watering/);
     assert.equal(
       await stopped.getByRole("button", { name: "Switch it on in Settings", exact: true }).count(),
       0,
@@ -472,94 +473,87 @@ try {
     await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
     assert.equal(await page.getByRole("dialog").count(), 0, "the panel closes when the log opens");
   });
-  await check("today: a compact laptop view says which zone needs you and why", async () => {
+  await check("today: a laptop view says which zone needs you and why, in place", async () => {
     await page.setViewportSize({ width: 1440, height: 900 });
     await go("today");
-    const cards = page.locator("article.today-zone");
-    await expectVisible(cards.first());
-    assert.equal(await cards.count(), 3, "one card per zone");
-    // The demo's readings are in before the page is measured.
-    await page.locator(".today-spark").first().waitFor();
-    // The new window size reaches the layout a frame or two after it is set: read until it settles.
-    await page
-      .waitForFunction(() => document.documentElement.scrollHeight <= innerHeight, null, {
-        timeout: 3_000,
-      })
-      .catch(() => {});
-    const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    assert.ok(height <= 900 + 64, `Today is ${height}px tall in a 900px window`);
-    // The room in one line: watering, the stage and its day, steering, lights, the phase, alerts.
-    const line = await page.locator("[data-today-line]").innerText();
-    for (const part of ["Watering on", "Vegetative", "Pore EC 3.5–6"])
-      assert.ok(line.includes(part), `the room's line says "${part}": ${line}`);
-    // Flagged only when needed, with the reason in a line: zone 1's pore EC under the stage's band,
-    // zone 3's back EC probe left out; zone 2 quiet.
-    const flags = await cards.evaluateAll((all) =>
-      all.map((card) => card.querySelector(".today-flag")?.textContent.trim() ?? null),
+    const rows = page.locator("article.today-zone");
+    await expectVisible(rows.first());
+    assert.equal(await rows.count(), 3, "one row per zone");
+    // Today's shots are in before the page is measured: a track per zone.
+    const tracks = page.locator('[data-today-strip] .st-row[data-kind="zone"]');
+    await tracks.first().waitFor();
+    assert.equal(await tracks.count(), 3, "a strip track per zone");
+    // The header, today's strip and every zone row within 1.35 windows; the plan line and the AI
+    // assistant's card follow.
+    const bottom = await rows.last().evaluate((el) => el.getBoundingClientRect().bottom + scrollY);
+    assert.ok(bottom <= 900 * 1.35, `the zone rows end ${bottom}px down a 900px window`);
+    // The room: state, stage and plants; the grow day and its stage's end; water, lights, climate.
+    assert.match(
+      await page.locator("[data-today-sub]").innerText(),
+      /^\S.* · Flower bulk · \d+ plants in 3 zones$/,
     );
-    assert.match(flags[0], /^Pore EC 2\.8, under the stage’s 3\.5–6/);
-    assert.equal(flags[1], null);
-    assert.match(flags[2], /^A pore EC probe left out: not reporting/);
-    // Each card: a status line, VWC and pore EC as gauges against their band, water per plant
-    // against the room, the last shot and the next.
+    assert.match(
+      await page.locator("[data-today-day]").innerText(),
+      /^Day 38 of 63 · 25 days left · harvest \d{1,2} [A-Z][a-z]{2}$/,
+    );
+    assert.equal(await page.locator(".today-run-mark").innerText(), "Flower bulk ends day 49");
+    const line = await page.locator("[data-today-line]").innerText();
+    for (const part of [/Water today\s+[\d.]+ L room · [\d.]+ L per watered plant/, /Lights\s+O(n|ff) /, /Air \(reading\)/, /RH/, /VPD/])
+      assert.match(line, part, `the room's line: ${line}`);
+    // Each row: VWC, dryback and pore EC against their targets, water against the room's median,
+    // and its sensors.
     for (const index of [0, 1, 2]) {
-      const card = cards.nth(index);
-      await expectVisible(card.locator(".today-zone-head [data-hmi-status]"));
-      await expectVisible(card.locator(".moisture-bar"));
-      assert.match(
-        await card.locator('[data-gauge="vwc"]').getAttribute("aria-label"),
-        /^VWC now [\d.]+%, (band [\d.]+% to [\d.]+%|target [\d.]+%), /,
-      );
-      assert.match(
-        await card.locator('[data-gauge="pore-ec"]').getAttribute("aria-label"),
-        /^Pore EC [\d.]+, band 3\.5 to 6, /,
-      );
-      // The levels the bar marks keep their key: rescue floor, re-water point and peak.
-      assert.match(
-        await card.locator(".hmi-gauge-marks").innerText(),
-        /^Rescue floor [\d.]+\s+Re-water [\d.]+\s+Peak [\d.]+$/,
-      );
-      const facts = await card.locator(".today-zone-facts").innerText();
-      assert.match(facts, /Water\s+[\d.]+ (mL|L)\/plant · (≈ the room|[\d.]+× the room)/);
-      assert.match(facts, /Last shot\s+\S/);
-      assert.match(facts, /Next\s+\S/);
+      const row = rows.nth(index);
+      assert.equal(await row.locator(".today-gauge").count(), 3);
+      assert.match(await row.locator(".today-gauge").nth(0).innerText(), /^VWC\s+target [\d.]+–[\d.]+%\s+[\d.]+%(\s*, [\d.]+ points (under|over))?$/);
+      assert.match(await row.locator(".today-gauge").nth(2).innerText(), /^Pore EC\s+target 3\.5–6(\.0)?\s+[\d.]+(\s*, [\d.]+ mS\/cm (under|over))?$/);
+      assert.match(await row.locator("[data-today-delta]").innerText(), /^[+−±]\d+ mL vs median \d+ mL$/);
+      assert.equal(await row.locator(".today-sensors li").count(), 2, "front and back sensors");
     }
-    // What the AI assistant changed today: three at most, newest first, with the way to the rest.
-    const jev = page.locator("[data-jev-today]");
-    const changes = jev.locator(".today-jev-list li");
-    assert.ok((await changes.count()) > 0 && (await changes.count()) <= 3);
-    await expectVisible(jev.getByRole("button", { name: "History" }));
-    // A card opens its zone.
-    await cards.nth(1).getByRole("link", { name: "Zone 2" }).click();
+    // Problems in place: zone 1's pore EC under the stage's band on its gauge; zone 3's back EC
+    // probe on its sensor, which says since when and what the zone reads; zone 2 quiet.
+    assert.equal(await rows.nth(0).locator(".today-gauge").nth(2).getAttribute("data-state"), "abnormal");
+    const back = rows.nth(2).locator('.today-sensors li[data-sensor="Back"]');
+    assert.match(await back.locator(".today-sensor-reading").innerText(), /^silent \d+ h$/);
+    assert.match(
+      await back.locator(".today-sensor-note").innerText(),
+      /^Last heard \S.*\. Left out: the zone reads the front sensor only\.$/,
+    );
+    assert.equal(await rows.nth(1).getAttribute("data-attention"), null);
+    assert.equal(await rows.nth(1).locator("[data-today-problem], .today-sensor-note").count(), 0);
+    // The AI assistant's changes are not repeated here, nor the zones as a table.
+    assert.equal(await page.locator("[data-jev-today], [data-today-table]").count(), 0);
+    // A row opens its zone.
+    await rows.nth(1).getByRole("link", { name: "Zone 2" }).click();
     await expectVisible(page.getByRole("heading", { name: "Zone 2", exact: true }));
     assert.equal(new URL(page.url()).hash, "#/zone/2");
+    // The strip opens the full timeline; the AI assistant's card opens its page.
     await go("today");
-    await jev.getByRole("button", { name: "History" }).click();
-    await expectVisible(page.getByRole("heading", { name: "History", exact: true }));
+    await page.locator("[data-today-strip]").getByRole("button", { name: "Open full timeline" }).click();
+    await expectVisible(page.getByRole("heading", { name: "Timeline", exact: true, level: 1 }));
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
-  await check("today: two phone screens at most, in both themes", async () => {
+  await check("today: a phone keeps the room, the strip and each zone in one column, in both themes", async () => {
     await page.setViewportSize({ width: 390, height: 844 });
+    const strip = '[data-today-strip] .st-row[data-kind="zone"]';
     await inBothThemes("today on a phone", async () => {
       await go("today");
-      await page.locator(".today-spark").first().waitFor();
+      await page.locator(strip).first().waitFor();
     });
     await go("today");
-    await page.locator(".today-spark").first().waitFor();
-    const strip = page.locator("[data-run-progress]");
-    await strip.waitFor();
-    await page
-      .waitForFunction(() => document.documentElement.scrollHeight <= 2 * innerHeight, null, {
-        timeout: 3_000,
-      })
-      .catch(() => {});
+    await page.locator(strip).first().waitFor();
+    await page.locator("[data-plan-feed]").waitFor();
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
-    // The run strip sits above the zones and adds its own height; the rest keeps its two screens.
-    const run = await strip.evaluate((el) => el.getBoundingClientRect().height + 16);
-    assert.ok(run <= 220, `the run strip is ${run}px tall on a phone`);
-    // The bottom section bar is fixed chrome; the page pads itself clear of it.
+    // The bottom section bar is fixed chrome; the page pads itself clear of it. Each zone row
+    // carries its sensors in place, so the page is three phone screens at most.
     const bar = await page.evaluate(() => document.querySelector(".bottom-nav")?.getBoundingClientRect().height ?? 0);
-    assert.ok(height - run - bar <= 2 * 844, `Today is ${height}px tall on a 844px phone`);
+    assert.ok(height - bar <= 3 * 844, `Today is ${height}px tall on a 844px phone`);
+    // Each zone row fits a screen, one column wide.
+    const rows = await page.locator("article.today-zone").evaluateAll((all) =>
+      all.map((row) => row.getBoundingClientRect()),
+    );
+    assert.equal(rows.length, 3);
+    for (const row of rows) assert.ok(row.height <= 844 && row.right <= 390, `a zone row is ${row.height}px tall`);
     await noOverflow();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
@@ -569,130 +563,61 @@ try {
       await page.goto(`${base}/dashboard.html?demo&room=f2&display=all#/today`, {
         waitUntil: "networkidle",
       });
-      // Table mode hides the desktop cards. Phones retain those cards instead of the table.
-      const ready =
-        page.viewportSize().width > 720
-          ? "[data-today-table] tbody tr"
-          : ".today-zones .today-spark";
-      await page.locator(ready).first().waitFor();
+      await page.locator('[data-today-strip] .st-row[data-kind="zone"]').first().waitFor();
+      await page.locator("[data-plan-feed]").waitFor();
     };
     await page.setViewportSize({ width: 1440, height: 900 });
     await open();
-    await page
-      .waitForFunction(() => document.documentElement.scrollHeight <= innerHeight, null, {
-        timeout: 3_000,
-      })
-      .catch(() => {});
-    const laptop = await page.evaluate(() => document.documentElement.scrollHeight);
-    assert.ok(
-      laptop <= 900 + 64,
-      `Today with every option on is ${laptop}px tall in a 900px window`,
-    );
+    // The tank readout joins the room's line; the zone rows still end within 1.35 windows.
+    await expectVisible(page.locator("[data-today-tank]"));
+    const bottom = await page
+      .locator("article.today-zone")
+      .last()
+      .evaluate((el) => el.getBoundingClientRect().bottom + scrollY);
+    assert.ok(bottom <= 900 * 1.35, `with every option on the zone rows end ${bottom}px down`);
     await page.setViewportSize({ width: 390, height: 844 });
     await open();
-    const strip = page.locator("[data-run-progress]");
-    await strip.waitFor();
-    await page
-      .waitForFunction(() => document.documentElement.scrollHeight <= 2 * innerHeight, null, {
-        timeout: 3_000,
-      })
-      .catch(() => {});
     const phone = await page.evaluate(() => document.documentElement.scrollHeight);
-    const run = await strip.evaluate((el) => el.getBoundingClientRect().height + 16);
     // The bottom section bar is fixed chrome; the page pads itself clear of it.
     const bar = await page.evaluate(() => document.querySelector(".bottom-nav")?.getBoundingClientRect().height ?? 0);
-    assert.ok(
-      phone - run - bar <= 2 * 844 + 64,
-      `Today with every option on is ${phone}px tall on a phone`,
-    );
+    assert.ok(phone - bar <= 3 * 844 + 64, `Today with every option on is ${phone}px tall on a phone`);
     await noOverflow();
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
   await check(
-    "today: the run strip shows the day, the phases, the grow plan and the feed recipe",
+    "today: the header owns the grow day; the plan line keeps the grow plan and the feed recipe",
     async () => {
       await go("today");
-      const strip = page.locator('[data-run-progress="running"]');
+      // The day once, in the header, with its run bar; no second run strip.
+      await expectVisible(page.locator("[data-today-run]"));
+      assert.match(await page.locator("[data-today-day]").innerText(), /^Day 38 of 63 /);
+      assert.equal(await page.locator("[data-run-figure], .run-bar").count(), 0);
+      assert.equal(await page.getByText(/^Day\s+\d+ of \d+$/).count(), 0, "no second day count");
+      const strip = page.locator("[data-plan-feed]");
       await expectVisible(strip);
-      // The demo run started 14 days ago; the demo grow plan runs 84 days in four phases.
-      const figure = (name) => strip.locator(`[data-run-figure="${name}"]`).innerText();
-      assert.match(await figure("day"), /^Day\s+15 of 84$/);
-      assert.match(await figure("done"), /^Done\s+14$/);
-      assert.match(await figure("left"), /^Left\s+70$/);
-      assert.match(await figure("end"), /^Harvest\s+\S+/);
-      const bar = strip.getByRole("progressbar", { name: "Run progress" });
-      assert.deepEqual(
-        await bar.evaluate((el) =>
-          ["aria-valuemin", "aria-valuenow", "aria-valuemax"].map((name) => el.getAttribute(name)),
-        ),
-        ["0", "14", "84"],
-      );
-      assert.equal(
-        await bar.getAttribute("aria-valuetext"),
-        "Day 15 of 84: 14 days done, 70 days left",
-      );
-      const phases = strip.getByRole("list", { name: "Phases of the grow" }).getByRole("listitem");
-      assert.deepEqual(
-        await phases.evaluateAll((items) =>
-          items.map((item) => [
-            item.querySelector(".run-phase-full").textContent,
-            item.getAttribute("aria-current"),
-          ]),
-        ),
-        [
-          ["20% generative", null],
-          ["70% generative", "step"],
-          ["40% generative", null],
-          ["60% generative", null],
-        ],
-      );
-      // Each phase is as wide as its days: 14, 21, 28 and 21 of 84.
-      const widths = await phases.evaluateAll((items) =>
-        items.map((item) => item.getBoundingClientRect().width),
-      );
-      const whole = widths.reduce((sum, width) => sum + width, 0);
-      [14, 21, 28, 21].forEach((days, index) =>
-        assert.ok(Math.abs(widths[index] / whole - days / 84) < 0.01, `phase ${index + 1} width`),
-      );
       const recipe = (name) => strip.locator(`[data-run-recipe="${name}"]`).innerText();
       assert.match(await recipe("plan"), /^Grow plan\s+Unnamed plan · Draft$/);
-      assert.match(await recipe("stage"), /^Stage\s+Flower bulk \u00b7 flower day 37 of 56$/);
       assert.match(await recipe("feed"), /^Feed\s+Bloom · week 3 of 12 · EC 2\.4 mS\/cm$/);
-      // A tooltip on each element, on keyboard focus too.
-      await phases.nth(1).focus();
+      // The stage is the header's.
+      assert.equal(await strip.locator('[data-run-recipe="stage"]').count(), 0);
+      // A tooltip on each, on keyboard focus too.
+      await strip.locator('[data-run-recipe="feed"]').focus();
       assert.match(
         await page.getByRole("tooltip").innerText(),
-        /^Phase 2, days 15 to 35: 70% generative\. The grow plan sets this phase\./,
+        /^The batch tank mixes this feed recipe today\. The feed schedule selects this recipe for this week\./,
       );
-      await strip.locator('[data-run-figure="left"]').focus();
-      assert.match(await page.getByRole("tooltip").innerText(), /^70 days stay in the run\./);
       await page.keyboard.press("Escape");
       await page.evaluate(() => document.activeElement?.blur());
       await strip.screenshot({ path: path.join(out, "run-progress-desktop.png") });
-      await axe("today run strip", '[data-run-progress="running"]');
-      await axeDark("today run strip", '[data-run-progress="running"]');
-      // At 375px the bar stays on the screen and the phases take their short labels.
+      await axe("today plan line", "[data-plan-feed]");
+      await axeDark("today plan line", "[data-plan-feed]");
+      // At 375px the header's run bar and the plan line stay on the screen.
       await page.setViewportSize({ width: 375, height: 812 });
       await go("today");
       await expectVisible(strip);
       await noOverflow();
-      const box = await bar.boundingBox();
-      assert.ok(box.x >= 0 && box.x + box.width <= 375, "the bar fits a 375px screen");
-      assert.deepEqual(
-        await phases.evaluateAll((items) =>
-          items.map((item) => [
-            item.querySelector(".run-phase-short").checkVisibility() &&
-              item.querySelector(".run-phase-short").textContent,
-            item.querySelector(".run-phase-full").getBoundingClientRect().width <= 1,
-          ]),
-        ),
-        [
-          ["20% G", true],
-          ["70% G", true],
-          ["40% G", true],
-          ["60% G", true],
-        ],
-      );
+      const box = await page.locator("[data-today-run]").boundingBox();
+      assert.ok(box.x >= 0 && box.x + box.width <= 375, "the run bar fits a 375px screen");
       await strip.screenshot({ path: path.join(out, "run-progress-mobile.png") });
       await page.setViewportSize({ width: 1440, height: 1000 });
       // Run records have one owner in History.
@@ -701,21 +626,10 @@ try {
       await ongoing.getByRole("button", { name: "Archive" }).click();
       // An archived run leaves the list.
       await ongoing.waitFor({ state: "detached" });
-      await page
-        .locator(".desktop-sidebar")
-        .getByRole("link", { name: "Status", exact: true })
-        .click();
-      // The Status tabs give way to the room tree on a desktop; open the room page directly.
-    await page.evaluate(() => {
-      location.hash = "#/today";
-    });
-      const empty = page.locator('[data-run-progress="none"]');
-      await expectVisible(empty);
-      assert.match(await empty.innerText(), /^No run is active in this room\./);
-      assert.equal(await page.getByRole("progressbar", { name: "Run progress" }).count(), 0);
-      await axe("today run strip, no run", '[data-run-progress="none"]');
-      await empty.getByRole("button", { name: "Add a run" }).click();
-      await expectVisible(page.locator("#run-records"));
+      // The room page's plan line does not depend on a run.
+      await go("today");
+      await expectVisible(page.locator("[data-plan-feed]"));
+      assert.match(await recipe("plan"), /^Grow plan\s+Unnamed plan · Draft$/);
     },
   );
   await check(
@@ -2631,7 +2545,7 @@ try {
     await go("today");
     await page.getByRole("link", { name: "Skip to content" }).focus();
     await page.keyboard.press("Enter");
-    await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room A", exact: true, level: 1 }));
     assert.equal(await page.evaluate(() => document.activeElement?.id), "main-content");
     assert.match(page.url(), /#\/today$/);
     await openFromMenu(
@@ -2641,7 +2555,7 @@ try {
     );
     await expectVisible(page.getByRole("heading", { name: "Probes", exact: true }));
     await page.goBack();
-    await expectVisible(page.getByRole("heading", { name: "Room A today", exact: true }));
+    await expectVisible(page.getByRole("heading", { name: "Room A", exact: true, level: 1 }));
     await page.goForward();
     await expectVisible(page.getByRole("heading", { name: "Probes", exact: true }));
   });
