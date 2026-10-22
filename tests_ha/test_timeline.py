@@ -42,8 +42,8 @@ async def _call(hass, user, name, **data):
     )
 
 
-async def _veg_room(hass):
-    """A second room, Veg, with no pump."""
+async def _veg_room(hass, pump=None):
+    """A second room, Veg, with no pump unless given one."""
     hass.states.async_set(VEG_VALVE, "off")
     hass.states.async_set("sensor.veg_vwc", "40", {"unit_of_measurement": "%"})
     flow = hass.config_entries.flow
@@ -62,7 +62,8 @@ async def _veg_room(hass):
         },
     )
     assert result["step_id"] == "hardware", result.get("errors")
-    result = await flow.async_configure(result["flow_id"], {"plumbing": "valves_only"})
+    hardware = {"plumbing": "pump_valves", "pump_switch": pump} if pump else {"plumbing": "valves_only"}
+    result = await flow.async_configure(result["flow_id"], hardware)
     assert result["type"] == "create_entry", result
     await hass.async_block_till_done()
 
@@ -133,10 +134,22 @@ async def test_two_rooms_48h_round_trip(hass, hass_admin_user, hass_read_only_us
             "intents": [
                 {"id": "t1", "zone": 1, "at": planned_at.isoformat(), "duration_s": 90,
                  "source": "timer", "program_id": "p", "expected": False},
+                {"id": "t2", "zone": 1, "at": (planned_at + timedelta(minutes=30)).isoformat(),
+                 "duration_s": 90, "source": "timer", "program_id": "p", "expected": False},
                 {"id": "e1", "zone": 1, "at": (now - timedelta(hours=1)).isoformat(),
                  "duration_s": 30, "source": "engine", "expected": True},
             ]
         },
+    )
+    # The integration owns the skips: t2 is already skipped.
+    await _call(
+        hass,
+        hass_admin_user,
+        "timer_skip",
+        room_id=TENT,
+        expected_revision=0,
+        zone=1,
+        at=(planned_at + timedelta(minutes=30)).isoformat(),
     )
     await hass.async_block_till_done()
 
@@ -154,7 +167,9 @@ async def test_two_rooms_48h_round_trip(hass, hass_admin_user, hass_read_only_us
     assert tent_room["planned_source"] == "projection_app"
     assert veg_room["planned_source"] == "unavailable"
     (row,) = tent_room["rows"]
-    shot, planned = row["blocks"]
+    shot, planned, skipped = row["blocks"]
+    assert (skipped["id"], skipped["skipped"], skipped["skippable"]) == ("t2", True, False)
+    assert planned["skipped"] is False
     assert (shot["kind"], shot["status"], shot["id"]) == ("shot", "done", tent)
     assert (shot["litres"], shot["metered_l"], shot["reason"]) == (1.5, None, "P1 ramp shot 1")
     assert shot["vwc_expected"] is None  # not sent: None, never guessed
@@ -214,3 +229,62 @@ async def test_two_rooms_48h_round_trip(hass, hass_admin_user, hass_read_only_us
     days = [(dt_util.now().date() - timedelta(days=d)).isoformat() for d in range(15)]
     with pytest.raises(HomeAssistantError, match="at most 14 days"):
         await _call(hass, hass_read_only_user, "timeline_summary", rooms=[TENT], days=days)
+
+
+async def test_pump_load_is_the_shared_pumps_total_even_for_a_room_not_asked(
+    hass, hass_admin_user, hass_read_only_user
+):
+    from custom_components.crop_steering.number import NUMBER_DESCRIPTIONS
+    from custom_components.crop_steering.timeline import LONGEST_SHOT_S
+
+    longest = next(d for d in NUMBER_DESCRIPTIONS if d.key == "max_shot_duration")
+    assert LONGEST_SHOT_S == longest.native_max_value
+
+    await hass.config.async_set_time_zone("Pacific/Auckland")
+    hass.states.async_set(PUMP, "off")
+    await _install(hass, {"pump_switch": PUMP, "plumbing": "pump_valves"})
+    await _veg_room(hass, pump=PUMP)
+    await hass.data[DOMAIN]["_journal"]._ready.wait()
+    demand = zone_demand_lph(
+        4, SIZING_DEFAULTS["drippers_per_plant"], SIZING_DEFAULTS["dripper_flow_rate"]
+    )
+    await _call(
+        hass,
+        hass_admin_user,
+        "supply_save",
+        expected_revision=0,
+        irrigation_pumps=[{"entity_id": PUMP, "max_flow_lph": demand * 4, "max_concurrent_zones": 2}],
+    )
+    at = dt_util.now() - timedelta(hours=1)
+    for room, offset in ((TENT, 0), (VEG, 30)):
+        intent = new_id()
+        await _call(
+            hass,
+            hass_admin_user,
+            "journal_append",
+            room_id=room,
+            events=[
+                _ev("shot.started", at + timedelta(seconds=offset), intent),
+                _ev("shot.completed", at + timedelta(seconds=offset + 60), intent),
+            ],
+        )
+    out = await _call(
+        hass,
+        hass_read_only_user,
+        "timeline_get",
+        rooms=[TENT],
+        start=(at - timedelta(hours=1)).isoformat(),
+        end=(at + timedelta(hours=1)).isoformat(),
+    )
+    (room,) = out["rooms"]
+    assert (room["pump"], room["pump_rooms"]) == (PUMP, [TENT, VEG])
+    assert [p["pct"] for p in room["pump_load"]] == [
+        pytest.approx(25.0),
+        pytest.approx(50.0),
+        pytest.approx(25.0),
+        0.0,
+    ]
+    assert [b["id"] for r in room["rows"] for b in r["blocks"]] and all(
+        r["zone"] == 1 for r in room["rows"]
+    )
+    assert len(room["rows"][0]["blocks"]) == 1  # Veg's shot loads the pump, it is not drawn here

@@ -10,7 +10,7 @@ the feed with the `crop_steering/subscribe` websocket command. `history_changes`
 journal and the controller's projection_app).
 
 Nothing here is needed for watering: a journal that cannot open only logs, `emit()` then does nothing, and the
-two services answer "unavailable".
+services that read it answer "unavailable".
 """
 
 from __future__ import annotations
@@ -653,15 +653,45 @@ def _rooms_of(args) -> list[str]:
     if not rooms or not all(
         isinstance(r, str) and r.startswith("room:") for r in rooms
     ):
-        raise _hub_error("rooms are one or more canonical room ids such as room:f2_")
+        raise _hub_error("rooms are ids such as room:f2_")
     return rooms
 
 
-def _timeline_room(hass, room_id) -> tuple[dict, list]:
-    """What timeline.build needs of one room, and its projection_app intents (the only planned source)."""
-    from . import timers_api
+async def _read(hub, room_id, since, until, *, openers, kinds=None) -> list:
+    """The room's events for [since, until) by timeline.windows (completions past the end; with `openers`,
+    starts before it), only `kinds` when given."""
+    from . import timeline
+
+    events = []
+    for low, high, wanted in timeline.windows(since, until, openers=openers):
+        wanted = [k for k in wanted if kinds is None or k in kinds]
+        if wanted:
+            events += await _all_events(
+                hub,
+                room_id=room_id,
+                since=low.isoformat(),
+                until=high.isoformat(),
+                kinds=wanted,
+            )
+    return events
+
+
+def _pumps(hass) -> dict:
+    """{room_id: the room's pump switch} for every room with one."""
     from .room import room_prefix
     from .setup_api import effective
+
+    out = {}
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        pump = (effective(entry).get("hardware") or {}).get("pump_switch")
+        if pump:
+            out["room:" + room_prefix(entry)] = pump
+    return out
+
+
+def _timeline_room(hass, room_id, pump) -> tuple[dict, list]:
+    """What timeline.build needs of one room, and its projection_app intents (the only planned source)."""
+    from . import timers_api
     from .site_api import SENSOR as SUPPLY
 
     prefix = room_id[len("room:") :]
@@ -678,19 +708,8 @@ def _timeline_room(hass, room_id) -> tuple[dict, list]:
     timers = next(
         (r for r in timers_api._rooms(hass).values() if r.room_id == room_id), None
     )
-    entry = next(
-        (
-            e
-            for e in hass.config_entries.async_entries(DOMAIN)
-            if room_prefix(e) == prefix
-        ),
-        None,
-    )
     supply = hass.states.get(SUPPLY)
     attrs = supply.attributes if supply is not None else {}
-    pump = (
-        (effective(entry).get("hardware") or {}).get("pump_switch") if entry else None
-    )
     capacity = next(
         (
             p.get("max_flow_lph")
@@ -702,20 +721,25 @@ def _timeline_room(hass, room_id) -> tuple[dict, list]:
     room = {
         "room_id": room_id,
         "lights_hours": timers.lights() if timers is not None else None,
-        "demand": dict((attrs.get("zone_demand_lph") or {}).get(room_id) or {}),
+        "pump": pump,
         "capacity_lph": capacity,
         "planned_source": source,
+        # The integration owns the timers config, so the timeline reads the skips itself.
+        "skips": timers._skips_in_force() if timers is not None else [],
     }
     return room, [{**i, "room_id": room_id} for i in intents if isinstance(i, dict)]
 
 
 async def timeline_get(hass, hub, args: dict) -> dict:
     """{rooms, errors, truncated?}: timeline.build over each room's shot, hold, queue, alert and flow events in
-    [start, end) and its projection_app intents, in HA local time. The fold runs in the executor.
+    [start, end) (and the shots running across its edges) and its projection_app intents, in HA local time. A
+    room's pump load is its pump's: the shots of every room on that pump are read, asked for or not. The fold
+    runs in the executor.
     """
     from homeassistant.util import dt as dt_util
 
     from . import timeline
+    from .site_api import SENSOR as SUPPLY
 
     tz = _local_tz()
     start, end = timeline.at(args["start"], tz), timeline.at(args["end"], tz)
@@ -725,19 +749,29 @@ async def timeline_get(hass, hub, args: dict) -> dict:
         timeline.check_span(start, end)
     except ValueError as err:
         raise _hub_error(str(err)) from err
+    asked = _rooms_of(args)
+    pump_of = _pumps(hass)
+    supply = hass.states.get(SUPPLY)
+    demand = (supply.attributes.get("zone_demand_lph") if supply else None) or {}
+    pumps = {}
+    for room_id in asked:
+        pump = pump_of.get(room_id)
+        if pump:
+            pumps[pump] = {
+                r: dict(demand.get(r) or {}) for r, p in pump_of.items() if p == pump
+            }
     rooms, events, planned = [], [], []
-    for room_id in _rooms_of(args):
-        events += await _all_events(
-            hub,
-            room_id=room_id,
-            since=start.isoformat(),
-            until=end.isoformat(),
-            kinds=list(timeline.KINDS),
-            zones=args.get("zones"),
-        )
-        room, intents = _timeline_room(hass, room_id)
+    for room_id in asked:
+        events += await _read(hub, room_id, start, end, openers=True)
+        room, intents = _timeline_room(hass, room_id, pump_of.get(room_id))
         rooms.append(room)
         planned += intents
+    for room_id in sorted(
+        {r for members in pumps.values() for r in members} - set(asked)
+    ):
+        events += await _read(
+            hub, room_id, start, end, openers=True, kinds=timeline.SHOT_KINDS
+        )
     return await hass.async_add_executor_job(
         lambda: timeline.build(
             rooms,
@@ -748,15 +782,16 @@ async def timeline_get(hass, hub, args: dict) -> dict:
             now=dt_util.now(),
             tz=tz,
             zones=args.get("zones"),
+            pumps=pumps,
         )
     )
 
 
 async def timeline_summary(hass, hub, args: dict) -> dict:
     """{days: [{date, rooms: [{room_id, shots, failed, warnings, held, queued}]}]}, each local day of each room
-    read from local midnight to the next."""
-    from datetime import datetime as dt
-    from datetime import time as dtime
+    read from local midnight to the next (a shot counted once, on the day it started).
+    """
+    from homeassistant.util import dt as dt_util
 
     from . import timeline
 
@@ -769,17 +804,12 @@ async def timeline_summary(hass, hub, args: dict) -> dict:
     events = []
     for room_id in rooms:
         for day in sorted(set(days)):
-            since = dt.combine(day, dtime(), tz)
-            until = dt.combine(day + timedelta(days=1), dtime(), tz)
-            events += await _all_events(
-                hub,
-                room_id=room_id,
-                since=since.isoformat(),
-                until=until.isoformat(),
-                kinds=list(timeline.KINDS),
-            )
+            since = datetime.combine(day, datetime.min.time(), tz)
+            until = datetime.combine(day + timedelta(days=1), datetime.min.time(), tz)
+            events += await _read(hub, room_id, since, until, openers=False)
+    now = dt_util.now()
     out = await hass.async_add_executor_job(
-        lambda: timeline.summarise(events, args["days"], rooms=rooms, tz=tz)
+        lambda: timeline.summarise(events, args["days"], rooms=rooms, tz=tz, now=now)
     )
     return {"days": out}
 

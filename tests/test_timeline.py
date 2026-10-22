@@ -55,9 +55,10 @@ def _room(room_id=F2, **over):
     return {
         "room_id": room_id,
         "lights_hours": (6.0, 18.0),
-        "demand": {},
+        "pump": None,
         "capacity_lph": None,
         "planned_source": "projection_app",
+        "skips": [],
         **over,
     }
 
@@ -314,18 +315,45 @@ def test_lights_windows_in_local_time():
     assert _build(rooms=[_room(lights_hours=None)])["rooms"][0]["lights"] == []
 
 
+PUMP = "switch.main_pump"
+
+
 def test_pump_load_is_demand_over_capacity_and_none_without_capacity():
     at = datetime(2026, 10, 22, 7, 0, tzinfo=NZ)
     _, events = _shot(at)
-    out = _build(events, rooms=[_room(demand={"3": 300.0}, capacity_lph=1200.0)])
+    pumps = {PUMP: {F2: {"3": 300.0}}}
+    out = _build(events, rooms=[_room(pump=PUMP, capacity_lph=1200.0)], pumps=pumps)
     assert out["rooms"][0]["pump_load"] == [
         {"t": at.isoformat(), "pct": 25.0},
         {"t": (at + timedelta(seconds=60)).isoformat(), "pct": 0.0},
     ]
-    out = _build(events, rooms=[_room(demand={"3": 300.0}, capacity_lph=None)])
+    assert (out["rooms"][0]["pump"], out["rooms"][0]["pump_rooms"]) == (PUMP, [F2])
+    out = _build(events, rooms=[_room(pump=PUMP, capacity_lph=None)], pumps=pumps)
     assert [p["pct"] for p in out["rooms"][0]["pump_load"]] == [None, None]
-    out = _build(events, rooms=[_room(demand={}, capacity_lph=1200.0)])
+    out = _build(
+        events, rooms=[_room(pump=PUMP, capacity_lph=1200.0)], pumps={PUMP: {F2: {}}}
+    )
     assert out["rooms"][0]["pump_load"][0]["pct"] is None
+    out = _build(events)  # no pump known
+    assert [p["pct"] for p in out["rooms"][0]["pump_load"]] == [None, None]
+
+
+def test_pump_load_is_the_shared_pumps_total_across_rooms():
+    # F1 and F2 share one pump; only F2 is asked for, F1's overlapping shot still loads the pump.
+    at = datetime(2026, 10, 22, 7, 0, tzinfo=NZ)
+    _, f2 = _shot(at)
+    _, f1 = _shot(at + timedelta(seconds=30), zone=1)
+    for ev in f1:
+        ev["room_id"] = F1
+    out = _build(
+        f2 + f1,
+        rooms=[_room(pump=PUMP, capacity_lph=1200.0)],
+        pumps={PUMP: {F2: {"3": 300.0}, F1: {"1": 300.0}}},
+    )
+    (room,) = out["rooms"]
+    assert room["pump_rooms"] == [F1, F2]
+    assert [p["pct"] for p in room["pump_load"]] == [25.0, 50.0, 25.0, 0.0]
+    assert [r["zone"] for r in room["rows"]] == [3]  # F1's shots are not drawn as F2's
 
 
 def test_too_many_blocks_answers_the_newest_and_says_truncated(monkeypatch):
@@ -412,3 +440,198 @@ def test_summary_refuses_more_than_14_days():
     with pytest.raises(ValueError, match="at most 14 days"):
         timeline.summarise([], days, rooms=[F2], tz=NZ)
     assert len(timeline.summarise([], days[:14], rooms=[F2], tz=NZ)) == 14
+
+
+def _read(events, since, until, *, openers):
+    """What the service reads from the journal for [since, until): timeline.windows over the stored events, with
+    journal_query's bounds (ts >= since, ts < until, kinds)."""
+    out = []
+    for low, high, kinds in timeline.windows(since, until, openers=openers):
+        out += [
+            e
+            for e in events
+            if e["kind"] in kinds and low <= datetime.fromisoformat(e["ts"]) < high
+        ]
+    return out
+
+
+def _midnight_shot():
+    intent = new_id()
+    at = datetime(2026, 10, 22, 23, 58, tzinfo=NZ)
+    return [
+        _ev("shot.started", at, intent=intent, duration_s=240),
+        _ev("shot.completed", at + timedelta(minutes=4), intent=intent, elapsed_s=240),
+    ]
+
+
+def _day(day):
+    since = datetime(2026, 10, day, 0, 0, tzinfo=NZ)
+    return since, since + timedelta(days=1)
+
+
+def test_a_shot_across_midnight_counts_once_on_its_start_day():
+    events = _midnight_shot()
+    zero = {"shots": 0, "failed": 0, "warnings": 0, "held": 0, "queued": 0}
+    done = {**zero, "shots": 1}
+    late = timeline.summarise(
+        _read(events, *_day(22), openers=False),
+        ["2026-10-22"],
+        rooms=[F2],
+        tz=NZ,
+        now=NOW + timedelta(days=2),
+    )
+    assert late[0]["rooms"][0] == {"room_id": F2, **done}  # done, not an open warning
+    early = timeline.summarise(
+        _read(events, *_day(23), openers=False),
+        ["2026-10-23"],
+        rooms=[F2],
+        tz=NZ,
+        now=NOW + timedelta(days=2),
+    )
+    assert early[0]["rooms"][0] == {
+        "room_id": F2,
+        **zero,
+    }  # the completion alone is not a shot
+    both = timeline.summarise(
+        _read(events, *_day(22), openers=False)
+        + _read(events, *_day(23), openers=False),
+        ["2026-10-22", "2026-10-23"],
+        rooms=[F2],
+        tz=NZ,
+        now=NOW + timedelta(days=2),
+    )
+    assert [d["rooms"][0] for d in both] == [
+        {"room_id": F2, **done},
+        {"room_id": F2, **zero},
+    ]
+
+
+def test_timeline_edges_draw_a_shot_across_them_whole():
+    events = _midnight_shot()
+    later = NOW + timedelta(days=2)
+    for since, until in (_day(22), _day(23)):
+        out = timeline.build(
+            [_room()],
+            _read(events, since, until, openers=True),
+            [],
+            since,
+            until,
+            now=later,
+            tz=NZ,
+        )
+        (block,) = _blocks(out)
+        assert (block["status"], block["running"]) == ("done", False)
+        assert block["start"][11:16] == "23:58" and block["end"][11:16] == "00:02"
+
+
+def test_an_open_shot_is_running_until_its_duration_and_grace_pass():
+    at = datetime(2026, 10, 22, 11, 58, tzinfo=NZ)  # 120 s shot, NOW is 12:00
+    _, events = _shot(at, end=False, duration_s=120)
+    (block,) = _blocks(_build(events))
+    assert (block["status"], block["running"]) == ("done", True)
+    stale = datetime(2026, 10, 22, 11, 55, tzinfo=NZ)  # 120 s + 120 s grace ended 11:59
+    _, events = _shot(stale, end=False, duration_s=120)
+    (block,) = _blocks(_build(events))
+    assert (block["status"], block["running"]) == ("warning", False)
+    # The summary counts a running shot as a shot, not a warning.
+    _, events = _shot(at, end=False, duration_s=120)
+    (day,) = timeline.summarise(events, ["2026-10-22"], rooms=[F2], tz=NZ, now=NOW)
+    assert day["rooms"][0]["shots"] == 1 and day["rooms"][0]["warnings"] == 0
+    # A partial completion is still a warning.
+    intent, events = _shot(at)
+    events[1]["outcome"] = "partial"
+    (block,) = _blocks(_build(events))
+    assert block["status"] == "warning"
+
+
+def test_a_skipped_slot_is_marked_and_not_skippable():
+    slot_at = NOW + timedelta(hours=2)
+    timer = {
+        "zone": 3,
+        "at": slot_at.isoformat(),
+        "duration_s": 60,
+        "source": "timer",
+        "room_id": F2,
+    }
+    other = {**timer, "zone": 4}
+    engine = {
+        **timer,
+        "source": "engine",
+        "at": (NOW + timedelta(hours=3)).isoformat(),
+        "expected": True,
+    }
+    skips = [
+        {
+            "zone": 3,
+            "at": slot_at.astimezone(UTC).isoformat(),
+            "until": (slot_at + timedelta(hours=4)).isoformat(),
+        }
+    ]
+    out = _build(planned=[timer, other, engine], rooms=[_room(skips=skips)])
+    got = {
+        (b["source"], r["zone"]): b
+        for r in out["rooms"][0]["rows"]
+        for b in r["blocks"]
+    }
+    assert (got[("timer", 3)]["skipped"], got[("timer", 3)]["skippable"]) == (
+        True,
+        False,
+    )
+    assert (got[("timer", 4)]["skipped"], got[("timer", 4)]["skippable"]) == (
+        False,
+        True,
+    )
+    assert (got[("engine", 3)]["skipped"], got[("engine", 3)]["skippable"]) == (
+        True,
+        False,
+    )
+
+
+def test_planned_intents_without_an_id_are_kept_and_deduped_by_slot():
+    slot = {
+        "zone": 3,
+        "at": (NOW + timedelta(hours=1)).isoformat(),
+        "duration_s": 60,
+        "source": "timer",
+        "room_id": F2,
+    }
+    later = {**slot, "at": (NOW + timedelta(hours=2)).isoformat()}
+    out = _build(planned=[slot, dict(slot), later])
+    assert len(_blocks(out)) == 2
+
+
+def test_summary_days_are_deduped():
+    out = timeline.summarise([], ["2026-10-22", "2026-10-22"], rooms=[F2], tz=NZ)
+    assert [d["date"] for d in out] == ["2026-10-22"]
+
+
+def test_the_summary_service_reads_a_shot_across_midnight_once(tmp_path, monkeypatch):
+    """timeline_summary against a real journal file: the 23:58-00:02 shot asked as D, D+1 and both."""
+    import asyncio
+    import sys
+
+    from .test_changes import _hub, _site
+
+    hass, api = _site(monkeypatch, tmp_path)
+    dt = sys.modules["homeassistant.util.dt"]
+    monkeypatch.setattr(dt, "get_default_time_zone", lambda: NZ, raising=False)
+    monkeypatch.setattr(dt, "now", lambda: NOW + timedelta(days=2))
+
+    async def go():
+        hub = await _hub(api, hass, tmp_path, {F2: _midnight_shot()})
+        return [
+            await api.timeline_summary(hass, hub, {"rooms": [F2], "days": days})
+            for days in (["2026-10-22"], ["2026-10-23"], ["2026-10-22", "2026-10-23"])
+        ]
+
+    d, d1, both = asyncio.run(go())
+
+    def counts(out):
+        return [
+            (day["date"], day["rooms"][0]["shots"], day["rooms"][0]["warnings"])
+            for day in out["days"]
+        ]
+
+    assert counts(d) == [("2026-10-22", 1, 0)]
+    assert counts(d1) == [("2026-10-23", 0, 0)]
+    assert counts(both) == [("2026-10-22", 1, 0), ("2026-10-23", 0, 0)]

@@ -2208,7 +2208,7 @@ history_revert:
           mode: box
 
 timeline_get:
-  name: Timeline
+  name: Read the timeline
   description: >-
     What each zone did and is planned to do, at most 48 h: shots (done or failed), holds, queued
     shots and alerts from the journal, and planned timer and engine shots from the controller
@@ -2241,7 +2241,7 @@ timeline_get:
         object:
 
 timeline_summary:
-  name: Timeline summary
+  name: Read the timeline summary
   description: >-
     Per room per local day: shots, failed, warnings, held and queued counts, from the journal.
     Any signed-in user.
