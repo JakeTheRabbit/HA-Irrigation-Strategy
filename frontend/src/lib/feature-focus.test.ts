@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { featureOf, featureTargets, roomOnlyFeature } from "./feature-focus";
+import { featureLabel, featureOf, featureTargets, roomOnlyFeature } from "./feature-focus";
 
 describe("feature links", () => {
   it("reads the feature an address names", () => {
@@ -19,5 +19,9 @@ describe("feature links", () => {
     expect(roomOnlyFeature("photoperiod")).toBe(true);
     expect(roomOnlyFeature("steering_mode")).toBe(false);
     expect(roomOnlyFeature(null)).toBe(false);
+  });
+  it("names the feature it opened at, for a screen reader", () => {
+    expect(featureLabel("photoperiod")).toBe("Lights schedule");
+    expect(featureLabel("nothing")).toBeNull();
   });
 });

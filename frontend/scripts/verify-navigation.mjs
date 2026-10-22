@@ -83,8 +83,29 @@ try {
       .then(() => true)
       .catch(() => false);
     if (!landed) missed.push(href);
+    // Keyboard focus moves to it, and a screen reader hears where the page opened.
+    else if (
+      !(await page.evaluate((id) => {
+        const el = document.querySelector(`[data-feature-focus="${id}"]`);
+        return !!el && (el === document.activeElement || el.contains(document.activeElement));
+      }, id))
+    )
+      missed.push(`${href} (focus)`);
   }
   assert.deepEqual(missed, []);
+  assert.match(await page.locator("#feature-announce").innerText(), /^Opened at /);
+  // Only the ?feature= part changing, on the same page, lands again: room scope included.
+  for (const [from, to] of [
+    ["#/settings?feature=water_today_view", "manual_hardware_enabled"],
+    ["#/plan/targets?feature=p0", "photoperiod"],
+    ["#/equipment/setup?feature=daily_limits", "source_gate"],
+  ]) {
+    await page.goto("about:blank");
+    await open(from);
+    await page.locator("[data-feature-focus]").waitFor();
+    await page.evaluate((hash) => (location.hash = hash), `${from.split("?")[0]}?feature=${to}`);
+    await page.locator(`[data-feature-focus="${to}"]`).waitFor({ timeout: 3000 });
+  }
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.deepEqual(errors, []);
