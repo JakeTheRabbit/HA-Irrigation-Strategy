@@ -6,6 +6,7 @@ import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
+from typing import Any
 
 import pytest
 
@@ -17,6 +18,8 @@ from custom_components.crop_steering.const import (
     PROBE_RANGE,
     PROBE_STALE_SECONDS,
 )
+from custom_components.crop_steering.generated import shot_length
+from custom_components.crop_steering.generated.defaults import CONTROLLER_FALLBACKS
 
 NOW = datetime(2026, 9, 27, 12, 0, tzinfo=timezone.utc)
 SOURCE = (
@@ -35,8 +38,12 @@ def sensor(states, prefix=""):
         "_get_zone_weekly_water_usage",
         "_get_zone_daily_water_usage",
         "_get_zone_last_irrigation",
+        "native_value",
         "extra_state_attributes",
-        "_average_sensor_values",
+        "_active_zone_mean",
+        "_get_zone_irrigation_count_today",
+        "_shot_seconds_by_zone",
+        "_zone_setting",
         "_probe_readings",
         "_fuse_zone",
         "_probe_method_entity",
@@ -54,6 +61,7 @@ def sensor(states, prefix=""):
     )
     module = ast.fix_missing_locations(ast.Module(body=[cls], type_ignores=[]))
     namespace = {
+        "Any": Any,
         "math": math,
         "_LOGGER": logging.getLogger(__name__),
         "to_native": units.to_native,
@@ -69,6 +77,26 @@ def sensor(states, prefix=""):
             if isinstance(node, ast.Assign)
             and getattr(node.targets[0], "id", None) == "SHOT_SIZE_KEYS"
         ),
+        # absent before the retired sensors were: {} keeps this harness loading the old code
+        "RETIRED_SENSORS": next(
+            (
+                ast.literal_eval(node.value)
+                for node in tree.body
+                if isinstance(node, ast.Assign)
+                and getattr(node.targets[0], "id", None) == "RETIRED_SENSORS"
+            ),
+            {},
+        ),
+        "CONTROLLER_FALLBACKS": CONTROLLER_FALLBACKS,
+        **{
+            name: getattr(shot_length, name)
+            for name in (
+                "DEFAULT_MAX_SHOT_S",
+                "raw_seconds",
+                "shot_seconds",
+                "valid_cap",
+            )
+        },
         "dt_util": SimpleNamespace(
             parse_datetime=datetime.fromisoformat,
             as_local=lambda value: value.replace(tzinfo=timezone.utc),
@@ -131,25 +159,144 @@ def test_weekly_consumer_uses_own_room_and_forwards_partial_coverage():
     assert entity.extra_state_attributes == attrs
 
 
-def test_fusion_rejects_nonfinite_without_changing_arithmetic_mean():
-    values = {
-        "sensor.a": "10",
-        "sensor.b": "40",
-        "sensor.c": "100",
-        "sensor.nan": "NaN",
-        "sensor.inf": "inf",
-        "sensor.neg_inf": "-inf",
-        "sensor.offline": "unavailable",
-        "sensor.bad": "not a number",
+def _probe_mean(entity, sensor_ids, kind=None):
+    """The plain mean of each probe as _probe_readings converts it."""
+    values = [
+        value
+        for _sensor_id, value, _age in entity._probe_readings(sensor_ids, kind)
+        if value is not None and math.isfinite(value)
+    ]
+    return round(sum(values) / len(values), 2) if values else None
+
+
+def _room(states, zones):
+    entity = sensor({k: SimpleNamespace(state=v) for k, v in states.items()})
+    entity._zones_config = zones
+    return entity
+
+
+def test_the_room_mean_is_of_its_active_zones_own_readings_only():
+    """INT-010: it averaged every probe in the config, archived zones and probes a zone leaves out
+    included. Each zone's own reading counts only its probes, fused as the controller reads them.
+    """
+    zones = {"1": {"active": True}, "2": {}, "3": {"active": False}}
+    entity = _room(
+        {
+            "sensor.crop_steering_vwc_zone_1": "40",
+            "sensor.crop_steering_vwc_zone_2": "44",
+            "sensor.crop_steering_vwc_zone_3": "90",  # archived: not counted
+            "sensor.crop_steering_ec_zone_1": "3.0",
+            "sensor.crop_steering_ec_zone_2": "unknown",
+        },
+        zones,
+    )
+    assert entity._active_zone_mean("vwc") == 42.0
+    assert entity._active_zone_mean("ec") == 3.0
+    entity.entity_description = SimpleNamespace(key="configured_avg_vwc")
+    assert entity.native_value == 42.0
+
+
+def test_the_room_mean_skips_readings_that_are_not_numbers_and_is_unknown_without_any():
+    zones = {"1": {}, "2": {}, "3": {}}
+    entity = _room(
+        {
+            "sensor.crop_steering_veg_vwc_zone_1": "NaN",
+            "sensor.crop_steering_veg_vwc_zone_2": "inf",
+            "sensor.crop_steering_veg_vwc_zone_3": "not a number",
+        },
+        zones,
+    )
+    entity._prefix = "veg_"
+    assert entity._active_zone_mean("vwc") is None
+    assert entity._active_zone_mean("ec") is None  # no state at all
+
+
+@pytest.mark.parametrize("value", [None, "unknown", "unavailable", "bad"])
+def test_shots_today_without_the_controllers_count_is_unknown_not_zero(value):
+    """INT-011: a stopped controller read as "0 shots today"."""
+    states = (
+        {}
+        if value is None
+        else {
+            "sensor.crop_steering_zone_1_irrigation_count_app": SimpleNamespace(
+                state=value
+            )
+        }
+    )
+    assert sensor(states)._get_zone_irrigation_count_today(1) is None
+
+
+def test_shots_today_mirror_the_controllers_count():
+    states = {
+        "sensor.crop_steering_zone_1_irrigation_count_app": SimpleNamespace(state="3")
     }
+    assert sensor(states)._get_zone_irrigation_count_today(1) == 3
+
+
+@pytest.mark.parametrize("key", ["ec_ratio", "p2_vwc_threshold_adjusted"])
+def test_a_retired_sensor_is_unknown_and_says_why(key):
+    """CTL-011, INT-007: these computed a re-water point and an EC ratio the controller never used,
+    from the select it does not read, with a missing number read as 0."""
     entity = sensor(
-        {key: SimpleNamespace(state=value) for key, value in values.items()}
+        {
+            "select.crop_steering_irrigation_phase": SimpleNamespace(state="P2"),
+            "select.crop_steering_steering_mode": SimpleNamespace(state="Vegetative"),
+            "number.crop_steering_p2_vwc_threshold": SimpleNamespace(state="40"),
+        }
     )
-    assert entity._average_sensor_values(list(values)) == 50.0
-    assert (
-        entity._average_sensor_values(["sensor.nan", "sensor.inf", "sensor.neg_inf"])
-        is None
+    entity.entity_description = SimpleNamespace(key=key)
+    assert entity.native_value is None
+    assert entity.extra_state_attributes["reason"].startswith("Retired:")
+
+
+def _sized(cap=None, **more):
+    states = {
+        "number.crop_steering_substrate_volume": "100",
+        "number.crop_steering_p2_shot_size": "50",
+        "number.crop_steering_drippers_per_plant": "1",
+        "number.crop_steering_dripper_flow_rate": "1",
+        **({} if cap is None else {"number.crop_steering_max_shot_duration": cap}),
+        **more,
+    }
+    entity = _room(states, {"1": {}})
+    entity.entity_description = SimpleNamespace(key="p2_shot_duration_seconds")
+    return entity
+
+
+def test_a_room_without_a_shot_limit_is_shown_within_the_controllers_900_seconds():
+    """CTL-010: 50% of 100 L at 1 L/h is 50 h; the controller runs 900 s, the sensor said 180000."""
+    entity = _sized()
+    assert entity._shot_seconds_by_zone("p2_shot_duration_seconds") == {1: 900}
+    assert entity.native_value == 900
+
+
+@pytest.mark.parametrize("cap", ["unavailable", "unknown", "abc", "3", "nan"])
+def test_a_shot_limit_that_is_not_one_shows_no_duration_as_the_controller_runs_none(
+    cap,
+):
+    """CTL-010: the controller starts no shot (CS-203); the sensor showed the uncapped length."""
+    entity = _sized(cap)
+    assert entity._shot_seconds_by_zone("p2_shot_duration_seconds") == {}
+    assert entity.native_value is None
+
+
+def test_the_shot_is_timed_on_zone_totals_as_the_controller_does():
+    # 2% of 11.4 L for each of 7 plants through two 3.8 L/hr drippers each: 108 s.
+    entity = _sized(
+        "900",
+        **{
+            "number.crop_steering_substrate_volume": "11.4",
+            "number.crop_steering_p2_shot_size": "2",
+            "number.crop_steering_drippers_per_plant": "2",
+            "number.crop_steering_dripper_flow_rate": "3.8",
+            "number.crop_steering_zone_1_plant_count": "7",
+        },
     )
+    raw = shot_length.raw_seconds(2.0, 11.4 * 7, 7 * 2 * 3.8 / 3600.0)
+    assert entity._shot_seconds_by_zone("p2_shot_duration_seconds") == {
+        1: shot_length.shot_seconds(raw, 900.0)
+    }
+    assert entity.native_value == 108
 
 
 def test_weekly_descriptor_allows_rolling_total_to_decrease():
@@ -268,22 +415,22 @@ def test_pore_ec_in_microsiemens_is_fused_as_millisiemens():
     entity = sensor(
         {"sensor.a": _probe(3200, "µS/cm"), "sensor.b": _probe(3.0, "mS/cm")}
     )
-    assert entity._average_sensor_values(["sensor.a", "sensor.b"], "ec") == 3.1
+    assert _probe_mean(entity, ["sensor.a", "sensor.b"], "ec") == 3.1
     greek_mu = sensor({"sensor.a": _probe(2500, "μS/cm")})
-    assert greek_mu._average_sensor_values(["sensor.a"], "ec") == 2.5
+    assert _probe_mean(greek_mu, ["sensor.a"], "ec") == 2.5
 
 
 def test_vwc_reported_as_a_volume_fraction_is_fused_as_percent():
     entity = sensor({"sensor.a": _probe(0.42, "m³/m³"), "sensor.b": _probe(44, "%")})
-    assert entity._average_sensor_values(["sensor.a", "sensor.b"], "vwc") == 43.0
+    assert _probe_mean(entity, ["sensor.a", "sensor.b"], "vwc") == 43.0
 
 
 def test_a_probe_with_no_unit_or_an_unknown_one_reads_exactly_as_before():
     entity = sensor(
         {"sensor.a": _probe(50, ""), "sensor.b": SimpleNamespace(state="52")}
     )
-    assert entity._average_sensor_values(["sensor.a", "sensor.b"], "vwc") == 51.0
-    assert entity._average_sensor_values(["sensor.a", "sensor.b"]) == 51.0
+    assert _probe_mean(entity, ["sensor.a", "sensor.b"], "vwc") == 51.0
+    assert _probe_mean(entity, ["sensor.a", "sensor.b"]) == 51.0
 
 
 # --------------------------------------------------------------------------- a zone's probes

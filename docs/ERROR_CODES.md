@@ -89,6 +89,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-609](#cs-609) | Second controller for room | Warning | Notification |
 | [CS-610](#cs-610) | Engine Enabled not kill switch | Warning | Repairs card |
 | [CS-611](#cs-611) | Settings above zone limit | Warning | Repairs card |
+| [CS-612](#cs-612) | Retired entities in use | Warning | Repairs card |
 | [CS-701](#cs-701) | No water at the zone | Warning | Notification |
 | [CS-702](#cs-702) | Unusual water for each plant | Information | Notification |
 | [CS-703](#cs-703) | Overnight probe fault suspected | Warning | Notification |
@@ -1354,6 +1355,25 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 - If the zone size is wrong, correct it in Rooms and setup, and the limit changes with it.
 - If the size is correct, decrease the setting to its limit at the next change. The card clears when each setting is inside its limit.
+
+<a id="cs-612"></a>
+
+### CS-612: Retired entities in use
+
+*Warning · Repairs card*
+
+**What it means.** An automation or a script uses an entity of Crop Steering that is retired. Nothing in Crop Steering reads it, and the controller never used it: the EC ratio, the adjusted re-water point, the high and low P2 EC ratios, the P3 EC targets and the irrigation phase select. The integration keeps these entities, hidden, so that the automation or the script still loads.
+
+**Effect on water.** Water continues as before. The retired entities do not change the shots.
+
+**Probable causes**
+
+- An automation or a script was made when these entities showed values of their own.
+
+**What to do**
+
+- Remove the entities that the card names from the automations and scripts that it names. The re-water point in force for each zone is on its zone page, under Waiting for.
+- The card clears at the next start of Home Assistant after no automation or script uses one.
 
 ## AI assistant (CS-7xx)
 
