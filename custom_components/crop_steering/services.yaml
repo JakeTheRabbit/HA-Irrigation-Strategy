@@ -2259,6 +2259,27 @@ timeline_summary:
       selector:
         object:
 
+alert_ack:
+  name: Acknowledge an alert
+  description: >-
+    Acknowledges one open alert of the room: it leaves the room's open alerts
+    (sensor.crop_steering_<prefix>alerts_open) and is journaled as alert.acknowledged with who did
+    it. A threshold rule's sensor stays on until its value is back in range. Refused when the alert
+    is not in the room's journal or is no longer open. Any signed-in user.
+  fields:
+    room_id:
+      name: Room
+      description: The room, "room:" plus the room prefix.
+      required: true
+      selector:
+        text:
+    alert_event_id:
+      name: Alert
+      description: The event_id of the open alert, from the alerts_open sensor.
+      required: true
+      selector:
+        text:
+
 timer_program_set:
   name: Save a timer program
   description: >-

@@ -153,6 +153,9 @@ PER_USER = {
 # room may stop it, as anyone may stop its dosing.
 # Ending one pump's prime or calibration likewise (tests_ha/test_pump_calibration.py).
 STOPS = {"stop_all": {"room_id": ROOM}, "pump_stop": {"room_id": ROOM, "pump": "balance"}}
+# Staff ack alarms: anyone signed in may acknowledge an open alert (an unknown one is refused for
+# itself, never for who asks).
+ACKS = {"alert_ack": {"room_id": ROOM, "alert_event_id": "01JAAAAAAAAAAAAAAAAAAAAAAA"}}
 EVENTS = ("crop_steering_manual_override",)
 
 
@@ -180,7 +183,7 @@ async def test_an_ordinary_user_can_look_and_changes_nothing(hass):
     assert hass.data[frontend.DATA_PANELS]["crop-steering"].require_admin is False  # still shown
     # Every service the integration registers is one or the other: nothing new slips through.
     assert set(hass.services.async_services()[DOMAIN]) == (
-        set(CHANGES) | set(READS) | set(NOTICES) | set(PER_USER) | set(STOPS)
+        set(CHANGES) | set(READS) | set(NOTICES) | set(PER_USER) | set(STOPS) | set(ACKS)
     )
     fired = []
     for event in EVENTS:
@@ -192,6 +195,9 @@ async def test_an_ordinary_user_can_look_and_changes_nothing(hass):
             await _call(hass, staff, name, data)
     for name, data in NOTICES.items():
         assert "seen" in await _call(hass, staff, name, data)
+    for name, data in ACKS.items():
+        with pytest.raises(HomeAssistantError, match="No alert"):
+            await _call(hass, staff, name, data)
     # Someone else's phone: reached with who they are, and refused by the store.
     for name, data in PER_USER.items():
         assert (await _call(hass, staff, name, data))["error"].startswith("not allowed: ")

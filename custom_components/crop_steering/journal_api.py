@@ -7,7 +7,8 @@ writes through `emit()`. A signed-in user who may not call `subscribe_events` fo
 the feed with the `crop_steering/subscribe` websocket command. `history_changes` reads who changed what
 (changes.py folds the journal) and `history_revert` puts one change back (an administrator only).
 `timeline_get` and `timeline_summary` read what each zone did and is planned to do (timeline.py folds the
-journal and the controller's projection_app).
+journal and the controller's projection_app). Each room's open alerts are sensor.crop_steering_<prefix>alerts_open
+(alerts_inbox.py), and `alert_ack` acknowledges one (any signed-in user: staff ack alarms).
 
 Nothing here is needed for watering: a journal that cannot open only logs, `emit()` then does nothing, and the
 services that read it answer "unavailable".
@@ -36,6 +37,7 @@ SERVICES = (
     "history_revert",
     "timeline_get",
     "timeline_summary",
+    "alert_ack",
 )
 MAX_APPEND = 50
 # history_changes answers at most this many rows, the newest (`truncated: true` when it cut).
@@ -637,6 +639,51 @@ async def _put_back_setup(hass, entry, old, new, who, call, check) -> dict:
         return _read_back(setup_api._owned(setup_api.setup_room(hass, entry)) == old)
 
 
+# ------------------------------------------------------------------ Alerts inbox
+async def alert_ack(hass, hub, call) -> dict:
+    """Acknowledge one open alert -> {room_id, alert_event_id, event_id}: journals alert.acknowledged
+    (who acked it by attribution); a threshold rule's live state becomes acknowledged. An alert that is
+    not in the room's journal, or no longer open, is refused (ValueError)."""
+    from . import alerts_inbox
+
+    room_id, alert_id = call.data["room_id"], call.data["alert_event_id"]
+    event = await hub.get(alert_id)
+    if (
+        event is None
+        or event.get("room_id") != room_id
+        or event.get("kind") != "alert.raised"
+    ):
+        raise ValueError(f"No alert {alert_id} in {room_id}")
+    if alert_id not in {
+        a["event_id"] for a in await alerts_inbox.read_open(hass, hub, room_id)
+    }:
+        raise ValueError(f"The alert {alert_id} is already closed")
+    raised = event.get("data") or {}
+    data = {"alert_event_id": alert_id}
+    for key in ("rule_id", "key"):
+        if raised.get(key):
+            data[key] = raised[key]
+    if raised.get("rule_id"):
+        alerts_inbox.acknowledge_rule(hass, raised["rule_id"])
+    who = attribution(hass, call)
+    ack_id = emit(
+        hass,
+        room_id,
+        "alert.acknowledged",
+        zone=event.get("zone"),
+        code=event.get("code"),
+        actor=who["actor"],
+        user_id=who["user_id"],
+        client=who["client"],
+        data=data,
+        correlation={
+            "causation_id": alert_id,
+            "proposal_token": who["proposal_token"],
+        },
+    )
+    return {"room_id": room_id, "alert_event_id": alert_id, "event_id": ack_id}
+
+
 # ------------------------------------------------------------------ Timeline (G5)
 PROJECTION = f"sensor.{DOMAIN}_{{}}projection_app"
 
@@ -844,8 +891,11 @@ def _readback_of(call, result):
 
 
 def _wire(hass, hub) -> list:
-    """The parts that need the real Home Assistant: the websocket command and the daily prune. -> unsubs."""
+    """The parts that need the real Home Assistant: the websocket command, the daily prune and the alerts
+    inbox. -> unsubs."""
     from homeassistant.helpers.event import async_track_time_interval
+
+    from .alerts_inbox import INBOX, Inbox
 
     data = hass.data[DOMAIN]
     if not data.get("_journal_ws"):
@@ -860,7 +910,8 @@ def _wire(hass, hub) -> list:
         except Exception as err:
             _LOGGER.warning("Journal prune failed: %s", err)
 
-    return [async_track_time_interval(hass, daily, PRUNE_EVERY)]
+    inbox = data[INBOX] = Inbox(hass, hub)
+    return [async_track_time_interval(hass, daily, PRUNE_EVERY), *inbox.start()]
 
 
 def _subscribe_schema():
@@ -920,8 +971,18 @@ async def _open_and_prune(hub) -> None:
         _LOGGER.warning("Journal prune failed: %s", err)
 
 
-async def async_setup_journal(hass) -> None:
-    """Once for the site, with the first room; each room after it only joins (async_unload_journal)."""
+def _join_inbox(hass, entry) -> None:
+    from .alerts_inbox import INBOX
+    from .room import room_prefix
+
+    inbox = hass.data.get(DOMAIN, {}).get(INBOX)
+    if entry is not None and inbox is not None:
+        inbox.join("room:" + room_prefix(entry))
+
+
+async def async_setup_journal(hass, entry=None) -> None:
+    """Once for the site, with the first room; each room after it only joins (async_unload_journal), and
+    `entry`'s room gets its alerts inbox sensor."""
     import voluptuous as vol
     from homeassistant.core import SupportsResponse
 
@@ -930,6 +991,7 @@ async def async_setup_journal(hass) -> None:
 
     data = hass.data.setdefault(DOMAIN, {})
     if HUB in data:
+        _join_inbox(hass, entry)
         return
     hub = JournalHub(
         hass,
@@ -964,6 +1026,11 @@ async def async_setup_journal(hass) -> None:
             return await timeline_get(hass, hub, call.data)
         if call.service == "timeline_summary":
             return await timeline_summary(hass, hub, call.data)
+        if call.service == "alert_ack":
+            try:
+                return await alert_ack(hass, hub, call)
+            except ValueError as err:
+                raise _hub_error(str(err)) from err
         args = {
             k: v for k, v in call.data.items() if k not in ("client", "proposal_token")
         }
@@ -1008,6 +1075,10 @@ async def async_setup_journal(hass) -> None:
             vol.Required("rooms"): [str],
             vol.Required("days"): [str],
         },
+        "alert_ack": {
+            vol.Required("room_id"): str,
+            vol.Required("alert_event_id"): str,
+        },
     }
     for service in SERVICES:
         hass.services.async_register(
@@ -1021,7 +1092,7 @@ async def async_setup_journal(hass) -> None:
             schema=vol.Schema(fields(schemas[service])),
             supports_response=(
                 SupportsResponse.OPTIONAL
-                if service in ("journal_append", "history_revert")
+                if service in ("journal_append", "history_revert", "alert_ack")
                 else SupportsResponse.ONLY
             ),
         )
@@ -1032,6 +1103,7 @@ async def async_setup_journal(hass) -> None:
             hass.services.async_remove(DOMAIN, service)
         raise
     data[HUB] = hub
+    _join_inbox(hass, entry)
     # Opened and pruned in the background: setup, and a room reload, never wait on the journal's file.
     hass.async_create_task(_open_and_prune(hub))
 
@@ -1113,14 +1185,29 @@ async def async_backfill_room(hass, entry) -> None:
         _LOGGER.warning("Journal backfill failed: %s", err)
 
 
+def async_leave_journal(hass, entry) -> None:
+    """The room's alerts inbox sensor goes with the room."""
+    from .alerts_inbox import INBOX
+    from .room import room_prefix
+
+    inbox = hass.data.get(DOMAIN, {}).get(INBOX)
+    if inbox is not None:
+        inbox.leave("room:" + room_prefix(entry))
+
+
 async def async_unload_journal(hass) -> None:
     """The site's journal goes with the last room (the caller checks that no other room is loaded)."""
+    from .alerts_inbox import INBOX
+
     data = hass.data.get(DOMAIN, {})
     hub = data.pop(HUB, None)
     if hub is None:
         return
     for unsub in data.pop(UNSUBS, []):
         unsub()
+    inbox = data.pop(INBOX, None)
+    if inbox is not None:
+        inbox.stop()
     for service in SERVICES:
         hass.services.async_remove(DOMAIN, service)
     hub.close_soon()

@@ -1082,6 +1082,20 @@
         }
       }
     },
+    "alert_ack": {
+      "name": "Acknowledge an alert",
+      "description": "Acknowledges one open alert of the room, so it leaves the room's open alerts. The acknowledgement is journaled with who made it. A threshold rule's sensor stays on until its value is back in range. Refused when the alert is unknown or no longer open. Any signed-in user can call it.",
+      "fields": {
+        "room_id": {
+          "name": "Room",
+          "description": "The room: `room:` followed by the room prefix."
+        },
+        "alert_event_id": {
+          "name": "Alert",
+          "description": "The `event_id` of the open alert, from the room's open alerts sensor."
+        }
+      }
+    },
     "notify_get": {
       "name": "Read notifications",
       "description": "Returns who gets which alerts: the row of each phone, the alert types, and the phones of the site with their owners. Changes nothing. It has no administrator check. The answer also shows if the caller can change every row. Use it to read the revision before `notify_save`."

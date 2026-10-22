@@ -151,7 +151,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     try:
         from .journal_api import async_setup_journal
 
-        await async_setup_journal(hass)
+        await async_setup_journal(hass, entry)
     except Exception as err:  # pragma: no cover - never block setup on the journal
         _LOGGER.warning("Event journal unavailable: %s", err)
 
@@ -465,6 +465,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .site_api import async_unload_site
 
     await async_unload_site(hass, entry)
+    from .journal_api import async_leave_journal
+
+    async_leave_journal(hass, entry)
     from .dashboards import async_unload_dashboards
 
     await async_unload_dashboards(hass, entry)

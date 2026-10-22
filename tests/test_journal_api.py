@@ -131,6 +131,7 @@ def test_setup_never_raises_when_the_journal_cannot_open(tmp_path, monkeypatch, 
         "history_revert",
         "timeline_get",
         "timeline_summary",
+        "alert_ack",
     }
 
 
