@@ -699,9 +699,9 @@ NOTIFY_TIMEOUT_S = 12
 EVENTS_BUDGET_S = 10.0
 # The codes whose severity is critical in docs/error-codes.json (tests/test_error_codes.py keeps the two equal):
 # their push is urgent, a high-priority one on a phone whose row asks for that.
-CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-211", "CS-301", "CS-308",
-                            "CS-310", "CS-311", "CS-315", "CS-402", "CS-601", "CS-606", "CS-801", "CS-809",
-                            "CS-811", "CS-901", "CS-902"})
+CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-211", "CS-212", "CS-301",
+                            "CS-308", "CS-310", "CS-311", "CS-315", "CS-402", "CS-601", "CS-606", "CS-801",
+                            "CS-809", "CS-811", "CS-901", "CS-902"})
 # How often a standing alert pushes again, by its severity in docs/error-codes.json (tests/test_error_codes.py
 # keeps INFO_CODES equal to the info codes): a critical code, or a warning that means a zone is not being watered,
 # every 30 minutes for as long as it lasts; any other warning after 15 minutes, then 1, 2 and 4 hours, then every
@@ -1014,7 +1014,7 @@ class Room:
         # when this room was seen switched off (see _room_switched_on); durable, None when not known
         self._off_since = None
         # what the room last reported, repeated while a shot holds the loop (Controller._keep_alive)
-        self._beat = None  # (hardware_fault, room_active) of its last heartbeat
+        self._beat = None  # (hardware_fault, room_active, loop_error) of its last heartbeat
         self._beat_at = None  # and when, by time.monotonic()
         self._statuses = {}  # z -> (label, reason) of its zones' last status
         self._safety_shown = {}  # z -> (label, since) of its zones' safety status (the hysteresis)
@@ -3324,12 +3324,13 @@ class Controller:
     # hold one round for 50 s, the kill switch unread and the valve open.
     KEEP_ALIVE_WRITES = 2
 
-    def _heartbeat(self, room, now, hardware_fault, room_active=True, timeout=None):
-        room._beat, room._beat_at = (hardware_fault, room_active), time.monotonic()
+    def _heartbeat(self, room, now, hardware_fault, room_active=True, loop_error=None, timeout=None):
+        room._beat, room._beat_at = (hardware_fault, room_active, loop_error), time.monotonic()
         ha_set(
             f"sensor.crop_steering_{room.prefix}ai_heartbeat",
-            "healthy",
+            "error" if loop_error else "healthy",
             {
+                **({"loop_error": loop_error} if loop_error else {}),  # the room's pass raised (_room_error)
                 "engine": PRODUCT,
                 # which controller is actually RUNNING, for the dashboard's sidebar
                 "controller_version": CONTROLLER_VERSION,
@@ -6434,14 +6435,50 @@ class Controller:
                 log("rediscover error", e)
         all_pub = {}
         for room in self.rooms:
-            self._guard_read(room)  # before this pass writes the room's heartbeat
-            self._refresh_lights(room)
-            pub = self._loop_room(room, now)
-            self._publish_status(room, pub, now)
-            all_pub[room.slug] = pub
+            try:  # one room's error never stops the rooms after it, nor the steps after the rooms
+                self._guard_read(room)  # before this pass writes the room's heartbeat
+                self._refresh_lights(room)
+                pub = self._loop_room(room, now)
+                self._publish_status(room, pub, now)
+                all_pub[room.slug] = pub
+                if f"room_error_{room.slug}" in self._alerted:  # its pass ran again: CS-212 is over
+                    ha_call("persistent_notification", "dismiss", notification_id=f"f2_room_error_{room.slug}")
+                    del self._alerted[f"room_error_{room.slug}"]
+            except Exception as e:  # only Exception: a stop (SystemExit, KeyboardInterrupt) still stops
+                self._room_error(room, now, e)
         self._check_defaulted_setpoints()
         self._maybe_notify(all_pub, now)
         self._send_events()
+
+    def _room_error(self, room, now, err):
+        """A room's pass raised (loop_once). The room says so: its heartbeat and its status read error,
+        its decision fires nothing (an earlier pass's shot must not look live), and CS-212 names it, at
+        most each 30 min while the fault stays (_alert); loop_once dismisses it after the room's next
+        pass. The report and the alert are tried apart, so one that fails as well never stops the
+        other, nor the next room."""
+        error = f"{type(err).__name__}: {err}"
+        log(f"[{room.slug}] room error", error)
+        try:
+            ha_set(f"sensor.crop_steering_{room.prefix}app_status", "error",
+                   {"engine": PRODUCT, "updated": now.isoformat()})
+            ha_set(f"sensor.crop_steering_{room.prefix}current_decision", f"Controller error: {error}"[:255],
+                   {"fired": [], "blocked": [f"Controller error: {error}"]})
+            active = room._beat[1] if room._beat else True  # as its last beat said: an off room stays off
+            self._heartbeat(room, now, self._hardware_fault_block(room), active, loop_error=error)
+        except Exception as e:
+            log(f"[{room.slug}] room error report error", e)
+        try:
+            self._alert(
+                f"room_error_{room.slug}",
+                "CS-212",
+                "controller error, this room is skipped",
+                "An error stopped the controller in this room. The room gets no shots until the error "
+                "stops. The controller tries the room again each minute, and the other rooms continue. "
+                f"Read the controller log, and report the error.\n\n{error}",
+                room=room,
+            )
+        except Exception as e:
+            log(f"[{room.slug}] room error alert error", e)
 
     # ---------------------------------------------------------------- two controllers on one room
     def _guard_read(self, room):

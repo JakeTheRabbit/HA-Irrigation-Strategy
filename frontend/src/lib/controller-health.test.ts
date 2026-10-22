@@ -485,6 +485,36 @@ describe("room status line", () => {
     ]);
     expect(banner(off)).toBeNull();
   });
+  it("shows a room whose pass failed as an error, never as watering from an old decision (CS-212)", () => {
+    const states = fixture([
+      entity(HEARTBEAT, "error", {
+        enable_flag: "input_boolean.f2_control_enabled",
+        loop_error: "RuntimeError: room is broken",
+      }),
+      entity("sensor.crop_steering_app_status", "irrigating"),
+      entity(DECISION, "Z1 P2 shot", { fired: ["Z1 P2 shot"], blocked: [] }),
+    ]);
+    expect(readHeartbeat(states[HEARTBEAT], NOW)).toMatchObject({
+      health: "fresh",
+      error: "RuntimeError: room is broken",
+    });
+    expect(status(states)).toMatchObject({ tone: "stopped", text: "Not watering" });
+    expect(status(states).detail).toMatch(
+      /^Controller error in this room: RuntimeError: room is broken\./,
+    );
+    const room = view(states);
+    expect(room.alerts[0]).toMatchObject({
+      severity: "critical",
+      title: "Controller error in this room",
+    });
+    expect(room.alerts[0].detail).toMatch(/^RuntimeError: room is broken\./);
+    expect(room.zones.map((zone) => zone.stale)).toEqual([true, true]);
+    expect(staleBanner(states, discoverRooms(states)[0], NOW)).toMatch(
+      /^Controller error in this room: .* Moisture and phases below are its last report, not live\.$/,
+    );
+    // A healthy beat carries no error.
+    expect(readHeartbeat(fixture()[HEARTBEAT], NOW).error).toBeUndefined();
+  });
   it("says how long ago the header's data was updated", () => {
     expect(updatedText(20_000)).toBe("Updated 20 s ago");
     expect(updatedText(3 * 60_000 + 5_000)).toBe("Updated 3 min ago");

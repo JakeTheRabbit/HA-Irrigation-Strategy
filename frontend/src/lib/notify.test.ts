@@ -619,6 +619,7 @@ describe("the demo's notification services", () => {
       "CS-204",
       "CS-207",
       "CS-211",
+      "CS-212",
       "CS-301",
       "CS-308",
       "CS-310",
