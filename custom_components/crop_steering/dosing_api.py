@@ -24,12 +24,12 @@ from __future__ import annotations
 
 import asyncio
 from copy import deepcopy
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 import logging
 import math
 import uuid
 
-from . import dosing
+from . import calibration as calibration_module, dosing
 from .admin import async_require_admin
 from .const import DOMAIN
 from .journal_api import attribution, note
@@ -53,6 +53,8 @@ PRIME_SECONDS = dosing.TIMED["prime"]
 CALIBRATE_SECONDS = dosing.TIMED["calibrate"]
 OFFLINE_S = 600  # a controller heartbeat older than this: the controller is offline
 BUSY = "Another dosing request is still waiting for the controller"
+HELD = "A dosing pump is being calibrated or primed: doses and batches wait until it is done"
+PRIME_HOLD_S = 60  # a prime holds room dosing for its run and this long after it
 # Fields of a pump only the store sets (a calibration commit, a prime): a save keeps the stored ones.
 OWNED = ("calibrated_ml_min", "calibrations", "primed_at")
 # Fields a page from before the catalogue does not send: a save without them keeps the stored ones.
@@ -94,7 +96,9 @@ def catalog() -> dict:
             if entry is None
             else {
                 "name": entry["name"],
-                "ml_min": {str(dial): ml for dial, ml in entry["ml_min"].items()},
+                "nominal_ml_min": {
+                    str(dial): ml for dial, ml in entry["nominal_ml_min"].items()
+                },
             }
         )
         for catalog_id, entry in dosing.PUMP_CATALOG.items()
@@ -135,6 +139,9 @@ class DosingStore:
         self.error = None
         # A prime's request id -> (pump, who), until the controller reports it.
         self._primes = {}
+        # A prime holds room dosing: {pump, request_id, until}, its run reported plus 60 s.
+        self._prime_hold = None
+        self._hold_timer = None
 
     @property
     def status_entity(self) -> str:
@@ -163,9 +170,10 @@ class DosingStore:
         week may move on. Returns the unsubscribe."""
         from homeassistant.core import callback
         from homeassistant.helpers.dispatcher import async_dispatcher_send
-        from homeassistant.helpers.event import async_track_time_change
-
-        from homeassistant.helpers.event import async_track_state_change_event
+        from homeassistant.helpers.event import (
+            async_track_state_change_event,
+            async_track_time_change,
+        )
 
         @callback
         def midnight(_now):
@@ -184,6 +192,7 @@ class DosingStore:
         def unsubscribe():
             for each in unsubscribes:
                 each()
+            self._end_hold_timer()
 
         return unsubscribe
 
@@ -247,10 +256,13 @@ class DosingStore:
             return None, {"error": self.error}
         batch = deepcopy(self.data["batch"])
         batch["recipe"] = self.recipe()
-        # Only while a feed-probe calibration session is open (calibration.py): the controller holds
-        # batches and pH correction on it. Absent otherwise, so the descriptor is as it always was.
+        # Only while a feed-probe or pump calibration session is open (calibration.py), or a prime holds
+        # the room: the controller holds batches and pH correction on it. Absent otherwise, so the
+        # descriptor is as it always was.
         calibration = self._calibration()
-        calibrating = calibration.calibrating() if calibration is not None else None
+        calibrating = (
+            calibration.calibrating() if calibration is not None else None
+        ) or self._priming()
         return self.data["revision"], {
             "pumps": deepcopy(self.data["pumps"]),
             "batch": batch,
@@ -332,6 +344,8 @@ class DosingStore:
             action = data.get("action")
             if action != "stop" and self.pending():
                 return {"request": None, "error": "busy"}
+            if action in ("dose", "batch") and self.pump_hold():
+                return {"request": None, "error": HELD}
             try:
                 pump, ml = dosing.check_request(
                     self.data,
@@ -352,9 +366,11 @@ class DosingStore:
             }
             if data.get("run_anyway"):
                 request["run_anyway"] = True
+            replaced = self.data["request"] if self.pending() else None
             draft = deepcopy(self.data)
             draft["request"] = request
             await self._commit(draft)
+            self._replaced(replaced)
             return {"request": deepcopy(request), "error": None}
 
     # ------------------------------------------------------------------ pump prime / calibrate (G3)
@@ -383,6 +399,7 @@ class DosingStore:
         except (AttributeError, TypeError):
             age = math.inf
         calibration = self._calibration()
+        other = calibration.pump_holding() if calibration is not None else None
         found = {
             code
             for code, applies in (
@@ -390,9 +407,10 @@ class DosingStore:
                 ("batch_running", self.running()),
                 ("mix_pump_on", self._on(self.data["batch"].get("mix_pump"))),
                 ("tank_filling", self._on(self.data["batch"].get("fill_valve"))),
+                ("calibrating", calibration is not None and calibration.probe_open()),
                 (
-                    "calibrating",
-                    calibration is not None and calibration.calibrating() is not None,
+                    "pump_calibrating",
+                    other is not None and other["pump"] != pump["id"],
                 ),
                 ("controller_offline", age > OFFLINE_S),
             )
@@ -431,6 +449,13 @@ class DosingStore:
         if request is None:
             return {"request_id": None, "outcome": "refused", "blockers": blockers}
         self._primes[request["id"]] = (request["pump"], who or {})
+        # The controller may take it up to REQUEST_MAX_AGE_S after it was asked for; the hold is cut
+        # to the run's report plus 60 s once that comes.
+        self._hold_prime(
+            request["pump"],
+            request["id"],
+            dosing.REQUEST_MAX_AGE_S + request["seconds"] + PRIME_HOLD_S,
+        )
         return {"request_id": request["id"], "outcome": "requested", "blockers": []}
 
     async def pump_calibrate(self, pump_id, seconds, by, who=None) -> dict:
@@ -471,6 +496,8 @@ class DosingStore:
                 "stop_pump",
             ):
                 raise ValueError(BUSY)
+            if waiting and waiting.get("pump") != pump:
+                raise ValueError(BUSY)  # never another pump's run
             request = {
                 "id": uuid.uuid4().hex,
                 "action": "stop_pump",
@@ -482,7 +509,64 @@ class DosingStore:
             draft = deepcopy(self.data)
             draft["request"] = request
             await self._commit(draft)
+            self._replaced(waiting)
         return {"request_id": request["id"]}
+
+    def _replaced(self, request):
+        """A waiting request was replaced before the controller took it. A prime then never runs: its
+        report and its hold go. A calibration never runs: its session ends, so the pump's later runs
+        are drawn from stock again."""
+        if not isinstance(request, dict):
+            return
+        if request.get("action") == "prime":
+            self._primes.pop(request.get("id"), None)
+            if self._prime_hold and self._prime_hold["request_id"] == request.get("id"):
+                self._prime_hold = None
+                self._end_hold_timer()
+                self._dispatch()
+        elif request.get("action") == "calibrate":
+            calibration = self._calibration()
+            if calibration is not None:
+                calibration.pump_close(request_id=request.get("id"))
+
+    def _dispatch(self):
+        from homeassistant.helpers.dispatcher import async_dispatcher_send
+
+        async_dispatcher_send(self.hass, f"{SIGNAL}_{self.entry.entry_id}")
+
+    def _hold_prime(self, pump, request_id, seconds):
+        """Hold room dosing for a prime for `seconds` from now; the descriptor is written again then."""
+
+        until = _now() + timedelta(seconds=seconds)
+        self._prime_hold = {"pump": pump, "request_id": request_id, "until": until}
+        self._end_hold_timer()
+        self._hold_timer = calibration_module._later(
+            self.hass, seconds + 1, lambda _now: self._dispatch()
+        )
+        self._dispatch()
+
+    def _end_hold_timer(self):
+        if self._hold_timer:
+            self._hold_timer()
+            self._hold_timer = None
+
+    def _priming(self) -> dict | None:
+        """A prime's hold on room dosing as {pump, request_id, until}, or None."""
+        hold = self._prime_hold
+        if hold is None or _now() >= hold["until"]:
+            return None
+        return {
+            "pump": hold["pump"],
+            "request_id": hold["request_id"],
+            "until": hold["until"].isoformat(),
+        }
+
+    def pump_hold(self) -> dict | None:
+        """What holds room dosing for a pump now: its open calibration session ({pump, session_id,
+        until}) or a prime ({pump, request_id, until}); None when nothing does."""
+        calibration = self._calibration()
+        held = calibration.pump_holding() if calibration is not None else None
+        return held or self._priming()
 
     def _status_changed(self, new_state):
         """The controller published its status: a handled_result for a calibration's request gives the
@@ -492,10 +576,15 @@ class DosingStore:
         if not isinstance(result, dict) or not result.get("id"):
             return
         ran_s = result.get("ran_s")
-        if isinstance(ran_s, bool) or not isinstance(ran_s, (int, float)):
-            return
-        if not (math.isfinite(ran_s) and ran_s >= 0):
-            return
+        if (
+            isinstance(ran_s, bool)
+            or not isinstance(ran_s, (int, float))
+            or not (math.isfinite(ran_s) and ran_s >= 0)
+        ):
+            # A run that never started (refused, stuck) may come with no seconds: it ran none.
+            if result.get("result") in (None, "done"):
+                return
+            ran_s = 0
         calibration = self._calibration()
         if calibration is not None and calibration.pump_reported(
             result["id"], ran_s, result.get("result")
@@ -503,6 +592,7 @@ class DosingStore:
             return
         primed = self._primes.pop(result["id"], None)
         if primed is not None:
+            self._hold_prime(primed[0], result["id"], PRIME_HOLD_S)
             self.hass.async_create_task(
                 self._primed(*primed, ran_s, result.get("result"))
             )
@@ -559,6 +649,9 @@ class DosingStore:
         async with self._lock:
             if self.error:
                 raise ValueError(self.error)
+            # Committed (or ended) while this call waited for the lock: refused as an expired one.
+            if calibration.session(session_id, pump=True) is not session:
+                raise ValueError(calibration_module.EXPIRED)
             draft = deepcopy(self.data)
             pump = next((p for p in draft["pumps"] if p["id"] == session["pump"]), None)
             if pump is None:
@@ -580,7 +673,7 @@ class DosingStore:
             ]
             draft.update(revision=self.data["revision"] + 1, updated_at=record["at"])
             await self._commit(draft)
-        calibration._close(session_id)
+            calibration.pump_close(session_id)
         written = await self._write_flow(pump.get("flow_entity"), ml_min / 60)
         self._journal(
             "pump.calibrated",

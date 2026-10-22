@@ -447,16 +447,35 @@ class CalibrationStore:
         return async_track_time_interval(self.hass, hourly, timedelta(hours=1))
 
     def calibrating(self):
-        """The dosing descriptor's `calibrating` while a probe session is open, else None. A pump's
-        calibration session is not one: the controller runs that calibration itself."""
+        """The dosing descriptor's `calibrating` while a session is open, else None: a probe session
+        ({probe, session_id, until}) or a pump's calibration ({pump, session_id, until}). Either holds the
+        room's dosing."""
         now = self._now()
         for session in self.sessions.values():
             until = session["active"] + SESSION_IDLE
-            if "probe" in session and now < until:
+            if now < until:
+                kind = "pump" if "pump" in session else "probe"
                 return {
-                    "probe": session["probe"],
+                    kind: session[kind],
                     "session_id": session["id"],
                     "until": until.isoformat(),
+                }
+        return None
+
+    def probe_open(self) -> bool:
+        """Whether a feed probe session is open (a pump's own calibration is not one)."""
+        self.expire()
+        return any("probe" in session for session in self.sessions.values())
+
+    def pump_holding(self) -> dict | None:
+        """The open pump calibration session as {pump, session_id, until}, or None."""
+        self.expire()
+        for session in self.sessions.values():
+            if "pump" in session:
+                return {
+                    "pump": session["pump"],
+                    "session_id": session["id"],
+                    "until": (session["active"] + SESSION_IDLE).isoformat(),
                 }
         return None
 
@@ -539,6 +558,16 @@ class CalibrationStore:
         self.sessions[session["id"]] = session
         self._touch(session)
         return session
+
+    def pump_close(self, session_id=None, request_id=None) -> bool:
+        """End a pump's calibration session, by its id or by the request it left."""
+        for sid, session in list(self.sessions.items()):
+            if "pump" in session and (
+                sid == session_id
+                or (request_id is not None and session["request_id"] == request_id)
+            ):
+                return self._close(sid)
+        return False
 
     def pump_reported(self, request_id, ran_s, result) -> bool:
         """The controller reported the run of `request_id`: its seconds and result go into the session

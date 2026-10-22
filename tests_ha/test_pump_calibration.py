@@ -86,7 +86,7 @@ async def test_a_30_s_run_of_150_ml_calibrates_the_pump_to_300_ml_min(
         "blockers": [],
     }
     doc = await _call(hass, hass_admin_user, "dosing_get")
-    assert doc["catalog"]["hea_h4"]["ml_min"]["10"] == 1360
+    assert doc["catalog"]["hea_h4"]["nominal_ml_min"]["10"] == 1360
 
     started = await _call(
         hass, hass_admin_user, "pump_calibrate", pump="balance", seconds=30
@@ -99,7 +99,9 @@ async def test_a_30_s_run_of_150_ml_calibrates_the_pump_to_300_ml_min(
         "balance",
         30,
     )
-    assert "calibrating" not in hass.states.get(CONFIG).attributes
+    # The open pump calibration holds the room's dosing: the controller reads it from the descriptor.
+    held = hass.states.get(CONFIG).attributes["calibrating"]
+    assert (held["pump"], held["session_id"]) == ("balance", started["session_id"])
     with pytest.raises(HomeAssistantError, match="not been reported"):
         await _call(
             hass,
@@ -126,6 +128,9 @@ async def test_a_30_s_run_of_150_ml_calibrates_the_pump_to_300_ml_min(
     await hass.async_block_till_done()
     doc = await _call(hass, hass_admin_user, "dosing_get")
     assert doc["config"]["pumps"][0]["calibration_session"]["ran_s"] == 30
+    # A batch waits while the jug is read.
+    batch = await _call(hass, hass_admin_user, "dosing_request", action="batch")
+    assert batch["request"] is None and "calibrated or primed" in batch["error"]
 
     out = await _call(
         hass,
@@ -142,6 +147,7 @@ async def test_a_30_s_run_of_150_ml_calibrates_the_pump_to_300_ml_min(
     assert dt_util.parse_datetime(hass.states.get(LAST).state) is not None
     pump = hass.states.get(CONFIG).attributes["pumps"][0]
     assert pump["calibrated_ml_min"] == 300 and len(pump["calibrations"]) == 1
+    assert "calibrating" not in hass.states.get(CONFIG).attributes
 
 
 async def test_a_prime_is_capped_at_30_s_and_only_an_administrator_primes(
@@ -170,6 +176,10 @@ async def test_a_prime_is_capped_at_30_s_and_only_an_administrator_primes(
     hass.states.async_set(BATCH["mix_pump"], "off")
     prime = await _call(hass, hass_admin_user, "pump_prime", pump="balance", seconds=30)
     assert prime["outcome"] == "requested"
+    await hass.async_block_till_done()
+    # A prime holds the room's dosing too, for its run and 60 s.
+    held = hass.states.get(CONFIG).attributes["calibrating"]
+    assert (held["pump"], held["request_id"]) == ("balance", prime["request_id"])
     # Anyone signed in may stop it: the stop replaces the waiting prime.
     stop = await _call(hass, staff, "pump_stop", pump="balance")
     await hass.async_block_till_done()

@@ -54,11 +54,14 @@ def _dial_table(per_dial: int) -> dict[int, int]:
 # maximum injection (mL/gal) x water flow (gal/min) of the published A3/P1/P2/H4 injection-rate tables
 # (Growlink knowledge base, "H.E. Anderson Pump Injection Limit Tables"): dial 10 gives 100, 340, 680
 # and 1360 mL/min. A peristaltic or other pump has no table: its flow is the one it is calibrated to.
+# UNVERIFIED: these are Growlink's tables, not H.E. Anderson's own sheet, and Growlink's text rates the H4
+# at 25.4 GPH (about 1602 mL/min), which its own table (1360) does not match. The owner signs them off
+# against the H.E. Anderson sheet; a calibration replaces them for any pump anyway.
 PUMP_CATALOG = {
-    "hea_a3": {"name": "H.E. Anderson A3", "ml_min": _dial_table(10)},
-    "hea_p1": {"name": "H.E. Anderson P1", "ml_min": _dial_table(34)},
-    "hea_p2": {"name": "H.E. Anderson P2", "ml_min": _dial_table(68)},
-    "hea_h4": {"name": "H.E. Anderson H4", "ml_min": _dial_table(136)},
+    "hea_a3": {"name": "H.E. Anderson A3", "nominal_ml_min": _dial_table(10)},
+    "hea_p1": {"name": "H.E. Anderson P1", "nominal_ml_min": _dial_table(34)},
+    "hea_p2": {"name": "H.E. Anderson P2", "nominal_ml_min": _dial_table(68)},
+    "hea_h4": {"name": "H.E. Anderson H4", "nominal_ml_min": _dial_table(136)},
     "peristaltic": None,
     "other": None,
 }
@@ -70,6 +73,7 @@ BLOCKERS = {
     "mix_pump_on": "Mix pump is on",
     "tank_filling": "Tank is filling",
     "calibrating": "Feed probe calibration in progress",
+    "pump_calibrating": "Another pump's calibration is still open",
     "controller_offline": "Controller is offline",
 }
 # Every domain a dosing setup can use: what dosing_get offers to pick from.
@@ -330,7 +334,7 @@ def _model(value, label) -> dict | None:
     dial = value.get("dial")
     if table is None:
         dial = None
-    elif isinstance(dial, bool) or dial not in table["ml_min"]:
+    elif isinstance(dial, bool) or dial not in table["nominal_ml_min"]:
         raise DosingError(f"{label}: its model's dial must be a whole 1 to 10")
     return {
         "catalog_id": value["catalog_id"],
@@ -343,7 +347,7 @@ def nominal_ml_min(model) -> int | None:
     if not isinstance(model, dict):
         return None
     table = PUMP_CATALOG.get(model.get("catalog_id"))
-    return table["ml_min"].get(model.get("dial")) if table else None
+    return table["nominal_ml_min"].get(model.get("dial")) if table else None
 
 
 def _calibrations(value, label) -> list:

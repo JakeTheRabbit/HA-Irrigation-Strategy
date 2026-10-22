@@ -218,6 +218,7 @@ def test_precheck_lists_every_blocker_and_writes_nothing(monkeypatch):
         "active": NOW,
         "unsub": None,
     }
+    rig.cal.sessions["s2"] = {"id": "s2", "pump": "bloom", "active": NOW, "unsub": None}
     rig.hass.states.set(HEARTBEAT, "ok", last_updated=NOW - timedelta(minutes=11))
     saves = rig.backing.saves
     out = rig.dosing.precheck("balance")
@@ -266,6 +267,8 @@ def test_pump_stop_replaces_a_pending_prime_request(monkeypatch):
         "Staff",
     )
     assert rig.backing.value["request"] == request
+    # The prime never ran: it no longer holds the room, and no report of it is awaited.
+    assert rig.dosing.pump_hold() is None and rig.dosing._primes == {}
     with pytest.raises(ValueError, match="unknown pump"):
         rig.run(rig.dosing.pump_stop("nope", "Staff"))
     # A pending batch is never cancelled by a pump stop.
@@ -300,9 +303,14 @@ def test_runner_ran_s_is_copied_into_the_session(monkeypatch):
     assert "calibration_session" not in rig.dosing.response()["config"]["pumps"][0]
     # The stored setup never carries the session: it is the response's view only.
     assert "calibration_session" not in rig.backing.value["pumps"][0]
-    # A pump session is no probe session: the dosing descriptor has no `calibrating`.
-    rig.calibrate(30)
-    assert "calibrating" not in rig.dosing.sensor()[1]
+    # A pump session holds room dosing: the descriptor carries `calibrating` for it.
+    again = rig.calibrate(30)
+    assert rig.dosing.sensor()[1]["calibrating"] == {
+        "pump": "balance",
+        "session_id": again["session_id"],
+        "until": (NOW + calibration.SESSION_IDLE).isoformat(),
+    }
+    # ...but it is no probe session: the probe wizard refuses it.
     with pytest.raises(ValueError, match="expired"):
         asyncio.run(
             rig.cal.capture(
@@ -327,6 +335,121 @@ def test_a_prime_reported_done_stamps_primed_at_and_journals(monkeypatch):
     assert len(rig.events) == 1
 
 
+def _bloom_rig(monkeypatch):
+    bloom = {
+        **PUMP,
+        "id": "bloom",
+        "name": "Bloom",
+        "volume_entity": "number.doser_bloom_volume",
+        "start_entity": "button.doser_bloom_start",
+        "dosing_entity": "sensor.doser_bloom_status",
+        "power_entity": "switch.doser_bloom_power",
+        "flow_entity": "number.doser_bloom_flow",
+    }
+    rig = Rig(
+        monkeypatch,
+        stored={
+            "revision": 1,
+            "pumps": [copy.deepcopy(PUMP), bloom],
+            "batch": copy.deepcopy(BATCH),
+        },
+    )
+    rig.hass.states.set("switch.doser_bloom_power", "off")
+    return rig
+
+
+def _handled(rig):
+    """The controller took the stored request (it no longer waits)."""
+    rig.hass.states.set(STATUS, "idle", {"handled": rig.dosing.data["request"]["id"]})
+
+
+def test_doses_and_batches_wait_while_a_pump_is_calibrated(monkeypatch):
+    rig = Rig(monkeypatch)
+    started = rig.calibrate(30)
+    _handled(rig)
+    for action, data in (("dose", {"pump": "balance", "ml": 5}), ("batch", {})):
+        out = rig.run(rig.dosing.request({"action": action, **data}, "Alex"))
+        assert out["request"] is None and out["error"] == dosing_api.HELD
+    # A room stop always gets through.
+    stop = rig.run(rig.dosing.request({"action": "stop"}, "Alex"))
+    assert stop["error"] is None
+    rig.report(started["request_id"], 30)
+    rig.commit(started["session_id"], 150)
+    _handled(rig)  # and the stop
+    assert "calibrating" not in rig.dosing.sensor()[1]
+    dose = rig.run(
+        rig.dosing.request({"action": "dose", "pump": "balance", "ml": 5}, "Alex")
+    )
+    assert dose["error"] is None
+
+
+def test_a_prime_holds_room_dosing_for_its_run_and_60_s(monkeypatch):
+    rig = Rig(monkeypatch)
+    prime = rig.run(rig.dosing.pump_prime("balance", 10, "Alex", WHO))
+    held = rig.dosing.sensor()[1]["calibrating"]
+    assert (held["pump"], held["request_id"]) == ("balance", prime["request_id"])
+    _handled(rig)
+    out = rig.run(rig.dosing.request({"action": "batch"}, "Alex"))
+    assert out["error"] == dosing_api.HELD
+    rig.clock["at"] = NOW + timedelta(seconds=15)
+    rig.report(prime["request_id"], 10)
+    until = rig.clock["at"] + timedelta(seconds=60)
+    assert rig.dosing.sensor()[1]["calibrating"]["until"] == until.isoformat()
+    rig.clock["at"] = until + timedelta(seconds=1)
+    assert "calibrating" not in rig.dosing.sensor()[1]
+    assert rig.run(rig.dosing.request({"action": "batch"}, "Alex"))["error"] is None
+
+
+def test_another_pumps_open_calibration_is_a_blocker(monkeypatch):
+    rig = _bloom_rig(monkeypatch)
+    started = rig.calibrate(30)
+    _handled(rig)
+    out = rig.run(rig.dosing.pump_calibrate("bloom", 30, "Alex", WHO))
+    assert out["outcome"] == "refused" and out["session_id"] is None
+    assert out["blockers"] == [
+        {
+            "code": "pump_calibrating",
+            "message": "Another pump's calibration is still open",
+        }
+    ]
+    # Balance's session is untouched, and Balance itself may run again.
+    view = rig.dosing.response()["config"]["pumps"][0]["calibration_session"]
+    assert view["session_id"] == started["session_id"]
+    assert rig.dosing.precheck("balance")["ok"] is True
+
+
+def test_pump_stop_on_a_waiting_calibration_ends_its_session(monkeypatch):
+    rig = Rig(monkeypatch)
+    started = rig.calibrate(30)
+    rig.run(rig.dosing.pump_stop("balance", "Staff"))
+    assert "calibration_session" not in rig.dosing.response()["config"]["pumps"][0]
+    assert rig.cal.pump_run("balance", NOW, NOW + timedelta(seconds=5)) is False
+    assert "calibrating" not in rig.dosing.sensor()[1]
+    with pytest.raises(ValueError, match="expired"):
+        rig.commit(started["session_id"], 150)
+
+
+def test_a_refusal_without_seconds_shows_on_the_session(monkeypatch):
+    rig = Rig(monkeypatch)
+    started = rig.calibrate(30)
+    rig.hass.states.set(
+        STATUS,
+        "idle",
+        {
+            "handled": started["request_id"],
+            "handled_result": {
+                "id": started["request_id"],
+                "result": "refused: a shot is in flight",
+            },
+        },
+    )
+    rig.dosing._status_changed(rig.hass.states.get(STATUS))
+    view = rig.dosing.response()["config"]["pumps"][0]["calibration_session"]
+    assert (view["ran_s"], view["result"]) == (0, "refused: a shot is in flight")
+    with pytest.raises(ValueError, match="a shot is in flight"):
+        rig.commit(started["session_id"], 150)
+
+
 def test_old_pump_dicts_load_with_no_catalog_fields(monkeypatch):
     rig = Rig(monkeypatch)
     assert rig.dosing.error is None
@@ -339,7 +462,7 @@ def test_old_pump_dicts_load_with_no_catalog_fields(monkeypatch):
     for key in ("model", "solution_type", "calibrated_ml_min", "calibrations"):
         assert key not in _pump(rig)
     response = rig.dosing.response()
-    assert response["catalog"]["hea_h4"]["ml_min"]["10"] == 1360
+    assert response["catalog"]["hea_h4"]["nominal_ml_min"]["10"] == 1360
     assert response["catalog"]["peristaltic"] is None
     # A page from before the catalogue saves its pumps: the stored calibration stays.
     started = rig.calibrate(30)
@@ -397,7 +520,7 @@ def test_catalogue_solution_type_and_model_rules():
         ("hea_p2", 680),
         ("hea_h4", 1360),
     ):
-        assert dosing.PUMP_CATALOG[catalog_id]["ml_min"][10] == ten
+        assert dosing.PUMP_CATALOG[catalog_id]["nominal_ml_min"][10] == ten
     with pytest.raises(dosing.DosingError, match="30"):
         dosing.clean(
             [{**PUMP, "calibrations": [{"ml_min": 1}] * 31}],

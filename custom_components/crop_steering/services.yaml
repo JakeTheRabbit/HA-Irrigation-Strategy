@@ -2021,7 +2021,7 @@ pump_precheck:
   description: >-
     Answers whether a timed run of the dosing pump (a prime or a calibration) could start now, and
     every blocker in the checklist's words: no power switch, room dosing running, mix pump on, tank
-    filling, a feed probe calibration open, or the controller offline (no heartbeat for 10 minutes).
+    filling, a feed probe calibration open, another pump's calibration open, or the controller offline (no heartbeat for 10 minutes).
     Changes nothing. It has no administrator check.
   fields:
     room_id:
@@ -2042,7 +2042,7 @@ pump_prime:
   name: Prime a dosing pump
   description: >-
     Leaves a request for the controller to run the pump's power switch for a number of seconds, to
-    fill its line. Refused, with the blockers, while any pump_precheck blocker stands; refused while
+    fill its line. Doses and batches of the room wait for its run and 60 seconds after it. Refused, with the blockers, while any pump_precheck blocker stands; refused while
     another dosing request still waits for the controller. At most 30 seconds. pump_stop ends it
     early. When a signed-in user calls it, that user must be a Home Assistant administrator.
   fields:
@@ -2097,7 +2097,7 @@ pump_calibrate:
   name: Run a dosing pump calibration
   description: >-
     Opens a pump calibration session and leaves a request for the controller to run the pump's power
-    switch for a number of seconds into a measuring jug. Refused, with the blockers, while any
+    switch for a number of seconds into a measuring jug. Doses and batches of the room wait while the session is open. Refused, with the blockers, while any
     pump_precheck blocker stands. The seconds it really ran appear in dosing_get under the pump's
     `calibration_session` once the controller reports them. That run is not drawn from the pump's
     stock tank. When a signed-in user calls it, that user must be a Home Assistant administrator.
