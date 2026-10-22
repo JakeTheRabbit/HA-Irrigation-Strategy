@@ -55,10 +55,15 @@ async def _calibrate(hass, admin, entry):
         == started["session_id"]
     )
     session = started["session_id"]
+    _later(manager, 120)
     point = await _service(
         hass, admin, "calibration_capture", session_id=session, point=0
     )
     assert point["stable"] is True and point["raw"] == 7.12
+    await hass.async_block_till_done()
+    # A capture moves the session on, and the dosing hold with it.
+    until = hass.states.get(DOSING).attributes["calibrating"]["until"]
+    assert until > started["expires_at"]
     hass.states.async_set(PH, "4.12", {"unit_of_measurement": "pH"})
     await hass.async_block_till_done()
     _later(manager, 0)
@@ -130,6 +135,7 @@ async def test_corrected_sensor_restores_after_restart(hass, hass_admin_user):
     await hass.async_block_till_done()
     assert float(hass.states.get(CORRECTED).state) == 4.0
     assert hass.states.get(CORRECTED).attributes["applied"] is True
+    assert hass.states.get(CORRECTED).attributes["restored"] is True
 
     # A probe that has not come back after 2 min is not hidden behind the old value.
     async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=121))
@@ -140,6 +146,7 @@ async def test_corrected_sensor_restores_after_restart(hass, hass_admin_user):
     hass.states.async_set(PH, "5.12", {"unit_of_measurement": "pH"})
     await hass.async_block_till_done()
     assert float(hass.states.get(CORRECTED).state) == 5.0
+    assert "restored" not in hass.states.get(CORRECTED).attributes
 
 
 async def test_upgrade_keeps_old_calibration_records_without_a_repairs_card(

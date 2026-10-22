@@ -455,3 +455,62 @@ def test_calibration_record_keeps_applied_false_and_gains_a_due_date(rig):
         "u1",
     )
     assert rig.cal.feed_calibration() == {}
+
+
+def test_a_capture_moves_the_dosing_hold_on_with_the_session(rig):
+    rig.read(PH, 7.0, ago=60)
+    session = rig.start()["session_id"]
+    first = rig.dosing.sensor()[1]["calibrating"]["until"]
+    rig.tick(10 * 60)
+    rig.capture(session, 0)
+    until = rig.dosing.sensor()[1]["calibrating"]["until"]
+    assert until > first
+    assert until == (rig.clock.at + timedelta(minutes=30)).isoformat()
+    assert until == rig.cal.status(session)["expires_at"]
+
+
+def test_a_failed_calibration_does_not_clear_a_due_card(rig):
+    rig.calibrate(7.12, 4.12)
+    rig.tick(31 * 86400)
+    rig.cal.publish_due()
+    assert "calibration_due_f2" in rig.hass._issues
+    with pytest.raises(ValueError, match="not applied"):
+        rig.calibrate(7.0, 4.6)
+    assert rig.hass.states.get(DUE).state == "on"
+    assert "calibration_due_f2" in rig.hass._issues
+
+
+def test_abandon_ends_the_session_and_an_unknown_one_is_refused(rig):
+    rig.read(PH, 7.0, ago=60)
+    session = rig.start()["session_id"]
+    assert rig.cal.abandon(session) == {"abandoned": True}
+    assert "calibrating" not in rig.dosing.sensor()[1]
+    with pytest.raises(ValueError, match="Calibration session expired. Start again."):
+        rig.cal.abandon(session)
+
+
+def test_a_session_commits_once_however_the_calls_race(rig):
+    class SlowStore(MemoryStore):
+        async def async_save(self, value):
+            await asyncio.sleep(0)
+            await super().async_save(value)
+
+    rig.cal._store = SlowStore()
+    rig.read(PH, 7.12, ago=60)
+    session = rig.start()["session_id"]
+    rig.capture(session, 0)
+    rig.read(PH, 4.12)
+    rig.tick(45)
+    rig.capture(session, 1)
+
+    async def both():
+        return await asyncio.gather(
+            rig.cal.commit(session, WHO),
+            rig.cal.commit(session, WHO),
+            return_exceptions=True,
+        )
+
+    first, second = asyncio.run(both())
+    assert first["applied"] is True
+    assert isinstance(second, ValueError) and "expired" in str(second)
+    assert len(rig.cal.document["records"]) == 1

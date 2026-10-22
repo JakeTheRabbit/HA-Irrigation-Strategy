@@ -718,6 +718,7 @@ class CropSteeringFeedCorrectedSensor(SensorEntity, RestoreEntity):
             and self._raw_not_reported(source)
         ):
             value = self._restored
+            attributes = {**attributes, "restored": True}  # not a live reading yet
         elif source and not self._raw_not_reported(source):
             self._restored = None  # the probe has reported: its own reading from now on
         self._value, self._attributes = value, attributes

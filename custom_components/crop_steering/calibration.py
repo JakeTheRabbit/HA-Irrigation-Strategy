@@ -33,6 +33,7 @@ from uuid import uuid4
 from .admin import async_require_admin
 from .const import DOMAIN, REPAIRS_DOCS_URL
 from .generated.ids import new_id
+from .health import _iid
 from .journal_api import attribution, note
 from .room import room_prefix
 
@@ -243,7 +244,7 @@ class CalibrationStore:
         self.prefix = room_prefix(entry)
         self.room_id = "room:" + self.prefix
         slug = (getattr(entry, "data", None) or {}).get("room_slug", "default")
-        self.issue_id = ISSUE if slug in ("", "default") else f"{ISSUE}_{slug}"
+        self.issue_id = _iid(ISSUE, slug)
         self.due_sensor = f"binary_sensor.{DOMAIN}_{self.prefix}calibration_due"
         self._store = store
         self._now = now or _utcnow
@@ -376,12 +377,18 @@ class CalibrationStore:
         )
 
     def due(self) -> dict:
-        """{probe: due date} for each probe whose newest record is past its due date. A record without
-        `due_days` (from before this release) never goes due (ruling R6)."""
+        """{probe: due date} for each probe whose newest record that did not fail is past its due date (a
+        failed calibration does not reset the clock). A record without `due_days` (from before this
+        release) never goes due (ruling R6)."""
         out, now = {}, self._now()
         for probe in PROBES:
             latest = next(
-                (r for r in self.document["records"] if r.get("probe") == probe), None
+                (
+                    r
+                    for r in self.document["records"]
+                    if r.get("probe") == probe and r.get("verdict") != "fail"
+                ),
+                None,
             )
             try:
                 days = latest["due_days"]
@@ -489,11 +496,12 @@ class CalibrationStore:
             self._close(sid)
 
     def _touch(self, session):
-        """Activity: the 30 min start again."""
+        """Activity: the 30 min start again, and the dosing descriptor's `calibrating.until` with them."""
         session["active"] = self._now()
         if self._timer:
             self._timer()
         self._timer = _later(self.hass, SESSION_IDLE.total_seconds() + 1, self.expire)
+        self._dosing_changed()
 
     def session(self, session_id):
         self.expire()
@@ -603,7 +611,6 @@ class CalibrationStore:
             lambda text, at: self._observe(session, text, at),
         )
         self._touch(session)
-        self._dosing_changed()
         until = (session["active"] + SESSION_IDLE).isoformat()
         self._journal(
             "calibration.started",
@@ -679,6 +686,10 @@ class CalibrationStore:
             raise ValueError("Capture both points before applying the calibration")
         who = who or {}
         async with self._lock:
+            if (
+                session_id not in self.sessions
+            ):  # committed (or ended) while this call waited
+                raise ValueError(EXPIRED)
             if self.error:
                 raise ValueError(self.error)
             result = evaluate(
@@ -792,7 +803,9 @@ class CalibrationStore:
         return out
 
     def abandon(self, session_id) -> dict:
-        self.expire()
+        self.session(
+            session_id
+        )  # unknown or expired: refused like every other session step
         return {"abandoned": self._close(session_id)}
 
     def _journal(self, kind, who, data):
@@ -925,10 +938,9 @@ async def async_setup_calibration(hass, entry):
                     data["session_id"], data["point"], data.get("force", False), who
                 )
             if service == "calibration_abandon":
-                for target in _managers(hass).values():
-                    if data["session_id"] in target.sessions:
-                        return target.abandon(data["session_id"])
-                return {"abandoned": False}
+                return resolve_session(hass, data["session_id"]).abandon(
+                    data["session_id"]
+                )
             target = resolve_calibration(hass, data["room_id"])
             if service == "calibration_get":
                 return target.response()
