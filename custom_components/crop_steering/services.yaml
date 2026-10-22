@@ -1575,3 +1575,74 @@ brain_prompt_publish:
       required: true
       selector:
         object:
+journal_append:
+  name: Append journal events
+  description: Administrator-only. Stores up to 50 events for a room, idempotent on the event id, and re-fires each new one on the bus as crop_steering_event.
+  fields:
+    room_id:
+      name: Room
+      description: Canonical room id, "room:" plus the room prefix.
+      required: true
+      selector:
+        text:
+    events:
+      name: Events
+      description: Up to 50 version 1 events.
+      required: true
+      selector:
+        object:
+journal_query:
+  name: Query the journal
+  description: Reads a room's events in time order. Any signed-in user. Returns the events and a cursor for the next page, or null.
+  fields:
+    room_id:
+      name: Room
+      description: Canonical room id, "room:" plus the room prefix.
+      required: true
+      selector:
+        text:
+    since:
+      name: Since
+      description: ISO-8601 start time, inclusive.
+      required: true
+      selector:
+        text:
+    until:
+      name: Until
+      description: ISO-8601 end time, exclusive.
+      required: false
+      selector:
+        text:
+    kinds:
+      name: Kinds
+      description: Only these event kinds.
+      required: false
+      selector:
+        object:
+    zones:
+      name: Zones
+      description: Only these zone numbers.
+      required: false
+      selector:
+        object:
+    actor:
+      name: Actor
+      description: Only events from this actor.
+      required: false
+      selector:
+        text:
+    limit:
+      name: Limit
+      description: Most events to return, 1 to 500.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 500
+          mode: box
+    cursor:
+      name: Cursor
+      description: The cursor a previous page returned.
+      required: false
+      selector:
+        text:

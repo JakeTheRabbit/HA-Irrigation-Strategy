@@ -73,6 +73,7 @@ CHANGES = {
     "test_shot": {"room_id": ROOM, "zone": 1},
     "overlay_keep": {"room_id": ROOM, "entity_id": "number.crop_steering_zone_1_p2_shot_size"},
     "overlay_undo": {"room_id": ROOM, "entity_id": "number.crop_steering_zone_1_p2_shot_size"},
+    "journal_append": {"room_id": ROOM, "events": []},
 }
 READS = {
     "harvests_get": {"room_id": ROOM},
@@ -89,6 +90,7 @@ READS = {
     "display_get": {"room_id": ROOM},
     "notify_get": {},
     "whats_new_get": {},
+    "journal_query": {"room_id": ROOM, "since": "2026-01-01T00:00:00+00:00"},
 }
 # Changes nothing but whether the dashboard's What's new window shows again: whoever opens the
 # dashboard first after an update may dismiss it, administrator or not.

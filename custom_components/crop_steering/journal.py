@@ -127,8 +127,12 @@ class Journal:
     def open(self) -> None:
         with self._lock:
             db = sqlite3.connect(self._path, check_same_thread=False)
-            db.executescript(_SCHEMA)
-            db.commit()
+            try:
+                db.executescript(_SCHEMA)
+                db.commit()
+            except Exception:
+                db.close()
+                raise
             self._db = db
 
     def close(self) -> None:

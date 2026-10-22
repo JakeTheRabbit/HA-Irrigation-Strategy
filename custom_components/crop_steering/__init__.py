@@ -145,6 +145,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the notify store
         _LOGGER.warning("Notifications unavailable: %s", err)
 
+    # The event journal (spec section 4): one per site. A journal that cannot open only logs.
+    try:
+        from .journal_api import async_setup_journal
+
+        await async_setup_journal(hass)
+    except Exception as err:  # pragma: no cover - never block setup on the journal
+        _LOGGER.warning("Event journal unavailable: %s", err)
+
     # Load this room's named-stage recipe (server-side Store) before the platforms
     # come up, so the recipe select + sensor can read it on setup.
     try:
@@ -442,6 +450,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         if e.entry_id != entry.entry_id
     ]
     if not others_loaded:
+        from .journal_api import async_unload_journal
+
+        await async_unload_journal(hass)
         await async_unload_services(hass)
         from .selftest import async_unload_selftest
 

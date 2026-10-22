@@ -2,6 +2,9 @@
 
 DOMAIN = "crop_steering"
 
+# Every stored journal event is re-fired on the bus under this type (journal_api.py).
+EVENT_JOURNAL = "crop_steering_event"
+
 # The default room's kill switch on an installation from before the setup wizard: a helper the
 # operator made by hand, and the controller app's shipped `enable_flag` option. A room made by the
 # wizard stops on its own Engine Enabled switch instead. Named here once; room.room_gate decides.

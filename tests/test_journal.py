@@ -143,3 +143,28 @@ def test_meta_roundtrip_and_reopen_keeps_seq(tmp_path):
     j2 = _open(tmp_path)
     assert j2.meta_get("k") == "2"
     assert j2.append(ROOM, [_ev()])["seq_max"] == 2
+
+
+def test_open_closes_the_connection_when_the_schema_cannot_be_created(
+    tmp_path, monkeypatch
+):
+    import sqlite3
+
+    closed = []
+
+    class Spy:
+        def __init__(self, real):
+            self._real = real
+
+        def executescript(self, sql):
+            raise sqlite3.DatabaseError("file is not a database")
+
+        def close(self):
+            closed.append(True)
+            self._real.close()
+
+    real_connect = sqlite3.connect
+    monkeypatch.setattr(sqlite3, "connect", lambda *a, **k: Spy(real_connect(*a, **k)))
+    with pytest.raises(sqlite3.DatabaseError):
+        Journal(str(tmp_path / "j.db")).open()
+    assert closed == [True]
