@@ -266,19 +266,21 @@ describe("inside Home Assistant", () => {
   function homeAssistant() {
     const ha: States = { ...createDemo(), "light.kitchen": entity("light.kitchen", "on") };
     const calls: string[] = [];
-    const listeners = new Map<string, () => void>();
+    const listeners = new Map<string, Set<() => void>>();
     let push: ((update: EntityUpdate) => void) | undefined;
     const connection = {
       connected: true,
-      subscribeMessage: vi.fn(async (callback: (update: EntityUpdate) => void) => {
-        push = callback;
+      // The crop_steering event feed subscribes too (lib/events.ts); its events are not pushed here.
+      subscribeMessage: vi.fn(async (callback: (update: EntityUpdate) => void, message: { type: string }) => {
+        if (message.type === "subscribe_entities") push = callback;
         return vi.fn();
       }),
       sendMessagePromise: vi.fn(
         async (_message: Record<string, unknown>): Promise<unknown> => ({}),
       ),
-      addEventListener: (event: string, callback: () => void) => listeners.set(event, callback),
-      removeEventListener: (event: string) => listeners.delete(event),
+      addEventListener: (event: string, callback: () => void) =>
+        listeners.set(event, (listeners.get(event) ?? new Set()).add(callback)),
+      removeEventListener: (event: string, callback: () => void) => listeners.get(event)?.delete(callback),
     };
     const session = {
       connection,
@@ -322,7 +324,7 @@ describe("inside Home Assistant", () => {
       connection,
       session,
       push: (update: EntityUpdate) => push!(update),
-      fire: (event: string) => listeners.get(event)?.(),
+      fire: (event: string) => listeners.get(event)?.forEach((callback) => callback()),
       fullFetches: () => calls.filter((call) => call === "GET states").length,
     };
   }
@@ -427,7 +429,9 @@ describe("inside Home Assistant", () => {
     home.fire("ready");
     await vi.advanceTimersByTimeAsync(0);
     expect(home.fullFetches()).toBe(2);
-    expect(home.connection.subscribeMessage).toHaveBeenCalledTimes(2);
+    expect(
+      home.connection.subscribeMessage.mock.calls.filter(([, message]) => message.type === "subscribe_entities"),
+    ).toHaveLength(2);
     expect(store.getSnapshot().connection).toBe("live");
     store.stop();
   });

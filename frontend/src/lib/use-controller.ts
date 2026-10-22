@@ -6,7 +6,9 @@ import type { TimelineRequest } from "./day-timeline";
 import { explorerSensors } from "./history-explorer";
 import type { OperatorAction } from "./operator-types";
 import { OperatorDemo } from "./operator-demo";
-import { isParityAction } from "./parity-api";
+import { JournalMissing, mergeEvents, startEventFeed } from "./events";
+import { isParityAction, pagedQuery } from "./parity-api";
+import type { CsEvent } from "./parity-types";
 import { useEffect, useRef, useSyncExternalStore } from "react";
 import type { Change, Controller, EntityState, States, WriteResult } from "./types";
 import {
@@ -128,6 +130,10 @@ export class ControllerStore {
   private operatorDemo?: OperatorDemo;
   private runDocuments = new Map<string, { generation: number; document: RunsDocument }>();
   private historyAborters = new Set<AbortController>();
+  /** The live event feed (Controller.recentEvents), over the rooms in `feedRooms`. */
+  private stopFeed?: () => void;
+  private feedRooms = "";
+  private recentEvents: readonly CsEvent[] = [];
   constructor(
     demo = typeof window !== "undefined" && isDemoLocation(window.location),
     /** The page's query (tests pass their own). */
@@ -202,6 +208,7 @@ export class ControllerStore {
       timeline: this.timeline,
       waterRecord: this.waterRecord,
       operator: this.operator,
+      recentEvents: this.recentEvents,
     };
     this.listeners.forEach((listener) => listener());
   }
@@ -231,6 +238,7 @@ export class ControllerStore {
       }
     }
     this.stopTimer ??= whileVisible(this.tick, 30_000);
+    this.startFeed();
     if (typeof window !== "undefined") window.addEventListener?.("pagehide", this.unsubscribe);
     return this.stop;
   };
@@ -239,6 +247,7 @@ export class ControllerStore {
     this.stopTimer = undefined;
     if (typeof window !== "undefined") window.removeEventListener?.("pagehide", this.unsubscribe);
     this.unsubscribe();
+    this.endFeed();
     clearTimeout(this.publishTimer);
     this.publishTimer = undefined;
     this.historyAborters.forEach((abort) => abort.abort());
@@ -266,6 +275,7 @@ export class ControllerStore {
       this.states = states;
       this.settle();
       if (this.live) this.subscribeLive(this.live);
+      this.startFeed();
       if (this.zoneOf !== client) void this.readTimeZone(client);
     } catch (error) {
       if (generation !== this.generation || request !== this.requestId) return;
@@ -367,6 +377,35 @@ export class ControllerStore {
         },
       );
   }
+  /** Every room's live Journal events into `recentEvents`: one feed per connection and set of
+   * rooms. A feed that stopped itself (an older integration) stays stopped until they change. */
+  private startFeed() {
+    const rooms = discoverRooms(this.states).map((room) => room.id);
+    if (!rooms.length || (this.stopFeed && rooms.join() === this.feedRooms)) return;
+    this.endFeed();
+    this.feedRooms = rooms.join();
+    this.stopFeed = startEventFeed({
+      connection: this.demo ? null : this.live,
+      rooms,
+      poll: async (room_id, since) => {
+        const page = await pagedQuery(this, { room_id, since });
+        if (page.kind === "missing") throw new JournalMissing();
+        if (page.kind === "error") throw new Error(page.message);
+        return page.data.events;
+      },
+      onEvents: (events) => {
+        const ring = mergeEvents(this.recentEvents, events);
+        if (ring === this.recentEvents) return;
+        this.recentEvents = ring;
+        this.publish();
+      },
+      visible: () => typeof document === "undefined" || !document.hidden,
+    });
+  }
+  private endFeed() {
+    this.stopFeed?.();
+    this.stopFeed = undefined;
+  }
   private unsubscribe = () => {
     this.liveToken++;
     this.dropLive?.();
@@ -422,6 +461,8 @@ export class ControllerStore {
     this.client?.dispose();
     this.client = client;
     this.unsubscribe();
+    this.endFeed();
+    this.recentEvents = [];
     this.watched.clear();
     this.live = liveConnection(session);
     this.states = {};
@@ -448,6 +489,7 @@ export class ControllerStore {
     this.client?.dispose();
     this.client = null;
     this.unsubscribe();
+    this.endFeed();
     this.live = null;
     this.connection = "offline";
     this.error = "Disconnected. Displayed data is the last successful snapshot.";
