@@ -1060,7 +1060,7 @@
       ]
     },
     {
-      "code": "CS-612",
+      "code": "CS-614",
       "title": "Retired entities in use",
       "source": "repairs",
       "severity": "warning",

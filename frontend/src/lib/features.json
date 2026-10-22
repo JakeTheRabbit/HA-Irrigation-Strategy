@@ -1266,27 +1266,27 @@
     {
       "domain": "select",
       "key": "irrigation_phase",
-      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-612)."
+      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-614)."
     },
     {
       "domain": "number",
       "key": "p2_ec_high_threshold",
-      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-612)."
+      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-614)."
     },
     {
       "domain": "number",
       "key": "p2_ec_low_threshold",
-      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-612)."
+      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-614)."
     },
     {
       "domain": "number",
       "key": "ec_target_veg_p3",
-      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-612)."
+      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-614)."
     },
     {
       "domain": "number",
       "key": "ec_target_gen_p3",
-      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-612)."
+      "why": "Retired, hidden; nothing reads it. Kept for old automations and scripts (CS-614)."
     },
     {
       "domain": "select",

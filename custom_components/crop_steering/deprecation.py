@@ -5,7 +5,7 @@ with: an EC ratio and an "adjusted re-water point" from a select the controller 
 four settings that only fed them. They are not removed: an operator's automation or script may
 still use one, and a removed entity breaks it. They are hidden instead (a new room creates them
 hidden, setup hides an old room's), and a room whose automations or scripts still use one gets a
-Repairs card (CS-612) naming each, which clears once none does.
+Repairs card (CS-614) naming each, which clears once none does.
 """
 
 from __future__ import annotations

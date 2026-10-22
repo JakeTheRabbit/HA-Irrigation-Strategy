@@ -129,7 +129,7 @@ KINDS = (
         "that is not critical also comes here.",
         "codes": _codes(
             "CS-201 CS-401 CS-402 CS-403 CS-405 CS-601 CS-605 CS-606 CS-607 CS-610 CS-611 "
-            "CS-612 CS-713"
+            "CS-614 CS-713"
         ),
         "events": (),
     },
@@ -154,7 +154,7 @@ REPAIRS = {
     "stock_low": "CS-608",
     "engine_switch_not_gate": "CS-610",
     "outside_zone_bounds": "CS-611",
-    "deprecated_entities": "CS-612",
+    "deprecated_entities": "CS-614",
 }
 
 

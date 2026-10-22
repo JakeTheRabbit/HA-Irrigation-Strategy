@@ -5,7 +5,7 @@ re-water point" from a select the controller never reads, with four settings tha
 shot length that ignored a broken room limit, and room means over archived zones. The figures that
 mirror the controller now give its number; the ones it has no number for are retired: kept, hidden
 and unknown with a reason, so an old install loads with every entity id it had and an automation
-that names one still loads, with a Repairs card (CS-612) saying so.
+that names one still loads, with a Repairs card (CS-614) saying so.
 """
 
 from homeassistant.helpers import entity_registry as er

@@ -183,7 +183,7 @@ describe("restored settings outside entity controls", () => {
 
 describe("retired settings", () => {
   // Nothing reads them: they fed the integration's EC ratio and adjusted re-water point, which the
-  // controller never used. Kept hidden in Home Assistant for old automations (CS-612), never offered.
+  // controller never used. Kept hidden in Home Assistant for old automations (CS-614), never offered.
   const retired = [
     "p2_ec_high_threshold",
     "p2_ec_low_threshold",
