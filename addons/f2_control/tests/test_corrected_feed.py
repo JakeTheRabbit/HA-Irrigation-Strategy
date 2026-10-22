@@ -50,6 +50,7 @@ def _ph_room(raw="5.4"):
     fake.set_state(FEED_PH, raw)
     fake.set_state(PH_MIN, "5.5")
     fake.set_state(PH_MAX, "6.5")
+    _session(fake, None)  # the integration's dosing_config, readable, no session open
     return c, fake, room
 
 
@@ -206,6 +207,7 @@ def test_a_revert_reads_raw_on_the_next_pass_before_the_descriptor_follows():
 
 # ------------------------------------------------------------------------------------------------- calibrating: gate
 CAL = "feed probe calibration in progress"
+PH_CAL_UNREAD = f"source-water pH calibration state unreadable ({CONFIG}) — holding (fail-closed)"
 
 
 def _ec_room(raw="1.2"):
@@ -217,53 +219,65 @@ def _ec_room(raw="1.2"):
     return c, fake, room
 
 
+def _session(fake, entry):
+    """dosing_config as the integration publishes it, `calibrating` only while `entry` is open."""
+    fake.set_state(CONFIG, "1", {"pumps": [], "batch": {}, "request": None,
+                                 **({"calibrating": entry} if entry is not None else {})})
+
+
 def test_the_gate_holds_its_ph_while_the_feed_ph_probe_is_calibrated():
-    """Fix round 1, ruling (5): the quantity being calibrated is unreadable: the gate holds at once (no grace, no
-    rescue), whatever the buffer reads; the other quantity and a pump's session change nothing."""
+    """Rulings (5) and fix round 2: the gate reads dosing_config `calibrating` itself (never through the dosing
+    runner). The quantity being calibrated is unreadable: the gate holds at once (no grace, no rescue), whatever the
+    buffer reads; the other quantity and a pump's session change nothing."""
     c, fake, room = _ph_room(raw="6.0")  # in band: a pH buffer could read anything
+    c.dosing = None  # the dosing runner never started
+    _session(fake, None)
     assert c._blocked(room, 1) is None
-    room._feed_calibrating = {"probe": "feed_ph", "session_id": "s", "until": "x"}
+    _session(fake, {"probe": "feed_ph", "session_id": "s", "until": "x"})
     assert c._blocked(room, 1) == CAL
     assert c._read_feed_ph(room) is None
-    room._feed_calibrating = {"probe": "feed_ec", "session_id": "s", "until": "x"}
+    _session(fake, {"probe": "feed_ec", "session_id": "s", "until": "x"})
     assert c._blocked(room, 1) is None
-    room._feed_calibrating = {"pump": "balance", "session_id": "s", "until": "x"}
+    _session(fake, {"pump": "balance", "session_id": "s", "until": "x"})
     assert c._blocked(room, 1) is None
-    room._feed_calibrating = None
-    assert c._blocked(room, 1) is None
+    _session(fake, "something unreadable")  # an entry that can't be read holds both halves
+    assert c._blocked(room, 1) == CAL
 
 
 def test_the_gate_holds_its_ec_while_the_feed_ec_probe_is_calibrated():
-    c, fake, room = _ec_room(raw="1.413")  # the EC buffer, inside the 1.0-2.0 band: never passes
-    assert c._blocked(room, 1) is None
-    room._feed_calibrating = {"probe": "feed_ec", "session_id": "s", "until": "x"}
-    assert c._blocked(room, 1) == CAL
     import gate_report
 
-    assert gate_report.first_hold(gate_report.report(c, room, 1)) == CAL  # the gate list says the same
-    room._feed_calibrating = "something unreadable"  # an entry that can't be read holds both halves
+    c, fake, room = _ec_room(raw="1.413")  # the EC buffer, inside the 1.0-2.0 band: never passes
+    c.dosing = None
+    assert c._blocked(room, 1) is None
+    _session(fake, {"probe": "feed_ec", "session_id": "s", "until": "x"})
     assert c._blocked(room, 1) == CAL
+    assert gate_report.first_hold(gate_report.report(c, room, 1)) == CAL  # the gate list says the same
 
 
-def test_the_runner_hands_the_calibrating_entry_to_the_gate(rig):
-    r = rig()
-    r.config()
-    room = r.c.rooms[0]
-    _calibrating(r, PROBE)
-    r.poll()
-    assert room._feed_calibrating == PROBE
-    state, attributes = r.fake.states[CONFIG][:2]
-    r.fake.set_state(CONFIG, "unavailable", {})  # can't be read: the last one stands (fail-closed)
-    r.poll()
-    assert room._feed_calibrating == PROBE
-    r.fake.set_state(CONFIG, state, {k: v for k, v in attributes.items() if k != "calibrating"})
-    r.poll()
-    assert room._feed_calibrating is None
+def test_an_unreadable_dosing_config_holds_only_a_calibrated_quantity():
+    """Fix round 2: dosing_config that can't be read can't say a probe is out of its buffer. With a calibration
+    applied that quantity holds (fail-closed, as #215); with none, the gate is as before (it never read it)."""
+    c, fake, room = _ph_room()
+    _fixed(fake, "5.6")
+    for unreadable in ("unavailable", "unknown"):
+        fake.set_state(CONFIG, unreadable, {})
+        assert c._blocked(room, 1) == "source-water pH 5.40 out of [5.5,6.5]"  # no calibration: as before
+        _describe(c, fake, feed_calibration={"ph": PH_FIX})
+        assert c._blocked(room, 1) == PH_CAL_UNREAD
+        assert c._read_feed_ph(room) is None
+        _describe(c, fake, feed_calibration=None)
+    del fake.states[CONFIG]  # no answer at all
+    _describe(c, fake, feed_calibration={"ph": PH_FIX})
+    assert c._blocked(room, 1) == PH_CAL_UNREAD
+    _session(fake, None)  # readable again, no session: the calibrated reading
+    assert c._blocked(room, 1) is None
 
 
 def test_the_ec_gate_reads_the_corrected_feed_ec():
     c, fake, room = _room()
     room.feed_ec_sensor = FEED_EC
+    _session(fake, None)
     fake.set_state(FEED_EC, "1.6")
     fake.set_state("number.crop_steering_irrigation_ec_min", "0")
     fake.set_state("number.crop_steering_irrigation_ec_max", "1.5")
@@ -417,6 +431,7 @@ def test_the_held_words_are_pinned():
     assert guards.CALIBRATING_PROBE == PROBE_HOLD
     assert guards.CALIBRATING_PUMP == PUMP_HOLD
     assert controller.FEED_CALIBRATING == PROBE_HOLD  # the source-water gate's hold
+    assert controller.FEED_CALIBRATION_UNREAD.format(name="pH", entity=CONFIG) == PH_CAL_UNREAD
     assert [(g.key, g.guard, g.code) for g in guards.CALIBRATING] == [("calibrating", "dosing_lockout", None)]
 
 

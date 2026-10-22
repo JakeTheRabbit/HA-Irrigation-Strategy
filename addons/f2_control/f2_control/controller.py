@@ -742,9 +742,12 @@ TIMER_OWED_MIN = 15  # a timer slot a rescue went before is still given this lon
 # The integration's feed pH / EC corrected by the probe's applied calibration (calibration.py, Task 17): read only while
 # engine_config's feed_calibration applies one (Controller._feed_read, ruling R4).
 FEED_CORRECTED = "sensor.crop_steering_{}feed_{}_corrected"
-# The source-water gate's hold while a feed probe sits in its calibration buffer (room._feed_calibrating, set by the
-# dosing runner from dosing_config's `calibrating`): the same words as the dosing runner's (guards.CALIBRATING_PROBE).
+# The source-water gate's holds while a feed probe may sit in its calibration buffer (Controller._feed_calibration_hold,
+# read from dosing_config's `calibrating` by the gate itself): an open session, in the dosing runner's words
+# (guards.CALIBRATING_PROBE), and a dosing_config that can't be read while a calibration is applied.
 FEED_CALIBRATING = "feed probe calibration in progress"
+FEED_CALIBRATION_UNREAD = "source-water {name} calibration state unreadable ({entity}) — holding (fail-closed)"
+DOSING_CONFIG = "sensor.crop_steering_{}dosing_config"
 TEST_SHOT_S = 10  # how long a zone's Test Shot waters it
 # The site's supply (the integration's site store, G1): the pumps, their output and the zones' demand. With one saved,
 # the zones that fire in a pass take turns at their pump, rescues first (_pump_line); none saved, as before.
@@ -2598,18 +2601,24 @@ class Controller:
             return corrected, (state, *read[1:3])
         return raw, (repr(number * fix["gain"] + fix["bias"]), *read[1:3])
 
-    @staticmethod
-    def _feed_calibrating(room, quantity):
-        """True while the room's feed `quantity` ("ph" or "ec") probe is in a calibration session (dosing_config's
-        `calibrating`, handed over by the dosing runner as room._feed_calibrating): it reads a buffer, not the feed.
-        A pump's session is not one; an entry that can't be read counts for both probes (fail-closed)."""
-        entry = getattr(room, "_feed_calibrating", None)
-        if not entry:
-            return False
-        if isinstance(entry, dict) and entry.get("pump"):
-            return False
+    def _feed_calibration_hold(self, room, quantity):
+        """Why the room's feed `quantity` ("ph" or "ec") probe can't be read as the feed, or None: a calibration
+        session is open for it (dosing_config's `calibrating`, read here, never through the dosing runner): it sits in
+        a buffer. A pump's session is not one; an entry that can't be read counts for both probes. A dosing_config that
+        can't be read holds only a quantity with a calibration applied (fail-closed); without one it is as before."""
+        entity = DOSING_CONFIG.format(room.prefix)
+        state, attrs = ha_get(entity)[:2]
+        if state in (None, "", "unknown", "unavailable") or not isinstance(attrs, dict):
+            if quantity in (getattr(room, "_feed_calibration", None) or {}):
+                return FEED_CALIBRATION_UNREAD.format(name={"ph": "pH", "ec": "EC"}[quantity], entity=entity)
+            return None
+        entry = attrs.get("calibrating")
+        if not entry or (isinstance(entry, dict) and entry.get("pump")):
+            return None
         probe = entry.get("probe") if isinstance(entry, dict) else None
-        return probe == f"feed_{quantity}" if probe in ("feed_ph", "feed_ec") else True
+        if probe in ("feed_ph", "feed_ec") and probe != f"feed_{quantity}":
+            return None
+        return FEED_CALIBRATING
 
     def _feed_value(self, room, quantity):
         """The room's feed `quantity` ("ph" or "ec") now, in its canonical unit, and the entity it was read from
@@ -2645,8 +2654,11 @@ class Controller:
             + (", ".join(f"{q} x{f['gain']:g} {f['bias']:+g}" for q, f in sorted(fixes.items())) or "none"))
         self._save_state()
 
-    def _read_feed_ec(self, room):
-        if not room.feed_ec_sensor or self._feed_calibrating(room, "ec"):  # a buffer is no feed reading
+    def _read_feed_ec(self, room, held=False):
+        """`held`: _feed_calibration_hold's answer when the caller has it (False: read it here)."""
+        if not room.feed_ec_sensor:
+            return None
+        if (self._feed_calibration_hold(room, "ec") if held is False else held):  # a buffer is no feed reading
             return None
         feed = self._feed_value(room, "ec")[0]
         if feed is not None:
@@ -2689,8 +2701,11 @@ class Controller:
                 quiet=False,
             )
 
-    def _read_feed_ph(self, room):
-        if not room.feed_ph_sensor or self._feed_calibrating(room, "ph"):  # a buffer is no feed reading
+    def _read_feed_ph(self, room, held=False):
+        """`held`: as _read_feed_ec's."""
+        if not room.feed_ph_sensor:
+            return None
+        if (self._feed_calibration_hold(room, "ph") if held is False else held):  # a buffer is no feed reading
             return None
         ph = self._feed_value(room, "ph")[0]
         if ph is not None:
@@ -3941,13 +3956,14 @@ class Controller:
         sensor the gate is disabled (the dosing/fill holds still apply) so the add-on is safe out of the box on
         installs without a reservoir probe."""
         if room.feed_ec_sensor:
-            feed = self._read_feed_ec(room)
+            held = self._feed_calibration_hold(room, "ec")
+            feed = self._read_feed_ec(room, held)
             lo, hi, unread = self._feed_band(room, "ec")
             if unread:
                 return f"source-water EC band unreadable ({unread}) — holding (fail-closed)"
             if lo > 0 or hi > 0:
-                if self._feed_calibrating(room, "ec"):  # unreadable: held at once, no grace, no rescue
-                    return FEED_CALIBRATING
+                if held:  # unreadable: held at once, no grace, no rescue
+                    return held
                 if feed is None:
                     if not feed_grace_ok(
                         datetime.now().timestamp(),
@@ -3973,9 +3989,10 @@ class Controller:
             if unread:
                 return f"source-water pH band unreadable ({unread}) — holding (fail-closed)"
             if ph_lo > 0 or ph_hi > 0:
-                if self._feed_calibrating(room, "ph"):  # unreadable: held at once, no grace, no rescue
-                    return FEED_CALIBRATING
-                ph = self._read_feed_ph(room)
+                held = self._feed_calibration_hold(room, "ph")
+                if held:  # unreadable: held at once, no grace, no rescue
+                    return held
+                ph = self._read_feed_ph(room, held)
                 if ph is None:
                     if not feed_grace_ok(
                         datetime.now().timestamp(),

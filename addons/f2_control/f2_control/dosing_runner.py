@@ -506,8 +506,6 @@ class DosingRunner:
 
     def _poll_room(self, room, busy):
         config = self._config(room)
-        if config is not False:  # the source-water gate's view of an open calibration; unreadable keeps the last one
-            room._feed_calibrating = config.get("calibrating") if config else None
         job = busy if busy is not None and busy.room.slug == room.slug else None
         request = config.get("request") if config else None
         if isinstance(request, dict) and isinstance(request.get("id"), str):
