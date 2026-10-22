@@ -167,7 +167,7 @@ export async function loadRevisions(controller: Pick<Controller, "operator">): P
 }
 
 export type SkipResult =
-  | { kind: "ok"; eventIds: string[] }
+  | { kind: "ok"; eventIds: string[]; verified: boolean }
   | { kind: "stale" }
   | { kind: "missing" }
   | { kind: "error"; message: string };
@@ -186,8 +186,24 @@ export async function skipShot(
     at: new Date(block.start).toISOString(),
     expected_revision: revision,
   });
-  if (outcome.kind === "ok") return { kind: "ok", eventIds: outcome.eventIds };
+  if (outcome.kind === "ok")
+    return { kind: "ok", eventIds: outcome.eventIds, verified: outcome.readback.status === "verified" };
   if (outcome.kind === "missing") return { kind: "missing" };
   if (outcome.code === "stale_revision") return { kind: "stale" };
   return { kind: "error", message: outcome.message };
 }
+
+/** What the page's body shows: the timeline (also whenever a room has no planned shots from the
+ * controller, so its note shows), "No problems on this day." when Problems only hides every row of
+ * a day that has blocks, else the empty state. `all` is before Problems only and the search. */
+export function bodyState(rows: TimelineRow[], all: TimelineRow[], problemsOnly: boolean): "timeline" | "no-problems" | "empty" {
+  if (all.some((r) => r.plannedUnavailable) || rows.some((r) => r.blocks.length)) return "timeline";
+  return problemsOnly && all.some((r) => r.blocks.length) ? "no-problems" : "empty";
+}
+
+/** The phone's failed count opens the whole day: 12 h widens to 24 h. */
+export const failedTap = (q: WateringQuery): WateringQuery => (q.span === 12 ? { ...q, span: 24 } : q);
+
+/** The last answer, kept through a failed read only while the rooms and span are the same. */
+export const keptData = <T extends { key: string }>(kept: T | null, key: string): T | null =>
+  kept && kept.key === key ? kept : null;

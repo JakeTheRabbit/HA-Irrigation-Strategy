@@ -21,11 +21,14 @@ import { offerUndo, revertEvents } from "@/lib/undo";
 import { useNarrow } from "@/lib/use-narrow";
 import { plantAmount, roomPlants } from "@/lib/water-view";
 import {
+  bodyState,
   dayChip,
   dayProblems,
   dayStart,
   defaultSpan,
+  failedTap,
   keepProblems,
+  keptData,
   liveMatch,
   loadRevisions,
   matchQuery,
@@ -40,13 +43,29 @@ import {
 } from "@/lib/watering";
 import "./watering.css";
 
-/** The page's choices outlive a room change (the room tree remounts the page): the address loses
- * its query then, so the last one stands in. Collapsed rooms likewise. */
-const memory: { query: WateringQuery | null; room: string | null; collapsed: Set<string> } = {
+/** The page's choices outlive a pick in the room tree, which remounts the page in the picked room
+ * and drops the address's query: the last query and collapsed rooms stand in then, and only then
+ * (any other way in starts clean). `treeAt` is when the room tree was last clicked; a header room
+ * switch keeps the address and is not a pick. (Task 31: openRoomPage should keep the query.) */
+const memory: { query: WateringQuery | null; room: string | null; collapsed: Set<string>; treeAt: number } = {
   query: null,
   room: null,
   collapsed: new Set(),
+  treeAt: 0,
 };
+const markTree = (event: Event) => {
+  if (event.target instanceof Element && event.target.closest(".room-tree")) memory.treeAt = Date.now();
+};
+/** The page mounted from a room-tree pick of another room. Clears the memory when it did not. */
+function treePicked(roomId: string): boolean {
+  const picked = memory.room !== null && memory.room !== roomId && Date.now() - memory.treeAt < 2000;
+  if (!picked) {
+    memory.query = null;
+    memory.collapsed = new Set();
+  }
+  memory.treeAt = 0;
+  return picked;
+}
 
 const SOURCES: Record<string, string> = {
   engine: "Steering engine",
@@ -75,8 +94,8 @@ function roomMeta(controller: Controller, room: Room) {
   };
 }
 
-function initialQuery(hash: string, width: number): WateringQuery {
-  if (!hash.includes("?") && memory.query) return memory.query;
+function initialQuery(hash: string, width: number, picked: boolean): WateringQuery {
+  if (picked && !hash.includes("?") && memory.query) return memory.query;
   const q = wateringQuery(hash);
   return /[?&]span=/.test(hash) ? q : { ...q, span: defaultSpan(width) };
 }
@@ -91,9 +110,18 @@ export function Watering({
 }) {
   const { timeZone } = controller;
   const phone = useNarrow(720);
+  const [picked] = useState(() => treePicked(controller.roomId));
   const [q, setQ] = useState(() =>
-    initialQuery(typeof window === "undefined" ? "" : window.location.hash, typeof window === "undefined" ? 1440 : window.innerWidth),
+    initialQuery(
+      typeof window === "undefined" ? "" : window.location.hash,
+      typeof window === "undefined" ? 1440 : window.innerWidth,
+      picked,
+    ),
   );
+  useEffect(() => {
+    document.addEventListener("click", markTree, true);
+    return () => document.removeEventListener("click", markTree, true);
+  }, []);
   const change = (next: Partial<WateringQuery>) => {
     const merged = { ...q, ...next };
     memory.query = merged;
@@ -132,10 +160,14 @@ export function Watering({
     ids.length ? { rooms: ids, days: week } : null,
     [ids, date],
   );
-  // What was last read, kept through a failed read.
-  const lastGood = useRef<{ data: TimelineGetData; at: number } | null>(null);
-  if (timeline.data && lastGood.current?.data !== timeline.data) lastGood.current = { data: timeline.data, at: Date.now() };
-  const data = timeline.data ?? (timeline.state === "error" ? (lastGood.current?.data ?? null) : null);
+  // What was last read, kept through a failed read of the same rooms and span (never drawn under
+  // another date).
+  const readKey = JSON.stringify([ids, span.start, span.end]);
+  const lastGood = useRef<{ key: string; data: TimelineGetData; at: number } | null>(null);
+  if (timeline.data && lastGood.current?.data !== timeline.data)
+    lastGood.current = { key: readKey, data: timeline.data, at: Date.now() };
+  const kept = timeline.state === "error" ? keptData(lastGood.current, readKey) : null;
+  const data = timeline.data ?? kept?.data ?? null;
 
   // Each room's timer revision, for a skip; read again when a skip finds it stale.
   const [revisions, setRevisions] = useState<Record<string, number> | null>(null);
@@ -174,10 +206,10 @@ export function Watering({
   // Collapsed rooms; a room chosen in the room tree opens and comes into view.
   const [collapsed, setCollapsed] = useState(() => {
     const next = new Set(memory.collapsed);
-    if (memory.room !== null && memory.room !== controller.roomId) next.delete(controller.roomId);
+    next.delete(controller.roomId);
     return next;
   });
-  const picked = useRef(memory.room !== null && memory.room !== controller.roomId);
+  const scrollPending = useRef(picked);
   useEffect(() => {
     memory.room = controller.roomId;
   }, [controller.roomId]);
@@ -186,8 +218,8 @@ export function Watering({
   }, [collapsed]);
   const body = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!picked.current || !rows.length) return;
-    picked.current = false;
+    if (!scrollPending.current || !rows.length) return;
+    scrollPending.current = false;
     const index = rows.filter((r) => r.zone === null).findIndex((r) => r.roomId === controller.roomId);
     if (index <= 0) return;
     const label = phone ? ".st-vroom" : '.st-row[data-kind="room"]';
@@ -215,6 +247,21 @@ export function Watering({
       body.current?.querySelector<HTMLButtonElement>(`.st-block[data-id="${CSS.escape(id)}"]`)?.focus(),
     );
   };
+  // The phone's day line counts the whole day: its "N failed" opens 24 h, then the first failed shot.
+  const [failedPending, setFailedPending] = useState(false);
+  const tapFailed = () => {
+    cycle.current = 0;
+    const next = failedTap(q);
+    if (next === q) return nextFailed();
+    change(next);
+    setFailedPending(true);
+  };
+  useEffect(() => {
+    // Only once the wider span's answer is in (the old one stays while it loads).
+    if (!failedPending || timeline.state !== "ready" || lastGood.current?.key !== readKey || !markers.length) return;
+    setFailedPending(false);
+    nextFailed();
+  }, [failedPending, timeline.state, timeline.data, readKey, markers.length]);
 
   // The block popover.
   const [open, setOpen] = useState<{ block: TimelineBlock; anchor: HTMLElement } | null>(null);
@@ -244,6 +291,7 @@ export function Watering({
       readRevisions();
       timeline.reload();
       const what = `${where(b)} ${clock(b.start, timeZone)}`;
+      if (!result.verified) return void toast("Skip sent, not confirmed. Check the timeline.");
       if (!result.eventIds.length) return void toast(`Skipped ${what}.`);
       offerUndo({
         message: `Skipped ${what}.`,
@@ -305,7 +353,7 @@ export function Watering({
       </>
     );
 
-  const empty = timeline.state === "ready" && !rows.some((r) => r.blocks.length);
+  const shows = timeline.state === "ready" ? bodyState(rows, all, q.problemsOnly) : "timeline";
   return (
     <>
       <Heading title="Timeline" description={phone ? "All rooms · swipe for more" : undefined} action={phone ? spanToggle : undefined} />
@@ -318,7 +366,14 @@ export function Watering({
             <p>
               <strong>{dayWords(date)}</strong>
               <span data-tone={problemWords.length ? "problem" : undefined}>
-                {problemWords.length ? problemWords.join(" · ") : summary.data ? "No problems" : " "}
+                {problems.failed > 0 && (
+                  <button type="button" className="wt-dayfailed" onClick={tapFailed} data-watering-day-failed>
+                    {problems.failed} failed
+                  </button>
+                )}
+                {problems.failed > 0 && problems.warnings > 0 && " · "}
+                {problems.warnings > 0 && `${problems.warnings} warning${problems.warnings === 1 ? "" : "s"}`}
+                {!problemWords.length && (summary.data ? "No problems" : " ")}
               </span>
             </p>
             <button type="button" aria-label="Day after" onClick={() => change({ date: shiftDate(date, 1) })}>
@@ -401,7 +456,7 @@ export function Watering({
           <div className="wt-error" role="alert">
             <p>
               Couldn't load the watering plan.
-              {lastGood.current && ` Showing what we had at ${clock(lastGood.current.at, timeZone)}.`}
+              {kept && ` Showing what we had at ${clock(kept.at, timeZone)}.`}
             </p>
             <Button variant="outline" size="sm" onClick={timeline.reload}>
               Try again
@@ -412,18 +467,22 @@ export function Watering({
 
         <div className="wt-body" ref={body}>
           {!data && timeline.state !== "error" ? (
-            <div className="wt-skeleton" aria-busy="true" aria-label="Loading the watering plan">
+            <div className="wt-skeleton" role="status" aria-busy="true" aria-label="Loading the watering plan">
               {Array.from({ length: 6 }, (_, i) => (
                 <span key={i} />
               ))}
             </div>
-          ) : empty ? (
+          ) : shows === "empty" ? (
             <div className="wt-empty">
               <p>No watering planned for this day.</p>
               <Button variant="outline" onClick={() => navigate("plan/timers")}>
                 Set up a timer
               </Button>
             </div>
+          ) : shows === "no-problems" ? (
+            <p className="wt-note" data-watering-no-problems>
+              No problems on this day.
+            </p>
           ) : (
             data && (
               <ShotTimeline

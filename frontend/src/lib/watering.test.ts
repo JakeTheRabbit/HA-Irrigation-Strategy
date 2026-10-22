@@ -3,10 +3,13 @@ import type { TimelineSummary } from "./parity-types";
 import type { TimelineBlock, TimelineRow } from "./shot-timeline";
 import { fakeController } from "./test-helpers";
 import {
+  bodyState,
   dayChip,
   dayStart,
   defaultSpan,
+  failedTap,
   keepProblems,
+  keptData,
   liveMatch,
   loadRevisions,
   shiftDate,
@@ -187,7 +190,7 @@ describe("skip", () => {
     const revisions = await loadRevisions(controller);
     expect(revisions).toEqual({ "room:": 7, "room:b_": 3 });
     const result = await skipShot(controller, block({ glyph: "planned", zone: 3, skippable: true }), revisions!);
-    expect(result).toEqual({ kind: "ok", eventIds: ["01EVT"] });
+    expect(result).toEqual({ kind: "ok", eventIds: ["01EVT"], verified: true });
     expect(calls[1]).toEqual([
       "timer_skip",
       { room_id: "room:", zone: 3, at: new Date(T0).toISOString(), expected_revision: 7, api: 2 },
@@ -231,4 +234,45 @@ test("a live event reloads only for a visible room inside the span", () => {
   expect(liveMatch(event("shot.started", "room:b_", T0 + 60_000), ["room:"], span)).toBe(false);
   expect(liveMatch(event("shot.started", "room:", T0 + 2 * 3_600_000), ["room:"], span)).toBe(false);
   expect(liveMatch(event("target.changed", "room:", T0 + 60_000), ["room:"], span)).toBe(false);
+});
+
+test("an unverified skip answer is ok but not confirmed", async () => {
+  const controller = fakeController({
+    operator: async () => ({ api: 2, ok: true, revision: 8, readback: { status: "unverified", at: null }, event_ids: ["01EVT"], data: {} }),
+  });
+  expect(await skipShot(controller, block({ skippable: true }), { "room:": 7 })).toEqual({
+    kind: "ok",
+    eventIds: ["01EVT"],
+    verified: false,
+  });
+});
+
+describe("bodyState", () => {
+  const done = [row("room:", null, []), row("room:", 1, [block({ glyph: "done" })])];
+  const bare = [row("room:", null, []), row("room:", 1, [])];
+  test("a room without planned shots from the controller draws the timeline (its note), never Empty", () => {
+    const head = { ...row("room:", null, []), plannedUnavailable: true };
+    expect(bodyState([head, row("room:", 1, [])], [head, row("room:", 1, [])], false)).toBe("timeline");
+    expect(bodyState([], [head], true)).toBe("timeline");
+  });
+  test("problems only with no problems says so; nothing at all is empty", () => {
+    expect(bodyState(keepProblems(done), done, true)).toBe("no-problems");
+    expect(bodyState(bare, bare, false)).toBe("empty");
+    expect(bodyState(bare, bare, true)).toBe("empty");
+    expect(bodyState(done, done, false)).toBe("timeline");
+  });
+});
+
+test("tapping the phone's failed count widens 12 h to 24 h", () => {
+  const q = wateringQuery("#/plan/watering?span=12&date=2026-10-22");
+  expect(failedTap(q)).toEqual({ ...q, span: 24 });
+  expect(failedTap({ ...q, span: 24 })).toEqual({ ...q, span: 24 });
+  expect(failedTap({ ...q, span: 48 })).toEqual({ ...q, span: 48 });
+});
+
+test("a failed read keeps the last answer only for the same rooms and span", () => {
+  const kept = { key: "a", data: { rooms: [], errors: { count: 0, markers: [] } }, at: 1 };
+  expect(keptData(kept, "a")).toBe(kept);
+  expect(keptData(kept, "b")).toBeNull();
+  expect(keptData(null, "a")).toBeNull();
 });

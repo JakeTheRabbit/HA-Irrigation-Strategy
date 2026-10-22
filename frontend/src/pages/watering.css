@@ -171,7 +171,7 @@
   grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
 }
-.wt-dayline button {
+.wt-dayline > button {
   display: grid;
   place-items: center;
   width: 44px;
@@ -318,4 +318,15 @@
   .watering {
     gap: 10px;
   }
+}
+.wt-dayfailed {
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
 }

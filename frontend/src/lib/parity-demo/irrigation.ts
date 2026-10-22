@@ -4,10 +4,10 @@ import { demoId, demoJournal, demoLightsOn } from "./journal";
 
 /** The demo's watering timeline (I1), folded from the demo Journal as the integration folds it:
  * the same rooms, zones and shot times. On top of the Journal's shots, holds, queue and alerts it
- * adds what a grow-day also has: one shot that failed (Room A zone 1, in the hour before this one,
- * the valve did not open; not in the Journal), the shot running now (Room A zone 3's timer), and each zone's next two planned shots
- * (Room A zone 3's from its timer, the first after a 12 min wait for the pump; the others are the
- * engine's expectations), all skippable until skipped. A skip lasts the page's life; its Undo
+ * adds what a grow-day also has: the shot running now (Room A zone 3's timer) and each zone's next
+ * two planned shots (Room A zone 3's from its timer, the first after a 12 min wait for the pump;
+ * the others are the engine's expectations), all skippable until skipped. The Journal's aborted
+ * shot (Room A zone 1, CS-304) is the failed block. A skip lasts the page's life; its Undo
  * (history_revert of the skip's event) puts the shot back. */
 
 const MIN = 60_000;
@@ -40,12 +40,13 @@ function roomBlocks(roomId: string, now: number): Map<number, TimelineBlock[]> {
     if (e.kind === "shot.started") {
       const d = e.data;
       const done = closing(e, "shot.completed");
+      const aborted = closing(e, "shot.aborted");
       const metered = done ? Number(done.data.metered_l) : null;
       add(e.zone, {
         ...blank(e.id, at),
-        end: done?.ts ?? iso(at + Number(d.duration_s) * 1000),
-        status: metered !== null && metered / Number(d.commanded_l) < 0.8 ? "warning" : "done",
-        code: closing(e, "flow.reconciled")?.code ?? null,
+        end: (done ?? aborted)?.ts ?? iso(at + Number(d.duration_s) * 1000),
+        status: aborted ? "error" : metered !== null && metered / Number(d.commanded_l) < 0.8 ? "warning" : "done",
+        code: aborted?.code ?? closing(e, "flow.reconciled")?.code ?? null,
         litres: Number(d.commanded_l), metered_l: metered, reason: String(d.reason), phase: String(d.phase),
         vwc_before: Number(d.vwc_before), vwc_expected: (d.vwc_expected as number | null) ?? null,
         requested_at: String(d.requested_at), pump_wait_s: Number(d.pump_wait_s), source: e.source.actor,
@@ -58,16 +59,6 @@ function roomBlocks(roomId: string, now: number): Map<number, TimelineBlock[]> {
     }
   }
   if (roomId === "room:") {
-    // The hour before this one (today's first minutes after midnight): the valve did not open. Tied
-    // to the clock, not the grow-day, so today's date always has it whenever the demo is opened.
-    const midnight = new Date(now).setHours(0, 5, 0, 0);
-    const failedAt = Math.min(now - MIN, Math.max(midnight, Math.floor(now / HOUR) * HOUR - HOUR + 18 * MIN));
-    add(1, {
-        ...blank(demoId(failedAt, "room::aborted:1"), failedAt), end: iso(failedAt + 20_000), status: "error",
-        code: "CS-301", litres: 1.21, metered_l: 0, reason: "P2 top-up: VWC under threshold. The valve did not open.",
-        phase: "P2", vwc_before: 57.2, requested_at: iso(failedAt), pump_wait_s: 0,
-        event_id: demoId(failedAt, "room::aborted:1"),
-      });
     // Zone 3's timer is watering now.
     const running = now - 30_000;
     add(3, {

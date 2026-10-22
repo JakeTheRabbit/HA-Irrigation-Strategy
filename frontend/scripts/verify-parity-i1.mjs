@@ -1,12 +1,15 @@
 /** I1 Watering timeline (mockup 05) and P2 phone timeline (mockup 25), against frontend/dist: run
  * after `vite build`. Opens #/plan/watering in the demo (Room A plays F2, Room B F1).
  *
+ * The clock is pinned to today 14:10 local, so the demo day is the same at any real hour.
+ *
  * Interactions asserted, at 1440 and 390:
  * - 3.18: the day strip ("Today" and the week, each day Done / N problems / Planned) on a desktop,
  *   "Today, <day>" with its failed and warning counts on a phone;
  * - 3.18: 48 h (desktop) or 24 h (phone) updates the hash (`span=48` / `span=24`) and the axis;
  * - 3.18: ←/→ on a focused block moves focus to the next block (↓/↑ on a phone, where time runs down);
- * - 3.18: the failed chip "{n} shot(s) failed" focuses a failed block;
+ * - 3.18: the failed chip "{n} shot(s) failed" focuses a failed block; on a phone the day line's
+ *   "1 failed" (the whole day) widens 12 h to 24 h and focuses the failed block;
  * - 3.18: clicking a planned block opens the popover with "Skip this shot"; skipping shows an Undo
  *   toast and the block reads skipped; Undo puts it back ("… is back on the plan.");
  * - 3.18: the room tree (desktop) picks Room B: the page stays, Room B's row is open and in view;
@@ -27,6 +30,12 @@ await runParity({
   check: async (page, { width, backend, region }) => {
     const label = `${width}px ${backend}`;
     const phone = width <= 720;
+    // The demo follows the clock: pin it to today 14:10 local (the mockups' "now"), so Room A's
+    // grow-day has its shots, the failed one (13:48) and planned ones ahead at any real hour.
+    const pinned = new Date();
+    pinned.setHours(14, 10, 0, 0);
+    await page.clock.setFixedTime(pinned);
+    await page.reload();
     const main = page.locator("main");
     await main.getByRole("heading", { level: 1, name: "Timeline", exact: true }).waitFor();
     const tree = page.locator(".room-tree");
@@ -60,8 +69,8 @@ await runParity({
       const day = main.locator("[data-watering-day]");
       await page.waitForFunction(() => /failed|warning|No problems/.test(document.querySelector("[data-watering-day] span")?.textContent ?? ""));
       assert.match(await day.locator("strong").innerText(), /^Today, \w{3} \d{1,2} \w{3}$/, `${label}: today line`);
-      // The demo's failed shot is always today; its warnings follow the grow-day, so may be yesterday.
-      assert.match(await day.locator("span").innerText(), /^1 failed( · \d+ warnings?)?$/, `${label}: problems line`);
+      // At 14:10: Room A zone 1's aborted shot; Room A zone 2's short shot and Room B's sensor alert.
+      assert.equal(await day.locator("span").innerText(), "1 failed · 2 warnings", `${label}: problems line`);
       assert.equal(await timeline.getAttribute("data-orientation"), "vertical", `${label}: vertical`);
       assert.match(await main.locator(".page-heading p").innerText(), /^All rooms · swipe for more$/, `${label}: subtitle`);
     } else {
@@ -112,6 +121,18 @@ await runParity({
     await page.waitForFunction(() => document.activeElement?.getAttribute("data-glyph") === "failed");
     region("failed chip");
 
+    // Phone: the day line's "1 failed" counts the whole day; from 12 h it opens 24 h and the
+    // failed shot.
+    if (phone) {
+      assert.match(page.url(), /span=12/, `${label}: 12 h before the tap`);
+      await page.evaluate(() => document.activeElement?.blur());
+      await main.locator("[data-watering-day-failed]").click();
+      await page.waitForFunction(() => location.hash.includes("span=24"));
+      assert.equal(await spans.getByRole("button", { name: "24 h" }).getAttribute("aria-pressed"), "true");
+      await page.waitForFunction(() => document.activeElement?.getAttribute("data-glyph") === "failed");
+      region("phone failed count");
+    }
+
     // A planned block: Skip this shot, Undo.
     const planned = timeline.locator('.st-block[data-glyph="planned"]:not([data-skipped]), .st-block[data-glyph="expected"]:not([data-skipped])').first();
     const id = await planned.getAttribute("data-id");
@@ -135,8 +156,11 @@ await runParity({
 
     // The room tree picks Room B: the page stays, its row is open.
     if (!phone) {
+      await spans.getByRole("button", { name: "48 h" }).click();
       await treeRoom("room:room_b_").click();
       await main.getByRole("heading", { level: 1, name: "Timeline", exact: true }).waitFor();
+      // The pick keeps the page's choices (the address loses its query there).
+      assert.equal(await spans.getByRole("button", { name: "48 h" }).getAttribute("aria-pressed"), "true", `${label}: 48 h kept`);
       const toggle = main.getByRole("button", { name: /^(Collapse|Expand) Room B$/ });
       await toggle.waitFor();
       assert.equal(await toggle.getAttribute("aria-expanded"), "true", `${label}: Room B open`);
@@ -144,4 +168,4 @@ await runParity({
     }
   },
 });
-console.log("PASS: I1 watering timeline (day strip, span hash, arrow keys, failed chip, skip + undo, room tree, 3.17 note)");
+console.log("PASS: I1 watering timeline (day strip, span hash, arrow keys, failed chip, phone failed count opens 24 h, skip + undo, room tree keeps choices, 3.17 note; clock pinned 14:10)");

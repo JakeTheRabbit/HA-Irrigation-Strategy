@@ -120,6 +120,14 @@ function roomDay(roomId: string, on: number, today: boolean): CsEvent[] {
       entity_id: `switch.crop_steering_${roomId.slice(5)}zone_${paused.zone}_enabled`,
       reason: paused.reason,
     }, { actor: "manual", zone: paused.zone });
+  // Room A zone 1 today, between its fourth and fifth shots: the valve did not open (CS-304).
+  if (today && roomId === "room:") {
+    const at = on + 228 * MIN;
+    const intent = demoId(at, `${roomId}:intent:1:aborted`);
+    const reason = "P2 top-up: VWC under threshold";
+    add(at, "shot.started", { phase: "P2", kind: "p2_topup", reason, size_pct: 3, duration_s: 60, commanded_l: 1.21, vwc_before: 57.2, vwc_expected: null, requested_at: iso(at), pump_wait_s: 0 }, { zone: 1, intent, detail: reason });
+    add(at + 20_000, "shot.aborted", { elapsed_s: 20, commanded_l: 1.21, reason: "The zone valve did not open." }, { zone: 1, intent, detail: reason, outcome: "failed", code: "CS-304" });
+  }
   room.shots.forEach((planned, index) => {
     const zone = index + 1;
     const count = paused?.zone === zone ? 0 : planned;
