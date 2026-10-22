@@ -739,6 +739,9 @@ TIMERS_SENSOR = "sensor.crop_steering_{}timers_config"  # the integration's time
 PROJECTION_SENSOR = "sensor.crop_steering_{}projection_app"  # what the room is planned to do (the timeline reads it)
 PROJECTION_H = 24
 TIMER_OWED_MIN = 15  # a timer slot a rescue went before is still given this long after its time, inside its window
+# The integration's feed pH / EC corrected by the probe's applied calibration (calibration.py, Task 17): read only while
+# engine_config's feed_calibration applies one (Controller._feed_read, ruling R4).
+FEED_CORRECTED = "sensor.crop_steering_{}feed_{}_corrected"
 TEST_SHOT_S = 10  # how long a zone's Test Shot waters it
 # The site's supply (the integration's site store, G1): the pumps, their output and the zones' demand. With one saved,
 # the zones that fire in a pass take turns at their pump, rescues first (_pump_line); none saved, as before.
@@ -1145,6 +1148,35 @@ def _timer_reason(program, seconds):
     reason = Reason(f"TIMER {program.get('name') or program.get('id')}: {seconds:g} s", "timer")
     reason.seconds, reason.program_id = seconds, str(program.get("id") or "") or None
     return reason
+
+
+def _finite_number(state):
+    """A state's finite number, or None."""
+    try:
+        number = float(state)
+    except (TypeError, ValueError):
+        return None
+    return number if math.isfinite(number) else None
+
+
+def _feed_fixes(value):
+    """engine_config's `feed_calibration` (or a state block's) as {"ph"|"ec": {"gain", "bias"}}, or None when it can't
+    be read: not a dict, or an entry without a finite bias and a finite gain above 0."""
+    if not isinstance(value, dict):
+        return None
+    fixes = {}
+    for quantity, fix in value.items():
+        if quantity not in ("ph", "ec"):
+            continue
+        if not isinstance(fix, dict):
+            return None
+        gain, bias = fix.get("gain"), fix.get("bias")
+        if any(isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) for v in (gain, bias)):
+            return None
+        if gain <= 0:
+            return None
+        fixes[quantity] = {"gain": float(gain), "bias": float(bias)}
+    return fixes
 
 
 def _wall_clock(now):
@@ -1751,6 +1783,9 @@ class Controller:
         modes = block.get("_irrigation_mode") if isinstance(block, dict) else None
         room._irrigation_mode = ({str(z): m for z, m in modes.items() if m in IRRIGATION_MODES}
                                  if isinstance(modes, dict) else {})
+        # The feed probes' last calibration in force (R4): absent on an older file, and while none is applied.
+        fixes = block.get("_feed_calibration", {}) if isinstance(block, dict) else {}
+        room._feed_calibration = _feed_fixes(fixes) or {}
         if isinstance(block, dict):
             room.strategy_required = bool(block.get("_strategy_required", False))
             room.journal_backfill = block.get("_journal_backfill") == 1
@@ -1949,6 +1984,7 @@ class Controller:
             # the room's climate sensors, read only for the water-and-VPD record (sensing.py)
             room.climate = {k: str(attrs.get(k) or "").strip() for k in ("vpd_sensor", "temperature_sensor",
                                                                          "humidity_sensor")}
+            self._adopt_feed_calibration(room, attrs)  # the feed probes' calibration (R4): needs no adoption
             saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_setup")
             another_room = self._is_another_room(room, attrs, saved)
             revision = attrs.get("setup_revision", 0)
@@ -2164,6 +2200,10 @@ class Controller:
                     block.pop("_dim", None)
                 if getattr(room, "_irrigation_mode", None):  # only once a zone's select has been read
                     block["_irrigation_mode"] = dict(room._irrigation_mode)
+                if getattr(room, "_feed_calibration", None):
+                    block["_feed_calibration"] = {q: dict(f) for q, f in room._feed_calibration.items()}
+                else:
+                    block.pop("_feed_calibration", None)
                 if getattr(room, "_off_since", None):
                     block["_room_off_since"] = room._off_since.isoformat()
                 else:
@@ -2432,13 +2472,15 @@ class Controller:
             return default
         return str(v).lower() in ON_STATES
 
-    def _device(self, entity, quantity, keep_refused=False):
+    def _device(self, entity, quantity, keep_refused=False, pick=None):
         """One read of a mapped device (a moisture or EC probe, a feed probe, a power plug) through the device-unit
         table (crop_steering_engine.defaults.UNITS) -> (value in the quantity's canonical unit or None, state,
         unit, last_updated, how the unit was taken or None when there is no number, attributes). Every numeric
         device read goes through here or _device_history, so none can skip the table (tests/test_device_units.py).
-        The unit of an entity that is unavailable now is the one it last reported this run."""
-        v, attrs, lu = ha_get(entity)
+        The unit of an entity that is unavailable now is the one it last reported this run. `pick(read)`: the read
+        to use instead of `entity`'s own (a calibrated feed probe, _feed_value)."""
+        read = ha_get(entity)
+        v, attrs, lu = (read if pick is None else pick(read))[:3]
         seen = self.__dict__.setdefault("_device_units", {})
         unit = (attrs or {}).get("unit_of_measurement")
         if v in (None, "unknown", "unavailable", ""):
@@ -2503,11 +2545,11 @@ class Controller:
             out.append((value, changed))
         return out
 
-    def _read_sensor(self, entity, quantity, max_age_min=20, keep_refused=False):
+    def _read_sensor(self, entity, quantity, max_age_min=20, keep_refused=False, pick=None):
         """A device's live reading in its quantity's canonical unit, or None: no number, set aside for its unit,
-        outside the quantity's sane range, stale, or stamped in the future."""
+        outside the quantity's sane range, stale, or stamped in the future. `pick`: as _device's."""
         lo, hi = UNITS[quantity]["plausible"]
-        f, _v, _unit, lu, _taken, _attrs = self._device(entity, quantity, keep_refused)
+        f, _v, _unit, lu, _taken, _attrs = self._device(entity, quantity, keep_refused, pick)
         if f is None or f < lo or f > hi:
             return None
         try:
@@ -2523,11 +2565,70 @@ class Controller:
             return None
         return f
 
+    def _feed_read(self, room, quantity, raw, read, get):
+        """Ruling R4: which reading of the room's feed `quantity` ("ph" or "ec") probe `raw` to use, given `raw`'s own
+        `read` (made by the caller's device read), as (the entity read, (state, attributes, last_updated)). The
+        corrected sensor is read with `get` (ha_get, or the dosing runner's read), and only while a calibration applies.
+        - No calibration applied for `quantity` (room._feed_calibration): `raw`'s own read, as before.
+        - Applied, and FEED_CORRECTED is a number for `raw` itself, applied and live (not a value restored after a
+          restart): its number.
+        - Applied otherwise (the corrected sensor unavailable, missing, restored or for another probe): raw x gain + bias.
+        A raw probe with no number is read as it is, whatever the corrected sensor shows: a dead probe stays dead. The
+        number is in `raw`'s unit, so `raw`'s attributes (its unit) and its last_updated (the reading's age) go with
+        it. A calibration in force is never read past: the raw number is never used uncorrected."""
+        fix = (getattr(room, "_feed_calibration", None) or {}).get(quantity)
+        if not fix:
+            return raw, read
+        corrected = FEED_CORRECTED.format(room.prefix, quantity)
+        state, attrs = get(corrected)[:2]
+        attrs = attrs if isinstance(attrs, dict) else {}
+        number = _finite_number(read[0])
+        if number is None:
+            return raw, read
+        live = _finite_number(state)
+        if (live is not None and attrs.get("applied") is True and attrs.get("source") == raw
+                and not attrs.get("restored")):
+            return corrected, (state, *read[1:3])
+        return raw, (repr(number * fix["gain"] + fix["bias"]), *read[1:3])
+
+    def _feed_value(self, room, quantity):
+        """The room's feed `quantity` ("ph" or "ec") now, in its canonical unit, and the entity it was read from
+        (_feed_read: the corrected sensor, or the raw probe, corrected or not): (value or None, entity). None: no
+        number, set aside for its unit, implausible, stale, or stamped in the future (_read_sensor). A feed EC probe in
+        ppm or ppt is read as before (keep_refused): never a new dead-feed hold."""
+        raw = getattr(room, f"feed_{quantity}_sensor")
+        chosen = [raw]
+
+        def pick(read):
+            chosen[0], read = self._feed_read(room, quantity, raw, read, ha_get)
+            return read
+
+        return self._read_sensor(raw, quantity, keep_refused=quantity == "ec", pick=pick), chosen[0]
+
+    def _adopt_feed_calibration(self, room, attrs):
+        """engine_config's `feed_calibration` ({q: {gain, bias, ...}}) into room._feed_calibration, saved in the room's
+        state block (_feed_calibration) so a restart with Home Assistant down still corrects. `attrs` is a readable
+        descriptor: without the key it clears the calibration; a key that can't be read keeps the last one."""
+        fixes = _feed_fixes(attrs.get("feed_calibration", {}))
+        unread = self.__dict__.setdefault("_feed_calibration_unread", set())
+        if fixes is None:
+            if room.slug not in unread:
+                unread.add(room.slug)
+                log(f"[{room.slug}] engine_config feed_calibration can't be read "
+                    f"({attrs.get('feed_calibration')!r}): the last one stays in force")
+            return
+        unread.discard(room.slug)
+        if fixes == getattr(room, "_feed_calibration", {}):
+            return
+        room._feed_calibration = fixes
+        log(f"[{room.slug}] feed probe calibration in force: "
+            + (", ".join(f"{q} x{f['gain']:g} {f['bias']:+g}" for q, f in sorted(fixes.items())) or "none"))
+        self._save_state()
+
     def _read_feed_ec(self, room):
         if not room.feed_ec_sensor:
             return None
-        # A feed probe in ppm or ppt is read as before (keep_refused): never a new dead-feed hold.
-        feed = self._read_sensor(room.feed_ec_sensor, "ec", keep_refused=True)
+        feed = self._feed_value(room, "ec")[0]
         if feed is not None:
             lo, hi, unread = self._feed_band(room, "ec")  # a band that can't be read proves no reading good
             if not unread and (lo <= 0 or feed >= lo) and (hi <= 0 or feed <= hi):
@@ -2571,7 +2672,7 @@ class Controller:
     def _read_feed_ph(self, room):
         if not room.feed_ph_sensor:
             return None
-        ph = self._read_sensor(room.feed_ph_sensor, "ph")
+        ph = self._feed_value(room, "ph")[0]
         if ph is not None:
             lo, hi, unread = self._feed_band(room, "ph")  # a band that can't be read proves no reading good
             if not unread and (lo <= 0 or ph >= lo) and (hi <= 0 or ph <= hi):
@@ -7360,8 +7461,9 @@ class Controller:
 
     def _slot_expiry(self, room, slot, program):
         """When an owed timer slot is no longer given: TIMER_OWED_MIN after its time, or the end of the program window
-        it belongs to (a lights-on window ends at lights-off), whichever comes first."""
-        late = slot.at + timedelta(minutes=TIMER_OWED_MIN)
+        it belongs to (a lights-on window ends at lights-off), whichever comes first, in UTC: the minutes are real
+        ones across a DST change, and a window's end is a wall-clock time."""
+        late = slot.at.astimezone(timezone.utc) + timedelta(minutes=TIMER_OWED_MIN)
         window = program.get("window") or {"kind": "all"}
         if program.get("type") == "one_off" or not isinstance(window, dict) or window.get("kind") == "all":
             return late
@@ -7370,7 +7472,7 @@ class Controller:
         except Exception:
             return late
         into = (slot.at.hour * 60 + slot.at.minute + slot.at.second / 60.0 - start) % 1440
-        return min(late, slot.at + timedelta(minutes=length - into))
+        return min(late, (slot.at + timedelta(minutes=length - into)).astimezone(timezone.utc))
 
     def _apply_modes(self, room, decisions, now, since):
         """Each zone's Watering by on this pass's decisions, before anything opens (R2, R3; spec 6.1):

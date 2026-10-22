@@ -660,6 +660,27 @@ PH_DOSE = (
 )
 
 
+# CALIBRATING (Task 18): dosing_config's `calibrating`, published while a feed probe's calibration session, a dosing
+# pump's calibration or a prime is open (the integration's calibration.py / dosing_api.py). Any entry holds a batch
+# (DosingRunner._batch_check, after BATCH) and pH auto-correct (_ph_tick, before the tank is read: a probe in its
+# buffer is no tank reading). A single dose (ctx dose) goes on during a feed probe's calibration and is refused during
+# a pump's calibration or prime, as the integration's dosing_request refuses it. ctx config (DosingRunner._config).
+CALIBRATING_PROBE = "feed probe calibration in progress"
+CALIBRATING_PUMP = "dosing pump calibration or prime in progress"
+
+
+def _calibrating(r, room, zone, ctx):
+    entry = ctx["config"].get("calibrating")
+    if not entry:
+        return None
+    if isinstance(entry, dict) and entry.get("pump"):
+        return CALIBRATING_PUMP
+    return None if ctx.get("dose") else CALIBRATING_PROBE
+
+
+CALIBRATING = (Guard("calibrating", "dosing_lockout", "calibrating", None, _calibrating),)
+
+
 # DOSE_RUN: a timed run of one pump's power (Task 20's prime and calibrate). ctx pump, profile, action, batch.
 def _run_inflight(r, room, zone, ctx):
     if getattr(room, "shot_inflight", None):

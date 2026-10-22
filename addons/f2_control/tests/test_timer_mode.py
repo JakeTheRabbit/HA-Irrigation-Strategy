@@ -6,7 +6,7 @@ off), the timeline's skips, and publishes projection_app.
 - R3: a timer zone keeps the safety fires (controller.TIMER_KEEPS); an off zone gets nothing at all.
 - A skip never touches the keep-set. Instants are compared in UTC.
 - projection_app is written after the pass, each program on its own; it never stops watering."""
-from datetime import timedelta, timezone
+from datetime import datetime, timedelta, timezone
 
 import pytest
 
@@ -545,6 +545,27 @@ def test_an_owed_slot_expires_when_its_window_ends(rig, engine):
     assert [e["source"]["actor"] for e in _started(c)] == ["engine"]
     expired, = _refused(c)
     assert expired["data"]["guard"] == "expired"
+
+
+def test_an_owed_slots_15_min_are_real_minutes_across_a_dst_change(rig):
+    """Task 15 carry: the grace is counted in UTC. NZ daylight time ends 2027-04-04 03:00 -> 02:00: a slot at the first
+    02:50 is 15 real minutes old at the second 02:05, though the wall clock went back 45 min. A window's end stays a
+    wall-clock time: on 2026-09-27 (02:00 -> 03:00) a window to 03:00 ends 10 real minutes after a 01:50 slot."""
+    from zoneinfo import ZoneInfo
+
+    from crop_steering_engine.timers import PlannedIntent
+
+    c, _fake = rig
+    room, nz = c.rooms[0], ZoneInfo("Pacific/Auckland")
+    slot = PlannedIntent("P1", 1, datetime(2027, 4, 4, 2, 50, tzinfo=nz), 20.0)  # fold 0: NZDT, 13:50 UTC
+    expiry = c._slot_expiry(room, slot, PROGRAM)
+    assert expiry == datetime(2027, 4, 3, 14, 5, tzinfo=timezone.utc)
+    assert datetime(2027, 4, 4, 2, 6, fold=1, tzinfo=nz) >= expiry  # 16 real minutes: expired
+    assert not datetime(2027, 4, 4, 2, 4, fold=1, tzinfo=nz) >= expiry  # 14 real minutes: still owed
+    window = {**PROGRAM, "window": {"kind": "custom", "from": "01:00", "to": "03:00"}}
+    spring = PlannedIntent("P1", 1, datetime(2026, 9, 27, 1, 50, tzinfo=nz), 20.0)  # NZST, 13:50 UTC
+    assert c._slot_expiry(room, spring, window) == datetime(2026, 9, 26, 14, 0, tzinfo=timezone.utc)
+    assert c._slot_expiry(room, spring, PROGRAM) == datetime(2026, 9, 26, 14, 5, tzinfo=timezone.utc)
 
 
 def test_a_queued_timer_shot_names_its_program(rig, engine):

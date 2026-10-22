@@ -212,6 +212,12 @@ def history_events(slug, history):
     return out
 
 
+def _probe_calibrating(config):
+    """A feed probe's calibration is open (dosing_config's `calibrating`, not a pump's): the tank probe reads a buffer."""
+    entry = config.get("calibrating") if isinstance(config, dict) else None
+    return bool(entry) and not (isinstance(entry, dict) and entry.get("pump"))
+
+
 def _aware(stamp):
     try:
         parsed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
@@ -716,6 +722,11 @@ class DosingRunner:
         "ran past its time", "not confirmed" or "stopped" ("stopped: an error in the controller"), or
         "refused: why" when nothing was pressed. job.left: what its end left not reading off."""
         job.left, job.pressed, job.cut_at = [], None, None
+        if job.kind == "dose":  # a single dose waits for a pump's calibration or prime (guards.CALIBRATING)
+            hit = guards.first(self, guards.CALIBRATING, job.room, None, {"config": job.config, "dose": True})
+            if hit:
+                self._journal_intent(job.room, "intent.refused", guards.Why(hit), job)
+                return f"refused: {hit[1]}"
         why, flow = self._dose_check(pump, ml, job.profile)
         if why:
             self._journal_intent(job.room, "intent.refused", why, job)
@@ -1136,7 +1147,8 @@ class DosingRunner:
         recipe mL entity read now (it wins over the recipe's mL; 0 skips the pump), in whole mL."""
         room, config = job.room, job.config
         batch = config["batch"]
-        hit = guards.first(self, guards.BATCH, room, None, {"batch": batch})
+        hit = guards.first(self, guards.BATCH, room, None, {"batch": batch}) or guards.first(
+            self, guards.CALIBRATING, room, None, {"config": config})
         if hit:
             return guards.Why(hit), None
         pumps = {p["id"]: p for p in config["pumps"]}
@@ -1540,9 +1552,18 @@ class DosingRunner:
                 self._log(f"[{room.slug}] dosing: mix check of the batch that started {mix.get('batch')} waits: "
                           "the room's feed EC or pH band can't be read")
             return
+        if bands and _probe_calibrating(self._config(room)):  # a probe in its buffer is no tank reading
+            live = self._live_of(room)
+            if live.get("mix_calibrating") != mix.get("batch"):
+                live["mix_calibrating"] = mix.get("batch")
+                self._log(f"[{room.slug}] dosing: mix check of the batch that started {mix.get('batch')} waits: "
+                          f"{guards.CALIBRATING_PROBE}")
+            return
         found, off, unread = {}, [], []
         for quantity, probe, lo, hi in bands:
-            value, state, unit = self._device(probe, quantity, keep_unknown=False)
+            value, state, unit = self._device(  # calibrated (Controller._feed_read, R4)
+                probe, quantity, keep_unknown=False,
+                pick=lambda read, q=quantity, p=probe: self.c._feed_read(room, q, p, read, self._fetch)[1])
             name = {"ec": "EC", "ph": "pH"}[quantity]
             band = f"{_fmt(lo) if lo > 0 else 'no minimum'} to {_fmt(hi) if hi > 0 else 'no maximum'}"
             found[quantity] = value
@@ -1612,10 +1633,10 @@ class DosingRunner:
     def _today(self):
         return self._now().astimezone().date().isoformat()
 
-    def _ph_reading(self, probe):
-        """The tank's pH now, or None: no number, a unit the table refuses, or a reading older than
-        ph_correct.PROBE_MAX_AGE_S (or stamped in the future)."""
-        read = self._fetch(probe)
+    def _ph_reading(self, room, probe):
+        """The tank's pH now, calibrated (Controller._feed_read, R4), or None: no number, a unit the table refuses, or
+        a reading older than ph_correct.PROBE_MAX_AGE_S (or stamped in the future)."""
+        read = self.c._feed_read(room, "ph", probe, self._fetch(probe), self._fetch)[1]
         state, attributes = read[0], read[1] or {}
         try:
             number = float(state)
@@ -1670,7 +1691,12 @@ class DosingRunner:
         if not probe or unread or (lo <= 0 and hi <= 0):
             watch.reset()
             return
-        ph = self._ph_reading(probe)
+        hit = guards.first(self, guards.CALIBRATING, room, None, {"config": config})
+        if hit:  # held while a calibration is open; the tank is read afresh after it
+            watch.reset()
+            self._journal_intent(room, "intent.held", guards.Why(hit))
+            return
+        ph = self._ph_reading(room, probe)
         way = watch.read(ph, lo, hi, now)
         if way is None:
             return
@@ -1775,7 +1801,7 @@ class DosingRunner:
                     raise _Ended(f"{pump['name']}: {result}")
                 self._done(job)
                 yield from self._pause(job, "postmix", s["mix_min"])
-                after = self._ph_reading(probe)
+                after = self._ph_reading(room, probe)
                 readings.append(after)
                 outcome = ph_correct.verdict(way, before, after, lo, hi, s["margin"])
                 if outcome != "again":
@@ -2267,7 +2293,7 @@ class DosingRunner:
                 and isinstance(batch, dict) and self._batch_readable(batch)):
             return False
         return {"revision": state, "pumps": pumps, "batch": batch, "request": attributes.get("request"),
-                "profile": attributes.get("profile")}
+                "profile": attributes.get("profile"), "calibrating": attributes.get("calibrating")}
 
     @staticmethod
     def _pump_readable(pump):
@@ -2292,15 +2318,17 @@ class DosingRunner:
         state = self._fetch(entity, quick)[0]
         return None if state is None else str(state)
 
-    def _device(self, entity, quantity, quick=False, keep_unknown=True):
+    def _device(self, entity, quantity, quick=False, keep_unknown=True, pick=None):
         """One read of a dosing device's number (a pump's volume or flow, a recipe amount, the mix pump's
         power, a tank probe) through the device-unit table (Controller._canonical) -> (the number in the
         quantity's canonical unit, mL, mL/s, W, mS/cm or pH, or None; the state as read; its unit). A unit
         the table does not know, or none, is read in that unit as it always was, never set aside: a dose
         is refused all the same for an uncalibrated flow, more than max_ml, more than MAX_DOSE_S and a
         volume that does not read back. `keep_unknown=False` (a tank probe): such a unit is read only
-        while plausible, and a refused one (ppm) not at all."""
+        while plausible, and a refused one (ppm) not at all. `pick(read)`: the read to use instead of `entity`'s
+        own (a calibrated feed probe, Controller._feed_read)."""
         read = self._fetch(entity, quick)
+        read = read if pick is None else pick(read)
         state, unit = read[0], (read[1] or {}).get("unit_of_measurement")
         state = None if state is None else str(state)
         try:
