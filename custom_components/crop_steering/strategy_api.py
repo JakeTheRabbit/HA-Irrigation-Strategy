@@ -2,6 +2,7 @@
 
 from .admin import async_require_admin
 from .const import DOMAIN
+from .journal_api import attribution
 
 SERVICES = (
     "strategy_get",
@@ -40,12 +41,16 @@ async def async_setup_strategy_services(hass):
             manager = resolve_manager(hass, call.data["room_id"])
             if call.service == "strategy_save":
                 return await manager.save(
-                    call.data["plan"], call.data["expected_revision"]
+                    call.data["plan"],
+                    call.data["expected_revision"],
+                    who=attribution(hass, call),
                 )
             if call.service == "strategy_activate":
-                return await manager.activate(call.data["expected_revision"])
+                return await manager.activate(
+                    call.data["expected_revision"], who=attribution(hass, call)
+                )
             if call.service == "strategy_disarm":
-                return await manager.disarm()
+                return await manager.disarm(who=attribution(hass, call))
             result = manager.response()
             if call.service == "strategy_preview":
                 result["preview"] = manager.preview(

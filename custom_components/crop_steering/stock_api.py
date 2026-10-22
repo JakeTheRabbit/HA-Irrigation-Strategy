@@ -19,6 +19,7 @@ import logging
 from . import stock
 from .admin import async_require_admin
 from .const import DOMAIN, REPAIRS_DOCS_URL
+from .journal_api import attribution, note
 from .room import room_prefix
 
 _LOGGER = logging.getLogger(__name__)
@@ -349,7 +350,38 @@ class StockStore:
             "error": self.error,
         }
 
-    async def mutate(self, action, data):
+    def _journal(self, kind, who, **data):
+        """One stock event; `who` is journal_api.attribution() of the service call, none for a change the
+        followed entities make (system)."""
+        who = who or {}
+        note(
+            self.hass,
+            self.room_id,
+            kind,
+            actor=who.get("actor", "system"),
+            user_id=who.get("user_id"),
+            client=who.get("client"),
+            data=data,
+        )
+
+    def _journal_draws(self, prior, draft, who):
+        """A `stock.drawn` for each tank the newest history row of `draft` took from, if it is new."""
+        try:
+            row = (draft["history"] or [None])[0]
+            if row and "draw_ml" in row and [row] != prior["history"][:1]:
+                for tank, ml in row["draw_ml"].items():
+                    self._journal(
+                        "stock.drawn",
+                        who,
+                        tank=tank,
+                        ml=ml,
+                        source=row.get("source"),
+                        key=row.get("key"),
+                    )
+        except Exception as err:  # a stock change stands whatever the journal does
+            _LOGGER.debug("Stock journal event not recorded: %s", err)
+
+    async def mutate(self, action, data, who=None):
         async with self._lock:
             if self.error:
                 raise ValueError(self.error)
@@ -373,13 +405,26 @@ class StockStore:
                 stock.draw(draft, doses, now, "manual")
             else:
                 raise ValueError("Unsupported stock operation")
-            await self._commit(draft)
+            before = {t["id"]: t["level_l"] for t in self.data["tanks"]}
+            await self._commit(draft, who)
+            if action == "stock_refill":
+                self._journal(
+                    "stock.refilled",
+                    who,
+                    tank=data["id"],
+                    level_l=next(
+                        (t["level_l"] for t in draft["tanks"] if t["id"] == data["id"]),
+                        None,
+                    ),
+                    old_level_l=before.get(data["id"]),
+                    full=data.get("level_l") is None,
+                )
             response = self.response()
             if skipped is not None:  # the linked tanks this batch did not draw
                 response["skipped"] = skipped
             return response
 
-    async def draw(self, data):
+    async def draw(self, data, who=None):
         """stock_draw: what the controller dosed out of linked tanks, counted once per key. A tank
         still linked to a pump is left as it is: what that pump runs draws it (_watch), whoever
         starts the dose, so the controller's report of the same dose never counts it twice. No
@@ -402,7 +447,7 @@ class StockStore:
                 linked,
             )
             if counted:
-                await self._commit(draft)
+                await self._commit(draft, who)
             return {
                 **self.response(),
                 "counted": counted,
@@ -416,11 +461,12 @@ class StockStore:
                 ),
             }
 
-    async def _commit(self, draft):
+    async def _commit(self, draft, who=None):
         """Store the next revision; only a saved change becomes the room's tanks."""
         draft["revision"] = self.data["revision"] + 1
         await self._store.async_save(draft)
-        self.data = draft
+        prior, self.data = self.data, draft
+        self._journal_draws(prior, draft, who)
         self._alert()
         from homeassistant.helpers.dispatcher import async_dispatcher_send
 
@@ -494,8 +540,8 @@ async def async_setup_stock(hass, entry):
             if call.service == "stock_get":
                 return target.response()
             if call.service == "stock_draw":
-                return await target.draw(call.data)
-            return await target.mutate(call.service, call.data)
+                return await target.draw(call.data, attribution(hass, call))
+            return await target.mutate(call.service, call.data, attribution(hass, call))
         except (ValueError, KeyError, OSError) as error:
             raise HomeAssistantError(str(error)) from error
 

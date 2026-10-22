@@ -13,12 +13,16 @@ from __future__ import annotations
 import asyncio
 from copy import deepcopy
 from datetime import datetime, timezone
+import logging
 import math
 from uuid import uuid4
 
 from .admin import async_require_admin
 from .const import DOMAIN
+from .journal_api import attribution, note
 from .room import room_prefix
+
+_LOGGER = logging.getLogger(__name__)
 
 SERVICES = ("calibration_get", "calibration_record")
 HISTORY = 100
@@ -171,6 +175,35 @@ class CalibrationStore:
             return self.response()
 
 
+def journal_record(hass, room_id, response, call):
+    """A check was recorded -> `calibration.captured`. It only judges the probe: nothing is applied to it."""
+    try:
+        record = response["records"][0]
+        who = attribution(hass, call)
+        note(
+            hass,
+            room_id,
+            "calibration.captured",
+            actor=who["actor"],
+            user_id=who["user_id"],
+            client=who["client"],
+            data={
+                "applied": False,
+                "record_id": record["id"],
+                "probe": record["probe"],
+                "kind": record["kind"],
+                "entity_id": record["entity_id"],
+                "slope_pct": record["slope_pct"],
+                "offset": record["offset"],
+                "verdict": record["verdict"],
+                "points": record["points"],
+                "note": record["note"],
+            },
+        )
+    except Exception as err:  # the record stands whatever the journal does
+        _LOGGER.debug("Calibration journal event not recorded: %s", err)
+
+
 def resolve_calibration(hass, room_id):
     if not isinstance(room_id, str) or not room_id.startswith("room:"):
         raise ValueError("A canonical room_id is required")
@@ -202,7 +235,9 @@ async def async_setup_calibration(hass, entry):
             target = resolve_calibration(hass, call.data["room_id"])
             if call.service == "calibration_get":
                 return target.response()
-            return await target.record(call.data)
+            response = await target.record(call.data)
+            journal_record(hass, call.data["room_id"], response, call)
+            return response
         except (ValueError, KeyError, OSError) as error:
             raise HomeAssistantError(str(error)) from error
 

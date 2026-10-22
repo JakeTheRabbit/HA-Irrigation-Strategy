@@ -13,6 +13,7 @@ import math
 from datetime import date, datetime, time, timedelta, timezone
 
 from .const import DOMAIN
+from .journal_api import note
 from .room import room_prefix
 from .strategy_model import (
     ENGINE_BOUNDS,
@@ -346,7 +347,32 @@ class StrategyManager:
             raise RuntimeError("Strategy storage is unavailable")
         await self._store.async_save(copy.deepcopy(self.document))
 
-    async def save(self, plan, expected_revision):
+    def _journal(self, kind, who=None, **extra):
+        """Record a plan change in the journal; `who` is journal_api.attribution() of the service call, and a
+        change the clock makes (lights-on) is the plan's own."""
+        try:
+            who = who or {"actor": "plan"}
+            note(
+                self.hass,
+                self.room_id,
+                kind,
+                actor=who["actor"],
+                user_id=who.get("user_id"),
+                client=who.get("client"),
+                correlation={
+                    "plan_revision": self.document["revision"],
+                    "proposal_token": who.get("proposal_token"),
+                },
+                data={
+                    "revision": self.document["revision"],
+                    "status": self.document["status"],
+                    **extra,
+                },
+            )
+        except Exception as err:  # the plan never waits on the journal
+            _LOGGER.debug("Plan journal event %s not recorded: %s", kind, err)
+
+    async def save(self, plan, expected_revision, who=None):
         async with self._lock:
             if expected_revision != self.document["revision"]:
                 raise ValueError("Strategy revision changed; reload before saving")
@@ -368,6 +394,7 @@ class StrategyManager:
                 self.document = prior
                 raise
             self._publish(_now())
+            self._journal("plan.saved", who)
             return self.response()
 
     def _lights_on(self, day, tz):
@@ -430,7 +457,7 @@ class StrategyManager:
                 stale[zone] = f"Zone {zone} VWC is unavailable or stale"
         return stale
 
-    async def activate(self, expected_revision, now=None):
+    async def activate(self, expected_revision, now=None, who=None):
         now = now or _now()
         async with self._lock:
             if expected_revision != self.document["revision"]:
@@ -461,9 +488,10 @@ class StrategyManager:
                 self.document = prior
                 raise
             self._publish(now)
+            self._journal("plan.armed", who, armed_after=first.isoformat())
             return self.response(now)
 
-    async def disarm(self, now=None):
+    async def disarm(self, now=None, who=None):
         now = now or _now()
         async with self._lock:
             prior = copy.deepcopy(self.document)
@@ -489,6 +517,7 @@ class StrategyManager:
                 self.document = prior
                 raise
             self._publish(now)
+            self._journal("plan.disarmed", who)
             return self.response(now)
 
     async def tick(self, now=None):
@@ -551,6 +580,7 @@ class StrategyManager:
                     release_legacy=True,
                 )
                 await self._persist()
+                self._journal("plan.expired", reason="disarmed at lights-on")
             return
         assigned = {zone["zone_id"] for zone in self.document["plan"].get("zones", [])}
         if (
@@ -603,6 +633,12 @@ class StrategyManager:
             error=None,
         )
         await self._persist()
+        self._journal(
+            "plan.activated",
+            grow_day=day,
+            zones=[z["zone_id"] for z in zones],
+            held=[z["zone_id"] for z in zones if z.get("held")],
+        )
 
     async def _release_held(self, now, day):
         """Apply `day` to each zone kept on an earlier day's targets whose moisture reads again."""

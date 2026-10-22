@@ -233,6 +233,31 @@ def test_an_event_emitted_just_before_an_unload_and_reload_is_stored(
     asyncio.run(go())
 
 
+def test_a_close_that_lands_while_the_journal_opens_leaves_no_open_connection(
+    tmp_path, monkeypatch
+):
+    hass, api = _rig(monkeypatch, tmp_path)
+
+    async def go():
+        hub = api.JournalHub(hass, str(tmp_path / "journal.db"))
+
+        async def slow_open(fn, *a):
+            if fn == hub._open:
+                await asyncio.sleep(0.1)
+            return fn(*a)
+
+        hass.async_add_executor_job = slow_open
+        opening = asyncio.ensure_future(hub.async_init())
+        await asyncio.sleep(0.01)
+        assert hub.opening
+        hub.close_soon()  # a reload that lands mid-open
+        await opening
+        await asyncio.sleep(0.2)
+        assert hub._journal._db is None
+
+    asyncio.run(go())
+
+
 def test_emit_refuses_a_malformed_event_synchronously(tmp_path, monkeypatch, caplog):
     hass, api = _rig(monkeypatch, tmp_path)
 

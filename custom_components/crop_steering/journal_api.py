@@ -85,6 +85,7 @@ class JournalHub:
         self.hass.async_create_task(self._close())
 
     async def _close(self) -> None:
+        await self._ready.wait()  # a reload while the file is still opening must not leak the connection
         if self._tasks:
             await asyncio.gather(*self._tasks, return_exceptions=True)
         self.ok = False
@@ -202,6 +203,16 @@ def emit(
         return event_id
     except Exception as err:
         _LOGGER.warning("Journal event %s not recorded: %s", kind, err)
+        return None
+
+
+def note(hass, room_id: str, kind: str, **kw) -> str | None:
+    """emit() for the producers: a journal problem is only logged at debug and never reaches the write it
+    describes."""
+    try:
+        return emit(hass, room_id, kind, **kw)
+    except Exception as err:
+        _LOGGER.debug("Journal event %s not recorded: %s", kind, err)
         return None
 
 

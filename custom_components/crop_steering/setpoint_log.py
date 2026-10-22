@@ -18,6 +18,7 @@ import time
 from copy import deepcopy
 
 from .const import DOMAIN
+from .journal_api import note
 from .room import room_prefix
 
 MAX_CHANGES = 2000
@@ -26,6 +27,14 @@ CLAIM_EVENT = f"{DOMAIN}_setpoint_write"
 CLAIM_S = 120
 CONTROLLER_WRITERS = ("learner", "brain", "safety")
 SERVICE = "setpoint_log_get"
+# The log's `who` -> the journal's source.actor.
+ACTORS = {
+    "operator": "manual",
+    "home_assistant": "automation",
+    "learner": "learner",
+    "brain": "ai",
+    "safety": "safety",
+}
 
 
 class SetpointLog:
@@ -132,6 +141,26 @@ class SetpointLog:
             self.changes.append(row)
             del self.changes[:-MAX_CHANGES]
             await self._store.async_save({"changes": self.changes})
+        note(
+            self.hass,
+            self.room_id,
+            "target.changed",
+            zone=zone,
+            actor=ACTORS.get(who, "system"),
+            user_id=getattr(context, "user_id", None) if who == "operator" else None,
+            data={
+                "key": field,
+                "scope": "room" if zone is None else f"zone:{zone}",
+                # A brain write that runs out by itself is an AI overlay (overlays.py).
+                "layer": "overlay" if who == "brain" and expires else "base",
+                "old": old,
+                "new": new,
+                "expires": expires,
+                "reason": reason,
+                "expected": expected,
+                "entity_id": entity_id,
+            },
+        )
         return who, expires
 
     def response(self):
