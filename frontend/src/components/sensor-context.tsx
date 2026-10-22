@@ -38,7 +38,8 @@ import {
   type SensorStats,
   type SensorWindow,
 } from "@/lib/sensor-context";
-import { formatClock } from "@/lib/clock";
+import { DATE_TIME, formatClock, formatDateTime } from "@/lib/clock";
+import { trimNumber as trim } from "@/lib/utils";
 import "./sensor-context.css";
 
 interface MetricContext {
@@ -160,7 +161,6 @@ export function useSensorContext(
   };
 }
 
-const trim = (value: number, digits: number) => String(Number(value.toFixed(digits)));
 const setpointText = (value: number, metric: SensorMetric) =>
   metric === "vwc" ? `${trim(value, 1)}%` : trim(value, 2);
 const clock = (time: number, hours: number) => formatClock(time, { weekday: hours > 24 });
@@ -550,7 +550,7 @@ function SensorChart({
 }
 
 function full(reading: SensorReading, metric: SensorMetric) {
-  return `${formatReading(reading.value, metric)} · ${new Date(reading.time).toLocaleString()}`;
+  return `${formatReading(reading.value, metric)} · ${formatDateTime(reading.time, DATE_TIME)}`;
 }
 
 /** "Recorded sensor behaviour": what the probes actually read, against the setpoints being typed. */

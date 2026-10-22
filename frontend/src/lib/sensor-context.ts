@@ -2,7 +2,7 @@ import { addDays, downsample, midnight, summarize } from "./comparison";
 import type { HistoryPoint } from "./comparison-types";
 import { settingWords } from "./setting-words";
 import type { Series } from "./types";
-import { formatClock } from "./clock";
+import { formatClock, formatDateTime } from "./clock";
 
 /** Recorded probe behaviour beside the setpoints an operator types.
  * Everything here is pure: the component only draws what these functions return. */
@@ -425,7 +425,7 @@ export function timeTicks(
         label:
           hours <= 24
             ? formatClock(at)
-            : at.toLocaleDateString([], { weekday: "short", day: "numeric" }),
+            : formatDateTime(at, { weekday: "short", day: "numeric" }),
       });
     at = new Date(at);
     if (hours <= 24) at.setHours(at.getHours() + stepHours);

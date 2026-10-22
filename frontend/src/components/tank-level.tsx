@@ -34,6 +34,7 @@ import { tankTelemetry } from "@/lib/tank-telemetry";
 import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import { estimateRuntime, flowInputs, waterParameters } from "@/lib/water-delivery";
+import { formatDateTime } from "@/lib/clock";
 import "./day-timeline.css";
 import "./tank-history.css";
 import "./tank-level.css";
@@ -257,7 +258,7 @@ function LevelRecord({
   const when = (time: number) =>
     hours <= 24
       ? clock(time)
-      : `${new Date(time).toLocaleDateString([], { weekday: "short" })} ${clock(time)}`;
+      : `${formatDateTime(time, { weekday: "short" })} ${clock(time)}`;
   const texts: Texts = {
     when,
     shot: (shot) => {

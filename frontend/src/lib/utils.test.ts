@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { dayWord, errorText, unreadableState } from "./utils";
+import { dayWord, errorText, trimNumber, unreadableState } from "./utils";
 import { numeric, readable } from "./model";
 import { FEATURES, valueOf } from "./features";
 
@@ -88,5 +88,13 @@ describe("unreadableState", () => {
     expect(numeric(none)).toBeNull();
     const control = FEATURES.flatMap((f) => f.settings).find((c) => c.domain === "select")!;
     expect(valueOf(control, { ...none, entity_id: "select.x" })).toBeNull();
+  });
+});
+
+describe("trimNumber", () => {
+  it("keeps at most the digits asked for, without trailing zeros", () => {
+    expect(trimNumber(1.5)).toBe("1.5");
+    expect(trimNumber(2)).toBe("2");
+    expect(trimNumber(3.14159, 3)).toBe("3.142");
   });
 });

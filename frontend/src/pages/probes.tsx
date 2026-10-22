@@ -25,6 +25,7 @@ import {
 import type { Controller, EntityState } from "@/lib/types";
 import { useRecentHistory } from "@/lib/use-recent-moisture";
 import { errorText, unreadableState } from "@/lib/utils";
+import { DATE_TIME, formatDateTime } from "@/lib/clock";
 import "./probes.css";
 
 /** Hours of readings each sparkline draws. */
@@ -263,7 +264,7 @@ function ProbeRow({
         ) : (
           <time
             dateTime={new Date(probe.reported).toISOString()}
-            title={new Date(probe.reported).toLocaleString()}
+            title={formatDateTime(probe.reported, DATE_TIME)}
           >
             {ageText(now - probe.reported)} ago
           </time>

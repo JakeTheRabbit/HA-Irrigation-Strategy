@@ -91,6 +91,7 @@ import { errorText } from "@/lib/utils";
 import { dailyWater, estimateRuntime, flowInputs, waterParameters } from "@/lib/water-delivery";
 import { plantAmount, useWaterView, zonePlants } from "@/lib/water-view";
 import { ecTargetBand, poreEcNeutral } from "@/lib/ec-band";
+import { formatDateTime } from "@/lib/clock";
 import "./day-timeline.css";
 
 /** Each phase as the zone views name it, and as its chart column says it where there is room. */
@@ -1698,9 +1699,7 @@ function columnText(column: Column, lane: Lane, day: GrowDay, now: number): stri
 
 /** A clock hour short enough for an axis: "4 PM", "16". */
 const hourLabel = (time: number) =>
-  new Date(time)
-    .toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-    .replace(/:00(?=\D|$)/, "");
+  formatDateTime(time, { hour: "numeric", minute: "2-digit" }).replace(/:00(?=\D|$)/, "");
 const diamond = (cx: number, cy: number) =>
   `M${cx} ${cy - 5}L${cx + 5} ${cy}L${cx} ${cy + 5}L${cx - 5} ${cy}Z`;
 /** The recorded VWC as one path, broken where readings stop for more than 20 minutes. */

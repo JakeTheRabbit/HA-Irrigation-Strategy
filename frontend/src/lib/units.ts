@@ -1,3 +1,4 @@
+import { trimNumber } from "./utils";
 /** Units for the zone sizing fields. Setup drafts, payloads and limits are always metric;
  * a unit only changes what the operator types and reads. */
 export const LITRES_PER_US_GALLON = 3.785411784;
@@ -62,7 +63,7 @@ export const fromMetric = (metric: number, unit: SizingUnit): number =>
   Number.isFinite(metric) ? metric / unit.factor : NaN;
 /** Display rounding only; never feed the result back into a draft. */
 export const displayNumber = (value: number, digits = 3): string =>
-  Number.isFinite(value) ? String(Number(value.toFixed(digits))) : "";
+  Number.isFinite(value) ? trimNumber(value, digits) : "";
 
 export const sizingLabel = (key: SizingKey, unit: SizingUnit) =>
   `${FIELDS[key].name} · ${unit.symbol} ${FIELDS[key].per}`;

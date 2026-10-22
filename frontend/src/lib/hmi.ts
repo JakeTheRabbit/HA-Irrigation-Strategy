@@ -1,4 +1,5 @@
 /** Pure helpers for the operator cards: data quality and how far a value is from its target. */
+import { trimNumber as fix } from "./utils";
 
 /** A substrate probe in use never reads 1 % VWC or less. Such a reading is a gap in the probe's
  * data (a dropout), not a dry substrate, so it is not drawn and is not used as a peak or a low. */
@@ -53,7 +54,6 @@ export interface GaugeModel {
   /** Named levels drawn as ticks on the bar, with a quiet key under it. */
   marks: { key: string; label: string; value: number }[];
 }
-const fix = (value: number, digits: number) => String(Number(value.toFixed(digits)));
 const amount = (value: number, digits: number, points: string) =>
   `${fix(Math.abs(value), digits)}${points.startsWith("%") ? "" : " "}${points}`;
 

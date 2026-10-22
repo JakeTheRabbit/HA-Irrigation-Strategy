@@ -37,11 +37,12 @@ import {
 } from "@/lib/stock";
 import type { Controller } from "@/lib/types";
 import { errorText } from "@/lib/utils";
+import { formatDateTime } from "@/lib/clock";
 import "./stock.css";
 
 const when = (iso: string | null) =>
   iso
-    ? new Date(iso).toLocaleString(undefined, {
+    ? formatDateTime(iso, {
         month: "short",
         day: "numeric",
         hour: "2-digit",

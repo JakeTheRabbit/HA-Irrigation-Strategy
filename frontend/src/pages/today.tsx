@@ -35,6 +35,7 @@ import { useRecentHistory } from "@/lib/use-recent-moisture";
 import { waitingText } from "@/lib/waiting-for";
 import { dailyWater } from "@/lib/water-delivery";
 import { plantAmount, roomPlants } from "@/lib/water-view";
+import { formatDateTime } from "@/lib/clock";
 import "./today.css";
 
 const H = 3_600_000;
@@ -84,7 +85,7 @@ function shotWhen(stamp: string | null, day: GrowDay | null, now: number): strin
   const at = Date.parse(stamp);
   if (day && at >= day.start) return clock(at);
   if (now - at < 36 * H) return `yesterday ${clock(at)}`;
-  return new Date(at).toLocaleDateString([], { month: "short", day: "numeric" });
+  return formatDateTime(at, { month: "short", day: "numeric" });
 }
 
 /** What comes next for the zone, in a few words: the controller's own first condition, without the

@@ -25,7 +25,7 @@ import type { Page } from "@/lib/routes";
 import { plantAmount } from "@/lib/water-view";
 import { Notice, UiTip } from "@/components/info-tip";
 import { Pill, type PillTone } from "./mini-visuals";
-import { formatClock } from "@/lib/clock";
+import { DATE_TIME, formatClock, formatDateTime } from "@/lib/clock";
 
 export type { Page };
 export const number = (value: number | null, digits = 1) =>
@@ -321,8 +321,8 @@ export function HistoryChart({
                     hours <= 24
                       ? time(value)
                       : hours <= 72
-                        ? `${new Date(value).toLocaleDateString([], { weekday: "short" })} ${time(value)}`
-                        : new Date(value).toLocaleDateString([], {
+                        ? `${formatDateTime(value, { weekday: "short" })} ${time(value)}`
+                        : formatDateTime(value, {
                             weekday: "short",
                             day: "numeric",
                           })
@@ -355,7 +355,7 @@ export function HistoryChart({
                   stroke="var(--muted-foreground)"
                 />
                 <Tooltip
-                  labelFormatter={(value) => new Date(Number(value)).toLocaleString()}
+                  labelFormatter={(value) => formatDateTime(Number(value), DATE_TIME)}
                   contentStyle={{
                     background: "var(--surface)",
                     color: "var(--foreground)",

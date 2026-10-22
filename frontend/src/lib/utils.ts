@@ -1,15 +1,16 @@
 import { clsx, type ClassValue } from "clsx";
 import { twMerge } from "tailwind-merge";
+import { calendarDays, formatDateTime } from "./clock";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
-/** The local calendar day of `at` as seen from `now`: "" for today, "Yesterday", else "Fri 26 Sep". */
+/** The calendar day of `at` as seen from `now`, on Home Assistant's calendar (lib/clock.ts): "" for
+ * today, "Yesterday", else "Fri 26 Sep". */
 export function dayWord(at: number, now: number): string {
-  const midnight = (ms: number) => new Date(ms).setHours(0, 0, 0, 0);
-  const days = Math.round((midnight(now) - midnight(at)) / 86_400_000);
+  const days = calendarDays(at, now);
   if (days === 0) return "";
   if (days === 1) return "Yesterday";
-  return new Date(at).toLocaleDateString([], { weekday: "short", day: "numeric", month: "short" });
+  return formatDateTime(at, { weekday: "short", day: "numeric", month: "short" });
 }
 /** Readable text for anything a catch block can receive. Home Assistant rejects
  * service calls with plain objects, which String() renders as "[object Object]". */
@@ -48,4 +49,9 @@ export function errorText(e: unknown): string {
 export function unreadableState(state: string | null | undefined): boolean {
   const text = state?.trim().toLowerCase() ?? "";
   return !text || ["unknown", "unavailable", "none"].includes(text);
+}
+
+/** A number to at most `digits` decimals, without trailing zeros: 1.50 → "1.5", 2.00 → "2". */
+export function trimNumber(value: number, digits = 2): string {
+  return String(Number(value.toFixed(digits)));
 }

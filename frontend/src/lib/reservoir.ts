@@ -1,6 +1,7 @@
 import type { PillTone } from "@/components/mini-visuals";
 import { BATCH_STEPS, STEP_LABELS, resultTone, resultWords, type DosingStatus } from "./dosing";
 import type { States } from "./types";
+import { formatDateTime } from "./clock";
 
 /** The tank level the controller reads from the level mapped in Rooms and setup, with its minimum and
  * overfill marks (docs/USER_GUIDE.md, "Reservoir minimum"). Published only for a room with a tank
@@ -142,7 +143,7 @@ export function batchLine(status: DosingStatus | null): { label: string; tone: P
   const ended = batch.ended_at ? new Date(batch.ended_at) : null;
   const when =
     ended && Number.isFinite(ended.getTime())
-      ? ` · ${ended.toLocaleString([], { dateStyle: "short", timeStyle: "short" })}`
+      ? ` · ${formatDateTime(ended, { dateStyle: "short", timeStyle: "short" })}`
       : "";
   return {
     label: `Last batch: ${resultWords(batch.result)}${when}`,
