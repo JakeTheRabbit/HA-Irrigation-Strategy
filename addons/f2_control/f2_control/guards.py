@@ -11,7 +11,7 @@ section 2.7). The first check that holds wins, as it always did.
            check answers Queued or None, the zone waters either way, and the answer is only journaled and shown.
   DOSE, BATCH, RECIPE, RECIPE_DOSE, PH_*   the dosing runner's checks (guards 18-19, calibration_valid and
            dosing_lockout, with the checks they stand among): `owner` is the DosingRunner, `zone` None. See below.
-  DOSE_RUN a timed pump run (prime, calibrate; Task 20). Nothing asks it yet.
+  DOSE_RUN a timed pump run (prime, calibrate; DosingRunner._run_timed), then CALIBRATING with the run's own pump.
 
 Each check is the code that stood inline in those methods, moved word for word: the same reads in the same order,
 the same alerts, releases and log lines. A check that raises an alert calls the controller method that holds it
@@ -426,7 +426,7 @@ def _dose_calibrated(r, room, zone, ctx):
 
 def _dose_amount(r, room, zone, ctx):
     pump, ml = ctx["pump"], ctx["ml"]
-    ctx["flow"] = r._device(pump["flow_entity"], "flow")[0]
+    ctx["flow"] = r._flow(pump)[0]
     if (isinstance(ml, bool) or not isinstance(ml, (int, float)) or not math.isfinite(ml)
             or not 0 < ml <= float(pump.get("max_ml") or 0)):
         fmt = _m(r)._fmt
@@ -545,7 +545,7 @@ def _recipe_max_ml(r, room, zone, ctx):
 
 def _recipe_too_long(r, room, zone, ctx):
     pump, ml, profile = ctx["pump"], ctx["ml"], ctx["profile"]
-    ctx["flow"] = flow = r._device(pump["flow_entity"], "flow")[0]
+    ctx["flow"] = flow = r._flow(pump)[0]
     if ml / flow > profile["max_dose_s"]:
         return r._too_long(pump, ml, flow, profile)
     return None
@@ -611,7 +611,7 @@ def _ph_mixing(r, room, zone, ctx):
     return None
 
 
-def _ph_fault(r, room, zone, ctx):
+def _dosing_hardware_fault(r, room, zone, ctx):
     return r.c._hardware_fault_block(room)
 
 
@@ -634,14 +634,14 @@ def _ph_daily_max(r, room, zone, ctx):
 
 def _ph_dose_ml(r, room, zone, ctx):
     pump, s = ctx["pump"], ctx["s"]
-    ctx["flow"] = flow = r._device(pump["flow_entity"], "flow")[0]
+    ctx["flow"] = flow = r._flow(pump)[0]
     ctx["ml"] = ml = _m(r).ph_correct.dose_ml(s["dose_s"], flow, float(pump.get("max_ml") or 0))
     if ml <= 0:
         return f"a {s['dose_s']:g} s dose of {pump['name']} is less than 1 mL"
     return None
 
 
-PH_LOCK = (Guard("latch", "dosing_lockout", "ph", "CS-809", _ph_latch),)
+PH_LOCK = (Guard("latch", "dosing_lockout", "ph", None, _ph_latch),)  # no fresh CS-809 is raised for a latch
 PH_SETUP = (
     Guard("ph_pump", "dosing_lockout", "ph", "CS-809", _ph_pump),
     Guard("mix_pump", "dosing_lockout", "ph", "CS-809", _ph_mix_pump),
@@ -651,7 +651,7 @@ PH_SETUP = (
 PH_WAIT = (
     Guard("hold", "dosing_lockout", "ph", None, _ph_hold),
     Guard("mixing", "dosing_lockout", "ph", None, _ph_mixing),
-    Guard("hardware_fault", "hardware_latch", "ph", "CS-301", _ph_fault),
+    Guard("hardware_fault", "hardware_latch", "ph", "CS-301", _dosing_hardware_fault),
     Guard("duplicate", "duplicate_controller", "ph", None, _ph_duplicate),  # not in spec
 )
 PH_DOSE = (
@@ -664,7 +664,9 @@ PH_DOSE = (
 # pump's calibration or a prime is open (the integration's calibration.py / dosing_api.py). Any entry holds a batch
 # (DosingRunner._batch_check, after BATCH) and pH auto-correct (_ph_tick, before the tank is read: a probe in its
 # buffer is no tank reading). A single dose (ctx dose) goes on during a feed probe's calibration and is refused during
-# a pump's calibration or prime, as the integration's dosing_request refuses it. ctx config (DosingRunner._config).
+# a pump's calibration or prime, as the integration's dosing_request refuses it. A timed run (ctx own, its pump's id)
+# is held by every hold but its own pump's (each of `sessions` when merged), as pump_precheck refuses it.
+# ctx config (DosingRunner._config).
 CALIBRATING_PROBE = "feed probe calibration in progress"
 CALIBRATING_PUMP = "dosing pump calibration or prime in progress"
 
@@ -673,6 +675,13 @@ def _calibrating(r, room, zone, ctx):
     entry = ctx["config"].get("calibrating")
     if not entry:
         return None
+    if ctx.get("own"):  # a timed run (DosingRunner._run_timed): its own pump's prime or calibration holds it not
+        merged = isinstance(entry, dict) and isinstance(entry.get("sessions"), list)
+        holds = [h for h in (entry["sessions"] if merged else [entry])
+                 if not (isinstance(h, dict) and h.get("pump") == ctx["own"] and not h.get("probe"))]
+        if not holds:
+            return None
+        return CALIBRATING_PUMP if any(isinstance(h, dict) and h.get("pump") for h in holds) else CALIBRATING_PROBE
     if isinstance(entry, dict) and entry.get("pump"):
         return CALIBRATING_PUMP
     return None if ctx.get("dose") else CALIBRATING_PROBE
@@ -681,7 +690,8 @@ def _calibrating(r, room, zone, ctx):
 CALIBRATING = (Guard("calibrating", "dosing_lockout", "calibrating", None, _calibrating),)
 
 
-# DOSE_RUN: a timed run of one pump's power (Task 20's prime and calibrate). ctx pump, profile, action, batch.
+# DOSE_RUN: a timed run of one pump's power (DosingRunner._run_timed: a prime or a calibration), before anything
+# moves. ctx pump, profile, action, batch.
 def _run_inflight(r, room, zone, ctx):
     if getattr(room, "shot_inflight", None):
         return "a shot is in flight in this room"
@@ -695,7 +705,7 @@ def _run_calibrated(r, room, zone, ctx):
 
 
 DOSE_RUN = (
-    Guard("hardware_fault", "hardware_latch", "dose_run", "CS-301", _ph_fault),
+    Guard("hardware_fault", "hardware_latch", "dose_run", "CS-301", _dosing_hardware_fault),
     Guard("inflight", "inflight", "dose_run", None, _run_inflight),
     Guard("calibrated", "calibration_valid", "dose_run", None, _run_calibrated),
     Guard("hold", "dosing_lockout", "dose_run", None, _batch_hold),

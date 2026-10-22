@@ -120,7 +120,7 @@ def test_a_latched_ph_correct_is_journaled_as_held_by_dosing_lockout(build):  # 
         r.runner._ph_block(r.c.rooms[0])["latch"] = {"at": "x", "why": "y", "fill": "2026-09-27 19:00:00"}
     minutes(r, 10)
     (held,) = _intents(r)
-    assert (held["kind"], held["outcome"], held["code"]) == ("intent.held", "held", "CS-809")
+    assert (held["kind"], held["outcome"], held["code"]) == ("intent.held", "held", None)  # no fresh CS-809
     assert held["data"] == {"guard": "dosing_lockout", "reason": (
         "pH auto-correct is locked until a person switches it off or the tank is filled again")}
 

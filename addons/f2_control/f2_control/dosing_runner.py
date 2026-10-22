@@ -5,8 +5,9 @@ sensor.crop_steering_<prefix>dosing_config. The main loop wakes whenever dosing 
 reads that every 2 s and takes each request once, and runs the dose or batch it took on to its next
 wait (a read of the pump, the fill, the mix, a pause), so nothing here sleeps through a wait. A dose sets a pump's volume number and presses its start: the pump's own firmware runs the
 motor for that volume and switches it off. A batch holds the watering it could disturb, fills the
-tank, mixes it, doses the recipe in order and stamps the fill. Nothing here ever switches a dosing
-motor on; switching one off (a stop, a dose past its time) is the only thing done to its power.
+tank, mixes it, doses the recipe in order and stamps the fill. Only a timed run (a prime or a pump's
+calibration, _run_timed) switches a dosing motor's power on, for its seconds, read back on and off; otherwise
+switching one off (a stop, a dose past its time) is the only thing done to its power.
 What each room is doing is published as sensor.crop_steering_<prefix>dosing.
 
 Whatever could be left running is written to dosing_state.json before anything moves. Whatever
@@ -78,8 +79,16 @@ REMIND_CHECK_S = 60.0
 REMIND_READS = 3
 REMIND_EVERY_S = 86400.0
 REMIND_CLEAR_PCT = 5.0
-_RUNNING = {"dose": "dosing", "batch": "making a batch"}  # handled_result until it ends
-_KIND = {"dose": "dose", "batch": "batch", "correct": "pH correction"}  # how a job is named to people
+MIX_CONFIG_WAIT_S = 1800.0  # a due mix check waits this long at most for a dosing_config it can't read
+# A timed run's longest (the integration's dosing.TIMED; the prime's 30 s is ruling R7): its request's seconds, at most.
+TIMED_S = {"prime": 30.0, "calibrate": 120.0}
+# How a timed run's end reads in the journal (dose.completed): (outcome, code); a refusal is "refused".
+_TIMED_ENDS = {"done": ("ok", None), "stopped": ("aborted", None), "stuck": ("failed", "CS-801")}
+_RUNNING = {"dose": "dosing", "batch": "making a batch", "prime": "priming",
+            "calibrate": "calibrating"}  # handled_result until it ends
+_KIND = {"dose": "dose", "batch": "batch", "correct": "pH correction", "prime": "prime",
+         "calibrate": "pump calibration"}  # how a job is named to people
+_RECORDED = ("dose", "batch", "correct", *TIMED_S)  # what a start that finds its record recovers
 _PUT_BACK = ("name", "volume_entity", "dosing_entity", "dosing_prefix", "power_entity")
 INTENT_REEMIT_S = 1800.0  # a refusal or hold that stands is journaled again this often (controller.HELD_REEMIT_S)
 _NUMBERS = re.compile(r"\d{1,2}:\d{2}|[-+]?\d+(?:\.\d+)?")  # its numbers and times (controller._HELD_NUMBERS)
@@ -210,6 +219,14 @@ def history_events(slug, history):
             continue
         out += events
     return out
+
+
+def _ml_s(ml_min):
+    """A pump's calibrated mL/min (the integration's pump calibration) in mL/s, or None when it is not a positive
+    number."""
+    usable = (isinstance(ml_min, (int, float)) and not isinstance(ml_min, bool) and math.isfinite(ml_min)
+              and ml_min > 0)
+    return ml_min / 60 if usable else None
 
 
 def _probe_calibrating(config):
@@ -442,7 +459,7 @@ class DosingRunner:
         return [] if job is None else self._job_off(job)
 
     def _job_off(self, job):
-        if job.kind == "dose":
+        if job.kind == "dose" or job.kind in TIMED_S:
             return [job.pump["power_entity"]] if job.pump else []
         return self._dosing_hardware(job.config)
 
@@ -607,22 +624,23 @@ class DosingRunner:
             stuck = self._stuck.get(room.slug)
             left = list(stuck["left"]) if stuck else []
         here = busy is not None and busy.room.slug == room.slug
-        if action == "stop" and (here or stuck):  # never too old while there is something to stop
-            return self._settle(room, config, request, self._stop(room, config, busy, request))
+        stops = {"stop": self._stop, "stop_pump": self._stop_pump}
+        if action in stops and (here or stuck):  # never too old while there is something to stop
+            return self._settle(room, config, request, stops[action](room, config, busy, request))
         if age is None or age > MAX_AGE_S:
             return self._settle(room, config, request, "too old to act on")
-        if action == "stop":
-            return self._settle(room, config, request, self._stop(room, config, busy, request))
+        if action in stops:
+            return self._settle(room, config, request, stops[action](room, config, busy, request))
         # Each controller keeps its own record of what it has handled, so two on one room would both take
         # this request. Refused, not deferred: it would be too old by the time the hold ends.
-        if action in ("dose", "batch") and self.c.duplicate_hold(room):
+        if action in ("dose", "batch", *TIMED_S) and self.c.duplicate_hold(room):
             return self._settle(room, config, request, "refused: another controller is driving this room")
         if busy is not None:
             where = "" if here else f" in room {busy.room.slug}"
             return self._settle(room, config, request, f"refused: a {_KIND[busy.kind]} is running{where}")
         if stuck:
             return self._settle(room, config, request, f"refused: {_does(left)} not read off yet")
-        if action not in ("dose", "batch"):
+        if action not in ("dose", "batch", *TIMED_S):
             return self._settle(room, config, request, f"refused: unknown action {action!r}")
         why = self._mix_refuses(room) if action == "batch" and request.get("by") is None else None
         if why:  # an automation's batch (no user): a person makes the next one after a failed mix check
@@ -631,8 +649,8 @@ class DosingRunner:
             block = self._block(room)
             block["handled"], block["handled_result"] = request["id"], _RUNNING[action]
             self._write()
-        self._start(self._run_dose(room, config, request) if action == "dose"
-                    else self._run_batch(room, config, request))
+        runs = {"dose": self._run_dose, "batch": self._run_batch}
+        self._start(runs.get(action, self._run_timed)(room, config, request))
         return None
 
     def _stop(self, room, config, busy, request):
@@ -657,6 +675,162 @@ class DosingRunner:
         if stuck and not left:
             self._release(room.slug, stuck)
         return "stopped" + (f"; {_does(left)} not read off" if left else "")
+
+    def _stop_pump(self, room, config, busy, request):
+        """A stop of one pump (the integration's pump_stop): that pump's prime or calibration running in the room
+        ends at its next tick (_timed_run), which switches it off and reads it back off; a dose, batch or pH
+        correction running in the room is left alone (the room's stop ends it); else the pump's power is switched
+        off and read back."""
+        job = busy if busy is not None and busy.room.slug == room.slug else None
+        if job is not None and job.kind in TIMED_S and job.pump["id"] == request.get("pump"):
+            job.stopped, job.stopped_by = True, request.get("by")
+            if job.pressed is not None and job.cut_at is None:
+                job.cut_at = self._mono()  # it ran until now (ran_s)
+            return "stopped"
+        if job is not None and job.kind not in TIMED_S:
+            return f"refused: a {_KIND[job.kind]} is running, and a pump's stop leaves it alone"
+        pump = next((p for p in config["pumps"] if p["id"] == request.get("pump")), None)
+        if pump is None:
+            return f"refused: there is no pump {request.get('pump')} in this room's setup"
+        left = self._switch_off([pump["power_entity"]])
+        return "stopped" + (f"; {_does(left)} not read off" if left else "")
+
+    # ------------------------------------------------------------------ a timed run (prime, calibrate)
+    def _run_timed(self, room, config, request):
+        """A prime or a pump's calibration run (the integration's pump_prime / pump_calibrate), always settled: the
+        pump's power on and read back on, its request's seconds (at most TIMED_S) with a stop and the abort checks
+        read every READ_S, then off and read back off on every way it ends. What does not read off latches the room
+        as a dose's does (CS-801); the app stopping sends the off and leaves the record for the next start. Its end
+        is handled_result {id, action, pump, ran_s, result: done | stopped | refused: why | stuck}, which the
+        integration reads (dosing_api._status_changed): ran_s is the seconds from the switch-on to the off, 0 for a
+        refused or stuck run."""
+        action = request["action"]
+        pump = next((p for p in config["pumps"] if p["id"] == request.get("pump")), None)
+        if pump is None:
+            return self._settle(room, config, request,
+                                f"refused: there is no pump {request.get('pump')} in this room's setup")
+        seconds = request.get("seconds")
+        if (isinstance(seconds, bool) or not isinstance(seconds, (int, float)) or not math.isfinite(seconds)
+                or seconds <= 0):
+            return self._settle(room, config, request, f"refused: {_fmt(seconds)} s is not a run length")
+        seconds = min(float(seconds), TIMED_S[action])
+        job = _Job(room, config, request, action)
+        job.pump, power = pump, pump["power_entity"]
+        why = self._timed_check(job)
+        if why:
+            self._journal_intent(room, "intent.refused", why, job)
+            return self._settle(room, config, request, f"refused: {why}")
+        job.started_at = self._now().isoformat()
+        if not self._record(job, {"kind": action, "at": job.started_at, "request": request["id"],
+                                  "by": request.get("by"), "pump": pump["id"], "seconds": seconds, "off": [power]}):
+            return self._settle(room, config, request,
+                                f"refused: the {_KIND[action]} could not be written to dosing_state.json", clear=True)
+        with self._lock:
+            self._job = job
+        job.dose = {"pump": pump["id"], "ml": None, "started_at": job.started_at, "expected_s": seconds}
+        self._show(room, config)
+        try:
+            try:
+                result = yield from self._timed_run(job, power, seconds)
+            except _Exit:
+                self._exit_off(job)  # its record stays: the next start reads it back off (recover)
+                raise
+            except Exception as e:  # anything unforeseen: still switched off and read back
+                self._log(f"[{room.slug}] dosing: {_KIND[action]} error", repr(e))
+                result = "stopped"
+            if job.cut_at is None:
+                job.cut_at = self._mono()
+            try:
+                left = self._switch_off([power])
+            except Exception as e:
+                self._log(f"[{room.slug}] dosing: could not switch {power} off", repr(e))
+                left = [power]
+        finally:
+            job.dose = None
+            with self._lock:
+                self._job = None
+        ran = (0 if left or result.startswith("refused") or job.pressed is None
+               else round(max(0.0, job.cut_at - job.pressed), 1))
+        if left:
+            result, event = "stuck", _event(pump["id"], job.started_at)
+            self._alert(room.slug, "CS-801", f"a dosing pump does not read off after a {_KIND[action]}",
+                        f"The {_KIND[action]} of {pump['name']} ended, and the controller set its power ({power}) "
+                        "to off, but it does not read off. The shots of this room are held, and the controller sends "
+                        "the off again each 2 s until it reads off. If the pump still runs, stop it by hand. Check "
+                        "the tank before the next dose.", event)
+            self._hold_stuck(room, left, None, {room.slug}, "CS-801", "a dosing pump does not read off",
+                             f"A {_KIND[action]} of {pump['name']} ended, and its power did not read off.",
+                             "Check the pump and the tank before the next dose.", event, alerted=True)
+        outcome, code = _TIMED_ENDS.get(result, ("refused", None))
+        self._journal(room, lambda: ("dose.completed", {
+            "outcome": outcome, "code": code, "actor": _actor(request.get("by")), "detail": request.get("by"),
+            "data": {"pump": pump["id"], "kind": action, "seconds": seconds, "ran_s": ran, "result": result,
+                     "ml": None, "given_ml": None, "flow_ml_s": None}}))
+        entry = {"kind": action, "at": job.started_at, "ended_at": self._now().isoformat(), "result": result,
+                 "pump": pump["id"], "seconds": seconds, "ran_s": ran, "doses": {}, "dosed": [],
+                 "by": request.get("by")}
+        self._settle(room, config, request, self._timed_report(request, ran, result), entry=entry, clear=not left,
+                     final=True)
+
+    def _timed_check(self, job):
+        """Why a timed run must not start (guards.DOSE_RUN; then guards.CALIBRATING, which every hold but its own
+        pump's holds; then the kill switch), else None."""
+        ctx = {"pump": job.pump, "profile": job.profile, "action": job.kind, "batch": job.config["batch"]}
+        hit = guards.first(self, guards.DOSE_RUN, job.room, None, ctx) or guards.first(
+            self, guards.CALIBRATING, job.room, None, {"config": job.config, "own": job.pump["id"]})
+        if hit:
+            return guards.Why(hit)
+        return self._run_abort(job.room)
+
+    def _run_abort(self, room):
+        """Why a timed run must end now, read at every tick: the room's kill switch off, a hardware fault latched,
+        a shot in flight in the room. Else None."""
+        gate = guards._m(self.c).room_gate(room)
+        if not self.c._on(gate, False):
+            return f"the room's kill switch ({gate}) is off"
+        fault = self.c._hardware_fault_block(room)
+        if fault:
+            return fault
+        return "a shot is in flight in this room" if getattr(room, "shot_inflight", None) else None
+
+    def _timed_run(self, job, power, seconds):
+        """The power on (_on, which reads a stop first) and read back on, then each READ_S: the app stopping, a
+        refused token, a stop (read now) and the abort checks, until `seconds` from the switch-on -> "done",
+        "stopped" or "refused: <power> did not read on". job.pressed: the switch-on; job.cut_at: when it ended."""
+        try:
+            self._on(job, power)
+        except _Ended:  # a stop came first: nothing was switched on
+            return "stopped"
+        job.pressed = self._mono()
+        if self._confirm([power], "on"):
+            return f"refused: {power} did not read on"
+        end = job.pressed + seconds
+        while True:
+            if self._exiting:
+                raise _Exit()
+            if self._refused():
+                raise _Refused()
+            self._catch_stop(job)
+            why = self._stop_reason(job) if job.stopped else self._run_abort(job.room)
+            now = self._mono()
+            if why:
+                if job.cut_at is None:
+                    job.cut_at = now
+                self._log(f"[{job.room.slug}] dosing: the {_KIND[job.kind]} of {job.pump['name']} stopped: {why}")
+                return "stopped"
+            if now >= end:
+                job.cut_at = now
+                return "done"
+            yield min(READ_S, end - now)
+
+    @staticmethod
+    def _timed_report(request, ran_s, result):
+        """handled_result of a timed run: {id, action, pump, ran_s, result}, its result done, stopped, stuck or
+        "refused: <why>" (any other words, such as "too old to act on", are a refusal)."""
+        if result not in ("done", "stopped", "stuck") and not result.startswith("refused"):
+            result = f"refused: {result}"
+        return {"id": request.get("id"), "action": request.get("action"), "pump": request.get("pump"),
+                "ran_s": ran_s, "result": result}
 
     # ------------------------------------------------------------------ one dose
     def _run_dose(self, room, config, request):
@@ -928,10 +1102,19 @@ class DosingRunner:
         """Why the pump's flow can't be used, or None: it must read a number of at least the profile's
         min_flow_ml_s (a firmware that divides by a zero flow runs its motor for ever, and a tiny one
         would put every time limit hours away)."""
-        flow, reading, _unit = self._device(pump["flow_entity"], "flow")
+        flow, reading = self._flow(pump)
         if flow is not None and flow >= profile["min_flow_ml_s"]:
             return None
-        return f"{pump['name']} is not calibrated (flow {'missing' if reading is None else reading})"
+        return f"{pump['name']} is not calibrated (flow {'missing' if reading is None else _fmt(reading)})"
+
+    def _flow(self, pump, quick=False):
+        """A pump's flow in mL/s -> (the number or None, its reading): its flow entity's, which wins; with none, its
+        calibrated_ml_min / 60 (the integration's pump calibration, G3)."""
+        if pump.get("flow_entity"):
+            flow, reading, _unit = self._device(pump["flow_entity"], "flow", quick)
+            return flow, reading
+        flow = _ml_s(pump.get("calibrated_ml_min"))
+        return flow, flow
 
     @staticmethod
     def _too_long(pump, ml, flow, profile=PROFILE):
@@ -1455,10 +1638,11 @@ class DosingRunner:
             raise _Ended("it ran past its watchdog")
 
     def _catch_stop(self, job):
-        """A stop for the job's room, read now: before every switch-on and at every step change."""
+        """A stop (or a pump's stop) for the job's room, read now: before every switch-on, at every step change and
+        every tick of a timed run."""
         config = self._config(job.room)
         request = config.get("request") if config else None
-        if not (isinstance(request, dict) and request.get("action") == "stop"
+        if not (isinstance(request, dict) and request.get("action") in ("stop", "stop_pump")
                 and isinstance(request.get("id"), str)):
             return
         with self._lock:
@@ -1541,7 +1725,7 @@ class DosingRunner:
                 block = self._doc["rooms"].get(room.slug)
                 mix = deepcopy(block.get("mix")) if isinstance(block, dict) else None
                 busy = self._job is not None and self._job.room.slug == room.slug
-            if not isinstance(mix, dict) or mix.get("verdict") is not None or busy:
+            if not isinstance(mix, dict) or mix.get("verdict") is not None or mix.get("gave_up_at") or busy:
                 continue
             due = _aware(mix.get("due"))
             if due is None or self._now() >= due:
@@ -1560,6 +1744,10 @@ class DosingRunner:
             return
         config = self._config(room) if bands else None
         if bands and _probe_calibrating(config):  # a probe in its buffer is no tank reading
+            due = _aware(mix.get("due"))
+            if not isinstance(config, dict) and (due is None or
+                                                 (self._now() - due).total_seconds() >= MIX_CONFIG_WAIT_S):
+                return self._give_up_mix(room, mix)
             live = self._live_of(room)
             if live.get("mix_calibrating") != mix.get("batch"):
                 live["mix_calibrating"] = mix.get("batch")
@@ -1602,6 +1790,28 @@ class DosingRunner:
                         "passes this check. The shots continue. Check the tank and its probes. Then correct the "
                         "tank, or make the next batch by hand.",
                         _event("mix", mix.get("batch")))
+
+    def _give_up_mix(self, room, mix):
+        """A due mix check whose dosing_config has not been readable (or published) for MIX_CONFIG_WAIT_S: it ends with
+        no verdict (gave_up_at), so the batch is never marked good and an automation's next batch stays refused
+        (_mix_refuses), and CS-808 says so once."""
+        with self._lock:
+            block = self._block(room)
+            if not isinstance(block.get("mix"), dict) or block["mix"].get("batch") != mix.get("batch"):
+                return  # a newer batch has replaced it
+            block["mix"] = {**mix, "gave_up_at": self._now().isoformat(),
+                            "why": "the dosing setup could not be read"}
+            self._write()
+        self._log(f"[{room.slug}] dosing: mix check of the batch that started {mix.get('batch')}: not checked, the "
+                  f"dosing setup could not be read for {MIX_CONFIG_WAIT_S / 60:g} min")
+        self._alert(room.slug, "CS-808", "the mix of a batch was not checked",
+                    f"The batch that started {mix.get('batch')} finished, but the controller could not read the dosing "
+                    f"setup of the room (sensor.crop_steering_{room.prefix}dosing_config) for "
+                    f"{MIX_CONFIG_WAIT_S / 60:g} min after its mix check was due, so it did not read the tank: a feed "
+                    "probe calibration may be open. The batch is not marked good. The controller refuses a batch that "
+                    "an automation asks for until a batch made by hand passes this check. The shots continue. Check "
+                    "the integration and the tank, then make the next batch by hand.",
+                    _event("mix", mix.get("batch")))
 
     def _mix_refuses(self, room):
         """Why a batch an automation asks for is refused: the last batch's mix check failed, or is still due."""
@@ -1930,7 +2140,7 @@ class DosingRunner:
         hold = record.get("hold") if kind in ("batch", "correct") and isinstance(record.get("hold"), str) else None
         held = {s for s in record.get("held") or [] if isinstance(s, str)} | {slug}
         at = record.get("at")
-        if kind in ("dose", "batch", "correct"):
+        if kind in _RECORDED:
             intro = (f"A {_KIND[kind]} that started {at} was still running when the controller stopped. It did "
                      "not finish, and the controller does not continue it. The controller set the power of "
                      "its dosing pumps, the fill valve, the mix pump and the mix valves to off"
@@ -1944,8 +2154,8 @@ class DosingRunner:
         self._held[slug] = held
         self._stuck[slug] = self._entry(off, hold, held, "CS-803", "a restart stopped a dose or batch",
                                         _event("restart", at), intro, advice, alerted=None,
-                                        announce=kind in ("dose", "batch", "correct"), sent=False)
-        if kind in ("dose", "batch", "correct") and not record.get("recovered"):
+                                        announce=kind in _RECORDED, sent=False)
+        if kind in _RECORDED and not record.get("recovered"):
             dosed = [d for d in record.get("dosed") or [] if isinstance(d, dict)]
             dose = record.get("dose")
             if isinstance(dose, dict) and not any(d.get("at") == dose.get("at") for d in dosed):
@@ -1958,6 +2168,9 @@ class DosingRunner:
                      "dosed": dosed, "by": record.get("by")}
             if kind == "batch":
                 entry["name"] = record.get("name") or ""
+            if kind in TIMED_S and block.get("handled") == record.get("request"):  # its report: ran_s not known
+                block["handled_result"] = self._timed_report(
+                    {"id": record.get("request"), "action": kind, "pump": record.get("pump")}, 0, "stopped")
             self._add_history(block, entry)
             self._recovered_rows.append((slug, entry))
             block["inflight"] = {**record, "recovered": True}  # its history is written once
@@ -2139,15 +2352,17 @@ class DosingRunner:
     def _journal(self, room, make):
         """One event to the controller's journal outbox (journal_out.Outbox.emit), `make()` -> (kind, its keywords):
         built and appended locally, never a wait, and an error anywhere in it is only logged. Nothing a dose or batch
-        does waits on it or changes with it."""
+        does waits on it or changes with it. -> whether it was appended."""
         journal = getattr(self.c, "journal", None)
         if journal is None:
-            return
+            return False
         try:
             kind, kw = make()
             journal.emit(getattr(room, "prefix", ""), kind, **kw)
         except Exception as e:
             self._log("dosing: journal error", repr(e))
+            return False
+        return True
 
     def _journal_intent(self, room, kind, why, job=None):
         """intent.refused / intent.held {guard, reason} for a dose, batch or pH correction a guard stopped (`why` a
@@ -2164,7 +2379,6 @@ class DosingRunner:
             key = (room.slug, kind, guard, _NUMBERS.sub("#", str(why)), job.id if job is not None else None)
             if key in seen:
                 return
-            seen[key] = now
         except Exception as e:
             self._log("dosing: journal error", repr(e))
             return
@@ -2177,7 +2391,8 @@ class DosingRunner:
                           "correlation": {"batch_id": batch_id} if batch_id else None,
                           "data": {"guard": guard, "reason": str(why)}}
 
-        self._journal(room, make)
+        if self._journal(room, make):  # kept only once it is in the outbox, so a failed one is tried again
+            seen[key] = now
 
     def journal_recovered(self):
         """The rows a restart interrupted (_recover_record), to the journal, on every start that finds one, once its
@@ -2247,7 +2462,7 @@ class DosingRunner:
         for pump in config["pumps"]:
             dosing = self._dosing(pump, quick=True)[0]
             readings[pump["id"]] = {
-                "flow": self._device(pump["flow_entity"], "flow", quick=True)[0],
+                "flow": self._flow(pump, quick=True)[0],
                 "state": "unavailable" if dosing is None else "dosing" if dosing else "idle",
             }
         with self._lock:
@@ -2304,11 +2519,13 @@ class DosingRunner:
 
     @staticmethod
     def _pump_readable(pump):
+        """Every entity named, and max_ml; the flow entity may be left out only for a pump with a calibrated flow."""
         return isinstance(pump, dict) and all(
             isinstance(pump.get(key), str) and pump[key]
-            for key in ("id", "name", "volume_entity", "start_entity", "dosing_entity", "power_entity",
-                        "flow_entity")
-        ) and isinstance(pump.get("max_ml"), (int, float))
+            for key in ("id", "name", "volume_entity", "start_entity", "dosing_entity", "power_entity")
+        ) and (isinstance(pump.get("flow_entity"), str) and bool(pump["flow_entity"])
+               or not pump.get("flow_entity") and _ml_s(pump.get("calibrated_ml_min")) is not None
+               ) and isinstance(pump.get("max_ml"), (int, float))
 
     @staticmethod
     def _batch_readable(batch):
@@ -2535,10 +2752,14 @@ class DosingRunner:
         """A request handled: its id and result saved (and the record of what ran cleared) and shown.
         `final`: the end of the dose or batch it started, which leaves a request handled since (a stop,
         a refusal) as the one shown, so none is ever taken twice."""
+        if request.get("action") in TIMED_S and not isinstance(result, dict):
+            result = self._timed_report(request, 0, result)  # the integration waits for this shape
         with self._lock:
             block = self._block(room)
             if not final or block["handled"] == request["id"]:
                 block["handled"], block["handled_result"] = request["id"], result
+            elif request.get("action") in TIMED_S:  # its report is awaited whatever was handled since (a stop)
+                block["handled_result"] = result
             if clear:
                 block["inflight"] = None
             if entry is not None:
