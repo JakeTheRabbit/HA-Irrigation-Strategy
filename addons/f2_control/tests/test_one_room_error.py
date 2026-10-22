@@ -78,6 +78,9 @@ def test_an_error_in_the_first_room_never_stops_the_second_or_the_steps_after(mo
     assert beat[0] == "error" and beat[1]["loop_error"] == "RuntimeError: room is broken"
     assert beat[1]["controller_instance"] == c.instance_id  # still this controller's beat
     assert fake.sets["sensor.crop_steering_app_status"][0] == "error"
+    # Nothing an earlier pass fired looks live: the room's decision fires nothing and names the error.
+    decision = fake.sets["sensor.crop_steering_current_decision"]
+    assert decision[1] == {"fired": [], "blocked": ["Controller error: RuntimeError: room is broken"]}
     cards = _cards(fake, "CS-212")
     assert len(cards) == 1 and cards[0]["notification_id"] == "f2_room_error_default"
     assert "RuntimeError: room is broken" in cards[0]["message"]
@@ -91,14 +94,32 @@ def test_a_fault_that_stays_is_alerted_once_not_every_minute(monkeypatch):
     assert len(_cards(fake, "CS-212")) == 1
 
 
-def test_a_room_that_recovers_reports_healthy_again(monkeypatch):
+def test_a_room_that_recovers_reports_healthy_again_and_its_card_goes(monkeypatch):
     c, fake = _two_rooms()
     with monkeypatch.context() as broken:
         _break(broken, "default")
         c.loop_once(NOW)
+    assert "room_error_default" in c._alerted
     c.loop_once(NOW)
     beat = fake.sets["sensor.crop_steering_ai_heartbeat"]
     assert beat[0] == "healthy" and "loop_error" not in beat[1]
+    dismissed = [d["notification_id"] for dom, svc, d in fake.calls
+                 if (dom, svc) == ("persistent_notification", "dismiss")]
+    assert dismissed.count("f2_room_error_default") == 1 and "room_error_default" not in c._alerted
+    c.loop_once(NOW)  # dismissed once, not every pass after
+    assert [d["notification_id"] for dom, svc, d in fake.calls
+            if (dom, svc) == ("persistent_notification", "dismiss")].count("f2_room_error_default") == 1
+
+
+def test_an_off_room_that_fails_is_not_reported_active(monkeypatch):
+    c, fake = _two_rooms()
+    c.rooms[0]._beat = (None, False, None)  # its last beat: the room is off
+    _break(monkeypatch, "default")
+    monkeypatch.setattr(controller.Controller, "_loop_room",
+                        lambda self, room, now: self._snapshot(room, 1, now, True, False))
+    c.loop_once(NOW)
+    beat = fake.sets["sensor.crop_steering_ai_heartbeat"]
+    assert beat[0] == "error" and beat[1]["room_active"] is False
 
 
 @pytest.mark.parametrize("stop", [SystemExit(0), KeyboardInterrupt()], ids=["SystemExit", "KeyboardInterrupt"])

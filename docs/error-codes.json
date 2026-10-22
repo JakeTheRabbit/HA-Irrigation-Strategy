@@ -350,7 +350,7 @@
       "source": "notification",
       "severity": "critical",
       "meaning": "An error stopped the controller in the pass of this room. The alert gives the error. The heartbeat and the status of the room show error. The other rooms continue.",
-      "watering": "The room gets no shots, also no rescue shots, until the error stops. The controller tries the room again each minute. The alert comes again every 30 minutes while the error continues.",
+      "watering": "The room gets no shots, also no rescue shots, until the error stops. The controller tries the room again each minute. The alert comes again every 30 minutes while the error continues, and clears after the next pass of the room without an error.",
       "causes": [
         "A fault in the controller, for example a setting or a state of the room that it cannot use.",
         "An entity of the room that gives a value of a type that the controller does not expect."
@@ -359,8 +359,7 @@
         "CAUTION: Do not leave the room in this state for a long time. The substrate dries out and the plants can wilt.",
         "Read the controller log near the time of the alert.",
         "Report the error with the log.",
-        "Until the error stops, water the room by hand.",
-        "After the room has its shots again, dismiss the alert."
+        "Until the error stops, water the room by hand."
       ]
     },
     {

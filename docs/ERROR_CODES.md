@@ -15,7 +15,7 @@ once each time the controller app starts, and CS-405 comes at the start. A dismi
 does not clear the hardware hold.
 
 Most alerts stay in Home Assistant until you dismiss them, also after their cause stops. The
-controller removes CS-201, CS-209, CS-210, CS-308 and CS-309 itself. When you set *Room Active* of a room
+controller removes CS-201, CS-209, CS-210, CS-212, CS-308 and CS-309 itself. When you set *Room Active* of a room
 to off, the controller removes the alerts of the room.
 When *Room Active* is off (no plants in the room), the room gives no alerts about water. The
 controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS-308, CS-309).
@@ -489,7 +489,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 **What it means.** An error stopped the controller in the pass of this room. The alert gives the error. The heartbeat and the status of the room show error. The other rooms continue.
 
-**Effect on water.** The room gets no shots, also no rescue shots, until the error stops. The controller tries the room again each minute. The alert comes again every 30 minutes while the error continues.
+**Effect on water.** The room gets no shots, also no rescue shots, until the error stops. The controller tries the room again each minute. The alert comes again every 30 minutes while the error continues, and clears after the next pass of the room without an error.
 
 **Probable causes**
 
@@ -502,7 +502,6 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - Read the controller log near the time of the alert.
 - Report the error with the log.
 - Until the error stops, water the room by hand.
-- After the room has its shots again, dismiss the alert.
 
 ## Pumps and valves (CS-3xx)
 

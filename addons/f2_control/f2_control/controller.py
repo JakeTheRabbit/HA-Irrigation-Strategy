@@ -6441,6 +6441,9 @@ class Controller:
                 pub = self._loop_room(room, now)
                 self._publish_status(room, pub, now)
                 all_pub[room.slug] = pub
+                if f"room_error_{room.slug}" in self._alerted:  # its pass ran again: CS-212 is over
+                    ha_call("persistent_notification", "dismiss", notification_id=f"f2_room_error_{room.slug}")
+                    del self._alerted[f"room_error_{room.slug}"]
             except Exception as e:  # only Exception: a stop (SystemExit, KeyboardInterrupt) still stops
                 self._room_error(room, now, e)
         self._check_defaulted_setpoints()
@@ -6449,14 +6452,19 @@ class Controller:
 
     def _room_error(self, room, now, err):
         """A room's pass raised (loop_once). The room says so: its heartbeat and its status read error,
-        and CS-212 names it, at most each 30 min while the fault stays (_alert). The report and the alert
-        are tried apart, so one that fails as well never stops the other, nor the next room."""
+        its decision fires nothing (an earlier pass's shot must not look live), and CS-212 names it, at
+        most each 30 min while the fault stays (_alert); loop_once dismisses it after the room's next
+        pass. The report and the alert are tried apart, so one that fails as well never stops the
+        other, nor the next room."""
         error = f"{type(err).__name__}: {err}"
         log(f"[{room.slug}] room error", error)
         try:
             ha_set(f"sensor.crop_steering_{room.prefix}app_status", "error",
                    {"engine": PRODUCT, "updated": now.isoformat()})
-            self._heartbeat(room, now, self._hardware_fault_block(room), loop_error=error)
+            ha_set(f"sensor.crop_steering_{room.prefix}current_decision", f"Controller error: {error}"[:255],
+                   {"fired": [], "blocked": [f"Controller error: {error}"]})
+            active = room._beat[1] if room._beat else True  # as its last beat said: an off room stays off
+            self._heartbeat(room, now, self._hardware_fault_block(room), active, loop_error=error)
         except Exception as e:
             log(f"[{room.slug}] room error report error", e)
         try:
