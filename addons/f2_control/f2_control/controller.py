@@ -75,7 +75,8 @@ from crop_steering_engine import (
     zone_status_label,
     settled_reading,
 )
-from crop_steering_engine.ids import new_id
+from crop_steering_engine.ids import derived_id, new_id
+from crop_steering_engine.timers import project as project_timer_program
 from crop_steering_engine.core import SETTLED_VWC_MIN, ec_flush_goal, floor_share, p1_stall, p1_stall_rewater
 # What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
 # controller column of the one defaults table, pinned to the values installed controllers use.
@@ -726,8 +727,17 @@ def _on_since_shot(history, started):
 # its copy of a sibling's rescue, and a test shot a person asked for (its zone's Test Shot button). Every
 # other gate (kill switch, faults, zone switches, source water, the daily budget) still applies to them.
 PLAN_HOLD_EXEMPT = frozenset(
-    {"p3_emergency", "watchdog", "min_daily", "blind_fallback", "blind_copy_rescue", "test_shot"}
+    {"p3_emergency", "watchdog", "min_daily", "blind_fallback", "blind_copy_rescue", "test_shot", "timer"}
 )
+# A zone's Watering by (the integration's select zone_N_irrigation_mode): steering (the engine, as always), timer (its
+# timer program's slots) or off. Anything else reads as unreadable (R2: the integration shows `unknown`).
+IRRIGATION_MODES = ("steering", "timer", "off")
+# The engine shots a timer zone still gets (R3, spec 6.1): the P3 emergency and the watchdog, the minimum-daily floor
+# and a blind zone's copy of a sibling's rescue. Not the blind fallback: a steering estimate. A skip never drops one.
+TIMER_KEEPS = safety_ops.RESCUE_KINDS | {"min_daily", "blind_copy_rescue"}
+TIMERS_SENSOR = "sensor.crop_steering_{}timers_config"  # the integration's timer programs and skips (timers_api.py)
+PROJECTION_SENSOR = "sensor.crop_steering_{}projection_app"  # what the room is planned to do (the timeline reads it)
+PROJECTION_H = 24
 TEST_SHOT_S = 10  # how long a zone's Test Shot waters it
 # The site's supply (the integration's site store, G1): the pumps, their output and the zones' demand. With one saved,
 # the zones that fire in a pass take turns at their pump, rescues first (_pump_line); none saved, as before.
@@ -1116,9 +1126,32 @@ def shot_priority(reason):
     (PLAN_HOLD_EXEMPT: the rescues, the minimum-daily floor, the blind fallback and copy) first, an operator's test
     shot last, every other shot steering."""
     kind = getattr(reason, "kind", None)
+    if kind == "timer":
+        return "timer"
     if kind in PLAN_HOLD_EXEMPT and kind != "test_shot":
         return "rescue"
     return "manual" if kind == "test_shot" else "steering"
+
+
+def shot_actor(reason):
+    """Who a shot is journaled as: a test shot the operator's, a timer program's slot the timer's, else the engine's."""
+    kind = getattr(reason, "kind", None)
+    return "manual" if kind == "test_shot" else "timer" if kind == "timer" else "engine"
+
+
+def _timer_reason(program, seconds):
+    """The decision's reason for a timer program's slot: it runs `seconds` (guards._max_shot), for its program."""
+    reason = Reason(f"TIMER {program.get('name') or program.get('id')}: {seconds:g} s", "timer")
+    reason.seconds, reason.program_id = seconds, str(program.get("id") or "") or None
+    return reason
+
+
+def _skipped_by(skip):
+    """intent.refused's words for a skip (timer_skip): who asked for it, when the integration says."""
+    by = skip.get("by")
+    if isinstance(by, dict):
+        by = by.get("user_id") or by.get("actor")
+    return f"skipped by {by or 'timer_skip'}"
 
 
 class Controller:
@@ -1701,6 +1734,10 @@ class Controller:
         # A dim the controller did not finish (dry_dim.py): absent on an older file. Restored on the first pass.
         room._dim = dry_dim.load(block.get("_dim") if isinstance(block, dict) else None)
         room._dimmer = dry_dim.Dimmer(restarted=room._dim is not None)
+        # Each zone's last-known Watering by (R2), {"3": "off"}: absent on an older file, and for a zone never seen.
+        modes = block.get("_irrigation_mode") if isinstance(block, dict) else None
+        room._irrigation_mode = ({str(z): m for z, m in modes.items() if m in IRRIGATION_MODES}
+                                 if isinstance(modes, dict) else {})
         if isinstance(block, dict):
             room.strategy_required = bool(block.get("_strategy_required", False))
             room.journal_backfill = block.get("_journal_backfill") == 1
@@ -2112,6 +2149,8 @@ class Controller:
                     block["_dim"] = room._dim
                 else:
                     block.pop("_dim", None)
+                if getattr(room, "_irrigation_mode", None):  # only once a zone's select has been read
+                    block["_irrigation_mode"] = dict(room._irrigation_mode)
                 if getattr(room, "_off_since", None):
                     block["_room_off_since"] = room._off_since.isoformat()
                 else:
@@ -6519,7 +6558,7 @@ class Controller:
                 zone=zone,
             )
         test = getattr(reason, "kind", None) == "test_shot"
-        actor = "manual" if test else "engine"  # a test shot is the operator's
+        actor = shot_actor(reason)  # a test shot is the operator's, a program's slot the timer's
         if fire and block:
             log(
                 f"[{room.slug}] Z{zone} {st['phase']} BLOCKED ({block}): would {reason}"
@@ -6550,7 +6589,8 @@ class Controller:
             room.__dict__.setdefault("_shot_intent", {})[zone] = {"snap": snap, "kind": getattr(reason, "kind", None)}
             self._execute_shot(room, zone, dur, size, flow_lps=flow,
                                plan_exempt=getattr(reason, "kind", None) in PLAN_HOLD_EXEMPT, steering=not test,
-                               actor=actor, reason_text=f"{what}: {why}", requested_at=requested_at)
+                               actor=actor, program_id=getattr(reason, "program_id", None),
+                               reason_text=f"{what}: {why}", requested_at=requested_at)
             if rescue and snap is not None and st.get("last_shot") is not was:
                 safety_ops.rescue_fired(st, snap.vwc, now)
                 self._save_state()
@@ -7174,7 +7214,7 @@ class Controller:
                           "requested_at": turn["requested_at"].isoformat(timespec="milliseconds"),
                           "guard": hit[0].guard if hit else "pump_capacity"}
             line["taken"][zone] = room.__dict__.setdefault("_turn", {})[zone] = {
-                "queued": queued, "actor": "manual" if getattr(reason, "kind", None) == "test_shot" else "engine",
+                "queued": queued, "actor": shot_actor(reason),
                 "lph": lph, "load": lph / most * 100 if lph is not None and most else None, "behind": len(ahead),
                 "waited": (datetime.now().astimezone() - turn["requested_at"]).total_seconds()}
         except Exception as e:
@@ -7265,6 +7305,140 @@ class Controller:
                 self._publish_load(room, load[1].get("pump"), 0.0)
         except Exception as e:
             log("pump queue error", room.slug, e)
+
+    # ---------- Watering by: each zone's irrigation_mode, its timer program and the timeline's skips ----------
+    def _irrigation_modes(self, room):
+        """{zone: steering|timer|off} this pass (R2). The select zone_N_irrigation_mode, read each pass; a mode that
+        reads is the zone's last-known one (room._irrigation_mode, saved in state.json), anything else (unknown,
+        unavailable, absent) uses that, and steering only when no mode was ever seen: an off zone stays off through a
+        Home Assistant restart, and a room whose integration has no select runs as it always ran."""
+        known = room.__dict__.setdefault("_irrigation_mode", {})
+        modes, changed = {}, False
+        for zone in room.zones:
+            state = ha_get(f"select.crop_steering_{room.prefix}zone_{zone}_irrigation_mode")[0]
+            if state in IRRIGATION_MODES and known.get(str(zone)) != state:
+                known[str(zone)], changed = state, True
+            modes[zone] = known.get(str(zone), "steering")
+        if changed:
+            self._save_state()
+        return modes
+
+    def _project(self, room, program, start, end):
+        """One timer program's slots in [start, end) (crop_steering_engine.timers.project, the room's lights), or []
+        for a program that cannot be projected: logged once for each new error, and only it is left out."""
+        try:
+            return project_timer_program(program, (room.lights_on_hour, room.lights_off_hour), start, end)
+        except Exception as e:
+            said = self.__dict__.setdefault("_timer_errors", {})
+            key = (room.slug, str(program.get("id")))
+            if said.get(key) != str(e):
+                said[key] = str(e)
+                log(f"[{room.slug}] timer program {program.get('name') or program.get('id')!r} not run: {e}")
+            return []
+
+    def _apply_modes(self, room, decisions, now, since):
+        """Each zone's Watering by on this pass's decisions, before anything opens (R2, R3; spec 6.1):
+        - off: no shot at all, the rescues included;
+        - timer: of the engine's shots only TIMER_KEEPS, plus its program's latest slot in (since, now] (`since` is
+          the room's last decided pass, kept in memory: the first pass after a restart only starts the clock, so no
+          missed slot is owed); a slot takes the zone's turn even from a kept shot, which the next pass decides again;
+        - steering: as always.
+        A skip (timers_config.skips, compared as UTC instants) drops a timer slot at its `at`, or the zone's first
+        engine shot outside TIMER_KEEPS in [at, until), once. Both are journaled intent.refused (guard skipped).
+        The slots are decisions like any other: every guard holds them (PASS, SIZED, QUEUE, PREOPEN). A test shot a
+        person asks for is decided after this, untouched. Nothing here writes to Home Assistant."""
+        modes = self._irrigation_modes(room)
+        state, attrs, _ = ha_get(TIMERS_SENSOR.format(room.prefix))
+        readable = state not in (None, "", "unknown", "unavailable") and isinstance(attrs, dict)
+        programs = [p for p in attrs.get("programs") or [] if isinstance(p, dict)] if readable else []
+        skips = [s for s in attrs.get("skips") or [] if isinstance(s, dict)] if readable else []
+        room._timers = {"modes": modes, "programs": programs, "published": state is not None}
+        until = now.astimezone()
+        self._timer_last_pass[room.slug] = until
+        tick = timedelta(microseconds=1)  # project() is [start, end): (since, until] is [since + tick, until + tick)
+        due = {}
+        for program in programs if since is not None else ():
+            for slot in self._project(room, program, since + tick, until + tick):
+                if modes.get(slot.zone) == "timer":
+                    due[slot.zone] = (slot, program)  # in time order: the latest slot is the one owed
+        used = room.__dict__.setdefault("_skips_used", set())  # (zone, at) of the skips an engine shot used up
+        now_utc = until.astimezone(timezone.utc)
+        used.difference_update([k for k in used if k[1] < now_utc - timedelta(days=1)])  # long past their until
+
+        def skip_of(zone, test):
+            for s in skips:
+                at, end = _aware(s.get("at")), _aware(s.get("until"))
+                if s.get("zone") == zone and at is not None and test(at.astimezone(timezone.utc), end):
+                    return s, (zone, at.astimezone(timezone.utc))
+            return None, None
+
+        def refuse(zone, skip, actor, would, program_id=None):
+            self._journal(room.prefix, "intent.refused", zone=zone, outcome="refused", actor=actor,
+                          program_id=program_id, data={"guard": "skipped", "reason": _skipped_by(skip),
+                                                       "would": str(would)})
+            log(f"[{room.slug}] Z{zone} {_skipped_by(skip)}: would {would}")
+
+        for zone in room.zones:
+            mode, (fire, _size, reason) = modes[zone], decisions.get(zone, (False, 0.0, None))
+            kind = getattr(reason, "kind", None)
+            if mode == "off":
+                if fire:
+                    decisions[zone] = (False, 0.0, Reason("OFF: this zone is set to no watering", "mode_off"))
+                continue
+            if fire and mode == "timer" and kind not in TIMER_KEEPS:
+                fire = False
+                decisions[zone] = (False, 0.0, Reason(f"TIMER: the engine's {kind} shot is not given", "mode_timer"))
+            if fire and kind not in TIMER_KEEPS:
+                skip, key = skip_of(zone, lambda at, end: (zone, at) not in used and at <= now_utc
+                                    and end is not None and now_utc < end.astimezone(timezone.utc))
+                if skip is not None:
+                    used.add(key)
+                    refuse(zone, skip, "engine", reason)
+                    decisions[zone] = (False, 0.0, Reason(f"SKIPPED: {_skipped_by(skip)}", "skipped"))
+            if zone in due:
+                slot, program = due[zone]
+                timed = _timer_reason(program, slot.duration_s)
+                skip, _key = skip_of(zone, lambda at, end: at == slot.at.astimezone(timezone.utc))
+                if skip is not None:
+                    refuse(zone, skip, "timer", timed, timed.program_id)
+                    continue
+                flow, substrate = self._zone_flow_lps(room, zone), self._substrate_l(room, zone)
+                sized = math.isfinite(flow) and flow > 0 and math.isfinite(substrate) and substrate > 0
+                # its size is what the counters add up; unsized, _act_zone says why (CS-204) and runs nothing
+                decisions[zone] = (True, slot.duration_s * flow / substrate * 100.0 if sized else 0.0, timed)
+
+    def _publish_projection(self, room, now):
+        """sensor.crop_steering_<prefix>projection_app (attribute intents), at the end of the room's pass, only when
+        it changes: the next PROJECTION_H hours of its timer zones' program slots, and each steering zone's next shot
+        as the engine expects it (its waiting_for, `expected: true`), each with a stable id. Written only once the
+        integration publishes timer programs (an older one has no timeline to read it). Each program is projected on
+        its own (_project); whatever else goes wrong is logged: it never stops watering (R5)."""
+        timers = getattr(room, "_timers", None)
+        if not timers or not timers["published"]:
+            return
+        try:
+            start, intents = now.astimezone(), []
+            for program in timers["programs"]:
+                for slot in self._project(room, program, start, start + timedelta(hours=PROJECTION_H)):
+                    if timers["modes"].get(slot.zone) == "timer":
+                        intents.append((slot.at, {
+                            "id": derived_id(slot.at, f"{room.prefix}:{slot.zone}:timer"), "zone": slot.zone,
+                            "at": slot.at.isoformat(), "duration_s": slot.duration_s, "source": "timer",
+                            "program_id": slot.program_id, "expected": False}))
+            for zone, (conditions, at) in (getattr(room, "_waiting", None) or {}).items():
+                waits = [c["in_min"] for c in conditions if c.get("shot") and c.get("in_min") is not None]
+                if timers["modes"].get(zone) != "steering" or not waits:
+                    continue
+                when = (at.astimezone() + timedelta(minutes=min(waits))).replace(second=0, microsecond=0)
+                intents.append((when, {
+                    "id": derived_id(when, f"{room.prefix}:{zone}:engine"), "zone": zone, "at": when.isoformat(),
+                    "duration_s": None, "source": "engine", "expected": True}))
+            intents = [i for _at, i in sorted(intents, key=lambda pair: pair[0])]
+            self._show_line(PROJECTION_SENSOR.format(room.prefix), str(len(intents)), {
+                "room_id": "room:" + room.prefix, "intents": intents,
+                "friendly_name": "Crop Steering planned shots (controller)", "engine": PRODUCT})
+        except Exception as e:
+            log("projection error", room.slug, e)
 
     def _room_error(self, room, now, err):
         """A room's pass raised (loop_once). The room says so: its heartbeat and its status read error,
@@ -7756,6 +7930,9 @@ class Controller:
         Reads/writes only this room's prefixed entities + its own state."""
         if getattr(self, "_unsaved_rooms", {}).get(room.slug):
             self._restore_unsaved_room(room)
+        # The end of the room's last decided pass (in memory: _apply_modes puts it back). A room not decided this pass
+        # (off, held) owes no timer slot from it, as after a restart.
+        timer_since = self.__dict__.setdefault("_timer_last_pass", {}).pop(room.slug, None)
         try:
             import prompt_runtime
             prompt_runtime.sync(self, room, ha_get, ha_call)
@@ -8031,6 +8208,7 @@ class Controller:
             )
             room._blind_zones.add(zone)
         room._blind_zones = {z for z in room._blind_zones if z not in snaps}
+        self._apply_modes(room, decisions, now, timer_since)  # each zone's Watering by, its timer slots and skips
         for zone in room.zones:  # a test shot asked for takes the zone's turn this pass
             test = self._test_shot(room, zone, now)
             if test:
@@ -8120,6 +8298,7 @@ class Controller:
             }
         if line:  # the pass's turns are over: nobody waits, the pump is idle
             self._line_done(room, line)
+        self._publish_projection(room, now)  # after the last pump closed (R5): it never delays a shot
         for z, why in cross_zone_outliers(snaps):
             self._alert(
                 f"xzone_{room.slug}_{z}",

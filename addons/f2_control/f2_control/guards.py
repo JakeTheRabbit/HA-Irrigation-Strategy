@@ -339,7 +339,8 @@ def _sizing(c, room, zone, ctx):
 def _max_shot(c, room, zone, ctx):
     m = _m(c)
     reason = ctx["reason"]
-    raw_dur = (float(getattr(reason, "seconds", m.TEST_SHOT_S)) if ctx["test"]
+    timed = ctx["test"] or getattr(reason, "kind", None) == "timer"  # a test shot or a timer slot asks for seconds
+    raw_dur = (float(getattr(reason, "seconds", m.TEST_SHOT_S)) if timed
                else raw_seconds(ctx["size"], ctx["substrate"], ctx["flow"]))
     ctx["raw_dur"] = raw_dur
     ctx["max_dur"] = max_dur = c._room_duration_cap(room)  # #201: the last good cap through a read blip (CS-203)

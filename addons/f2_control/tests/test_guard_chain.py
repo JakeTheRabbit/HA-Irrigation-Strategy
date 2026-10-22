@@ -245,7 +245,8 @@ def _(c, fake, room, mp):
     return out
 
 
-for _k in sorted(controller.PLAN_HOLD_EXEMPT) + ["p2_topup"]:
+# "timer" (Task 15) came after the recording: test_timer_mode.py holds it.
+for _k in sorted(controller.PLAN_HOLD_EXEMPT - {"timer"}) + ["p2_topup"]:
     def _plan(c, fake, room, mp, kind=_k):
         room.strategy_snapshot = {"required": True, "error": "plan unreadable"}
         return c._blocked(room, 1, _kind(kind))
@@ -673,9 +674,11 @@ def _observe(name, capsys, tmp_path):
         c, fake, room = _room()
         reads, writes = [], []
         # The supply (Task 12) is read once a pass since the recording. None is saved here, so it changes nothing
-        # else; test_pump_queue.py holds that read and what follows from it.
+        # else; test_pump_queue.py holds that read and what follows from it. Likewise each zone's irrigation_mode
+        # select and the timer programs (Task 15), absent here: test_timer_mode.py holds them.
+        new_reads = (controller.SUPPLY_SENSOR, controller.TIMERS_SENSOR.format(""))
         mp.setattr(controller, "ha_get", lambda e, timeout=8: (
-            e == controller.SUPPLY_SENSOR or reads.append(e), fake.ha_get(e, timeout))[1])
+            e in new_reads or e.endswith("_irrigation_mode") or reads.append(e), fake.ha_get(e, timeout))[1])
         mp.setattr(controller, "ha_set", lambda e, s, a=None, timeout=None: (
             writes.append((e, s, a)), fake.ha_set(e, s, a, timeout))[1])
         fake.calls.clear()
