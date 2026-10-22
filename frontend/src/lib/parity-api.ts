@@ -130,8 +130,8 @@ export async function callV2<T>(
   };
 }
 
-/** Reads a room's Journal from `since`, 500 events a call, until the cursor runs out or `max`
- * events are read. */
+/** Reads a room's Journal from `since`, 500 events a call, until the cursor runs out, a page comes
+ * back empty, or `max` events are read. */
 export async function pagedQuery(
   controller: Pick<Controller, "operator">,
   q: { room_id: string; since: string; until?: string; kinds?: string[]; zones?: number[] },
@@ -148,28 +148,37 @@ export async function pagedQuery(
     if (page.kind !== "ok") return page;
     events.push(...page.data.events);
     cursor = page.data.cursor;
-    if (!cursor || events.length >= max)
+    if (!cursor || !page.data.events.length || events.length >= max)
       return { ...page, data: { events: events.slice(0, max) } };
   }
 }
 
+export type ParityState = "idle" | "loading" | "ready" | "missing" | "error";
+
 /** One v2 read for a page part: `missing` on an older backend (render `NeedsIntegration`), and
- * nothing is asked while `data` is null. Re-reads when `deps` change or on `reload()`. */
+ * `idle` (nothing asked) while `data` is null. Re-reads when `deps` change or on `reload()`;
+ * `deps` are compared by their JSON. */
 export function useParity<T>(
   controller: Pick<Controller, "operator">,
   action: ParityAction,
   data: Record<string, unknown> | null,
   deps: unknown[],
-): { state: "loading" | "ready" | "missing" | "error"; data: T | null; error: string | null; reload(): void } {
-  const [result, setResult] = useState<{ state: "loading" | "ready" | "missing" | "error"; data: T | null; error: string | null }>(
-    { state: "loading", data: null, error: null },
-  );
+): { state: ParityState; data: T | null; error: string | null; reload(): void } {
+  const [result, setResult] = useState<{ state: ParityState; data: T | null; error: string | null }>(() => ({
+    state: data ? "loading" : "idle",
+    data: null,
+    error: null,
+  }));
   const [tick, setTick] = useState(0);
   const latest = useRef({ controller, data });
   latest.current = { controller, data };
+  const key = JSON.stringify([data === null, deps]);
   useEffect(() => {
     const { controller, data } = latest.current;
-    if (!data) return;
+    if (!data) {
+      setResult({ state: "idle", data: null, error: null });
+      return;
+    }
     let current = true;
     setResult((previous) => ({ ...previous, state: "loading", error: null }));
     void callV2<T>(controller, action, data).then((outcome) => {
@@ -181,8 +190,7 @@ export function useParity<T>(
     return () => {
       current = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [action, tick, data === null, ...deps]);
+  }, [action, tick, key]);
   const reload = useCallback(() => setTick((n) => n + 1), []);
   return { ...result, reload };
 }

@@ -2,7 +2,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, test, vi } from "vitest";
 import { NeedsIntegration } from "@/components/needs-integration";
-import { callV2, isMissingService, pagedQuery, PARITY_ACTIONS, PARITY_MIN_VERSION } from "./parity-api";
+import { callV2, isMissingService, pagedQuery, PARITY_ACTIONS, PARITY_MIN_VERSION, useParity } from "./parity-api";
 import { parityDemo } from "./parity-demo";
 import { demoController, fakeController } from "./test-helpers";
 import type { CsEvent } from "./parity-types";
@@ -111,6 +111,51 @@ test("pump_stop and reads are never refused behind a write in flight", async () 
     callV2(c, "supply_save", { expected_revision: 1 }),
   ];
   expect((await Promise.all(calls)).map((o) => o.kind)).toEqual(["ok", "ok", "ok", "error"]);
+});
+test("preview: true skips the write lock only on the four previewable services", async () => {
+  const c = demoController("?demo=1");
+  const calls = [
+    callV2(c, "timer_program_set", { program: {}, expected_revision: 1 }),
+    callV2(c, "pump_prime", { pump: "a", seconds: 10, preview: true }),
+    callV2(c, "supply_save", { expected_revision: 1, preview: true }),
+  ];
+  expect((await Promise.all(calls)).map((o) => o.kind)).toEqual(["ok", "error", "ok"]);
+});
+test("pagedQuery stops on an empty page even with a cursor", async () => {
+  const op = vi.fn().mockResolvedValue({ api: 2, ok: true, data: { events: [], cursor: "still" } });
+  const out = await pagedQuery(fakeController({ operator: op }), { room_id: "room:", since: "x" });
+  expect(op).toHaveBeenCalledTimes(1);
+  expect(out.kind === "ok" && out.data.events).toEqual([]);
+});
+test("useParity is idle, not loading, while there is nothing to ask", () => {
+  let seen = "";
+  const Probe = ({ data }: { data: Record<string, unknown> | null }) => {
+    seen = useParity(fakeController({}), "supply_get", data, [1]).state;
+    return null;
+  };
+  renderToStaticMarkup(createElement(Probe, { data: null }));
+  expect(seen).toBe("idle");
+  renderToStaticMarkup(createElement(Probe, { data: {} }));
+  expect(seen).toBe("loading");
+});
+test("demo prime refuses more than 30 s the way the integration does", async () => {
+  expect(await callV2(demoController("?demo=1"), "pump_prime", { pump: "a", seconds: 31 })).toMatchObject({ kind: "error", code: "invalid" });
+  expect((await callV2(demoController("?demo=1"), "pump_prime", { pump: "a", seconds: 30 })).kind).toBe("ok");
+});
+test("demo 3.18 answers an existing service's refusal in the envelope, keeping stale_revision", async () => {
+  expect(await callV2(demoController("?demo=1"), "display_save", { expected_revision: -1, options: {} })).toEqual({
+    kind: "error", code: "stale_revision", message: "Display options changed elsewhere. Reload before saving.",
+  });
+});
+test("the timer-mode zone is not a paused zone", async () => {
+  const now = Date.now();
+  const list = (await parityDemo("timer_program_list", {}, now, "3.18")) as { data: { programs: { room_id: string; zones: number[] }[] } };
+  const since = new Date(now - 2 * 86_400_000).toISOString();
+  for (const program of list.data.programs) {
+    const page = (await parityDemo("journal_query", { room_id: program.room_id, since }, now, "3.18")) as { data: { events: CsEvent[] } };
+    const paused = page.data.events.filter((e) => e.kind === "intent.held" && e.data.reason === "zone disabled");
+    for (const zone of program.zones) expect(paused.some((e) => e.zone === zone)).toBe(false);
+  }
 });
 test("journal fixture filters by kinds and pages by cursor", async () => {
   const now = Date.parse("2026-10-22T15:00:00+13:00");

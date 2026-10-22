@@ -71,6 +71,9 @@ const PARITY_ROOM_DEFAULT = new Set<string>([
   "timer_program_preview",
   "timer_skip",
 ]);
+/** v2 services whose `preview: true` dry run writes nothing (backend Tasks 11, 21, 22). No other
+ * service's `preview` key skips the write lock. */
+const PREVIEWABLE = new Set<string>(["preset_apply", "copy_config", "probe_offset_set", "supply_save"]);
 /** v2 services that change nothing: kept out of the one-write-at-a-time lock. `pump_stop` is
  * here too: it ends a while-held prime and must never be refused behind another write. */
 const PARITY_READS = new Set<string>([
@@ -560,7 +563,12 @@ export class ControllerStore {
     // must never wait behind anything.
     const mutation =
       !action.startsWith("whats_new_") &&
-      !(parity && (PARITY_READS.has(action) || data.preview === true || (action === "alert_rule_test" && data.send !== true))) &&
+      !(
+        parity &&
+        (PARITY_READS.has(action) ||
+          (PREVIEWABLE.has(action) && data.preview === true) ||
+          (action === "alert_rule_test" && data.send !== true))
+      ) &&
       ![
         "strategy_get",
         "strategy_preview",

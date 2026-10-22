@@ -2,10 +2,12 @@ import type { DemoHandler } from "../parity-demo";
 import type { CsEvent, JournalActor, JournalOutcome, JournalPage } from "../parity-types";
 
 /** The demo's Journal: a deterministic grow-day per demo room, yesterday's and today's, from its
- * lights-on. Room A plays F2 ("Flower · bulk", P2, 7/6/7 shots a day), Room B plays F1 ("Flower ·
- * stretch", P1, 4/4/0 shots, zone 3 paused). Only events at or before `now` are answered. */
-const ROOMS: Record<string, { lightsOn: number; phase: "P1" | "P2"; shots: number[]; low?: number }> = {
-  "room:": { lightsOn: 10, phase: "P2", shots: [7, 6, 7], low: 2 },
+ * lights-on. Room A plays F2 ("Flower · bulk", P2, 7/6/7 shots a day; zone 3 waters by timer
+ * program "Zone 3 day timer"), Room B plays F1 ("Flower · stretch", P1, 4/4/0 shots, zone 3
+ * paused). Only events at or before `now` are answered. */
+export const DEMO_TIMER_PROGRAM_ID = "01JDEMQT1MERZ0NE3DAY000000";
+const ROOMS: Record<string, { lightsOn: number; phase: "P1" | "P2"; shots: number[]; low?: number; timer?: number }> = {
+  "room:": { lightsOn: 10, phase: "P2", shots: [7, 6, 7], low: 2, timer: 3 },
   "room:room_b_": { lightsOn: 8, phase: "P1", shots: [4, 4, 0] },
 };
 const MIN = 60_000;
@@ -49,7 +51,7 @@ function roomDay(roomId: string, on: number): CsEvent[] {
     at: number,
     kind: string,
     data: Record<string, unknown>,
-    opts: { zone?: number | null; actor?: JournalActor; outcome?: JournalOutcome; code?: string | null; detail?: string; intent?: string } = {},
+    opts: { zone?: number | null; actor?: JournalActor; outcome?: JournalOutcome; code?: string | null; detail?: string; intent?: string; program?: string } = {},
   ) => {
     const id = demoId(at, `${roomId}:${kind}:${opts.zone ?? ""}:${at}`);
     out.push({
@@ -61,7 +63,7 @@ function roomDay(roomId: string, on: number): CsEvent[] {
       kind,
       outcome: opts.outcome ?? "ok",
       code: opts.code ?? null,
-      source: { actor: opts.actor ?? "engine", detail: opts.detail ?? null, user_id: opts.actor === "manual" ? "demo-user" : null },
+      source: { actor: opts.actor ?? "engine", detail: opts.detail ?? null, program_id: opts.program ?? null, user_id: opts.actor === "manual" ? "demo-user" : null },
       correlation: opts.intent ? { intent_id: opts.intent } : {},
       data,
     });
@@ -99,9 +101,12 @@ function roomDay(roomId: string, on: number): CsEvent[] {
       const vwc = 56.4 + shot * 0.6 + index * 0.3;
       const intent = demoId(requested, `${roomId}:intent:${zone}:${shot}`);
       if (queued) add(requested, "intent.queued", { position: 1, priority: "steering", requested_at: iso(requested), guard: "pump_capacity" }, { zone, outcome: "queued", intent });
-      const reason = phase === "P1" ? `P1 ramp shot ${shot + 1}` : "P2 top-up: VWC under threshold";
-      add(start, "shot.started", { phase, kind: phase === "P1" ? "p1_ramp" : "p2_topup", reason, size_pct: 3, duration_s: 60, commanded_l: commanded, vwc_before: vwc, vwc_expected: phase === "P1" ? vwc + 1.8 : null, requested_at: iso(requested), pump_wait_s: wait }, { zone, intent, detail: reason });
-      add(start + 61_000, "shot.completed", { elapsed_s: 61, commanded_l: commanded, metered_l: metered, vwc_before: vwc, ec_before: 4.8 + index * 0.4 }, { zone, intent, detail: reason });
+      const timer = zone === room.timer;
+      const by = timer ? { actor: "timer" as const, program: DEMO_TIMER_PROGRAM_ID } : {};
+      const reason = timer ? "Timer: Zone 3 day timer" : phase === "P1" ? `P1 ramp shot ${shot + 1}` : "P2 top-up: VWC under threshold";
+      const kind = timer ? "timer" : phase === "P1" ? "p1_ramp" : "p2_topup";
+      add(start, "shot.started", { phase, kind, reason, size_pct: 3, duration_s: 60, commanded_l: commanded, vwc_before: vwc, vwc_expected: phase === "P1" && !timer ? vwc + 1.8 : null, requested_at: iso(requested), pump_wait_s: wait }, { zone, intent, detail: reason, ...by });
+      add(start + 61_000, "shot.completed", { elapsed_s: 61, commanded_l: commanded, metered_l: metered, vwc_before: vwc, ec_before: 4.8 + index * 0.4 }, { zone, intent, detail: reason, ...by });
       const ratio = metered / commanded;
       add(start + 62_000, "flow.reconciled", { ratio, commanded_l: commanded, metered_l: metered }, { zone, intent, outcome: ratio < 0.8 ? "partial" : "ok", code: ratio < 0.8 ? "CS-318" : null });
     }

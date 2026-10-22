@@ -435,8 +435,15 @@ export class OperatorDemo {
     // 3.17 one answers v1, which callV2 reads as missing.
     if (data.api === 2) {
       const { api: _api, ...v1 } = data;
-      const result = await this.call<unknown>(action, v1);
-      return (this.backend === "3.17" ? result : demoEnvelope(result, Date.now(), data.room_id)) as T;
+      if (this.backend === "3.17") return this.call<T>(action, v1);
+      try {
+        return demoEnvelope(await this.call<unknown>(action, v1), Date.now(), data.room_id) as T;
+      } catch (error) {
+        // The 3.18 integration answers a refusal inside the envelope; a moved revision keeps its code.
+        const message = error instanceof Error ? error.message : String(error);
+        const code = /revision|changed elsewhere|Reload/i.test(message) ? "stale_revision" : "invalid";
+        return { api: 2, ok: false, error: { code, message } } as T;
+      }
     }
     if (action === "stop_all") {
       // The demo's room: its kill switch off, as the integration's Stop all does first.

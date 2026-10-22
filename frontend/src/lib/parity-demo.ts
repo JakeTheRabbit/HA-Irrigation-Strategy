@@ -1,6 +1,6 @@
 import { demoBackend, type DemoBackend } from "./demo";
 import { PARITY_ACTIONS, type ParityAction } from "./parity-api";
-import { demoId, demoJournal } from "./parity-demo/journal";
+import { DEMO_TIMER_PROGRAM_ID, demoId, demoJournal } from "./parity-demo/journal";
 import type {
   AlertPreview,
   AlertRuleListItem,
@@ -165,9 +165,9 @@ const SUPPLY: SupplyDoc = {
 };
 
 const timerProgram = (now: number): TimerProgramListItem => ({
-  id: "01JDEMOTIMERMOTHERSAM0000", room_id: "room:room_b_", name: "Mothers AM", zones: [3], type: "recycle",
-  duration_s: 120, interval_min: 30, frequency_per_day: null, start_at: null,
-  window: { kind: "custom", from: "08:00", to: "12:00" }, sync_time: null, active: true, revision: 1,
+  id: DEMO_TIMER_PROGRAM_ID, room_id: "room:", name: "Zone 3 day timer", zones: [3], type: "recycle",
+  duration_s: 60, interval_min: 45, frequency_per_day: null, start_at: null,
+  window: { kind: "lights_on" }, sync_time: null, active: true, revision: 1,
   next_at: iso(now + 30 * 60_000), zones_in_timer_mode: [3],
 });
 
@@ -226,6 +226,7 @@ const DASHBOARDS: DashboardList = {
 
 /** Task 3's answer for every parity action: plausible, deterministic for `now`. */
 const DEFAULTS: Record<ParityAction, (data: Record<string, unknown>, now: number) => unknown> = {
+  // Never reached: parity-demo/journal.ts always answers journal_query (the record needs a key).
   journal_query: () => ({ events: [], cursor: null }),
   timeline_get: timeline,
   timeline_summary: summary,
@@ -234,7 +235,11 @@ const DEFAULTS: Record<ParityAction, (data: Record<string, unknown>, now: number
   supply_get: () => structuredClone(SUPPLY),
   supply_save: (d) => ({ ...structuredClone(SUPPLY), revision: Number(d.expected_revision ?? SUPPLY.revision) + (d.preview ? 0 : 1) }),
   pump_precheck: () => ({ ok: true, blockers: [] }),
-  pump_prime: (_d, now) => ({ request_id: demoId(now, "prime"), outcome: "requested", blockers: [] }),
+  pump_prime: (d, now) =>
+    // The integration's schema caps a prime at 1–30 s; the envelope reports it as `invalid`.
+    d.seconds !== undefined && !(Number(d.seconds) >= 1 && Number(d.seconds) <= 30)
+      ? { api: 2, ok: false, error: { code: "invalid", message: "value must be between 1 and 30 for dictionary value @ data['seconds']" } }
+      : { request_id: demoId(now, "prime"), outcome: "requested", blockers: [] },
   pump_stop: (_d, now) => ({ request_id: demoId(now, "stop") }),
   pump_calibrate: (_d, now) => ({ session_id: demoId(now, "pump-cal"), outcome: "requested" }),
   pump_calibration_commit: (d) => ({ ml_min: (Number(d.measured_ml) || 150) / 30 * 60, previous_ml_min: 290, flow_entity_written: true }),
