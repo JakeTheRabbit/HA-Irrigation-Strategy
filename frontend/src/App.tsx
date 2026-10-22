@@ -17,6 +17,7 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 import { useController } from "@/lib/use-controller";
+import { useDisplayUnits } from "@/lib/display-units";
 import { useHaTheme } from "@/lib/ha-theme";
 import { useHaShell } from "@/lib/ha-shell";
 import { errorText } from "@/lib/utils";
@@ -78,6 +79,7 @@ function readRoute(): Route {
 
 export default function App() {
   const controller = useController();
+  useDisplayUnits(controller);
   const [route, setRoute] = useState<Route>(readRoute);
   const [mobile, setMobile] = useState(false);
   const [drafts, setDrafts] = useState<Drafts>({});

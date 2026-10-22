@@ -25,13 +25,15 @@ import {
   type SizingKey,
   type SizingUnit,
   type UnitSystem,
+  VOLUME_CHOICE_KEY,
 } from "@/lib/units";
+import { getDisplayUnits } from "@/lib/display-units";
 
 /** Helpers beside the zone sizing fields. Each one only fills the local setup draft, in
  * litres and L/h; saving still goes through "Review configuration". */
 type Quantity = keyof typeof SIZING_UNITS;
 const STORAGE: Record<Quantity, string> = {
-  volume: "crop-steering-unit-volume",
+  volume: VOLUME_CHOICE_KEY,
   flow: "crop-steering-unit-flow",
 };
 function remembered(quantity: Quantity): string | null {
@@ -51,7 +53,8 @@ export function useSizingUnits(): SizingUnits {
   const [systems, setSystems] = useState<Record<Quantity, UnitSystem>>(() => {
     const homeAssistant = unitSystemFromHass(findSession());
     return {
-      volume: initialUnitSystem(homeAssistant, remembered("volume")),
+      // The room's display volume unit: its `auto` resolves exactly as flow does below.
+      volume: getDisplayUnits().volume === "gal" ? "us" : "metric",
       flow: initialUnitSystem(homeAssistant, remembered("flow")),
     };
   });

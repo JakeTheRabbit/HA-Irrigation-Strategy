@@ -101,6 +101,9 @@ export function unitSystemFromHass(hass: unknown): UnitSystem | null {
   const volume = config?.unit_system?.volume;
   return volume === "gal" ? "us" : volume === "L" ? "metric" : null;
 }
+/** This browser's last pot-volume unit (the zone sizing picker). The display units' `auto` volume
+ * reads it too, so both resolve with `initialUnitSystem`. */
+export const VOLUME_CHOICE_KEY = "crop-steering-unit-volume";
 export const rememberedUnitSystem = (stored: string | null): UnitSystem | null =>
   stored === "metric" || stored === "us" ? stored : null;
 /** Home Assistant's unit system when known, else this browser's last choice, else metric. */
