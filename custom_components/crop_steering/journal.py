@@ -233,6 +233,16 @@ class Journal:
         next_cursor = f"{rows[-1][1]}:{rows[-1][2]}" if more else None
         return {"events": [json.loads(r[0]) for r in rows], "cursor": next_cursor}
 
+    def get(self, event_id: str) -> dict | None:
+        """One stored event (with its room_id and seq) by id, or None."""
+        with self._lock:
+            row = (
+                self._need_db()
+                .execute("SELECT body FROM events WHERE id = ?", (event_id,))
+                .fetchone()
+            )
+        return json.loads(row[0]) if row else None
+
     def prune(self, now_ms: int) -> int:
         cutoff = now_ms - SHORT_DAYS * 86_400_000
         clause = " OR ".join("kind LIKE ?" for _ in SHORT_KINDS)

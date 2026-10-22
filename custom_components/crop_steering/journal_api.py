@@ -4,7 +4,8 @@ One store for the site (journal.py, SQLite at <config>/crop_steering/journal.db)
 kept while any room is loaded. `journal_append` stores events (the controller's outbox flush) and `journal_query`
 reads them back. Every stored event is re-fired on the bus as `crop_steering_event`; other integration code
 writes through `emit()`. A signed-in user who may not call `subscribe_events` for a custom event type can follow
-the feed with the `crop_steering/subscribe` websocket command.
+the feed with the `crop_steering/subscribe` websocket command. `history_changes` reads who changed what
+(changes.py folds the journal) and `history_revert` puts one change back (an administrator only).
 
 Nothing here is needed for watering: a journal that cannot open only logs, `emit()` then does nothing, and the
 two services answer "unavailable".
@@ -26,7 +27,7 @@ from .journal import validate_event
 
 _LOGGER = logging.getLogger(__name__)
 
-SERVICES = ("journal_append", "journal_query")
+SERVICES = ("journal_append", "journal_query", "history_changes", "history_revert")
 MAX_APPEND = 50
 READY_TIMEOUT_S = 30
 PRUNE_EVERY = timedelta(days=1)
@@ -131,6 +132,10 @@ class JournalHub:
             )
         except ValueError as err:
             raise _hub_error(str(err)) from err
+
+    async def get(self, event_id: str) -> dict | None:
+        await self._wait_ready()
+        return await self.hass.async_add_executor_job(self._journal.get, event_id)
 
     async def backfill(self, room_id: str, rows: dict, build) -> int:
         """Store the room's old history, one source at a time. `rows` maps a source name to its rows, or to
@@ -282,6 +287,276 @@ def attribution(hass, call) -> dict:
     }
 
 
+# ------------------------------------------------------------------ History › Changes (G8)
+CANT = "This change can't be put back"
+
+
+def _room_ids(hass) -> list[str]:
+    from .room import room_prefix
+
+    return sorted(
+        {"room:" + room_prefix(e) for e in hass.config_entries.async_entries(DOMAIN)}
+    )
+
+
+def _step_scope(hass, room_id: str):
+    """The room's "Max setpoint move applies to" choice, or None."""
+    state = hass.states.get(
+        f"select.{DOMAIN}_{room_id[len('room:'):]}setpoint_step_limit_applies_to"
+    )
+    return getattr(state, "state", None)
+
+
+async def history_changes(hass, hub, args: dict) -> dict:
+    """{changes}: changes.fold_changes over the room's journal (every room when no room_id), filtered by
+    zone, key and change kinds, each row with the name of the Home Assistant user who made it.
+    """
+    from .changes import KINDS, fold_changes
+
+    rooms = [args["room_id"]] if args.get("room_id") else _room_ids(hass)
+    events = []
+    for room_id in rooms:
+        cursor = None
+        while True:
+            page = await hub.query(
+                room_id=room_id,
+                since=args["since"],
+                until=args.get("until"),
+                kinds=list(KINDS),
+                cursor=cursor,
+            )
+            events += page["events"]
+            cursor = page["cursor"]
+            if cursor is None:
+                break
+    rows = fold_changes(
+        events, {r: {"step_scope": _step_scope(hass, r)} for r in rooms}
+    )
+    if args.get("zone") is not None:
+        rows = [r for r in rows if r["scope"] == f"zone:{args['zone']}"]
+    if args.get("key"):
+        rows = [r for r in rows if r["key"] == args["key"]]
+    if args.get("kinds"):
+        rows = [r for r in rows if r["kind"] in args["kinds"]]
+    names: dict = {}
+    for row in rows:
+        user_id = row["user_id"]
+        if user_id and user_id not in names:
+            user = await hass.auth.async_get_user(user_id)
+            names[user_id] = getattr(user, "name", None)
+        row["user_name"] = names.get(user_id) if user_id else None
+    return {"changes": rows}
+
+
+async def history_revert(hass, hub, call) -> dict:
+    """Put one change back -> {reverted_event_id, new_event_id, readback, error?}. A setting is
+    written back and read back (presets.write_numbers); a store section is saved again from its
+    `old` copy at the current revision. Either is journaled as manual, "put back", caused by the
+    change. A setting or section that moved since is StaleRevision; a change that is not
+    revertible is refused."""
+    from .changes import PUT_BACK, fold_changes
+
+    event_id = call.data["event_id"]
+    event = await hub.get(event_id)
+    if event is None:
+        raise _hub_error(f"No change {event_id} in the journal")
+    rows = fold_changes([event], {})
+    if not rows or not rows[0]["revertible"]:
+        raise _hub_error(CANT)
+    who = {
+        **attribution(hass, call),
+        "actor": "manual",
+        "detail": PUT_BACK,
+        "causation_id": event_id,
+    }
+    emitted, outer = [], EMITTED.get()
+    token = EMITTED.set(emitted)
+    try:
+        answer = await _put_back(hass, event, who, call)
+    except (ValueError, KeyError) as err:
+        raise _hub_error(str(err)) from err
+    finally:
+        EMITTED.reset(token)
+        if outer is not None:
+            outer.extend(emitted)
+    return {
+        "reverted_event_id": event_id,
+        "new_event_id": emitted[0][0] if emitted else None,
+        **answer,
+    }
+
+
+def _stale(what, revision=None):
+    from .api_v2 import StaleRevision
+
+    return StaleRevision(
+        f"{what} has changed since this change; reload the history", revision
+    )
+
+
+async def _put_back(hass, event, who, call) -> dict:
+    from . import presets
+
+    data, room_id = event["data"], event["room_id"]
+    entry = presets._entry(hass, room_id=room_id)
+    if event["kind"] == "target.changed":
+        entity_id = data["entity_id"]
+        now = presets._state(hass, entity_id)
+        if now is None or not presets.same(now, data["new"]):
+            raise _stale(f"The setting {data.get('key') or entity_id}")
+        (row,) = await presets.write_numbers(
+            hass,
+            entry.entry_id,
+            [
+                {
+                    "entity_id": entity_id,
+                    "key": data.get("key"),
+                    "value": data["old"],
+                    "zone": event.get("zone"),
+                }
+            ],
+            who,
+        )
+        return {"readback": row["readback"], "error": row.get("error")}
+    expected = call.data.get("expected_revision")
+
+    def check(name, current, new, revision):
+        if (expected is not None and expected != revision) or current != new:
+            raise _stale(name, revision)
+
+    if event["kind"] == "calibration.committed":
+        from .calibration import resolve_calibration
+
+        store = resolve_calibration(hass, room_id)
+        applied = next(
+            (
+                r.get("id")
+                for r in store.document["records"]
+                if r.get("probe") == data.get("probe") and r.get("applied")
+            ),
+            None,
+        )
+        check(
+            "The probe's calibration",
+            applied,
+            data.get("record_id"),
+            store.document["revision"],
+        )
+        await store.revert(data["probe"], who)
+        return {"readback": "verified"}
+    return await _put_back_section(hass, entry, room_id, data, who, call, check)
+
+
+async def _put_back_section(hass, entry, room_id, data, who, call, check) -> dict:
+    """A store section saved again from its `old` copy, through the store's own save path."""
+    from copy import deepcopy
+
+    store, section, old, new = data["store"], data["section"], data["old"], data["new"]
+    if store == "timers":
+        from . import timers_api
+
+        room = timers_api._rooms(hass)[entry.entry_id]
+        revision = room.document["revision"]
+        check("The timer programs", room.document["programs"], new, revision)
+        live = {p.get("id") for p in new if not p.get("deleted_at")}
+        programs = [
+            p if p.get("id") in live else {k: v for k, v in p.items() if k != "id"}
+            for p in deepcopy(old)
+            if not p.get("deleted_at")
+        ]
+        await timers_api.set_programs(hass, entry.entry_id, programs, revision, who)
+        return {"readback": "verified"}
+    if store == "site":
+        from . import site_store
+
+        site = hass.data[DOMAIN]["_site"]
+        if section == "supply":
+            revision = site.document["revision"]
+            check("The supply", site_store.supply_of(site.document), new, revision)
+            out = await site.save({**deepcopy(old), "expected_revision": revision}, who)
+            ok = out["readback"]["status"] == "ok"
+            return {"readback": "verified" if ok else "refused"}
+        revision = site.document["presets_revision"]
+        check("The presets", site.document["presets"], new, revision)
+
+        def change(stored):
+            stored[:] = deepcopy(old)
+
+        await site._save_presets(revision, change, who, room_id)
+        return {"readback": "verified"}
+    if store == "calibration":
+        from .calibration import resolve_calibration
+
+        cal = resolve_calibration(hass, room_id)
+        check(
+            "The probe offsets",
+            cal.document["probe_user_offsets"],
+            new,
+            cal.document["revision"],
+        )
+        for entity_id in sorted(set(old) | set(new)):
+            if old.get(entity_id) == new.get(entity_id):
+                continue
+            fix = old.get(entity_id) or {}
+            await cal.probe_offset_set(
+                {
+                    "entity_id": entity_id,
+                    "offset": fix.get("offset", 0.0),
+                    "curve": fix.get("curve") or "none",
+                    "expected_revision": cal.document["revision"],
+                },
+                who,
+            )
+        return {"readback": "verified"}
+    from . import setup_api  # store "setup", section "room"
+
+    async with hass.data[DOMAIN]["_setup"]["lock"]:
+        before = setup_api.setup_room(hass, entry)
+        check("The room setup", setup_api._owned(before), new, before["revision"])
+        payload = {
+            k: deepcopy(old[k])
+            for k in (
+                "room_name",
+                "active",
+                "zones",
+                "hardware",
+                "plumbing",
+                "tank_level",
+            )
+            if k in old
+        }
+        result = await setup_api.save_setup(
+            hass,
+            {
+                **payload,
+                "entry_id": entry.entry_id,
+                "expected_revision": before["revision"],
+            },
+        )
+        setup_api._record(hass, "setup_save", before, result, call.context, who)
+    return {"readback": "verified"}
+
+
+def _not_put_back(call, result):
+    """API v2: a put back whose setting did not read back as the old value."""
+    from .api_v2 import failure
+
+    if result.get("readback") != "refused":
+        return None
+    return failure(
+        "guard_refused",
+        f"Not put back: {result.get('error') or 'it did not read back'}",
+    )
+
+
+def _readback_of(call, result):
+    from .api_v2 import _readback
+
+    if call.service == "history_revert":
+        return result.get("readback", "none")
+    return _readback(call, result)
+
+
 def _wire(hass, hub) -> list:
     """The parts that need the real Home Assistant: the websocket command and the daily prune. -> unsubs."""
     from homeassistant.helpers.event import async_track_time_interval
@@ -365,6 +640,7 @@ async def async_setup_journal(hass) -> None:
     from homeassistant.core import SupportsResponse
 
     from .api_v2 import fields, wrap
+    from .changes import CHANGE_KINDS
 
     data = hass.data.setdefault(DOMAIN, {})
     if HUB in data:
@@ -389,10 +665,15 @@ async def async_setup_journal(hass) -> None:
                     source["client"] = who["client"]
                 events.append({**raw, "source": source})
             return await hub.append(call.data["room_id"], events)
+        if call.service == "history_revert":
+            await async_require_admin(hass, call, f"{DOMAIN}.history_revert")
+            return await history_revert(hass, hub, call)
         if user_id and await hass.auth.async_get_user(user_id) is None:
             raise forbidden(
-                f"{DOMAIN}.journal_query requires a signed-in Home Assistant user"
+                f"{DOMAIN}.{call.service} requires a signed-in Home Assistant user"
             )
+        if call.service == "history_changes":
+            return await history_changes(hass, hub, call.data)
         args = {
             k: v for k, v in call.data.items() if k not in ("client", "proposal_token")
         }
@@ -415,16 +696,32 @@ async def async_setup_journal(hass) -> None:
             vol.Optional("cursor"): str,
             vol.Optional("client"): str,
         },
+        "history_changes": {
+            vol.Optional("room_id"): str,
+            vol.Required("since"): str,
+            vol.Optional("until"): str,
+            vol.Optional("zone"): vol.Coerce(int),
+            vol.Optional("key"): str,
+            vol.Optional("kinds"): [vol.In(CHANGE_KINDS)],
+        },
+        "history_revert": {
+            vol.Required("event_id"): str,
+            vol.Optional("expected_revision"): vol.All(int, vol.Range(min=0)),
+        },
     }
     for service in SERVICES:
         hass.services.async_register(
             DOMAIN,
             service,
-            wrap(handle),
+            wrap(
+                handle,
+                readback_of=_readback_of,
+                error_of={"history_revert": _not_put_back},
+            ),
             schema=vol.Schema(fields(schemas[service])),
             supports_response=(
                 SupportsResponse.OPTIONAL
-                if service == "journal_append"
+                if service in ("journal_append", "history_revert")
                 else SupportsResponse.ONLY
             ),
         )

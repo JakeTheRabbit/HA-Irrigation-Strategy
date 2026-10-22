@@ -193,6 +193,7 @@ NEVER_ANSWERS_REFUSAL = frozenset(
         "grow_days_backfill",
         "grow_days_get",
         "harvests_get",
+        "history_changes",
         "history_connection_get",
         "history_connection_save",
         "history_long",

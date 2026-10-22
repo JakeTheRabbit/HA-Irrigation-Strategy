@@ -213,6 +213,7 @@ async def test_every_response_service_has_a_refusal_hook_or_never_answers_one(ha
         "dosing_request",
         "dosing_save",
         "grow_day_record",
+        "history_revert",
         "notify",
         "notify_save",
         "notify_test",

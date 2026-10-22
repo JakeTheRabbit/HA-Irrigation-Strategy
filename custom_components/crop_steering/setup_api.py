@@ -1086,9 +1086,15 @@ def _journal(hass, action, before, room, who):
         "room:" + room["prefix"],
         "config.changed",
         actor=who.get("actor", "system"),
+        detail=who.get("detail"),
         user_id=who.get("user_id"),
         client=who.get("client"),
-        correlation={"setup_revision": room["revision"]},
+        correlation={
+            "setup_revision": room["revision"],
+            **(
+                {"causation_id": who["causation_id"]} if who.get("causation_id") else {}
+            ),
+        },
         data={
             "store": "setup",
             "section": "room",

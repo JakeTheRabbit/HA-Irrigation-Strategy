@@ -2138,6 +2138,75 @@ journal_query:
       selector:
         text:
 
+history_changes:
+  name: Change history
+  description: >-
+    Who changed what: setting, plan, recipe, setup, calibration and alert rule changes from the
+    journal, newest first, each with its user, its outcome line and whether it can be put back.
+    Any signed-in user. Without a room, every room merged by time.
+  fields:
+    room_id:
+      name: Room
+      description: Canonical room id, "room:" plus the room prefix. Empty for every room.
+      required: false
+      selector:
+        text:
+    since:
+      name: Since
+      description: ISO-8601 start time, inclusive.
+      required: true
+      selector:
+        text:
+    until:
+      name: Until
+      description: ISO-8601 end time, exclusive.
+      required: false
+      selector:
+        text:
+    zone:
+      name: Zone
+      description: Only this zone's changes.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 99
+          mode: box
+    key:
+      name: Setting
+      description: Only changes of this setting key.
+      required: false
+      selector:
+        text:
+    kinds:
+      name: Kinds
+      description: Only these change kinds (setpoint, plan, recipe, setup, calibration, alerts).
+      required: false
+      selector:
+        object:
+
+history_revert:
+  name: Put a change back
+  description: >-
+    Puts one change back: a setting is written back to its old value and read back, a saved
+    section is saved again from its old copy. Journaled as a manual "put back" change. Refused
+    when the setting or section has changed since. Administrators only.
+  fields:
+    event_id:
+      name: Change
+      description: The id of the change, from history_changes.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: For a saved section, the store revision the caller read.
+      required: false
+      selector:
+        number:
+          min: 0
+          mode: box
+
 timer_program_set:
   name: Save a timer program
   description: >-

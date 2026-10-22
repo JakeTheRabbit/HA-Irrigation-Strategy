@@ -1002,6 +1002,50 @@
         }
       }
     },
+    "history_changes": {
+      "name": "Read the change history",
+      "description": "Returns who changed what: setting, plan, recipe, setup, calibration and alert rule changes, newest first. Changes nothing. Any signed-in user can call it.",
+      "fields": {
+        "room_id": {
+          "name": "Room",
+          "description": "The room to read: `room:` followed by the room prefix. Empty: every room."
+        },
+        "since": {
+          "name": "Since",
+          "description": "The first moment to include, as an ISO time with its offset."
+        },
+        "until": {
+          "name": "Until",
+          "description": "The first moment to leave out, as an ISO time with its offset. Empty: no end."
+        },
+        "zone": {
+          "name": "Zone",
+          "description": "Return only the changes of this zone number. Empty: all zones."
+        },
+        "key": {
+          "name": "Setting",
+          "description": "Return only the changes of this setting key. Example: `p2_shot_size`."
+        },
+        "kinds": {
+          "name": "Kinds",
+          "description": "Return only these change kinds: setpoint, plan, recipe, setup, calibration or alerts. Empty: all kinds."
+        }
+      }
+    },
+    "history_revert": {
+      "name": "Put a change back",
+      "description": "Puts one change back and reads it back. Refused when the value has moved since. Only an administrator can call it.",
+      "fields": {
+        "event_id": {
+          "name": "Change",
+          "description": "The ID of the change, from `history_changes`."
+        },
+        "expected_revision": {
+          "name": "Expected revision",
+          "description": "For a saved section: the revision of the store that you read. Empty: no check."
+        }
+      }
+    },
     "notify_get": {
       "name": "Read notifications",
       "description": "Returns who gets which alerts: the row of each phone, the alert types, and the phones of the site with their owners. Changes nothing. It has no administrator check. The answer also shows if the caller can change every row. Use it to read the revision before `notify_save`."

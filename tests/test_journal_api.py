@@ -127,6 +127,8 @@ def test_setup_never_raises_when_the_journal_cannot_open(tmp_path, monkeypatch, 
     assert {n for (_, n) in hass.services.registered} == {
         "journal_append",
         "journal_query",
+        "history_changes",
+        "history_revert",
     }
 
 

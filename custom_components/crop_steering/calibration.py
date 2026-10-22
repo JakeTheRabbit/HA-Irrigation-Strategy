@@ -1294,8 +1294,10 @@ class CalibrationStore:
                 self.room_id,
                 kind,
                 actor=who.get("actor", "system"),
+                detail=who.get("detail"),
                 user_id=who.get("user_id"),
                 client=who.get("client"),
+                correlation={"causation_id": who.get("causation_id")},
                 data=data,
             )
         except Exception as err:

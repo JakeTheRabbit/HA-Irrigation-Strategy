@@ -323,8 +323,10 @@ class SiteStore:
             room_id,
             "config.changed",
             actor=who.get("actor", "system"),
+            detail=who.get("detail"),
             user_id=who.get("user_id"),
             client=who.get("client"),
+            correlation={"causation_id": who.get("causation_id")},
             data={
                 "store": "site",
                 "section": "presets",
@@ -358,14 +360,15 @@ class SiteStore:
             )
             if not ids and rooms:
                 ids = [min(r["room_id"] for r in rooms)]
-            shared = new_id()
             who = who or {}
+            shared = who.get("causation_id") or new_id()
             for room_id in ids:
                 note(
                     self.hass,
                     room_id,
                     "config.changed",
                     actor=who.get("actor", "system"),
+                    detail=who.get("detail"),
                     user_id=who.get("user_id"),
                     client=who.get("client"),
                     correlation={"causation_id": shared},
