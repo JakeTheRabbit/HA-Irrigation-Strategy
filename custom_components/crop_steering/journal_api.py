@@ -725,7 +725,7 @@ def _timeline_room(hass, room_id, pump) -> tuple[dict, list]:
         "capacity_lph": capacity,
         "planned_source": source,
         # The integration owns the timers config, so the timeline reads the skips itself.
-        "skips": timers._skips_in_force() if timers is not None else [],
+        "skips": timers.skips_in_force() if timers is not None else [],
     }
     return room, [{**i, "room_id": room_id} for i in intents if isinstance(i, dict)]
 

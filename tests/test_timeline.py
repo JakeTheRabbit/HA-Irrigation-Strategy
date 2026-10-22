@@ -635,3 +635,55 @@ def test_the_summary_service_reads_a_shot_across_midnight_once(tmp_path, monkeyp
     assert counts(d) == [("2026-10-22", 1, 0)]
     assert counts(d1) == [("2026-10-23", 0, 0)]
     assert counts(both) == [("2026-10-22", 1, 0), ("2026-10-23", 0, 0)]
+
+
+def test_a_shot_that_closed_before_the_window_is_not_drawn():
+    since, until = _day(22)
+    intent = new_id()
+    events = [
+        _ev(
+            "shot.started",
+            since - timedelta(minutes=30),
+            intent=intent,
+            duration_s=3600,
+        ),
+        _ev(
+            "shot.aborted",
+            since - timedelta(minutes=20),
+            intent=intent,
+            outcome="aborted",
+            code="CS-301",
+        ),
+    ]
+    out = timeline.build(
+        [_room()],
+        _read(events, since, until, openers=True),
+        [],
+        since,
+        until,
+        now=NOW,
+        tz=NZ,
+    )
+    assert _blocks(out) == [] and out["errors"]["count"] == 0
+
+
+def test_shared_pump_load_is_clipped_to_the_window():
+    since, until = _day(22)
+    _, inside = _shot(datetime(2026, 10, 22, 7, 0, tzinfo=NZ))
+    _, before = _shot(since - timedelta(minutes=30))
+    for ev in before:
+        ev["room_id"] = (
+            F1  # another room on the pump, read whole from before the window
+        )
+    out = timeline.build(
+        [_room(pump=PUMP, capacity_lph=1200.0)],
+        inside + before,
+        [],
+        since,
+        until,
+        now=NOW,
+        tz=NZ,
+        pumps={PUMP: {F2: {"3": 300.0}, F1: {"3": 300.0}}},
+    )
+    times = [datetime.fromisoformat(p["t"]) for p in out["rooms"][0]["pump_load"]]
+    assert times and all(since <= t <= until for t in times)

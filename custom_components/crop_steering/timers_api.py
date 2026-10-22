@@ -183,7 +183,7 @@ class TimerPrograms:
             )
         ]
 
-    def _skips_in_force(self) -> list[dict]:
+    def skips_in_force(self) -> list[dict]:
         now = self._now()
         return [
             s for s in self.document["skips"] if _instant(s["at"]) + SKIP_KEPT > now
@@ -268,7 +268,7 @@ class TimerPrograms:
                 ],
                 "skips": [
                     {key: s[key] for key in ("zone", "at", "until")}
-                    for s in self._skips_in_force()
+                    for s in self.skips_in_force()
                 ],
             },
         )

@@ -86,11 +86,12 @@ def check_days(days) -> list[date]:
 
 def windows(since: datetime, until: datetime, *, openers: bool) -> list[tuple]:
     """The journal reads for [since, until): (since, until, kinds). Every kind in the window; the completions of
-    shots started in it up to CLOSE_MARGIN after it; with `openers`, the starts up to CLOSE_MARGIN before it, so a
-    shot that runs into the window is drawn whole."""
+    shots started in it up to CLOSE_MARGIN after it; with `openers`, the starts and closes up to CLOSE_MARGIN before
+    it, so a shot that runs into the window is drawn whole and one that closed before it is not drawn.
+    """
     out = [(since, until, KINDS), (until, until + CLOSE_MARGIN, CLOSING_KINDS)]
     if openers:
-        out.append((since - CLOSE_MARGIN, since, ("shot.started",)))
+        out.append((since - CLOSE_MARGIN, since, ("shot.started", *CLOSING_KINDS)))
     return out
 
 
@@ -271,17 +272,21 @@ def lights_windows(hours, tz, start: datetime, end: datetime) -> list[dict]:
     return out
 
 
-def pump_load(shots, demand: dict, capacity_lph) -> list[dict]:
-    """[{t, pct}] at each shot start and end: the running zones' demand (L/h) over the pump's capacity, in %.
-    shots: [(room_id, zone, block)]; demand: {room_id: {"3": L/h}}. pct is None when the capacity, or a running
-    zone's demand, is not known."""
+def pump_load(shots, demand: dict, capacity_lph, start, end) -> list[dict]:
+    """[{t, pct}] at each shot start and end within [start, end] (and at `start` when a shot runs across it): the
+    running zones' demand (L/h) over the pump's capacity, in %. shots: [(room_id, zone, block)]; demand:
+    {room_id: {"3": L/h}}. pct is None when the capacity, or a running zone's demand, is not known.
+    """
     spans = [
         (b["start"], b["end"], room_id, zone)
         for room_id, zone, b in shots
         if b["start"] and b["end"]
     ]
     out = []
-    for moment in sorted({t for s, e, _, _ in spans for t in (s, e)}):
+    moments = {t for s, e, _, _ in spans for t in (s, e) if start <= t <= end}
+    if any(s < start < e for s, e, _, _ in spans):
+        moments.add(start)
+    for moment in sorted(moments):
         running = [(r, z) for s, e, r, z in spans if s <= moment < e]
         needs = [(demand.get(r) or {}).get(str(z)) for r, z in running]
         if capacity_lph is None or any(n is None for n in needs):
@@ -370,10 +375,16 @@ def build(
                 ],
                 on_pump,
                 room.get("capacity_lph"),
+                start,
+                end,
             )
         else:
             load = pump_load(
-                [(room_id, z, b) for z, b in mine if b["kind"] == "shot"], {}, None
+                [(room_id, z, b) for z, b in mine if b["kind"] == "shot"],
+                {},
+                None,
+                start,
+                end,
             )
         rows: dict = {}
         for zone, block in mine:
