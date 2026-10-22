@@ -281,6 +281,9 @@ function useEarlierDays(
  * numbers, then what the zone did today (its phases, shots and pore EC), where it is now against
  * today's stage, and what comes next. Today is downloaded once when the page opens and live updates
  * extend it; the earlier days (yesterday, the typical day, last night's dryback) are downloaded once. */
+/** What the zone page compares today's VWC with. */
+export type ZoneCompare = "off" | "yesterday" | "last-run" | "typical";
+
 export function ZoneDay({
   controller,
   zone,
@@ -291,10 +294,10 @@ export function ZoneDay({
 }: {
   controller: Controller;
   zone: Zone;
-  /** Set by the page: what today's VWC is compared with, chosen from Off · Yesterday · Last run in
-   * the chart's heading (`onCompare`). Unset, the chart keeps its own remembered choice. */
-  compare?: "off" | "yesterday" | "last-run";
-  onCompare?: (next: "off" | "yesterday" | "last-run") => void;
+  /** What today's VWC is compared with, chosen in the chart's heading (`onCompare`): Off,
+   * Yesterday, the last run's day of the same number, or the typical day (median of 7). */
+  compare: ZoneCompare;
+  onCompare: (next: ZoneCompare) => void;
   /** The previous run's grow-day of the same number; "Last run" is offered only with one. */
   lastRun?: { day: number; trace: DayTrace } | null;
   /** A second chart beside today's VWC: under it on a wide screen, swiped to on a phone. */
@@ -306,18 +309,13 @@ export function ZoneDay({
     const timer = window.setInterval(() => tick((value) => value + 1), 30_000);
     return () => window.clearInterval(timer);
   }, []);
-  const [stored, setCompare] = useState(() => storedChart().compare);
-  const choose = (next: Compare) => {
-    setCompare(next);
-    rememberChart({ compare: next });
-  };
   const versusRun = compareWith === "last-run" && lastRun ? lastRun : null;
   const compare: Compare =
-    compareWith === undefined
-      ? stored
-      : compareWith === "off" || (compareWith === "last-run" && !versusRun)
-        ? "none"
-        : "yesterday";
+    compareWith === "typical"
+      ? "typical"
+      : compareWith === "yesterday" || versusRun
+        ? "yesterday"
+        : "none";
   const slides = useRef<HTMLDivElement>(null);
   const [slide, setSlide] = useState(0);
   const { room, states } = controller;
@@ -381,10 +379,11 @@ export function ZoneDay({
     rows && day
       ? buildLane(controller, zone, entities, day, rows, now, earlier, compare, versusRun)
       : null;
-  const choices: ["off" | "yesterday" | "last-run", string][] = [
+  const choices: [ZoneCompare, string][] = [
     ["off", "Off"],
     ["yesterday", "Yesterday"],
-    ...(lastRun ? [["last-run", `Last run, day ${lastRun.day}`] as ["last-run", string]] : []),
+    ...(lastRun ? [["last-run", `Last run, day ${lastRun.day}`] as [ZoneCompare, string]] : []),
+    ["typical", "Typical"],
   ];
   const chart = (
     <section className="panel zone-day-chart" aria-labelledby={`zone-day-${zone.id}`}>
@@ -397,42 +396,24 @@ export function ZoneDay({
         )}
         {rows && (
           <div className="timeline-heading-side">
-            {compareWith !== undefined && onCompare ? (
-              <div className="zone-day-compare" role="group" aria-label="Compare with">
-                <span className="timeline-compare" aria-hidden="true">
-                  Compare with
-                </span>
-                {choices.map(([value, label]) => (
-                  <button
-                    type="button"
-                    key={value}
-                    aria-pressed={compareWith === value}
-                    data-compare={value}
-                    onClick={() => onCompare(value)}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <>
-                <span className="label-with-tip">
-                  <label htmlFor="day-timeline-compare" className="timeline-compare">
-                    Compare with
-                  </label>
-                  <UiTip copyKey="compare with" />
-                </span>
-                <select
-                  id="day-timeline-compare"
-                  value={compare}
-                  onChange={(event) => choose(event.target.value as Compare)}
+            <div className="zone-day-compare" role="group" aria-label="Compare with">
+              <span className="timeline-compare" aria-hidden="true">
+                Compare with
+              </span>
+              {choices.map(([value, label]) => (
+                <button
+                  type="button"
+                  key={value}
+                  aria-pressed={compareWith === value}
+                  data-compare={value}
+                  title={value === "typical" ? "The median of the last 7 days, with its middle half" : undefined}
+                  onClick={() => onCompare(value)}
                 >
-                  <option value="yesterday">Yesterday</option>
-                  <option value="typical">Typical (median of 7 days)</option>
-                  <option value="none">None</option>
-                </select>
-              </>
-            )}
+                  {label}
+                </button>
+              ))}
+              <UiTip copyKey="compare with" />
+            </div>
             <span className="timeline-age" data-age={ageTone(age)}>
               {controller.demo ? "Demo data · " : ""}
               {age === null ? "Nothing recorded yet" : `Newest reading ${ageText(age)} old`}
@@ -503,7 +484,7 @@ export function ZoneDay({
                 type="button"
                 key={name}
                 aria-label={`Show the ${name} chart`}
-                aria-pressed={slide === index}
+                aria-current={slide === index ? "true" : undefined}
                 onClick={() =>
                   slides.current?.scrollTo({ left: index * slides.current.clientWidth, behavior: "smooth" })
                 }

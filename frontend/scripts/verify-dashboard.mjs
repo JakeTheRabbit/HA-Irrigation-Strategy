@@ -727,12 +727,20 @@ try {
       assert.doesNotMatch(await readout.innerText(), /pore EC/);
       await page.mouse.move(0, 0);
       assert.equal(await key.getByRole("button").count(), await key.locator("li").count());
-      // Compare with Off, Yesterday or the last run's day of the same number (mockup 04).
+      // Compare with Off, Yesterday, the last run's day of the same number (mockup 04) or Typical.
       const compare = day.getByRole("group", { name: "Compare with" });
       const choice = (name) => compare.getByRole("button", { name, exact: true });
-      await choice("Off").click();
+      await choice("Typical").click();
+      await expectVisible(layer("typical"));
+      assert.ok(
+        (await layer("typical").locator(".typical-band").getAttribute("d")).length > 100,
+        "the typical day is a p25-p75 band",
+      );
       assert.equal(await layer("yesterday").count(), 0);
+      // Off takes the typical day away again, as it was drawn a moment ago.
+      await choice("Off").click();
       assert.equal(await layer("typical").count(), 0);
+      assert.equal(await layer("yesterday").count(), 0);
       // The choices are remembered in the browser.
       await page.reload({ waitUntil: "networkidle" });
       await expectVisible(day.locator(".grow-svg"));

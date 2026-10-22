@@ -1,4 +1,5 @@
 import { settingWords } from "./setting-words";
+import type { Controller, States } from "./types";
 import { dayWord } from "./utils";
 
 /** The room's AI overlays (crop_steering.overlay_get): settings the AI brain moved that go back to
@@ -47,4 +48,19 @@ export function overlayText(overlay: Overlay, now: number) {
 /** This zone's open overlays, oldest first; none for another room's document or no document. */
 export function zoneOverlays(doc: OverlayDocument | null, roomId: string, zone: number) {
   return doc?.room_id === roomId ? doc.overlays.filter((overlay) => overlay.zone === zone) : [];
+}
+
+/** Undo after Keep: the AI's change has ended (neither overlay_undo nor history_revert can take it
+ * back), so the grower's own value is written back, and only while the setting still holds the
+ * AI's value. Throws with the reason when it has changed since or is not read back. */
+export async function undoKept(
+  overlay: Overlay,
+  states: () => States,
+  write: Controller["write"],
+): Promise<void> {
+  if (Number(states()[overlay.entity_id]?.state) !== overlay.new)
+    throw new Error("This value has changed since you applied it. Nothing was undone.");
+  const result = await write([{ entityId: overlay.entity_id, value: overlay.old }]);
+  if (!result.applied.includes(overlay.entity_id))
+    throw new Error(result.failed[0]?.reason || "The controller did not confirm the previous value.");
 }

@@ -72,13 +72,13 @@ export function tableShotLog(raw: unknown, dayStart: number, plants: number | nu
     .sort((a, b) => b.at - a.at);
 }
 
-/** VWC once a shot has settled: the recorded reading nearest `shotEnd + settleMs`, null without one
- * inside 15 min of it. */
+/** VWC once a shot has settled: of the readings at or after the shot's end, the one nearest
+ * `shotEnd + settleMs`, null without one inside 15 min of it. */
 export function vwcAfter(series: { t: number; v: number }[], shotEnd: number, settleMs = 300_000): number | null {
   const target = shotEnd + settleMs;
   let best: { t: number; v: number } | null = null;
   for (const point of series)
-    if (Math.abs(point.t - target) <= 15 * MIN && (!best || Math.abs(point.t - target) < Math.abs(best.t - target)))
+    if (point.t >= shotEnd && Math.abs(point.t - target) <= 15 * MIN && (!best || Math.abs(point.t - target) < Math.abs(best.t - target)))
       best = point;
   return best?.v ?? null;
 }

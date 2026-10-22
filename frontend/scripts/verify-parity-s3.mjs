@@ -5,15 +5,18 @@
  * - the header: "Room A / Zone 2", the phase chip, the mode chip and "… plants · … sensors" (with
  *   "Day 38 of 63" on 3.18; 3.17 has the stage arc's day, where there is one);
  * - Compare with: Off removes the compared line; Yesterday adds `[data-series="yesterday"]`;
- *   "Last run, day 38" (3.18, the grow plan's day) draws `[data-series="last-run"]`;
+ *   "Last run, day 38" (3.18, the grow plan's day) draws `[data-series="last-run"]`; Typical draws
+ *   the typical day alone;
  * - the pore EC chart draws today's line against its target;
  * - the AI suggestion sits on the page: Apply keeps the AI's change (overlay_keep) and toasts
- *   "… is yours now. Written and read back HH:MM." with Undo; Undo writes the grower's value back
- *   and toasts "… is back to …"; the suggestion is gone after Apply;
+ *   "AI change kept: … is yours now." (no value written, so no "Written and read back") with Undo;
+ *   Undo writes the grower's value back and toasts "… is back to …. Written and read back HH:MM.";
+ *   the suggestion is gone after Apply;
  * - Why / next action is there;
  * - the shot log has at least one row "HH:MM P2 33 mL · 61 s 58.0 → 60.8%" (3.18: the Journal,
- *   with run time; 3.17: the controller's shot table, without);
- * - on a phone, a swipe across the charts moves to the pore EC chart and its dot.
+ *   with run time; 3.17: the controller's shot table, without), and on every row VWC after the
+ *   shot is at least VWC before it;
+ * - on a phone, a swipe across the charts moves to the pore EC chart and its dot (24 px targets).
  * Also writes full-page light and dark screenshots of each run beside the harness's own. */
 import assert from "node:assert/strict";
 import { runParity } from "./parity-harness.mjs";
@@ -56,12 +59,14 @@ await runParity({
 
     // Compare with.
     const compare = page.getByRole("group", { name: "Compare with" });
+    const button = (name) => compare.getByRole("button", { name, exact: true });
     const series = (name) => charts.locator(`[data-series="${name}"]`);
-    await compare.getByRole("button", { name: "Off", exact: true }).click();
-    assert.equal(await charts.locator('[data-layer="yesterday"]').count(), 0, `${label}: off`);
-    await compare.getByRole("button", { name: "Yesterday", exact: true }).click();
+    const layer = (name) => charts.locator(`[data-layer="${name}"]`);
+    await button("Off").click();
+    assert.equal(await layer("yesterday").count(), 0, `${label}: off`);
+    await button("Yesterday").click();
     await series("yesterday").waitFor({ state: "attached" });
-    assert.equal(await compare.getByRole("button", { name: "Yesterday" }).getAttribute("aria-pressed"), "true");
+    assert.equal(await button("Yesterday").getAttribute("aria-pressed"), "true");
     const lastRun = compare.getByRole("button", { name: /^Last run, day \d+$/ });
     if (v318) {
       await lastRun.waitFor();
@@ -69,8 +74,13 @@ await runParity({
       await lastRun.click();
       await series("last-run").waitFor({ state: "attached" });
       assert.equal(await series("yesterday").count(), 0, `${label}: one compared line`);
-      await compare.getByRole("button", { name: "Yesterday", exact: true }).click();
     }
+    await button("Typical").click();
+    await layer("typical").waitFor({ state: "attached" });
+    assert.equal(await layer("yesterday").count(), 0, `${label}: typical alone`);
+    await button("Yesterday").click();
+    await series("yesterday").waitFor({ state: "attached" });
+    assert.equal(await layer("typical").count(), 0, `${label}: typical gone`);
     region("vwc chart compare");
 
     // Pore EC chart.
@@ -83,13 +93,15 @@ await runParity({
     if (phone) {
       const slides = charts.locator(".zone-day-slides");
       const dots = charts.getByRole("group", { name: "Charts" }).getByRole("button");
-      assert.equal(await dots.nth(0).getAttribute("aria-pressed"), "true", `${label}: first dot`);
+      assert.equal(await dots.nth(0).getAttribute("aria-current"), "true", `${label}: first dot`);
+      const dot = await dots.nth(1).boundingBox();
+      assert.ok(dot.width >= 24 && dot.height >= 24, `${label}: dot target ${dot.width}x${dot.height}`);
       assert.match(await charts.locator(".zone-day-swipe").innerText(), /^Swipe: VWC · Pore EC$/);
       const box = await slides.boundingBox();
       await page.mouse.move(box.x + box.width / 2, box.y + 80);
       await page.mouse.wheel(box.width, 0);
       await page.waitForFunction(
-        () => document.querySelector('.zone-day-dots button:nth-child(2)')?.getAttribute("aria-pressed") === "true",
+        () => document.querySelector(".zone-day-dots button:nth-child(2)")?.getAttribute("aria-current") === "true",
       );
       // The snap settles with the pore EC chart where the VWC chart was.
       await page.waitForFunction(() => {
@@ -110,9 +122,14 @@ await runParity({
     const rows = await log.locator("[data-shot-row]").allInnerTexts();
     assert.ok(rows.length >= 1, `${label}: shot rows`);
     const shape = new RegExp(
-      `^${HHMM}\\s+P[0-3]\\s+\\d+ mL${v318 ? " · \\d+ s" : ""}\\s+(\\d+\\.\\d|—) → (\\d+\\.\\d|—)%$`,
+      `^${HHMM}\\s+P[0-3]\\s+\\d+ mL${v318 ? " · \\d+ s" : ""}\\s+(\\d+\\.\\d) → (\\d+\\.\\d)%$`,
     );
-    for (const row of rows) assert.match(row.trim(), shape, `${label}: shot row "${row}"`);
+    for (const row of rows) {
+      const match = row.trim().match(shape);
+      assert.ok(match, `${label}: shot row "${row}"`);
+      // The water landed: VWC five minutes after the shot is at least what it was before.
+      assert.ok(Number(match[2]) >= Number(match[1]), `${label}: after < before in "${row}"`);
+    }
     assert.equal(await log.getByRole("button", { name: "History" }).count(), 1, `${label}: history link`);
     region("shot log");
 
@@ -120,13 +137,17 @@ await runParity({
     const suggestion = page.locator("[data-zone-suggestion]");
     assert.match(await suggestion.innerText(), /AI assistant suggests: Substrate EC target, P2 \(vegetative\) 3 mS\/cm instead of your 3\.4 mS\/cm/, `${label}: suggestion`);
     await suggestion.getByRole("button", { name: "Apply", exact: true }).click();
-    const toast = page.locator("[data-sonner-toast]").filter({ hasText: "is yours now" });
+    const toast = page.locator("[data-sonner-toast]").filter({ hasText: "AI change kept" });
     await toast.waitFor();
-    assert.match(await toast.innerText(), new RegExp(`is yours now\\. Written and read back ${HHMM}\\.`), `${label}: apply toast`);
+    const kept = await toast.innerText();
+    assert.match(kept, /AI change kept: Substrate EC target, P2 \(vegetative\) 3 mS\/cm is yours now\./, `${label}: apply toast`);
+    assert.doesNotMatch(kept, /Written and read back/, `${label}: keep writes no value`);
     await suggestion.waitFor({ state: "detached" });
     await toast.getByRole("button", { name: "Undo" }).click();
-    await page.locator("[data-sonner-toast]").filter({ hasText: "is back to 3.4 mS/cm" }).waitFor();
+    const undone = page.locator("[data-sonner-toast]").filter({ hasText: "is back to 3.4 mS/cm" });
+    await undone.waitFor();
+    assert.match(await undone.innerText(), new RegExp(`Written and read back ${HHMM}\\.`), `${label}: undo read back`);
     region("ai suggestion");
   },
 });
-console.log("PASS: S3 zone (header, compare, pore EC chart, AI suggestion apply and undo, shot log, phone swipe)");
+console.log("PASS: S3 zone (header, compare incl. typical, pore EC chart, AI suggestion apply and undo, shot log after >= before, phone swipe)");

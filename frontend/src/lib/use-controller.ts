@@ -6,6 +6,7 @@ import type { TimelineRequest } from "./day-timeline";
 import { explorerSensors } from "./history-explorer";
 import type { OperatorAction } from "./operator-types";
 import { OperatorDemo } from "./operator-demo";
+import { demoJournalVwc } from "./parity-demo/journal";
 import { demoParityStatus, demoShotTable } from "./parity-demo/status";
 import { JournalMissing, mergeEvents, startEventFeed } from "./events";
 import { isParityAction, pagedQuery } from "./parity-api";
@@ -786,7 +787,8 @@ export class ControllerStore {
     ]);
     if (entityIds.some((id) => !allowed.has(id)))
       throw new Error("History is limited to entities in the selected room.");
-    if (this.demo) return demoHistory(this.states, entityIds, hours);
+    // Zone VWC follows the demo Journal's shots, so each shot's "after" agrees with its "before".
+    if (this.demo) return demoJournalVwc(demoHistory(this.states, entityIds, hours), Date.now());
     if (!this.client || this.connection !== "live")
       throw new Error("Connect to Home Assistant to load recorded history.");
     const generation = this.generation;

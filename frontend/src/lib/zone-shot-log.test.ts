@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { CsEvent } from "./parity-types";
+import { demoJournal, demoJournalVwc } from "./parity-demo/journal";
 import { shotLog, tableShotLog, vwcAfter, vwcBefore } from "./zone-shot-log";
 
 const ON = Date.UTC(2026, 9, 22, 6, 0);
@@ -94,6 +95,20 @@ describe("zone shot log", () => {
     expect(vwcAfter(series, ON, 20 * MIN)).toBe(60);
   });
 
+  it("vwcAfter never takes a reading from before the shot ended", () => {
+    // Settled at +9 min: +10 is nearest, but only readings at or after the end (+4) count.
+    expect(vwcAfter(series, ON + 4 * MIN)).toBe(59);
+    // The shot ended at +12: the +10 reading is before it, so the +15 one stands.
+    expect(vwcAfter(series, ON + 12 * MIN)).toBe(59.5);
+    expect(vwcAfter([{ t: ON, v: 70 }], ON + MIN)).toBeNull();
+  });
+
+  it("vwcAfter takes what there is for a shot that ended under five minutes ago", () => {
+    const recent = [{ t: ON - 5 * MIN, v: 57 }, { t: ON + MIN, v: 58.6 }];
+    expect(vwcAfter(recent, ON)).toBe(58.6);
+    expect(vwcAfter([{ t: ON - 5 * MIN, v: 57 }], ON)).toBeNull();
+  });
+
   it("vwcAfter returns null without a reading inside 15 min", () => {
     expect(vwcAfter(series, ON + 60 * MIN)).toBeNull();
     expect(vwcAfter([], ON)).toBeNull();
@@ -103,5 +118,26 @@ describe("zone shot log", () => {
     expect(vwcBefore(series, ON + 12 * MIN)).toBe(59);
     expect(vwcBefore(series, ON - MIN)).toBeNull();
     expect(vwcBefore(series, ON + 50 * MIN)).toBeNull();
+  });
+
+  it("the demo's probe rises after every Journal shot, from the shot's own VWC before", () => {
+    const now = Date.UTC(2026, 9, 23, 3, 0);
+    for (const [room, prefix] of [["room:", ""], ["room:room_b_", "room_b_"]])
+      for (const zone of [1, 2, 3]) {
+        const id = `sensor.crop_steering_${prefix}vwc_zone_${zone}`;
+        // The probe's own day, every 5 min for 50 h: drying all the way, as if never watered.
+        const own = Array.from({ length: 601 }, (_, i) => ({
+          time: new Date(now - (600 - i) * 5 * 60_000).toISOString(),
+          value: 70 - i * 0.03,
+        }));
+        const flat = [{ entityId: id, label: id, points: own }];
+        const [series] = demoJournalVwc(flat, now);
+        const points = series.points.map((p) => ({ t: Date.parse(p.time), v: p.value }));
+        const rows = shotLog(demoJournal(room, now), zone, 0, 40);
+        for (const row of rows) {
+          expect(vwcBefore(points, row.at)).toBeCloseTo(row.vwcBefore!, 1);
+          expect(vwcAfter(points, row.end)!).toBeGreaterThanOrEqual(row.vwcBefore!);
+        }
+      }
   });
 });

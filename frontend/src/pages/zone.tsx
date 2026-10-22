@@ -7,7 +7,7 @@ import { Empty, number, ReviewDialog, time as clock, type Page } from "@/compone
 import { useBrain } from "@/lib/brain";
 import { CameraCard, ClimatePanel, HardwarePanel, RootZonePanel } from "@/components/zone-extras";
 import { UiTip } from "@/components/info-tip";
-import { ZoneDay } from "@/components/day-timeline";
+import { ZoneDay, type ZoneCompare } from "@/components/day-timeline";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { OverlayRows, useOverlays } from "@/components/overlay-row";
 import { Pill } from "@/components/mini-visuals";
@@ -34,7 +34,7 @@ import {
   type JevSetpoints,
 } from "@/lib/jev";
 import { numeric } from "@/lib/model";
-import { overlayLabel, zoneOverlays, type Overlay, type OverlayDocument } from "@/lib/overlays";
+import { overlayLabel, undoKept, zoneOverlays, type Overlay, type OverlayDocument } from "@/lib/overlays";
 import { pagedQuery } from "@/lib/parity-api";
 import { smoothRecorded } from "@/lib/planning-curve";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
@@ -60,13 +60,12 @@ const PHASE_NAMES: Record<string, string> = {
   P3: "Overnight dryback",
 };
 const capital = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
-type CompareChoice = "off" | "yesterday" | "last-run";
 const COMPARE_KEY = "crop-steering-zone-compare";
 /** What the zone's chart is compared with, remembered in this browser. */
-function storedCompare(): CompareChoice {
+function storedCompare(): ZoneCompare {
   try {
     const value = localStorage.getItem(COMPARE_KEY);
-    return value === "off" || value === "last-run" ? value : "yesterday";
+    return value === "off" || value === "last-run" || value === "typical" ? value : "yesterday";
   } catch {
     return "yesterday";
   }
@@ -148,7 +147,7 @@ export function ZonePage({
   const suggestion =
     overlays.find((overlay) => isEcOverlay(overlay) && !dismissed.includes(overlay.entity_id)) ??
     null;
-  const choose = (next: CompareChoice) => {
+  const choose = (next: ZoneCompare) => {
     setCompare(next);
     try {
       localStorage.setItem(COMPARE_KEY, next);
@@ -210,7 +209,8 @@ export function ZonePage({
           key={zone.id}
           controller={controller}
           zone={zone}
-          compare={compare}
+          // A remembered "Last run" with no last run to draw shows as Off.
+          compare={compare === "last-run" && !lastRun ? "off" : compare}
           onCompare={choose}
           lastRun={lastRun}
           beside={{
@@ -480,6 +480,8 @@ function EcSuggestion({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const latest = useRef(controller);
+  latest.current = controller;
   const tz = controller.timeZone;
   const label = overlayLabel(overlay);
   const ec = (value: number) => formatEc(value, digitsOf(value));
@@ -495,16 +497,18 @@ function EcSuggestion({
       await controller.operator("overlay_keep", { entity_id: overlay.entity_id });
       const after = await controller.operator<OverlayDocument>("overlay_get");
       reload();
+      // Keep writes no value: it ends the AI's change, and the setting must still read the AI's.
+      const reads = Number(latest.current.states[overlay.entity_id]?.state);
       if (after.overlays.some((item) => item.entity_id === overlay.entity_id))
         throw new Error("The controller did not confirm it. Reload and check it before trying again.");
+      if (reads !== overlay.new)
+        throw new Error(
+          `The AI change ended, but ${label} reads ${Number.isFinite(reads) ? ec(reads) : "nothing"}, not ${ec(overlay.new)}. Reload and check it.`,
+        );
       offerUndo({
-        message: `${label} ${ec(overlay.new)} is yours now. Written and read back ${wallClock(Date.now(), tz)}.`,
-        // Kept, the AI's change has ended, so overlay_undo has nothing left to undo: Undo writes
-        // the grower's own value back, as overlay_undo would have.
+        message: `AI change kept: ${label} ${ec(overlay.new)} is yours now.`,
         undo: async () => {
-          const result = await controller.write([{ entityId: overlay.entity_id, value: overlay.old }]);
-          if (!result.applied.includes(overlay.entity_id))
-            throw new Error(result.failed[0]?.reason || "The controller did not confirm the previous value.");
+          await undoKept(overlay, () => latest.current.states, latest.current.write);
           toast(`${label} is back to ${ec(overlay.old)}. Written and read back ${wallClock(Date.now(), tz)}.`);
         },
       });

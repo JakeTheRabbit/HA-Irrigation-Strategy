@@ -1,5 +1,6 @@
 import type { DemoHandler } from "../parity-demo";
 import type { CsEvent, JournalActor, JournalOutcome, JournalPage } from "../parity-types";
+import type { Series } from "../types";
 
 /** The demo's Journal: a deterministic grow-day per demo room, yesterday's and today's, from its
  * lights-on. Room A plays F2 ("Flower · bulk", P2, 7/6/7 shots a day; zone 3 waters by timer
@@ -183,6 +184,59 @@ export function journalQuery(data: Record<string, unknown>, now: number): Journa
   const events = match.slice(0, limit);
   const last = events[events.length - 1];
   return { events, cursor: match.length > limit && last ? `${tsMs(last)}:${last.seq}` : null };
+}
+
+/** The demo rooms' zone VWC (`sensor.crop_steering_<prefix>vwc_zone_N`) around their Journal shots:
+ * at each shot's `vwc_before` as it starts and up 2.5 points ten minutes after it ends, eased in
+ * from and back to the probe's own day ten minutes either side. Elsewhere, and for other series,
+ * the readings are as they were. */
+export function demoJournalVwc(series: Series[], now: number): Series[] {
+  return series.map((item) => {
+    const match = /^sensor\.crop_steering_(.*?)vwc_zone_(\d+)$/.exec(item.entityId);
+    const roomId = match ? `room:${match[1]}` : "";
+    if (!match || !ROOMS[roomId] || item.points.length < 2) return item;
+    const zone = Number(match[2]);
+    const events = demoJournal(roomId, now);
+    const starts = new Map(
+      events.filter((e) => e.kind === "shot.started" && e.zone === zone).map((e) => [e.correlation?.intent_id, e]),
+    );
+    const own = item.points.map((point) => ({ t: Date.parse(point.time), v: point.value }));
+    const probe = (t: number) => {
+      const next = own.findIndex((point) => point.t >= t);
+      if (next <= 0) return own[next < 0 ? own.length - 1 : 0].v;
+      const a = own[next - 1], b = own[next];
+      return a.v + ((b.v - a.v) * (t - a.t)) / (b.t - a.t || 1);
+    };
+    const windows: [number, number][][] = [];
+    for (const e of events) {
+      if (e.kind !== "shot.completed" || e.zone !== zone) continue;
+      const start = Date.parse(starts.get(e.correlation?.intent_id)?.ts ?? e.ts);
+      const before = Number(e.data.vwc_before);
+      windows.push([
+        [start - 10 * MIN, probe(start - 10 * MIN)],
+        [start, before],
+        [tsMs(e) + 10 * MIN, before + 2.5],
+        [tsMs(e) + 20 * MIN, probe(tsMs(e) + 20 * MIN)],
+      ]);
+    }
+    if (!windows.length) return item;
+    const value = (t: number) => {
+      const knots = windows.find((w) => t >= w[0][0] && t <= w[3][0]);
+      if (!knots) return probe(t);
+      const next = knots.findIndex(([at]) => at >= t);
+      if (next <= 0) return knots[0][1];
+      const [t0, v0] = knots[next - 1], [t1, v1] = knots[next];
+      return v0 + ((v1 - v0) * (t - t0)) / (t1 - t0 || 1);
+    };
+    const times = new Set(own.map((point) => point.t));
+    for (const knots of windows) for (const [at] of knots) if (at >= own[0].t && at <= now) times.add(at);
+    return {
+      ...item,
+      points: [...times]
+        .sort((a, b) => a - b)
+        .map((t) => ({ time: new Date(t).toISOString(), value: Number(value(t).toFixed(2)) })),
+    };
+  });
 }
 
 export const handlers: DemoHandler[] = [{ action: "journal_query", answer: journalQuery }];

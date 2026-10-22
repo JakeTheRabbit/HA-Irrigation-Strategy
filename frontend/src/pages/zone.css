@@ -565,16 +565,24 @@
   .zone-day-dots {
     display: flex;
     justify-content: center;
-    gap: 8px;
-    padding-top: 10px;
+    gap: 4px;
+    padding-top: 4px;
   }
+  /* A 24 px target around each small dot. */
   .zone-day-dots button {
+    display: grid;
+    place-items: center;
+    min-width: 24px;
+    height: 24px;
+  }
+  .zone-day-dots button::before {
+    content: "";
     width: 10px;
     height: 10px;
     border-radius: 999px;
     background: var(--border);
   }
-  .zone-day-dots button[aria-pressed="true"] {
+  .zone-day-dots button[aria-current="true"]::before {
     width: 28px;
     background: var(--primary);
   }

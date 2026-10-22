@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { overlayLabel, overlayText, zoneOverlays, type Overlay } from "./overlays";
+import { describe, expect, it, vi } from "vitest";
+import { overlayLabel, overlayText, undoKept, zoneOverlays, type Overlay } from "./overlays";
 
 const at = (hour: number, day = 15) => new Date(2026, 9, day, hour, 48).toISOString();
 const overlay = (zone: number | null, field = "p2_shot_size"): Overlay => ({
@@ -41,5 +41,28 @@ describe("AI overlays on a zone", () => {
     expect(zoneOverlays(rows, "room:", 2).map((row) => row.zone)).toEqual([2]);
     expect(zoneOverlays(rows, "room:other_", 2)).toEqual([]);
     expect(zoneOverlays(null, "room:", 1)).toEqual([]);
+  });
+});
+
+describe("undoing a kept AI change", () => {
+  const kept = overlay(2);
+  const states = (value: string) => ({
+    [kept.entity_id]: { entity_id: kept.entity_id, state: value, attributes: {} },
+  });
+  it("writes the grower's own value back while the setting still holds the AI's", async () => {
+    const write = vi.fn(async () => ({ applied: [kept.entity_id], failed: [] }));
+    await undoKept(kept, () => states("4"), write);
+    expect(write).toHaveBeenCalledWith([{ entityId: kept.entity_id, value: 4.5 }]);
+  });
+  it("refuses, writing nothing, once the value has changed since", async () => {
+    const write = vi.fn(async () => ({ applied: [kept.entity_id], failed: [] }));
+    await expect(undoKept(kept, () => states("3.8"), write)).rejects.toThrow(
+      "This value has changed since you applied it. Nothing was undone.",
+    );
+    expect(write).not.toHaveBeenCalled();
+  });
+  it("says why when the write is not read back", async () => {
+    const write = vi.fn(async () => ({ applied: [], failed: [{ entityId: kept.entity_id, reason: "Read back 4." }] }));
+    await expect(undoKept(kept, () => states("4"), write)).rejects.toThrow("Read back 4.");
   });
 });
