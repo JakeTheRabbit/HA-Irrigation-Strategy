@@ -1,5 +1,6 @@
 """Offline regressions for shot deadlines, blind budgets and durable hardware holds."""
 import json
+from unittest.mock import ANY
 from datetime import datetime, timedelta
 
 import pytest
@@ -627,7 +628,10 @@ def test_a_valve_that_does_not_read_on_is_counted_only_when_it_may_have_opened(r
     states = {"off": lambda t, over: "off", "unavailable": lambda t, over: "unavailable",
               "late": lambda t, over: "on" if over else "off"}
     times, alerts = _valve_reads(c, fake, clock, monkeypatch, states[valve])
+    room.state[1]["on_failures"] = {"count": 1, "last": datetime.now().isoformat()}
     c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    # a definite failure (the whole 16 s with no ON) adds to the zone's run; an ON on the final read ends it
+    assert room.state[1]["on_failures"] == (None if valve == "late" else {"count": 2, "last": ANY})
     assert [code for code, _msg in alerts] == ["CS-304"]
     assert f"did not read on within {controller.SWITCH_ON_S:g} s" in alerts[0][1]
     assert times["turn_off"] - times["turn_on"] >= controller.SWITCH_ON_S
@@ -801,18 +805,22 @@ def test_hanging_operator_switch_reads_cannot_stretch_the_valve_read_back(rig, m
     assert times["turn_off"] - times["turn_on"] <= controller.SWITCH_ON_S + 3
 
 
-def test_a_late_valve_cannot_run_a_short_shot_to_twice_its_length(rig, monkeypatch):
-    """CTL-002 final review: a 5 s shot whose valve reports ON only at 12 s is closed once its time (or the
-    first 6 s read-back stage) is up, counted as maybe open, and is one more failed shot for the backoff."""
+@pytest.mark.parametrize("on_at", [10, 12])
+def test_a_late_valve_cannot_run_a_short_shot_to_twice_its_length(rig, monkeypatch, on_at):
+    """CTL-002 final review: a 5 s shot whose valve reports ON only at 10 or 12 s is closed once its time (or
+    the first 6 s read-back stage) is up and counted as maybe open. Its own time cut the read-back short, so
+    it is not a definite failure: the zone's run of failed shots is left as it was."""
     c, fake, clock = rig
     room = c.rooms[0]
-    times, alerts = _valve_reads(c, fake, clock, monkeypatch, lambda t, over: "on" if t >= 12 else "off")
+    room.state[1]["on_failures"] = {"count": 1, "last": datetime.now().isoformat()}
+    times, alerts = _valve_reads(c, fake, clock, monkeypatch, lambda t, over: "on" if t >= on_at else "off")
     c._execute_shot(room, 1, 5, 5, flow_lps=0.05)
     open_s = times["turn_off"] - times["turn_on"]
     assert open_s <= 2 * 5
     assert [code for code, _msg in alerts] == ["CS-304"] and "counts the" in alerts[0][1]
     assert room.state[1]["daily_vol"] == pytest.approx(0.05 * open_s)
-    assert room.state[1]["on_failures"]["count"] == 1
+    assert room.state[1]["on_failures"]["count"] == 1  # unchanged
+    assert "shots of this zone in a row could not start" not in alerts[0][1]
     assert all(fake.states[e][0] == "off" for e in ("switch.p", "switch.m", "switch.v1"))
 
 

@@ -294,3 +294,39 @@ def test_a_hold_that_comes_on_during_the_pumps_prime_stops_the_shot_before_its_v
     assert st["daily_vol"] == 0 and st["shots"] == 0 and st["on_failures"] is None
     assert room.hardware_fault is None and room.shot_inflight is None
     assert [n["title"] for n in notifications(fake)] == [CUT]
+
+
+@pytest.mark.parametrize("stage, trigger", [
+    ("main-line read-back", "hold"),
+    ("valve read-back", "hold"),
+    ("pump read-back", "waste"),
+])
+def test_a_switch_cut_short_while_it_opens_is_sent_off_though_it_still_reads_its_old_off(rig, monkeypatch,
+                                                                                          stage, trigger):
+    """CTL-002 re-review: a hold (or the waste valve) that comes on while a shot opens closes it as mid-shot,
+    but the switch just sent ON often still reads its old OFF. It is sent OFF all the same, and read back,
+    so its late ON cannot leave it open with nobody owning it. Only a hold keeps the pump."""
+    c, fake, clock = rig
+    room = c.rooms[0]
+    if trigger == "waste":
+        room.waste = "switch.waste"
+        fake.set_state("switch.waste", "off")
+        fake.set_state("select.crop_steering_waste_valve_rule", "Check closed")
+    stuck = {"main-line read-back": MAIN, "valve read-back": VALVE, "pump read-back": PUMP}[stage]
+    real = controller.ha_call
+
+    def call(domain, service, **data):
+        if (service, data.get("entity_id")) == ("turn_on", stuck):
+            fake.calls.append((domain, service, data))  # taken; its ON report has not landed yet
+            clock.at(clock.seconds + 1.5, lambda: fake.set_state(HOLD if trigger == "hold" else "switch.waste", "on"))
+            return True
+        return real(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    c._execute_shot(room, 1, 170, 2.8, flow_lps=FLOW)
+    assert stuck in offs(fake) and fake.states[stuck][0] == "off"
+    assert fake.states[PUMP][0] == ("on" if trigger == "hold" else "off")  # a hold keeps the pump, nothing else
+    assert (PUMP in offs(fake)) == (trigger == "waste")
+    assert room.hardware_fault is None and room.shot_inflight is None
+    assert room.state[1]["on_failures"] is None
+    assert [n["title"] for n in notifications(fake)] == [CUT]

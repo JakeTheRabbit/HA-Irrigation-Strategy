@@ -5502,7 +5502,7 @@ class Controller:
                     time.sleep(min(step, remaining))
         return time.monotonic() - started, None
 
-    def _close_cut_short(self, room, zone, by, elapsed, duration_s, valve_opened):
+    def _close_cut_short(self, room, zone, by, elapsed, duration_s, valve_opened, unconfirmed=None):
         """Close a shot that something else cut short (see _wait_shot) -> seconds its valve was open.
 
         The shot's valve and main line are its own: each is switched off unless it already reads OFF
@@ -5516,12 +5516,15 @@ class Controller:
         change falls between this shot opening it and the interruption being seen: it closed before
         the controller looked. Otherwise (still open, or no usable change time) they run to when the
         interruption was seen.
+
+        `unconfirmed` (a shot cut short while it opened): the switch it had sent ON and not yet read back
+        ON. Its OFF may only be its old state, the ON still to land, so it is switched off whatever it reads.
         """
         valve, mainline, pump = room.hw["valves"].get(zone), room.hw.get("mainline"), room.hw.get("pump")
         reads = {e: hw_get(e) for e in (valve, mainline, pump) if e}
-        close = [e for e in (valve, mainline) if e and reads[e][0] != "off"]
+        close = [e for e in (valve, mainline) if e and (e == unconfirmed or reads[e][0] != "off")]
         left = []
-        if pump and reads[pump][0] != "off":
+        if pump and (pump == unconfirmed or reads[pump][0] != "off"):
             (left if any(self._on(f, False) for f in self.hold_entities) else close).append(pump)
         failures = self._switch_off_failures(close) if close else []
         if failures:
@@ -5696,18 +5699,21 @@ class Controller:
         valve_started = valve_opened = None
         counted = False
         stopping = False
+        pending = [None]  # the switch sent ON and not yet read back ON
 
         def switch_on(ent, what, lead_s=0.0, until=None):
             """Switch `ent` on and read it back ON, then let what is left of `lead_s` from its ack run out
-            -> (None, _) or (why not in the words of its alert, whether it may have been on all the same).
-            A relay that takes the command and stays off must not be counted as a shot. The read-back runs
+            -> (None, _, _) or (why not in the words of its alert, whether it may have been on all the same,
+            what it does to the zone's run of failed shots: "count", "reset" (it read ON just too late) or
+            "keep" (the shot's own time cut the read-back short: not a definite failure)). A relay that takes the command and stays off must not be counted as a shot. The read-back runs
             inside the lead time, so a switch that reports promptly costs a normal shot nothing; one that
             reports late stretches the pump's prime or the main line's lead by the difference. A read-back
             cut short by `until` (the monotonic clock) may have been on: nothing proved it off in time."""
+            pending[0] = ent  # sent ON, not yet read back ON (_close_cut_short)
             if not hw_call(ent, True):
                 if _GATE.state == "all":  # the token refused: not a switch that failed (no CS-302 to CS-304)
                     raise _ShotStopped(("refused", None))
-                return f"Home Assistant returned an error when the controller tried to {what}.", False
+                return f"Home Assistant returned an error when the controller tried to {what}.", False, "count"
             acked, reads = time.monotonic(), []
             # The operator's switches are read through the read-back and the lead time too (_ShotStopped),
             # each check bounded by the end of its stage.
@@ -5722,22 +5728,30 @@ class Controller:
                 cut = until is not None and time.monotonic() >= until
                 waited = min(SWITCH_ON_S, until - acked) if until is not None else SWITCH_ON_S
                 # "opening" (a valve. entity on its way) or anything but a definite OFF may be open
+                tally = "reset" if reads[-1] == "on" else "keep" if cut else "count"
                 return (f"Home Assistant took the command to {what}, but it did not read on within "
-                        f"{waited:.0f} s."), cut or any(state != "off" for state in reads)
+                        f"{waited:.0f} s."), cut or any(state != "off" for state in reads), tally
+            pending[0] = None
             while (left := lead_s - (time.monotonic() - acked)) > 0:
                 by = stop(acked + lead_s)
                 if by:
                     raise _ShotStopped(by)
                 time.sleep(min(2.0, left))
-            return None, False
+            return None, False, None
 
-        def cancelled(why, named, delivered_s=None):
+        def cancelled(why, named, delivered_s=None, tally="count"):
             """The shot cancelled because a switch did not read on (`delivered_s`: the valve may have been
-            open that long, and is counted): one more such shot in a row for this zone (_switch_on_retry_at)
+            open that long, and is counted). A definite failure (`tally` "count") is one more such shot in a
+            row for this zone (_switch_on_retry_at); a switch that read ON just too late ("reset") ends the
+            run; one whose read-back the shot's own time cut short ("keep") leaves it as it is
             -> its alert's message and quiet."""
             st = room.state[zone]
-            failures = (st.get("on_failures") or {}).get("count", 0) + 1
-            st["on_failures"] = {"count": failures, "last": datetime.now().isoformat()}
+            failures = (st.get("on_failures") or {}).get("count", 0)
+            if tally == "count":
+                failures += 1
+                st["on_failures"] = {"count": failures, "last": datetime.now().isoformat()}
+            elif tally == "reset":
+                st["on_failures"], failures = None, 0
             water = (
                 "No water went to the zone, and the controller did not count the shot."
                 if delivered_s is None
@@ -5748,11 +5762,12 @@ class Controller:
                 f" The last {failures} shots of this zone in a row could not start, so the controller "
                 f"now tries this zone at most once every {SWITCH_ON_BACKOFF_MIN} min, rescue shots too, until "
                 "its switches read on again."
-                if failures >= SWITCH_ON_BACKOFF_AFTER
+                if tally == "count" and failures >= SWITCH_ON_BACKOFF_AFTER
                 else ""
             )
             # the zone backing off is news: never held back
-            return f"{why} {water} {_CANCELLED_SHOT_CLEANUP}{backoff}\n\n{named}", failures != SWITCH_ON_BACKOFF_AFTER
+            quiet = not (tally == "count" and failures == SWITCH_ON_BACKOFF_AFTER)
+            return f"{why} {water} {_CANCELLED_SHOT_CLEANUP}{backoff}\n\n{named}", quiet
 
         def stopped_early(aborted, elapsed):
             """A shot the operator's switches (or a refused token) ended early: CS-305, or a log line.
@@ -5785,19 +5800,20 @@ class Controller:
             # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
             # Pump and mainline are optional (a one-switch tent has neither): each is sequenced when
             # mapped and skipped, with its lead time, when not. The valve is always required.
-            why = pump and switch_on(pump, "start the pump", prime)[0]
+            why, _maybe, tally = switch_on(pump, "start the pump", prime) if pump else (None, False, None)
             if why:
                 hw_call(pump, False)  # it may be on all the same: off before the alert
-                message, quiet = cancelled(why, f"Pump: {pump}")
+                message, quiet = cancelled(why, f"Pump: {pump}", tally=tally)
                 self._alert(f"hw_{room.slug}_z{zone}", "CS-302", "shot cancelled, the pump did not start",
                             message, room=room, zone=zone, quiet=quiet)
                 return
-            why = mainline and switch_on(mainline, "open the main-line valve", lead)[0]
+            why, _maybe, tally = (switch_on(mainline, "open the main-line valve", lead) if mainline
+                                  else (None, False, None))
             if why:
                 hw_call(mainline, False)  # it may open all the same
                 if pump:
                     hw_call(pump, False)
-                message, quiet = cancelled(why, f"Main-line valve: {mainline}")
+                message, quiet = cancelled(why, f"Main-line valve: {mainline}", tally=tally)
                 self._alert(f"hw_{room.slug}_z{zone}", "CS-303", "shot cancelled, the main-line valve did not open",
                             message, room=room, zone=zone, quiet=quiet)
                 return
@@ -5809,7 +5825,7 @@ class Controller:
             # report cannot run a short shot to several times its length.
             valve_started = time.monotonic()
             valve_opened = datetime.now(timezone.utc)  # on Home Assistant's clock too: see _close_cut_short
-            why, maybe_open = switch_on(valve, "open the valve of this zone",
+            why, maybe_open, tally = switch_on(valve, "open the valve of this zone",
                                         until=valve_started + max(duration_s, CONFIRM_TIMEOUT_S))
             if why:
                 hw_call(valve, False)  # it may open all the same
@@ -5824,7 +5840,7 @@ class Controller:
                     counted = True
                     self._advance_shot_counters(room, zone, size_pct * run, delivered_l=nominal_l * run,
                                                 steering=steering)
-                message, quiet = cancelled(why, f"Valve: {valve}", delivered_s)
+                message, quiet = cancelled(why, f"Valve: {valve}", delivered_s, tally)
                 self._alert(f"hw_{room.slug}_z{zone}", "CS-304", "shot cancelled, the zone valve did not open",
                             message, room=room, zone=zone, quiet=quiet)
                 return
@@ -5897,7 +5913,7 @@ class Controller:
                 if stopped.by[0] == "external":
                     # As _wait_shot's: only what is still this shot's is closed, never a pump a hold now owns.
                     elapsed = self._close_cut_short(room, zone, stopped.by[1], elapsed or 0.0, duration_s,
-                                                    valve_opened or datetime.now(timezone.utc))
+                                                    valve_opened or datetime.now(timezone.utc), pending[0])
                     shutdown_checked = True
                 if valve_started is not None and not counted:
                     counted = True
