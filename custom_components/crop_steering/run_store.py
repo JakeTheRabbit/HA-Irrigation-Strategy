@@ -231,7 +231,10 @@ class RunStore:
 
     def _mapped_sensors(self):
         """Every sensor the room's zones and hardware map now (the config entry, no registry)."""
-        cfg = {**self.entry.data, **self.entry.options}
+        cfg = {
+            **getattr(self.entry, "data", {}),
+            **getattr(self.entry, "options", {}),
+        }
         found = set()
         for zone in cfg.get("zones", {}).values():
             for key, value in zone.items():
