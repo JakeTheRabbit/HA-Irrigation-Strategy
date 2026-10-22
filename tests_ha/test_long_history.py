@@ -205,6 +205,9 @@ async def test_one_slow_or_missing_sensor_does_not_fail_the_others(hass, hass_ad
         return [{"time": first.timestamp() * 1000, "value": 1}] if entity == "sensor.good" else []
 
     monkeypatch.setattr(manager, "read", read)
+    # read() is stubbed, so no real session is needed; a real one leaves its resolver's
+    # shutdown thread behind on the oldest supported Home Assistant.
+    monkeypatch.setattr("homeassistant.helpers.aiohttp_client.async_get_clientsession", lambda _: object())
     result = await manager.query(cfg, ["sensor.slow", "sensor.good", "sensor.gone"], "2026-01-01T00:00:00Z", "2026-01-02T00:00:00Z")
     by = {row["entityId"]: row for row in result["series"]}
     assert by["sensor.good"]["points"] and "error" not in by["sensor.good"]
