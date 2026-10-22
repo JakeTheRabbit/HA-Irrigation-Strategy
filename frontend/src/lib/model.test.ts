@@ -5,6 +5,7 @@ import {
   numeric,
   roomSlug,
   runningVersions,
+  shotRunning,
   validateChange,
 } from "./model";
 import { applyChanges, HaClient } from "./client";
@@ -550,5 +551,39 @@ describe("every new room has a slug", () => {
     });
     const both = discoverRooms({ ...fresh, [upgraded.entity_id]: upgraded });
     expect(both.map((r) => r.id)).toEqual(["room:", "room:tent_"]);
+  });
+});
+
+describe("a running shot, by the controller's own longest shot", () => {
+  const open = (minutes: number, published: number | null, cap?: string) => {
+    const states = createDemo();
+    const room = discoverRooms(states)[0];
+    const valves = states["sensor.crop_steering_engine_config"].attributes.valves;
+    const valve = (valves as Record<string, string>)["1"];
+    const now = Date.parse("2026-10-01T12:00:00Z");
+    const ago = new Date(now - minutes * 60_000).toISOString();
+    states[valve] = { ...states[valve], state: "on", last_changed: ago };
+    delete states["number.crop_steering_max_shot_duration"];
+    delete states["number.crop_steering_maximum_shot_duration"];
+    if (cap !== undefined)
+      states["number.crop_steering_max_shot_duration"] = entity(
+        "number.crop_steering_max_shot_duration",
+        cap,
+      );
+    const beat = states["sensor.crop_steering_ai_heartbeat"].attributes;
+    if (published === null) delete beat.max_shot_s;
+    else beat.max_shot_s = published;
+    return shotRunning(states, room, now);
+  };
+  it("counts a valve open no longer than the cap the controller last sized a shot with", () => {
+    expect(open(9, 600, "900")).toBe("1");
+    expect(open(11, 600, "900")).toBeNull();
+  });
+  it("uses the room's cap setting when the controller publishes none", () => {
+    expect(open(9, null, "600")).toBe("1");
+    expect(open(11, null, "600")).toBeNull();
+  });
+  it("never reads as watering without a known cap: no copy of the controller's fallback", () => {
+    expect(open(1, null)).toBeNull();
   });
 });

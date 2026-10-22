@@ -419,23 +419,29 @@ export function leadingNotices(alerts: Notice[], limit = 3): Notice[] {
 
 /** The zone whose valve a running shot holds open, or null. A shot holds the controller's loop, so
  * a controller that does not report during one goes quiet until it ends. Only a valve that opened
- * no longer ago than the room's maximum shot length counts: a valve open longer is not a shot, and
- * a controller that stopped mid-shot must never read as watering. */
+ * no longer ago than the maximum shot length counts: the one the controller last sized a shot with
+ * (its heartbeat's `max_shot_s`), else the room's setting. A valve open longer is not a shot, and
+ * with neither known nothing reads as watering: a controller that stopped mid-shot never must. */
 export function shotRunning(states: States, room: Room, now: number): string | null {
   const valves = descriptor(states, room)?.attributes.valves;
-  const cap = Number(
-    resolve(states, room, "number", "max_shot_duration", "maximum_shot_duration")?.state,
-  );
-  // The controller's own fallback when the room has no cap entity.
-  const longest = (Number.isFinite(cap) && cap >= 5 ? cap : 900) * 1000;
+  const longest =
+    [
+      resolve(states, room, "sensor", "ai_heartbeat")?.attributes.max_shot_s,
+      Number(resolve(states, room, "number", "max_shot_duration", "maximum_shot_duration")?.state),
+    ].find((cap): cap is number => typeof cap === "number" && Number.isFinite(cap) && cap >= 5) ??
+    null;
+  if (longest === null) return null;
   if (!valves || typeof valves !== "object" || Array.isArray(valves)) return null;
   for (const [zone, id] of Object.entries(valves as Record<string, unknown>)) {
     const valve = typeof id === "string" ? states[id] : undefined;
     if (valve?.state !== "on") continue;
-    if (now - Date.parse(valve.last_changed ?? valve.last_updated ?? "") <= longest) return zone;
+    if (now - Date.parse(valve.last_changed ?? valve.last_updated ?? "") <= longest * 1000)
+      return zone;
   }
   return null;
 }
+
+const OLDER_CONTROLLER_MAX_AGE_S = 20 * 60;
 
 export function buildRoom(states: States, room: Room): RoomView {
   const config = descriptor(states, room);
@@ -470,10 +476,12 @@ export function buildRoom(states: States, room: Room): RoomView {
     ];
   });
   const heartbeat = resolve(states, room, "sensor", "ai_heartbeat");
+  // The controller's heartbeat says how old a reading it uses may be. A controller from before it
+  // did (3.17 and older) read with 20 minutes, fixed.
   const maxAgeS =
     [heartbeat?.attributes.max_sensor_age_s, config?.attributes.max_sensor_age_s].find(
       (value): value is number => typeof value === "number" && Number.isFinite(value) && value > 0,
-    ) ?? 20 * 60;
+    ) ?? OLDER_CONTROLLER_MAX_AGE_S;
   const strategyEntity = resolve(states, room, "sensor", "strategy_plan");
   const strategyAttrs = strategyEntity?.attributes || {};
   const strategyEngaged =

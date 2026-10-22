@@ -168,6 +168,10 @@ export function createDemo(now = Date.now()): States {
     put(`sensor.crop_steering_${prefix}ai_heartbeat`, "online", {
       enable_flag: enable,
       last_beat: new Date(now - 18_000).toISOString(),
+      // What the controller judges with, as its heartbeat publishes it.
+      max_sensor_age_s: 1200,
+      max_shot_s: 900,
+      pore_ec_neutral: [0.8, 1.0],
     });
     put(`sensor.crop_steering_${prefix}app_status`, "safe_idle");
     const fired = index ? [] : [`Z1 P1 ramp shot ${demoRampShot(now)}/6 (demo)`];
@@ -203,6 +207,9 @@ export function createDemo(now = Date.now()): States {
           below_minimum: false,
           over_full: false,
           minimum_pct: 8,
+          release_pct: 12,
+          over_pct: 102,
+          over_release_pct: 98,
         },
       );
     number(prefix, "irrigation_ec_min", 2.3, 0, 6, 0.1, "mS/cm");
