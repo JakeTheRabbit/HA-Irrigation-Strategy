@@ -106,9 +106,10 @@ def resolve_questions(hass, room_id):
 
 async def async_setup_brain(hass, entry):
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     manager = BrainQuestions(hass, entry)
     await manager.async_init()

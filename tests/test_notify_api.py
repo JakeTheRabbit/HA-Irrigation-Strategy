@@ -807,3 +807,32 @@ def test_a_card_pushes_nothing_while_nobody_is_set_up_and_its_wording_never_lose
     assert service == PHONE_A
     assert payload["title"] == "A card in Settings → Repairs (CS-602)"
     assert "Code CS-602." in payload["message"]
+
+
+def test_api_v2_a_refusal_answered_instead_of_raised_is_not_ok(services):
+    def v2(name, user, **data):
+        request = SimpleNamespace(
+            service=name,
+            data={"api": 2, **data},
+            context=SimpleNamespace(user_id=getattr(user, "id", user)),
+            return_response=True,
+        )
+        return asyncio.run(services.hass.services.registered[(DOMAIN, name)](request))
+
+    # notify_get reports the settings' revision, which it carries in `config`.
+    assert v2("notify_get", ADMIN)["revision"] == 0
+    other = v2("notify_test", OTHER, service=PHONE_A)
+    assert other["ok"] is False and other["error"]["code"] == "forbidden"
+    assert other["data"]["sent"] is False
+    assert other["error"]["message"].startswith("not allowed: ")
+    # v1 answers exactly as before.
+    v1 = services.call("notify_test", OTHER, service=PHONE_A)
+    assert v1 == other["data"]
+    assert v2("notify_test", STAFF, service=PHONE_A)["ok"] is True
+    staff = v2("notify_save", STAFF, expected_revision=0, recipients=[row(PHONE_A)])
+    assert staff["ok"] is False and staff["error"]["code"] == "forbidden"
+    stale = v2("notify_save", ADMIN, expected_revision=7, recipients=[])
+    assert stale["error"]["code"] == "stale_revision"
+    assert stale["error"]["current_revision"] == 0
+    gone = v2("notify_test", "someone-deleted", service=PHONE_A)
+    assert gone["error"]["code"] == "forbidden"

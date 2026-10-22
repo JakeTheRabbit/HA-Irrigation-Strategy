@@ -220,10 +220,10 @@ async def async_stop_all(hass, entry, context=None) -> dict:
 async def async_setup_stop_all(hass):
     """The crop_steering.stop_all service, by canonical room id. Any user may call it: it only stops."""
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
+    from .api_v2 import failure, fields, wrap
     from .room import room_prefix
 
     async def handle(call):
@@ -236,10 +236,27 @@ async def async_setup_stop_all(hass):
                 return await async_stop_all(hass, entry, call.context)
         raise HomeAssistantError(f"No room {room_id}")
 
+    def not_off(result):
+        return [*result.get("still_on", ()), *result.get("refused", ())]
+
+    def stopped(call, result) -> str:
+        """API v2 read-back: every switch read back off and none refused."""
+        return "none" if not_off(result) else "verified"
+
+    def refusal(call, result):
+        """API v2: a stop that left something on is never a success; the answer stays in `data`."""
+        still_on = list(dict.fromkeys(not_off(result)))
+        if not still_on:
+            return None
+        return failure(
+            "guard_refused",
+            "Stop all did not switch everything off; still on: " + ", ".join(still_on),
+        )
+
     hass.services.async_register(
         DOMAIN,
         "stop_all",
-        wrap(handle),
+        wrap(handle, readback_of=stopped, error_of=refusal),
         schema=vol.Schema(fields({vol.Required("room_id"): str})),
         supports_response=SupportsResponse.OPTIONAL,
     )

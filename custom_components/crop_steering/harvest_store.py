@@ -19,8 +19,8 @@ import logging
 import math
 import re
 
-from .api_v2 import StaleRevision
 from .admin import async_require_admin
+from .api_v2 import StaleRevision
 from .const import DOMAIN, MAX_ZONES
 from .room import room_prefix
 
@@ -226,9 +226,10 @@ def resolve_harvests(hass, room_id):
 
 async def async_setup_harvests(hass, entry):
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     manager = HarvestStore(hass, entry)
     await manager.async_init()

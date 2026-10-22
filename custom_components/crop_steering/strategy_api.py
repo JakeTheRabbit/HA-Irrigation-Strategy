@@ -31,9 +31,10 @@ def resolve_manager(hass, room_id):
 
 async def async_setup_strategy_services(hass):
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     async def handle(call):
         if call.service not in READ_ONLY:

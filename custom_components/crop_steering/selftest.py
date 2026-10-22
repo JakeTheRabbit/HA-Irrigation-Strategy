@@ -22,9 +22,10 @@ def shot_button(room_id, zone) -> str:
 
 async def async_setup_selftest(hass):
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     async def handle(call):
         await async_require_admin(hass, call, f"{DOMAIN}.{call.service}")

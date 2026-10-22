@@ -9,8 +9,8 @@ import hashlib
 import json
 import re
 
-from .api_v2 import StaleRevision
 from .admin import async_require_admin
+from .api_v2 import StaleRevision
 from .const import DOMAIN
 from .room import room_prefix
 
@@ -234,9 +234,10 @@ class BrainPromptStore:
 
 async def async_setup_brain_prompt(hass, entry):
     import voluptuous as vol
-    from . import api_v2
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from . import api_v2
 
     manager = BrainPromptStore(hass, entry)
     await manager.async_init()

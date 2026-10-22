@@ -10,7 +10,7 @@ import re
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
-from .api_v2 import StaleRevision
+from .api_v2 import StaleRevision, Unavailable
 from .const import DOMAIN, MAX_ZONES
 from .room import room_prefix
 from .strategy_model import MODE_KEYS, PARAMETERS as STRATEGY_PARAMETERS
@@ -245,7 +245,7 @@ class RunStore:
             self.hass.data.get(DOMAIN, {}).get("_strategy", {}).get(self.entry.entry_id)
         )
         if manager is None:
-            raise ValueError(
+            raise Unavailable(
                 "Room strategy metadata is unavailable; reload the integration"
             )
         response = manager.response()
@@ -455,7 +455,7 @@ class RunStore:
     async def mutate(self, action, data):
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             if (
                 type(data.get("expected_revision")) is not int
                 or data["expected_revision"] != self.document["revision"]

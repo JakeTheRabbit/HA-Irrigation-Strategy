@@ -184,9 +184,10 @@ def log_for(hass, entry_id):
 
 async def async_setup_setpoint_log(hass, entry):
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse, callback
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     log = SetpointLog(hass, entry)
     await log.async_init()

@@ -34,7 +34,7 @@ import re
 import time
 
 from . import notify_catalog
-from .admin import async_require_admin
+from .admin import async_require_admin, forbidden
 from .const import DOMAIN
 from .room import room_prefix
 from .setup_panel import PANEL
@@ -920,9 +920,10 @@ async def async_setup_notify(hass, entry) -> None:
     """Once for the site, with the first room that sets up; each room after it only joins, and the store, the
     sensor and the services stay while any room is loaded (async_unload_notify)."""
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import failure, fields, nested_revision, wrap
 
     data = hass.data.setdefault(DOMAIN, {})
     data.setdefault("_notify_entries", set()).add(entry.entry_id)
@@ -944,7 +945,7 @@ async def async_setup_notify(hass, entry) -> None:
         # Anyone signed in may save their own phone's row and test their own phone; a user id Home
         # Assistant does not know may not, as the administrator check refuses it.
         if user_id and user is None:
-            raise HomeAssistantError(
+            raise forbidden(
                 f"{DOMAIN}.{call.service} requires a signed-in Home Assistant user"
             )
         try:
@@ -967,6 +968,32 @@ async def async_setup_notify(hass, entry) -> None:
             return await notifier.test_many(call.data["services"], user)
         except OSError as error:
             raise HomeAssistantError(str(error)) from error
+
+    def refusal(call, result):
+        """API v2: a save or a one-phone test this service answered as refused instead of raising.
+        Its refusals for who the caller is all start "not allowed:"."""
+        error = result.get("error") if isinstance(result, dict) else None
+        if not error or call.service not in ("notify_save", "notify_test"):
+            return None
+        if call.service == "notify_test" and (
+            "service" not in call.data or result["sent"]
+        ):
+            return None
+        if error.startswith("not allowed:"):
+            return failure("forbidden", error)
+        if call.service == "notify_test":
+            if not notifier._has(call.data["service"]):
+                return failure("invalid", error)
+            return failure("unavailable", error)  # the phone's notify service failed
+        if error == "revision":
+            return failure(
+                "stale_revision",
+                "Notification settings changed elsewhere. Reload before saving.",
+                nested_revision(result),
+            )
+        if error == notifier.error:
+            return failure("unavailable", error)
+        return failure("invalid", error)
 
     schemas = {
         "notify_get": {},
@@ -995,7 +1022,7 @@ async def async_setup_notify(hass, entry) -> None:
         hass.services.async_register(
             DOMAIN,
             service,
-            wrap(handle),
+            wrap(handle, revision_of=nested_revision, error_of=refusal),
             schema=vol.Schema(fields(schemas[service])),
             # The controller app calls notify over REST asking for its answer; a script may call it without.
             supports_response=(

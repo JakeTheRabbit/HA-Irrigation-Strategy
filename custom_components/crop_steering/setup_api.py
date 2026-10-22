@@ -8,9 +8,9 @@ from datetime import datetime
 import logging
 import math
 
-from .api_v2 import StaleRevision
 from . import units
 from .admin import async_require_admin
+from .api_v2 import StaleRevision
 from .const import DOMAIN, LEGACY_KILL_SWITCH, MAX_ZONES
 from .generated.defaults import SIZING_DEFAULTS
 from .journal_api import attribution, note
@@ -1161,6 +1161,7 @@ async def async_setup_setup_services(hass):
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
     import voluptuous as vol
+
     from .api_v2 import API, fields, wrap
 
     state = hass.data.setdefault(DOMAIN, {}).setdefault("_setup", {})

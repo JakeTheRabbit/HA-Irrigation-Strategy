@@ -16,9 +16,9 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import logging
 
-from .api_v2 import StaleRevision
 from . import stock
 from .admin import async_require_admin
+from .api_v2 import StaleRevision, Unavailable
 from .const import DOMAIN, REPAIRS_DOCS_URL
 from .journal_api import attribution, note
 from .room import room_prefix
@@ -400,7 +400,7 @@ class StockStore:
     async def mutate(self, action, data, who=None):
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             if data.get("expected_revision") != self.data["revision"]:
                 raise StaleRevision(
                     "Stock tanks changed elsewhere. Reload before saving.",
@@ -451,7 +451,7 @@ class StockStore:
         """
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             key = data.get("key")
             duplicate = key in self.data["draw_keys"]
             linked = self.linked()
@@ -541,9 +541,10 @@ def resolve_stock(hass, room_id):
 
 async def async_setup_stock(hass, entry):
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     manager = StockStore(hass, entry)
     await manager.async_init()

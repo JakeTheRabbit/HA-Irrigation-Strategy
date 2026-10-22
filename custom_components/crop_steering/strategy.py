@@ -12,7 +12,7 @@ import logging
 import math
 from datetime import date, datetime, time, timedelta, timezone
 
-from .api_v2 import StaleRevision
+from .api_v2 import GuardRefused, StaleRevision, Unavailable
 from .const import DOMAIN
 from .journal_api import note
 from .room import room_prefix
@@ -345,7 +345,7 @@ class StrategyManager:
 
     async def _persist(self):
         if self._store is None:
-            raise RuntimeError("Strategy storage is unavailable")
+            raise Unavailable("Strategy storage is unavailable")
         await self._store.async_save(copy.deepcopy(self.document))
 
     def _journal(self, kind, who=None, **extra):
@@ -474,7 +474,7 @@ class StrategyManager:
             preview = self.preview()
             stale = self._readiness(now, [row["zone_id"] for row in preview["zones"]])
             if stale:  # arming needs every zone's moisture reading
-                raise ValueError("; ".join(stale.values()))
+                raise GuardRefused("; ".join(stale.values()))
             if any(row["errors"] for row in preview["zones"]):
                 raise ValueError(
                     "Resolve hydraulic configuration errors before activation"

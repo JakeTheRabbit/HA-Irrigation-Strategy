@@ -35,8 +35,8 @@ import logging
 import math
 from uuid import uuid4
 
-from .api_v2 import StaleRevision
 from .admin import async_require_admin
+from .api_v2 import StaleRevision, Unavailable
 from .const import DOMAIN, REPAIRS_DOCS_URL
 from .calculations import fuse_probes
 from .const import PROBE_FAR, PROBE_RANGE, PROBE_STALE_SECONDS
@@ -619,7 +619,7 @@ class CalibrationStore:
         entity_id = data.get("entity_id")
         preview = bool(data.get("preview"))
         if self.error or self.offsets_error:
-            raise ValueError(self.error or self.offsets_error)
+            raise Unavailable(self.error or self.offsets_error)
         if entity_id not in self._vwc_zones():
             raise ValueError("That is not a moisture probe of this room")
         if not any(k in data for k in ("offset", "curve", "match_handheld")):
@@ -628,7 +628,7 @@ class CalibrationStore:
             raise ValueError("Give an offset or a handheld reading to match, not both")
         async with self._lock:
             if self.error or self.offsets_error:
-                raise ValueError(self.error or self.offsets_error)
+                raise Unavailable(self.error or self.offsets_error)
             if (
                 not preview
                 and data.get("expected_revision") != self.document["revision"]
@@ -1041,7 +1041,7 @@ class CalibrationStore:
 
     async def start(self, probe, solutions=None, who=None) -> dict:
         if self.error:
-            raise ValueError(self.error)
+            raise Unavailable(self.error)
         if probe not in PROBES:
             raise ValueError("Calibrate the feed-water pH or EC probe")
         kind, key = PROBES[probe]
@@ -1158,7 +1158,7 @@ class CalibrationStore:
             ):  # committed (or ended) while this call waited
                 raise ValueError(EXPIRED)
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             result = evaluate(
                 session["kind"],
                 [
@@ -1230,7 +1230,7 @@ class CalibrationStore:
         kind = PROBES[probe][0]
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             records = deepcopy(self.document["records"])
             current = next(
                 (r for r in records if r.get("probe") == probe and r.get("applied")),
@@ -1304,7 +1304,7 @@ class CalibrationStore:
     async def record(self, data, who=None):
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             if data.get("expected_revision") != self.document["revision"]:
                 raise StaleRevision(
                     "Calibration history changed elsewhere. Reload before saving.",
@@ -1386,9 +1386,10 @@ def resolve_session(hass, session_id):
 
 async def async_setup_calibration(hass, entry):
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     manager = CalibrationStore(hass, entry)
     await manager.async_init()

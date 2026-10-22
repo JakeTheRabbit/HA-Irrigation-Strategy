@@ -16,8 +16,8 @@ from urllib.parse import urlsplit
 
 import aiohttp
 
-from .api_v2 import StaleRevision
 from .admin import async_require_admin
+from .api_v2 import StaleRevision
 from .const import DOMAIN
 from .room import room_prefix
 
@@ -317,9 +317,10 @@ class LongHistory:
 
 async def async_setup_long_history(hass, entry):
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     manager = LongHistory(hass, entry)
     stored = await manager.store.async_load()

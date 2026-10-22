@@ -221,11 +221,11 @@ def overlays_for(hass, entry_id):
 
 async def async_setup_overlays(hass, entry):
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
     from .admin import async_require_admin
+    from .api_v2 import fields, wrap
 
     held = Overlays(hass, entry)
     await held.async_init()

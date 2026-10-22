@@ -19,6 +19,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 
 from .admin import async_require_admin
+from .api_v2 import Unavailable
 from .const import DOMAIN
 from .generated.ids import new_id
 from .journal_api import attribution, note
@@ -366,7 +367,7 @@ class DashboardStore:
         if template not in TEMPLATES:
             raise ValueError(f"Unknown dashboard template {template!r}")
         if self.error:
-            raise ValueError(self.error)
+            raise Unavailable(self.error)
         room_ids = list(dict.fromkeys(room_ids))
         rooms = [room_of(self.hass, room_id) for room_id in room_ids]
         config = render(template, rooms)
@@ -462,9 +463,10 @@ def _created(call, result) -> str:
 async def async_setup_dashboards(hass, entry) -> None:
     """Once for the site, with the first room that sets up; each room after it only joins."""
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     data = hass.data.setdefault(DOMAIN, {})
     data.setdefault("_dashboard_entries", set()).add(entry.entry_id)

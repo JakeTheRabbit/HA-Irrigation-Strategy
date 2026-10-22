@@ -111,16 +111,35 @@ def test_stale_revision_maps_to_its_code_and_current_revision():
             _run(wrapped(call))
 
 
-def test_a_stale_save_answered_rather_than_raised_is_stale_revision():
+def test_a_refusal_answered_rather_than_raised_comes_from_the_service_s_own_hook():
     _, api_v2 = _stubs()
+    answer = {"config": {"revision": 9}, "error": "revision"}
 
     async def handler(call):
-        return {"config": {"revision": 9}, "error": "revision"}
+        return answer
 
-    out = _run(api_v2.wrap(handler)(_call({"api": 2})))
-    assert out["ok"] is False
-    assert out["error"]["code"] == "stale_revision"
-    assert out["error"]["current_revision"] == 9
+    def error_of(call, result):
+        if result["error"] == "revision":
+            return api_v2.failure("stale_revision", "changed", 9)
+        return None
+
+    out = _run(api_v2.wrap(handler, error_of=error_of)(_call({"api": 2})))
+    assert out == {
+        "api": 2,
+        "ok": False,
+        "error": {
+            "code": "stale_revision",
+            "message": "changed",
+            "current_revision": 9,
+        },
+        "data": answer,
+    }
+    # No hook, no sniffing: the same answer from another service is ok, its revision as given.
+    plain = _run(
+        api_v2.wrap(handler, revision_of=api_v2.nested_revision)(_call({"api": 2}))
+    )
+    assert plain["ok"] is True and plain["revision"] == 9
+    assert _run(api_v2.wrap(handler, error_of=error_of)(_call({}))) is answer
 
 
 def test_forbidden_maps_from_the_admin_check():
@@ -149,11 +168,16 @@ def test_forbidden_maps_from_the_admin_check():
     [
         (ValueError("pump_over_capacity: switch.pump cannot feed 3 zones"), "invalid"),
         (ValueError("Give at least one target"), "invalid"),
-        (ValueError("The stored dashboards could not be loaded; ..."), "unavailable"),
+        (ValueError("The stored dashboards could not be loaded; ..."), "invalid"),
+        ("Unavailable", "unavailable"),
+        ("GuardRefused", "guard_refused"),
     ],
 )
 def test_value_errors_map_to_their_codes(error, code):
     _, api_v2 = _stubs()
+
+    if isinstance(error, str):  # a type of api_v2: same message, the code from the type
+        error = getattr(api_v2, error)("Zone 1 VWC is unavailable or stale")
 
     async def handler(call):
         raise error
@@ -166,11 +190,53 @@ def test_the_journal_being_unavailable_is_unavailable():
     _, api_v2 = _stubs()
     from homeassistant.exceptions import HomeAssistantError
 
+    message = "The event journal is unavailable"
+
     async def handler(call):
-        raise HomeAssistantError("The event journal is unavailable")
+        raise HomeAssistantError(message) from api_v2.Unavailable(message)
 
     out = _run(api_v2.wrap(handler)(_call({"api": 2})))
-    assert out["error"]["code"] == "unavailable"
+    assert out["error"] == {"code": "unavailable", "message": message}
+
+    async def only_says_so(call):
+        raise HomeAssistantError(message)
+
+    # The code comes from the type, never from the words.
+    out = _run(api_v2.wrap(only_says_so)(_call({"api": 2})))
+    assert out["error"]["code"] == "invalid"
+
+
+def test_only_what_an_error_was_raised_from_counts():
+    _, api_v2 = _stubs()
+    from homeassistant.exceptions import HomeAssistantError
+
+    async def handler(call):
+        try:
+            raise api_v2.StaleRevision("changed elsewhere", 3)
+        except ValueError:
+            raise HomeAssistantError("Something else went wrong")
+
+    out = _run(api_v2.wrap(handler)(_call({"api": 2})))
+    assert out["error"] == {"code": "invalid", "message": "Something else went wrong"}
+
+
+def test_forbidden_comes_from_the_type_not_the_words():
+    _, api_v2 = _stubs()
+    from homeassistant.exceptions import HomeAssistantError
+
+    from custom_components.crop_steering.admin import Forbidden, forbidden
+
+    refusal = forbidden("x requires an authenticated Home Assistant administrator")
+    assert isinstance(refusal, HomeAssistantError) and isinstance(refusal, Forbidden)
+    assert str(refusal) == "x requires an authenticated Home Assistant administrator"
+
+    async def handler(call):
+        raise HomeAssistantError(
+            "x requires an authenticated Home Assistant administrator"
+        )
+
+    out = _run(api_v2.wrap(handler)(_call({"api": 2})))
+    assert out["error"]["code"] == "invalid"
 
 
 def test_a_guard_refusal_is_guard_refused():

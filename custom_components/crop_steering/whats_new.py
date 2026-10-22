@@ -131,9 +131,10 @@ async def async_setup_whats_new(hass, entry, fresh: bool) -> None:
     `fresh`: this room has no entities yet, so it was set up just now, not on an earlier start.
     """
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     data = hass.data.setdefault(DOMAIN, {})
     data.setdefault("_whats_new_entries", set()).add(entry.entry_id)

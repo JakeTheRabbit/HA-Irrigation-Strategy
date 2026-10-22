@@ -30,7 +30,8 @@ import math
 import uuid
 
 from . import calibration as calibration_module, dosing
-from .admin import async_require_admin
+from .admin import async_require_admin, forbidden
+from .api_v2 import Unavailable
 from .const import DOMAIN
 from .journal_api import attribution, note
 from .room import room_prefix
@@ -424,7 +425,7 @@ class DosingStore:
     async def _timed(self, action, pump_id, seconds, by) -> tuple[dict | None, list]:
         """Store a prime's or a calibration's request, unless a blocker stands -> (request, blockers)."""
         if self.error:
-            raise ValueError(self.error)
+            raise Unavailable(self.error)
         pump, seconds = dosing.check_timed(self.data, action, pump_id, seconds)
         blockers = self.precheck(pump)["blockers"]
         if blockers:
@@ -497,7 +498,7 @@ class DosingStore:
         """
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             pump = dosing.find_pump(self.data, pump_id)["id"]
             waiting = self.data["request"] if self.pending() else None
             action = waiting.get("action") if waiting else None
@@ -689,7 +690,7 @@ class DosingStore:
         who = who or {}
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             # Committed (or ended) while this call waited for the lock: refused as an expired one.
             if calibration.session(session_id, pump=True) is not session:
                 raise ValueError(calibration_module.EXPIRED)
@@ -851,10 +852,9 @@ async def _require_signed_in(hass, call, action):
     """A stop only switches things off, so anyone who may look at the room may stop its dosing: any
     signed-in user, administrator or not, and an automation (no user) as before. A user id Home
     Assistant does not know is refused, as the administrator check refuses it."""
-    from homeassistant.exceptions import HomeAssistantError
 
     if getattr(call.context, "user_id", None) and await _caller(hass, call) is None:
-        raise HomeAssistantError(f"{action} requires a signed-in Home Assistant user")
+        raise forbidden(f"{action} requires a signed-in Home Assistant user")
 
 
 async def _handle_pump(hass, call):
@@ -891,9 +891,10 @@ async def _handle_pump(hass, call):
 
 async def async_setup_dosing(hass, entry):
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import failure, fields, nested_revision, wrap
 
     manager = DosingStore(hass, entry)
     await manager.async_init()
@@ -924,6 +925,30 @@ async def async_setup_dosing(hass, entry):
             return await target.save(call.data, can_edit)
         except (ValueError, KeyError, OSError) as error:
             raise HomeAssistantError(str(error)) from error
+
+    def refusal(call, result):
+        """API v2: a request or save this service answered as refused instead of raising."""
+        if call.service not in ("dosing_request", "dosing_save"):
+            return None
+        error = result.get("error") if isinstance(result, dict) else None
+        if not error or (call.service == "dosing_request" and result.get("request")):
+            return None
+        if error == "revision":
+            return failure(
+                "stale_revision",
+                "The dosing setup changed elsewhere. Reload before saving.",
+                nested_revision(result),
+            )
+        if error == "busy":
+            return failure(
+                "guard_refused",
+                "A dose or batch is waiting or running: try again after it",
+            )
+        if error == HELD:
+            return failure("guard_refused", error)
+        if error == resolve_dosing(hass, call.data["room_id"]).error:
+            return failure("unavailable", error)
+        return failure("invalid", error)
 
     schemas = {
         "dosing_get": {vol.Required("room_id"): str},
@@ -969,7 +994,7 @@ async def async_setup_dosing(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            wrap(handle),
+            wrap(handle, revision_of=nested_revision, error_of=refusal),
             schema=vol.Schema(fields(schemas[service])),
             # Reads answer only; a pump service that leaves a request or stores a flow may answer.
             supports_response=(

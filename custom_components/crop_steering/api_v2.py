@@ -8,6 +8,17 @@ any other caller gets the exception v1 raised, so a refused write never looks li
 An exception this module does not know is raised as it is.
 
 `event_ids` are the journal events `journal_api.emit()` recorded while the service ran.
+
+Fields every response service takes besides its own (`COMMON`; documented here and in docs/MCP.md,
+not per service in services.yaml): `api` (1 or 2; absent or 1 is v1), `client` (`mcp` or `aigrow`,
+for attribution) and `proposal_token` (the reviewed proposal a write carries). A field a service
+already declares keeps its own validator.
+
+Error codes, each from a type, never from message text: StaleRevision -> `stale_revision` (with
+`current_revision`), admin.Forbidden -> `forbidden`, GuardRefused or an `intent.refused` event ->
+`guard_refused`, Unavailable -> `unavailable`, any other ValueError or HomeAssistantError -> `invalid`.
+Each is matched on the exception or what it was raised from (`raise ... from`). A service that
+answers a refusal instead of raising maps it with its `error_of` hook; the answer stays in `data`.
 """
 
 from __future__ import annotations
@@ -16,19 +27,22 @@ import functools
 
 from .journal_api import EMITTED
 
-FORBIDDEN = (
-    "requires an authenticated Home Assistant administrator",
-    "requires a signed-in Home Assistant user",
-)
-UNAVAILABLE = ("unavailable", "could not be loaded")
-
 
 class StaleRevision(ValueError):
-    """A save against a revision that has moved on. The message is the one v1 raised."""
+    """A save against a revision that has moved on (`stale_revision`). The message is the one v1
+    raised."""
 
     def __init__(self, message: str, current_revision=None) -> None:
         super().__init__(message)
         self.current_revision = current_revision
+
+
+class Unavailable(ValueError):
+    """A hub or store that cannot be used (`unavailable`): it could not be loaded or is not set up."""
+
+
+class GuardRefused(ValueError):
+    """A guard that refuses the change for now (`guard_refused`), such as a readiness check."""
 
 
 def __getattr__(name):
@@ -84,6 +98,12 @@ def _revision(result):
     return result.get("revision") if isinstance(result, dict) else None
 
 
+def nested_revision(result):
+    """`revision_of` for an answer that carries its stored setup as `config` (dosing, notify)."""
+    config = result.get("config") if isinstance(result, dict) else None
+    return config.get("revision") if isinstance(config, dict) else None
+
+
 def _readback(call, result) -> str:
     """The handler's own read-back: `applied` rows (presets) or a `readback` status (supply_save)."""
     if not isinstance(result, dict):
@@ -103,10 +123,11 @@ def _readback(call, result) -> str:
 
 
 def _chain(error) -> list:
+    """`error` and what it was raised from (`raise ... from`), never what it was raised while handling."""
     out = []
     while error is not None and error not in out:
         out.append(error)
-        error = error.__cause__ or error.__context__
+        error = error.__cause__
     return out
 
 
@@ -116,27 +137,53 @@ def _failure(error, events) -> dict | None:
     `invalid`; anything else (a bug) is raised as it is."""
     from homeassistant.exceptions import HomeAssistantError
 
+    from .admin import Forbidden
+
     if not isinstance(error, (ValueError, HomeAssistantError)):
         return None
     chain = _chain(error)
     message = str(error)
-    stale = next((e for e in chain if isinstance(e, StaleRevision)), None)
+
+    def raised(kind):
+        return next((e for e in chain if isinstance(e, kind)), None)
+
+    stale = raised(StaleRevision)
     if stale is not None:
-        out = {"code": "stale_revision", "message": message}
-        if stale.current_revision is not None:
-            out["current_revision"] = stale.current_revision
-        return out
-    if any(text in message for text in FORBIDDEN):
-        return {"code": "forbidden", "message": message}
-    if any(kind == "intent.refused" for _, kind in events):
-        return {"code": "guard_refused", "message": message}
-    if any(text in message.lower() for text in UNAVAILABLE):
-        return {"code": "unavailable", "message": message}
-    return {"code": "invalid", "message": message}
+        return failure("stale_revision", message, stale.current_revision)
+    if raised(Forbidden):
+        return failure("forbidden", message)
+    if raised(GuardRefused) or any(kind == "intent.refused" for _, kind in events):
+        return failure("guard_refused", message)
+    if raised(Unavailable):
+        return failure("unavailable", message)
+    return failure("invalid", message)
 
 
-def wrap(handler, *, room_of=_room, revision_of=_revision, readback_of=_readback):
-    """The service handler, answering in the v2 envelope when the call says `api: 2`."""
+def failure(code: str, message: str, current_revision=None) -> dict:
+    """An `error` of the envelope; for a service's `error_of` hook too."""
+    out = {"code": code, "message": message}
+    if current_revision is not None:
+        out["current_revision"] = current_revision
+    return out
+
+
+def _no_error(call, result):
+    return None
+
+
+def wrap(
+    handler,
+    *,
+    room_of=_room,
+    revision_of=_revision,
+    readback_of=_readback,
+    error_of=_no_error,
+):
+    """The service handler, answering in the v2 envelope when the call says `api: 2`.
+
+    `error_of(call, result)` -> a failure() for an answer that is a refusal (a service that answers
+    one instead of raising), else None; the answer then stays in `data`.
+    """
 
     @functools.wraps(handler)
     async def wrapped(call):
@@ -151,22 +198,15 @@ def wrap(handler, *, room_of=_room, revision_of=_revision, readback_of=_readback
         try:
             result = await handler(call)
         except Exception as error:
-            failure = _failure(error, events)
-            if failure is None:
+            failed = _failure(error, events)
+            if failed is None:
                 raise
-            return {"api": 2, "ok": False, "error": failure}
+            return {"api": 2, "ok": False, "error": failed}
         finally:
             EMITTED.reset(token)
-        if isinstance(result, dict) and result.get("error") == "revision":
-            # dosing_save and notify_save answer a stale save instead of raising.
-            failure = {
-                "code": "stale_revision",
-                "message": "Changed elsewhere. Reload before saving.",
-            }
-            current = (result.get("config") or {}).get("revision")
-            if current is not None:
-                failure["current_revision"] = current
-            return {"api": 2, "ok": False, "error": failure}
+        refused = error_of(call, result)
+        if refused is not None:
+            return {"api": 2, "ok": False, "error": refused, "data": result}
         return {
             "api": 2,
             "ok": True,

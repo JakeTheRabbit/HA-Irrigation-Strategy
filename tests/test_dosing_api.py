@@ -570,3 +570,63 @@ def test_a_store_from_before_ph_roles_loads_unchanged():
     old = {"revision": 3, "pumps": [copy.deepcopy(PUMP)], "batch": copy.deepcopy(BATCH)}
     hass, store = rig(old)
     assert store.error is None and "ph_role" not in store.data["pumps"][0]
+
+
+def _v2(services, name, user="admin", **data):
+    """The service as an API v2 caller that asks for the answer."""
+    request = SimpleNamespace(
+        service=name,
+        data={"room_id": "room:", "api": 2, **data},
+        context=SimpleNamespace(user_id=user),
+        return_response=True,
+    )
+    return asyncio.run(services.hass.services.registered[(DOMAIN, name)](request))
+
+
+def test_api_v2_a_request_answered_as_refused_is_not_ok(services, monkeypatch):
+    saved = services.call(
+        "dosing_save",
+        expected_revision=0,
+        pumps=[copy.deepcopy(PUMP)],
+        batch=copy.deepcopy(BATCH),
+    )
+    # dosing_get and dosing_save report the setup's revision, which they carry in `config`.
+    assert _v2(services, "dosing_get")["revision"] == saved["config"]["revision"]
+    first = _v2(services, "dosing_request", action="dose", pump="balance", ml=5)
+    assert first["ok"] is True and first["data"]["request"]
+    busy = _v2(services, "dosing_request", action="dose", pump="balance", ml=5)
+    assert busy["ok"] is False and busy["error"]["code"] == "guard_refused"
+    assert busy["data"] == {"request": None, "error": "busy"}
+    # v1 answers exactly as before.
+    assert services.call("dosing_request", action="dose", pump="balance", ml=5) == {
+        "request": None,
+        "error": "busy",
+    }
+    invalid = _v2(services, "dosing_request", action="stop", run_anyway=True)
+    assert invalid["ok"] is False and invalid["error"]["code"] == "invalid"
+    assert "only a batch" in invalid["error"]["message"]
+    stale = _v2(
+        services,
+        "dosing_save",
+        expected_revision=0,
+        pumps=[copy.deepcopy(PUMP)],
+        batch=copy.deepcopy(BATCH),
+    )
+    assert stale["error"]["code"] == "stale_revision"
+    assert stale["error"]["current_revision"] == saved["config"]["revision"]
+
+
+def test_api_v2_a_request_held_by_a_pump_being_calibrated_is_guard_refused(
+    services, monkeypatch
+):
+    services.call(
+        "dosing_save",
+        expected_revision=0,
+        pumps=[copy.deepcopy(PUMP)],
+        batch=copy.deepcopy(BATCH),
+    )
+    (store,) = services.hass.data[DOMAIN]["_dosing"].values()
+    monkeypatch.setattr(store, "pump_hold", lambda: True)
+    held = _v2(services, "dosing_request", action="dose", pump="balance", ml=5)
+    assert held["ok"] is False
+    assert held["error"] == {"code": "guard_refused", "message": dosing_api.HELD}

@@ -19,9 +19,9 @@ import logging
 from copy import deepcopy
 from datetime import datetime, timezone
 
-from .api_v2 import StaleRevision
 from . import presets, site_store
 from .admin import async_require_admin
+from .api_v2 import StaleRevision, Unavailable
 from .const import DOMAIN
 from .generated.guards import zone_demand_lph
 from .generated.ids import new_id
@@ -174,7 +174,7 @@ class SiteStore:
 
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             if data["expected_revision"] != self.document["revision"]:
                 raise StaleRevision(
                     "Supply settings changed elsewhere. Reload before saving.",
@@ -301,7 +301,7 @@ class SiteStore:
 
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             if expected_revision != self.document["presets_revision"]:
                 raise StaleRevision(
                     "Presets changed elsewhere. Reload before saving.",
@@ -385,9 +385,10 @@ async def async_setup_site(hass, entry) -> None:
     """Once for the site, with the first room that sets up; each room after it only joins (and
     publishes again, as its sizing may have changed)."""
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     data = hass.data.setdefault(DOMAIN, {})
     data.setdefault("_site_entries", set()).add(entry.entry_id)

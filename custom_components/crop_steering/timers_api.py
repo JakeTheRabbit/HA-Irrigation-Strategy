@@ -22,8 +22,8 @@ import math
 from copy import deepcopy
 from datetime import datetime, timedelta
 
-from .api_v2 import StaleRevision
 from .admin import async_require_admin
+from .api_v2 import StaleRevision, Unavailable
 from .const import DOMAIN
 from .generated import timers
 from .generated.ids import new_id
@@ -310,7 +310,7 @@ class TimerPrograms:
 
         async with self._lock:
             if self.error:
-                raise ValueError(self.error)
+                raise Unavailable(self.error)
             if expected_revision != self.document["revision"]:
                 raise StaleRevision(
                     "Timer programs changed elsewhere. Reload before saving.",
@@ -513,9 +513,10 @@ async def set_programs(
 
 async def async_setup_timers(hass, entry) -> None:
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
+
+    from .api_v2 import fields, wrap
 
     room = TimerPrograms(hass, entry)
     await room.async_init()

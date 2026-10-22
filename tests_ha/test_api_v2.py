@@ -139,3 +139,52 @@ async def test_a_read_takes_client_and_proposal_token_too(hass, hass_admin_user)
     )
     assert out["ok"] is True and out["room_id"] == F2
     assert "events" in out["data"]
+
+
+async def test_a_non_admin_write_is_forbidden(hass, hass_read_only_user):
+    await _install(hass)
+    out = await _call(
+        hass,
+        hass_read_only_user,
+        "supply_save",
+        api=2,
+        expected_revision=0,
+        irrigation_pumps=[],
+    )
+    assert out["ok"] is False and out["error"]["code"] == "forbidden"
+    assert "administrator" in out["error"]["message"]
+    with pytest.raises(HomeAssistantError, match="administrator"):
+        await _call(
+            hass,
+            hass_read_only_user,
+            "supply_save",
+            expected_revision=0,
+            irrigation_pumps=[],
+        )
+
+
+async def test_a_stop_all_that_leaves_something_on_is_never_ok(
+    hass, hass_admin_user, monkeypatch
+):
+    from homeassistant.components import persistent_notification
+    from test_safety_ops import KILL, WASTE, _pumped_room
+
+    from custom_components.crop_steering import safety_ops
+
+    monkeypatch.setattr(safety_ops, "STOP_READBACK_S", 1.0)
+    monkeypatch.setattr(persistent_notification, "async_create", lambda *a, **k: None)
+    await _pumped_room(hass)
+    await hass.services.async_call(
+        "switch", "turn_on", {"entity_id": KILL}, blocking=True
+    )
+    hass.states.async_set(WASTE, "on")  # no device behind it: it stays on
+    out = await _call(hass, hass_admin_user, "stop_all", api=2, room_id=F2)
+    assert out["ok"] is False and out["error"]["code"] == "guard_refused"
+    assert WASTE in out["error"]["message"]
+    assert WASTE in out["data"]["still_on"]
+    # With everything off, the read-back is verified.
+    hass.states.async_set(WASTE, "off")
+    out = await _call(hass, hass_admin_user, "stop_all", api=2, room_id=F2)
+    assert out["ok"] is True, out
+    assert out["readback"]["status"] == "verified"
+    assert out["data"]["still_on"] == [] and out["data"]["refused"] == []

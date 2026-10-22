@@ -19,7 +19,7 @@ import logging
 import os
 import time
 
-from .admin import async_require_admin
+from .admin import async_require_admin, forbidden
 from .const import DOMAIN, EVENT_JOURNAL
 from .generated.ids import new_id
 from .journal import validate_event
@@ -103,7 +103,10 @@ class JournalHub:
             except asyncio.TimeoutError:
                 pass
         if not self.ok:
-            raise _hub_error("The event journal is unavailable")
+            from .api_v2 import Unavailable
+
+            message = "The event journal is unavailable"
+            raise _hub_error(message) from Unavailable(message)
 
     async def append(self, room_id: str, events: list) -> dict:
         if len(events) > MAX_APPEND:
@@ -359,8 +362,9 @@ async def _open_and_prune(hub) -> None:
 async def async_setup_journal(hass) -> None:
     """Once for the site, with the first room; each room after it only joins (async_unload_journal)."""
     import voluptuous as vol
-    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
+
+    from .api_v2 import fields, wrap
 
     data = hass.data.setdefault(DOMAIN, {})
     if HUB in data:
@@ -386,7 +390,7 @@ async def async_setup_journal(hass) -> None:
                 events.append({**raw, "source": source})
             return await hub.append(call.data["room_id"], events)
         if user_id and await hass.auth.async_get_user(user_id) is None:
-            raise _hub_error(
+            raise forbidden(
                 f"{DOMAIN}.journal_query requires a signed-in Home Assistant user"
             )
         args = {

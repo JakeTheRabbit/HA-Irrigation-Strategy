@@ -95,6 +95,26 @@ Saving a draft does not arm or activate it and does not change live manual numbe
 - If source configuration changed, preview again. If HA reports equipment blockers, resolve them through normal controls, inspect the state, and make a new proposal.
 - A timeout or failed readback after submission may mean HA saved the change. There is no automatic write retry or rollback. Read the room/plan and inspect HA before proposing another change.
 
+## API v2 answers (integration services)
+
+Every `crop_steering` service that answers (`SupportsResponse.ONLY` or `OPTIONAL`) takes three optional fields besides its own. They are documented here once, not on each service in `services.yaml`:
+
+- `api`: `1` or `2`. Without it, or with `1`, the service answers exactly as before. `setup_read` keeps `api_version: 1`.
+- `client`: `mcp` or `aigrow`, so the journal can attribute the change.
+- `proposal_token`: the reviewed proposal a write carries.
+
+With `api: 2`, a caller that asks for the answer (`return_response`) gets `{api: 2, ok: true, room_id, revision, readback: {status, at}, event_ids, data}`. `data` is the v1 answer. `readback.status` is `verified`, `refused` or `none`, and comes only from the service's own read-back. `event_ids` are the journal events the call recorded.
+
+A refusal is `{api: 2, ok: false, error: {code, message, current_revision?}}`, with `data` kept when the service answered rather than raised. The codes are:
+
+- `stale_revision` (with the current revision)
+- `invalid`
+- `forbidden`
+- `guard_refused`: for example, a Stop all that left something on
+- `unavailable`
+
+A caller that does not ask for the answer gets the error raised, as in v1, so a refused write never looks like success. The source of truth is `custom_components/crop_steering/api_v2.py`.
+
 ## Verification and upstream references
 
 The package uses official `@modelcontextprotocol/server` and `@modelcontextprotocol/client` **2.0.0**, verified from the npm registry on 2026-09-08, with an exact dependency lockfile. The official SDK identifies v2 as the stable release line and provides the local `serveStdio` transport. See the [SDK documentation](https://ts.sdk.modelcontextprotocol.io/v2/), [stdio client handshake documentation](https://ts.sdk.modelcontextprotocol.io/v2/clients/connect), and [Home Assistant REST API](https://developers.home-assistant.io/docs/api/rest/).
