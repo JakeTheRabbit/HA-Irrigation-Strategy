@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { Timeline } from "@/pages/timeline";
+import { Explorer } from "@/pages/explorer";
 import { ZonePage } from "@/pages/zone";
 import { createDemo } from "./demo";
 import { parseJevEntry, type JevEntry } from "./jev";
@@ -271,7 +271,7 @@ describe("the Timeline page", () => {
   it("lists the demo room's records and the AI assistant's actions, a tick or cross on a checked decision", () => {
     const states = createDemo(noon);
     const html = renderToStaticMarkup(
-      createElement(Timeline, { controller: controller(states, "") }),
+      createElement(Explorer, { controller: controller(states, "") }),
     );
     const rows = html.match(/class="timeline-row"/g)?.length ?? 0;
     const merged = mergeTimeline(
@@ -296,7 +296,7 @@ describe("the Timeline page", () => {
   it("shows a room without the AI assistant its controller records, without the AI assistant's controls", () => {
     const states = createDemo(noon);
     const html = renderToStaticMarkup(
-      createElement(Timeline, { controller: controller(states, "room_b_") }),
+      createElement(Explorer, { controller: controller(states, "room_b_") }),
     );
     expect(html).toContain('class="timeline-row"');
     expect(html).not.toContain("All AI assistant decisions");
@@ -319,7 +319,7 @@ describe("the Timeline page", () => {
     expect(detail).not.toContain("Recorded behaviour against targets");
     expect(detail).not.toContain("data-brain-zone");
     const history = renderToStaticMarkup(
-      createElement(Timeline, { controller: control, zone: zone.id }),
+      createElement(Explorer, { controller: control, zone: zone.id }),
     );
     expect(history.match(/data-history-explorer=/g)).toHaveLength(1);
     expect(history).toContain(`Recorded evidence · ${zone.name}`);
@@ -328,7 +328,7 @@ describe("the Timeline page", () => {
   it("opens on one zone when asked", () => {
     const states = createDemo(noon);
     const html = renderToStaticMarkup(
-      createElement(Timeline, { controller: controller(states, ""), zone: 3 }),
+      createElement(Explorer, { controller: controller(states, ""), zone: 3 }),
     );
     expect(
       html.match(/class="timeline-zone">([^<]+)</g)?.every((cell) => cell.includes("Zone 3")),

@@ -511,7 +511,7 @@
           "default": 0.0
         }
       ],
-      "alsoOn": "equipment/feed"
+      "alsoOn": "equipment/dosing"
     },
     {
       "id": "ai_no_touch",

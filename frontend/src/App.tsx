@@ -1,14 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  Activity,
-  ArrowUpRight,
-  CalendarRange,
-  Droplets,
-  History,
-  House,
-  Settings2,
-  Wrench,
-} from "lucide-react";
+import { ArrowUpRight, Droplets, House } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -34,13 +25,17 @@ import {
   canonicalHash,
   routeHash,
   sameRoute,
+  SECTION_PAGES,
   sectionOf,
+  ZONE_FOCUS_PAGES,
   type Page,
   type Route,
 } from "@/lib/routes";
+import { NAV_TREE } from "@/lib/nav-tree";
 import { AppHeader, StaleBanner } from "@/components/app-header";
 import { UiTip } from "@/components/info-tip";
-import { PageTabs, pageLabel, SECTION_LABELS } from "@/components/page-tabs";
+import { PageTabs, pageLabel } from "@/components/page-tabs";
+import { NavTree } from "@/components/nav-tree";
 import { RoomTree } from "@/components/room-tree";
 import { WaterViewProvider } from "@/lib/water-view";
 import { WhatsNewOnUpdate } from "@/components/whats-new";
@@ -51,7 +46,7 @@ import { initialRoute, readLandingView } from "@/lib/landing-view";
 import { Today } from "@/pages/today";
 import { type Drafts } from "@/pages/strategy";
 import { Irrigation } from "@/pages/irrigation";
-import { Timeline } from "@/pages/timeline";
+import { Explorer } from "@/pages/explorer";
 import { Probes } from "@/pages/probes";
 import { Settings } from "@/pages/settings";
 import { Features } from "@/pages/features";
@@ -62,18 +57,16 @@ import { Comparison } from "@/pages/comparison";
 import { Grows } from "@/pages/grows";
 import { DrybackDrivers } from "@/pages/drivers";
 import { StockTanks } from "@/pages/stock";
-import { Reservoir } from "@/pages/reservoir";
 import { Dosing } from "@/pages/dosing";
 import { WaterUsePage } from "@/pages/water-use";
 import { AiSettings, BrainPage } from "@/components/brain";
-
-const navigation = [
-  { page: "all-zones", label: SECTION_LABELS.today, icon: Activity },
-  { page: "plan/targets", label: SECTION_LABELS.plan, icon: CalendarRange },
-  { page: "history/timeline", label: SECTION_LABELS.history, icon: History },
-  { page: "equipment/probes", label: SECTION_LABELS.equipment, icon: Wrench },
-  { page: "settings", label: SECTION_LABELS.settings, icon: Settings2 },
-] as const satisfies readonly { page: Page; label: string; icon: unknown }[];
+import { Watering } from "@/pages/watering";
+import { Timers } from "@/pages/timers";
+import { Changes } from "@/pages/changes";
+import { PumpCalibration } from "@/pages/pump-calibration";
+import { FeedCalibration } from "@/pages/feed-calibration";
+import { AlertRules } from "@/pages/alert-rules";
+import { SystemStatus } from "@/pages/system";
 
 /** The page this address opens; an old or short form of it is rewritten in place (no new history
  * entry), keeping a Help link's `?code=`. */
@@ -88,7 +81,7 @@ export default function App() {
   const [route, setRoute] = useState<Route>(readRoute);
   const [mobile, setMobile] = useState(false);
   const [drafts, setDrafts] = useState<Drafts>({});
-  /** The zone Plan › Targets starts on, or the one History › Timeline shows. */
+  /** The zone Plan › Targets starts on, or the one History › Explorer shows. */
   const [focusZone, setFocusZone] = useState<number | undefined>(() => route.zone ?? undefined);
   const [workspaceDirty, setWorkspaceDirty] = useState(false);
   const [pending, setPending] = useState<(() => void) | null>(null);
@@ -106,17 +99,15 @@ export default function App() {
     else action();
   }
   /** Opens a page. `zone` opens that zone's page, picks the zone Plan › Targets starts on, or the
-   * zone History › Timeline shows. */
+   * zone History › Explorer shows. */
   function navigate(next: Page, zone?: number) {
+    const focused = ZONE_FOCUS_PAGES.includes(next);
     const target: Route =
       next === "zone"
         ? { page: "zone", zone: zone ?? null }
-        : zone !== undefined &&
-            (next === "plan/targets" || next === "plan/schedule" || next === "history/timeline")
+        : zone !== undefined && focused
           ? { page: next, zone }
           : { page: next };
-    const focused =
-      next === "plan/targets" || next === "plan/schedule" || next === "history/timeline";
     if (sameRoute(target, route) && (!focused || zone === undefined)) {
       setMobile(false);
       return;
@@ -244,22 +235,11 @@ export default function App() {
           Crop Steering<small>Irrigation control</small>
         </span>
       </a>
-      <nav aria-label="Main navigation">
-        {navigation.map((item) => (
-          <button
-            key={item.page}
-            className={`${section === sectionOf(item.page) ? "active" : ""} ${item.page === "settings" ? "nav-separated" : ""}`}
-            aria-current={section === sectionOf(item.page) ? "page" : undefined}
-            onClick={() => navigate(item.page)}
-          >
-            <item.icon size={19} />
-            <span>{item.label}</span>
-            {item.page === "plan/targets" && Object.keys(drafts).length > 0 && (
-              <i className="nav-draft-count">{Object.keys(drafts).length}</i>
-            )}
-          </button>
-        ))}
-      </nav>
+      <NavTree
+        page={page}
+        navigate={(next) => navigate(next)}
+        badges={{ "plan/targets": Object.keys(drafts).length }}
+      />
       <RoomTree
         controller={controller}
         allRooms={page === "all-zones"}
@@ -306,6 +286,183 @@ export default function App() {
     </>
   );
   const pageKey = controller.roomId;
+  /** The open page's component; every page in RENDERED_PAGES has a case. */
+  function renderPage() {
+    switch (page) {
+      case "all-zones":
+        return <AllZones controller={controller} open={openRoomPage} />;
+      case "today":
+        return <Today key={pageKey} controller={controller} navigate={navigate} />;
+      case "zone":
+        return (
+          <ZonePage
+            key={pageKey}
+            controller={controller}
+            zoneId={route.zone ?? null}
+            onDirtyChange={setWorkspaceDirty}
+            navigate={navigate}
+          />
+        );
+      case "today/ai":
+        return <BrainPage key={pageKey} controller={controller} navigate={navigate} />;
+      case "plan/targets":
+      case "plan/schedule":
+        return (
+          <Irrigation
+            key={controller.roomId}
+            controller={controller}
+            drafts={drafts}
+            setDrafts={setDrafts}
+            onDirtyChange={setWorkspaceDirty}
+            zoneId={focusZone}
+            initialView={page === "plan/schedule" ? "calendar" : "current"}
+            navigate={navigate}
+          />
+        );
+      case "plan/watering":
+        return (
+          <Watering
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "plan/timers":
+        return (
+          <Timers
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "history/explorer":
+        return (
+          <Explorer
+            key={pageKey}
+            controller={controller}
+            zone={focusZone}
+            onZoneChange={(zone) => {
+              setFocusZone(zone);
+              const query = new URLSearchParams(window.location.hash.split("?")[1] ?? "");
+              if (zone) query.set("zone", String(zone));
+              else query.delete("zone");
+              const target: Route = zone
+                ? { page: "history/explorer", zone }
+                : { page: "history/explorer" };
+              setRoute(target);
+              window.history.replaceState(
+                null,
+                "",
+                "#/history/explorer" + (query.size ? "?" + query.toString() : ""),
+              );
+            }}
+          />
+        );
+      case "history/water":
+        return <WaterUsePage key={pageKey} controller={controller} />;
+      case "history/drivers":
+        return <DrybackDrivers key={pageKey} controller={controller} />;
+      case "history/compare":
+        return <Comparison key={pageKey} controller={controller} navigate={navigate} />;
+      case "history/changes":
+        return (
+          <Changes
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "history/grows":
+        return <Grows key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />;
+      case "equipment/probes":
+        return (
+          <Probes
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "equipment/stock":
+        return <StockTanks key={pageKey} controller={controller} navigate={navigate} />;
+      case "equipment/dosing":
+        return (
+          <Dosing
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "equipment/pump-calibration":
+        return (
+          <PumpCalibration
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "equipment/feed-calibration":
+        return (
+          <FeedCalibration
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "equipment/setup":
+        return <Setup key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />;
+      case "settings":
+        return (
+          <Settings
+            controller={controller}
+            theme={theme.preference}
+            setTheme={theme.setPreference}
+            themeSource={theme.source}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "settings/alerts":
+        return (
+          <AlertRules
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "settings/notifications":
+        return (
+          <Notifications key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
+        );
+      case "settings/system":
+        return (
+          <SystemStatus
+            key={pageKey}
+            controller={controller}
+            navigate={navigate}
+            onDirtyChange={setWorkspaceDirty}
+          />
+        );
+      case "settings/ai":
+        return (
+          <AiSettings key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
+        );
+      case "settings/features":
+        return <Features key={pageKey} controller={controller} />;
+      case "help":
+        return <Help controller={controller} />;
+      default: {
+        const unrendered: never = page;
+        return unrendered;
+      }
+    }
+  }
   const shell = (
     <div className="app-shell">
       <a
@@ -334,7 +491,7 @@ export default function App() {
           haMenu={haShell.available ? haShell.toggle : null}
           openNavigation={() => setMobile(true)}
           selectRoom={selectRoom}
-          openLog={() => navigate("history/timeline")}
+          openLog={() => navigate("history/explorer")}
           openBrain={() => navigate("today/ai")}
           refresh={() => void refresh()}
           refreshing={refreshing}
@@ -366,140 +523,35 @@ export default function App() {
                 )}
               </div>
             )}
-            {section !== "plan" && (
-              <PageTabs
-                page={page}
-                navigate={(next) => navigate(next)}
-                badges={{ "plan/targets": Object.keys(drafts).length }}
-                hidden={
-                  controller.room.display.options.show_dryback_drivers ? [] : ["history/drivers"]
-                }
-              />
-            )}
-            {page === "all-zones" && <AllZones controller={controller} open={openRoomPage} />}
-            {page === "today" && (
-              <Today key={pageKey} controller={controller} navigate={navigate} />
-            )}
-            {page === "zone" && (
-              <ZonePage
-                key={pageKey}
-                controller={controller}
-                zoneId={route.zone ?? null}
-                onDirtyChange={setWorkspaceDirty}
-                navigate={navigate}
-              />
-            )}
-            {page === "today/ai" && (
-              <BrainPage key={pageKey} controller={controller} navigate={navigate} />
-            )}
-            {(page === "plan/targets" || page === "plan/schedule") && (
-              <Irrigation
-                key={controller.roomId}
-                controller={controller}
-                drafts={drafts}
-                setDrafts={setDrafts}
-                onDirtyChange={setWorkspaceDirty}
-                zoneId={focusZone}
-                initialView={page === "plan/schedule" ? "calendar" : "current"}
-                navigate={navigate}
-              />
-            )}
-            {page === "history/timeline" && (
-              <Timeline
-                key={pageKey}
-                controller={controller}
-                zone={focusZone}
-                onZoneChange={(zone) => {
-                  setFocusZone(zone);
-                  const query = new URLSearchParams(window.location.hash.split("?")[1] ?? "");
-                  if (zone) query.set("zone", String(zone));
-                  else query.delete("zone");
-                  const target: Route = zone
-                    ? { page: "history/timeline", zone }
-                    : { page: "history/timeline" };
-                  setRoute(target);
-                  window.history.replaceState(
-                    null,
-                    "",
-                    "#/history/timeline" + (query.size ? "?" + query.toString() : ""),
-                  );
-                }}
-              />
-            )}
-            {page === "history/water" && <WaterUsePage key={pageKey} controller={controller} />}
-            {page === "history/drivers" && <DrybackDrivers key={pageKey} controller={controller} />}
-            {page === "history/compare" && (
-              <Comparison key={pageKey} controller={controller} navigate={navigate} />
-            )}
-            {page === "history/grows" && (
-              <Grows key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
-            )}
-            {page === "equipment/probes" && (
-              <Probes
-                key={pageKey}
-                controller={controller}
-                navigate={navigate}
-                onDirtyChange={setWorkspaceDirty}
-              />
-            )}
-            {page === "equipment/stock" && (
-              <StockTanks key={pageKey} controller={controller} navigate={navigate} />
-            )}
-            {page === "equipment/feed" && (
-              <Reservoir key={pageKey} controller={controller} navigate={navigate} />
-            )}
-            {page === "equipment/dosing" && (
-              <Dosing
-                key={pageKey}
-                controller={controller}
-                navigate={navigate}
-                onDirtyChange={setWorkspaceDirty}
-              />
-            )}
-            {page === "equipment/setup" && (
-              <Setup key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
-            )}
-            {page === "settings" && (
-              <Settings
-                controller={controller}
-                theme={theme.preference}
-                setTheme={theme.setPreference}
-                themeSource={theme.source}
-                onDirtyChange={setWorkspaceDirty}
-              />
-            )}
-            {page === "settings/features" && <Features key={pageKey} controller={controller} />}
-            {page === "settings/notifications" && (
-              <Notifications
-                key={pageKey}
-                controller={controller}
-                onDirtyChange={setWorkspaceDirty}
-              />
-            )}
-            {page === "settings/ai" && (
-              <AiSettings key={pageKey} controller={controller} onDirtyChange={setWorkspaceDirty} />
-            )}
-            {page === "help" && <Help controller={controller} />}
+            <PageTabs
+              page={page}
+              navigate={(next) => navigate(next)}
+              badges={{ "plan/targets": Object.keys(drafts).length }}
+            />
+            {renderPage()}
           </div>
         </main>
       </div>
       <nav className="bottom-nav" aria-label="Sections">
-        {navigation.map((item) => (
-          <button
-            type="button"
-            key={item.page}
-            aria-current={section === sectionOf(item.page) ? "page" : undefined}
-            onClick={() => navigate(item.page)}
-          >
-            <span className="bottom-nav-icon">
-              <item.icon size={21} aria-hidden="true" />
-              {item.page === "plan/targets" && Object.keys(drafts).length > 0 && (
-                <i className="nav-draft-count">{Object.keys(drafts).length}</i>
-              )}
-            </span>
-            <span>{item.label}</span>
-          </button>
-        ))}
+        {NAV_TREE.map((group) => {
+          const target = SECTION_PAGES[group.section] ?? group.items[0].page;
+          return (
+            <button
+              type="button"
+              key={group.section}
+              aria-current={section === group.section ? "page" : undefined}
+              onClick={() => navigate(target)}
+            >
+              <span className="bottom-nav-icon">
+                <group.icon size={21} aria-hidden="true" />
+                {group.section === "plan" && Object.keys(drafts).length > 0 && (
+                  <i className="nav-draft-count">{Object.keys(drafts).length}</i>
+                )}
+              </span>
+              <span>{group.label}</span>
+            </button>
+          );
+        })}
       </nav>
       <WhatsNewOnUpdate controller={controller} />
       <Tour navigate={navigate} />

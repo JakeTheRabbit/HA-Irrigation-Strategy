@@ -138,7 +138,7 @@ export function ZonePage({
           {display.show_substrate_temp && <RootZonePanel controller={controller} zone={zone} />}
         </div>
       )}
-      <Button variant="outline" onClick={() => navigate("history/timeline", zone.id)}>
+      <Button variant="outline" onClick={() => navigate("history/explorer", zone.id)}>
         Explore recorded history and comparisons <ArrowRight size={15} aria-hidden="true" />
       </Button>
       <ZoneWhy key={`why-${zone.id}`} controller={controller} zone={zone} navigate={navigate} />
@@ -344,7 +344,7 @@ function JevOnZone({
                 : "Watching: no judge acting on this zone now")}
           </p>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => navigate("history/timeline", zone.id)}>
+        <Button variant="ghost" size="sm" onClick={() => navigate("history/explorer", zone.id)}>
           History <ArrowRight size={15} aria-hidden="true" />
         </Button>
       </div>

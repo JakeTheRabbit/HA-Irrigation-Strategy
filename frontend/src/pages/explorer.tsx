@@ -38,7 +38,7 @@ import {
 } from "@/lib/timeline";
 import type { Controller } from "@/lib/types";
 import { dayWord } from "@/lib/utils";
-import "./timeline.css";
+import "./explorer.css";
 
 const KINDS: Record<TimelineKind, { label: string; icon: LucideIcon }> = {
   water: { label: "Water", icon: Droplets },
@@ -57,9 +57,9 @@ const TYPES: { type: TimelineType; label: string }[] = [
   { type: "jev", label: "AI assistant" },
 ];
 
-/** History › Timeline: what watered, when and why; phase changes; setpoint changes, the grower's and
+/** History › Explorer: what watered, when and why; phase changes; setpoint changes, the grower's and
  * The AI assistant's; alerts; and the AI assistant's decisions with how they turned out. One list, newest first. */
-export function Timeline({
+export function Explorer({
   controller,
   zone,
   onZoneChange,

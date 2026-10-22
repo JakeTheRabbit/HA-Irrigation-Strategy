@@ -349,7 +349,7 @@ function TankCard({ r, open }: { r: FacilityRoom; open: Open }) {
       type="button"
       className="facility-tank"
       data-held={held || undefined}
-      onClick={() => open(r.room.id, "equipment/feed")}
+      onClick={() => open(r.room.id, "equipment/dosing")}
       aria-label={`Open ${r.room.name} tank and feed`}
     >
       <FeedTankDrawing

@@ -230,14 +230,14 @@ const PLACEMENT_PAGES: Record<string, { group: string; page: Page; location: str
   "LF-54": { group: "equipment", page: "equipment/setup", location: "Equipment > Setup" },
   "NEW-03": {
     group: "history",
-    page: "history/timeline",
-    location: "History > Timeline > Sensor history",
+    page: "history/explorer",
+    location: "History > Explorer > Sensor history",
   },
   "LF-87": { group: "history", page: "equipment/setup", location: "Equipment > Setup" },
   "LF-86": {
     group: "history",
-    page: "history/timeline",
-    location: "History > Timeline > Overlays",
+    page: "history/explorer",
+    location: "History > Explorer > Overlays",
   },
   "LF-165": {
     group: "feed",

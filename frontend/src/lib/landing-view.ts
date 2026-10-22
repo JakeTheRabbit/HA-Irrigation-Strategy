@@ -5,7 +5,7 @@ export const LANDING_VIEWS = [
   { value: "today", label: "Status · selected room" },
   { value: "plan/targets", label: "Irrigation · current day" },
   { value: "plan/schedule", label: "Irrigation · calendar" },
-  { value: "history/timeline", label: "History · readings and events" },
+  { value: "history/explorer", label: "History · explorer" },
   { value: "history/water", label: "History · water use" },
   { value: "equipment/setup", label: "Equipment · rooms and zones" },
 ] as const satisfies readonly { value: Page; label: string }[];

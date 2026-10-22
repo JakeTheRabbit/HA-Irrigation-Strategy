@@ -21,7 +21,7 @@ export const TOUR_STOPS: readonly TourStop[] = [
     text: "Targets are the moisture and EC each zone steers to, stage by stage. Schedule lays the stages out over the run. Every change is reviewed before it is written.",
   },
   {
-    page: "history/timeline",
+    page: "history/explorer",
     title: "History",
     text: "What the controller did and why, shot by shot, with the water used and run-by-run comparisons.",
   },

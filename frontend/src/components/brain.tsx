@@ -336,7 +336,7 @@ export function BrainPage({
       <section className="panel" aria-labelledby="brain-list-title">
         <div className="panel-heading">
           <h2 id="brain-list-title">Decisions</h2>
-          <Button variant="ghost" size="sm" onClick={() => navigate("history/timeline")}>
+          <Button variant="ghost" size="sm" onClick={() => navigate("history/explorer")}>
             History <ArrowRight size={15} aria-hidden="true" />
           </Button>
         </div>

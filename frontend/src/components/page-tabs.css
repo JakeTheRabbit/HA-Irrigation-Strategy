@@ -39,11 +39,23 @@
   line-height: 18px;
 }
 @media (max-width: 720px) {
+  /* One row that scrolls sideways: a section can hold six pages. */
   .page-tabs {
     gap: 2px 16px;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
   }
   .page-tabs button {
+    flex-shrink: 0;
+    white-space: nowrap;
     font-size: var(--text-sm);
     min-height: 40px;
+  }
+}
+/* Wider than a phone, the tree menu lists every page: the tabs would repeat it. */
+@media (min-width: 721px) {
+  .page-tabs {
+    display: none;
   }
 }

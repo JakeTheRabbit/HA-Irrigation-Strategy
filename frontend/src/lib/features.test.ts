@@ -170,8 +170,8 @@ describe("restored settings outside entity controls", () => {
     expect(placementsFor("all", "camera").map((row) => row.location)).toContain(
       "Settings > Display",
     );
-    expect(placementsFor("history", "dryback markers")[0]?.page).toBe("history/timeline");
-    expect(placementsFor("history", "Per-probe grow comparison")[0]?.page).toBe("history/timeline");
+    expect(placementsFor("history", "dryback markers")[0]?.page).toBe("history/explorer");
+    expect(placementsFor("history", "Per-probe grow comparison")[0]?.page).toBe("history/explorer");
     expect(placementsFor("equipment", "ACs")[0]?.page).toBe("equipment/setup");
     expect(
       PLACEMENTS.some((row) => /^(switch|number|select)\.crop_steering_/.test(row.entity)),

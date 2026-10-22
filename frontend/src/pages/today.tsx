@@ -244,7 +244,7 @@ export function Today({
             controller={controller}
             entries={jev.log.entries}
             day={day}
-            openHistory={() => navigate("history/timeline")}
+            openHistory={() => navigate("history/explorer")}
           />
         )}
       </div>
