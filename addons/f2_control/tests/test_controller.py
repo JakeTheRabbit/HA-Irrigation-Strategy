@@ -153,7 +153,8 @@ def test_execute_shot_abort_closes_valve_and_alerts(monkeypatch):
 
     def sleep(dt):
         clock["seconds"] += dt
-        fake.set_state("input_boolean.kill", "off")
+        if fake.states["switch.v1"][0] == "on":  # the kill switch goes off once the valve is open
+            fake.set_state("input_boolean.kill", "off")
 
     monkeypatch.setattr(controller.time, "sleep", sleep)
     c._execute_shot(c.rooms[0], 1, 10, 6)

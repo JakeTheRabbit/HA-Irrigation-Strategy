@@ -590,8 +590,8 @@ def _valve_reads(c, fake, clock, monkeypatch, state_at):
             return controller.HAState(state_at(clock.seconds - times["turn_on"], over[0]), {}, None)
         return real_get(entity, timeout=timeout)
 
-    def confirm(entities, want, deadline=None, reads=None):
-        ok = real_confirm(entities, want, deadline, reads)
+    def confirm(entities, want, deadline=None, **kw):
+        ok = real_confirm(entities, want, deadline, **kw)
         over[0] = over[0] or (want == "on" and tuple(entities) == ("switch.v1",) and not ok)
         return ok
 
@@ -682,3 +682,92 @@ def test_the_switch_on_backoff_survives_a_restart_and_an_old_state_file_loads(ri
     assert controller._switch_on_retry_at(room.state[1]) > datetime.now()
     bad = {**old, "on_failures": {"count": "3", "last": "yesterday"}}
     assert c._apply_saved_zone(c._fresh_zone(), bad)["on_failures"] is None
+
+
+@pytest.mark.parametrize("stage", ["pump-read-back", "main-read-back", "valve-read-back", "lead-time"])
+def test_the_kill_switch_stops_a_shot_while_it_opens(rig, monkeypatch, stage):
+    """CTL-002 review: the operator's switches are read through the ON read-backs and the lead times too, so
+    the kill switch stops a shot that is still opening within about 2 s. Water counts only once the valve
+    was sent ON; it is a stop, not a switch that failed, so the zone does not back off."""
+    c, fake, clock = rig
+    room = c.rooms[0]
+    stuck = {"pump-read-back": "switch.p", "main-read-back": "switch.m", "valve-read-back": "switch.v1"}.get(stage)
+    flip_after = 0.5 if stage == "lead-time" else 3.0  # after `trigger`'s turn_on
+    trigger = stuck or "switch.p"
+    if stage == "lead-time":  # a long prime: the stop is seen inside it, not at the main line's read-back
+        fake.set_state("number.crop_steering_pump_prime_time", "8")
+    at, flip, alerts, real_call, alert = {}, [], [], controller.ha_call, c._alert
+
+    def call(domain, service, **data):
+        entity = data.get("entity_id")
+        at.setdefault((service, entity), clock.seconds)
+        if (service, entity) == ("turn_on", stuck):
+            fake.calls.append((domain, service, data))
+            return True  # reports ON late: still off when the kill switch goes
+        return real_call(domain, service, **data)
+
+    def sleep(seconds):
+        clock.sleep(seconds)
+        on = at.get(("turn_on", trigger))
+        if on is not None and clock.seconds - on >= flip_after and not flip:
+            flip.append(clock.seconds)
+            fake.set_state("input_boolean.kill", "off")
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller.time, "sleep", sleep)
+    monkeypatch.setattr(c, "_alert", lambda key, cs, *a, **k: (alerts.append(cs), alert(key, cs, *a, **k))[1])
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    first_off = min(t for (service, _e), t in at.items() if service == "turn_off")
+    assert first_off - flip[0] <= 2.0
+    assert alerts == ["CS-305"]
+    assert all(fake.states[e][0] == "off" for e in ("switch.p", "switch.m", "switch.v1"))
+    assert room.shot_inflight is None and c._hardware_fault_block(room) is None
+    assert room.state[1]["on_failures"] is None
+    if stage == "valve-read-back":
+        assert room.state[1]["daily_vol"] == pytest.approx(0.05 * (first_off - at[("turn_on", "switch.v1")]))
+        assert room.state[1]["shots"] == 1
+    else:
+        assert ("turn_on", "switch.v1") not in at and room.state[1]["daily_vol"] == 0
+
+
+def test_a_hanging_read_cannot_stretch_the_valve_read_back(rig, monkeypatch):
+    """CTL-002 review: each ON read is bounded by what is left of the read-back, not the 8 s a read may take."""
+    c, fake, clock = rig
+    room = c.rooms[0]
+    times, real_call, real_get = {}, controller.ha_call, controller.ha_get
+
+    def call(domain, service, **data):
+        if data.get("entity_id") == "switch.v1":
+            times.setdefault(service, clock.seconds)
+        return real_call(domain, service, **data)
+
+    def get(entity, timeout=8):
+        if entity == "switch.v1" and "turn_on" in times and "turn_off" not in times:
+            clock.sleep(timeout)  # Home Assistant hangs: the read takes all the time it is given
+            return controller.HAState(None, {}, None)
+        return real_get(entity, timeout=timeout)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller, "ha_get", get)
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    assert times["turn_off"] - times["turn_on"] <= controller.SWITCH_ON_S + 4
+    assert room.state[1]["daily_vol"] == pytest.approx(0.05 * (times["turn_off"] - times["turn_on"]))
+
+
+def test_a_manual_test_shot_is_not_held_by_the_backoff(rig):
+    """CTL-002 review: a backed-off zone still takes its Test Shot (steering off): it is how a repair is checked."""
+    c, fake, _clock = rig
+    room = c.rooms[0]
+    room.state[1]["on_failures"] = {"count": 3, "last": datetime.now().isoformat()}
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    assert not any(svc == "turn_on" for _dom, svc, _d in fake.calls)  # an automatic or rescue shot waits
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05, steering=False)
+    assert ("switch", "turn_on", {"entity_id": "switch.v1"}) in fake.calls
+    assert room.state[1]["on_failures"] is None and room.state[1]["daily_vol"] == pytest.approx(3.0)
+
+
+def test_a_switch_on_backoff_saved_with_a_timezone_is_dropped(rig):
+    c, _fake, _clock = rig
+    saved = {**c._serialize_zone(c.rooms[0].state[1]),
+             "on_failures": {"count": 3, "last": "2026-10-22T10:00:00+13:00"}}
+    assert c._apply_saved_zone(c._fresh_zone(), saved)["on_failures"] is None
