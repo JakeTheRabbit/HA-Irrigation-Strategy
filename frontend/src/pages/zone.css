@@ -9,37 +9,6 @@
 .zone-empty-title {
   margin: 8px 0 16px;
 }
-.zone-page-bar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 14px;
-}
-.zone-page-bar > button:first-child {
-  margin-left: -10px;
-}
-.zone-switcher {
-  flex-direction: row;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
-}
-.zone-switcher button {
-  min-height: 30px;
-  padding: 0 12px;
-  border-radius: 6px;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-  font-weight: 500;
-}
-.zone-switcher button[aria-current="page"] {
-  background: var(--muted);
-  color: var(--foreground);
-  box-shadow: inset 0 0 0 1px var(--border);
-  font-weight: 600;
-}
 .zone-page-title {
   display: flex;
   flex-wrap: wrap;
@@ -49,6 +18,181 @@
 .zone-page-title h1 {
   margin-right: 4px;
   font-size: 22px;
+}
+/* The room the zone is in, as a way back to it: "F2 / Zone 2". */
+.zone-page-title .zone-room {
+  color: var(--muted-foreground);
+  font-size: 18px;
+}
+.zone-page-title .zone-room:hover {
+  color: var(--foreground);
+  text-decoration: underline;
+}
+.zone-crumb {
+  color: var(--muted-foreground);
+  font-size: 18px;
+}
+.zone-facts {
+  margin: 0 0 0 auto;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+}
+
+/* Mockup 04: the charts, the AI's suggestion under them; beside them today in numbers, why and
+ * what comes next, and the shot log. The zone day's own parts sit in this grid. */
+.zone-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 400px);
+  grid-template-areas:
+    "charts numbers"
+    "charts why"
+    "suggest shots"
+    ". shots";
+  grid-template-rows: auto auto auto 1fr;
+  align-items: start;
+  gap: 16px;
+}
+.zone-layout > .zone-day {
+  display: contents;
+}
+.zone-layout .zone-numbers-wrap {
+  grid-area: numbers;
+}
+.zone-layout .zone-day-charts {
+  grid-area: charts;
+}
+.zone-layout > .zone-why-panel {
+  grid-area: why;
+}
+.zone-layout > .zone-suggestion {
+  grid-area: suggest;
+}
+.zone-layout > .zone-shot-log {
+  grid-area: shots;
+}
+/* In the side column the facts under the gauges stack. */
+.zone-layout .zone-numbers {
+  grid-template-columns: minmax(0, 1fr);
+}
+.zone-layout .zone-numbers > div + div {
+  padding-left: 0;
+  border-left: 0;
+}
+.zone-day-slides {
+  display: grid;
+  gap: 16px;
+}
+.zone-day-swipe,
+.zone-day-dots {
+  display: none;
+}
+.zone-day-compare {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+.zone-day-compare .timeline-compare {
+  padding: 0 8px 0 6px;
+}
+.zone-day-compare button {
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+.zone-day-compare button[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--primary) 16%, var(--surface));
+  color: var(--primary-strong);
+  font-weight: 600;
+}
+
+/* Pore EC through the day: the stage's band green, the lights-off hours dark. */
+.zone-ec-plot {
+  padding: 0 16px 12px;
+}
+.zone-ec-band {
+  fill: color-mix(in srgb, var(--success) 18%, transparent);
+}
+.zone-ec-dark {
+  fill: color-mix(in srgb, var(--foreground) 7%, transparent);
+}
+.zone-ec-line {
+  fill: none;
+  stroke: var(--foreground);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+.zone-ec-now {
+  stroke: var(--muted-foreground);
+  stroke-width: 1.5;
+}
+.zone-ec-axis {
+  fill: var(--muted-foreground);
+  font-size: 12px;
+}
+
+/* The AI's suggestion on the pore EC chart: the problem, what it set, Apply or Dismiss. */
+.zone-suggestion {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px 14px;
+  padding: 16px 18px;
+  border-color: color-mix(in srgb, var(--warning) 55%, var(--border));
+  background: color-mix(in srgb, var(--warning) 8%, var(--surface));
+}
+.zone-suggestion-icon {
+  color: var(--warning);
+}
+.zone-suggestion-text p {
+  margin: 0;
+}
+.zone-suggestion-text p + p {
+  margin-top: 4px;
+}
+.zone-suggestion-problem {
+  font-weight: 600;
+}
+.zone-suggestion-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Today's shots: time, phase, water per plant and run time, VWC before and after. */
+.zone-shot-rows {
+  margin: 0;
+  padding: 0 20px 12px;
+  list-style: none;
+}
+.zone-shot-rows li {
+  display: grid;
+  grid-template-columns: 48px 34px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 0;
+  border-top: 1px solid color-mix(in srgb, var(--border) 70%, transparent);
+  font-size: var(--text-sm);
+}
+.zone-shot-rows time {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.zone-shot-water {
+  color: var(--muted-foreground);
+}
+.zone-shot-vwc {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.zone-shot-log > .muted,
+.zone-shot-log > .jev-trouble,
+.zone-shot-log > .needs-integration {
+  margin: 0 20px 16px;
 }
 .zone-steering {
   font-size: var(--text-sm);
@@ -386,10 +530,65 @@
   .zone-page-grid {
     grid-template-columns: minmax(0, 1fr);
   }
+  .zone-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "charts" "numbers" "suggest" "why" "shots";
+    grid-template-rows: none;
+  }
 }
 @media (max-width: 720px) {
   .zone-page-title h1 {
     font-size: 20px;
+  }
+  .zone-facts {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+  /* Phone (mockup 26): the charts side by side, one at a time, swiped. */
+  .zone-day-slides {
+    display: flex;
+    gap: 12px;
+    overflow-x: auto;
+    scroll-snap-type: x mandatory;
+    scrollbar-width: none;
+  }
+  .zone-day-slides > * {
+    flex: 0 0 100%;
+    scroll-snap-align: start;
+  }
+  .zone-day-swipe {
+    display: inline;
+    margin-left: auto;
+    color: var(--muted-foreground);
+    font-size: var(--text-sm);
+  }
+  .zone-day-dots {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+    padding-top: 10px;
+  }
+  .zone-day-dots button {
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    background: var(--border);
+  }
+  .zone-day-dots button[aria-pressed="true"] {
+    width: 28px;
+    background: var(--primary);
+  }
+  .zone-suggestion {
+    grid-template-columns: auto minmax(0, 1fr);
+  }
+  .zone-suggestion-actions {
+    grid-column: 1 / -1;
+  }
+  .zone-suggestion-actions > * {
+    flex: 1;
+  }
+  .zone-shot-rows {
+    padding: 0 14px 10px;
   }
   .zone-numbers-wrap {
     padding: 12px 14px;

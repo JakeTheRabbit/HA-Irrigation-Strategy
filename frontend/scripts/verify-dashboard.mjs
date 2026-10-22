@@ -636,7 +636,7 @@ try {
     },
   );
   await check(
-    "zone page: the day as a phase reference chart, fitted to today, against yesterday or a typical day",
+    "zone page: the day as a phase reference chart, fitted to today, against yesterday or the last run",
     async () => {
       await go("zone/1");
       const day = page.locator("[data-day-timeline]");
@@ -727,30 +727,25 @@ try {
       assert.doesNotMatch(await readout.innerText(), /pore EC/);
       await page.mouse.move(0, 0);
       assert.equal(await key.getByRole("button").count(), await key.locator("li").count());
-      const compare = day.getByRole("combobox", { name: "Compare with" });
-      await compare.selectOption("typical");
-      await expectVisible(layer("typical"));
-      assert.ok(
-        (await layer("typical").locator(".typical-band").getAttribute("d")).length > 100,
-        "the typical day is a p25-p75 band",
-      );
+      // Compare with Off, Yesterday or the last run's day of the same number (mockup 04).
+      const compare = day.getByRole("group", { name: "Compare with" });
+      const choice = (name) => compare.getByRole("button", { name, exact: true });
+      await choice("Off").click();
       assert.equal(await layer("yesterday").count(), 0);
-      await compare.selectOption("none");
       assert.equal(await layer("typical").count(), 0);
-      assert.equal(await layer("yesterday").count(), 0);
       // The choices are remembered in the browser.
       await page.reload({ waitUntil: "networkidle" });
       await expectVisible(day.locator(".grow-svg"));
-      assert.equal(await compare.inputValue(), "none");
+      assert.equal(await choice("Off").getAttribute("aria-pressed"), "true");
       assert.equal(await ecKey.getAttribute("aria-pressed"), "false");
       assert.equal(await layer("ec").count(), 0);
       await ecKey.click();
       await expectVisible(layer("ec"));
-      await compare.selectOption("yesterday");
+      await choice("Yesterday").click();
       await expectVisible(layer("yesterday"));
       await axe("zone day", "[data-day-timeline]");
       await axeDark("zone day", "[data-day-timeline]");
-      await day.screenshot({ path: path.join(out, "dashboard-zone-day.png") });
+      await day.locator(".zone-day-chart").screenshot({ path: path.join(out, "dashboard-zone-day.png") });
     },
   );
   await check("zone page: why, the AI, the controls, and the rest on request", async () => {

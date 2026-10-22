@@ -73,7 +73,7 @@ function roomDay(roomId: string, on: number, today: boolean): CsEvent[] {
     at: number,
     kind: string,
     data: Record<string, unknown>,
-    opts: { zone?: number | null; actor?: JournalActor; outcome?: JournalOutcome; code?: string | null; detail?: string; intent?: string; program?: string } = {},
+    opts: { zone?: number | null; actor?: JournalActor; outcome?: JournalOutcome; code?: string | null; detail?: string; intent?: string; program?: string; readback?: CsEvent["readback"] } = {},
   ) => {
     const id = demoId(at, `${roomId}:${kind}:${opts.zone ?? ""}:${at}`);
     out.push({
@@ -88,6 +88,7 @@ function roomDay(roomId: string, on: number, today: boolean): CsEvent[] {
       source: { actor: opts.actor ?? "engine", detail: opts.detail ?? null, program_id: opts.program ?? null, user_id: opts.actor === "manual" ? "demo-user" : null },
       correlation: opts.intent ? { intent_id: opts.intent } : {},
       data,
+      ...(opts.readback ? { readback: opts.readback } : {}),
     });
     return id;
   };
@@ -138,7 +139,7 @@ function roomDay(roomId: string, on: number, today: boolean): CsEvent[] {
       const reason = timer ? "Timer: Zone 3 day timer" : phase === "P1" ? `P1 ramp shot ${shot + 1}` : "P2 top-up: VWC under threshold";
       const kind = timer ? "timer" : phase === "P1" ? "p1_ramp" : "p2_topup";
       add(start, "shot.started", { phase, kind, reason, size_pct: 3, duration_s: 60, commanded_l: commanded, vwc_before: vwc, vwc_expected: phase === "P1" && !timer ? vwc + 1.8 : null, requested_at: iso(requested), pump_wait_s: wait }, { zone, intent, detail: reason, ...by });
-      add(start + 61_000, "shot.completed", { elapsed_s: 61, commanded_l: commanded, metered_l: metered, vwc_before: vwc, ec_before: 4.8 + index * 0.4 }, { zone, intent, detail: reason, ...by });
+      add(start + 61_000, "shot.completed", { elapsed_s: 61, commanded_l: commanded, metered_l: metered, vwc_before: vwc, ec_before: 4.8 + index * 0.4 }, { zone, intent, detail: reason, ...by, readback: { status: "verified", entities: [`switch.crop_steering_${roomId.slice(5)}zone_${zone}_valve`], at: iso(start + 61_000) } });
       const ratio = metered / commanded;
       add(start + 62_000, "flow.reconciled", { ratio, commanded_l: commanded, metered_l: metered }, { zone, intent, outcome: ratio < 0.8 ? "partial" : "ok", code: ratio < 0.8 ? "CS-318" : null });
     }

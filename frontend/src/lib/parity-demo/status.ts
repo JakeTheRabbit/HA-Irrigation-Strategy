@@ -108,3 +108,33 @@ export function demoParityStatus(states: States, now: number): States {
   put("sensor.crop_steering_zone_2_flow_ratio", 0.79, { commanded_l: 1.21, metered_l: 0.96, shot_id: demoId(now - 600_000, "room::shot:2") });
   return out;
 }
+
+/** A 3.17 integration's shot table per zone (`zone_N_shot_log_app.shots`, newest first), from the
+ * same Journal shots: what the zone page's shot log reads without the Journal (`?backend=3.17`). */
+export function demoShotTable(states: States, now: number): States {
+  const out: States = { ...states };
+  for (const room_id of ["room:", "room:room_b_"]) {
+    const events = demoJournal(room_id, now);
+    const starts = new Map(
+      events.filter((e) => e.kind === "shot.started").map((e) => [e.correlation?.intent_id, e]),
+    );
+    for (const zone of [1, 2, 3]) {
+      const shots = events
+        .filter((e) => e.kind === "shot.completed" && e.zone === zone)
+        .map((e) => {
+          const start = starts.get(e.correlation?.intent_id);
+          return { start: start?.ts ?? e.ts, kind: start?.data.kind ?? "shot", litres: e.data.metered_l, verdict: "landed" };
+        })
+        .reverse();
+      const entity_id = `sensor.crop_steering_${room_id.slice(5)}zone_${zone}_shot_log_app`;
+      out[entity_id] = {
+        entity_id,
+        state: shots.length ? "landed" : "unknown",
+        attributes: { friendly_name: `Zone ${zone} shot log`, shots },
+        last_updated: new Date(now).toISOString(),
+        last_changed: new Date(now).toISOString(),
+      };
+    }
+  }
+  return out;
+}

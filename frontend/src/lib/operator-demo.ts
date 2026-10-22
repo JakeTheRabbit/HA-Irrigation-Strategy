@@ -362,26 +362,29 @@ export class OperatorDemo {
     const prefix = roomId.replace(/^room:/, "");
     const states = this.getStates();
     const entity = `number.crop_steering_${prefix}zone_3_p2_shot_size`;
+    // Zone 2's salt judge diluted its maintenance feed: the pore EC suggestion on its page.
+    const feed = `number.crop_steering_${prefix}zone_2_ec_target_veg_p2`;
     if (!this.overlays.has(roomId)) {
       const now = Date.now();
       const value = Number(states[entity]?.state);
-      this.overlays.set(
-        roomId,
-        states[`sensor.crop_steering_${prefix}zone_3_jev`] && Number.isFinite(value)
-          ? [
-              {
-                entity_id: entity,
-                zone: 3,
-                field: "p2_shot_size",
-                old: 4.5,
-                new: value,
-                by: "brain",
-                at: new Date(now - 3 * 3_600_000).toISOString(),
-                expires: new Date(now + 9 * 3_600_000).toISOString(),
-              },
-            ]
-          : [],
-      );
+      const diluted = Number(states[feed]?.state);
+      const rows: Overlay[] = [];
+      const open = (entity_id: string, zone: number, field: string, old: number, value: number) =>
+        rows.push({
+          entity_id,
+          zone,
+          field,
+          old,
+          new: value,
+          by: "brain",
+          at: new Date(now - 3 * 3_600_000).toISOString(),
+          expires: new Date(now + 9 * 3_600_000).toISOString(),
+        });
+      if (states[`sensor.crop_steering_${prefix}zone_3_jev`] && Number.isFinite(value))
+        open(entity, 3, "p2_shot_size", 4.5, value);
+      if (states[`sensor.crop_steering_${prefix}zone_2_jev`] && Number.isFinite(diluted))
+        open(feed, 2, "ec_target_veg_p2", 3.4, diluted);
+      this.overlays.set(roomId, rows);
     }
     const rows = this.overlays.get(roomId)!;
     if (action === "overlay_get")

@@ -308,6 +308,9 @@ describe("the Timeline page", () => {
       ...controller(states, ""),
       roomId: "test-room",
       timeZone: "Pacific/Auckland",
+      // The zone page's header and shot log read the room's facts and the live Journal.
+      rooms: discoverRooms(states),
+      recentEvents: [],
     };
     const zone = control.room.zones[2];
     const detail = renderToStaticMarkup(
