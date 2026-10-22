@@ -58,3 +58,29 @@ async def test_an_accepted_stage_shows_on_the_select(hass):
     await _pick(hass, "Ripen")
     assert hass.states.get(SELECT).state == "Ripen"
     assert _ladder(hass)["p1_target_vwc"] == 58.0
+
+
+async def test_a_failed_setpoint_write_leaves_the_select_on_the_old_stage(hass):
+    from unittest.mock import patch
+
+    from custom_components.crop_steering.number import async_set_numbers
+    from custom_components.crop_steering.recipe import get_manager
+
+    entry = await _install(hass)
+    mgr = get_manager(hass, entry)
+    await _pick(hass, "Bulk")
+    bad = Z1 + "p2_shot_size"
+
+    async def _fail_one(hass_, pairs):
+        applied, failed = await async_set_numbers(
+            hass_, [(e, v) for e, v in pairs if e != bad]
+        )
+        return applied, failed + [(bad, "boom")]
+
+    with patch("custom_components.crop_steering.number.async_set_numbers", _fail_one):
+        with pytest.raises(
+            HomeAssistantError, match="only partly applied.*p2_shot_size"
+        ):
+            await _pick(hass, "Ripen")
+    assert hass.states.get(SELECT).state == "Bulk"
+    assert mgr.active_stage == "Bulk"
