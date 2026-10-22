@@ -1,4 +1,4 @@
-import { sizingChangedSince } from "@/lib/setup-sizing";
+import { newZone, sizingChangedSince } from "@/lib/setup-sizing";
 import { CanonicalControls } from "@/components/canonical-controls";
 import { AllZonesSwitch, RoomPower } from "@/components/room-controls";
 import { useLayoutEffect, useEffect, useState } from "react";
@@ -196,23 +196,6 @@ export function MappingPicker({
       </Dialog>
     </div>
   );
-}
-/** A new zone, its sizing from the integration's one defaults table (`defaults`; these values
- * where an older integration does not send it). */
-function newZone(id: number, defaults: SetupDocument["sizing_defaults"] = {}): SetupZone {
-  return {
-    id,
-    name: "Zone " + id,
-    active: true,
-    valve: "",
-    vwc_sensors: [],
-    ec_sensors: [],
-    plant_count: 1,
-    substrate_volume: 5,
-    drippers_per_plant: 1,
-    dripper_flow_rate: 2,
-    ...defaults,
-  };
 }
 const hardwareFields = [
   ["pump_switch", "Room pump", "switch"],
