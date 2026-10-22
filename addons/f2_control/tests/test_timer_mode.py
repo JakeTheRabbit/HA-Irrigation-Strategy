@@ -256,6 +256,7 @@ def test_kill_switch_holds_a_timer_shot(rig, engine):
     assert _valves(fake) == []
     held, = [e for e in _events(c, "intent.held") if e["zone"] == 1]
     assert held["source"]["actor"] == "timer" and held["data"]["guard"] == "kill_switch"
+    assert held["source"]["program_id"] == "P1"
 
 
 # --------------------------------------------------------------------------------------------------------- skips
@@ -458,10 +459,14 @@ def test_a_timer_shot_is_not_a_learner_input(rig, engine):
     st = c.rooms[0].state[1]
     _pass_at(c, fake, 12, 0)
     st["last_vwc"] = 40.0
-    st["learn"]["pending"] = {"t": 0.0, "pre": 40.0, "pct": 2.0, "ramp": False}  # an engine shot settling
+    st["learn"]["pending"] = {"t": _Wall(2026, 10, 22, 12, 29).timestamp(), "pre": 38.0, "pct": 2.0, "ramp": True}  # an engine ramp shot settling
+    ramp = len(st["learn"]["ramp"])
     _pass_at(c, fake, 12, 30)
     assert _started(c)[0]["source"]["actor"] == "timer"
-    assert st["learn"]["pending"] is None  # its reading now holds timer water: not that shot's to learn from
+    # the engine shot is settled on the reading before the timer water, as shot() settles it; the timer shot
+    # itself is never recorded
+    assert st["learn"]["pending"] is None
+    assert len(st["learn"]["ramp"]) == ramp + 1 and st["learn"]["ramp"][-1]["rise"] == 2.0
     engine[1] = RESCUE
     st["last_vwc"] = 40.0
     _pass_at(c, fake, 12, 35)
@@ -494,3 +499,72 @@ def test_the_projection_follows_the_nz_spring_forward(rig, engine, monkeypatch):
     assert [controller._aware(i["at"]) for i in timer] == [
         controller.datetime(2026, 9, 26, 19, 0, tzinfo=timezone.utc)]
     assert timer[0]["at"].endswith("+00:00")  # each slot in UTC
+
+
+# ------------------------------------------------------------------------------- review round 2 (Task 15 fixes)
+def test_a_test_shot_in_the_pass_of_a_due_slot_keeps_the_slot_owed(rig, engine):
+    c, fake = rig
+    fake.set_state(_mode(1), "timer")
+    _timers(fake)
+    button = "button.crop_steering_zone_1_test_shot"
+    fake.set_state(button, "2026-10-22T11:00:00+00:00")  # the first state seen is a starting point
+    _pass_at(c, fake, 12, 0)
+    _at(12, 30)
+    fake.set_state(button, _Wall.current.astimezone().isoformat())
+    _pass_at(c, fake, 12, 30)  # the slot and the press in one pass: the press takes the turn
+    _pass_at(c, fake, 12, 31)
+    assert [e["source"]["actor"] for e in _started(c)] == ["manual", "timer"]
+
+
+def test_an_owed_slot_expires_15_min_after_its_time(rig, engine):
+    c, fake = rig
+    fake.set_state(_mode(1), "timer")
+    _timers(fake)
+    _pass_at(c, fake, 12, 0)
+    engine[1] = RESCUE
+    _pass_at(c, fake, 12, 30)
+    _pass_at(c, fake, 12, 40)  # still owed
+    assert _events(c, "intent.refused") == []
+    engine[1] = IDLE
+    _pass_at(c, fake, 12, 46)  # 16 min after its time: never given late
+    assert [e["source"]["actor"] for e in _started(c)] == ["engine", "engine"]
+    expired, = _refused(c)
+    assert expired["data"]["guard"] == "expired" and expired["source"]["actor"] == "timer"
+    assert expired["source"]["program_id"] == "P1" and expired["zone"] == 1
+
+
+def test_an_owed_slot_expires_when_its_window_ends(rig, engine):
+    c, fake = rig
+    fake.set_state(_mode(1), "timer")
+    _timers(fake, programs=[{**PROGRAM, "window": {"kind": "custom", "from": "08:00", "to": "12:40"}}])
+    _pass_at(c, fake, 12, 0)
+    engine[1] = RESCUE
+    _pass_at(c, fake, 12, 30)  # the window's last slot, owed behind the rescue
+    engine[1] = IDLE
+    _pass_at(c, fake, 12, 41)  # inside 15 min, but its window ended at 12:40
+    assert [e["source"]["actor"] for e in _started(c)] == ["engine"]
+    expired, = _refused(c)
+    assert expired["data"]["guard"] == "expired"
+
+
+def test_a_queued_timer_shot_names_its_program(rig, engine):
+    from test_pump_queue import _supply
+
+    c, fake = rig
+    engine[1] = TOPUP
+    fake.set_state(_mode(2), "timer")
+    _timers(fake, programs=[{**PROGRAM, "id": "P2", "zones": [2]}])
+    _supply(fake)
+    _pass_at(c, fake, 12, 0)
+    _pass_at(c, fake, 12, 30)
+    queued = [e for e in _events(c, "intent.queued") if e["zone"] == 2]
+    assert queued and queued[-1]["source"]["program_id"] == "P2" and queued[-1]["data"]["priority"] == "timer"
+
+
+def test_two_programs_on_one_zone_at_one_instant_get_two_ids(rig, engine):
+    c, fake = rig
+    fake.set_state(_mode(1), "timer")
+    _timers(fake, programs=[PROGRAM, {**PROGRAM, "id": "P9"}])
+    _pass_at(c, fake, 12, 10)
+    first = [i for i in _projection(fake) if i["source"] == "timer"][:2]
+    assert first[0]["at"] == first[1]["at"] and first[0]["id"] != first[1]["id"]

@@ -76,7 +76,7 @@ from crop_steering_engine import (
     settled_reading,
 )
 from crop_steering_engine.ids import derived_id, new_id
-from crop_steering_engine.timers import project as project_timer_program
+from crop_steering_engine.timers import _window as timer_window, project as project_timer_program
 from crop_steering_engine.core import SETTLED_VWC_MIN, ec_flush_goal, floor_share, p1_stall, p1_stall_rewater
 # What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
 # controller column of the one defaults table, pinned to the values installed controllers use.
@@ -738,6 +738,7 @@ TIMER_KEEPS = safety_ops.RESCUE_KINDS | {"min_daily", "blind_copy_rescue"}
 TIMERS_SENSOR = "sensor.crop_steering_{}timers_config"  # the integration's timer programs and skips (timers_api.py)
 PROJECTION_SENSOR = "sensor.crop_steering_{}projection_app"  # what the room is planned to do (the timeline reads it)
 PROJECTION_H = 24
+TIMER_OWED_MIN = 15  # a timer slot a rescue went before is still given this long after its time, inside its window
 TEST_SHOT_S = 10  # how long a zone's Test Shot waters it
 # The site's supply (the integration's site store, G1): the pumps, their output and the zones' demand. With one saved,
 # the zones that fire in a pass take turns at their pump, rescues first (_pump_line); none saved, as before.
@@ -5143,7 +5144,7 @@ class Controller:
         """A delivered shot's water, counted. A test shot (steering False) is water like any other, but
         not one of the day's shots: it is not a ramp shot, and nothing learns from it. A timer shot (learn False) is
         one of the day's shots, but the Auto setpoints learner never reads it: a timer's water must not steer the
-        engine's setpoints, and an engine shot still settling cannot be judged once timer water is on top of it."""
+        engine's setpoints. An engine shot still settling is settled on the reading before the timer water."""
         st = room.state[zone]
         now = datetime.now()
         self._water_usage(room, zone, now)
@@ -5160,7 +5161,7 @@ class Controller:
             if learn:
                 auto_setpoints.shot(st["learn"], st.get("phase"), size_pct, st.get("last_vwc"), now.timestamp())
             else:
-                st["learn"]["pending"] = None
+                auto_setpoints.settle(st["learn"], st.get("last_vwc"))
             first = st.get("phase") == "P1" and st["shots"] == 0
             try:  # the day's first shot closes the night: the VWC it started from is what the zone landed on
                 record = zone_history.shot(st, vwc_before=st.get("last_vwc"), now=now, day=day, first=first)
@@ -5869,7 +5870,7 @@ class Controller:
             if not g.quiet:  # a hardware fault returns without a word, as it always has
                 log(f"[{room.slug}] Z{zone} shot held: {why}")
                 self._journal_held(room, zone, why, guard=g.guard, code=code, now=datetime.now(),
-                                   would=reason_text, actor=actor)
+                                   would=reason_text, actor=actor, program_id=program_id)
             return
         if turn:  # it runs: its wait and its pump load are given now
             self._turn_runs(room, zone, turn)
@@ -6583,7 +6584,7 @@ class Controller:
             )
             guard, _why, code = held_by or (None, None, None)
             self._journal_held(room, zone, block, guard=guard and guard.guard, code=code, now=now, would=reason,
-                               actor=actor)
+                               actor=actor, program_id=getattr(reason, "program_id", None))
         elif fire:
             requested_at = requested_at or datetime.now().astimezone()  # this pass decided to fire
             # Sized: guards.SIZED, in order (its size, its longest shot, the day's budget left, which may clip it).
@@ -6591,7 +6592,8 @@ class Controller:
             hit = guards.first(self, guards.SIZED, room, zone, ctx)
             if hit:
                 g, held, code = hit
-                self._journal_held(room, zone, held, guard=g.guard, code=code, now=now, would=reason, actor=actor)
+                self._journal_held(room, zone, held, guard=g.guard, code=code, now=now, would=reason, actor=actor,
+                                   program_id=getattr(reason, "program_id", None))
                 return (False, 0.0, held) if g.reports else None
             flow, raw_dur, max_dur, size, dur = ctx["flow"], ctx["raw_dur"], ctx["max_dur"], ctx["size"], ctx["dur"]
             what, why = log_words.shot(reason)
@@ -7138,7 +7140,8 @@ class Controller:
         if failed:
             self._journal_skip = JOURNAL_BACKOFF_PASSES
 
-    def _journal_held(self, room, zone, reason, *, guard=None, code=None, now, would=None, actor="engine"):
+    def _journal_held(self, room, zone, reason, *, guard=None, code=None, now, would=None, actor="engine",
+                      program_id=None):
         """intent.held for a shot the act loop held (_act_zone, and _execute_shot before anything opens), once per
         (room, zone, guard, reason) and again each HELD_REEMIT_S while it stands. Never from _blocked: it also only
         describes (_publish_waiting_for's gates). A hold is known by its guard and its words without their numbers
@@ -7156,7 +7159,8 @@ class Controller:
             if guard:
                 data["guard"] = guard
             data["would"] = None if would is None else str(would)
-            self._journal(room.prefix, "intent.held", zone=zone, outcome="held", code=code, actor=actor, data=data)
+            self._journal(room.prefix, "intent.held", zone=zone, outcome="held", code=code, actor=actor,
+                          program_id=program_id, data=data)
         except Exception as e:
             log("journal intent.held error", room.slug, zone, e)
 
@@ -7232,7 +7236,7 @@ class Controller:
                           "requested_at": turn["requested_at"].isoformat(timespec="milliseconds"),
                           "guard": hit[0].guard if hit else "pump_capacity"}
             line["taken"][zone] = room.__dict__.setdefault("_turn", {})[zone] = {
-                "queued": queued, "actor": shot_actor(reason),
+                "queued": queued, "actor": shot_actor(reason), "program_id": getattr(reason, "program_id", None),
                 "lph": lph, "load": lph / most * 100 if lph is not None and most else None, "behind": len(ahead),
                 "waited": (datetime.now().astimezone() - turn["requested_at"]).total_seconds()}
         except Exception as e:
@@ -7244,7 +7248,7 @@ class Controller:
         try:
             if turn["queued"]:
                 self._journal(room.prefix, "intent.queued", zone=zone, outcome="queued", actor=turn["actor"],
-                              data=turn["queued"])
+                              program_id=turn.get("program_id"), data=turn["queued"])
         except Exception as e:
             log("pump turn error", room.slug, zone, e)
 
@@ -7354,6 +7358,20 @@ class Controller:
                 log(f"[{room.slug}] timer program {program.get('name') or program.get('id')!r} not run: {e}")
             return []
 
+    def _slot_expiry(self, room, slot, program):
+        """When an owed timer slot is no longer given: TIMER_OWED_MIN after its time, or the end of the program window
+        it belongs to (a lights-on window ends at lights-off), whichever comes first."""
+        late = slot.at + timedelta(minutes=TIMER_OWED_MIN)
+        window = program.get("window") or {"kind": "all"}
+        if program.get("type") == "one_off" or not isinstance(window, dict) or window.get("kind") == "all":
+            return late
+        try:
+            start, length = timer_window(window, (room.lights_on_hour, room.lights_off_hour))
+        except Exception:
+            return late
+        into = (slot.at.hour * 60 + slot.at.minute + slot.at.second / 60.0 - start) % 1440
+        return min(late, slot.at + timedelta(minutes=length - into))
+
     def _apply_modes(self, room, decisions, now, since):
         """Each zone's Watering by on this pass's decisions, before anything opens (R2, R3; spec 6.1):
         - off: no shot at all, the rescues included;
@@ -7385,7 +7403,16 @@ class Controller:
             for slot in self._project(room, program, since + tick, until + tick):
                 if modes.get(slot.zone) == "timer":
                     owed[slot.zone] = (slot, program)  # in time order: the latest slot is the one owed
-        used = room.__dict__.setdefault("_skips_used", set())  # (zone, at) of the skips an engine shot used up
+        for zone, (slot, program) in list(owed.items()):  # never given late: TIMER_OWED_MIN, or its window's end
+            if until >= self._slot_expiry(room, slot, program):
+                del owed[zone]
+                timed = _timer_reason(program, slot.duration_s)
+                why = f"the {slot.at:%H:%M} slot was not given in time (its window or {TIMER_OWED_MIN} min passed)"
+                self._journal(room.prefix, "intent.refused", zone=zone, outcome="refused", actor="timer",
+                              program_id=timed.program_id, data={"guard": "expired", "reason": why,
+                                                                 "would": str(timed)})
+                log(f"[{room.slug}] Z{zone} {why}: would {timed}")
+        used =room.__dict__.setdefault("_skips_used", set())  # (zone, at) of the skips an engine shot used up
         now_utc = until.astimezone(timezone.utc)
         used.difference_update([k for k in used if k[1] < now_utc - timedelta(days=1)])  # long past their until
 
@@ -7422,6 +7449,7 @@ class Controller:
             if zone in owed and not fire:  # a rescue or floor shot firing now goes first; the slot waits a pass
                 slot, program = owed.pop(zone)
                 timed = _timer_reason(program, slot.duration_s)
+                timed.slot = (slot, program)  # owed again should a test shot take this turn (_loop_room)
                 skip, _key = skip_of(zone, lambda at, end: at == slot.at.astimezone(timezone.utc))
                 if skip is not None:
                     refuse(zone, skip, "timer", timed, timed.program_id)
@@ -7449,7 +7477,8 @@ class Controller:
                     if timers["modes"].get(slot.zone) == "timer":
                         at = slot.at.astimezone(timezone.utc)
                         intents.append((at, {
-                            "id": derived_id(at, f"{room.prefix}:{slot.zone}:timer"), "zone": slot.zone,
+                            "id": derived_id(at, f"{room.prefix}:{slot.zone}:timer:{slot.program_id}"),
+                            "zone": slot.zone,
                             "at": at.isoformat(), "duration_s": slot.duration_s, "source": "timer",
                             "program_id": slot.program_id, "expected": False}))
             for zone, (conditions, at) in (getattr(room, "_waiting", None) or {}).items():
@@ -7459,7 +7488,7 @@ class Controller:
                 when = (_wall_clock(at).astimezone(timezone.utc)
                         + timedelta(minutes=min(waits))).replace(second=0, microsecond=0)
                 intents.append((when, {
-                    "id": derived_id(when, f"{room.prefix}:{zone}:engine"), "zone": zone, "at": when.isoformat(),
+                    "id": derived_id(when, f"{room.prefix}:{zone}:engine:"), "zone": zone, "at": when.isoformat(),
                     "duration_s": None, "source": "engine", "expected": True}))
             intents = [i for _at, i in sorted(intents, key=lambda pair: pair[0])]
             self._show_line(PROJECTION_SENSOR.format(room.prefix), str(len(intents)), {
@@ -8240,6 +8269,9 @@ class Controller:
         for zone in room.zones:  # a test shot asked for takes the zone's turn this pass
             test = self._test_shot(room, zone, now)
             if test:
+                slot = getattr(decisions.get(zone, (None, None, None))[2], "slot", None)
+                if slot is not None:  # a timer slot it takes the turn from stays owed (_apply_modes)
+                    room._timer_owed[zone] = slot
                 decisions[zone] = test
         if room._beat is None or not room._beat[1]:
             self._report_before_acting(room, decisions, snaps, now)

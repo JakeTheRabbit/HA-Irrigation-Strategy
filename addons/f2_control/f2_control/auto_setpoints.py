@@ -142,6 +142,14 @@ def shot(learn, phase, size_pct, pre_vwc, ts):
     learn["pending"] = {"t": ts, "pre": pre_vwc, "pct": size_pct, "ramp": phase in ("P0", "P1")}
 
 
+def settle(learn, pre_vwc):
+    """Water the learner never reads (a timer shot) is about to land: the pending shot is settled on the reading
+    before it, as shot() settles it, and nothing new is recorded."""
+    if learn["pending"] and pre_vwc is not None:
+        _settle(learn, pre_vwc)
+    learn["pending"] = None
+
+
 def tick(learn, vwc, phase, ts, lights_on, dryback_rate, minutes_since_shot):
     """Settle the last shot once it is old enough, and sample the dryback rate when the zone is quiet."""
     if learn["pending"] and ts - learn["pending"]["t"] >= SETTLE_MIN * 60.0:
