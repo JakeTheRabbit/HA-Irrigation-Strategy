@@ -126,6 +126,7 @@ def test_blind_fallback_and_sibling_copy_stop_at_own_daily_cap(rig, healthy_sibl
         # Live sibling may legitimately need a high-EC emergency above its own cap.
         fake.set_state("sensor.crop_steering_vwc_zone_2", "30")
         fake.set_state("sensor.crop_steering_ec_zone_2", "12")
+        fake.set_state("sensor.crop_steering_dosing_config", "3", {"feed": {"ec": 3.0}})  # flushable: a known feed
     pub = c._loop_room(room, now)
     assert pub[1]["fire"] is False
     assert "daily-cap" in pub[1]["reason"]

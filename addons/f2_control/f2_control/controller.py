@@ -2675,7 +2675,7 @@ class Controller:
             feed_ec = room._feed_last_good_value
         else:
             feed_ec = None
-        if feed_ec is None:  # measured first, then the feed recipe's declared EC, then 3.0
+        if feed_ec is None:  # measured first, then the feed recipe's declared EC, else unknown (None)
             feed_ec = self._recipe_feed_ec(room)
         new_grow_day = self._new_grow_day(room, st, now, lights_on)
         snap = ZoneSnapshot(
@@ -2703,7 +2703,7 @@ class Controller:
             # the min-daily floor's clock: it is paced from lights-on (core.floor_share)
             hours_since_lights_on=(24.0 - self._hours_to(now, room.lights_on_hour)) % 24.0,
             uptime_min=(now - self._start).total_seconds() / 60.0,
-            feed_ec=(feed_ec if feed_ec is not None else 3.0),
+            feed_ec=feed_ec,
             new_grow_day=new_grow_day,
             # the P1 rule (core.decide): reached the target, the peak before the last shot, shots since reaching it
             p1_reached=bool(st.get("p1_reached")),

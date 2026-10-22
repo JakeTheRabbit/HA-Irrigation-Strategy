@@ -150,7 +150,7 @@ Doctrine 0.1.0. Merged and de-duplicated. Priority 1 = core.
 
 ## Feed and source water
 
-- **FEED-01** (p1) Read feed EC from a live or recent mapped sensor. Without that measurement, the dilution comparison uses declared recipe EC where available, otherwise the fallback 3.0 mS/cm. These are assumptions, not measurements: mark the feed unchecked and do not claim a measured feed strength. — `product-rule` · CTRL, ENGINE, SKILL-CONCEPTS
+- **FEED-01** (p1) Read feed EC from a live or recent mapped sensor. Without that measurement, the dilution comparison uses declared recipe EC where available; otherwise the feed EC is unknown and the engine takes no EC flush and no feed-based high-EC hold. A recipe EC is an assumption, not a measurement: mark the feed unchecked and do not claim a measured feed strength. — `product-rule` · CTRL, ENGINE, SKILL-CONCEPTS
 - **FEED-02** (p2) EC measures ionic load, not full water quality: uncharged compounds escape it, and alkalinity (bicarbonate) can dominate pH behaviour. — `research` · USU
 - **FEED-03** (p3) Softening that swaps calcium and magnesium for sodium makes water worse for plants; verify reverse-osmosis output rather than assuming it. — `research` · USU
 - **FEED-04** (p2) Visual deficiency symptoms are late and non-specific; confirm root-zone pH and EC (and tissue tests where possible) before blaming the feed. — `research` · USU

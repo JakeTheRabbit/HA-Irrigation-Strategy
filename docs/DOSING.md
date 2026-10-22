@@ -123,7 +123,8 @@ batch recipe unchanged.
 
 A feed recipe may declare the feed EC it mixes to (`ec`). The dosing config carries the EC of the
 recipe in use today as `feed.ec`, and watering compares pore EC with, in order: a mapped feed EC
-probe's reading, that declared EC, else 3.0 mS/cm. A declared value can't catch a mis-mixed tank, so a
+probe's reading, that declared EC, else none: with the feed EC unknown the controller takes no EC flush
+and no feed-based high-EC hold, and waters on moisture. A declared value can't catch a mis-mixed tank, so a
 probe always wins and the source-water gate runs on the probe alone; a recipe's EC never holds water.
 
 `dosing_save` takes `feed` as optional: left out (a dashboard from before it), the stored one is

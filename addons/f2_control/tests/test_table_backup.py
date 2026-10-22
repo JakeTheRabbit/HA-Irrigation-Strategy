@@ -112,6 +112,7 @@ def test_a_backed_up_zone_gets_no_ec_flush(rig):  # noqa: F811
     # 54 and got none); what stops one is this hold: a flush poured into a table that isn't draining floods it.
     c, fake, room = rig
     now = Clock.instant = Clock(2026, 9, 23, 14, 0)
+    fake.set_state("sensor.crop_steering_dosing_config", "3", {"feed": {"ec": 3.0}})  # a declared feed EC (CTL-008)
     for zone in (1, 2):
         probe(fake, zone, 50, ec=10.0)  # over max_ec 9, feed 3: the anti-lockout flush is due
         room.state[zone].update(phase="P2", last_shot=now - timedelta(minutes=60), last_daily_reset=date(2026, 9, 23))
@@ -231,6 +232,7 @@ def test_saying_the_room_drains_freely_clears_a_card_it_had(rig):  # noqa: F811
 def test_a_free_draining_room_gets_its_ec_flush(rig):  # noqa: F811
     c, fake, room = rig
     fake.set_state(DRAINAGE, "free_drain")
+    fake.set_state("sensor.crop_steering_dosing_config", "3", {"feed": {"ec": 3.0}})  # a declared feed EC (CTL-008)
     now = Clock.instant = Clock(2026, 9, 23, 14, 0)
     for zone in (1, 2):
         probe(fake, zone, 50, ec=10.0)
