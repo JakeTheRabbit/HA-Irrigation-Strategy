@@ -771,3 +771,31 @@ def test_a_switch_on_backoff_saved_with_a_timezone_is_dropped(rig):
     saved = {**c._serialize_zone(c.rooms[0].state[1]),
              "on_failures": {"count": 3, "last": "2026-10-22T10:00:00+13:00"}}
     assert c._apply_saved_zone(c._fresh_zone(), saved)["on_failures"] is None
+
+
+def test_hanging_operator_switch_reads_cannot_stretch_the_valve_read_back(rig, monkeypatch):
+    """CTL-002 review: the operator checks inside the valve's read-back are bounded by its end too."""
+    c, fake, clock = rig
+    room = c.rooms[0]
+    times, real_call, real_get = {}, controller.ha_call, controller.ha_get
+    operator = {"input_boolean.kill", "switch.crop_steering_room_active", "switch.crop_steering_zone_1_enabled",
+                "switch.crop_steering_zone_1_manual_override"}
+
+    def call(domain, service, **data):
+        if data.get("entity_id") == "switch.v1":
+            times.setdefault(service, clock.seconds)
+            if service == "turn_on":
+                fake.calls.append((domain, service, data))
+                return True  # stays off: the read-back runs its whole length
+        return real_call(domain, service, **data)
+
+    def get(entity, timeout=8):
+        if entity in operator and "turn_on" in times and "turn_off" not in times:
+            clock.sleep(timeout)  # Home Assistant hangs on the operator's switches
+            return controller.HAState(None, {}, None)
+        return real_get(entity, timeout=timeout)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(controller, "ha_get", get)
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    assert times["turn_off"] - times["turn_on"] <= controller.SWITCH_ON_S + 3

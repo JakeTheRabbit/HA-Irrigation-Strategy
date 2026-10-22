@@ -5541,8 +5541,8 @@ class Controller:
     def _confirm_switches(entities, want, deadline=None, reads=None, stop=None):
         """True only when every switch reads back `want`. Each state read is added to `reads` when given.
 
-        With `stop` (a shot opening: _operator_stop for it), `stop()` is asked at most every 2 s before a
-        pause, and an answer raises _ShotStopped; each read is then also bounded by what is left of the
+        With `stop` (a shot opening: _operator_stop for it), `stop(end of this stage)` is asked at most every
+        2 s before a pause, and an answer raises _ShotStopped; each read is then also bounded by what is left of the
         read-back, so a hanging Home Assistant cannot stretch it while the shot's switches are on.
 
         Zigbee/MQTT plugs accept a command at once but report the new state later
@@ -5554,10 +5554,10 @@ class Controller:
 
         asked = [None]  # when stop() was last asked
 
-        def check():
+        def check(end):
             if stop is not None and (asked[0] is None or time.monotonic() - asked[0] >= 2.0):
                 asked[0] = time.monotonic()
-                by = stop()
+                by = stop(end)
                 if by:
                     raise _ShotStopped(by)
 
@@ -5574,7 +5574,7 @@ class Controller:
             end = time.monotonic() + window
             if deadline is not None:
                 end = min(end, deadline.until)
-            check()
+            check(end)
             _pause(first, deadline)
             while True:
                 if deadline is not None and deadline.timeout(8) is None:
@@ -5583,7 +5583,7 @@ class Controller:
                     return True
                 if time.monotonic() >= end:
                     return False
-                check()
+                check(end)
                 _pause(CONFIRM_POLL_S, deadline)
 
         # First read at 1 s, exactly as before, so a plug that reports promptly costs nothing extra.
@@ -5686,16 +5686,22 @@ class Controller:
             inside the lead time, so a switch that reports promptly costs a normal shot nothing; one that
             reports late stretches the pump's prime or the main line's lead by the difference."""
             if not hw_call(ent, True):
+                if _GATE.state == "all":  # the token refused: not a switch that failed (no CS-302 to CS-304)
+                    raise _ShotStopped(("refused", None))
                 return f"Home Assistant returned an error when the controller tried to {what}.", False
             acked, reads = time.monotonic(), []
-            # The operator's switches are read through the read-back and the lead time too (_ShotStopped).
-            if not self._confirm_switches((ent,), "on", reads=reads, stop=lambda: self._operator_stop(room, zone, 2.0)):
+            # The operator's switches are read through the read-back and the lead time too (_ShotStopped),
+            # each check bounded by the end of its stage.
+            def stop(until):
+                return self._operator_stop(room, zone, 2.0, until)
+
+            if not self._confirm_switches((ent,), "on", reads=reads, stop=stop):
                 # once more as it is switched off: an ON just after the window
                 reads.append(hw_get(ent, timeout=2.0)[0])
                 return (f"Home Assistant took the command to {what}, but it did not read on within "
                         f"{SWITCH_ON_S:g} s."), any(state != "off" for state in reads)
             while (left := lead_s - (time.monotonic() - acked)) > 0:
-                by = self._operator_stop(room, zone, 2.0)
+                by = stop(acked + lead_s)
                 if by:
                     raise _ShotStopped(by)
                 time.sleep(min(2.0, left))
@@ -5893,7 +5899,11 @@ class Controller:
                     # Read back as patiently as after a normal close: a plug that reports OFF 1.6 s
                     # late is not a stuck pump (the 15 Sep false hold, on this very path).
                     closed = self._confirm_switches(closing, "off")
-                    if refused or not closed:
+                    if (refused or not closed) and _GATE.state == "all":
+                        # Refused, not stuck (as after a normal close): left recorded for the reconciler.
+                        log(f"[{room.slug}] Z{zone} shot cleanup with Home Assistant refusing: its offs were "
+                            "sent, not read back; left recorded")
+                    elif refused or not closed:
                         self._latch_hardware_fault(
                             room,
                             f"zone {zone} shot error cleanup",

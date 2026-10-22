@@ -341,3 +341,22 @@ def test_the_log_shows_home_assistants_address_without_a_password():
     assert '"| base:", BASE)' not in source
     shown = runtime_env._shown("http://grower:hunter2@ha:8123/api")
     assert "hunter2" not in shown and shown.endswith("@ha:8123/api")
+
+
+# ------------------------------------------------------------------ refused while a shot opens (CTL-002)
+@pytest.mark.parametrize("when, start", [("pump-on", 0), ("main-line-stage", 2.5), ("valve-read-back", 3.5)])
+def test_a_token_refused_while_a_shot_opens_is_not_a_hardware_fault(rig, monkeypatch, when, start):
+    """A refused token is not a switch that failed: no CS-302 to CS-304, no backoff, no CS-301 hold. The
+    shot's offs are sent and its record is left for the reconciler, as after a refusal mid-shot."""
+    c, fake, session, clock = rig()
+    room, codes, alert = c.rooms[0], [], c._alert
+    monkeypatch.setattr(c, "_alert", lambda key, cs, *a, **k: (codes.append(cs), alert(key, cs, *a, **k))[1])
+    refuse_from(session, start, 401)
+    shot(c, clock)
+    assert controller._GATE.state == "all"
+    assert not {"CS-301", "CS-302", "CS-303", "CS-304"} & set(codes)
+    assert room.hardware_fault is None and room.state[1]["on_failures"] is None
+    assert room.shot_inflight is not None  # left recorded for the reconciler
+    offs = {p for _t, m, p, _s in session.sent if m == "POST"} & {"/services/switch/turn_off"}
+    assert offs  # the shot's offs were sent
+    assert (("turn_on", VALVE) in switched(fake)) == (when == "valve-read-back")
