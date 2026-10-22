@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createDemo, demoDay } from "./demo";
 import { growDay, timelineEntities, valveShots } from "./day-timeline";
-import { jevAnswer, jevChangeText, parseJevSetpoints, parseJevZone, readJev } from "./jev";
+import { jevAnswer, parseJevSetpoints, parseJevZone, readJev } from "./jev";
 import { buildRoom, discoverRooms, eventsForRoom } from "./model";
 import { mergeTimeline, timelineResult, timelineText } from "./timeline";
 import { growerWords } from "./words";
@@ -55,7 +55,7 @@ describe("no engine token reaches the demo's screens", () => {
       for (const item of mergeTimeline(eventsForRoom(states, room), entries, now))
         shown.push(timelineText(item), timelineResult(item), item.jev?.reason ?? "");
       for (const entry of entries)
-        shown.push(jevAnswer(entry), entry.action, entry.reason, jevChangeText(entry));
+        shown.push(jevAnswer(entry), entry.action, entry.reason);
       for (const zone of view.zones) {
         const id = `sensor.crop_steering_${room.prefix}zone_${zone.id}_jev`;
         for (const judge of parseJevZone(states[id])?.judges ?? [])

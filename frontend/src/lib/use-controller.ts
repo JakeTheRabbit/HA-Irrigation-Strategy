@@ -528,15 +528,15 @@ export class ControllerStore {
           const reason = validateChange(this.snapshot.room, this.states, change);
           if (reason) result.failed.push({ entityId: change.entityId, reason });
           else {
+            const state =
+              typeof change.value === "boolean" ? (change.value ? "on" : "off") : String(change.value);
+            const stamp = new Date().toISOString();
             next[change.entityId] = {
               ...next[change.entityId],
-              state:
-                typeof change.value === "boolean"
-                  ? change.value
-                    ? "on"
-                    : "off"
-                  : String(change.value),
-              last_updated: new Date().toISOString(),
+              state,
+              last_updated: stamp,
+              // As Home Assistant does: a new state is a change.
+              ...(next[change.entityId]?.state !== state ? { last_changed: stamp } : {}),
             };
             next = demoReact(next, change.entityId, change.value);
             result.applied.push(change.entityId);

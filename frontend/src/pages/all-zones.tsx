@@ -303,7 +303,13 @@ function ZoneCard({
   const poreEc = r.stage?.poreEc ?? null;
   const phase = /^P[0-3]$/.test(zone.phase) ? zone.phase : null;
   const context = [r.room.name, zone.name];
-  const troubled = z.sensors.filter((s) => s.health !== "ok" && s.health !== "not-counted");
+  // A sensor the zone's open alert already names ("Back sensor silent 3 h…") is said once, there.
+  const troubled = z.sensors.filter(
+    (s) =>
+      s.health !== "ok" &&
+      s.health !== "not-counted" &&
+      !z.problem?.toLowerCase().startsWith(`${sensorName(s, context).toLowerCase()} sensor`),
+  );
   return (
     <article
       className="facility-zone"

@@ -1,11 +1,12 @@
 import type { States } from "../types";
-import { demoId } from "./journal";
+import { demoId, demoJournal, demoLightsOn, demoZonePause } from "./journal";
 
 /** The 3.18 room entities the All rooms page reads, for the demo (`?demo=1`; not with
  * `?backend=3.17`). As in the Journal: Room A plays F2 (flower bulk, day 38 of 63; zone 2 waits
  * for the pump and its last shot came up short; zone 3 waters by timer; the feed pH probe is due
  * for calibration), Room B plays F1 (flower stretch, day 12 of 63; zone 2's back sensor alert is
- * open). */
+ * open, its back sensor silent 3 h and left out; zone 3 paused by Ben, as the Journal says, so its
+ * switch last changed then; each zone's shots and water today are the Journal's). */
 export function demoParityStatus(states: States, now: number): States {
   const out: States = { ...states };
   const stamp = new Date(now - 18_000).toISOString();
@@ -56,6 +57,53 @@ export function demoParityStatus(states: States, now: number): States {
         options: ["steering", "timer", "off"],
       });
   }
+  // Room B's front and back sensors in each zone. Zone 2's back sensor stopped reporting 3 h ago
+  // (the open CS-406 alert): the zone reads its front sensor only.
+  for (const zone of [1, 2, 3]) {
+    const silent = zone === 2;
+    for (const kind of ["vwc", "ec"] as const) {
+      const fused = `sensor.crop_steering_room_b_${kind}_zone_${zone}`;
+      const value = Number(states[fused]?.state);
+      const step = kind === "vwc" ? 0.8 : 0.1;
+      const ids = ["front", "back"].map((side) => `sensor.demo_room_b_z${zone}_${side}_${kind}`);
+      ids.forEach((id, side) => {
+        put(id, (silent ? value + (side ? step : 0) : value + (side ? -step : step)).toFixed(kind === "ec" ? 2 : 1), {
+          friendly_name: `Zone ${zone} ${side ? "back" : "front"} ${kind === "vwc" ? "VWC" : "EC"}`,
+          unit_of_measurement: kind === "vwc" ? "%" : "mS/cm",
+        });
+        if (silent && side) out[id].last_updated = out[id].last_changed = new Date(now - 3 * 3_600_000).toISOString();
+      });
+      out[fused] = {
+        ...states[fused],
+        attributes: {
+          ...states[fused]?.attributes,
+          probes: 2,
+          used: silent ? [ids[0]] : ids,
+          excluded: silent ? { [ids[1]]: "not reporting" } : {},
+        },
+      };
+    }
+  }
+  // Each Room B zone's shots and water today, as the Journal has them.
+  const since = demoLightsOn("room:room_b_", now);
+  const day = demoJournal("room:room_b_", now).filter((e) => e.kind === "shot.completed" && Date.parse(e.ts) >= since);
+  for (const zone of [1, 2, 3]) {
+    const shots = day.filter((e) => e.zone === zone);
+    const litres = shots.reduce((sum, e) => sum + Number(e.data.metered_l), 0);
+    for (const [key, state] of [
+      ["irrigation_count_app", shots.length],
+      ["daily_water_app", litres.toFixed(2)],
+    ] as const) {
+      const id = `sensor.crop_steering_room_b_zone_${zone}_${key}`;
+      out[id] = { ...states[id], state: String(state) };
+    }
+  }
+  // Who paused Room B zone 3: the Journal's user, a Home Assistant person; the switch changed then.
+  put("person.ben", "home", { friendly_name: "Ben", user_id: "demo-user" });
+  const pause = demoZonePause("room:room_b_", now);
+  const switchId = `switch.crop_steering_room_b_zone_${pause?.zone}_enabled`;
+  if (pause && out[switchId])
+    out[switchId] = { ...out[switchId], last_changed: new Date(pause.at).toISOString() };
   // The Journal's shot size (1.21 L commanded); 0.96 L arrived.
   put("sensor.crop_steering_zone_2_flow_ratio", 0.79, { commanded_l: 1.21, metered_l: 0.96, shot_id: demoId(now - 600_000, "room::shot:2") });
   return out;

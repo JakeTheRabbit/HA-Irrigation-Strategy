@@ -3,12 +3,23 @@ import type { CsEvent, JournalActor, JournalOutcome, JournalPage } from "../pari
 
 /** The demo's Journal: a deterministic grow-day per demo room, yesterday's and today's, from its
  * lights-on. Room A plays F2 ("Flower · bulk", P2, 7/6/7 shots a day; zone 3 waters by timer
- * program "Zone 3 day timer"), Room B plays F1 ("Flower · stretch", P1, 4/4/0 shots, zone 3
- * paused). Only events at or before `now` are answered. */
+ * program "Zone 3 day timer"), Room B plays F1 ("Flower · stretch", P1, 4 shots a zone; zone 3
+ * paused by Ben 8 min before today's lights-on for a slab change, so it has none today). Only
+ * events at or before `now` are answered. */
 export const DEMO_TIMER_PROGRAM_ID = "01JDEMQT1MERZ0NE3DAY000000";
-const ROOMS: Record<string, { lightsOn: number; phase: "P1" | "P2"; shots: number[]; low?: number; timer?: number }> = {
+const ROOMS: Record<
+  string,
+  {
+    lightsOn: number;
+    phase: "P1" | "P2";
+    shots: number[];
+    low?: number;
+    timer?: number;
+    paused?: { zone: number; minutesBeforeOn: number; reason: string };
+  }
+> = {
   "room:": { lightsOn: 10, phase: "P2", shots: [7, 6, 7], low: 2, timer: 3 },
-  "room:room_b_": { lightsOn: 8, phase: "P1", shots: [4, 4, 0] },
+  "room:room_b_": { lightsOn: 8, phase: "P1", shots: [4, 4, 4], paused: { zone: 3, minutesBeforeOn: 8, reason: "slab change" } },
 };
 const MIN = 60_000;
 const CROCKFORD = "0123456789ABCDEFGHJKMNPQRSTVWXYZ";
@@ -44,7 +55,18 @@ function lightsOnBefore(now: number, hour: number): number {
   return d.getTime();
 }
 
-function roomDay(roomId: string, on: number): CsEvent[] {
+/** When the demo room's grow-day began: its last lights-on at or before `now`. */
+export const demoLightsOn = (roomId: string, now: number) => lightsOnBefore(now, ROOMS[roomId]?.lightsOn ?? 0);
+
+/** The demo room's zone paused today, as its switch reads: when (epoch ms), which zone and why. */
+export function demoZonePause(roomId: string, now: number) {
+  const paused = ROOMS[roomId]?.paused;
+  if (!paused) return null;
+  const at = demoLightsOn(roomId, now) - paused.minutesBeforeOn * MIN;
+  return { zone: paused.zone, at, reason: paused.reason };
+}
+
+function roomDay(roomId: string, on: number, today: boolean): CsEvent[] {
   const room = ROOMS[roomId];
   const out: CsEvent[] = [];
   const add = (
@@ -87,8 +109,18 @@ function roomDay(roomId: string, on: number): CsEvent[] {
     add(on + 270 * MIN, "alert.raised", { key: "pore_ec_high", title: "Pore EC 6.6 is over the 4.5–6.0 band", entity_id: "sensor.crop_steering_ec_zone_2" }, { zone: 2, code: "CS-205", outcome: "partial" });
   else
     add(on + 270 * MIN, "alert.raised", { key: "probe_silent", title: "Back sensor silent 3 h, left out of the reading" }, { zone: 2, code: "CS-406", outcome: "partial" });
-  room.shots.forEach((count, index) => {
+  const paused = today ? room.paused : undefined;
+  if (paused)
+    add(on - paused.minutesBeforeOn * MIN, "config.changed", {
+      store: "setup",
+      section: "zones",
+      diff: [{ path: `zones.${paused.zone}.enabled`, old: true, new: false }],
+      entity_id: `switch.crop_steering_${roomId.slice(5)}zone_${paused.zone}_enabled`,
+      reason: paused.reason,
+    }, { actor: "manual", zone: paused.zone });
+  room.shots.forEach((planned, index) => {
     const zone = index + 1;
+    const count = paused?.zone === zone ? 0 : planned;
     if (!count) add(on + 70 * MIN, "intent.held", { reason: "zone disabled", guard: "zone_paused", would: "P1 ramp shot" }, { zone, outcome: "held" });
     for (let shot = 0; shot < count; shot++) {
       const requested = on + 70 * MIN + shot * 45 * MIN + index * 4 * MIN;
@@ -121,7 +153,7 @@ export function demoJournal(roomId: string, now: number): CsEvent[] {
   const room = ROOMS[roomId];
   if (!room) return [];
   const today = lightsOnBefore(now, room.lightsOn);
-  const events = [...roomDay(roomId, today - 86_400_000), ...roomDay(roomId, today)].sort(
+  const events = [...roomDay(roomId, today - 86_400_000, false), ...roomDay(roomId, today, true)].sort(
     (a, b) => tsMs(a) - tsMs(b) || a.id.localeCompare(b.id),
   );
   events.forEach((e, i) => (e.seq = i + 1));
