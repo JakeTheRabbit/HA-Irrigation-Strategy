@@ -199,6 +199,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     ) as err:  # pragma: no cover - never block setup on the display options
         _LOGGER.warning("Display options unavailable: %s", err)
 
+    # The site store (pumps, exclusive groups, meters): one per site, set up with the first room.
+    try:
+        from .site_api import async_setup_site
+
+        await async_setup_site(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the site store
+        _LOGGER.warning("Site settings unavailable: %s", err)
+
     # Tests from the dashboard: a zone's test shot.
     from .selftest import async_setup_selftest
 
@@ -436,6 +444,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .display import async_unload_display
 
     await async_unload_display(hass, entry)
+    from .site_api import async_unload_site
+
+    await async_unload_site(hass, entry)
     from .brain_api import async_unload_brain
 
     await async_unload_brain(hass, entry)

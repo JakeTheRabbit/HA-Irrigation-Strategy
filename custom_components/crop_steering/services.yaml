@@ -1360,6 +1360,75 @@ display_save:
       required: true
       selector:
         object:
+supply_get:
+  name: Read supply settings
+  description: >-
+    Returns the site's supply settings: the irrigation pumps with their output and how many zones
+    each may feed at once, the water sources, the exclusive groups of zones and the flow meter of
+    each zone, with a capacity check (the worst case each pump must carry and, for every pair of
+    zones on a pump, whether they can run together). Changes nothing. It has no administrator
+    check. Use it to read the revision before you save.
+
+supply_save:
+  name: Save supply settings
+  description: >-
+    Replaces the site's pumps, and optionally its water sources, exclusive groups and zone flow
+    meters. The integration refuses with pump_over_capacity when a pump is set to feed more zones
+    at once than its output can carry, and says how many it can. When a signed-in user calls it,
+    that user must be a Home Assistant administrator. An automation can call it without this
+    check. Give the revision that you read with supply_get. The integration refuses the save when
+    the settings changed after you read them. With preview it checks and answers with the
+    difference and the capacity check, and saves nothing.
+  fields:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that supply_get returned. Example: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    irrigation_pumps:
+      name: Irrigation pumps
+      description: >-
+        The pumps, each as entity_id (the pump switch of the rooms that use it), max_flow_lph
+        (optional), max_concurrent_zones (1 or more, default 1) and flow_meter (optional).
+        Example: [{"entity_id": "switch.pump", "max_flow_lph": 1200, "max_concurrent_zones": 2}].
+      required: true
+      selector:
+        object:
+    water_sources:
+      name: Water sources
+      description: >-
+        The water sources, as a list. Left out, the saved ones are kept.
+      required: false
+      selector:
+        object:
+    zone_groups:
+      name: Exclusive groups
+      description: >-
+        The exclusive group of each zone, by room and zone number. Zones in one group never run
+        together. Left out, the saved groups are kept. Example: {"room:f2_": {"3": "a"}}.
+      required: false
+      selector:
+        object:
+    zone_meters:
+      name: Zone flow meters
+      description: >-
+        The flow meter of each zone, by room and zone number. Left out, the saved meters are kept.
+        Example: {"room:f2_": {"3": "sensor.f2_meter_3"}}.
+      required: false
+      selector:
+        object:
+    preview:
+      name: Preview
+      description: Check and answer without saving.
+      required: false
+      selector:
+        boolean:
+
 harvests_get:
   name: Read harvests
   description: >-
