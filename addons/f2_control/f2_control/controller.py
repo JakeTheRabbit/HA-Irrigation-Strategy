@@ -5602,6 +5602,7 @@ class Controller:
         valve_started = None
         counted = False
         stopping = False
+        errored = False
 
         def count_water_so_far():
             # The shot ended without its close counting it (stopped or errored): count the water given
@@ -5754,7 +5755,7 @@ class Controller:
             raise
         except Exception as e:
             log("shot error", room.slug, zone, e)
-            count_water_so_far()
+            errored = True
         finally:
             try:
                 # Early command failures and unexpected exceptions need the SAME hold
@@ -5780,6 +5781,8 @@ class Controller:
                     else:
                         room.shot_inflight = None
                         self._save_state()
+                if errored:  # after the close, as a normal shot is: its time counts too
+                    count_water_so_far()
             finally:
                 self._busy = False
                 self._shot_room = None

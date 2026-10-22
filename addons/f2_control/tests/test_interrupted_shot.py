@@ -486,10 +486,24 @@ def test_stopping_the_app_mid_shot_closes_that_shot_and_counts_the_water_already
     assert counted_for_30_s(on_disk["1"]["daily_vol"]) and "_shot_inflight" not in on_disk
 
 
+def counting(c, fake, monkeypatch):
+    """What the valve read each time a shot was counted."""
+    seen = []
+    real = c._advance_shot_counters
+
+    def advance(*args, **kwargs):
+        seen.append(fake.states["switch.v1"][0])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(c, "_advance_shot_counters", advance)
+    return seen
+
+
 def test_an_error_mid_shot_closes_the_shot_and_counts_the_water_already_given(rig, monkeypatch):
     # CTL-005: an error 40 s into a 120 s shot closed the hardware but counted nothing, so the daily cap
-    # and the minimum interval did not see the water at the next pass.
+    # and the minimum interval did not see the water at the next pass. Counted once, after the close.
     c, fake, clock = rig
+    seen = counting(c, fake, monkeypatch)
 
     def wait(room, zone, duration_s, started=None):
         clock.sleep(40)
@@ -499,11 +513,56 @@ def test_an_error_mid_shot_closes_the_shot_and_counts_the_water_already_given(ri
     c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
     assert {e: fake.states[e][0] for e in ("switch.v1", "switch.m", "switch.p")} == dict.fromkeys(
         ("switch.v1", "switch.m", "switch.p"), "off")
+    assert seen == ["off"]  # counted once, with the valve already closed
     st = c.rooms[0].state[1]
-    assert st["daily_vol"] == pytest.approx(0.05 * 120 / 3) and st["shots"] == 1
+    # 40 s of water, plus the close like a normal shot: a little over, never under.
+    assert 0.05 * 40 <= st["daily_vol"] <= 0.05 * (40 + controller.CONFIRM_TIMEOUT_S) and st["shots"] == 1
     assert c.rooms[0].hardware_fault is None and c.rooms[0].shot_inflight is None
     on_disk = saved(c)["default"]
-    assert on_disk["1"]["daily_vol"] == pytest.approx(2.0) and "_shot_inflight" not in on_disk
+    assert on_disk["1"]["daily_vol"] == st["daily_vol"] and "_shot_inflight" not in on_disk
+
+
+def test_an_error_after_a_shot_was_counted_does_not_count_it_again(rig, monkeypatch):
+    c, fake, clock = rig
+    seen = counting(c, fake, monkeypatch)
+    real = c._advance_shot_counters
+
+    def advance_then_fail(*args, **kwargs):
+        real(*args, **kwargs)
+        raise RuntimeError("after the count")
+
+    monkeypatch.setattr(c, "_advance_shot_counters", advance_then_fail)
+    c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    st = c.rooms[0].state[1]
+    assert len(seen) == 1 and st["shots"] == 1
+    assert 0.05 * 120 <= st["daily_vol"] <= 0.05 * (120 + 1 + controller.CONFIRM_TIMEOUT_S)
+    assert all(fake.states[e][0] == "off" for e in ("switch.v1", "switch.m", "switch.p"))
+
+
+def test_an_error_closing_a_shot_cut_short_still_counts_its_water(rig, monkeypatch):
+    # _close_cut_short switches the shot off, then its CS-307 alert fails: the water is still counted.
+    c, fake, clock = rig
+    seen = counting(c, fake, monkeypatch)
+
+    def wait(room, zone, duration_s, started=None):
+        clock.sleep(40)
+        return 40, ("external", "switch.hold")
+
+    real_alert = c._alert
+
+    def alert(key, code, *args, **kwargs):
+        if code == "CS-307":
+            raise RuntimeError("notify failed")
+        return real_alert(key, code, *args, **kwargs)
+
+    monkeypatch.setattr(c, "_wait_shot", wait)
+    monkeypatch.setattr(c, "_alert", alert)
+    c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert all(fake.states[e][0] == "off" for e in ("switch.v1", "switch.m", "switch.p"))
+    assert seen == ["off"]
+    st = c.rooms[0].state[1]
+    assert 0.05 * 40 <= st["daily_vol"] <= 0.05 * (40 + controller.CONFIRM_TIMEOUT_S) and st["shots"] == 1
+    assert c.rooms[0].hardware_fault is None and c.rooms[0].shot_inflight is None
 
 
 def test_stopping_the_app_with_no_shot_in_flight_switches_nothing_off(rig):
