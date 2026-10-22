@@ -35,9 +35,10 @@ KINDS = (
         "table that does not drain. Also a sump pump that stopped, and a pump or "
         "valve that the controller cannot switch. Also rescue shots that do not raise "
         "the moisture, a waste valve that is not closed, and a pump that runs with "
-        "every valve shut. Also a sump water balance that does not close.",
+        "every valve shut. Also a sump water balance that does not close. Also a "
+        "zone that needs more than its pump.",
         "codes": _codes(
-            "CS-301 CS-302 CS-303 CS-304 CS-305 CS-306 CS-307 CS-308 CS-309 CS-310 CS-311 "
+            "CS-214 CS-301 CS-302 CS-303 CS-304 CS-305 CS-306 CS-307 CS-308 CS-309 CS-310 CS-311 "
             "CS-312 CS-313 CS-314 CS-315 CS-316 CS-317 CS-701 CS-710"
         ),
         "events": (),

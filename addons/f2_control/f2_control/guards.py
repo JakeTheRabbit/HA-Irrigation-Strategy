@@ -6,6 +6,9 @@ section 2.7). The first check that holds wins, as it always did.
            (tests/test_guard_chain.py holds the two in step).
   PREOPEN  Controller._execute_shot, just before anything opens.
   SIZED    Controller._act_zone, once the shot's size is known.
+  QUEUE    Controller._loop_room, with a supply saved in the integration (sensor.crop_steering_supply_config): why a
+           zone about to water waited for the zones watered before it this pass. These never hold (ruling R1): a
+           check answers Queued or None, the zone waters either way, and the answer is only journaled and shown.
 
 Each check is the code that stood inline in those methods, moved word for word: the same reads in the same order,
 the same alerts, releases and log lines. A check that raises an alert calls the controller method that holds it
@@ -22,6 +25,7 @@ import sys
 from dataclasses import dataclass
 from typing import Callable
 
+from crop_steering_engine.guards import capacity_ok
 from crop_steering_engine.shot_length import raw_seconds, shot_seconds
 
 
@@ -33,6 +37,15 @@ class Guard:
     code: str | None
     check: Callable
     quiet: bool = False  # holds without a word: no log line, nothing journaled
+    reports: bool = False  # a SIZED hold _act_zone hands back to the act loop to publish: (False, 0.0, why)
+
+
+@dataclass(frozen=True)
+class Queued:
+    """A QUEUE check's answer: the zone waits its turn behind `behind` (the zones ahead of it it waits on). Never a
+    hold: it waters after them."""
+
+    behind: tuple
 
 
 def first(owner, stage, room, zone, ctx):
@@ -174,10 +187,7 @@ def _settings(c, room, zone, ctx):
 
 
 def _tank(c, room, zone, ctx):
-    why = c._tank_hold(room)  # only with a tank level mapped: never on an upgraded room until then
-    if why and why.startswith("tank level unknown"):
-        return why, "CS-902"  # the level does not read (CS-901 is the tank at its minimum)
-    return why
+    return c._tank_hold(room)  # (why, CS-901 or CS-902); only with a tank level mapped
 
 
 def _feed_ec(c, room, zone, ctx):
@@ -361,5 +371,28 @@ def _daily_cap(c, room, zone, ctx):
 SIZED = (
     Guard("sizing", "shot_sizing", "sized", "CS-204", _sizing),  # not in spec
     Guard("max_shot", "max_shot", "sized", "CS-203", _max_shot),  # not in spec (#201)
-    Guard("daily_cap", "daily_cap", "sized", "CS-205", _daily_cap),
+    Guard("daily_cap", "daily_cap", "sized", "CS-205", _daily_cap, reports=True),
+)
+
+
+# ------------------------------------------------------------------------------------------- QUEUE (_loop_room)
+# ctx: lph (the zone's demand in L/h, None unknown), ahead [(zone, lph)] (the zones watered before it this pass),
+# pump {max_flow_lph, max_concurrent_zones} (its row of the supply, {} when not listed), groups {zone: group}.
+def _pump_capacity(c, room, zone, ctx):
+    pump, ahead = ctx["pump"], ctx["ahead"]
+    running = [lph or 0.0 for _z, lph in ahead]
+    if capacity_ok(running, ctx["lph"] or 0.0, pump.get("max_flow_lph"), pump.get("max_concurrent_zones") or 1):
+        return None
+    return Queued(tuple(z for z, _lph in ahead))
+
+
+def _exclusive_group(c, room, zone, ctx):
+    group = ctx["groups"].get(zone)
+    behind = tuple(z for z, _lph in ctx["ahead"] if group is not None and ctx["groups"].get(z) == group)
+    return Queued(behind) if behind else None
+
+
+QUEUE = (
+    Guard("pump_capacity", "pump_capacity", "queue", None, _pump_capacity),
+    Guard("exclusive_group", "exclusive_group", "queue", None, _exclusive_group),  # recorded only (R1)
 )

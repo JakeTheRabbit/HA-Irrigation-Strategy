@@ -672,7 +672,10 @@ def _observe(name, capsys, tmp_path):
         mp.setattr(fake_ha, "datetime", _Wall)  # the fake's state times on the same clock
         c, fake, room = _room()
         reads, writes = [], []
-        mp.setattr(controller, "ha_get", lambda e, timeout=8: (reads.append(e), fake.ha_get(e, timeout))[1])
+        # The supply (Task 12) is read once a pass since the recording. None is saved here, so it changes nothing
+        # else; test_pump_queue.py holds that read and what follows from it.
+        mp.setattr(controller, "ha_get", lambda e, timeout=8: (
+            e == controller.SUPPLY_SENSOR or reads.append(e), fake.ha_get(e, timeout))[1])
         mp.setattr(controller, "ha_set", lambda e, s, a=None, timeout=None: (
             writes.append((e, s, a)), fake.ha_set(e, s, a, timeout))[1])
         fake.calls.clear()

@@ -52,6 +52,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-210](#cs-210) | Hold entity missing | Warning | Notification |
 | [CS-211](#cs-211) | Shots held for too long | Critical | Notification |
 | [CS-212](#cs-212) | Controller error in room | Critical | Notification |
+| [CS-214](#cs-214) | Zone needs more than its pump | Warning | Notification |
 | [CS-301](#cs-301) | Hardware fault latch | Critical | Notification |
 | [CS-302](#cs-302) | Pump command error | Warning | Notification |
 | [CS-303](#cs-303) | Main-line valve command error | Warning | Notification |
@@ -506,6 +507,28 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - Read the controller log near the time of the alert.
 - Report the error with the log.
 - Until the error stops, water the room by hand.
+
+<a id="cs-214"></a>
+
+### CS-214: Zone needs more than its pump
+
+*Warning · Notification*
+
+**What it means.** A supply is set in Crop Steering (the pumps, their flow and the zones on each). This zone alone needs more water per hour than its pump gives, from its plants, drippers per plant and dripper flow. Or a shot of this zone waited more than 10 minutes for its turn at the pump, behind the other shots of the same pass. The alert names the zone, the pump and the litres per hour.
+
+**Effect on water.** Water continues; the zone takes turns with the others on its pump.
+
+**Probable causes**
+
+- The pump's maximum flow in the supply is lower than the zone's demand, or set wrong.
+- The plant count, the drippers per plant or the dripper flow of the zone is set too high.
+- Many zones of the room fire in the same pass, and each one waits for the shots before it.
+
+**What to do**
+
+- Check the maximum flow of the pump in the supply that is set in Crop Steering (crop_steering.supply_get shows it).
+- Check the plant count, drippers per plant and dripper flow of the zone.
+- If the zone really needs more than the pump gives, split the zone or use a bigger pump: the zone gets less pressure, and its drippers can give less water than the controller counts.
 
 ## Pumps and valves (CS-3xx)
 
