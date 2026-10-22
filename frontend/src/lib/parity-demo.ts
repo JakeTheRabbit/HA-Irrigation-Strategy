@@ -260,7 +260,7 @@ const DEFAULTS: Record<ParityAction, (data: Record<string, unknown>, now: number
   alert_ack: (d, now) => ({ alert_event_id: d.alert_event_id ?? null, event_id: demoId(now, "ack") }),
   timer_program_set: (d, now) => ({ program: { ...timerProgram(now), ...(isRecord(d.program) ? d.program : {}) }, revision: 2, preview: [] }),
   timer_program_delete: (d) => ({ id: d.id ?? null, revision: 2 }),
-  timer_program_list: (d, now) => ({ programs: [timerProgram(now)].filter((p) => d.room_id == null || p.room_id === d.room_id), revision: 1 }),
+  timer_program_list: (d, now) => ({ programs: [timerProgram(now)].filter((p) => d.room_id == null || p.room_id === d.room_id), revision: 1, revisions: Object.fromEntries(DEMO_ROOMS.map((room) => [room, 1])) }),
   timer_program_preview: (_d, now) => {
     const preview = Array.from({ length: 8 }, (_, i) => ({ zone: 3, at: iso(now + (i + 1) * 30 * 60_000), duration_s: 120 }));
     return { preview, shots: preview.length, total_s: preview.length * 120 };
