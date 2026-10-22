@@ -540,7 +540,7 @@ class Notifier:
         message = (
             f"This phone gets: {', '.join(names)}."
             if names
-            else "This phone gets nothing yet: tick what it should get under Settings & help "
+            else "This phone gets nothing yet: tick what it should get under Settings "
             "› Notifications."
         )
         error = await self._deliver(
