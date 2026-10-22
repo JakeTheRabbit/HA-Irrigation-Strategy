@@ -129,6 +129,32 @@ def test_a_zone_setting_read_once_and_then_not_answered_never_becomes_the_room_v
     assert PER in room._settings_missing
 
 
+@pytest.mark.parametrize(
+    "status", [None, 500, 403]
+)  # no answer, a server error, refused
+def test_a_zone_sizing_setting_with_no_answer_on_its_first_read_is_unread_not_the_room_value(
+    monkeypatch, status
+):
+    sized = {f"number.crop_steering_{s}": ("2", {}) for s in controller.WATER_SIZING}
+    c, _fake = _build(
+        {"num_zones": 1}, states={**sized, PER: ("6.5", {}), ROOM: ("9", {})}
+    )
+    real = controller.ha_get_status
+    monkeypatch.setattr(
+        controller,
+        "ha_get_status",
+        lambda eid, *a, **k: (
+            (status, controller.HAState()) if eid == PER else real(eid, *a, **k)
+        ),
+    )
+    room = c.rooms[0]
+    _pass(c, room)
+    assert c._zone_num(room, 1, "substrate_volume", None) is None  # never the room's 9
+    assert c._settings_hold(room, 1).startswith(
+        f"waiting for its settings to load ({PER}"
+    )
+
+
 def test_an_unreadable_zone_setting_of_another_kind_takes_the_room_value_and_says_so():
     zone = "number.crop_steering_zone_1_p2_shot_size"
     c, _fake = _build(

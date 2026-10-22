@@ -2080,19 +2080,24 @@ class Controller:
                 return None  # missing, unknown, unavailable or not a number: not read
 
         # One read each, its own state parsed: a second read that failed gave the built-in value as read.
-        v, attributes, _ = ha_get(per)
+        sizing = suffix in WATER_SIZING
+        if sizing:  # whether Home Assistant has the zone's number at all: only a 404 means it has none
+            status, (v, attributes, _) = ha_get_status(per)
+        else:
+            v, attributes, _ = ha_get(per)
         value = number(v)
         if value is not None:
             self._note_setting(per, value, attributes)
             seen[per] = value
             return value
-        # The zone has its own number and it reads no number (unavailable, unknown; or no answer, once it was
-        # read in this run): not the room's value unseen. A setting that sizes the zone's water is unread (the
-        # settings wait, then CS-402); any other takes the room's value, and CS-402 names the zone's number.
-        unread = v is not None or per in seen
+        # The zone has its own number and it reads no number: not the room's value unseen. A setting that sizes
+        # the zone's water is unread unless Home Assistant answers it has no such number (the settings wait, then
+        # CS-402); any other, answering unavailable or unknown or read earlier in this run, takes the room's
+        # value, and CS-402 names the zone's number.
+        unread = status != 404 if sizing else v is not None or per in seen
         if unread:
             self._defaulted_this_loop.add(per)
-        if not (unread and suffix in WATER_SIZING):
+        if not (unread and sizing):
             v, attributes, _ = ha_get(glob)
             value = number(v)
             if value is not None:
@@ -2104,7 +2109,7 @@ class Controller:
         # so this only trips on a real misconfig (renamed/removed entity). Record it so
         # _check_defaulted_setpoints can surface it — EXCEPT engine-only knobs the integration
         # deliberately doesn't create (optional=True): those default by design, never alert.
-        if unread and suffix in WATER_SIZING:
+        if unread and sizing:
             room.__dict__.setdefault("_settings_missing", set()).add(per)
             last = seen.get(per)
             if last is not None:  # the zone's own value, read earlier in this run
@@ -6448,7 +6453,7 @@ class Controller:
                 "CS-402",
                 "settings missing, the controller uses built-in values",
                 "The controller cannot read these settings in Home Assistant. It uses the last value that "
-                "it read since it started, or its built-in value"
+                "it read since it started, else, for a zone's own setting, the room's value, else its built-in value"
                 + (f". {' and '.join(key).capitalize()} set the water of a zone. A zone that has not read "
                    "one of them since the controller started gets no shots, including rescue shots, until "
                    "the setting is back"
