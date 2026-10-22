@@ -331,7 +331,60 @@ def test_a_program_the_lights_moved_away_from_still_lists():
     lit = recycle(window={"kind": "lights_on"}, sync_time="20:00")
     assert put(room, lit)["preview"][0]["at"] == "2026-10-22T20:00:00+13:00"
     hass.states.async_set(f"number.{DOMAIN}_f2_lights_off_hour", "18")
+    # never silently stopped: it runs from the start of the moved window
     (listed,) = timers_api.list_programs(hass, "room:f2_")["programs"]
-    assert listed["next_at"] is None
+    assert listed["next_at"] == "2026-10-22T12:00:00+13:00" and listed["error"] is None
+    # a save checks the sync time against the lights as they are now
     with pytest.raises(ValueError, match="sync time must be inside the window"):
         room.preview(lit, 24)
+
+
+def test_one_program_that_cannot_be_projected_is_named_and_the_others_still_list(
+    monkeypatch,
+):
+    hass, room, _ = rig()
+    bad = put(room, recycle(name="Bad", zones=[1]))["program"]
+    good = put(room, recycle(name="Good", zones=[2]))["program"]
+    real = timers_api.timers.project
+
+    def project(program, *args):
+        if program["id"] == bad["id"]:
+            raise RuntimeError("boom")
+        return real(program, *args)
+
+    monkeypatch.setattr(timers_api.timers, "project", project)
+    listed = {p["name"]: p for p in timers_api.list_programs(hass, None)["programs"]}
+    assert listed["Bad"]["next_at"] is None and "boom" in listed["Bad"]["error"]
+    assert listed["Good"]["next_at"] == "2026-10-22T08:00:00+13:00"
+    assert listed["Good"]["error"] is None and listed["Good"]["id"] == good["id"]
+
+
+def test_a_skip_more_than_48_h_ahead_is_refused():
+    _, room, backing = rig()
+    with pytest.raises(ValueError, match="more than 48 h ahead"):
+        asyncio.run(room.skip(0, 1, "2026-10-24T06:01:00+13:00", {}))
+    assert (
+        asyncio.run(room.skip(0, 1, "2026-10-24T06:00:00+13:00", {}))["revision"] == 1
+    )
+    assert backing.saves == 1
+
+
+def test_a_hand_edited_skip_without_an_offset_is_dropped_not_fatal(caplog):
+    stored = {
+        "revision": 4,
+        "programs": [],
+        "skips": [
+            {"zone": 1, "at": "2026-10-22T08:00:00", "until": "2026-10-22T08:15:00"},
+            {
+                "zone": 2,
+                "at": "2026-10-22T09:00:00+13:00",
+                "until": "2026-10-22T09:15:00+13:00",
+            },
+        ],
+    }
+    hass, room, _ = rig(value=stored)
+    assert room.error is None
+    assert [s["zone"] for s in hass.states.get(room.sensor).attributes["skips"]] == [2]
+    assert "has no offset" in caplog.text
+    put(room, recycle(), expected=4)  # prune and compare never raise
+    assert [s["zone"] for s in room.document["skips"]] == [2]

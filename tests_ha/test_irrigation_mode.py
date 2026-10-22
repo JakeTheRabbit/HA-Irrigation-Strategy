@@ -130,7 +130,7 @@ async def test_a_non_administrator_lists_and_previews_but_may_not_save(hass):
     assert (await _call(hass, "timer_program_list", staff, room_id=ROOM))["revision"] == 0
     assert (await _call(hass, "timer_program_preview", staff, room_id=ROOM, program=PROGRAM))[
         "shots"
-    ] >= 0
+    ] == 8
     for service, data in (
         ("timer_program_set", {"program": PROGRAM}),
         ("timer_program_delete", {"id": "x"}),

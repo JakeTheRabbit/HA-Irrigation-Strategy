@@ -86,10 +86,20 @@ def _stored_program(value) -> dict:
     return {key: program[key] for key in FIELDS if key in program}
 
 
-def _stored_skip(value) -> dict:
-    if not isinstance(value, dict) or type(value.get("zone")) is not int:
-        raise ValueError("a stored skip has no zone")
-    _instant(value.get("at")), _instant(value.get("until"))
+def _stored_skip(value) -> dict | None:
+    """A stored skip, or None (logged) for one that is not a zone with two times that carry an offset:
+    a skip only ever covers one shot, so dropping a broken one never loses a program."""
+    try:
+        if not isinstance(value, dict) or type(value.get("zone")) is not int:
+            raise ValueError("it has no zone")
+        for key in ("at", "until"):
+            if _instant(value.get(key)).tzinfo is None:
+                raise ValueError(f"its {key} has no offset")
+    except ValueError as error:
+        _LOGGER.warning(
+            "Crop Steering timers: stored skip %r dropped: %s", value, error
+        )
+        return None
     return dict(value)
 
 
@@ -103,7 +113,7 @@ def load(value) -> dict:
     return {
         "revision": max(value["revision"], 0),
         "programs": [_stored_program(p) for p in programs],
-        "skips": [_stored_skip(s) for s in skips],
+        "skips": [s for s in map(_stored_skip, skips) if s is not None],
     }
 
 
@@ -187,18 +197,22 @@ class TimerPrograms:
         """The room's programs as timer_program_list shows them."""
         out = []
         for program in self.programs():
-            start = self._now()
+            start, error = self._now(), None
             try:
                 shots = timers.project(
                     program, self.lights(), start, start + NEXT_WITHIN
                 )
-            except ValueError:  # its sync time is outside a lights window moved since
-                shots = []
+            except Exception as failed:  # named on this program; the others still list
+                shots, error = [], f"Its next shot could not be worked out: {failed}"
+                _LOGGER.warning(
+                    "Crop Steering timers %s: %s %s", self.room_id, program["id"], error
+                )
             out.append(
                 {
                     **program,
                     "room_id": self.room_id,
                     "next_at": shots[0].at.isoformat() if shots else None,
+                    "error": error,
                     "zones_in_timer_mode": [
                         zone
                         for zone in program["zones"]
@@ -219,11 +233,9 @@ class TimerPrograms:
         if (
             type(hours) not in (int, float)
             or not math.isfinite(hours)
-            or not 0 < hours <= MAX_PREVIEW_HOURS
+            or not 1 <= hours <= MAX_PREVIEW_HOURS
         ):
-            raise ValueError(
-                f"hours must be more than 0 and at most {MAX_PREVIEW_HOURS}"
-            )
+            raise ValueError(f"hours must be from 1 to {MAX_PREVIEW_HOURS}")
         if not isinstance(program, dict):
             raise ValueError("program must be an object")
         checked = self._check(program)
@@ -426,6 +438,8 @@ class TimerPrograms:
             when = when.replace(tzinfo=self._now().tzinfo)
         if when + SKIP_KEPT <= self._now():
             raise ValueError("That time is more than 24 h ago")
+        if when > self._now() + timedelta(hours=MAX_PREVIEW_HOURS):
+            raise ValueError(f"That time is more than {MAX_PREVIEW_HOURS} h ahead")
         who = who or {}
         skip = {
             "zone": zone,
@@ -549,7 +563,7 @@ async def async_setup_timers(hass, entry) -> None:
             vol.Required("program"): dict,
             vol.Optional("hours"): vol.All(
                 vol.Coerce(float),
-                vol.Range(min=0, min_included=False, max=MAX_PREVIEW_HOURS),
+                vol.Range(min=1, max=MAX_PREVIEW_HOURS),
             ),
         },
         "timer_program_list": {vol.Optional("room_id"): str},

@@ -126,8 +126,12 @@ def test_validate_refuses_a_sync_time_outside_the_window():
     assert validate(lit)["sync_time"] == "20:00"
     with pytest.raises(ValueError, match="sync time must be inside the window"):
         validate(lit, (6, 18))
-    with pytest.raises(ValueError, match="sync time must be inside the window"):
-        project(lit, (6, 18), *DAY)
+
+
+def test_a_sync_time_the_lights_moved_away_from_starts_at_the_window_start():
+    lit = _prog(sync_time="20:00", interval_min=120, window={"kind": "lights_on"})
+    assert _hm(project(lit, (12, 0), *DAY)) == ["20:00", "22:00"]  # as saved
+    assert _hm(project(lit, (6, 18), *DAY)) == ["06:00", "08:00", "10:00", "12:00", "14:00", "16:00"]
 
 
 @pytest.mark.parametrize("value", ["false", "true", 0, 1, None])

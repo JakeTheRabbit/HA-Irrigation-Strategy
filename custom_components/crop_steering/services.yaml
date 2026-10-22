@@ -1836,8 +1836,8 @@ timer_skip:
   name: Skip a planned shot
   description: >-
     Skips the planned shot of one zone at a given time: the timer shot, or the engine shot the
-    timeline showed then. The skip covers 15 minutes from that time and is dropped 24 hours after
-    it. When a signed-in user calls it, that user must be a Home Assistant administrator.
+    timeline showed then. Rescue and emergency shots are never skipped. The time may be up to 48
+    hours ahead. The skip covers 15 minutes from that time and is dropped 24 hours after it. When a signed-in user calls it, that user must be a Home Assistant administrator.
   fields:
     room_id:
       name: Room ID

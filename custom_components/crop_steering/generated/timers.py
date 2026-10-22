@@ -114,7 +114,8 @@ def _window(w: dict, lights: tuple[float, float]) -> tuple[float, float]:
 def project(
     program: dict, lights: tuple[float, float], start: datetime, end: datetime
 ) -> list[PlannedIntent]:
-    p = validate(program, lights)
+    # without the lights: a program saved under other lights hours still runs (see sync_time below)
+    p = validate(program)
     if not p["active"]:
         return []
     tz = start.tzinfo
@@ -137,6 +138,10 @@ def project(
         first = 0.0
         if p.get("sync_time") is not None:
             first = (_minutes(p["sync_time"]) - w_from) % 1440
+            if (
+                first >= length
+            ):  # the lights moved the window away from it: start the window
+                first = 0.0
         offsets = []
         t = first
         while t < length:
