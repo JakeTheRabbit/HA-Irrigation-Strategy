@@ -86,6 +86,7 @@ from crop_steering_engine.defaults import UNITS, to_canonical
 # How long a shot runs, the one rule the integration's shot-duration sensors show too.
 from crop_steering_engine.shot_length import DEFAULT_MAX_SHOT_S, MIN_SHOT_S, valid_cap
 from crop_steering_engine.guards import order as supply_order
+from crop_steering_engine.flow import reconcile as reconcile_flow, to_litres
 # What depends on what a room grows in (its substrate select): "generic" is what every room ran on before.
 from crop_steering_engine.defaults import SUBSTRATE_PROFILES
 
@@ -755,6 +756,10 @@ TEST_SHOT_S = 10  # how long a zone's Test Shot waters it
 SUPPLY_SENSOR = "sensor.crop_steering_supply_config"
 QUEUE_ALERT_S = 600  # CS-214 once a zone has waited this long for its turn at the pump (it still waters)
 LINE_SET_TIMEOUT_S = 2  # the queue and pump load are written between shots: a slow Home Assistant waits this long
+# G4, flow reconciliation (_flow_meter): a zone's flow meter in the supply, read before its pump opens and after its
+# close reads back; one that does not answer in this long reconciles nothing, and the shot runs as before.
+METER_READ_TIMEOUT_S = 2
+METER_IDLE_L = 0.5  # CS-319: a meter that rises more than this between shots, with no shot in flight
 GROW_DAY_PROBE_S = 600  # how often the probes behind each zone are read for its grow-day summary (day_summary)
 # A Test Shot press older than this when the controller sees it is not acted on: the person testing is
 # watching the drippers, and a shot long after they asked for it tests nothing for them.
@@ -6049,6 +6054,7 @@ class Controller:
         # The journal's record of this shot: its shot.started intent id (None until it is written), the switches
         # sent ON and read back ON (#208), and how it ended (shot.completed, or shot.aborted's outcome and code).
         journaled = {"intent_id": None, "sent": [], "on": [], "refused": False, "end": None, "elapsed": None}
+        meter = meter_before = None  # the zone's flow meter and its total before the pump opens (G4)
 
         def count_water_so_far():
             # The shot ended without its close counting it (stopped or errored): count the water given
@@ -6178,6 +6184,9 @@ class Controller:
                 lead = _lead_time(
                     self._zone_num(room, zone, "main_line_lead_time", FALLBACK["main_line_lead_time"], optional=True),
                     FALLBACK["main_line_lead_time"], MAIN_LINE_LEAD_MAX_S)
+            meter = self._flow_meter(room, zone)  # None with no supply or no meter: no read, as before
+            if meter:
+                meter_before = self._meter_litres(meter, METER_READ_TIMEOUT_S)
             # WRITE-AHEAD: what this shot is about to open, and when, saved BEFORE anything opens. If the
             # controller dies, is killed or loses Home Assistant mid-shot, the next loop closes exactly what
             # this shot opened, from this record, and nothing else (see _reconcile_room_inflight).
@@ -6304,6 +6313,11 @@ class Controller:
             )
             journaled["elapsed"] = elapsed
             journaled["end"] = ("aborted", None if aborted[0] == "refused" else "CS-305") if aborted else "completed"
+            if meter_before is not None and not aborted and "close" not in journaled:
+                # closed and read back OFF: what the meter saw of this shot (_journal_shot_end reconciles it)
+                after = self._meter_litres(meter, METER_READ_TIMEOUT_S)
+                if after is not None and after >= meter_before:
+                    journaled["metered_l"] = after - meter_before
             if aborted:
                 stopped_early(aborted, elapsed)
         except _ShotStopped as stopped:
@@ -6387,6 +6401,8 @@ class Controller:
             finally:
                 self._busy = False
                 self._shot_room = None
+                if commanded:  # this shot's water is no leak: the room's meters start again (_watch_meters)
+                    self._meters_rebase(room)
                 if journaled["intent_id"] is not None:  # its end, after its water is counted (#197)
                     self._journal_shot_end(room, zone, journaled, valve_started)
 
@@ -6441,22 +6457,172 @@ class Controller:
             outcome, code = ("ok", None) if completed else end
             if completed and "close" in journaled:
                 outcome, code = "failed", journaled["close"]
+            commanded_l = round(max(0.0, litres), 3)
+            metered = journaled.get("metered_l")
+            metered_l = round(metered, 3) if completed and metered is not None else None
             self._journal(
                 room.prefix, "shot.completed" if completed else "shot.aborted", zone=zone,
                 outcome=outcome, code=code,
                 correlation={"intent_id": journaled["intent_id"]},
                 data={
                     "elapsed_s": round(elapsed, 1) if elapsed is not None else 0.0,
-                    "commanded_l": round(max(0.0, litres), 3),
-                    "metered_l": None,
+                    "commanded_l": commanded_l,
+                    "metered_l": metered_l,
                     "vwc_before": journaled["vwc_before"],
                     "ec_before": journaled["ec_before"],
                 },
                 readback={"status": status, "entities": list(on),
                           "at": datetime.now().astimezone().isoformat(timespec="milliseconds")},
             )
+            if metered_l is not None:
+                self._flow_reconciled(room, zone, journaled["intent_id"], commanded_l, metered_l)
         except Exception as e:
             log("journal shot end error", room.slug, zone, e)
+
+    def _flow_reconciled(self, room, zone, intent_id, commanded_l, metered_l):
+        """G4: a completed shot's metered litres against the litres it counted -> flow.reconciled (an outbox append),
+        and its sensor and CS-318 kept for the end of the room's pass (_flow_done): nothing here touches Home
+        Assistant, and nothing here changes the water."""
+        verdict = reconcile_flow(commanded_l, metered_l)
+        if verdict["verdict"] == "unmetered":  # nothing counted: no ratio to give
+            return
+        data = {"ratio": verdict["ratio"], "commanded_l": commanded_l, "metered_l": metered_l,
+                "verdict": verdict["verdict"]}
+        self._journal(room.prefix, "flow.reconciled", zone=zone, actor="system",
+                      correlation={"intent_id": intent_id}, data=data)
+        room.__dict__.setdefault("_flow_pending", []).append({"zone": zone, "intent_id": intent_id, **data})
+
+    def _flow_done(self, room):
+        """The end of the room's pass: each reconciled shot's sensor.crop_steering_<px>zone_N_flow_ratio, and CS-318
+        raised for a zone that got under flow.LOW of its water, taken down by a shot that got enough. Only tells."""
+        for row in room.__dict__.pop("_flow_pending", []):
+            try:
+                zone, key = row["zone"], f"flow_low_{room.slug}_z{row['zone']}"
+                ha_set(f"sensor.crop_steering_{room.prefix}zone_{zone}_flow_ratio", row["ratio"],
+                       {"commanded_l": row["commanded_l"], "metered_l": row["metered_l"],
+                        "intent_id": row["intent_id"]})
+                if row["verdict"] != "low":
+                    self._dismiss(key)
+                    continue
+                meter = self._flow_meter(room, zone)
+                self._alert(
+                    key,
+                    "CS-318",
+                    "less water than expected",
+                    f"The flow meter saw {row['metered_l']:.2f} L of the {row['commanded_l']:.2f} L that the "
+                    f"controller counted for the last shot of this zone ({row['ratio'] * 100:.0f}%). The controller "
+                    "counts the water from the dripper settings, so the zone can get less than it counts and dry "
+                    "out. Check the line, the drippers and the filter of this zone, and the meter."
+                    + (f"\n\nMeter: {meter}" if meter else ""),
+                    room=room,
+                    zone=zone,
+                    entity_id=meter,
+                )
+            except Exception as e:
+                log("flow reconcile error", room.slug, row.get("zone"), e)
+
+    def _flow_meter(self, room, zone):
+        """The flow meter of a zone in this pass's supply (sensor.crop_steering_supply_config): its own in zone_meters
+        ("room:<prefix>" -> zone number as a string), else its pump's flow_meter; None when there is none."""
+        try:
+            supply = getattr(self, "_supply", None) or {}
+            meter = ((supply.get("zone_meters") or {}).get("room:" + room.prefix) or {}).get(str(zone))
+            return meter if isinstance(meter, str) and meter else self._pump_meter(room)
+        except Exception as e:
+            log("flow meter error", room.slug, zone, e)
+            return None
+
+    def _pump_meter(self, room):
+        """The flow_meter of the room's pump in this pass's supply, or None."""
+        pump_id = room.hw.get("pump")
+        pump = next((p for p in (getattr(self, "_supply", None) or {}).get("irrigation_pumps") or []
+                     if isinstance(p, dict) and pump_id and p.get("entity_id") == pump_id), {})
+        meter = pump.get("flow_meter")
+        return meter if isinstance(meter, str) and meter else None
+
+    def _room_meters(self, room):
+        """Every flow meter this room's zones are read on -> [(entity, its zone, or None for the pump's)]."""
+        pump, out = self._pump_meter(room), {}
+        for zone in room.zones:
+            meter = self._flow_meter(room, zone)
+            if meter:
+                out.setdefault(meter, None if meter == pump else zone)
+        return list(out.items())
+
+    def _meter_litres(self, entity, timeout=8):
+        """A flow meter's total in litres (flow.to_litres), or None: unreadable, or a unit it does not know, which is
+        logged once for the meter (no guess at what a pulse is worth)."""
+        try:
+            state, attrs, _ = ha_get(entity, timeout=timeout)
+            value = float(state)
+        except (TypeError, ValueError):
+            return None
+        except Exception as e:
+            log("flow meter read error", entity, e)
+            return None
+        if not math.isfinite(value):
+            return None
+        unit = (attrs or {}).get("unit_of_measurement")
+        litres = to_litres(value, unit)
+        if litres is None:
+            warned = self.__dict__.setdefault("_meter_unit_warned", set())
+            if entity not in warned:
+                warned.add(entity)
+                log(f"flow meter {entity} reports in {unit!r}, not L, m³ or gal: it is not read")
+        return litres
+
+    def _meters_rebase(self, room):
+        """A shot of this room ran: its meters' baselines go, and the next pass takes them again (_watch_meters)."""
+        watch = self.__dict__.get("_meter_watch")
+        try:
+            for entity, _zone in self._room_meters(room) if watch else ():
+                watch.pop(entity, None)
+        except Exception as e:
+            log("flow meter error", room.slug, e)
+
+    # ---------- CS-319: water through a meter with no shot in flight (alert only) ----------
+    def _watch_meters(self):
+        """Once a pass, before any room waters: each flow meter of the supply is read. Its baseline is the first
+        reading after the last shot of its room had ended (_meters_rebase), so the meter's late report of that shot is
+        not counted. A rise of more than METER_IDLE_L above it, with no shot in flight, is CS-319, and the baseline
+        moves up to it; the card goes once the meter stops. A meter that falls (a reset) starts again. Only tells."""
+        watch = self.__dict__.setdefault("_meter_watch", {})
+        if not getattr(self, "_supply", None):
+            watch.clear()
+            return
+        seen = set()
+        for room in self.rooms:
+            meters = [(e, z) for e, z in self._room_meters(room) if e not in seen]
+            seen.update(e for e, _z in meters)
+            for entity, zone in meters:
+                key = f"flow_idle_{entity}"
+                if getattr(room, "shot_inflight", None):  # a shot still recorded: its water may be flowing
+                    watch.pop(entity, None)
+                    continue
+                litres = self._meter_litres(entity)
+                if litres is None:
+                    continue
+                st = watch.get(entity)
+                if st is None or litres < st["last"]:
+                    watch[entity] = {"base": litres, "last": litres}
+                    continue
+                rise = litres - st["base"]
+                if rise > METER_IDLE_L:
+                    st["base"] = litres
+                    self._alert(
+                        key,
+                        "CS-319",
+                        "water flows with no zone on",
+                        f"The flow meter counted {rise:.2f} L while the controller ran no shot. A valve can be stuck open or leak, a line can be broken, or "
+                        "someone waters by hand. Check the valves and the lines of this meter now. The controller "
+                        f"does not switch anything off.\n\nMeter: {entity}",
+                        room=room,
+                        zone=zone,
+                        entity_id=entity,
+                    )
+                elif litres <= st["last"]:
+                    self._dismiss(key)
+                st["last"] = litres
 
     def _safe_off(self, deadline=None):
         """Stopping (SIGTERM: the app stopped, updated or restarted): close only what this controller has
@@ -7128,6 +7294,10 @@ class Controller:
             except Exception as e:
                 log("rediscover error", e)
         self._supply = self._read_supply()
+        try:  # CS-319 only ever tells: read before any room waters, so no shot's water is in it
+            self._watch_meters()
+        except Exception as e:
+            log("flow meter watch error", e)
         all_pub = {}
         self._calibrating_pass = {}  # the gate's read of dosing_config `calibrating`, once a pass (_calibrating_entry)
         for room in self.rooms:
@@ -8526,6 +8696,7 @@ class Controller:
             }
         if line:  # the pass's turns are over: nobody waits, the pump is idle
             self._line_done(room, line)
+        self._flow_done(room)  # the shots' flow ratios and CS-318, after the last pump closed (R5)
         self._publish_projection(room, now)  # after the last pump closed (R5): it never delays a shot
         for z, why in cross_zone_outliers(snaps):
             self._alert(

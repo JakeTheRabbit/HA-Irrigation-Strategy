@@ -70,6 +70,8 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-315](#cs-315) | Rescue shots not absorbed | Critical | Notification |
 | [CS-316](#cs-316) | Waste valve not closed | Warning | Notification |
 | [CS-317](#cs-317) | Pump runs with every valve shut | Warning | Notification |
+| [CS-318](#cs-318) | Less water than expected | Warning | Notification |
+| [CS-319](#cs-319) | Water flowing with no zone on | Warning | Notification |
 | [CS-401](#cs-401) | Setting outside controller range | Warning | Notification |
 | [CS-402](#cs-402) | Missing settings | Critical | Notification |
 | [CS-403](#cs-403) | Lights hours from the integration | Information | Notification |
@@ -942,6 +944,50 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - CAUTION: Check the pump now. A pump that runs dry or against shut valves can be damaged.
 - Switch the pump off, or open the valve that it should feed.
 - If the pump uses power when it is off, increase Pump dead-head power above that value.
+
+<a id="cs-318"></a>
+
+### CS-318: Less water than expected
+
+*Warning · Notification*
+
+**What it means.** A flow meter is set in the supply in Crop Steering for this zone, or for its pump. After a shot, the meter saw less than 80% of the litres that the controller counted for it. The controller counts the water from the plant count, the drippers per plant and the dripper flow, not from the meter. The alert names the litres of both and the meter.
+
+**Effect on water.** Water continues as usual. The zone can get less water than the controller counts, so the substrate can dry out. The alert clears after a shot of the zone that the meter sees in full.
+
+**Probable causes**
+
+- A line, a filter or the drippers of the zone are blocked or kinked, or a hand valve is partly closed.
+- The dripper flow, the drippers per plant or the plant count of the zone is set higher than the real value.
+- The meter reports late, in steps that are too big, or in a unit that is set wrong.
+
+**What to do**
+
+- CAUTION: Check the zone soon. A blocked line can leave the zone dry while the controller counts water.
+- Check the line, the filter and the drippers of the zone, and do a catch test on one dripper.
+- Check the dripper settings of the zone, and the meter and its unit.
+
+<a id="cs-319"></a>
+
+### CS-319: Water flowing with no zone on
+
+*Warning · Notification*
+
+**What it means.** A flow meter is set in the supply in Crop Steering. Between shots, with no shot of its room running, the meter counted more than 0.5 L. The count starts from the first reading after the last shot, so the late report of a shot is not counted. The alert names the meter.
+
+**Effect on water.** The alert does not change the water. The controller does not switch anything off. The alert clears when the meter stops counting.
+
+**Probable causes**
+
+- A zone valve is stuck open or leaks.
+- A line or a fitting after the meter is broken.
+- Someone waters by hand, or an automation opens a valve, through the same meter.
+
+**What to do**
+
+- CAUTION: Check the valves and the lines after the meter now. Water that flows with no zone on can flood a table or the room.
+- Close the valve that is open, or repair the leak.
+- If the water was given by hand, no action is needed.
 
 ## Settings (CS-4xx)
 

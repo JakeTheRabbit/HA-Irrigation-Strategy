@@ -724,6 +724,42 @@
       ]
     },
     {
+      "code": "CS-318",
+      "title": "Less water than expected",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "A flow meter is set in the supply in Crop Steering for this zone, or for its pump. After a shot, the meter saw less than 80% of the litres that the controller counted for it. The controller counts the water from the plant count, the drippers per plant and the dripper flow, not from the meter. The alert names the litres of both and the meter.",
+      "watering": "Water continues as usual. The zone can get less water than the controller counts, so the substrate can dry out. The alert clears after a shot of the zone that the meter sees in full.",
+      "causes": [
+        "A line, a filter or the drippers of the zone are blocked or kinked, or a hand valve is partly closed.",
+        "The dripper flow, the drippers per plant or the plant count of the zone is set higher than the real value.",
+        "The meter reports late, in steps that are too big, or in a unit that is set wrong."
+      ],
+      "fixes": [
+        "CAUTION: Check the zone soon. A blocked line can leave the zone dry while the controller counts water.",
+        "Check the line, the filter and the drippers of the zone, and do a catch test on one dripper.",
+        "Check the dripper settings of the zone, and the meter and its unit."
+      ]
+    },
+    {
+      "code": "CS-319",
+      "title": "Water flowing with no zone on",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "A flow meter is set in the supply in Crop Steering. Between shots, with no shot of its room running, the meter counted more than 0.5 L. The count starts from the first reading after the last shot, so the late report of a shot is not counted. The alert names the meter.",
+      "watering": "The alert does not change the water. The controller does not switch anything off. The alert clears when the meter stops counting.",
+      "causes": [
+        "A zone valve is stuck open or leaks.",
+        "A line or a fitting after the meter is broken.",
+        "Someone waters by hand, or an automation opens a valve, through the same meter."
+      ],
+      "fixes": [
+        "CAUTION: Check the valves and the lines after the meter now. Water that flows with no zone on can flood a table or the room.",
+        "Close the valve that is open, or repair the leak.",
+        "If the water was given by hand, no action is needed."
+      ]
+    },
+    {
       "code": "CS-401",
       "title": "Setting outside controller range",
       "source": "notification",
