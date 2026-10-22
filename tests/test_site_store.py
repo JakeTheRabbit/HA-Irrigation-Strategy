@@ -49,13 +49,17 @@ class States:
         return self.items.get(entity_id)
 
 
-def rig(zones=None, value=None, pump=PUMP, monkeypatch=None):
-    hass = SimpleNamespace(states=States())
+async def _in_executor(function, *args):
+    return function(*args)
+
+
+def rig(zones=None, value=None, rooms=None):
+    hass = SimpleNamespace(states=States(), async_add_executor_job=_in_executor)
     backing = MemoryStore(value)
     site = site_api.SiteStore(hass, backing)
     asyncio.run(site.async_init())
-    demand = {z: lph for z, lph in (zones or {}).items()}
-    site.rooms = lambda: [{"room_id": ROOM, "pump": pump, "zones": demand}]
+    found = rooms or [{"room_id": ROOM, "pump": PUMP, "zones": dict(zones or {})}]
+    site.rooms = lambda skip=None: found
     return hass, site, backing
 
 
@@ -79,7 +83,7 @@ SIX_AT_240 = {z: 240.0 for z in range(1, 7)}
 
 def test_missing_store_reads_as_no_supply():
     hass, site, backing = rig(SIX_AT_240)
-    read = site.response()
+    read = asyncio.run(site.response())
     assert read["revision"] == 0
     assert read["irrigation_pumps"] == []
     assert read["zone_groups"] == {} and read["zone_meters"] == {}
@@ -125,7 +129,9 @@ def test_one_zone_at_a_time_is_never_refused():
 
 def test_groups_lower_the_worst_case():
     _, site, _ = rig(SIX_AT_240)
-    plain = site.check({**site_store.empty(), "irrigation_pumps": [pump(1200, 6)]})
+    plain = asyncio.run(
+        site.check({**site_store.empty(), "irrigation_pumps": [pump(1200, 6)]})
+    )
     assert plain["worst_case_lph"] == 1440.0 and plain["ok"] is False
     # Zones 1-3 on one line and 4-6 on another: at most one from each group runs.
     groups = {ROOM: {"1": "a", "2": "a", "3": "a", "4": "b", "5": "b", "6": "b"}}
@@ -142,8 +148,17 @@ def test_preview_writes_nothing():
     assert preview["diff"] and preview["capacity_check"]["ok"] is True
     assert backing.saves == 0 and site.document["revision"] == 0
     assert hass.states.get(site_api.SENSOR) is None
+
+
+def test_preview_of_an_over_capacity_config_shows_it_and_does_not_raise():
+    _, site, backing = rig(SIX_AT_240)
+    preview = save(site, preview=True, irrigation_pumps=[pump(1200, 6)])
+    check = preview["capacity_check"]
+    assert check["ok"] is False and check["suggest_max_concurrent"] == 5
+    assert check["worst_case_lph"] == 1440.0 and len(check["pairs"]) == 15
+    assert backing.saves == 0
     with pytest.raises(ValueError, match="pump_over_capacity"):
-        save(site, preview=True, irrigation_pumps=[pump(1200, 6)])
+        save(site, irrigation_pumps=[pump(1200, 6)])
 
 
 def test_capacity_pairs_say_together_or_one_after_another():
@@ -273,3 +288,84 @@ def test_an_unreadable_store_is_never_overwritten():
     with pytest.raises(ValueError):
         save(site)
     assert backing.saves == 0
+
+
+def test_twenty_zones_on_one_pump_answer_quickly():
+    import time
+
+    zones = {z: 100.0 + z for z in range(1, 21)}
+    _, site, _ = rig(zones)
+    started = time.monotonic()
+    saved = save(site, irrigation_pumps=[pump(2000, 20)], preview=True)
+    assert time.monotonic() - started < 1.0
+    check = saved["capacity_check"]
+    assert check["ok"] is False and len(check["pairs"]) == 190
+    assert 1 <= check["suggest_max_concurrent"] < 20
+    # With groups in the mix too.
+    groups = {ROOM: {str(z): "g" + str(z % 3) for z in range(1, 11)}}
+    started = time.monotonic()
+    save(site, irrigation_pumps=[pump(2000, 20)], zone_groups=groups, preview=True)
+    assert time.monotonic() - started < 1.0
+
+
+def test_the_fast_worst_case_equals_the_vendored_guard():
+    import random
+
+    from custom_components.crop_steering.generated.guards import worst_case_lph
+
+    rnd = random.Random(7)
+    for _ in range(200):
+        n = rnd.randint(1, 9)
+        demands = {i: rnd.choice([50.0, 120.0, 240.0, 333.0]) for i in range(n)}
+        groups = {i: rnd.choice([None, None, "a", "b"]) for i in range(n)}
+        count = rnd.randint(1, n)
+        assert site_store._worst(demands, groups, count) == worst_case_lph(
+            demands, groups, count
+        )
+    # Above the enumeration limit the shortcut still equals it.
+    demands = {i: float(10 + i) for i in range(16)}
+    groups = {i: (None if i % 2 else "a") for i in range(16)}
+    assert site_store._worst(demands, groups, 5) == worst_case_lph(demands, groups, 5)
+
+
+def test_an_unreadable_stored_section_is_named_and_not_lost_by_the_next_save(caplog):
+    stored = {
+        "revision": 3,
+        "irrigation_pumps": [pump(1200, 2)],
+        "zone_groups": "garbage",
+        "zone_meters": {ROOM: {"1": "sensor.m"}},
+    }
+    with caplog.at_level("WARNING"):
+        _, site, backing = rig(SIX_AT_240, value=stored)
+    assert "zone_groups" in caplog.text
+    [warning] = asyncio.run(site.response())["warnings"]
+    assert warning["section"] == "zone_groups" and warning["error"]
+    with pytest.raises(ValueError, match="zone_groups"):
+        save(site)
+    assert backing.saves == 0
+    saved = save(site, zone_groups={ROOM: {"1": "a"}})
+    assert saved["warnings"] == [] and saved["zone_groups"] == {ROOM: {"1": "a"}}
+    assert save(site)["revision"] == 5
+
+
+def test_a_site_wide_change_is_journaled_in_every_room_on_the_pump(monkeypatch):
+    rooms = [
+        {"room_id": "room:a_", "pump": PUMP, "zones": {1: 100.0}},
+        {"room_id": "room:b_", "pump": PUMP, "zones": {1: 100.0}},
+        {"room_id": "room:c_", "pump": "switch.other", "zones": {1: 100.0}},
+    ]
+    _, site, _ = rig(rooms=rooms)
+    journal = []
+    monkeypatch.setattr(
+        site_api, "note", lambda h, room_id, kind, **kw: journal.append((room_id, kw))
+    )
+    save(site, irrigation_pumps=[pump(1200, 2)])
+    assert [room for room, _ in journal] == ["room:a_", "room:b_"]
+    ids = {kw["correlation"]["causation_id"] for _, kw in journal}
+    assert len(ids) == 1 and len(next(iter(ids))) == 26
+    assert journal[0][1]["data"] == journal[1][1]["data"]
+    # A change that names no room's pump still lands in the first room.
+    rooms[0]["pump"] = rooms[1]["pump"] = "switch.other"
+    journal.clear()
+    save(site, irrigation_pumps=[pump(1200, 2)], water_sources=[{"id": "tank"}])
+    assert [room for room, _ in journal] == ["room:a_"]

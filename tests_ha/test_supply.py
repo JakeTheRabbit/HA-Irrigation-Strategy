@@ -37,9 +37,7 @@ async def _call(hass, service, user=None, **data):
 
 async def _room(hass):
     hass.states.async_set(PUMP, "off")
-    return await _install(
-        hass, {"pump_switch": PUMP, "plumbing": "pump_valves"}
-    )
+    return await _install(hass, {"pump_switch": PUMP, "plumbing": "pump_valves"})
 
 
 def _demand():
@@ -59,7 +57,7 @@ async def test_a_site_that_never_saved_a_supply_reads_as_before(hass):
     )
     read = await _call(hass, "supply_get")
     assert (read["revision"], read["irrigation_pumps"]) == (0, [])
-    assert read["capacity_check"]["ok"] is True
+    assert read["capacity_check"]["ok"] is True and read["warnings"] == []
     assert hass.states.get(SENSOR) is None
 
 
@@ -98,9 +96,7 @@ async def test_supply_save_publishes_the_descriptor_and_reads_back(
         )
 
 
-async def test_a_pump_asked_to_feed_more_than_it_can_is_refused(
-    hass, hass_admin_user
-):
+async def test_a_pump_asked_to_feed_more_than_it_can_is_refused(hass, hass_admin_user):
     await _room(hass)
     pump = {"entity_id": PUMP, "max_flow_lph": _demand() / 2, "max_concurrent_zones": 2}
     with pytest.raises(HomeAssistantError, match=r"^pump_over_capacity:"):
@@ -120,6 +116,16 @@ async def test_a_pump_asked_to_feed_more_than_it_can_is_refused(
         irrigation_pumps=[{**pump, "max_concurrent_zones": 1}],
     )
     assert set(preview) == {"diff", "capacity_check"}
+    over = await _call(
+        hass,
+        "supply_save",
+        hass_admin_user,
+        expected_revision=0,
+        preview=True,
+        irrigation_pumps=[pump],
+    )  # shown, not refused
+    assert over["capacity_check"]["ok"] is False
+    assert over["capacity_check"]["suggest_max_concurrent"] == 1
     assert (await _call(hass, "supply_get"))["revision"] == 0
     assert hass.states.get(SENSOR) is None
 

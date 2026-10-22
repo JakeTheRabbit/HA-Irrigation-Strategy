@@ -21,6 +21,7 @@ from . import site_store
 from .admin import async_require_admin
 from .const import DOMAIN
 from .generated.guards import zone_demand_lph
+from .generated.ids import new_id
 from .journal_api import attribution, note
 from .room import room_prefix
 
@@ -39,6 +40,7 @@ class SiteStore:
         self._lock = asyncio.Lock()
         self.document = site_store.empty()
         self.error = None
+        self.warnings = []
 
     async def async_init(self):
         try:
@@ -48,7 +50,14 @@ class SiteStore:
                 self._store = Store(self.hass, 1, STORAGE_KEY)
             value = await self._store.async_load()
             if value is not None:
-                self.document = site_store.from_store(value)
+                self.document, self.warnings = site_store.load(value)
+                for warning in self.warnings:
+                    _LOGGER.warning(
+                        "Crop Steering site store: stored %s could not be read and reads as empty "
+                        "until a save replaces it: %s",
+                        warning["section"],
+                        warning["error"],
+                    )
         except Exception as error:
             # The supply then reads as not set up; a save is refused, so the file is never overwritten.
             self.error = (
@@ -57,14 +66,15 @@ class SiteStore:
             )
             _LOGGER.error("Crop Steering site store: %s", self.error)
 
-    def rooms(self) -> list[dict]:
-        """Every active room's pump and each active zone's demand in L/h."""
+    def rooms(self, skip=None) -> list[dict]:
+        """Every active room's pump and each active zone's demand in L/h (not the room of the
+        config entry `skip`, which is going away)."""
         from .setup_api import effective, setup_sizing
 
         rooms = []
         for entry in self.hass.config_entries.async_entries(DOMAIN):
             data = effective(entry)
-            if not data.get("active", True):
+            if entry.entry_id == skip or not data.get("active", True):
                 continue
             zones = {}
             for zone in range(1, int(data.get("num_zones", 1)) + 1):
@@ -89,21 +99,26 @@ class SiteStore:
             )
         return rooms
 
-    def check(self, section: dict) -> dict:
-        return site_store.capacity_check(
-            section["irrigation_pumps"], self.rooms(), section["zone_groups"]
+    async def check(self, section: dict) -> dict:
+        """The capacity check, worked out off the event loop (the rooms are read on it)."""
+        return await self.hass.async_add_executor_job(
+            site_store.capacity_check,
+            section["irrigation_pumps"],
+            self.rooms(),
+            section["zone_groups"],
         )
 
-    def response(self) -> dict:
+    async def response(self) -> dict:
         section = site_store.supply_of(self.document)
         return {
             "revision": self.document["revision"],
             **deepcopy(section),
-            "capacity_check": self.check(section),
+            "capacity_check": await self.check(section),
+            "warnings": deepcopy(self.warnings),
             "error": self.error,
         }
 
-    def publish(self):
+    def publish(self, skip=None):
         """sensor.crop_steering_supply_config: absent until a supply is saved, unavailable while the
         stored settings cannot be read (the controller then runs as it did before)."""
         if self.error:
@@ -113,7 +128,7 @@ class SiteStore:
             self.hass.states.async_remove(SENSOR)
             return
         demand = {}
-        for room in self.rooms():
+        for room in self.rooms(skip):
             if room["zones"]:
                 demand[room["room_id"]] = {
                     str(zone): lph for zone, lph in sorted(room["zones"].items())
@@ -152,13 +167,24 @@ class SiteStore:
                 raise ValueError(
                     "Supply settings changed elsewhere. Reload before saving."
                 )
+            unread = [
+                w["section"]
+                for w in self.warnings
+                if w["section"] != "irrigation_pumps" and w["section"] not in data
+            ]
+            if unread:
+                raise ValueError(
+                    f"The stored {', '.join(unread)} could not be read and would be lost. "
+                    "Send that section in this save to replace it."
+                )
             old = deepcopy(site_store.supply_of(self.document))
             new = self._new_section(data)
-            check = self.check(new)
-            site_store.refuse_over_capacity(check)
+            check = await self.check(new)
             diff = setup_diff(old, new)
             if data.get("preview"):
+                # Shown, not refused: the caller draws the sentence and the suggested count.
                 return {"diff": diff, "capacity_check": check}
+            site_store.refuse_over_capacity(check)
             document = {
                 **self.document,
                 **new,
@@ -166,9 +192,14 @@ class SiteStore:
             }
             await self._store.async_save(deepcopy(document))
             self.document = document
+            self.warnings = [
+                w
+                for w in self.warnings
+                if w["section"] != "irrigation_pumps" and w["section"] not in data
+            ]
             self.publish()
             self._journal(old, new, diff, who)
-            result = self.response()
+            result = await self.response()
             published = self.hass.states.get(SENSOR)
             result["readback"] = {
                 "status": (
@@ -183,30 +214,47 @@ class SiteStore:
             return result
 
     def _journal(self, old, new, diff, who):
-        """config.changed with the whole section before and after, on the first room's journal. Never
-        fails or delays the save."""
+        """config.changed with the whole section before and after, once in the journal of every room
+        whose pump or zone is in the old or the new section (all sharing one causation_id so a fold
+        can count the change once); the first room when none is. Never fails or delays the save.
+        """
         try:
             if not diff:
                 return
-            rooms = sorted(r["room_id"] for r in self.rooms())
-            if not rooms:
-                return
-            who = who or {}
-            note(
-                self.hass,
-                rooms[0],
-                "config.changed",
-                actor=who.get("actor", "system"),
-                user_id=who.get("user_id"),
-                client=who.get("client"),
-                data={
-                    "store": "site",
-                    "section": "supply",
-                    "old": old,
-                    "new": new,
-                    "diff": diff,
-                },
+            rooms = self.rooms()
+            pumps = {p["entity_id"] for s in (old, new) for p in s["irrigation_pumps"]}
+            named = {
+                room_id
+                for s in (old, new)
+                for key in ("zone_groups", "zone_meters")
+                for room_id in s[key]
+            }
+            ids = sorted(
+                r["room_id"]
+                for r in rooms
+                if r["pump"] in pumps or r["room_id"] in named
             )
+            if not ids and rooms:
+                ids = [min(r["room_id"] for r in rooms)]
+            shared = new_id()
+            who = who or {}
+            for room_id in ids:
+                note(
+                    self.hass,
+                    room_id,
+                    "config.changed",
+                    actor=who.get("actor", "system"),
+                    user_id=who.get("user_id"),
+                    client=who.get("client"),
+                    correlation={"causation_id": shared},
+                    data={
+                        "store": "site",
+                        "section": "supply",
+                        "old": old,
+                        "new": new,
+                        "diff": diff,
+                    },
+                )
         except Exception as error:
             _LOGGER.debug("Supply change not journaled: %s", error)
 
@@ -230,7 +278,7 @@ async def async_setup_site(hass, entry) -> None:
     async def handle(call):
         try:
             if call.service == "supply_get":
-                return site.response()
+                return await site.response()
             await async_require_admin(hass, call, f"{DOMAIN}.supply_save")
             return await site.save(call.data, attribution(hass, call))
         except (ValueError, OSError) as error:
@@ -272,7 +320,7 @@ async def async_unload_site(hass, entry) -> None:
     if site is None:
         return
     if entries:
-        site.publish()
+        site.publish(skip=entry.entry_id)
         return
     for service in SERVICES:
         hass.services.async_remove(DOMAIN, service)

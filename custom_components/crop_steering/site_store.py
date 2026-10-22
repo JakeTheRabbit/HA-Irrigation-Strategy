@@ -132,12 +132,13 @@ def clean_meters(value) -> dict:
     return _by_room(value, "zone_meters", _entity)
 
 
-def from_store(value) -> dict:
-    """A stored document. A section this version cannot read is dropped to its empty value rather
-    than refusing the store: the supply then reads as not set up."""
+def load(value) -> tuple[dict, list[dict]]:
+    """A stored document and its warnings. A section this version cannot read reads as empty
+    rather than refusing the store, and is named in the warnings [{section, error}]; the caller
+    must not save over it unless the save replaces that section on purpose."""
     if not isinstance(value, dict) or type(value.get("revision")) is not int:
         raise ValueError("Invalid stored revision")
-    document = empty()
+    document, warnings = empty(), []
     document["revision"] = max(value["revision"], 0)
     for key, clean in (
         ("irrigation_pumps", clean_pumps),
@@ -147,12 +148,43 @@ def from_store(value) -> dict:
     ):
         try:
             document[key] = clean(value.get(key, document[key]))
-        except ValueError:
-            continue
+        except ValueError as error:
+            warnings.append({"section": key, "error": str(error)})
     for key in ("presets", "alert_rules"):
         if isinstance(value.get(key), list):
             document[key] = value[key]
-    return document
+    return document, warnings
+
+
+def from_store(value) -> dict:
+    return load(value)[0]
+
+
+# Up to this many candidates the vendored guard enumerates directly (2**12 subsets at most).
+_ENUMERATE = 12
+
+
+def _worst(demands, groups, count):
+    """worst_case_lph(demands, groups, count), fast for a big pump.
+
+    Only the largest zone of each exclusive group can be in the worst mix, and of the zones in no
+    group only the `count` largest. What is left has no group in common, so beyond _ENUMERATE
+    candidates the answer is the sum of the `count` largest; below it the vendored guard is asked.
+    """
+    top, loose = {}, []
+    for zone, lph in demands.items():
+        group = groups.get(zone)
+        if group is None:
+            loose.append(zone)
+        elif group not in top or lph > demands[top[group]]:
+            top[group] = zone
+    loose = sorted(loose, key=lambda z: demands[z], reverse=True)[:count]
+    keep = [*top.values(), *loose]
+    if len(keep) <= _ENUMERATE:
+        return worst_case_lph(
+            {z: demands[z] for z in keep}, {z: groups.get(z) for z in keep}, count
+        )
+    return sum(sorted((demands[z] for z in keep), reverse=True)[:count])
 
 
 def _suggest(demands, groups, max_flow):
@@ -160,9 +192,10 @@ def _suggest(demands, groups, max_flow):
     if max_flow is None or not demands:
         return None
     best = 1
-    for count in range(1, len(demands) + 1):
-        if worst_case_lph(demands, groups, count) <= max_flow:
-            best = count
+    for count in range(2, len(demands) + 1):
+        if _worst(demands, groups, count) > max_flow:
+            break  # the worst mix only grows with the count
+        best = count
     return best
 
 
@@ -174,7 +207,7 @@ def _pump_check(pump, members, zone_groups):
         for i, (room_id, zone, _) in enumerate(members)
     }
     max_flow, concurrent = pump["max_flow_lph"], pump["max_concurrent_zones"]
-    worst = worst_case_lph(demands, groups, concurrent)
+    worst = _worst(demands, groups, concurrent)
     row = {
         "entity_id": pump["entity_id"],
         "worst_case_lph": worst,
