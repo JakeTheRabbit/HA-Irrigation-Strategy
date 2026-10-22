@@ -244,3 +244,32 @@ async def test_keep_and_undo_tapped_on_a_phone_reach_the_overlay(
     assert _value(hass, SHOT) == old + 2
     await tap(actions["Undo"], hass_admin_user)  # nothing left to undo: nothing changes
     assert _value(hass, SHOT) == old + 2
+
+
+async def test_a_claim_names_one_write_and_only_its_own_cancel_takes_it_back(
+    hass, controller_for, hass_admin_user
+):
+    """A claim is used once: the write it named consumes it, and the same value written again later is
+    the operator's."""
+    _entry, c, fake, room = await _room(hass, controller_for)
+    admin = Context(user_id=hass_admin_user.id)
+    old = await _write(hass, c, fake, room, SHOT, _value(hass, SHOT) + 1)
+    for value in (old, old + 1):
+        await hass.services.async_call(
+            "number", "set_value", {"entity_id": SHOT, "value": value}, blocking=True, context=admin
+        )
+    assert (await _log(hass))[-3:] == [("brain", old, old + 1), ("operator", old + 1, old), ("operator", old, old + 1)]
+    assert await _overlays(hass) == []
+
+    # A cancel naming another claim leaves this one alone; a claim with no id (a controller from before
+    # claims carried one) is never cancelled, and names its write as it always did.
+    for claim_id in ("mine", None):
+        threshold = _value(hass, THRESHOLD)
+        claim = {"entity_id": THRESHOLD, "value": threshold + 1, "who": "learner"}
+        hass.bus.async_fire("crop_steering_setpoint_write", {**claim, "claim_id": claim_id} if claim_id else claim)
+        hass.bus.async_fire("crop_steering_setpoint_claim_cancel", {**claim, "claim_id": "another"})
+        await hass.async_block_till_done()
+        await hass.services.async_call(
+            "number", "set_value", {"entity_id": THRESHOLD, "value": threshold + 1}, blocking=True
+        )
+        assert (await _log(hass))[-1] == ("learner", threshold, threshold + 1)
