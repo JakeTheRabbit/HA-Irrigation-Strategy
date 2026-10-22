@@ -1,3 +1,5 @@
+import { v2Answer } from "./schemas.js";
+
 export class SafeError extends Error {}
 export type Service =
   | "setup_read"
@@ -5,7 +7,14 @@ export type Service =
   | "strategy_get"
   | "strategy_preview"
   | "strategy_save"
-  | "runs_get";
+  | "runs_get"
+  | "journal_query"
+  | "timeline_get"
+  | "timeline_summary"
+  | "history_changes"
+  | "supply_get"
+  | "system_status_get"
+  | "alert_rule_list";
 const services = new Set<Service>([
   "setup_read",
   "setup_save",
@@ -13,6 +22,13 @@ const services = new Set<Service>([
   "strategy_preview",
   "strategy_save",
   "runs_get",
+  "journal_query",
+  "timeline_get",
+  "timeline_summary",
+  "history_changes",
+  "supply_get",
+  "system_status_get",
+  "alert_rule_list",
 ]);
 export interface Config {
   url: string;
@@ -156,6 +172,29 @@ export class HaClient {
         "The updated Crop Steering response API is required.",
       );
     return result.service_response;
+  }
+  // An API v2 read (custom_components/crop_steering/api_v2.py): asks with `api: 2` and answers
+  // the envelope's `data`; `ok: false` is an error carrying its code and message.
+  async read(
+    service: Service,
+    data: Record<string, unknown> = {},
+  ): Promise<unknown> {
+    const answer = v2Answer.safeParse(
+      await this.service(service, { ...data, api: 2 }),
+    );
+    if (!answer.success)
+      throw new SafeError(
+        `Unsupported Crop Steering ${service} response. Update the integration to one that answers API v2.`,
+      );
+    if (!answer.data.ok) {
+      const error = answer.data.error;
+      throw new SafeError(
+        error
+          ? `${error.code}: ${this.redact(error.message).slice(0, 600)}`
+          : `Home Assistant refused ${service}.`,
+      );
+    }
+    return answer.data.data;
   }
   async state(entity: string): Promise<Record<string, unknown> | null> {
     if (!/^[a-z_]+\.[a-z0-9_]+$/.test(entity))

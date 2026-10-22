@@ -174,12 +174,75 @@ export async function mockHa(t) {
         state: suffix.includes("phase") ? "P1" : "5.6",
       });
   }
+  // The read services that answer the API v2 envelope (api_v2.wrap): service -> request -> data.
+  // `refuse` maps a service to the {code, message} it answers ok:false with.
+  const v2 = {
+    journal_query: (body) => ({
+      events: [
+        { v: 1, id: "01J0000000000000000000000A", kind: "shot.started", room_id: body.room_id },
+      ],
+      cursor: null,
+    }),
+    timeline_get: (body) => ({
+      rooms: body.rooms.map((room_id) => ({
+        room_id,
+        lights: [],
+        rows: [],
+        pump: null,
+        pump_rooms: [],
+        pump_load: [],
+        planned_source: "unavailable",
+        added_later: true,
+      })),
+      errors: { count: 0, markers: [] },
+    }),
+    timeline_summary: (body) => ({
+      days: body.days.map((date) => ({
+        date,
+        rooms: body.rooms.map((room_id) => ({
+          room_id,
+          shots: 3,
+          failed: 0,
+          warnings: 1,
+          held: 0,
+          queued: 0,
+        })),
+      })),
+    }),
+    history_changes: (body) => ({
+      changes: [{ event_id: "e1", room_id: body.room_id, key: "p1_target_vwc" }],
+    }),
+    supply_get: () => ({
+      revision: 2,
+      irrigation_pumps: [],
+      water_sources: [],
+      zone_groups: {},
+      zone_meters: {},
+      capacity_check: [],
+      warnings: [],
+      error: null,
+    }),
+    system_status_get: () => ({
+      controller: "running",
+      addon_version: "3.0.0",
+      pct_online: 100,
+      rooms: [],
+      ha_version: "2026.10.0",
+      ai: null,
+      card_version: null,
+    }),
+    alert_rule_list: (body) => ({
+      rules: [{ id: "r1", room_id: body.room_id ?? "room:", state: "armed" }],
+    }),
+  };
   const state = {
     rooms,
     candidates,
     plans,
     calls,
     states,
+    v2,
+    refuse: {},
     intercept: null,
     saveCount: 0,
   };
@@ -209,7 +272,22 @@ export async function mockHa(t) {
       if (match) {
         let result;
         const action = match[1];
-        if (action === "setup_read")
+        if (v2[action]) {
+          if (body?.api !== 2)
+            return json({ message: "This mock answers only api 2" }, 400);
+          const refused = state.refuse[action];
+          result = refused
+            ? { api: 2, ok: false, error: refused }
+            : {
+                api: 2,
+                ok: true,
+                room_id: body.room_id ?? null,
+                revision: null,
+                readback: { status: "none", at: "2026-10-23T05:00:00+13:00" },
+                event_ids: [],
+                data: v2[action](body),
+              };
+        } else if (action === "setup_read")
           result = { api_version: 1, rooms, candidates, ignored_secret: TOKEN };
         else if (action === "setup_save") {
           const r = rooms.find((r) => r.entry_id === body.entry_id);

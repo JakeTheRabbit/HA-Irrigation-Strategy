@@ -143,7 +143,7 @@ export const parameters = z.strictObject({
   watchdog_hours: number.optional(),
 });
 const identifier = z.string().regex(/^[a-zA-Z0-9_-]{1,64}$/);
-const date = z
+export const date = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/)
   .refine((value) => {
@@ -188,3 +188,75 @@ export const plan = z.strictObject({
     .max(64),
 });
 export type Plan = z.infer<typeof plan>;
+
+// API v2 answers (custom_components/crop_steering/api_v2.py, docs/MCP.md). Loose throughout: a
+// field the integration adds later passes through; only what these tools use is checked.
+export const v2Answer = z.looseObject({
+  api: z.literal(2),
+  ok: z.boolean(),
+  data: z.unknown().optional(),
+  error: z
+    .looseObject({ code: z.string().max(100), message: z.string() })
+    .optional(),
+});
+const row = z.looseObject({});
+const roomRow = z.looseObject({ room_id: roomId });
+// journal_query (journal.py query): a page of at most 500 events and the next page's cursor.
+export const journalPage = z.looseObject({
+  events: z.array(row).max(500),
+  cursor: z.string().max(100).nullable(),
+});
+// timeline_get (timeline.py build).
+export const timeline = z.looseObject({
+  rooms: z.array(roomRow).max(1000),
+  errors: z.looseObject({ count: z.number().int().nonnegative() }),
+  truncated: z.boolean().optional(),
+});
+// timeline_summary (timeline.py summarise): at most 14 local days.
+export const timelineSummary = z.looseObject({
+  days: z
+    .array(z.looseObject({ date, rooms: z.array(roomRow).max(1000) }))
+    .max(14),
+});
+// history_changes (journal_api.py, changes.py): at most 2000 rows, `truncated` when it cut.
+export const changeKinds = [
+  "setpoint",
+  "plan",
+  "recipe",
+  "setup",
+  "calibration",
+  "alerts",
+] as const;
+export const changes = z.looseObject({
+  changes: z.array(row).max(2000),
+  truncated: z.boolean().optional(),
+});
+// supply_get (site_api.py SiteStore.response): the site's supply, revision 0 until saved.
+export const supply = z.looseObject({
+  revision: z.number().int().nonnegative(),
+});
+// system_status_get (system_status.py status).
+export const systemStatus = z.looseObject({
+  controller: z.string().max(40),
+  rooms: z.array(roomRow).max(1000),
+});
+// alert_rule_list (site_api.py RuleEvaluator.listing).
+export const alertRules = z.looseObject({
+  rules: z.array(
+    z.looseObject({ id: z.string().max(100), room_id: z.string().max(100) }),
+  ),
+});
+// The journal's source.actor values (spec section 4).
+export const actors = [
+  "engine",
+  "timer",
+  "plan",
+  "manual",
+  "ai",
+  "learner",
+  "safety",
+  "mcp",
+  "aigrow",
+  "automation",
+  "system",
+] as const;
