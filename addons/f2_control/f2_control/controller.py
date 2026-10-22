@@ -2070,25 +2070,46 @@ class Controller:
         if override is not None:
             return float(override)
         seen = self.__dict__.setdefault("_settings_seen", {})  # entity -> the last value read since start
-        # One read each, its own state parsed: a second read that failed gave the built-in value as read.
-        for entity in (f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}",
-                       f"number.crop_steering_{room.prefix}{suffix}"):
-            v, attributes, _ = ha_get(entity)
-            try:
-                value = float(v)
-            except (TypeError, ValueError):
-                continue  # missing, unknown, unavailable or not a number: not read
-            self._note_setting(entity, value, attributes)
-            seen[entity] = value
-            return value
         per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
         glob = f"number.crop_steering_{room.prefix}{suffix}"
+
+        def number(state):
+            try:
+                return float(state)
+            except (TypeError, ValueError):
+                return None  # missing, unknown, unavailable or not a number: not read
+
+        # One read each, its own state parsed: a second read that failed gave the built-in value as read.
+        v, attributes, _ = ha_get(per)
+        value = number(v)
+        if value is not None:
+            self._note_setting(per, value, attributes)
+            seen[per] = value
+            return value
+        # The zone has its own number and it reads no number (unavailable, unknown; or no answer, once it was
+        # read in this run): not the room's value unseen. A setting that sizes the zone's water is unread (the
+        # settings wait, then CS-402); any other takes the room's value, and CS-402 names the zone's number.
+        unread = v is not None or per in seen
+        if unread:
+            self._defaulted_this_loop.add(per)
+        if not (unread and suffix in WATER_SIZING):
+            v, attributes, _ = ha_get(glob)
+            value = number(v)
+            if value is not None:
+                self._note_setting(glob, value, attributes)
+                seen[glob] = value
+                return value
         # Neither the per-zone NOR the global setpoint entity exists → the engine is silently
         # running its built-in default. On a healthy install the integration creates the global,
         # so this only trips on a real misconfig (renamed/removed entity). Record it so
         # _check_defaulted_setpoints can surface it — EXCEPT engine-only knobs the integration
         # deliberately doesn't create (optional=True): those default by design, never alert.
-        if not optional:
+        if unread and suffix in WATER_SIZING:
+            room.__dict__.setdefault("_settings_missing", set()).add(per)
+            last = seen.get(per)
+            if last is not None:  # the zone's own value, read earlier in this run
+                return last
+        elif not optional:
             self._defaulted_this_loop.add(glob)
             room.__dict__.setdefault("_settings_missing", set()).add(glob)
             last = seen.get(per, seen.get(glob))
@@ -6386,7 +6407,9 @@ class Controller:
             self._zone_num(room, zone, suffix, None)  # a read is remembered; a miss is noted for CS-402
             per = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
             glob = f"number.crop_steering_{room.prefix}{suffix}"
-            if per not in seen and glob not in seen:
+            if per in getattr(room, "_settings_missing", ()) and per not in seen:
+                unread.append(per)  # the zone's own number reads no number: never the room's value instead
+            elif per not in seen and glob not in seen:
                 unread.append(glob)
         waiting = sorted(
             e for e in getattr(room, "_settings_missing", ())
@@ -7600,7 +7623,7 @@ class Controller:
         injection or tzdata is missing, the container is UTC and every lights/dryback/daily-reset
         window silently shifts by the site's offset. Log the effective offset at startup and
         alert if it disagrees with Home Assistant's configured zone. -> False while Home Assistant has not
-        answered with its zone: run() asks again each loop until it has."""
+        answered with its zone, or a mismatch's card is not up: run() asks again each loop until then."""
         now_local = datetime.now().astimezone()
         off = now_local.utcoffset()
         off_h = off.total_seconds() / 3600.0 if off else 0.0
@@ -7627,7 +7650,7 @@ class Controller:
             log("timezone: could not resolve HA zone", ha_tz, e)
             return True
         if abs(ha_off - off_h) > 0.01:
-            self._alert(
+            return self._alert(  # a card not created is tried again
                 "tz_mismatch",
                 "CS-405",
                 "time zone mismatch, the grow-day can move",
@@ -7691,9 +7714,12 @@ class Controller:
         while True:
             if _GATE.state is not None:
                 self._park_refused()
-            try:
-                if not tz_checked:  # Home Assistant did not answer at start: CS-405 is checked once it does
+            if not tz_checked:  # Home Assistant did not answer at start: CS-405 is checked once it does
+                try:  # on its own: a raise here never skips the pass
                     tz_checked = self._log_timezone()
+                except Exception as e:
+                    log("timezone check error", e)
+            try:
                 if self.hold_entities and self._holds_card is not False:
                     self._check_holds()
                 self.loop_once(datetime.now())
