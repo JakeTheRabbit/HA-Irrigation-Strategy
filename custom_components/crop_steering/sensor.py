@@ -45,6 +45,7 @@ from .const import (
 from .room import room_prefix, build_engine_config
 from . import stock
 from .calculations import ShotCalculator, ec_type_key, fuse_probes
+from .probe_offsets import read as read_probe
 from .units import to_native
 from .zone_status import mirrored_status, status_app_entity
 
@@ -830,6 +831,9 @@ class CropSteeringSensor(SensorEntity):
         self._probe_offsets: dict[str, float] = {}
         self._offsets_at: str | None = None
         self._fusion: dict | None = None
+        # The offset and curve each moisture probe was last read under (probe_offsets.py), so a change
+        # moves what fusion learned of the probe by the same step.
+        self._applied_fix: dict[str, tuple] = {}
 
         # Extract zone number from key if this is a zone sensor.
         # Regex matches BOTH `vwc_zone_3` and `zone_3_status`-style keys; the prior
@@ -1141,6 +1145,15 @@ class CropSteeringSensor(SensorEntity):
                 pass
         return 0
 
+    def _user_corrections(self) -> dict:
+        """{probe: (offset, curve)} the grower set for the room's moisture probes (calibration.py)."""
+        manager = (
+            self.hass.data.get(DOMAIN, {})
+            .get("_calibration", {})
+            .get(self._entry.entry_id)
+        )
+        return manager.user_corrections() if manager is not None else {}
+
     def _probe_readings(
         self, sensor_ids: list[str], kind: str | None = None
     ) -> list[tuple[str, float | None, float | None]]:
@@ -1152,6 +1165,7 @@ class CropSteeringSensor(SensorEntity):
         """
         readings = []
         self._unit_set_aside = {}
+        fixes = self._user_corrections() if kind == "vwc" else {}
         for sensor_id in sensor_ids:
             if not sensor_id:
                 continue
@@ -1166,7 +1180,16 @@ class CropSteeringSensor(SensorEntity):
                         unit = (getattr(state, "attributes", None) or {}).get(
                             "unit_of_measurement"
                         )
-                        value, aside = to_native(kind, unit, value, sensor_id)
+                        raw = value
+                        fix = fixes.get(sensor_id)
+                        if fix:
+                            _base, value, aside = read_probe(
+                                raw, unit, fix[0], fix[1], sensor_id
+                            )
+                        else:
+                            value, aside = to_native(kind, unit, raw, sensor_id)
+                        if kind == "vwc":
+                            self._follow_fix(sensor_id, raw, unit, fix, value)
                         if aside:
                             self._unit_set_aside[sensor_id] = unit or ""
                     # last_reported moves on every report, last_updated only on a change.
@@ -1179,6 +1202,19 @@ class CropSteeringSensor(SensorEntity):
                 _LOGGER.debug(f"Could not parse sensor value for {sensor_id}: {e}")
             readings.append((sensor_id, value, age))
         return readings
+
+    def _follow_fix(self, sensor_id, raw, unit, fix, value) -> None:
+        """A probe's offset or curve changed since it was last read: what fusion learned of the probe
+        (its offset against the zone) moves by the same step, so a later pass with a probe missing
+        does not step the reading."""
+        fix = fix or (0.0, None)
+        before = self._applied_fix.get(sensor_id)
+        self._applied_fix[sensor_id] = fix
+        if before is None or before == fix or sensor_id not in self._probe_offsets:
+            return
+        _base, was, _aside = read_probe(raw, unit, before[0], before[1], sensor_id)
+        if was is not None and value is not None:
+            self._probe_offsets[sensor_id] += value - was
 
     def _probe_method_entity(self, kind: str) -> str:
         """The zone's select of how its probes become its `kind` reading (select.py)."""
@@ -1405,6 +1441,18 @@ class CropSteeringProbeSensor(CropSteeringSensor, RestoreEntity):
                 self.hass, [self._probe_method_entity(kind)], self._method_changed
             )
         )
+        if kind == "vwc":  # a probe's new offset or curve shows at once
+            from homeassistant.helpers.dispatcher import async_dispatcher_connect
+
+            from .calibration import SIGNAL as CALIBRATION_SIGNAL
+
+            self.async_on_remove(
+                async_dispatcher_connect(
+                    self.hass,
+                    f"{CALIBRATION_SIGNAL}_{self._entry.entry_id}",
+                    self.async_write_ha_state,
+                )
+            )
 
     @callback
     def _method_changed(self, _event) -> None:

@@ -9,7 +9,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from custom_components.crop_steering import units
+from custom_components.crop_steering import probe_offsets, units
 from custom_components.crop_steering.calculations import ec_type_key, fuse_probes
 from custom_components.crop_steering.const import (
     DOMAIN,
@@ -38,6 +38,8 @@ def sensor(states, prefix=""):
         "extra_state_attributes",
         "_average_sensor_values",
         "_probe_readings",
+        "_user_corrections",
+        "_follow_fix",
         "_fuse_zone",
         "_probe_method_entity",
         "_ec_types",
@@ -57,6 +59,7 @@ def sensor(states, prefix=""):
         "math": math,
         "_LOGGER": logging.getLogger(__name__),
         "to_native": units.to_native,
+        "read_probe": probe_offsets.read,
         "fuse_probes": fuse_probes,
         "ec_type_key": ec_type_key,
         "DOMAIN": DOMAIN,
@@ -77,7 +80,9 @@ def sensor(states, prefix=""):
     }
     exec(compile(module, str(SOURCE), "exec"), namespace)
     instance = namespace["SensorMethods"]()
-    instance.hass = SimpleNamespace(states=SimpleNamespace(get=states.get))
+    instance.hass = SimpleNamespace(states=SimpleNamespace(get=states.get), data={})
+    instance._entry = SimpleNamespace(entry_id="entry")
+    instance._applied_fix = {}
     instance._prefix = prefix
     instance._zone_number = 1
     instance._zones_config = {}

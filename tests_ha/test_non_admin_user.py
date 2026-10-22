@@ -56,6 +56,12 @@ CHANGES = {
     "calibration_commit": {"session_id": "s"},
     "calibration_revert": {"room_id": ROOM, "probe": "feed_ph"},
     "calibration_abandon": {"session_id": "s"},
+    "probe_offset_set": {
+        "room_id": ROOM,
+        "entity_id": "sensor.probe",
+        "expected_revision": 0,
+        "offset": 1.0,
+    },
     "dosing_save": {"room_id": ROOM, "expected_revision": 0, "pumps": [], "batch": {}},
     # A stop is the one dosing request anyone may make (test_an_ordinary_user_may_stop_dosing).
     "dosing_request": {"room_id": ROOM, "action": "dose", "pump": "balance", "ml": 5},

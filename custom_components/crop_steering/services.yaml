@@ -879,6 +879,81 @@ calibration_revert:
           options:
             - feed_ph
             - feed_ec
+probe_offset_set:
+  name: Set a moisture probe's offset or curve
+  description: >-
+    Sets the offset (percentage points of moisture) and/or the curve of one moisture probe of the
+    room, or, with `match_handheld`, the offset that makes the probe read what a handheld meter
+    reads. The zone applies it before it combines its probes, and the probe gets a
+    sensor.<probe>_corrected sensor. With `preview` nothing is saved. A curve is refused on a probe
+    that already reports moisture in percent. When a signed-in user calls it, that user must be a
+    Home Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    entity_id:
+      name: Probe
+      description: >-
+        The moisture probe's entity. Example: `sensor.f2_teros_a`.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision the caller last read (calibration_get). Needed to save; a preview does not need it.
+      required: false
+      selector:
+        number:
+          min: 0
+          mode: box
+    offset:
+      name: Offset
+      description: >-
+        Percentage points added to the probe's reading, from -20 to 20. Zero with no curve removes
+        the setting.
+      required: false
+      selector:
+        number:
+          min: -20
+          max: 20
+          step: 0.1
+          mode: box
+    curve:
+      name: Curve
+      description: >-
+        `rockwool` or `soilless` turns a raw reading into moisture; `none` removes the curve.
+      required: false
+      selector:
+        select:
+          options:
+            - rockwool
+            - soilless
+            - none
+    match_handheld:
+      name: Handheld reading
+      description: >-
+        What a handheld meter reads now (percent moisture). The offset becomes that minus the
+        probe's reading now. Not together with `offset`.
+      required: false
+      selector:
+        number:
+          min: 0
+          max: 100
+          step: 0.1
+          mode: box
+    preview:
+      name: Preview
+      description: >-
+        Answer with the offset, the reading it gives and the zone's reading before and after, and save nothing.
+      required: false
+      selector:
+        boolean:
 calibration_abandon:
   name: Abandon a probe or pump calibration
   description: >-

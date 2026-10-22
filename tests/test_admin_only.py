@@ -91,6 +91,12 @@ CHANGES = {
     "calibration_commit": {"session_id": "s"},
     "calibration_revert": {"room_id": ROOM, "probe": "feed_ph"},
     "calibration_abandon": {"session_id": "s"},
+    "probe_offset_set": {
+        "room_id": ROOM,
+        "entity_id": "sensor.probe",
+        "expected_revision": 0,
+        "offset": 1.0,
+    },
     # A dose or a batch is what makes the controller app run a pump: never for a
     # non-administrator. A stop only switches things off (STOP, below).
     "dosing_save": {"room_id": ROOM, "expected_revision": 0, "pumps": [], "batch": {}},
@@ -182,6 +188,7 @@ def rig(monkeypatch):
         capture=AsyncMock(return_value={}),
         commit=AsyncMock(return_value={}),
         revert=AsyncMock(return_value={}),
+        probe_offset_set=AsyncMock(return_value={}),
         abandon=MagicMock(return_value={"abandoned": True}),
     )
     monkeypatch.setattr(calibration, "CalibrationStore", lambda hass, entry: probes)
@@ -267,6 +274,7 @@ def rig(monkeypatch):
             probes.capture,
             probes.commit,
             probes.revert,
+            probes.probe_offset_set,
             dosing.save,
             dosing.request,
             dosing.pump_prime,

@@ -16,6 +16,11 @@ raw sensors are never touched, and nothing here switches any hardware: while a s
 dosing descriptor carries `calibrating`, and the controller holds batches and pH correction on it.
 
 Sessions live in memory and end 30 min after their last capture (a status read does not count).
+
+The same store holds each moisture probe's own offset and curve (G9, `probe_user_offsets`
+{entity_id: {offset, curve, at, by}}, absent = none; see probe_offsets.py). `probe_offset_set` changes
+one of them, checked and read back, with `preview` showing the effect and writing nothing. The zone
+sensor applies them before it fuses its probes; a probe with one also gets sensor.<probe>_corrected.
 A record made from this release on is due 30 days after it (`due_days`): the room's
 binary_sensor.crop_steering_<px>calibration_due and a Repairs card (CS-612) say so. A record from
 before has no `due_days` and never goes due (ruling R6).
@@ -32,10 +37,14 @@ from uuid import uuid4
 
 from .admin import async_require_admin
 from .const import DOMAIN, REPAIRS_DOCS_URL
+from .calculations import fuse_probes
+from .const import PROBE_FAR, PROBE_RANGE, PROBE_STALE_SECONDS
 from .generated.ids import new_id
 from .health import _iid
 from .journal_api import attribution, note
+from .probe_offsets import CURVES, OFFSET_LIMIT, read
 from .room import room_prefix
+from .units import accepted, normalise
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,6 +57,7 @@ SERVICES = (
     "calibration_commit",
     "calibration_revert",
     "calibration_abandon",
+    "probe_offset_set",
 )
 # Open to any signed-in user; every other service needs an administrator.
 READS = ("calibration_get", "calibration_status")
@@ -69,6 +79,9 @@ DUE_DAYS = 30
 EXPIRED = "Calibration session expired. Start again."
 SIGNAL = f"{DOMAIN}_calibration_changed"
 ISSUE = "calibration_due"
+CURVE_ON_PERCENT = (
+    "This probe already converts to moisture. A curve only applies to raw readings."
+)
 
 
 def _number(value, low, high, label):
@@ -172,6 +185,22 @@ def steady_for(samples: list[tuple[float, float]], kind: str) -> float:
     return end - since
 
 
+def _stored_offsets(value) -> dict:
+    """The stored `probe_user_offsets` (absent = none), or ValueError: a value that is not understood
+    is never loaded half way and then saved over."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ValueError("Invalid stored probe offsets")
+    for entity_id, entry in value.items():
+        if not isinstance(entity_id, str) or not isinstance(entry, dict):
+            raise ValueError("Invalid stored probe offsets")
+        _number(entry.get("offset", 0.0), -OFFSET_LIMIT, OFFSET_LIMIT, "Offset")
+        if entry.get("curve") is not None and entry["curve"] not in CURVES:
+            raise ValueError("Invalid stored probe offsets")
+    return deepcopy(value)
+
+
 def _trim(records) -> list:
     """The newest HISTORY records, and any applied one older than those (a correction in force is never
     dropped by the history limit)."""
@@ -250,7 +279,8 @@ class CalibrationStore:
         self._now = now or _utcnow
         self._lock = asyncio.Lock()
         self._timer = None
-        self.document = {"revision": 0, "records": []}
+        self.document = {"revision": 0, "records": [], "probe_user_offsets": {}}
+        self._corrected = {}  # probe entity_id -> unsubscribe of its raw sensor
         self.sessions = {}
         self.error = None
 
@@ -274,6 +304,9 @@ class CalibrationStore:
                 self.document = {
                     "revision": value["revision"],
                     "records": _trim(value["records"]),
+                    "probe_user_offsets": _stored_offsets(
+                        value.get("probe_user_offsets")
+                    ),
                 }
         except Exception as error:
             self.error = f"Stored calibration history could not be loaded; it has not been overwritten: {error}"
@@ -376,6 +409,258 @@ class CalibrationStore:
             attributes,
         )
 
+    # ------------------------------------------------------------------ probe offsets and curves (G9)
+    def user_corrections(self) -> dict:
+        """{probe entity_id: (offset, curve)} for the zone sensors to apply; none while the store is
+        unreadable (a probe then reads as it did before)."""
+        if self.error:
+            return {}
+        return {
+            entity_id: (float(entry.get("offset", 0.0)), entry.get("curve"))
+            for entity_id, entry in self.document["probe_user_offsets"].items()
+        }
+
+    def _zones(self) -> dict:
+        """The room's zones as its setup holds them (zone number as a string, or an int)."""
+        data = self.hass.data.get(DOMAIN, {}).get(self.entry.entry_id) or {}
+        return data.get("zones") or {}
+
+    @staticmethod
+    def _zone_probes(zone) -> list:
+        sensors = list(zone.get("vwc_sensors") or [])
+        if not sensors:
+            sensors = [zone[k] for k in ("vwc_front", "vwc_back") if zone.get(k)]
+        return sensors
+
+    def _vwc_zones(self) -> dict:
+        """{probe entity_id: zone key} for every moisture probe the room's zones name (the first zone
+        that names it)."""
+        out = {}
+        for key, zone in self._zones().items():
+            for entity_id in self._zone_probes(zone):
+                out.setdefault(entity_id, key)
+        return out
+
+    def _raw(self, entity_id):
+        """(the probe's number or None, its unit)."""
+        state = self.hass.states.get(entity_id)
+        unit = (getattr(state, "attributes", None) or {}).get("unit_of_measurement")
+        return _number_or_none(getattr(state, "state", None)), unit
+
+    def corrected_value(self, entity_id, fix):
+        """(the probe's reading before its offset and curve, with them) under `fix` = (offset, curve), or
+        (None, None) while the probe has no usable number."""
+        raw, unit = self._raw(entity_id)
+        if raw is None:
+            return None, None
+        base, value, _aside = read(raw, unit, fix[0], fix[1], entity_id)
+        return base, value
+
+    @staticmethod
+    def _corrected_id(entity_id) -> str:
+        return f"sensor.{entity_id.split('.', 1)[-1]}_corrected"
+
+    def _publish_corrected(self, entity_id):
+        """sensor.<probe>_corrected: the probe's reading under its offset and curve. It follows the raw
+        sensor and is unavailable while the raw sensor is: nothing old is ever shown in its place.
+        """
+        entry = self.document["probe_user_offsets"].get(entity_id)
+        if entry is None or self.error:
+            self.hass.states.async_remove(self._corrected_id(entity_id))
+            return
+        fix = (float(entry.get("offset", 0.0)), entry.get("curve"))
+        base, value = self.corrected_value(entity_id, fix)
+        raw_state = self.hass.states.get(entity_id)
+        self.hass.states.async_set(
+            self._corrected_id(entity_id),
+            "unavailable" if value is None else str(round(value, 3)),
+            {
+                "friendly_name": f"{entity_id.split('.', 1)[-1]} corrected",
+                "unit_of_measurement": "%",
+                "room_id": self.room_id,
+                "source": entity_id,
+                "raw": base,
+                "offset": fix[0],
+                "curve": fix[1],
+                "set_at": entry.get("at"),
+                "restored": bool(
+                    (getattr(raw_state, "attributes", None) or {}).get("restored")
+                ),
+            },
+        )
+
+    def sync_corrected(self):
+        """Publish a corrected sensor for each probe with an offset or curve and none for the rest."""
+        wanted = set() if self.error else set(self.document["probe_user_offsets"])
+        for entity_id in [e for e in self._corrected if e not in wanted]:
+            self._corrected.pop(entity_id)()
+            self.hass.states.async_remove(self._corrected_id(entity_id))
+        for entity_id in wanted:
+            if entity_id not in self._corrected:
+                self._corrected[entity_id] = _track(
+                    self.hass,
+                    entity_id,
+                    lambda _text, _at, e=entity_id: self._publish_corrected(e),
+                )
+            self._publish_corrected(entity_id)
+
+    def _fused(self, entity_id, fix):
+        """What the probe's zone would read with `fix` on this probe and every other probe as it is now,
+        or None. Mirrors the zone sensor's fusion without its learned memory of the probes.
+        """
+        key = self._vwc_zones().get(entity_id)
+        zone = self._zones().get(key) or {}
+        sensors = self._zone_probes(zone)
+        unused = set(zone.get("vwc_unused") or ()) & set(sensors)
+        if unused == set(sensors):
+            unused = set()
+        fixes = {**self.user_corrections(), entity_id: fix}
+        readings = []
+        for probe in sensors:
+            if probe in unused:
+                continue
+            offset, curve = fixes.get(probe, (0.0, None))
+            raw, unit = self._raw(probe)
+            value = age = None
+            if raw is not None:
+                _base, value, _aside = read(raw, unit, offset, curve, probe)
+                state = self.hass.states.get(probe)
+                stamp = getattr(state, "last_reported", None) or getattr(
+                    state, "last_updated", None
+                )
+                if stamp is not None:
+                    age = (self._now() - stamp).total_seconds()
+            readings.append((probe, value, age))
+        method = self.hass.states.get(
+            f"select.{DOMAIN}_{self.prefix}zone_{key}_vwc_method"
+        )
+        value, _detail = fuse_probes(
+            readings,
+            {},
+            *PROBE_RANGE["vwc"],
+            PROBE_STALE_SECONDS,
+            method.state if method is not None else "Median",
+            PROBE_FAR["vwc"],
+        )
+        return value
+
+    async def probe_offset_set(self, data, who=None) -> dict:
+        """Set one moisture probe's offset and/or curve, or (match_handheld) the offset that makes it read
+        what a handheld meter reads. `preview` answers with the effect and saves, publishes and journals
+        nothing. A write is checked against the revision, bounded, saved, read back and journaled.
+        """
+        entity_id = data.get("entity_id")
+        preview = bool(data.get("preview"))
+        if self.error:
+            raise ValueError(self.error)
+        if entity_id not in self._vwc_zones():
+            raise ValueError("That is not a moisture probe of this room")
+        if not any(k in data for k in ("offset", "curve", "match_handheld")):
+            raise ValueError("Give an offset, a curve or a handheld reading to match")
+        if "match_handheld" in data and "offset" in data:
+            raise ValueError("Give an offset or a handheld reading to match, not both")
+        async with self._lock:
+            if self.error:
+                raise ValueError(self.error)
+            if (
+                not preview
+                and data.get("expected_revision") != self.document["revision"]
+            ):
+                raise ValueError(
+                    "Calibration history changed elsewhere. Reload before saving."
+                )
+            section = self.document["probe_user_offsets"]
+            old_entry = section.get(entity_id) or {}
+            old_fix = (float(old_entry.get("offset", 0.0)), old_entry.get("curve"))
+            offset, curve = old_fix
+            if "curve" in data:
+                curve = data["curve"]
+                if curve in (None, "none"):
+                    curve = None
+                elif curve not in CURVES:
+                    raise ValueError(
+                        "The curve must be one of: " + ", ".join(sorted(CURVES))
+                    )
+            if curve is not None and normalise(self._raw(entity_id)[1]) in accepted(
+                "vwc"
+            ):
+                raise ValueError(CURVE_ON_PERCENT)
+            if "offset" in data:
+                offset = _number(data["offset"], -OFFSET_LIMIT, OFFSET_LIMIT, "Offset")
+            if "match_handheld" in data:
+                handheld = _number(
+                    data["match_handheld"], *PROBE_RANGE["vwc"], "Handheld"
+                )
+                raw, unit = self._raw(entity_id)
+                bare = None
+                if raw is not None:
+                    _base, bare, _aside = read(raw, unit, 0.0, curve, entity_id)
+                if bare is None:
+                    raise ValueError("The probe has no reading to match")
+                offset = round(handheld - bare, 3)
+                if abs(offset) > OFFSET_LIMIT:
+                    raise ValueError(
+                        f"The probe reads {bare:g} and the handheld {handheld:g}: "
+                        f"{abs(offset):g} apart, more than the {OFFSET_LIMIT:g} an offset may be"
+                    )
+            fix = (offset, curve)
+            _base, corrected = self.corrected_value(entity_id, fix)
+            low, high = PROBE_RANGE["vwc"]
+            if corrected is not None and not low <= corrected <= high:
+                raise ValueError(
+                    f"The probe would read {corrected:g}, outside {low:g} to {high:g}"
+                )
+            new_section = deepcopy(section)
+            if offset == 0.0 and curve is None:
+                new_section.pop(entity_id, None)
+            else:
+                new_section[entity_id] = {
+                    "offset": offset,
+                    "curve": curve,
+                    "at": self._now().isoformat(),
+                    "by": (who or {}).get("user_id") or (who or {}).get("actor"),
+                }
+            from .setup_api import setup_diff
+
+            diff = setup_diff(section, new_section)
+            out = {
+                "offset": offset,
+                "curve": curve,
+                "corrected_now": None if corrected is None else round(corrected, 3),
+                "fused_before": self._fused(entity_id, old_fix),
+                "fused_after": self._fused(entity_id, fix),
+            }
+            if preview:
+                return {**out, "preview": True, "diff": diff}
+            document = {
+                **self.document,
+                "revision": self.document["revision"] + 1,
+                "probe_user_offsets": new_section,
+            }
+            await self._store.async_save(deepcopy(document))
+            stored = await self._store.async_load()
+            if ((stored or {}).get("probe_user_offsets") or {}).get(
+                entity_id
+            ) != new_section.get(entity_id):
+                raise ValueError(
+                    "The probe offset did not read back from storage. It was not applied."
+                )
+            self.document = document
+        self.sync_corrected()
+        _send(self.hass, f"{SIGNAL}_{self.entry.entry_id}")
+        self._journal(
+            "config.changed",
+            who,
+            {
+                "store": "calibration",
+                "section": "probe_user_offsets",
+                "old": deepcopy(section),
+                "new": deepcopy(new_section),
+                "diff": diff,
+            },
+        )
+        return {**out, "revision": document["revision"]}
+
     def due(self) -> dict:
         """{probe: due date} for each probe whose newest record that did not fail is past its due date (a
         failed calibration does not reset the clock). A record without `due_days` (from before this
@@ -444,6 +729,7 @@ class CalibrationStore:
             self.publish_due()
 
         self.publish_due()
+        self.sync_corrected()
         return async_track_time_interval(self.hass, hourly, timedelta(hours=1))
 
     def calibrating(self):
@@ -823,6 +1109,7 @@ class CalibrationStore:
                         old["applied"], old["superseded_by"] = False, record["id"]
                         superseded = superseded or old.get("id")
             document = {
+                **self.document,
                 "revision": self.document["revision"] + 1,
                 "records": _trim([record, *records]),
             }
@@ -878,6 +1165,7 @@ class CalibrationStore:
             if previous is not None:
                 previous["applied"], previous["superseded_by"] = True, None
             document = {
+                **self.document,
                 "revision": self.document["revision"] + 1,
                 "records": records,
             }
@@ -959,6 +1247,7 @@ class CalibrationStore:
                 "superseded_by": None,
             }
             document = {
+                **self.document,
                 "revision": self.document["revision"] + 1,
                 "records": _trim([record, *self.document["records"]]),
             }
@@ -1054,6 +1343,8 @@ async def async_setup_calibration(hass, entry):
                 return await target.start(data["probe"], data.get("solutions"), who)
             if service == "calibration_revert":
                 return await target.revert(data["probe"], who)
+            if service == "probe_offset_set":
+                return await target.probe_offset_set(data, who)
             response = await target.record(data, who)
             journal_record(hass, data["room_id"], response, call)
             return response
@@ -1086,6 +1377,15 @@ async def async_setup_calibration(hass, entry):
         "calibration_commit": session_id,
         "calibration_revert": {**room_id, probe: vol.In(list(PROBES))},
         "calibration_abandon": session_id,
+        "probe_offset_set": {
+            **room_id,
+            vol.Required("entity_id"): str,
+            vol.Optional("expected_revision"): vol.All(int, vol.Range(min=0)),
+            vol.Optional("offset"): vol.Coerce(float),
+            vol.Optional("curve"): str,
+            vol.Optional("match_handheld"): vol.Coerce(float),
+            vol.Optional("preview"): bool,
+        },
     }
     for service in SERVICES:
         hass.services.async_register(
@@ -1109,6 +1409,10 @@ async def async_unload_calibration(hass, entry):
     manager = managers.pop(entry.entry_id, None)
     if manager is not None:
         manager._close()
+        for entity_id, unsubscribe in manager._corrected.items():
+            unsubscribe()
+            hass.states.async_remove(manager._corrected_id(entity_id))
+        manager._corrected.clear()
         if manager._timer:
             manager._timer()
             manager._timer = None
