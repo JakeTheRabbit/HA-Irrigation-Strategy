@@ -1,6 +1,9 @@
 /** S2 Room (mockup 03), against frontend/dist: run after `vite build`. Opens Room B (the demo's F1:
  * Holding, flower stretch, day 12 of 63) at #/today.
  *
+ * The clock is pinned to today 14:10 local, so the demo day is the same at any real hour (Room B's
+ * lights come on at 08:00: earlier, its strip has no shots yet).
+ *
  * Interactions asserted, at 1440 and 390 on both backends:
  * - the header: the room's stage and plants, "Day 12 of 63 · 51 days left · harvest …", the run
  *   bar's "Stretch ends day 21" marker, "Water today … room · … per watered plant" and the lights;
@@ -32,6 +35,10 @@ await runParity({
   check: async (page, { width, backend, region }) => {
     const label = `${width}px ${backend}`;
     const v318 = backend === "3.18";
+    // The demo follows the clock: pin it to today 14:10 local, as verify-parity-i1 does.
+    const pinned = new Date();
+    pinned.setHours(14, 10, 0, 0);
+    await page.clock.setFixedTime(pinned);
     // The mockup's room: Room B.
     const url = new URL(page.url());
     url.searchParams.set("room", "room:room_b_");

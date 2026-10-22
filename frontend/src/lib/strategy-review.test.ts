@@ -345,6 +345,61 @@ describe("apply and undo", () => {
     expect(found).toEqual({ backend: "3.17", ids: [] });
     expect(operator).toHaveBeenCalledOnce();
   });
+  test("undo on 3.18 of numbers and a choice: the Journal puts the numbers back, the choice is re-written", async () => {
+    const operator = vi.fn(async (_action: string, _data?: Record<string, unknown>) => ({
+      api: 2,
+      ok: true,
+      data: {},
+      readback: { status: "verified" },
+      event_ids: [],
+    }));
+    const write = vi.fn(async () => ({ applied: [MODE], failed: [] }));
+    const mixed: LastApply = {
+      at: at(14, 2),
+      backend: "3.18",
+      eventIds: ["01B"],
+      before: [changeOf(REWATER, 57), { entityId: MODE, value: "Vegetative" }],
+      after: [changeOf(REWATER, 56), { entityId: MODE, value: "Generative" }],
+    };
+    const states = {
+      ...STATES,
+      [REWATER]: number(REWATER, "56"),
+      [MODE]: { ...STATES[MODE], state: "Generative" },
+    };
+    await undoApply(mixed, { controller: fakeController({ operator }), states, write });
+    expect(operator).toHaveBeenCalledWith("history_revert", { event_id: "01B", api: 2 });
+    expect(write).toHaveBeenCalledWith([{ entityId: MODE, value: "Vegetative" }]);
+
+    // A choice that moved since: nothing is undone, not even the numbers.
+    operator.mockClear();
+    write.mockClear();
+    const moved = { ...states, [MODE]: { ...STATES[MODE], state: "Vegetative" } };
+    await expect(
+      undoApply(mixed, { controller: fakeController({ operator }), states: moved, write }),
+    ).rejects.toThrow("This value has changed since you applied it. Nothing was undone.");
+    expect(operator).not.toHaveBeenCalled();
+    expect(write).not.toHaveBeenCalled();
+
+    // A number without its journal record still refuses, choice or not.
+    await expect(
+      undoApply(
+        { ...mixed, eventIds: [] },
+        { controller: fakeController({ operator }), states, write },
+      ),
+    ).rejects.toThrow(
+      "The controller has no record of this change to put back. Nothing was undone.",
+    );
+    expect(write).not.toHaveBeenCalled();
+
+    // The numbers went back but the choice was refused: how many are back.
+    const refuse = vi.fn(async () => ({
+      applied: [],
+      failed: [{ entityId: MODE, reason: "Fixture refused write" }],
+    }));
+    await expect(
+      undoApply(mixed, { controller: fakeController({ operator }), states, write: refuse }),
+    ).rejects.toMatchObject({ message: "1 of 2 put back: Fixture refused write", reverted: 1 });
+  });
   test("undo of a select-only apply on 3.17 re-writes the previous choice", async () => {
     const write = vi.fn(async () => ({ applied: [MODE], failed: [] }));
     const states = { ...STATES, [MODE]: { ...STATES[MODE], state: "Generative" } };

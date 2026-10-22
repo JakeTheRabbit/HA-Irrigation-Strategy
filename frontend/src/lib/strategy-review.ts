@@ -333,28 +333,50 @@ export async function undoApply(
   },
 ): Promise<void> {
   const n = last.after.length;
-  if (last.backend === "3.18") {
-    if (last.eventIds.length < n)
-      throw new UndoError(
-        "The controller has no record of this change to put back. Nothing was undone.",
-        0,
-        n,
-      );
-    return revertEvents(deps.controller, last.eventIds);
-  }
-  if (last.before.some(({ value }) => typeof value === "number" && !Number.isFinite(value)))
+  // On 3.18 the numbers go back through the Journal. A choice (a select) has no setpoint event yet,
+  // so it is written back as on 3.17.
+  const journalled =
+    last.backend === "3.18"
+      ? last.after.filter(({ entityId }) => entityId.startsWith("number."))
+      : [];
+  const ids = new Set(journalled.map((c) => c.entityId));
+  const rewrite = last.before.filter(({ entityId }) => !ids.has(entityId));
+  if (last.eventIds.length < journalled.length)
+    throw new UndoError(
+      "The controller has no record of this change to put back. Nothing was undone.",
+      0,
+      n,
+    );
+  if (rewrite.some(({ value }) => typeof value === "number" && !Number.isFinite(value)))
     throw new UndoError("The previous value is not known. Nothing was undone.", 0, n);
-  const moved = last.after.some(({ entityId, value }) => {
-    const state = deps.states[entityId];
-    if (typeof value !== "number") return state?.state !== String(value);
-    const step = Number(state?.attributes.step);
-    return !sameValue(state?.state, value, Number.isFinite(step) ? step : undefined);
-  });
+  const moved = last.after
+    .filter(({ entityId }) => !ids.has(entityId))
+    .some(({ entityId, value }) => {
+      const state = deps.states[entityId];
+      if (typeof value !== "number") return state?.state !== String(value);
+      const step = Number(state?.attributes.step);
+      return !sameValue(state?.state, value, Number.isFinite(step) ? step : undefined);
+    });
   if (moved)
     throw new UndoError("This value has changed since you applied it. Nothing was undone.", 0, n);
-  const result = await deps.write(last.before);
+  if (journalled.length) {
+    try {
+      await revertEvents(deps.controller, last.eventIds);
+    } catch (error) {
+      // Its count is of the Journal's changes; say it of the whole apply.
+      if (error instanceof UndoError && rewrite.length && error.reverted)
+        throw new UndoError(
+          error.message.replace(/^\d+ of \d+/, `${error.reverted} of ${n}`),
+          error.reverted,
+          n,
+        );
+      throw error;
+    }
+  }
+  if (!rewrite.length) return;
+  const result = await deps.write(rewrite);
   if (result.failed.length) {
-    const k = result.applied.length;
+    const k = journalled.length + result.applied.length;
     const reason = result.failed[0].reason;
     throw new UndoError(k ? `${k} of ${n} put back: ${reason}` : reason, k, n);
   }
