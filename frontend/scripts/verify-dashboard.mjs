@@ -6,12 +6,13 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { readmeImage } from "./readme-images.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const publicRoot = path.join(root, "www");
 const out = path.join(root, "output/playwright");
 // The README's screenshots, from the same demo the checks drive.
-const img = (name) => path.join(root, "img", name);
+const img = readmeImage;
 await mkdir(out, { recursive: true });
 const server = createServer(async (req, res) => {
   try {

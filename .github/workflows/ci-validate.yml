@@ -352,7 +352,7 @@ jobs:
   frontend:
     name: Dashboard build and browser workflows
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -395,6 +395,32 @@ jobs:
           node frontend/scripts/verify-tank-status.mjs
           node frontend/scripts/verify-calibration.mjs
           node frontend/scripts/verify-ha-shell.mjs
+          node frontend/scripts/verify-navigation.mjs
+          node frontend/scripts/verify-ai-instructions.mjs
+          node frontend/scripts/verify-irrigation-workspace.mjs
+      - name: Build Academy catalogue and install the pinned lesson media
+        # The same three commands the Pages deploy runs after merge; here they gate the PR.
+        run: |
+          python scripts/build_course.py
+          python scripts/install_course_media.py
+          python scripts/build_course.py --verify-media
+      - name: Install Google Chrome
+        # The lesson videos are H.264. Playwright's bundled Chromium cannot decode them.
+        working-directory: frontend
+        run: npx playwright install --with-deps chrome
+      - name: Academy browser suites
+        # academy-scene-sync.browser.mjs is not run: it compares the videos with private production
+        # masters (ACADEMY_PRODUCTION) that are kept outside Git. See docs/ACADEMY.md.
+        env:
+          BROWSER_CHANNEL: chrome
+        run: |
+          node frontend/node_modules/vite/bin/vite.js preview --outDir www --host 127.0.0.1 --port 8794 &
+          trap 'kill $!' EXIT
+          for _ in $(seq 30); do curl -sf http://127.0.0.1:8794/learn/ >/dev/null && break; sleep 1; done
+          node tests/academy.browser.mjs
+          node tests/academy-navigation.browser.mjs
+          node tests/academy-video.browser.mjs
+          node tests/academy-media.browser.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -5,10 +5,9 @@ import assert from "node:assert/strict";
 import fs from "node:fs";
 import path from "node:path";
 import os from "node:os";
-import { fileURLToPath } from "node:url";
 import { chromium } from "../frontend/node_modules/playwright/index.mjs";
 import AxeBuilder from "../frontend/node_modules/@axe-core/playwright/dist/index.mjs";
-const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
+import { readmeImage } from "../frontend/scripts/readme-images.mjs";
 const base = (process.env.BASE_URL || "http://127.0.0.1:8794/learn/").replace(
   /\/?$/,
   "/",
@@ -79,7 +78,7 @@ try {
   });
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({
-    path: path.join(root, "img/academy-home.png"),
+    path: readmeImage("academy-home.png"),
     fullPage: true,
   });
   await page.getByRole("link", { name: "Course", exact: true }).click();
@@ -331,7 +330,7 @@ try {
   await page.mouse.move(0, 0);
   await page.waitForTimeout(3500);
   await page.locator(".lp").screenshot({
-    path: path.join(root, "img/academy-lesson.png"),
+    path: readmeImage("academy-lesson.png"),
   });
   await page.locator("video").evaluate(video => video.pause());
   const blocked = await browser.newContext();

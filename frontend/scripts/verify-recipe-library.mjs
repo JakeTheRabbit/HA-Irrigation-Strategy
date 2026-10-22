@@ -5,6 +5,7 @@ import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+import { readmeImage } from "./readme-images.mjs";
 const out = fileURLToPath(new URL("../../output/playwright/", import.meta.url));
 await mkdir(out, { recursive: true });
 const html = await readFile(new URL("../../www/dashboard.html", import.meta.url));
@@ -161,7 +162,7 @@ try {
         window.scrollTo(0, 0);
       });
       await library().screenshot({
-        path: fileURLToPath(new URL("../../img/recipe-library.png", import.meta.url)),
+        path: readmeImage("recipe-library.png"),
       });
     },
   );

@@ -2,7 +2,9 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
-const origin = process.env.IRRIGATION_URL || "http://127.0.0.1:5178";
+import { serveDashboard } from "./dashboard-server.mjs";
+const served = process.env.IRRIGATION_URL ? null : await serveDashboard();
+const origin = process.env.IRRIGATION_URL || served.origin;
 const out = new URL("../../output/ui-implementation-2026-10-18/", import.meta.url);
 await mkdir(out, { recursive: true });
 const browser = await chromium.launch({
@@ -102,4 +104,5 @@ try {
   console.log(JSON.stringify({ checks, errors, requests }, null, 2));
 } finally {
   await browser.close();
+  await served?.close();
 }
