@@ -18,7 +18,6 @@ import {
   CHART_LAYERS,
   dayScales,
   hourTicks,
-  overnightDryback,
   parseChartPrefs,
   phaseColumns,
   placeBadges,
@@ -34,7 +33,6 @@ import {
   type ChartPrefs,
   type Column,
   type Compare,
-  type Dryback,
   type Readout,
   type Steering,
 } from "@/lib/day-chart";
@@ -84,6 +82,14 @@ import {
   smoothRecorded,
   type PlanningPhaseId,
 } from "@/lib/planning-curve";
+import {
+  drybackId,
+  publishedDryback,
+  publishedNextIrrigation,
+  publishedVmax,
+  recordedDryback,
+  type PublishedDryback,
+} from "@/lib/published";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { waitingText } from "@/lib/waiting-for";
 import type { Controller, Setting, Zone } from "@/lib/types";
@@ -108,8 +114,6 @@ const HELD: Record<Block["kind"], string> = {
 };
 const NO_ESTIMATE: Partial<Record<NextShot["basis"], string>> = {
   late: "no shot expected before lights-off at the current dry-down",
-  settling: "VWC is still settling after the last shot",
-  "no-dry-down": "VWC is not falling measurably",
   "no-reading": "no live VWC reading",
   unknown: "not enough to go on",
 };
@@ -169,7 +173,8 @@ interface Lane {
   steering: Steering | null;
   /** The pore EC band the stage calls for, else the zone's EC target ±10 % (the steer's own band). */
   ecBand: { band: [number, number]; source: string } | null;
-  dryback: { night: "tonight" | "last night"; value: Dryback } | null;
+  /** The controller's dryback: tonight's live, else last night's as recorded at lights-on. */
+  dryback: { night: "tonight" | "last night"; value: PublishedDryback };
   jev: JevEntry[];
   /** The room publishes the AI assistant's log: the chart keeps a lane for its decisions. */
   jevOn: boolean;
@@ -525,7 +530,6 @@ function buildLane(
   // The zone's target (model.ts) is what the controller compares with in its phase, the plan's
   // while one runs; a plan's timing is its own, so P0 and P1 are not estimated under one.
   const phaseTarget = (key: string) => (zone.phase === phase ? zone.target.value : read(key));
-  const target = phase === "P2" ? phaseTarget("p2_vwc_threshold") : null;
   const stopped = !room.roomActive
     ? "the room is off"
     : zone.stale
@@ -549,9 +553,8 @@ function buildLane(
           since,
           held,
           lastShot: shots.at(-1) ?? null,
-          points,
           vwc: zone.vwc.value,
-          threshold: target,
+          estimate: publishedNextIrrigation(states, room.room.prefix, zone.id, phase, since, now),
           ceiling,
           interval: planned ? null : water.p1_time_between_shots,
           maxWait: planned ? null : read("p0_maximum_wait_time"),
@@ -652,11 +655,8 @@ function buildLane(
   const choice = states[`select.${root}zone_${zone.id}_steering_mode`]?.state;
   const steering = steeringOf(choice, stage?.steering);
   const ecTarget = zone.ecTarget.value;
-  // Last night's dryback runs from yesterday's evening into today; tonight's from today's.
+  // Tonight's dryback is the controller's live one; last night's, what it held at lights-on.
   const tonight = now >= day.lightsOff;
-  const night = tonight
-    ? overnightDryback(points, day.lightsOff, day.end, now)
-    : yesterday && overnightDryback(yesterday.points, yesterday.day.lightsOff, day.start, now);
   return {
     zone,
     bands,
@@ -689,7 +689,12 @@ function buildLane(
             source: `the zone’s EC target ${number(ecTarget, 2)} ±10 %`,
           }
         : null,
-    dryback: night ? { night: tonight ? "tonight" : "last night", value: night } : null,
+    dryback: tonight
+      ? { night: "tonight", value: publishedDryback(states, room.room.prefix, zone.id) }
+      : {
+          night: "last night",
+          value: recordedDryback(rows[drybackId(room.room.prefix, zone.id)], day.start),
+        },
     jev: (jev.log?.entries ?? []).filter(
       (entry) =>
         entry.kind === "decision" &&
@@ -762,7 +767,10 @@ function ZoneNumbers({
   const targets = buildSetpointPreview(controller.room, controller.states, zone.id, {}).saved
     .parameters;
   const phase = lane?.phase ?? (/^P[0-3]$/.test(zone.phase) ? zone.phase : null);
-  const peak = lane?.points.length ? Math.max(...lane.points.map((point) => point.value)) : null;
+  // The peak and the dryback are the controller's own (published.ts), never worked out here.
+  const prefix = controller.room.room.prefix;
+  const live = publishedDryback(controller.states, prefix, zone.id);
+  const vmax = publishedVmax(controller.states, prefix, zone.id);
   const gauges = [
     {
       id: "vwc",
@@ -778,7 +786,8 @@ function ZoneNumbers({
       id: "peak",
       model: gauge({
         label: "Peak today",
-        value: peak,
+        value: live.peak,
+        quality: live.reason ?? undefined,
         target: targets.p1_target_vwc ?? null,
         unit: "%",
         tolerance: 3,
@@ -790,6 +799,7 @@ function ZoneNumbers({
       model: gauge({
         label: dryback?.night === "tonight" ? "Dryback tonight" : "Last night’s dryback",
         value: dryback?.value.percent ?? null,
+        quality: dryback?.value.reason ?? undefined,
         target: targets.dryback_target ?? null,
         reference: referenceDryback(stage?.drybackPoints, dryback?.value.peak),
         unit: "%",
@@ -868,6 +878,20 @@ function ZoneNumbers({
           <dt>Shots</dt>
           <dd>{zone.shots.value === null ? "—" : number(zone.shots.value, 0)}</dd>
           {lastShot !== null && <dd className="zone-sub">last {clock(lastShot)}</dd>}
+        </div>
+        <div
+          title="Ramp ceiling. The highest VWC that the controller saw the slab reach on the morning ramp. It is advisory: the controller does not change a setpoint from it."
+          data-vmax={zone.id}
+        >
+          <dt>Ramp ceiling</dt>
+          <dd>{vmax.value === null ? "—" : `${number(vmax.value)}%`}</dd>
+          <dd className="zone-sub">
+            {vmax.value === null
+              ? vmax.reason
+              : vmax.confidence === null
+                ? "detected"
+                : `detected, ${number(vmax.confidence * 100, 0)}% sure`}
+          </dd>
         </div>
         {rate !== null && (
           <div
@@ -1834,14 +1858,14 @@ function nextWords(lane: Lane, day: GrowDay): { text: string; detail: string; to
       ? waitingText(zone.waiting, {
           number: (value) => number(value),
           clock,
-          shotEstimate: next.basis === "dry-down" ? next.at : null,
+          shotEstimate: next.basis === "controller" ? next.at : null,
         })
       : "";
   const first = conditions.split(" · ")[0];
   const estimate =
     next.at === null
       ? null
-      : next.basis === "dry-down"
+      : next.basis === "controller"
         ? `shot ≈ ${clock(next.at)}`
         : next.basis === "due"
           ? "shot due now"
@@ -1857,7 +1881,7 @@ function nextWords(lane: Lane, day: GrowDay): { text: string; detail: string; to
         ? ""
         : next.basis === "due"
           ? " · due now"
-          : next.basis === "dry-down"
+          : next.basis === "controller"
             ? ` · ≈ ${clock(next.at)}`
             : "";
     return { text: `${first}${when}`, detail: `What the controller waits for: ${conditions}` };
@@ -1870,14 +1894,21 @@ function nextWords(lane: Lane, day: GrowDay): { text: string; detail: string; to
           : `overnight, no shots until ${clock(day.end)}`,
       detail: "Overnight the controller waters only to rescue a zone that dries below its floor.",
     };
-  if (estimate) return { text: estimate, detail: "An estimate from today’s readings." };
+  if (estimate)
+    return {
+      text: estimate,
+      detail:
+        next.basis === "controller"
+          ? "The controller’s estimate: VWC down to the re-water point at its current dryback rate."
+          : "An estimate from today’s readings.",
+    };
   if (next.basis === "ramp-done")
     return { text: "hand-over to P2 maintenance", detail: "The ramp is at its ceiling." };
   if (next.basis === "late")
     return { text: "no more shots before lights-off", detail: NO_ESTIMATE.late! };
   return {
     text: "no estimate yet",
-    detail: NO_ESTIMATE[next.basis] ?? "not enough to go on",
+    detail: next.reason ?? NO_ESTIMATE[next.basis] ?? "not enough to go on",
   };
 }
 function changeText(change: Change): string {

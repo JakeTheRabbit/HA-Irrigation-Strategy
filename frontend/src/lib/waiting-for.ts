@@ -52,7 +52,7 @@ export function readWaiting(
 export interface WaitingFormat {
   number: (value: number) => string;
   clock: (time: number) => string;
-  /** The dashboard's own estimate of the next maintenance shot, from the dry-down rate. */
+  /** The controller's own estimate of the next maintenance shot, at its current dryback rate. */
   shotEstimate?: number | null;
 }
 

@@ -5,6 +5,7 @@ import { addDays, dateInZone, daysBetween, midnight, wallTime } from "./comparis
 import type { RunRecord } from "./comparison-types";
 import { growDay, type TimelineRow } from "./day-timeline";
 import { descriptor } from "./model";
+import { drybackId } from "./published";
 import type { SteCopy } from "./ste-copy";
 import type { RoomView, States } from "./types";
 
@@ -13,8 +14,8 @@ const HOUR = 3_600_000;
 /** The longest range the explorer reads: one request per day, two at a time. */
 export const MAX_RANGE_DAYS = 180;
 
-export type Unit = "%" | "mS/cm" | "°C" | "°F" | "kPa" | "pH" | "ppm" | "µmol/m²/s";
-export type SensorKind = "vwc" | "ec" | "climate" | "feed";
+export type Unit = "%" | "% of peak" | "mS/cm" | "°C" | "°F" | "kPa" | "pH" | "ppm" | "µmol/m²/s";
+export type SensorKind = "vwc" | "ec" | "dryback" | "climate" | "feed";
 export interface ExplorerSensor {
   /** Stable for the URL: the entity id. */
   key: string;
@@ -108,6 +109,16 @@ export function explorerSensors(room: RoomView, states: States): ExplorerSensor[
           unit: kind === "vwc" ? "%" : "mS/cm",
         });
     }
+  // Each zone's dryback as the controller published it, recorded: the figure its decisions used.
+  for (const zone of room.zones)
+    add({
+      entityId: drybackId(room.room.prefix, zone.id),
+      label: `${zone.name} dryback`,
+      group: zone.name,
+      kind: "dryback",
+      zone: zone.id,
+      unit: "% of peak",
+    });
   const mapped = descriptor(states, room.room)?.attributes ?? {};
   // Each zone's root-zone temperature probe (Equipment › Setup), in the zone's own group.
   const roots = mapped.substrate_temperature_sensors;
@@ -165,8 +176,6 @@ export interface Choice {
   compareRun: string | null;
   shots: boolean;
   phases: boolean;
-  /** Each grow day's peak and the low after it, on the zone's VWC (ranges of 14 d at most). */
-  dryback: boolean;
 }
 export const DEFAULT_CHOICE: Choice = {
   preset: "growday",
@@ -177,7 +186,6 @@ export const DEFAULT_CHOICE: Choice = {
   compareRun: null,
   shots: true,
   phases: true,
-  dryback: false,
 };
 
 /** The explorer's choice from the query of the page's hash (`#/zone/1?range=7d&s=...`). */
@@ -205,7 +213,6 @@ export function readChoice(hash: string): Choice {
     compareRun: /^[a-zA-Z0-9_-]{1,64}$/.test(query.get("vs") ?? "") ? query.get("vs") : null,
     shots: query.get("shots") !== "0",
     phases: query.get("phases") !== "0",
-    dryback: query.get("dryback") === "1",
   };
 }
 
@@ -213,6 +220,7 @@ export function readChoice(hash: string): Choice {
 export function writeChoice(hash: string, choice: Choice): string {
   const [path, rest = ""] = hash.split("?");
   const query = new URLSearchParams(rest);
+  // "dryback": an old link's dryback markers, which the explorer no longer draws.
   for (const key of ["range", "from", "to", "s", "compare", "vs", "shots", "phases", "dryback", "pc", "pm"])
     query.delete(key);
   query.set("range", choice.preset);
@@ -227,7 +235,6 @@ export function writeChoice(hash: string, choice: Choice): string {
   if (choice.compare && choice.compareRun) query.set("vs", choice.compareRun);
   if (!choice.shots) query.set("shots", "0");
   if (!choice.phases) query.set("phases", "0");
-  if (choice.dryback) query.set("dryback", "1");
   return `${path}?${query.toString().replaceAll("%2C", ",")}`;
 }
 
@@ -468,6 +475,7 @@ export function alignGrid(
 /** The decimals a value of each unit is shown with. */
 export const UNIT_DIGITS: Record<Unit, number> = {
   "%": 1,
+  "% of peak": 1,
   "mS/cm": 2,
   "°C": 1,
   "°F": 1,
@@ -505,15 +513,6 @@ export const EXPLORER_COPY = {
         "The chart shows day N of the previous run at the same position as day N of this run.",
     } satisfies SteCopy,
   },
-  dryback: {
-    label: "Dryback markers",
-    copy: {
-      tooltip:
-        "This marks the peak VWC of each grow day and the lowest VWC after it, on the VWC of this zone. The label is the dryback as the controller calculates it: the drop as a percent of the peak.",
-      impact: "The chart shows the markers only for a range of 14 days or less.",
-      guidance: "Select the VWC of this zone to see the markers.",
-    } satisfies SteCopy,
-  },
   sensors: {
     label: "Sensors",
     copy: {
@@ -522,49 +521,6 @@ export const EXPLORER_COPY = {
     } satisfies SteCopy,
   },
 } as const;
-
-/** The longest range the dryback markers are drawn on: past it they are noise. */
-export const DRYBACK_MARKER_DAYS = 14;
-export interface DrybackMarker {
-  /** The grow day's highest reading, and the lowest after it before the next lights-on. */
-  peak: { t: number; value: number };
-  low: { t: number; value: number };
-  /** As the controller measures dryback: (peak − low) / peak × 100, percent of the peak. */
-  percent: number;
-}
-/** Per grow day (from each lights-on, `starts`), the zone's peak VWC and the low after it, from the
- * explorer's grid of values (`times[i]` the time of `values[i]`). A day with under two readings, or
- * whose low is not under its peak, has none. */
-export function drybackMarkers(
-  times: readonly number[],
-  values: readonly (number | null)[],
-  starts: readonly number[],
-): DrybackMarker[] {
-  const markers: DrybackMarker[] = [];
-  starts.forEach((start, index) => {
-    const end = starts[index + 1] ?? Infinity;
-    let peak: { t: number; value: number } | null = null;
-    let at = -1;
-    for (let i = 0; i < times.length; i++) {
-      const value = values[i];
-      if (times[i] < start || times[i] >= end || value === null) continue;
-      if (!peak || value > peak.value) {
-        peak = { t: times[i], value };
-        at = i;
-      }
-    }
-    if (!peak || peak.value <= 0) return;
-    let low: { t: number; value: number } | null = null;
-    for (let i = at + 1; i < times.length && times[i] < end; i++) {
-      const value = values[i];
-      // A reading of 0 or less is a probe gap, not a dry slab.
-      if (value !== null && value > 0 && (!low || value < low.value)) low = { t: times[i], value };
-    }
-    if (!low || low.value >= peak.value) return;
-    markers.push({ peak, low, percent: ((peak.value - low.value) / peak.value) * 100 });
-  });
-  return markers;
-}
 
 
 function readProbeChoice(text: string | null): Record<string, string> {

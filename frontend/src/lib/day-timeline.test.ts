@@ -5,7 +5,6 @@ import {
   atHour,
   compareDays,
   dayTrace,
-  dryDown,
   duration,
   earlierDays,
   earlierEntities,
@@ -14,7 +13,6 @@ import {
   joinRows,
   levels,
   maintenanceStop,
-  morningDryback,
   nextShot,
   NOT_REPORTING,
   openSeconds,
@@ -37,7 +35,6 @@ import {
   type DayTrace,
   type GrowDay,
   type PhaseBand,
-  type Reading,
   type Shot,
   type TimelineRow,
 } from "./day-timeline";
@@ -456,41 +453,6 @@ describe("setpoint changes", () => {
   });
 });
 
-const drying = (from: number, minutes: number, start: number, rate: number): Reading[] =>
-  Array.from({ length: minutes + 1 }, (_, minute) => ({
-    time: from + minute * 60_000,
-    // A probe's noise, alternating around the trend.
-    value: start - (rate * minute) / 60 + (minute % 2 ? 0.04 : -0.04),
-  }));
-
-describe("dry-down", () => {
-  const T = at("02:00:00");
-  it("fits the recent fall and says when it reaches the threshold", () => {
-    const points = drying(T, 40, 32, 0.8);
-    const fit = dryDown(points, 30, T, T + 40 * 60_000)!;
-    expect(fit.rate).toBeCloseTo(0.8, 1);
-    // 32 - 0.8 * 40/60 = 31.47 now; 1.47 points at 0.8 per hour is about 110 minutes more.
-    expect(fit.from.value).toBeCloseTo(31.47, 1);
-    expect(Math.abs(fit.at - (T + 150 * 60_000))).toBeLessThan(4 * 60_000);
-  });
-  it("says nothing without enough recent data or a real fall", () => {
-    const now = T + 40 * 60_000;
-    expect(dryDown(drying(T, 40, 32, -0.5), 30, T, now)).toBeNull();
-    expect(dryDown(drying(T, 40, 32, 0), 30, T, now)).toBeNull();
-    expect(dryDown(drying(T, 10, 32, 0.8), 30, T, now)).toBeNull();
-    expect(
-      dryDown(
-        drying(T, 40, 32, 0.8).filter((_, i) => i % 12 === 0),
-        30,
-        T,
-        now,
-      ),
-    ).toBeNull();
-    // Readings before `since` (the shot still wetting up) are not used.
-    expect(dryDown(drying(T, 40, 32, 0.8), 30, T + 30 * 60_000, now)).toBeNull();
-  });
-});
-
 describe("next shot", () => {
   const day: GrowDay = {
     start: START,
@@ -510,30 +472,35 @@ describe("next shot", () => {
     since: at("01:00:00", "2026-09-23"),
     held: null as Block | null,
     lastShot: shot(at("01:50:00", "2026-09-23")) as Shot | null,
-    points: drying(at("02:00:00", "2026-09-23"), 60, 32, 0.8),
     vwc: 31.2 as number | null,
-    threshold: 30 as number | null,
+    estimate: { at: at("04:30:00", "2026-09-23"), reason: null } as {
+      at: number | null;
+      reason: string | null;
+    },
     ceiling: null as number | null,
     interval: 20 as number | null,
     maxWait: 60 as number | null,
   };
-  it("estimates P2 from the dry-down since the last shot settled", () => {
-    const next = nextShot(zone, day, now);
-    expect(next.basis).toBe("dry-down");
-    expect(next.fit!.rate).toBeCloseTo(0.8, 1);
-    expect(Math.abs(next.at! - at("04:30:00", "2026-09-23"))).toBeLessThan(5 * 60_000);
-    // Past lights-off it is no estimate, though the line is still drawn.
+  it("in P2 is the controller's own estimate, never one of the dashboard's", () => {
+    expect(nextShot(zone, day, now)).toEqual({
+      at: at("04:30:00", "2026-09-23"),
+      basis: "controller",
+    });
+    // Past lights-off it is no estimate.
     const early = { ...day, lightsOff: at("04:00:00", "2026-09-23") };
-    expect(nextShot(zone, early, now)).toMatchObject({ at: null, basis: "late" });
-    expect(nextShot(zone, early, now).fit).toBeDefined();
+    expect(nextShot(zone, early, now)).toEqual({ at: null, basis: "late" });
   });
-  it("is due at or under the threshold, settling right after a shot, and silent when flat", () => {
-    expect(nextShot({ ...zone, vwc: 29.9 }, day, now)).toEqual({ at: now, basis: "due" });
-    expect(nextShot({ ...zone, lastShot: shot(now - 20 * 60_000) }, day, now).basis).toBe(
-      "settling",
-    );
-    const flat = drying(at("02:00:00", "2026-09-23"), 60, 32, 0);
-    expect(nextShot({ ...zone, points: flat }, day, now).basis).toBe("no-dry-down");
+  it("is due when the controller says 0 h, and says why when it has no estimate", () => {
+    expect(nextShot({ ...zone, estimate: { at: now, reason: null } }, day, now)).toEqual({
+      at: now,
+      basis: "due",
+    });
+    const none = { at: null, reason: "no estimate from the controller in this P2 yet" };
+    expect(nextShot({ ...zone, estimate: none }, day, now)).toEqual({
+      at: null,
+      basis: "no-estimate",
+      reason: "no estimate from the controller in this P2 yet",
+    });
     expect(nextShot({ ...zone, vwc: null }, day, now).basis).toBe("no-reading");
   });
   it("follows the engine's own timing in P0 and P1", () => {
@@ -642,6 +609,17 @@ describe("what a room's timeline reads", () => {
       expect(read.entityIds).toContain(id);
     expect(read.entityIds.some((id) => id.startsWith("number.crop_steering_room_b_"))).toBe(false);
     expect(read.attributeIds).toEqual(["sensor.crop_steering_current_decision"]);
+  });
+  it("for one zone, also the controller's dryback with its peak, after the decision", () => {
+    const states = createDemo(Date.UTC(2026, 8, 23, 3));
+    const room = buildRoom(
+      states,
+      discoverRooms(states).find((item) => item.prefix === "")!,
+    );
+    expect(timelineEntities(room, states, 2).attributeIds).toEqual([
+      "sensor.crop_steering_current_decision",
+      "sensor.crop_steering_zone_2_dryback_app",
+    ]);
   });
 });
 
@@ -1034,19 +1012,6 @@ describe("how today is tracking", () => {
         points,
       ),
     ).toEqual([]);
-  });
-  it("how far P0 dried, as the engine measures it", () => {
-    const points = [
-      { time: START, value: 30 },
-      { time: START + 600_000, value: 30.5 },
-      { time: START + 1_800_000, value: 28.1 },
-      { time: START + 5_000_000, value: 20 },
-    ];
-    expect(morningDryback(points, { start: START, end: START + 3_600_000 })).toBeCloseTo(
-      ((30.5 - 28.1) / 30.5) * 100,
-      6,
-    );
-    expect(morningDryback(points, { start: 0, end: 1 })).toBeNull();
   });
   it("a controller not reporting gets no projection, only when it last reported", () => {
     const now = at("03:00:00");
