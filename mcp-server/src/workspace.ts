@@ -1,7 +1,10 @@
 import { createHash, randomBytes } from "node:crypto";
 import { HaClient, SafeError } from "./ha.js";
 import {
+  actuatorDomains,
   hardwareDomains,
+  probeUnits,
+  sensorKinds,
   plumbingLayouts,
   setupResponse,
   type Room,
@@ -379,13 +382,7 @@ export class Workspace {
           `Select an existing ${domains.join("/")} entity for ${kind || "this mapping"}.`,
         );
       const unit = (source.unit ?? "").toLowerCase().replaceAll(" ", "");
-      const units: Record<string, string[]> = {
-        vwc: ["%"],
-        ec: ["ms/cm", "ds/m"],
-        ph: ["ph", ""],
-        temperature: ["°c", "°f", "k"],
-      };
-      if (kind && !units[kind]?.includes(unit))
+      if (kind && !probeUnits[kind]?.includes(unit))
         throw new SafeError(`Incompatible ${kind} unit on ${entity}.`);
     };
     for (const [key, entity] of Object.entries(changes.hardware ?? {})) {
@@ -393,17 +390,11 @@ export class Workspace {
         validate(
           entity,
           hardwareDomains[key]!,
-          key.includes("_ec_")
-            ? "ec"
-            : key.includes("_ph_")
-              ? "ph"
-              : key === "tank_temperature_sensor"
-                ? "temperature"
-                : undefined,
+          sensorKinds[key],
         );
     }
     for (const patch of changes.zones ?? []) {
-      if (patch.valve !== undefined) validate(patch.valve, ["switch"]);
+      if (patch.valve !== undefined) validate(patch.valve, actuatorDomains);
       for (const kind of ["vwc", "ec"] as const) {
         const sensors = patch[`${kind}_sensors`];
         if (sensors && new Set(sensors).size !== sensors.length)
