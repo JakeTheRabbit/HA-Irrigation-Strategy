@@ -166,6 +166,11 @@ describe("placement and keys", () => {
     });
   });
 
+  test("place answers 0/0 for an empty span", () => {
+    expect(place(block({}), { start: T0, end: T0 })).toEqual({ offsetPct: 0, sizePct: 0 });
+    expect(place(block({}), { start: T0, end: T0 - min })).toEqual({ offsetPct: 0, sizePct: 0 });
+  });
+
   test("queued block keeps requestedAt and pumpWaitS", () => {
     const requested = T0 - 5 * min;
     const [queued] = rowsOf([
@@ -283,6 +288,21 @@ describe("ShotTimeline", () => {
       createElement(ShotTimeline, { rows: list, span, now, mode: "full", timeZone: TZ }),
     );
     expect(out.match(/Planned shots not available from the controller/g)).toHaveLength(1);
+  });
+
+  test("blocks entirely outside the span are not drawn", () => {
+    const list = rows();
+    list[1].blocks.push(
+      block({ id: "before", start: T0 - 60 * min, end: T0 - 50 * min }),
+      block({ id: "after", start: T0 + 13 * 60 * min, end: T0 + 13 * 60 * min + min }),
+      block({ id: "edge", start: T0 - 5 * min, end: T0 + 5 * min }),
+    );
+    const out = renderToStaticMarkup(
+      createElement(ShotTimeline, { rows: list, span, now, mode: "full", timeZone: TZ }),
+    );
+    expect(out).not.toContain('data-id="before"');
+    expect(out).not.toContain('data-id="after"');
+    expect(out).toContain('data-id="edge"');
   });
 
   test("a collapsed room shows its zones' blocks on the room row", () => {

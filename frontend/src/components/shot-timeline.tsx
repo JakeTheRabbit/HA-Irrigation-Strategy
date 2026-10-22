@@ -7,7 +7,7 @@ import {
   type TimelineBlock,
   type TimelineRow,
 } from "@/lib/shot-timeline";
-import { clock, startOfDay } from "@/lib/time";
+import { clock, dayLabel, hourTicks } from "@/lib/time";
 import "./shot-timeline.css";
 
 type Key = "ArrowLeft" | "ArrowRight" | "ArrowUp" | "ArrowDown" | "Home";
@@ -22,23 +22,22 @@ const TURNED: Record<Key, Key> = {
 };
 const HOUR = 3_600_000;
 
-/** A collapsed room's row carries every block of its zones; its zone rows are left out. */
-function visibleRows(rows: TimelineRow[], collapsed: Set<string> | undefined): TimelineRow[] {
+/** Only blocks that touch the span are drawn. A collapsed room's row carries every block of its
+ * zones; its zone rows are left out. */
+function visibleRows(
+  rows: TimelineRow[],
+  collapsed: Set<string> | undefined,
+  span: { start: number; end: number },
+): TimelineRow[] {
+  const inSpan = (b: TimelineBlock) => b.start < span.end && b.end >= span.start;
   return rows.flatMap((row) => {
-    if (!collapsed?.has(row.roomId)) return [row];
+    if (!collapsed?.has(row.roomId)) return [{ ...row, blocks: row.blocks.filter(inSpan) }];
     if (row.zone !== null) return [];
-    const blocks = rows.filter((r) => r.roomId === row.roomId).flatMap((r) => r.blocks);
+    const blocks = rows
+      .filter((r) => r.roomId === row.roomId)
+      .flatMap((r) => r.blocks.filter(inSpan));
     return [{ ...row, blocks: blocks.sort((a, b) => a.start - b.start) }];
   });
-}
-
-function ticks(span: { start: number; end: number }, timeZone: string) {
-  const hours = (span.end - span.start) / HOUR;
-  const step = hours <= 12 ? 1 : hours <= 24 ? 2 : 4;
-  const out: number[] = [];
-  for (let t = Math.ceil(span.start / HOUR) * HOUR; t < span.end; t += HOUR)
-    if (Math.round((t - startOfDay(t, timeZone)) / HOUR) % step === 0) out.push(t);
-  return out;
 }
 
 /** Each zone's shots, holds, alerts and planned shots over a span, on one shared time axis.
@@ -73,10 +72,10 @@ export function ShotTimeline({
   // A strip is bare tracks: a room's own row (which names the room) draws nothing there.
   const visible = useMemo(
     () =>
-      visibleRows(rows, collapsedRooms).filter(
+      visibleRows(rows, collapsedRooms, span).filter(
         (r) => mode !== "strip" || r.zone !== null || r.blocks.length,
       ),
-    [rows, collapsedRooms, mode],
+    [rows, collapsedRooms, span.start, span.end, mode],
   );
   const names = new Map(rows.filter((r) => r.zone === null).map((r) => [r.roomId, r.label]));
   const maxWater = Math.max(
@@ -112,7 +111,8 @@ export function ShotTimeline({
 
   const length = span.end - span.start;
   const pct = (t: number) =>
-    ((Math.min(span.end, Math.max(span.start, t)) - span.start) / length) * 100;
+    length > 0 ? ((Math.min(span.end, Math.max(span.start, t)) - span.start) / length) * 100 : 0;
+  const hours = length / HOUR;
   const nowShown = now >= span.start && now <= span.end;
   const unavailable = span.end > now ? rows.filter((r) => r.plannedUnavailable) : [];
   const roomCount = rows.filter((r) => r.zone === null).length;
@@ -177,7 +177,8 @@ export function ShotTimeline({
       {clock(now, timeZone)}
     </span>
   );
-  const tickMarks = ticks(span, timeZone).map((t) => (
+  const step = hours <= 12 ? 1 : hours <= 24 ? 2 : 4;
+  const tickMarks = hourTicks(span.start, span.end, step, timeZone).map((t) => (
     <span
       key={t}
       className="st-tick"
@@ -218,12 +219,7 @@ export function ShotTimeline({
   const trackName = (row: TimelineRow) =>
     row.zone === null ? row.label : `${names.get(row.roomId) ?? row.roomId} ${row.label}`;
 
-  const range = new Intl.DateTimeFormat("en-GB", {
-    weekday: "short",
-    day: "numeric",
-    month: "short",
-    timeZone,
-  }).format(span.start);
+  const range = dayLabel(span.start, timeZone);
 
   let body;
   if (!vertical)
@@ -232,7 +228,7 @@ export function ShotTimeline({
         {labelled && (
           <div className="st-row st-head">
             <div className="st-label">
-              {range} · {Math.round(length / HOUR)} h
+              {range} · {Math.round(hours)} h
             </div>
             <div className="st-track st-axis">
               {tickMarks}
@@ -270,7 +266,7 @@ export function ShotTimeline({
       return { roomId, head, columns };
     });
     body = (
-      <div className="st-vgrid" style={{ "--hours": length / HOUR } as CSSProperties}>
+      <div className="st-vgrid" style={{ "--hours": hours } as CSSProperties}>
         {labelled && (
           <div className="st-vaxis" aria-hidden="true">
             <div className="st-vhead" />

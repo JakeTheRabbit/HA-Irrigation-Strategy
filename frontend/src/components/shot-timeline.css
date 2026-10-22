@@ -240,6 +240,21 @@
     transparent 2px 6px
   );
 }
+/* A skipped future slot while stale keeps its strike-through over the hatching. */
+.st-block[data-skipped][data-stale] {
+  background-image:
+    linear-gradient(
+      to top right,
+      transparent calc(50% - 1px),
+      var(--muted-foreground) 50%,
+      transparent calc(50% + 1px)
+    ),
+    repeating-linear-gradient(
+      -45deg,
+      color-mix(in srgb, var(--muted-foreground) 50%, transparent) 0 2px,
+      transparent 2px 6px
+    );
+}
 .st-block[data-focus] {
   box-shadow:
     0 0 0 2px var(--surface),

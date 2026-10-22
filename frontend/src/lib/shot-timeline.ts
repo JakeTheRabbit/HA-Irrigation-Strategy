@@ -132,12 +132,14 @@ export function toTimelineRows(
   });
 }
 
-/** Where a block sits in the span, in % of it; a block crossing an edge is cut at it. */
+/** Where a block sits in the span, in % of it; a block crossing an edge is cut at it. An empty
+ * span places everything at 0/0. */
 export function place(
   block: TimelineBlock,
   span: { start: number; end: number },
 ): { offsetPct: number; sizePct: number } {
   const length = span.end - span.start;
+  if (length <= 0) return { offsetPct: 0, sizePct: 0 };
   const clamp = (t: number) => Math.min(span.end, Math.max(span.start, t));
   const start = clamp(block.start);
   return {

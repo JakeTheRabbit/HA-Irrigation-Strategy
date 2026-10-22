@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { createDemo } from "./demo";
 import { discoverRooms } from "./model";
-import { openAlerts } from "./open-alerts";
+import { newestFirst, openAlerts } from "./open-alerts";
 import { fakeController } from "./test-helpers";
 import type { States } from "./types";
 
@@ -114,5 +114,42 @@ describe("openAlerts", () => {
     expect(openAlerts(c).map((a) => [a.roomId, a.title])).toEqual([
       ["room:", "Stock tank running low"],
     ]);
+  });
+  test("an unknown time is null, never NaN, and sorts last", () => {
+    const states = createDemo(Date.now());
+    const c = fakeController({
+      states: {
+        ...states,
+        ...lowStock(""),
+        "sensor.crop_steering_room_b_alerts_open": {
+          entity_id: "sensor.crop_steering_room_b_alerts_open",
+          state: "1",
+          attributes: {
+            alerts: [
+              {
+                event_id: "e",
+                ts: null,
+                code: null,
+                title: "Odd",
+                zone: null,
+                entity_id: null,
+                acknowledged: false,
+              },
+            ],
+          },
+        },
+      },
+      rooms: discoverRooms(states),
+      roomId: "room:",
+      lastUpdated: null,
+    });
+    const all = openAlerts(c);
+    expect(all.map((a) => a.at)).toEqual([null, null]);
+    const sorted = [
+      { ...all[0], at: null },
+      { ...all[0], at: 5 },
+      { ...all[0], at: 9 },
+    ].sort(newestFirst);
+    expect(sorted.map((a) => a.at)).toEqual([9, 5, null]);
   });
 });

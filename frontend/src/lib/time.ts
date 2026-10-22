@@ -77,3 +77,32 @@ export function lightsWindow(dayStartMs: number, onHHMM: string, offHHMM: string
   const nextDay = off.h * 60 + off.m <= on.h * 60 + on.m ? 1 : 0;
   return { on: zoned(y, m, d, on.h, on.m, tz), off: zoned(y, m, d + nextDay, off.h, off.m, tz) };
 }
+/** The instants in [startMs, endMs) whose wall clock reads a whole hour divisible by `stepHours`
+ * ("00:00", "02:00" …), on the zone's clock: half-hour and 45-minute zones and daylight-saving days
+ * included (an hour the clock skips is left out, one it repeats counts once). */
+export function hourTicks(startMs: number, endMs: number, stepHours: number, tz: string): number[] {
+  const out = new Set<number>();
+  for (let day = startOfDay(startMs, tz); day < endMs; day = startOfDay(day + 36 * 3_600_000, tz)) {
+    const { y, m, d } = wall(day, tz);
+    for (let h = 0; h < 24; h += stepHours) {
+      const t = zoned(y, m, d, h, 0, tz);
+      if (t >= startMs && t < endMs && wall(t, tz).h === h) out.add(t);
+    }
+  }
+  return [...out].sort((a, b) => a - b);
+}
+const dayLabels = new Map<string, Intl.DateTimeFormat>();
+/** The zone's date as "Thu 22 Oct". */
+export function dayLabel(ms: number, tz: string): string {
+  let f = dayLabels.get(tz);
+  if (!f) {
+    f = new Intl.DateTimeFormat("en-GB", {
+      weekday: "short",
+      day: "numeric",
+      month: "short",
+      timeZone: tz,
+    });
+    dayLabels.set(tz, f);
+  }
+  return f.format(ms);
+}

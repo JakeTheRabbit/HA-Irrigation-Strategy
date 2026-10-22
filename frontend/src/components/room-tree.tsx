@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { number } from "@/components/dashboard";
 import { facilityRooms, irrigationMode, pickKey } from "@/lib/facility";
 import { openAlerts } from "@/lib/open-alerts";
@@ -43,6 +43,11 @@ export function RoomTree({
   const sheet = useRef<HTMLDialogElement>(null);
   const picking = !!pick;
 
+  // Whatever opened the picker gets focus back when it ends (captured before the sheet takes it).
+  const opener = useRef<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (picking) opener.current = document.activeElement as HTMLElement | null;
+  }, [picking]);
   // Desktop: the page waits while the tree picks. Phone: the sheet is modal by itself.
   useEffect(() => {
     if (!picking || phone) return;
@@ -52,8 +57,20 @@ export function RoomTree({
   }, [picking, phone]);
   useEffect(() => {
     const dialog = sheet.current;
-    if (picking && phone && dialog && !dialog.open) dialog.showModal();
+    if (!picking || !phone || !dialog) return;
+    if (!dialog.open) dialog.showModal();
+    return () => {
+      if (dialog.open) dialog.close();
+    };
   }, [picking, phone]);
+  // After the cleanups above (inert off, sheet closed), so the opener can take focus again.
+  useEffect(() => {
+    if (!picking) return;
+    return () => {
+      opener.current?.focus?.();
+      opener.current = null;
+    };
+  }, [picking]);
 
   const rooms = facilityRooms(controller.states, controller.rooms);
   const alerts = openAlerts(controller);
@@ -111,7 +128,8 @@ export function RoomTree({
       aria-label={pick ? pick.title : "Rooms"}
       data-picking={picking || undefined}
       onKeyDown={(event) => {
-        if (pick && event.key === "Escape") pick.onCancel();
+        // On phone the sheet's own cancel event answers Escape.
+        if (pick && !phone && event.key === "Escape") pick.onCancel();
       }}
     >
       <span className="room-tree-heading">{pick ? pick.title : "Rooms"}</span>

@@ -12,9 +12,19 @@ export interface OpenAlert {
   code: string | null;
   title: string;
   ruleId: string | null;
-  /** When it was raised (epoch ms); on 3.17, when the controller last reported. */
-  at: number;
+  /** When it was raised (epoch ms); on 3.17, when the controller last reported. Null when
+   * unknown: sort with `newestFirst`, which puts those last. */
+  at: number | null;
 }
+
+/** Newest first; alerts with no known time last. */
+export const newestFirst = (a: OpenAlert, b: OpenAlert) =>
+  a.at === null ? (b.at === null ? 0 : 1) : b.at === null ? -1 : b.at - a.at;
+
+const instant = (text: string | null | undefined) => {
+  const ms = text ? Date.parse(text) : NaN;
+  return Number.isNaN(ms) ? null : ms;
+};
 
 interface InboxAlert {
   event_id?: string | null;
@@ -44,7 +54,7 @@ export function openAlerts(controller: Controller): OpenAlert[] {
           code: alert.code ?? null,
           title: alert.title || alert.code || "Alert",
           ruleId: alert.rule_id ?? null,
-          at: alert.ts ? Date.parse(alert.ts) : NaN,
+          at: instant(alert.ts),
         }));
     return buildRoom(states, room)
       .alerts.filter((notice) => notice.severity !== "info")
@@ -56,7 +66,7 @@ export function openAlerts(controller: Controller): OpenAlert[] {
           code: asCode(notice.title),
           title: notice.title,
           ruleId: null,
-          at: controller.lastUpdated ?? NaN,
+          at: controller.lastUpdated ?? null,
         })),
       );
   });
