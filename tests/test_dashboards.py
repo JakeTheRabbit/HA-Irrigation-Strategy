@@ -108,3 +108,8 @@ def test_the_number_is_the_lowest_free_one():
         == "crop-steering-facility_wall-1"
     )
     assert dashboards.TEMPLATES == ("facility_wall", "room_tablet", "dosing_station")
+
+
+def test_a_dashboard_that_would_name_no_entity_is_refused():
+    with pytest.raises(ValueError, match="would show nothing"):
+        dashboards.render("dosing_station", [VEG])

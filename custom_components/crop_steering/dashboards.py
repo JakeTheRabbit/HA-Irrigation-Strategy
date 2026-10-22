@@ -208,7 +208,14 @@ def render(template: str, rooms: list[dict]) -> dict:
         raise ValueError(f"Unknown dashboard template {template!r}")
     if not rooms:
         raise ValueError("Choose at least one room")
-    return {"views": _RENDER[template](rooms)}
+    views = _RENDER[template](rooms)
+    # A card is only made with an entity in it, so no card means nothing to show.
+    if not any(view["cards"] for view in views):
+        raise ValueError(
+            f"The {template} dashboard would show nothing: the chosen rooms have none of the "
+            "entities it uses"
+        )
+    return {"views": views}
 
 
 def url_path_for(template: str, used) -> str:
@@ -261,27 +268,36 @@ def room_of(hass, room_id: str) -> dict:
     }
 
 
-def _lovelace(hass):
-    """(dashboards collection, {url_path: LovelaceConfig}), or a HomeAssistantError while Home
-    Assistant's dashboards are not loaded.
-
-    Read from Home Assistant 2024.10 and 2026.9: hass.data["lovelace"] is a dict there and a
-    LovelaceData dataclass here, and 2026.9 keeps the collection nowhere but in the websocket
-    commands it serves (DashboardsCollectionWebSocket.storage_collection), so it is found there.
+def _dashboards(hass):
+    """{url_path: LovelaceConfig} of Home Assistant's dashboards, or None while they are not loaded.
+    hass.data["lovelace"] is a dict on Home Assistant 2024.10 and a LovelaceData dataclass on 2026.9.
     """
+    data = hass.data.get("lovelace")
+    if isinstance(data, dict):
+        return data.get("dashboards")
+    return getattr(data, "dashboards", None)
+
+
+def _lovelace(hass):
+    """(dashboards collection, {url_path: LovelaceConfig}) for a create, or a HomeAssistantError.
+
+    Home Assistant 2026.9 keeps the dashboards collection nowhere but in the websocket commands it
+    serves (DashboardsCollectionWebSocket.storage_collection), so it is found there; 2024.10 the same
+    way. Read in the lovelace and websocket_api sources of both versions."""
     from homeassistant.exceptions import HomeAssistantError
 
-    data = hass.data.get("lovelace")
-    dashboards = getattr(data, "dashboards", None)
-    if dashboards is None and isinstance(data, dict):
-        dashboards = data.get("dashboards")
-    handler = (hass.data.get("websocket_api") or {}).get("lovelace/dashboards/create")
-    owner = getattr(inspect.unwrap(handler[0]), "__self__", None) if handler else None
-    collection = getattr(owner, "storage_collection", None)
-    if dashboards is None or collection is None:
+    dashboards = _dashboards(hass)
+    if dashboards is None:
         raise HomeAssistantError(
             "Home Assistant's dashboards are not loaded yet. Try again once Home Assistant has "
             "finished starting."
+        )
+    handler = (hass.data.get("websocket_api") or {}).get("lovelace/dashboards/create")
+    owner = getattr(inspect.unwrap(handler[0]), "__self__", None) if handler else None
+    collection = getattr(owner, "storage_collection", None)
+    if collection is None:
+        raise HomeAssistantError(
+            "Crop Steering cannot reach HA's dashboards collection (unsupported HA version)."
         )
     return collection, dashboards
 
@@ -304,6 +320,8 @@ class DashboardStore:
             if value is not None:
                 if not isinstance(value.get("dashboards"), list):
                     raise ValueError("dashboards is not a list")
+                if type(value.get("revision")) is not int:
+                    raise ValueError("revision is not a whole number")
                 self.document = value
         except Exception as error:
             # Creating is then refused, so the file is never overwritten.
@@ -311,10 +329,7 @@ class DashboardStore:
             _LOGGER.error("Crop Steering dashboards: %s", self.error)
 
     def listing(self) -> dict:
-        try:
-            _, existing = _lovelace(self.hass)
-        except Exception:
-            existing = {}
+        existing = _dashboards(self.hass) or {}
         return {
             "dashboards": [
                 {
@@ -366,7 +381,7 @@ class DashboardStore:
                 | set(dashboards)
             )
             url_path = url_path_for(template, used)
-            await collection.async_create_item(
+            item = await collection.async_create_item(
                 {
                     "url_path": url_path,
                     "title": title,
@@ -376,27 +391,46 @@ class DashboardStore:
                     "mode": "storage",
                 }
             )
-            await dashboards[url_path].async_save(deepcopy(config))
-            if await dashboards[url_path].async_load(False) != config:
-                raise HomeAssistantError(
-                    f"Dashboard {url_path} was created but its config did not read back"
-                )
             who = who or {}
             old = deepcopy(self.document["dashboards"])
-            new = old + [
-                {
-                    "url_path": url_path,
-                    "title": title,
-                    "template": template,
-                    "rooms": room_ids,
-                    "created_at": datetime.now(timezone.utc).isoformat(
-                        timespec="seconds"
-                    ),
-                    "by": {"actor": who.get("actor"), "user_id": who.get("user_id")},
+            try:
+                await dashboards[url_path].async_save(deepcopy(config))
+                if await dashboards[url_path].async_load(False) != config:
+                    raise HomeAssistantError(
+                        f"Dashboard {url_path} was created but its config did not read back"
+                    )
+                new = old + [
+                    {
+                        "url_path": url_path,
+                        "title": title,
+                        "template": template,
+                        "rooms": room_ids,
+                        "created_at": datetime.now(timezone.utc).isoformat(
+                            timespec="seconds"
+                        ),
+                        "by": {
+                            "actor": who.get("actor"),
+                            "user_id": who.get("user_id"),
+                        },
+                    }
+                ]
+                document = {
+                    "revision": self.document.get("revision", 0) + 1,
+                    "dashboards": new,
                 }
-            ]
-            document = {"revision": self.document["revision"] + 1, "dashboards": new}
-            await self._store.async_save(deepcopy(document))
+                await self._store.async_save(deepcopy(document))
+            except Exception:
+                # Nothing half-made stays in Home Assistant, and the number is free again.
+                try:
+                    await collection.async_delete_item(item["id"])
+                except Exception as error:
+                    _LOGGER.error(
+                        "Crop Steering dashboards: %s could not be removed after a failed "
+                        "create: %s",
+                        url_path,
+                        error,
+                    )
+                raise
             self.document = document
         shared = new_id()
         for room_id in room_ids:

@@ -95,3 +95,59 @@ async def test_without_dashboards_loaded_a_create_says_so(hass, hass_admin_user)
     with pytest.raises(HomeAssistantError, match="dashboards are not loaded yet"):
         await _call(hass, hass_admin_user, "dashboard_create", template="facility_wall", rooms=[ROOM])
     assert (await _call(hass, hass_admin_user, "dashboard_list"))["dashboards"] == []
+
+
+async def test_list_reads_ha_dashboards_even_when_the_collection_cannot_be_reached(
+    hass, hass_admin_user
+):
+    await _install(hass)
+    assert await async_setup_component(hass, "lovelace", {})
+    made = await _call(hass, hass_admin_user, "dashboard_create", template="room_tablet", rooms=[ROOM])
+    hass.data["websocket_api"].pop("lovelace/dashboards/create")
+
+    listed = await _call(hass, hass_admin_user, "dashboard_list")
+    assert [(d["url_path"], d["exists"]) for d in listed["dashboards"]] == [(made["url_path"], True)]
+    with pytest.raises(HomeAssistantError, match="cannot reach HA's dashboards collection"):
+        await _call(hass, hass_admin_user, "dashboard_create", template="room_tablet", rooms=[ROOM])
+
+
+async def test_a_failed_create_leaves_no_dashboard_and_frees_its_number(hass, hass_admin_user):
+    await _install(hass)
+    assert await async_setup_component(hass, "lovelace", {})
+    store = hass.data[DOMAIN]["_dashboards"]._store
+    saved = store.async_save
+
+    async def refuse(_data):
+        raise OSError("disk full")
+
+    store.async_save = refuse
+    with pytest.raises(HomeAssistantError, match="disk full"):
+        await _call(hass, hass_admin_user, "dashboard_create", template="room_tablet", rooms=[ROOM])
+    await hass.async_block_till_done()
+    assert not [i for i in _collection(hass).async_items() if i["url_path"].startswith("crop-steering-")]
+    served = hass.data["lovelace"]
+    dashboards = served.dashboards if hasattr(served, "dashboards") else served["dashboards"]
+    assert "crop-steering-room_tablet-1" not in dashboards
+    assert (await _call(hass, hass_admin_user, "dashboard_list"))["dashboards"] == []
+
+    store.async_save = saved
+    made = await _call(hass, hass_admin_user, "dashboard_create", template="room_tablet", rooms=[ROOM])
+    assert made["url_path"] == "crop-steering-room_tablet-1"
+
+
+async def test_a_dashboard_with_nothing_to_show_is_refused(hass, hass_admin_user):
+    await _install(hass)
+    assert await async_setup_component(hass, "lovelace", {})
+    # A room with no dosing entities: the ones a dosing station would show are disabled.
+    from homeassistant.helpers import entity_registry as er
+
+    registry = er.async_get(hass)
+    for key in ("dosing_config", "stock_low", "feed_ec_corrected", "feed_ph_corrected"):
+        if registry.async_get(f"sensor.crop_steering_tent_{key}"):
+            registry.async_update_entity(
+                f"sensor.crop_steering_tent_{key}",
+                disabled_by=er.RegistryEntryDisabler.USER,
+            )
+    with pytest.raises(HomeAssistantError, match="would show nothing"):
+        await _call(hass, hass_admin_user, "dashboard_create", template="dosing_station", rooms=[ROOM])
+    assert not [i for i in _collection(hass).async_items() if i["url_path"].startswith("crop-steering-")]
