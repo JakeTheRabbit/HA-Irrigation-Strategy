@@ -1969,6 +1969,7 @@ class Controller:
         # Preserve undiscovered rooms and unknown metadata/zones. A descriptor going
         # missing must never delete counters or erase a latched shared-hardware hold.
         out = dict(getattr(self, "_saved_room_blocks", {}))
+        self._unsaved_rooms = {}  # slug -> the error: what this save could not write (see _loop_room)
         for room in self.rooms:
             try:  # one room's state that cannot be saved must not stop every room's save
                 prior = out.get(room.slug)
@@ -2026,6 +2027,7 @@ class Controller:
                 json.dumps(block)  # what json.dump below would refuse, refused here, for this room only
             except Exception as e:
                 log("state save failed", room.slug, e, "- its last saved state is kept")
+                self._unsaved_rooms[room.slug] = f"{type(e).__name__}: {e}"
                 continue
             out[room.slug] = block
         try:
@@ -5608,7 +5610,11 @@ class Controller:
                 "zone": zone, "valve": valve, "mainline": mainline, "pump": pump,
                 "started": datetime.now(timezone.utc).isoformat(),
             }
-            self._save_state()
+            saved = self._save_state()
+            unsaved = getattr(self, "_unsaved_rooms", {}).get(room.slug)
+            if not saved or unsaved:  # no record on disk, nothing opens (raised below: CS-212)
+                raise RuntimeError(f"Z{zone} shot refused, its in-flight record was not saved: "
+                                   f"{unsaved or 'the state file could not be written'}")
             commanded = True
             # OPEN sequence — FAIL CLOSED: if any service call errors, cut what's on, alert, and DO NOT count the shot
             # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
@@ -5754,6 +5760,8 @@ class Controller:
             raise
         except Exception as e:
             log("shot error", room.slug, zone, e)
+            if not commanded:  # nothing opened: the room's pass stops here and says so (CS-212)
+                raise
         finally:
             try:
                 # Early command failures and unexpected exceptions need the SAME hold
@@ -6843,6 +6851,10 @@ class Controller:
     def _loop_room(self, room, now):
         """One room's full control pass: snapshot -> decide -> act -> build the publish dict.
         Reads/writes only this room's prefixed entities + its own state."""
+        if getattr(self, "_unsaved_rooms", {}).get(room.slug):
+            self._save_state()  # tried again each pass; until it saves, the room stops here (CS-212)
+            if self._unsaved_rooms.get(room.slug):
+                raise RuntimeError(f"the state of this room cannot be saved: {self._unsaved_rooms[room.slug]}")
         try:
             import prompt_runtime
             prompt_runtime.sync(self, room, ha_get, ha_call)

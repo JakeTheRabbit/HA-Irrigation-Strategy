@@ -3,7 +3,7 @@
 `_busy` is set before the shot reads its lead times and writes its in-flight record; if either raised,
 `_busy` stayed True for good: every later loop returned at once, the in-flight record was never
 reconciled, and no room was watered again (CTL-032). And one room's state that cannot be saved must
-not make the save raise for every room."""
+not make the save raise for every room, nor let a shot open with no record on disk."""
 import copy
 import json
 from datetime import datetime
@@ -71,28 +71,49 @@ def test_a_bad_lead_time_before_any_valve_opens_does_not_wedge_the_controller(ri
     c, fake = rig
     monkeypatch.setattr(controller, "parameter_override",
                         lambda snap, zone, suffix: "junk" if suffix == "pump_prime_time" else None)
-    c._execute_shot(c.rooms[0], 1, 6, 5)
+    with pytest.raises(ValueError):  # the room's pass stops and says so (CS-212, loop_once)
+        c._execute_shot(c.rooms[0], 1, 6, 5)
     assert c._busy is False and c._shot_room is None
     assert switched(fake) == []  # nothing opened, and nothing a person may be using was switched off
     assert c.rooms[0].shot_inflight is None
     assert loop_runs(c, monkeypatch)
 
 
-def test_a_failed_write_ahead_save_does_not_wedge_the_controller(rig, monkeypatch):
+def unsavable(room, zone=2):
+    room.state[zone]["day_hist"] = [object()]  # what json cannot write
+
+
+def test_a_shot_whose_record_cannot_be_saved_opens_nothing(rig, monkeypatch):
     c, fake = rig
-    real = c._save_state
-
-    def broken():
-        if c.rooms[0].shot_inflight:
-            raise TypeError("a room's state cannot be saved")
-        return real()
-
-    monkeypatch.setattr(c, "_save_state", broken)
-    c._execute_shot(c.rooms[0], 1, 6, 5)
-    assert c._busy is False and c._shot_room is None
+    room = c.rooms[0]
+    unsavable(room)
+    before = dict(room.state[1])
+    with pytest.raises(RuntimeError, match="in-flight record was not saved"):
+        c._execute_shot(room, 1, 6, 5)
     assert switched(fake) == []
-    assert c.rooms[0].shot_inflight is None  # nothing opened: no record left to block the room's shots
+    assert room.state[1]["daily_vol"] == before["daily_vol"] and room.state[1]["last_shot"] == before["last_shot"]
+    assert c._busy is False and c._shot_room is None and room.shot_inflight is None
     assert loop_runs(c, monkeypatch)
+
+
+def test_a_shot_is_refused_when_the_state_file_cannot_be_written(rig, tmp_path):
+    c, fake = rig
+    c._state_path = str(tmp_path / "missing" / "state.json")
+    with pytest.raises(RuntimeError, match="state file could not be written"):
+        c._execute_shot(c.rooms[0], 1, 6, 5)
+    assert switched(fake) == [] and c._busy is False and c.rooms[0].shot_inflight is None
+
+
+def test_a_room_whose_state_cannot_be_saved_stops_its_pass_until_it_saves(rig):
+    c, _ = rig
+    room = c.rooms[0]
+    unsavable(room)
+    c._save_state()
+    with pytest.raises(RuntimeError, match="cannot be saved"):  # loud: CS-212 for this room (loop_once)
+        c._loop_room(room, NOW)
+    room.state[2]["day_hist"] = []
+    c._save_state()
+    assert c._unsaved_rooms == {}
 
 
 def test_a_normal_shot_still_opens_closes_and_clears_its_record(rig):
@@ -110,10 +131,12 @@ def test_one_rooms_bad_state_does_not_stop_the_others_saving(rig):
     assert c._save_state()
     bad = copy.copy(good)
     bad.slug = "other"
-    bad.state = {1: None}  # cannot be serialised
+    bad.state = {1: dict(good.state[1])}
+    unsavable(bad, 1)
     c.rooms = [bad, good]
     good.shot_inflight = {"zone": 1, "valve": "switch.v1", "mainline": "switch.m", "pump": "switch.p",
                           "started": "2026-10-22T00:00:00+00:00"}
     assert c._save_state()
     assert saved(c)["default"]["_shot_inflight"]["valve"] == "switch.v1"
     assert "other" not in saved(c)  # the bad room keeps what it had saved before (here: nothing)
+    assert list(c._unsaved_rooms) == ["other"]
