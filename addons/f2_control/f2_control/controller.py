@@ -2078,11 +2078,15 @@ class Controller:
 
     def _room_duration_cap(self, room):
         """Read the canonical room cap, or its same-room legacy entity if absent. A read that fails
-        (no answer, an HA error) is not "absent": it keeps the cap read earlier this run, or holds."""
+        (no answer, an HA error) is not "absent": it keeps the cap read earlier this run, or holds.
+        `room._cap_seen` is only ever the value the last answered read gave (None after an invalid
+        value or a missing entity). Accepted by design: a cap lowered since that read loses to the
+        old value if the very next read fails; the read after it applies the new one."""
         for suffix in ("max_shot_duration", "maximum_shot_duration"):
             entity = f"number.crop_steering_{room.prefix}{suffix}"
             status, (raw, _attributes, _updated) = ha_get_status(entity)
             if status == 404:
+                room._cap_seen = None
                 continue
             if status != 200:
                 last = room.__dict__.get("_cap_seen")
@@ -2104,7 +2108,9 @@ class Controller:
                 value = None
             if value is not None and math.isfinite(value) and value >= 5:
                 room._cap_seen = value
+                self._dismiss(f"duration_config_{room.slug}")
                 return value
+            room._cap_seen = None
             self._alert(
                 f"duration_config_{room.slug}",
                 "CS-203",
