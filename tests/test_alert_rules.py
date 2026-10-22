@@ -15,7 +15,7 @@ from . import ha_stubs
 
 ha_stubs.install()
 
-from custom_components.crop_steering import site_api  # noqa: E402
+from custom_components.crop_steering import alert_rules, site_api  # noqa: E402
 from custom_components.crop_steering.alert_rules import (  # noqa: E402
     replay,
     step,
@@ -567,3 +567,179 @@ def test_a_rule_push_goes_by_its_own_kind_and_an_emergency_one_past_a_mute():
     assert asyncio.run(notifier.send(data))["muted"] is True
     urgent = evaluator.push_data(rule(routing="emergency"), "t", "m")
     assert asyncio.run(notifier.send(urgent))["sent_to"] == ["notify.sensor_phone"]
+
+
+# ------------------------------------------------------------------ fix round 1
+def _raise(states, r):
+    hass, evaluator, site = rig(states)
+    notifier = hass.data[DOMAIN]["_notify"] = Notifier()
+
+    async def go():
+        evaluator.evaluate(r, at(10))
+        await asyncio.gather(*hass.tasks)
+
+    asyncio.run(go())
+    (push,) = notifier.sent
+    return push["title"], push["message"]
+
+
+@pytest.mark.parametrize(
+    "states,kw,title,message",
+    [
+        (
+            {"sensor.crop_steering_f2_vwc_zone_1": "25"},
+            {"source": "zone.vwc", "zones": [1], "threshold": 40},
+            "F2 zone 1 VWC below 40%",
+            "Zone 1 VWC is 25%. Tell when F2 zone 1 VWC goes below 40%.",
+        ),
+        (
+            {
+                "sensor.crop_steering_f2_engine_config": ha_stubs.FakeState(
+                    "ok", {"feed_ph_sensor": "sensor.raw_ph"}
+                ),
+                "sensor.raw_ph": "6.5",
+            },
+            {"source": "feed.ph", "op": "above", "threshold": 6.2},
+            "F2 feed pH above pH 6.2",
+            "Feed pH is pH 6.5. Tell when F2 feed pH goes above pH 6.2.",
+        ),
+        (
+            {"sensor.crop_steering_f2_ec_zone_2": "4.1"},
+            {"source": "zone.ec", "zones": [2], "op": "above", "threshold": 3.5},
+            "F2 zone 2 EC above 3.5 mS/cm",
+            "Zone 2 EC is 4.1 mS/cm. Tell when F2 zone 2 EC goes above 3.5 mS/cm.",
+        ),
+    ],
+)
+def test_the_raised_push_says_exactly_what_crossed(states, kw, title, message):
+    assert _raise(states, rule(min_duration_s=0, **kw)) == (title, message)
+
+
+def test_a_pending_breach_that_leaves_its_window_is_outside_window_not_short():
+    r = rule(window="lights_on", min_duration_s=600)  # lights 06:00-18:00
+    out = replay([(at(17, 55), 10), (at(18, 30), 50)], r, LIGHTS)
+    assert out["count"] == 0
+    assert out["ignored"] == [
+        {
+            "start": at(17, 55).isoformat(),
+            "end": at(18, 30).isoformat(),
+            "reason": "outside window",
+        }
+    ]
+
+
+def test_a_pending_breach_held_by_a_mute_is_muted_not_short():
+    r = rule(min_duration_s=600)
+    out = replay(
+        [(at(9), 10), (at(9, 20), 50)], r, LIGHTS, muted=[(at(9, 5), at(9, 30))]
+    )
+    assert out["ignored"] == [
+        {"start": at(9).isoformat(), "end": at(9, 20).isoformat(), "reason": "muted"}
+    ]
+
+
+def test_a_breach_ended_by_a_missing_reading_has_no_ignored_row():
+    r = rule(min_duration_s=600)
+    out = replay([(at(9), 10), (at(9, 1), None), (at(9, 10), 50)], r, LIGHTS)
+    assert out["ignored"] == [] and out["count"] == 0
+
+
+def test_wording_names_durations_and_windows():
+    probe = rule(
+        source="probe.silence_s", entity_id="sensor.slab_1", op="above", threshold=600
+    )
+    assert summary_sentence(probe, "F2", "Slab 1") == (
+        "Tell when F2 Slab 1 silence stays above 10 min for 2 min."
+    )
+    assert alert_rules.amount(7200, "s") == "2 h"
+    assert alert_rules.amount(45, "s") == "45 s"
+    assert summary_sentence(rule(min_duration_s=600)).endswith("for 10 min.")
+    with pytest.raises(ValueError, match="Start and end can't be the same"):
+        rule(window={"kind": "custom", "from": "06:00", "to": "06:00"})
+
+
+def test_names_come_from_the_stock_store_and_the_probe():
+    hass, evaluator, site = rig(
+        {"sensor.slab_1": ha_stubs.FakeState("40", {"friendly_name": "Slab 1"})}
+    )
+    hass.data[DOMAIN]["_stock"] = {
+        "f2": SimpleNamespace(
+            room_id=ROOM,
+            error=None,
+            data={
+                "tanks": [
+                    {
+                        "id": "bloom",
+                        "name": "Bloom A",
+                        "level_l": 4.0,
+                        "capacity_l": 20.0,
+                    }
+                ]
+            },
+        )
+    }
+    tank = rule(source="stock.litres", tank_id="bloom", threshold=5)
+    assert site_api.rule_title(hass, tank) == "F2 stock tank Bloom A below 5 L"
+    probe = rule(
+        source="probe.silence_s", entity_id="sensor.slab_1", op="above", threshold=600
+    )
+    assert site_api.rule_title(hass, probe) == "F2 Slab 1 silence above 10 min"
+    assert site_api.rule_title(hass, rule()) == "F2 tank level below 30%"
+
+
+def test_the_last_rule_deleted_unsubscribes_everything():
+    made, undone = [], []
+
+    def track(*a):
+        made.append(a)
+        return lambda: undone.append(a)
+
+    hass, evaluator, site = rig({"sensor.crop_steering_f2_tank_level": "50"})
+    old = (event.async_track_time_interval, event.async_track_state_change_event)
+    event.async_track_time_interval = event.async_track_state_change_event = track
+    try:
+        saved = save(site, {**rule(), "id": None})["rule"]
+        assert len(made) == 2 and evaluator._watching
+        asyncio.run(site.delete_rule({"id": saved["id"], "expected_revision": 1}))
+    finally:
+        event.async_track_time_interval, event.async_track_state_change_event = old
+    assert len(undone) == 2
+    assert evaluator._unsubs == [] and evaluator._watching == ()
+
+
+def test_after_a_restart_a_silent_probe_counts_from_its_last_recorded_report(
+    monkeypatch,
+):
+    import types
+
+    probe = "sensor.slab_1"
+    recorded = [
+        ha_stubs.FakeState("41", last_updated=at(9, 20)),
+        ha_stubs.FakeState("unavailable", last_updated=at(9, 40)),
+    ]
+    recorder = types.ModuleType("homeassistant.components.recorder")
+    history = types.ModuleType("homeassistant.components.recorder.history")
+    history.get_last_state_changes = lambda hass, n, entity_id: {entity_id: recorded}
+
+    class Instance:
+        async def async_add_executor_job(self, func, *args):
+            return func(*args)
+
+    recorder.get_instance = lambda hass: Instance()
+    recorder.history = history
+    components = types.ModuleType("homeassistant.components")
+    components.__path__ = []
+    monkeypatch.setitem(sys.modules, "homeassistant.components", components)
+    monkeypatch.setitem(sys.modules, "homeassistant.components.recorder", recorder)
+    monkeypatch.setitem(
+        sys.modules, "homeassistant.components.recorder.history", history
+    )
+    hass, evaluator, site = rig()
+    hass.config.components = {"recorder"}
+    hass.states.set(probe, "unavailable", last_changed=at(9, 58))  # since the restart
+    r = rule(source="probe.silence_s", entity_id=probe, op="above", threshold=600)
+    assert (
+        evaluator.value(r, at(10)) == 120
+    )  # nothing remembered: since it went unavailable
+    asyncio.run(evaluator.seed_reports([probe]))
+    assert evaluator.value(r, at(10)) == 40 * 60  # since its last numeric report

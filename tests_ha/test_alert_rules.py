@@ -5,7 +5,9 @@ entity platform and registry; an old install with no rules gets no binary sensor
 
 from datetime import timedelta
 
-from homeassistant.core import Context
+from homeassistant.config_entries import ConfigEntryState
+from homeassistant.core import Context, SupportsResponse
+from homeassistant.data_entry_flow import FlowResultType
 from homeassistant.helpers import entity_registry as er
 from pytest_homeassistant_custom_component.common import async_fire_time_changed
 from test_non_admin_user import _staff
@@ -62,6 +64,8 @@ async def test_rule_entity_appears_and_turns_on_after_min_duration(
     await _minute(hass, freezer, 61)
     state = hass.states.get(entity_id)
     assert state.state == "on" and state.attributes["firing_since"]
+    # A short name, with the room's name and no sentence.
+    assert state.attributes["friendly_name"].endswith(" tank level below 30%")
 
     listed = await _call(hass, None, "alert_rule_list", room_id=ROOM)
     (row,) = listed["rules"]
@@ -118,3 +122,126 @@ async def test_old_install_without_rules_loads_with_no_binary_sensors(hass):
     site = hass.data[DOMAIN]["_site"]
     assert site.alerts._unsubs == [] and site.alerts._watching == ()
     assert (await _call(hass, None, "alert_rule_list"))["rules"] == []
+
+
+async def test_alert_rule_test_can_send_so_it_answers_optionally(hass):
+    await _install(hass)
+    supports = hass.services.supports_response
+    assert supports(DOMAIN, "alert_rule_test") is SupportsResponse.OPTIONAL
+    for read in ("alert_rule_list", "alert_rule_preview"):
+        assert supports(DOMAIN, read) is SupportsResponse.ONLY
+
+
+async def _fire(hass, freezer, entity_id):
+    await _minute(hass, freezer)
+    assert hass.states.get(entity_id).state == "off"
+    await _minute(hass, freezer, 61)
+    assert hass.states.get(entity_id).state == "on"
+
+
+async def test_a_firing_rule_fires_again_after_a_restart(
+    hass, hass_admin_user, freezer
+):
+    """The rule's state lives in memory: a restart arms it again, and a source still out of range
+    raises it again once min_duration_s has passed."""
+    entry = await _install(hass)
+    hass.states.async_set(LEVEL, "12", {"unit_of_measurement": "%"})
+    saved = await _call(
+        hass, hass_admin_user, "alert_rule_set", expected_revision=0, rule=RULE
+    )
+    await hass.async_block_till_done()
+    entity_id = f"binary_sensor.crop_steering_rule_{saved['rule']['id'].lower()}"
+    await _fire(hass, freezer, entity_id)
+
+    assert await hass.config_entries.async_reload(entry.entry_id)
+    await hass.async_block_till_done()
+    state = hass.states.get(entity_id)
+    assert state.state == "off" and state.attributes["state"] == "pending"
+    await _fire(hass, freezer, entity_id)
+    events = await _call(
+        hass,
+        None,
+        "journal_query",
+        room_id=ROOM,
+        since="2000-01-01T00:00:00+00:00",
+        kinds=["alert.raised"],
+    )
+    assert [e["data"]["rule_id"] for e in events["events"]] == [saved["rule"]["id"]] * 2
+
+
+async def test_the_last_room_unloading_stops_the_rules(hass, hass_admin_user, freezer):
+    entry = await _install(hass)
+    hass.states.async_set(LEVEL, "12", {"unit_of_measurement": "%"})
+    await _call(hass, hass_admin_user, "alert_rule_set", expected_revision=0, rule=RULE)
+    await hass.async_block_till_done()
+    evaluator = hass.data[DOMAIN]["_site"].alerts
+    assert evaluator._unsubs and evaluator._watching
+    assert await hass.config_entries.async_unload(entry.entry_id)
+    await hass.async_block_till_done()
+    assert entry.state is ConfigEntryState.NOT_LOADED
+    assert evaluator._unsubs == [] and evaluator._watching == ()
+    assert "_site" not in hass.data.get(DOMAIN, {})
+    before = dict(evaluator.states)
+    hass.states.async_set(LEVEL, "5", {"unit_of_measurement": "%"})
+    await _minute(hass, freezer, 180)
+    assert evaluator.states == before  # nothing evaluates any more
+
+
+async def _second_room(hass):
+    hass.states.async_set("switch.veg_tent", "off")
+    hass.states.async_set("sensor.veg_vwc", "50", {"unit_of_measurement": "%"})
+    flow = await hass.config_entries.flow.async_init(DOMAIN, context={"source": "user"})
+    flow = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], {"room_name": "Veg tent"}
+    )
+    flow = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], {"num_zones": 1}
+    )
+    flow = await hass.config_entries.flow.async_configure(
+        flow["flow_id"],
+        {
+            "zone_1_switch": "switch.veg_tent",
+            "zone_1_vwc": ["sensor.veg_vwc"],
+            "zone_1_plant_count": 2,
+        },
+    )
+    done = await hass.config_entries.flow.async_configure(
+        flow["flow_id"], {"plumbing": "valves_only"}
+    )
+    assert done["type"] is FlowResultType.CREATE_ENTRY
+    await hass.async_block_till_done()
+    return done["result"]
+
+
+async def test_a_rule_moved_to_another_room_moves_its_sensor_without_a_collision(
+    hass, hass_admin_user, caplog
+):
+    first, _ = await _upgrade(hass, "entry_2_17_wizard.json")  # the default room, room:
+    second = await _second_room(hass)
+    rule = {**RULE, "room_id": "room:"}
+    saved = await _call(
+        hass, hass_admin_user, "alert_rule_set", expected_revision=0, rule=rule
+    )
+    await hass.async_block_till_done()
+    entity_id = f"binary_sensor.crop_steering_rule_{saved['rule']['id'].lower()}"
+    registry = er.async_get(hass)
+    assert registry.async_get(entity_id).config_entry_id == first.entry_id
+
+    moved = {**saved["rule"], "room_id": "room:veg_tent_"}
+    await _call(
+        hass, hass_admin_user, "alert_rule_set", expected_revision=1, rule=moved
+    )
+    await hass.async_block_till_done()
+    assert registry.async_get(entity_id).config_entry_id == second.entry_id
+    assert hass.states.get(entity_id).attributes["room_id"] == "room:veg_tent_"
+    assert (
+        hass.states.get(entity_id)
+        .attributes["friendly_name"]
+        .endswith("Veg tent tank level below 30%")
+    )
+    assert "unique ID" not in caplog.text and "already exists" not in caplog.text
+    assert [
+        e.entity_id
+        for e in registry.entities.values()
+        if e.unique_id == f"crop_steering_rule_{saved['rule']['id']}"
+    ] == [entity_id]

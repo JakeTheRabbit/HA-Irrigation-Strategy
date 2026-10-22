@@ -5,6 +5,10 @@ fires when the value stays above or below its threshold for `min_duration_s` ins
 sources are left out on purpose (G6). site_api.py stores the rules, reads the sources and drives step();
 replay() runs the same step() over a recorded series, so what a preview says is what the rule would do.
 
+`severity` (info, warning, emergency) is informational: it is stored and shown, and nothing reads it to
+decide anything. How loud a push is follows `routing` (spec 2.9): a rule routed to the emergency kind is
+pushed as urgent and is never held by a room's mute; every other rule is held while its room is muted.
+
 Rules only notify. Nothing here, nor in what drives it, touches irrigation.
 """
 
@@ -128,7 +132,7 @@ def clean_window(value) -> dict:
     if value["kind"] != "custom":
         return {"kind": value["kind"]}
     if _minutes(value.get("from")) == _minutes(value.get("to")):
-        raise ValueError("End must be after start")
+        raise ValueError("Start and end can't be the same")
     return {"kind": "custom", "from": value["from"], "to": value["to"]}
 
 
@@ -144,6 +148,8 @@ def _num(value) -> str:
 
 
 def amount(value, unit) -> str:
+    if unit == "s":
+        return _duration(value)
     if unit == "%":
         return f"{_num(value)}%"
     if unit == "pH":
@@ -152,11 +158,13 @@ def amount(value, unit) -> str:
 
 
 def _duration(seconds) -> str:
+    """600 -> "10 min", 7200 -> "2 h", 90 -> "1.5 min", 45 -> "45 s"."""
+    seconds = round(seconds)
+    if seconds < 60:
+        return f"{seconds} s"
     if seconds % 3600 == 0:
         return f"{seconds // 3600} h"
-    if seconds % 60 == 0:
-        return f"{seconds // 60} min"
-    return f"{seconds} s"
+    return f"{round(seconds / 60, 1):g} min"
 
 
 def _zones(zones) -> str:
@@ -165,16 +173,30 @@ def _zones(zones) -> str:
     return "zones " + ", ".join(map(str, zones[:-1])) + f" and {zones[-1]}"
 
 
-def label(rule) -> str:
-    """What the rule watches, in words: "zone 1 VWC", "feed pH", "stock tank bloom"."""
+def label(rule, name=None) -> str:
+    """What the rule watches, in words: "zone 1 VWC", "feed pH", "stock tank Bloom A". `name`: the
+    stock tank's name, or the probe's friendly name (else its tank_id or entity_id)."""
     source, words = rule["source"], SOURCES[rule["source"]][1]
     if source in ZONE_SOURCES:
         return f"{_zones(rule['zones'])} {words}"
     if source in STOCK_SOURCES:
-        return f"{words} {rule['tank_id']}"
+        return f"{words} {name or rule['tank_id']}"
     if source == "probe.silence_s":
-        return f"{rule['entity_id']} silence"
+        return f"{name or rule['entity_id']} silence"
     return words
+
+
+def first_upper(text: str) -> str:
+    """Only the first character upper-cased: "zone 1 VWC" -> "Zone 1 VWC" (never "Zone 1 vwc")."""
+    return text[:1].upper() + text[1:]
+
+
+def title(rule, room_name=None, name=None) -> str:
+    """The rule's short name: "F2 tank level below 30%"."""
+    return (
+        f"{room_name or room_words(rule['room_id'])} {label(rule, name)} {rule['op']} "
+        f"{amount(rule['threshold'], rule['unit'])}"
+    )
 
 
 def room_words(room_id: str) -> str:
@@ -183,12 +205,12 @@ def room_words(room_id: str) -> str:
     return slug.title() if slug else "The room"
 
 
-def summary_sentence(rule: dict, room_name: str | None = None) -> str:
+def summary_sentence(rule: dict, room_name: str | None = None, name=None) -> str:
     """ "Tell when F2 tank level stays below 30% for 10 min during lights-on." """
     seconds = rule.get("min_duration_s", 0)
     verb = "stays" if seconds else "goes"
     text = (
-        f"Tell when {room_name or room_words(rule['room_id'])} {label(rule)} {verb} "
+        f"Tell when {room_name or room_words(rule['room_id'])} {label(rule, name)} {verb} "
         f"{rule['op']} {amount(rule['threshold'], rule['unit'])}"
     )
     if seconds:
@@ -311,6 +333,10 @@ def replay(
     {series, fires: [{start, fired_at, end}], ignored: [{start, end, reason}], count, min, max,
     sentence}. Evaluated at every sample and every minute between, as the live rule is. `muted`:
     spans [(start, end)] the room was muted, which hold the rule unless it is routed to emergencies.
+
+    `ignored` reasons: "shorter than min_duration" (back in range before min_duration_s), "outside
+    window" (a breach outside the rule's window, or one that left it while pending), "muted". A breach
+    that ends because the reading went missing (None) gets no row.
     """
     samples = sorted(samples, key=lambda p: p[0])
     values = [v for _, v in samples if v is not None]
@@ -337,20 +363,27 @@ def replay(
             held = not emergency and any(a <= t < b for a, b in muted)
             before = state
             state, event = step(state, value, t, rule, lights, held)
+            carry = None  # the start of a breach that goes on, now held by the window or a mute
             if event == "raised":
                 out["fires"].append(
                     {"start": _iso(state["since"]), "fired_at": _iso(t), "end": None}
                 )
             elif event == "cleared":
                 out["fires"][-1]["end"] = _iso(t)
-            elif before.get("state") == "pending" and state["state"] == "armed":
-                out["ignored"].append(
-                    {
-                        "start": _iso(before["since"]),
-                        "end": _iso(t),
-                        "reason": "shorter than min_duration",
-                    }
-                )
+            elif before.get("state") == "pending" and state["state"] != "pending":
+                # A pending breach that ends: back in range is a short breach; still breaching, it
+                # left the window or the room was muted (its span below starts with the breach). A
+                # missing reading (None) ends it with no row: nothing says what the value did.
+                if value is not None and not breaching(value, rule):
+                    out["ignored"].append(
+                        {
+                            "start": _iso(before["since"]),
+                            "end": _iso(t),
+                            "reason": "shorter than min_duration",
+                        }
+                    )
+                elif value is not None:
+                    carry = before["since"]
             reason = None
             if breaching(value, rule) and state["state"] not in ON:
                 if state["state"] == "muted":
@@ -362,7 +395,7 @@ def replay(
                 out["ignored"].append(open_span)
                 open_span = None
             if reason and open_span is None:
-                open_span = {"start": _iso(t), "end": None, "reason": reason}
+                open_span = {"start": _iso(carry or t), "end": None, "reason": reason}
         if open_span:
             out["ignored"].append(open_span)
         out["ignored"].sort(key=lambda span: span["start"])

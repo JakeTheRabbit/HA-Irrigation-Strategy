@@ -53,16 +53,17 @@ SERVICES = (
     "alert_rule_preview",
     "alert_rule_list",
 )
+# alert_rule_test is not one: with send it pushes, so it is OPTIONAL like a write.
 READS = (
     "supply_get",
     "preset_list",
-    "alert_rule_test",
     "alert_rule_preview",
     "alert_rule_list",
 )
 SENSOR = f"sensor.{DOMAIN}_supply_config"
 # The rules of the site changed (binary_sensor.py adds and removes its entities), and one rule's state.
 RULES_CHANGED = f"{DOMAIN}_rules_changed"
+SENSORS = "_rule_sensors"  # {entry_id: binary_sensor.RuleSensors}
 RULE_STATE = f"{DOMAIN}_rule_state_{{}}"
 TICK = timedelta(seconds=60)
 SINCE_EVER = "1970-01-01T00:00:00+00:00"
@@ -402,7 +403,7 @@ class SiteStore:
         revision = await self._save_alert_rules(
             data["expected_revision"], change, who, rule["room_id"]
         )
-        sentence = alert_rules.summary_sentence(rule, _room_name(self.hass, rule))
+        sentence = rule_sentence(self.hass, rule)
         return {
             "rule": {**deepcopy(rule), "summary_sentence": sentence},
             "summary_sentence": sentence,
@@ -474,6 +475,13 @@ class SiteStore:
         evaluator = getattr(self, "alerts", None)
         if evaluator is not None:
             evaluator.refresh()
+        # Every room's removals first, then every room's additions: a rule moved to another room
+        # leaves its old room before the new one adds it under the same unique_id.
+        rooms = list(self.hass.data.get(DOMAIN, {}).get(SENSORS, {}).values())
+        for sensors in rooms:
+            await sensors.remove_gone()
+        for sensors in rooms:
+            sensors.add_new()
         async_dispatcher_send(self.hass, RULES_CHANGED)
         return document["alert_rules_revision"]
 
@@ -532,6 +540,34 @@ def _room_name(hass, rule) -> str | None:
     from .setup_api import effective
 
     return effective(entry).get("room_name") or None
+
+
+def _thing_name(hass, rule) -> str | None:
+    """The stock tank's name from the stock store, or the probe's friendly name."""
+    if rule["source"] == "probe.silence_s":
+        state = hass.states.get(rule["entity_id"])
+        return (getattr(state, "attributes", None) or {}).get("friendly_name")
+    if rule["source"] in alert_rules.STOCK_SOURCES:
+        from .stock_api import resolve_stock
+
+        try:
+            tanks = resolve_stock(hass, rule["room_id"]).data["tanks"]
+        except ValueError:
+            return None
+        tank = next((t for t in tanks if t.get("id") == rule["tank_id"]), None)
+        return (tank or {}).get("name") or None
+    return None
+
+
+def rule_title(hass, rule) -> str:
+    """The rule's short name with the room's and the tank's or probe's names: "F2 tank level below 30%"."""
+    return alert_rules.title(rule, _room_name(hass, rule), _thing_name(hass, rule))
+
+
+def rule_sentence(hass, rule) -> str:
+    return alert_rules.summary_sentence(
+        rule, _room_name(hass, rule), _thing_name(hass, rule)
+    )
 
 
 def _number(state):
@@ -649,8 +685,36 @@ class RuleEvaluator:
             at = getattr(state, "last_reported", None) or state.last_updated
             self._reported[entity_id] = at
         else:
+            # Since its last numeric report. After a restart with nothing remembered yet, the
+            # recorder's newest numeric report (seed_reports) is the start; until it is read, or with
+            # no recorder, the time the probe went unavailable is, so the clock starts again then.
             at = self._reported.get(entity_id) or state.last_changed
         return None if at is None else (now - at).total_seconds()
+
+    async def seed_reports(self, entity_ids):
+        """The recorder's newest numeric report of each silent probe not yet remembered (after a
+        restart), then its rules evaluated again."""
+        if "recorder" not in self.hass.config.components:
+            return
+        from homeassistant.components.recorder import get_instance, history
+
+        for entity_id in entity_ids:
+            try:
+                found = await get_instance(self.hass).async_add_executor_job(
+                    history.get_last_state_changes, self.hass, 20, entity_id
+                )
+            except Exception as error:  # the silence then counts from last_changed
+                _LOGGER.debug("Probe %s: no recorded report: %s", entity_id, error)
+                continue
+            numeric = [s for s in found.get(entity_id, []) if _number(s) is not None]
+            if numeric and entity_id not in self._reported:
+                newest = max(numeric, key=lambda s: s.last_updated)
+                self._reported[entity_id] = (
+                    getattr(newest, "last_reported", None) or newest.last_updated
+                )
+        for rule in self.site.rules():
+            if rule.get("entity_id") in entity_ids:
+                self.evaluate(rule)
 
     def _stock(self, rule):
         from .stock_api import resolve_stock
@@ -707,11 +771,7 @@ class RuleEvaluator:
                 )
 
     def title(self, rule) -> str:
-        room = _room_name(self.hass, rule) or alert_rules.room_words(rule["room_id"])
-        return (
-            f"{room} {alert_rules.label(rule)} {rule['op']} "
-            f"{alert_rules.amount(rule['threshold'], rule['unit'])}"
-        )
+        return rule_title(self.hass, rule)
 
     def _announce(self, rule, event, value):
         """alert.raised / alert.cleared in the room's journal; a raise is pushed too."""
@@ -752,12 +812,12 @@ class RuleEvaluator:
             return [
                 {"service": None, "ok": False, "error": "Notifications are not set up"}
             ]
-        sentence = alert_rules.summary_sentence(rule, _room_name(self.hass, rule))
+        sentence = rule_sentence(self.hass, rule)
         title = ("Test: " if test else "") + self.title(rule)
         message = sentence
         if value is not None:
             message = (
-                f"{alert_rules.label(rule).capitalize()} is "
+                f"{alert_rules.first_upper(alert_rules.label(rule, _thing_name(self.hass, rule)))} is "
                 f"{alert_rules.amount(value, rule['unit'])}. {sentence}"
             )
         try:
@@ -802,6 +862,15 @@ class RuleEvaluator:
             )
         self._watch(force=True)
         self.evaluate_all()
+        silent = [
+            rule["entity_id"]
+            for rule in self.site.rules()
+            if rule["source"] == "probe.silence_s"
+            and rule["entity_id"] not in self._reported
+            and self.hass.states.get(rule["entity_id"]) is not None
+        ]
+        if silent and "recorder" in self.hass.config.components:
+            self.hass.async_create_task(self.seed_reports(sorted(set(silent))))
 
     def _watch(self, force=False):
         """Follow the entities the active rules read (they may move: a feed calibration applied)."""
@@ -884,9 +953,7 @@ class RuleEvaluator:
             out.append(
                 {
                     **rule,
-                    "summary_sentence": alert_rules.summary_sentence(
-                        rule, _room_name(self.hass, rule)
-                    ),
+                    "summary_sentence": rule_sentence(self.hass, rule),
                     "state": current,
                     "last_fired": fired.get(rule["id"]),
                     "firing_since": (
@@ -1029,7 +1096,7 @@ async def _alert_rule(hass, site, call) -> dict:
     hours = float(args.get("hours", 24))
     if call.service == "alert_rule_preview":
         rule = alert_rules.validate_rule(args["rule"], "draft")
-        sentence = alert_rules.summary_sentence(rule, _room_name(hass, rule))
+        sentence = rule_sentence(hass, rule)
         return {"summary_sentence": sentence, **await alerts.replay(rule, hours)}
     if ("id" in args) == ("rule" in args):
         raise ValueError(f"{DOMAIN}.alert_rule_test needs either id or rule")
@@ -1038,7 +1105,7 @@ async def _alert_rule(hass, site, call) -> dict:
     else:
         rule = alert_rules.validate_rule(args["rule"], args["rule"].get("id"))
     out = {
-        "summary_sentence": alert_rules.summary_sentence(rule, _room_name(hass, rule)),
+        "summary_sentence": rule_sentence(hass, rule),
         "replay": await alerts.replay(rule, hours),
     }
     if args.get("send"):
