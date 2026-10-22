@@ -642,8 +642,9 @@ async def _put_back_setup(hass, entry, old, new, who, call, check) -> dict:
 # ------------------------------------------------------------------ Alerts inbox
 async def alert_ack(hass, hub, call) -> dict:
     """Acknowledge one open alert -> {room_id, alert_event_id, event_id}: journals alert.acknowledged
-    (who acked it by attribution); a threshold rule's live state becomes acknowledged. An alert that is
-    not in the room's journal, or no longer open, is refused (ValueError)."""
+    (who acked it by attribution), then a threshold rule's live state becomes acknowledged. An alert
+    that is not in the room's journal, or no longer open, is refused (ValueError), and so is an ack
+    the journal does not take (nothing changes then)."""
     from . import alerts_inbox
 
     room_id, alert_id = call.data["room_id"], call.data["alert_event_id"]
@@ -663,8 +664,6 @@ async def alert_ack(hass, hub, call) -> dict:
     for key in ("rule_id", "key"):
         if raised.get(key):
             data[key] = raised[key]
-    if raised.get("rule_id"):
-        alerts_inbox.acknowledge_rule(hass, raised["rule_id"])
     who = attribution(hass, call)
     ack_id = emit(
         hass,
@@ -681,6 +680,10 @@ async def alert_ack(hass, hub, call) -> dict:
             "proposal_token": who["proposal_token"],
         },
     )
+    if ack_id is None:
+        raise ValueError("The journal is not available; try again")
+    if raised.get("rule_id"):
+        alerts_inbox.acknowledge_rule(hass, raised["rule_id"])
     return {"room_id": room_id, "alert_event_id": alert_id, "event_id": ack_id}
 
 
@@ -910,8 +913,14 @@ def _wire(hass, hub) -> list:
         except Exception as err:
             _LOGGER.warning("Journal prune failed: %s", err)
 
+    prune = async_track_time_interval(hass, daily, PRUNE_EVERY)
     inbox = data[INBOX] = Inbox(hass, hub)
-    return [async_track_time_interval(hass, daily, PRUNE_EVERY), *inbox.start()]
+    try:
+        return [prune, *inbox.start()]
+    except Exception:
+        prune()
+        data.pop(INBOX, None)
+        raise
 
 
 def _subscribe_schema():

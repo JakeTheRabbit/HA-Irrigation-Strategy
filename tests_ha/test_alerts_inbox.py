@@ -126,32 +126,130 @@ async def test_a_staff_ack_closes_a_rule_alert_and_its_sensor_stays_on(
     assert out["error"]["message"].startswith("No alert")
 
 
+RAISED = {
+    "v": 1,
+    "id": "01JBBBBBBBBBBBBBBBBBBBBBBB",
+    "ts": "2026-10-22T07:00:00+00:00",
+    "kind": "alert.raised",
+    "zone": 2,
+    "outcome": "ok",
+    "code": "CS-101",
+    "source": {"actor": "engine"},
+    "data": {"key": "stale_z2", "title": "Zone 2 probe stale"},
+}
+
+
+async def _controller_alert(hass, admin):
+    """Until Task 8 the controller journals no alerts; this one is appended as it will be."""
+    await _call(hass, admin, "journal_append", room_id=ROOM, events=[RAISED])
+    await hass.async_block_till_done()
+
+
 async def test_a_controller_alert_closes_when_its_notification_is_gone(
     hass, hass_admin_user, freezer
 ):
-    """Until Task 8 the controller journals no alerts; this one is appended as it will be."""
     await _install(hass)
     persistent_notification.async_create(hass, "Probe stale", "Zone 2", "f2_stale_z2")
-    raised = {
-        "v": 1,
-        "id": "01JBBBBBBBBBBBBBBBBBBBBBBB",
-        "ts": "2026-10-22T07:00:00+00:00",
-        "kind": "alert.raised",
-        "zone": 2,
-        "outcome": "ok",
-        "code": "CS-101",
-        "source": {"actor": "engine"},
-        "data": {"key": "stale_z2", "title": "Zone 2 probe stale"},
-    }
-    await _call(hass, hass_admin_user, "journal_append", room_id=ROOM, events=[raised])
-    await hass.async_block_till_done()
+    await _controller_alert(hass, hass_admin_user)
     (alert,) = hass.states.get(INBOX).attributes["alerts"]
-    assert (alert["event_id"], alert["code"], alert["zone"]) == (raised["id"], "CS-101", 2)
+    assert (alert["event_id"], alert["code"], alert["zone"]) == (RAISED["id"], "CS-101", 2)
     assert alert["entity_id"] is None and "rule_id" not in alert
 
     persistent_notification.async_dismiss(hass, "f2_stale_z2")
     await _tick(hass, freezer, 5 * 60 + 1)
     assert hass.states.get(INBOX).state == "0"
+
+
+async def test_a_restart_that_wiped_the_notifications_keeps_the_alert_open(
+    hass, hass_admin_user, freezer
+):
+    """Notifications live in memory: after a restart none was ever seen live, so none is "gone".
+    Stale beats dropped."""
+    await _install(hass)
+    await _controller_alert(hass, hass_admin_user)
+    await _tick(hass, freezer, 5 * 60 + 1)
+    assert [a["event_id"] for a in hass.states.get(INBOX).attributes["alerts"]] == [
+        RAISED["id"]
+    ]
+    # Shown again by the controller, seen live, then dismissed: it closes.
+    persistent_notification.async_create(hass, "Probe stale", "Zone 2", "f2_stale_z2")
+    await _tick(hass, freezer, 5 * 60 + 1)
+    assert hass.states.get(INBOX).state == "1"
+    persistent_notification.async_dismiss(hass, "f2_stale_z2")
+    await _tick(hass, freezer, 5 * 60 + 1)
+    assert hass.states.get(INBOX).state == "0"
+
+
+async def test_without_the_notifications_helper_alerts_stay_open_and_ack_works(
+    hass, hass_admin_user, freezer, monkeypatch, caplog
+):
+    """A Home Assistant without the private notifications getter: no notification closes
+    anything, one warning, and rule alerts and alert_ack carry on."""
+    monkeypatch.delattr(persistent_notification, "_async_get_or_create_notifications")
+    await _install(hass)
+    await _controller_alert(hass, hass_admin_user)
+    rule_id, binary = await _firing_rule(hass, hass_admin_user, freezer)
+    await _tick(hass, freezer, 5 * 60 + 1)
+    alerts = hass.states.get(INBOX).attributes["alerts"]
+    assert {a["event_id"] for a in alerts} >= {RAISED["id"]}
+    (rule_alert,) = [a for a in alerts if a.get("rule_id") == rule_id]
+    await _call(
+        hass, None, "alert_ack", room_id=ROOM, alert_event_id=rule_alert["event_id"]
+    )
+    await hass.async_block_till_done()
+    assert hass.states.get(binary).attributes["state"] == "acknowledged"
+    assert [a["event_id"] for a in hass.states.get(INBOX).attributes["alerts"]] == [
+        RAISED["id"]
+    ]
+    warned = [r for r in caplog.records if r.name.endswith("alerts_inbox")]
+    assert len(warned) == 1 and warned[0].levelname == "WARNING"
+
+
+async def test_an_ack_the_journal_cannot_take_is_refused_and_changes_nothing(
+    hass, hass_admin_user, freezer, monkeypatch
+):
+    from custom_components.crop_steering import journal_api
+
+    await _install(hass)
+    _, binary = await _firing_rule(hass, hass_admin_user, freezer)
+    (alert,) = hass.states.get(INBOX).attributes["alerts"]
+    monkeypatch.setattr(journal_api, "emit", lambda *a, **k: None)
+    with pytest.raises(HomeAssistantError, match="journal is not available"):
+        await _call(
+            hass, None, "alert_ack", room_id=ROOM, alert_event_id=alert["event_id"]
+        )
+    await hass.async_block_till_done()
+    assert hass.states.get(binary).attributes["state"] == "firing"
+    assert hass.states.get(INBOX).state == "1"
+
+
+async def test_a_journal_outage_warns_once(hass, monkeypatch, caplog):
+    await _install(hass)
+    await hass.async_block_till_done()
+    inbox = hass.data[DOMAIN]["_alerts_inbox"]
+    query = inbox.hub.query
+
+    async def down(**_):
+        raise HomeAssistantError("The event journal is unavailable")
+
+    def warnings():
+        return [
+            r
+            for r in caplog.records
+            if r.levelname == "WARNING" and r.name.endswith("alerts_inbox")
+        ]
+
+    monkeypatch.setattr(inbox.hub, "query", down)
+    await inbox.publish_all()
+    await inbox.publish_all()
+    assert hass.states.get(INBOX).state == "unavailable"
+    assert len(warnings()) == 1
+    monkeypatch.setattr(inbox.hub, "query", query)
+    await inbox.publish_all()
+    assert hass.states.get(INBOX).state == "0"
+    monkeypatch.setattr(inbox.hub, "query", down)
+    await inbox.publish_all()
+    assert len(warnings()) == 2  # a new outage
 
 
 async def test_the_last_room_unloading_takes_the_inbox_away(hass):

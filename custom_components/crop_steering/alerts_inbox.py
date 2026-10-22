@@ -4,7 +4,9 @@ open_alerts() is the pure fold. An alert is open from its alert.raised until an 
 alert.acknowledged of the same alert (`data.rule_id` for a threshold rule, `data.key` for the
 controller app's). A controller alert (actor other than system) also closes when its `f2_<key>`
 persistent notification is gone, as the controller dismisses some notifications directly, with no
-alert.cleared. Inbox publishes the fold for every loaded room on each stored alert.* event and every
+alert.cleared. "Gone" means the Inbox saw it live since it started and it is absent now: Home
+Assistant keeps notifications in memory only, so after a restart an alert stays open (stale beats
+dropped) until its notification is seen again and then dismissed. Inbox publishes the fold for every loaded room on each stored alert.* event and every
 5 min (journal_api wires it). The sensor's state is the count; `alerts` lists them, newest first.
 
 Nothing here touches irrigation: it only reads the journal and sets a state.
@@ -38,11 +40,11 @@ def _identity(event) -> tuple:
 
 
 def open_alerts(
-    events: list[dict], live_notifications: set[str], entity_of: dict | None = None
+    events: list[dict], gone: set[str], entity_of: dict | None = None
 ) -> list[dict]:
     """The open alerts of `events` (one room's alert.* events, oldest first), newest first.
-    `live_notifications`: the ids of the persistent notifications shown now. `entity_of`: {rule id:
-    the entity its source reads}. A raise repeated while the alert is open keeps the first.
+    `gone`: the ids of the persistent notifications seen live that are no longer shown. `entity_of`:
+    {rule id: the entity its source reads}. A raise repeated while the alert is open keeps the first.
     """
     raised: dict[tuple, dict] = {}
     for event in events:
@@ -56,11 +58,7 @@ def open_alerts(
         data = event.get("data") or {}
         rule_id = data.get("rule_id")
         controller = (event.get("source") or {}).get("actor") != "system"
-        if (
-            controller
-            and data.get("key")
-            and f"f2_{data['key']}" not in live_notifications
-        ):
+        if controller and data.get("key") and f"f2_{data['key']}" in gone:
             continue
         alert = {
             "event_id": event.get("id"),
@@ -82,11 +80,15 @@ def sensor_id(room_id: str) -> str:
     return f"sensor.{DOMAIN}_{room_id[len('room:'):]}alerts_open"
 
 
-def live_notifications(hass) -> set[str]:
-    """The ids of the persistent notifications Home Assistant shows now."""
+def live_notifications(hass) -> set[str] | None:
+    """The ids of the persistent notifications Home Assistant shows now; None when this Home
+    Assistant has no such (private) getter."""
     from homeassistant.components import persistent_notification
 
-    return set(persistent_notification._async_get_or_create_notifications(hass))
+    getter = getattr(
+        persistent_notification, "_async_get_or_create_notifications", None
+    )
+    return None if getter is None else set(getter(hass))
 
 
 def rule_entities(hass, room_id) -> dict:
@@ -118,7 +120,9 @@ async def read_open(hass, hub, room_id) -> list[dict]:
         cursor = page["cursor"]
         if cursor is None:
             break
-    return open_alerts(events, live_notifications(hass), rule_entities(hass, room_id))
+    inbox = hass.data.get(DOMAIN, {}).get(INBOX)
+    gone = inbox.gone() if inbox is not None else set()
+    return open_alerts(events, gone, rule_entities(hass, room_id))
 
 
 def acknowledge_rule(hass, rule_id) -> None:
@@ -141,6 +145,24 @@ class Inbox:
         self.hass, self.hub = hass, hub
         self.rooms: set[str] = set()
         self._lock = asyncio.Lock()
+        self._seen: set[str] = set()  # f2_* notifications seen live since the start
+        self._no_getter = False
+        self._down = False
+
+    def gone(self) -> set[str]:
+        """The f2_* notifications seen live since the start that are no longer shown. Nothing is
+        gone when the notifications cannot be read (the alerts then stay open)."""
+        live = live_notifications(self.hass)
+        if live is None:
+            if not self._no_getter:
+                self._no_getter = True
+                _LOGGER.warning(
+                    "Alerts inbox: Home Assistant's persistent notifications cannot be read; "
+                    "a dismissed controller notification leaves its alert open"
+                )
+            return set()
+        self._seen |= {n for n in live if n.startswith("f2_")}
+        return self._seen - live
 
     def join(self, room_id) -> None:
         self.rooms.add(room_id)
@@ -157,11 +179,14 @@ class Inbox:
             try:
                 alerts = await read_open(self.hass, self.hub, room_id)
             except Exception as error:  # the journal is down: say so, never raise
-                _LOGGER.debug("Alerts inbox of %s not read: %s", room_id, error)
+                if not self._down:
+                    self._down = True
+                    _LOGGER.warning("Alerts inbox of %s not read: %s", room_id, error)
                 self.hass.states.async_set(
                     sensor_id(room_id), "unavailable", {"room_id": room_id}
                 )
                 return
+            self._down = False
             if room_id not in self.rooms:  # the room left while it was read
                 return
             self.hass.states.async_set(
