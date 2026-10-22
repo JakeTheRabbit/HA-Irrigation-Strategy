@@ -91,9 +91,16 @@ def test_first_is_the_first_hold_or_none():
         return lambda owner, room, zone, ctx: (seen.append(answer), answer)[1]
 
     chain = tuple(guards.Guard(k, k, "pass", None, check(a)) for k, a in (("a", None), ("b", "held"), ("c", "x")))
-    assert guards.first(None, chain, None, 1, {}) == (chain[1], "held")
+    assert guards.first(None, chain, None, 1, {}) == (chain[1], "held", None)
     assert seen == [None, "held"]  # the chain stops at its first hold
     assert guards.first(None, chain[:1], None, 1, {}) is None
+
+
+def test_a_check_may_name_its_own_code():
+    chain = (guards.Guard("a", "a", "pass", "CS-901", lambda *a: ("held", "CS-902")),)
+    assert guards.first(None, chain, None, 1, {}) == (chain[0], "held", "CS-902")
+    chain = (guards.Guard("a", "a", "pass", "CS-901", lambda *a: "held"),)
+    assert guards.first(None, chain, None, 1, {}) == (chain[0], "held", "CS-901")
 
 
 def test_a_held_intent_names_its_guard_and_code():
@@ -104,6 +111,38 @@ def test_a_held_intent_names_its_guard_and_code():
     held, = [e for e in c.journal.pending() if e["kind"] == "intent.held"]
     assert held["data"]["guard"] == "tank_min" and held["code"] == "CS-901"
     assert held["data"]["reason"].startswith("this 100.0 L shot would take the tank")
+
+
+def _pass_holds(setup, passes=1):
+    """The act loop's fire+block holds (guards.PASS) of a zone that is to fire, over `passes` passes."""
+    c, fake, room = _room()
+    run = _looping(setup, passes=passes)
+    with pytest.MonkeyPatch.context() as mp:
+        run(c, fake, room, mp)
+    return [e for e in c.journal.pending() if e["kind"] == "intent.held"]
+
+
+def test_a_pass_hold_names_its_guard_and_code():
+    held, = _pass_holds(lambda c, f, r, mp, i: _tank_min(c, f, r, mp))
+    assert (held["data"]["guard"], held["code"]) == ("tank_min", "CS-901")
+    assert held["data"]["reason"] == "tank at its minimum (reads 8.0 %)"
+
+
+def test_an_unreadable_tank_level_journals_its_own_code():
+    def unread(c, f, r, mp, i):
+        _tank_min(c, f, r, mp)
+        f.set_state(TANK_DIST, "unavailable")
+    held, = _pass_holds(unread)
+    assert (held["data"]["guard"], held["code"]) == ("tank_min", "CS-902")
+
+
+def test_two_holds_under_one_guard_are_two_holds():
+    """zone_paused: the zone switch off, then unreadable. Each is journaled; the same one standing is not again."""
+    def step(c, f, r, mp, i):
+        f.set_state(ZONE_SWITCH, ["off", "off", "unavailable", "unavailable"][i])
+    held = _pass_holds(step, passes=4)
+    assert [(e["data"]["guard"], e["data"]["reason"]) for e in held] == [
+        ("zone_paused", "zone disabled"), ("zone_paused", f"{ZONE_SWITCH} unreadable (reads neither on nor off)")]
 
 
 def test_a_sized_hold_names_its_guard_and_code():
@@ -704,8 +743,6 @@ def test_matches_what_the_controller_did_before_the_chain(capsys, tmp_path):
     differ = []
     for name in sorted(golden):
         new, old = seen[name], golden[name]
-        if name in MERGED:
-            old = _merged(old)
         differ += [f"{name}: {part}" for part in ("result", "reads", "calls", "writes", "log", "state")
                    if new[part] != old[part]]
         try:
@@ -714,16 +751,3 @@ def test_matches_what_the_controller_did_before_the_chain(capsys, tmp_path):
             differ.append(f"{name}: journal")
     assert differ == []
 
-
-# A hold is journaled once per guard while it stands (_journal_held's key is the guard). The pre-open plumbing hold and
-# the pre-open unswitchable hold share the guard "plumbing", so the second, straight after the first, is the same hold
-# and is not journaled again: before the chain it was, under its own words. Nothing else the recording holds changes.
-MERGED = {"preopen/plumbing_then_undrivable", "preopen/stacked"}
-
-
-def _merged(old):
-    old = json.loads(json.dumps(old))
-    old["journal"] = [e for e in old["journal"]
-                      if not (e["kind"] == "intent.held" and e["data"]["reason"] == "light.p can't be switched")]
-    old["state"]["held_keys"] -= 1
-    return old

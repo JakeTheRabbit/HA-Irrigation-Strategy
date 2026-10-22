@@ -3704,8 +3704,12 @@ class Controller:
     def _blocked(self, room, zone, reason=None):
         """Why the zone may not be watered this pass, else None: the first check of guards.PASS that holds, with its
         alerts and releases. `reason` is the zone's decision (a held plan lets its rescues through)."""
-        held = guards.first(self, guards.PASS, room, zone, {"reason": reason})
+        held = self._blocked_by(room, zone, reason)
         return held[1] if held else None
+
+    def _blocked_by(self, room, zone, reason=None):
+        """_blocked's (guard, why, code), or None: what the act loop journals of the hold."""
+        return guards.first(self, guards.PASS, room, zone, {"reason": reason})
 
     def _plumbing_gate(self, room):
         """guards.PASS "plumbing": why the room's plumbing and its switches disagree (CS-202), else None."""
@@ -5786,10 +5790,10 @@ class Controller:
                "steering": steering}
         hit = guards.first(self, guards.PREOPEN, room, zone, ctx)
         if hit:
-            g, why = hit
+            g, why, code = hit
             if not g.quiet:  # a hardware fault returns without a word, as it always has
                 log(f"[{room.slug}] Z{zone} shot held: {why}")
-                self._journal_held(room, zone, why, guard=g.guard, code=g.code, now=datetime.now(),
+                self._journal_held(room, zone, why, guard=g.guard, code=code, now=datetime.now(),
                                    would=reason_text, actor=actor)
             return
         nominal_l = ctx["litres"]  # frozen before anything opens (guards._pre_tank_short)
@@ -6464,6 +6468,8 @@ class Controller:
 
     def _act_zone(self, room, zone, p, snap, decision, block, lights_on, now):
         st = room.state[zone]
+        # _blocked_by's (guard, why, code) of `block`, as _loop_room kept it this pass (taken now, never kept longer)
+        held_by = room.__dict__.get("_held_by", {}).pop(zone, None)
         fire, size, reason = decision
         if (
             snap is not None
@@ -6495,15 +6501,17 @@ class Controller:
             log(
                 f"[{room.slug}] Z{zone} {st['phase']} BLOCKED ({block}): would {reason}"
             )
-            self._journal_held(room, zone, block, now=now, would=reason, actor=actor)
+            guard, _why, code = held_by or (None, None, None)
+            self._journal_held(room, zone, block, guard=guard and guard.guard, code=code, now=now, would=reason,
+                               actor=actor)
         elif fire:
             requested_at = datetime.now().astimezone()  # this pass decided to fire
             # Sized: guards.SIZED, in order (its size, its longest shot, the day's budget left, which may clip it).
             ctx = {"reason": reason, "size": size, "test": test, "p": p, "st": st, "snap": snap}
             hit = guards.first(self, guards.SIZED, room, zone, ctx)
             if hit:
-                g, held = hit
-                self._journal_held(room, zone, held, guard=g.guard, code=g.code, now=now, would=reason, actor=actor)
+                g, held, code = hit
+                self._journal_held(room, zone, held, guard=g.guard, code=code, now=now, would=reason, actor=actor)
                 return (False, 0.0, held) if g.guard == "daily_cap" else None
             flow, raw_dur, max_dur, size, dur = ctx["flow"], ctx["raw_dur"], ctx["max_dur"], ctx["size"], ctx["dur"]
             what, why = log_words.shot(reason)
@@ -7049,12 +7057,13 @@ class Controller:
 
     def _journal_held(self, room, zone, reason, *, guard=None, code=None, now, would=None, actor="engine"):
         """intent.held for a shot the act loop held (_act_zone, and _execute_shot before anything opens), once per
-        (room, zone, reason) and again each HELD_REEMIT_S while it stands. Never from _blocked: it also only
-        describes (_publish_waiting_for's gates). A hold is known by its guard, else by its words without their
-        numbers and times, so a reading that drifts while it holds is one hold. A journal error is only logged."""
+        (room, zone, guard, reason) and again each HELD_REEMIT_S while it stands. Never from _blocked: it also only
+        describes (_publish_waiting_for's gates). A hold is known by its guard and its words without their numbers
+        and times: a reading that drifts while it holds is one hold, and two holds under one guard are two. A journal
+        error is only logged."""
         try:
             seen = self.__dict__.setdefault("_held_journaled", {})
-            key = (room.slug, zone, guard or _HELD_NUMBERS.sub("#", str(reason)))
+            key = (room.slug, zone, guard, _HELD_NUMBERS.sub("#", str(reason)))
             self.__dict__.setdefault("_held_touched", set()).add(key)
             last = seen.get(key)
             if last is not None and 0 <= (now - last).total_seconds() < HELD_REEMIT_S:
@@ -7868,8 +7877,10 @@ class Controller:
                 decisions[zone] = (fire, size, reason)
             # A held plan is shown on every zone it holds: decide() no longer returns the steering shot it
             # would have stopped (ZoneSnapshot.steering_held), so the hold is said here instead.
-            block = (self._blocked(room, zone, reason) if fire
+            held_by = self._blocked_by(room, zone, reason) if fire else None
+            block = ((held_by[1] if held_by else None) if fire
                      else strategy_block(getattr(room, "strategy_snapshot", None), zone))
+            room.__dict__.setdefault("_held_by", {})[zone] = held_by  # for _act_zone's journal
             if fire and not block and getattr(self, "jev", None) is not None and getattr(reason, "kind", None) != "test_shot":
                 brain_bridge.shot_started(room, zone, snaps.get(zone), getattr(reason, "kind", None))
             if fire and not block and room.__dict__.get("_shot_check", "off") != "off":

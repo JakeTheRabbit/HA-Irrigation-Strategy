@@ -14,7 +14,7 @@ the same alerts, releases and log lines. A check that raises an alert calls the 
 something out for the code after the chain (the litres of a shot, its length) leaves it in `ctx`.
 
 Guard ids are the spec's. Those the spec has no id for are marked "not in spec". `code` is the CS code the check
-raises or names; None when it has none.
+raises or names; None when it has none. A check whose hold has a code of its own returns (why, code).
 """
 from __future__ import annotations
 
@@ -36,11 +36,13 @@ class Guard:
 
 
 def first(owner, stage, room, zone, ctx):
-    """(guard, why) of the first check of `stage` that holds, or None. Later checks are not asked."""
+    """(guard, why, code) of the first check of `stage` that holds, or None. Later checks are not asked. `code` is
+    the one the check returned with its hold, else the guard's."""
     for g in stage:
-        why = g.check(owner, room, zone, ctx)
-        if why:
-            return g, why
+        held = g.check(owner, room, zone, ctx)
+        if held:
+            why, code = held if isinstance(held, tuple) else (held, g.code)
+            return g, why, code
     return None
 
 
@@ -172,7 +174,10 @@ def _settings(c, room, zone, ctx):
 
 
 def _tank(c, room, zone, ctx):
-    return c._tank_hold(room)  # CS-901/902; only with a tank level mapped: never on an upgraded room until then
+    why = c._tank_hold(room)  # only with a tank level mapped: never on an upgraded room until then
+    if why and why.startswith("tank level unknown"):
+        return why, "CS-902"  # the level does not read (CS-901 is the tank at its minimum)
+    return why
 
 
 def _feed_ec(c, room, zone, ctx):

@@ -310,7 +310,9 @@ def test_a_standing_hold_is_journaled_once_per_reason_and_every_30_min(rig, firi
     held = _events(c, "intent.held")
     assert len(held) == 2
     assert held[0]["outcome"] == "held" and held[0]["zone"] == 1
-    assert held[0]["data"] == {"reason": f"{controller.PRODUCT} disabled (kill switch off)", "would": TOPUP}
+    assert held[0]["data"] == {"reason": f"{controller.PRODUCT} disabled (kill switch off)", "guard": "kill_switch",
+                               "would": TOPUP}
+    assert held[0]["code"] is None
     assert not _events(c, "shot.started")
     assert len(c._held_journaled) == 1
     fake.set_state(KILL, "on")  # the hold clears and the zone fires: its key goes
