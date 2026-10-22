@@ -1,0 +1,359 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import { describe, expect, test } from "vitest";
+import { ReviewApplyView, type ApplyReceipt } from "@/components/review-apply";
+import { callV2, type V2Outcome } from "./parity-api";
+import type { PresetResult } from "./parity-types";
+import {
+  copyReceipt,
+  diffRows,
+  notCopiedLines,
+  parseTarget,
+  presetWords,
+  skippedLine,
+  targetKey,
+  type PresetWords,
+} from "./presets";
+import { demoController } from "./test-helpers";
+import { revertEvents } from "./undo";
+
+const NZ = "Pacific/Auckland";
+const AT = Date.parse("2026-10-23T14:10:00+13:00");
+const F1 = { room_id: "room:f1_" };
+const WORDS: PresetWords = {
+  label: (key) =>
+    ({
+      p1_target_vwc: "Peak moisture",
+      p2_vwc_threshold: "Re-water point",
+      timers: "Timer programs",
+    })[key] ?? key,
+  value: (_key, value) =>
+    typeof value === "number" ? `${value}%` : value == null ? "none" : String(value),
+  target: (t) => (t.zone ? `F1 zone ${t.zone}` : "F1"),
+};
+const DIFF = [
+  { target: F1, key: "p1_target_vwc", old: 66, new: 70 },
+  { target: F1, key: "p2_vwc_threshold", old: 63, new: 60 },
+];
+const ok = (data: PresetResult, eventIds = ["01B", "01A"]): V2Outcome<PresetResult> => ({
+  kind: "ok",
+  data,
+  revision: null,
+  readback: { status: "verified", at: null },
+  eventIds,
+});
+const isReceipt = (r: unknown): r is ApplyReceipt => !!r && typeof r === "object" && "ok" in r;
+
+describe("diffRows", () => {
+  test("diffRows renders old struck and new", () => {
+    const rows = diffRows(DIFF, WORDS);
+    expect(rows.map((r) => [r.id, r.key, r.target, r.label, r.before, r.after])).toEqual([
+      ["room:f1_|p1_target_vwc", "p1_target_vwc", "room:f1_", "Peak moisture", "66%", "70%"],
+      ["room:f1_|p2_vwc_threshold", "p2_vwc_threshold", "room:f1_", "Re-water point", "63%", "60%"],
+    ]);
+    // A copy is all or nothing per section: no row can be taken out on its own.
+    expect(rows.every((r) => r.undo === undefined)).toBe(true);
+    const html = renderToStaticMarkup(
+      createElement(ReviewApplyView, {
+        rows,
+        layout: "panel",
+        apply: () => Promise.resolve({ kind: "missing" as const }),
+        onDiscard: () => {},
+        timeZone: NZ,
+        state: { phase: "idle" },
+        applyLabel: "Copy 2 changes to F1",
+      }),
+    );
+    expect(html).toContain("<s>66%</s> → <b>70%</b>");
+    expect(html).toContain("<s>63%</s> → <b>60%</b>");
+    expect(html).toContain("Copy 2 changes to F1");
+    expect(html).not.toContain(">Undo<");
+  });
+
+  test("names the target on each row only when the copy has more than one", () => {
+    const rows = diffRows(
+      [
+        ...DIFF,
+        { target: { room_id: "room:f1_", zone: 2 }, key: "p1_target_vwc", old: 64, new: 70 },
+      ],
+      WORDS,
+    );
+    expect(rows.map((r) => r.label)).toEqual([
+      "F1 · Peak moisture",
+      "F1 · Re-water point",
+      "F1 zone 2 · Peak moisture",
+    ]);
+    expect(rows[2].target).toBe("room:f1_:2");
+  });
+});
+
+describe("targets", () => {
+  test("a pick key is a room or a zone of it, as the backend expects", () => {
+    expect(parseTarget("room:f1_")).toEqual({ room_id: "room:f1_" });
+    expect(parseTarget("room:f1_:3")).toEqual({ room_id: "room:f1_", zone: 3 });
+    expect(parseTarget("room::2")).toEqual({ room_id: "room:", zone: 2 });
+    expect(parseTarget("room:")).toEqual({ room_id: "room:" });
+    expect(targetKey({ room_id: "room:", zone: 2 })).toBe("room::2");
+  });
+});
+
+describe("copyReceipt", () => {
+  const rows = diffRows(DIFF, WORDS);
+  test("every value read back: a green receipt with the event ids for Undo", () => {
+    const r = copyReceipt(
+      ok({
+        diff: DIFF,
+        missing: [],
+        applied: DIFF.map(({ target, key }) => ({
+          target,
+          key,
+          readback: "verified",
+          error: null,
+        })),
+      }),
+      rows,
+      WORDS,
+      AT,
+    );
+    expect(isReceipt(r) && r.ok).toBe(true);
+    expect(isReceipt(r) && r.eventIds).toEqual(["01B", "01A"]);
+    expect(isReceipt(r) && r.summary).toBe("Peak moisture 66% → 70% · Re-water point 63% → 60%");
+    expect(isReceipt(r) && r.notCopied).toBeUndefined();
+  });
+
+  test("refused readback row stays failed in the receipt", () => {
+    const outcome: V2Outcome<PresetResult> = {
+      kind: "error",
+      code: "guard_refused",
+      message: "Not applied: p2_vwc_threshold: waiting for its neighbour",
+      data: {
+        diff: DIFF,
+        missing: [],
+        applied: [
+          { target: F1, key: "p1_target_vwc", readback: "verified", error: null },
+          {
+            target: F1,
+            key: "p2_vwc_threshold",
+            readback: "refused",
+            error: "waiting for its neighbour",
+          },
+        ],
+      },
+    };
+    const r = copyReceipt(outcome, rows, WORDS, AT);
+    expect(isReceipt(r)).toBe(true);
+    if (!isReceipt(r)) return;
+    expect(r.ok).toBe(false);
+    expect(r.unconfirmed).toBeUndefined();
+    expect(r.failed).toEqual([{ id: "room:f1_|p2_vwc_threshold", holds: "63%" }]);
+    expect(r.summary).toBe("Peak moisture 66% → 70%");
+    // The refusal envelope lists no events: nothing to undo by id.
+    expect(r.eventIds).toEqual([]);
+    const html = renderToStaticMarkup(
+      createElement(ReviewApplyView, {
+        rows: [],
+        layout: "panel",
+        apply: () => Promise.resolve(r),
+        onDiscard: () => {},
+        timeZone: NZ,
+        state: { phase: "done", result: r },
+      }),
+    );
+    expect(html).toContain("Controller still holds 63%.");
+    expect(html).toContain("Peak moisture 66% → 70%: written and read back.");
+    expect(html).not.toContain("Written and read back");
+  });
+
+  test("a timer the source has none of is not copied, the rest is written, and the receipt names it", () => {
+    const missing = [{ target: F1, key: "timers", reason: "source room has no timer programs" }];
+    const outcome: V2Outcome<PresetResult> = {
+      kind: "error",
+      code: "guard_refused",
+      message: "Not applied: timers: source room has no timer programs",
+      data: {
+        diff: DIFF,
+        missing,
+        applied: [
+          ...DIFF.map(({ target, key }) => ({
+            target,
+            key,
+            readback: "verified" as const,
+            error: null,
+          })),
+          {
+            target: F1,
+            key: "timers",
+            readback: "refused",
+            error: "source room has no timer programs",
+          },
+        ],
+      },
+    };
+    const r = copyReceipt(outcome, rows, WORDS, AT);
+    expect(isReceipt(r) && r.ok).toBe(true);
+    expect(isReceipt(r) && r.notCopied).toEqual([
+      "Timer programs (source room has no timer programs)",
+    ]);
+    const html = renderToStaticMarkup(
+      createElement(ReviewApplyView, {
+        rows: [],
+        layout: "panel",
+        apply: () => Promise.resolve(r as ApplyReceipt),
+        onDiscard: () => {},
+        timeZone: NZ,
+        state: { phase: "done", result: r as ApplyReceipt },
+      }),
+    );
+    expect(html).toContain("Written and read back 14:10");
+    expect(html).toContain("Not copied: Timer programs (source room has no timer programs)");
+  });
+
+  test("a row with no read-back, or a refusal that matches no row, claims nothing", () => {
+    const partial = copyReceipt(
+      {
+        kind: "error",
+        code: "guard_refused",
+        message: "x",
+        data: {
+          diff: DIFF,
+          missing: [],
+          applied: [{ target: F1, key: "p2_vwc_threshold", readback: "refused" }],
+        },
+      },
+      rows,
+      WORDS,
+      AT,
+    );
+    expect(isReceipt(partial) && partial.unconfirmed).toBe(true);
+    const stray = copyReceipt(
+      ok({
+        diff: DIFF,
+        missing: [],
+        applied: [...DIFF, { target: F1, key: "maximum_ec" }].map(({ target, key }) => ({
+          target,
+          key,
+          readback: key === "maximum_ec" ? "refused" : "verified",
+        })),
+      }),
+      rows,
+      WORDS,
+      AT,
+    );
+    expect(isReceipt(stray) && stray.unconfirmed).toBe(true);
+  });
+
+  test("other refusals and an older integration pass through", () => {
+    expect(copyReceipt({ kind: "missing" }, rows, WORDS, AT)).toEqual({ kind: "missing" });
+    const forbidden: V2Outcome<PresetResult> = {
+      kind: "error",
+      code: "forbidden",
+      message: "Admin only",
+    };
+    expect(copyReceipt(forbidden, rows, WORDS, AT)).toBe(forbidden);
+  });
+});
+
+describe("words", () => {
+  test("not copied and not saved lines", () => {
+    expect(
+      notCopiedLines(
+        [
+          { target: F1, key: "p2_dilute_ratio" },
+          { target: F1, key: "timers", reason: "source room has no timer programs" },
+        ],
+        WORDS,
+      ),
+    ).toEqual([
+      "p2_dilute_ratio (F1 has no such setting)",
+      "Timer programs (source room has no timer programs)",
+    ]);
+    expect(skippedLine(["p1_target_vwc", "timers"], WORDS)).toBe(
+      "Not saved: Peak moisture, Timer programs (no reading)",
+    );
+    expect(skippedLine([], WORDS)).toBe("");
+  });
+
+  test("presetWords reads the unit from the room's own entity and names rooms and zones", () => {
+    const words = presetWords(
+      {
+        "number.crop_steering_f1_zone_1_p1_target_vwc": {
+          entity_id: "",
+          state: "64",
+          attributes: { unit_of_measurement: "%" },
+          last_changed: "",
+          last_updated: "",
+        },
+        "number.crop_steering_f1_max_shot_duration": {
+          entity_id: "",
+          state: "120",
+          attributes: { unit_of_measurement: "s" },
+          last_changed: "",
+          last_updated: "",
+        },
+      },
+      [{ id: "room:f1_", name: "F1", prefix: "f1_" }],
+    );
+    expect(words.value("p1_target_vwc", 70)).toBe("70%");
+    expect(words.value("max_shot_duration", 90)).toBe("90 s");
+    expect(words.value("timers", [{}, {}])).toBe("2 programs");
+    expect(words.value("timers", [])).toBe("none");
+    expect(words.value("timer", { name: "Day timer" })).toBe("Day timer");
+    expect(words.target({ room_id: "room:f1_", zone: 2 })).toBe("F1 zone 2");
+    expect(words.label("p1_target_vwc")).not.toBe("p1_target_vwc");
+    expect(words.label("p2_dilute_ratio")).toBe("P2 dilute ratio");
+  });
+});
+
+describe("demo copy (3.18)", () => {
+  const roomA = { room_id: "room:" },
+    roomB = { room_id: "room:room_b_" };
+  const sections = ["targets", "phase_timing", "water_limits", "timers"];
+  test("Room A to Room B: real diffs, one setting Room B has no entity for, applied, read back and undone", async () => {
+    const c = demoController("?demo=1");
+    const preview = await callV2<PresetResult>(c, "copy_config", { from: roomA, to: [roomB], sections, preview: true });
+    if (preview.kind !== "ok") throw new Error("not ok");
+    expect(preview.data.diff.map((d) => [d.key, d.old, Array.isArray(d.new) ? d.new.length : d.new])).toEqual([
+      ["p1_target_vwc", 66, 70],
+      ["p2_vwc_threshold", 63, 60],
+      ["timers", [], 2],
+    ]);
+    expect(preview.data.missing).toEqual([{ target: roomB, key: "p2_dilute_ratio" }]);
+    const words = presetWords(c.states, c.rooms);
+    const rows = diffRows(preview.data.diff, words);
+    expect(rows.map((r) => `${r.label}: ${r.before} → ${r.after}`)).toEqual([
+      "Peak VWC target: 66% → 70%",
+      "Maintenance shot when below: 63% → 60%",
+      "Timer programs: none → 2 programs",
+    ]);
+    const applied = await callV2<PresetResult>(c, "copy_config", { from: roomA, to: [roomB], sections });
+    const receipt = copyReceipt(applied, rows, words, AT);
+    if (!isReceipt(receipt)) throw new Error("no receipt");
+    expect(receipt.ok).toBe(true);
+    expect(receipt.eventIds).toHaveLength(3);
+    expect(receipt.notCopied).toEqual(["P2 dilute ratio (Room B has no such setting)"]);
+    const again = await callV2<PresetResult>(c, "copy_config", { from: roomA, to: [roomB], sections, preview: true });
+    expect(again.kind === "ok" && again.data.diff).toEqual([]);
+    expect(await revertEvents(c, receipt.eventIds)).toHaveLength(3);
+    const back = await callV2<PresetResult>(c, "copy_config", { from: roomA, to: [roomB], sections, preview: true });
+    expect(back.kind === "ok" && back.data.diff.map((d) => d.key)).toEqual(["p1_target_vwc", "p2_vwc_threshold", "timers"]);
+  });
+
+  test("Room B to Room A: no timer programs to copy, so the apply is refused for that row and the rest stands", async () => {
+    const c = demoController("?demo=1");
+    const words = presetWords(c.states, c.rooms);
+    const preview = await callV2<PresetResult>(c, "copy_config", { from: roomB, to: [roomA], sections, preview: true });
+    if (preview.kind !== "ok") throw new Error("not ok");
+    expect(preview.data.missing).toEqual([{ target: roomA, key: "timers", reason: "source room has no timer programs" }]);
+    const rows = diffRows(preview.data.diff, words);
+    const applied = await callV2<PresetResult>(c, "copy_config", { from: roomB, to: [roomA], sections });
+    expect(applied.kind === "error" && applied.code).toBe("guard_refused");
+    const receipt = copyReceipt(applied, rows, words, AT);
+    expect(isReceipt(receipt) && receipt.ok).toBe(true);
+    expect(isReceipt(receipt) && receipt.eventIds).toEqual([]);
+    expect(isReceipt(receipt) && receipt.notCopied).toEqual(["Timer programs (source room has no timer programs)"]);
+  });
+
+  test("3.17 has no presets", async () => {
+    expect((await callV2(demoController("?demo=1&backend=3.17"), "preset_list", {})).kind).toBe("missing");
+  });
+});

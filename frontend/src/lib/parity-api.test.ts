@@ -5,6 +5,7 @@ import { NeedsIntegration } from "@/components/needs-integration";
 import { callV2, isMissingService, pagedQuery, PARITY_ACTIONS, PARITY_MIN_VERSION, useParity } from "./parity-api";
 import { parityDemo } from "./parity-demo";
 import { DEMO_TIMER_PROGRAM_ID } from "./parity-demo/journal";
+import { DEMO_PRESET_IDS } from "./parity-demo/presets";
 import { demoController, fakeController } from "./test-helpers";
 import type { CsEvent } from "./parity-types";
 
@@ -90,6 +91,10 @@ const ASKED: Partial<Record<string, Record<string, unknown>>> = {
   timer_program_set: { expected_revision: 1, program: DAY_TIMER },
   timer_program_preview: { program: DAY_TIMER },
   timer_program_delete: { expected_revision: 1, id: DEMO_TIMER_PROGRAM_ID },
+  preset_save: { name: "Room A now", scope: "all", from: { room_id: "room:" }, expected_revision: 1 },
+  preset_apply: { preset_id: DEMO_PRESET_IDS.roomB, to: [{ room_id: "room:" }], preview: true },
+  preset_delete: { id: DEMO_PRESET_IDS.timer, expected_revision: 1 },
+  copy_config: { from: { room_id: "room:" }, to: [{ room_id: "room:room_b_" }], sections: ["targets"], preview: true },
 };
 test("demo 3.18 answers every parity action ok", async () => {
   for (const a of PARITY_ACTIONS) expect([a, (await callV2(demoController("?demo=1"), a, ASKED[a] ?? {})).kind]).toEqual([a, "ok"]);

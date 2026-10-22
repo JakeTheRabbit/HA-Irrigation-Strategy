@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
+import { createContext, useEffect, useLayoutEffect, useRef, type ReactNode } from "react";
 import { number } from "@/components/dashboard";
 import { facilityRooms, irrigationMode, pickKey } from "@/lib/facility";
 import { openAlerts } from "@/lib/open-alerts";
@@ -13,7 +13,13 @@ export interface RoomPick {
   onChange(next: Set<string>): void;
   onDone(): void;
   onCancel(): void;
+  /** A room left out of the pick, with its zones (the room a copy comes from). */
+  exclude?: string;
 }
+
+/** How a page asks the shell's room tree to pick (null ends it): the desktop sidebar's tree, or on a
+ * phone a tree in a bottom sheet. */
+export const RoomPickContext = createContext<(pick: RoomPick | null) => void>(() => {});
 
 /** The menu's live room list: every room with its state, and under it every zone with its phase
  * and moisture. One click opens a room (in the section already open) or a zone's own page, so any
@@ -72,7 +78,9 @@ export function RoomTree({
     };
   }, [picking]);
 
-  const rooms = facilityRooms(controller.states, controller.rooms);
+  const rooms = facilityRooms(controller.states, controller.rooms).filter(
+    ({ room }) => room.id !== pick?.exclude,
+  );
   const alerts = openAlerts(controller);
   const toggle = (key: string) => {
     if (!pick) return;

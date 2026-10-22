@@ -305,3 +305,25 @@ export const handlers: DemoHandler[] = [
     },
   },
 ];
+
+/** A program as a copy carries it (presets.timer_value): without where and when it was stored. */
+const shape = ({ id: _i, room_id: _r, created_at: _c, updated_at: _u, deleted_at: _d, ...rest }: Stored) => rest;
+/** A room's programs as a copy reads them, in a stable order; null for a room the demo has none of. */
+export function demoTimerShapes(room: string): Record<string, unknown>[] | null {
+  const store = rooms[room];
+  return store ? live(store).map(shape).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b))) : null;
+}
+/** A copy's write of a room's programs: each live one ends and the copied ones run in their place,
+ * journalled as one save so `history_revert` puts the room's own back. -> its event id. */
+export function copyDemoTimers(room: string, shapes: Record<string, unknown>[], now: number): string | null {
+  const store = rooms[room];
+  if (!store) return null;
+  const out = save({ room_id: room, expected_revision: store.revision }, now, (programs, stamp) => {
+    for (const p of programs.filter((q) => !q.deleted_at)) Object.assign(p, { active: false, deleted_at: stamp, updated_at: stamp });
+    shapes.forEach((s, i) =>
+      programs.push({ ...(structuredClone(s) as Omit<Stored, "id" | "room_id">), id: demoId(now, `copied:${room}:${i}`), room_id: room, created_at: stamp, updated_at: stamp }),
+    );
+    return {};
+  });
+  return "eventId" in out ? (out.eventId as string) : null;
+}

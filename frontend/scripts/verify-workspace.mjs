@@ -5,6 +5,8 @@ import { mkdir, writeFile, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+/** Grow plan & presets arms at the room's next lights-on and names it (I4). */
+const ARM_PLAN = /^Arm at (lights-on, \w{3} \d{1,2}:\d{2}( [ap]m)?|next lights-on)$/;
 const out = fileURLToPath(new URL("../../output/playwright/", import.meta.url));
 await mkdir(out, { recursive: true });
 // CI must exercise the checked-out artifact without relying on a developer's server.
@@ -525,12 +527,12 @@ try {
     await visible(page.getByRole("heading", { name: "Review grow plan", exact: true }));
     assert.match(await page.getByRole("dialog").innerText(), /Room A only/);
     await page.getByRole("button", { name: "Save draft", exact: true }).click();
-    await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
+    await visible(page.getByRole("button", { name: ARM_PLAN }));
     assert.equal(
-      await page.getByRole("button", { name: "Arm plan", exact: true }).isEnabled(),
+      await page.getByRole("button", { name: ARM_PLAN }).isEnabled(),
       true,
     );
-    await page.getByRole("button", { name: "Arm plan", exact: true }).click();
+    await page.getByRole("button", { name: ARM_PLAN }).click();
     await page.getByRole("button", { name: "Arm for next lights-on", exact: true }).click();
     await visible(page.getByRole("button", { name: "Disarm plan", exact: true }));
     assert.equal(await page.locator("#steering-balance").isDisabled(), true);
@@ -540,7 +542,7 @@ try {
     assert.equal(await gridCell.isEditable(), false, "An armed plan's grid is read only");
     await page.getByRole("button", { name: "Disarm plan", exact: true }).click();
     await page.getByRole("button", { name: "Confirm disarm", exact: true }).click();
-    await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
+    await visible(page.getByRole("button", { name: ARM_PLAN }));
     assert.equal(await page.locator("#steering-balance").isEnabled(), true);
     assert.equal(await gridCell.isEditable(), true);
   });
@@ -553,7 +555,7 @@ try {
         why = page.locator(".plan-state-why");
       assert.equal(await label.innerText(), "Draft");
       assert.match(await why.innerText(), /^Saved, not running\./);
-      await page.getByRole("button", { name: "Arm plan", exact: true }).click();
+      await page.getByRole("button", { name: ARM_PLAN }).click();
       await page.getByRole("button", { name: "Arm for next lights-on", exact: true }).click();
       await visible(page.getByRole("button", { name: "Disarm plan", exact: true }));
       await label.filter({ hasText: /^Scheduled$/ }).waitFor({ state: "visible" });
@@ -562,7 +564,7 @@ try {
       await page.screenshot({ path: out + `workspace-plan-state-${width}.png`, fullPage: true });
       await page.getByRole("button", { name: "Disarm plan", exact: true }).click();
       await page.getByRole("button", { name: "Confirm disarm", exact: true }).click();
-      await visible(page.getByRole("button", { name: "Arm plan", exact: true }));
+      await visible(page.getByRole("button", { name: ARM_PLAN }));
     }
     await page.setViewportSize({ width: 1440, height: 1000 });
   });
@@ -1353,7 +1355,7 @@ try {
         await lp.getByRole("button", { name: "Review & save", exact: true }).click();
         await lp.getByRole("button", { name: "Save draft", exact: true }).click();
         await lp.getByRole("dialog").waitFor({ state: "hidden" });
-        await lp.getByRole("button", { name: "Arm plan", exact: true }).click();
+        await lp.getByRole("button", { name: ARM_PLAN }).click();
         await lp.getByRole("button", { name: "Arm for next lights-on", exact: true }).click();
         await visible(lp.getByRole("button", { name: "Disarm plan", exact: true }));
         await lp.locator("#preview-grow-day").fill("22");
@@ -1361,7 +1363,7 @@ try {
         document.revision++;
         await lp
           .locator(".plan-state")
-          .filter({ hasText: /^active$/i })
+          .filter({ hasText: /^Armed · running$/ })
           .waitFor({ state: "visible" });
         assert.equal(
           await lp.locator("#preview-grow-day").inputValue(),
@@ -1403,7 +1405,7 @@ try {
         await lp.reload();
         await openPlanner("Steering balance", lp);
         assert.equal(await lp.locator("#steering-balance").isDisabled(), true);
-        assert.equal(await lp.getByRole("button", { name: "Arm plan", exact: true }).count(), 0);
+        assert.equal(await lp.getByRole("button", { name: ARM_PLAN }).count(), 0);
         assert.equal(
           await lp.getByRole("button", { name: "Disarm plan", exact: true }).isEnabled(),
           true,
@@ -1440,7 +1442,7 @@ try {
         assert.match(await rewater.innerText(), /77/);
         const mutations = () =>
           apiCalls.filter(
-            (call) => !["setup_read", "strategy_get", "strategy_preview"].includes(call.action),
+            (call) => !["setup_read", "strategy_get", "strategy_preview", "preset_list"].includes(call.action),
           );
         const writesBeforeToday = structuredClone(mutations());
         await navigate("Plan", lp);

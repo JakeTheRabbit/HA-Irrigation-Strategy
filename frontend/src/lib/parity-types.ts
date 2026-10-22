@@ -239,7 +239,44 @@ export interface PresetTarget {
 }
 export interface PresetDiff {
   diff: { target: PresetTarget; key: string; old: unknown; new: unknown }[];
-  applied?: { target: PresetTarget; key: string; readback: "verified" | "refused" }[];
+  applied?: { target: PresetTarget; key: string; readback: "verified" | "refused"; error?: string | null }[];
+}
+/** A key the target has no setting for (no `reason`), or a timer the source has none of (`reason`):
+ * never written, never in `diff`. */
+export interface PresetMissing {
+  target: PresetTarget;
+  key: string;
+  reason?: string;
+}
+/** preset_apply / copy_config: what would change (`preview`) or what changed (`applied`, one row a
+ * write with its read-back). copy_config adds the source's `skipped` keys (no reading). */
+export interface PresetResult extends PresetDiff {
+  missing: PresetMissing[];
+  skipped?: string[];
+}
+export type PresetScope = "targets" | "timers" | "all";
+/** One preset as the site store keeps it: values by section, keyed without a zone prefix. */
+export interface StoredPreset {
+  id: string;
+  name: string;
+  scope: PresetScope;
+  sections: string[];
+  from: PresetTarget;
+  values: Record<string, Record<string, unknown>>;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+export interface PresetList {
+  revision: number;
+  presets: StoredPreset[];
+  error: string | null;
+}
+export interface PresetSaved {
+  preset: StoredPreset;
+  revision: number;
+  /** The source's settings that could not be read, so are not in the preset. */
+  skipped: string[];
 }
 
 // system_status_get (backend Task 28)

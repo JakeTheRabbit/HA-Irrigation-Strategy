@@ -58,6 +58,7 @@ async function openTab(name) {
 }
 async function openLibrary() {
   await openTab("Recipes");
+  await page.getByRole("heading", { level: 2, name: "On this browser", exact: true }).waitFor();
   await library().waitFor();
   if ((await library().getAttribute("open")) === null)
     await library().locator("summary").first().click();
@@ -90,8 +91,8 @@ async function axe(name) {
   );
 }
 try {
-  // An old address opens the unified Irrigation calendar.
-  await page.goto(origin + "/dashboard.html?demo=1#/grow-plan", { waitUntil: "networkidle" });
+  // Grow plan & presets: the browser recipe library sits under "On this browser".
+  await page.goto(origin + "/dashboard.html?demo=1#/plan/schedule", { waitUntil: "networkidle" });
   await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
   await openTab("Recipes");
   await library().waitFor();
@@ -285,7 +286,7 @@ try {
         "keep",
       );
       await page.evaluate(() => {
-        window.location.hash = "#/grow-plan";
+        window.location.hash = "#/plan/schedule";
       });
       await page.getByRole("heading", { name: "Irrigation", exact: true }).waitFor();
       await openLibrary();

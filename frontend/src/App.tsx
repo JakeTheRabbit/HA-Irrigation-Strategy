@@ -38,7 +38,8 @@ import { AppHeader, StaleBanner } from "@/components/app-header";
 import { UiTip } from "@/components/info-tip";
 import { PageTabs, pageLabel } from "@/components/page-tabs";
 import { NavTree } from "@/components/nav-tree";
-import { RoomTree } from "@/components/room-tree";
+import { RoomPickContext, RoomTree, type RoomPick } from "@/components/room-tree";
+import { useNarrow } from "@/lib/use-narrow";
 import { WaterViewProvider } from "@/lib/water-view";
 import { WhatsNewOnUpdate } from "@/components/whats-new";
 import { Tour } from "@/components/tour";
@@ -88,6 +89,9 @@ export default function App() {
   const [focusZone, setFocusZone] = useState<number | undefined>(() => route.zone ?? undefined);
   const [workspaceDirty, setWorkspaceDirty] = useState(false);
   const [pending, setPending] = useState<(() => void) | null>(null);
+  // A page's room pick (Copy to room…): the sidebar's tree on desktop, a bottom sheet on a phone.
+  const [roomPick, setRoomPick] = useState<RoomPick | null>(null);
+  const phone = useNarrow(720);
   const [refreshing, setRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState("");
   const theme = useHaTheme();
@@ -257,6 +261,7 @@ export default function App() {
         openZone={(room, zone) =>
           room === controller.roomId ? navigate("zone", zone) : openRoomPage(room, "zone", zone)
         }
+        pick={variant === "desktop" && !phone ? roomPick : null}
       />
       <div className="sidebar-footer">
         {haShell.available && (
@@ -562,6 +567,16 @@ export default function App() {
           );
         })}
       </nav>
+      {phone && roomPick && (
+        <RoomTree
+          controller={controller}
+          allRooms={false}
+          currentZone={null}
+          openRoom={() => {}}
+          openZone={() => {}}
+          pick={roomPick}
+        />
+      )}
       <WhatsNewOnUpdate controller={controller} />
       <Tour navigate={navigate} />
       <Dialog
@@ -600,5 +615,9 @@ export default function App() {
       </Dialog>
     </div>
   );
-  return <WaterViewProvider controller={controller}>{shell}</WaterViewProvider>;
+  return (
+    <WaterViewProvider controller={controller}>
+      <RoomPickContext.Provider value={setRoomPick}>{shell}</RoomPickContext.Provider>
+    </WaterViewProvider>
+  );
 }

@@ -60,7 +60,8 @@ export type V2Outcome<T> =
       eventIds: string[];
     }
   | { kind: "missing" }
-  | { kind: "error"; code: V2ErrorCode; message: string; currentRevision?: number };
+  /** `data`: the answer a refusal still carries (a copy's `applied` rows, written and refused). */
+  | { kind: "error"; code: V2ErrorCode; message: string; currentRevision?: number; data?: unknown };
 
 const KNOWN_CODES: readonly string[] = ["stale_revision", "invalid", "forbidden", "guard_refused", "unavailable"];
 
@@ -115,6 +116,7 @@ export async function callV2<T>(
       code,
       message: typeof error.message === "string" ? error.message : "The integration refused this.",
       ...(typeof error.current_revision === "number" ? { currentRevision: error.current_revision } : {}),
+      ...(answer.data !== undefined ? { data: answer.data } : {}),
     };
   }
   const readback = isRecord(answer.readback) ? answer.readback : {};

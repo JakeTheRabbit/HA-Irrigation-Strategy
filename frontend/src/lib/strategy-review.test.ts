@@ -69,7 +69,7 @@ describe("targetRows", () => {
     });
     expect(rows[1].note).toMatch(/^\+1\.5 pts · /);
     expect(rows[2]).toMatchObject({ before: "Vegetative", after: "Generative" });
-    rows[0].undo();
+    rows[0].undo?.();
     expect(remove).toHaveBeenCalledWith(REWATER);
   });
 });

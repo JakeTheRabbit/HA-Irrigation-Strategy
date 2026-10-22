@@ -10,7 +10,8 @@ import "./review-apply.css";
 
 /** One pending edit: what it was, what it becomes, and how to take just this one back out of the
  * draft. A v2 save's `applied[]` entry is this row when its `key` is the row's `key` (else `id`) and
- * its `target` is the row's `target` (any target when the row names none). */
+ * its `target` is the row's `target` (any target when the row names none). A row without `undo`
+ * cannot be taken out on its own (a copy writes whole sections). */
 export interface ReviewRow {
   id: string;
   key?: string;
@@ -19,7 +20,7 @@ export interface ReviewRow {
   before: string;
   after: string;
   note?: string;
-  undo(): void;
+  undo?(): void;
 }
 /** What an apply did. `ok` only when the controller read every value back as written.
  * `unconfirmed`: nothing says which values took, so the receipt claims none of them. */
@@ -31,6 +32,8 @@ export interface ApplyReceipt {
   /** Rows written but not read back (a 3.17 write, row by row): they may have taken, so the
    * receipt names them without saying what the controller holds. */
   notConfirmed?: string[];
+  /** What the apply left out on purpose, each with why (a copy's missing settings). */
+  notCopied?: string[];
   summary: string;
   by?: string;
   eventIds: string[];
@@ -110,6 +113,8 @@ export interface ReviewApplyProps {
   layout: "bar" | "panel";
   summary?: ReactNode;
   discardLabel?: string;
+  /** The Apply button's own words ("Copy 3 changes to F1"); "Apply n changes" without. */
+  applyLabel?: string;
   checks?: { ok: boolean | "warn"; text: string }[];
   consequence?: ReactNode;
   apply(): Promise<ApplyReceipt | Refusal>;
@@ -130,6 +135,7 @@ export type ApplyState =
   /** `reverted`: how many of the receipt's changes were put back before the undo stopped. */
   | { phase: "undo-failed"; receipt: ApplyReceipt; message: string; reverted: number };
 
+const notCopiedText = (r: ApplyReceipt) => (r.notCopied?.length ? `Not copied: ${r.notCopied.join("; ")}.` : "");
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const isReceipt = (r: ApplyReceipt | Refusal): r is ApplyReceipt => "ok" in r;
 
@@ -262,7 +268,7 @@ export function ReviewApplyView(
       <span className="review-apply-blocked">Fix the red check to apply</span>
     ) : (
       <Button onClick={props.onApply} disabled={busy} className={state.phase === "sending" ? "is-sending" : undefined}>
-        {state.phase === "sending" ? "Sending…" : `Apply ${plural(n, "change")}`}
+        {state.phase === "sending" ? "Sending…" : (props.applyLabel ?? `Apply ${plural(n, "change")}`)}
       </Button>
     )
   ) : null;
@@ -281,9 +287,11 @@ export function ReviewApplyView(
             <s>{row.before}</s> → <b>{row.after}</b>
           </span>
           {row.note && <span className="review-apply-note">{row.note}</span>}
-          <Button variant="link" size="sm" onClick={row.undo} disabled={busy} aria-label={`Undo ${row.label}`}>
-            Undo
-          </Button>
+          {row.undo && (
+            <Button variant="link" size="sm" onClick={row.undo} disabled={busy} aria-label={`Undo ${row.label}`}>
+              Undo
+            </Button>
+          )}
         </li>
       ))}
     </ul>
@@ -376,6 +384,7 @@ export function ReviewApplyView(
       const unsure = result.notConfirmed?.length
         ? `The controller did not confirm: ${result.notConfirmed.map(labelOf).join(", ")}.`
         : "";
+      const left = notCopiedText(result);
       return (
         <div role="alert" className="review-apply-error">
           <span>
@@ -387,6 +396,7 @@ export function ReviewApplyView(
                 : unsure
                   ? ""
                   : "Nothing else was changed.",
+              left,
             ]
               .filter(Boolean)
               .join(" ")}
@@ -408,6 +418,7 @@ export function ReviewApplyView(
         <span className="review-apply-receipt-text">
           <b>Written and read back {clock(result.at, timeZone)}</b>
           {result.summary && <span>{result.summary}</span>}
+          {result.notCopied?.length ? <span className="review-apply-not-copied">{notCopiedText(result)}</span> : null}
           <small>Controller confirmed every value{result.by ? ` · by ${result.by}` : ""}</small>
         </span>
         {props.undo ? (

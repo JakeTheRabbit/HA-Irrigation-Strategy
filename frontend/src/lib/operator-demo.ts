@@ -35,6 +35,7 @@ import {
   settleDemoTargetWrite,
 } from "./parity-demo/targets";
 import { resetDemoTimers } from "./parity-demo/timers";
+import { answerPresets, resetDemoPresets } from "./parity-demo/presets";
 import { sameValue } from "./utils";
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -70,6 +71,7 @@ export class OperatorDemo {
     // The demo Journal's own setpoint writes and timer programs belong to this demo and its backend only.
     resetDemoTargetWrites();
     resetDemoTimers();
+    resetDemoPresets();
     this.whatsNewSeen =
       whatsNew === "unknown"
         ? null
@@ -443,6 +445,13 @@ export class OperatorDemo {
     });
     return response(revision, options);
   }
+  /** One number entity set to `value` (a copy's write); the states after it. */
+  private writeNumber(entityId: string, value: number): States {
+    const states = this.getStates();
+    const next = { ...states, [entityId]: { ...states[entityId], state: String(value), last_changed: new Date().toISOString() } };
+    this.updateStates(next);
+    return next;
+  }
   /** A 3.18 integration journals each base setpoint write as a manual `target.changed`. */
   journalTarget(roomId: string, prefix: string, entityId: string, old: number | null, value: number) {
     if (this.backend === "3.18") journalDemoTargetWrite(roomId, prefix, entityId, old, value, Date.now());
@@ -469,6 +478,9 @@ export class OperatorDemo {
   async call<T>(action: OperatorAction, data: Record<string, unknown>): Promise<T> {
     if (action === "history_revert" && this.backend === "3.18" && demoTargetWrite(String(data.event_id)))
       return this.revertTarget(String(data.event_id), data.room_id) as T;
+    // Presets read and write the demo's own states; an older integration has none of them.
+    if (this.backend === "3.18" && ["preset_list", "preset_save", "preset_delete", "preset_apply", "copy_config"].includes(action))
+      return answerPresets(action, data, this.getStates(), (entityId, value) => this.writeNumber(entityId, value), Date.now()) as T;
     if (isParityAction(action)) return (await parityDemo(action, data, Date.now(), this.backend)) as T;
     // An existing service asked for v2: a 3.18 integration wraps its v1 answer in the envelope; a
     // 3.17 one answers v1, which callV2 reads as missing.

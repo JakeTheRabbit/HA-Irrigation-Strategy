@@ -4,10 +4,12 @@ import {
   blockForDay,
   columnRange,
   dateForDay,
+  exceptionOn,
   growDay,
   interpolate,
   parseBalance,
   parsePlanImport,
+  planEdits,
   planErrors,
   planState,
   rangeBlock,
@@ -250,5 +252,30 @@ describe("grow planner", () => {
       (s) => state(s).sentence,
     );
     expect(new Set(sentences).size).toBe(sentences.length);
+  });
+});
+
+describe("draft edits and exceptions", () => {
+  const plan = {
+    schema_version: 1 as const,
+    name: "Bulk",
+    profiles: [profile],
+    zones: [{ zone_id: 1, start_date: "2026-09-16", schedule: [{ start_day: 1, end_day: 63, profile_id: "p", bias: 40 }] }],
+  };
+  it("counts each changed value, block and date once", () => {
+    expect(planEdits(plan, structuredClone(plan))).toBe(0);
+    const draft = structuredClone(plan);
+    draft.profiles[0].vegetative.p1_target_vwc = 72;
+    draft.zones[0].schedule = replaceRange(draft.zones[0].schedule, { start_day: 40, end_day: 40, profile_id: "p", bias: 70 });
+    // Day 40 split from its block is one edit, however many blocks the split leaves.
+    expect(planEdits(plan, draft)).toBe(2);
+    expect(planEdits(plan, { ...plan, name: "Bulk 2" })).toBe(1);
+  });
+  it("a one-day block is an exception; a plan of one block has none", () => {
+    const zone = structuredClone(plan.zones[0]);
+    expect(exceptionOn(zone, 40)).toBeNull();
+    zone.schedule = replaceRange(zone.schedule, { start_day: 40, end_day: 40, profile_id: "p", bias: 70 });
+    expect(exceptionOn(zone, 40)).toEqual({ start_day: 40, end_day: 40, profile_id: "p", bias: 70 });
+    expect(exceptionOn(zone, 41)).toBeNull();
   });
 });

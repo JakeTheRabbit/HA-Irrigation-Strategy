@@ -6,6 +6,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import AxeBuilder from "@axe-core/playwright";
+/** Grow plan & presets arms at the room's next lights-on and names it (I4). */
+const ARM_PLAN = /^Arm at (lights-on, \w{3} \d{1,2}:\d{2}( [ap]m)?|next lights-on)$/;
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const publicRoot = path.join(root, "www");
@@ -1059,7 +1061,7 @@ try {
       assert.equal(await page.locator(".grow-weeks li[aria-current]").innerText(), "W6");
       // Validate and arm stay in view; the balance grid, endpoints and recipes are one tap down.
       await expectVisible(page.getByRole("button", { name: "Validate preview" }));
-      await expectVisible(page.getByRole("button", { name: "Arm plan" }));
+      await expectVisible(page.getByRole("button", { name: ARM_PLAN }));
       const advanced = page.locator("details.plan-advanced");
       if ((await advanced.getAttribute("open")) === null) await advanced.locator("summary").click();
       const tabs = page.getByRole("tablist", { name: "Grow planner view" });
