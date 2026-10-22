@@ -40,6 +40,7 @@ def sensor(states, prefix=""):
         "_probe_readings",
         "_user_corrections",
         "_follow_fix",
+        "_unreadable_offsets",
         "_fuse_zone",
         "_probe_method_entity",
         "_ec_types",

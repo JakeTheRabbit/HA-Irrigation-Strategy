@@ -90,6 +90,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-610](#cs-610) | Engine Enabled not kill switch | Warning | Repairs card |
 | [CS-611](#cs-611) | Settings above zone limit | Warning | Repairs card |
 | [CS-612](#cs-612) | Feed probe calibration due | Warning | Repairs card |
+| [CS-615](#cs-615) | Probe offsets unreadable | Warning | Repairs card |
 | [CS-701](#cs-701) | No water at the zone | Warning | Notification |
 | [CS-702](#cs-702) | Unusual water for each plant | Information | Notification |
 | [CS-703](#cs-703) | Overnight probe fault suspected | Warning | Notification |
@@ -1375,6 +1376,26 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 - Calibrate the probe in two reference solutions: open Crop Steering → Equipment → Tank and feed and press Calibrate.
 - The card clears when each probe has a calibration less than 30 days old. A calibration from before this release is never due.
+
+<a id="cs-615"></a>
+
+### CS-615: Probe offsets unreadable
+
+*Warning · Repairs card*
+
+**What it means.** The stored offsets of the moisture probes of the room could not be read. The probes named on the card now read without their offsets, so the zones steer on the raw readings.
+
+**Effect on water.** Water continues. The zones steer on the raw probe readings, which differ from the corrected readings by the offsets that were set. Nothing is overwritten, and probe offsets cannot be changed until the file reads again.
+
+**Probable causes**
+
+- The file crop_steering.calibration.<entry id> in the .storage folder is damaged or was edited by hand.
+- A restore put back a file the integration does not understand.
+
+**What to do**
+
+- Look in the Home Assistant log for the line that says the probe offsets could not be read.
+- Restore the file from a backup, or ask for help. The card clears when the offsets read again.
 
 ## AI assistant (CS-7xx)
 

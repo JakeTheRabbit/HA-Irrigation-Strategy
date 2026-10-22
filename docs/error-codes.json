@@ -1076,6 +1076,22 @@
       ]
     },
     {
+      "code": "CS-615",
+      "title": "Probe offsets unreadable",
+      "source": "repairs",
+      "severity": "warning",
+      "meaning": "The stored offsets of the moisture probes of the room could not be read. The probes named on the card now read without their offsets, so the zones steer on the raw readings.",
+      "watering": "Water continues. The zones steer on the raw probe readings, which differ from the corrected readings by the offsets that were set. Nothing is overwritten, and probe offsets cannot be changed until the file reads again.",
+      "causes": [
+        "The file crop_steering.calibration.<entry id> in the .storage folder is damaged or was edited by hand.",
+        "A restore put back a file the integration does not understand."
+      ],
+      "fixes": [
+        "Look in the Home Assistant log for the line that says the probe offsets could not be read.",
+        "Restore the file from a backup, or ask for help. The card clears when the offsets read again."
+      ]
+    },
+    {
       "code": "CS-701",
       "title": "No water at the zone",
       "source": "notification",

@@ -108,7 +108,47 @@ async def test_a_curve_on_a_percent_probe_is_refused(hass, hass_admin_user):
             "probe_offset_set",
             room_id=ROOM,
             entity_id=PROBE,
-            curve="rockwool",
+            curve="generic_rockwool",
             expected_revision=document["revision"],
         )
     assert hass.states.get(CORRECTED) is None
+
+
+async def test_unreadable_offsets_are_loud_and_leave_the_calibration_alone(
+    hass, hass_storage, hass_admin_user
+):
+    from custom_components.crop_steering.calibration import OFFSETS_ISSUE
+    from homeassistant.helpers import issue_registry as ir
+    from test_upgrade_in_place import _upgrade
+
+    from conftest import fixture
+
+    seed = fixture("entry_3_11_1_pumped_room.json")
+    record = {
+        "id": "old",
+        "probe": "feed_ph",
+        "kind": "ph",
+        "entity_id": "sensor.feed_ph",
+        "at": "2026-10-01T00:00:00+00:00",
+        "points": [],
+        "slope_pct": 100.0,
+        "offset": 0.0,
+        "verdict": "pass",
+        "note": "",
+    }
+    key = f"{DOMAIN}.calibration.{seed['entry_id']}"
+    hass_storage[key] = {
+        "version": 1,
+        "minor_version": 1,
+        "key": key,
+        "data": {"revision": 1, "records": [record], "probe_user_offsets": [1]},
+    }
+    await _upgrade(hass, "entry_3_11_1_pumped_room.json")
+    document = await _service(hass, hass_admin_user, "calibration_get", room_id="room:")
+    assert document["error"] is None and document["offsets_error"]
+    assert document["records"] == [record]
+    issues = ir.async_get(hass).issues
+    assert any(
+        domain == DOMAIN and issue_id.startswith(OFFSETS_ISSUE)
+        for domain, issue_id in issues
+    )

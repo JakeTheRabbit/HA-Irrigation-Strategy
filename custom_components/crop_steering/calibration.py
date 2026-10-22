@@ -42,7 +42,7 @@ from .const import PROBE_FAR, PROBE_RANGE, PROBE_STALE_SECONDS
 from .generated.ids import new_id
 from .health import _iid
 from .journal_api import attribution, note
-from .probe_offsets import CURVES, OFFSET_LIMIT, read
+from .probe_offsets import CURVES, CURVE_WARNING, OFFSET_LIMIT, is_permittivity, read
 from .room import room_prefix
 from .units import accepted, normalise
 
@@ -79,6 +79,11 @@ DUE_DAYS = 30
 EXPIRED = "Calibration session expired. Start again."
 SIGNAL = f"{DOMAIN}_calibration_changed"
 ISSUE = "calibration_due"
+OFFSETS_ISSUE = "probe_offsets_unreadable"
+CURVE_NEEDS_PERMITTIVITY = (
+    "A curve applies only to a probe that reports permittivity (unit \u03b5, permittivity or "
+    "dielectric). This probe reports {unit}."
+)
 CURVE_ON_PERCENT = (
     "This probe already converts to moisture. A curve only applies to raw readings."
 )
@@ -274,6 +279,7 @@ class CalibrationStore:
         self.room_id = "room:" + self.prefix
         slug = (getattr(entry, "data", None) or {}).get("room_slug", "default")
         self.issue_id = _iid(ISSUE, slug)
+        self.offsets_issue_id = _iid(OFFSETS_ISSUE, slug)
         self.due_sensor = f"binary_sensor.{DOMAIN}_{self.prefix}calibration_due"
         self._store = store
         self._now = now or _utcnow
@@ -283,6 +289,9 @@ class CalibrationStore:
         self._corrected = {}  # probe entity_id -> unsubscribe of its raw sensor
         self.sessions = {}
         self.error = None
+        # The probe offsets section is judged on its own: when it cannot be read the feed calibration
+        # stays applied, and when the records cannot be read the offsets still apply.
+        self.offsets_error = None
 
     async def async_init(self):
         try:
@@ -294,22 +303,39 @@ class CalibrationStore:
                 )
             value = await self._store.async_load()
             if value is not None:
-                if (
-                    not isinstance(value, dict)
-                    or type(value.get("revision")) is not int
-                    or value["revision"] < 0
-                    or not isinstance(value.get("records"), list)
-                ):
+                if not isinstance(value, dict):
                     raise ValueError("Invalid stored calibration history")
-                self.document = {
-                    "revision": value["revision"],
-                    "records": _trim(value["records"]),
-                    "probe_user_offsets": _stored_offsets(
+                try:
+                    if (
+                        type(value.get("revision")) is not int
+                        or value["revision"] < 0
+                        or not isinstance(value.get("records"), list)
+                    ):
+                        raise ValueError("Invalid stored calibration history")
+                    self.document["revision"] = value["revision"]
+                    self.document["records"] = _trim(value["records"])
+                except Exception as error:
+                    self.error = f"Stored calibration history could not be loaded; it has not been overwritten: {error}"
+                try:
+                    self.document["probe_user_offsets"] = _stored_offsets(
                         value.get("probe_user_offsets")
-                    ),
-                }
+                    )
+                except Exception as error:
+                    # Kept as stored, so a save of the records carries it through untouched.
+                    self.document["probe_user_offsets"] = deepcopy(
+                        value.get("probe_user_offsets")
+                    )
+                    self._offsets_unreadable(error)
         except Exception as error:
             self.error = f"Stored calibration history could not be loaded; it has not been overwritten: {error}"
+            self._offsets_unreadable(error)
+
+    def _offsets_unreadable(self, error):
+        self.offsets_error = (
+            "The stored probe offsets could not be read; they have not been overwritten "
+            f"and the probes read without them: {error}"
+        )
+        _LOGGER.error("%s: %s", self.room_id, self.offsets_error)
 
     # ------------------------------------------------------------------ reading
     def _descriptor(self) -> dict:
@@ -340,6 +366,7 @@ class CalibrationStore:
             **deepcopy(self.document),
             "sensors": self.sensors(),
             "error": self.error,
+            "offsets_error": self.offsets_error,
             "max_records": HISTORY,
         }
 
@@ -412,13 +439,49 @@ class CalibrationStore:
     # ------------------------------------------------------------------ probe offsets and curves (G9)
     def user_corrections(self) -> dict:
         """{probe entity_id: (offset, curve)} for the zone sensors to apply; none while the store is
-        unreadable (a probe then reads as it did before)."""
-        if self.error:
+        unreadable (a probe then reads as it did before, and says so: see `affected_probes`).
+        """
+        if self.offsets_error:
             return {}
         return {
             entity_id: (float(entry.get("offset", 0.0)), entry.get("curve"))
             for entity_id, entry in self.document["probe_user_offsets"].items()
         }
+
+    def affected_probes(self) -> set:
+        """The room's moisture probes that read without their offsets because the stored offsets cannot be
+        read: the ones the stored section names, or every moisture probe when it names none it can.
+        """
+        if not self.offsets_error:
+            return set()
+        room = set(self._vwc_zones())
+        stored = self.document["probe_user_offsets"]
+        named = room & set(stored) if isinstance(stored, dict) else set()
+        return named or room
+
+    def publish_offsets_issue(self):
+        """The loud side of an unreadable offsets section: a Repairs card naming the probes that now read
+        without their offsets. Cleared when the section reads again."""
+        from homeassistant.helpers import issue_registry as ir
+
+        if not self.offsets_error:
+            ir.async_delete_issue(self.hass, DOMAIN, self.offsets_issue_id)
+            return
+        probes = sorted(self.affected_probes())
+        ir.async_create_issue(
+            self.hass,
+            DOMAIN,
+            self.offsets_issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=OFFSETS_ISSUE,
+            translation_placeholders={
+                "room": self.room_id,
+                "probes": "\n".join(f"- {probe}" for probe in probes)
+                or "- (the room's moisture probes)",
+            },
+            learn_more_url=REPAIRS_DOCS_URL,
+        )
 
     def _zones(self) -> dict:
         """The room's zones as its setup holds them (zone number as a string, or an int)."""
@@ -465,7 +528,7 @@ class CalibrationStore:
         sensor and is unavailable while the raw sensor is: nothing old is ever shown in its place.
         """
         entry = self.document["probe_user_offsets"].get(entity_id)
-        if entry is None or self.error:
+        if entry is None or self.offsets_error:
             self.hass.states.async_remove(self._corrected_id(entity_id))
             return
         fix = (float(entry.get("offset", 0.0)), entry.get("curve"))
@@ -491,7 +554,9 @@ class CalibrationStore:
 
     def sync_corrected(self):
         """Publish a corrected sensor for each probe with an offset or curve and none for the rest."""
-        wanted = set() if self.error else set(self.document["probe_user_offsets"])
+        wanted = (
+            set() if self.offsets_error else set(self.document["probe_user_offsets"])
+        )
         for entity_id in [e for e in self._corrected if e not in wanted]:
             self._corrected.pop(entity_id)()
             self.hass.states.async_remove(self._corrected_id(entity_id))
@@ -506,7 +571,8 @@ class CalibrationStore:
 
     def _fused(self, entity_id, fix):
         """What the probe's zone would read with `fix` on this probe and every other probe as it is now,
-        or None. Mirrors the zone sensor's fusion without its learned memory of the probes.
+        or None, and why each probe it leaves out is left out. An estimate: it mirrors the zone
+        sensor's fusion without its learned memory of the probes.
         """
         key = self._vwc_zones().get(entity_id)
         zone = self._zones().get(key) or {}
@@ -534,7 +600,7 @@ class CalibrationStore:
         method = self.hass.states.get(
             f"select.{DOMAIN}_{self.prefix}zone_{key}_vwc_method"
         )
-        value, _detail = fuse_probes(
+        value, detail = fuse_probes(
             readings,
             {},
             *PROBE_RANGE["vwc"],
@@ -542,7 +608,7 @@ class CalibrationStore:
             method.state if method is not None else "Median",
             PROBE_FAR["vwc"],
         )
-        return value
+        return value, dict(detail["excluded"])
 
     async def probe_offset_set(self, data, who=None) -> dict:
         """Set one moisture probe's offset and/or curve, or (match_handheld) the offset that makes it read
@@ -551,8 +617,8 @@ class CalibrationStore:
         """
         entity_id = data.get("entity_id")
         preview = bool(data.get("preview"))
-        if self.error:
-            raise ValueError(self.error)
+        if self.error or self.offsets_error:
+            raise ValueError(self.error or self.offsets_error)
         if entity_id not in self._vwc_zones():
             raise ValueError("That is not a moisture probe of this room")
         if not any(k in data for k in ("offset", "curve", "match_handheld")):
@@ -560,8 +626,8 @@ class CalibrationStore:
         if "match_handheld" in data and "offset" in data:
             raise ValueError("Give an offset or a handheld reading to match, not both")
         async with self._lock:
-            if self.error:
-                raise ValueError(self.error)
+            if self.error or self.offsets_error:
+                raise ValueError(self.error or self.offsets_error)
             if (
                 not preview
                 and data.get("expected_revision") != self.document["revision"]
@@ -581,10 +647,16 @@ class CalibrationStore:
                     raise ValueError(
                         "The curve must be one of: " + ", ".join(sorted(CURVES))
                     )
-            if curve is not None and normalise(self._raw(entity_id)[1]) in accepted(
-                "vwc"
-            ):
-                raise ValueError(CURVE_ON_PERCENT)
+            if curve is not None:
+                unit = self._raw(entity_id)[1]
+                if normalise(unit) in accepted("vwc"):
+                    raise ValueError(CURVE_ON_PERCENT)
+                if not is_permittivity(unit):
+                    raise ValueError(
+                        CURVE_NEEDS_PERMITTIVITY.format(
+                            unit=repr(unit) if unit else "no unit"
+                        )
+                    )
             if "offset" in data:
                 offset = _number(data["offset"], -OFFSET_LIMIT, OFFSET_LIMIT, "Offset")
             if "match_handheld" in data:
@@ -623,13 +695,18 @@ class CalibrationStore:
             from .setup_api import setup_diff
 
             diff = setup_diff(section, new_section)
+            fused_before, _was = self._fused(entity_id, old_fix)
+            fused_after, excluded = self._fused(entity_id, fix)
             out = {
                 "offset": offset,
                 "curve": curve,
                 "corrected_now": None if corrected is None else round(corrected, 3),
-                "fused_before": self._fused(entity_id, old_fix),
-                "fused_after": self._fused(entity_id, fix),
+                "fused_before": fused_before,
+                "fused_after": fused_after,
+                "excluded_after": excluded,
             }
+            if curve is not None:
+                out["warning"] = CURVE_WARNING
             if preview:
                 return {**out, "preview": True, "diff": diff}
             document = {
@@ -642,6 +719,10 @@ class CalibrationStore:
             if ((stored or {}).get("probe_user_offsets") or {}).get(
                 entity_id
             ) != new_section.get(entity_id):
+                try:  # put back what was there, so the store and the room agree again
+                    await self._store.async_save(deepcopy(self.document))
+                except Exception as error:
+                    _LOGGER.error("Probe offsets could not be put back: %s", error)
                 raise ValueError(
                     "The probe offset did not read back from storage. It was not applied."
                 )
@@ -729,6 +810,7 @@ class CalibrationStore:
             self.publish_due()
 
         self.publish_due()
+        self.publish_offsets_issue()
         self.sync_corrected()
         return async_track_time_interval(self.hass, hourly, timedelta(hours=1))
 
@@ -1418,6 +1500,7 @@ async def async_unload_calibration(hass, entry):
             manager._timer = None
         hass.states.async_remove(manager.due_sensor)
         ir.async_delete_issue(hass, DOMAIN, manager.issue_id)
+        ir.async_delete_issue(hass, DOMAIN, manager.offsets_issue_id)
     if not managers:
         for service in SERVICES:
             hass.services.async_remove(DOMAIN, service)

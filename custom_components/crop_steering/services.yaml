@@ -886,7 +886,7 @@ probe_offset_set:
     room, or, with `match_handheld`, the offset that makes the probe read what a handheld meter
     reads. The zone applies it before it combines its probes, and the probe gets a
     sensor.<probe>_corrected sensor. With `preview` nothing is saved. A curve is refused on a probe
-    that already reports moisture in percent. When a signed-in user calls it, that user must be a
+    that does not report permittivity; `fused_before` and `fused_after` are estimates. When a signed-in user calls it, that user must be a
     Home Assistant administrator.
   fields:
     room_id:
@@ -927,13 +927,16 @@ probe_offset_set:
     curve:
       name: Curve
       description: >-
-        `rockwool` or `soilless` turns a raw reading into moisture; `none` removes the curve.
+        `generic_rockwool` or `generic_soilless` turns a raw permittivity reading into moisture; `none`
+        removes the curve. Generic approximation (Topp 1980 mineral-soil fit), not a substrate
+        calibration: match a handheld after choosing. Only for a probe whose unit is a permittivity
+        label (for example ε). The answer carries a `warning` while a curve is set.
       required: false
       selector:
         select:
           options:
-            - rockwool
-            - soilless
+            - generic_rockwool
+            - generic_soilless
             - none
     match_handheld:
       name: Handheld reading
@@ -950,7 +953,9 @@ probe_offset_set:
     preview:
       name: Preview
       description: >-
-        Answer with the offset, the reading it gives and the zone's reading before and after, and save nothing.
+        Answer with the offset, the reading it gives, an estimate of the zone's reading before and after
+        (`fused_before`, `fused_after`) and which probes that would leave out (`excluded_after`), and save
+        nothing.
       required: false
       selector:
         boolean:

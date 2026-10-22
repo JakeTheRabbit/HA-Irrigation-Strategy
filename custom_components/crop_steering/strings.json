@@ -846,6 +846,10 @@
       "title": "Crop Steering: Feed probe calibration due (CS-612)",
       "description": "The last calibration of these feed probes is 30 days old or older:\n\n{probes}\n\nA probe drifts over time. The controller uses its reading for the feed checks and the pH correction.\n\nCalibrate each probe in two reference solutions. Open Crop Steering → Equipment → Tank and feed and press Calibrate. The card clears when each probe has a calibration less than 30 days old.\n\nCode CS-612. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
+    "probe_offsets_unreadable": {
+      "title": "Crop Steering: Probe offsets could not be read (CS-615)",
+      "description": "The stored offsets of the moisture probes in {room} could not be read, so these probes now read WITHOUT their offsets and the zones steer on the raw readings:\n\n{probes}\n\nNothing has been overwritten. Probe offsets cannot be changed until this is fixed. Check the Home Assistant log for the error, restore the file crop_steering.calibration.<entry id> from a backup, or ask for help. The card clears when the offsets read again.\n\nCode CS-615. What it means and what to do: Crop Steering \u2192 Help & tools \u2192 Error codes."
+    },
     "outside_zone_bounds": {
       "title": "Crop Steering: {count} setting(s) above zone limit (CS-611)",
       "description": "The limits of the daily water and the maximum shot length now follow the size of each zone. The size comes from the plants, the litres per plant and the dripper flow. These settings were already above the new limit:\n\n{settings}\n\nThe controller keeps these settings and uses them as before. Nothing changes until you edit one of them. A new value must then be in the limit.\n\nExamine the plants, the litres per plant and the dripper flow of each zone in Rooms and setup. If a zone size is too small, correct it. The limit then follows. The card clears when each setting is in its limit.\n\nCode CS-611. What it means and what to do: Crop Steering → Help & tools → Error codes."

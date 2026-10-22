@@ -1154,6 +1154,16 @@ class CropSteeringSensor(SensorEntity):
         )
         return manager.user_corrections() if manager is not None else {}
 
+    def _unreadable_offsets(self, sensor_ids) -> bool:
+        """Whether the stored probe offsets of any of these probes cannot be read (calibration.py), so
+        they read without them."""
+        manager = (
+            self.hass.data.get(DOMAIN, {})
+            .get("_calibration", {})
+            .get(self._entry.entry_id)
+        )
+        return manager is not None and bool(manager.affected_probes() & set(sensor_ids))
+
     def _probe_readings(
         self, sensor_ids: list[str], kind: str | None = None
     ) -> list[tuple[str, float | None, float | None]]:
@@ -1279,6 +1289,8 @@ class CropSteeringSensor(SensorEntity):
             )
             self._fusion["unit_set_aside"] = aside
         self._fusion["excluded"].update(dict.fromkeys(sorted(unused), "not counted"))
+        if kind == "vwc" and self._unreadable_offsets(sensor_ids):
+            self._fusion["user_offsets"] = "unreadable"
         primary = zone.get(f"{kind}_primary")
         self._fusion["primary"] = (
             primary if primary in sensor_ids and primary not in unused else None

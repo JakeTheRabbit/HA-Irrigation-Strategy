@@ -37,6 +37,8 @@ ISSUE_IDS = (
     "outside_zone_bounds",
     # Raised and cleared by calibration.py, hourly and when a feed probe is calibrated.
     "calibration_due",
+    # Raised and cleared by calibration.py, when it loads and hourly.
+    "probe_offsets_unreadable",
 )
 # The platforms whose entities the controller reads by exact id and has no other way to find.
 # Fused sensors are left out: the controller tolerates their legacy naming and an add-on option
@@ -226,6 +228,7 @@ def run_health_check(hass: HomeAssistant, entry: ConfigEntry) -> None:
                     "stock_low",
                     "outside_zone_bounds",
                     "calibration_due",
+                    "probe_offsets_unreadable",
                 ):
                     _issue(hass, False, _iid(base, slug), ir.IssueSeverity.WARNING)
             return
