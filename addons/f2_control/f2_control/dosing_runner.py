@@ -70,6 +70,7 @@ POLL_FAILS = 15  # one room failing this many passes in a row (30 s) is alerted
 REPUBLISH_S = 60.0  # an unchanged status is published again this often (with a new updated_at)
 MIX_SETTLE_S = 300.0  # a finished batch's tank is read this long after its mix stopped (the mix check)
 HISTORY = 20
+ANSWERS = 10  # handled_results keeps the answers to the last this many requests, by request id
 OUTBOX = 50  # alerts waiting for Home Assistant, at most
 DEAD = ("", "unknown", "unavailable", "none")
 # The refill reminder (CS-906): a room's batch tank level is read this often, and said once it has read
@@ -647,7 +648,7 @@ class DosingRunner:
             return self._settle(room, config, request, f"refused: {why}")
         with self._lock:  # taken: from here on it is handled, whatever comes of it
             block = self._block(room)
-            block["handled"], block["handled_result"] = request["id"], _RUNNING[action]
+            self._answer(block, request["id"], _RUNNING[action])
             self._write()
         runs = {"dose": self._run_dose, "batch": self._run_batch}
         self._start(runs.get(action, self._run_timed)(room, config, request))
@@ -701,9 +702,10 @@ class DosingRunner:
         pump's power on and read back on, its request's seconds (at most TIMED_S) with a stop and the abort checks
         read every READ_S, then off and read back off on every way it ends. What does not read off latches the room
         as a dose's does (CS-801); the app stopping sends the off and leaves the record for the next start. Its end
-        is handled_result {id, action, pump, ran_s, result: done | stopped | refused: why | stuck}, which the
-        integration reads (dosing_api._status_changed): ran_s is the seconds from the switch-on to the off, 0 for a
-        refused or stuck run."""
+        is reported as {id, action, pump, ran_s, result: done | stopped | refused: why | stuck} in handled_results
+        under its request id (and handled_result while no other request was handled since), which the integration
+        reads (dosing_api._status_changed): ran_s is the seconds from the switch-on to the off, 0 for a refused or
+        stuck run."""
         action = request["action"]
         pump = next((p for p in config["pumps"] if p["id"] == request.get("pump")), None)
         if pump is None:
@@ -2168,9 +2170,10 @@ class DosingRunner:
                      "dosed": dosed, "by": record.get("by")}
             if kind == "batch":
                 entry["name"] = record.get("name") or ""
-            if kind in TIMED_S and block.get("handled") == record.get("request"):  # its report: ran_s not known
-                block["handled_result"] = self._timed_report(
-                    {"id": record.get("request"), "action": kind, "pump": record.get("pump")}, 0, "stopped")
+            if kind in TIMED_S and isinstance(record.get("request"), str):  # its report: ran_s not known
+                self._answer(block, record["request"], self._timed_report(
+                    {"id": record["request"], "action": kind, "pump": record.get("pump")}, 0, "stopped"),
+                    latest=block.get("handled") == record["request"])
             self._add_history(block, entry)
             self._recovered_rows.append((slug, entry))
             block["inflight"] = {**record, "recovered": True}  # its history is written once
@@ -2493,6 +2496,7 @@ class DosingRunner:
             "batch": batch,
             "handled": block["handled"],
             "handled_result": block["handled_result"],
+            "handled_results": block["handled_results"],
             "history": block["history"],
             "mix": block.get("mix") if isinstance(block.get("mix"), dict) else None,
             "last_batch": block["last_batch"],
@@ -2728,7 +2732,22 @@ class DosingRunner:
                 block[key] = []
         if not isinstance(block.get("last"), dict):
             block["last"] = {}
+        if not isinstance(block.get("handled_results"), dict):
+            block["handled_results"] = {}
         return block
+
+    @staticmethod
+    def _answer(block, request_id, result, latest=True):
+        """A request's answer, kept by its id in handled_results (the last ANSWERS), so a later request never takes
+        it away (the integration reads a timed run's report by its id); `latest`: it is also handled and
+        handled_result, the request handled last, as every reader had them."""
+        answers = block["handled_results"]
+        answers.pop(request_id, None)
+        answers[request_id] = result
+        for old in list(answers)[:-ANSWERS]:
+            del answers[old]
+        if latest:
+            block["handled"], block["handled_result"] = request_id, result
 
     @staticmethod
     def _add_history(block, entry):
@@ -2745,7 +2764,7 @@ class DosingRunner:
             record.update(fields)
             block["inflight"] = record
             if not merge:
-                block["handled"], block["handled_result"] = job.request["id"], _RUNNING[job.kind]
+                self._answer(block, job.request["id"], _RUNNING[job.kind])
             return self._write()
 
     def _settle(self, room, config, request, result, entry=None, clear=False, final=False):
@@ -2756,10 +2775,8 @@ class DosingRunner:
             result = self._timed_report(request, 0, result)  # the integration waits for this shape
         with self._lock:
             block = self._block(room)
-            if not final or block["handled"] == request["id"]:
-                block["handled"], block["handled_result"] = request["id"], result
-            elif request.get("action") in TIMED_S:  # its report is awaited whatever was handled since (a stop)
-                block["handled_result"] = result
+            # A final answer to a request handled before others (a stop, a refusal) is kept by its id only.
+            self._answer(block, request["id"], result, latest=not final or block["handled"] == request["id"])
             if clear:
                 block["inflight"] = None
             if entry is not None:

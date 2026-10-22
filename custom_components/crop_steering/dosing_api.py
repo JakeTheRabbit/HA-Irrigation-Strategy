@@ -610,10 +610,31 @@ class DosingStore:
         return held or self._priming()
 
     def _status_changed(self, new_state):
-        """The controller published its status: a handled_result for a calibration's request gives the
-        session its seconds; one for a prime stamps the pump's primed_at and journals pump.primed.
+        """The controller published its status: the report of a calibration's request gives the session
+        its seconds; one of a prime stamps the pump's primed_at and journals pump.primed. A controller
+        that keeps each request's answer by its id (handled_results) is read for each request awaited
+        here, by its own id; an older one only in handled_result.
         """
-        result = (getattr(new_state, "attributes", None) or {}).get("handled_result")
+        attributes = getattr(new_state, "attributes", None) or {}
+        answers = attributes.get("handled_results")
+        if not isinstance(answers, dict):
+            self._report(attributes.get("handled_result"))
+            return
+        calibration = self._calibration()
+        awaited = [*self._primes]
+        if calibration is not None:
+            awaited += [
+                session["request_id"]
+                for session in calibration.sessions.values()
+                if "pump" in session and session["ran_s"] is None
+            ]
+        for request_id in dict.fromkeys(awaited):
+            result = answers.get(request_id)
+            if isinstance(result, dict) and result.get("id") == request_id:
+                self._report(result)
+
+    def _report(self, result):
+        """One timed request's report {id, ran_s, result, ...} from the controller."""
         if not isinstance(result, dict) or not result.get("id"):
             return
         ran_s = result.get("ran_s")

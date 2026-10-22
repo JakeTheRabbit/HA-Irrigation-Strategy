@@ -159,9 +159,10 @@ def test_stop_pump_ends_a_prime_early_and_reports_ran_s(rig):
     (off,) = _off_at(r)
     assert 4 <= off <= 6  # seen within one wait tick
     assert r.fake.states[POWER][0] == "off"
-    assert _report(r) == {"id": request["id"], "action": "prime", "pump": "balance", "ran_s": 4.0,
-                          "result": "stopped"}
-    assert r.status()[1]["handled"] == stop["id"]  # the stop is taken once, too
+    status = r.status()[1]
+    assert (status["handled"], status["handled_result"]) == (stop["id"], "stopped")  # the stop is taken once, too
+    assert status["handled_results"][request["id"]] == {"id": request["id"], "action": "prime", "pump": "balance",
+                                                       "ran_s": 4.0, "result": "stopped"}
     (done,) = _events(r, "dose.completed")
     assert (done["outcome"], done["data"]["ran_s"]) == ("aborted", 4.0)
 
@@ -208,8 +209,9 @@ def test_a_room_stop_ends_a_calibration_run(rig):
     r.clock.at(7, lambda: r.ask("stop", by="Sam"))
     r.poll()
     assert r.fake.states[POWER][0] == "off" and max(_off_at(r)) <= 9
-    assert _report(r) == {"id": request["id"], "action": "calibrate", "pump": "balance", "ran_s": 7.0,
-                          "result": "stopped"}
+    assert _report(r) == "stopped"  # the room stop, handled last
+    assert r.status()[1]["handled_results"][request["id"]] == {"id": request["id"], "action": "calibrate",
+                                                               "pump": "balance", "ran_s": 7.0, "result": "stopped"}
 
 
 @pytest.mark.parametrize("what", ["kill switch", "hardware fault", "shot in flight"])
@@ -474,3 +476,33 @@ def test_a_mix_check_with_no_dosing_config_gives_up_and_alerts(rig):
     m.runner.poll()
     assert len(m.creates("CS-808")) == 1  # said once
     assert m.runner._mix_refuses(m.c.rooms[0]) == "the last batch's mix is not checked yet"
+
+
+# ------------------------------------------------------------------------------------------------- each answer kept
+def test_a_dose_refused_during_a_prime_keeps_its_own_answer_and_the_prime_reports(rig):
+    r = rig()
+    r.config()
+    prime = _timed(r, seconds=20)
+    dose = {}
+    r.clock.at(5, lambda: dose.update(r.ask(ml=50)))
+    r.poll()
+    status = r.status()[1]
+    # The latest request handled keeps handled / handled_result, as every reader had them.
+    assert (status["handled"], status["handled_result"]) == (dose["id"], "refused: a prime is running")
+    assert status["handled_results"] == {
+        prime["id"]: {"id": prime["id"], "action": "prime", "pump": "balance", "ran_s": 20.0, "result": "done"},
+        dose["id"]: "refused: a prime is running"}
+    assert r.saved()["handled_results"] == status["handled_results"]  # kept across a restart
+
+
+def test_the_last_ten_answers_are_kept(rig):
+    r = rig()
+    r.config()
+    r.set("number.balance_flow", "0")
+    asked = []
+    for _ in range(12):
+        asked.append(r.ask(ml=50)["id"])
+        r.poll()
+    answers = r.status()[1]["handled_results"]
+    assert list(answers) == asked[2:]
+    assert set(answers.values()) == {"refused: Balance is not calibrated (flow 0)"}

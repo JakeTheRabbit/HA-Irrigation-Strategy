@@ -1140,6 +1140,54 @@
   ],
   "result": "refused: Balance's dosing state (binary_sensor.balance_dosing) can't be read"
  },
+ "dose/ml_bool": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "c521f717522c330f9436a44ec4f54dafb0b49ef4ca273eef4e84ff1f11f194b8"
+  ],
+  "ph": null,
+  "reads": [
+   6,
+   "fbf18b13c4e8d57b10998132a9a0e935bf731f040879ec90716c65d91323ac6f"
+  ],
+  "result": "refused: 1 mL is not more than 0 and at most 2000 mL"
+ },
+ "dose/ml_nan": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "540c0ec05fa3cd00f095145a687ed37b3ff193acb42e26955d41a657fed29095"
+  ],
+  "ph": null,
+  "reads": [
+   6,
+   "fbf18b13c4e8d57b10998132a9a0e935bf731f040879ec90716c65d91323ac6f"
+  ],
+  "result": "refused: nan mL is not more than 0 and at most 2000 mL"
+ },
+ "dose/ml_text": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   1,
+   "9fe818d5c21b2fece25b0cad5cfb00b5629ebc8269578593f8c4de7d8a668307"
+  ],
+  "ph": null,
+  "reads": [
+   6,
+   "fbf18b13c4e8d57b10998132a9a0e935bf731f040879ec90716c65d91323ac6f"
+  ],
+  "result": "refused: 50 mL is not more than 0 and at most 2000 mL"
+ },
  "dose/ok": {
   "calls": [
    [
@@ -1642,6 +1690,22 @@
   "result": null
  },
  "ph/latched": {
+  "calls": [],
+  "history": [],
+  "inflight": null,
+  "journal": [],
+  "logs": [
+   0,
+   "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+  ],
+  "ph": null,
+  "reads": [
+   65,
+   "3e7a93fb76e1b8c6afa97fed0b552b205d394227f1e32f7cbfebe9aaade218d4"
+  ],
+  "result": null
+ },
+ "ph/latched_fill_unavailable": {
   "calls": [],
   "history": [],
   "inflight": null,

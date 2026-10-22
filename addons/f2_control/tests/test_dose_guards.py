@@ -335,6 +335,9 @@ SCENARIOS = {
     "dose/already_dosing": _single(**{"binary_sensor.balance_dosing": "on"}),
     "dose/dosing_unreadable": _single(**{"binary_sensor.balance_dosing": "unavailable"}),
     "dose/by_hand": _single(**{"switch.balance_power": "on"}),
+    "dose/ml_text": _single(ml="50"),
+    "dose/ml_bool": _single(ml=True),
+    "dose/ml_nan": _single(ml=float("nan")),
     "batch/ok": _batch(),
     "batch/fault": _batch(fault=True),
     "batch/hold_on": _batch(**{"input_boolean.tank_hold": "on"}),
@@ -361,6 +364,7 @@ SCENARIOS = {
     "ph/daily_used": _ph(used=3),
     "ph/dose_under_1_ml": _ph(pumps=(dict(UP, max_ml=0),)),
     "ph/latched": _ph(latch=FILLED),
+    "ph/latched_fill_unavailable": _ph(latch=FILLED, **{"input_datetime.tank_filled": "unavailable"}),
     "ph/latched_then_filled": _ph(latch="2026-09-26 08:00:00", moves=(0.3,)),
     "ph/down": _ph(ph="6.9", pumps=(UP, DOWN), moves=(-0.6,), **{
         "number.acid_volume": "0", "button.acid_start": "unknown", "binary_sensor.acid_dosing": "off",

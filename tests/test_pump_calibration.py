@@ -782,3 +782,48 @@ def test_a_probe_session_opened_after_a_pump_session_is_published_with_it(monkey
         "session_id": "probe-1",
         "until": (NOW + calibration.SESSION_IDLE).isoformat(),
     }
+
+
+def test_reports_are_read_by_their_own_request_id_from_handled_results(monkeypatch):
+    """The controller keeps each request's answer (handled_results): a calibration's and a prime's report are
+    found by their own ids although a later request's answer stands in handled_result.
+    """
+    rig = Rig(monkeypatch)
+    started = rig.calibrate(30)
+    report = {
+        "id": started["request_id"],
+        "action": "calibrate",
+        "pump": "balance",
+        "ran_s": 29.6,
+        "result": "done",
+    }
+    rig.hass.states.set(
+        STATUS,
+        "idle",
+        {
+            "handled": "a-dose",
+            "handled_result": "refused: a pump calibration is running",
+            "handled_results": {
+                started["request_id"]: report,
+                "a-dose": "refused: a pump calibration is running",
+            },
+        },
+    )
+    rig.dosing._status_changed(rig.hass.states.get(STATUS))
+    session = rig.dosing.response()["config"]["pumps"][0]["calibration_session"]
+    assert (session["ran_s"], session["result"]) == (29.6, "done")
+    # handled_results present: handled_result is not read for a report (it is the dose's answer here).
+    rig.hass.states.set(
+        STATUS,
+        "idle",
+        {
+            "handled": "x",
+            "handled_result": dict(report, ran_s=5),
+            "handled_results": {"x": "stopped"},
+        },
+    )
+    rig.dosing._status_changed(rig.hass.states.get(STATUS))
+    assert (
+        rig.dosing.response()["config"]["pumps"][0]["calibration_session"]["ran_s"]
+        == 29.6
+    )
