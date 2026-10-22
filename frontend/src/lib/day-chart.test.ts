@@ -7,7 +7,6 @@ import {
   dayScales,
   EC_AXIS,
   hourTicks,
-  overnightDryback,
   phaseColumns,
   placeBadges,
   placeMarkers,
@@ -163,39 +162,6 @@ describe("markers and badges", () => {
     expect(placeBadges([45, 55, 150, 260], 18, 3, 36, 300)).toEqual([45, 66, 150, 260]);
     // The first stays inside the chart, and the last comes back in from its edge.
     expect(placeBadges([30, 290, 296], 18, 3, 36, 300)).toEqual([45, 270, 291]);
-  });
-});
-
-describe("overnight dryback", () => {
-  const off = 22 * H,
-    end = 34 * H;
-  const night = [
-    { time: 19 * H, value: 70 }, // before the window: not the evening peak
-    { time: 20.5 * H, value: 64 },
-    { time: 21.5 * H, value: 62 },
-    { time: 23 * H, value: 58 },
-    { time: 28 * H, value: 51.2 },
-    { time: 33.9 * H, value: 49.6 },
-    { time: 35 * H, value: 44 }, // after lights-on: the next day
-  ];
-  it("is relative to the evening peak, as the P3 dryback target is", () => {
-    const dryback = overnightDryback(night, off, end, 36 * H)!;
-    expect(dryback.peak).toBe(64);
-    expect(dryback.low).toBe(49.6);
-    expect(dryback.drop).toBeCloseTo(14.4);
-    expect(dryback.percent).toBeCloseTo(22.5);
-    expect(dryback.complete).toBe(true);
-  });
-  it("so far, while the night is still on", () => {
-    const dryback = overnightDryback(night, off, end, 28.5 * H)!;
-    expect(dryback.low).toBe(51.2);
-    expect(dryback.percent).toBeCloseTo(20);
-    expect(dryback.complete).toBe(false);
-  });
-  it("needs readings on both sides of lights-off", () => {
-    expect(overnightDryback(night.slice(0, 3), off, end, 30 * H)).toBeNull();
-    expect(overnightDryback(night.slice(3), off, end, 30 * H)).toBeNull();
-    expect(overnightDryback([], off, end, 30 * H)).toBeNull();
   });
 });
 

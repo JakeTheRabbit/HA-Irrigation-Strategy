@@ -208,41 +208,6 @@ export function placeBadges(
   return placed;
 }
 
-export interface Dryback {
-  /** The evening peak: the highest reading in the last hours before lights-off. */
-  peak: number;
-  /** The lowest reading since lights-off. */
-  low: number;
-  /** (peak − low) / peak × 100: the relative dryback, the way the P3 dryback target is set. */
-  percent: number;
-  /** In points of the probe. */
-  drop: number;
-  /** The night is over: lights came back on. */
-  complete: boolean;
-}
-/** How far a zone dried back overnight, relative to its evening peak, the way P3 is measured: from the
- * highest reading in the `window` before lights-off to the lowest reading after it, up to `now` (so far)
- * or the next lights-on (`end`). Null without readings on both sides of lights-off. */
-export function overnightDryback(
-  points: readonly Reading[],
-  lightsOff: number,
-  end: number,
-  now: number,
-  window = 2 * 3_600_000,
-): Dryback | null {
-  let peak = -Infinity,
-    low = Infinity;
-  const until = Math.min(end, now);
-  for (const point of points) {
-    if (point.time >= lightsOff - window && point.time <= lightsOff)
-      peak = Math.max(peak, point.value);
-    else if (point.time > lightsOff && point.time <= until) low = Math.min(low, point.value);
-  }
-  if (!Number.isFinite(peak) || !Number.isFinite(low) || peak <= 0) return null;
-  const drop = Math.max(0, peak - low);
-  return { peak, low, drop, percent: (drop / peak) * 100, complete: now >= end };
-}
-
 export interface Column {
   phase: string;
   start: number;
