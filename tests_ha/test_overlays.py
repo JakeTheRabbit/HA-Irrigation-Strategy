@@ -246,6 +246,32 @@ async def test_keep_and_undo_tapped_on_a_phone_reach_the_overlay(
     assert _value(hass, SHOT) == old + 2
 
 
+async def test_a_brain_write_that_failed_names_nobody_and_opens_no_overlay(
+    hass, controller_for, hass_admin_user, monkeypatch
+):
+    """CTL-035: the controller names its write before it makes it. When Home Assistant refuses the write,
+    the controller takes the claim back, so the operator writing that same value a moment later is the
+    operator, and no overlay opens to put the old value back over theirs at lights-on."""
+    import controller
+
+    _entry, c, fake, room = await _room(hass, controller_for)
+    old = _value(hass, SHOT)
+    monkeypatch.setattr(controller, "ha_call", lambda *a, **k: False)  # Home Assistant refuses it
+    room.state[1]["phase"] = "P3"
+    assert not c._auto_write(room, 1, "p2_shot_size", old, old + 1, {}, datetime.now(), by="Jev")
+    for event, data in fake.events:
+        hass.bus.async_fire(event, data)
+    await hass.async_block_till_done()
+    assert _value(hass, SHOT) == old
+
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": SHOT, "value": old + 1}, blocking=True,
+        context=Context(user_id=hass_admin_user.id),
+    )
+    assert (await _log(hass))[-1] == ("operator", old, old + 1)
+    assert await _overlays(hass) == []
+
+
 async def test_a_claim_names_one_write_and_only_its_own_cancel_takes_it_back(
     hass, controller_for, hass_admin_user
 ):
