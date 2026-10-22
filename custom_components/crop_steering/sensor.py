@@ -488,11 +488,38 @@ class CropSteeringDosingConfigSensor(SensorEntity):
 
         from .dosing_api import SIGNAL
 
+        self._pump_sensors: set[str] = set()
+
+        @callback
+        def changed() -> None:
+            self.async_write_ha_state()
+            self._publish_pumps()
+
         self.async_on_remove(
             async_dispatcher_connect(
-                self.hass, f"{SIGNAL}_{self._entry.entry_id}", self.async_write_ha_state
+                self.hass, f"{SIGNAL}_{self._entry.entry_id}", changed
             )
         )
+        self.async_on_remove(self._remove_pumps)
+        self._publish_pumps()
+
+    @callback
+    def _publish_pumps(self) -> None:
+        """Each dosing pump's sensor.crop_steering_<prefix>dosing_pump_<id>_ml_min and _last_calibrated
+        (G3), set from the dosing store; a pump no longer set up loses its two."""
+        manager = self._manager()
+        sensors = manager.pump_sensors() if manager is not None else {}
+        for entity_id in self._pump_sensors - set(sensors):
+            self.hass.states.async_remove(entity_id)
+        for entity_id, (state, attributes) in sensors.items():
+            self.hass.states.async_set(entity_id, str(state), attributes)
+        self._pump_sensors = set(sensors)
+
+    @callback
+    def _remove_pumps(self) -> None:
+        for entity_id in self._pump_sensors:
+            self.hass.states.async_remove(entity_id)
+        self._pump_sensors = set()
 
 
 class CropSteeringBrainQuestionsSensor(SensorEntity):

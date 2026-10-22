@@ -344,7 +344,7 @@ def services(monkeypatch):
     monkeypatch.setattr(
         sys.modules["homeassistant.core"],
         "SupportsResponse",
-        SimpleNamespace(ONLY="only"),
+        SimpleNamespace(ONLY="only", OPTIONAL="optional"),
         raising=False,
     )
 
@@ -370,6 +370,13 @@ def services(monkeypatch):
         return lambda: event.midnight.remove((action, at))
 
     event.async_track_time_change = track
+    event.followed = []
+
+    def follow(hass, entities, action):
+        event.followed.append(list(entities))
+        return lambda: event.followed.remove(list(entities))
+
+    event.async_track_state_change_event = follow
     monkeypatch.setitem(sys.modules, "homeassistant.helpers.event", event)
     monkeypatch.setattr(dosing_api, "DosingStore", _memory_store)
     asyncio.run(dosing_api.async_setup_dosing(hass, entry))
@@ -452,6 +459,9 @@ def test_the_services_find_the_room_and_record_who_asked(services):
     for unsubscribe in services.entry.unloads:
         unsubscribe()
     assert services.event.midnight == []
+    assert (
+        services.event.followed == []
+    )  # and the dosing status listener (pump calibration)
 
 
 FEED = {

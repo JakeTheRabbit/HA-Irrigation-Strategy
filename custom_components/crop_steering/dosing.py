@@ -29,10 +29,49 @@ MAX_PARTS = 100
 REQUEST_MAX_AGE_S = 120
 MAX_RECIPES = 12
 MAX_WEEKS = 52  # a feed schedule's weeks
-ACTIONS = ("dose", "batch", "stop")
+# What dosing_request asks for. A prime or a calibration runs one pump's power switch for a number of
+# seconds, and a stop_pump ends that run early (pump_prime, pump_calibrate, pump_stop; the controller
+# app runs them): those are stored by their own services only.
+REQUEST_ACTIONS = ("dose", "batch", "stop")
+ACTIONS = (*REQUEST_ACTIONS, "prime", "calibrate", "stop_pump")
+# A timed run's seconds, low..high. A prime is capped at 30 s, the UX's hold-to-prime cap: an intentional
+# deviation from the spec's 120 s (ruling R7).
+TIMED = {"prime": (1, 30), "calibrate": (5, 120)}
 # A pump's pH role for pH auto-correct (docs/DOSING.md): at most one pump per role in a room. Stored only
 # when set, so a setup from before it reads back unchanged.
 PH_ROLES = ("ph_up", "ph_down")
+# What a pump doses; a pH type is mirrored to its pH role. Stored only when set.
+SOLUTION_TYPES = ("nutrient", "ph_up", "ph_down", "additive")
+MAX_CALIBRATIONS = 30
+
+
+def _dial_table(per_dial: int) -> dict[int, int]:
+    return {dial: per_dial * dial for dial in range(1, 11)}
+
+
+# The pump catalogue (G3): each model's nominal flow in mL/min at each dial setting, 1 to 10. H.E.
+# Anderson's heads scale linearly with the dial (10 = 100 % of the head's rating); the figures are the
+# maximum injection (mL/gal) x water flow (gal/min) of the published A3/P1/P2/H4 injection-rate tables
+# (Growlink knowledge base, "H.E. Anderson Pump Injection Limit Tables"): dial 10 gives 100, 340, 680
+# and 1360 mL/min. A peristaltic or other pump has no table: its flow is the one it is calibrated to.
+PUMP_CATALOG = {
+    "hea_a3": {"name": "H.E. Anderson A3", "ml_min": _dial_table(10)},
+    "hea_p1": {"name": "H.E. Anderson P1", "ml_min": _dial_table(34)},
+    "hea_p2": {"name": "H.E. Anderson P2", "ml_min": _dial_table(68)},
+    "hea_h4": {"name": "H.E. Anderson H4", "ml_min": _dial_table(136)},
+    "peristaltic": None,
+    "other": None,
+}
+# Why a timed run of a pump (prime, calibrate) cannot start now, in the order the checklist shows them;
+# each message is the UX checklist's words.
+BLOCKERS = {
+    "no_power_entity": "No power switch: a timed run needs the pump's own power switch",
+    "batch_running": "Room dosing is running",
+    "mix_pump_on": "Mix pump is on",
+    "tank_filling": "Tank is filling",
+    "calibrating": "Feed probe calibration in progress",
+    "controller_offline": "Controller is offline",
+}
 # Every domain a dosing setup can use: what dosing_get offers to pick from.
 CANDIDATE_DOMAINS = (
     "number",
@@ -221,6 +260,18 @@ def _pump(raw, taken, exists, stock_tanks=None) -> dict:
         role = None
     if role is not None and role not in PH_ROLES:
         raise DosingError(f"{label}: its pH role must be ph_up, ph_down or none")
+    solution = raw.get("solution_type")
+    if solution in ("", None):
+        solution = None
+    elif solution not in SOLUTION_TYPES:
+        raise DosingError(
+            f"{label}: its solution type must be nutrient, ph_up, ph_down or additive"
+        )
+    else:  # a pH type is the pump's pH role; any other has none
+        mirrored = solution if solution in PH_ROLES else None
+        if role is not None and role != mirrored:
+            raise DosingError(f"{label}: its solution type and pH role disagree")
+        role = mirrored
     pump = {
         "id": pump_id,
         "name": name,
@@ -248,7 +299,71 @@ def _pump(raw, taken, exists, stock_tanks=None) -> dict:
     }
     if role:
         pump["ph_role"] = role
+    # The catalogue and calibration fields, each stored only when set, so a pump from before them reads
+    # back unchanged.
+    extra = {
+        "model": _model(raw.get("model"), label),
+        "solution_type": solution,
+        "calibrated_ml_min": (
+            None
+            if raw.get("calibrated_ml_min") is None
+            else _number(
+                raw["calibrated_ml_min"], 0.01, 1000000, f"{label}: calibrated mL/min"
+            )
+        ),
+        "calibrations": _calibrations(raw.get("calibrations"), label),
+        "primed_at": _moment(raw.get("primed_at"), f"{label}: primed at"),
+    }
+    pump.update({key: value for key, value in extra.items() if value})
     return pump
+
+
+def _model(value, label) -> dict | None:
+    """{catalog_id, dial}: a catalogue model and, for one with a table, its dial setting 1 to 10."""
+    if value in (None, ""):
+        return None
+    if not isinstance(value, dict) or value.get("catalog_id") not in PUMP_CATALOG:
+        raise DosingError(
+            f"{label}: its model must be one of {', '.join(PUMP_CATALOG)}"
+        )
+    table = PUMP_CATALOG[value["catalog_id"]]
+    dial = value.get("dial")
+    if table is None:
+        dial = None
+    elif isinstance(dial, bool) or dial not in table["ml_min"]:
+        raise DosingError(f"{label}: its model's dial must be a whole 1 to 10")
+    return {
+        "catalog_id": value["catalog_id"],
+        "dial": None if dial is None else int(dial),
+    }
+
+
+def nominal_ml_min(model) -> int | None:
+    """The catalogue's flow for a pump's model and dial, mL/min, or None (no model, or no table)."""
+    if not isinstance(model, dict):
+        return None
+    table = PUMP_CATALOG.get(model.get("catalog_id"))
+    return table["ml_min"].get(model.get("dial")) if table else None
+
+
+def _calibrations(value, label) -> list:
+    if value is None:
+        return []
+    if not isinstance(value, list) or len(value) > MAX_CALIBRATIONS:
+        raise DosingError(f"{label}: keep at most {MAX_CALIBRATIONS} calibrations")
+    if not all(isinstance(item, dict) for item in value):
+        raise DosingError(f"{label}: each calibration must be an object")
+    return value
+
+
+def _moment(value, what) -> str | None:
+    if value in (None, ""):
+        return None
+    try:
+        datetime.fromisoformat(str(value))
+    except ValueError:
+        raise DosingError(f"{what} must be a date and time") from None
+    return str(value)
 
 
 def whole_ml(ml) -> int:
@@ -607,7 +722,7 @@ def check_request(config: dict, action, pump=None, ml=None, run_anyway=False) ->
     """A request's action, pump and mL, checked against the room's setup -> (pump, ml) to store.
     A stop and a batch carry neither. `run_anyway`: only a batch (a test refill) may carry it.
     """
-    if action not in ACTIONS:
+    if action not in REQUEST_ACTIONS:
         raise DosingError("the action must be dose, batch or stop")
     if not isinstance(run_anyway, bool):
         raise DosingError("run anyway must be true or false")
@@ -628,6 +743,35 @@ def check_request(config: dict, action, pump=None, ml=None, run_anyway=False) ->
             f"{found['max_ml']:g} mL"
         )
     return found["id"], int(amount) if amount.is_integer() else amount
+
+
+def find_pump(config: dict, pump) -> dict:
+    found = next((p for p in config["pumps"] if p["id"] == pump), None)
+    if found is None:
+        raise DosingError(f"unknown pump: {pump}")
+    return found
+
+
+def check_timed(config: dict, action, pump, seconds) -> tuple:
+    """A prime's or a calibration's pump and seconds, checked -> (pump id, seconds) to store."""
+    low, high = TIMED[action]
+    found = find_pump(config, pump)
+    try:
+        amount = math.nan if isinstance(seconds, bool) else float(seconds)
+    except (TypeError, ValueError):
+        amount = math.nan
+    if not (math.isfinite(amount) and low <= amount <= high):
+        raise DosingError(f"a {action} runs for {low} to {high} s")
+    return found["id"], int(amount) if amount.is_integer() else amount
+
+
+def pump_blockers(found: set) -> list[dict]:
+    """The blockers among BLOCKERS' codes that apply, in checklist order, each with its words."""
+    return [
+        {"code": code, "message": message}
+        for code, message in BLOCKERS.items()
+        if code in found
+    ]
 
 
 def request_time(request) -> datetime | None:

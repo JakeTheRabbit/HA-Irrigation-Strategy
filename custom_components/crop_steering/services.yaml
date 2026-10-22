@@ -2016,3 +2016,150 @@ timer_skip:
       required: true
       selector:
         text:
+pump_precheck:
+  name: Check a dosing pump can prime or calibrate
+  description: >-
+    Answers whether a timed run of the dosing pump (a prime or a calibration) could start now, and
+    every blocker in the checklist's words: no power switch, room dosing running, mix pump on, tank
+    filling, a feed probe calibration open, or the controller offline (no heartbeat for 10 minutes).
+    Changes nothing. It has no administrator check.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    pump:
+      name: Pump
+      description: >-
+        The ID of the dosing pump. Example: `balance`.
+      required: true
+      selector:
+        text:
+pump_prime:
+  name: Prime a dosing pump
+  description: >-
+    Leaves a request for the controller to run the pump's power switch for a number of seconds, to
+    fill its line. Refused, with the blockers, while any pump_precheck blocker stands; refused while
+    another dosing request still waits for the controller. At most 30 seconds. pump_stop ends it
+    early. When a signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    pump:
+      name: Pump
+      description: >-
+        The ID of the dosing pump. Example: `balance`.
+      required: true
+      selector:
+        text:
+    seconds:
+      name: Seconds
+      description: >-
+        How long the pump runs, 1 to 30 seconds. Example: 10.
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 30
+          unit_of_measurement: s
+          mode: box
+pump_stop:
+  name: Stop a dosing pump's prime or calibration
+  description: >-
+    Leaves a request for the controller to end the prime or the calibration run of this pump now. It
+    replaces a prime or calibration that still waits, never a dose or a batch, and never touches
+    another pump. To stop all dosing in the room, use dosing_request with the action stop. Any
+    signed-in user may call it.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    pump:
+      name: Pump
+      description: >-
+        The ID of the dosing pump. Example: `balance`.
+      required: true
+      selector:
+        text:
+pump_calibrate:
+  name: Run a dosing pump calibration
+  description: >-
+    Opens a pump calibration session and leaves a request for the controller to run the pump's power
+    switch for a number of seconds into a measuring jug. Refused, with the blockers, while any
+    pump_precheck blocker stands. The seconds it really ran appear in dosing_get under the pump's
+    `calibration_session` once the controller reports them. That run is not drawn from the pump's
+    stock tank. When a signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    pump:
+      name: Pump
+      description: >-
+        The ID of the dosing pump. Example: `balance`.
+      required: true
+      selector:
+        text:
+    seconds:
+      name: Seconds
+      description: >-
+        How long the pump runs, 5 to 120 seconds. Example: 30.
+      required: true
+      selector:
+        number:
+          min: 5
+          max: 120
+          unit_of_measurement: s
+          mode: box
+pump_calibration_commit:
+  name: Save a dosing pump calibration
+  description: >-
+    Works out the pump's flow from the mL it gave in its calibration run: mL / seconds ran x 60, in
+    mL/min. Stores it as the pump's calibrated flow (the newest 30 calibrations are kept), sets a
+    flow number of the pump to it in mL/s and reads that back, and ends the session. Refused until
+    the controller has reported the run. When a signed-in user calls it, that user must be a Home
+    Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    session_id:
+      name: Session ID
+      description: >-
+        The session ID that pump_calibrate returned. An unknown or expired session is refused with
+        "Calibration session expired. Start again." Example: 01JB2Y3M4N5P6Q7R8S9T0V1W2X.
+      required: true
+      selector:
+        text:
+    measured_ml:
+      name: Measured mL
+      description: >-
+        How many mL the pump gave into the jug. Example: 150.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 50000
+          step: 0.1
+          unit_of_measurement: mL
+          mode: box

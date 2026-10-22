@@ -47,6 +47,8 @@ READ_ONLY = {
     "calibration_get",
     "calibration_status",
     "dosing_get",
+    # Whether a dosing pump could prime or calibrate now: reads the hardware, writes nothing.
+    "pump_precheck",
     "notify_get",
     "whats_new_get",
 }
@@ -93,11 +95,17 @@ CHANGES = {
     # non-administrator. A stop only switches things off (STOP, below).
     "dosing_save": {"room_id": ROOM, "expected_revision": 0, "pumps": [], "batch": {}},
     "dosing_request": {"room_id": ROOM, "action": "dose", "pump": "balance", "ml": 5},
+    # A prime or a calibration runs a pump; a calibration commit changes the flow it doses by.
+    "pump_prime": {"room_id": ROOM, "pump": "balance", "seconds": 10},
+    "pump_calibrate": {"room_id": ROOM, "pump": "balance", "seconds": 30},
+    "pump_calibration_commit": {"room_id": ROOM, "session_id": "s", "measured_ml": 150},
     # A push to the phones: the controller app calls it as the Supervisor user, an administrator.
     "notify": {"key": "k", "title": "t", "message": "m"},
 }
 # Anyone who may look at a room may stop its dosing; a user id Home Assistant does not know may not.
 STOP = {"room_id": ROOM, "action": "stop"}
+# The same for ending one pump's prime or calibration.
+PUMP_STOP = {"pump_stop": {"room_id": ROOM, "pump": "balance"}}
 # Anyone signed in may save their own phone's row and test their own phone: the call goes through
 # with who they are, and the store decides row by row. A user id Home Assistant does not know may not.
 PER_USER = {
@@ -184,6 +192,11 @@ def rig(monkeypatch):
         response=MagicMock(return_value={"config": {}}),
         save=AsyncMock(return_value={"config": {}}),
         request=AsyncMock(return_value={"request": None, "error": None}),
+        precheck=MagicMock(return_value={"ok": True, "blockers": []}),
+        pump_prime=AsyncMock(return_value={}),
+        pump_calibrate=AsyncMock(return_value={}),
+        pump_calibration_commit=AsyncMock(return_value={}),
+        pump_stop=AsyncMock(return_value={}),
     )
     monkeypatch.setattr(dosing_api, "DosingStore", lambda hass, entry: dosing)
     notice = SimpleNamespace(
@@ -256,6 +269,10 @@ def rig(monkeypatch):
             probes.revert,
             dosing.save,
             dosing.request,
+            dosing.pump_prime,
+            dosing.pump_calibrate,
+            dosing.pump_calibration_commit,
+            dosing.pump_stop,
             notifier.save,
             notifier.test,
             notifier.send,
@@ -277,7 +294,7 @@ def rig(monkeypatch):
         request = SimpleNamespace(
             service=name,
             data=dict(
-                {**CHANGES, **NOTICES, **PER_USER}.get(name, {})
+                {**CHANGES, **NOTICES, **PER_USER, **PUMP_STOP}.get(name, {})
                 if data is None
                 else data
             ),
@@ -294,7 +311,9 @@ def rig(monkeypatch):
 def test_every_service_is_either_read_only_or_checked(rig):
     """A new service has to be put in one list or the other here, on purpose."""
     registered = {name for _domain, name in rig.hass.services.registered}
-    assert registered == READ_ONLY | SETUP | set(CHANGES) | set(NOTICES) | set(PER_USER)
+    assert registered == (
+        READ_ONLY | SETUP | set(CHANGES) | set(NOTICES) | set(PER_USER) | set(PUMP_STOP)
+    )
 
 
 @pytest.mark.parametrize("user", [STAFF, ADMIN, None])
@@ -372,6 +391,23 @@ def test_any_signed_in_user_or_an_automation_may_stop_dosing(rig, user):
                 rig.call("dosing_request", user, {**STOP, "action": action})
 
 
+@pytest.mark.parametrize("user", [STAFF, ADMIN, None])
+def test_any_signed_in_user_or_an_automation_may_stop_a_pump(rig, user):
+    before = rig.effects()
+    rig.call("pump_stop", user)
+    assert rig.effects() != before
+
+
+def test_a_user_home_assistant_does_not_know_may_not_stop_a_pump(rig):
+    before = rig.effects()
+    with pytest.raises(
+        HomeAssistantError,
+        match=r"^crop_steering\.pump_stop requires a signed-in Home Assistant user$",
+    ):
+        rig.call("pump_stop", GHOST)
+    assert rig.effects() == before
+
+
 def test_a_user_home_assistant_does_not_know_may_not_stop_dosing(rig):
     before = rig.effects()
     with pytest.raises(
@@ -386,5 +422,5 @@ def test_a_user_home_assistant_does_not_know_may_not_stop_dosing(rig):
 @pytest.mark.parametrize("name", sorted(READ_ONLY))
 def test_reading_stays_open_to_every_login(rig, name, user):
     before = rig.effects()
-    rig.call(name, user, {"room_id": ROOM, "session_id": "s"})
+    rig.call(name, user, {"room_id": ROOM, "session_id": "s", "pump": "balance"})
     assert rig.effects() == before

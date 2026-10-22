@@ -447,11 +447,12 @@ class CalibrationStore:
         return async_track_time_interval(self.hass, hourly, timedelta(hours=1))
 
     def calibrating(self):
-        """The dosing descriptor's `calibrating` while a session is open, else None."""
+        """The dosing descriptor's `calibrating` while a probe session is open, else None. A pump's
+        calibration session is not one: the controller runs that calibration itself."""
         now = self._now()
         for session in self.sessions.values():
             until = session["active"] + SESSION_IDLE
-            if now < until:
+            if "probe" in session and now < until:
                 return {
                     "probe": session["probe"],
                     "session_id": session["id"],
@@ -503,12 +504,77 @@ class CalibrationStore:
         self._timer = _later(self.hass, SESSION_IDLE.total_seconds() + 1, self.expire)
         self._dosing_changed()
 
-    def session(self, session_id):
+    def session(self, session_id, pump=False):
+        """An open probe session (or, with `pump`, a pump's calibration session), else EXPIRED."""
         self.expire()
         session = self.sessions.get(session_id)
-        if session is None:
+        if session is None or ("pump" in session) != pump:
             raise ValueError(EXPIRED)
         return session
+
+    def _close_kind(self, pump: bool):
+        """End every probe session, or every pump session: one of each kind per room."""
+        for sid in [sid for sid, s in self.sessions.items() if ("pump" in s) == pump]:
+            self._close(sid)
+
+    # ------------------------------------------------------------------ pump sessions (G3)
+    # A pump's calibration is the same session with one point: pump_calibrate opens it with the request it
+    # leaves for the controller, the controller's report of that request gives the seconds the pump ran,
+    # and pump_calibration_commit (dosing_api.py) turns the mL measured into the pump's flow.
+    def pump_open(self, pump, request_id, seconds) -> dict:
+        self._close_kind(pump=True)
+        now = self._now()
+        session = {
+            "id": new_id(),
+            "pump": pump,
+            "request_id": request_id,
+            "seconds": seconds,
+            "ran_s": None,
+            "result": None,
+            "at": now,
+            "reported_at": None,
+            "active": now,
+            "unsub": None,
+        }
+        self.sessions[session["id"]] = session
+        self._touch(session)
+        return session
+
+    def pump_reported(self, request_id, ran_s, result) -> bool:
+        """The controller reported the run of `request_id`: its seconds and result go into the session
+        (once). Restarts the 30 min, so the grower has time to read the jug."""
+        for session in self.sessions.values():
+            if session.get("request_id") == request_id and session["ran_s"] is None:
+                session.update(ran_s=ran_s, result=result, reported_at=self._now())
+                self._touch(session)
+                return True
+        return False
+
+    def pump_view(self, pump) -> dict | None:
+        """The open calibration session of `pump`, as dosing_get shows it, or None."""
+        self.expire()
+        for session in self.sessions.values():
+            if session.get("pump") == pump:
+                return {
+                    "session_id": session["id"],
+                    "request_id": session["request_id"],
+                    "seconds": session["seconds"],
+                    "ran_s": session["ran_s"],
+                    "result": session["result"],
+                    "expires_at": (session["active"] + SESSION_IDLE).isoformat(),
+                }
+        return None
+
+    def pump_run(self, pump, since, end) -> bool:
+        """Whether a run of `pump` from `since` to `end` overlaps its open calibration: from the request
+        until the controller reported it. Such a run went into a measuring jug, not to the tank.
+        """
+        return any(
+            session.get("pump") == pump
+            and session["at"] <= end
+            and (session["reported_at"] is None or session["reported_at"] >= since)
+            for session in self.sessions.values()
+        )
 
     def _silent(self, kind):
         return f"No reading from the feed {NAMES[kind]} probe for 2 min. Check it's plugged in."
@@ -589,7 +655,9 @@ class CalibrationStore:
         now = self._now()
         if raw is None or reported is None or now - reported > SILENT:
             raise ValueError(self._silent(kind))
-        self._close()  # one session per room: a new start replaces the last
+        self._close_kind(
+            pump=False
+        )  # one session per room: a new start replaces the last
         state = self.hass.states.get(entity)
         since = getattr(state, "last_changed", None) or reported
         session = {
@@ -786,7 +854,7 @@ class CalibrationStore:
             }
             await self._store.async_save(document)
             self.document = document
-        self._close()
+        self._close_kind(pump=False)
         self._changed()
         out = {
             "probe": probe,

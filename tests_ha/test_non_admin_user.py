@@ -59,6 +59,10 @@ CHANGES = {
     "dosing_save": {"room_id": ROOM, "expected_revision": 0, "pumps": [], "batch": {}},
     # A stop is the one dosing request anyone may make (test_an_ordinary_user_may_stop_dosing).
     "dosing_request": {"room_id": ROOM, "action": "dose", "pump": "balance", "ml": 5},
+    # A prime or a calibration runs a pump; a commit changes the flow it doses by.
+    "pump_prime": {"room_id": ROOM, "pump": "balance", "seconds": 10},
+    "pump_calibrate": {"room_id": ROOM, "pump": "balance", "seconds": 30},
+    "pump_calibration_commit": {"room_id": ROOM, "session_id": "s", "measured_ml": 150},
     # A push to the phones: the controller app's, as Home Assistant's administrator Supervisor user.
     "notify": {"key": "k", "title": "t", "message": "m"},
     # An ask spends the room's AI budget.
@@ -100,6 +104,7 @@ READS = {
     "calibration_get": {"room_id": ROOM},
     "calibration_status": {"session_id": "s"},
     "dosing_get": {"room_id": ROOM},
+    "pump_precheck": {"room_id": ROOM, "pump": "balance"},
     "display_get": {"room_id": ROOM},
     "supply_get": {},
     "timer_program_list": {},
@@ -119,7 +124,8 @@ PER_USER = {
 }
 # Stop all only switches things off (the kill switch, then the room's pumps and valves): whoever may look at a
 # room may stop it, as anyone may stop its dosing.
-STOPS = {"stop_all": {"room_id": ROOM}}
+# Ending one pump's prime or calibration likewise (tests_ha/test_pump_calibration.py).
+STOPS = {"stop_all": {"room_id": ROOM}, "pump_stop": {"room_id": ROOM, "pump": "balance"}}
 EVENTS = ("crop_steering_manual_override",)
 
 

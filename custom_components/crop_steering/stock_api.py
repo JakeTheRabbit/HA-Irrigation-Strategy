@@ -247,7 +247,22 @@ class StockStore:
         """A linked pump stopped: the seconds it ran times its calibrated flow (read as it started,
         or as it stopped when it could not be read then) come off its stock tank, never below
         empty, logged as "pump" under a key of the pump and the moment it started, so the same
-        run is never drawn twice."""
+        run is never drawn twice. A run during the pump's open calibration (pump_calibrate) went into
+        a measuring jug and is not drawn."""
+        calibration = (
+            self.hass.data.get(DOMAIN, {})
+            .get("_calibration", {})
+            .get(self.entry.entry_id)
+        )
+        if calibration is not None and calibration.pump_run(
+            pump["id"], run["since"], end
+        ):
+            _LOGGER.info(
+                "Stock tanks for %s: %s ran for its calibration, nothing drawn",
+                self.room_id,
+                pump.get("name"),
+            )
+            return
         seconds = (end - run["since"]).total_seconds()
         flow = run["flow"]
         if stock.pumped_ml(seconds, flow) is None:
