@@ -6848,13 +6848,40 @@ class Controller:
         self._save_state()
         return snapshot
 
+    def _restore_unsaved_room(self, room):
+        """The room's state could not be saved (_save_state): this pass stops with an error (CS-212).
+
+        Its last saved block is loaded back, as at start-up, so the next pass runs. What only memory holds
+        and must not be lost stays: a hardware hold, an in-flight record, and a day's water above the
+        saved one (never less water counted, so the daily cap is never lifted). With no saved block to go
+        back to, nothing is reset: the room stays stopped until its state saves or the controller restarts."""
+        self._save_state()  # it may save now
+        error = self._unsaved_rooms.get(room.slug)
+        if not error:
+            return
+        if not isinstance(getattr(self, "_saved_room_blocks", {}).get(room.slug), dict):
+            raise RuntimeError(f"the state of this room cannot be saved ({error}), and there is no saved state "
+                               "to go back to: the room stays stopped until it saves or the controller restarts")
+        fault, inflight = room.hardware_fault, getattr(room, "shot_inflight", None)
+        days = {z: (s.get("last_daily_reset"), s.get("daily_vol")) for z, s in room.state.items()
+                if isinstance(s, dict)}
+        self._load_room_state(room)
+        room.hardware_fault = room.hardware_fault or fault
+        room.shot_inflight = room.shot_inflight or inflight
+        for z, (reset, vol) in days.items():
+            s = room.state.get(z)
+            if (s is not None and reset == s.get("last_daily_reset") and isinstance(vol, (int, float))
+                    and math.isfinite(vol) and vol > (s.get("daily_vol") or 0)):
+                s["daily_vol"] = vol
+        self._save_state()
+        raise RuntimeError(f"the state of this room could not be saved ({error}); its last saved state "
+                           "was loaded back, and the room runs again next pass")
+
     def _loop_room(self, room, now):
         """One room's full control pass: snapshot -> decide -> act -> build the publish dict.
         Reads/writes only this room's prefixed entities + its own state."""
         if getattr(self, "_unsaved_rooms", {}).get(room.slug):
-            self._save_state()  # tried again each pass; until it saves, the room stops here (CS-212)
-            if self._unsaved_rooms.get(room.slug):
-                raise RuntimeError(f"the state of this room cannot be saved: {self._unsaved_rooms[room.slug]}")
+            self._restore_unsaved_room(room)
         try:
             import prompt_runtime
             prompt_runtime.sync(self, room, ha_get, ha_call)

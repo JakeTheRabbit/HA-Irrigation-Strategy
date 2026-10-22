@@ -104,15 +104,35 @@ def test_a_shot_is_refused_when_the_state_file_cannot_be_written(rig, tmp_path):
     assert switched(fake) == [] and c._busy is False and c.rooms[0].shot_inflight is None
 
 
-def test_a_room_whose_state_cannot_be_saved_stops_its_pass_until_it_saves(rig):
-    c, _ = rig
+def test_a_room_whose_state_cannot_be_saved_fails_one_pass_then_runs_on_its_last_saved_state(rig):
+    c, fake = rig
     room = c.rooms[0]
+    room.state[1]["daily_vol"] = 4.0
+    assert c._save_state()
     unsavable(room)
     c._save_state()
-    with pytest.raises(RuntimeError, match="cannot be saved"):  # loud: CS-212 for this room (loop_once)
+    assert list(c._unsaved_rooms) == ["default"]
+    with pytest.raises(RuntimeError, match="last saved state was loaded back"):  # loud: CS-212 (loop_once)
         c._loop_room(room, NOW)
-    room.state[2]["day_hist"] = []
+    assert c._unsaved_rooms == {} and room.state[1]["daily_vol"] == 4.0  # never less water counted
+    assert room.state[2]["day_hist"] == []
+    c._restore_unsaved_room(room)  # the next pass is not stopped
+    c._execute_shot(room, 1, 6, 5)  # and can shoot
+    assert ("turn_on", "switch.v1") in switched(fake)
+
+
+def test_a_room_with_no_saved_state_to_go_back_to_stays_stopped(rig):
+    c, fake = rig
+    room = c.rooms[0]
+    room.state[1]["daily_vol"] = 4.0
+    unsavable(room)
     c._save_state()
+    for _ in range(2):
+        with pytest.raises(RuntimeError, match="stays stopped"):
+            c._loop_room(room, NOW)
+    assert room.state[1]["daily_vol"] == 4.0  # nothing reset: the daily cap is not lifted
+    room.state[2]["day_hist"] = []  # once it saves, the room runs again
+    c._restore_unsaved_room(room)
     assert c._unsaved_rooms == {}
 
 
