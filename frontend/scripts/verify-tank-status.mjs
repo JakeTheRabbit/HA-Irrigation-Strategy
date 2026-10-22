@@ -86,17 +86,17 @@ try {
   await page.goto(`${origin}/dashboard.html?demo=1#/today`);
   await page.locator('[data-last-irrigation="1"]').waitFor();
   assert.ok(await page.locator('[data-last-irrigation="1"]:visible').getAttribute("datetime"));
-  // The tank: Equipment › Tank & feed. The old Tank & pump address still opens it.
+  // The tank lives on Equipment › Feed & dosing. The old Tank & pump address still opens it.
   await page.goto(`${origin}/dashboard.html?demo=1#/equipment/tank`);
-  await page.waitForFunction(() => location.hash === "#/equipment/feed");
+  await page.waitForFunction(() => location.hash === "#/equipment/dosing");
+  await page.getByRole("heading", { name: "Dosing", exact: true, level: 1 }).waitFor();
   const tank = page.locator("[data-tank-status]");
   await tank.waitFor();
   assert.equal(
     await page
-      .getByRole("navigation", { name: "Equipment views" })
-      .locator('[aria-current="page"]')
+      .locator('.desktop-sidebar nav[aria-label="Main navigation"] [aria-current="page"]')
       .innerText(),
-    "Tank and feed",
+    "Feed & dosing",
   );
   // The demo tank was filled to 100 % two hours ago and is being drawn down since.
   const cardLevel = Number(await tank.locator("[data-tank-level]").getAttribute("data-tank-level"));

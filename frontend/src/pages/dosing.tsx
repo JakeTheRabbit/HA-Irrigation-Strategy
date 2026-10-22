@@ -725,6 +725,8 @@ export function Dosing({
           {loadError}
         </p>
       )}
+      {/* The tank first: its card, the minimum and the level chart, also while dosing is unavailable. */}
+      <TankPanels controller={controller} navigate={navigate} />
       {loading && <p className="muted">Loading dosing…</p>}
       {config && (
         <section className="panel dosing-tank" aria-label={`${room.room.name} batch tank`}>
@@ -1168,7 +1170,6 @@ export function Dosing({
           />
         </details>
       )}
-      <TankPanels controller={controller} navigate={navigate} />
       <RequestDialog controller={controller} review={review} onClose={() => setReview(null)} />
     </div>
   );
