@@ -263,9 +263,12 @@ class DosingStore:
         # the room: the controller holds batches and pH correction on it. Absent otherwise, so the
         # descriptor is as it always was.
         calibration = self._calibration()
-        calibrating = (
-            calibration.calibrating() if calibration is not None else None
-        ) or self._priming()
+        calibrating = calibration_module.merge_holds(
+            [
+                *(calibration.open_holds() if calibration is not None else []),
+                self._priming(),
+            ]
+        )
         return self.data["revision"], {
             "pumps": deepcopy(self.data["pumps"]),
             "batch": batch,

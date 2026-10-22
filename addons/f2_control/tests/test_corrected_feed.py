@@ -441,3 +441,84 @@ def test_the_state_file_round_trips_the_calibration():
     with open(c._state_path, encoding="utf-8") as fh:
         block = json.load(fh)["default"]
     assert block["_feed_calibration"] == {"ph": {"gain": 1.05, "bias": -0.07}, "ec": {"gain": 0.98, "bias": 0.01}}
+
+
+# ------------------------------------------------------------------------------------------------- review round
+BOTH = {"pump": "balance", "session_id": "s-pump", "probe": "feed_ph", "until": "2026-10-23T10:00:00+00:00",
+        "sessions": [{"pump": "balance", "session_id": "s-pump", "until": "2026-10-23T10:00:00+00:00"},
+                     {"probe": "feed_ph", "session_id": "s-probe", "until": "2026-10-23T09:50:00+00:00"}]}
+
+
+def test_a_pump_and_a_probe_session_together_hold_the_probes_quantity():
+    """Task 18 review: the integration publishes every open session; a pump's next to a probe's still holds the
+    probe's quantity (and only it)."""
+    c, fake, room = _ph_room(raw="6.0")
+    _session(fake, BOTH)
+    assert c._blocked(room, 1) == CAL
+    e, fake_e, room_e = _ec_room()
+    _session(fake_e, BOTH)
+    assert e._blocked(room_e, 1) is None  # the pH probe is in its buffer, not the EC one
+
+
+def test_a_calibrating_entry_with_neither_key_holds_both_halves():
+    c, fake, room = _ph_room(raw="6.0")
+    _session(fake, {"session_id": "s", "until": "x"})
+    assert c._blocked(room, 1) == CAL
+    e, fake_e, room_e = _ec_room()
+    _session(fake_e, {"session_id": "s", "until": "x"})
+    assert e._blocked(room_e, 1) == CAL
+
+
+def test_dosing_config_attributes_that_are_not_a_dict_are_unreadable():
+    c, fake, room = _ph_room()
+    fake.states[CONFIG] = ("1", ["not", "a", "dict"], fake.states[CONFIG][2])
+    assert c._blocked(room, 1) == "source-water pH 5.40 out of [5.5,6.5]"  # no calibration: as before
+    _describe(c, fake, feed_calibration={"ph": PH_FIX})
+    assert c._blocked(room, 1) == PH_CAL_UNREAD
+
+
+def test_the_calibrating_read_is_made_once_a_pass_for_every_zone(monkeypatch):
+    c, fake, room = _ph_room(raw="6.0")
+    reads = []
+    real = controller.Controller._read_calibrating
+    monkeypatch.setattr(controller.Controller, "_read_calibrating",
+                        lambda self, r: (reads.append(r.prefix), real(self, r))[1])
+    c._blocked(room, 1)
+    c._blocked(room, 1)
+    assert len(reads) == 2  # outside a pass: read each time
+    reads.clear()
+    c._calibrating_pass = {}  # what loop_once opens for its pass
+    c._blocked(room, 1)
+    c._blocked(room, 1)
+    assert len(reads) == 1
+
+
+def test_a_pump_and_a_probe_session_hold_a_batch_with_the_pump_words(rig):
+    r = rig()
+    _full_batch(r)
+    _calibrating(r, BOTH)
+    r.ask("batch")
+    r.poll()
+    assert r.status()[1]["handled_result"] == f"refused: {PUMP_HOLD}"
+    assert _intents(r) == [("intent.refused", {"guard": "dosing_lockout", "reason": PUMP_HOLD})]
+
+
+def test_the_mix_check_waits_with_a_pump_and_a_probe_session(rig):
+    m = _mix_rig(rig, "2.0")
+    _calibrating(m, BOTH)
+    m.fake.set_state("sensor.tank_ec", "1.413", {"unit_of_measurement": "mS/cm"})
+    m.clock.sleep(dosing_runner.MIX_SETTLE_S)
+    m.runner.poll()
+    assert m.status()[1]["mix"]["verdict"] is None
+
+
+def test_the_mix_check_waits_while_dosing_config_cant_be_read(rig):
+    m = _mix_rig(rig, "2.0")
+    state, attributes = m.fake.states[CONFIG][:2]
+    m.fake.set_state(CONFIG, "unavailable", {})
+    m.clock.sleep(dosing_runner.MIX_SETTLE_S)
+    m.runner.poll()
+    assert m.status()[1]["mix"]["verdict"] is None  # a calibration may be open: not judged
+    m.fake.set_state(CONFIG, state, attributes)
+    m.runner.poll()
+    assert m.status()[1]["mix"]["verdict"] == "good"

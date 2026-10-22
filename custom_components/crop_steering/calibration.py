@@ -155,6 +155,25 @@ def gain_bias(slope_pct: float, offset: float, anchor: float) -> tuple[float, fl
     return gain, anchor - (anchor + offset) * gain
 
 
+def merge_holds(entries):
+    """PURE. dosing_config `calibrating` from every open hold on room dosing (probe sessions, pump sessions,
+    primes): None for none; one exactly as it always was; several as one dict with each kind's key together
+    (`probe`, `pump`, the first of each, and the first's other keys), the latest `until`, and every hold
+    under `sessions`. The controller holds on either key."""
+    entries = [entry for entry in entries if entry]
+    if not entries:
+        return None
+    if len(entries) == 1:
+        return entries[0]
+    merged = {}
+    for entry in entries:
+        for key, value in entry.items():
+            merged.setdefault(key, value)
+    merged["until"] = max(entry["until"] for entry in entries)
+    merged["sessions"] = entries
+    return merged
+
+
 def _steady(kind, values) -> bool:
     """pH moved less than 0.02; EC less than 1 % of its mean (a reading that did not move at all is steady)."""
     span = max(values) - min(values)
@@ -822,21 +841,29 @@ class CalibrationStore:
         self.sync_corrected()
         return async_track_time_interval(self.hass, hourly, timedelta(hours=1))
 
-    def calibrating(self):
-        """The dosing descriptor's `calibrating` while a session is open, else None: a probe session
-        ({probe, session_id, until}) or a pump's calibration ({pump, session_id, until}). Either holds the
-        room's dosing."""
+    def open_holds(self) -> list:
+        """Every open session as the dosing descriptor names it: a probe session ({probe, session_id,
+        until}) or a pump's calibration ({pump, session_id, until})."""
         now = self._now()
+        holds = []
         for session in self.sessions.values():
             until = session["active"] + SESSION_IDLE
             if now < until:
                 kind = "pump" if "pump" in session else "probe"
-                return {
-                    kind: session[kind],
-                    "session_id": session["id"],
-                    "until": until.isoformat(),
-                }
-        return None
+                holds.append(
+                    {
+                        kind: session[kind],
+                        "session_id": session["id"],
+                        "until": until.isoformat(),
+                    }
+                )
+        return holds
+
+    def calibrating(self):
+        """The dosing descriptor's `calibrating` while a session is open, else None: every open session
+        (merge_holds), so a probe session next to a pump's is never hidden. Either holds the room's
+        dosing."""
+        return merge_holds(self.open_holds())
 
     def probe_open(self) -> bool:
         """Whether a feed probe session is open (a pump's own calibration is not one)."""

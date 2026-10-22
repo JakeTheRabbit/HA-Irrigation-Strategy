@@ -213,9 +213,15 @@ def history_events(slug, history):
 
 
 def _probe_calibrating(config):
-    """A feed probe's calibration is open (dosing_config's `calibrating`, not a pump's): the tank probe reads a buffer."""
-    entry = config.get("calibrating") if isinstance(config, dict) else None
-    return bool(entry) and not (isinstance(entry, dict) and entry.get("pump"))
+    """A feed probe's calibration may be open, so the tank probe may read a buffer: dosing_config's `calibrating` names
+    a probe (with or without a pump, calibration.merge_holds), is anything but a pump's alone, or dosing_config can't
+    be read at all."""
+    if not isinstance(config, dict):
+        return True
+    entry = config.get("calibrating")
+    if not entry:
+        return False
+    return not (isinstance(entry, dict) and entry.get("pump") and not entry.get("probe"))
 
 
 def _aware(stamp):
@@ -1552,12 +1558,13 @@ class DosingRunner:
                 self._log(f"[{room.slug}] dosing: mix check of the batch that started {mix.get('batch')} waits: "
                           "the room's feed EC or pH band can't be read")
             return
-        if bands and _probe_calibrating(self._config(room)):  # a probe in its buffer is no tank reading
+        config = self._config(room) if bands else None
+        if bands and _probe_calibrating(config):  # a probe in its buffer is no tank reading
             live = self._live_of(room)
             if live.get("mix_calibrating") != mix.get("batch"):
                 live["mix_calibrating"] = mix.get("batch")
-                self._log(f"[{room.slug}] dosing: mix check of the batch that started {mix.get('batch')} waits: "
-                          f"{guards.CALIBRATING_PROBE}")
+                why = guards.CALIBRATING_PROBE if config else "the dosing setup can't be read (a calibration may be open)"
+                self._log(f"[{room.slug}] dosing: mix check of the batch that started {mix.get('batch')} waits: {why}")
             return
         found, off, unread = {}, [], []
         for quantity, probe, lo, hi in bands:

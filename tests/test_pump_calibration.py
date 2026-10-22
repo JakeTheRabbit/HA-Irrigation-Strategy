@@ -718,3 +718,67 @@ def test_flow_entity_number_is_written_and_read_back(monkeypatch):
     calls = len(sensor.hass.services.calls)
     assert sensor.commit(started["session_id"], 150)["flow_entity_written"] is False
     assert len(sensor.hass.services.calls) == calls
+
+
+# ------------------------------------------------------------------ Task 18 review: every open hold published
+def test_merge_holds_keeps_one_hold_as_it_always_was_and_publishes_every_kind_together():
+    probe = {
+        "probe": "feed_ph",
+        "session_id": "s1",
+        "until": "2026-10-22T09:30:00+00:00",
+    }
+    pump = {"pump": "balance", "session_id": "s2", "until": "2026-10-22T09:40:00+00:00"}
+    prime = {
+        "pump": "balance",
+        "request_id": "r1",
+        "until": "2026-10-22T09:02:10+00:00",
+    }
+    assert (
+        calibration.merge_holds([]) is None
+        and calibration.merge_holds([None, None]) is None
+    )
+    assert (
+        calibration.merge_holds([probe]) == probe
+        and calibration.merge_holds([None, prime]) == prime
+    )
+    assert calibration.merge_holds([pump, probe]) == {
+        "pump": "balance",
+        "session_id": "s2",
+        "probe": "feed_ph",
+        "until": "2026-10-22T09:40:00+00:00",
+        "sessions": [pump, probe],
+    }
+    merged = calibration.merge_holds([probe, prime])
+    assert (merged["probe"], merged["pump"], merged["request_id"]) == (
+        "feed_ph",
+        "balance",
+        "r1",
+    )
+
+
+def test_a_probe_session_opened_after_a_pump_session_is_published_with_it(monkeypatch):
+    """Both sessions open: dosing_config `calibrating` carries the probe and the pump together, so the controller's
+    source-water gate sees the probe in its buffer (it used to see only the first session).
+    """
+    rig = Rig(monkeypatch)
+    pump = rig.calibrate(30)
+    rig.cal.sessions["probe-1"] = {
+        "id": "probe-1",
+        "probe": "feed_ph",
+        "kind": "ph",
+        "active": NOW,
+        "unsub": None,
+    }
+    held = rig.dosing.sensor()[1]["calibrating"]
+    assert (held["pump"], held["probe"]) == ("balance", "feed_ph")
+    assert [s["session_id"] for s in held["sessions"]] == [
+        pump["session_id"],
+        "probe-1",
+    ]
+    # the pump's session ends: the probe's alone, exactly as before
+    del rig.cal.sessions[pump["session_id"]]
+    assert rig.dosing.sensor()[1]["calibrating"] == {
+        "probe": "feed_ph",
+        "session_id": "probe-1",
+        "until": (NOW + calibration.SESSION_IDLE).isoformat(),
+    }

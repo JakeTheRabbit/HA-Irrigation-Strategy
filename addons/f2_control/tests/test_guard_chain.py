@@ -14,7 +14,6 @@ import hashlib
 import json
 import os
 import re
-import sys
 from datetime import datetime, timedelta
 
 import pytest
@@ -677,13 +676,14 @@ def _observe(name, capsys, tmp_path):
         # The supply (Task 12) is read once a pass since the recording. None is saved here, so it changes nothing
         # else; test_pump_queue.py holds that read and what follows from it. Likewise each zone's irrigation_mode
         # select and the timer programs (Task 15), absent here: test_timer_mode.py holds them.
-        # The feed gate's own read of dosing_config `calibrating` (Task 18), by its reader only: other reads of
-        # dosing_config were recorded.
         new_reads = (controller.SUPPLY_SENSOR, controller.TIMERS_SENSOR.format(""))
         mp.setattr(controller, "ha_get", lambda e, timeout=8: (
-            e in new_reads or e.endswith("_irrigation_mode")
-            or sys._getframe(1).f_code.co_name == "_feed_calibration_hold" or reads.append(e),
-            fake.ha_get(e, timeout))[1])
+            e in new_reads or e.endswith("_irrigation_mode") or reads.append(e), fake.ha_get(e, timeout))[1])
+        # The feed gate's own read of dosing_config `calibrating` (Task 18) goes through its seam, kept apart: every
+        # other read of dosing_config was recorded and is compared.
+        calibrating = []
+        mp.setattr(controller.Controller, "_read_calibrating", lambda self, r: (
+            calibrating.append(r.prefix), fake.ha_get(controller.DOSING_CONFIG.format(r.prefix))[:2])[1])
         mp.setattr(controller, "ha_set", lambda e, s, a=None, timeout=None: (
             writes.append((e, s, a)), fake.ha_set(e, s, a, timeout))[1])
         fake.calls.clear()

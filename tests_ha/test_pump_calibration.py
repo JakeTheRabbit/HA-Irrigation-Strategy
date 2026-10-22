@@ -33,8 +33,8 @@ async def _call(hass, user, name, **data):
     )
 
 
-async def _room(hass, admin):
-    await _install(hass)
+async def _room(hass, admin, hardware=None):
+    await _install(hass, hardware)
     assert await async_setup_component(
         hass,
         "input_number",
@@ -238,3 +238,18 @@ async def test_calibration_abandon_releases_a_pump_calibration_hold(
     assert "calibrating" not in hass.states.get(CONFIG).attributes
     batch = await _call(hass, hass_admin_user, "dosing_request", action="batch")
     assert batch["error"] is None
+
+
+async def test_a_probe_session_after_a_pump_session_publishes_both(hass, hass_admin_user):
+    """Task 18 review: dosing_config `calibrating` carries every open session, so the controller's source-water
+    gate sees a feed probe in its buffer while a pump is being calibrated too."""
+    hass.states.async_set("sensor.feed_ph", "7.01", {"unit_of_measurement": "pH"})
+    await _room(hass, hass_admin_user, {"feed_ph_sensor": "sensor.feed_ph"})
+    pump = await _call(hass, hass_admin_user, "pump_calibrate", pump="balance", seconds=30)
+    await hass.async_block_till_done()
+    hass.states.async_set("sensor.feed_ph", "7.02", {"unit_of_measurement": "pH"})
+    probe = await _call(hass, hass_admin_user, "calibration_start", probe="feed_ph")
+    await hass.async_block_till_done()
+    held = hass.states.get(CONFIG).attributes["calibrating"]
+    assert (held["pump"], held["probe"]) == ("balance", "feed_ph")
+    assert {s["session_id"] for s in held["sessions"]} == {pump["session_id"], probe["session_id"]}

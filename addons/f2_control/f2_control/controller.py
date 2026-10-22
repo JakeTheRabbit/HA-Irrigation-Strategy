@@ -748,6 +748,7 @@ FEED_CORRECTED = "sensor.crop_steering_{}feed_{}_corrected"
 FEED_CALIBRATING = "feed probe calibration in progress"
 FEED_CALIBRATION_UNREAD = "source-water {name} calibration state unreadable ({entity}) — holding (fail-closed)"
 DOSING_CONFIG = "sensor.crop_steering_{}dosing_config"
+CALIBRATING_CACHE_S = 30.0  # inside a pass, the gate's read of `calibrating` is reused this long for every zone
 TEST_SHOT_S = 10  # how long a zone's Test Shot waters it
 # The site's supply (the integration's site store, G1): the pumps, their output and the zones' demand. With one saved,
 # the zones that fire in a pass take turns at their pump, rescues first (_pump_line); none saved, as before.
@@ -2601,23 +2602,45 @@ class Controller:
             return corrected, (state, *read[1:3])
         return raw, (repr(number * fix["gain"] + fix["bias"]), *read[1:3])
 
+    def _read_calibrating(self, room):
+        """dosing_config as (state, attributes): the integration's sensor the dosing runner reads too."""
+        return ha_get(DOSING_CONFIG.format(room.prefix))[:2]
+
+    def _calibrating_entry(self, room):
+        """(readable, dosing_config's `calibrating`): read by the gate itself, never through the dosing runner.
+        Inside a pass (loop_once opens _calibrating_pass) one read serves every zone for CALIBRATING_CACHE_S."""
+        cache = getattr(self, "_calibrating_pass", None)
+        if cache is not None and room.prefix in cache:
+            at, answer = cache[room.prefix]
+            if 0 <= time.monotonic() - at < CALIBRATING_CACHE_S:
+                return answer
+        state, attrs = self._read_calibrating(room)
+        readable = state not in (None, "", "unknown", "unavailable") and isinstance(attrs, dict)
+        answer = (readable, attrs.get("calibrating") if readable else None)
+        if cache is not None:
+            cache[room.prefix] = (time.monotonic(), answer)
+        return answer
+
     def _feed_calibration_hold(self, room, quantity):
         """Why the room's feed `quantity` ("ph" or "ec") probe can't be read as the feed, or None: a calibration
-        session is open for it (dosing_config's `calibrating`, read here, never through the dosing runner): it sits in
-        a buffer. A pump's session is not one; an entry that can't be read counts for both probes. A dosing_config that
+        session is open for it (_calibrating_entry): it sits in a buffer. The integration publishes every open session
+        together (calibration.merge_holds): an entry naming a feed probe holds that probe's quantity, whatever pump
+        is with it; a pump's alone holds nothing here; any other entry counts for both probes. A dosing_config that
         can't be read holds only a quantity with a calibration applied (fail-closed); without one it is as before."""
-        entity = DOSING_CONFIG.format(room.prefix)
-        state, attrs = ha_get(entity)[:2]
-        if state in (None, "", "unknown", "unavailable") or not isinstance(attrs, dict):
+        readable, entry = self._calibrating_entry(room)
+        if not readable:
             if quantity in (getattr(room, "_feed_calibration", None) or {}):
+                entity = DOSING_CONFIG.format(room.prefix)
                 return FEED_CALIBRATION_UNREAD.format(name={"ph": "pH", "ec": "EC"}[quantity], entity=entity)
             return None
-        entry = attrs.get("calibrating")
-        if not entry or (isinstance(entry, dict) and entry.get("pump")):
+        if not entry:
             return None
-        probe = entry.get("probe") if isinstance(entry, dict) else None
-        if probe in ("feed_ph", "feed_ec") and probe != f"feed_{quantity}":
-            return None
+        if isinstance(entry, dict):
+            probe = entry.get("probe")
+            if probe in ("feed_ph", "feed_ec"):
+                return FEED_CALIBRATING if probe == f"feed_{quantity}" else None
+            if probe is None and entry.get("pump"):
+                return None
         return FEED_CALIBRATING
 
     def _feed_value(self, room, quantity):
@@ -7106,6 +7129,7 @@ class Controller:
                 log("rediscover error", e)
         self._supply = self._read_supply()
         all_pub = {}
+        self._calibrating_pass = {}  # the gate's read of dosing_config `calibrating`, once a pass (_calibrating_entry)
         for room in self.rooms:
             try:  # one room's error never stops the rooms after it, nor the steps after the rooms
                 self._guard_read(room)  # before this pass writes the room's heartbeat
@@ -7119,6 +7143,7 @@ class Controller:
             except Exception as e:  # only Exception: a stop (SystemExit, KeyboardInterrupt) still stops
                 self._room_error(room, now, e)
                 self._clear_queue(room)
+        self._calibrating_pass = None
         self._check_defaulted_setpoints()
         self._maybe_notify(all_pub, now)
         self._send_events()
