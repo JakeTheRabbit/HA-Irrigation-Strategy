@@ -267,11 +267,16 @@ def test_pump_stop_replaces_a_pending_prime_request(monkeypatch):
         "Staff",
     )
     assert rig.backing.value["request"] == request
+    assert stop["replaced"] == {
+        "id": prime["request_id"],
+        "action": "prime",
+        "pump": "balance",
+    }
     # The prime never ran: it no longer holds the room, and no report of it is awaited.
     assert rig.dosing.pump_hold() is None and rig.dosing._primes == {}
     with pytest.raises(ValueError, match="unknown pump"):
         rig.run(rig.dosing.pump_stop("nope", "Staff"))
-    # A pending batch is never cancelled by a pump stop.
+    # A stop is always taken: a waiting batch never ran, and the answer says it was replaced.
     rig.dosing.data["request"] = {
         "id": "b1",
         "action": "batch",
@@ -280,9 +285,90 @@ def test_pump_stop_replaces_a_pending_prime_request(monkeypatch):
         "at": NOW.isoformat(),
         "by": "Alex",
     }
-    with pytest.raises(ValueError, match="still waiting"):
-        rig.run(rig.dosing.pump_stop("balance", "Staff"))
-    assert rig.dosing.data["request"]["id"] == "b1"
+    stop = rig.run(rig.dosing.pump_stop("balance", "Staff"))
+    assert stop["replaced"]["action"] == "batch"
+    assert rig.dosing.data["request"]["action"] == "stop_pump"
+    # A waiting room stop already stops this pump: it is kept, and is the answer.
+    rig.dosing.data["request"] = {
+        **rig.dosing.data["request"],
+        "id": "s1",
+        "action": "stop",
+        "pump": None,
+    }
+    assert rig.run(rig.dosing.pump_stop("balance", "Staff")) == {
+        "request_id": "s1",
+        "replaced": None,
+    }
+    assert rig.dosing.data["request"]["id"] == "s1"
+
+
+def test_pump_stop_is_taken_while_another_pumps_run_waits(monkeypatch):
+    rig = _bloom_rig(monkeypatch)
+    prime = rig.run(rig.dosing.pump_prime("bloom", 20, "Alex", WHO))
+    stop = rig.run(rig.dosing.pump_stop("balance", "Staff"))
+    assert stop["replaced"] == {
+        "id": prime["request_id"],
+        "action": "prime",
+        "pump": "bloom",
+    }
+    assert rig.dosing.data["request"]["pump"] == "balance"
+    assert rig.dosing.pump_hold() is None  # bloom's prime never runs
+
+
+def test_two_primes_hold_the_room_until_the_later_one_ends(monkeypatch):
+    rig = _bloom_rig(monkeypatch)
+    a = rig.run(rig.dosing.pump_prime("balance", 10, "Alex", WHO))
+    _handled(rig)
+    rig.clock["at"] = NOW + timedelta(seconds=5)
+    b = rig.run(rig.dosing.pump_prime("bloom", 10, "Alex", WHO))
+    b_until = rig.clock["at"] + timedelta(seconds=dosing.REQUEST_MAX_AGE_S + 10 + 60)
+    # A reports before B is taken up: A's own hold shortens, B's still holds the room.
+    rig.clock["at"] = NOW + timedelta(seconds=20)
+    rig.report(a["request_id"], 10)
+    held = rig.dosing.sensor()[1]["calibrating"]
+    assert (held["request_id"], held["until"]) == (b["request_id"], b_until.isoformat())
+    rig.clock["at"] = NOW + timedelta(seconds=90)  # A's report + 60 s is over
+    assert rig.dosing.sensor()[1]["calibrating"]["request_id"] == b["request_id"]
+    _handled(rig)
+    assert rig.run(rig.dosing.request({"action": "batch"}, "Alex"))["error"] == (
+        dosing_api.HELD
+    )
+    rig.report(b["request_id"], 10)
+    until = rig.clock["at"] + timedelta(seconds=60)
+    assert rig.dosing.sensor()[1]["calibrating"]["until"] == until.isoformat()
+    rig.clock["at"] = until + timedelta(seconds=1)
+    assert "calibrating" not in rig.dosing.sensor()[1]
+
+
+def test_a_prime_reported_done_without_seconds_or_never_reported_is_dropped(
+    monkeypatch,
+):
+    rig = Rig(monkeypatch)
+    prime = rig.run(rig.dosing.pump_prime("balance", 10, "Alex", WHO))
+    rig.report(prime["request_id"], None)  # done, no seconds
+    assert rig.dosing._primes == {} and rig.events == []
+    # One never reported is dropped once no report could still come.
+    _handled(rig)
+    stale = rig.run(rig.dosing.pump_prime("balance", 10, "Alex", WHO))
+    rig.hass.states.set(STATUS, "idle", {"handled": "nothing"})
+    rig.clock["at"] = NOW + timedelta(minutes=10)
+    _handled(rig)
+    rig.dosing._rearm()
+    assert stale["request_id"] not in rig.dosing._primes
+
+
+def test_abandon_releases_a_pump_calibration_hold(monkeypatch):
+    rig = Rig(monkeypatch)
+    started = rig.calibrate(30)
+    # Before its run is reported it may still start: abandon refuses, pump_stop is the way.
+    with pytest.raises(ValueError, match="stop the pump first"):
+        rig.cal.abandon(started["session_id"])
+    rig.report(started["request_id"], 30)
+    assert rig.cal.abandon(started["session_id"]) == {"abandoned": True}
+    assert "calibrating" not in rig.dosing.sensor()[1]
+    assert rig.dosing.pump_hold() is None
+    with pytest.raises(ValueError, match="expired"):
+        rig.commit(started["session_id"], 150)
 
 
 def test_runner_ran_s_is_copied_into_the_session(monkeypatch):

@@ -900,9 +900,17 @@ class CalibrationStore:
         return out
 
     def abandon(self, session_id) -> dict:
-        self.session(
-            session_id
-        )  # unknown or expired: refused like every other session step
+        # A probe session or a pump's calibration session (which releases its hold on the room's
+        # dosing early); unknown or expired: refused like every other session step.
+        self.expire()
+        session = self.sessions.get(session_id)
+        if session is None:
+            raise ValueError(EXPIRED)
+        if "pump" in session and session["ran_s"] is None:
+            # Its run may still start: the hold stays until pump_stop ends it or it is reported.
+            raise ValueError(
+                "The pump's calibration run has not been reported yet: stop the pump first"
+            )
         return {"abandoned": self._close(session_id)}
 
     def _journal(self, kind, who, data):

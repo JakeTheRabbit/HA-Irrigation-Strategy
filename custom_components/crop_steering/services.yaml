@@ -880,10 +880,12 @@ calibration_revert:
             - feed_ph
             - feed_ec
 calibration_abandon:
-  name: Abandon a probe calibration
+  name: Abandon a probe or pump calibration
   description: >-
-    Ends the calibration session without a record. The dosing descriptor drops `calibrating`. When a
-    signed-in user calls it, that user must be a Home Assistant administrator.
+    Ends the calibration session without a record. The dosing descriptor drops `calibrating`. A
+    pump's calibration session (from pump_calibrate) can be abandoned once its run is reported;
+    before that, stop the pump with pump_stop. When a signed-in user calls it, that user must be a
+    Home Assistant administrator.
   fields:
     session_id:
       name: Session ID
@@ -2021,8 +2023,8 @@ pump_precheck:
   description: >-
     Answers whether a timed run of the dosing pump (a prime or a calibration) could start now, and
     every blocker in the checklist's words: no power switch, room dosing running, mix pump on, tank
-    filling, a feed probe calibration open, another pump's calibration open, or the controller offline (no heartbeat for 10 minutes).
-    Changes nothing. It has no administrator check.
+    filling, a feed probe calibration open, another pump's calibration open, or the controller
+    offline (no heartbeat for 10 minutes). Changes nothing. It has no administrator check.
   fields:
     room_id:
       name: Room ID
@@ -2042,9 +2044,9 @@ pump_prime:
   name: Prime a dosing pump
   description: >-
     Leaves a request for the controller to run the pump's power switch for a number of seconds, to
-    fill its line. Doses and batches of the room wait for its run and 60 seconds after it. Refused, with the blockers, while any pump_precheck blocker stands; refused while
-    another dosing request still waits for the controller. At most 30 seconds. pump_stop ends it
-    early. When a signed-in user calls it, that user must be a Home Assistant administrator.
+    fill its line. Doses and batches of the room wait for its run and 60 seconds after it.
+    Refused, with the blockers, while any pump_precheck blocker stands; refused while another
+    dosing request still waits for the controller. At most 30 seconds. pump_stop ends it early. When a signed-in user calls it, that user must be a Home Assistant administrator.
   fields:
     room_id:
       name: Room ID
@@ -2075,9 +2077,10 @@ pump_stop:
   name: Stop a dosing pump's prime or calibration
   description: >-
     Leaves a request for the controller to end the prime or the calibration run of this pump now. It
-    replaces a prime or calibration that still waits, never a dose or a batch, and never touches
-    another pump. To stop all dosing in the room, use dosing_request with the action stop. Any
-    signed-in user may call it.
+    is always taken: it replaces any request that still waits (the answer names it in `replaced`),
+    except a waiting room stop, which stops this pump too and is kept. It never touches a running
+    batch or another pump's running job. To stop all dosing in the room, use dosing_request with the
+    action stop. Any signed-in user may call it.
   fields:
     room_id:
       name: Room ID
@@ -2097,7 +2100,8 @@ pump_calibrate:
   name: Run a dosing pump calibration
   description: >-
     Opens a pump calibration session and leaves a request for the controller to run the pump's power
-    switch for a number of seconds into a measuring jug. Doses and batches of the room wait while the session is open. Refused, with the blockers, while any
+    switch for a number of seconds into a measuring jug. Doses and batches of the room wait while
+    the session is open (calibration_abandon ends it). Refused, with the blockers, while any
     pump_precheck blocker stands. The seconds it really ran appear in dosing_get under the pump's
     `calibration_session` once the controller reports them. That run is not drawn from the pump's
     stock tank. When a signed-in user calls it, that user must be a Home Assistant administrator.

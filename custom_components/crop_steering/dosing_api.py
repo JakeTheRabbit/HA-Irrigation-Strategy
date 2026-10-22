@@ -137,10 +137,11 @@ class DosingStore:
         self._lock = asyncio.Lock()
         self.data = dosing.empty()
         self.error = None
-        # A prime's request id -> (pump, who), until the controller reports it.
+        # A prime's request id -> (pump, who, asked at), until the controller reports it.
         self._primes = {}
-        # A prime holds room dosing: {pump, request_id, until}, its run reported plus 60 s.
-        self._prime_hold = None
+        # Each prime holds room dosing: request id -> {pump, until}, until its run is reported plus
+        # 60 s. The latest `until` of them all holds the room.
+        self._prime_holds = {}
         self._hold_timer = None
 
     @property
@@ -448,7 +449,7 @@ class DosingStore:
             request, blockers = await self._timed("prime", pump_id, seconds, by)
         if request is None:
             return {"request_id": None, "outcome": "refused", "blockers": blockers}
-        self._primes[request["id"]] = (request["pump"], who or {})
+        self._primes[request["id"]] = (request["pump"], who or {}, _now())
         # The controller may take it up to REQUEST_MAX_AGE_S after it was asked for; the hold is cut
         # to the run's report plus 60 s once that comes.
         self._hold_prime(
@@ -482,22 +483,18 @@ class DosingStore:
         }
 
     async def pump_stop(self, pump_id, by) -> dict:
-        """End a prime or a calibration of the pump: a stop_pump replaces a waiting prime, calibration or
-        stop_pump, never a dose or a batch (those wait; the room-wide stop is dosing_request's).
+        """End a prime or a calibration of the pump: always taken. The stop_pump replaces whatever
+        request still waits (it never ran, and the answer names it in `replaced`), except a room stop,
+        which already stops this pump too: that one stays and its id is the answer. A running batch
+        or another pump's running job is never touched (the controller stops only this pump).
         """
         async with self._lock:
             if self.error:
                 raise ValueError(self.error)
             pump = dosing.find_pump(self.data, pump_id)["id"]
             waiting = self.data["request"] if self.pending() else None
-            if waiting and waiting.get("action") not in (
-                "prime",
-                "calibrate",
-                "stop_pump",
-            ):
-                raise ValueError(BUSY)
-            if waiting and waiting.get("pump") != pump:
-                raise ValueError(BUSY)  # never another pump's run
+            if waiting and waiting.get("action") == "stop":
+                return {"request_id": waiting["id"], "replaced": None}
             request = {
                 "id": uuid.uuid4().hex,
                 "action": "stop_pump",
@@ -510,7 +507,12 @@ class DosingStore:
             draft["request"] = request
             await self._commit(draft)
             self._replaced(waiting)
-        return {"request_id": request["id"]}
+        replaced = (
+            {key: waiting.get(key) for key in ("id", "action", "pump")}
+            if waiting and waiting.get("action") != "stop_pump"
+            else None
+        )
+        return {"request_id": request["id"], "replaced": replaced}
 
     def _replaced(self, request):
         """A waiting request was replaced before the controller took it. A prime then never runs: its
@@ -520,10 +522,8 @@ class DosingStore:
             return
         if request.get("action") == "prime":
             self._primes.pop(request.get("id"), None)
-            if self._prime_hold and self._prime_hold["request_id"] == request.get("id"):
-                self._prime_hold = None
-                self._end_hold_timer()
-                self._dispatch()
+            if self._prime_holds.pop(request.get("id"), None) is not None:
+                self._rearm()
         elif request.get("action") == "calibrate":
             calibration = self._calibration()
             if calibration is not None:
@@ -535,14 +535,34 @@ class DosingStore:
         async_dispatcher_send(self.hass, f"{SIGNAL}_{self.entry.entry_id}")
 
     def _hold_prime(self, pump, request_id, seconds):
-        """Hold room dosing for a prime for `seconds` from now; the descriptor is written again then."""
+        """Hold room dosing for this prime for `seconds` from now. A report shortens only its own
+        request's hold; the room stays held until the latest of them all."""
+        self._prime_holds[request_id] = {
+            "pump": pump,
+            "until": _now() + timedelta(seconds=seconds),
+        }
+        self._rearm()
 
-        until = _now() + timedelta(seconds=seconds)
-        self._prime_hold = {"pump": pump, "request_id": request_id, "until": until}
-        self._end_hold_timer()
-        self._hold_timer = calibration_module._later(
-            self.hass, seconds + 1, lambda _now: self._dispatch()
+    def _rearm(self):
+        """The holds changed: drop the ended ones and the primes no report can come for any more, write
+        the descriptor again now, and again when the latest hold ends."""
+        now = _now()
+        self._prime_holds = {
+            rid: hold for rid, hold in self._prime_holds.items() if now < hold["until"]
+        }
+        stale = now - timedelta(
+            seconds=dosing.REQUEST_MAX_AGE_S + PRIME_SECONDS[1] + PRIME_HOLD_S
         )
+        self._primes = {
+            rid: prime for rid, prime in self._primes.items() if prime[2] > stale
+        }
+        self._end_hold_timer()
+        holding = self._priming()
+        if holding is not None:
+            left = (datetime.fromisoformat(holding["until"]) - now).total_seconds()
+            self._hold_timer = calibration_module._later(
+                self.hass, left + 1, lambda _now: self._rearm()
+            )
         self._dispatch()
 
     def _end_hold_timer(self):
@@ -551,15 +571,18 @@ class DosingStore:
             self._hold_timer = None
 
     def _priming(self) -> dict | None:
-        """A prime's hold on room dosing as {pump, request_id, until}, or None."""
-        hold = self._prime_hold
-        if hold is None or _now() >= hold["until"]:
+        """The primes' hold on room dosing as {pump, request_id, until} of the one that ends last, or
+        None."""
+        now = _now()
+        live = [
+            (hold["until"], rid, hold["pump"])
+            for rid, hold in self._prime_holds.items()
+            if now < hold["until"]
+        ]
+        if not live:
             return None
-        return {
-            "pump": hold["pump"],
-            "request_id": hold["request_id"],
-            "until": hold["until"].isoformat(),
-        }
+        until, rid, pump = max(live)
+        return {"pump": pump, "request_id": rid, "until": until.isoformat()}
 
     def pump_hold(self) -> dict | None:
         """What holds room dosing for a pump now: its open calibration session ({pump, session_id,
@@ -581,8 +604,12 @@ class DosingStore:
             or not isinstance(ran_s, (int, float))
             or not (math.isfinite(ran_s) and ran_s >= 0)
         ):
-            # A run that never started (refused, stuck) may come with no seconds: it ran none.
+            # A run that never started (refused, stuck) may come with no seconds: it ran none. A
+            # prime reported done without them is over too: no report of it is awaited any more.
             if result.get("result") in (None, "done"):
+                primed = self._primes.pop(result["id"], None)
+                if primed is not None:
+                    self._hold_prime(primed[0], result["id"], PRIME_HOLD_S)
                 return
             ran_s = 0
         calibration = self._calibration()
@@ -594,7 +621,7 @@ class DosingStore:
         if primed is not None:
             self._hold_prime(primed[0], result["id"], PRIME_HOLD_S)
             self.hass.async_create_task(
-                self._primed(*primed, ran_s, result.get("result"))
+                self._primed(primed[0], primed[1], ran_s, result.get("result"))
             )
 
     async def _primed(self, pump_id, who, ran_s, result):

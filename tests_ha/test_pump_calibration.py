@@ -190,3 +190,36 @@ async def test_a_prime_is_capped_at_30_s_and_only_an_administrator_primes(
         "balance",
         "Staff phone",
     )
+
+
+async def test_calibration_abandon_releases_a_pump_calibration_hold(
+    hass, hass_admin_user
+):
+    await _room(hass, hass_admin_user)
+    started = await _call(
+        hass, hass_admin_user, "pump_calibrate", pump="balance", seconds=30
+    )
+    request = hass.states.get(CONFIG).attributes["request"]
+    hass.states.async_set(
+        STATUS,
+        "idle",
+        {
+            "handled": request["id"],
+            "handled_result": {"id": request["id"], "ran_s": 30, "result": "done"},
+        },
+    )
+    await hass.async_block_till_done()
+    assert "calibrating" in hass.states.get(CONFIG).attributes
+    out = await hass.services.async_call(
+        DOMAIN,
+        "calibration_abandon",
+        {"session_id": started["session_id"]},
+        blocking=True,
+        return_response=True,
+        context=Context(user_id=hass_admin_user.id),
+    )
+    assert out == {"abandoned": True}
+    await hass.async_block_till_done()
+    assert "calibrating" not in hass.states.get(CONFIG).attributes
+    batch = await _call(hass, hass_admin_user, "dosing_request", action="batch")
+    assert batch["error"] is None
