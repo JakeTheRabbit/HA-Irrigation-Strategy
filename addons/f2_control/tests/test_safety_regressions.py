@@ -655,7 +655,7 @@ def test_a_zone_whose_valve_will_not_open_backs_off_then_resets_once_it_does(rig
         return "turn_on" in times
 
     assert shot() and shot()
-    assert "at most once every 30 min" not in alerts[-1][1]
+    assert "shots of this zone in a row could not start" not in alerts[-1][1]
     assert shot()  # the third in a row: the zone backs off, and says so at once
     assert "The last 3 shots of this zone in a row could not start" in alerts[-1][1]
     assert not shot() and not shot(plan_exempt=True)  # held, a rescue shot too: no command sent
@@ -799,3 +799,35 @@ def test_hanging_operator_switch_reads_cannot_stretch_the_valve_read_back(rig, m
     monkeypatch.setattr(controller, "ha_get", get)
     c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
     assert times["turn_off"] - times["turn_on"] <= controller.SWITCH_ON_S + 3
+
+
+def test_a_late_valve_cannot_run_a_short_shot_to_twice_its_length(rig, monkeypatch):
+    """CTL-002 final review: a 5 s shot whose valve reports ON only at 12 s is closed once its time (or the
+    first 6 s read-back stage) is up, counted as maybe open, and is one more failed shot for the backoff."""
+    c, fake, clock = rig
+    room = c.rooms[0]
+    times, alerts = _valve_reads(c, fake, clock, monkeypatch, lambda t, over: "on" if t >= 12 else "off")
+    c._execute_shot(room, 1, 5, 5, flow_lps=0.05)
+    open_s = times["turn_off"] - times["turn_on"]
+    assert open_s <= 2 * 5
+    assert [code for code, _msg in alerts] == ["CS-304"] and "counts the" in alerts[0][1]
+    assert room.state[1]["daily_vol"] == pytest.approx(0.05 * open_s)
+    assert room.state[1]["on_failures"]["count"] == 1
+    assert all(fake.states[e][0] == "off" for e in ("switch.p", "switch.m", "switch.v1"))
+
+
+@pytest.mark.parametrize("opens", [True, False], ids=["opening-then-open", "still-opening"])
+def test_a_valve_reporting_opening_is_waited_for_then_counted_if_it_never_reads_open(rig, monkeypatch, opens):
+    """CTL-002 final review: a valve. entity's "opening" is on its way: waited for, and if the read-back ends
+    while it still says so, it may be open: closed and counted, not a definite failure."""
+    c, fake, clock = rig
+    room = c.rooms[0]
+    times, alerts = _valve_reads(c, fake, clock, monkeypatch,
+                                 lambda t, over: "on" if opens and t >= 3 else "opening")
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    open_s = times["turn_off"] - times["turn_on"]
+    if opens:
+        assert alerts == [] and room.state[1]["daily_vol"] == pytest.approx(3.0)
+    else:
+        assert [code for code, _msg in alerts] == ["CS-304"]
+        assert room.state[1]["daily_vol"] == pytest.approx(0.05 * open_s)

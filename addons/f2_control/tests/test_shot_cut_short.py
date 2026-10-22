@@ -270,3 +270,27 @@ def test_a_hold_that_goes_unavailable_mid_shot_ends_nothing(rig, monkeypatch):
                               ("turn_off", VALVE), ("turn_off", MAIN), ("turn_off", PUMP)]
     assert st["daily_vol"] == pytest.approx(FLOW * 60) and notifications(fake) == []
     assert c._blocked(c.rooms[0], 1) == f"external hold {HOLD} unreadable (reads neither on nor off)"
+
+
+def test_a_hold_that_comes_on_during_the_pumps_prime_stops_the_shot_before_its_valve(rig, monkeypatch):
+    """CTL-002 final review: the holds are read while a shot opens too. Dosing takes the tank during the
+    pump's prime: the valve is never opened, the pump is left to the hold, nothing is counted, no backoff."""
+    c, fake, clock = rig
+    fake.set_state("number.crop_steering_pump_prime_time", "8")
+    real = controller.ha_call
+
+    def call(domain, service, **data):
+        ok = real(domain, service, **data)
+        if (service, data.get("entity_id")) == ("turn_on", PUMP):
+            clock.at(clock.seconds + 0.5, lambda: fake.set_state(HOLD, "on"))
+        return ok
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    c._execute_shot(c.rooms[0], 1, 170, 2.8, flow_lps=FLOW)
+    room, st = c.rooms[0], c.rooms[0].state[1]
+    assert ("turn_on", VALVE) not in switched(fake) and ("turn_on", MAIN) not in switched(fake)
+    assert fake.states[PUMP][0] == "on"  # the dose's now
+    assert clock.seconds <= 0.5 + 2 + 1  # seen at the next check inside the prime
+    assert st["daily_vol"] == 0 and st["shots"] == 0 and st["on_failures"] is None
+    assert room.hardware_fault is None and room.shot_inflight is None
+    assert [n["title"] for n in notifications(fake)] == [CUT]
