@@ -123,9 +123,9 @@ def engine_flag(hass, data):
 
 
 LIGHTS_SAME_HOUR = (
-    "Lights on and lights off at the same hour read as lights never on, so the controller "
-    "would keep every zone in its overnight phase. A room lit around the clock is not "
-    "supported yet: set the hours the lights switch on and off"
+    "Lights on and lights off at the same hour give no time for lights-off, so the controller "
+    "cannot use them. A room lit around the clock is not supported yet: set the hours the "
+    "lights switch on and off"
 )
 
 

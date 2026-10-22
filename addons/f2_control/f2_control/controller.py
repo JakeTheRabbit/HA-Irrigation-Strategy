@@ -426,6 +426,17 @@ CONTROLLER_VERSION = read_controller_version()
 # legacy room may rely on it; on a wizard-made room it is a value nobody chose.
 SHIPPED_LIGHTS = (10.0, 22.0)
 
+
+def usable_lights(on, off):
+    """(on, off) as floats when they are two different hours from 0 to under 24, else None: the same
+    hour gives no lights-off and reads as lights never on (CTL-030)."""
+    try:
+        on, off = float(on), float(off)
+    except (TypeError, ValueError):
+        return None
+    return (on, off) if 0 <= on < 24 and 0 <= off < 24 and on != off else None
+
+
 # A zone with no usable moisture reading, by why: title and the advice that fits. The codes and
 # their full entries live in docs/error-codes.json with every other code.
 _PROBE_ALERTS = {
@@ -2043,6 +2054,8 @@ class Controller:
                     block.pop("_shot_inflight", None)
                 if hasattr(room, "_room_active_known"):
                     block["_room_active"] = room._room_active_known
+                if getattr(room, "_lights_last_read", None):
+                    block["_lights"] = list(room._lights_last_read)
                 waste_rule = getattr(room, "_waste_rule_known", None)
                 if waste_rule in ("Off", WASTE_CHECK, WASTE_CLOSE):
                     block["_waste_rule"] = waste_rule
@@ -2506,27 +2519,75 @@ class Controller:
     def _refresh_lights(self, room):
         """Lights are configured once in the integration, per room. Read them live from
         number.crop_steering_<prefix>lights_on_hour / _off_hour each loop, keeping the hours last
-        read through a loop that can't read them, and falling back to the add-on option only when
-        none have been read since start (an older integration without the entities). Log the
-        source once per room, and alert once if the integration value disagrees with the
-        (now-legacy) add-on option."""
+        read (saved in state.json, so a restart keeps them too) through a loop that can't read them
+        or reads them at the same hour (CS-401), and falling back to the add-on option only when
+        none have ever been read (an older integration without the entities), and to the shipped
+        hours when the option's are the same hour or out of range (CS-401). Log the source once per
+        room, and alert once if the integration value disagrees with the (now-legacy) add-on option."""
         lon = self._num_or_none(f"number.crop_steering_{room.prefix}lights_on_hour")
         loff = self._num_or_none(f"number.crop_steering_{room.prefix}lights_off_hour")
+        same = lon if lon is not None and lon == loff else None
+        if same is not None:
+            # Equal hours have no lights-off and read as lights never on: every zone held overnight all day
+            # (CTL-030). Setup refuses them, but each entity takes any hour, so they count as unreadable.
+            lon = loff = None
+        if not hasattr(room, "_lights_last_read"):
+            saved = (getattr(self, "_saved_room_blocks", {}).get(room.slug) or {}).get("_lights")
+            room._lights_last_read = usable_lights(*saved) if isinstance(saved, list) and len(saved) == 2 else None
+        option = None
         if lon is not None and loff is not None:
             src = "integration"
-            room._lights_last_read = (lon, loff)
-        elif getattr(room, "_lights_last_read", None):
+            if room._lights_last_read != (lon, loff):
+                room._lights_last_read = (lon, loff)
+                self._save_state()
+        elif room._lights_last_read:
             # One unreadable loop (Home Assistant restarting, an integration reload, a timed-out
             # read) must not swap in the option: with the integration on 7-20 and the option on
             # 10-22, 08:30 read as lights-off, the zone was forced to P3, and the next loop's
             # lights-on edge restarted its day, daily volume and shot count included.
             (lon, loff), src = room._lights_last_read, "integration (last reading)"
-        else:
+        elif usable_lights(room.opt_lon, room.opt_loff):
             lon, loff, src = (
                 room.opt_lon,
                 room.opt_loff,
-                "add-on option (integration entity missing)",
+                "add-on option (integration entity missing)" if same is None
+                else "add-on option (integration hours the same)",
             )
+        else:
+            option = "the same hour" if room.opt_lon == room.opt_loff else "out of range"
+            (lon, loff), src = SHIPPED_LIGHTS, (
+                "shipped default (option hours the same)" if room.opt_lon == room.opt_loff
+                else "shipped default (option hours out of range)"
+            )
+        if same is not None:
+            self._alert(
+                f"lights_same_hour_{room.slug}",
+                "CS-401",
+                "lights-on and lights-off at the same hour",
+                f"Lights on hour and Lights off hour are both {int(same)}:00, the same hour. The controller cannot "
+                "use the same hour for the two: it gives no time for lights-off. The controller continues on "
+                f"{int(lon)}:00-{int(loff)}:00 ({src}). A room lit around the clock is not supported yet. Set the "
+                "hours the lights switch on and off."
+                f"\n\nSettings: number.crop_steering_{room.prefix}lights_on_hour, "
+                f"number.crop_steering_{room.prefix}lights_off_hour",
+                room=room,
+            )
+        elif src == "integration":
+            self._dismiss(f"lights_same_hour_{room.slug}")
+        if option:
+            self._alert(
+                f"lights_option_{room.slug}",
+                "CS-401",
+                "lights hours of the option not usable",
+                f"The controller has no lights hours from the integration, and the lights_on_hour and "
+                f"lights_off_hour options of the controller ({room.opt_lon:g} and {room.opt_loff:g}) are {option}: "
+                "the controller cannot use them. It uses the shipped hours "
+                f"{int(lon)}:00-{int(loff)}:00. Set Lights on hour and Lights off hour in the integration, and set "
+                "the options to the same hours, from 0 to 23 and not the same hour.",
+                room=room,
+            )
+        else:
+            self._dismiss(f"lights_option_{room.slug}")
         if not room._lights_logged:
             tag = "" if room.prefix == "" else f"[{room.slug}] "
             log(f"config: {tag}lights {int(lon)}:00-{int(loff)}:00 (source: {src})")
