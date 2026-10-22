@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import {
   ReviewApplyView,
   closeSheetAfter,
+  focusReceiptAfterSheet,
   receiptFromV2,
   runApply,
   runUndo,
@@ -274,14 +275,19 @@ describe("partial undo", () => {
 
 describe("ReviewApply states", () => {
   const receipt: ApplyReceipt = { at: AT, ok: true, failed: [], summary: "Re-water point 57% → 56%", eventIds: ["a1"] };
-  test("apply goes sending → done with the receipt, and a thrown apply is an error, not a receipt", async () => {
+  test("apply goes sending → done with the receipt, and a thrown apply is unconfirmed, not a refusal", async () => {
     const states: ApplyState[] = [];
     expect(await runApply(() => Promise.resolve(receipt), (s) => states.push(s))).toBe(receipt);
     expect(states.map((s) => s.phase)).toEqual(["sending", "done"]);
     expect(states[1]).toMatchObject({ phase: "done", result: receipt });
+    // A thrown apply (socket closed, timeout) may have landed: unconfirmed, never "refused".
     const thrown: ApplyState[] = [];
-    await runApply(() => Promise.reject(new Error("socket closed")), (s) => thrown.push(s));
-    expect(thrown[1]).toMatchObject({ phase: "done", result: { kind: "error", code: "unknown" } });
+    await runApply(() => Promise.reject(new Error("socket closed")), (s) => thrown.push(s), () => AT);
+    expect(thrown[1]).toMatchObject({ phase: "done", result: { at: AT, ok: false, unconfirmed: true } });
+    const html = render(props(), thrown[1]);
+    expect(html).toContain("The controller did not confirm the values. Reload and check before trying again.");
+    expect(html).not.toContain("refused");
+    expect(html).not.toContain("socket closed");
   });
   test("undo goes undoing → undone, or undo-failed carrying the number put back", async () => {
     const states: ApplyState[] = [];
@@ -299,11 +305,25 @@ describe("ReviewApply states", () => {
     const calls: string[] = [];
     const sheet = { close: () => calls.push("close") };
     const trigger = { focus: () => calls.push("focus") };
-    closeSheetAfter(receipt, sheet, trigger);
+    expect(closeSheetAfter(receipt, sheet, trigger)).toBe(true);
     expect(calls).toEqual(["close", "focus"]);
     calls.length = 0;
-    closeSheetAfter({ ...receipt, ok: false, failed: [{ id: "rewater", holds: "57%" }] }, sheet, trigger);
-    closeSheetAfter({ kind: "error", code: "forbidden", message: "" }, sheet, trigger);
+    expect(closeSheetAfter({ ...receipt, ok: false, failed: [{ id: "rewater", holds: "57%" }] }, sheet, trigger)).toBe(false);
+    expect(closeSheetAfter({ kind: "error", code: "forbidden", message: "" }, sheet, trigger)).toBe(false);
     expect(calls).toEqual([]);
+  });
+  test("after the sheet closes, focus lands on the read-back receipt once the inline view is back", () => {
+    const focused: string[] = [];
+    const status = { focus: () => focused.push("receipt") };
+    // Still in the sheet (the page has not emptied the draft yet): wait.
+    expect(focusReceiptAfterSheet(true, true, status)).toBe(false);
+    // Inline again with the receipt mounted: focus it, once.
+    expect(focusReceiptAfterSheet(true, false, status)).toBe(true);
+    expect(focused).toEqual(["receipt"]);
+    // Nothing pending: never steal focus.
+    expect(focusReceiptAfterSheet(false, false, status)).toBe(false);
+    expect(focused).toEqual(["receipt"]);
+    // The receipt is focusable from script only.
+    expect(render(props({ rows: [], last: receipt }))).toMatch(/role="status" class="review-apply-receipt" tabindex="-1"/);
   });
 });

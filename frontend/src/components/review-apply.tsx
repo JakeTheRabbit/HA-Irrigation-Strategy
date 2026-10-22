@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import { Check, TriangleAlert, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NeedsIntegration } from "@/components/needs-integration";
@@ -113,17 +113,19 @@ export type ApplyState =
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const isReceipt = (r: ApplyReceipt | Refusal): r is ApplyReceipt => "ok" in r;
 
-/** Apply: sending, then done with what came back. A throw is an error, never a receipt. */
+/** Apply: sending, then done with what came back. A throw (socket closed, timeout) may still have
+ * landed, so it is an unconfirmed receipt: it claims neither a write nor a refusal. */
 export async function runApply(
   apply: ReviewApplyProps["apply"],
   set: (state: ApplyState) => void,
+  now: () => number = Date.now,
 ): Promise<ApplyReceipt | Refusal> {
   set({ phase: "sending" });
   let result: ApplyReceipt | Refusal;
   try {
     result = await apply();
   } catch (error) {
-    result = { kind: "error", code: "unknown", message: error instanceof Error ? error.message : "" };
+    result = { at: now(), ok: false, unconfirmed: true, failed: [], summary: "", eventIds: [] };
   }
   set({ phase: "done", result });
   return result;
@@ -151,15 +153,27 @@ export async function runUndo(
   }
 }
 /** A written and read-back apply closes the phone sheet and puts focus back on its trigger,
- * before the page empties the draft and both unmount. */
+ * before the page empties the draft and both unmount. True when it closed the sheet. */
 export function closeSheetAfter(
   result: ApplyReceipt | Refusal,
   sheet: Pick<HTMLDialogElement, "close"> | null,
   trigger: Pick<HTMLElement, "focus"> | null,
-) {
-  if (!isReceipt(result) || !result.ok) return;
+): boolean {
+  if (!isReceipt(result) || !result.ok) return false;
   sheet?.close();
   trigger?.focus();
+  return true;
+}
+/** Once the sheet has closed and the inline view is back, focus moves to the read-back receipt so
+ * a screen reader lands on the outcome. True when the pending focus is done. */
+export function focusReceiptAfterSheet(
+  pending: boolean,
+  inSheet: boolean,
+  receipt: Pick<HTMLElement, "focus"> | null,
+): boolean {
+  if (!pending || inSheet) return false;
+  receipt?.focus();
+  return true;
 }
 
 /** Pending edits, their checks, one Apply, and what the controller read back. On a phone the bar
@@ -170,11 +184,25 @@ export function ReviewApply(props: ReviewApplyProps) {
   const narrow = useNarrow(720);
   const sheet = useRef<HTMLDialogElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
-  const run = async () => closeSheetAfter(await runApply(props.apply, setState), sheet.current, trigger.current);
+  const receipt = useRef<HTMLDivElement>(null);
+  const [focusReceipt, setFocusReceipt] = useState(false);
+  const run = async () => {
+    if (closeSheetAfter(await runApply(props.apply, setState), sheet.current, trigger.current)) setFocusReceipt(true);
+  };
   const undo = (receipt: ApplyReceipt) => void runUndo(props.undo!, receipt, setState);
   const inSheet = narrow && props.layout === "bar" && props.rows.length > 0;
+  useEffect(() => {
+    if (focusReceiptAfterSheet(focusReceipt, inSheet, receipt.current)) setFocusReceipt(false);
+  }, [focusReceipt, inSheet]);
   const view = (
-    <ReviewApplyView {...props} state={state} onApply={run} onUndo={props.undo ? undo : undefined} inSheet={inSheet} />
+    <ReviewApplyView
+      {...props}
+      state={state}
+      onApply={run}
+      onUndo={props.undo ? undo : undefined}
+      inSheet={inSheet}
+      receiptRef={receipt}
+    />
   );
   if (!inSheet) return view;
   return (
@@ -200,6 +228,7 @@ export function ReviewApplyView(
     onUndo?(receipt: ApplyReceipt): void;
     /** Inside the phone sheet, which carries the name already. */
     inSheet?: boolean;
+    receiptRef?: Ref<HTMLDivElement>;
   },
 ) {
   const { rows, layout, state, timeZone } = props;
@@ -337,7 +366,7 @@ export function ReviewApplyView(
     }
     applied = true;
     return (
-      <div role="status" className="review-apply-receipt">
+      <div role="status" className="review-apply-receipt" tabIndex={-1} ref={props.receiptRef}>
         <span className="review-apply-tick" aria-hidden>
           <Check />
         </span>
