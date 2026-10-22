@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import "./primitives.css";
 
 /** Every way a hold can end. Each one stops a `while-held` action. */
@@ -10,6 +10,7 @@ export type HoldEnd =
   | "visibilitychange"
   | "keyup"
   | "unmount"
+  | "disabled"
   | "max";
 
 /** The hold logic, free of the DOM.
@@ -76,11 +77,34 @@ export function isRealPress(e: {
   return false;
 }
 
+/** Ends the hold when this pointer lifts or is cancelled anywhere on `target` (the window). Used
+ * when pointer capture fails, so a release outside the button still stops the action. Returns the
+ * cleanup. */
+export function endOnWindowRelease(
+  target: EventTarget,
+  pointerId: number,
+  end: (reason: "pointerup" | "pointercancel") => void,
+): () => void {
+  const listener = (e: Event) => {
+    if ((e as PointerEvent).pointerId === pointerId) end(e.type as "pointerup" | "pointercancel");
+  };
+  target.addEventListener("pointerup", listener);
+  target.addEventListener("pointercancel", listener);
+  return () => {
+    target.removeEventListener("pointerup", listener);
+    target.removeEventListener("pointercancel", listener);
+  };
+}
+
 type Phase = "idle" | "holding" | "running";
 
 /** A button for a physical action. `while-held` runs the action only while it is held (pump
  * prime); `hold-to-confirm` starts a fixed action after an unbroken hold (test shot). Pointer or
- * Space only. With `disabledReason` it does nothing and shows why. */
+ * Space only. With `disabledReason` it does nothing and shows why; becoming disabled mid-hold
+ * stops the action at once.
+ *
+ * Keep `mode`, `maxSeconds` and `confirmMs` stable during a hold: a change rebuilds the controller,
+ * which stops the running action. */
 export function HoldButton({
   mode,
   label,
@@ -123,10 +147,18 @@ export function HoldButton({
       }),
     [mode, maxSeconds, confirmMs],
   );
+  const stopWindowWatch = useRef<(() => void) | null>(null);
   const end = (reason: HoldEnd) => {
+    stopWindowWatch.current?.();
+    stopWindowWatch.current = null;
     hold.release(reason);
     setPhase("idle");
   };
+  // Disabling mid-hold (dosing paused, another pump started) must stop the action now, not at
+  // maxSeconds: the end handlers below stay attached too, but this does not wait for the finger.
+  useLayoutEffect(() => {
+    if (disabledReason) end("disabled");
+  }, [disabledReason, hold]); // `end` only closes over `hold`.
   useEffect(() => {
     const blur = () => end("blur");
     const visibility = () => document.visibilityState === "hidden" && end("visibilitychange");
@@ -135,6 +167,7 @@ export function HoldButton({
     return () => {
       window.removeEventListener("blur", blur);
       document.removeEventListener("visibilitychange", visibility);
+      stopWindowWatch.current?.();
       hold.release("unmount");
     };
   }, [hold]); // `end` only closes over `hold`.
@@ -146,41 +179,28 @@ export function HoldButton({
   const status =
     phase === "running" ? "Running · let go to stop" : phase === "holding" ? "Keep holding…" : null;
 
-  if (disabledReason)
-    return (
-      <span className="hold-button-wrap">
-        <button
-          type="button"
-          className="hold-button"
-          data-mode={mode}
-          data-state="disabled"
-          aria-disabled="true"
-          aria-describedby={reasonId}
-        >
-          <span>{label}</span>
-          <span className="sr-only">{srLabel}</span>
-        </button>
-        <span className="hold-button-reason" id={reasonId}>
-          {disabledReason}
-        </span>
-      </span>
-    );
+  const disabled = !!disabledReason;
   return (
     <span className="hold-button-wrap">
       <button
         type="button"
         className="hold-button"
         data-mode={mode}
-        data-state={phase}
-        aria-pressed={mode === "while-held" ? phase === "running" : undefined}
+        data-state={disabled ? "disabled" : phase}
+        aria-disabled={disabled ? "true" : undefined}
+        aria-describedby={disabled ? reasonId : undefined}
+        aria-pressed={mode === "while-held" && !disabled ? phase === "running" : undefined}
         style={{ "--confirm-ms": `${confirmMs}ms` } as CSSProperties}
         onPointerDown={(e) => {
+          if (disabled) return;
           if (!isRealPress({ type: "pointerdown", isTrusted: e.nativeEvent.isTrusted, button: e.button, isPrimary: e.isPrimary }))
             return;
           try {
             e.currentTarget.setPointerCapture(e.pointerId);
           } catch {
-            // Capture can fail on a pointer that already lifted; the up/cancel handlers still end it.
+            // Without capture, a finger lifted outside the button never reaches it: watch the window.
+            stopWindowWatch.current?.();
+            stopWindowWatch.current = endOnWindowRelease(window, e.pointerId, end);
           }
           start();
         }}
@@ -193,7 +213,8 @@ export function HoldButton({
           if (e.key === "Enter") e.preventDefault();
           if (e.key !== " ") return;
           e.preventDefault();
-          if (isRealPress({ type: "keydown", isTrusted: e.nativeEvent.isTrusted, key: e.key, repeat: e.repeat })) start();
+          if (!disabled && isRealPress({ type: "keydown", isTrusted: e.nativeEvent.isTrusted, key: e.key, repeat: e.repeat }))
+            start();
         }}
         onKeyUp={(e) => {
           if (e.key !== " ") return;
@@ -201,11 +222,16 @@ export function HoldButton({
           end("keyup");
         }}
       >
-        {mode === "hold-to-confirm" && <span className="hold-button-fill" aria-hidden="true" />}
+        {mode === "hold-to-confirm" && !disabled && <span className="hold-button-fill" aria-hidden="true" />}
         <span>{label}</span>
         <span className="sr-only">{srLabel}</span>
-        {status && <span className="hold-button-status">{status}</span>}
+        {status && !disabled && <span className="hold-button-status">{status}</span>}
       </button>
+      {disabled && (
+        <span className="hold-button-reason" id={reasonId}>
+          {disabledReason}
+        </span>
+      )}
     </span>
   );
 }

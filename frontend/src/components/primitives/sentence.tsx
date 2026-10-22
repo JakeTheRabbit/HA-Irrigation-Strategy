@@ -31,8 +31,8 @@ type Part = string | SentenceToken;
 const wordy = (text: string) => /[\p{L}\p{N}]/u.test(text);
 
 /** The phone layout of a sentence: each text part starts a row and names it, and the controls
- * after it sit in that row. Text without letters or digits (",") starts an unnamed row; rows
- * without controls are dropped. */
+ * after it sit in that row. Text without letters or digits (",") starts an unnamed row. Text with
+ * no controls after it stays as a plain text row; empty rows are dropped. */
 export function phoneRows(parts: Part[]): { text: string; tokens: SentenceToken[] }[] {
   const rows: { text: string; tokens: SentenceToken[] }[] = [];
   for (const part of parts) {
@@ -42,7 +42,7 @@ export function phoneRows(parts: Part[]): { text: string; tokens: SentenceToken[
       rows[rows.length - 1].tokens.push(part);
     }
   }
-  return rows.filter((row) => row.tokens.length);
+  return rows.filter((row) => row.tokens.length || row.text);
 }
 
 /** A choice as an inline button that opens a listbox: arrows, Home and End move, Enter or Space
@@ -131,10 +131,22 @@ function ListboxToken({ token }: { token: Extract<SentenceToken, { kind: "select
   );
 }
 
-/** A number field that lets the text be cleared while typing; only valid numbers are passed on. */
-function NumberToken({ token }: { token: Extract<SentenceToken, { kind: "number" }> }) {
+type NumberTokenT = Extract<SentenceToken, { kind: "number" }>;
+
+/** The hint for a number field's text: null when it holds a number inside the token's range. */
+export function numberHint(text: string, token: NumberTokenT): string | null {
+  const v = text.trim() === "" ? NaN : Number(text);
+  if (Number.isFinite(v) && v >= token.min && v <= token.max) return null;
+  return `Between ${token.min} and ${token.max}${token.unit ? ` ${token.unit}` : ""}`;
+}
+
+/** A number field that lets the text be cleared while typing. Only numbers inside the range are
+ * passed on; anything else stays as typed with a hint saying what is allowed. */
+function NumberToken({ token }: { token: NumberTokenT }) {
+  const hintId = useId();
   const [text, setText] = useState(String(token.value));
   useEffect(() => setText(String(token.value)), [token.value]);
+  const hint = numberHint(text, token);
   return (
     <span className="sentence-number">
       <input
@@ -142,18 +154,23 @@ function NumberToken({ token }: { token: Extract<SentenceToken, { kind: "number"
         type="number"
         inputMode="decimal"
         aria-label={token.label}
+        aria-invalid={hint ? true : undefined}
+        aria-describedby={hint ? hintId : undefined}
         value={text}
         min={token.min}
         max={token.max}
         step={token.step}
         onChange={(e) => {
           setText(e.target.value);
-          const v = e.target.valueAsNumber;
-          if (Number.isFinite(v) && v >= token.min && v <= token.max) token.onChange(v);
+          if (!numberHint(e.target.value, token)) token.onChange(Number(e.target.value));
         }}
-        onBlur={() => setText(String(token.value))}
       />
       {token.unit && <span className="sentence-unit">{token.unit}</span>}
+      {hint && (
+        <span className="sentence-hint" id={hintId} role="status">
+          {hint}
+        </span>
+      )}
     </span>
   );
 }
@@ -215,16 +232,22 @@ export function Sentence({
   if (phone)
     return (
       <div className="sentence" data-phone="" role="group" aria-label={ariaLabel}>
-        {phoneRows(parts).map((row) => (
-          <div className="sentence-row" key={row.tokens[0].id}>
-            <span className="sentence-row-word">{row.text}</span>
-            <span className="sentence-row-controls">
-              {row.tokens.map((token) => (
-                <Token key={token.id} token={token} phone />
-              ))}
-            </span>
-          </div>
-        ))}
+        {phoneRows(parts).map((row, i) =>
+          row.tokens.length ? (
+            <div className="sentence-row" key={row.tokens[0].id}>
+              <span className="sentence-row-word">{row.text}</span>
+              <span className="sentence-row-controls">
+                {row.tokens.map((token) => (
+                  <Token key={token.id} token={token} phone />
+                ))}
+              </span>
+            </div>
+          ) : (
+            <p className="sentence-row-text" key={`text-${i}`}>
+              {row.text}
+            </p>
+          ),
+        )}
       </div>
     );
   return (

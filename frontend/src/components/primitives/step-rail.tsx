@@ -56,12 +56,13 @@ export function StepRail({
             {state(i) === "done" ? <Check size={18} strokeWidth={3} /> : i + 1}
           </span>
           <span className="step-rail-text">
-            <strong
+            <h2
+              className="step-rail-title"
               tabIndex={state(i) === "current" ? -1 : undefined}
               ref={state(i) === "current" ? heading : undefined}
             >
               {step.title}
-            </strong>
+            </h2>
             <span>{step.detail}</span>
           </span>
         </li>

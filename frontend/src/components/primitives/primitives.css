@@ -258,18 +258,19 @@
   font-size: 13px;
   line-height: 1.3;
 }
-.step-rail-text strong {
+.step-rail-title {
+  margin: 0;
   font-size: 15px;
   font-weight: 600;
   color: var(--foreground);
 }
-.step-rail > li[aria-current="step"] strong {
+.step-rail > li[aria-current="step"] .step-rail-title {
   color: var(--primary);
 }
-.step-rail-text strong:focus {
+.step-rail-title:focus {
   outline: none;
 }
-.step-rail-text strong:focus-visible {
+.step-rail-title:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 2px;
 }
@@ -351,6 +352,8 @@
   color: var(--muted-foreground);
   cursor: not-allowed;
 }
+/* Functional progress, not decoration: it shows how much longer to hold, so it stays under
+   prefers-reduced-motion. */
 .hold-button-fill {
   position: absolute !important;
   inset: 0;
@@ -358,7 +361,9 @@
   transform-origin: left;
   background: color-mix(in srgb, var(--background) 30%, transparent);
 }
-.hold-button[data-state="holding"] .hold-button-fill {
+.hold-button[data-state="holding"] /* Functional progress, not decoration: it shows how much longer to hold, so it stays under
+   prefers-reduced-motion. */
+.hold-button-fill {
   transform: scaleX(1);
   transition: transform var(--confirm-ms, 1500ms) linear;
 }
@@ -412,7 +417,9 @@
   outline-offset: 1px;
 }
 .sentence-number {
+  position: relative;
   display: inline-flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
@@ -473,6 +480,27 @@ a.sentence-static {
 .sentence-row-word {
   align-self: center;
   color: var(--muted-foreground);
+}
+.sentence-row-text {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+/* Under the field on desktop so the sentence line does not jump; in the row on phone. */
+.sentence-hint {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 2px;
+  color: var(--warning);
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.sentence[data-phone] .sentence-hint {
+  position: static;
+  flex-basis: 100%;
+  margin-top: 0;
 }
 .sentence-row-controls {
   display: flex;

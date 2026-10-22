@@ -5,9 +5,9 @@ import { ArcGauge, arcAngle } from "@/components/primitives/arc-gauge";
 import { HealthRing, StabilityRing, announceThrottle } from "@/components/primitives/ring";
 import { CapacityBar } from "@/components/primitives/capacity-bar";
 import { StepRail } from "@/components/primitives/step-rail";
-import { HoldButton, holdController, isRealPress } from "@/components/primitives/hold-button";
-import { Sentence, phoneRows, type SentenceToken } from "@/components/primitives/sentence";
-import { wakeLockSupported } from "./wake-lock";
+import { HoldButton, endOnWindowRelease, holdController, isRealPress } from "@/components/primitives/hold-button";
+import { Sentence, numberHint, phoneRows, type SentenceToken } from "@/components/primitives/sentence";
+import { createWakeLock, wakeLockSupported } from "./wake-lock";
 
 const html = (el: Parameters<typeof renderToStaticMarkup>[0]) => renderToStaticMarkup(el);
 
@@ -104,6 +104,9 @@ describe("StepRail", () => {
     expect(out).toMatch(/<li[^>]*aria-current="step"[^>]*>.*Buffer 1/);
     expect(out).toMatch(/<li[^>]*data-done=""[^>]*>.*Choose probe/);
     expect(out.match(/aria-current/g)).toHaveLength(1);
+    // The focus target on desktop is the current step's heading.
+    expect(out).toMatch(/<h2[^>]*tabindex="-1"[^>]*>Buffer 1<\/h2>/);
+    expect(out.match(/tabindex="-1"/g)).toHaveLength(1);
   });
 
   test("compact rail shows bars and the current step heading", () => {
@@ -133,7 +136,7 @@ describe("holdController", () => {
     expect(hold.active()).toBe(false);
   });
 
-  test.each(["pointerup", "pointercancel", "lostpointercapture", "blur", "visibilitychange", "keyup", "unmount"] as const)(
+  test.each(["pointerup", "pointercancel", "lostpointercapture", "blur", "visibilitychange", "keyup", "unmount", "disabled"] as const)(
     "while-held stops once on %s",
     (reason) => {
       const { onStop, hold } = make("while-held");
@@ -146,6 +149,32 @@ describe("holdController", () => {
       expect(onStop).toHaveBeenCalledTimes(1);
     },
   );
+
+  test("becoming disabled ends an active hold with onStop exactly once", () => {
+    const { onStop, hold } = make("while-held");
+    hold.press();
+    hold.release("disabled");
+    expect(onStop).toHaveBeenCalledTimes(1);
+    expect(hold.active()).toBe(false);
+    hold.release("pointerup");
+    vi.advanceTimersByTime(60_000);
+    expect(onStop).toHaveBeenCalledTimes(1);
+  });
+
+  test("a release outside the button ends the hold when capture failed", () => {
+    const target = new EventTarget();
+    const end = vi.fn();
+    const stop = endOnWindowRelease(target, 7, end);
+    target.dispatchEvent(Object.assign(new Event("pointerup"), { pointerId: 3 }));
+    expect(end).not.toHaveBeenCalled();
+    target.dispatchEvent(Object.assign(new Event("pointercancel"), { pointerId: 7 }));
+    expect(end).toHaveBeenCalledWith("pointercancel");
+    target.dispatchEvent(Object.assign(new Event("pointerup"), { pointerId: 7 }));
+    expect(end).toHaveBeenLastCalledWith("pointerup");
+    stop();
+    target.dispatchEvent(Object.assign(new Event("pointerup"), { pointerId: 7 }));
+    expect(end).toHaveBeenCalledTimes(2);
+  });
 
   test("hold releases on visibility hidden", () => {
     const { onStart, onStop, hold } = make("while-held");
@@ -291,6 +320,25 @@ describe("Sentence", () => {
     expect(phone).toContain(">Tell<");
   });
 
+  test("phone keeps text-only parts as plain rows", () => {
+    const rows = phoneRows([...parts().slice(0, -1), "while lights are on", "."]);
+    expect(rows.at(-1)).toEqual({ text: "while lights are on", tokens: [] });
+    expect(rows).toHaveLength(6);
+    const out = html(
+      createElement(Sentence, { parts: [...parts().slice(0, -1), "while lights are on", "."], phone: true, ariaLabel: "Rule" }),
+    );
+    expect(out).toMatch(/<p class="sentence-row-text">while lights are on<\/p>/);
+  });
+
+  test("number out of range shows a hint", () => {
+    const limit = parts()[6] as Extract<SentenceToken, { kind: "number" }>;
+    expect(numberHint("30", limit)).toBeNull();
+    expect(numberHint("0", limit)).toBeNull();
+    expect(numberHint("130", limit)).toBe("Between 0 and 100 %");
+    expect(numberHint("", limit)).toBe("Between 0 and 100 %");
+    expect(numberHint("-1", { ...limit, unit: undefined })).toBe("Between 0 and 100");
+  });
+
   test("phone rows start at each word and drop rows without controls", () => {
     const rows = phoneRows(parts());
     expect(rows.map((r) => [r.text, r.tokens.map((t) => t.id)])).toEqual([
@@ -320,5 +368,56 @@ describe("wake lock", () => {
     expect(wakeLockSupported(undefined)).toBe(false);
     expect(wakeLockSupported({} as Navigator)).toBe(false);
     expect(wakeLockSupported({ wakeLock: { request: () => Promise.resolve() } } as unknown as Navigator)).toBe(true);
+  });
+
+  const fakeLock = () => {
+    const pending: ((s: { released: boolean; release: () => Promise<void> }) => void)[] = [];
+    const sentinels: { released: boolean; release: ReturnType<typeof vi.fn> }[] = [];
+    const request = vi.fn(
+      () =>
+        new Promise<{ released: boolean; release: () => Promise<void> }>((resolve) =>
+          pending.push(resolve),
+        ),
+    );
+    const grant = () => {
+      const s = { released: false, release: vi.fn(() => ((s.released = true), Promise.resolve())) };
+      sentinels.push(s);
+      pending.shift()!(s);
+    };
+    return { request, grant, sentinels };
+  };
+  const flush = () => new Promise((r) => setTimeout(r, 0));
+
+  test("a visibility change while a request is pending does not ask twice", async () => {
+    const lock = fakeLock();
+    const wake = createWakeLock(lock, () => true);
+    wake.acquire();
+    wake.acquire(); // visibilitychange while the first request is still pending
+    expect(lock.request).toHaveBeenCalledTimes(1);
+    lock.grant();
+    await flush();
+    wake.acquire(); // held and not released: nothing to do
+    expect(lock.request).toHaveBeenCalledTimes(1);
+    lock.sentinels[0].released = true; // the browser dropped it when the page hid
+    wake.acquire();
+    expect(lock.request).toHaveBeenCalledTimes(2);
+  });
+
+  test("a lock granted after deactivation is released at once", async () => {
+    const lock = fakeLock();
+    const wake = createWakeLock(lock, () => true);
+    wake.acquire();
+    wake.dispose();
+    lock.grant();
+    await flush();
+    expect(lock.sentinels[0].release).toHaveBeenCalledTimes(1);
+    wake.acquire();
+    expect(lock.request).toHaveBeenCalledTimes(1);
+  });
+
+  test("no request while the page is hidden", () => {
+    const lock = fakeLock();
+    createWakeLock(lock, () => false).acquire();
+    expect(lock.request).not.toHaveBeenCalled();
   });
 });
