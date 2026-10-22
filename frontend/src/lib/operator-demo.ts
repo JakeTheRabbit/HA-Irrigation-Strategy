@@ -34,6 +34,7 @@ import {
   resetDemoTargetWrites,
   settleDemoTargetWrite,
 } from "./parity-demo/targets";
+import { resetDemoTimers } from "./parity-demo/timers";
 import { sameValue } from "./utils";
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -66,8 +67,9 @@ export class OperatorDemo {
     private backend: DemoBackend = "3.18",
   ) {
     this.stockDemo = new StockDemo(getStates, updateStates);
-    // The demo Journal's own setpoint writes belong to this demo and its backend only.
+    // The demo Journal's own setpoint writes and timer programs belong to this demo and its backend only.
     resetDemoTargetWrites();
+    resetDemoTimers();
     this.whatsNewSeen =
       whatsNew === "unknown"
         ? null

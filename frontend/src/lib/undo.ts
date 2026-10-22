@@ -34,12 +34,17 @@ export class UndoError extends Error {
 
 /** Puts back the changes these Journal events record, newest first (event ids are ULIDs, so they
  * sort by time). Stops at the first refusal and throws an `UndoError` with its words and how many
- * were put back before it. Resolves only when the controller read every value back. */
-export async function revertEvents(controller: Pick<Controller, "operator">, eventIds: string[]): Promise<void> {
+ * were put back before it. Resolves, with each put-back's answer, only when the controller read every
+ * value back. */
+export async function revertEvents(
+  controller: Pick<Controller, "operator">,
+  eventIds: string[],
+): Promise<HistoryRevertResult[]> {
   const ids = [...eventIds].sort().reverse();
   const stop = (reason: string, reverted: number): never => {
     throw new UndoError(reverted ? `${reverted} of ${ids.length} put back: ${reason}` : reason, reverted, ids.length);
   };
+  const results: HistoryRevertResult[] = [];
   for (const [reverted, eventId] of ids.entries()) {
     const outcome = await callV2<HistoryRevertResult>(controller, "history_revert", { event_id: eventId });
     if (outcome.kind === "missing")
@@ -47,5 +52,7 @@ export async function revertEvents(controller: Pick<Controller, "operator">, eve
     else if (outcome.kind === "error") stop(outcome.message, reverted);
     else if (outcome.readback.status !== "verified")
       stop("The controller did not confirm the previous value. Reload and check it before trying again.", reverted);
+    else results.push(outcome.data);
   }
+  return results;
 }

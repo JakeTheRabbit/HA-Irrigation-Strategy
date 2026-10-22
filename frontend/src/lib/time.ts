@@ -77,6 +77,17 @@ export function lightsWindow(dayStartMs: number, onHHMM: string, offHHMM: string
   const nextDay = off.h * 60 + off.m <= on.h * 60 + on.m ? 1 : 0;
   return { on: zoned(y, m, d, on.h, on.m, tz), off: zoned(y, m, d + nextDay, off.h, off.m, tz) };
 }
+/** The zone's wall time at `ms` as a 24-hour "HH:MM" (a time field's value). */
+export function wallHhmm(ms: number, tz: string): string {
+  const { h, min } = wall(ms, tz);
+  return `${pad(h)}:${pad(min)}`;
+}
+/** The instant the zone's clock reads `hhmm` on the date holding `dayMs`. */
+export function wallInstant(dayMs: number, hhmmText: string, tz: string): number {
+  const { y, m, d } = wall(dayMs, tz);
+  const { h, m: min } = hhmm(hhmmText);
+  return zoned(y, m, d, h, min, tz);
+}
 /** The instants in [startMs, endMs) whose wall clock reads a whole hour divisible by `stepHours`
  * ("00:00", "02:00" …), on the zone's clock: half-hour and 45-minute zones and daylight-saving days
  * included (an hour the clock skips is left out, one it repeats counts once). */

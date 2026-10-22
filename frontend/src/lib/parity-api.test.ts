@@ -4,6 +4,7 @@ import { describe, expect, test, vi } from "vitest";
 import { NeedsIntegration } from "@/components/needs-integration";
 import { callV2, isMissingService, pagedQuery, PARITY_ACTIONS, PARITY_MIN_VERSION, useParity } from "./parity-api";
 import { parityDemo } from "./parity-demo";
+import { DEMO_TIMER_PROGRAM_ID } from "./parity-demo/journal";
 import { demoController, fakeController } from "./test-helpers";
 import type { CsEvent } from "./parity-types";
 
@@ -83,8 +84,15 @@ test("pagedQuery passes missing through", async () => {
 test("demo with backend=3.17 answers every parity action as missing", async () => {
   for (const a of PARITY_ACTIONS) expect((await callV2(demoController("?demo=1&backend=3.17"), a, {})).kind).toBe("missing");
 });
+// The timer writes and preview need a program the demo can check, as the integration does.
+const DAY_TIMER = { id: DEMO_TIMER_PROGRAM_ID, name: "Zone 3 day timer", type: "recycle", zones: [3], duration_s: 60, interval_min: 45, window: { kind: "lights_on" } };
+const ASKED: Partial<Record<string, Record<string, unknown>>> = {
+  timer_program_set: { expected_revision: 1, program: DAY_TIMER },
+  timer_program_preview: { program: DAY_TIMER },
+  timer_program_delete: { expected_revision: 1, id: DEMO_TIMER_PROGRAM_ID },
+};
 test("demo 3.18 answers every parity action ok", async () => {
-  for (const a of PARITY_ACTIONS) expect([a, (await callV2(demoController("?demo=1"), a, {})).kind]).toEqual([a, "ok"]);
+  for (const a of PARITY_ACTIONS) expect([a, (await callV2(demoController("?demo=1"), a, ASKED[a] ?? {})).kind]).toEqual([a, "ok"]);
 });
 test("demo 3.18 wraps an existing service in the envelope; 3.17 answers it v1", async () => {
   expect((await callV2(demoController("?demo=1"), "display_get", {})).kind).toBe("ok");
@@ -115,7 +123,12 @@ test("pump_stop and reads are never refused behind a write in flight", async () 
 test("preview: true skips the write lock only on the four previewable services", async () => {
   const c = demoController("?demo=1");
   const calls = [
-    callV2(c, "timer_program_set", { program: {}, expected_revision: 1 }),
+    // Room A's day timer saved as it is (the demo checks a program as the integration does).
+    callV2(c, "timer_program_set", {
+      room_id: "room:",
+      expected_revision: 1,
+      program: DAY_TIMER,
+    }),
     callV2(c, "pump_prime", { pump: "a", seconds: 10, preview: true }),
     callV2(c, "supply_save", { expected_revision: 1, preview: true }),
   ];

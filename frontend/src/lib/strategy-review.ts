@@ -269,7 +269,7 @@ export interface LastApply {
  * manual setpoint change of its key and zone since `since` from the value it had (`before`) to the
  * written one, never a put-back. A learner's or the AI's write of the same value is not this apply's.
  * A 3.17 integration has no Journal: the first call says so, or one call when only choices were
- * written (a choice has no setpoint event, so its 3.18 Undo refuses: no record). */
+ * written (a choice has no setpoint event; its Undo writes the previous choice back on either). */
 export async function appliedEventIds(
   controller: Pick<Controller, "operator">,
   roomId: string,
@@ -322,8 +322,9 @@ export async function appliedEventIds(
 
 /** Undo of the last apply. On 3.18 the Journal puts its `target.changed` events back
  * (`revertEvents`; its refusal is shown as it is). On 3.17 the previous values are written again
- * with read-back, but only while the controller still holds what was applied. Never falls back
- * from one to the other. */
+ * with read-back, but only while the controller still holds what was applied. A choice has no
+ * setpoint event, so on 3.18 too it is written back that way; a number never falls back from the
+ * Journal to a write. */
 export async function undoApply(
   last: LastApply,
   deps: {

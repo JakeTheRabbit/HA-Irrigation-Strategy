@@ -123,6 +123,8 @@ export interface HistoryRevertResult {
   reverted_event_id: string;
   new_event_id: string;
   readback: unknown;
+  /** A store put back: each program the change had deleted, back under a new id. */
+  renewed?: { name: string | null; old_id: string; id: string }[];
 }
 
 // supply_get / supply_save (backend Task 11)
@@ -179,6 +181,8 @@ export interface TimerProgram {
 export interface TimerProgramListItem extends TimerProgram {
   next_at: string | null;
   zones_in_timer_mode: number[];
+  /** Why its next shot could not be worked out; the other programs still list. */
+  error?: string | null;
 }
 export interface TimerPreview {
   preview: { zone: number; at: string; duration_s: number }[];

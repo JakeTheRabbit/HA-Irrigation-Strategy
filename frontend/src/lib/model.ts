@@ -1009,6 +1009,11 @@ export function validateChange(room: RoomView, states: States, change: Change): 
       ? null
       : "Choose Zone total or Per plant.";
   }
+  // What waters a zone (Timer programs) is not a target either: one of the select's own options.
+  if (room.zones.some((z) => change.entityId === `select.${ROOT}${room.room.prefix}zone_${z.id}_irrigation_mode`)) {
+    const options = states[change.entityId]?.attributes.options;
+    return Array.isArray(options) && options.includes(change.value) ? null : "Choose Steering, Timer or Off.";
+  }
   if (room.strategy.engaged && /^(number|select)[.]/.test(change.entityId))
     return "An active grow plan owns these targets. Disarm the plan before editing manual setpoints.";
   const hardware = discoverRooms(states).flatMap((r) => {
