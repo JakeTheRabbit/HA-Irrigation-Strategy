@@ -1,6 +1,6 @@
 """The feed EC watering compares pore EC with, in a real Home Assistant with the real controller: a
 measured feed EC probe first, then the EC the feed recipe in use today declares (saved through the real
-dosing_save, published on sensor.crop_steering_dosing_config), then 3.0.
+dosing_save, published on sensor.crop_steering_dosing_config), else unknown (None: no EC flush, CS-907).
 
 A declared value can't catch a mis-mixed tank, so a mapped probe always wins: a room upgraded from
 3.11.1 with its probe and its dosing store waters on the probe's reading exactly as before, and still
@@ -55,8 +55,8 @@ async def test_a_recipe_declared_ec_reaches_the_real_controller_without_a_probe(
     await _install(hass)  # a new room has a slug: the wizard's "Tent" is tent_
     _devices(hass)
     c, fake, _clock = controller_for()
-    # No probe and no declared EC: 3.0, as before.
-    assert set(_feed_ecs(c, fake, "tent_").values()) == {3.0}
+    # No probe and no declared EC: the feed is unknown (CTL-008; it used to be an invented 3.0).
+    assert set(_feed_ecs(c, fake, "tent_").values()) == {None}
 
     saved = await _call(
         hass,

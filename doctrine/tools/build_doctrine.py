@@ -356,16 +356,19 @@ def engine_facts(doc, paths):
         ("CT-4", "Relative dryback the engine compares: (peak - vwc) / peak x 100. The peak restarts at the lights-on reading when the zone enters P0 and then follows the highest reading of the grow-day, so in P0 the figure is the drop since lights-on and later in the day it is the drop from the day's peak.",
          '(st["peak"] - vwc) / st["peak"] * 100' in ctrl and 'if vwc > st["peak"]:' in ctrl
          and 'st["daily_vol"], st["shots"], st["peak"] = 0.0, 0, snap.vwc' in ctrl),
-        ("CT-5", "Dead or set-aside probe: after a 15 min grace the zone copies the healthiest sibling's shot (closest p1_target) or, with no sibling, waters every blind_fallback_min (default 90) within its own budget; VWC-driven phase changes wait; the lights' edges, the P0 maximum wait (p0_max_wait_min) and the P1 maximum shots still move it.",
+        ("CT-5", "Dead or set-aside probe: after a 15 min grace the zone copies the healthiest sibling's shot (closest p1_target) or, with no sibling, waters every blind_fallback_min (default 90) in P1 and P2 with the lights on, within its own budget; the minimum daily floor (CT-9) needs no probe and waters it too, with the lights on and past P0, when no other shot fires; VWC-driven phase changes wait; the lights' edges, the P0 maximum wait (p0_max_wait_min) and the P1 maximum shots still move it.",
          "BLIND_GRACE_MIN = 15" in ctrl and 'o.get("blind_fallback_min", 90)' in ctrl
+         and '"(no live probe)", "min_daily"' in ctrl
          and 'st["phase"] == "P0" and waited >= p.p0_max_wait_min' in ctrl
          and 'st["phase"] == "P1" and st["shots"] >= p.p1_max_shots' in ctrl),
         ("CT-6", "Source-water gate, two halves (feed EC, feed pH), each only when its feed sensor is configured and its band is set (feed sensors default to empty): a feed outside its band holds the zone; a dead feed probe holds after feed_grace_min (default 30). External holds apply only when configured (none by default). Offline pump or valve switches hold too.",
          'o.get("feed_grace_min", 30)' in ctrl and "holding (fail-closed)" in ctrl
          and "if room.feed_ec_sensor:" in ctrl and "if room.feed_ph_sensor:" in ctrl and "if lo > 0 or hi > 0:" in ctrl),
         ("CT-7", "SIGTERM closes whatever is in flight, saves state and exits.", "signal.SIGTERM" in ctrl),
-        ("CT-8", f"With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller uses declared recipe EC when available, otherwise hands decide() an assumed feed EC of {core.ZoneSnapshot.__dataclass_fields__['feed_ec'].default:.1f} mS/cm, not a measurement, for the dilution comparison. Recipe EC and fallback EC are not measurements.",
-         "feed_ec=(feed_ec if feed_ec is not None else 3.0)" in ctrl and core.ZoneSnapshot.__dataclass_fields__["feed_ec"].default == 3.0),
+        ("CT-8", "With no live feed EC reading (no feed EC sensor, or its last good reading older than feed_grace_min) the controller uses declared recipe EC when available, otherwise hands decide() no feed EC: the feed is unknown, so decide() takes no EC flush or dilute and no feed-not-dilutive hold (CS-206) and waters the zone on its moisture. Recipe EC is not a measurement.",
+         "feed_ec=feed_ec," in ctrl and "else 3.0" not in ctrl
+         and run({"ec": 10.0, "feed_ec": None})[4].kind not in ("flush_high_ec", "block_high_ec")
+         and run({"ec": 10.0, "feed_ec": None, "vwc": 40})[4].kind == "p2_topup"),
         ("CT-9", "The minimum daily floor is each zone's Min Daily Water Per Plant setting (min_daily_ml_per_plant, mL per plant per grow-day; an integration older than the setting has only the hand-made helper of the same name, read in its place) times the zone's plant count, defaulting to 0: a fresh install runs with the floor off. Its VWC ceiling is field capacity plus a margin, inside 50-100.",
          re.search(r'"min_daily_ml_per_plant",\s*self\._num\(f"[^"]*zone_\{zone\}_min_daily_ml_per_plant", 0\.0\)', ctrl) is not None
          and 'min_daily_key = f"zone_{zone_num}_min_daily_ml_per_plant"' in nums

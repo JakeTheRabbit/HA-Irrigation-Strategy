@@ -32,6 +32,7 @@ import time
 import uuid
 from datetime import date, datetime, timedelta, timezone
 from email.utils import parsedate_to_datetime
+from types import SimpleNamespace
 
 import requests
 import auto_setpoints
@@ -72,7 +73,7 @@ from crop_steering_engine import (
     zone_status_label,
     settled_reading,
 )
-from crop_steering_engine.core import SETTLED_VWC_MIN, ec_flush_goal, p1_stall, p1_stall_rewater
+from crop_steering_engine.core import SETTLED_VWC_MIN, ec_flush_goal, floor_share, p1_stall, p1_stall_rewater
 # What _zone_num falls back to when neither the zone's nor the room's setting can be read: the
 # controller column of the one defaults table, pinned to the values installed controllers use.
 from crop_steering_engine.defaults import CONTROLLER_FALLBACKS as FALLBACK
@@ -2447,6 +2448,25 @@ class Controller:
             return None
         return ec if 0.1 <= ec <= 10 else None
 
+    def _watch_feed_known(self, room):
+        """CS-907, raised once: a room with no feed EC probe and no recipe feed EC has an unknown feed, and decide()
+        takes no EC flush on a feed it never measured. The card comes down when either appears."""
+        key = f"feed_unknown_{room.slug}"
+        if not room.zones or room.feed_ec_sensor or self._recipe_feed_ec(room) is not None:
+            self._dismiss(key)
+        elif key not in self._alerted:
+            self._alert(
+                key,
+                "CS-907",
+                "EC flushing is off: the feed EC is unknown",
+                "EC flushing is off in this room: set a recipe feed EC or map a feed EC probe. The room has no "
+                "feed EC probe and its feed recipe declares no EC, so the controller cannot tell whether the feed "
+                "can lower the pore EC. Zones are watered on their moisture only, with no EC flush and no hold "
+                "for a high EC.",
+                room=room,
+                quiet=False,
+            )
+
     def _read_feed_ph(self, room):
         if not room.feed_ph_sensor:
             return None
@@ -2794,7 +2814,7 @@ class Controller:
             feed_ec = room._feed_last_good_value
         else:
             feed_ec = None
-        if feed_ec is None:  # measured first, then the feed recipe's declared EC, then 3.0
+        if feed_ec is None:  # measured first, then the feed recipe's declared EC, else unknown (None)
             feed_ec = self._recipe_feed_ec(room)
         new_grow_day = self._new_grow_day(room, st, now, lights_on)
         snap = ZoneSnapshot(
@@ -2822,7 +2842,7 @@ class Controller:
             # the min-daily floor's clock: it is paced from lights-on (core.floor_share)
             hours_since_lights_on=(24.0 - self._hours_to(now, room.lights_on_hour)) % 24.0,
             uptime_min=(now - self._start).total_seconds() / 60.0,
-            feed_ec=(feed_ec if feed_ec is not None else 3.0),
+            feed_ec=feed_ec,
             new_grow_day=new_grow_day,
             # the P1 rule (core.decide): reached the target, the peak before the last shot, shots since reaching it
             p1_reached=bool(st.get("p1_reached")),
@@ -6442,6 +6462,8 @@ class Controller:
             if rescue and snap is not None and st.get("last_shot") is not was:
                 safety_ops.rescue_fired(st, snap.vwc, now)
                 self._save_state()
+            if st.get("last_shot") is not was:  # the kind of the zone's last delivered shot (blind copy gate)
+                room.__dict__.setdefault("_last_shot_kind", {})[zone] = getattr(reason, "kind", None)
             # A test or manual shot cut to the longest shot is not one of CS-312's run (it resets it, as before).
             self._count_capped(room, zone, raw_dur > max_dur and not test)
         else:
@@ -7294,6 +7316,7 @@ class Controller:
                 brain_bridge.lights_on(self, room, now)
             except Exception as e:
                 log("brain lights-on error", room.slug, e)
+        self._watch_feed_known(room)
         snaps, decisions, healthy, blind, params = {}, {}, [], [], {}
         for zone in room.zones:
             st = room.state[zone]
@@ -7456,13 +7479,22 @@ class Controller:
                 sib = pick_sibling(p.p1_target, healthy)
                 s_fire, s_size, s_reason = decisions[sib]
                 rescue = getattr(s_reason, "kind", None) in PLAN_HOLD_EXEMPT
-                decisions[zone] = (s_fire, s_size, Reason(f"COPY Z{sib} (VWC probe dead)",
-                                                          "blind_copy_rescue" if rescue else "blind_copy"))
+                mss = self._minutes_since_shot(st, now)
+                floor_last = room.__dict__.get("_last_shot_kind", {}).get(zone) == "min_daily"
+                if s_fire and not rescue and floor_last and mss < p.p2_min_interval_min:
+                    # only after this zone's own floor shot (below): no routine copy lands minutes after it.
+                    # Every other copy follows the sibling exactly, its ramp and EC shots included.
+                    decisions[zone] = (False, 0.0, Reason(
+                        f"COPY Z{sib} waits: last shot {mss:.0f}/{p.p2_min_interval_min:.0f} min ago", "blind_copy"))
+                else:
+                    decisions[zone] = (s_fire, s_size, Reason(f"COPY Z{sib} (VWC probe dead)",
+                                                              "blind_copy_rescue" if rescue else "blind_copy"))
                 plan = (
                     "Until the reading is normal again, this zone gets the same shots as "
                     f"{self._zone_title(room, sib)}, which has a good probe."
                 )
             else:
+                sib = None
                 mss = self._minutes_since_shot(st, now)
                 # Only in the day's watering phases: a timer cannot tell a P3 rescue from overwatering.
                 decisions[zone] = (
@@ -7475,6 +7507,22 @@ class Controller:
                     f"{int(self.blind_fallback_min)} min in P1 and P2 while the lights and the kill switch are "
                     "on, inside its daily water limit. Phase changes that use the moisture reading wait for the probe."
                 )
+            # The minimum daily water needs no probe (decide()'s floor, paced by floor_share): a blind zone behind it
+            # gets it too, with the lights on and past P0, when no other shot fires. Every shot counts toward it.
+            # Never into a table that is not draining (CS-310), the zone's or, in copy mode, its sibling's.
+            backed_up = getattr(room, "_backed_up", None) or {}
+            floor_due = p.min_daily_volume * floor_share(SimpleNamespace(
+                hours_since_lights_on=(24.0 - self._hours_to(now, room.lights_on_hour)) % 24.0,
+                hours_to_lights_off=self._hours_to(now, room.lights_off_hour)), p)
+            if (not decisions[zone][0] and p.min_daily_volume > 0 and lights_on and st["phase"] != "P0"
+                    and zone not in backed_up and sib not in backed_up
+                    and st["daily_vol"] < floor_due and mss >= p.p2_min_interval_min):
+                decisions[zone] = (True, p.p2_shot_size, Reason(
+                    f"MIN-DAILY floor {st['daily_vol']:.1f}<{floor_due:.1f} of {p.min_daily_volume:.1f}L "
+                    "(no live probe)", "min_daily"))
+            if p.min_daily_volume > 0:
+                plan += (f" With the lights on, after P0, it also gets its daily minimum of {p.min_daily_volume:g} L "
+                         "in shots spread over the day.")
             # Re-alert each tick — _alert's 30-min debounce throttles it to a repeating
             # reminder so a dead probe can't sit unnoticed (the silent-freeze lesson). Why it
             # is unusable is read every tick, so a changed cause replaces the card's diagnosis.

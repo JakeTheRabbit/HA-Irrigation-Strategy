@@ -190,7 +190,8 @@ class ZoneSnapshot:
     hours_to_lights_on: float
     hours_to_lights_off: float
     uptime_min: float
-    feed_ec: float = 3.0          # source-water (tank) EC — for the anti-lockout dilutive-flush test
+    feed_ec: float | None = 3.0   # source-water (tank) EC — for the anti-lockout dilutive-flush test; None = unknown
+    #                               (never measured): no rule reasons about the feed, so no EC flush and no CS-206 hold
     new_grow_day: bool = False    # wall-clock fallback: True when in the lights-on window AND the daily
     #                               budget has NOT yet been reset for THIS grow-day (photoperiod).
     ec_settled: float | None = None  # pore EC read >= EC_SETTLE_MIN after the last shot (or the last such
@@ -465,13 +466,15 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     # flushes (anti-lockout, P2 rescue) also need the reading under field capacity - 2, so that a probe reading
     # above that setpoint cannot run them outside the budget for ever (observed on a production room, 5 Oct 2026: a
     # zone read 70 against a field capacity of 54, and that test had stopped every flush while its pore EC sat at 7).
-    dilutive = ec_known and s.feed_ec < ec and not s.backed_up
+    feed_known = s.feed_ec is not None and math.isfinite(s.feed_ec)
+    dilutive = ec_known and feed_known and s.feed_ec < ec and not s.backed_up
     flush_ok = dilutive and s.vwc < p.field_capacity - 2.0
 
     # PRIORITY 1 — ANTI-LOCKOUT: high pore EC FLUSHES in ANY phase, never locks out. While steering is held
     # the flush waits too (it steers to max_ec, a setpoint the plan manages); the blocks below still apply.
     # A slab that reads full gets no anti-lockout flush; the capped corrections below still flush it.
-    if ec_known and ec >= p.max_ec and (flush_ok or not dilutive):
+    # A feed never measured neither flushes nor holds: the zone is watered on its moisture (noted in the reason).
+    if ec_known and ec >= p.max_ec and (flush_ok or not dilutive) and (feed_known or s.backed_up):
         if not dilutive:
             why = "table not draining" if s.backed_up else "feed not dilutive"
             reason = treason + (" | " if treason else "") + f"BLOCK high EC {ec:.1f} — {why} (self-clears)"
@@ -593,6 +596,8 @@ def decide(s: ZoneSnapshot, p: ZoneParams):
     reason = treason + (" | " if (treason and ir) else "") + ir
     if not ec_known:
         reason += (" | " if reason else "") + "EC unknown: base VWC watering; salt protection unverified"
+    elif not feed_known and ec >= p.max_ec:
+        reason += (" | " if reason else "") + f"high EC {ec:.1f} not flushed: feed EC unknown"
     return phase, round(p2_thr, 1), fire, round(size, 1), Reason(reason, kind, fire and CAP_EXEMPT.get(kind, False))
 
 

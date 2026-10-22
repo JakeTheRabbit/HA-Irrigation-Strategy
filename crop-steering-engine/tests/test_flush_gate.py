@@ -85,3 +85,24 @@ def test_settled_ec_still_paces_the_dilute():
 def test_feed_saltier_than_the_slab_never_flushes():
     _, _, fire, _, reason = decide(snap(feed_ec=7.5), Z2())
     assert not (fire and reason.kind in ("p2_dilute", "p2_rescue", "flush_high_ec"))
+
+
+def test_a_feed_never_measured_neither_flushes_nor_holds():
+    # CTL-008: no feed EC sensor, no recent reading, no recipe EC. The feed is unknown, so no EC rule may reason
+    # about it: no dilute, no rescue, no anti-lockout flush, and no "feed not dilutive" hold (CS-206). The zone is
+    # watered on its moisture alone, and the reason says why the high EC is not flushed.
+    for kw in (dict(vwc=70.7), dict(vwc=50.0), dict(ec=7.6, ec_settled=7.6, vwc=50.0), dict(ec=8.9, ec_settled=8.9),
+               dict(ec=8.9, ec_settled=8.9, vwc=50.0)):
+        _, _, fire, _, reason = decide(snap(feed_ec=None, **kw), Z2())
+        assert reason.kind not in ("p2_dilute", "p2_rescue", "flush_high_ec", "block_high_ec", "hold_high_ec")
+    _, _, fire, _, reason = decide(snap(feed_ec=None, ec=8.9, ec_settled=8.9, vwc=20.0), Z2())
+    assert fire is True and reason.kind == "p2_topup" and "feed EC unknown" in reason
+    # P0's EC flush needs a known feed too
+    p0 = dict(phase="P0", feed_ec=None, ec=7.1, ec_settled=7.1, phase_minutes=10, hours_since_lights_on=0.2)
+    _, _, fire, _, reason = decide(snap(**p0), Z2())
+    assert not fire and reason.kind != "p0_ec_flush"
+
+
+def test_a_table_not_draining_is_still_held_with_the_feed_unknown():
+    _, _, fire, _, reason = decide(snap(feed_ec=None, ec=8.9, ec_settled=8.9, vwc=50.0, backed_up=True), Z2())
+    assert fire is False and reason.kind == "block_high_ec" and "table not draining" in reason

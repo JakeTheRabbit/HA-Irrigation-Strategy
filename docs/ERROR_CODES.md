@@ -122,6 +122,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-904](#cs-904) | Tank above full mark | Warning | Notification |
 | [CS-905](#cs-905) | Estimated tank level low | Warning | Notification |
 | [CS-906](#cs-906) | Batch tank low | Information | Notification |
+| [CS-907](#cs-907) | EC flushing off, feed EC unknown | Warning | Notification |
 
 ## Probes (CS-1xx)
 
@@ -2120,3 +2121,23 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 
 - Refill the tank by hand, or make a batch.
 - To stop the reminders, set the refill reminder to 0% in the dosing setup.
+
+<a id="cs-907"></a>
+
+### CS-907: EC flushing off, feed EC unknown
+
+*Warning · Notification*
+
+**What it means.** The room has no feed EC probe, and the feed recipe in use declares no feed EC. The controller does not know the EC of the feed water.
+
+**Effect on water.** The zones get water on their VWC only. The controller does not flush high pore EC and does not hold a zone for high EC, because it cannot tell if the feed can decrease the pore EC. The alert comes once and goes when the room gets a feed EC.
+
+**Probable causes**
+
+- No feed EC probe is set for the room in the controller app options (feed_ec_sensor).
+- The feed recipe in use has no EC, or the room has no dosing setup.
+
+**What to do**
+
+- CAUTION: Do not ignore this alert for many days. Salt can build up in the substrate when the controller cannot flush.
+- Set the feed EC on the feed recipe in use (Crop Steering → Dosing), or set a feed EC probe in the controller app options.
