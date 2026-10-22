@@ -486,6 +486,26 @@ def test_stopping_the_app_mid_shot_closes_that_shot_and_counts_the_water_already
     assert counted_for_30_s(on_disk["1"]["daily_vol"]) and "_shot_inflight" not in on_disk
 
 
+def test_an_error_mid_shot_closes_the_shot_and_counts_the_water_already_given(rig, monkeypatch):
+    # CTL-005: an error 40 s into a 120 s shot closed the hardware but counted nothing, so the daily cap
+    # and the minimum interval did not see the water at the next pass.
+    c, fake, clock = rig
+
+    def wait(room, zone, duration_s, started=None):
+        clock.sleep(40)
+        raise RuntimeError("boom")
+
+    monkeypatch.setattr(c, "_wait_shot", wait)
+    c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=0.05)
+    assert {e: fake.states[e][0] for e in ("switch.v1", "switch.m", "switch.p")} == dict.fromkeys(
+        ("switch.v1", "switch.m", "switch.p"), "off")
+    st = c.rooms[0].state[1]
+    assert st["daily_vol"] == pytest.approx(0.05 * 120 / 3) and st["shots"] == 1
+    assert c.rooms[0].hardware_fault is None and c.rooms[0].shot_inflight is None
+    on_disk = saved(c)["default"]
+    assert on_disk["1"]["daily_vol"] == pytest.approx(2.0) and "_shot_inflight" not in on_disk
+
+
 def test_stopping_the_app_with_no_shot_in_flight_switches_nothing_off(rig):
     # The tank circulating to heat: pump and manifold relay ON, and no shot of the controller's running.
     c, fake, _ = rig
