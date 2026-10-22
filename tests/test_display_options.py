@@ -43,12 +43,12 @@ def test_values_are_checked():
             clean_option(key, value)
 
 
-def test_old_store_reads_units_as_mS_C_L_24():
+def test_old_store_reads_units_as_mS_C_auto_24():
     old = from_store({"revision": 2, "options": {"show_climate": True}})
     assert old["options"] == {"show_climate": True}
     shown = {**defaults(), **old["options"]}
     assert (shown["ec_unit"], shown["temp_unit"]) == ("mS/cm", "C")
-    assert (shown["volume_unit"], shown["clock"]) == ("L", 24)
+    assert (shown["volume_unit"], shown["clock"]) == ("auto", 24)
 
 
 def test_save_refuses_an_unknown_unit():
@@ -67,6 +67,7 @@ def test_save_refuses_an_unknown_unit():
         ("ec_unit", "ppm700"),
         ("temp_unit", "F"),
         ("volume_unit", "gal"),
+        ("volume_unit", "auto"),
         ("clock", 12),
     ):
         assert clean_option(key, value) == value

@@ -42,7 +42,8 @@ OPTIONS: dict[str, dict] = {
     # Units and clock: display only, per room. Storage and the API stay canonical.
     "ec_unit": {"default": "mS/cm", "choices": ("mS/cm", "ppm500", "ppm700")},
     "temp_unit": {"default": "C", "choices": ("C", "F")},
-    "volume_unit": {"default": "L", "choices": ("L", "gal")},
+    # "auto" follows Home Assistant's unit system, as the dashboard does today.
+    "volume_unit": {"default": "auto", "choices": ("auto", "L", "gal")},
     "clock": {"default": 24, "choices": (12, 24)},
 }
 

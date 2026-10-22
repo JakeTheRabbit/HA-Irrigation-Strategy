@@ -33,7 +33,7 @@ async def _call(hass, service, user=None, room=ROOM, **data):
 
 
 def test_every_option_defaults_to_the_dashboard_as_it_was():
-    units = {"ec_unit": "mS/cm", "temp_unit": "C", "volume_unit": "L", "clock": 24}
+    units = {"ec_unit": "mS/cm", "temp_unit": "C", "volume_unit": "auto", "clock": 24}
     assert defaults() == {
         key: units.get(key, "cards" if key == "today_zone_layout" else False)
         for key in OPTIONS
