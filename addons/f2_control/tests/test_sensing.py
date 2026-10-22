@@ -119,7 +119,7 @@ def _p2(vwcs, start=datetime(2026, 9, 23, 12, 0), shot_at=None):
 def test_next_irrigation_is_unknown_with_a_reason_when_the_controller_has_no_estimate():
     _, _, seen = _p2([55, 55, 55, 55])  # steady: no falling VWC, no estimate
     state, attrs = seen[-1][0]
-    assert state == "unknown" and attrs["reason"] and attrs["estimated_at"] is None
+    assert state == "unknown" and attrs["reason"]
 
 
 def test_a_stale_zero_is_replaced_by_unknown_after_the_shot():
@@ -138,7 +138,7 @@ def test_a_stale_zero_is_replaced_by_unknown_after_the_shot():
     assert state == "unknown" and "shot" in attrs["reason"]
 
 
-def test_a_new_estimate_carries_when_it_was_made():
+def test_a_falling_zone_publishes_a_number_and_no_estimated_at():
     now = datetime(2026, 9, 23, 12, 0)
     c, fake = _room()
     c.rooms[0].state[1]["phase"] = "P2"
@@ -146,8 +146,38 @@ def test_a_new_estimate_carries_when_it_was_made():
         fake.set_state("sensor.crop_steering_vwc_zone_1", str(v))
         c.loop_once(now + timedelta(minutes=i))
     state, attrs = fake.sets[NEXT]
-    assert isinstance(state, float) and state > 0 and "reason" not in attrs
-    assert attrs["estimated_at"] == (now + timedelta(minutes=3)).astimezone().isoformat(timespec="seconds")
+    assert isinstance(state, float) and state > 0 and "reason" not in attrs and "estimated_at" not in attrs
+
+
+def test_the_rate_is_known_after_three_post_shot_readings_though_the_window_spans_the_shot():
+    c, fake = _room()
+    st = c.rooms[0].state[1]
+    st["phase"] = "P2"
+    t0 = datetime(2026, 9, 23, 12, 0)
+    for i in range(30):  # a full 30-reading window before the shot
+        fake.set_state("sensor.crop_steering_vwc_zone_1", "50")
+        c.loop_once(t0 + timedelta(minutes=i))
+    shot = t0 + timedelta(minutes=29, seconds=30)
+    st["last_shot"] = shot
+    rates = []
+    for i, v in enumerate([62, 61.9, 61.8, 61.7]):
+        fake.set_state("sensor.crop_steering_vwc_zone_1", str(v))
+        c.loop_once(t0 + timedelta(minutes=30 + i))
+        rates.append(fake.sets[DRYBACK][1]["rate_points_per_h"])
+    assert rates[:2] == [None, None] and rates[2] == pytest.approx(0.2 * 30, rel=0.01)  # 0.2 points in 2 min
+    assert rates[3] is not None and rates[3] > 0
+
+
+def test_the_reason_does_not_say_shot_when_the_last_shot_is_only_the_switch_on_anchor():
+    c, fake = _room()
+    st = c.rooms[0].state[1]
+    st["phase"] = "P2"
+    st["last_shot_is_anchor"] = True
+    t0 = datetime(2026, 9, 23, 12, 0)
+    st["last_shot"] = t0
+    fake.set_state("sensor.crop_steering_vwc_zone_1", "55")
+    c.loop_once(t0 + timedelta(minutes=1))
+    assert "shot" not in fake.sets[NEXT][1]["reason"]
 
 
 def test_the_dryback_rate_is_null_when_there_is_no_rate_and_a_number_when_steady():

@@ -51,13 +51,18 @@ def dryback(peak, vwc, rate, minutes_since_shot):
     }
 
 
-def rate_known(window, last_shot):
-    """Whether the zone's recent readings give a dryback rate: three or more, all taken after its last shot (a window
-    that holds the shot's rise measures the shot, not the drying)."""
-    return len(window) >= 3 and (last_shot is None or window[0][0] > last_shot)
+def post_shot_rate(window, last_shot):
+    """The zone's dryback rate in VWC points an hour from its readings taken after its last shot, or None until
+    there are three (the window is not cleared on a shot, and a window holding the shot's rise measures the shot,
+    not the drying). Never negative, as the snapshot's rate."""
+    pts = [(t, v) for t, v in window if last_shot is None or t > last_shot]
+    if len(pts) < 3:
+        return None
+    dt_h = (pts[-1][0] - pts[0][0]).total_seconds() / 3600.0
+    return max(0.0, (pts[0][1] - pts[-1][1]) / dt_h) if dt_h > 0 else None
 
 
-def next_irrigation(phase, vwc, threshold, rate, known, after_shot):
+def next_irrigation(phase, vwc, threshold, rate, after_shot):
     """(hours, reason) to the zone's next P2 top-up: hours is None, with the reason, whenever the controller has no
     current estimate. 0.0 = due now."""
     if vwc is None:
@@ -66,10 +71,10 @@ def next_irrigation(phase, vwc, threshold, rate, known, after_shot):
         return None, "the controller estimates the next shot only in P2"
     if vwc <= threshold:
         return 0.0, None
-    if not known:
+    if rate is None:
         return None, ("no dryback rate yet since the last shot" if after_shot
                       else "no dryback rate yet")
-    if not rate or rate <= 0:
+    if rate <= 0:
         return None, "VWC is not falling, so there is no time to the next shot"
     return round(min((vwc - threshold) / rate, 48.0), 2), None
 

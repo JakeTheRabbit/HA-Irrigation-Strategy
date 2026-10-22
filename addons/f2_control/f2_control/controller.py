@@ -7139,10 +7139,10 @@ class Controller:
             # 0 = due now, None elsewhere. Drives the dashboard's "next" on the frequency card.
             pz = params[zone]
             zst = room.state[zone]
-            known = sensing.rate_known(zst["win"], zst["last_shot"])
+            rate = sensing.post_shot_rate(zst["win"], zst["last_shot"])
             next_h, next_reason = sensing.next_irrigation(
                 zst["phase"], snap.vwc if snap else None, pz.p2_threshold,
-                snap.dryback_rate if snap else None, known, zst["last_shot"] is not None,
+                rate, zst["last_shot"] is not None and not zst.get("last_shot_is_anchor"),
             )
             pub[zone] = {
                 "phase": room.state[zone]["phase"],
@@ -7158,7 +7158,7 @@ class Controller:
                 "next_h": next_h,
                 "next_reason": next_reason,
                 # the zone's live dryback (sensing.dryback): the numbers decide() used this pass
-                "dryback": (snap.peak_vwc, snap.vwc, snap.dryback_rate if known else None,
+                "dryback": (snap.peak_vwc, snap.vwc, rate,
                             snap.minutes_since_shot) if snap else None,
             }
         for z, why in cross_zone_outliers(snaps):
@@ -7417,8 +7417,7 @@ class Controller:
                     },
                 )
                 # Estimated hours to the next P2 shot (drives the dashboard "next"). Always published: "unknown" with
-                # the reason when the controller has no current estimate, so an old one never stands; estimated_at
-                # is when this estimate was made, so a fresh one differs from a stale one.
+                # the reason when the controller has no current estimate, so an old one never stands.
                 nh = d.get("next_h")
                 ha_set(
                     f"sensor.crop_steering_{px}prediction_zone_{zone}_next_irrigation_hours",
@@ -7427,7 +7426,6 @@ class Controller:
                         "unit_of_measurement": "h",
                         "friendly_name": f"Zone {zone} next irrigation",
                         "engine": PRODUCT,
-                        "estimated_at": None if nh is None else now.astimezone().isoformat(timespec="seconds"),
                         **({"reason": d.get("next_reason")} if nh is None else {}),
                     },
                 )
