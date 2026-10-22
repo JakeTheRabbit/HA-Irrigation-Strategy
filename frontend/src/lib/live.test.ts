@@ -532,6 +532,7 @@ describe("inside Home Assistant", () => {
       statistic_ids: [WATER],
       period: "hour",
       types: ["state"],
+      units: { volume: "L" },
     });
     expect(home.calls).toEqual([]);
     store.stop();

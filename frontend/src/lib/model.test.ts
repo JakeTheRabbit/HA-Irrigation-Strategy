@@ -6,6 +6,7 @@ import {
   roomSlug,
   runningVersions,
   validateChange,
+  waterLitres,
 } from "./model";
 import { applyChanges, HaClient } from "./client";
 import { createDemo, demoHistory } from "./demo";
@@ -578,5 +579,16 @@ describe("water today units", () => {
   it("keeps litres when the entity names no unit, and shows nothing for a unit it cannot convert", () => {
     expect(roomWith(undefined, "10").zones[0].water.value).toBe(10);
     expect(roomWith("bushels", "10").zones[0].water.value).toBeNull();
+  });
+});
+
+describe("waterLitres", () => {
+  it("reads a live counter in litres from its own unit", () => {
+    const at = (state: string, unit?: string) =>
+      entity("sensor.w", state, unit ? { unit_of_measurement: unit } : {});
+    expect(waterLitres(at("2", "gal"))).toBeCloseTo(7.570823568);
+    expect(waterLitres(at("5", "L"))).toBe(5);
+    expect(waterLitres(at("unavailable", "L"))).toBeNull();
+    expect(waterLitres(undefined)).toBeNull();
   });
 });

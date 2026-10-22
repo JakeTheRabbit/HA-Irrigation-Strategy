@@ -285,8 +285,11 @@ function metric(entity: EntityState | undefined, label: string, unit: string): M
 /** A zone's water today in litres, from whatever volume unit the entity reports (Home Assistant can
  * display the integration's sensor in gallons); a unit it cannot convert reads as unavailable. */
 function waterToday(entity: EntityState | undefined): Metric {
-  const read = metric(entity, "Water today", "");
-  return { ...read, unit: "L", value: volumeToLitres(read.value, read.unit) };
+  return { ...metric(entity, "Water today", ""), unit: "L", value: waterLitres(entity) };
+}
+/** A water counter's reading in litres, whatever unit its entity reports; null when unreadable. */
+export function waterLitres(entity: EntityState | undefined): number | null {
+  return volumeToLitres(numeric(entity), String(entity?.attributes?.unit_of_measurement ?? ""));
 }
 function telemetryIssue(
   entity: EntityState | undefined,
