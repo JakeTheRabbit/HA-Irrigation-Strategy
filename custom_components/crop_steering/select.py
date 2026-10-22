@@ -321,6 +321,13 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
     async def async_select_option(self, option: str) -> None:
         """Change the selected option."""
         if option in self.options:
+            # A recipe stage is applied first: the select shows it only once its setpoints
+            # are written, and a refused stage (ServiceValidationError) leaves it unchanged.
+            if self.entity_description.key == "recipe_stage":
+                mgr = get_manager(self.hass, self._entry)
+                if mgr is not None:
+                    await mgr.async_apply(option)
+                    option = mgr.active_stage
             self._attr_current_option = option
             self._since = dt_util.utcnow().isoformat()
             self.async_write_ha_state()
@@ -335,11 +342,6 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
                         "forced": True,
                     },
                 )
-            # Selecting a recipe stage applies its setpoints to the zone numbers.
-            elif self.entity_description.key == "recipe_stage":
-                mgr = get_manager(self.hass, self._entry)
-                if mgr is not None:
-                    await mgr.async_apply(option)
 
     @property
     def extra_state_attributes(self):
