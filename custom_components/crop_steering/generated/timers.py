@@ -90,7 +90,9 @@ def _window(w: dict, lights: tuple[float, float]) -> tuple[float, float]:
     return a, (b - a) % 1440 or 1440.0
 
 
-def project(program: dict, lights: tuple[float, float], start: datetime, end: datetime) -> list[PlannedIntent]:
+def project(
+    program: dict, lights: tuple[float, float], start: datetime, end: datetime
+) -> list[PlannedIntent]:
     p = validate(program)
     if not p["active"]:
         return []
@@ -120,7 +122,9 @@ def project(program: dict, lights: tuple[float, float], start: datetime, end: da
             offsets.append(t)
             t += p["interval_min"]
     else:
-        offsets = [i * length / p["frequency_per_day"] for i in range(p["frequency_per_day"])]
+        offsets = [
+            i * length / p["frequency_per_day"] for i in range(p["frequency_per_day"])
+        ]
 
     day = start.date() - timedelta(days=1)
     while day <= end.date():
