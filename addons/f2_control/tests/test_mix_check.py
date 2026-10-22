@@ -150,3 +150,23 @@ def test_a_dosing_state_file_from_before_the_mix_check_loads_and_doses(rig):
     r.c.dosing = r.runner = again
     assert again.recover()
     assert _batch(r, by=None)["handled_result"] == "finished"
+
+
+@pytest.mark.parametrize("only_band", [False, True])
+def test_a_batch_finished_while_its_band_is_unreadable_is_checked_once_the_band_reads_again(rig, only_band):
+    """A band that can't be read when the batch finishes defers its check (never "nothing to check"): the batch is not
+    marked good, an automation's next batch is refused, and the check runs once the band reads again. `only_band`: the
+    room's one band is the unreadable one, so reading it as no band would plan no check at all."""
+    r, room = _room_with_probes(rig)
+    if only_band:
+        room.feed_ph_sensor = ""
+        del r.fake.states["number.crop_steering_irrigation_ec_min"]
+    r.fake.set_state("number.crop_steering_irrigation_ec_max", "unavailable")
+    status = _batch(r)
+    assert status["handled_result"] == "finished" and status["mix"]["verdict"] is None
+    assert _settle(r)["mix"]["verdict"] is None and r.codes() == []
+    _settle(r, 60)
+    assert sum("waits: the room's feed EC or pH band can't be read" in line for line in r.logs) == 1
+    assert _batch(r, by=None)["handled_result"] == "refused: the last batch's mix is not checked yet"
+    r.fake.set_state("number.crop_steering_irrigation_ec_max", "2.5")
+    assert _settle(r, 60)["mix"]["verdict"] == "good"

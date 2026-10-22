@@ -1438,23 +1438,28 @@ class DosingRunner:
     # ------------------------------------------------------------------ the mix check
     def _mix_bands(self, room):
         """What a finished batch's tank is checked against: [(quantity, its tank probe, low, high)] for each of
-        the room's feed EC and pH probes that is mapped and has a band (a bound of 0 or less is no bound)."""
+        the room's feed EC and pH probes that is mapped and has a band (a bound of 0 or less is no bound). None when
+        a mapped probe's band can't be read (Controller._feed_band): whether there is anything to check can't be known."""
         bands = []
         for quantity, probe in (("ec", getattr(room, "feed_ec_sensor", "")),
                                 ("ph", getattr(room, "feed_ph_sensor", ""))):
-            lo = self.c._num(f"number.crop_steering_{room.prefix}irrigation_{quantity}_min", 0)
-            hi = self.c._num(f"number.crop_steering_{room.prefix}irrigation_{quantity}_max", 0)
-            if probe and (lo > 0 or hi > 0):
+            if not probe:
+                continue
+            lo, hi, unread = self.c._feed_band(room, quantity)
+            if unread:
+                return None
+            if lo > 0 or hi > 0:
                 bands.append((quantity, probe, lo, hi))
         return bands
 
     def _plan_mix(self, room, started_at):
         """A finished batch's mix check, due MIX_SETTLE_S from now; none when nothing can check it (no tank
-        probe with a band), which also lets go of an older batch's verdict."""
+        probe with a band), which also lets go of an older batch's verdict. A band that can't be read plans the
+        check: _judge_mix waits for it."""
         due = (self._now() + timedelta(seconds=MIX_SETTLE_S)).isoformat()
         with self._lock:
             self._block(room)["mix"] = ({"batch": started_at, "due": due, "verdict": None}
-                                        if self._mix_bands(room) else None)
+                                        if self._mix_bands(room) != [] else None)
             self._write()
 
     def _check_mixes(self):
@@ -1474,6 +1479,13 @@ class DosingRunner:
         """The tank read through the device-unit table and judged: "good" with every reading inside its band,
         else "off target" or "not read" with CS-808. Neither holds watering."""
         bands = self._mix_bands(room)
+        if bands is None:  # a band can't be read: judged on a later pass, and until then the batch is not marked good
+            live = self._live_of(room)
+            if live.get("mix_deferred") != mix.get("batch"):  # said once per batch, not every pass
+                live["mix_deferred"] = mix.get("batch")
+                self._log(f"[{room.slug}] dosing: mix check of the batch that started {mix.get('batch')} waits: "
+                          "the room's feed EC or pH band can't be read")
+            return
         found, off, unread = {}, [], []
         for quantity, probe, lo, hi in bands:
             value, state, unit = self._device(probe, quantity, keep_unknown=False)
@@ -1600,9 +1612,8 @@ class DosingRunner:
             watch.reset()
             return
         probe = getattr(room, "feed_ph_sensor", "")
-        lo = self.c._num(f"number.crop_steering_{px}irrigation_ph_min", 0)
-        hi = self.c._num(f"number.crop_steering_{px}irrigation_ph_max", 0)
-        if not probe or (lo <= 0 and hi <= 0):
+        lo, hi, unread = self.c._feed_band(room, "ph")
+        if not probe or unread or (lo <= 0 and hi <= 0):
             watch.reset()
             return
         ph = self._ph_reading(probe)

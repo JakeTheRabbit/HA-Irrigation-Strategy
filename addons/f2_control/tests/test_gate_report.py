@@ -140,3 +140,78 @@ def test_dead_feed_gate_matches_the_shots_rescue_only_exception(kind, bypass, re
     assert gate_report.first_hold(gates) == c._blocked(room, 1, reason)
     fake.set_state(KILL, "off")
     assert gate_report.first_hold(gate_report.report(c, room, 1, reason)) == c._blocked(room, 1, reason)
+
+
+@pytest.mark.parametrize("band", ["unavailable", "unknown", "not a number", "absent"])
+@pytest.mark.parametrize("half", ["ec", "ph"])
+def test_an_unreadable_feed_band_holds_and_an_absent_one_is_no_band(band, half):
+    """A band setting that can't be read is not "no band": an out-of-band feed would pass. It holds, fail-closed,
+    and the gate list says the same. One Home Assistant does not have (404) is no band, as before."""
+    c, fake, room = _room()
+    probe = f"sensor.feed_{half}"
+    setattr(room, f"feed_{half}_sensor", probe)
+    fake.set_state(probe, "9.9", {"unit_of_measurement": "pH" if half == "ph" else "mS/cm"})
+    entity = f"number.crop_steering_irrigation_{half}_max"
+    fake.set_state(entity, "3.0")
+    out = c._blocked(room, 1)
+    assert out.startswith(f"source-water {half.upper() if half == 'ec' else 'pH'} 9.9")
+    if band == "absent":
+        del fake.states[entity]
+    else:
+        fake.set_state(entity, band)
+    held = c._blocked(room, 1)
+    name = "EC" if half == "ec" else "pH"
+    assert held == (None if band == "absent"
+                    else f"source-water {name} band unreadable ({entity}) — holding (fail-closed)")
+    assert gate_report.first_hold(gate_report.report(c, room, 1)) == held
+
+
+def test_a_band_home_assistant_gives_no_answer_for_is_unreadable(monkeypatch):
+    """No answer at all (a timeout, Home Assistant restarting: status None) is not a 404: the band is unreadable."""
+    import controller
+    c, fake, room = _room()
+    room.feed_ec_sensor = "sensor.feed_ec"
+    fake.set_state(room.feed_ec_sensor, "9.9", {"unit_of_measurement": "mS/cm"})
+    entity = "number.crop_steering_irrigation_ec_max"
+    real_get, real_status = controller.ha_get, controller.ha_get_status
+    monkeypatch.setattr(controller, "ha_get", lambda e, timeout=8: fake_none() if e == entity else real_get(e, timeout))
+    monkeypatch.setattr(controller, "ha_get_status",
+                        lambda e, timeout=8: (None, fake_none()) if e == entity else real_status(e, timeout))
+    assert c._feed_band(room, "ec") == (0.0, 0.0, entity)
+    held = f"source-water EC band unreadable ({entity}) — holding (fail-closed)"
+    assert c._blocked(room, 1) == held == gate_report.first_hold(gate_report.report(c, room, 1))
+
+
+def fake_none():
+    import controller
+    return controller.HAState()
+
+
+@pytest.mark.parametrize("half", ["ec", "ph"])
+def test_a_feed_read_while_its_band_is_unreadable_is_not_a_last_good_reading(half):
+    """An out-of-band feed read during a band blip must not become the last good reading: it would feed the engine
+    inside the grace window and restart the dead-probe grace timer."""
+    c, fake, room = _room()
+    probe = f"sensor.feed_{half}"
+    setattr(room, f"feed_{half}_sensor", probe)
+    fake.set_state(probe, "9.9", {"unit_of_measurement": "pH" if half == "ph" else "mS/cm"})
+    fake.set_state(f"number.crop_steering_irrigation_{half}_max", "unavailable")
+    read = c._read_feed_ec if half == "ec" else c._read_feed_ph
+    assert read(room) == 9.9
+    value, stamp = (("_feed_last_good_value", "_feed_last_good_time") if half == "ec"
+                    else ("_feed_ph_last_good", "_feed_ph_last_good_time"))
+    assert getattr(room, value, None) is None and getattr(room, stamp, None) is None
+    fake.set_state(f"number.crop_steering_irrigation_{half}_max", "10")  # the band reads again: 9.9 is good
+    read(room)
+    assert getattr(room, value) == 9.9 and getattr(room, stamp) is not None
+
+
+def test_the_ai_is_told_a_band_that_cant_be_read_not_none_set():
+    import brain_bridge
+    c, fake, room = _room()
+    room.feed_ec_sensor, room.feed_ph_sensor = "sensor.feed_ec", "sensor.feed_ph"
+    fake.set_state("number.crop_steering_irrigation_ec_max", "unavailable")
+    fake.set_state("number.crop_steering_irrigation_ph_min", "5.8")
+    facts = brain_bridge.feed_facts(c, room, datetime(2026, 9, 23, 12, 0))
+    assert facts["feed_ec_band"] == "can't be read (number.crop_steering_irrigation_ec_max)"
+    assert facts["feed_ph_band"] == "at least 5.8"
