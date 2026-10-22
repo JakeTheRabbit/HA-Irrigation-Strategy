@@ -162,7 +162,8 @@ def test_backfill_is_idempotent_by_derived_id(tmp_path, monkeypatch):
         first = _all(hub)
         assert len(first) == 2 + 3 + 1 + 1
         # Forget the flag: the second run finds every id already there.
-        hub._journal.meta_set(f"backfill:{ROOM}:v1", "")
+        for name in ("setpoint_log", "stock", "calibration", "overlays"):
+            hub._journal.meta_set(f"backfill:{ROOM}:{name}:v1", "")
         await api.async_backfill_room(hass, _entry())
         assert [e["id"] for e in _all(hub)] == [e["id"] for e in first]
         assert hass.bus.events == []  # old history is not re-announced
@@ -177,15 +178,100 @@ def test_backfill_runs_once_per_room(tmp_path, monkeypatch):
     async def go():
         hub = await _hub(hass, api, tmp_path)
         await api.async_backfill_room(hass, _entry())
-        assert hub._journal.meta_get(f"backfill:{ROOM}:v1") == "done"
+        for name in ("setpoint_log", "stock", "calibration", "overlays"):
+            assert hub._journal.meta_get(f"backfill:{ROOM}:{name}:v1") == "done"
 
-        class Boom:
-            @property
-            def changes(self):
-                raise AssertionError("stores were read again")
+        def boom(*a, **k):
+            raise AssertionError("stores were read again")
 
-        hass.data["crop_steering"]["_setpoint_log"][ENTRY] = Boom()
+        monkeypatch.setattr(api, "_build", boom)
         await api.async_backfill_room(hass, _entry())
+        assert len(_all(hub)) == 7
+
+    asyncio.run(go())
+
+
+def test_a_source_that_was_absent_is_imported_when_it_turns_up(tmp_path, monkeypatch):
+    hass, api = _rig(monkeypatch, tmp_path)
+    _stores(hass, _setpoint_log=1)
+
+    async def go():
+        hub = await _hub(hass, api, tmp_path)
+        await api.async_backfill_room(hass, _entry())
+        assert {e["kind"] for e in _all(hub)} == {"target.changed"}
+        assert hub._journal.meta_get(f"backfill:{ROOM}:stock:v1") is None
+        _stores(hass, _stock=1)
+        await api.async_backfill_room(hass, _entry())
+        kinds = [e["kind"] for e in _all(hub)]
+        assert kinds.count("target.changed") == 2 and kinds.count("stock.drawn") == 3
+
+    asyncio.run(go())
+
+
+def test_a_store_that_failed_to_load_is_not_marked_done(tmp_path, monkeypatch):
+    hass, api = _rig(monkeypatch, tmp_path)
+    _stores(hass)
+    hass.data["crop_steering"]["_stock"][ENTRY].error = "could not load"
+
+    async def go():
+        hub = await _hub(hass, api, tmp_path)
+        await api.async_backfill_room(hass, _entry())
+        assert "stock.drawn" not in {e["kind"] for e in _all(hub)}
+        assert hub._journal.meta_get(f"backfill:{ROOM}:stock:v1") is None
+        assert hub._journal.meta_get(f"backfill:{ROOM}:calibration:v1") == "done"
+
+    asyncio.run(go())
+
+
+def test_a_held_overlay_is_one_event_not_two(tmp_path, monkeypatch):
+    from custom_components.crop_steering import journal
+
+    brain = {
+        "at": "2026-10-21T06:00:01+00:00",
+        "entity_id": OVERLAYS[0]["entity_id"],
+        "field": "p1_target",
+        "zone": 2,
+        "old": 50.0,
+        "new": 55.0,
+        "who": "brain",
+        "reason": "hot day",
+    }
+    rows = [*SETPOINTS, brain]
+    events = journal.import_setpoint_log(ROOM, rows, OVERLAYS)
+    merged = events[-1]
+    assert merged["data"]["layer"] == "overlay"
+    assert merged["data"]["expires"] == OVERLAYS[0]["expires"]
+    assert merged["data"]["reason"] == "hot day" and merged["source"]["actor"] == "ai"
+    assert [e["data"]["layer"] for e in events[:-1]] == ["base", "base"]
+    assert journal.import_overlays(ROOM, OVERLAYS, rows) == []
+    # Its row trimmed off the log: the overlay stands alone.
+    assert len(journal.import_overlays(ROOM, OVERLAYS, SETPOINTS)) == 1
+
+    hass, api = _rig(monkeypatch, tmp_path)
+    _stores(hass)
+    hass.data["crop_steering"]["_setpoint_log"][ENTRY].changes = rows
+
+    async def go():
+        hub = await _hub(hass, api, tmp_path)
+        await api.async_backfill_room(hass, _entry())
+        moves = [e for e in _all(hub) if e["data"].get("new") == 55.0]
+        assert len(moves) == 1
+
+    asyncio.run(go())
+
+
+def test_rows_from_the_moment_backfill_started_are_left_to_their_live_event(
+    tmp_path, monkeypatch
+):
+    hass, api = _rig(monkeypatch, tmp_path)
+    _stores(hass)
+    late = {**SETPOINTS[0], "at": "2999-01-01T00:00:00+00:00", "new": 99.0}
+    hass.data["crop_steering"]["_setpoint_log"][ENTRY].changes = [*SETPOINTS, late]
+
+    async def go():
+        hub = await _hub(hass, api, tmp_path)
+        await api.async_backfill_room(hass, _entry())
+        assert 99.0 not in [e["data"].get("new") for e in _all(hub)]
         assert len(_all(hub)) == 7
 
     asyncio.run(go())

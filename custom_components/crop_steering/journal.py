@@ -334,13 +334,44 @@ def _zone(value):
     return value if isinstance(value, int) and not isinstance(value, bool) else None
 
 
-def import_setpoint_log(room_id: str, rows) -> list[dict]:
+def _same(a, b) -> bool:
+    try:
+        return abs(float(a) - float(b)) < 1e-6
+    except (TypeError, ValueError):
+        return a == b
+
+
+def _held_matches(setpoint_rows, overlays) -> dict:
+    """For each held overlay, the latest brain row of the setpoint log that made it -> {id(row): overlay}.
+    An overlay whose row has been trimmed off the log has no entry."""
+    rows = _rows(setpoint_rows)
+    found = {}
+    for overlay in _rows(overlays):
+        hits = [
+            r
+            for r in rows
+            if r.get("entity_id") == overlay.get("entity_id")
+            and r.get("who") == "brain"
+            and _same(r.get("new"), overlay.get("new"))
+            and _when(r.get("at")) is not None
+        ]
+        if hits:
+            found[id(max(hits, key=lambda r: _when(r["at"])))] = overlay
+    return found
+
+
+def import_setpoint_log(room_id: str, rows, overlays=()) -> list[dict]:
     """setpoint_log rows -> `target.changed`, as setpoint_log.record() emits them live. A row keeps no expiry,
-    so none of them is an overlay (the room's active overlays come from import_overlays).
+    so it reads as the base layer, with one exception: the row that made a still-held AI overlay is that
+    overlay's change, so it is imported once on the overlay layer with the overlay's expiry (import_overlays
+    leaves that overlay out). Known limit: an overlay that has ended is not stored anywhere, so its row stays
+    base.
     """
+    held = _held_matches(rows, overlays)
     out = []
     for row in _rows(rows):
         zone = _zone(row.get("zone"))
+        overlay = held.get(id(row))
         event = _backfilled(
             room_id,
             "setpoint_log",
@@ -352,10 +383,10 @@ def import_setpoint_log(room_id: str, rows) -> list[dict]:
             {
                 "key": row.get("field"),
                 "scope": "room" if zone is None else f"zone:{zone}",
-                "layer": "base",
+                "layer": "base" if overlay is None else "overlay",
                 "old": row.get("old"),
                 "new": row.get("new"),
-                "expires": None,
+                "expires": None if overlay is None else overlay.get("expires"),
                 "reason": row.get("reason"),
                 "expected": row.get("expected"),
                 "entity_id": row.get("entity_id"),
@@ -426,10 +457,15 @@ def import_calibration(room_id: str, records) -> list[dict]:
     return out
 
 
-def import_overlays(room_id: str, rows) -> list[dict]:
-    """The AI overlays still held -> `target.changed` on the overlay layer (old = the operator's value)."""
+def import_overlays(room_id: str, rows, setpoint_rows=()) -> list[dict]:
+    """The AI overlays still held -> `target.changed` on the overlay layer (old = the operator's value), except
+    those whose change import_setpoint_log already carries (it is given the same `setpoint_rows`).
+    """
+    merged = {id(o) for o in _held_matches(setpoint_rows, rows).values()}
     out = []
     for row in _rows(rows):
+        if id(row) in merged:
+            continue
         zone = _zone(row.get("zone"))
         event = _backfilled(
             room_id,
