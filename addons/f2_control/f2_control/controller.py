@@ -1969,59 +1969,66 @@ class Controller:
         # Preserve undiscovered rooms and unknown metadata/zones. A descriptor going
         # missing must never delete counters or erase a latched shared-hardware hold.
         out = dict(getattr(self, "_saved_room_blocks", {}))
+        self._unsaved_rooms = {}  # slug -> the error: what this save could not write (see _loop_room)
         for room in self.rooms:
-            prior = out.get(room.slug)
-            block = dict(prior) if isinstance(prior, dict) else {}
-            block.update(
-                {str(z): self._serialize_zone(s) for z, s in room.state.items()}
-            )
-            if getattr(room, "strategy_required", False):
-                block["_strategy_required"] = True
-            else:
-                block.pop("_strategy_required", None)
-            if room.hardware_fault:
-                block["_hardware_fault"] = room.hardware_fault
-            else:
-                block.pop("_hardware_fault", None)
-            if getattr(room, "shot_inflight", None):
-                block["_shot_inflight"] = room.shot_inflight
-            else:
-                block.pop("_shot_inflight", None)
-            if hasattr(room, "_room_active_known"):
-                block["_room_active"] = room._room_active_known
-            waste_rule = getattr(room, "_waste_rule_known", None)
-            if waste_rule in ("Off", WASTE_CHECK, WASTE_CLOSE):
-                block["_waste_rule"] = waste_rule
-            if room.tank_drawdown["base_pct"] is not None:  # only once a level has been read
-                block["_tank"] = room.tank_drawdown
-            estimate = getattr(room, "tank_estimate", None) or {}
-            if estimate.get("filled_at"):  # only once the tank has been marked filled
-                block["_tank_estimate"] = estimate
-            runoff = getattr(room, "_runoff", None)
-            if runoff and runoff_balance.has_data(runoff):  # only once the estimator has recorded something
-                block["_runoff"] = runoff
-            else:
-                block.pop("_runoff", None)
-            if getattr(room, "_dim", None):
-                block["_dim"] = room._dim
-            else:
-                block.pop("_dim", None)
-            if getattr(room, "_off_since", None):
-                block["_room_off_since"] = room._off_since.isoformat()
-            else:
-                block.pop("_room_off_since", None)
-            adherence = plan_adherence.dump(getattr(room, "_adherence", None) or plan_adherence.fresh(), datetime.now().date())
-            if adherence:
-                block["_adherence"] = adherence
-            else:
-                block.pop("_adherence", None)
-            if getattr(room, "_setup_fingerprint_adopted", None):  # else keep whatever was saved
-                block["_setup"] = {
-                    "revision": room.setup_revision,
-                    "fingerprint": room._setup_fingerprint_adopted,
-                }
-                if getattr(room, "_setup_entry_id", None):  # which room it was (see _is_another_room)
-                    block["_setup"]["entry_id"] = room._setup_entry_id
+            try:  # one room's state that cannot be saved must not stop every room's save
+                prior = out.get(room.slug)
+                block = dict(prior) if isinstance(prior, dict) else {}
+                block.update(
+                    {str(z): self._serialize_zone(s) for z, s in room.state.items()}
+                )
+                if getattr(room, "strategy_required", False):
+                    block["_strategy_required"] = True
+                else:
+                    block.pop("_strategy_required", None)
+                if room.hardware_fault:
+                    block["_hardware_fault"] = room.hardware_fault
+                else:
+                    block.pop("_hardware_fault", None)
+                if getattr(room, "shot_inflight", None):
+                    block["_shot_inflight"] = room.shot_inflight
+                else:
+                    block.pop("_shot_inflight", None)
+                if hasattr(room, "_room_active_known"):
+                    block["_room_active"] = room._room_active_known
+                waste_rule = getattr(room, "_waste_rule_known", None)
+                if waste_rule in ("Off", WASTE_CHECK, WASTE_CLOSE):
+                    block["_waste_rule"] = waste_rule
+                if room.tank_drawdown["base_pct"] is not None:  # only once a level has been read
+                    block["_tank"] = room.tank_drawdown
+                estimate = getattr(room, "tank_estimate", None) or {}
+                if estimate.get("filled_at"):  # only once the tank has been marked filled
+                    block["_tank_estimate"] = estimate
+                runoff = getattr(room, "_runoff", None)
+                if runoff and runoff_balance.has_data(runoff):  # only once the estimator has recorded something
+                    block["_runoff"] = runoff
+                else:
+                    block.pop("_runoff", None)
+                if getattr(room, "_dim", None):
+                    block["_dim"] = room._dim
+                else:
+                    block.pop("_dim", None)
+                if getattr(room, "_off_since", None):
+                    block["_room_off_since"] = room._off_since.isoformat()
+                else:
+                    block.pop("_room_off_since", None)
+                adherence = plan_adherence.dump(getattr(room, "_adherence", None) or plan_adherence.fresh(), datetime.now().date())
+                if adherence:
+                    block["_adherence"] = adherence
+                else:
+                    block.pop("_adherence", None)
+                if getattr(room, "_setup_fingerprint_adopted", None):  # else keep whatever was saved
+                    block["_setup"] = {
+                        "revision": room.setup_revision,
+                        "fingerprint": room._setup_fingerprint_adopted,
+                    }
+                    if getattr(room, "_setup_entry_id", None):  # which room it was (see _is_another_room)
+                        block["_setup"]["entry_id"] = room._setup_entry_id
+                json.dumps(block)  # what json.dump below would refuse, refused here, for this room only
+            except Exception as e:
+                log("state save failed", room.slug, e, "- its last saved state is kept")
+                self._unsaved_rooms[room.slug] = f"{type(e).__name__}: {e}"
+                continue
             out[room.slug] = block
         try:
             tmp = self._state_path + ".tmp"
@@ -5577,33 +5584,39 @@ class Controller:
         if making:
             log(f"[{room.slug}] Z{zone} shot held: {making}")
             return
-        hw = room.hw
-        valve = hw["valves"].get(zone)
-        pump, mainline = hw.get("pump"), hw.get("mainline")
-        # Read before anything opens, so nothing waits on Home Assistant between the steps.
-        # An integration older than these settings has neither: the 2 s and 1 s always waited apply.
-        prime = lead = 0.0
-        if pump:
-            prime = _lead_time(
-                self._zone_num(room, zone, "pump_prime_time", FALLBACK["pump_prime_time"], optional=True),
-                FALLBACK["pump_prime_time"], PUMP_PRIME_MAX_S)
-        if mainline:
-            lead = _lead_time(
-                self._zone_num(room, zone, "main_line_lead_time", FALLBACK["main_line_lead_time"], optional=True),
-                FALLBACK["main_line_lead_time"], MAIN_LINE_LEAD_MAX_S)
-        # WRITE-AHEAD: what this shot is about to open, and when, saved BEFORE anything opens. If the
-        # controller dies, is killed or loses Home Assistant mid-shot, the next loop closes exactly what
-        # this shot opened, from this record, and nothing else (see _reconcile_room_inflight).
-        room.shot_inflight = {
-            "zone": zone, "valve": valve, "mainline": mainline, "pump": pump,
-            "started": datetime.now(timezone.utc).isoformat(),
-        }
-        self._save_state()
         shutdown_checked = False
         valve_started = None
         counted = False
         stopping = False
-        try:
+        commanded = False  # a switch has been sent ON: from here an error must close what may be open
+        try:  # from the moment _busy is set: an error before any valve opens must not leave it set
+            hw = room.hw
+            valve = hw["valves"].get(zone)
+            pump, mainline = hw.get("pump"), hw.get("mainline")
+            # Read before anything opens, so nothing waits on Home Assistant between the steps.
+            # An integration older than these settings has neither: the 2 s and 1 s always waited apply.
+            prime = lead = 0.0
+            if pump:
+                prime = _lead_time(
+                    self._zone_num(room, zone, "pump_prime_time", FALLBACK["pump_prime_time"], optional=True),
+                    FALLBACK["pump_prime_time"], PUMP_PRIME_MAX_S)
+            if mainline:
+                lead = _lead_time(
+                    self._zone_num(room, zone, "main_line_lead_time", FALLBACK["main_line_lead_time"], optional=True),
+                    FALLBACK["main_line_lead_time"], MAIN_LINE_LEAD_MAX_S)
+            # WRITE-AHEAD: what this shot is about to open, and when, saved BEFORE anything opens. If the
+            # controller dies, is killed or loses Home Assistant mid-shot, the next loop closes exactly what
+            # this shot opened, from this record, and nothing else (see _reconcile_room_inflight).
+            room.shot_inflight = {
+                "zone": zone, "valve": valve, "mainline": mainline, "pump": pump,
+                "started": datetime.now(timezone.utc).isoformat(),
+            }
+            saved = self._save_state()
+            unsaved = getattr(self, "_unsaved_rooms", {}).get(room.slug)
+            if not saved or unsaved:  # no record on disk, nothing opens (raised below: CS-212)
+                raise RuntimeError(f"Z{zone} shot refused, its in-flight record was not saved: "
+                                   f"{unsaved or 'the state file could not be written'}")
+            commanded = True
             # OPEN sequence — FAIL CLOSED: if any service call errors, cut what's on, alert, and DO NOT count the shot
             # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
             # Pump and mainline are optional (a one-switch tent has neither): each is sequenced when
@@ -5748,11 +5761,22 @@ class Controller:
             raise
         except Exception as e:
             log("shot error", room.slug, zone, e)
+            if not commanded:  # nothing opened: the room's pass stops here and says so (CS-212)
+                raise
         finally:
             try:
                 # Early command failures and unexpected exceptions need the SAME hold
                 # guarantee as normal shutdown; no path may start the next row blindly.
-                if not shutdown_checked and not stopping:
+                if not commanded and not stopping:
+                    # Nothing was sent ON, so nothing is switched off (a person may be running the pump),
+                    # and the record of this shot (it held every shot of the room until reconciled) goes.
+                    if getattr(room, "shot_inflight", None):
+                        room.shot_inflight = None
+                        try:
+                            self._save_state()
+                        except Exception as e:
+                            log("state save failed", e)
+                elif not shutdown_checked and not stopping:
                     closing = [
                         e for e in (valve, hw.get("mainline"), hw.get("pump")) if e
                     ]
@@ -6861,9 +6885,73 @@ class Controller:
         self._save_state()
         return snapshot
 
+    def _restore_unsaved_room(self, room):
+        """The room's state could not be saved (_save_state): this pass stops with an error (CS-212).
+
+        Its last saved block is loaded back, as at start-up, so the next pass runs. What only memory holds
+        and must not be lost stays: a hardware hold, an in-flight record, and, zone by zone, the newer of
+        the shot and water counters (_keep_newer_shots: never less water or an older last shot, so neither
+        the daily cap nor the shot interval is lifted). With no saved block to go back to, or when what
+        memory must keep is itself what cannot be saved, nothing is pretended: the room stays stopped until
+        its state saves or the controller restarts."""
+        self._save_state()  # it may save now
+        error = self._unsaved_rooms.get(room.slug)
+        if not error:
+            return
+        stopped = "the room stays stopped until it saves or the controller restarts"
+        if not isinstance(getattr(self, "_saved_room_blocks", {}).get(room.slug), dict):
+            raise RuntimeError(f"the state of this room cannot be saved ({error}), and there is no saved state "
+                               f"to go back to: {stopped}")
+        fault, inflight = room.hardware_fault, getattr(room, "shot_inflight", None)
+        memory = {z: s for z, s in room.state.items() if isinstance(s, dict)}
+        self._load_room_state(room)
+        room.hardware_fault = room.hardware_fault or fault
+        room.shot_inflight = room.shot_inflight or inflight
+        for z, mem in memory.items():
+            if z in room.state:
+                self._keep_newer_shots(mem, room.state[z])
+        self._save_state()
+        if self._unsaved_rooms.get(room.slug):
+            raise RuntimeError(f"the state of this room cannot be saved ({self._unsaved_rooms[room.slug]}), "
+                               f"even on its last saved state: {stopped}")
+        raise RuntimeError(f"the state of this room could not be saved ({error}); its last saved state "
+                           "was loaded back, and the room runs again next pass")
+
+    @staticmethod
+    def _keep_newer_shots(mem, s):
+        """Into the zone `s` loaded back from the saved block, what memory `mem` has that is newer: the later
+        last shot, and the day's counters (memory's whole, when its day is newer; the larger, on the same
+        day), and each grow-day's larger water. A value of the wrong type in memory is not kept."""
+        def number(v):
+            return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) and v >= 0
+
+        shot = mem.get("last_shot")
+        if isinstance(shot, datetime) and (not isinstance(s.get("last_shot"), datetime) or shot > s["last_shot"]):
+            s["last_shot"] = shot
+            s["last_shot_is_anchor"] = bool(mem.get("last_shot_is_anchor"))
+        reset, saved_reset = mem.get("last_daily_reset"), s.get("last_daily_reset")
+        if type(reset) is date and (type(saved_reset) is not date or reset > saved_reset):
+            s["last_daily_reset"] = reset  # a new day in memory: its counters, not the saved day's
+            s["daily_vol"] = mem.get("daily_vol") if number(mem.get("daily_vol")) else s["daily_vol"]
+            s["shots"] = mem.get("shots") if number(mem.get("shots")) else s["shots"]
+        elif reset == saved_reset:
+            for key in ("daily_vol", "shots"):
+                if number(mem.get(key)) and mem[key] > (s.get(key) or 0):
+                    s[key] = mem[key]
+        days = {item["grow_day"]: item for item in s.get("water_history") or []}
+        for item in mem.get("water_history") or []:
+            if (isinstance(item, dict) and isinstance(item.get("grow_day"), str) and number(item.get("litres"))
+                    and item["litres"] > days.get(item["grow_day"], {}).get("litres", -1)):
+                days[item["grow_day"]] = {"grow_day": item["grow_day"], "litres": float(item["litres"]),
+                                          "complete": item.get("complete") is True}
+        if days:
+            s["water_history"] = [days[d] for d in sorted(days)[-7:]]
+
     def _loop_room(self, room, now):
         """One room's full control pass: snapshot -> decide -> act -> build the publish dict.
         Reads/writes only this room's prefixed entities + its own state."""
+        if getattr(self, "_unsaved_rooms", {}).get(room.slug):
+            self._restore_unsaved_room(room)
         try:
             import prompt_runtime
             prompt_runtime.sync(self, room, ha_get, ha_call)
