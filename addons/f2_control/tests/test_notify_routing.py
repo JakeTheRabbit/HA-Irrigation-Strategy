@@ -30,6 +30,7 @@ TOOK = {"sent_to": ["notify.mobile_app_a"], "error": None}
 def _setup(recipients=1, idle_hours=3, notify_service=OPTION):
     """A one-zone room; `recipients` None is an integration from before notifications (no sensor at all)."""
     states = _room(1)
+    states["sensor.crop_steering_dosing_config"] = ("3", {"feed": {"ec": 3.0}})  # a known feed: no CS-907 card
     if recipients is not None:
         states[CONFIG] = (str(recipients), {"recipients": recipients, "idle_hours": idle_hours})
     return _build({"notify_service": notify_service, "num_zones": 1}, states=states)

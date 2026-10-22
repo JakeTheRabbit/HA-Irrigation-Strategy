@@ -594,3 +594,49 @@ def test_the_blind_timer_shot_is_not_doubled_by_the_floor(rig):
     after = room.state[1]["daily_vol"]
     pub = c._loop_room(room, now + timedelta(minutes=1))
     assert pub[1]["fire"] is False and room.state[1]["daily_vol"] == after
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+@pytest.mark.parametrize("held", [1, 2])
+def test_no_floor_shot_into_a_table_that_is_not_draining(rig, held):
+    """CS-310 holds the floor (the engine zeroes it for a backed-up zone): the blind zone's own table (1), or the
+    sibling it copies (2)."""
+    c, fake, _clock = rig
+    now = datetime(2026, 9, 7, 14, 0)
+    room = _blind_day(c, fake, now, "P2")
+    room._was_lights_on = True
+    if held == 2:
+        fake.set_state("sensor.crop_steering_vwc_zone_2", "60")
+    room._backed_up = {held: now}
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] is False and room.state[1]["daily_vol"] == 0.0
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+def test_a_blind_zone_copying_a_sibling_gets_the_floor_and_no_copy_on_top_of_it(rig):
+    c, fake, _clock = rig
+    now = datetime(2026, 9, 7, 14, 0)
+    room = _blind_day(c, fake, now, "P2")
+    room._was_lights_on = True
+    fake.set_state("sensor.crop_steering_vwc_zone_2", "60")  # the sibling: wet, nothing due
+    pub = c._loop_room(room, now)
+    assert pub[2]["fire"] is False
+    assert pub[1]["fire"] is True and "MIN-DAILY floor" in str(pub[1]["reason"])
+    after = room.state[1]["daily_vol"]
+    fake.set_state("sensor.crop_steering_vwc_zone_2", "30")  # the sibling now wants a routine top-up
+    pub = c._loop_room(room, now + timedelta(minutes=2))
+    assert pub[2]["fire"] is True
+    assert pub[1]["fire"] is False and "waits" in str(pub[1]["reason"])
+    assert room.state[1]["daily_vol"] == after
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+def test_the_blind_alert_names_the_daily_minimum(rig):
+    c, fake, _clock = rig
+    now = datetime(2026, 9, 7, 14, 0)
+    room = _blind_day(c, fake, now, "P2")
+    room._was_lights_on = True
+    c._loop_room(room, now)
+    card = next(d for dom, svc, d in fake.calls if (dom, svc) == ("persistent_notification", "create")
+                and d["notification_id"] == "f2_blind_default_z1")
+    assert "daily minimum of 4 L" in card["message"]

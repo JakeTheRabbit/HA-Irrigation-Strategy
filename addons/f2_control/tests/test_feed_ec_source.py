@@ -50,3 +50,34 @@ def test_a_measured_feed_ec_always_wins_and_the_gate_runs_on_it(rig):  # noqa: F
                    last_updated=Clock.now(controller.timezone.utc).isoformat())
     assert _feed_ec(c, room) == 3.6  # a mis-mixed tank shows on the probe, never on the recipe
     assert c._read_feed_ec(room) == 3.6  # what the source-water gate reads: the probe alone
+
+
+def _cards(fake, key="f2_feed_unknown_default"):
+    return [(svc, d) for dom, svc, d in fake.calls if dom == "persistent_notification" and d.get("notification_id") == key]
+
+
+def test_a_room_with_no_feed_ec_is_told_once_that_ec_flushing_is_off(rig):  # noqa: F811
+    c, fake, room = rig
+    probe(fake, 1, 50)
+    probe(fake, 2, 50)
+    c._loop_room(room, Clock.now())
+    c._loop_room(room, Clock.now())
+    cards = _cards(fake)
+    assert [svc for svc, _d in cards] == ["create"]  # once, not every pass
+    assert "CS-907" in cards[0][1]["title"]
+    assert "set a recipe feed EC or map a feed EC probe" in cards[0][1]["message"]
+
+
+def test_the_card_goes_when_a_recipe_ec_or_a_feed_probe_appears(rig):  # noqa: F811
+    c, fake, room = rig
+    probe(fake, 1, 50)
+    probe(fake, 2, 50)
+    c._loop_room(room, Clock.now())
+    _recipe(fake, 2.4)
+    c._loop_room(room, Clock.now())
+    assert [svc for svc, _d in _cards(fake)] == ["create", "dismiss"]
+    _recipe(fake, None)
+    c._loop_room(room, Clock.now())
+    room.feed_ec_sensor = FEED_EC
+    c._loop_room(room, Clock.now())
+    assert [svc for svc, _d in _cards(fake)] == ["create", "dismiss", "create", "dismiss"]

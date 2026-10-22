@@ -1630,6 +1630,22 @@
         "Refill the tank by hand, or make a batch.",
         "To stop the reminders, set the refill reminder to 0% in the dosing setup."
       ]
+    },
+    {
+      "code": "CS-907",
+      "title": "EC flushing off, feed EC unknown",
+      "source": "notification",
+      "severity": "warning",
+      "meaning": "The room has no feed EC probe, and the feed recipe in use declares no feed EC. The controller does not know the EC of the feed water.",
+      "watering": "The zones get water on their VWC only. The controller does not flush high pore EC and does not hold a zone for high EC, because it cannot tell if the feed can decrease the pore EC. The alert comes once and goes when the room gets a feed EC.",
+      "causes": [
+        "No feed EC probe is set for the room in the controller app options (feed_ec_sensor).",
+        "The feed recipe in use has no EC, or the room has no dosing setup."
+      ],
+      "fixes": [
+        "CAUTION: Do not ignore this alert for many days. Salt can build up in the substrate when the controller cannot flush.",
+        "Set the feed EC on the feed recipe in use (Crop Steering → Dosing), or set a feed EC probe in the controller app options."
+      ]
     }
   ]
 }
