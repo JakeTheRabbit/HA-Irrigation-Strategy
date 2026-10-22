@@ -5,6 +5,7 @@ import { addDays, dateInZone, daysBetween, midnight, wallTime } from "./comparis
 import type { RunRecord } from "./comparison-types";
 import { growDay, type TimelineRow } from "./day-timeline";
 import { descriptor } from "./model";
+import { getDisplayUnits } from "./display-units";
 import { pagedQuery, type V2Outcome } from "./parity-api";
 import type { CsEvent } from "./parity-types";
 import type { SteCopy } from "./ste-copy";
@@ -185,12 +186,16 @@ export const DEFAULT_CHOICE: Choice = {
   dryback: false,
 };
 
-/** The explorer's choice from the query of the page's hash (`#/zone/1?range=7d&s=...`). */
+/** The zone explorer's choice from the query of the page's hash (`#/history/explorer?zone=1&zr=7d&s=...`).
+ * Its range keys are its own (`zr`, `zfrom`, `zto`): History › Explorer's room charts use `range`,
+ * `from` and `to`. An address from before that has only `range` (one of these presets) is read once. */
 export function readChoice(hash: string): Choice {
   const query = new URLSearchParams(hash.includes("?") ? hash.slice(hash.indexOf("?") + 1) : "");
-  const range = query.get("range") ?? "";
-  const from = Date.parse(query.get("from") ?? ""),
-    to = Date.parse(query.get("to") ?? "");
+  const old = query.get("range") ?? "";
+  const legacy = !query.has("zr") && (PRESETS.some((item) => item.id === old) || old === "custom");
+  const range = query.get("zr") ?? (legacy ? old : "");
+  const from = Date.parse(query.get("zfrom") ?? (legacy ? query.get("from") : null) ?? ""),
+    to = Date.parse(query.get("zto") ?? (legacy ? query.get("to") : null) ?? "");
   const custom = range === "custom" && Number.isFinite(from) && Number.isFinite(to) && to > from;
   const preset = PRESETS.some((item) => item.id === range)
     ? (range as Preset)
@@ -214,16 +219,17 @@ export function readChoice(hash: string): Choice {
   };
 }
 
-/** The hash with the explorer's choice in its query; other query keys stay. */
+/** The hash with the zone explorer's choice in its query; other query keys (the room explorer's
+ * among them) stay. */
 export function writeChoice(hash: string, choice: Choice): string {
   const [path, rest = ""] = hash.split("?");
   const query = new URLSearchParams(rest);
-  for (const key of ["range", "from", "to", "s", "compare", "vs", "shots", "phases", "dryback", "pc", "pm"])
+  for (const key of ["zr", "zfrom", "zto", "s", "compare", "vs", "shots", "phases", "dryback", "pc", "pm"])
     query.delete(key);
-  query.set("range", choice.preset);
+  query.set("zr", choice.preset);
   if (choice.preset === "custom" && choice.from !== null && choice.to !== null) {
-    query.set("from", new Date(choice.from).toISOString());
-    query.set("to", new Date(choice.to).toISOString());
+    query.set("zfrom", new Date(choice.from).toISOString());
+    query.set("zto", new Date(choice.to).toISOString());
   }
   if (choice.sensors) query.set("s", choice.sensors.join(","));
   if (Object.keys(choice.probeCompare ?? {}).length) query.set("pc", JSON.stringify(choice.probeCompare));
@@ -674,9 +680,12 @@ export type ExplorerEvents =
   | { kind: "ok"; events: CsEvent[]; truncated: boolean }
   | { kind: "missing" }
   | { kind: "error"; message: string };
-/** The room's phase changes, completed shots and alerts over `span`, oldest first: read a day at a
- * time from the newest back (pagedQuery with `kinds`), until `max` events. A day that would pass
- * `max` is left out, so what shows is the newest whole days (`truncated`). `missing` on 3.17. */
+/** How many days are read at once. */
+const DAYS_AT_ONCE = 4;
+/** The room's phase changes, completed shots and alerts over `span`, oldest first (pagedQuery with
+ * `kinds`; journal_query answers oldest first). Days are read four at a time from the newest back,
+ * until `max` events: past it, only the newest `max` are kept (`truncated`), the day that overflows
+ * read again in halves, newest half first, to find them. `missing` on 3.17. */
 export async function loadExplorerEvents(
   controller: Pick<Controller, "operator">,
   roomId: string,
@@ -684,32 +693,54 @@ export async function loadExplorerEvents(
   query: EventRead = pagedQuery,
   max = MAX_EXPLORER_EVENTS,
 ): Promise<ExplorerEvents> {
-  const days: CsEvent[][] = [];
-  let total = 0;
-  for (let end = span.end; end > span.start; end -= DAY) {
-    const since = Math.max(span.start, end - DAY);
-    const remaining = max - total;
-    const read = await query(
+  const read = (window: Span, limit: number) =>
+    query(
       controller,
       {
         room_id: roomId,
-        since: new Date(since).toISOString(),
-        until: new Date(end).toISOString(),
+        since: new Date(window.start).toISOString(),
+        until: new Date(window.end).toISOString(),
         kinds: [...EXPLORER_KINDS],
       },
-      remaining + 1,
+      limit,
     );
-    if (read.kind === "missing") return { kind: "missing" };
-    if (read.kind === "error") return { kind: "error", message: read.message };
-    if (read.data.events.length > remaining) {
-      // The newest day alone is over the cap: show what came rather than nothing.
-      if (!days.length) days.push(read.data.events.slice(0, max));
-      return { kind: "ok", events: days.reverse().flat(), truncated: true };
+  type Read = { events: CsEvent[] } | { kind: "missing" } | { kind: "error"; message: string };
+  /** The newest `need` events of `window`, oldest first. */
+  const newest = async (window: Span, need: number): Promise<Read> => {
+    const short = window.end - window.start <= HOUR;
+    const first = await read(window, short ? Number.MAX_SAFE_INTEGER : need + 1);
+    if (first.kind !== "ok") return first.kind === "missing" ? first : { kind: "error", message: first.message };
+    if (first.data.events.length <= need) return { events: first.data.events };
+    if (short) return { events: first.data.events.slice(-need) };
+    const middle = window.start + Math.floor((window.end - window.start) / 2);
+    const later = await newest({ start: middle, end: window.end }, need);
+    if (!("events" in later) || later.events.length >= need) return later;
+    const earlier = await newest({ start: window.start, end: middle }, need - later.events.length);
+    return "events" in earlier ? { events: [...earlier.events, ...later.events] } : earlier;
+  };
+  const days: Span[] = [];
+  for (let end = span.end; end > span.start; end -= DAY) days.push({ start: Math.max(span.start, end - DAY), end });
+  const kept: CsEvent[][] = [];
+  let total = 0;
+  for (let i = 0; i < days.length; i += DAYS_AT_ONCE) {
+    const batch = days.slice(i, i + DAYS_AT_ONCE);
+    const reads = await Promise.all(batch.map((day) => read(day, max + 1)));
+    for (const [j, answer] of reads.entries()) {
+      if (answer.kind === "missing") return { kind: "missing" };
+      if (answer.kind === "error") return { kind: "error", message: answer.message };
+      const need = max - total;
+      if (answer.data.events.length <= need) {
+        kept.push(answer.data.events);
+        total += answer.data.events.length;
+        continue;
+      }
+      const last = await newest(batch[j], need);
+      if (!("events" in last)) return last.kind === "missing" ? last : { kind: "error", message: last.message };
+      kept.push(last.events);
+      return { kind: "ok", events: kept.reverse().flat(), truncated: true };
     }
-    days.push(read.data.events);
-    total += read.data.events.length;
   }
-  return { kind: "ok", events: days.reverse().flat(), truncated: false };
+  return { kind: "ok", events: kept.reverse().flat(), truncated: false };
 }
 
 export interface PhaseSegment {
@@ -721,12 +752,13 @@ export interface PhaseSegment {
 const PHASE = /^P[0-3]$/;
 /** One zone's phases over `span`, from the Journal's `phase.changed` (a room-wide one counts for every
  * zone): the phase held at the span's start is the first change's `from`. Recorded segments end now.
- * Planned: the phase now carries on while the controller's projection has shots for the zone ahead
- * (to the end of its last); with no projection there is no planned segment. */
+ * Planned: only from projected shots that carry their phase, each phase to the end of its shot. The
+ * controller's projection does not carry one yet, so today there is no planned segment: none is
+ * guessed. */
 export function phaseLane(
   events: readonly CsEvent[],
   span: Span,
-  projection: readonly ProjectionIntent[] | null,
+  projection: readonly (ProjectionIntent & { phase?: unknown })[] | null,
   options: { now: number; zone?: number | null },
 ): PhaseSegment[] {
   const { now } = options;
@@ -759,12 +791,18 @@ export function phaseLane(
   }
   push(end);
   const ahead = (projection ?? [])
-    .filter((i) => options.zone == null || i.zone === options.zone)
-    .map((i) => Date.parse(i.at) + (Number(i.duration_s) || 0) * 1000)
-    .filter((t) => Number.isFinite(t) && t > now);
-  const until = Math.min(span.end, Math.max(...ahead));
-  if (ahead.length && phase && PHASE.test(phase) && until > end)
-    lane.push({ from: end, to: until, phase, planned: true });
+    .filter((i) => (options.zone == null || i.zone === options.zone) && typeof i.phase === "string" && PHASE.test(i.phase))
+    .map((i) => ({ end: Date.parse(i.at) + (Number(i.duration_s) || 0) * 1000, phase: i.phase as string }))
+    .filter((i) => Number.isFinite(i.end) && i.end > end)
+    .sort((a, b) => a.end - b.end);
+  for (const intent of ahead) {
+    const last = lane.at(-1);
+    const from = last?.planned ? last.to : end;
+    const to = Math.min(span.end, intent.end);
+    if (to <= from) continue;
+    if (last?.planned && last.phase === intent.phase) last.to = to;
+    else lane.push({ from, to, phase: intent.phase, planned: true });
+  }
   return lane;
 }
 
@@ -786,7 +824,8 @@ export interface ChartNote {
 const trimmed = (value: number) => String(Number(value.toFixed(1)));
 /** The notes the explorer writes on its charts, only from what was recorded: a selected series that
  * left its saved band (once, where it left: "Zone 2 over the band since 09:40"), a tank level that
- * rose 10 points or more, from its first higher reading ("Refilled 06:10 · 40% to 74%"), and an alert
+ * rose 10 points or more and held for two readings, from its first higher reading ("Refilled 06:10 ·
+ * 40% to 74%"; a reading of 0 or less is a dropout, not a level), and an alert
  * raised on a selected series' sensor, unless a band note within 30 min already says it. */
 export function chartNotes(
   events: readonly CsEvent[],
@@ -821,6 +860,8 @@ export function chartNotes(
         i = j;
       }
     if (reading.kind === "level") {
+      // A level of 0 or less is a probe dropout: a gap, so its recovery is not a refill.
+      const points = reading.points.filter((p) => Number.isFinite(p.v) && p.v > 0);
       const rises = (k: number) =>
         points[k + 1].v - points[k].v > 1 && points[k + 1].t - points[k].t <= 15 * MIN;
       for (let i = 0; i + 1 < points.length; i++) {
@@ -832,7 +873,9 @@ export function chartNotes(
           j++;
           if (points[j].v > points[top].v) top = j;
         }
-        if (points[top].v - points[i].v >= 10)
+        // It holds: the two readings after the top stay at least 10 points over the start.
+        const held = [points[top + 1], points[top + 2]].every((p) => p && p.v - points[i].v >= 10);
+        if (points[top].v - points[i].v >= 10 && held)
           notes.push({
             at: points[i + 1].t,
             series: reading.key,
@@ -853,6 +896,20 @@ export function chartNotes(
       notes.push({ at: t, series: reading.key, text: title });
   }
   return notes.sort((a, b) => a.at - b.at);
+}
+
+/** Values in the units the legend shows them in (Settings › Display): EC in ppm when chosen, °C as
+ * °F; storage stays mS/cm and °C. Values are not rounded past the conversion's own float noise. */
+export function inDisplayUnits(
+  unit: Unit,
+  values: readonly (number | null)[],
+): { unit: string; values: (number | null)[] } {
+  const { ec, temp } = getDisplayUnits();
+  const map = (convert: (v: number) => number) =>
+    values.map((v) => (v === null ? null : Number(convert(v).toPrecision(12))));
+  if (unit === "mS/cm" && ec !== "mS/cm") return { unit: "ppm", values: map((v) => v * (ec === "ppm500" ? 500 : 700)) };
+  if (unit === "°C" && temp === "F") return { unit: "°F", values: map((v) => (v * 9) / 5 + 32) };
+  return { unit, values: [...values] };
 }
 
 const csvField = (text: string) => (/[",\n]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text);

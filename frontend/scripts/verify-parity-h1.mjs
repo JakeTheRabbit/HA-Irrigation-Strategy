@@ -16,7 +16,8 @@
  * - moving the mouse over a chart shows the time pill "HH:MM · P2" and the legend reads that time;
  * - Compare with last run draws the last run's lines (dashed) beside today's;
  * - 7 d reads a week; back to Today;
- * - #/history/timeline redirects here.
+ * - #/history/timeline redirects here;
+ * - "Setting changes will show on History › Changes." and the AI assistant's decisions show.
  * Also writes full-page light and dark screenshots of each run beside the harness's own. */
 import assert from "node:assert/strict";
 import { runParity } from "./parity-harness.mjs";
@@ -46,6 +47,8 @@ await runParity({
     assert.match(await page.locator("[data-range-text]").innerText(), /^\w{3} \d{1,2} \w{3,4}, 00:00 to now$/, `${label}: range text`);
     const exportButton = page.locator("[data-export-csv]");
     assert.equal((await exportButton.innerText()).trim(), "Export CSV · 8 series", `${label}: export`);
+    assert.equal((await page.locator("[data-changes-note]").innerText()).trim(), "Setting changes will show on History › Changes.", `${label}: changes note`);
+    assert.ok((await page.locator("[data-ai-decision]").count()) > 0, `${label}: AI assistant decisions`);
     region("header");
 
     // Lanes.

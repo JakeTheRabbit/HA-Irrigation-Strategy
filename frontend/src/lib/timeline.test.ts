@@ -81,6 +81,12 @@ describe("History › Explorer", () => {
     // Without a zone picked, the zone's probe detail waits for one.
     expect(html).not.toContain("data-history-explorer");
     expect(html).toContain("Pick a zone in the room list");
+    // Until History › Changes is built, the page says where setting changes will be.
+    expect(html).toContain("Setting changes will show on History › Changes.");
+    // The AI assistant's decisions that acted, with how each turned out.
+    expect(html).toContain("AI assistant decisions");
+    expect(html).toMatch(/data-ai-decision=/);
+    expect(html).toMatch(/class="explorer-outcome" data-worked="(true|false)"/);
   });
   it("keeps one operational chart on Zone and moves long-term evidence into History for that zone", () => {
     const states = createDemo(noon);

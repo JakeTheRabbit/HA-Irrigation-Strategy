@@ -2583,7 +2583,7 @@ try {
     const rangeQuery = new URLSearchParams(new URL(page.url()).hash.split("?")[1]);
     assert.equal(new URL(page.url()).hash.split("?")[0], "#/history/explorer");
     assert.equal(rangeQuery.get("zone"), "1");
-    assert.equal(rangeQuery.get("range"), "7d");
+    assert.equal(rangeQuery.get("zr"), "7d");
     // Any sensor of the room: ticking one adds its series, on an axis of its own unit.
     const more = await loads();
     await explorer.locator('[data-sensor="sensor.demo_vpd"]').check();

@@ -524,3 +524,59 @@
     padding-left: 10px;
   }
 }
+
+/* Until History › Changes is built, and the AI assistant's decisions until its page lists them. */
+.explorer-changes-note {
+  margin: -6px 0 14px;
+}
+.explorer-ai {
+  margin-bottom: 16px;
+}
+.explorer-ai-list {
+  margin: 0;
+  padding: 0 0 6px;
+  list-style: none;
+}
+.explorer-ai-list li {
+  display: grid;
+  grid-template-columns: 110px 70px minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  padding: 8px 20px;
+  border-top: 1px solid color-mix(in srgb, var(--border) 60%, transparent);
+  font-size: var(--text-sm);
+}
+.explorer-ai-list time {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.explorer-ai-result {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.explorer-outcome {
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--success) 16%, var(--surface));
+  color: color-mix(in srgb, var(--success) 60%, var(--foreground));
+}
+.explorer-outcome[data-worked="false"] {
+  background: color-mix(in srgb, var(--destructive) 14%, var(--surface));
+  color: var(--destructive);
+}
+@media (max-width: 720px) {
+  .explorer-ai-list li {
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    padding: 8px 14px;
+  }
+  .explorer-ai-list li > span:nth-child(3) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

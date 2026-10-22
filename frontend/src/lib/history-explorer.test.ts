@@ -10,6 +10,7 @@ import {
   defaultExplorerSeries,
   drybackMarkers,
   explorerCsv,
+  inDisplayUnits,
   explorerSensors,
   explorerSeries,
   loadExplorerEvents,
@@ -27,6 +28,7 @@ import {
   writeExplorerChoice,
   type NoteReading,
 } from "./history-explorer";
+import { setDisplayUnits } from "./display-units";
 import type { CsEvent } from "./parity-types";
 import type { ProjectionIntent } from "./strategy-review";
 import { buildRoom, discoverRooms } from "./model";
@@ -207,12 +209,27 @@ describe("range and address", () => {
       shots: false,
     };
     const hash = writeChoice("#/zone/1?code=CS-1", choice);
-    expect(hash.startsWith("#/zone/1?code=CS-1&range=custom")).toBe(true);
+    expect(hash.startsWith("#/zone/1?code=CS-1&zr=custom")).toBe(true);
     expect(readChoice(hash)).toEqual(choice);
     expect(readChoice("#/zone/1")).toEqual(DEFAULT_CHOICE);
-    expect(readChoice("#/zone/1?range=7d").preset).toBe("7d");
+    expect(readChoice("#/zone/1?zr=7d").preset).toBe("7d");
     // A custom range that is not one falls back to the default.
-    expect(readChoice("#/zone/1?range=custom&from=x").preset).toBe(DEFAULT_CHOICE.preset);
+    expect(readChoice("#/zone/1?zr=custom&zfrom=x").preset).toBe(DEFAULT_CHOICE.preset);
+    // An address from before: its `range` is read once when it is one of the zone presets.
+    expect(readChoice("#/zone/1?range=14d").preset).toBe("14d");
+    expect(readChoice("#/zone/1?range=growday&zr=3d").preset).toBe("3d");
+  });
+  it("keeps the room explorer's range and the zone explorer's apart in one address", () => {
+    let hash = "#/history/explorer?zone=1";
+    hash = writeExplorerChoice(hash, { range: "7d", from: null, to: null, series: null, last: false });
+    hash = writeChoice(hash, { ...DEFAULT_CHOICE, preset: "3d" });
+    hash = writeExplorerChoice(hash, { ...readExplorerChoice(hash), last: true });
+    // Reloaded: both read back as written.
+    expect(readExplorerChoice(hash)).toMatchObject({ range: "7d", last: true });
+    expect(readChoice(hash).preset).toBe("3d");
+    const custom = writeChoice(hash, { ...DEFAULT_CHOICE, preset: "custom", from: 1e12, to: 1.1e12 });
+    expect(readExplorerChoice(custom)).toMatchObject({ range: "7d", from: null });
+    expect(readChoice(custom)).toMatchObject({ preset: "custom", from: 1e12, to: 1.1e12 });
   });
   it("resolves each preset", () => {
     const now = Date.parse("2026-09-28T16:00:00Z");
@@ -254,7 +271,7 @@ describe("the room's sensors", () => {
 
 describe("the 30 d range and the dryback markers", () => {
   it("offers 30 d, kept in the address with the dryback overlay", () => {
-    const choice = readChoice("#/zone/1?range=30d&dryback=1");
+    const choice = readChoice("#/zone/1?zr=30d&dryback=1");
     expect(choice.preset).toBe("30d");
     expect(choice.dryback).toBe(true);
     expect(readChoice("#/zone/1").dryback).toBe(false);
@@ -314,13 +331,23 @@ describe("H1 explorer: lanes, notes, CSV and the event read", () => {
       { zone: 1, at: iso(at(15)), duration_s: 60, source: "engine", expected: true },
       { zone: 1, at: iso(at(16, 30)), duration_s: 60, source: "timer", expected: false },
     ];
-    const lane = phaseLane(events, span, projection, { now, zone: 1 });
-    expect(lane).toEqual([
+    const recorded = [
       { from: at(0), to: at(6), phase: "P3", planned: false },
       { from: at(6), to: at(7, 30), phase: "P0", planned: false },
       { from: at(7, 30), to: at(10), phase: "P1", planned: false },
       { from: at(10), to: now, phase: "P2", planned: false },
-      { from: now, to: at(16, 31), phase: "P2", planned: true },
+    ];
+    // The projection says when shots are planned, not in which phase: no planned phase is guessed.
+    expect(phaseLane(events, span, projection, { now, zone: 1 })).toEqual(recorded);
+    // A projection that carries each shot's phase draws it.
+    const phased = [
+      { ...projection[0], phase: "P2" },
+      { ...projection[1], phase: "P3" },
+    ];
+    expect(phaseLane(events, span, phased, { now, zone: 1 })).toEqual([
+      ...recorded,
+      { from: now, to: at(15, 1), phase: "P2", planned: true },
+      { from: at(15, 1), to: at(16, 31), phase: "P3", planned: true },
     ]);
     // No projection, no planned segment: the lane ends now.
     expect(phaseLane(events, span, null, { now, zone: 1 }).some((s) => s.planned)).toBe(false);
@@ -356,6 +383,7 @@ describe("H1 explorer: lanes, notes, CSV and the event read", () => {
         { t: at(6, 10), v: 41 },
         { t: at(6, 20), v: 74 },
         { t: at(7), v: 73 },
+        { t: at(7, 30), v: 73 },
       ],
     };
     const alert = event("alert.raised", at(9, 40), { title: "Pore EC 6.6 is over the band", entity_id: "sensor.ec_2" }, 2);
@@ -367,6 +395,44 @@ describe("H1 explorer: lanes, notes, CSV and the event read", () => {
       { at: at(6, 30), series: "tank", text: "Tank low" },
       { at: at(9, 30), series: "ec2", text: "Zone 2 over the band 09:30 to 11:00" },
     ]);
+  });
+
+  it("a refill is a rise that holds, and a probe dropout is a gap, not a refill", () => {
+    const tank = (values: [number, number][]): NoteReading => ({
+      key: "tank",
+      label: "Tank",
+      entityId: "sensor.tank",
+      kind: "level",
+      band: null,
+      points: values.map(([m, v]) => ({ t: at(6) + m * MIN, v })),
+    });
+    // 52 → 0 (the probe dropped out) → 52 again: no refill.
+    expect(chartNotes([], ["tank"], [tank([[0, 52], [5, 52], [10, 0], [15, 0], [20, 52], [25, 52], [30, 51]])], "UTC")).toEqual([]);
+    // A spike that falls straight back is not a refill either.
+    expect(chartNotes([], ["tank"], [tank([[0, 40], [5, 70], [10, 40], [15, 40]])], "UTC")).toEqual([]);
+    // A real refill: one note, at its first higher reading.
+    expect(chartNotes([], ["tank"], [tank([[0, 40], [5, 40], [10, 58], [15, 74], [20, 74], [25, 73]])], "UTC")).toEqual([
+      { at: at(6, 10), series: "tank", text: "Refilled 06:10 · 40% to 74%" },
+    ]);
+  });
+
+  it("the CSV says each value in the display units, as the legend does", () => {
+    setDisplayUnits({ ec: "ppm500", temp: "F" });
+    try {
+      const ec = inDisplayUnits("mS/cm", [2.79, null]);
+      const temp = inDisplayUnits("°C", [20]);
+      expect(ec).toEqual({ unit: "ppm", values: [1395, null] });
+      expect(temp).toEqual({ unit: "°F", values: [68] });
+      expect(inDisplayUnits("%", [58.4])).toEqual({ unit: "%", values: [58.4] });
+      const csv = explorerCsv([at(10)], [{ label: "Zone 1 Pore EC", ...ec }, { label: "Zone 1 Root temp", ...temp }], "UTC");
+      expect(csv.split("\n")[0]).toBe("Time,Zone 1 Pore EC (ppm),Zone 1 Root temp (°F)");
+      expect(csv.split("\n")[1]).toBe("2026-10-22 10:00,1395,68");
+      setDisplayUnits({ ec: "ppm700", temp: "C" });
+      expect(inDisplayUnits("mS/cm", [2])).toEqual({ unit: "ppm", values: [1400] });
+      expect(inDisplayUnits("°C", [20.4])).toEqual({ unit: "°C", values: [20.4] });
+    } finally {
+      setDisplayUnits({ ec: "mS/cm", temp: "C" });
+    }
   });
 
   it("csv header counts selected series", () => {
@@ -401,17 +467,37 @@ describe("H1 explorer: lanes, notes, CSV and the event read", () => {
     expect(query.mock.calls[0][1].until).toBe(iso(span.end));
     expect(read).toMatchObject({ kind: "ok", truncated: false });
     if (read.kind === "ok") expect(read.events.map((e) => Date.parse(e.ts))).toEqual([...read.events.map((e) => Date.parse(e.ts))].sort((a, b) => a - b));
-    // Over the cap: the newest whole days only, and it says so.
-    const many = vi.fn(async (_c: unknown, q: { since: string }, max?: number) => ({
-      kind: "ok" as const,
-      data: { events: Array.from({ length: Math.min(max ?? 5000, 3) }, (_, i) => event("shot.completed", Date.parse(q.since) + i * MIN, {}, 1)) },
-      revision: null,
-      readback: { status: "verified" as const, at: null },
-      eventIds: [],
-    }));
-    const capped = await loadExplorerEvents({ operator: vi.fn() } as never, "room:", span, many, 7);
+    // A store that answers as journal_query does: oldest first from `since`, at most `max`.
+    const store = (perDay: number) => {
+      const all = Array.from({ length: 7 * perDay }, (_, i) =>
+        event("shot.completed", span.start + Math.floor((i * DAY) / perDay) + MIN, { n: i }, 1),
+      );
+      let open = 0;
+      let peak = 0;
+      const read = vi.fn(async (_c: unknown, q: { since: string; until?: string }, max = 5000) => {
+        open++;
+        peak = Math.max(peak, open);
+        await new Promise((resolve) => setTimeout(resolve, 1));
+        open--;
+        const from = Date.parse(q.since),
+          to = Date.parse(q.until ?? "");
+        const events = all.filter((e) => Date.parse(e.ts) >= from && Date.parse(e.ts) < to).slice(0, max);
+        return { kind: "ok" as const, data: { events }, revision: null, readback: { status: "verified" as const, at: null }, eventIds: [] };
+      });
+      return { all, read, peak: () => peak };
+    };
+    // Over the cap: the newest events, not the oldest of the last day read, and it says so.
+    const three = store(3);
+    const capped = await loadExplorerEvents({ operator: vi.fn() } as never, "room:", span, three.read, 7);
     expect(capped).toMatchObject({ kind: "ok", truncated: true });
-    if (capped.kind === "ok") expect(capped.events).toHaveLength(6);
+    if (capped.kind === "ok") expect(capped.events.map((e) => e.data.n)).toEqual(three.all.slice(-7).map((e) => e.data.n));
+    // One day alone over the cap: still its newest.
+    const busy = store(40);
+    const day = await loadExplorerEvents({ operator: vi.fn() } as never, "room:", span, busy.read, 25);
+    if (day.kind === "ok") expect(day.events.map((e) => e.data.n)).toEqual(busy.all.slice(-25).map((e) => e.data.n));
+    // The days are read four at a time.
+    expect(three.peak()).toBeLessThanOrEqual(4);
+    expect(three.peak()).toBeGreaterThan(1);
   });
 });
 

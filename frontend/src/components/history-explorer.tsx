@@ -43,6 +43,7 @@ import {
   explorerSensors,
   explorerSeries,
   explorerSpan,
+  inDisplayUnits,
   loadExplorerEvents,
   phaseLane,
   pickRuns,
@@ -137,7 +138,7 @@ export function useGrids(
         const day = days[next++];
         try {
           const result = await read({
-            entityIds: [...wanted, ...events],
+            entityIds: [...new Set([...wanted, ...events])],
             attributeIds: [],
             ...day,
           });
@@ -1288,18 +1289,21 @@ export function RoomExplorer({ controller, zone }: { controller: Controller; zon
         : controller.timeline,
     [controller.demo, controller.timeline, controller.states],
   );
+  // The tank level's own readings too: a refill is read from them, not from the grid's averages.
+  const tankLevel = shown.find((series) => series.chart === "Tank level")?.entityId ?? null;
   const recorded = useGrids(
     controller,
     shown.map((series) => series.entityId),
-    legacy && phaseEntity && states[phaseEntity] ? [phaseEntity] : [],
+    [...(legacy && phaseEntity && states[phaseEntity] ? [phaseEntity] : []), ...(tankLevel ? [tankLevel] : [])],
     connected ? data : null,
     step,
     reader,
   );
-  // A VWC of 0 or less is a probe gap, not a dry slab.
+  // A VWC or a tank level of 0 or less is a probe gap, not a dry slab or an empty tank.
+  const gappy = (series: ExplorerSeries) => series.kind === "vwc" || series.chart === "Tank level";
   const values = (series: ExplorerSeries) => {
     const list = recorded.values.get(series.entityId) ?? null;
-    return list && series.kind === "vwc" ? list.map((v) => (v !== null && v <= 0 ? null : v)) : list;
+    return list && gappy(series) ? list.map((v) => (v !== null && v <= 0 ? null : v)) : list;
   };
 
   // Compare with the last run: the previous finished run at the same grow days.
@@ -1418,7 +1422,13 @@ export function RoomExplorer({ controller, zone }: { controller: Controller; zon
       entityId: series.entityId,
       band: bandOf(series),
       kind: series.chart === "Tank level" ? "level" : "value",
-      points: (values(series) ?? []).flatMap((v, i) => (v === null ? [] : [{ t: times[i], v }])),
+      points:
+        series.chart === "Tank level"
+          ? (recorded.rows.get(series.entityId) ?? []).flatMap((row) => {
+              const v = Number(row.state);
+              return row.state.trim() && Number.isFinite(v) && data && row.time >= data.start ? [{ t: row.time, v }] : [];
+            })
+          : (values(series) ?? []).flatMap((v, i) => (v === null ? [] : [{ t: times[i], v }])),
     }));
   const notes = legacy || !read ? [] : chartNotes(journal, selected, readings, timeZone);
 
@@ -1443,7 +1453,11 @@ export function RoomExplorer({ controller, zone }: { controller: Controller; zon
     if (!grid) return;
     const csv = explorerCsv(
       times,
-      shown.map((series) => ({ label: `${series.groupLabel} ${series.chartTitle}`, unit: series.unit, values: values(series) ?? [] })),
+      // In the units the legend shows: ppm or °F where Settings › Display says so.
+      shown.map((series) => ({
+        label: `${series.groupLabel} ${series.chartTitle}`,
+        ...inDisplayUnits(series.unit, values(series) ?? []),
+      })),
       timeZone,
     );
     const url = URL.createObjectURL(new Blob(["﻿", csv], { type: "text/csv;charset=utf-8" }));
