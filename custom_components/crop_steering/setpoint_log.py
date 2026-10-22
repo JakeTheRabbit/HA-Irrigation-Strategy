@@ -7,7 +7,9 @@ without the log) reads as an empty log; nothing is written until a setting moves
 
 Who: Home Assistant sees only the controller app's token, so the controller names the writer of
 each of its writes first, with the `crop_steering_setpoint_write` event (the learner, the AI brain,
-or the brain's safety put-back). A claim names one write: that write consumes it, and the controller
+or the brain's safety put-back). A brain write also names the AI ledger row it carries out
+(`ledger_id`), which its target.changed carries in correlation.ledger_id: that row's ai.outcome finds
+the change by it (changes.py). A claim names one write: that write consumes it, and the controller
 takes it back (`crop_steering_setpoint_claim_cancel`) when its write did not land. A write it has not
 named is the operator's when a signed-in person made it, and Home Assistant's own (an automation or a
 script) otherwise.
@@ -47,11 +49,13 @@ class SetpointLog:
         self._store = store
         self._lock = asyncio.Lock()
         # entity_id -> (value, who, monotonic seconds, expires or None, reason or None, expected or None,
-        # claim_id or None: a controller from before CTL-035 sends none)
+        # claim_id or None: a controller from before CTL-035 sends none, ledger_id or None)
         self._claims = {}
         self._reasons = (
             {}
         )  # entity_id -> (reason, expected) the last named write gave, for record()
+        # entity_id -> the AI ledger row the last named write gave, for record()
+        self._ledger_ids = {}
         self.changes = []
         self.error = None
         # ids of the contexts whose writes a caller journals itself, with their readback
@@ -102,6 +106,7 @@ class SetpointLog:
                 reason,
                 expected,
                 data.get("claim_id"),
+                str(data["ledger_id"]) if data.get("ledger_id") is not None else None,
             )
 
     def cancel(self, data):
@@ -130,6 +135,8 @@ class SetpointLog:
         ):
             if claim[4] or claim[5]:
                 self._reasons[entity_id] = (claim[4], claim[5])
+            if claim[7]:
+                self._ledger_ids[entity_id] = claim[7]
             return claim[1], claim[3]
         user_id = getattr(context, "user_id", None)
         user = await self.hass.auth.async_get_user(user_id) if user_id else None
@@ -144,8 +151,10 @@ class SetpointLog:
         from homeassistant.util import dt as dt_util
 
         self._reasons.pop(entity_id, None)
+        self._ledger_ids.pop(entity_id, None)
         who, expires = await self.who(entity_id, new, context)
         reason, expected = self._reasons.pop(entity_id, None) or (None, None)
+        ledger_id = self._ledger_ids.pop(entity_id, None)
         if self.error is not None or old == new:
             return who, expires
         row = {
@@ -186,6 +195,7 @@ class SetpointLog:
                 "expected": expected,
                 "entity_id": entity_id,
             },
+            **({"correlation": {"ledger_id": ledger_id}} if ledger_id else {}),
         )
         return who, expires
 

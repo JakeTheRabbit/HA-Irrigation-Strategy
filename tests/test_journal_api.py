@@ -93,6 +93,20 @@ def test_append_rejects_a_bad_event_and_stores_the_rest(tmp_path, monkeypatch):
     asyncio.run(go())
 
 
+def test_a_non_object_event_is_rejected_on_its_own(tmp_path, monkeypatch):
+    hass, api = _rig(monkeypatch, tmp_path)
+
+    async def go():
+        hub = api.JournalHub(hass, str(tmp_path / "journal.db"))
+        await hub.async_init()
+        first, last = _event(), _event()
+        out = await hub.append(ROOM, [first, "not an event", 7, None, last])
+        assert out["accepted"] == [first["id"], last["id"]]
+        assert out["rejected"] == [{"id": None, "error": "event must be an object"}] * 3
+
+    asyncio.run(go())
+
+
 def test_append_refuses_more_than_50_events(tmp_path, monkeypatch):
     hass, api = _rig(monkeypatch, tmp_path)
     from homeassistant.exceptions import HomeAssistantError

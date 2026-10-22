@@ -123,6 +123,19 @@ def test_a_write_with_no_person_is_an_automation_and_the_brain_is_ai(emitted):
     )
 
 
+def test_the_brains_write_carries_its_ledger_id(emitted):
+    log = log_rig()
+    log.claim({"entity_id": ENTITY, "value": 49.0, "who": "brain", "ledger_id": "7"})
+    record(log, 50.0, 49.0)
+    log.claim({"entity_id": ENTITY, "value": 48.0, "who": "learner"})
+    record(log, 49.0, 48.0)
+    ai, learner = emitted
+    assert ai.correlation == {"ledger_id": "7"}
+    assert not hasattr(
+        learner, "correlation"
+    )  # a write that names no ledger row is journaled as before
+
+
 def test_a_safety_put_back_is_safety(emitted):
     log = log_rig()
     log.claim({"entity_id": ENTITY, "value": 50.0, "who": "safety"})

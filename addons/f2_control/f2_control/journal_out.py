@@ -48,9 +48,10 @@ class Outbox:
 
     def emit(self, room_prefix: str, kind: str, *, zone=None, outcome="ok", code=None, actor="engine",
              detail=None, program_id=None, data=None, correlation=None, readback=None, durable=False,
-             now: datetime | None = None) -> str:
-        """Append one event for the room with this prefix ("" or "f2_", never its slug) -> its id."""
-        event_id = new_id()
+             now: datetime | None = None, event_id: str | None = None) -> str:
+        """Append one event for the room with this prefix ("" or "f2_", never its slug) -> its id. `event_id`: one
+        derived from the row an event mirrors (ids.derived_id), so the same row is always the same event."""
+        event_id = event_id or new_id()
         try:
             event = {
                 "v": 1,

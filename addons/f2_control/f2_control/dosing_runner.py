@@ -39,6 +39,7 @@ from copy import deepcopy
 from datetime import datetime, timedelta, timezone
 
 import ph_correct
+from crop_steering_engine.ids import derived_id, new_id
 
 POLL_S = 2.0  # each room's dosing_config is read this often
 READ_S = 1.0  # a dosing pump is read this often during a dose
@@ -141,6 +142,73 @@ def _event(*parts):
     return re.sub(r"[^a-z0-9]+", "_", "_".join(str(p) for p in parts if p).lower()).strip("_")[:80]
 
 
+# How a dose's result reads in the journal (dose.completed): (outcome, code). Any other end is a failure (CS-806).
+_DOSE_ENDS = {"finished": ("ok", None), "ended early": ("partial", "CS-802"), "not confirmed": ("failed", "CS-802"),
+              "ran past its time": ("failed", "CS-801"), "stopped": ("aborted", None),
+              "interrupted by a restart": ("failed", "CS-803")}
+
+
+def _actor(by):
+    """A request a person made (its `by`) is manual; one with no person, an automation's."""
+    return "manual" if by else "automation"
+
+
+def _dose_event(slug, item, flow, by, batch_id):
+    """dose.completed for one dose given (`item` as _Job.dosed keeps it) -> (kind, Outbox.emit keywords). Its id is
+    derived from the room and the dose's start, so the dose is the same event live or backfilled (history_events)."""
+    at = item["at"]
+    when = datetime.fromisoformat(at)
+    outcome, code = _DOSE_ENDS.get(str(item.get("result") or "").split(";")[0], ("failed", "CS-806"))
+    return "dose.completed", {
+        "now": when, "event_id": derived_id(when, f"dosing:{slug}:{at}:dose.completed"), "outcome": outcome,
+        "code": code, "actor": _actor(by), "detail": by, "correlation": {"batch_id": batch_id},
+        "data": {"pump": item.get("pump"), "ml": item.get("ml"), "given_ml": item.get("given"), "flow_ml_s": flow}}
+
+
+def _failed(result, name, by, batch_id, codes=(), stopped=None):
+    """batch.failed's keywords for a batch (or pH correction) that did not finish: the step it stopped in and why, from
+    its result ("stopped: <step>: <reason>"), and the code of its first alert other than CS-806 (CS-806 when it raised
+    no other). A stop asked for is aborted."""
+    parts = str(result).split(": ", 2)
+    step, reason = (parts[1], parts[2]) if len(parts) == 3 and parts[0] == "stopped" else (None, str(result))
+    own = [c for c in codes if c != "CS-806"]
+    if stopped is None:
+        stopped = reason.startswith("stop requested")
+    return {"outcome": "aborted" if stopped else "failed", "code": own[0] if own else ("CS-806" if codes else None),
+            "actor": _actor(by), "detail": by, "correlation": {"batch_id": batch_id},
+            "data": {"step": step, "reason": reason, "recipe": name}}
+
+
+def history_events(slug, history):
+    """The journal events of a room's dosing history from before the journal (Controller._journal_backfill): each dose
+    given as dose.completed, each batch's end as batch.step finish (done) or batch.failed, with ids derived from the
+    row, "dosing:<slug>:<at>:<kind>" -> [(kind, Outbox.emit keywords)]. A row it cannot read is left out."""
+    out = []
+    for row in reversed(history):  # the history keeps the newest first
+        try:
+            at = row["at"]
+            when = datetime.fromisoformat(at)
+            try:
+                ended = datetime.fromisoformat(row["ended_at"])
+            except (KeyError, TypeError, ValueError):
+                ended = when
+            kind, by = row.get("kind"), row.get("by")
+            batch_id = derived_id(when, f"dosing:{slug}:{at}:batch") if kind in ("batch", "correct") else None
+            events = [_dose_event(slug, item, None, by, batch_id) for item in row.get("dosed") or []
+                      if isinstance(item, dict) and item.get("at")]
+            if kind == "batch":
+                name, result = row.get("name") or "", str(row.get("result") or "")
+                end = "batch.step" if result.startswith("finished") else "batch.failed"
+                kw = ({"actor": _actor(by), "detail": by, "correlation": {"batch_id": batch_id},
+                       "data": {"step": "finish", "state": "done", "recipe": name}} if end == "batch.step"
+                      else _failed(result, name, by, batch_id))
+                events.append((end, {**kw, "now": ended, "event_id": derived_id(when, f"dosing:{slug}:{at}:{end}")}))
+        except (KeyError, TypeError, ValueError, AttributeError):
+            continue
+        out += events
+    return out
+
+
 def _aware(stamp):
     try:
         parsed = datetime.fromisoformat(str(stamp).replace("Z", "+00:00"))
@@ -167,6 +235,8 @@ class _Job:
         self.doses = {}  # pump -> mL of every dose started, for the history
         self.dosed = []  # each dose in the order it went in: pump, name, mL asked, mL given, result
         self.started_at = None
+        self.id = new_id()  # the journal's batch_id: every step of a batch, and its doses, carry it
+        self.codes = []  # the codes of the alerts it raised, in order (its batch.failed names the first)
 
 
 class DosingRunner:
@@ -679,6 +749,10 @@ class DosingRunner:
         end = job.cut_at if job.cut_at is not None else self._mono()
         elapsed = end - job.pressed if job.pressed is not None else 0.0
         given = self._given(result, ml, flow, elapsed)
+        if not result.startswith("refused"):
+            self._journal(job.room, lambda: _dose_event(
+                job.room.slug, {"pump": pump["id"], "ml": ml, "given": given, "result": result, "at": started}, flow,
+                job.request.get("by"), job.id if job.kind != "dose" else None))
         result = self._stock_draw(job, pump, given, result, started)
         if not result.startswith("refused"):
             job.doses[pump["id"]] = ml
@@ -1039,6 +1113,9 @@ class DosingRunner:
         with self._lock:
             view = self._live_of(room)["batch"]
             view.update(step="idle", pump=None, result=result, ended_at=self._now().isoformat())
+        if not result.startswith("finished"):
+            self._journal(room, lambda: ("batch.failed", _failed(result, batch.get("name") or "", request.get("by"),
+                                                                 job.id, job.codes, job.stopped)))
         left = bool(stuck or hold_left)
         if left:
             title = ("the hold of a finished batch did not release" if result.startswith("finished")
@@ -1780,6 +1857,9 @@ class DosingRunner:
         with self._lock:
             view = self._live_of(room)["batch"]
             view.update(step="idle", pump=None, result=result, ended_at=self._now().isoformat())
+        if not result.startswith("finished"):
+            self._journal(room, lambda: ("batch.failed", _failed(result, "pH correction", None, job.id, job.codes,
+                                                                 job.stopped)))
         left = bool(stuck or hold_left)
         if left:
             self._hold_stuck(room, stuck, batch.get("hold_entity"), held, "CS-806", "a pH correction stopped",
@@ -2014,6 +2094,9 @@ class DosingRunner:
         Assistant has it: tried now, and again with the chores until it is created. A newer one for
         the same event replaces one still waiting."""
         item = {"slug": slug, "code": code, "title": title, "message": message, "event": event}
+        job = self._job
+        if job is not None and job.room.slug == slug:
+            job.codes.append(code)  # for its batch.failed
         with self._lock:
             outbox = [a for a in self._doc["outbox"]
                       if (a.get("slug"), a.get("code"), a.get("event")) != (slug, code, event)]
@@ -2046,12 +2129,15 @@ class DosingRunner:
             view = self._live_of(job.room)["batch"]
             view.update(step=step, step_started_at=now)
             view["steps"].append({"step": step, "state": "running", "at": now, "note": None})
+        self._journal_step(job, step, "running")
         self._show(job.room, job.config)
         self._check(job, catch=True)  # a stop is looked for at every step
 
     def _done(self, job):
         with self._lock:
-            self._live_of(job.room)["batch"]["steps"][-1]["state"] = "done"
+            last = self._live_of(job.room)["batch"]["steps"][-1]
+            last["state"] = "done"
+        self._journal_step(job, last["step"], "done")
         self._show(job.room, job.config)
 
     def _skip(self, job, step, note):
@@ -2059,8 +2145,35 @@ class DosingRunner:
         with self._lock:
             self._live_of(job.room)["batch"]["steps"].append(
                 {"step": step, "state": "skipped", "at": self._now().isoformat(), "note": note})
+        self._journal_step(job, step, "skipped")
         self._show(job.room, job.config)
         self._check(job, catch=True)
+
+    # ------------------------------------------------------------------ the journal
+    def _journal(self, room, make):
+        """One event to the controller's journal outbox (journal_out.Outbox.emit), `make()` -> (kind, its keywords):
+        built and appended locally, never a wait, and an error anywhere in it is only logged. Nothing a dose or batch
+        does waits on it or changes with it."""
+        journal = getattr(self.c, "journal", None)
+        if journal is None:
+            return
+        try:
+            kind, kw = make()
+            journal.emit(getattr(room, "prefix", ""), kind, **kw)
+        except Exception as e:
+            self._log("dosing: journal error", repr(e))
+
+    def _journal_step(self, job, step, state):
+        """batch.step for a batch's (or pH correction's) step, with the job's id as its batch_id."""
+
+        def make():
+            with self._lock:
+                name = self._live_of(job.room)["batch"].get("name") or ""
+            by = job.request.get("by")
+            return "batch.step", {"actor": _actor(by), "detail": by, "correlation": {"batch_id": job.id},
+                                  "data": {"step": step, "state": state, "recipe": name}}
+
+        self._journal(job.room, make)
 
     # ------------------------------------------------------------------ status
     def _live_of(self, room):

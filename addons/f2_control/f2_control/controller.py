@@ -1162,6 +1162,7 @@ class Controller:
         self.journal = journal_out.Outbox(os.path.join(os.path.dirname(self._state_path), "journal_outbox.jsonl"))
         self.journal.client = f"f2_control/{CONTROLLER_VERSION}"
         self._journal_skip = 0  # passes the flush still skips after a failure
+        brain_bridge.journal_ledger(self)  # the AI assistant's verdicts and their outcomes, into the same outbox
         self._guard = {}  # room slug -> {"answered", "seen", "until"} (_guard_read)
         self._guard_lock = threading.Lock()
         # Dosing runs in steps on the main loop, which wakes whenever one is due (run, _sleep_for). Like
@@ -1288,6 +1289,7 @@ class Controller:
         # state for all rooms (nested by slug; old flat single-room files load as 'default')
         self._load_state()
         self._apply_setup_descriptors()  # Gate tombstones/revisions before the very first shot.
+        self._journal_backfill()  # before the dosing thread and the first pass: nothing of theirs is in it yet
         # The guard's first read, before run() starts the dosing thread: a room counts as held until its
         # heartbeat has been read.
         for room in self.rooms:
@@ -1664,6 +1666,7 @@ class Controller:
         room.hardware_fault = None
         room.shot_inflight = None
         room.strategy_required = False
+        room.journal_backfill = False  # its dosing history and ledger rows sent to the journal (_journal_backfill)
         room._strategy_persisted = True
         room._off_since = None
         block = per_room.get(room.slug)
@@ -1679,6 +1682,7 @@ class Controller:
         room._dimmer = dry_dim.Dimmer(restarted=room._dim is not None)
         if isinstance(block, dict):
             room.strategy_required = bool(block.get("_strategy_required", False))
+            room.journal_backfill = block.get("_journal_backfill") == 1
             try:
                 room._off_since = datetime.fromisoformat(block["_room_off_since"])
             except (KeyError, TypeError, ValueError):
@@ -2056,6 +2060,8 @@ class Controller:
                     block["_strategy_required"] = True
                 else:
                     block.pop("_strategy_required", None)
+                if getattr(room, "journal_backfill", False):  # inside the room's block: a top-level key reads as a room
+                    block["_journal_backfill"] = 1
                 if room.hardware_fault:
                     block["_hardware_fault"] = room.hardware_fault
                 else:
@@ -3433,10 +3439,12 @@ class Controller:
             pass
         return float(lo), float(hi)
 
-    def _auto_write(self, room, zone, suffix, old, value, learn, now, by="auto", reason=None, expected=None):
+    def _auto_write(self, room, zone, suffix, old, value, learn, now, by="auto", reason=None, expected=None,
+                    ledger_id=None):
         """Write one per-zone number -> False when it was not written (no such number, or Home Assistant refused).
         `reason` and `expected`: why, and the result expected, for the room's setpoint change log (an AI assistant
-        power's write names both)."""
+        power's write names both). `ledger_id`: the AI assistant's ledger row the write carries out, named in the
+        claim so the integration's target.changed carries it (its ai.outcome finds the change by it)."""
         entity = f"number.crop_steering_{room.prefix}zone_{zone}_{suffix}"
         if ha_get(entity)[0] in (None, "unknown", "unavailable", ""):
             return False  # no per-zone number on this install: room-level values are the operator's, never ours
@@ -3453,6 +3461,8 @@ class Controller:
             claim["reason"] = str(reason)[:200]
         if expected:
             claim["expected"] = str(expected)[:200]
+        if ledger_id:
+            claim["ledger_id"] = str(ledger_id)
         if by.startswith(("Jev", "AI setpoints judge")) and who == "brain":
             # An AI change is an overlay that goes back by itself (the integration's overlays.py): at the
             # lights-on that ends the grow-day it is for. A night move (P3) is for the next grow-day.
@@ -6986,6 +6996,7 @@ class Controller:
         self._check_defaulted_setpoints()
         self._maybe_notify(all_pub, now)
         self._send_events()
+        self._journal_backfill()  # a room discovered since the start: after the pass, never before a shot
         self._flush_journal()
 
     def _journal(self, room_prefix, kind, **kw):
@@ -6993,6 +7004,53 @@ class Controller:
         -> its id, or None for a controller built without one."""
         journal = getattr(self, "journal", None)
         return journal.emit(room_prefix, kind, **kw) if journal is not None else None
+
+    def _journal_backfill(self):
+        """Once per room (its state block's `_journal_backfill: 1`): the room's dosing history (dosing_state.json) and
+        the AI assistant's ledger rows for it (jev_ledger.jsonl) from before the journal, as journal events with ids
+        derived from each row (dosing_runner.history_events, brain_bridge.ledger_events), so a backfill that runs
+        again (the app stopped before its state was saved) sends the same ids, and journal_append keeps one of each.
+        Local file reads and outbox appends only; a row it cannot read is left out, and an error leaves the flag
+        unset for the next start."""
+        journal = getattr(self, "journal", None)
+        todo = [r for r in self.rooms if not getattr(r, "journal_backfill", False)]
+        if journal is None or not todo:
+            return
+        data = os.path.dirname(self._state_path) or "."
+        try:
+            with open(os.path.join(data, "dosing_state.json"), encoding="utf-8") as fh:
+                dosing = (json.load(fh).get("rooms") or {})
+        except (OSError, ValueError, AttributeError):
+            dosing = {}
+        rows = []
+        try:
+            with open(os.path.join(data, "jev_ledger.jsonl"), encoding="utf-8") as fh:
+                for line in fh:
+                    try:
+                        rows.append(json.loads(line))
+                    except ValueError:
+                        continue
+        except OSError:
+            pass
+        for room in todo:
+            try:
+                block = dosing.get(room.slug) if isinstance(dosing, dict) else None
+                history = block.get("history") if isinstance(block, dict) else None
+                events = [(kw["now"], kind, kw) for kind, kw in
+                          dosing_runner.history_events(room.slug, history if isinstance(history, list) else [])]
+                for row in rows:
+                    if isinstance(row, dict) and row.get("room") == room.slug:
+                        try:
+                            events += [(kw["now"], kind, kw) for kind, kw in brain_bridge.ledger_events(row)]
+                        except (KeyError, TypeError, ValueError):
+                            continue
+                for _at, kind, kw in sorted(events, key=lambda e: e[0].timestamp()):
+                    journal.emit(room.prefix, kind, **kw)
+                room.journal_backfill = True
+                if events:
+                    log(f"[{room.slug}] journal: {len(events)} events of its dosing and AI history queued once")
+            except Exception as e:
+                log(f"[{room.slug}] journal backfill error", e)
 
     def _flush_journal(self):
         """The outbox to the integration (crop_steering.journal_append), once, after every room's pass and never

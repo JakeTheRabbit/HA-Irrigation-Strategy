@@ -78,22 +78,35 @@ def _kind(event) -> str:
     return "calibration"
 
 
+def _ledger_key(event):
+    ledger_id = (event.get("correlation") or {}).get("ledger_id")
+    return None if ledger_id is None else (event.get("room_id"), str(ledger_id))
+
+
 def _outcomes(events) -> dict:
-    """{change event id: ai.outcome data} (the outcome names the change in correlation.causation_id)."""
-    out = {}
+    """{(room_id, ledger_id): [(ts ms, ai.outcome data)]}. An outcome names the controller's ledger row in
+    correlation.ledger_id, and so does the AI's own write of the change it judges (setpoint_log, from its claim).
+    """
+    out: dict = {}
     for event in events:
-        if event.get("kind") != "ai.outcome":
-            continue
-        cause = (event.get("correlation") or {}).get("causation_id")
-        if cause:
-            out[cause] = event.get("data") or {}
+        key = _ledger_key(event) if event.get("kind") == "ai.outcome" else None
+        if key is not None:
+            out.setdefault(key, []).append(
+                (_ms(event.get("ts")), event.get("data") or {})
+            )
+    for found in out.values():
+        found.sort(key=lambda o: o[0])
     return out
 
 
 def _outcome(event, outcomes):
     if (event.get("source") or {}).get("actor") not in WRITERS:
         return None
-    found = outcomes.get(event["id"])
+    # A ledger that was damaged starts its ids again: only an outcome at or after the change judges it.
+    at = _ms(event.get("ts"))
+    found = next(
+        (data for ts, data in outcomes.get(_ledger_key(event), ()) if ts >= at), None
+    )
     if found is None or not isinstance(found.get("good"), bool):
         return TOO_SOON
     return GOOD if found["good"] else NOT_YET

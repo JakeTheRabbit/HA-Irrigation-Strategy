@@ -133,7 +133,8 @@ class JournalHub:
             try:
                 valid.append(validate_event(event))
             except ValueError as err:
-                rejected.append({"id": event.get("id"), "error": str(err)})
+                event_id = event.get("id") if isinstance(event, dict) else None
+                rejected.append({"id": event_id, "error": str(err)})
         await self._wait_ready()
         async with self._lock:
             try:

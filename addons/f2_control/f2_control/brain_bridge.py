@@ -47,6 +47,7 @@ from brain import plan_task as jev_plan
 from brain import powers as jev_powers
 from brain.setpoint_memory import SetpointMemory
 import phase_options
+from crop_steering_engine.ids import derived_id
 
 ALL = ("dawn", "ramp", "salt", "dusk", "probe", "shot", "night", "zones", "stage", "setpoints", "channel", "balance", "feed", "report", "why",
        "plan", "targets", "shotsize")
@@ -704,10 +705,72 @@ def _last_words(last):
                else " (put back after a rescue shot)" if last.get("reverted") else ""))
 
 
-def _pending(suffix, frm, to, by, now):
-    """A write to read back: sent once now, again RETRIES times, PENDING_S apart and doubling, while it has not landed."""
-    return {"suffix": suffix, "from": frm, "to": to, "by": by, "at": now.isoformat(timespec="seconds"),
-            "tries": 0, "next": (now + timedelta(seconds=PENDING_S)).isoformat(timespec="seconds")}
+def _pending(suffix, frm, to, by, now, ledger_id=None):
+    """A write to read back: sent once now, again RETRIES times, PENDING_S apart and doubling, while it has not landed.
+    `ledger_id`: the ledger row the write carries out, named again by each write sent again."""
+    out = {"suffix": suffix, "from": frm, "to": to, "by": by, "at": now.isoformat(timespec="seconds"),
+           "tries": 0, "next": (now + timedelta(seconds=PENDING_S)).isoformat(timespec="seconds")}
+    if ledger_id:
+        out["ledger_id"] = ledger_id
+    return out
+
+
+def _ledger_id(c, room, zone, d, now):
+    """The id of the ledger row the brain recorded for this directive on this pass (Brain._judge), as a string, or None
+    (a dry run records none, nor does an answer already acted on). The write names it in its claim, so the
+    integration's target.changed carries it, and the row's ai.outcome finds that change (changes.py)."""
+    at = now.isoformat(timespec="seconds")
+    for e in reversed(list(getattr(getattr(c.jev, "ledger", None), "entries", None) or ())):
+        if isinstance(e, dict) and (e.get("judge"), e.get("room"), e.get("zone"), e.get("action"), e.get("at")) == (
+                d.judge, room.slug, zone, d.kind, at):
+            return str(e["id"])
+    return None
+
+
+def _named(ledger_id):
+    """_auto_write's ledger_id keyword, only when there is one (a write the ledger holds no row for is as before)."""
+    return {"ledger_id": ledger_id} if ledger_id else {}
+
+
+def ledger_events(entry, what=None):
+    """The journal events one ledger row mirrors (spec 3, Judgement): "record" its ai.judgement, "resolve" its ai.outcome
+    once its check is known, None both (the backfill) -> [(kind, Outbox.emit keywords)]. Each id is derived from the
+    row, so a row is the same event live or backfilled, and correlation.ledger_id is the row's id."""
+    out = []
+    ledger_id = str(entry["id"])
+    common = {"zone": entry.get("zone"), "actor": "ai", "detail": entry.get("judge"),
+              "correlation": {"ledger_id": ledger_id}}
+    if what in (None, "record"):
+        at = datetime.fromisoformat(entry["at"])
+        out.append(("ai.judgement", {
+            **common, "now": at, "event_id": derived_id(at, f"ledger:{ledger_id}"),
+            "outcome": "refused" if entry.get("action") == "refused" else "ok",
+            "data": {"judge": entry.get("judge"), "label": entry.get("label"), "action": entry.get("action"),
+                     "power": JUDGE_POWER.get(entry.get("judge")), "evidence": entry.get("evidence") or {}}}))
+    result = entry.get("outcome")
+    if what in (None, "resolve") and isinstance(result, dict):
+        known = datetime.fromisoformat(result.get("at") or entry.get("check_at") or entry["at"])
+        out.append(("ai.outcome", {
+            **common, "now": known, "event_id": derived_id(known, f"ledger:{ledger_id}:outcome"),
+            "data": {"what": result.get("what"), "good": bool(result.get("good"))}}))
+    return out
+
+
+def journal_ledger(c):
+    """Mirror the AI assistant's ledger into the controller's journal outbox (Ledger.listener): each row as it is
+    recorded and each check as it is written back, into the room the row names (a slug, mapped to its prefix). A row
+    for a room no longer here is left out. Only a local append (journal_out.Outbox.emit), never a wait."""
+    ledger = getattr(getattr(c, "jev", None), "ledger", None)
+    if ledger is None or getattr(c, "journal", None) is None:
+        return
+
+    def mirror(what, entry):
+        room = next((r for r in list(getattr(c, "rooms", None) or ()) if r.slug == entry.get("room")), None)
+        if room is not None:
+            for kind, kw in ledger_events(entry, what):
+                c.journal.emit(room.prefix, kind, **kw)
+
+    ledger.listener = mirror
 
 
 def readback(c, room, zone, now):
@@ -734,7 +797,7 @@ def readback(c, room, zone, now):
         pend["tries"] += 1
         pend["next"] = (now + timedelta(seconds=PENDING_S * 2 ** pend["tries"])).isoformat(timespec="seconds")
         learn = room.state[zone].get("learn") if isinstance(room.state[zone].get("learn"), dict) else {}
-        c._auto_write(room, zone, suffix, frm, to, learn, now, by=pend["by"])
+        c._auto_write(room, zone, suffix, frm, to, learn, now, by=pend["by"], **_named(pend.get("ledger_id")))
         mem.save()
         return
     rec["pending"] = None
@@ -778,9 +841,11 @@ def apply_setpoint(c, room, zone, d, ctx, now):
     mem = c.jev.setpoints
     rec = mem.zone(room.slug, zone)
     learn = room.state[zone].get("learn") if isinstance(room.state[zone].get("learn"), dict) else {}
-    wrote = c._auto_write(room, zone, v["suffix"], float(v["from"]), float(v["to"]), learn, now, by=SETPOINTS_BY)
+    ledger_id = _ledger_id(c, room, zone, d, now)
+    wrote = c._auto_write(room, zone, v["suffix"], float(v["from"]), float(v["to"]), learn, now, by=SETPOINTS_BY,
+                          **_named(ledger_id))
     rec["written"][v["suffix"]] = float(v["to"])
-    rec["pending"] = _pending(v["suffix"], float(v["from"]), float(v["to"]), SETPOINTS_BY, now)
+    rec["pending"] = _pending(v["suffix"], float(v["from"]), float(v["to"]), SETPOINTS_BY, now, ledger_id)
     rec["last"] = {"suffix": v["suffix"], "from": float(v["from"]), "to": float(v["to"]),
                    "at": now.isoformat(timespec="seconds"), "day": (ctx.setpoints or {}).get("day"),
                    "words": v["words"], "choice": v["choice"], "reverted": False}
@@ -1857,6 +1922,7 @@ def apply_values(c, room, zone, d, ctx, now):
     view = (ctx.targets if judge == "targets" else ctx.shots) or {}
     ai = _ai(c, room, zone)
     by = f"{AI_BY} ({'targets' if judge == 'targets' else 'shot sizes'})"
+    ledger_id = _ledger_id(c, room, zone, d, now)
     plan, clamped, stepped = {}, {}, {}
     for k, asked in v["values"].items():
         lo, hi = c._number_range(room, zone, k)
@@ -1895,12 +1961,13 @@ def apply_values(c, room, zone, d, ctx, now):
             if k in stepped:
                 reason = (reason + " " if reason else "") + "(clamped by the daily limit)"
             if c._auto_write(room, zone, k, old, new, {}, now, by=by, reason=reason or None,
-                             expected=v.get("expected") or None):
+                             expected=v.get("expected") or None, **_named(ledger_id)):
                 if judge == "targets" and hasattr(c, "_step_count"):
                     c._step_count(room, zone, k, old, new, now)
                 wrote.append(k)
                 ai["written"][k] = new
-                ai["pending"] = [w for w in ai["pending"] if w.get("suffix") != k] + [_pending(k, old, new, by, now)]
+                ai["pending"] = [w for w in ai["pending"] if w.get("suffix") != k] + [
+                    _pending(k, old, new, by, now, ledger_id)]
                 _tell_setpoints(c, room, zone, k, old, new, now)
             else:
                 left.append(k)
@@ -1947,7 +2014,7 @@ def ai_readback(c, room, zone, now):
         if w["tries"] < RETRIES:
             w["tries"] += 1
             w["next"] = (now + timedelta(seconds=PENDING_S * 2 ** w["tries"])).isoformat(timespec="seconds")
-            c._auto_write(room, zone, w["suffix"], frm, to, {}, now, by=w["by"])
+            c._auto_write(room, zone, w["suffix"], frm, to, {}, now, by=w["by"], **_named(w.get("ledger_id")))
             keep.append(w)
             continue
         ai["written"][w["suffix"]] = frm

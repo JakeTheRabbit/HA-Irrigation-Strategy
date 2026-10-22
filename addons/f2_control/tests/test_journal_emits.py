@@ -251,6 +251,25 @@ def test_a_valve_that_does_not_open_is_a_failed_shot_with_its_code(rig, monkeypa
     assert not _events(c, "shot.completed")
 
 
+def test_a_short_shot_whose_valve_does_not_open_reads_back_unread(rig, monkeypatch):
+    """A 10 s shot ends inside the 16 s read-back window: the valve's read-back is cut short by the shot's own time,
+    which may still be open (#208), so its status is "unread", never "off"."""
+    c, fake, _clock = rig
+    real_call = fake.ha_call
+
+    def call(domain, service, **data):
+        if data.get("entity_id") == VALVE and service == "turn_on":
+            fake.calls.append((domain, service, data))
+            return True  # taken, but it stays off
+        return real_call(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    c._execute_shot(c.rooms[0], 1, 10, 2.0, flow_lps=0.05, reason_text="test")
+    ended, = _events(c, "shot.aborted")
+    assert ended["outcome"] == "failed" and ended["code"] == "CS-304"
+    assert ended["readback"]["status"] == "unread"
+
+
 def test_an_errored_shot_whose_water_was_counted_is_a_failed_abort_with_its_litres(rig, monkeypatch):
     c, fake, _clock = rig
     room = c.rooms[0]

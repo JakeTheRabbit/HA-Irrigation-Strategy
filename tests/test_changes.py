@@ -1,10 +1,15 @@
 """History › Changes (G8): changes.fold_changes over journal events, and history_changes /
 history_revert (journal_api.py) against the stubs and a real journal file.
 
-`ai.outcome` comes from the controller lanes, not built yet: the events here are synthetic, shaped
-{kind: ai.outcome, correlation.causation_id: <the change's event id>, data.good: bool}."""
+`ai.outcome` comes from the controller's ledger (brain_bridge.ledger_events): {kind: ai.outcome,
+correlation.ledger_id: <the ledger row's id>, data.good: bool}. The AI's own write names the same row in its claim,
+so its target.changed carries correlation.ledger_id too; the end-to-end test drives the real add-on code."""
 
 import asyncio
+import sys
+import types
+from datetime import datetime, timedelta
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -35,7 +40,10 @@ def _ev(
         "zone": zone,
         "outcome": "ok",
         "source": {"actor": actor, "user_id": user_id, "detail": detail},
-        "correlation": {"causation_id": data.pop("causation_id", None)},
+        "correlation": {
+            "causation_id": data.pop("causation_id", None),
+            "ledger_id": data.pop("ledger_id", None),
+        },
         "data": data,
     }
 
@@ -107,30 +115,43 @@ def test_rows_carry_id_kind_outcome_and_limits():
 
 
 def test_the_outcome_line_follows_the_matching_ai_outcome():
-    good = _target("2026-10-20T06:00:00+00:00", actor="ai")
-    flat = _target("2026-10-20T06:30:00+00:00", actor="learner")
+    good = _target("2026-10-20T06:00:00+00:00", actor="ai", ledger_id="4")
+    flat = _target("2026-10-20T06:30:00+00:00", actor="ai", ledger_id="5")
     later = _target("2026-10-21T06:30:00+00:00", actor="learner")
+    other = _target("2026-10-20T06:00:00+00:00", actor="ai", room=F1, ledger_id="4")
     outcomes = [
         _ev(
             "ai.outcome",
             "2026-10-21T06:00:00+00:00",
             actor="ai",
-            causation_id=good["id"],
+            ledger_id="4",
             good=True,
         ),
         _ev(
             "ai.outcome",
             "2026-10-21T06:00:00+00:00",
             actor="ai",
-            causation_id=flat["id"],
+            ledger_id="5",
             good=False,
         ),
     ]
-    by_id = {r["id"]: r for r in fold_changes([good, flat, later, *outcomes], {})}
-    assert len(by_id) == 3  # ai.outcome is read, never listed
+    rows = fold_changes([good, flat, later, other, *outcomes], {})
+    by_id = {r["id"]: r for r in rows}
+    assert len(by_id) == 4  # ai.outcome is read, never listed
     assert by_id[good["id"]]["outcome"] == GOOD == "Dryback came back to target."
     assert by_id[flat["id"]]["outcome"] == NOT_YET == "No change in dryback yet."
     assert by_id[later["id"]]["outcome"] == TOO_SOON
+    assert by_id[other["id"]]["outcome"] == TOO_SOON  # a ledger id is one room's
+
+
+def test_an_outcome_from_before_the_change_is_not_its_outcome():
+    """A ledger that was damaged starts its ids again: an older row's outcome never judges a newer change."""
+    change = _target("2026-10-20T06:00:00+00:00", actor="ai", ledger_id="4")
+    old = _ev(
+        "ai.outcome", "2026-10-10T06:00:00+00:00", actor="ai", ledger_id="4", good=True
+    )
+    (row,) = fold_changes([old, change], {})
+    assert row["outcome"] == TOO_SOON
 
 
 def test_kinds_and_what_can_be_put_back():
@@ -464,3 +485,120 @@ def test_a_type_error_in_a_put_back_is_a_refusal_not_a_crash(tmp_path, monkeypat
 
     with pytest.raises(HomeAssistantError, match="zones must be a list"):
         asyncio.run(go())
+
+
+# ------------------------------------------------------------------ end to end, with the add-on's own code
+ADDON = Path(__file__).resolve().parents[1] / "addons" / "f2_control" / "f2_control"
+
+
+def _addon():
+    """The controller app's modules (controller.py imports `requests`, only in its container: stubbed when absent)."""
+    if "requests" not in sys.modules:
+        stub = types.ModuleType("requests")
+        stub.Session = lambda: SimpleNamespace(get=None, post=None, headers={})
+        sys.modules["requests"] = stub
+    if str(ADDON) not in sys.path:
+        sys.path.insert(0, str(ADDON))
+    import brain_bridge
+    import controller
+    import journal_out
+
+    return brain_bridge, controller, journal_out
+
+
+@pytest.mark.parametrize("good, line", [(True, GOOD), (False, NOT_YET)])
+def test_an_ai_setpoint_write_shows_its_outcome_end_to_end(
+    tmp_path, monkeypatch, good, line
+):
+    """A ledger row -> the brain's setpoint write, whose claim names the row -> the integration's setpoint log
+    journals target.changed -> the row's check is written back as ai.outcome -> history_changes shows the outcome line
+    on that change."""
+    brain_bridge, controller, journal_out = _addon()
+    from brain.envelope import Directive
+    from brain.journal import Journal
+    from brain.ledger import Ledger
+    from brain.setpoint_memory import SetpointMemory
+
+    from custom_components.crop_steering.setpoint_log import SetpointLog
+    from tests import ha_stubs
+
+    from .test_journal_producers import MemoryStore
+
+    hass, api = _site(monkeypatch, tmp_path)
+    claims = []
+    monkeypatch.setattr(controller, "ha_get", lambda entity, **k: ("50", {}, None))
+    monkeypatch.setattr(controller, "ha_call", lambda *a, **k: True)
+    monkeypatch.setattr(controller, "log", lambda *a: None)
+    monkeypatch.setattr(
+        controller, "ha_fire", lambda event, data, **k: claims.append((event, data))
+    )
+    room = SimpleNamespace(
+        slug="f2", prefix="f2_", state={3: {"phase": "P3"}}, lights_on_hour=10
+    )
+    c = SimpleNamespace(
+        journal=journal_out.Outbox(str(tmp_path / "journal_outbox.jsonl")),
+        jev=SimpleNamespace(
+            ledger=Ledger(None), setpoints=SetpointMemory(None), journal=Journal(None)
+        ),
+        rooms=[room],
+        _activity=[],
+        _grow_day_start=lambda room, local: local.date(),
+        _notify_event=lambda *a: None,
+    )
+    c._auto_write = types.MethodType(controller.Controller._auto_write, c)
+    brain_bridge.journal_ledger(c)
+    at = datetime.now().replace(microsecond=0) - timedelta(hours=1)
+    row = c.jev.ledger.record("setpoints", "f2", 3, "later_rewater", "setpoint", at=at)
+    move = {
+        "suffix": "p2_vwc_threshold",
+        "from": 50.0,
+        "to": 49.0,
+        "words": "re-water at 49",
+        "choice": "later_rewater",
+    }
+    brain_bridge.apply_setpoint(
+        c,
+        room,
+        3,
+        Directive("setpoints", "setpoint", move, "why", at + timedelta(hours=1)),
+        SimpleNamespace(setpoints={}),
+        at,
+    )
+    ((event, claim),) = claims
+    assert (event, claim["who"], claim["ledger_id"]) == (
+        "crop_steering_setpoint_write",
+        "brain",
+        str(row),
+    )
+
+    async def go():
+        hub = await _hub(api, hass, tmp_path, {})
+        log = SetpointLog(
+            hass,
+            ha_stubs.FakeEntry(data={"room_prefix": "f2_"}, entry_id="f2"),
+            MemoryStore(),
+        )
+        await log.async_init()
+        log.claim(claim)
+        entity = "number.crop_steering_f2_zone_3_p2_vwc_threshold"
+        await log.record(entity, "p2_vwc_threshold", 3, 50.0, 49.0, None)
+        await asyncio.gather(*list(hub._tasks))
+        c.jev.ledger.resolve(
+            row, "the dryback", good, at=datetime.now() + timedelta(minutes=1)
+        )
+        sent = [
+            {k: v for k, v in e.items() if k != "room_id"} for e in c.journal.pending()
+        ]
+        assert {e["kind"] for e in sent} == {"ai.judgement", "ai.outcome"}
+        out = await hub.append(F2, sent)
+        assert out["rejected"] == [] and len(out["accepted"]) == 2
+        return await api.history_changes(hass, hub, {"room_id": F2, "since": SINCE})
+
+    (change,) = asyncio.run(go())["changes"]
+    assert (change["actor"], change["key"], change["old"], change["new"]) == (
+        "ai",
+        "p2_vwc_threshold",
+        50.0,
+        49.0,
+    )
+    assert change["outcome"] == line
