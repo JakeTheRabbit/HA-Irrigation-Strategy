@@ -17,7 +17,8 @@ midnight): inside them a push to that phone that is not critical joins its diges
 digest, and goes to it as one push when the window ends (the queue is checked every minute; it is held in memory,
 so a restart drops what waits, as for a digest). The controller's non-critical "not watering" warnings
 (NOT_WATERING_CODES, e.g. CS-206, CS-316) wait as well. Only a critical push breaks through: one marked urgent or
-with a critical code. A push whose code or event this version does not know is never held.
+with a critical code. A push whose code or event this version does not know is never held, nor is one with Keep
+and Undo (the AI's setpoints) to a phone that takes no digest: a digest has no buttons.
 
 Nothing here is needed for watering: a store that can't be read, a phone that fails, or no store at all only
 changes who gets a push.
@@ -527,6 +528,10 @@ class Notifier:
             }
             await self._store.async_save(draft)
             self.data = draft
+            # A phone no longer listed gets nothing of what waited for it.
+            kept = {row["service"] for row in rows}
+            for service in [s for s in self._held if s not in kept]:
+                del self._held[service]
             self.publish()
             return await self.response(user)
 
@@ -610,8 +615,19 @@ class Notifier:
     async def test_many(self, services, user=None) -> dict:
         """notify_test with `services`: one test push to each, at once -> {results: [{service, sent, error}]}."""
         services = list(dict.fromkeys(services))
-        answers = await asyncio.gather(*(self.test(s, user) for s in services))
-        return {"results": [{"service": s, **a} for s, a in zip(services, answers)]}
+        answers = await asyncio.gather(
+            *(self.test(s, user) for s in services), return_exceptions=True
+        )
+        return {
+            "results": [
+                (
+                    {"service": s, "sent": False, "error": str(a) or type(a).__name__}
+                    if isinstance(a, Exception)
+                    else {"service": s, **a}
+                )
+                for s, a in zip(services, answers)
+            ]
+        }
 
     async def send(self, data) -> dict:
         """notify: one push to every row that ticks one of its kinds and covers its room, once per service ->
@@ -643,7 +659,13 @@ class Notifier:
         quiet = []
         if not urgent and known and any(r["quiet_hours"] for r in rows):
             minute = self._minute()
-            quiet = [r["service"] for r in rows if is_quiet(r["quiet_hours"], minute)]
+            # A push with Keep and Undo (`overlays`) waits only on a digest phone: a digest has no buttons.
+            quiet = [
+                r["service"]
+                for r in rows
+                if is_quiet(r["quiet_hours"], minute)
+                and (r["digest"] or not data.get("overlays"))
+            ]
         held += [service for service in quiet if service not in held]
         for service in held:
             self._hold(service, data, service in quiet)
@@ -777,6 +799,14 @@ class Notifier:
         self._untrack = async_track_time_interval(self.hass, tick, DIGEST_CHECK)
 
     def stop(self):
+        for service, box in self._held.items():
+            _LOGGER.warning(
+                "Crop Steering notifications stopped: dropping %d held %s for %s",
+                len(box["items"]),
+                "push" if len(box["items"]) == 1 else "pushes",
+                service,
+            )
+        self._held = {}
         if self._unsubscribe is not None:
             self._unsubscribe()
             self._unsubscribe = None
@@ -925,6 +955,10 @@ async def async_setup_notify(hass, entry) -> None:
                 )
             if "service" in call.data:
                 return await notifier.test(call.data["service"], user)
+            if not call.data["services"]:
+                raise HomeAssistantError(
+                    f"{DOMAIN}.notify_test needs at least one phone in services"
+                )
             if len(call.data["services"]) > MAX_RECIPIENTS:
                 raise HomeAssistantError(
                     f"{DOMAIN}.notify_test tests at most {MAX_RECIPIENTS} phones"

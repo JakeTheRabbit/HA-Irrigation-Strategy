@@ -1272,6 +1272,7 @@ notify_save:
 # own). Inside the window, in Home Assistant's time zone, a push to that phone that is not critical waits in its
 # digest queue, even with digest off, and goes as one push when the window ends. The controller's non-critical
 # "not watering" warnings (NOT_WATERING_CODES, e.g. CS-206, CS-316) wait too: only critical codes break through.
+# A push with Keep/Undo buttons (an AI setpoint change) is never held for quiet hours unless the phone takes a digest.
 # notify_test takes `service` (one phone -> {sent, error}) or `services` (several -> {results: [{service, sent,
 # error}]}), not both.
 notify_test:

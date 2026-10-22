@@ -265,3 +265,129 @@ def test_test_several_phones_reports_each(services):  # noqa: F811 (the fixture)
     for data in ({}, {"service": PHONE_A, "services": [PHONE_B]}):
         with pytest.raises(HomeAssistantError, match="either service or services"):
             call("notify_test", ADMIN, **data)
+
+
+# ------------------------------------------------------------------ review round 1
+def test_stopping_the_site_logs_what_it_drops(caplog):
+    hass, notifier = rig(
+        saved(
+            row(
+                PHONE_A, kinds=["sensors"], quiet_hours={"from": "21:00", "to": "23:00"}
+            )
+        )
+    )
+    _at(notifier, 22)
+    send(notifier, key="a", code="CS-102", room="")
+    send(notifier, key="b", code="CS-103", room="")
+    notifier.listen()
+    with caplog.at_level("WARNING"):
+        notifier.stop()
+    assert f"2 held pushes for {PHONE_A}" in caplog.text
+    assert notifier._held == {}
+
+
+def test_quiet_hours_never_hold_a_push_with_keep_and_undo_for_a_phone_without_a_digest():
+    window = {"from": "21:00", "to": "23:00"}
+    hass, notifier = rig(
+        saved(
+            row(PHONE_A, kinds=["jev"], quiet_hours=window),
+            row(PHONE_B, kinds=["jev"], quiet_hours=window, digest=True),
+        )
+    )
+    _at(notifier, 22)
+    answer = send(
+        notifier,
+        key="ai",
+        event="jev_setpoint",
+        room="",
+        overlays=["number.crop_steering_p1_target_vwc"],
+    )
+    # The phone that takes no digest gets the buttons now; the digest phone waits, as a digest always did.
+    assert answer == {"sent_to": [PHONE_A], "error": None, "held": [PHONE_B]}
+    assert "actions" in hass.services.sent[0][1]["data"]
+    # Without buttons, the same push waits.
+    assert sorted(send(notifier, key="ai2", event="jev_setpoint", room="")["held"]) == [
+        PHONE_A,
+        PHONE_B,
+    ]
+
+
+def test_a_phone_removed_while_pushes_wait_gets_nothing():
+    hass, notifier = rig(
+        saved(
+            row(
+                PHONE_A, kinds=["sensors"], quiet_hours={"from": "21:00", "to": "23:00"}
+            ),
+            row(PHONE_B, kinds=["sensors"]),
+        )
+    )
+    _at(notifier, 22)
+    assert send(notifier, code="CS-102", room="")["held"] == [PHONE_A]
+    rows = notifier.data["recipients"]
+    assert save(notifier, recipients=[rows[1]])["error"] is None
+    assert notifier._held == {}
+    _at(notifier, 23)
+    asyncio.run(notifier.flush())
+    assert [s for s, _ in hass.services.sent] == [PHONE_B]
+
+
+def test_a_window_removed_while_pushes_wait_flushes_on_the_next_tick():
+    hass, notifier = rig(
+        saved(
+            row(
+                PHONE_A, kinds=["sensors"], quiet_hours={"from": "21:00", "to": "23:00"}
+            )
+        )
+    )
+    _at(notifier, 22)
+    send(notifier, code="CS-102", room="")
+    save(notifier, recipients=[{**notifier.data["recipients"][0], "quiet_hours": None}])
+    _at(notifier, 22, 1)
+    asyncio.run(notifier.flush())
+    assert [s for s, _ in hass.services.sent] == [PHONE_A]
+
+
+def test_a_window_extended_while_pushes_wait_holds_them_to_the_new_end():
+    hass, notifier = rig(
+        saved(
+            row(
+                PHONE_A, kinds=["sensors"], quiet_hours={"from": "21:00", "to": "23:00"}
+            )
+        )
+    )
+    _at(notifier, 22)
+    send(notifier, code="CS-102", room="")
+    later = {"from": "21:00", "to": "23:30"}
+    save(
+        notifier, recipients=[{**notifier.data["recipients"][0], "quiet_hours": later}]
+    )
+    _at(notifier, 23)
+    asyncio.run(notifier.flush())
+    assert hass.services.sent == []
+    _at(notifier, 23, 30)
+    asyncio.run(notifier.flush())
+    assert [s for s, _ in hass.services.sent] == [PHONE_A]
+
+
+def test_testing_several_phones_refuses_an_empty_list(services):  # noqa: F811
+    with pytest.raises(HomeAssistantError, match="at least one phone"):
+        services.call("notify_test", ADMIN, services=[])
+
+
+def test_testing_several_phones_reports_a_phone_that_raises():
+    hass, notifier = rig()
+    real = notifier._has
+
+    def has(service):
+        if service == PHONE_B:
+            raise OSError("registry unreadable")
+        return real(service)
+
+    notifier._has = has
+    answer = asyncio.run(notifier.test_many([PHONE_A, PHONE_B], ADMIN))
+    assert answer == {
+        "results": [
+            {"service": PHONE_A, "sent": True, "error": None},
+            {"service": PHONE_B, "sent": False, "error": "registry unreadable"},
+        ]
+    }
