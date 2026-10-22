@@ -7,7 +7,7 @@ import logging
 import voluptuous as vol
 
 from homeassistant.core import HomeAssistant, ServiceCall
-from homeassistant.exceptions import HomeAssistantError, ServiceValidationError
+from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers import config_validation as cv
 from homeassistant.util import dt as dt_util
 
@@ -200,6 +200,8 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             except Exception:  # pragma: no cover - the select may not exist yet
                 pass
         if errors:
+            from homeassistant.exceptions import ServiceValidationError
+
             # A refusal stays a refusal (ServiceValidationError) when every failure was one.
             kind = (
                 ServiceValidationError
