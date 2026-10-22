@@ -388,3 +388,19 @@ def test_a_hand_edited_skip_without_an_offset_is_dropped_not_fatal(caplog):
     assert "has no offset" in caplog.text
     put(room, recycle(), expected=4)  # prune and compare never raise
     assert [s["zone"] for s in room.document["skips"]] == [2]
+
+
+def test_only_a_put_back_journals_a_causation_id(journal):
+    _hass, room, _ = rig()
+    put(room, recycle())
+    asyncio.run(
+        room.set_programs(
+            room.document["revision"],
+            [],
+            {"actor": "manual", "detail": "put back", "causation_id": "C" * 26},
+        )
+    )
+    v1, put_back = (kw for _, kind, kw in journal if kind == "config.changed")
+    assert "causation_id" not in (v1.get("correlation") or {})
+    assert put_back["correlation"]["causation_id"] == "C" * 26
+    assert put_back["detail"] == "put back"

@@ -191,3 +191,38 @@ async def test_a_timer_program_change_is_saved_again_from_its_old_copy(
     )
     assert stale["ok"] is False and stale["error"]["code"] == "stale_revision"
     assert stale["error"]["current_revision"] == 3
+
+
+async def test_a_setting_under_a_live_ai_change_is_not_put_back(hass, hass_admin_user):
+    from datetime import timedelta
+
+    from homeassistant.util import dt as dt_util
+
+    await _three_zones(hass)
+    old = float(hass.states.get(SHOT).state)
+    change = await _operator_sets(hass, hass_admin_user, old + 1)
+    # The AI assistant moves it for the night: an overlay, live until it runs out.
+    expires = (dt_util.utcnow() + timedelta(hours=8)).isoformat(timespec="seconds")
+    hass.bus.async_fire(
+        f"{DOMAIN}_setpoint_write",
+        {"entity_id": SHOT, "value": old + 1, "who": "brain", "expires": expires},
+    )
+    await hass.async_block_till_done()
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": SHOT, "value": old + 1}, blocking=True
+    )
+    hass.bus.async_fire(
+        f"{DOMAIN}_setpoint_write",
+        {"entity_id": SHOT, "value": old + 2, "who": "brain", "expires": expires},
+    )
+    await hass.async_block_till_done()
+    await hass.services.async_call(
+        "number", "set_value", {"entity_id": SHOT, "value": old + 2}, blocking=True
+    )
+    await _settled(hass)
+    overlays = await _call(hass, hass_admin_user, "overlay_get", room_id=ROOM)
+    assert [o["entity_id"] for o in overlays["overlays"]] == [SHOT]
+    out = await _call(hass, hass_admin_user, "history_revert", api=2, event_id=change["id"])
+    assert out["ok"] is False and out["error"]["code"] == "guard_refused", out
+    assert out["error"]["message"] == "Keep or undo the AI change first"
+    assert float(hass.states.get(SHOT).state) == old + 2

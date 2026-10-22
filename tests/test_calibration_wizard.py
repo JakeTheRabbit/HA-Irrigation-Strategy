@@ -514,3 +514,16 @@ def test_a_session_commits_once_however_the_calls_race(rig):
     assert first["applied"] is True
     assert isinstance(second, ValueError) and "expired" in str(second)
     assert len(rig.cal.document["records"]) == 1
+
+
+def test_only_a_put_back_journals_a_causation_id(rig):
+    rig.calibrate(7.12, 4.12)
+    asyncio.run(
+        rig.cal.revert(
+            "feed_ph", {**WHO, "detail": "put back", "causation_id": "C" * 26}
+        )
+    )
+    (committed,) = [kw for kind, kw in rig.events if kind == "calibration.committed"]
+    (reverted,) = [kw for kind, kw in rig.events if kind == "calibration.reverted"]
+    assert "causation_id" not in (committed.get("correlation") or {})
+    assert reverted["correlation"]["causation_id"] == "C" * 26

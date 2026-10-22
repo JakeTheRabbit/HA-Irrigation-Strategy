@@ -29,6 +29,8 @@ _LOGGER = logging.getLogger(__name__)
 
 SERVICES = ("journal_append", "journal_query", "history_changes", "history_revert")
 MAX_APPEND = 50
+# history_changes answers at most this many rows, the newest (`truncated: true` when it cut).
+MAX_CHANGES = 2000
 READY_TIMEOUT_S = 30
 PRUNE_EVERY = timedelta(days=1)
 HUB = "_journal"
@@ -289,6 +291,11 @@ def attribution(hass, call) -> dict:
 
 # ------------------------------------------------------------------ History › Changes (G8)
 CANT = "This change can't be put back"
+HELD_BY_AI = "Keep or undo the AI change first"
+# What a room setup put back sends to setup_save. An empty plumbing or tank level is left out,
+# and refused when the room has one now: a save cannot take one away.
+SETUP_KEYS = ("room_name", "active", "zones", "hardware", "plumbing", "tank_level")
+OPTIONAL_SETUP_KEYS = ("plumbing", "tank_level")
 
 
 def _room_ids(hass) -> list[str]:
@@ -308,10 +315,11 @@ def _step_scope(hass, room_id: str):
 
 
 async def history_changes(hass, hub, args: dict) -> dict:
-    """{changes}: changes.fold_changes over the room's journal (every room when no room_id), filtered by
-    zone, key and change kinds, each row with the name of the Home Assistant user who made it.
+    """{changes, truncated?}: changes.fold_changes over the room's journal (every room when no
+    room_id), filtered by zone, key and change kinds, at most MAX_CHANGES rows (the newest), each
+    with the name of the Home Assistant user who made it. The fold runs in the executor.
     """
-    from .changes import KINDS, fold_changes
+    from .changes import KINDS
 
     rooms = [args["room_id"]] if args.get("room_id") else _room_ids(hass)
     events = []
@@ -329,23 +337,33 @@ async def history_changes(hass, hub, args: dict) -> dict:
             cursor = page["cursor"]
             if cursor is None:
                 break
-    rows = fold_changes(
-        events, {r: {"step_scope": _step_scope(hass, r)} for r in rooms}
-    )
+    limits = {r: {"step_scope": _step_scope(hass, r)} for r in rooms}
+    rows = await hass.async_add_executor_job(_folded, events, limits, dict(args))
+    out = {"changes": rows[:MAX_CHANGES]}
+    if len(rows) > MAX_CHANGES:
+        out["truncated"] = True
+    names: dict = {}
+    for row in out["changes"]:
+        user_id = row["user_id"]
+        if user_id and user_id not in names:
+            user = await hass.auth.async_get_user(user_id)
+            names[user_id] = getattr(user, "name", None)
+        row["user_name"] = names.get(user_id) if user_id else None
+    return out
+
+
+def _folded(events, limits, args) -> list:
+    """The folded, filtered rows (in the executor)."""
+    from . import changes
+
+    rows = changes.fold_changes(events, limits)
     if args.get("zone") is not None:
         rows = [r for r in rows if r["scope"] == f"zone:{args['zone']}"]
     if args.get("key"):
         rows = [r for r in rows if r["key"] == args["key"]]
     if args.get("kinds"):
         rows = [r for r in rows if r["kind"] in args["kinds"]]
-    names: dict = {}
-    for row in rows:
-        user_id = row["user_id"]
-        if user_id and user_id not in names:
-            user = await hass.auth.async_get_user(user_id)
-            names[user_id] = getattr(user, "name", None)
-        row["user_name"] = names.get(user_id) if user_id else None
-    return {"changes": rows}
+    return rows
 
 
 async def history_revert(hass, hub, call) -> dict:
@@ -373,7 +391,7 @@ async def history_revert(hass, hub, call) -> dict:
     token = EMITTED.set(emitted)
     try:
         answer = await _put_back(hass, event, who, call)
-    except (ValueError, KeyError) as err:
+    except (ValueError, KeyError, TypeError) as err:
         raise _hub_error(str(err)) from err
     finally:
         EMITTED.reset(token)
@@ -395,12 +413,16 @@ def _stale(what, revision=None):
 
 
 async def _put_back(hass, event, who, call) -> dict:
-    from . import presets
+    from . import overlays, presets
+    from .api_v2 import GuardRefused
 
     data, room_id = event["data"], event["room_id"]
     entry = presets._entry(hass, room_id=room_id)
     if event["kind"] == "target.changed":
         entity_id = data["entity_id"]
+        held = overlays.overlays_for(hass, entry.entry_id)
+        if held is not None and entity_id in held.rows:
+            raise GuardRefused(HELD_BY_AI)
         now = presets._state(hass, entity_id)
         if now is None or not presets.same(now, data["new"]):
             raise _stale(f"The setting {data.get('key') or entity_id}")
@@ -428,27 +450,61 @@ async def _put_back(hass, event, who, call) -> dict:
         from .calibration import resolve_calibration
 
         store = resolve_calibration(hass, room_id)
-        applied = next(
-            (
-                r.get("id")
-                for r in store.document["records"]
-                if r.get("probe") == data.get("probe") and r.get("applied")
-            ),
-            None,
-        )
+
+        def applied():
+            return next(
+                (
+                    r.get("id")
+                    for r in store.document["records"]
+                    if r.get("probe") == data.get("probe") and r.get("applied")
+                ),
+                None,
+            )
+
         check(
             "The probe's calibration",
-            applied,
+            applied(),
             data.get("record_id"),
             store.document["revision"],
         )
         await store.revert(data["probe"], who)
-        return {"readback": "verified"}
+        # What it replaced is applied again (or nothing, when it replaced none).
+        return _read_back(applied() == data.get("superseded_record_id"))
     return await _put_back_section(hass, entry, room_id, data, who, call, check)
 
 
+def _read_back(match: bool) -> dict:
+    return {"readback": "verified" if match else "refused"}
+
+
+def _programs(programs) -> list:
+    """Timer programs as compared on read-back: without ids and time stamps, in any order."""
+    import json
+
+    return sorted(
+        json.dumps(
+            {
+                k: v
+                for k, v in p.items()
+                if k not in ("id", "created_at", "updated_at", "deleted_at")
+            },
+            sort_keys=True,
+            default=str,
+        )
+        for p in programs
+        if not p.get("deleted_at")
+    )
+
+
+def _fix(entry) -> tuple:
+    """A probe offset as compared on read-back: (offset, curve); none is (0.0, None)."""
+    entry = entry or {}
+    return (float(entry.get("offset", 0.0)), entry.get("curve"))
+
+
 async def _put_back_section(hass, entry, room_id, data, who, call, check) -> dict:
-    """A store section saved again from its `old` copy, through the store's own save path."""
+    """A store section saved again from its `old` copy, through the store's own save path, then read
+    back from the store and compared with `old`."""
     from copy import deepcopy
 
     store, section, old, new = data["store"], data["section"], data["old"], data["new"]
@@ -459,13 +515,24 @@ async def _put_back_section(hass, entry, room_id, data, who, call, check) -> dic
         revision = room.document["revision"]
         check("The timer programs", room.document["programs"], new, revision)
         live = {p.get("id") for p in new if not p.get("deleted_at")}
+        olds = [p for p in deepcopy(old) if not p.get("deleted_at")]
+        revived = [p for p in olds if p.get("id") not in live]
         programs = [
             p if p.get("id") in live else {k: v for k, v in p.items() if k != "id"}
-            for p in deepcopy(old)
-            if not p.get("deleted_at")
+            for p in olds
         ]
         await timers_api.set_programs(hass, entry.entry_id, programs, revision, who)
-        return {"readback": "verified"}
+        now = room.programs()
+        known = {p.get("id") for p in old}
+        fresh = [p for p in now if p.get("id") not in known]
+        return {
+            **_read_back(_programs(now) == _programs(olds)),
+            # A program the change had deleted comes back under a new id.
+            "renewed": [
+                {"name": n.get("name"), "old_id": o.get("id"), "id": n.get("id")}
+                for o, n in zip(revived, fresh)
+            ],
+        }
     if store == "site":
         from . import site_store
 
@@ -474,8 +541,10 @@ async def _put_back_section(hass, entry, room_id, data, who, call, check) -> dic
             revision = site.document["revision"]
             check("The supply", site_store.supply_of(site.document), new, revision)
             out = await site.save({**deepcopy(old), "expected_revision": revision}, who)
-            ok = out["readback"]["status"] == "ok"
-            return {"readback": "verified" if ok else "refused"}
+            return _read_back(
+                out["readback"]["status"] == "ok"
+                and site_store.supply_of(site.document) == old
+            )
         revision = site.document["presets_revision"]
         check("The presets", site.document["presets"], new, revision)
 
@@ -483,7 +552,7 @@ async def _put_back_section(hass, entry, room_id, data, who, call, check) -> dic
             stored[:] = deepcopy(old)
 
         await site._save_presets(revision, change, who, room_id)
-        return {"readback": "verified"}
+        return _read_back(site.document["presets"] == old)
     if store == "calibration":
         from .calibration import resolve_calibration
 
@@ -494,6 +563,7 @@ async def _put_back_section(hass, entry, room_id, data, who, call, check) -> dic
             new,
             cal.document["revision"],
         )
+        entities = []
         for entity_id in sorted(set(old) | set(new)):
             if old.get(entity_id) == new.get(entity_id):
                 continue
@@ -507,24 +577,36 @@ async def _put_back_section(hass, entry, room_id, data, who, call, check) -> dic
                 },
                 who,
             )
-        return {"readback": "verified"}
-    from . import setup_api  # store "setup", section "room"
+            now = cal.document["probe_user_offsets"].get(entity_id)
+            entities.append(
+                {"entity_id": entity_id, **_read_back(_fix(now) == _fix(fix))}
+            )
+        refused = any(e["readback"] == "refused" for e in entities)
+        return {**_read_back(not refused), "entities": entities}
+    return await _put_back_setup(hass, entry, old, new, who, call, check)
+
+
+async def _put_back_setup(hass, entry, old, new, who, call, check) -> dict:
+    """The room setup, whole: refused when its old copy lacks a part the setup has now, as a save
+    without it would keep today's part (never a partial put back). The save keeps every safety
+    check (setup_save's own)."""
+    from copy import deepcopy
+
+    from . import setup_api
 
     async with hass.data[DOMAIN]["_setup"]["lock"]:
         before = setup_api.setup_room(hass, entry)
-        check("The room setup", setup_api._owned(before), new, before["revision"])
-        payload = {
-            k: deepcopy(old[k])
-            for k in (
-                "room_name",
-                "active",
-                "zones",
-                "hardware",
-                "plumbing",
-                "tank_level",
-            )
-            if k in old
-        }
+        owned = setup_api._owned(before)
+        if set(owned) - set(old):
+            raise _hub_error(CANT)
+        payload = {}
+        for key in SETUP_KEYS:
+            if key in OPTIONAL_SETUP_KEYS and not old.get(key):
+                if owned.get(key):  # a save cannot take it away
+                    raise _hub_error(CANT)
+                continue
+            payload[key] = deepcopy(old[key])
+        check("The room setup", owned, new, before["revision"])
         result = await setup_api.save_setup(
             hass,
             {
@@ -534,7 +616,7 @@ async def _put_back_section(hass, entry, room_id, data, who, call, check) -> dic
             },
         )
         setup_api._record(hass, "setup_save", before, result, call.context, who)
-    return {"readback": "verified"}
+        return _read_back(setup_api._owned(setup_api.setup_room(hass, entry)) == old)
 
 
 def _not_put_back(call, result):

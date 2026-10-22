@@ -395,3 +395,72 @@ def test_revert_refuses_a_change_that_cannot_be_put_back(tmp_path, monkeypatch):
 
     with pytest.raises(HomeAssistantError, match="This change can't be put back"):
         asyncio.run(go())
+
+
+def test_history_changes_caps_at_2000_newest_first_and_folds_off_the_loop(
+    tmp_path, monkeypatch
+):
+    from custom_components.crop_steering import changes
+
+    assert api_cap() == 2000
+    hass, api = _site(monkeypatch, tmp_path)
+    monkeypatch.setattr(api, "MAX_CHANGES", 3)
+    rows = [_target(f"2026-10-20T0{h}:00:00+00:00") for h in range(5)]
+    busy = {"executor": False, "folded_in_executor": None}
+    real_job, real_fold = hass.async_add_executor_job, changes.fold_changes
+
+    def job(fn, *a):
+        busy["executor"] = True
+        try:
+            return real_job(fn, *a)
+        finally:
+            busy["executor"] = False
+
+    def fold(*a, **kw):
+        busy["folded_in_executor"] = busy["executor"]
+        return real_fold(*a, **kw)
+
+    hass.async_add_executor_job = job
+    monkeypatch.setattr(changes, "fold_changes", fold)
+
+    async def go():
+        hub = await _hub(api, hass, tmp_path, {F2: rows})
+        capped = await api.history_changes(hass, hub, {"room_id": F2, "since": SINCE})
+        whole = await api.history_changes(
+            hass, hub, {"room_id": F2, "since": "2026-10-20T03:00:00+00:00"}
+        )
+        return capped, whole
+
+    capped, whole = asyncio.run(go())
+    assert [r["id"] for r in capped["changes"]] == [r["id"] for r in rows[:1:-1]]
+    assert capped["truncated"] is True
+    assert len(whole["changes"]) == 2 and "truncated" not in whole
+    assert busy["folded_in_executor"] is True
+
+
+def api_cap():
+    from custom_components.crop_steering import journal_api
+
+    return journal_api.MAX_CHANGES
+
+
+def test_a_type_error_in_a_put_back_is_a_refusal_not_a_crash(tmp_path, monkeypatch):
+    from homeassistant.exceptions import HomeAssistantError
+
+    hass, api = _site(monkeypatch, tmp_path)
+    change = _target("2026-10-20T06:00:00+00:00")
+
+    async def broken(*a, **kw):
+        raise TypeError("zones must be a list")
+
+    monkeypatch.setattr(api, "_put_back", broken)
+    call = SimpleNamespace(
+        data={"event_id": change["id"]}, context=SimpleNamespace(user_id=None)
+    )
+
+    async def go():
+        hub = await _hub(api, hass, tmp_path, {F2: [change]})
+        return await api.history_revert(hass, hub, call)
+
+    with pytest.raises(HomeAssistantError, match="zones must be a list"):
+        asyncio.run(go())

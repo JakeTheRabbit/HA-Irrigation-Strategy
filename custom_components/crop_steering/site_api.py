@@ -326,7 +326,11 @@ class SiteStore:
             detail=who.get("detail"),
             user_id=who.get("user_id"),
             client=who.get("client"),
-            correlation={"causation_id": who.get("causation_id")},
+            correlation=(
+                {"causation_id": who["causation_id"]}
+                if who.get("causation_id")
+                else None
+            ),
             data={
                 "store": "site",
                 "section": "presets",

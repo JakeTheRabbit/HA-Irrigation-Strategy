@@ -349,3 +349,24 @@ def test_a_site_wide_change_is_journaled_in_every_room_on_the_pump(monkeypatch):
     journal.clear()
     save(site, irrigation_pumps=[pump(1200, 2)], water_sources=[{"id": "tank"}])
     assert [room for room, _ in journal] == ["room:a_"]
+
+
+def test_only_a_put_back_journals_a_presets_causation_id(monkeypatch):
+    _, site, _ = rig()
+    journal = []
+    monkeypatch.setattr(
+        site_api, "note", lambda h, room_id, kind, **kw: journal.append(kw)
+    )
+
+    def add(stored):
+        stored.append({"id": "p1", "name": "Week 3"})
+
+    asyncio.run(site._save_presets(0, add, {"actor": "manual"}, ROOM))
+    asyncio.run(
+        site._save_presets(
+            1, lambda stored: stored.clear(), {"causation_id": "C" * 26}, ROOM
+        )
+    )
+    v1, put_back = journal
+    assert "causation_id" not in (v1.get("correlation") or {})
+    assert put_back["correlation"]["causation_id"] == "C" * 26
