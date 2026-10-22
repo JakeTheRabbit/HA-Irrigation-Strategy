@@ -243,19 +243,19 @@ def test_shot_queued_and_pump_load_are_published(monkeypatch, tmp_path, fires):
     _pass(c)
     queued = [(s, a) for e, s, a in fake.writes if e == QUEUED]
     loads = [(s, a) for e, s, a in fake.writes if e == LOAD]
-    requested = _events(c, "intent.queued")[0]["data"]["requested_at"]
-    # after zone 1's shot: zone 2 takes its turn next, zone 3 waits behind it; after zone 2's, nobody waits
-    assert queued == [
-        ("on", {"room_id": "room:", "queue": [{"zone": 3, "position": 1, "requested_at": requested,
-                                               "priority": "steering"}], "friendly_name": "Shot queued"}),
-        ("off", {"room_id": "room:", "queue": [], "friendly_name": "Shot queued"})]
-    assert [s for s, _a in loads] == [60.0, 0.0]  # the last shot's 600 of 1000 L/h (unchanged for 2 and 3); idle
+    # once the pass is over (never between turns): nobody waits, and the most its shots put on the pump
+    assert queued == [("off", {"room_id": "room:", "queue": [], "friendly_name": "Shot queued"})]
+    assert [s for s, _a in loads] == [60.0]  # 600 of 1000 L/h
     assert loads[0][1]["unit_of_measurement"] == "%" and loads[0][1]["pump"] == PUMP
-    fake.writes.clear()
-    _Wall.current += timedelta(hours=1)
-    fires[1] = fires[2] = Reason("nothing due", kind="idle")
-    _pass(c)
-    assert not {e for e, _s, _a in fake.writes} & {QUEUED, LOAD}  # written only when they change
+    fake.set_state(KILL, "off")  # every zone held: nothing runs
+    for hours in (1, 2):
+        fake.writes.clear()
+        _Wall.current += timedelta(hours=1)
+        _probes(fake, 3)
+        _pass(c)
+        loads = [s for e, s, _a in fake.writes if e == LOAD]
+        assert loads == ([0.0] if hours == 1 else [])  # nothing ran: 0, then written only when it changes
+        assert QUEUED not in {e for e, _s, _a in fake.writes}
 
 
 def test_a_queued_shot_records_its_pump_wait(rig, fires):
@@ -335,32 +335,30 @@ def _ha_log(monkeypatch, fake):
 
 
 def test_a_saved_supply_adds_no_home_assistant_call_before_any_pump_opens(monkeypatch, tmp_path, fires):
-    """R5's spirit: nothing new slows watering. With a supply saved, the calls from the pass's decision to each pump
-    ON are the calls made with none; the queue and pump load are written only after a shot and after the pass."""
+    """R5's spirit: nothing new slows watering. With a supply saved, every Home Assistant call up to the pass's last
+    pump OFF is the call made with none; the queue, the pump load and CS-214 come after it."""
+    monkeypatch.setattr(controller, "QUEUE_ALERT_S", 5)  # zone 2 and 3 wait longer: CS-214 on the wait too
     runs = {}
     for name in ("none", "supply"):
         _Wall.current = _Wall(2026, 10, 22, 12, 0)
         c, fake = _build(monkeypatch, tmp_path / name, zones=3)
         if name == "supply":
-            _supply(fake, demand=(600.0, 600.0, 600.0))
+            _supply(fake, demand=(600.0, 600.0, 1500.0))  # zone 3 alone is bigger than its pump: CS-214
         seen = _ha_log(monkeypatch, fake)
         _pass(c)
         runs[name] = seen
     pump_on, pump_off = ("call", "switch", "turn_on", PUMP), ("call", "switch", "turn_off", PUMP)
-    new = [i for i, x in enumerate(runs["supply"]) if x in (("set", QUEUED), ("set", LOAD))]
     assert runs["supply"].count(pump_on) == runs["none"].count(pump_on) == 3
 
-    def shots(seen):  # from the pass's start to its last shot's close (what follows the pass is not watering)
-        return seen[:len(seen) - seen[::-1].index(pump_off)]
+    def last_off(seen):
+        return len(seen) - seen[::-1].index(pump_off)
 
-    # take the queue and pump load writes away: every other call is the same, in the same order
-    assert shots([x for i, x in enumerate(runs["supply"]) if i not in new]) == shots(runs["none"])
-    # and none of the writes lies inside a zone's turn: each comes before the next zone's own checks start
-    for i in new:
-        later = runs["supply"][i:]
-        if pump_on in later:
-            before_pump = later[:later.index(pump_on)]
-            assert any(x[0] == "get" and x[1].endswith("_enabled") for x in before_pump), runs["supply"][i]
+    supply, none = runs["supply"], runs["none"]
+    assert supply[:last_off(supply)] == none[:last_off(none)]  # identical, nothing taken away
+    after = supply[last_off(supply):]
+    assert ("set", QUEUED) in after and ("set", LOAD) in after
+    raised = [x[3] for x in after if x[:3] == ("call", "persistent_notification", "create")]
+    assert "f2_pump_short_default_z3" in raised and "f2_pump_wait_default_z3" in raised
 
 
 # ------------------------------------------------------------------------------------------------------ fix round 1
@@ -387,20 +385,26 @@ def test_a_shot_held_after_its_turn_is_not_queued_and_adds_no_pump_load(rig, fir
     assert _valves(fake) == [("turn_on", V1), ("turn_off", V1)]
     assert _events(c, "intent.queued") == []
     assert [e["zone"] for e in _events(c, "intent.held")] == [2]
-    assert [s for e, s, _a in fake.writes if e == LOAD] == [60.0, 0.0]  # zone 2's 30 % never shown
+    assert [s for e, s, _a in fake.writes if e == LOAD] == [60.0]  # zone 2's 30 % never counted
 
 
-def test_a_room_error_mid_loop_clears_shot_queued(monkeypatch, tmp_path, fires):
+def test_a_room_error_mid_loop_clears_shot_queued_and_the_pump_load(monkeypatch, tmp_path, fires):
     c, fake = _build(monkeypatch, tmp_path, zones=3)
     _supply(fake, demand=(600.0, 600.0, 600.0))
+    _pass(c)
+    assert [s for e, s, _a in fake.writes if e == LOAD] == [60.0]
+    c._line_shown[QUEUED] = ("on", {})  # as a queue still shown would read
     real = c._sweep_held
 
-    def sweep(room, zone):  # after zone 1's turn showed zone 3 waiting, zone 2's act raises
+    def sweep(room, zone):  # zone 2's act raises: the pass never reaches its end
         real(room, zone)
         if zone == 2:
             raise RuntimeError("boom")
 
     monkeypatch.setattr(c, "_sweep_held", sweep)
+    fake.writes.clear()
+    _Wall.current += timedelta(hours=1)
+    _probes(fake, 3)
     _pass(c)
-    queued = [(s, a["queue"]) for e, s, a in fake.writes if e == QUEUED]
-    assert queued[0][0] == "on" and queued[-1] == ("off", [])
+    assert [(s, a["queue"]) for e, s, a in fake.writes if e == QUEUED] == [("off", [])]
+    assert [s for e, s, _a in fake.writes if e == LOAD] == [0.0]

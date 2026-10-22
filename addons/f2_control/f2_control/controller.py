@@ -7150,7 +7150,7 @@ class Controller:
             for z in firing:  # _act_zone journals the shot as asked for now, however long it waits
                 room.__dict__.setdefault("_requested_at", {})[z] = requested_at
             return {"pump_id": pump_id, "pump": pump, "demand": demand, "groups": groups, "turns": turns, "ran": [],
-                    "taken": {}, "done": set(),
+                    "taken": {}, "peak": None, "alerts": [],
                     "visit": [next(slots) if z in firing else z for z in room.zones]}
         except Exception as e:
             log("pump line error", room.slug, e)
@@ -7160,8 +7160,8 @@ class Controller:
         """A zone about to water with a supply saved (_loop_room, once nothing holds it). Works out, and calls nothing:
         when a zone watered before it this pass it waited, and why (the first QUEUE guard that says, pump_capacity
         when none: the controller opens one zone at a time). _execute_shot journals that (intent.queued, an outbox
-        append) once the shot passed every check before it opens (_turn_runs); _turn_over says the rest after the
-        shot. Nothing here or there touches Home Assistant before a pump opens (R5: nothing new slows watering)."""
+        append) once the shot passed every check before it opens (_turn_runs); _turn_over and _line_done say the rest
+        once the pass is over. Nothing here or there touches Home Assistant before a pump opens (R5: nothing new slows watering)."""
         try:
             turns, ahead, lph = line["turns"], line["ran"], line["demand"].get(zone)
             turn = next(t for t in turns if t["zone"] == zone)
@@ -7191,47 +7191,45 @@ class Controller:
             log("pump turn error", room.slug, zone, e)
 
     def _turn_over(self, room, zone, line, ran):
-        """After a zone's act (_loop_room), before the next zone's checks: who still waits behind the zone taking its
-        turn next is shown, and for a shot that ran, its pump load, and CS-214 when it alone needs more than its pump
-        or waited longer than QUEUE_ALERT_S (it watered all the same)."""
+        """After a zone's act (_loop_room): for a shot that ran, its pump load is counted and CS-214 decided (it alone
+        needs more than its pump, or waited longer than QUEUE_ALERT_S; it watered all the same). Nothing is said
+        here: _line_done says it all once every zone had its turn, after the pass's last pump closed."""
         try:
-            line["done"].add(zone)
-            left = [t for t in line["turns"] if t["zone"] not in line["done"]]
-            self._publish_queue(room, [{"zone": t["zone"], "position": n, "priority": t["priority"],
-                                        "requested_at": t["requested_at"].isoformat(timespec="milliseconds")}
-                                       for n, t in enumerate(left[1:], 1)])
             turn = line["taken"].get(zone)
             if not ran or turn is None:
                 return
             pump, most, lph, waited = line["pump_id"], line["pump"].get("max_flow_lph"), turn["lph"], turn["waited"]
-            self._publish_load(room, pump, turn["load"])
-            if turn["behind"] and waited > QUEUE_ALERT_S:
-                self._alert(
-                    f"pump_wait_{room.slug}_z{zone}",
-                    "CS-214",
-                    "the zone waited long for its pump",
-                    f"zone {zone} waited {waited / 60:.0f} min for {pump}, behind {turn['behind']} other shot(s) of "
-                    "this pass; it watered after them",
-                    room=room,
-                    zone=zone,
-                    entity_id=pump,
-                )
-            else:
-                self._dismiss(f"pump_wait_{room.slug}_z{zone}")
-            if lph is not None and most and lph > most:
-                self._alert(
-                    f"pump_short_{room.slug}_z{zone}",
-                    "CS-214",
-                    "the zone needs more than its pump",
-                    f"zone {zone} needs {lph:.0f} L/h, {pump} gives {most:.0f} L/h; it waters anyway",
-                    room=room,
-                    zone=zone,
-                    entity_id=pump,
-                )
-            else:
-                self._dismiss(f"pump_short_{room.slug}_z{zone}")
+            if turn["load"] is not None:
+                line["peak"] = max(line["peak"] or 0.0, turn["load"])
+            line["alerts"].append((
+                f"pump_wait_{room.slug}_z{zone}",
+                (f"zone {zone} waited {waited / 60:.0f} min for {pump}, behind {turn['behind']} other shot(s) of this "
+                 "pass; it watered after them") if turn["behind"] and waited > QUEUE_ALERT_S else None,
+                "the zone waited long for its pump", zone))
+            line["alerts"].append((
+                f"pump_short_{room.slug}_z{zone}",
+                f"zone {zone} needs {lph:.0f} L/h, {pump} gives {most:.0f} L/h; it waters anyway"
+                if lph is not None and most and lph > most else None,
+                "the zone needs more than its pump", zone))
         except Exception as e:
             log("pump turn error", room.slug, zone, e)
+
+    def _line_done(self, room, line):
+        """The end of the room's pass, every zone visited and the last pump closed: nobody waits (shot_queued off),
+        pump_load_pct is the most a shot of this pass put on its pump (0 when none ran, unknown without a demand or
+        the pump's max flow), and the CS-214 raises and dismissals the turns decided are made. Never before a pump
+        opens (R5: nothing new slows watering)."""
+        try:
+            self._publish_queue(room, [])
+            self._publish_load(room, line["pump_id"], line["peak"] if line["peak"] is not None
+                               else 0.0 if line["pump"].get("max_flow_lph") else None)
+            for key, message, title, zone in line["alerts"]:
+                if message is None:
+                    self._dismiss(key)
+                    continue
+                self._alert(key, "CS-214", title, message, room=room, zone=zone, entity_id=line["pump_id"])
+        except Exception as e:
+            log("pump line error", room.slug, e)
 
     def _show_line(self, entity, state, attrs):
         """Write one of the pump line's states, only when it changes."""
@@ -7242,24 +7240,29 @@ class Controller:
 
     def _publish_queue(self, room, queue):
         """binary_sensor.crop_steering_<px>shot_queued, attribute queue: [{zone, position, requested_at, priority}],
-        who waits behind the zone taking its turn next (written between turns, never before a pump opens)."""
+        written at the pass's end (_line_done), when nobody waits any more, and on a room error (_clear_queue)."""
         self._show_line(f"binary_sensor.crop_steering_{room.prefix}shot_queued", "on" if queue else "off",
                         {"room_id": "room:" + room.prefix, "queue": queue, "friendly_name": "Shot queued"})
 
     def _publish_load(self, room, pump, load):
-        """sensor.crop_steering_<px>pump_load_pct: the demand of the pass's last shot against its pump's max_flow_lph,
-        written once it is over (never before a pump opens), 0 once the pass is over, unknown without both."""
+        """sensor.crop_steering_<px>pump_load_pct: the most a shot of the room's last pass put on its pump (its demand
+        against the pump's max_flow_lph), written at the pass's end (_line_done)."""
         self._show_line(f"sensor.crop_steering_{room.prefix}pump_load_pct",
                         "unknown" if load is None else round(load, 1),
                         {"room_id": "room:" + room.prefix, "pump": pump, "unit_of_measurement": "%",
                          "friendly_name": "Pump load"})
 
     def _clear_queue(self, room):
-        """A room's pass raised mid-loop (loop_once): a queue it showed is taken down, not left on until its next pass."""
+        """A room's pass raised mid-loop (loop_once): a queue or a pump load it showed is taken down, not left until its
+        next pass. Only what this controller showed: a room with no supply saved is never written to."""
         try:
+            shown = self.__dict__.get("_line_shown", {})
             entity = f"binary_sensor.crop_steering_{room.prefix}shot_queued"
-            if self.__dict__.get("_line_shown", {}).get(entity, ("off",))[0] == "on":
+            if shown.get(entity, ("off",))[0] == "on":
                 self._publish_queue(room, [])
+            load = shown.get(f"sensor.crop_steering_{room.prefix}pump_load_pct")
+            if load is not None and load[0] not in (0.0, "unknown"):
+                self._publish_load(room, load[1].get("pump"), 0.0)
         except Exception as e:
             log("pump queue error", room.slug, e)
 
@@ -8116,8 +8119,7 @@ class Controller:
                             snap.minutes_since_shot) if snap else None,
             }
         if line:  # the pass's turns are over: nobody waits, the pump is idle
-            self._publish_queue(room, [])
-            self._publish_load(room, line["pump_id"], 0.0 if line["pump"].get("max_flow_lph") else None)
+            self._line_done(room, line)
         for z, why in cross_zone_outliers(snaps):
             self._alert(
                 f"xzone_{room.slug}_{z}",
