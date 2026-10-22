@@ -124,6 +124,28 @@ class JournalHub:
         except ValueError as err:
             raise _hub_error(str(err)) from err
 
+    async def backfill(self, room_id: str, read) -> int:
+        """Store the events `read()` returns, once per room: a `backfill:<room>:v1` flag in the journal's meta
+        says it was done, and `read` (which reads the old stores) is not called again. Quiet: backfilled events
+        are history, so they are not re-fired on the bus. -> how many were new."""
+        await self._wait_ready()
+        flag = f"backfill:{room_id}:v1"
+        if (
+            await self.hass.async_add_executor_job(self._journal.meta_get, flag)
+            == "done"
+        ):
+            return 0
+        events = read()
+        added = 0
+        async with self._lock:
+            for i in range(0, len(events), MAX_APPEND):
+                out = await self.hass.async_add_executor_job(
+                    self._journal.append, room_id, events[i : i + MAX_APPEND]
+                )
+                added += len(out["accepted"])
+            await self.hass.async_add_executor_job(self._journal.meta_set, flag, "done")
+        return added
+
     async def prune(self) -> None:
         if self.ok:
             await self.hass.async_add_executor_job(
@@ -387,6 +409,49 @@ async def async_setup_journal(hass) -> None:
     data[HUB] = hub
     # Opened and pruned in the background: setup, and a room reload, never wait on the journal's file.
     hass.async_create_task(_open_and_prune(hub))
+
+
+def _old_events(hass, entry, room_id) -> list:
+    """Every old store of the room as journal events. A store that is not there is skipped, and so is one
+    that cannot be read; the source stores are only read."""
+    from . import journal
+
+    data = hass.data.get(DOMAIN, {})
+    sources = (
+        ("_setpoint_log", journal.import_setpoint_log, lambda s: s.changes),
+        ("_stock", journal.import_stock_history, lambda s: s.data["history"]),
+        ("_calibration", journal.import_calibration, lambda s: s.document["records"]),
+        ("_overlays", journal.import_overlays, lambda s: list(s.rows.values())),
+    )
+    events: list = []
+    for key, importer, rows in sources:
+        store = data.get(key, {}).get(entry.entry_id)
+        if store is None:
+            continue
+        try:
+            events += importer(room_id, rows(store))
+        except Exception as err:
+            _LOGGER.warning("Journal backfill skipped %s: %s", key, err)
+    return events
+
+
+async def async_backfill_room(hass, entry) -> None:
+    """Once per room, after its stores are set up: import the setpoint log, stock history, calibration history
+    and held overlays as journal events. Ids come from the rows, so a run that is cut short and repeated adds
+    nothing twice. Never raises: a journal that is down just has no history yet, and tries again next start.
+    """
+    from .room import room_prefix
+
+    try:
+        hub = hass.data.get(DOMAIN, {}).get(HUB)
+        if hub is None or hub.failed or hub.closed:
+            return
+        room_id = "room:" + room_prefix(entry)
+        added = await hub.backfill(room_id, lambda: _old_events(hass, entry, room_id))
+        if added:
+            _LOGGER.info("Journal backfilled %d events for %s", added, room_id)
+    except Exception as err:
+        _LOGGER.warning("Journal backfill failed: %s", err)
 
 
 async def async_unload_journal(hass) -> None:

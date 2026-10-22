@@ -254,6 +254,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .overlays import async_setup_overlays
 
     await async_setup_overlays(hass, entry)
+    # The journal's history from the stores that now exist (once per room; in the background, setup never
+    # waits on it).
+    try:
+        from .journal_api import async_backfill_room
+
+        hass.async_create_task(async_backfill_room(hass, entry))
+    except Exception as err:  # pragma: no cover - never block setup on the journal
+        _LOGGER.warning("Journal backfill unavailable: %s", err)
     await async_setup_panel(hass)
     # What's new: the release highlights the dashboard shows once after an update.
     try:

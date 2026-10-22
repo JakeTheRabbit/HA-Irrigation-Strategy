@@ -264,3 +264,193 @@ class Journal:
         if self._db is None:
             raise RuntimeError("journal is not open")
         return self._db
+
+
+# --- Backfill: the old stores as journal events (run once per room by journal_api) -------------------------------
+
+# The setpoint log's `who` (and an overlay's `by`) -> the journal's source.actor.
+_WRITER_ACTORS = {
+    "operator": "manual",
+    "home_assistant": "automation",
+    "learner": "learner",
+    "brain": "ai",
+    "safety": "safety",
+}
+
+
+def _when(value) -> datetime | None:
+    try:
+        at = datetime.fromisoformat(value)
+    except (TypeError, ValueError):
+        return None
+    return at if at.tzinfo is not None else at.replace(tzinfo=UTC)
+
+
+def _backfilled(room_id, source, row_key, at_text, kind, zone, actor, data):
+    """One event for an old row, or None when the row has no usable time. Its id is derived from the row, so
+    importing the same row again gives the same id and the journal drops it as a duplicate.
+    """
+    from .generated.ids import derived_id
+
+    at = _when(at_text)
+    if at is None:
+        return None
+    return {
+        "v": 1,
+        "id": derived_id(at, f"{source}:{room_id}:{row_key}"),
+        "ts": at_text,
+        "zone": zone,
+        "kind": kind,
+        "outcome": "ok",
+        "code": None,
+        "source": {
+            "actor": actor,
+            "detail": "backfill",
+            "program_id": None,
+            "user_id": None,
+            "judge": None,
+            "client": None,
+        },
+        "correlation": {
+            "intent_id": None,
+            "causation_id": None,
+            "batch_id": None,
+            "run_id": None,
+            "plan_revision": None,
+            "setup_revision": None,
+            "proposal_token": None,
+            "ledger_id": None,
+        },
+        "data": data,
+        "readback": None,
+    }
+
+
+def _rows(rows):
+    return [row for row in rows or () if isinstance(row, dict)]
+
+
+def _zone(value):
+    return value if isinstance(value, int) and not isinstance(value, bool) else None
+
+
+def import_setpoint_log(room_id: str, rows) -> list[dict]:
+    """setpoint_log rows -> `target.changed`, as setpoint_log.record() emits them live. A row keeps no expiry,
+    so none of them is an overlay (the room's active overlays come from import_overlays).
+    """
+    out = []
+    for row in _rows(rows):
+        zone = _zone(row.get("zone"))
+        event = _backfilled(
+            room_id,
+            "setpoint_log",
+            f"{row.get('entity_id')}|{row.get('at')}|{row.get('new')}",
+            row.get("at"),
+            "target.changed",
+            zone,
+            _WRITER_ACTORS.get(row.get("who"), "system"),
+            {
+                "key": row.get("field"),
+                "scope": "room" if zone is None else f"zone:{zone}",
+                "layer": "base",
+                "old": row.get("old"),
+                "new": row.get("new"),
+                "expires": None,
+                "reason": row.get("reason"),
+                "expected": row.get("expected"),
+                "entity_id": row.get("entity_id"),
+            },
+        )
+        if event:
+            out.append(event)
+    return out
+
+
+def import_stock_history(room_id: str, rows) -> list[dict]:
+    """Stock history rows -> one `stock.drawn` per tank in the row (the row key, or its time, plus the tank
+    names the event)."""
+    out = []
+    for row in _rows(rows):
+        draws = row.get("draw_ml")
+        if not isinstance(draws, dict):
+            continue
+        base = row.get("key") or row.get("at")
+        for tank, ml in draws.items():
+            event = _backfilled(
+                room_id,
+                "stock",
+                f"{base}|{tank}",
+                row.get("at"),
+                "stock.drawn",
+                None,
+                "manual" if row.get("source") == "manual" else "system",
+                {
+                    "tank": tank,
+                    "ml": ml,
+                    "source": row.get("source"),
+                    "key": row.get("key"),
+                },
+            )
+            if event:
+                out.append(event)
+    return out
+
+
+def import_calibration(room_id: str, records) -> list[dict]:
+    """Calibration checks -> `calibration.captured` (a check only judges the probe; nothing was applied)."""
+    out = []
+    for record in _rows(records):
+        event = _backfilled(
+            room_id,
+            "calibration",
+            record.get("id"),
+            record.get("at"),
+            "calibration.captured",
+            None,
+            "manual",
+            {
+                "applied": False,
+                "record_id": record.get("id"),
+                "probe": record.get("probe"),
+                "kind": record.get("kind"),
+                "entity_id": record.get("entity_id"),
+                "slope_pct": record.get("slope_pct"),
+                "offset": record.get("offset"),
+                "verdict": record.get("verdict"),
+                "points": record.get("points"),
+                "note": record.get("note"),
+            },
+        )
+        if event:
+            out.append(event)
+    return out
+
+
+def import_overlays(room_id: str, rows) -> list[dict]:
+    """The AI overlays still held -> `target.changed` on the overlay layer (old = the operator's value)."""
+    out = []
+    for row in _rows(rows):
+        zone = _zone(row.get("zone"))
+        event = _backfilled(
+            room_id,
+            "overlay",
+            f"{row.get('entity_id')}|{row.get('at')}",
+            row.get("at"),
+            "target.changed",
+            zone,
+            _WRITER_ACTORS.get(row.get("by"), "system"),
+            {
+                "key": row.get("field"),
+                "scope": "room" if zone is None else f"zone:{zone}",
+                "layer": "overlay",
+                "old": row.get("old"),
+                "new": row.get("new"),
+                "expires": row.get("expires"),
+                "reason": None,
+                "expected": None,
+                "entity_id": row.get("entity_id"),
+            },
+        )
+        if event:
+            out.append(event)
+    return out
