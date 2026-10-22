@@ -721,6 +721,8 @@ BACKUP_RISE_PTS, BACKUP_WINDOW_MIN, BACKUP_GRACE_MIN, BACKUP_CLEAR_MIN = 3.0, 60
 # re-water threshold moves with it; a smaller move is field capacity only. The rescue (P3 emergency) floor never moves.
 # The room's substrate profile sets it (fc_shift_min); this is the generic profile's.
 FC_SHIFT_MIN = SUBSTRATE_PROFILES["generic"]["fc_shift_min"]
+# A probe reading older than this many minutes is not used (_read_sensor). The heartbeat publishes it for the dashboard.
+SENSOR_MAX_AGE_MIN = 20
 # The most the follower moves any one setpoint in a grow-day, in points: a drifting probe or a flood can only drag the
 # ladder this far a day. The fallback of the room's Max setpoint move per day (_step_limit).
 FC_STEP_MAX = 1.0
@@ -797,6 +799,13 @@ SUBSTRATES = tuple(SUBSTRATE_PROFILES)
 def _profile(room):
     """The room's substrate profile (defaults.SUBSTRATE_PROFILES): generic unless the room chose another."""
     return SUBSTRATE_PROFILES.get(getattr(room, "substrate", "generic"), SUBSTRATE_PROFILES["generic"])
+
+
+def _pore_ec_neutral(room):
+    """The pore EC to target ratios a shot's size is left alone within (ec_adjust): over the highest 'under' row
+    and up to the lowest 'over' row of the room's substrate profile. The dashboard's EC band around a target."""
+    prof = _profile(room)
+    return [max(r for r, _ in prof["ec_adjust_down"]), min(r for r, _ in prof["ec_adjust_up"])]
 
 
 _SIGN = {"<": "<", "<=": "≤", ">": ">", ">=": "≥"}
@@ -2077,7 +2086,12 @@ class Controller:
         return None if default is None else float(default)
 
     def _room_duration_cap(self, room):
-        """Read the canonical room cap, or its same-room legacy entity if absent."""
+        """Read the canonical room cap, or its same-room legacy entity if absent. The heartbeat publishes the
+        last one read (`max_shot_s`): a valve open longer than that is not a shot."""
+        room._max_shot_s = cap = self._read_duration_cap(room)
+        return cap
+
+    def _read_duration_cap(self, room):
         for suffix in ("max_shot_duration", "maximum_shot_duration"):
             entity = f"number.crop_steering_{room.prefix}{suffix}"
             raw, attributes, updated = ha_get(entity)
@@ -2279,7 +2293,7 @@ class Controller:
             out.append((value, changed))
         return out
 
-    def _read_sensor(self, entity, quantity, max_age_min=20, keep_refused=False):
+    def _read_sensor(self, entity, quantity, max_age_min=SENSOR_MAX_AGE_MIN, keep_refused=False):
         """A device's live reading in its quantity's canonical unit, or None: no number, set aside for its unit,
         outside the quantity's sane range, stale, or stamped in the future."""
         lo, hi = UNITS[quantity]["plausible"]
@@ -3353,6 +3367,11 @@ class Controller:
                 "setup_pending": getattr(room, "_setup_pending", None),
                 "room_active": room_active,
                 "max_run": self._max_run_report(room),
+                # what the dashboard judges with, the controller's own: a reading older than this is not used,
+                # a valve open longer than the last shot's cap is not a shot, and the pore-EC band of a target
+                "max_sensor_age_s": SENSOR_MAX_AGE_MIN * 60,
+                "max_shot_s": getattr(room, "_max_shot_s", None),
+                "pore_ec_neutral": _pore_ec_neutral(room),
             },
             **({"timeout": timeout} if timeout else {}),
         )
@@ -4280,6 +4299,9 @@ class Controller:
                 "below_minimum": drawdown["low"],
                 "over_full": drawdown["over"],
                 "minimum_pct": tank_level.LOW_HOLD_PCT,
+                "release_pct": tank_level.LOW_RELEASE_PCT,
+                "over_pct": tank_level.OVER_HOLD_PCT,
+                "over_release_pct": tank_level.OVER_RELEASE_PCT,
                 "engine": PRODUCT,
             },
         )
@@ -4787,7 +4809,7 @@ class Controller:
         """One entity's state for the AI assistant's context (the room's flower start date)."""
         return ha_get(entity)[0]
 
-    def _unreadable(self, entity, max_age_min=20):
+    def _unreadable(self, entity, max_age_min=SENSOR_MAX_AGE_MIN):
         """Why `_read_sensor` found no usable moisture reading at `entity`, as (code, sentence).
         The same tests in the same order, on one more read of the entity."""
         lo, hi = UNITS["vwc"]["plausible"]
