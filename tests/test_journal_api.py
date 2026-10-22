@@ -75,6 +75,24 @@ def test_append_fires_each_new_event_once_on_the_bus(tmp_path, monkeypatch):
     asyncio.run(go())
 
 
+def test_append_rejects_a_bad_event_and_stores_the_rest(tmp_path, monkeypatch):
+    hass, api = _rig(monkeypatch, tmp_path)
+
+    async def go():
+        hub = api.JournalHub(hass, str(tmp_path / "journal.db"))
+        await hub.async_init()
+        first, bad, last = _event(), _event(kind="no.such.kind"), _event()
+        out = await hub.append(ROOM, [first, bad, last])
+        assert out["accepted"] == [first["id"], last["id"]] and out["duplicate"] == []
+        assert [r["id"] for r in out["rejected"]] == [bad["id"]]
+        assert "unknown kind" in out["rejected"][0]["error"]
+        assert [d["id"] for _, d in hass.bus.events] == [first["id"], last["id"]]
+        again = await hub.append(ROOM, [first])
+        assert again["rejected"] == [] and again["duplicate"] == [first["id"]]
+
+    asyncio.run(go())
+
+
 def test_append_refuses_more_than_50_events(tmp_path, monkeypatch):
     hass, api = _rig(monkeypatch, tmp_path)
     from homeassistant.exceptions import HomeAssistantError

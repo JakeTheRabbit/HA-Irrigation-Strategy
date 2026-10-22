@@ -754,6 +754,8 @@ EVENTS_BUDGET_S = 10.0
 # standing on one reason is journaled again (intent.held) after this many seconds.
 JOURNAL_BACKOFF_PASSES = 5
 HELD_REEMIT_S = 1800
+JOURNAL_FLUSH_BUDGET_S = 1.5  # no flush batch starts later than this into the flush
+_HELD_NUMBERS = re.compile(r"\d{1,2}:\d{2}|[-+]?\d+(?:\.\d+)?")  # a hold's times and numbers (_journal_held)
 # The codes whose severity is critical in docs/error-codes.json (tests/test_error_codes.py keeps the two equal):
 # their push is urgent, a high-priority one on a phone whose row asks for that.
 CRITICAL_CODES = frozenset({"CS-201", "CS-202", "CS-203", "CS-204", "CS-207", "CS-211", "CS-212", "CS-301",
@@ -5932,8 +5934,10 @@ class Controller:
                 waited = min(SWITCH_ON_S, until - acked) if until is not None else SWITCH_ON_S
                 # "opening" (a valve. entity on its way) or anything but a definite OFF may be open
                 tally = "reset" if reads[-1] == "on" else "keep" if cut else "count"
+                maybe_on = cut or any(state != "off" for state in reads)
+                journaled["off"] = not maybe_on  # read back a definite OFF (the journal's readback "off")
                 return (f"Home Assistant took the command to {what}, but it did not read on within "
-                        f"{waited:.0f} s."), cut or any(state != "off" for state in reads), tally
+                        f"{waited:.0f} s."), maybe_on, tally
             pending[0] = None
             journaled["on"].append(ent)
             while (left := lead_s - (time.monotonic() - acked)) > 0:
@@ -6117,12 +6121,14 @@ class Controller:
                 # reads it back once Home Assistant accepts this controller again.
                 log(f"[{room.slug}] Z{zone} shot closed with Home Assistant refusing: its offs were sent, "
                     "not read back; left recorded")
+                journaled["close"] = None  # not closed as far as anyone can tell: no code (not CS-301)
             elif refused or not closed:
                 # Which one, and how, as it is now: before the second try below changes it.
                 failures = self._close_failures((valve, *upstream), refused)
                 for ent in reversed(upstream):
                     hw_call(ent, False)
                 self._latch_hardware_fault(room, f"zone {zone} shot end", failures)
+                journaled["close"] = "CS-301"
             else:
                 room.shot_inflight = None  # closed and read back OFF: this shot left nothing open
             shutdown_checked = True
@@ -6237,10 +6243,6 @@ class Controller:
             journaled["intent_id"] = new_id()
             journaled["vol_before"] = float(st.get("daily_vol") or 0.0)
             journaled["vwc_before"], journaled["ec_before"] = vwc, snap.ec if snap is not None else None
-            # a shot started: what held this zone before is over, and is journaled again if it comes back
-            seen = self.__dict__.get("_held_journaled", {})
-            for key in [k for k in seen if k[:2] == (room.slug, zone)]:
-                del seen[key]
             self._journal(
                 room.prefix, "shot.started", zone=zone, actor=actor, program_id=program_id, detail=reason_text,
                 correlation={"intent_id": journaled["intent_id"]}, durable=True, now=started,
@@ -6263,7 +6265,8 @@ class Controller:
 
     def _journal_shot_end(self, room, zone, journaled, valve_started):
         """shot.completed, or shot.aborted with its outcome and code, with the litres the shot counted (#197) and
-        what read back ON (#208): `verified` only when every switch sent ON read back ON."""
+        what read back ON (#208): `verified` only when every switch sent ON read back ON, `off` when one read back a
+        definite OFF. A shot whose close failed completes `failed`, with CS-301 when it latched a hardware fault."""
         try:
             end = journaled["end"] or ("failed", None)  # an end no path named: not a shot that completed
             elapsed = journaled["elapsed"]
@@ -6271,12 +6274,16 @@ class Controller:
                 elapsed = time.monotonic() - valve_started
             sent, on = journaled["sent"], journaled["on"]
             status = ("verified" if sent and on == sent
-                      else "refused" if journaled["refused"] or _GATE.state is not None else "unread")
+                      else "refused" if journaled["refused"] or _GATE.state is not None
+                      else "off" if journaled.get("off") else "unread")
             litres = float(room.state[zone].get("daily_vol") or 0.0) - journaled["vol_before"]
             completed = end == "completed"
+            outcome, code = ("ok", None) if completed else end
+            if completed and "close" in journaled:
+                outcome, code = "failed", journaled["close"]
             self._journal(
                 room.prefix, "shot.completed" if completed else "shot.aborted", zone=zone,
-                outcome="ok" if completed else end[0], code=None if completed else end[1],
+                outcome=outcome, code=code,
                 correlation={"intent_id": journaled["intent_id"]},
                 data={
                     "elapsed_s": round(elapsed, 1) if elapsed is not None else 0.0,
@@ -6596,10 +6603,14 @@ class Controller:
                     room=room,
                     zone=zone,
                 )
+                self._journal_held(room, zone, "shot size cannot be calculated", code="CS-204", now=now,
+                                   would=reason, actor=actor)
                 return
             raw_dur = float(getattr(reason, "seconds", TEST_SHOT_S)) if test else raw_seconds(size, substrate, flow)
             max_dur = self._room_duration_cap(room)
             if max_dur is None:
+                self._journal_held(room, zone, "maximum shot length not valid", code="CS-203", now=now,
+                                   would=reason, actor=actor)
                 return
             # Hydraulic sizing determines nominal runtime; the room's duration
             # limit bounds every physical shot independently of its requested volume.
@@ -7001,10 +7012,10 @@ class Controller:
             if status != 200 or not isinstance(answer, dict):
                 failed.append(status)
                 return None
-            return answer.get("accepted") or [], answer.get("duplicate") or []
+            return answer.get("accepted") or [], answer.get("duplicate") or [], answer.get("rejected") or []
 
         try:
-            journal.flush(send)
+            journal.flush(send, budget_s=JOURNAL_FLUSH_BUDGET_S)
         except Exception as e:
             log("journal flush error", e)
             failed.append(e)
@@ -7014,18 +7025,32 @@ class Controller:
     def _journal_held(self, room, zone, reason, *, guard=None, code=None, now, would=None, actor="engine"):
         """intent.held for a shot the act loop held (_act_zone, and _execute_shot before anything opens), once per
         (room, zone, reason) and again each HELD_REEMIT_S while it stands. Never from _blocked: it also only
-        describes (_publish_waiting_for's gates)."""
-        seen = self.__dict__.setdefault("_held_journaled", {})
-        key = (room.slug, zone, str(reason))
-        last = seen.get(key)
-        if last is not None and 0 <= (now - last).total_seconds() < HELD_REEMIT_S:
-            return
-        seen[key] = now
-        data = {"reason": str(reason)}
-        if guard:
-            data["guard"] = guard
-        data["would"] = None if would is None else str(would)
-        self._journal(room.prefix, "intent.held", zone=zone, outcome="held", code=code, actor=actor, data=data)
+        describes (_publish_waiting_for's gates). A hold is known by its guard, else by its words without their
+        numbers and times, so a reading that drifts while it holds is one hold. A journal error is only logged."""
+        try:
+            seen = self.__dict__.setdefault("_held_journaled", {})
+            key = (room.slug, zone, guard or _HELD_NUMBERS.sub("#", str(reason)))
+            self.__dict__.setdefault("_held_touched", set()).add(key)
+            last = seen.get(key)
+            if last is not None and 0 <= (now - last).total_seconds() < HELD_REEMIT_S:
+                return
+            seen[key] = now
+            data = {"reason": str(reason)}
+            if guard:
+                data["guard"] = guard
+            data["would"] = None if would is None else str(would)
+            self._journal(room.prefix, "intent.held", zone=zone, outcome="held", code=code, actor=actor, data=data)
+        except Exception as e:
+            log("journal intent.held error", room.slug, zone, e)
+
+    def _sweep_held(self, room, zone):
+        """After the zone's act (_loop_room): the holds it no longer has (it fired, or nothing holds it) are
+        forgotten, so one that comes back is journaled again and the keys never grow."""
+        seen = self.__dict__.get("_held_journaled", {})
+        touched = self.__dict__.get("_held_touched", set())
+        for key in [k for k in seen if k[:2] == (room.slug, zone) and k not in touched]:
+            del seen[key]
+        touched.difference_update([k for k in touched if k[:2] == (room.slug, zone)])
 
     def _room_error(self, room, now, err):
         """A room's pass raised (loop_once). The room says so: its heartbeat and its status read error,
@@ -7835,6 +7860,7 @@ class Controller:
                 lights_on,
                 now,
             )
+            self._sweep_held(room, zone)
             self._grow_day_shot(room, zone, getattr(reason, "kind", None), room.state[zone]["daily_vol"] - fed_before, now)
             if acted is not None:  # held back at the daily budget after all: publish what happened
                 fire, size, reason = decisions[zone] = acted

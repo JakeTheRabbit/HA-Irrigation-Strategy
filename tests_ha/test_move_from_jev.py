@@ -245,10 +245,11 @@ def test_the_copy_list_names_every_file_the_controller_keeps_in_its_data_folder(
     # Not data to move: the Supervisor's options.json, files that ship beside the code (the brain's tools and the
     # doctrine manifest), and brain_notices.json and brain_report.json, which only this app writes (a AI assistant app never
     # had either); error-codes.json is the repository's table the controller brief is generated from, never data;
-    # journal_outbox.jsonl only holds journal events waiting to be sent, and only this app writes it.
+    # journal_outbox.jsonl and journal_dead.jsonl only hold journal events waiting to be sent or set aside, and only
+    # this app writes them.
     assert set(_copied()) == named - {
         "options.json", "brain_tools.json", "manifest.json", "brain_notices.json", "brain_report.json",
-        "error-codes.json", "journal_outbox.jsonl"}
+        "error-codes.json", "journal_outbox.jsonl", "journal_dead.jsonl"}
     assert {p.name for p in RECORDED.iterdir()} | {"state.json", "jev_usage.json"} == set(_copied())
     assert hashlib.sha256("\n".join(sorted(_copied())).encode()).hexdigest() == COPIED_SHA256
 

@@ -92,6 +92,23 @@ async def test_query_round_trips_what_append_stored(
     assert got["cursor"] is None
 
 
+async def test_an_invalid_event_is_rejected_and_the_rest_are_stored(
+    hass, real_api, hass_admin_user, monkeypatch
+):
+    await _up(hass, real_api, monkeypatch)
+    good, bad = _event(), _event(kind="no.such.kind")
+    out = await _call(
+        hass, hass_admin_user, "journal_append", room_id=F2, events=[bad, good]
+    )
+    assert out["accepted"] == [good["id"]] and out["duplicate"] == []
+    assert [r["id"] for r in out["rejected"]] == [bad["id"]]
+    assert "unknown kind" in out["rejected"][0]["error"]
+    with pytest.raises(HomeAssistantError):  # a bad request is still an error
+        await _call(
+            hass, hass_admin_user, "journal_append", room_id=F2, events=["not an event"]
+        )
+
+
 async def test_query_needs_a_signed_in_user_and_append_an_admin(
     hass, real_api, hass_read_only_user, monkeypatch
 ):

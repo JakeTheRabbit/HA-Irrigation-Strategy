@@ -187,7 +187,7 @@ def test_shot_started_is_on_disk_before_the_pump_switch_is_called(rig, firing, m
     monkeypatch.setattr(controller, "ha_call", call)
     c.loop_once(NOW)
     assert "shot.started" in seen
-    assert seen[-1] >= 1  # fsynced before the pump was asked to start
+    assert synced == []  # in the file (flushed), never fsynced on the watering path (ruling R5)
 
 
 def test_a_completed_shot_carries_verified_readback_litres_and_the_started_intent_id(rig, firing):
@@ -241,12 +241,12 @@ def test_a_valve_that_does_not_open_is_a_failed_shot_with_its_code(rig, monkeypa
         return real_call(domain, service, **data)
 
     monkeypatch.setattr(controller, "ha_call", call)
-    c._execute_shot(c.rooms[0], 1, 10, 2.0, flow_lps=0.05, reason_text="test")
+    c._execute_shot(c.rooms[0], 1, 120, 2.0, flow_lps=0.05, reason_text="test")  # a read-back the shot does not cut short
     started, = _events(c, "shot.started")
     ended, = _events(c, "shot.aborted")
     assert ended["outcome"] == "failed" and ended["code"] == "CS-304"
     assert ended["correlation"]["intent_id"] == started["correlation"]["intent_id"]
-    assert ended["readback"]["status"] != "verified"
+    assert ended["readback"]["status"] == "off"  # it read back a definite OFF
     assert ended["readback"]["entities"] == [PUMP, MAIN]  # what did read back on
     assert not _events(c, "shot.completed")
 
@@ -293,6 +293,61 @@ def test_a_standing_hold_is_journaled_once_per_reason_and_every_30_min(rig, firi
     assert held[0]["outcome"] == "held" and held[0]["zone"] == 1
     assert held[0]["data"] == {"reason": f"{controller.PRODUCT} disabled (kill switch off)", "would": TOPUP}
     assert not _events(c, "shot.started")
+    assert len(c._held_journaled) == 1
+    fake.set_state(KILL, "on")  # the hold clears and the zone fires: its key goes
+    c.loop_once(NOW + timedelta(hours=1))
+    assert _events(c, "shot.started") and c._held_journaled == {}
+
+
+def test_a_hold_whose_numbers_drift_is_one_hold(rig, firing):
+    c, fake, _clock = rig
+    c.journal.flush = lambda *a, **k: 0
+    room = c.rooms[0]
+    room.feed_ec_sensor = "sensor.feed_ec"
+    fake.set_state("number.crop_steering_irrigation_ec_min", "1")
+    fake.set_state("number.crop_steering_irrigation_ec_max", "2")
+    for i in range(40):  # the feed EC drifts each pass, out of its band all along
+        fake.set_state("sensor.feed_ec", f"{2.5 + i * 0.1:.1f}", {"unit_of_measurement": "mS/cm"})
+        c.loop_once(NOW + timedelta(seconds=30 * i))
+    held = _events(c, "intent.held")
+    assert len(held) == 1 and held[0]["data"]["reason"].startswith("source-water EC 2.5 out of [1,2]")
+    assert len(c._held_journaled) == 1  # the keys do not grow
+
+
+def test_an_unsized_zone_and_an_unreadable_cap_are_journaled_holds(rig, firing, monkeypatch):
+    c, fake, _clock = rig
+    c.journal.flush = lambda *a, **k: 0
+    monkeypatch.setattr(c, "_zone_flow_lps", lambda room, zone: 0.0)
+    c.loop_once(NOW)
+    monkeypatch.setattr(c, "_zone_flow_lps", lambda room, zone: 0.05)
+    monkeypatch.setattr(c, "_room_duration_cap", lambda room: None)
+    c.loop_once(NOW + timedelta(minutes=1))
+    held = _events(c, "intent.held")
+    assert [(e["code"], e["data"]["would"]) for e in held] == [("CS-204", TOPUP), ("CS-203", TOPUP)]
+    assert not _events(c, "shot.started")
+
+
+def test_a_shot_whose_valve_close_failed_completes_failed_with_its_code(rig, monkeypatch):
+    c, fake, _clock = rig
+    real_call = fake.ha_call
+
+    def call(domain, service, **data):
+        if data.get("entity_id") == VALVE and service == "turn_off":
+            return False  # Home Assistant refused the close
+        return real_call(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    c._execute_shot(c.rooms[0], 1, 6, 2.0, flow_lps=0.05)
+    done, = _events(c, "shot.completed")
+    assert done["outcome"] == "failed" and done["code"] == "CS-301"
+    assert done["data"]["commanded_l"] > 0
+
+
+def test_a_held_journal_that_breaks_never_raises(rig):
+    c, _fake, _clock = rig
+    room = c.rooms[0]
+    c._journal_held(room, 1, "a hold", now=NOW)
+    c._journal_held(room, 1, "a hold", now="not a time")  # its own error is logged, never raised
 
 
 def test_a_pre_open_hold_is_journaled(rig, firing):

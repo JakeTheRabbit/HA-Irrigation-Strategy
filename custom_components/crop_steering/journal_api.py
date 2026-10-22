@@ -123,18 +123,28 @@ class JournalHub:
             raise _hub_error(message) from Unavailable(message)
 
     async def append(self, room_id: str, events: list) -> dict:
+        """Store the well-formed events -> {accepted, duplicate, seq_max, rejected: [{id, error}]}. An event that
+        is not well formed is rejected on its own, so one bad event never blocks the others (the controller's
+        outbox sets it aside); a request that cannot be served at all still raises."""
         if len(events) > MAX_APPEND:
             raise _hub_error(f"journal_append takes at most {MAX_APPEND} events")
+        valid, rejected = [], []
+        for event in events:
+            try:
+                valid.append(validate_event(event))
+            except ValueError as err:
+                rejected.append({"id": event.get("id"), "error": str(err)})
         await self._wait_ready()
         async with self._lock:
             try:
                 out = await self.hass.async_add_executor_job(
-                    self._journal.append, room_id, events
+                    self._journal.append, room_id, valid
                 )
             except ValueError as err:
                 raise _hub_error(str(err)) from err
         for event in out.pop("stored"):
             self.hass.bus.async_fire(EVENT_JOURNAL, event)
+        out["rejected"] = rejected
         return out
 
     async def query(self, **kw) -> dict:
