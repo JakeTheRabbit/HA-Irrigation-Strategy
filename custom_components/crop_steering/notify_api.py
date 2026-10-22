@@ -920,6 +920,7 @@ async def async_setup_notify(hass, entry) -> None:
     """Once for the site, with the first room that sets up; each room after it only joins, and the store, the
     sensor and the services stay while any room is loaded (async_unload_notify)."""
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -994,8 +995,8 @@ async def async_setup_notify(hass, entry) -> None:
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schemas[service]),
+            wrap(handle),
+            schema=vol.Schema(fields(schemas[service])),
             # The controller app calls notify over REST asking for its answer; a script may call it without.
             supports_response=(
                 SupportsResponse.OPTIONAL

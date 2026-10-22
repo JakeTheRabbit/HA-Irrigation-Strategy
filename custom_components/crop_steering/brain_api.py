@@ -106,6 +106,7 @@ def resolve_questions(hass, room_id):
 
 async def async_setup_brain(hass, entry):
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -132,15 +133,17 @@ async def async_setup_brain(hass, entry):
     hass.services.async_register(
         DOMAIN,
         SERVICE,
-        handle,
+        wrap(handle),
         schema=vol.Schema(
-            {
-                vol.Required("room_id"): str,
-                vol.Required("question"): vol.All(
-                    str, vol.Length(min=1, max=MAX_QUESTION)
-                ),
-                vol.Optional("zone"): vol.All(int, vol.Range(min=1, max=MAX_ZONES)),
-            }
+            fields(
+                {
+                    vol.Required("room_id"): str,
+                    vol.Required("question"): vol.All(
+                        str, vol.Length(min=1, max=MAX_QUESTION)
+                    ),
+                    vol.Optional("zone"): vol.All(int, vol.Range(min=1, max=MAX_ZONES)),
+                }
+            )
         ),
         supports_response=SupportsResponse.OPTIONAL,
     )

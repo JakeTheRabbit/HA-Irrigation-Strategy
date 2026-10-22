@@ -364,6 +364,7 @@ def resolve_days(hass, room_id):
 
 async def async_setup_grow_days(hass, entry):
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -427,8 +428,10 @@ async def async_setup_grow_days(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema({vol.Required("room_id"): str, **schemas[service]}),
+            wrap(handle),
+            schema=vol.Schema(
+                fields({vol.Required("room_id"): str, **schemas[service]})
+            ),
             # The controller app sends grow_day_record over REST, asking for the answer.
             supports_response=(
                 SupportsResponse.OPTIONAL

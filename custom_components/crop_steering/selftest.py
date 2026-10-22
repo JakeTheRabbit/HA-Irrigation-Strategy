@@ -22,6 +22,7 @@ def shot_button(room_id, zone) -> str:
 
 async def async_setup_selftest(hass):
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -47,12 +48,14 @@ async def async_setup_selftest(hass):
     hass.services.async_register(
         DOMAIN,
         "test_shot",
-        handle,
+        wrap(handle),
         schema=vol.Schema(
-            {
-                vol.Required("room_id"): str,
-                vol.Required("zone"): vol.All(int, vol.Range(min=1)),
-            }
+            fields(
+                {
+                    vol.Required("room_id"): str,
+                    vol.Required("zone"): vol.All(int, vol.Range(min=1)),
+                }
+            )
         ),
         supports_response=SupportsResponse.ONLY,
     )

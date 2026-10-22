@@ -131,6 +131,7 @@ async def async_setup_whats_new(hass, entry, fresh: bool) -> None:
     `fresh`: this room has no entities yet, so it was set up just now, not on an earlier start.
     """
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -155,15 +156,15 @@ async def async_setup_whats_new(hass, entry, fresh: bool) -> None:
     hass.services.async_register(
         DOMAIN,
         "whats_new_get",
-        handle,
-        schema=vol.Schema({}),
+        wrap(handle),
+        schema=vol.Schema(fields({})),
         supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(
         DOMAIN,
         "whats_new_seen",
-        handle,
-        schema=vol.Schema({vol.Required("version"): str}),
+        wrap(handle),
+        schema=vol.Schema(fields({vol.Required("version"): str})),
         supports_response=SupportsResponse.ONLY,
     )
 

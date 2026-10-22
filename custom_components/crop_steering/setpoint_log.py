@@ -184,6 +184,7 @@ def log_for(hass, entry_id):
 
 async def async_setup_setpoint_log(hass, entry):
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse, callback
     from homeassistant.exceptions import HomeAssistantError
 
@@ -210,8 +211,8 @@ async def async_setup_setpoint_log(hass, entry):
     hass.services.async_register(
         DOMAIN,
         SERVICE,
-        handle,
-        schema=vol.Schema({vol.Required("room_id"): str}),
+        wrap(handle),
+        schema=vol.Schema(fields({vol.Required("room_id"): str})),
         supports_response=SupportsResponse.ONLY,
     )
 

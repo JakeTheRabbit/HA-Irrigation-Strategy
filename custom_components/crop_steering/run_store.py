@@ -10,6 +10,7 @@ import re
 from uuid import uuid4
 from zoneinfo import ZoneInfo
 
+from .api_v2 import StaleRevision
 from .const import DOMAIN, MAX_ZONES
 from .room import room_prefix
 from .strategy_model import MODE_KEYS, PARAMETERS as STRATEGY_PARAMETERS
@@ -459,7 +460,10 @@ class RunStore:
                 type(data.get("expected_revision")) is not int
                 or data["expected_revision"] != self.document["revision"]
             ):
-                raise ValueError("Runs changed elsewhere. Reload before saving.")
+                raise StaleRevision(
+                    "Runs changed elsewhere. Reload before saving.",
+                    self.document["revision"],
+                )
             values = deepcopy(self.document["runs"])
             if action == "runs_save":
                 raw = data.get("record")

@@ -19,6 +19,7 @@ import logging
 from copy import deepcopy
 from datetime import datetime, timezone
 
+from .api_v2 import StaleRevision
 from . import presets, site_store
 from .admin import async_require_admin
 from .const import DOMAIN
@@ -175,8 +176,9 @@ class SiteStore:
             if self.error:
                 raise ValueError(self.error)
             if data["expected_revision"] != self.document["revision"]:
-                raise ValueError(
-                    "Supply settings changed elsewhere. Reload before saving."
+                raise StaleRevision(
+                    "Supply settings changed elsewhere. Reload before saving.",
+                    self.document["revision"],
                 )
             unread = [
                 w["section"]
@@ -301,7 +303,10 @@ class SiteStore:
             if self.error:
                 raise ValueError(self.error)
             if expected_revision != self.document["presets_revision"]:
-                raise ValueError("Presets changed elsewhere. Reload before saving.")
+                raise StaleRevision(
+                    "Presets changed elsewhere. Reload before saving.",
+                    self.document["presets_revision"],
+                )
             old = deepcopy(self.document["presets"])
             stored = deepcopy(old)
             result = change(stored)
@@ -380,6 +385,7 @@ async def async_setup_site(hass, entry) -> None:
     """Once for the site, with the first room that sets up; each room after it only joins (and
     publishes again, as its sizing may have changed)."""
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -486,8 +492,8 @@ async def async_setup_site(hass, entry) -> None:
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schemas[service]),
+            wrap(handle),
+            schema=vol.Schema(fields(schemas[service])),
             supports_response=(
                 SupportsResponse.ONLY if service in READS else SupportsResponse.OPTIONAL
             ),

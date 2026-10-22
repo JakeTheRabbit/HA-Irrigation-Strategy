@@ -221,6 +221,7 @@ def overlays_for(hass, entry_id):
 
 async def async_setup_overlays(hass, entry):
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -261,10 +262,14 @@ async def async_setup_overlays(hass, entry):
             raise HomeAssistantError(f"No AI overlay on {call.data['entity_id']}")
         held.journal(ended, call, undone=True)
 
-    one = vol.Schema({vol.Required("room_id"): str})
+    one = vol.Schema(fields({vol.Required("room_id"): str}))
     each = vol.Schema({vol.Required("room_id"): str, vol.Required("entity_id"): str})
     hass.services.async_register(
-        DOMAIN, "overlay_get", get, schema=one, supports_response=SupportsResponse.ONLY
+        DOMAIN,
+        "overlay_get",
+        wrap(get),
+        schema=one,
+        supports_response=SupportsResponse.ONLY,
     )
     hass.services.async_register(DOMAIN, "overlay_keep", keep, schema=each)
     hass.services.async_register(DOMAIN, "overlay_undo", undo, schema=each)

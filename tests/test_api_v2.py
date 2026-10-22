@@ -1,0 +1,258 @@
+"""The API v2 envelope (api_v2.py) against the stubs: v1 unchanged, the envelope, the error codes and the
+journal event ids."""
+
+import asyncio
+from types import SimpleNamespace
+
+import pytest
+
+ROOM = "room:f2_"
+
+
+def _stubs():
+    from . import ha_stubs
+
+    ha_stubs.install()
+    from custom_components.crop_steering import api_v2
+
+    return ha_stubs, api_v2
+
+
+def _call(data, *, user_id=None, return_response=True, service="thing"):
+    return SimpleNamespace(
+        data=data,
+        context=SimpleNamespace(user_id=user_id),
+        return_response=return_response,
+        service=service,
+        domain="crop_steering",
+    )
+
+
+def _run(coro):
+    return asyncio.run(coro)
+
+
+def test_without_api_the_answer_is_unchanged():
+    _, api_v2 = _stubs()
+    answer = {"revision": 3, "rows": [1, 2]}
+    seen = []
+
+    async def handler(call):
+        seen.append(call)
+        return answer
+
+    call = _call({"room_id": ROOM})
+    assert _run(api_v2.wrap(handler)(call)) is answer
+    assert seen == [call]  # the very call, not a copy
+    # api 1 is v1 too; only `api` is taken off what the handler sees.
+    assert _run(api_v2.wrap(handler)(_call({"room_id": ROOM, "api": 1}))) is answer
+    assert seen[-1].data == {"room_id": ROOM}
+
+
+def test_api_2_wraps_the_answer():
+    _, api_v2 = _stubs()
+
+    async def handler(call):
+        assert "api" not in call.data and call.service == "thing"
+        return {"revision": 7, "applied": [{"readback": "verified"}]}
+
+    out = _run(api_v2.wrap(handler)(_call({"room_id": ROOM, "api": 2})))
+    assert out["api"] == 2 and out["ok"] is True
+    assert out["room_id"] == ROOM and out["revision"] == 7
+    assert out["readback"]["status"] == "verified"
+    assert out["readback"]["at"] == "2026-01-01T12:00:00+00:00"
+    assert out["event_ids"] == []
+    assert out["data"] == {"revision": 7, "applied": [{"readback": "verified"}]}
+
+
+@pytest.mark.parametrize(
+    "result,status",
+    [
+        ({"applied": [{"readback": "verified"}, {"readback": "verified"}]}, "verified"),
+        ({"applied": [{"readback": "verified"}, {"readback": "refused"}]}, "refused"),
+        ({"applied": []}, "none"),
+        ({"readback": {"status": "ok"}}, "verified"),
+        ({"readback": {"status": "mismatch"}}, "none"),
+        ({"revision": 1}, "none"),
+    ],
+)
+def test_readback_comes_only_from_the_handlers_own_read_back(result, status):
+    _, api_v2 = _stubs()
+
+    async def handler(call):
+        return result
+
+    out = _run(api_v2.wrap(handler)(_call({"api": 2})))
+    assert out["readback"]["status"] == status
+
+
+def test_stale_revision_maps_to_its_code_and_current_revision():
+    _, api_v2 = _stubs()
+    from homeassistant.exceptions import HomeAssistantError
+
+    message = "Harvests changed elsewhere. Reload before saving."
+
+    async def handler(call):
+        try:
+            raise api_v2.StaleRevision(message, 4)
+        except ValueError as error:
+            raise HomeAssistantError(str(error)) from error
+
+    wrapped = api_v2.wrap(handler)
+    out = _run(wrapped(_call({"room_id": ROOM, "api": 2})))
+    assert out == {
+        "api": 2,
+        "ok": False,
+        "error": {"code": "stale_revision", "message": message, "current_revision": 4},
+    }
+    # v1, and a v2 caller that does not read the answer, get the exception as before.
+    for call in (_call({}), _call({"api": 2}, return_response=False)):
+        with pytest.raises(HomeAssistantError, match="changed elsewhere"):
+            _run(wrapped(call))
+
+
+def test_a_stale_save_answered_rather_than_raised_is_stale_revision():
+    _, api_v2 = _stubs()
+
+    async def handler(call):
+        return {"config": {"revision": 9}, "error": "revision"}
+
+    out = _run(api_v2.wrap(handler)(_call({"api": 2})))
+    assert out["ok"] is False
+    assert out["error"]["code"] == "stale_revision"
+    assert out["error"]["current_revision"] == 9
+
+
+def test_forbidden_maps_from_the_admin_check():
+    ha_stubs, api_v2 = _stubs()
+    from custom_components.crop_steering.admin import async_require_admin
+
+    hass = ha_stubs.FakeHass()
+
+    async def get_user(user_id):
+        return SimpleNamespace(id=user_id, is_admin=False)
+
+    hass.auth = SimpleNamespace(async_get_user=get_user)
+
+    async def handler(call):
+        await async_require_admin(hass, call, "crop_steering.thing")
+        return {}
+
+    out = _run(api_v2.wrap(handler)(_call({"api": 2}, user_id="staff")))
+    assert out["ok"] is False
+    assert out["error"]["code"] == "forbidden"
+    assert "administrator" in out["error"]["message"]
+
+
+@pytest.mark.parametrize(
+    "error,code",
+    [
+        (ValueError("pump_over_capacity: switch.pump cannot feed 3 zones"), "invalid"),
+        (ValueError("Give at least one target"), "invalid"),
+        (ValueError("The stored dashboards could not be loaded; ..."), "unavailable"),
+    ],
+)
+def test_value_errors_map_to_their_codes(error, code):
+    _, api_v2 = _stubs()
+
+    async def handler(call):
+        raise error
+
+    out = _run(api_v2.wrap(handler)(_call({"api": 2})))
+    assert out["error"] == {"code": code, "message": str(error)}
+
+
+def test_the_journal_being_unavailable_is_unavailable():
+    _, api_v2 = _stubs()
+    from homeassistant.exceptions import HomeAssistantError
+
+    async def handler(call):
+        raise HomeAssistantError("The event journal is unavailable")
+
+    out = _run(api_v2.wrap(handler)(_call({"api": 2})))
+    assert out["error"]["code"] == "unavailable"
+
+
+def test_a_guard_refusal_is_guard_refused():
+    _, api_v2 = _stubs()
+    from homeassistant.exceptions import HomeAssistantError
+
+    from custom_components.crop_steering.journal_api import EMITTED
+
+    async def handler(call):
+        EMITTED.get().append(("01J0000000000000000000000A", "intent.refused"))
+        raise HomeAssistantError("Refused: the zone is in its no-touch window")
+
+    out = _run(api_v2.wrap(handler)(_call({"api": 2})))
+    assert out["error"]["code"] == "guard_refused"
+
+
+def test_an_unknown_exception_still_raises():
+    _, api_v2 = _stubs()
+
+    async def handler(call):
+        raise KeyError("bug")
+
+    with pytest.raises(KeyError):
+        _run(api_v2.wrap(handler)(_call({"api": 2})))
+
+    async def while_refusing(call):
+        try:
+            raise ValueError("Give at least one target")
+        except ValueError:
+            raise KeyError("bug")
+
+    with pytest.raises(KeyError):
+        _run(api_v2.wrap(while_refusing)(_call({"api": 2})))
+
+
+def test_a_refusal_raised_as_home_assistant_error_is_invalid():
+    _, api_v2 = _stubs()
+    from homeassistant.exceptions import HomeAssistantError
+
+    async def handler(call):
+        raise HomeAssistantError("crop_steering.notify_test needs either service")
+
+    out = _run(api_v2.wrap(handler)(_call({"api": 2})))
+    assert out["error"]["code"] == "invalid"
+
+
+def test_event_ids_are_the_events_emitted_during_the_call(tmp_path, monkeypatch):
+    from .test_journal_api import _rig
+
+    hass, journal_api = _rig(monkeypatch, tmp_path)
+    from custom_components.crop_steering import api_v2
+
+    async def go():
+        hub = journal_api.JournalHub(hass, str(tmp_path / "journal.db"))
+        # Still opening: the id is known at emit time, the event goes in once it opens.
+        hass.data.setdefault("crop_steering", {})["_journal"] = hub
+        outside = journal_api.emit(hass, ROOM, "shot.completed", zone=3)
+        ids = []
+
+        async def handler(call):
+            ids.append(journal_api.note(hass, ROOM, "shot.completed", zone=1))
+            ids.append(journal_api.emit(hass, ROOM, "shot.completed", zone=2))
+            return {}
+
+        out = await api_v2.wrap(handler)(_call({"api": 2}))
+        await hub.async_init()
+        assert out["event_ids"] == ids and None not in ids and outside not in ids
+        assert journal_api.emit(hass, ROOM, "shot.completed", zone=4)  # no call open
+
+    asyncio.run(go())
+
+
+def test_common_keeps_a_field_the_service_already_declares():
+    _, api_v2 = _stubs()
+    import voluptuous as vol
+
+    own = vol.Optional("proposal_token")
+    merged = api_v2.fields({vol.Required("room_id"): str, own: dict})
+    assert merged[own] is dict
+    assert {getattr(k, "key", getattr(k, "schema", k)) for k in merged} == {
+        "room_id",
+        "proposal_token",
+        "api",
+        "client",
+    }

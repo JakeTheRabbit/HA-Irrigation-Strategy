@@ -891,6 +891,7 @@ async def _handle_pump(hass, call):
 
 async def async_setup_dosing(hass, entry):
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -968,8 +969,8 @@ async def async_setup_dosing(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schemas[service]),
+            wrap(handle),
+            schema=vol.Schema(fields(schemas[service])),
             # Reads answer only; a pump service that leaves a request or stores a flow may answer.
             supports_response=(
                 SupportsResponse.OPTIONAL

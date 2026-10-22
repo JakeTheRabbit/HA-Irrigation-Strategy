@@ -8,6 +8,7 @@ from datetime import datetime
 import logging
 import math
 
+from .api_v2 import StaleRevision
 from . import units
 from .admin import async_require_admin
 from .const import DOMAIN, LEGACY_KILL_SWITCH, MAX_ZONES
@@ -791,7 +792,7 @@ def _selected(hass, payload):
         type(payload.get("expected_revision")) is not int
         or payload["expected_revision"] != revision
     ):
-        raise ValueError("Room setup changed; refresh and review again")
+        raise StaleRevision("Room setup changed; refresh and review again", revision)
     return entry
 
 
@@ -1160,6 +1161,7 @@ async def async_setup_setup_services(hass):
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
     import voluptuous as vol
+    from .api_v2 import API, fields, wrap
 
     state = hass.data.setdefault(DOMAIN, {}).setdefault("_setup", {})
     if state.get("services_registered"):
@@ -1172,6 +1174,12 @@ async def async_setup_setup_services(hass):
         "setup_remove": remove_setup,
         "setup_commission": commission_setup,
     }
+
+    def _room_of(service_call, result):
+        """API v2: the room a setup answer is about; none for setup_read (every room)."""
+        entry = _entry(hass, (result or {}).get("entry_id"))
+        return "room:" + effective(entry).get("room_prefix", "") if entry else None
+
     for name, handler in handlers.items():
 
         async def call(service_call, fn=handler, action=name):
@@ -1199,8 +1207,8 @@ async def async_setup_setup_services(hass):
         hass.services.async_register(
             DOMAIN,
             name,
-            call,
-            schema=vol.Schema({}, extra=vol.ALLOW_EXTRA),
+            wrap(call, room_of=_room_of),
+            schema=vol.Schema(fields({}, API), extra=vol.ALLOW_EXTRA),
             supports_response=(
                 SupportsResponse.ONLY
                 if name == "setup_read"

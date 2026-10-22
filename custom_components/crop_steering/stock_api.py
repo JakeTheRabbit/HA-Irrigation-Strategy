@@ -16,6 +16,7 @@ from copy import deepcopy
 from datetime import datetime, timezone
 import logging
 
+from .api_v2 import StaleRevision
 from . import stock
 from .admin import async_require_admin
 from .const import DOMAIN, REPAIRS_DOCS_URL
@@ -401,7 +402,10 @@ class StockStore:
             if self.error:
                 raise ValueError(self.error)
             if data.get("expected_revision") != self.data["revision"]:
-                raise ValueError("Stock tanks changed elsewhere. Reload before saving.")
+                raise StaleRevision(
+                    "Stock tanks changed elsewhere. Reload before saving.",
+                    self.data["revision"],
+                )
             now = _now()
             draft = deepcopy(self.data)
             skipped = None
@@ -537,6 +541,7 @@ def resolve_stock(hass, room_id):
 
 async def async_setup_stock(hass, entry):
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -582,8 +587,8 @@ async def async_setup_stock(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schema),
+            wrap(handle),
+            schema=vol.Schema(fields(schema)),
             # The controller app calls stock_draw over REST without asking for the answer.
             supports_response=(
                 SupportsResponse.OPTIONAL

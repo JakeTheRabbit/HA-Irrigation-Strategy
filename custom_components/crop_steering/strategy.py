@@ -12,6 +12,7 @@ import logging
 import math
 from datetime import date, datetime, time, timedelta, timezone
 
+from .api_v2 import StaleRevision
 from .const import DOMAIN
 from .journal_api import note
 from .room import room_prefix
@@ -375,7 +376,10 @@ class StrategyManager:
     async def save(self, plan, expected_revision, who=None):
         async with self._lock:
             if expected_revision != self.document["revision"]:
-                raise ValueError("Strategy revision changed; reload before saving")
+                raise StaleRevision(
+                    "Strategy revision changed; reload before saving",
+                    self.document["revision"],
+                )
             if self.document["status"] != "draft":
                 raise ValueError(
                     "Disarm the strategy and wait for the next boundary before replacing it"
@@ -461,7 +465,10 @@ class StrategyManager:
         now = now or _now()
         async with self._lock:
             if expected_revision != self.document["revision"]:
-                raise ValueError("Strategy revision changed; reload before activating")
+                raise StaleRevision(
+                    "Strategy revision changed; reload before activating",
+                    self.document["revision"],
+                )
             if self.document["status"] != "draft":
                 raise ValueError("Only a saved draft can be armed")
             preview = self.preview()

@@ -35,6 +35,7 @@ import logging
 import math
 from uuid import uuid4
 
+from .api_v2 import StaleRevision
 from .admin import async_require_admin
 from .const import DOMAIN, REPAIRS_DOCS_URL
 from .calculations import fuse_probes
@@ -632,8 +633,9 @@ class CalibrationStore:
                 not preview
                 and data.get("expected_revision") != self.document["revision"]
             ):
-                raise ValueError(
-                    "Calibration history changed elsewhere. Reload before saving."
+                raise StaleRevision(
+                    "Calibration history changed elsewhere. Reload before saving.",
+                    self.document["revision"],
                 )
             section = self.document["probe_user_offsets"]
             old_entry = section.get(entity_id) or {}
@@ -1304,8 +1306,9 @@ class CalibrationStore:
             if self.error:
                 raise ValueError(self.error)
             if data.get("expected_revision") != self.document["revision"]:
-                raise ValueError(
-                    "Calibration history changed elsewhere. Reload before saving."
+                raise StaleRevision(
+                    "Calibration history changed elsewhere. Reload before saving.",
+                    self.document["revision"],
                 )
             probe = data.get("probe")
             if probe not in PROBES:
@@ -1383,6 +1386,7 @@ def resolve_session(hass, session_id):
 
 async def async_setup_calibration(hass, entry):
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -1473,8 +1477,8 @@ async def async_setup_calibration(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schemas[service]),
+            wrap(handle),
+            schema=vol.Schema(fields(schemas[service])),
             # calibration_record answers only, as it always did.
             supports_response=(
                 SupportsResponse.ONLY

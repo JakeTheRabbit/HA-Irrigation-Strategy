@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 from copy import deepcopy
 
+from .api_v2 import StaleRevision
 from .admin import async_require_admin
 from .const import DOMAIN
 from .room import room_prefix
@@ -141,8 +142,9 @@ class DisplayOptions:
             if self.error:
                 raise ValueError(self.error)
             if expected_revision != self.document["revision"]:
-                raise ValueError(
-                    "Display options changed elsewhere. Reload before saving."
+                raise StaleRevision(
+                    "Display options changed elsewhere. Reload before saving.",
+                    self.document["revision"],
                 )
             if not isinstance(changes, dict) or not changes:
                 raise ValueError("Give at least one display option to save")
@@ -173,6 +175,7 @@ def resolve_display(hass, room_id):
 
 async def async_setup_display(hass, entry):
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -207,8 +210,8 @@ async def async_setup_display(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schemas[service]),
+            wrap(handle),
+            schema=vol.Schema(fields(schemas[service])),
             supports_response=SupportsResponse.ONLY,
         )
 

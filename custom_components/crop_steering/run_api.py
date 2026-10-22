@@ -22,6 +22,7 @@ def resolve_runs(hass, room_id):
 
 async def async_setup_runs(hass, entry):
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -54,8 +55,8 @@ async def async_setup_runs(hass, entry):
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schema),
+            wrap(handle),
+            schema=vol.Schema(fields(schema)),
             supports_response=SupportsResponse.ONLY,
         )
 

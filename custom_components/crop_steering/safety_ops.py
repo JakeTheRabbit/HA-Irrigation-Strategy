@@ -220,6 +220,7 @@ async def async_stop_all(hass, entry, context=None) -> dict:
 async def async_setup_stop_all(hass):
     """The crop_steering.stop_all service, by canonical room id. Any user may call it: it only stops."""
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -238,7 +239,7 @@ async def async_setup_stop_all(hass):
     hass.services.async_register(
         DOMAIN,
         "stop_all",
-        handle,
-        schema=vol.Schema({vol.Required("room_id"): str}),
+        wrap(handle),
+        schema=vol.Schema(fields({vol.Required("room_id"): str})),
         supports_response=SupportsResponse.OPTIONAL,
     )

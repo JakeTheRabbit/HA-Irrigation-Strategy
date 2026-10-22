@@ -22,6 +22,7 @@ import math
 from copy import deepcopy
 from datetime import datetime, timedelta
 
+from .api_v2 import StaleRevision
 from .admin import async_require_admin
 from .const import DOMAIN
 from .generated import timers
@@ -311,8 +312,9 @@ class TimerPrograms:
             if self.error:
                 raise ValueError(self.error)
             if expected_revision != self.document["revision"]:
-                raise ValueError(
-                    "Timer programs changed elsewhere. Reload before saving."
+                raise StaleRevision(
+                    "Timer programs changed elsewhere. Reload before saving.",
+                    self.document["revision"],
                 )
             document = deepcopy(self.document)
             result = change(document)
@@ -511,6 +513,7 @@ async def set_programs(
 
 async def async_setup_timers(hass, entry) -> None:
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -579,8 +582,8 @@ async def async_setup_timers(hass, entry) -> None:
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schemas[service]),
+            wrap(handle),
+            schema=vol.Schema(fields(schemas[service])),
             supports_response=(
                 SupportsResponse.ONLY if service in READS else SupportsResponse.OPTIONAL
             ),

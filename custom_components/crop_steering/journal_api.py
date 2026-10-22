@@ -13,6 +13,7 @@ two services answer "unavailable".
 from __future__ import annotations
 
 import asyncio
+import contextvars
 from datetime import datetime, timedelta
 import logging
 import os
@@ -31,6 +32,10 @@ READY_TIMEOUT_S = 30
 PRUNE_EVERY = timedelta(days=1)
 HUB = "_journal"
 UNSUBS = "_journal_unsubs"
+# [(event_id, kind)] of what emit() records while an API v2 call runs (api_v2.wrap sets it).
+EMITTED: contextvars.ContextVar = contextvars.ContextVar(
+    "crop_steering_emitted", default=None
+)
 
 
 def _hub_error(message):
@@ -235,6 +240,9 @@ def emit(
         }
         validate_event(event)
         hub.schedule(room_id, event)
+        emitted = EMITTED.get()
+        if emitted is not None:
+            emitted.append((event_id, kind))
         return event_id
     except Exception as err:
         _LOGGER.warning("Journal event %s not recorded: %s", kind, err)
@@ -351,6 +359,7 @@ async def _open_and_prune(hub) -> None:
 async def async_setup_journal(hass) -> None:
     """Once for the site, with the first room; each room after it only joins (async_unload_journal)."""
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
 
     data = hass.data.setdefault(DOMAIN, {})
@@ -380,7 +389,9 @@ async def async_setup_journal(hass) -> None:
             raise _hub_error(
                 f"{DOMAIN}.journal_query requires a signed-in Home Assistant user"
             )
-        args = {k: v for k, v in call.data.items() if k != "client"}
+        args = {
+            k: v for k, v in call.data.items() if k not in ("client", "proposal_token")
+        }
         return await hub.query(**args)
 
     schemas = {
@@ -405,8 +416,8 @@ async def async_setup_journal(hass) -> None:
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schemas[service]),
+            wrap(handle),
+            schema=vol.Schema(fields(schemas[service])),
             supports_response=(
                 SupportsResponse.OPTIONAL
                 if service == "journal_append"

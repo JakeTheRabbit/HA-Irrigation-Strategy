@@ -453,9 +453,16 @@ class DashboardStore:
         return {"url_path": url_path, "title": title}
 
 
+def _created(call, result) -> str:
+    """API v2 read-back: a dashboard_create that answered read its config back (create() raises when
+    it did not)."""
+    return "verified" if call.service == "dashboard_create" else "none"
+
+
 async def async_setup_dashboards(hass, entry) -> None:
     """Once for the site, with the first room that sets up; each room after it only joins."""
     import voluptuous as vol
+    from .api_v2 import fields, wrap
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -495,8 +502,8 @@ async def async_setup_dashboards(hass, entry) -> None:
         hass.services.async_register(
             DOMAIN,
             service,
-            handle,
-            schema=vol.Schema(schemas[service]),
+            wrap(handle, readback_of=_created),
+            schema=vol.Schema(fields(schemas[service])),
             supports_response=(
                 SupportsResponse.ONLY if service in READS else SupportsResponse.OPTIONAL
             ),

@@ -9,6 +9,7 @@ import hashlib
 import json
 import re
 
+from .api_v2 import StaleRevision
 from .admin import async_require_admin
 from .const import DOMAIN
 from .room import room_prefix
@@ -164,7 +165,10 @@ class BrainPromptStore:
     async def change(self, expected, config=None, rollback=None, rebuild=False):
         async with self._lock:
             if expected != self.revision:
-                raise ValueError("Instructions changed elsewhere. Reload before saving")
+                raise StaleRevision(
+                    "Instructions changed elsewhere. Reload before saving",
+                    self.revision,
+                )
             if rebuild:
                 await self._persist(
                     self.revision,
@@ -200,8 +204,9 @@ class BrainPromptStore:
     async def publish(self, expected, live):
         async with self._lock:
             if expected != self.revision:
-                raise ValueError(
-                    "Controller prompt was built from an older configuration"
+                raise StaleRevision(
+                    "Controller prompt was built from an older configuration",
+                    self.revision,
                 )
             blocks = live.get("blocks") if isinstance(live, dict) else None
             if not isinstance(blocks, list) or [
@@ -229,6 +234,7 @@ class BrainPromptStore:
 
 async def async_setup_brain_prompt(hass, entry):
     import voluptuous as vol
+    from . import api_v2
     from homeassistant.core import SupportsResponse
     from homeassistant.exceptions import HomeAssistantError
 
@@ -284,8 +290,8 @@ async def async_setup_brain_prompt(hass, entry):
         hass.services.async_register(
             DOMAIN,
             action,
-            handler(action),
-            schema=vol.Schema(fields),
+            api_v2.wrap(handler(action)),
+            schema=vol.Schema(api_v2.fields(fields)),
             supports_response=SupportsResponse.OPTIONAL,
         )
 
