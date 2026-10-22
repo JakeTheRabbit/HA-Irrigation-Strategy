@@ -480,8 +480,11 @@ class SiteStore:
         rooms = list(self.hass.data.get(DOMAIN, {}).get(SENSORS, {}).values())
         for sensors in rooms:
             await sensors.remove_gone()
+        loaded = self.hass.data.get(DOMAIN, {}).get(SENSORS, {})
         for sensors in rooms:
-            sensors.add_new()
+            # A room whose entry unloaded during the awaits above has left the managers: skip it.
+            if any(m is sensors for m in loaded.values()):
+                sensors.add_new()
         async_dispatcher_send(self.hass, RULES_CHANGED)
         return document["alert_rules_revision"]
 
@@ -601,6 +604,11 @@ class RuleEvaluator:
         self.hass, self.site = hass, site
         self.states = {}  # rule id -> alert_rules.step state
         self._reported = {}  # probe entity -> its last numeric report
+        self._looked = (
+            set()
+        )  # probes the recorder was asked about this run (asked once)
+        self._seeding = None  # the seed_reports task, cancelled by stop()
+        self._running = False
         self._watching = ()
         self._unwatch = None
         self._unsubs = []
@@ -699,6 +707,7 @@ class RuleEvaluator:
         from homeassistant.components.recorder import get_instance, history
 
         for entity_id in entity_ids:
+            self._looked.add(entity_id)
             try:
                 found = await get_instance(self.hass).async_add_executor_job(
                     history.get_last_state_changes, self.hass, 20, entity_id
@@ -706,12 +715,16 @@ class RuleEvaluator:
             except Exception as error:  # the silence then counts from last_changed
                 _LOGGER.debug("Probe %s: no recorded report: %s", entity_id, error)
                 continue
+            if not self._running:
+                return  # stopped meanwhile (the last room unloaded): evaluate nothing
             numeric = [s for s in found.get(entity_id, []) if _number(s) is not None]
             if numeric and entity_id not in self._reported:
                 newest = max(numeric, key=lambda s: s.last_updated)
                 self._reported[entity_id] = (
                     getattr(newest, "last_reported", None) or newest.last_updated
                 )
+        if not self._running:
+            return
         for rule in self.site.rules():
             if rule.get("entity_id") in entity_ids:
                 self.evaluate(rule)
@@ -836,6 +849,7 @@ class RuleEvaluator:
             del self.states[rule_id]
         if not known:
             return
+        self._running = True
         from homeassistant.core import callback
         from homeassistant.helpers.dispatcher import async_dispatcher_connect
         from homeassistant.helpers.event import async_track_time_interval
@@ -867,10 +881,13 @@ class RuleEvaluator:
             for rule in self.site.rules()
             if rule["source"] == "probe.silence_s"
             and rule["entity_id"] not in self._reported
+            and rule["entity_id"] not in self._looked
             and self.hass.states.get(rule["entity_id"]) is not None
         ]
         if silent and "recorder" in self.hass.config.components:
-            self.hass.async_create_task(self.seed_reports(sorted(set(silent))))
+            self._seeding = self.hass.async_create_task(
+                self.seed_reports(sorted(set(silent)))
+            )
 
     def _watch(self, force=False):
         """Follow the entities the active rules read (they may move: a feed calibration applied)."""
@@ -904,6 +921,10 @@ class RuleEvaluator:
         self._unwatch = async_track_state_change_event(self.hass, list(wanted), changed)
 
     def stop(self):
+        self._running = False
+        if self._seeding is not None and not self._seeding.done():
+            self._seeding.cancel()
+        self._seeding = None
         for unsub in self._unsubs:
             unsub()
         self._unsubs = []

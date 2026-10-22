@@ -741,5 +741,113 @@ def test_after_a_restart_a_silent_probe_counts_from_its_last_recorded_report(
     assert (
         evaluator.value(r, at(10)) == 120
     )  # nothing remembered: since it went unavailable
+    evaluator._running = True  # as refresh() leaves it while the site has rules
     asyncio.run(evaluator.seed_reports([probe]))
     assert evaluator.value(r, at(10)) == 40 * 60  # since its last numeric report
+
+
+# ------------------------------------------------------------------ fix round 2
+def _slow_recorder(monkeypatch, gate, queries):
+    import types
+
+    recorder = types.ModuleType("homeassistant.components.recorder")
+    history = types.ModuleType("homeassistant.components.recorder.history")
+
+    def changes(hass, n, entity_id):
+        queries.append(entity_id)
+        return {entity_id: [ha_stubs.FakeState("41", last_updated=at(9))]}
+
+    history.get_last_state_changes = changes
+
+    class Instance:
+        async def async_add_executor_job(self, func, *args):
+            await gate.wait()
+            return func(*args)
+
+    recorder.get_instance = lambda hass: Instance()
+    recorder.history = history
+    components = types.ModuleType("homeassistant.components")
+    components.__path__ = []
+    monkeypatch.setitem(sys.modules, "homeassistant.components", components)
+    monkeypatch.setitem(sys.modules, "homeassistant.components.recorder", recorder)
+    monkeypatch.setitem(
+        sys.modules, "homeassistant.components.recorder.history", history
+    )
+
+
+SILENT = {
+    "room_id": ROOM,
+    "source": "probe.silence_s",
+    "entity_id": "sensor.slab_1",
+    "op": "above",
+    "threshold": 600,
+}
+
+
+def test_a_seed_that_finishes_after_stop_evaluates_and_pushes_nothing(monkeypatch):
+    queries = []
+    hass, evaluator, site = rig()
+    hass.config.components = {"recorder"}
+    notifier = hass.data[DOMAIN]["_notify"] = Notifier()
+    hass.states.set("sensor.slab_1", "unavailable", last_changed=at(9, 59))
+
+    async def go():
+        gate = asyncio.Event()
+        _slow_recorder(monkeypatch, gate, queries)
+        await site.save_rule({"rule": SILENT, "expected_revision": 0})
+        evaluator.stop()  # the last room unloads while the recorder is still being read
+        gate.set()
+        await asyncio.gather(*hass.tasks, return_exceptions=True)
+        return evaluator, notifier
+
+    evaluator, notifier = asyncio.run(go())
+    assert notifier.sent == []
+    assert all(s["state"] != "firing" for s in evaluator.states.values())
+
+
+def test_a_probe_with_no_recorded_number_is_looked_up_once(monkeypatch):
+    queries = []
+    hass, evaluator, site = rig()
+    hass.config.components = {"recorder"}
+    hass.states.set("sensor.slab_1", "unavailable", last_changed=at(9, 59))
+
+    async def go():
+        gate = asyncio.Event()
+        gate.set()
+        _slow_recorder(monkeypatch, gate, queries)
+        sys.modules[
+            "homeassistant.components.recorder.history"
+        ].get_last_state_changes = (
+            lambda hass, n, entity_id: queries.append(entity_id) or {}
+        )
+        await site.save_rule({"rule": SILENT, "expected_revision": 0})
+        await asyncio.gather(*hass.tasks)
+        await site.save_rule(
+            {"rule": {**SILENT, "threshold": 900}, "expected_revision": 1}
+        )
+        await asyncio.gather(*hass.tasks)
+
+    asyncio.run(go())
+    assert queries == ["sensor.slab_1"]
+
+
+def test_a_room_unloaded_during_a_save_gets_no_new_sensors():
+    hass, evaluator, site = rig()
+    managers = hass.data[DOMAIN][site_api.SENSORS] = {}
+    added = []
+
+    class Room:
+        def __init__(self, entry_id, drops=None):
+            self.entry_id, self.drops = entry_id, drops
+
+        async def remove_gone(self):
+            if self.drops:
+                managers.pop(self.drops, None)  # that room unloads meanwhile
+
+        def add_new(self):
+            added.append(self.entry_id)
+
+    managers["a"] = Room("a", drops="b")
+    managers["b"] = Room("b")
+    save(site, {**rule(), "id": None})
+    assert added == ["a"]
