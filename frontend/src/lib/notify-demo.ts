@@ -115,7 +115,7 @@ export const DEMO_KINDS: NotifyKind[] = [
       "CS-607",
       "CS-610",
       "CS-611",
-      "CS-612",
+      "CS-613",
       "CS-713",
     ],
     events: [],

@@ -2,7 +2,7 @@ apply_recipe:
   name: Apply recipe stage (deprecated)
   description: >-
     DEPRECATED. Nothing in the dashboard, the controller or the shipped automations calls this
-    service, and the integration will remove it in release 4.0.0. The first use raises a Repairs
+    service, and the integration will remove it in a future major release. The first use raises a Repairs
     notice. Instead set the targets of the room in the dashboard, or use a grow plan. Until the
     removal it works as described next. Writes the setpoints of one recipe stage into the VWC, dryback, EC and shot size numbers. The
     integration applies the stage in every zone of one room. Changes live setpoints that the
@@ -42,7 +42,7 @@ save_recipe:
   name: Save recipe table (deprecated)
   description: >-
     DEPRECATED. The dashboard does not call this service, and the integration will remove it in
-    release 4.0.0. The first use raises a Repairs notice. Instead set the targets of the room in the
+    a future major release. The first use raises a Repairs notice. Instead set the targets of the room in the
     dashboard, or use a grow plan. Until the removal it works as described next. Replaces the stored recipe table of one room. The table gives the setpoints for each recipe
     stage. Changes stored data only. No live setpoint changes until you apply a stage. When a
     signed-in user calls it, that user must be a Home Assistant administrator. An automation can

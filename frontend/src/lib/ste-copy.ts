@@ -178,7 +178,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The lowest feed pH at which the controller starts shots. While the feed pH is below this value, all shots in the room wait. It operates only when the controller app has a feed pH sensor."
   },
   "irrigation_phase": {
-    "caution": "DEPRECATED. The integration will remove this select in release 4.0.0. The first time you choose a value, a notice appears in Repairs.",
+    "caution": "DEPRECATED. The integration will remove this select in a future major release. The first time you choose a value, a notice appears in Repairs.",
     "guidance": "Do not use this select to move a zone. Use the Set phase select of the zone.",
     "impact": "P0, P1, P2 or P3: the `current_phase` sensor shows the selected phase when the controller publishes no phase. The EC ratio sensor uses the selected phase to find its EC target. A change sends the event `crop_steering_phase_transition`. Nothing in this project listens to that event.",
     "tooltip": "A manual phase marker for the room. The controller does not read it, and a change does not move a zone."
@@ -349,7 +349,7 @@ export const SETTING_COPY: Record<string, SteCopy> = {
     "tooltip": "The time that the pump runs before the main-line valve opens. With no main-line valve, the zone valve opens after this time. The controller uses it only when the room has a pump."
   },
   "recipe_stage": {
-    "caution": "DEPRECATED. Nothing in the dashboard uses this select, and the integration will remove it in release 4.0.0. The first time you choose a value, a notice appears in Repairs. CAUTION: Examine the values of a stage before you select it. The controller uses the new setpoints for all zones at its next pass.",
+    "caution": "DEPRECATED. Nothing in the dashboard uses this select, and the integration will remove it in a future major release. The first time you choose a value, a notice appears in Repairs. CAUTION: Examine the values of a stage before you select it. The controller uses the new setpoints for all zones at its next pass.",
     "guidance": "Examine the setpoints of the stage on the recipe page before you select it. After you select a stage, examine the setpoints of each zone.",
     "impact": "Each option writes its own set of setpoints from the recipe. The integration keeps each value inside the limits of its number. If the VWC setpoints of the stage put the levels of a zone out of order, the integration writes nothing. It then shows an error. Auto setpoints and the setpoints judge of the AI assistant can change the values after that.",
     "tooltip": "Selects a stage of the room recipe: Veg, Transition, Bulk, Ripen or Custom. When you select a stage, the integration writes the setpoints of that stage into the numbers of the room and of each zone."

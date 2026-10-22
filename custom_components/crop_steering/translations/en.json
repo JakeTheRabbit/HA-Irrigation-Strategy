@@ -793,8 +793,8 @@
   },
   "issues": {
     "deprecated_feature": {
-      "title": "Crop Steering: {what} is deprecated (CS-612)",
-      "description": "{what} is deprecated. It still works, and nothing is changed for now. The integration will remove it in release {removal}.\n\nWhat to use instead: {instead}\n\nThe call that raised this notice came from a person, an automation or a script. Change that caller before the removal. This notice does not come back until Home Assistant restarts.\n\nCode CS-612. What it means and what to do: Crop Steering → Help & tools → Error codes."
+      "title": "Crop Steering: {what} is deprecated (CS-613)",
+      "description": "{what} is deprecated. It still works, and nothing is changed for now. The integration will remove it in {removal}.\n\nWhat to use instead: {instead}\n\nThe call that raised this notice came from a person, an automation or a script. Change that caller before the removal. This notice does not come back until Home Assistant restarts.\n\nCode CS-613. What it means and what to do: Crop Steering → Help & tools → Error codes."
     },
     "kill_switch_missing": {
       "title": "Crop Steering: Kill switch missing (CS-601)",

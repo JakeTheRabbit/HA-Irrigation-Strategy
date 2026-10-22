@@ -1290,12 +1290,12 @@
     {
       "domain": "select",
       "key": "irrigation_phase",
-      "why": "Deprecated, removal planned for 4.0.0. A manual phase marker: the controller neither reads nor writes it. Use the zone set-phase select."
+      "why": "Deprecated, removal planned for a future major release. A manual phase marker: the controller neither reads nor writes it. Use the zone set-phase select."
     },
     {
       "domain": "select",
       "key": "recipe_stage",
-      "why": "Deprecated, removal planned for 4.0.0. Applies a recipe row to many setpoints; nothing in the dashboard uses it."
+      "why": "Deprecated, removal planned for a future major release. Applies a recipe row to many setpoints; nothing in the dashboard uses it."
     },
     {
       "domain": "select",

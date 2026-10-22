@@ -1060,7 +1060,7 @@
       ]
     },
     {
-      "code": "CS-612",
+      "code": "CS-613",
       "title": "Deprecated feature in use",
       "source": "repairs",
       "severity": "warning",

@@ -89,7 +89,7 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 | [CS-609](#cs-609) | Second controller for room | Warning | Notification |
 | [CS-610](#cs-610) | Engine Enabled not kill switch | Warning | Repairs card |
 | [CS-611](#cs-611) | Settings above zone limit | Warning | Repairs card |
-| [CS-612](#cs-612) | Deprecated feature in use | Warning | Repairs card |
+| [CS-613](#cs-613) | Deprecated feature in use | Warning | Repairs card |
 | [CS-701](#cs-701) | No water at the zone | Warning | Notification |
 | [CS-702](#cs-702) | Unusual water for each plant | Information | Notification |
 | [CS-703](#cs-703) | Overnight probe fault suspected | Warning | Notification |
@@ -1356,9 +1356,9 @@ controller still reports a setup change (CS-201) and a hardware hold (CS-301, CS
 - If the zone size is wrong, correct it in Rooms and setup, and the limit changes with it.
 - If the size is correct, decrease the setting to its limit at the next change. The card clears when each setting is inside its limit.
 
-<a id="cs-612"></a>
+<a id="cs-613"></a>
 
-### CS-612: Deprecated feature in use
+### CS-613: Deprecated feature in use
 
 *Warning · Repairs card*
 

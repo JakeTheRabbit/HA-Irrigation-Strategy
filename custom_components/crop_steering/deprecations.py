@@ -16,8 +16,8 @@ from .const import DOMAIN, REPAIRS_DOCS_URL
 
 _LOGGER = logging.getLogger(__name__)
 
-# The release that removes the deprecated items. Also stated in CHANGELOG.md.
-REMOVAL_RELEASE = "4.0.0"
+# When the deprecated items go. No version number: versions are set on release branches.
+REMOVAL_RELEASE = "a future major release"
 
 
 def note_deprecated(hass: HomeAssistant, key: str, what: str, instead: str) -> None:
