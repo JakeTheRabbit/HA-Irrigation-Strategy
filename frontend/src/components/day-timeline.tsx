@@ -90,6 +90,7 @@ import type { Controller, Setting, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
 import { dailyWater, estimateRuntime, flowInputs, waterParameters } from "@/lib/water-delivery";
 import { plantAmount, useWaterView, zonePlants } from "@/lib/water-view";
+import { ecTargetBand, poreEcNeutral } from "@/lib/ec-band";
 import "./day-timeline.css";
 
 /** Each phase as the zone views name it, and as its chart column says it where there is room. */
@@ -652,6 +653,7 @@ function buildLane(
   const choice = states[`select.${root}zone_${zone.id}_steering_mode`]?.state;
   const steering = steeringOf(choice, stage?.steering);
   const ecTarget = zone.ecTarget.value;
+  const targetBand = ecTargetBand(poreEcNeutral(states, room.room.prefix), ecTarget);
   // Last night's dryback runs from yesterday's evening into today; tonight's from today's.
   const tonight = now >= day.lightsOff;
   const night = tonight
@@ -683,10 +685,10 @@ function buildLane(
     steering,
     ecBand: stage?.poreEc
       ? { band: stage.poreEc, source: `the pore EC band for ${stage.name}` }
-      : ecTarget !== null && ecTarget > 0
+      : targetBand
         ? {
-            band: [ecTarget * 0.9, ecTarget * 1.1],
-            source: `the zone’s EC target ${number(ecTarget, 2)} ±10 %`,
+            band: targetBand,
+            source: `the zone’s EC target ${number(ecTarget, 2)}, where the controller leaves a shot’s size alone`,
           }
         : null,
     dryback: night ? { night: tonight ? "tonight" : "last night", value: night } : null,

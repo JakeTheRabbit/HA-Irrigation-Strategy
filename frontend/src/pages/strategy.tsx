@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import type { Choice, Controller, Setting } from "@/lib/types";
 import { PlanningCurve } from "@/components/planning-curve";
 import { buildSetpointPreview, validateSetpoint } from "@/lib/setpoint-preview";
+import { poreEcNeutral } from "@/lib/ec-band";
 import { smoothRecorded } from "@/lib/planning-curve";
 import { useSensorContext } from "@/components/sensor-context";
 import { AutoSetpointsControl, AutoZoneChip } from "@/components/room-controls";
@@ -339,6 +340,7 @@ export function Strategy({
         zoneName={sensorZone?.name}
         phase={sensorZone?.phase}
         ecBand={readJev(states, room.room.prefix).room?.stage?.poreEc ?? null}
+        ecRatios={poreEcNeutral(states, room.room.prefix)}
         drybackPoints={readJev(states, room.room.prefix).room?.stage?.drybackPoints ?? null}
         parameters={preview.draft.parameters}
         lightsOn={preview.draft.lightsOn}

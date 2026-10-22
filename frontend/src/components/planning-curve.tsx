@@ -23,6 +23,7 @@ import {
   type RecordedPoint,
   type RecordedReading,
 } from "@/lib/planning-curve";
+import { ecTargetBand, type EcRatios } from "@/lib/ec-band";
 import { settingWords } from "@/lib/setting-words";
 
 export interface PlanningCurveProps {
@@ -51,6 +52,8 @@ export interface PlanningCurveProps {
   phase?: string | null;
   /** The pore EC band of the growth stage, when there is one. */
   ecBand?: [number, number] | null;
+  /** Without one, the band around the EC target: the controller's pore-EC ratios (lib/ec-band). */
+  ecRatios?: EcRatios | null;
   /** The stage's reference overnight dryback, in VWC points, when there is one. */
   drybackPoints?: [number, number] | null;
 }
@@ -96,6 +99,7 @@ export function PlanningCurve({
   zoneName,
   phase,
   ecBand,
+  ecRatios = null,
   drybackPoints,
 }: PlanningCurveProps) {
   const limits =
@@ -339,6 +343,9 @@ export function PlanningCurve({
   const p1Done = nowHour !== null && nowHour >= p1.end;
   const ecTarget =
     phaseNow && phaseNow !== "P3" ? parameters[`ec_target_${phaseNow.toLowerCase()}`] : NaN;
+  // The day timeline's band: the stage's, else the controller's around the target. With neither,
+  // the gauge shows the distance to the target and judges nothing out of band.
+  const poreBand = ecBand ?? ecTargetBand(ecRatios, ecTarget);
   const gauges = hasRecorded
     ? [
         {
@@ -382,9 +389,9 @@ export function PlanningCurve({
           model: gauge({
             label: "Pore EC",
             value: nowEc?.value ?? null,
-            band: ecBand ?? null,
-            target: ecBand ? null : ecTarget,
-            tolerance: Number.isFinite(ecTarget) ? ecTarget * 0.15 : 0,
+            band: poreBand,
+            target: poreBand ? null : ecTarget,
+            tolerance: poreBand ? 0 : Infinity,
             unit: "",
             digits: 2,
             points: "mS/cm",
