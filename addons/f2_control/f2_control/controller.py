@@ -41,6 +41,7 @@ import dosing_runner
 import dry_dim
 import brain_bridge
 import gate_report
+import guards
 import journal_out
 import log_words
 import phase_options
@@ -82,7 +83,7 @@ from crop_steering_engine.defaults import CONTROLLER_FALLBACKS as FALLBACK
 # Every number read from a device goes through the one device-unit table (_device).
 from crop_steering_engine.defaults import UNITS, to_canonical
 # How long a shot runs, the one rule the integration's shot-duration sensors show too.
-from crop_steering_engine.shot_length import DEFAULT_MAX_SHOT_S, MIN_SHOT_S, raw_seconds, shot_seconds, valid_cap
+from crop_steering_engine.shot_length import DEFAULT_MAX_SHOT_S, MIN_SHOT_S, valid_cap
 # What depends on what a room grows in (its substrate select): "generic" is what every room ran on before.
 from crop_steering_engine.defaults import SUBSTRATE_PROFILES
 
@@ -3701,33 +3702,14 @@ class Controller:
 
     # ---------- gates ----------
     def _blocked(self, room, zone, reason=None):
-        if getattr(room, "_setup_pending", None):
-            return room._setup_pending
-        if getattr(room, "setup_active", True) is False:
-            return "Room archived in integration setup"
-        if not self._room_active(room):
-            return "Room off (nothing growing)"
-        making = self._dosing_hold(room)  # every shot, the rescues a plan hold lets through included
-        if making:
-            return making
-        planned_hold = strategy_block(getattr(room, "strategy_snapshot", None), zone)
-        if planned_hold:
-            if getattr(reason, "kind", None) not in PLAN_HOLD_EXEMPT:
-                return planned_hold
-            log(f"[{room.slug}] Z{zone} {planned_hold}: not holding a {reason.kind} shot")
-        fault = self._hardware_fault_block(room)
-        if fault:
-            return fault
-        latched = self._max_run_hold(room, zone)
-        if latched:
-            return latched
-        hw = room.hw
-        if not hw["valves"].get(zone):
-            return (
-                "no hardware mapped — set this zone's valve (and the pump and mainline, if the room "
-                "has them) in the Crop Steering integration (or the add-on `hardware` option)"
-            )
-        plumbing = plumbing_hold(hw)
+        """Why the zone may not be watered this pass, else None: the first check of guards.PASS that holds, with its
+        alerts and releases. `reason` is the zone's decision (a held plan lets its rescues through)."""
+        held = guards.first(self, guards.PASS, room, zone, {"reason": reason})
+        return held[1] if held else None
+
+    def _plumbing_gate(self, room):
+        """guards.PASS "plumbing": why the room's plumbing and its switches disagree (CS-202), else None."""
+        plumbing = plumbing_hold(room.hw)
         if plumbing:
             self._alert(
                 f"plumbing_{room.slug}",
@@ -3740,6 +3722,10 @@ class Controller:
                 room=room,
             )
             return plumbing
+        return None
+
+    def _switchable_gate(self, room, zone):
+        """guards.PASS "switchable": the zone's valve, pump or main line the controller cannot switch (CS-313)."""
         undrivable = self._undrivable(room, zone)
         if undrivable:
             names = ", ".join(undrivable)
@@ -3755,51 +3741,12 @@ class Controller:
                 zone=zone,
             )
             return f"{names} can't be switched (a zone valve, main line or pump must be a switch, input_boolean or valve)"
-        if not self._on(room_gate(room), False):
-            return f"{PRODUCT} disabled (kill switch off)"
-        retired = getattr(room, "_retired_off", None)
-        if retired:  # switched off in their place this pass; the switch may not read OFF yet
-            return f"{' and '.join(retired)} off: engine switch switched off in its place"
-        # A zone switch that can't be read holds the zone, as the kill switch does: whether the zone
-        # is paused can't be known, and when every one reads unavailable the integration itself is
-        # not running (not loaded, disabled, Home Assistant in safe mode), so its overrides can't be
-        # read either. A shot already running still ends only on a definite OFF (_wait_shot).
-        zone_switch = f"switch.crop_steering_{room.prefix}zone_{zone}_enabled"
-        state = ha_get(zone_switch)[0]
-        if state in (None, "unknown", "unavailable", ""):
-            return f"{zone_switch} unreadable (reads neither on nor off)"
-        if str(state).lower() not in ON_STATES:
-            return "zone disabled"
-        if self._on(
-            f"switch.crop_steering_{room.prefix}zone_{zone}_manual_override", False
-        ):
-            return "manual override"
-        # External operator holds (tank dosing / manual fill / flush) are configurable
-        # (self.hold_entities, empty by default) — an install without them never holds here.
-        # One that can't be read (missing, unknown, unavailable) holds too, as an unreadable zone
-        # switch does: whether its tank is being dosed or filled can't be known. A shot already
-        # running still ends only on a definite ON (_wait_shot). One Home Assistant answers it does
-        # not have (404, a typo or a deleted helper) says so: no wait makes that one readable.
-        for f in self.hold_entities:
-            state = ha_get(f)[0]
-            if state is None and ha_get_status(f)[0] == 404:
-                return hold_missing(f)
-            if state in (None, "unknown", "unavailable", ""):
-                return f"external hold {f} unreadable (reads neither on nor off)"
-            if str(state).lower() in ON_STATES:
-                return f"external hold ({f.split('.')[-1]})"
-        waste = self._waste_hold(room)
-        if waste:
-            return waste
-        settings = self._settings_hold(room, zone)
-        if settings:
-            return settings
-        tank = self._tank_hold(room)  # only with a tank level mapped: never on an upgraded room until then
-        if tank:
-            return tank
-        # Source-water EC gate — only when a feed-EC sensor is configured. With no feed sensor
-        # the gate is disabled (the dosing/fill holds above still apply) so the add-on is safe
-        # out of the box on installs without a reservoir probe.
+        return None
+
+    def _feed_ec_gate(self, room, zone, reason):
+        """guards.PASS "feed_ec": the source-water EC gate. Only when a feed-EC sensor is configured. With no feed
+        sensor the gate is disabled (the dosing/fill holds still apply) so the add-on is safe out of the box on
+        installs without a reservoir probe."""
         if room.feed_ec_sensor:
             feed = self._read_feed_ec(room)
             lo, hi, unread = self._feed_band(room, "ec")
@@ -3817,13 +3764,15 @@ class Controller:
                         self.feed_grace_min,
                     ) and not self._rescue_past_dead_probe(room, zone, reason, "EC"):
                         return f"source-water EC dead >{self.feed_grace_min:.0f}min — holding (fail-closed)"
-                    # Inside the grace window we skip the EC band check only — fall through
-                    # so the pH gate below still runs. Returning None here would report the
-                    # zone as unblocked and silently bypass pH entirely.
+                    # Inside the grace window only the EC band check is skipped: the pH gate after it
+                    # (guards.PASS "feed_ph") still runs.
                 elif (lo > 0 and feed < lo) or (hi > 0 and feed > hi):
                     return f"source-water EC {feed:.1f} out of [{lo:g},{hi:g}]"
-        # pH half of the source-water gate — bad-pH feed locks out nutrients / burns roots, so
-        # gate it too, but only when a feed-pH sensor is configured.
+        return None
+
+    def _feed_ph_gate(self, room, zone, reason):
+        """guards.PASS "feed_ph": the pH half of the source-water gate. Bad-pH feed locks out nutrients / burns roots,
+        so it is gated too, but only when a feed-pH sensor is configured."""
         if room.feed_ph_sensor:
             ph_lo, ph_hi, unread = self._feed_band(room, "ph")
             if unread:
@@ -3843,15 +3792,6 @@ class Controller:
                         return f"source-water pH probe dead >{self.feed_grace_min:.0f}min — holding (fail-closed)"
                 elif (ph_lo > 0 and ph < ph_lo) or (ph_hi > 0 and ph > ph_hi):
                     return f"source-water pH {ph:.2f} out of [{ph_lo:g},{ph_hi:g}]"
-        # Last, once nothing else holds the zone: a switch that reads neither on nor off (its device
-        # offline, Home Assistant still starting) accepts a command without switching and cannot be read
-        # back after the shot. On 25 Sep 2026 a shot opened onto an offline pump, could not be confirmed
-        # closed, and latched a hold that stopped the room for 7 hours. Nothing is opened until the
-        # whole feed path reads again, and nothing latches.
-        offline = [e for e in (hw.get("pump"), hw.get("mainline"), hw["valves"].get(zone))
-                   if e and str(hw_get(e)[0]).lower() not in ("on", "off")]
-        if offline:
-            return f"{', '.join(offline)} offline (reads neither on nor off)"
         return None
 
     def _rescue_past_dead_probe(self, room, zone, reason, half):
@@ -5841,59 +5781,18 @@ class Controller:
         # it never outlives this call.
         intent = room.__dict__.get("_shot_intent", {}).pop(zone, None) or {}
 
-        def held(why):
-            log(f"[{room.slug}] Z{zone} shot held: {why}")
-            self._journal_held(room, zone, why, now=datetime.now(), would=reason_text, actor=actor)
-
-        if self._hardware_fault_block(room):
+        # Before anything opens: guards.PREOPEN, in order. Passing its last check marks the shot in flight (_busy).
+        ctx = {"duration_s": duration_s, "size_pct": size_pct, "flow_lps": flow_lps, "plan_exempt": plan_exempt,
+               "steering": steering}
+        hit = guards.first(self, guards.PREOPEN, room, zone, ctx)
+        if hit:
+            g, why = hit
+            if not g.quiet:  # a hardware fault returns without a word, as it always has
+                log(f"[{room.slug}] Z{zone} shot held: {why}")
+                self._journal_held(room, zone, why, guard=g.guard, code=g.code, now=datetime.now(),
+                                   would=reason_text, actor=actor)
             return
-        if _GATE.state is not None:
-            held("Home Assistant refuses this controller's token")
-            return
-        if getattr(room, "shot_inflight", None):
-            held("an interrupted shot's hardware is not accounted for yet")
-            return
-        plumbing = plumbing_hold(room.hw)
-        if plumbing:  # never open a valve on a room whose declared pump is not there to run
-            held(plumbing)
-            return
-        undrivable = self._undrivable(room, zone)
-        if undrivable:  # never sent a command (_blocked raises CS-313 for it)
-            held(f"{', '.join(undrivable)} can't be switched")
-            return
-        # A shot a plan hold never stops (PLAN_HOLD_EXEMPT) does not wait on the plan here either.
-        strategy_hold = None if plan_exempt else self._strategy_preflight(room, zone, datetime.now())
-        if strategy_hold:
-            held(strategy_hold)
-            return
-        # A zone whose pump, main line or valve has not switched on for several shots in a row is tried at
-        # most once every SWITCH_ON_BACKOFF_MIN, rescue shots too: a dead valve delivers no rescue water,
-        # and retrying it each pass would short-cycle the pump. An operator's Test Shot (the only shot with
-        # steering off) is not held: it is how a repair is checked.
-        retry_at = _switch_on_retry_at(room.state[zone]) if steering else None
-        if retry_at is not None and datetime.now() < retry_at:
-            held(f"its pump, main line or valve did not switch on "
-                 f"{room.state[zone]['on_failures']['count']} shots in a row; next try at {retry_at:%H:%M}")
-            return
-        # Freeze hydraulic sizing before opening hardware. Editing plant count,
-        # substrate or dripper configuration mid-shot must not rewrite its litres.
-        nominal_l = (flow_lps * duration_s if flow_lps is not None
-                     else size_pct / 100.0 * self._substrate_l(room, zone))
-        short = self._tank_short(room, zone, nominal_l)
-        if short:  # the plan-ahead half of the reservoir minimum: _tank_plan asks for the refill
-            held(short)
-            return
-        if not self._close_waste(room, zone):  # Close for each shot: a waste valve still open, nothing opens
-            held("the waste valve did not close")
-            return
-        with self._shot_lock:  # a batch holds rooms under this lock (see _shot_running)
-            making = self._dosing_hold(room)
-            if not making:
-                self._busy = True
-                self._shot_room = room  # the room whose shot is in flight right now (see _safe_off)
-        if making:
-            held(making)
-            return
+        nominal_l = ctx["litres"]  # frozen before anything opens (guards._pre_tank_short)
         shutdown_checked = False
         valve_started = valve_opened = None
         counted = False
@@ -6599,63 +6498,14 @@ class Controller:
             self._journal_held(room, zone, block, now=now, would=reason, actor=actor)
         elif fire:
             requested_at = datetime.now().astimezone()  # this pass decided to fire
-            flow = self._zone_flow_lps(room, zone)
-            substrate = self._substrate_l(room, zone)
-            if not (
-                math.isfinite(flow)
-                and flow > 0
-                and math.isfinite(substrate)
-                and substrate > 0
-            ):
-                self._alert(
-                    f"sizing_{room.slug}_z{zone}",
-                    "CS-204",
-                    "shot size cannot be calculated, no shots",
-                    "To calculate a shot, the controller needs the substrate volume (litres for each plant), "
-                    "the plant count, the drippers for each plant and the dripper flow of this zone. One of "
-                    "these is missing, zero or not readable. Set them in Rooms & setup.",
-                    room=room,
-                    zone=zone,
-                )
-                self._journal_held(room, zone, "shot size cannot be calculated", code="CS-204", now=now,
-                                   would=reason, actor=actor)
-                return
-            raw_dur = float(getattr(reason, "seconds", TEST_SHOT_S)) if test else raw_seconds(size, substrate, flow)
-            max_dur = self._room_duration_cap(room)
-            if max_dur is None:
-                self._journal_held(room, zone, "maximum shot length not valid", code="CS-203", now=now,
-                                   would=reason, actor=actor)
-                return
-            # Hydraulic sizing determines nominal runtime; the room's duration
-            # limit bounds every physical shot independently of its requested volume.
-            dur = shot_seconds(raw_dur, max_dur)
-            if raw_dur > max_dur:
-                self._alert(
-                    f"durcap_{room.slug}_z{zone}",
-                    "CS-306",
-                    "shot cut to the safety limit",
-                    f"The planned shot was {int(raw_dur)} s, more than the {int(max_dur)} s limit of the "
-                    f"room. The shot runs for {int(max_dur)} s and gives less water than planned. Check the "
-                    "substrate volume and the dripper flow of this zone. If they are correct, increase the "
-                    "maximum shot length.",
-                    room=room,
-                    zone=zone,
-                )
-            # A shot that is not exempt from the daily budget gets only what is left of it (22 Sep: a
-            # 607 s, ~28 L flush fired with ~2 L of an 80 L budget left). Copied / blind-schedule
-            # decisions are never exempt either (their Reason, or plain text, is not cap_exempt).
-            if p is not None and not getattr(reason, "cap_exempt", False):
-                left_l = p.max_daily_volume - float(st.get("daily_vol") or 0.0)
-                allowed = int(left_l / flow) if left_l > 0 else 0
-                if allowed < MIN_SHOT_S:
-                    held = f"BLOCK daily-cap ({max(left_l, 0.0):.2f} L left)"
-                    self._alert_daily_cap(room, zone, st, snap is None, held)
-                    log(f"[{room.slug}] Z{zone} {st['phase']} hold — {held}: would {reason}")
-                    self._journal_held(room, zone, held, now=now, would=reason, actor=actor)
-                    return False, 0.0, held
-                if dur > allowed:
-                    log(f"[{room.slug}] Z{zone} shot clipped {dur}s -> {allowed}s: {left_l:.2f} L of the daily budget left")
-                    size, dur = round(size * allowed / dur, 2), allowed
+            # Sized: guards.SIZED, in order (its size, its longest shot, the day's budget left, which may clip it).
+            ctx = {"reason": reason, "size": size, "test": test, "p": p, "st": st, "snap": snap}
+            hit = guards.first(self, guards.SIZED, room, zone, ctx)
+            if hit:
+                g, held = hit
+                self._journal_held(room, zone, held, guard=g.guard, code=g.code, now=now, would=reason, actor=actor)
+                return (False, 0.0, held) if g.guard == "daily_cap" else None
+            flow, raw_dur, max_dur, size, dur = ctx["flow"], ctx["raw_dur"], ctx["max_dur"], ctx["size"], ctx["dur"]
             what, why = log_words.shot(reason)
             log(f"[{room.slug}] Z{zone} {st['phase']} FIRE {size}% ~{dur}s — {what}: {why}")
             # Count configured flow x actual runtime, including caps, truncation,
@@ -6882,6 +6732,43 @@ class Controller:
             elif capped >= MAX_RUN_IN_A_ROW:
                 report[str(zone)] = {"capped": capped, "latched": False}
         return report
+
+    def _shot_sizing(self, room, zone):
+        """guards.SIZED "sizing": -> (flow, substrate, why the shot cannot be sized or None). CS-204 when it cannot."""
+        flow = self._zone_flow_lps(room, zone)
+        substrate = self._substrate_l(room, zone)
+        if not (
+            math.isfinite(flow)
+            and flow > 0
+            and math.isfinite(substrate)
+            and substrate > 0
+        ):
+            self._alert(
+                f"sizing_{room.slug}_z{zone}",
+                "CS-204",
+                "shot size cannot be calculated, no shots",
+                "To calculate a shot, the controller needs the substrate volume (litres for each plant), "
+                "the plant count, the drippers for each plant and the dripper flow of this zone. One of "
+                "these is missing, zero or not readable. Set them in Rooms & setup.",
+                room=room,
+                zone=zone,
+            )
+            return flow, substrate, "shot size cannot be calculated"
+        return flow, substrate, None
+
+    def _alert_shot_cut(self, room, zone, raw_dur, max_dur):
+        """CS-306: a shot planned longer than the room's longest shot runs cut to it (guards.SIZED "max_shot")."""
+        self._alert(
+            f"durcap_{room.slug}_z{zone}",
+            "CS-306",
+            "shot cut to the safety limit",
+            f"The planned shot was {int(raw_dur)} s, more than the {int(max_dur)} s limit of the "
+            f"room. The shot runs for {int(max_dur)} s and gives less water than planned. Check the "
+            "substrate volume and the dripper flow of this zone. If they are correct, increase the "
+            "maximum shot length.",
+            room=room,
+            zone=zone,
+        )
 
     def _alert_daily_cap(self, room, zone, st, blind, detail):
         """CS-205. A zone with a working probe still gets its rescue shots past its daily limit; a zone
