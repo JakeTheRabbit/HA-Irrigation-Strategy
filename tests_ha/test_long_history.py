@@ -123,3 +123,41 @@ async def test_provider_generated_http_reads(hass, hass_admin_user, monkeypatch,
     if version == "2":
         assert kwargs["headers"]["Authorization"] == "Token secret"
         assert "aggregateWindow" in kwargs["data"]
+
+
+async def test_old_run_snapshot_sensors_can_be_read_but_arbitrary_entities_cannot(hass, hass_admin_user, monkeypatch):
+    """Comparison asks for the sensors an archived run was registered with, which the room may no
+    longer map. They are the room's own history, so they read; any other entity still does not."""
+    from test_zone_cultivar import _save
+
+    entry = await _install(hass)
+    for entity in ("sensor.row_a", "sensor.row_b", "sensor.someone_elses"):
+        hass.states.async_set(entity, "50", {"unit_of_measurement": "%"})
+    await _save(hass, hass_admin_user, vwc_sensors=["sensor.row_a"])
+    await call(hass, hass_admin_user, "runs_save", expected_revision=0, record={"name": "Old", "start_date": "2026-01-01"})
+    await _save(hass, hass_admin_user, vwc_sensors=["sensor.row_b"])
+    # Saving a mapping reloads the room, so the manager is the one after the saves.
+    manager = hass.data["crop_steering"]["_long_history"][entry.entry_id]
+    manager.config = connection({"source": "influxdb", "url": "http://influx.example:8086"})
+    query = AsyncMock(return_value={"series": []})
+    monkeypatch.setattr(manager, "query", query)
+    window = {"start": "2026-01-01T00:00:00Z", "end": "2026-01-02T00:00:00Z"}
+    await call(hass, hass_admin_user, "history_long", entity_ids=["sensor.row_a"], **window)
+    assert query.await_args.args[1] == ["sensor.row_a"]
+    with pytest.raises(HomeAssistantError):
+        await call(hass, hass_admin_user, "history_long", entity_ids=["sensor.someone_elses"], **window)
+
+
+async def test_more_than_four_room_sensors_can_be_read_at_once(hass, hass_admin_user, monkeypatch):
+    entry = await _install(hass)
+    manager = hass.data["crop_steering"]["_long_history"][entry.entry_id]
+    manager.config = connection({"source": "influxdb", "url": "http://influx.example:8086"})
+    query = AsyncMock(return_value={"series": []})
+    monkeypatch.setattr(manager, "query", query)
+    ids = [f"sensor.probe_{n}" for n in range(8)]
+    monkeypatch.setattr(manager, "allowed", lambda: set(ids))
+    window = {"start": "2026-01-01T00:00:00Z", "end": "2026-01-02T00:00:00Z"}
+    await call(hass, hass_admin_user, "history_long", entity_ids=ids, **window)
+    assert query.await_args.args[1] == ids
+    with pytest.raises(HomeAssistantError):
+        await call(hass, hass_admin_user, "history_long", entity_ids=[f"sensor.probe_{n}" for n in range(17)], **window)

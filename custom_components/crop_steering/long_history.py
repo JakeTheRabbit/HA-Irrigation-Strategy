@@ -21,6 +21,7 @@ from .const import DOMAIN
 from .room import room_prefix
 
 SERVICES = ("history_connection_get", "history_connection_save", "history_long")
+MAX_SENSORS = 16
 MAX_POINTS = 1000
 MAX_BYTES = 2_000_000
 
@@ -241,6 +242,18 @@ class LongHistory:
             for v in cfg.get("hardware", {}).values()
             if isinstance(v, str) and v.startswith("sensor.")
         )
+        # The sensors this room's archived runs were registered with: Comparison reads an old run's
+        # curve through them, and the room may have re-mapped since. They are this room's own
+        # history; no other entity is.
+        runs = self.hass.data.get(DOMAIN, {}).get("_runs", {}).get(self.entry.entry_id)
+        for run in getattr(runs, "document", {}).get("runs", []):
+            for zone in run.get("zones", []):
+                allowed.update(
+                    v
+                    for v in (zone.get("vwc_sensor"), zone.get("ec_sensor"))
+                    if isinstance(v, str)
+                )
+                allowed.update(p["entity_id"] for p in zone.get("probes", []))
         return allowed
 
     async def query(self, config, ids, start, end):
@@ -374,10 +387,12 @@ async def async_setup_long_history(hass, entry):
                     target.config, target.revision = candidate, target.revision + 1
                     return target.public()
                 ids = list(dict.fromkeys(call.data["entity_ids"]))
-                if not 1 <= len(ids) <= 4 or any(
+                if not 1 <= len(ids) <= MAX_SENSORS or any(
                     e not in target.allowed() for e in ids
                 ):
-                    raise ValueError("Select 1-4 sensors already mapped to this room")
+                    raise ValueError(
+                        f"Select 1-{MAX_SENSORS} sensors mapped to this room or its runs"
+                    )
                 if target.config["source"] != "influxdb":
                     raise ValueError("InfluxDB history is not enabled")
                 return await target.query(
