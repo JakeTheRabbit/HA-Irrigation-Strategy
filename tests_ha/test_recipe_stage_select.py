@@ -84,3 +84,35 @@ async def test_a_failed_setpoint_write_leaves_the_select_on_the_old_stage(hass):
             await _pick(hass, "Ripen")
     assert hass.states.get(SELECT).state == "Bulk"
     assert mgr.active_stage == "Bulk"
+
+
+async def test_apply_recipe_names_every_room_that_failed_and_applies_the_rest(hass):
+    from types import SimpleNamespace
+
+    from custom_components.crop_steering.const import DOMAIN
+    from custom_components.crop_steering.recipe import get_manager
+
+    entry = await _install(hass)
+    mgr = get_manager(hass, entry)
+
+    async def _refuse(stage=None):
+        raise HomeAssistantError(
+            "Stage 'Ripen' only partly applied: p2_shot_size (boom)"
+        )
+
+    # A second room whose apply fails, after the real one in the loop.
+    fake = SimpleNamespace(
+        entry=SimpleNamespace(title="Flower B", entry_id="b"),
+        active_stage="Veg",
+        async_apply=_refuse,
+    )
+    hass.data[DOMAIN]["_recipe"]["b"] = fake
+    try:
+        with pytest.raises(HomeAssistantError, match=r"Flower B: .*p2_shot_size"):
+            await hass.services.async_call(
+                "crop_steering", "apply_recipe", {"stage": "Ripen"}, blocking=True
+            )
+    finally:
+        hass.data[DOMAIN]["_recipe"].pop("b")
+    assert mgr.active_stage == "Ripen"  # the room that could take it did
+    assert _ladder(hass)["p1_target_vwc"] == 58.0
