@@ -37,14 +37,28 @@ export function draftStore(storage: () => Storage | null | undefined) {
 
 const session = draftStore(() => sessionStorage);
 
-function broadcast(message: { key: string; value?: unknown }) {
+/** Tells this browser's other tabs the draft under `key` (undefined: discarded). */
+export function publishDraft(key: string, value: unknown) {
   try {
     const channel = new BroadcastChannel(CHANNEL);
-    channel.postMessage(message);
+    channel.postMessage({ key, value });
     channel.close();
   } catch {
     /* No other tabs to tell. */
   }
+}
+/** Hears the other tabs' drafts under `key`; returns the unsubscribe. */
+export function subscribeDrafts(key: string, onValue: (value: unknown) => void): () => void {
+  let channel: BroadcastChannel | null = null;
+  try {
+    channel = new BroadcastChannel(CHANNEL);
+    channel.onmessage = (event: MessageEvent<{ key: string; value?: unknown }>) => {
+      if (event.data?.key === key) onValue(event.data.value);
+    };
+  } catch {
+    /* This tab only. */
+  }
+  return () => channel?.close();
 }
 
 /** The draft of `saved` under `key`: `saved` itself until something is set. Pages pass their
@@ -59,18 +73,7 @@ export function useDraft<T>(
   if (held.key !== key) setHeld({ key, value });
   const dirty = value !== undefined && !isSameDraft(value, saved);
 
-  useEffect(() => {
-    let channel: BroadcastChannel | null = null;
-    try {
-      channel = new BroadcastChannel(CHANNEL);
-      channel.onmessage = (event: MessageEvent<{ key: string; value?: T }>) => {
-        if (event.data?.key === key) setHeld({ key, value: event.data.value });
-      };
-    } catch {
-      /* This tab only. */
-    }
-    return () => channel?.close();
-  }, [key]);
+  useEffect(() => subscribeDrafts(key, (next) => setHeld({ key, value: next as T | undefined })), [key]);
 
   const report = useRef(onDirtyChange);
   report.current = onDirtyChange;
@@ -81,7 +84,7 @@ export function useDraft<T>(
     if (next === undefined) session.clear(key);
     else session.write(key, next);
     setHeld({ key, value: next });
-    broadcast({ key, value: next });
+    publishDraft(key, next);
   };
   return {
     draft: value ?? saved,

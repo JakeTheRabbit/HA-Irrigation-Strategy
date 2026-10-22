@@ -1,26 +1,32 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Check, TriangleAlert, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NeedsIntegration } from "@/components/needs-integration";
 import type { V2Outcome } from "@/lib/parity-api";
 import { clock } from "@/lib/time";
 import type { WriteResult } from "@/lib/types";
+import { useNarrow } from "@/lib/use-narrow";
 import "./review-apply.css";
 
 /** One pending edit: what it was, what it becomes, and how to take just this one back out of the
- * draft. `id` is the setting's key, as the v2 `applied[].key` names it. */
+ * draft. A v2 save's `applied[]` entry is this row when its `key` is the row's `key` (else `id`) and
+ * its `target` is the row's `target` (any target when the row names none). */
 export interface ReviewRow {
   id: string;
+  key?: string;
+  target?: string;
   label: string;
   before: string;
   after: string;
   note?: string;
   undo(): void;
 }
-/** What an apply did. `ok` only when the controller read every value back as written. */
+/** What an apply did. `ok` only when the controller read every value back as written.
+ * `unconfirmed`: nothing says which values took, so the receipt claims none of them. */
 export interface ApplyReceipt {
   at: number;
   ok: boolean;
+  unconfirmed?: boolean;
   failed: { id: string; holds: string }[];
   summary: string;
   by?: string;
@@ -47,17 +53,28 @@ export function receiptFromWrite(
   return { at: now, ok: !failed.length, failed, summary: summaryOf(rows, new Set(failed.map((f) => f.id))), eventIds: [] };
 }
 
-/** A v2 save. A row the controller refused keeps its old value; a read-back that is not verified
- * fails every row, since nothing confirms what the controller holds. */
-export function receiptFromV2(
-  outcome: V2Outcome<{ applied?: { target: string; key: string; readback: "verified" | "refused" }[] }>,
-  rows: ReviewRow[],
-  now: number,
-): ApplyReceipt {
-  if (outcome.kind !== "ok") return { at: now, ok: false, failed: rows.map((r) => ({ id: r.id, holds: r.before })), summary: "", eventIds: [] };
-  const refused = new Set((outcome.data?.applied ?? []).filter((a) => a.readback === "refused").map((a) => a.key));
-  const failed =
-    outcome.readback.status !== "verified" ? rows : rows.filter((row) => refused.has(row.id));
+type Applied = { target: string; key: string; readback: "verified" | "refused" };
+const matches = (row: ReviewRow, a: Applied) =>
+  (row.key ?? row.id) === a.key && (row.target === undefined || row.target === a.target);
+
+/** A v2 save. A row the controller refused keeps its old value. A read-back that is not verified,
+ * or a refusal that matches no row, fails every row unconfirmed: nothing then says which took. */
+export function receiptFromV2(outcome: V2Outcome<{ applied?: Applied[] }>, rows: ReviewRow[], now: number): ApplyReceipt {
+  const refused = outcome.kind === "ok" ? (outcome.data?.applied ?? []).filter((a) => a.readback === "refused") : [];
+  if (
+    outcome.kind !== "ok" ||
+    outcome.readback.status !== "verified" ||
+    refused.some((a) => !rows.some((row) => matches(row, a)))
+  )
+    return {
+      at: now,
+      ok: false,
+      unconfirmed: true,
+      failed: rows.map((r) => ({ id: r.id, holds: r.before })),
+      summary: "",
+      eventIds: outcome.kind === "ok" ? outcome.eventIds : [],
+    };
+  const failed = rows.filter((row) => refused.some((a) => matches(row, a)));
   const ids = new Set(failed.map((r) => r.id));
   return {
     at: now,
@@ -87,55 +104,82 @@ export interface ReviewApplyProps {
 export type ApplyState =
   | { phase: "idle" }
   | { phase: "sending" }
-  | { phase: "done"; result: ApplyReceipt | Refusal; at?: number }
+  | { phase: "done"; result: ApplyReceipt | Refusal }
   | { phase: "undoing"; receipt: ApplyReceipt }
   | { phase: "undone"; at: number }
-  | { phase: "undo-failed"; receipt: ApplyReceipt; message: string };
+  /** `reverted`: how many of the receipt's changes were put back before the undo stopped. */
+  | { phase: "undo-failed"; receipt: ApplyReceipt; message: string; reverted: number };
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const isReceipt = (r: ApplyReceipt | Refusal): r is ApplyReceipt => "ok" in r;
 
-function useNarrow() {
-  const query = "(max-width: 720px)";
-  const [narrow, setNarrow] = useState(() => typeof window !== "undefined" && !!window.matchMedia?.(query).matches);
-  useEffect(() => {
-    const media = window.matchMedia?.(query);
-    if (!media) return;
-    const change = () => setNarrow(media.matches);
-    media.addEventListener("change", change);
-    return () => media.removeEventListener("change", change);
-  }, []);
-  return narrow;
+/** Apply: sending, then done with what came back. A throw is an error, never a receipt. */
+export async function runApply(
+  apply: ReviewApplyProps["apply"],
+  set: (state: ApplyState) => void,
+): Promise<ApplyReceipt | Refusal> {
+  set({ phase: "sending" });
+  let result: ApplyReceipt | Refusal;
+  try {
+    result = await apply();
+  } catch (error) {
+    result = { kind: "error", code: "unknown", message: error instanceof Error ? error.message : "" };
+  }
+  set({ phase: "done", result });
+  return result;
+}
+/** Undo: undoing, then undone, or undo-failed with how many were put back (`UndoError.reverted`,
+ * else 0). */
+export async function runUndo(
+  undo: NonNullable<ReviewApplyProps["undo"]>,
+  receipt: ApplyReceipt,
+  set: (state: ApplyState) => void,
+  now: () => number = Date.now,
+): Promise<void> {
+  set({ phase: "undoing", receipt });
+  try {
+    await undo(receipt);
+    set({ phase: "undone", at: now() });
+  } catch (error) {
+    const reverted = (error as { reverted?: unknown } | null)?.reverted;
+    set({
+      phase: "undo-failed",
+      receipt,
+      reverted: typeof reverted === "number" ? reverted : 0,
+      message: error instanceof Error && error.message ? error.message : "Undo failed.",
+    });
+  }
+}
+/** A written and read-back apply closes the phone sheet and puts focus back on its trigger,
+ * before the page empties the draft and both unmount. */
+export function closeSheetAfter(
+  result: ApplyReceipt | Refusal,
+  sheet: Pick<HTMLDialogElement, "close"> | null,
+  trigger: Pick<HTMLElement, "focus"> | null,
+) {
+  if (!isReceipt(result) || !result.ok) return;
+  sheet?.close();
+  trigger?.focus();
 }
 
 /** Pending edits, their checks, one Apply, and what the controller read back. On a phone the bar
- * is one "Review n changes" button that opens a bottom sheet. */
+ * is one "Review n changes" button that opens a bottom sheet. 720 px is the app's phone breakpoint
+ * (bottom bar); the shared hook's default is History Explorer's 640 px. */
 export function ReviewApply(props: ReviewApplyProps) {
   const [state, setState] = useState<ApplyState>({ phase: "idle" });
-  const narrow = useNarrow();
+  const narrow = useNarrow(720);
   const sheet = useRef<HTMLDialogElement>(null);
-  const run = async () => {
-    setState({ phase: "sending" });
-    try {
-      setState({ phase: "done", result: await props.apply(), at: Date.now() });
-    } catch (error) {
-      setState({ phase: "done", result: { kind: "error", code: "unknown", message: error instanceof Error ? error.message : "" }, at: Date.now() });
-    }
-  };
-  const undo = async (receipt: ApplyReceipt) => {
-    setState({ phase: "undoing", receipt });
-    try {
-      await props.undo!(receipt);
-      setState({ phase: "undone", at: Date.now() });
-    } catch (error) {
-      setState({ phase: "undo-failed", receipt, message: error instanceof Error && error.message ? error.message : "Undo failed." });
-    }
-  };
-  const view = <ReviewApplyView {...props} state={state} onApply={run} onUndo={props.undo ? undo : undefined} />;
-  if (!narrow || props.layout !== "bar" || !props.rows.length) return view;
+  const trigger = useRef<HTMLButtonElement>(null);
+  const run = async () => closeSheetAfter(await runApply(props.apply, setState), sheet.current, trigger.current);
+  const undo = (receipt: ApplyReceipt) => void runUndo(props.undo!, receipt, setState);
+  const inSheet = narrow && props.layout === "bar" && props.rows.length > 0;
+  const view = (
+    <ReviewApplyView {...props} state={state} onApply={run} onUndo={props.undo ? undo : undefined} inSheet={inSheet} />
+  );
+  if (!inSheet) return view;
   return (
     <>
-      <Button className="review-apply-open" onClick={() => sheet.current?.showModal()}>
+      <Button ref={trigger} className="review-apply-open" aria-haspopup="dialog" onClick={() => sheet.current?.showModal()}>
         Review {plural(props.rows.length, "change")}
       </Button>
       <dialog ref={sheet} className="review-apply-sheet" aria-label="Review and apply">
@@ -150,7 +194,13 @@ export function ReviewApply(props: ReviewApplyProps) {
 
 /** The markup for one state; exported for tests and the story page. */
 export function ReviewApplyView(
-  props: ReviewApplyProps & { state: ApplyState; onApply?(): void; onUndo?(receipt: ApplyReceipt): void },
+  props: ReviewApplyProps & {
+    state: ApplyState;
+    onApply?(): void;
+    onUndo?(receipt: ApplyReceipt): void;
+    /** Inside the phone sheet, which carries the name already. */
+    inSheet?: boolean;
+  },
 ) {
   const { rows, layout, state, timeZone } = props;
   const n = rows.length;
@@ -213,20 +263,33 @@ export function ReviewApplyView(
     const result =
       state.phase === "done" ? state.result : state.phase === "undoing" || state.phase === "undo-failed" ? state.receipt : props.last;
     if (!result) return null;
-    const at = state.phase === "done" ? (state.at ?? Date.now()) : Date.now();
+    // Part of an undo went through: the receipt no longer says what the controller holds.
+    if (state.phase === "undo-failed" && state.reverted > 0)
+      return (
+        <div role="alert" className="review-apply-error">
+          <span>{state.message}</span>
+          {props.onReload && (
+            <Button variant="outline" size="sm" onClick={props.onReload}>
+              Reload
+            </Button>
+          )}
+        </div>
+      );
     if (!isReceipt(result)) {
       if (result.kind === "missing") return <NeedsIntegration feature="Applying these changes" compact />;
+      const known = result.code === "stale_revision" || result.code === "forbidden" || result.code === "guard_refused";
       const text =
         result.code === "stale_revision"
-          ? `Someone else changed this at ${clock(at, timeZone)}. Reload their version and reapply your edits.`
+          ? "Someone else changed this since you started editing. Reload their version and reapply your edits."
           : result.code === "forbidden"
             ? "Only a Home Assistant administrator can change this."
             : result.code === "guard_refused"
               ? `The controller refused: ${result.message}`
-              : result.message || "Home Assistant did not answer. Nothing was changed.";
+              : "The controller refused this change.";
       return (
         <div role="alert" className="review-apply-error">
           <span>{text}</span>
+          {!known && <small className="review-apply-detail">Code: {result.code}</small>}
           {result.code === "stale_revision" && props.onReload ? (
             <Button variant="outline" size="sm" onClick={props.onReload}>
               Reload
@@ -240,15 +303,29 @@ export function ReviewApplyView(
       );
     }
     if (!result.ok) {
+      if (result.unconfirmed)
+        return (
+          <div role="alert" className="review-apply-error">
+            <span>The controller did not confirm the values. Reload and check before trying again.</span>
+            {props.onReload ? (
+              <Button variant="outline" size="sm" onClick={props.onReload}>
+                Reload
+              </Button>
+            ) : n ? (
+              <Button variant="outline" size="sm" onClick={props.onApply} disabled={busy}>
+                Try again
+              </Button>
+            ) : null}
+          </div>
+        );
       const holds =
         result.failed.length === 1
-          ? result.failed[0].holds
-          : result.failed.map((f) => `${labelOf(f.id)} ${f.holds}`).join(", ");
+          ? `Controller still holds ${result.failed[0].holds}.`
+          : result.failed.map((f) => `${labelOf(f.id)} is still ${f.holds}.`).join(" ");
       return (
         <div role="alert" className="review-apply-error">
           <span>
-            Controller still holds {holds}.{" "}
-            {result.summary ? `${result.summary}: written and read back.` : "Nothing else was changed."}
+            {holds} {result.summary ? `${result.summary}: written and read back.` : "Nothing else was changed."}
           </span>
           {n ? (
             <Button variant="outline" size="sm" onClick={props.onApply} disabled={busy}>
@@ -287,7 +364,7 @@ export function ReviewApplyView(
 
   if (layout === "panel")
     return (
-      <section className="review-apply is-panel" aria-label="Review and apply" data-pending={n || undefined}>
+      <section className="review-apply is-panel" aria-label={props.inSheet ? undefined : "Review and apply"} data-pending={n || undefined}>
         <h2>Review &amp; apply</h2>
         {props.summary ??
           (n ? (
@@ -304,7 +381,7 @@ export function ReviewApplyView(
       </section>
     );
   return (
-    <section className="review-apply is-bar" aria-label="Review and apply" data-pending={n || undefined}>
+    <section className="review-apply is-bar" aria-label={props.inSheet ? undefined : "Review and apply"} data-pending={n || undefined}>
       <div className="review-apply-main">
         <div className="review-apply-head">
           <b>{props.summary ?? (n ? `${plural(n, "change")} · Review & apply` : "No pending changes")}</b>

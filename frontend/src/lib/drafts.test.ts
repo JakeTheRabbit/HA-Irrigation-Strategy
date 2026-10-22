@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { DRAFT_PREFIX, draftStore, isSameDraft } from "./drafts";
+import { DRAFT_PREFIX, draftStore, isSameDraft, publishDraft, subscribeDrafts } from "./drafts";
 
 function memoryStorage() {
   const data = new Map<string, string>();
@@ -37,4 +37,28 @@ describe("drafts", () => {
     expect(isSameDraft({ a: 1, b: [2] }, { a: 1, b: [2] })).toBe(true);
     expect(isSameDraft({ a: 1 }, { a: 2 })).toBe(false);
   });
+});
+
+test("drafts reach the other tabs over the BroadcastChannel, for their key only", async () => {
+  const seen: unknown[] = [];
+  const stop = subscribeDrafts("targets:f2_:1", (value) => seen.push(value));
+  publishDraft("targets:f2_:2", { rewater: 50 });
+  publishDraft("targets:f2_:1", { rewater: 56 });
+  publishDraft("targets:f2_:1", undefined);
+  await new Promise((resolve) => setTimeout(resolve, 50));
+  stop();
+  publishDraft("targets:f2_:1", { rewater: 1 });
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  expect(seen).toEqual([{ rewater: 56 }, undefined]);
+});
+test("no BroadcastChannel: subscribing and publishing do nothing and do not throw", () => {
+  const original = globalThis.BroadcastChannel;
+  // @ts-expect-error simulating an engine without BroadcastChannel
+  delete globalThis.BroadcastChannel;
+  try {
+    expect(() => publishDraft("k", 1)).not.toThrow();
+    expect(() => subscribeDrafts("k", () => {})()).not.toThrow();
+  } finally {
+    globalThis.BroadcastChannel = original;
+  }
 });

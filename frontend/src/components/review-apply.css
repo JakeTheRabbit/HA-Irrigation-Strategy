@@ -242,3 +242,7 @@
     border-top: 1px solid var(--border);
   }
 }
+.review-apply-detail {
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}

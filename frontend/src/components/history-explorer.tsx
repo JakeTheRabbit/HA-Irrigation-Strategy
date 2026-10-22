@@ -52,6 +52,7 @@ import { numeric } from "@/lib/model";
 import type { GrowDay } from "@/lib/grows";
 import type { Controller, Zone } from "@/lib/types";
 import { errorText } from "@/lib/utils";
+import { useNarrow } from "@/lib/use-narrow";
 import "./history-explorer.css";
 
 const PHASE_FILL: Record<string, string> = {
@@ -60,21 +61,6 @@ const PHASE_FILL: Record<string, string> = {
   P2: "#6450b0",
   P3: "#34405a",
 };
-
-function useNarrow() {
-  const query = "(max-width: 640px)";
-  const [narrow, setNarrow] = useState(
-    () => typeof window !== "undefined" && window.matchMedia?.(query).matches,
-  );
-  useEffect(() => {
-    const media = window.matchMedia?.(query);
-    if (!media) return;
-    const change = () => setNarrow(media.matches);
-    media.addEventListener("change", change);
-    return () => media.removeEventListener("change", change);
-  }, []);
-  return narrow;
-}
 
 interface Loaded {
   key: string;

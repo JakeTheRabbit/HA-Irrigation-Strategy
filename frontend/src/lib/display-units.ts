@@ -106,11 +106,14 @@ export function formatVolume(l: number, sourceDigits: number): string {
 }
 /** A typed EC back to mS/cm: ppm when the text says so or the display shows ppm. */
 export function parseEc(text: string): number | null {
-  const match = /^\s*(-?\d+(?:[.,]\d+)?)\s*(mS\/cm|ppm)?\s*$/i.exec(text);
+  const match = /^\s*(-?\d+(?:[.,]\d+)*)\s*(mS\/cm|ppm)?\s*$/i.exec(text);
   if (!match) return null;
-  const value = Number(match[1].replace(",", "."));
   const { ec } = getDisplayUnits();
   const unit = match[2]?.toLowerCase() ?? (ec === "mS/cm" ? "ms/cm" : "ppm");
+  // In ppm a comma before three digits groups thousands ("1,200"); elsewhere it is a decimal comma.
+  const digits = unit === "ppm" && /^-?\d{1,3}(,\d{3})+(\.\d+)?$/.test(match[1]) ? match[1].replace(/,/g, "") : match[1].replace(",", ".");
+  if (!/^-?\d+(\.\d+)?$/.test(digits)) return null;
+  const value = Number(digits);
   if (unit === "ms/cm") return value;
   return Number((value / (ec === "ppm700" ? 700 : 500)).toPrecision(12));
 }

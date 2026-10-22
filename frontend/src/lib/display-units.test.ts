@@ -41,6 +41,14 @@ describe("display units", () => {
     setDisplayUnits({ ec: "mS/cm" });
     expect(parseEc("2.4")).toBe(2.4);
     expect(parseEc("")).toBeNull();
+    // ppm: a comma before three digits is a thousands separator.
+    setDisplayUnits({ ec: "ppm500" });
+    expect(parseEc("1,200 ppm")).toBe(2.4);
+    expect(parseEc("1,200")).toBe(2.4);
+    setDisplayUnits({ ec: "ppm700" });
+    expect(parseEc("1,680")).toBe(2.4);
+    setDisplayUnits({ ec: "mS/cm" });
+    expect(parseEc("2,4")).toBe(2.4);
     expect(parseEc("high")).toBeNull();
   });
   test("volume auto follows Home Assistant's unit system, the same answer units.ts gives", () => {

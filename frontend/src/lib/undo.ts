@@ -19,15 +19,33 @@ export function offerUndo(opts: { message: string; undo: () => Promise<void> }):
   });
 }
 
+/** An undo that stopped part way: `reverted` of `total` changes are back. The message starts
+ * "{k} of {n} put back:" once any are. */
+export class UndoError extends Error {
+  constructor(
+    message: string,
+    readonly reverted: number,
+    readonly total: number,
+  ) {
+    super(message);
+    this.name = "UndoError";
+  }
+}
+
 /** Puts back the changes these Journal events record, newest first (event ids are ULIDs, so they
- * sort by time). Stops at the first refusal and throws its words: the ones before it are back,
- * that one and the older ones are not. Resolves only when the controller read every value back. */
+ * sort by time). Stops at the first refusal and throws an `UndoError` with its words and how many
+ * were put back before it. Resolves only when the controller read every value back. */
 export async function revertEvents(controller: Pick<Controller, "operator">, eventIds: string[]): Promise<void> {
-  for (const eventId of [...eventIds].sort().reverse()) {
+  const ids = [...eventIds].sort().reverse();
+  const stop = (reason: string, reverted: number): never => {
+    throw new UndoError(reverted ? `${reverted} of ${ids.length} put back: ${reason}` : reason, reverted, ids.length);
+  };
+  for (const [reverted, eventId] of ids.entries()) {
     const outcome = await callV2<HistoryRevertResult>(controller, "history_revert", { event_id: eventId });
-    if (outcome.kind === "missing") throw new Error("Undo needs Crop Steering 3.18 or newer. Nothing was changed.");
-    if (outcome.kind === "error") throw new Error(outcome.message);
-    if (outcome.readback.status !== "verified")
-      throw new Error("The controller did not confirm the previous value. Reload and check it before trying again.");
+    if (outcome.kind === "missing")
+      stop(`Undo needs Crop Steering 3.18 or newer.${reverted ? "" : " Nothing was changed."}`, reverted);
+    else if (outcome.kind === "error") stop(outcome.message, reverted);
+    else if (outcome.readback.status !== "verified")
+      stop("The controller did not confirm the previous value. Reload and check it before trying again.", reverted);
   }
 }
