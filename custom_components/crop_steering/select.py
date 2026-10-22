@@ -21,6 +21,7 @@ from .const import (
     PROBE_METHODS,
     STEERING_MODES,
     GROWTH_STAGES,
+    IRRIGATION_MODES,
     NO_TOUCH_OPTIONS,
     RECIPE_STAGES,
     RECIPE_PARAMS,
@@ -179,6 +180,21 @@ async def async_setup_entry(
             )
         )
 
+        # What waters the zone: the engine (the default, as always), the room's timer programs, or
+        # nothing. The controller app reads it.
+        selects.append(
+            CropSteeringSelect(
+                entry,
+                SelectEntityDescription(
+                    key=f"zone_{zone_num}_irrigation_mode",
+                    name=f"Zone {zone_num} Watering by",
+                    options=IRRIGATION_MODES,
+                    icon="mdi:timer-cog-outline",
+                ),
+                zone_num=zone_num,
+            )
+        )
+
         # Move the zone to a phase by hand. The controller applies a choice once, within a
         # minute, and sets this back to Keep; its own rules carry on from that phase.
         selects.append(
@@ -289,6 +305,10 @@ class CropSteeringSelect(SelectEntity, RestoreEntity):
             if last_state.state in self.options:
                 self._attr_current_option = last_state.state
                 self._since = last_state.attributes.get("since")
+            elif self.entity_description.key.endswith("_irrigation_mode"):
+                # A saved mode this code cannot read is not steering: the select reads unknown
+                # until someone picks, and the controller keeps the mode it last knew.
+                self._attr_current_option = None
         # The recipe stage's source of truth is the server-side recipe Store, not
         # the restored entity state — reflect the loaded recipe's active stage.
         if self.entity_description.key == "recipe_stage":

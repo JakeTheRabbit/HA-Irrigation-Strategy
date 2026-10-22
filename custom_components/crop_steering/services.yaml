@@ -1715,3 +1715,162 @@ journal_query:
       required: false
       selector:
         text:
+
+timer_program_set:
+  name: Save a timer program
+  description: >-
+    Adds a timer program to the room, or changes one when the program has an id. A zone may belong
+    to one active timer program only. The controller app runs a program for the zones whose
+    Watering by select reads timer. When a signed-in user calls it, that user must be a Home
+    Assistant administrator. Give the revision that you read with timer_program_list. Answers with
+    the saved program, the new revision and its shots over the next 24 hours.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room: `room:` for the default room, or `room:` and the room prefix
+        for a named room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that timer_program_list returned. Example: 0.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    program:
+      name: Program
+      description: >-
+        The program: name, type (recycle, simple or one_off), zones, duration_s, active, window
+        ({"kind": "all"}, lights_on, lights_off, or custom with from and to as HH:MM), and
+        interval_min with an optional sync_time (recycle), frequency_per_day (simple) or start_at
+        (one_off). Example: {"name": "Mothers AM", "type": "recycle", "zones": [1], "duration_s":
+        120, "interval_min": 30, "window": {"kind": "custom", "from": "08:00", "to": "12:00"}}.
+      required: true
+      selector:
+        object:
+
+timer_program_delete:
+  name: Delete a timer program
+  description: >-
+    Switches a timer program off and marks it deleted. It stays in the store for its history and is
+    no longer listed. When a signed-in user calls it, that user must be a Home Assistant
+    administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that timer_program_list returned. Example: 3.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    id:
+      name: Program ID
+      description: The id of the program to delete.
+      required: true
+      selector:
+        text:
+
+timer_program_preview:
+  name: Preview a timer program
+  description: >-
+    Checks a timer program, saved or a draft without an id, and answers with the shots it would
+    give over the coming hours, how many and their total seconds. Saves nothing. It has no
+    administrator check.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    program:
+      name: Program
+      description: The program, as timer_program_set takes it.
+      required: true
+      selector:
+        object:
+    hours:
+      name: Hours
+      description: How many hours ahead, up to 48. Default 24.
+      required: false
+      selector:
+        number:
+          min: 1
+          max: 48
+          mode: box
+
+timer_program_list:
+  name: List timer programs
+  description: >-
+    Returns the room's timer programs that are not deleted, each with its next shot and the zones
+    whose Watering by select reads timer, and the revision to save against. Without a room it
+    returns every room's programs, each with its room_id, and each room's revision. Changes
+    nothing. It has no administrator check.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Leave it out for every room. Example: `room:f2_`.
+      required: false
+      selector:
+        text:
+
+timer_skip:
+  name: Skip a planned shot
+  description: >-
+    Skips the planned shot of one zone at a given time: the timer shot, or the engine shot the
+    timeline showed then. The skip covers 15 minutes from that time and is dropped 24 hours after
+    it. When a signed-in user calls it, that user must be a Home Assistant administrator.
+  fields:
+    room_id:
+      name: Room ID
+      description: >-
+        The canonical ID of the room. Example: `room:f2_`.
+      required: true
+      selector:
+        text:
+    expected_revision:
+      name: Expected revision
+      description: >-
+        The revision that timer_program_list returned. Example: 3.
+      required: true
+      selector:
+        number:
+          min: 0
+          max: 1000000
+          mode: box
+    zone:
+      name: Zone
+      description: >-
+        The zone number. Example: 3.
+      required: true
+      selector:
+        number:
+          min: 1
+          max: 24
+          mode: box
+    at:
+      name: At
+      description: >-
+        The time of the planned shot, as an ISO date and time with its offset. Example:
+        2026-10-22T08:00:00+13:00.
+      required: true
+      selector:
+        text:

@@ -63,6 +63,10 @@ CHANGES = {
     # What the dashboard shows in the room, for everyone who opens it.
     "display_save": {"room_id": ROOM, "expected_revision": 0, "options": {"show_climate": True}},
     "supply_save": {"expected_revision": 0, "irrigation_pumps": []},
+    # The room's timer programs and skips: what the controller app waters by.
+    "timer_program_set": {"room_id": ROOM, "expected_revision": 0, "program": {}},
+    "timer_program_delete": {"room_id": ROOM, "expected_revision": 0, "id": "x"},
+    "timer_skip": {"room_id": ROOM, "expected_revision": 0, "zone": 1, "at": "2026-10-22T08:00:00+13:00"},
     "save_recipe": {"recipe": {}},
     "apply_recipe": {},
     "set_manual_override": {"zone": 1},
@@ -90,6 +94,8 @@ READS = {
     "dosing_get": {"room_id": ROOM},
     "display_get": {"room_id": ROOM},
     "supply_get": {},
+    "timer_program_list": {},
+    "timer_program_preview": {"room_id": ROOM, "program": {}},
     "notify_get": {},
     "whats_new_get": {},
     "journal_query": {"room_id": ROOM, "since": "2026-01-01T00:00:00+00:00"},

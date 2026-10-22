@@ -207,6 +207,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     except Exception as err:  # pragma: no cover - never block setup on the site store
         _LOGGER.warning("Site settings unavailable: %s", err)
 
+    # Timer programs (G7): the room's watering timers, published for the controller app.
+    try:
+        from .timers_api import async_setup_timers
+
+        await async_setup_timers(hass, entry)
+    except Exception as err:  # pragma: no cover - never block setup on the timer store
+        _LOGGER.warning("Timer programs unavailable: %s", err)
+
     # Tests from the dashboard: a zone's test shot.
     from .selftest import async_setup_selftest
 
@@ -447,6 +455,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     from .site_api import async_unload_site
 
     await async_unload_site(hass, entry)
+    from .timers_api import async_unload_timers
+
+    await async_unload_timers(hass, entry)
     from .brain_api import async_unload_brain
 
     await async_unload_brain(hass, entry)

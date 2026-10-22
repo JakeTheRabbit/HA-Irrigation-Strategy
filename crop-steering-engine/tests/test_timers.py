@@ -86,3 +86,62 @@ def test_validate_refuses(bad, msg):
 def test_validate_normalises():
     out = validate(_prog(zones=[1, "2"], duration_s="90"))
     assert out["zones"] == [1, 2] and out["duration_s"] == 90.0 and out["active"] is True
+
+
+@pytest.mark.parametrize("field", ["duration_s", "interval_min"])
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), "nan", "-inf"])
+def test_validate_refuses_numbers_that_are_not_finite(field, value):
+    with pytest.raises(ValueError, match=field.split("_")[0]):
+        validate(_prog(**{field: value}))
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf")])
+def test_validate_refuses_a_frequency_or_a_zone_that_is_not_finite(value):
+    with pytest.raises(ValueError, match="frequency"):
+        validate(_prog(type="simple", frequency_per_day=value))
+    with pytest.raises(ValueError, match="zones"):
+        validate(_prog(zones=[1, value]))
+
+
+def test_validate_refuses_an_interval_under_a_minute():
+    with pytest.raises(ValueError, match="at least 1 minute"):
+        validate(_prog(interval_min=0.5))
+    assert validate(_prog(interval_min=1))["interval_min"] == 1.0
+
+
+def test_validate_drops_a_zone_named_twice_keeping_the_order():
+    assert validate(_prog(zones=[3, 1, "3", 2, 1]))["zones"] == [3, 1, 2]
+
+
+def test_validate_refuses_a_sync_time_outside_the_window():
+    with pytest.raises(ValueError, match="sync time must be inside the window"):
+        validate(_prog(sync_time="13:00"))
+    with pytest.raises(ValueError, match="sync time must be inside the window"):
+        validate(_prog(sync_time="12:00"))  # the window ends at 12:00, not after it
+    assert validate(_prog(sync_time="08:00"))["sync_time"] == "08:00"
+    # across midnight: 22:00-02:00 holds 01:00
+    assert validate(_prog(sync_time="01:00", window={"kind": "custom", "from": "22:00", "to": "02:00"}))
+    # a lights window is checked when the lights are given
+    lit = _prog(sync_time="20:00", window={"kind": "lights_on"})
+    assert validate(lit)["sync_time"] == "20:00"
+    with pytest.raises(ValueError, match="sync time must be inside the window"):
+        validate(lit, (6, 18))
+    with pytest.raises(ValueError, match="sync time must be inside the window"):
+        project(lit, (6, 18), *DAY)
+
+
+@pytest.mark.parametrize("value", ["false", "true", 0, 1, None])
+def test_validate_takes_active_only_as_true_or_false(value):
+    with pytest.raises(ValueError, match="active must be true or false"):
+        validate(_prog(active=value))
+    assert validate(_prog(active=False))["active"] is False
+    program = _prog()
+    del program["active"]
+    assert validate(program)["active"] is True
+
+
+@pytest.mark.parametrize("value", ["all", ["custom"], 3])
+def test_validate_names_a_window_that_is_not_an_object(value):
+    with pytest.raises(ValueError, match="window must be an object"):
+        validate(_prog(window=value))
+    assert validate(_prog(window=None))["window"] == {"kind": "all"}
