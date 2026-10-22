@@ -435,6 +435,7 @@ export class Workspace {
       throw new SafeError(
         `${error.message}. Inspect Home Assistant before a new proposal; do not automatically retry.`,
         error.code,
+        error.data,
       );
     }
   }
@@ -632,6 +633,10 @@ export class Workspace {
       { room_id: id },
       timerPrograms,
     );
+    if (!list.programs.every((p) => p.room_id === id))
+      throw new SafeError(
+        "Unsupported Crop Steering timer_program_list answer. Update the integration or inspect it in Home Assistant.",
+      );
     if (list.error)
       throw new SafeError(`The room's timer programs cannot be read: ${list.error}`);
     const current = list.programs.find((p) => p.id === program.id);
@@ -893,9 +898,40 @@ export class Workspace {
       throw new SafeError(
         "The targets changed after preview. Nothing was written; refresh and review a new proposal.",
       );
-    const written = presetAnswer.safeParse(
-      await this.write(service, proposal.payload, token),
-    );
+    let answer: JsonObject;
+    try {
+      answer = await this.write(service, proposal.payload, token);
+    } catch (error) {
+      // A refused row (guard_refused) leaves the others written: say which values on the live
+      // room changed, from HA's own `applied` rows and the reviewed old -> new.
+      const rows =
+        error instanceof SafeError && error.code === "guard_refused"
+          ? presetAnswer.safeParse(error.data).data?.applied
+          : undefined;
+      if (!rows) throw error;
+      const label = (row: (typeof rows)[number]) => {
+        const target = row.target as { room_id: string; zone?: number };
+        const reviewed = fresh.diff.find(
+          (d) => d.key === row.key && digest(d.target) === digest(row.target),
+        );
+        return (
+          `${target.room_id}${target.zone ? ` zone ${target.zone}` : ""} ${row.key}` +
+          (reviewed ? ` ${String(reviewed.old)} -> ${String(reviewed.new)}` : "")
+        );
+      };
+      const changed = rows.filter((row) => row.readback === "verified");
+      const unchanged = rows
+        .filter((row) => row.readback !== "verified")
+        .map(
+          (row) =>
+            `${label(row)} (${row.readback}${row.error ? `: ${String(row.error)}` : ""})`,
+        );
+      throw new SafeError(
+        `${(error as SafeError).message.replace(/\. Inspect Home Assistant.*$/, "")}. Changed: ${changed.map(label).join("; ") || "nothing"}. Not changed: ${unchanged.join("; ") || "nothing"}. Inspect Home Assistant before a new proposal; do not automatically retry.`,
+        "guard_refused",
+      );
+    }
+    const written = presetAnswer.safeParse(answer);
     if (!written.success)
       throw new SafeError(
         `Unsupported Crop Steering ${service} answer. Inspect Home Assistant; do not automatically retry.`,

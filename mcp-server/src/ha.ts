@@ -1,10 +1,12 @@
 import { v2Answer } from "./schemas.js";
 
-// `code`: the API v2 error code of a refused answer (stale_revision, guard_refused, ...).
+// `code`: the API v2 error code of a refused answer (stale_revision, guard_refused, ...); `data`:
+// what the service answered with it (a preset's `applied` rows, written or not).
 export class SafeError extends Error {
   constructor(
     message: string,
     readonly code?: string,
+    readonly data?: unknown,
   ) {
     super(message);
   }
@@ -212,6 +214,7 @@ export class HaClient {
           ? `${error.code}: ${this.redact(error.message).slice(0, 600)}`
           : `Home Assistant refused ${service}.`,
         error?.code,
+        answer.data.data,
       );
     }
     return answer.data.data;

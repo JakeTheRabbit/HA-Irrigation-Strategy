@@ -15,6 +15,8 @@ npm run build
 npm test
 ```
 
+Any npm-compatible installer (pnpm, bun) works too; do not commit a lockfile it writes, as `package-lock.json` is the one CI installs from.
+
 The MCP host launches `node /absolute/path/to/HA-Irrigation-Strategy/mcp-server/dist/index.js`. Provide these values through the host's process environment:
 
 | Variable                     | Meaning                                                                                                                 |

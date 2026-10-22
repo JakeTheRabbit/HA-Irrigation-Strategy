@@ -349,3 +349,46 @@ test("hardware-moving services are not in the allowlist", async () => {
     await assert.rejects(off.service(service, {}), /Writes are disabled/);
   await assert.rejects(off.service("preset_apply", { preview: true }), /connection failed|timed out/);
 });
+
+test("a refused preset or copy row lists what was already changed and what was not", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, WRITES);
+  ha.presetFault = "refuse";
+  for (const [name, args, service] of [
+    ["preview_preset_apply", { room_id: ROOM, preset_id: "p1", zones: [1] }, "preset_apply"],
+    ["preview_copy_config", { room_id: ROOM, from: { room_id: "room:", zone: 1 }, sections: ["targets"] }, "copy_config"],
+  ]) {
+    const p = data(await call(client, name, args));
+    const result = await apply(client, p);
+    error(result, /guard_refused/);
+    const text = result.content[0].text;
+    if (service === "preset_apply") {
+      // One row, refused: nothing changed.
+      assert.match(text, /Changed: nothing/);
+      assert.match(text, /Not changed: room:room_b_ zone 1 p1_target_vwc 58 -> 65 \(refused: out of bounds\)/);
+    } else {
+      // Two rows: p1_target_vwc written, p2_shot_size refused.
+      assert.match(text, /Changed: room:room_b_ p1_target_vwc 60 -> 66\./);
+      assert.match(text, /Not changed: room:room_b_ p2_shot_size 2 -> 3 \(refused: out of bounds\)/);
+      assert.equal(ha.numbers[ROOM].p1_target_vwc, 66);
+    }
+  }
+});
+
+test("preview_timer_program refuses a list answer that carries another room's program", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha, WRITES);
+  ha.v2.timer_program_list = () => ({
+    programs: [{ ...ha.timers.programs[0], room_id: "room:" }],
+    revision: 3,
+    error: null,
+  });
+  error(
+    await call(client, "preview_timer_program", {
+      room_id: ROOM,
+      program: { id: "t1", name: "Morning", type: "simple", zones: [1], duration_s: 90, frequency_per_day: 2 },
+    }),
+    /Unsupported Crop Steering timer_program_list answer/,
+  );
+  assert.equal(serviceCalls(ha, "timer_program_preview").length, 0);
+});

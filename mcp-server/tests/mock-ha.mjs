@@ -243,7 +243,8 @@ export async function mockHa(t) {
   const where = (target) =>
     target.room_id + (target.zone ? "/" + target.zone : "");
   // presets.apply: {diff, missing, applied?}. `presetFault`: "sticky" = a write that does not
-  // take; "timer" = once written, a (re-)preview names a refused timer row in `missing`.
+  // take; "timer" = once written, a (re-)preview names a refused timer row in `missing`;
+  // "refuse" = the last row is refused (site_api._rows_refused: ok:false guard_refused, data kept).
   const writeValues = (wanted, to, preview) => {
     const out = { diff: [], missing: [] };
     for (const target of to) {
@@ -263,7 +264,10 @@ export async function mockHa(t) {
     if (preview) return out;
     state.writes++;
     const sticky = state.presetFault === "sticky";
+    const refused = state.presetFault === "refuse" ? out.diff.at(-1) : null;
     out.applied = out.diff.map((row) => {
+      if (row === refused)
+        return { target: row.target, key: row.key, readback: "refused", error: "out of bounds" };
       if (!sticky) numbers[where(row.target)][row.key] = row.new;
       return {
         target: row.target,
@@ -272,6 +276,11 @@ export async function mockHa(t) {
         error: null,
       };
     });
+    if (refused)
+      throw Object.assign(
+        refusal("guard_refused", `Not applied: ${refused.key}: out of bounds`),
+        { data: out },
+      );
     return out;
   };
   // The services that answer the API v2 envelope (api_v2.wrap): service -> request -> data.
@@ -503,7 +512,8 @@ export async function mockHa(t) {
           if (body?.api !== 2)
             return json({ message: "This mock answers only api 2" }, 400);
           let refused = state.refuse[action],
-            answer;
+            answer,
+            kept;
           try {
             if (!refused) answer = v2[action](body);
           } catch (error) {
@@ -512,9 +522,10 @@ export async function mockHa(t) {
             refused = { code, message };
             if (current_revision !== undefined)
               refused.current_revision = current_revision;
+            kept = error.data;
           }
           result = refused
-            ? { api: 2, ok: false, error: refused }
+            ? { api: 2, ok: false, error: refused, ...(kept ? { data: kept } : {}) }
             : {
                 api: 2,
                 ok: true,
