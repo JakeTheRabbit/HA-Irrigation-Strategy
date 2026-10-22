@@ -902,3 +902,19 @@ def test_a_valve_reporting_opening_is_waited_for_then_counted_if_it_never_reads_
     else:
         assert [code for code, _msg in alerts] == ["CS-304"]
         assert room.state[1]["daily_vol"] == pytest.approx(0.05 * open_s)
+
+
+@pytest.mark.usefixtures("no_blind_grace")
+def test_blind_fallback_does_not_water_at_night(rig):
+    """CTL-001: a dead probe with no healthy sibling must not get the timer shot with the lights off."""
+    c, fake, _clock = rig
+    room = c.rooms[0]
+    now = datetime(2026, 9, 7, 23, 30)  # lights 10-22: off
+    room._was_lights_on = False
+    for st in room.state.values():
+        st.update(phase="P3", last_shot=now - timedelta(hours=2), daily_vol=0.0,
+                  last_phase_change=now - timedelta(hours=1))
+    pub = c._loop_room(room, now)
+    assert pub[1]["fire"] is False and pub[2]["fire"] is False
+    assert not any(dom == "switch" and svc == "turn_on" for dom, svc, _data in fake.calls)
+    assert room.state[1]["daily_vol"] == 0.0 and room.state[2]["daily_vol"] == 0.0
