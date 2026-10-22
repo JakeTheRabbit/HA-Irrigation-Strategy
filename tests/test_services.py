@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import asyncio
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 
 import pytest
 
@@ -130,9 +130,8 @@ def test_apply_recipe_named_room_leaves_the_other_room_untouched():
     asyncio.run(_handlers(hass)["apply_recipe"](Call(stage="Bulk", room="veg")))
     m["veg-entry"].async_apply.assert_awaited_once_with("Bulk")
     m["default-entry"].async_apply.assert_not_awaited()
-    assert [c[2]["entity_id"] for c in hass.services.calls] == [
-        f"select.{DOMAIN}_veg_recipe_stage"
-    ]
+    # The stage is applied once, by the service itself: no second pass through the select.
+    assert hass.services.calls == []
 
 
 def test_save_recipe_named_room_leaves_the_other_room_untouched():
@@ -178,3 +177,46 @@ def test_recipe_service_unknown_room_is_refused():
 def test_recipe_schemas_take_a_room():
     for schema in (services.APPLY_RECIPE_SCHEMA, services.SAVE_RECIPE_SCHEMA):
         assert "room" in {k.key for k in schema}
+
+
+def test_apply_recipe_syncs_the_select_without_applying_again():
+    hass, m = _recipe_rooms(_veg_entry())
+    select = SimpleNamespace(sync_stage=Mock())
+    hass.data[DOMAIN]["_recipe_selects"] = {"veg-entry": select}
+    asyncio.run(_handlers(hass)["apply_recipe"](Call(stage="Bulk")))
+    m["veg-entry"].async_apply.assert_awaited_once_with("Bulk")
+    select.sync_stage.assert_called_once_with()
+    assert hass.services.calls == []
+
+
+@pytest.mark.parametrize(
+    "service,data,issue",
+    [
+        ("apply_recipe", {"stage": "Bulk"}, "deprecated_apply_recipe"),
+        ("save_recipe", {"recipe": {"stages": {}}}, "deprecated_save_recipe"),
+    ],
+)
+def test_a_deprecated_recipe_service_still_works_and_raises_one_repair(
+    service, data, issue, caplog
+):
+    hass, m = _recipe_rooms(_veg_entry())
+    h = _handlers(hass)
+    with caplog.at_level("WARNING"):
+        asyncio.run(h[service](Call(**data)))
+        first = dict(hass._issues)
+        asyncio.run(h[service](Call(**data)))
+    mgr = m["veg-entry"]
+    done = mgr.async_apply if service == "apply_recipe" else mgr.async_save
+    assert done.await_count == 2  # still does its job
+    assert list(first) == [issue]
+    assert first[issue]["severity"] == "warning"
+    assert first[issue]["translation_key"] == "deprecated_feature"
+    assert list(hass._issues) == [issue]  # raised once, not per call
+    assert sum("is deprecated" in r.getMessage() for r in caplog.records) == 2
+
+
+def test_the_deprecation_repair_is_raised_even_when_the_call_is_refused():
+    hass = ha_stubs.FakeHass()  # no recipe store
+    with pytest.raises(HomeAssistantError):
+        asyncio.run(_handlers(hass)["apply_recipe"](Call(stage="Bulk")))
+    assert "deprecated_apply_recipe" in hass._issues

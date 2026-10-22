@@ -21,6 +21,7 @@ from .const import (
     SERVICE_APPLY_RECIPE,
     SERVICE_SAVE_RECIPE,
 )
+from .deprecations import note_deprecated
 from .room import room_prefix
 
 _LOGGER = logging.getLogger(__name__)
@@ -186,6 +187,12 @@ async def async_setup_services(hass: HomeAssistant) -> None:
 
     async def async_apply_recipe(call: ServiceCall) -> None:
         """Apply a recipe stage's setpoints to the zone numbers of one room."""
+        note_deprecated(
+            hass,
+            "apply_recipe",
+            "The crop_steering.apply_recipe service",
+            "Set the targets of the room in the dashboard, or use a grow plan.",
+        )
         stage = call.data.get("stage")
         mgr = _recipe_manager(call, "apply_recipe", "no setpoints were applied")
         applied = await mgr.async_apply(stage)
@@ -194,22 +201,22 @@ async def async_setup_services(hass: HomeAssistant) -> None:
             stage or mgr.active_stage,
             applied,
         )
-        # Keep the recipe_stage select in sync with what was applied.
-        try:
-            await hass.services.async_call(
-                "select",
-                "select_option",
-                {
-                    "entity_id": f"select.{DOMAIN}_{room_prefix(mgr.entry)}recipe_stage",
-                    "option": mgr.active_stage,
-                },
-                blocking=False,
-            )
-        except Exception:  # pragma: no cover - the select may not exist yet
-            pass
+        # Show the applied stage on the recipe_stage select. The select is told directly: going
+        # through select.select_option would apply the same stage a second time.
+        select = (
+            hass.data.get(DOMAIN, {}).get("_recipe_selects", {}).get(mgr.entry.entry_id)
+        )
+        if select is not None:
+            select.sync_stage()
 
     async def async_save_recipe(call: ServiceCall) -> None:
-        """Replace the recipe table (dashboard authoring) of one room."""
+        """Replace the recipe table of one room."""
+        note_deprecated(
+            hass,
+            "save_recipe",
+            "The crop_steering.save_recipe service",
+            "Set the targets of the room in the dashboard, or use a grow plan.",
+        )
         recipe = call.data["recipe"]
         mgr = _recipe_manager(call, "save_recipe", "recipe was not saved")
         await mgr.async_save(recipe)

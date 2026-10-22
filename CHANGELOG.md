@@ -9,6 +9,24 @@ notes**, the entity- and code-level detail for developers and AI agents working 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+**Deprecation: the named-stage recipe system and the Irrigation phase select.** Nothing is removed in this change; planned removal: **4.0.0**. Merge after #205 (`apply_recipe` and `save_recipe` take a room).
+
+### 🌱 In plain English
+
+- **Three things you probably never use are now marked as going away.** They are the Recipe stage and Irrigation phase selects, and the `apply_recipe` and `save_recipe` services. Nothing in the dashboard or the controller uses them. They still work. The first time one is used after Home Assistant starts, a notice appears in Repairs that says what to use instead: set the targets in the dashboard, use a grow plan, or move one zone with its own Set phase select. If an automation of yours calls them, change it before 4.0.0.
+- **Applying a recipe stage no longer does the work twice.** The service wrote every setpoint, and then its own change to the Recipe stage select wrote every setpoint again.
+- **The dashboard shows the same EC targets the controller uses.** For a zone with no steering mode of its own, the dashboard used the room's Steering mode, while the controller uses the room's Growth stage. A room could show vegetative targets while the controller steered generative. The dashboard now follows the controller.
+- **Wrong help text fixed.** The help no longer says the Recipe stage select is used from the Plan page, that the controller writes the Irrigation phase select, or that the dashboard calls `save_recipe`.
+
+### 🔧 Technical notes
+
+- New `deprecations.py` (`note_deprecated`): a log warning on every use and one Repairs issue (`deprecated_<key>`, translation key `deprecated_feature`, warning, not fixable, new code CS-612) per Home Assistant run. Called by `apply_recipe`, `save_recipe` and by choosing a value in `select.recipe_stage` or `select.irrigation_phase`. New issue text in `strings.json` and `translations/en.json`; `services.yaml`, `docs/ENTITIES.md`, `features.json` and `ste-copy.ts` say deprecated.
+- INT-003: `apply_recipe` no longer calls `select.select_option`. The recipe select registers itself in `hass.data[DOMAIN]["_recipe_selects"]` and the service calls its `sync_stage()`, which only sets the shown option.
+- INT-014: `buildRoom` picks the EC target family as the controller's `_veg()` does: `zone_N_steering_mode`, else `growth_stage`, else Generative. The room `steering_mode` select stays (the EC ratio sensor uses it). Dashboard bundles rebuilt.
+- No change to the controller, entity ids, the `crop_steering_recipes_<entry>` store, add-on options or `/data/state.json`; a stored recipe from an older install loads as before (`tests_ha/test_recipe_deprecated.py`).
+
 ## [3.17.0] - 2026-10-21
 
 Pair: **controller 3.17.0**. **C1: dashboard navigation.** Controller, engine, integration runtime, entities, options and persisted state are unchanged. The dashboard bundle was hot-deployed to the owner's Work HA add-on before release, at the owner's request; no photoperiod soak is claimed.
