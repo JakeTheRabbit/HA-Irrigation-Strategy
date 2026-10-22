@@ -487,6 +487,9 @@ try {
     // assistant's card follow.
     const bottom = await rows.last().evaluate((el) => el.getBoundingClientRect().bottom + scrollY);
     assert.ok(bottom <= 900 * 1.35, `the zone rows end ${bottom}px down a 900px window`);
+    // The whole page: measured 1357px at 1440 x 900 with the demo, plus 10%.
+    const whole = await page.evaluate(() => document.documentElement.scrollHeight);
+    assert.ok(whole <= 1357 * 1.1, `Today is ${whole}px tall in a 900px window`);
     // The room: state, stage and plants; the grow day and its stage's end; water, lights, climate.
     assert.match(
       await page.locator("[data-today-sub]").innerText(),
@@ -545,9 +548,9 @@ try {
     await page.locator("[data-plan-feed]").waitFor();
     const height = await page.evaluate(() => document.documentElement.scrollHeight);
     // The bottom section bar is fixed chrome; the page pads itself clear of it. Each zone row
-    // carries its sensors in place, so the page is three phone screens at most.
+    // carries its sensors in place, so the page is 2.85 phone screens at most (measured 2317px).
     const bar = await page.evaluate(() => document.querySelector(".bottom-nav")?.getBoundingClientRect().height ?? 0);
-    assert.ok(height - bar <= 3 * 844, `Today is ${height}px tall on a 844px phone`);
+    assert.ok(height - bar <= 2.85 * 844, `Today is ${height}px tall on a 844px phone`);
     // Each zone row fits a screen, one column wide.
     const rows = await page.locator("article.today-zone").evaluateAll((all) =>
       all.map((row) => row.getBoundingClientRect()),

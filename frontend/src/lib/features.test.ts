@@ -163,8 +163,12 @@ describe("restored settings outside entity controls", () => {
   it("finds each room display preference through the Display settings link", () => {
     const options = RESTORED_MANIFEST.filter((row) => row.entity.includes("display (attribute "));
     expect(options).toHaveLength(11);
-    for (const option of options)
+    // "Zones as" (today_zone_layout) stays stored but is not offered: the room page has no table.
+    const offered = options.filter((row) => !row.entity.includes("(attribute today_zone_layout)"));
+    expect(offered).toHaveLength(10);
+    for (const option of offered)
       expect(PLACEMENTS.find((row) => row.entity === option.entity)?.page).toBe("settings");
+    expect(PLACEMENTS.some((row) => row.id === "LF-138" || row.entity.includes("today_zone_layout"))).toBe(false);
   });
   it("keeps setup and overlays discoverable without making them entity writes", () => {
     expect(placementsFor("all", "camera").map((row) => row.location)).toContain(

@@ -248,6 +248,8 @@ const PLACEMENT_PAGES: Record<string, { group: string; page: Page; location: str
 export const PLACEMENTS: Placement[] = restored.flatMap((row) => {
   // Entity controls are in the main registry. App options already have their own section below it.
   if (/^(switch|number|select)\.crop_steering_/.test(row.entity) || row.scope === "app") return [];
+  // "Zones as" stays stored, but the room page has no zone table to lay out: nothing to link to.
+  if (row.entity.includes("(attribute today_zone_layout)")) return [];
   const target = row.entity.includes("display (attribute ")
     ? { group: "display", page: "settings" as Page, location: "Settings > Display" }
     : PLACEMENT_PAGES[row.id];
