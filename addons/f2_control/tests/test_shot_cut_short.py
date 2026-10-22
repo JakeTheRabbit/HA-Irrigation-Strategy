@@ -169,7 +169,8 @@ def test_a_valve_switched_off_by_something_else_counts_only_the_time_it_was_open
     c._execute_shot(c.rooms[0], 1, 120, 5, flow_lps=FLOW)
 
     room, st = c.rooms[0], c.rooms[0].state[1]
-    counted = 30.4 if stamped else 32  # else the first check after it (every 2 s: 30, then 32)
+    # else the first check after it (every 2 s from the valve's ON read-back at 1 s: 29, then 31)
+    counted = 30.4 if stamped else 31
     assert st["daily_vol"] == pytest.approx(FLOW * counted, rel=1e-3) and st["shots"] == 1
     assert offs(fake) == [MAIN, PUMP]  # the shot's main line and pump; its valve is not switched again
     assert room.hardware_fault is None and room.shot_inflight is None
@@ -192,11 +193,11 @@ def test_a_hold_that_comes_on_mid_shot_closes_valve_and_main_line_and_leaves_the
     assert offs(fake) == [VALVE, MAIN]  # the shot's own, valve first
     assert fake.states[PUMP][0] == "on"  # the dose's now: never switched off, never read back
     assert room.hardware_fault is None and room.shot_inflight is None
-    # Still open when the hold was seen at the 12 s check: its change time is when it opened, not a close.
-    assert st["daily_vol"] == pytest.approx(FLOW * 12) and st["shots"] == 1
+    # Still open when the hold was seen at the 11 s check: its change time is when it opened, not a close.
+    assert st["daily_vol"] == pytest.approx(FLOW * 11) and st["shots"] == 1
     alerts = notifications(fake)
     assert [n["title"] for n in alerts] == [CUT]
-    assert HOLD in alerts[0]["message"] and "after 12 s of 170 s" in alerts[0]["message"]
+    assert HOLD in alerts[0]["message"] and "after 11 s of 170 s" in alerts[0]["message"]
     assert f"left {PUMP} on" in alerts[0]["message"]
 
 
@@ -251,7 +252,7 @@ def test_the_kill_switch_still_wins_and_closes_as_before(rig, monkeypatch, valve
 
     room, st = c.rooms[0], c.rooms[0].state[1]
     assert offs(fake) == [VALVE, MAIN, PUMP]  # the shot's valve, main line and pump, as always
-    assert st["daily_vol"] == pytest.approx(FLOW * 22) and st["shots"] == 1  # to the check that saw it
+    assert st["daily_vol"] == pytest.approx(FLOW * 21) and st["shots"] == 1  # to the check that saw it
     assert [n["title"] for n in notifications(fake)] == ["Zone 1: shot stopped early (CS-305)"]
     assert room.hardware_fault is None and room.shot_inflight is None
 

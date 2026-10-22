@@ -5602,45 +5602,61 @@ class Controller:
         valve_started = None
         counted = False
         stopping = False
+
+        def switch_on(ent, what, lead_s=0.0):
+            """Switch `ent` on and read it back ON, then let what is left of `lead_s` from its ack run out
+            -> None, or why not in the words of its alert. A relay that takes the command and stays off
+            must not be counted as a shot. The read-back runs inside the lead time, so a switch that
+            reports promptly costs a normal shot nothing."""
+            if not hw_call(ent, True):
+                return f"Home Assistant returned an error when the controller tried to {what}."
+            acked = time.monotonic()
+            if not self._confirm_switches((ent,), "on"):
+                return (f"Home Assistant took the command to {what}, but it did not read on within "
+                        f"{CONFIRM_FIRST_READ_S + CONFIRM_TIMEOUT_S:g} s.")
+            time.sleep(max(0.0, lead_s - (time.monotonic() - acked)))
+            return None
+
         try:
             # OPEN sequence — FAIL CLOSED: if any service call errors, cut what's on, alert, and DO NOT count the shot
             # (otherwise daily_vol / last_shot lie after an auth/entity/service failure and a zone silently starves).
             # Pump and mainline are optional (a one-switch tent has neither): each is sequenced when
             # mapped and skipped, with its lead time, when not. The valve is always required.
-            if pump and not hw_call(pump, True):
+            why = pump and switch_on(pump, "start the pump", prime)
+            if why:
                 hw_call(pump, False)  # it may be on all the same: off before the alert
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "CS-302",
                     "shot cancelled, the pump did not start",
-                    "Home Assistant returned an error when the controller tried to start the pump. No water "
+                    f"{why} No water "
                     f"went to the zone, and the controller did not count the shot. {_CANCELLED_SHOT_CLEANUP}"
                     f"\n\nPump: {pump}",
                     room=room,
                     zone=zone,
                 )
                 return
-            if pump:
-                time.sleep(prime)
-            if mainline and not hw_call(mainline, True):
+            why = mainline and switch_on(mainline, "open the main-line valve", lead)
+            if why:
+                hw_call(mainline, False)  # it may open all the same
                 if pump:
                     hw_call(pump, False)
                 self._alert(
                     f"hw_{room.slug}_z{zone}",
                     "CS-303",
                     "shot cancelled, the main-line valve did not open",
-                    "Home Assistant returned an error when the controller tried to open the main-line valve. "
+                    f"{why} "
                     f"No water went to the zone, and the controller did not count the shot. {_CANCELLED_SHOT_CLEANUP}"
                     f"\n\nMain-line valve: {mainline}",
                     room=room,
                     zone=zone,
                 )
                 return
-            if mainline:
-                time.sleep(lead)
             valve_started = time.monotonic()
             valve_opened = datetime.now(timezone.utc)  # on Home Assistant's clock too: see _close_cut_short
-            if not hw_call(valve, True):
+            why = switch_on(valve, "open the valve of this zone")
+            if why:
+                hw_call(valve, False)  # it may open all the same
                 for upstream in (mainline, pump):
                     if upstream:
                         hw_call(upstream, False)
@@ -5648,7 +5664,7 @@ class Controller:
                     f"hw_{room.slug}_z{zone}",
                     "CS-304",
                     "shot cancelled, the zone valve did not open",
-                    "Home Assistant returned an error when the controller tried to open the valve of this zone. "
+                    f"{why} "
                     f"No water went to the zone, and the controller did not count the shot. {_CANCELLED_SHOT_CLEANUP}"
                     f"\n\nValve: {valve}",
                     room=room,

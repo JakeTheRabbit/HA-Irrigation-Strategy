@@ -224,8 +224,9 @@ def test_a_403_mid_shot_closes_the_shot_parks_and_carries_on_once_accepted(rig, 
 
 def test_a_403_that_clears_before_the_close_reopens_at_once(rig):
     c, fake, session, clock = rig()
-    refuse_from(session, 20, 403, until=21)
+    refuse_from(session, 20, 403, until=21, only=lambda method, _path: method == "GET")  # a read, not the close
     shot(c, clock)
+    assert session.refused()
     assert controller._GATE.state is None
     assert c.rooms[0].shot_inflight is None and fake.states[VALVE][0] == "off"
     assert switched(fake)[-3:] == [("turn_off", VALVE), ("turn_off", MAIN), ("turn_off", PUMP)]

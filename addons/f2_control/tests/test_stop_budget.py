@@ -326,7 +326,7 @@ def test_the_normal_close_after_a_shot_waits_as_it_always_did(rig, monkeypatch):
 
     monkeypatch.setattr(controller.Controller, "_confirm_switches", staticmethod(confirm))
     c._execute_shot(rooms["default"], 1, 10, 5, flow_lps=0.05)
-    assert seen == [None]
+    assert seen == [None] * 4  # the pump's, main line's and valve's ON read-backs, then the close
 
 
 APP = {"F2_RUNTIME": "addon", "SUPERVISOR_TOKEN": "t"}  # what the Supervisor gives the app

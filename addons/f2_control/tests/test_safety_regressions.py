@@ -111,7 +111,7 @@ def test_accounting_does_not_hide_request_overrun(rig, monkeypatch):
 
     monkeypatch.setattr(controller, "ha_get", late_read)
     c._execute_shot(c.rooms[0], 1, 6, 6)
-    assert c.rooms[0].state[1]["daily_vol"] == pytest.approx(.5)
+    assert c.rooms[0].state[1]["daily_vol"] == pytest.approx(.55)  # 11 s: the valve's 1 s ON read-back too
 
 
 @pytest.mark.usefixtures("no_blind_grace")
@@ -471,7 +471,7 @@ def test_capped_shot_partial_abort_uses_configured_flow(rig, monkeypatch):
     monkeypatch.setattr(c, "_wait_shot", abort_after_ten)
     c._act_zone(room, 1, None, None, (True, 2, "partial accounting"),
                 None, True, datetime.now())
-    assert room.state[1]["daily_vol"] == pytest.approx(42 * 4 / 3600 * 10)
+    assert room.state[1]["daily_vol"] == pytest.approx(42 * 4 / 3600 * 11)  # and the valve's 1 s ON read-back
     assert room.state[1]["shots"] == 1
 
 
@@ -517,3 +517,53 @@ def test_a_second_hardware_hold_is_announced_after_the_first_is_cleared(rig):
     fake.set_state("input_boolean.kill", "on")
     c._latch_hardware_fault(room, "zone 2 valve/pump/mainline close not confirmed")
     assert len(cards()) == 2 and "zone 2" in cards()[-1]["message"]
+
+
+@pytest.mark.parametrize("stuck, code", [("switch.p", "CS-302"), ("switch.m", "CS-303"), ("switch.v1", "CS-304")])
+def test_a_switch_that_takes_its_turn_on_but_never_reads_on_cancels_the_shot_uncounted(rig, monkeypatch, stuck, code):
+    """CTL-002: a dead relay or an offline plug that still acks takes the turn_on and stays OFF. The shot is
+    cancelled before any water is counted, its alert raised, and everything set back to off."""
+    c, fake, _clock = rig
+    room = c.rooms[0]
+    steps, codes = [], []
+
+    def call(domain, service, **data):
+        steps.append((service, data.get("entity_id")))
+        if (service, data.get("entity_id")) == ("turn_on", stuck):
+            fake.calls.append((domain, service, data))
+            return True  # accepted, never switches
+        return fake.ha_call(domain, service, **data)
+
+    alert = c._alert
+    monkeypatch.setattr(controller, "ha_call", call)
+    monkeypatch.setattr(c, "_alert", lambda key, cs, *a, **k: (codes.append(cs), alert(key, cs, *a, **k))[1])
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    assert room.state[1]["daily_vol"] == 0
+    assert room.state[1]["shots"] == 0
+    assert code in codes
+    assert all(fake.states[e][0] == "off" for e in ("switch.p", "switch.m", "switch.v1"))
+    assert room.shot_inflight is None
+    assert c._hardware_fault_block(room) is None
+    downstream = {"switch.p": ("switch.m", "switch.v1"), "switch.m": ("switch.v1",), "switch.v1": ()}[stuck]
+    assert not any(("turn_on", e) in steps for e in downstream)
+
+
+def test_switches_that_read_on_add_no_time_before_the_valve_opens(rig, monkeypatch):
+    """CTL-002: the ON read-back runs inside the pump's prime and the main line's lead, so a normal shot opens
+    its valve when it always did and is counted as before."""
+    c, fake, clock = rig
+    room = c.rooms[0]
+    opened = {}
+
+    def call(domain, service, **data):
+        if service == "turn_on":
+            opened[data.get("entity_id")] = clock.seconds
+        return fake.ha_call(domain, service, **data)
+
+    monkeypatch.setattr(controller, "ha_call", call)
+    c._execute_shot(room, 1, 60, 5, flow_lps=0.05)
+    assert opened["switch.v1"] - opened["switch.p"] == pytest.approx(
+        controller.FALLBACK["pump_prime_time"] + controller.FALLBACK["main_line_lead_time"])
+    assert room.state[1]["daily_vol"] == pytest.approx(3.0)
+    assert room.state[1]["shots"] == 1
+    assert room.shot_inflight is None
