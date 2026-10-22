@@ -483,6 +483,25 @@ describe("fix round 1: a copy never claims more than it did", () => {
     expect(html).not.toContain("Controller confirmed every value</small>");
   });
 
+  test("an extra row the controller did not read back is named too, and the receipt claims nothing", () => {
+    const r = copyReceipt(
+      ok({
+        diff: DIFF,
+        missing: [],
+        applied: [...verified, { target: F1, key: "maximum_ec", readback: "refused", error: "x" }],
+      }),
+      rows,
+      WORDS,
+      AT,
+    ) as ApplyReceipt;
+    expect(r.ok).toBe(false);
+    expect(r.unconfirmed).toBe(true);
+    expect(r.alsoWritten).toEqual(["maximum_ec (not read back)"]);
+    const html = view(r);
+    expect(html).toContain("Also written: maximum_ec (not read back).");
+    expect(html).not.toContain("Written and read back");
+  });
+
   test("an apply that wrote a row the preview did not show names it and claims nothing", () => {
     const r = copyReceipt(
       ok({

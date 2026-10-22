@@ -164,13 +164,11 @@ export function copyReceipt(
     status = "unverified";
   const notCopied = notCopiedLines(missing, words, data.skipped ?? []);
   const left = notCopied.length ? { notCopied } : {};
-  // A write the reviewed rows did not show (the source changed since the preview): name it and
-  // claim nothing.
+  // A write the reviewed rows did not show (the source changed since the preview), read back or
+  // not: name each one and claim nothing.
   const many = new Set(applied.map((a) => a.target)).size > 1;
   const extra = applied.filter(
-    (a) =>
-      a.readback === "verified" &&
-      !rows.some((row) => row.key === a.key && row.target === a.target),
+    (a) => !rows.some((row) => row.key === a.key && row.target === a.target),
   );
   if (extra.length)
     return {
@@ -178,10 +176,11 @@ export function copyReceipt(
       ok: false,
       unconfirmed: true,
       failed: rows.map((row) => ({ id: row.id, holds: row.before, label: row.label })),
-      alsoWritten: extra.map((a) =>
-        many
-          ? `${words.target(parseTarget(a.target))} · ${words.label(a.key)}`
-          : words.label(a.key),
+      alsoWritten: extra.map(
+        (a) =>
+          (many
+            ? `${words.target(parseTarget(a.target))} · ${words.label(a.key)}`
+            : words.label(a.key)) + (a.readback === "verified" ? "" : " (not read back)"),
       ),
       summary: "",
       eventIds,
