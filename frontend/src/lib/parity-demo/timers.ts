@@ -56,32 +56,59 @@ const finite = (value: unknown, what: string) => {
   return v;
 };
 
-/** timers.validate, with the room's zones checked as timers_api does. */
+/** Python's int(): a number truncated toward zero, a string of digits, a bool as 0/1; else throws. */
+function pyInt(value: unknown, what: string): number {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (typeof value === "number" && Number.isFinite(value)) return Math.trunc(value);
+  if (typeof value === "string" && /^s*[+-]?d+s*$/.test(value)) return Number(value);
+  throw new Error(what);
+}
+/** Python truthiness, for `p.get("window") or {...}`. */
+const falsy = (v: unknown) =>
+  v === null || v === undefined || v === false || v === 0 || v === "" || (Array.isArray(v) && !v.length) ||
+  (typeof v === "object" && !Array.isArray(v) && !Object.keys(v as object).length);
+/** A window's start and length in minutes from midnight (timers._window). */
+function span(w: TimerProgram["window"], lights: [number, number]): [number, number] {
+  const [on, off] = lights;
+  if (w.kind === "all") return [0, 1440];
+  const [a, b] = w.kind === "lights_on" ? [on * 60, off * 60] : w.kind === "lights_off" ? [off * 60, on * 60] : [hhmm(w.from), hhmm(w.to)];
+  return [a, (((b - a) % 1440) + 1440) % 1440 || 1440];
+}
+
+/** timers.validate with the room's lights (as timers_api checks a program), the room's zones too. */
 function validate(raw: Record<string, unknown>, room: string): Stored {
   const p = { ...raw } as Record<string, unknown>;
   if (!["one_off", "recycle", "simple"].includes(String(p.type))) throw new Error("type must be one of one_off, recycle, simple");
-  const zones = [...new Set(((p.zones as unknown[]) ?? []).map(Number))];
-  if (zones.some((z) => !Number.isInteger(z))) throw new Error("zones must be integers");
+  const rawZones = falsy(p.zones) ? [] : p.zones;
+  if (!Array.isArray(rawZones)) throw new Error("zones must be integers");
+  const zones = [...new Set(rawZones.map((z) => pyInt(z, "zones must be integers")))];
   if (!zones.length) throw new Error("pick at least one zone");
   const duration = finite(p.duration_s, "duration must be a number of seconds");
   if (duration <= 0) throw new Error("duration must be greater than 0");
-  const active = p.active ?? true;
+  const active = "active" in p ? p.active : true;
   if (typeof active !== "boolean") throw new Error("active must be true or false");
-  const window = (p.window ?? { kind: "all" }) as TimerProgram["window"];
+  const given = falsy(p.window) ? { kind: "all" } : p.window;
+  if (typeof given !== "object" || Array.isArray(given)) throw new Error('window must be an object such as {"kind": "all"}');
+  const window = { ...given } as TimerProgram["window"];
   if (!["all", "lights_on", "lights_off", "custom"].includes(window.kind))
     throw new Error("window kind must be one of all, lights_on, lights_off, custom");
   if (window.kind === "custom" && hhmm(window.from) === hhmm(window.to)) throw new Error("End must be after start");
+  const sync = p.sync_time === null || p.sync_time === undefined ? null : String(p.sync_time);
+  if (sync !== null) hhmm(p.sync_time);
   const out: Stored = {
     id: String(p.id ?? ""), room_id: room, name: String(p.name ?? "").trim() || "Timer", zones,
     type: p.type as TimerProgram["type"], duration_s: duration, active, window,
-    interval_min: null, frequency_per_day: null, start_at: null, sync_time: null,
+    interval_min: null, frequency_per_day: null, start_at: null, sync_time: sync,
   };
   if (out.type === "recycle") {
     out.interval_min = finite(p.interval_min, "interval must be a number of minutes");
     if (out.interval_min < 1) throw new Error("interval must be at least 1 minute");
+    if (sync !== null) {
+      const [from, length] = span(window, LIGHTS[room] ?? [12, 0]);
+      if ((((hhmm(sync) - from) % 1440) + 1440) % 1440 >= length) throw new Error("sync time must be inside the window");
+    }
   } else if (out.type === "simple") {
-    const n = Number(p.frequency_per_day);
-    if (!Number.isInteger(n)) throw new Error("frequency must be a whole number per day");
+    const n = pyInt(p.frequency_per_day, "frequency must be a whole number per day");
     if (n < 1) throw new Error("frequency must be at least 1 per day");
     out.frequency_per_day = n;
   } else {
@@ -101,13 +128,12 @@ function project(p: Stored, room: string, start: number, end: number) {
   };
   if (p.type === "one_off") emit(Date.parse(String(p.start_at)));
   else {
-    const [on, off] = LIGHTS[room] ?? [12, 0];
-    const kind = p.window.kind;
-    const [a, b] =
-      kind === "all" ? [0, 1440] : kind === "lights_on" ? [on * 60, off * 60] : kind === "lights_off" ? [off * 60, on * 60] : [hhmm(p.window.from), hhmm(p.window.to)];
-    const length = kind === "all" ? 1440 : (((b - a) % 1440) + 1440) % 1440 || 1440;
+    const [a, length] = span(p.window, LIGHTS[room] ?? [12, 0]);
     const offsets: number[] = [];
-    if (p.type === "recycle") for (let t = 0; t < length; t += p.interval_min!) offsets.push(t);
+    // A sync time starts the shots there; one the lights moved out of the window starts the window.
+    let first = p.type === "recycle" && p.sync_time ? (((hhmm(p.sync_time) - a) % 1440) + 1440) % 1440 : 0;
+    if (first >= length) first = 0;
+    if (p.type === "recycle") for (let t = first; t < length; t += p.interval_min!) offsets.push(t);
     else for (let i = 0; i < p.frequency_per_day!; i++) offsets.push((i * length) / p.frequency_per_day!);
     const day = new Date(start);
     day.setHours(0, 0, 0, 0);

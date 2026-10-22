@@ -7,7 +7,8 @@
  * Interactions asserted, at 1440 and 390:
  * - 3.18: the program cards ("On · next shot today 14:30", "Draft · not running");
  * - 3.18: the Amount sentence: on a phone its choices are native selects;
- * - 3.18: Every 45 → 30 min changes the Next 24 hours count, and the daily limit names its stop;
+ * - 3.18: Every 45 → 30 min changes the Next 24 hours count, and the daily limit names today's stop
+ *   (counted from lights-on, from the water zone 3 already had today);
  * - 3.18: the edit goes through Review & apply: "Written and read back HH:MM", the card reads the new
  *   interval and the button "Saved"; its Undo writes the previous program back;
  * - 3.18: a custom window ending at its start shows "End must be after start" beside it and the
@@ -86,8 +87,14 @@ await runParity({
     }
     region("amount sentence");
     await page.waitForFunction(() => /^24 shots/.test(document.querySelector("[data-timer-summary]")?.textContent ?? ""));
-    assert.match(await summary.innerText(), /^24 shots · 24 min · about 1\.6 L per plant\. Stops after shot 16: daily limit 1\.11 L per plant\./, `${label}: count changed, daily limit`);
-    assert.ok(await main.locator('.tm-preview .st-block[data-glyph="failed"]').count() >= 1, `${label}: blocked shots drawn`);
+    // Today's grow-day began at 10:00 and zone 3 already had 7.1 L (0.20 L a plant of 36): 13 of
+    // today's 15 shots fit under 40 L; tomorrow's lights-on starts the count again.
+    assert.equal(
+      await summary.innerText(),
+      "24 shots · 24 min · about 1.6 L per plant. Stops after shot 13 today: daily limit 1.11 L per plant, 0.20 L used already. First today 14:30.",
+      `${label}: count changed, daily limit`,
+    );
+    assert.equal(await main.locator('.tm-preview .st-block[data-glyph="failed"]').count(), 2, `${label}: today's last 2 shots blocked`);
     assert.match(await main.locator(".tm-kicker").innerText(), /Unsaved edits/i);
     region("preview count");
 

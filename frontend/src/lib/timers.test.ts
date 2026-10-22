@@ -13,7 +13,10 @@ import {
   nextShotWords,
   programRows,
   readBackReceipt,
+  previewRows,
+  dailyUse,
   restoreDeleted,
+  restoredWords,
   sharedZoneError,
   timerTitle,
   timerTokens,
@@ -73,25 +76,68 @@ describe("consequence", () => {
   const shots = (n: number, zone = 1) =>
     Array.from({ length: n }, (_, i) => ({ zone, at: new Date(Date.UTC(2026, 9, 23, 8, i * 30)).toISOString(), duration_s: 120 }));
   const preview = (list: ReturnType<typeof shots>) => ({ preview: list, shots: list.length, total_s: list.reduce((s, p) => s + p.duration_s, 0) });
+  // No lights-on inside the preview and nothing used yet today.
+  const fresh = { resets: [], usedToday: { 1: 0, 2: 0 } };
   test("consequence names the daily-limit stop with consistent numbers", () => {
     // 0.00125 L a plant a second: 0.15 L a 2 min shot; 1.5 L allows 10 of the 12.
-    expect(consequence(preview(shots(8)), { 1: 0.00125 }, 1.5)).toBe("8 shots · 16 min · about 1.2 L per plant.");
-    expect(consequence(preview(shots(12)), { 1: 0.00125 }, 1.5)).toBe(
-      "12 shots · 24 min · about 1.8 L per plant. Stops after shot 10: daily limit 1.5 L per plant.",
+    expect(consequence(preview(shots(8)), { 1: 0.00125 }, 1.5, fresh)).toBe("8 shots · 16 min · about 1.2 L per plant.");
+    expect(consequence(preview(shots(12)), { 1: 0.00125 }, 1.5, fresh)).toBe(
+      "12 shots · 24 min · about 1.8 L per plant. Stops after shot 10 today: daily limit 1.5 L per plant.",
+    );
+  });
+  test("a lights-on between shots starts a new grow-day count", () => {
+    // 6 shots (0.9 L) before 11:00 UTC, 6 after: neither grow-day reaches 1.5 L.
+    const reset = { resets: [Date.UTC(2026, 9, 23, 11, 0)], usedToday: { 1: 0 } };
+    expect(consequence(preview(shots(12)), { 1: 0.00125 }, 1.5, reset)).toBe("12 shots · 24 min · about 1.8 L per plant.");
+    // A limit of 0.6 L stops the next grow-day too, but today's stop is named first.
+    expect(consequence(preview(shots(12)), { 1: 0.00125 }, 0.6, reset)).toBe(
+      "12 shots · 24 min · about 1.8 L per plant. Stops after shot 4 today: daily limit 0.6 L per plant.",
+    );
+    expect(consequence(preview(shots(12)), { 1: 0.00125 }, 0.6, { ...reset, usedToday: { 1: null } })).toBe(
+      "12 shots · 24 min · about 1.8 L per plant. Stops when a zone reaches 0.6 L per plant in a day; in the next grow-day after shot 4.",
+    );
+  });
+  test("today is seeded with the water already used", () => {
+    // 1.2 L used: two more 0.15 L shots fit.
+    expect(consequence(preview(shots(8)), { 1: 0.00125 }, 1.5, { resets: [], usedToday: { 1: 1.2 } })).toBe(
+      "8 shots · 16 min · about 1.2 L per plant. Stops after shot 2 today: daily limit 1.5 L per plant, 1.2 L used already.",
+    );
+    expect(consequence(preview(shots(8)), { 1: 0.00125 }, 1.5, { resets: [], usedToday: { 1: 1.6 } })).toBe(
+      "8 shots · 16 min · about 1.2 L per plant. Stops before its first shot today: daily limit 1.5 L per plant, 1.6 L used already.",
+    );
+  });
+  test("without today's reading the limit is named per grow-day, with no shot number for today", () => {
+    expect(consequence(preview(shots(12)), { 1: 0.00125 }, 1.5, { resets: [], usedToday: {} })).toBe(
+      "12 shots · 24 min · about 1.8 L per plant. Stops when a zone reaches 1.5 L per plant in a day.",
+    );
+    // Without the lights hours the grow-days can't be told apart either.
+    expect(consequence(preview(shots(12)), { 1: 0.00125 }, 1.5, null)).toBe(
+      "12 shots · 24 min · about 1.8 L per plant. Stops when a zone reaches 1.5 L per plant in a day.",
     );
   });
   test("without the zone's rate it gives shots and minutes only", () => {
-    expect(consequence(preview(shots(12)), {}, 1.5)).toBe("12 shots · 24 min.");
-    expect(consequence(preview(shots(3)), { 1: Number.NaN }, null)).toBe("3 shots · 6 min.");
+    expect(consequence(preview(shots(12)), {}, 1.5, fresh)).toBe("12 shots · 24 min.");
+    expect(consequence(preview(shots(3)), { 1: Number.NaN }, null, fresh)).toBe("3 shots · 6 min.");
   });
   test("with two zones the one that stops is named, each zone's shots counted on their own", () => {
     const both = preview([...shots(12, 1), ...shots(12, 2)]);
-    expect(consequence(both, { 1: 0.00125, 2: 0.00125 }, { 1: 1.5, 2: 3 })).toBe(
-      "24 shots · 48 min · about 1.8 L per plant. Zone 1 stops after shot 10: daily limit 1.5 L per plant.",
+    expect(consequence(both, { 1: 0.00125, 2: 0.00125 }, { 1: 1.5, 2: 3 }, fresh)).toBe(
+      "24 shots · 48 min · about 1.8 L per plant. Zone 1 stops after shot 10 today: daily limit 1.5 L per plant.",
     );
   });
   test("no shots at all", () => {
-    expect(consequence(preview([]), { 1: 0.00125 }, 1.5)).toBe("No shots in the next 24 hours.");
+    expect(consequence(preview([]), { 1: 0.00125 }, 1.5, fresh)).toBe("No shots in the next 24 hours.");
+  });
+  test("the drawn blocks and the daily card follow the same grow-days", () => {
+    const reset = { resets: [Date.UTC(2026, 9, 23, 11, 0)], usedToday: { 1: 0.6 } };
+    const rows = previewRows(shots(12), {
+      roomName: "Room A", zones: [{ zone: 1, label: "Zone 1", sublabel: "" }], rates: { 1: 0.00125 },
+      dailyMax: { 1: 1.2 }, oneAtATime: false, lights: [], days: reset,
+    });
+    // Today: 0.6 used + 4 shots fit, shots 5 and 6 blocked; the next grow-day's 6 (0.9 L) all fit.
+    expect(rows[0].blocks.map((b) => b.glyph === "failed")).toEqual([false, false, false, false, true, true, false, false, false, false, false, false]);
+    // Today's fullest: 0.6 L used (8 min at this rate) + 12 min of shots, of 16 min.
+    expect(dailyUse(shots(12), [1], { 1: 0.00125 }, { 1: 1.2 }, reset)).toEqual({ zone: 1, usedMin: 20, allowedMin: 16, today: true });
   });
 });
 
@@ -259,5 +305,43 @@ describe("demo timers, as the integration keeps them", () => {
       room_id: "room:", program: { type: "recycle", zones: [3], duration_s: 60, interval_min: 30, window: { kind: "custom", from: "08:00", to: "08:00" } },
     });
     expect(end.error.message).toBe("End must be after start");
+  });
+});
+
+describe("fix round 1", () => {
+  const listed = (p: TimerProgram): TimerProgramListItem => ({ ...p, next_at: null, zones_in_timer_mode: p.zones });
+  const ctx = { names: { room: "Room A" }, tz: TZ };
+  test("a save is read back only when the whole program holds as sent", () => {
+    const saved = base({ interval_min: 30 });
+    const draft = base({ interval_min: 45 });
+    const rows = programRows(saved, draft, { room: "Room A" }, TZ, () => {});
+    const out = readBackReceipt(rows, draft, { kind: "ok", programs: [listed({ ...draft, zones: [1, 2] })] }, ctx, 1000, []);
+    expect(out.ok).toBe(false);
+    expect(out.failed).toEqual([{ id: "program", holds: "Every 45 min for 2 min, all day, Room A zones 1–2" }]);
+  });
+  test("a time the integration can't read is shown beside From and To", () => {
+    expect(fieldErrors("time must be HH:MM, got '25:00'")).toEqual([{ field: "times", message: "Time must be HH:MM, got '25:00'" }]);
+  });
+  test("a put-back program is named restored only once the list has it", () => {
+    expect(restoredWords("Every 45 min", "b", [base({ id: "b" })])).toBe("Restored: Every 45 min.");
+    expect(restoredWords("Every 45 min", "b", [base({ id: "a" })])).toBe("Put back, but not in the list yet. Reload.");
+  });
+  const ask = (program: Record<string, unknown>) =>
+    parityDemo("timer_program_preview", { room_id: "room:", program }, Date.parse("2026-10-23T14:10:00+13:00"), "3.18") as Promise<Record<string, any>>;
+  const recycle = { type: "recycle", zones: [3], duration_s: 60, interval_min: 30, window: { kind: "custom", from: "08:00", to: "12:00" } };
+  test("the demo checks a program as timers.validate does", async () => {
+    expect((await ask({ ...recycle, active: null })).error.message).toBe("active must be true or false");
+    expect((await ask({ ...recycle, window: "all" })).error.message).toBe('window must be an object such as {"kind": "all"}');
+    expect((await ask({ ...recycle, sync_time: "8am" })).error.message).toBe("time must be HH:MM, got '8am'");
+    expect((await ask({ ...recycle, sync_time: "13:00" })).error.message).toBe("sync time must be inside the window");
+    expect((await ask({ ...recycle, zones: ["2.5"] })).error.message).toBe("zones must be integers");
+    expect((await ask({ type: "simple", zones: [3], duration_s: 60, frequency_per_day: "x" })).error.message).toBe("frequency must be a whole number per day");
+    // int() truncates: zone 3.7 is zone 3, 2.9 a day is 2.
+    expect((await ask({ ...recycle, zones: [3.7] })).data.preview.every((s: { zone: number }) => s.zone === 3)).toBe(true);
+    const simple = await ask({ type: "simple", zones: [3], duration_s: 60, frequency_per_day: 2.9, window: { kind: "all" } });
+    expect(simple.data.shots).toBe(2);
+    // A sync time inside the window starts the shots there: 09:00, 09:30 … tomorrow (the window is 08:00–12:00).
+    const synced = await ask({ ...recycle, sync_time: "09:00" });
+    expect(new Date(synced.data.preview[0].at).getHours()).toBe(9);
   });
 });

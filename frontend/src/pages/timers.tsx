@@ -10,7 +10,7 @@ import { ShotTimeline } from "@/components/shot-timeline";
 import { Button } from "@/components/ui/button";
 import { formatVolume } from "@/lib/display-units";
 import { irrigationMode } from "@/lib/facility";
-import { descriptor } from "@/lib/model";
+import { descriptor, zoneHasProbe } from "@/lib/model";
 import { callV2, useParity, type V2Outcome } from "@/lib/parity-api";
 import type { SupplyDoc, TimerPreview, TimerProgram, TimerProgramListItem } from "@/lib/parity-types";
 import { clock, lightsWindow, startOfDay } from "@/lib/time";
@@ -34,15 +34,17 @@ import {
   readBackReceipt,
   readPrograms,
   restoreDeleted,
+  restoredWords,
   sameProgram,
   sharedZoneError,
   timerTitle,
   timerTokens,
+  type GrowDays,
   type IrrigationMode,
 } from "@/lib/timers";
 import { UndoError, offerUndo } from "@/lib/undo";
 import { useNarrow } from "@/lib/use-narrow";
-import { coreWaterValue, positiveCount, waterParameters } from "@/lib/water-delivery";
+import { coreWaterValue, dailyWater, positiveCount, waterParameters } from "@/lib/water-delivery";
 import type { PageProps } from "./placeholder";
 import "./timers.css";
 
@@ -112,6 +114,8 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
   const rates: Record<number, number> = {};
   const perPlantMax: Record<number, number | null> = {};
   const zoneLph: Record<number, number | null> = {};
+  // Today's water so far, in litres a plant (the zone's Water today reading); null without it.
+  const usedToday: Record<number, number | null> = {};
   for (const z of room.zones) {
     const p = waterParameters(controller, z.id);
     const plants = positiveCount(p.plant_count) ? p.plant_count : null;
@@ -120,11 +124,13 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
     const limit = coreWaterValue("max_daily_volume", p.max_daily_volume).value;
     perPlantMax[z.id] = limit !== null && plants ? limit / plants : null;
     zoneLph[z.id] = perPlantLph && plants ? perPlantLph * plants : null;
+    const water = dailyWater(z, plants);
+    usedToday[z.id] = water.zoneL !== null && plants ? water.zoneL / plants : null;
   }
   const covered = (zone: number) => list.programs.some((p) => p.active && p.zones.includes(zone));
 
   // The next 24 hours, 250 ms after the last edit. The draft is only previewed, never saved.
-  const [preview, setPreview] = useState<{ data: TimerPreview | null; error: string | null } | null>(null);
+  const [preview, setPreview] = useState<{ data: TimerPreview | null; error: string | null; missing?: boolean } | null>(null);
   const body = draft ? JSON.stringify(programBody(draft)) : null;
   useEffect(() => {
     if (!draft) return setPreview(null);
@@ -134,7 +140,13 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
     const timer = setTimeout(() => {
       void callV2<TimerPreview>(controller, "timer_program_preview", { room_id: roomId, program: programBody(draft), hours: 24 }).then((out) => {
         if (!current) return;
-        setPreview(out.kind === "ok" ? { data: out.data, error: null } : { data: null, error: out.kind === "error" ? out.message : null });
+        setPreview(
+          out.kind === "ok"
+            ? { data: out.data, error: null }
+            : out.kind === "missing"
+              ? { data: null, error: null, missing: true }
+              : { data: null, error: out.message },
+        );
       });
     }, 250);
     return () => {
@@ -273,7 +285,7 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
           const after = await load();
           const back = after.kind === "ok" ? after.data.programs.find((p) => p.id === id) : undefined;
           if (back) open(back);
-          toast(`Restored: ${title}.`);
+          toast(restoredWords(title, id, after.kind === "ok" ? after.data.programs : []));
         },
       });
     } finally {
@@ -285,8 +297,14 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
   const lightsOff = Number(states[`number.crop_steering_${prefix}lights_off_hour`]?.state);
   const lights = useMemo(() => {
     if (!Number.isFinite(lightsOn) || !Number.isFinite(lightsOff)) return [];
-    return [-1, 0, 1].map((d) => lightsWindow(startOfDay(now + d * 24 * HOUR + 12 * HOUR, tz), hh(lightsOn), hh(lightsOff), tz));
+    const today = startOfDay(now, tz);
+    return [-1, 0, 1].map((d) => lightsWindow(startOfDay(today + d * 24 * HOUR + 12 * HOUR, tz), hh(lightsOn), hh(lightsOff), tz));
   }, [lightsOn, lightsOff, now, tz]);
+  // The grow-days the next 24 hours span: a new one at each lights-on; without the lights hours
+  // they can't be told apart.
+  const days: GrowDays | null = lights.length
+    ? { resets: lights.map((l) => l.on).filter((t) => t > now && t <= now + 24 * HOUR), usedToday }
+    : null;
 
   if (list.state === "missing")
     return (
@@ -358,7 +376,7 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
         {room.zones.map((z) => {
           const mode = irrigationMode(states, room.room, z.id);
           const options = states[modeEntity(z.id)]?.attributes.options;
-          const probe = !!z.vwc.entityId && !!states[z.vwc.entityId];
+          const probe = zoneHasProbe(z, states);
           const asked = pending?.zone === z.id ? pending : null;
           const line = modeNote({ zone: z.id, mode: asked?.mode ?? mode ?? "", hasProbe: probe, covered: covered(z.id), pending: !!asked });
           return (
@@ -422,7 +440,7 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
     const listedZones = room.zones.filter((z) => irrigationMode(states, room.room, z.id) === "timer" || draft.zones.includes(z.id));
     const shots = preview?.data?.preview ?? [];
     const firstShot = shots[0];
-    const use = dailyUse(shots, draft.zones, rates, perPlantMax);
+    const use = dailyUse(shots, draft.zones, rates, perPlantMax, days);
     const lph = draft.zones.map((z) => ({ zone: z, lph: zoneLph[z] ?? null }));
     const segments = (oneAtATime ? [...lph].sort((a, b) => (b.lph ?? 0) - (a.lph ?? 0)).slice(0, 1) : lph)
       .filter((s): s is { zone: number; lph: number } => s.lph !== null)
@@ -496,7 +514,7 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
           <span className="tm-label">Amount</span>
           <div className="tm-field">
             <Sentence parts={timerTokens(draft, set, { now, timeZone: tz })} phone={phone} ariaLabel="Amount" />
-            {errorOf("duration_s", "interval_min", "frequency_per_day", "start_at", "end")}
+            {errorOf("duration_s", "interval_min", "frequency_per_day", "start_at", "end", "times")}
           </div>
 
           {draft.type !== "one_off" && (
@@ -531,10 +549,12 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
             <h3 id="tm-preview-title">Next 24 hours</h3>
             <span data-timer-summary>
               {preview?.data
-                ? `${consequence(preview.data, rates, perPlantMax)}${firstShot ? ` First ${nextShotWords(firstShot.at, now, tz)}.` : ""}`
-                : preview?.error
-                  ? "Fix the program to see its shots."
-                  : "Working out the shots…"}
+                ? `${consequence(preview.data, rates, perPlantMax, days)}${firstShot ? ` First ${nextShotWords(firstShot.at, now, tz)}.` : ""}`
+                : preview?.missing
+                  ? "The next 24 hours need Crop Steering 3.18 or newer."
+                  : preview?.error
+                    ? "Fix the program to see its shots."
+                    : "Working out the shots…"}
             </span>
           </div>
           {errorOf("program")}
@@ -572,7 +592,7 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
                   <span style={{ width: `${Math.min(100, (use.usedMin / use.allowedMin) * 100)}%` }} data-over={use.usedMin > use.allowedMin || undefined} />
                 </span>
                 <p>
-                  <b>{minutes(use.usedMin)}</b> of {minutes(use.allowedMin)} a day{draft.zones.length > 1 ? ` · Zone ${use.zone}` : ""}
+                  <b>{minutes(use.usedMin)}</b> of {minutes(use.allowedMin)} a day{use.today ? " today" : " in the next grow-day"}{draft.zones.length > 1 ? ` · Zone ${use.zone}` : ""}
                 </p>
               </>
             ) : (
@@ -674,6 +694,7 @@ export function Timers({ controller, onDirtyChange }: PageProps) {
       dailyMax: perPlantMax,
       oneAtATime,
       lights,
+      days,
     });
   }
 

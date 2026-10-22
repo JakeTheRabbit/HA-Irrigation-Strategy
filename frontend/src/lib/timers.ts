@@ -163,43 +163,89 @@ const minutesText = (s: number) => (s < 60 ? `${Number(s.toFixed(1))} s` : `${Nu
 const litres = (l: number) => formatVolume(l, Math.min(2, (String(l).split(".")[1] ?? "").length));
 const known = (rate: number | undefined): rate is number => typeof rate === "number" && Number.isFinite(rate) && rate > 0;
 
-/** What a preview waters: "8 shots · 16 min · about 1.2 L per plant." and, where a zone's shots pass
- * its daily limit, "Stops after shot 10: daily limit 1.5 L per plant." Litres only with every zone's
- * own rate (litres a plant a second, from its drippers); without one, shots and minutes only.
- * `dailyMaxL` is litres a plant: one for every zone, or each zone's. */
+/** The grow-days a preview spans: each lights-on inside it starts a new one (`resets`), and the
+ * water each zone already had today, in litres a plant (`usedToday`; null or absent: no reading). */
+export interface GrowDays {
+  resets: number[];
+  usedToday: Record<number, number | null | undefined>;
+}
+type Shot = TimerPreview["preview"][number];
+/** One zone's shots walked against its daily limit, grow-day by grow-day: which are blocked, the
+ * first stop (its grow-day, 0 today, and how many shots of that day fit), and whether today could
+ * not be counted (no reading of today's water, or no lights hours to tell the days apart). */
+function walkLimit(shots: Shot[], rate: number | null, limit: number | null, days: GrowDays | null, zone: number) {
+  const blocked = new Set<Shot>();
+  let stop: { day: number; after: number } | null = null;
+  let todayUnknown = false;
+  if (rate === null || limit === null || !Number.isFinite(limit)) return { blocked, stop, todayUnknown };
+  const resets = [...(days?.resets ?? [])].sort((a, b) => a - b);
+  const dayOf = (s: Shot) => resets.filter((r) => r <= Date.parse(s.at)).length;
+  const groups = new Map<number, Shot[]>();
+  for (const s of [...shots].sort((a, b) => Date.parse(a.at) - Date.parse(b.at))) {
+    const day = days ? dayOf(s) : 0;
+    groups.set(day, [...(groups.get(day) ?? []), s]);
+  }
+  for (const [day, list] of [...groups].sort(([a], [b]) => a - b)) {
+    const seed = day > 0 ? 0 : (days?.usedToday[zone] ?? null);
+    if (seed === null || !Number.isFinite(seed)) {
+      todayUnknown = true;
+      continue;
+    }
+    let sum = seed;
+    list.forEach((s, i) => {
+      sum += s.duration_s * rate;
+      if (sum <= limit + 1e-9) return;
+      blocked.add(s);
+      if (!stop) stop = { day, after: i };
+    });
+  }
+  return { blocked, stop: stop as { day: number; after: number } | null, todayUnknown };
+}
+const limitOf = (dailyMaxL: number | null | Record<number, number | null>, zone: number) =>
+  typeof dailyMaxL === "number" || dailyMaxL === null ? dailyMaxL : (dailyMaxL[zone] ?? null);
+
+/** What a preview waters: "8 shots · 16 min · about 1.2 L per plant." and where a zone's shots pass
+ * its daily limit, "Stops after shot 10 today: daily limit 1.5 L per plant, 0.2 L used already."
+ * The limit counts per grow-day (from lights-on, `days`), today's from the water the zone already
+ * had. Without today's reading (or the lights hours) today gets no shot number: "Stops when a zone
+ * reaches 1.5 L per plant in a day." Litres only with every zone's own rate (litres a plant a
+ * second, from its drippers); without one, shots and minutes only. `dailyMaxL` is litres a plant:
+ * one for every zone, or each zone's. */
 export function consequence(
   preview: TimerPreview,
   lPerPlantPerSecond: Record<number, number>,
   dailyMaxL: number | null | Record<number, number | null>,
+  days: GrowDays | null,
 ): string {
   if (!preview.shots) return "No shots in the next 24 hours.";
   const head = `${plural(preview.shots, "shot")} · ${minutesText(preview.total_s)}`;
   const zones = [...new Set(preview.preview.map((s) => s.zone))].sort((a, b) => a - b);
   if (!zones.every((z) => known(lPerPlantPerSecond[z]))) return `${head}.`;
-  const ordered = [...preview.preview].sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
   const perPlant = Math.max(
-    ...zones.map((z) => ordered.filter((s) => s.zone === z).reduce((sum, s) => sum + s.duration_s * lPerPlantPerSecond[z], 0)),
+    ...zones.map((z) => preview.preview.filter((s) => s.zone === z).reduce((sum, s) => sum + s.duration_s * lPerPlantPerSecond[z], 0)),
   );
   let text = `${head} · about ${formatVolume(perPlant, 1)} per plant.`;
-  for (const zone of zones) {
-    const limit = typeof dailyMaxL === "number" || dailyMaxL === null ? dailyMaxL : (dailyMaxL[zone] ?? null);
-    if (limit === null || !Number.isFinite(limit)) continue;
-    const stop = stopAfter(ordered.filter((s) => s.zone === zone), lPerPlantPerSecond[zone], limit);
-    if (stop === null) continue;
-    const who = zones.length > 1 ? `Zone ${zone} stops` : "Stops";
-    text += ` ${stop ? `${who} after shot ${stop}` : `${who} before its first shot`}: daily limit ${litres(limit)} per plant.`;
-    break;
+  const walks = zones.map((zone) => {
+    const limit = limitOf(dailyMaxL, zone);
+    return { zone, limit, ...walkLimit(preview.preview.filter((s) => s.zone === zone), lPerPlantPerSecond[zone], limit, days, zone) };
+  });
+  const who = (zone: number) => (zones.length > 1 ? `Zone ${zone} stops` : "Stops");
+  const at = (stop: { day: number; after: number }) =>
+    stop.after ? `after shot ${stop.after}` : "before its first shot";
+  const unknown = walks.find((w) => w.todayUnknown && w.limit !== null);
+  const stopped = walks.find((w) => w.stop);
+  if (unknown) {
+    text += ` Stops when a zone reaches ${litres(unknown.limit!)} per plant in a day`;
+    // A later grow-day starts from nothing, so its stop can still be named.
+    text += stopped ? `; ${zones.length > 1 ? `zone ${stopped.zone} ` : ""}in the next grow-day ${at(stopped.stop!)}.` : ".";
+  } else if (stopped) {
+    const stop = stopped.stop!;
+    const used = days?.usedToday[stopped.zone] ?? 0;
+    text +=
+      ` ${who(stopped.zone)} ${at(stop)} ${stop.day ? "in the next grow-day" : "today"}: daily limit ${litres(stopped.limit!)} per plant` +
+      `${!stop.day && used > 0 ? `, ${litres(used)} used already` : ""}.`;
   }
   return text;
-}
-/** How many of a zone's shots fit under its limit; null when all do. */
-function stopAfter(shots: { duration_s: number }[], rate: number, limit: number): number | null {
-  let sum = 0;
-  for (const [i, s] of shots.entries()) {
-    sum += s.duration_s * rate;
-    if (sum > limit + 1e-9) return i;
-  }
-  return null;
 }
 
 /** The integration's refusal of a program, on the field it is about (timers.validate's words). */
@@ -213,7 +259,9 @@ export function fieldErrors(error: string | null): { field: string; message: str
     [/^interval/i, "interval_min"],
     [/^frequency/i, "frequency_per_day"],
     [/^start_at/i, "start_at"],
-    [/^(window|time must|sync time)/i, "window"],
+    // A From or To the integration can not read: they sit in the Amount sentence.
+    [/^time must/i, "times"],
+    [/^(window|sync time)/i, "window"],
     [/^type must/i, "type"],
   ];
   return [{ field: rules.find(([re]) => re.test(error))?.[1] ?? "program", message }];
@@ -333,7 +381,9 @@ export function programRows(
 
 /** A save's receipt, row by row, from the program list read after it: a row is written and read
  * back only when the listed program holds its field as sent; one that does not is "still" what the
- * list holds. A list that could not be read claims nothing. `sent` carries the saved id. */
+ * list holds. The receipt is green only when the whole listed program is what was sent: a field the
+ * edit did not touch that the list holds otherwise fails the program as a whole. A list that could
+ * not be read claims nothing. `sent` carries the saved id. */
 export function readBackReceipt(
   rows: ReviewRow[],
   sent: TimerProgram,
@@ -353,6 +403,8 @@ export function readBackReceipt(
       id: r.id,
       holds: !held ? "None" : r.id === "program" ? timerTitle(held, ctx.names, ctx.tz) : fieldText(r.id as Field, held, ctx.names, ctx.tz),
     }));
+  if (held && !failed.length && !sameProgram(held, sent))
+    failed.push({ id: "program", holds: timerTitle(held, ctx.names, ctx.tz) });
   const bad = new Set(failed.map((f) => f.id));
   return {
     at: now,
@@ -385,6 +437,11 @@ export async function restoreDeleted(
   return results.flatMap((r) => r.renewed ?? []).find((r) => r.old_id === oldId)?.id ?? oldId;
 }
 
+/** The toast after a delete's Undo: "Restored" only once the list has the program back. */
+export function restoredWords(title: string, id: string, programs: TimerProgram[]): string {
+  return programs.some((p) => p.id === id) ? `Restored: ${title}.` : "Put back, but not in the list yet. Reload.";
+}
+
 export type IrrigationMode = "steering" | "timer" | "off";
 /** The line under a zone's irrigation mode: what a switch does before it is applied (`pending`),
  * else what the mode leaves the zone with now. */
@@ -408,8 +465,8 @@ export function modeNote(o: {
 }
 
 /** The preview as ShotTimeline rows, one per zone of the draft. A shot past the zone's daily limit
- * is drawn blocked; on a pump that runs one zone at a time, each later zone's shot waits for the
- * one before (drawn waiting, that much later). */
+ * (counted per grow-day, as `consequence` counts it) is drawn blocked; on a pump that runs one zone
+ * at a time, each later zone's shot waits for the one before (drawn waiting, that much later). */
 export function previewRows(
   shots: TimerPreview["preview"],
   o: {
@@ -419,63 +476,71 @@ export function previewRows(
     dailyMax: Record<number, number | null>;
     oneAtATime: boolean;
     lights: { on: number; off: number }[];
+    days: GrowDays | null;
   },
 ): TimelineRow[] {
   const order = o.zones.map((z) => z.zone);
   return o.zones.map(({ zone, label, sublabel }) => {
     const rate = known(o.rates[zone]) ? o.rates[zone] : null;
-    const limit = o.dailyMax[zone] ?? null;
-    let sum = 0;
-    const blocks = shots
-      .filter((s) => s.zone === zone)
-      .sort((a, b) => Date.parse(a.at) - Date.parse(b.at))
-      .map((s): TimelineBlock => {
-        const wait = o.oneAtATime ? order.indexOf(zone) * s.duration_s : 0;
-        const start = Date.parse(s.at) + wait * 1000;
-        const perPlant = rate === null ? null : s.duration_s * rate;
-        sum += perPlant ?? 0;
-        const blocked = perPlant !== null && limit !== null && sum > limit + 1e-9;
-        return {
-          id: `${zone}:${s.at}`,
-          glyph: blocked ? "failed" : wait ? "queued" : "planned",
-          start,
-          end: start + s.duration_s * 1000,
-          requestedAt: wait ? Date.parse(s.at) : null,
-          pumpWaitS: wait || null,
-          litres: null,
-          meteredL: null,
-          litresPerPlant: perPlant,
-          reason: blocked ? "Blocked by the daily limit" : wait ? "Waits for the pump" : "This program",
-          phase: null,
-          vwcBefore: null,
-          vwcExpected: null,
-          source: "timer",
-          code: null,
-          eventId: null,
-          skippable: false,
-          zone,
-          roomId: o.roomName,
-          running: false,
-          skipped: false,
-        };
-      });
+    const mine = shots.filter((s) => s.zone === zone).sort((a, b) => Date.parse(a.at) - Date.parse(b.at));
+    const { blocked } = walkLimit(mine, rate, o.dailyMax[zone] ?? null, o.days, zone);
+    const blocks = mine.map((s): TimelineBlock => {
+      const wait = o.oneAtATime ? order.indexOf(zone) * s.duration_s : 0;
+      const start = Date.parse(s.at) + wait * 1000;
+      const stopped = blocked.has(s);
+      return {
+        id: `${zone}:${s.at}`,
+        glyph: stopped ? "failed" : wait ? "queued" : "planned",
+        start,
+        end: start + s.duration_s * 1000,
+        requestedAt: wait ? Date.parse(s.at) : null,
+        pumpWaitS: wait || null,
+        litres: null,
+        meteredL: null,
+        litresPerPlant: rate === null ? null : s.duration_s * rate,
+        reason: stopped ? "Blocked by the daily limit" : wait ? "Waits for the pump" : "This program",
+        phase: null,
+        vwcBefore: null,
+        vwcExpected: null,
+        source: "timer",
+        code: null,
+        eventId: null,
+        skippable: false,
+        zone,
+        roomId: o.roomName,
+        running: false,
+        skipped: false,
+      };
+    });
     return { key: `preview:${zone}`, roomId: o.roomName, zone, label, sublabel, blocks, lights: o.lights };
   });
 }
 
-/** The Daily max card: the zone nearest its limit, its watering minutes in the preview against the
- * minutes its limit allows (null without its rate or limit). */
+/** The Daily max card: the fullest grow-day of the zone nearest its limit. Its watering minutes
+ * (today's: the water already used, at the zone's rate, plus today's shots) against the minutes its
+ * limit allows (null without its rate or limit). Today without a reading counts its shots only. */
 export function dailyUse(
   shots: TimerPreview["preview"],
   zones: number[],
   rates: Record<number, number>,
   dailyMax: Record<number, number | null>,
-): { zone: number; usedMin: number; allowedMin: number | null } | null {
-  const rows = zones.map((zone) => {
-    const usedMin = shots.filter((s) => s.zone === zone).reduce((sum, s) => sum + s.duration_s, 0) / 60;
+  days: GrowDays | null,
+): { zone: number; usedMin: number; allowedMin: number | null; today: boolean } | null {
+  const resets = [...(days?.resets ?? [])].sort((a, b) => a - b);
+  const rows = zones.flatMap((zone) => {
     const limit = dailyMax[zone] ?? null;
-    const allowedMin = known(rates[zone]) && limit !== null && Number.isFinite(limit) ? limit / rates[zone] / 60 : null;
-    return { zone, usedMin, allowedMin };
+    const rate = known(rates[zone]) ? rates[zone] : null;
+    const allowedMin = rate !== null && limit !== null && Number.isFinite(limit) ? limit / rate / 60 : null;
+    const byDay = new Map<number, number>();
+    for (const s of shots.filter((q) => q.zone === zone)) {
+      const day = resets.filter((r) => r <= Date.parse(s.at)).length;
+      byDay.set(day, (byDay.get(day) ?? 0) + s.duration_s / 60);
+    }
+    const used = days?.usedToday[zone];
+    if (rate !== null && typeof used === "number" && Number.isFinite(used))
+      byDay.set(0, (byDay.get(0) ?? 0) + used / rate / 60);
+    if (!byDay.size) byDay.set(0, 0);
+    return [...byDay].map(([day, usedMin]) => ({ zone, usedMin, allowedMin, today: day === 0 }));
   });
   if (!rows.length) return null;
   const share = (r: (typeof rows)[number]) => (r.allowedMin ? r.usedMin / r.allowedMin : -1);
