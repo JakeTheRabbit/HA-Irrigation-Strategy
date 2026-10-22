@@ -35,9 +35,11 @@ import {
   routeHash,
   sameRoute,
   sectionOf,
+  zoneOnPage,
   type Page,
   type Route,
 } from "@/lib/routes";
+import { featureOf, featureTargets } from "@/lib/feature-focus";
 import { AppHeader, StaleBanner } from "@/components/app-header";
 import { UiTip } from "@/components/info-tip";
 import { PageTabs, pageLabel, SECTION_LABELS } from "@/components/page-tabs";
@@ -162,12 +164,46 @@ export default function App() {
   }, []);
   const zoneName =
     page === "zone"
-      ? (controller.room.zones.find((zone) => zone.id === route.zone) ?? controller.room.zones[0])
-          ?.name
+      ? (zoneOnPage(controller.room.zones, route.zone ?? null)?.name ??
+        (controller.room.zones.length ? `Zone ${route.zone} not in this room` : undefined))
       : undefined;
   useEffect(() => {
     document.title = `${zoneName ?? pageLabel(page)} · ${controller.room.room.name} · Crop Steering`;
   }, [page, zoneName, controller.room.room.name]);
+  // A `?feature=` link opens its page at the feature's control, once the control is on screen.
+  const roomRef = useRef(controller.room);
+  roomRef.current = controller.room;
+  useEffect(() => {
+    document
+      .querySelectorAll("[data-feature-focus]")
+      .forEach((element) => element.removeAttribute("data-feature-focus"));
+    const id = featureOf(window.location.hash);
+    if (!id) return;
+    const land = () => {
+      const { room, zones } = roomRef.current;
+      const target = featureTargets(id, room.prefix, zones.map((zone) => zone.id))
+        .map((item) => document.getElementById(item))
+        .find((element) => element?.getClientRects().length);
+      if (!target) return false;
+      target.setAttribute("data-feature-focus", id);
+      // The window, not scrollIntoView: a control inside a panel that clips its overflow does
+      // not scroll the page.
+      requestAnimationFrame(() => {
+        const box = target.getBoundingClientRect();
+        window.scrollTo({ top: window.scrollY + box.top - (window.innerHeight - box.height) / 2 });
+      });
+      return true;
+    };
+    if (land()) return;
+    // The control can arrive later: the room's states, or a page's own data, still loading.
+    const observer = new MutationObserver(() => land() && observer.disconnect());
+    observer.observe(document.body, { childList: true, subtree: true });
+    const stop = setTimeout(() => observer.disconnect(), 10_000);
+    return () => {
+      observer.disconnect();
+      clearTimeout(stop);
+    };
+  }, [route]);
   async function refresh() {
     setRefreshing(true);
     setRefreshError("");

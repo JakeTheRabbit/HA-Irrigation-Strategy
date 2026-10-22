@@ -5,6 +5,7 @@ import { UiTip } from "@/components/info-tip";
 import { ReviewDialog, number, type ReviewItem } from "@/components/dashboard";
 import { useSensorContext } from "@/components/sensor-context";
 import { SettingRow } from "@/components/setting-row";
+import { featureOf, roomOnlyFeature } from "@/lib/feature-focus";
 import { validateSetpoint } from "@/lib/setpoint-preview";
 import { setpointParam } from "@/lib/sensor-context";
 import { GROUP_HELP, settingWords } from "@/lib/setting-words";
@@ -25,7 +26,9 @@ export function ControllerSettings({
   onDirtyChange: (dirty: boolean) => void;
 }) {
   const { room, states } = controller;
-  const [zoneId, setZoneId] = useState(String(room.zones[0]?.id ?? "room"));
+  const [zoneId, setZoneId] = useState(() =>
+    roomOnlyFeature(featureOf(window.location.hash)) ? "room" : String(room.zones[0]?.id ?? "room"),
+  );
   const [drafts, setDrafts] = useState<Drafts>({});
   const [review, setReview] = useState(false);
   const [saved, setSaved] = useState(false);

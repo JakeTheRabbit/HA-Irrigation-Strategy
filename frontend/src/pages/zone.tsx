@@ -29,6 +29,7 @@ import { zoneOverlays } from "@/lib/overlays";
 import { buildSetpointPreview } from "@/lib/setpoint-preview";
 import { jevChip, TARGET_GROUPS } from "@/lib/targets";
 import { ecType, fusionMethod, PROBE_TONE, zoneProbes } from "@/lib/probes";
+import { zoneOnPage } from "@/lib/routes";
 import type { Controller, Zone } from "@/lib/types";
 import { dayWord } from "@/lib/utils";
 import { waitingText } from "@/lib/waiting-for";
@@ -58,7 +59,32 @@ export function ZonePage({
   navigate: (page: Page, zone?: number) => void;
 }) {
   const zones = controller.room.zones;
-  const zone = zones.find((item) => item.id === zoneId) ?? zones[0];
+  const zone = zoneOnPage(zones, zoneId);
+  if (!zone && zones.length)
+    return (
+      <>
+        <h1 className="zone-empty-title">Zone {zoneId}</h1>
+        <section className="panel">
+          <Empty
+            title={`Zone ${zoneId} is not in ${controller.room.room.name}`}
+            detail="The link may be from another room, or the zone was removed. Open one of this room’s zones."
+            action={
+              <div className="heading-actions">
+                {zones.map((item) => (
+                  <Button
+                    key={item.id}
+                    variant="outline"
+                    onClick={() => navigate("zone", item.id)}
+                  >
+                    {item.name}
+                  </Button>
+                ))}
+              </div>
+            }
+          />
+        </section>
+      </>
+    );
   if (!zone)
     return (
       <>
@@ -605,7 +631,7 @@ function ZoneControls({ controller, zone }: { controller: Controller; zone: Zone
         <h2 id="zone-controls-title">Controls</h2>
       </div>
       <div className="zone-panel-body">
-        <div className="zone-control-row">
+        <div className="zone-control-row" id="config-zone_enabled">
           <span>
             Scheduling{" "}
             <Pill

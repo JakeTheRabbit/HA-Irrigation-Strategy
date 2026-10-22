@@ -198,7 +198,7 @@ export function Settings({
                 </button>
               ))}
             </div>
-            <div>
+            <div id="config-water_today_view">
               <div className="label-with-tip">
                 <h3 id="water-view-label">Water today display</h3>
                 <UiTip copyKey="water today, shown as" />

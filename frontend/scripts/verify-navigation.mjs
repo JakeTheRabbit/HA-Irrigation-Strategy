@@ -53,11 +53,43 @@ try {
   await page.locator("#landing-view").selectOption("all-zones");
   await open();
   await page.getByRole("heading", { name: "All rooms", exact: true }).waitFor();
+  // A zone the room does not have says so; it never shows the room's first zone under that address.
+  await open("#/zone/99");
+  await page.getByText("Zone 99 is not in", { exact: false }).waitFor();
+  assert.equal(await page.locator("[data-zone-page]").count(), 0);
+  assert.match(await page.title(), /^Zone 99 not in this room/);
+  // Every Capabilities link opens its page at the control it names, highlighted and in view.
+  await open("#/settings/features");
+  await page.locator("a.features-also").first().waitFor();
+  const featureLinks = [
+    ...new Set(await page.$$eval("a.features-also", (as) => as.map((a) => a.getAttribute("href")))),
+  ].filter((href) => href.includes("?feature="));
+  assert.ok(featureLinks.length >= 20);
+  const missed = [];
+  for (const href of featureLinks) {
+    await page.goto("about:blank");
+    await open(href);
+    const id = new URLSearchParams(href.split("?")[1]).get("feature");
+    const landed = await page
+      .waitForFunction(
+        (id) => {
+          const el = document.querySelector(`[data-feature-focus="${id}"]`);
+          const box = el?.getBoundingClientRect();
+          return !!box && box.height > 0 && box.top < innerHeight && box.bottom > 0;
+        },
+        id,
+        { timeout: 3000 },
+      )
+      .then(() => true)
+      .catch(() => false);
+    if (!landed) missed.push(href);
+  }
+  assert.deepEqual(missed, []);
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: all rooms, correct-room details, default preference, direct links, history room filter, protected zone drafts, confirmed zone navigation, mobile width, zero browser errors",
+    "PASS: all rooms, correct-room details, default preference, direct links, missing zone notice, capability links land on their control, history room filter, protected zone drafts, confirmed zone navigation, mobile width, zero browser errors",
   );
 } finally {
   await browser.close();

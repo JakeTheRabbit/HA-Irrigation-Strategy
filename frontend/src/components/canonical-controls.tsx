@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useState } from "react";
+import { useLayoutEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { ReviewDialog, type ReviewItem } from "@/components/dashboard";
 import { ControlEditor } from "@/components/registry-control-editor";
@@ -50,10 +50,6 @@ export function CanonicalControls({
     onDirtyChange?.(dirty);
     return () => onDirtyChange?.(false);
   }, [dirty, onDirtyChange]);
-  useEffect(() => {
-    const id = new URLSearchParams(window.location.hash.split("?")[1] ?? "").get("feature");
-    if (id) document.getElementById(`config-${id}`)?.scrollIntoView?.({ block: "center" });
-  }, [owner, zoneId]);
   const locked = controller.admin === false || !["live", "demo"].includes(controller.connection);
   const name = (zone: number | null) =>
     zone === null
