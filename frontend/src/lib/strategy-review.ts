@@ -170,29 +170,27 @@ export function estimatedIntents(
   }));
 }
 
-/** The shots in [from, to) and their litres per plant: the saved plan's (`saved`, the controller's
- * projection or `estimatedIntents`) and the edited targets' projection. Litres are NaN where the
- * zone's sizing is unknown. */
+/** The shots in [from, to) and their litres per plant. Saved is the saved plan (`saved`: the
+ * controller's projection, or `estimatedIntents`). With edits is Saved plus only what the edit
+ * changes: the edited targets' projection less the saved targets' (`baseline`) over the window, so a
+ * projection that differs from the controller's plan never shows as an edit. Litres are NaN where
+ * the zone's sizing is unknown. */
 export function afternoon(
   saved: ProjectionIntent[],
   edited: SetpointCurveState,
   from: number,
   to: number,
-  options: ProjectionOptions & { lightsOnAt: number },
+  options: ProjectionOptions & { lightsOnAt: number; baseline: SetpointCurveState },
 ): { saved: { shots: number; lPerPlant: number }; edited: { shots: number; lPerPlant: number } } {
   const inWindow = (ms: number) => ms >= from && ms < to;
   const planned = saved.filter((intent) => inWindow(Date.parse(intent.at)));
   const flow = flowPerPlant(edited.parameters);
-  const shots = dayShots(edited, options).filter((shot) =>
-    inWindow(options.lightsOnAt + shot.hour * HOUR),
-  );
   const volume = edited.parameters.substrate_volume;
-  return {
-    saved: {
-      shots: planned.length,
-      lPerPlant: planned.reduce((sum, intent) => sum + intent.duration_s * flow, 0),
-    },
-    edited: {
+  const projected = (state: SetpointCurveState) => {
+    const shots = dayShots(state, options).filter((shot) =>
+      inWindow(options.lightsOnAt + shot.hour * HOUR),
+    );
+    return {
       shots: shots.length,
       lPerPlant: positive(volume)
         ? shots.reduce(
@@ -200,6 +198,20 @@ export function afternoon(
             0,
           )
         : NaN,
+    };
+  };
+  const plan = {
+    shots: planned.length,
+    lPerPlant: planned.reduce((sum, intent) => sum + intent.duration_s * flow, 0),
+  };
+  if (JSON.stringify(edited) === JSON.stringify(options.baseline)) return { saved: plan, edited: plan };
+  const after = projected(edited),
+    before = projected(options.baseline);
+  return {
+    saved: plan,
+    edited: {
+      shots: Math.max(0, plan.shots + after.shots - before.shots),
+      lPerPlant: Math.max(0, plan.lPerPlant + after.lPerPlant - before.lPerPlant),
     },
   };
 }
@@ -251,40 +263,48 @@ export interface LastApply {
 }
 
 /** The `target.changed` events this apply journalled (3.18): per written value, the newest
- * setpoint change of its key and zone since `since` that reads the written value. A 3.17
- * integration has no Journal. */
+ * manual setpoint change of its key and zone since `since` from the value it had (`before`) to the
+ * written one, never a put-back. A learner's or the AI's write of the same value is not this apply's.
+ * A 3.17 integration has no Journal. */
 export async function appliedEventIds(
   controller: Pick<Controller, "operator">,
   roomId: string,
   prefix: string,
   after: Change[],
+  before: Change[],
   since: number,
 ): Promise<{ backend: "3.18" | "3.17"; ids: string[] }> {
-  const outcome = await callV2<{ changes?: HistoryChange[] }>(controller, "history_changes", {
-    room_id: roomId,
-    since: new Date(since).toISOString(),
-    kinds: ["setpoint"],
-  });
-  if (outcome.kind === "missing") return { backend: "3.17", ids: [] };
-  if (outcome.kind !== "ok") return { backend: "3.18", ids: [] };
-  const changes = outcome.data?.changes ?? [];
   const root = `number.crop_steering_${prefix}`;
-  const ids = after.flatMap((change) => {
-    if (!change.entityId.startsWith(root) || typeof change.value !== "number") return [];
+  const ids: string[] = [];
+  for (const change of after) {
+    const was = before.find((b) => b.entityId === change.entityId)?.value;
+    if (!change.entityId.startsWith(root) || typeof change.value !== "number" || typeof was !== "number")
+      continue;
     const rest = change.entityId.slice(root.length);
     const zone = rest.match(/^zone_(\d+)_/)?.[1];
     const key = rest.replace(/^zone_\d+_/, "");
-    const scope = zone ? `zone:${zone}` : "room";
-    const found = changes.find(
+    const outcome = await callV2<{ changes?: HistoryChange[] }>(controller, "history_changes", {
+      room_id: roomId,
+      since: new Date(since).toISOString(),
+      ...(zone ? { zone: Number(zone) } : {}),
+      key,
+      kinds: ["setpoint"],
+    });
+    if (outcome.kind === "missing") return { backend: "3.17", ids: [] };
+    if (outcome.kind !== "ok") continue;
+    const found = (outcome.data?.changes ?? []).find(
       (c) =>
         c.kind === "setpoint" &&
         c.key === key &&
-        c.scope === scope &&
+        c.scope === (zone ? `zone:${zone}` : "room") &&
+        c.actor === "manual" &&
+        (c as { detail?: unknown }).detail !== "put back" &&
         Date.parse(c.ts) >= since &&
+        sameValue(String(c.old), was) &&
         sameValue(String(c.new), change.value as number),
     );
-    return found ? [found.id] : [];
-  });
+    if (found) ids.push(found.id);
+  }
   return { backend: "3.18", ids };
 }
 
@@ -310,6 +330,8 @@ export async function undoApply(
       );
     return revertEvents(deps.controller, last.eventIds);
   }
+  if (last.before.some(({ value }) => typeof value === "number" && !Number.isFinite(value)))
+    throw new UndoError("The previous value is not known. Nothing was undone.", 0, n);
   const moved = last.after.some(({ entityId, value }) => {
     const state = deps.states[entityId];
     if (typeof value !== "number") return state?.state !== String(value);

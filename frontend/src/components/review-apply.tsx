@@ -41,7 +41,12 @@ const summaryOf = (rows: ReviewRow[], failed: Set<string>) =>
     .map(line)
     .join(" · ");
 
-/** A 3.17 write (`controller.write`, which reads each entity back). */
+/** A write the controller may have taken but did not read back (client.ts `applyChanges`): it is
+ * not a refusal, so nothing says what the controller holds. */
+const UNCONFIRMED = /did not confirm|unconfirmed/i;
+
+/** A 3.17 write (`controller.write`, which reads each entity back). A failure that was not read
+ * back makes the whole receipt unconfirmed; "still holds" is only for a definite refusal. */
 export function receiptFromWrite(
   result: WriteResult,
   rows: ReviewRow[],
@@ -49,6 +54,15 @@ export function receiptFromWrite(
   holds: (entityId: string) => string,
   now: number,
 ): ApplyReceipt {
+  if (result.failed.some((f) => UNCONFIRMED.test(f.reason)))
+    return {
+      at: now,
+      ok: false,
+      unconfirmed: true,
+      failed: rows.map((r) => ({ id: r.id, holds: r.before })),
+      summary: "",
+      eventIds: [],
+    };
   const failed = result.failed.map((f) => ({ id: rowOf(f.entityId), holds: holds(f.entityId) }));
   return { at: now, ok: !failed.length, failed, summary: summaryOf(rows, new Set(failed.map((f) => f.id))), eventIds: [] };
 }

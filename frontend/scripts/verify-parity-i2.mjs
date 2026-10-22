@@ -8,6 +8,7 @@
  * - "This afternoon, 14:10–22:00" shows Saved (estimated: the demo publishes no projection_app);
  * - ArrowDown on the re-water handle: "1 change · Review & apply" (a phone's "Review 1 change"
  *   opens the sheet), the handle reads "was …% · not applied", and With edits joins Saved;
+ * - a reload keeps the unapplied edit (this tab's stored draft);
  * - Apply 1 change: "Written and read back HH:MM" under Last applied, and the draft is gone;
  * - Undo: write back the previous values: "Previous values written back HH:MM" and the re-water
  *   handle holds its old value again (3.18: history_revert of the base target.changed event;
@@ -59,6 +60,13 @@ await runParity({
     assert.match(await day.locator('[data-afternoon="edited"]').innerText(), /^With edits\s+\d+ shots? · /, `${label}: with edits`);
     region("handles");
 
+    // The unapplied edit survives a reload (this tab's stored draft).
+    await page.reload();
+    await slider.waitFor();
+    await page.waitForFunction(() => document.querySelector('[data-target-handle="p2_vwc_threshold"]')?.hasAttribute("data-changed"));
+    assert.ok(Number(await slider.getAttribute("aria-valuenow")) < was, `${label}: draft kept over a reload`);
+    region("draft kept over reload");
+
     const bar = page.getByRole("region", { name: "Review and apply" });
     if (phone) {
       await page.getByRole("button", { name: "Review 1 change", exact: true }).click();
@@ -88,4 +96,4 @@ await runParity({
     region("undo");
   },
 });
-console.log("PASS: I2 current day (header, afternoon window, ArrowDown on re-water → 1 change · Review & apply, apply → Written and read back, undo restores; 3.18 revert and 3.17 re-write; clock pinned 14:10)");
+console.log("PASS: I2 current day (header, afternoon window, ArrowDown on re-water → 1 change · Review & apply, the draft kept over a reload, apply → Written and read back, undo restores; 3.18 revert and 3.17 re-write; clock pinned 14:10)");

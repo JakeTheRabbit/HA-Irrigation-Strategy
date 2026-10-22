@@ -64,9 +64,28 @@ describe("review & apply", () => {
     expect(html).toContain("Controller confirmed every value · by Ben");
     expect(html).toContain("Undo: write back the previous values");
   });
+  test("a write the controller did not read back is unconfirmed, never 'still holds'", () => {
+    for (const reason of [
+      "Readback did not confirm the requested value. Refresh and review before retrying.",
+      "Room or connection changed during write; result is unconfirmed.",
+    ]) {
+      const receipt = receiptFromWrite(
+        { applied: ["number.f2_z1_rewater"], failed: [{ entityId: "number.f2_z1_dryback", reason }] },
+        ROWS,
+        (entityId) => (entityId.endsWith("dryback") ? "dryback" : "rewater"),
+        () => "50%",
+        AT,
+      );
+      expect(receipt).toMatchObject({ ok: false, unconfirmed: true });
+      const html = render(props(), { phase: "done", result: receipt });
+      expect(html).toContain("The controller did not confirm the values. Reload and check before trying again.");
+      expect(html).not.toContain("still holds");
+      expect(html).not.toContain("Written and read back");
+    }
+  });
   test("partial apply keeps failed rows in the draft", () => {
     const fromWrite = receiptFromWrite(
-      { applied: ["number.f2_z1_rewater"], failed: [{ entityId: "number.f2_z1_dryback", reason: "Readback did not confirm" }] },
+      { applied: ["number.f2_z1_rewater"], failed: [{ entityId: "number.f2_z1_dryback", reason: "Use a value between 40 and 60." }] },
       ROWS,
       (entityId) => (entityId.endsWith("dryback") ? "dryback" : "rewater"),
       () => "50%",

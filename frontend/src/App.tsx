@@ -21,6 +21,7 @@ import { useDisplayUnits } from "@/lib/display-units";
 import { useHaTheme } from "@/lib/ha-theme";
 import { useHaShell } from "@/lib/ha-shell";
 import { errorText } from "@/lib/utils";
+import { discardDrafts } from "@/lib/drafts";
 import { resolveRequestedRoom, runningVersions } from "@/lib/model";
 import {
   canonicalHash,
@@ -172,9 +173,14 @@ export default function App() {
       setRefreshing(false);
     }
   }
+  /** Drops Current day's drafts, with their stored copies, so a reload never brings them back. */
+  function dropDrafts() {
+    setDrafts({});
+    discardDrafts("targets:");
+  }
   function selectRoom(id: string) {
     confirmNavigation(() => {
-      setDrafts({});
+      dropDrafts();
       setFocusZone(undefined);
       controller.changeRoom(id);
       setMobile(false);
@@ -183,7 +189,7 @@ export default function App() {
   function openRoomPage(id: string, next: Page, zone?: number) {
     confirmNavigation(() => {
       const target: Route = next === "zone" ? { page: next, zone: zone ?? null } : { page: next };
-      setDrafts({});
+      dropDrafts();
       setWorkspaceDirty(false);
       setFocusZone(zone);
       controller.changeRoom(id);
@@ -579,7 +585,7 @@ export default function App() {
               variant="destructive"
               onClick={() => {
                 const action = pending;
-                setDrafts({});
+                dropDrafts();
                 setWorkspaceDirty(false);
                 dirtyRef.current = false;
                 setPending(null);

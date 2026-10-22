@@ -102,35 +102,64 @@ const EDITED: SetpointCurveState = {
 };
 
 describe("afternoon", () => {
+  const intent = (ms: number, zone = 1): ProjectionIntent => ({
+    zone,
+    at: iso(ms),
+    duration_s: 216,
+    source: "engine",
+    expected: true,
+  });
+  const SAVED_STATE: SetpointCurveState = { ...EDITED, parameters: PARAMS };
+  const shotsIn = (state: SetpointCurveState) =>
+    projectDay(buildPlanningCurve(state.parameters, 10, 22), state.parameters)!.shots.filter(
+      (s) => s.hour >= 4 + 10 / 60 && s.hour < 12,
+    );
   test("afternoon counts saved projection shots and edited preview shots in the window", () => {
-    const intent = (ms: number, zone = 1): ProjectionIntent => ({
-      zone,
-      at: iso(ms),
-      duration_s: 30,
-      source: "engine",
-      expected: true,
-    });
-    // One before the window, two in it, one after lights-off.
+    // projection_app: one before the window, two in it, one after lights-off.
     const saved = [intent(at(13)), intent(at(14, 30)), intent(at(16)), intent(at(22, 30))];
-    const result = afternoon(saved, EDITED, at(14, 10), at(22), { lightsOnAt: ON });
+    // Smaller maintenance shots: more of them.
+    const raised: SetpointCurveState = { ...EDITED, parameters: { ...PARAMS, p2_shot_size: 2 } };
+    const result = afternoon(saved, raised, at(14, 10), at(22), {
+      lightsOnAt: ON,
+      baseline: SAVED_STATE,
+    });
     expect(result.saved.shots).toBe(2);
-    // 30 s on one 4 L/h dripper, twice.
-    expect(result.saved.lPerPlant).toBeCloseTo(2 * (30 / 3600) * 4, 6);
-    const expected = projectDay(
-      buildPlanningCurve(EDITED.parameters, 10, 22),
-      EDITED.parameters,
-    )!.shots.filter((s) => s.hour >= 4 + 10 / 60 && s.hour < 12);
-    expect(expected.length).toBeGreaterThan(0);
-    expect(result.edited.shots).toBe(expected.length);
-    // Every afternoon shot is a 4% maintenance shot of a 6 L pot.
-    expect(result.edited.lPerPlant).toBeCloseTo(expected.length * 0.04 * 6, 6);
+    // 216 s on one 4 L/h dripper (a 4% shot of a 6 L pot), twice.
+    expect(result.saved.lPerPlant).toBeCloseTo(2 * (216 / 3600) * 4, 6);
+    // With edits is Saved plus only what the edit changes in the projection.
+    const edited = shotsIn(raised),
+      baseline = shotsIn(SAVED_STATE);
+    expect(edited.length).toBeGreaterThan(baseline.length);
+    expect(result.edited.shots).toBe(2 + edited.length - baseline.length);
+    // Afternoon shots are maintenance shots of a 6 L pot: 2% edited, 4% saved.
+    expect(result.edited.lPerPlant).toBeCloseTo(
+      2 * (216 / 3600) * 4 + edited.length * 0.02 * 6 - baseline.length * 0.04 * 6,
+      6,
+    );
+    // Fewer shots than the plan has never reads below none.
+    const lowered = afternoon(saved, EDITED, at(14, 10), at(22), {
+      lightsOnAt: ON,
+      baseline: SAVED_STATE,
+    });
+    expect(lowered.edited.shots).toBeGreaterThanOrEqual(0);
+    expect(lowered.edited.lPerPlant).toBeGreaterThanOrEqual(0);
+  });
+  test("with no edit, With edits is exactly Saved, whatever the projection says", () => {
+    const saved = [intent(at(14, 30)), intent(at(16))];
+    const result = afternoon(saved, SAVED_STATE, at(14, 10), at(22), {
+      lightsOnAt: ON,
+      baseline: SAVED_STATE,
+    });
+    expect(result.edited).toEqual(result.saved);
   });
   test("the saved estimate is the same day's projection, sized by the zone's drippers", () => {
-    const saved: SetpointCurveState = { ...EDITED, parameters: PARAMS };
-    const intents = estimatedIntents(saved, 1, ON);
-    const result = afternoon(intents, saved, at(14, 10), at(22), { lightsOnAt: ON });
-    expect(result.saved.shots).toBe(result.edited.shots);
-    expect(result.saved.lPerPlant).toBeCloseTo(result.edited.lPerPlant, 6);
+    const intents = estimatedIntents(SAVED_STATE, 1, ON);
+    const result = afternoon(intents, SAVED_STATE, at(14, 10), at(22), {
+      lightsOnAt: ON,
+      baseline: SAVED_STATE,
+    });
+    expect(result.saved.shots).toBe(shotsIn(SAVED_STATE).length);
+    expect(result.saved.lPerPlant).toBeCloseTo(shotsIn(SAVED_STATE).length * 0.04 * 6, 6);
   });
   test("without sizing the litres are unknown, not invented", () => {
     const bare: SetpointCurveState = {
@@ -142,7 +171,7 @@ describe("afternoon", () => {
       bare,
       at(14),
       at(22),
-      { lightsOnAt: ON },
+      { lightsOnAt: ON, baseline: bare },
     );
     expect(result.saved.shots).toBe(1);
     expect(result.saved.lPerPlant).toBeNaN();
@@ -195,63 +224,88 @@ describe("growDayWindow", () => {
 
 describe("apply and undo", () => {
   const changeOf = (entityId: string, value: number) => ({ entityId, value });
+  const change = (over: Record<string, unknown>) => ({
+    id: "01B",
+    kind: "setpoint",
+    key: "p2_vwc_threshold",
+    scope: "zone:1",
+    ts: iso(at(14, 2)),
+    actor: "manual",
+    old: 57,
+    new: 56,
+    ...over,
+  });
+  const answer = (changes: unknown[]) => ({
+    api: 2,
+    ok: true,
+    data: { changes },
+    readback: { status: "verified" },
+    event_ids: [],
+  });
   test("finds the base target.changed events the apply journalled", async () => {
     const since = at(14);
-    const operator = vi.fn(async (_action: string, data?: Record<string, unknown>) => ({
-      api: 2,
-      ok: true,
-      data: {
-        changes: [
-          {
-            id: "01B",
-            kind: "setpoint",
-            key: "p2_vwc_threshold",
-            scope: "zone:1",
-            ts: iso(at(14, 2)),
-            new: 56,
-          },
-          // Before the apply, another zone, or another value: not this apply's.
-          {
-            id: "01A",
-            kind: "setpoint",
-            key: "p2_vwc_threshold",
-            scope: "zone:1",
-            ts: iso(at(13)),
-            new: 56,
-          },
-          {
-            id: "01C",
-            kind: "setpoint",
-            key: "p2_vwc_threshold",
-            scope: "zone:2",
-            ts: iso(at(14, 2)),
-            new: 56,
-          },
-          {
-            id: "01D",
-            kind: "setpoint",
-            key: "p2_vwc_threshold",
-            scope: "zone:1",
-            ts: iso(at(14, 2)),
-            new: 55,
-          },
-        ],
-      },
-      readback: { status: "verified" },
-      event_ids: [],
-    }));
+    const operator = vi.fn(async (_action: string, _data?: Record<string, unknown>) =>
+      answer([
+        // Newest first. A learner's or the AI's same value in the window is not this apply's...
+        change({ id: "01F", actor: "learner" }),
+        change({ id: "01G", actor: "brain" }),
+        // ...nor is a put-back, one from another value, before the apply, or of another zone.
+        change({ id: "01H", detail: "put back" }),
+        change({ id: "01E", old: 58 }),
+        change({ id: "01D", new: 55 }),
+        change({ id: "01C", scope: "zone:2" }),
+        change({ id: "01B" }),
+        change({ id: "01A", ts: iso(at(13)) }),
+      ]),
+    );
     const found = await appliedEventIds(
       fakeController({ operator }),
       "room:",
       "",
       [changeOf(REWATER, 56)],
+      [changeOf(REWATER, 57)],
       since,
     );
     expect(found).toEqual({ backend: "3.18", ids: ["01B"] });
-    const [, data] = operator.mock.calls[0];
-    expect(data).toMatchObject({ room_id: "room:", since: iso(since), kinds: ["setpoint"] });
+    const [action, data] = operator.mock.calls[0];
+    expect(action).toBe("history_changes");
+    expect(data).toMatchObject({
+      room_id: "room:",
+      since: iso(since),
+      zone: 1,
+      key: "p2_vwc_threshold",
+      kinds: ["setpoint"],
+    });
     expect(data).not.toHaveProperty("client");
     expect(data).not.toHaveProperty("proposal_token");
+  });
+  test("a learner's same-value write alone is never taken for this apply", async () => {
+    const operator = vi.fn(async () => answer([change({ id: "01F", actor: "learner" })]));
+    const found = await appliedEventIds(
+      fakeController({ operator }),
+      "room:",
+      "",
+      [changeOf(REWATER, 56)],
+      [changeOf(REWATER, 57)],
+      at(14),
+    );
+    expect(found).toEqual({ backend: "3.18", ids: [] });
+  });
+  test("a room-wide target asks without a zone", async () => {
+    const PEAK_ROOM = "number.crop_steering_p1_target_vwc";
+    const operator = vi.fn(async (_action: string, _data?: Record<string, unknown>) =>
+      answer([change({ id: "01R", key: "p1_target_vwc", scope: "room", old: 62, new: 63 })]),
+    );
+    const found = await appliedEventIds(
+      fakeController({ operator }),
+      "room:",
+      "",
+      [changeOf(PEAK_ROOM, 63)],
+      [changeOf(PEAK_ROOM, 62)],
+      at(14),
+    );
+    expect(found.ids).toEqual(["01R"]);
+    expect(operator.mock.calls[0][1]).not.toHaveProperty("zone");
   });
   test("a 3.17 integration has no Journal to look in", async () => {
     const operator = vi.fn(async () => {
@@ -263,6 +317,7 @@ describe("apply and undo", () => {
         "room:",
         "",
         [changeOf(REWATER, 56)],
+        [changeOf(REWATER, 57)],
         at(14),
       ),
     ).toEqual({ backend: "3.17", ids: [] });
@@ -288,6 +343,17 @@ describe("apply and undo", () => {
       undoApply(last17, { controller: fakeController({}), states, write: applyChanges }),
     ).rejects.toThrow("This value has changed since you applied it. Nothing was undone.");
     expect(applyChanges).not.toHaveBeenCalled();
+  });
+  test("undo on 3.17 refuses a previous value that was not a number, and writes nothing", async () => {
+    const write = vi.fn();
+    const states = { ...STATES, [REWATER]: number(REWATER, "56") };
+    await expect(
+      undoApply(
+        { ...last17, before: [changeOf(REWATER, NaN)] },
+        { controller: fakeController({}), states, write },
+      ),
+    ).rejects.toThrow("The previous value is not known. Nothing was undone.");
+    expect(write).not.toHaveBeenCalled();
   });
   test("undo on 3.17 within the entity's step is not stale", async () => {
     const applyChanges = vi.fn(async () => ({ applied: [REWATER], failed: [] }));

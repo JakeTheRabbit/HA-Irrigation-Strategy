@@ -985,6 +985,11 @@ try {
     await field.fill("999");
     await expectVisible(page.locator('[id="note-number.crop_steering_zone_1_p1_target_vwc"]'));
     await expectVisible(page.getByText("Fix the red check to apply"));
+    assert.equal(
+      await page.getByRole("button", { name: /^Apply \d+ changes?$/ }).count(),
+      0,
+      "an invalid draft has no Apply",
+    );
     await field.fill(String(original + 1));
     await page.getByRole("button", { name: "Refresh controller data" }).click();
     assert.equal(await field.inputValue(), String(original + 1));
@@ -998,6 +1003,8 @@ try {
     );
     const bar = page.getByRole("region", { name: "Review and apply" });
     await expectVisible(bar.getByText("1 change · Review & apply"));
+    // The change is the selected room's only.
+    await expectVisible(bar.getByText("These changes affect Room A only."));
     await axe("targets review");
     await page.screenshot({ path: path.join(out, "dashboard-review.png") });
     await bar.getByRole("button", { name: "Apply 1 change", exact: true }).click();

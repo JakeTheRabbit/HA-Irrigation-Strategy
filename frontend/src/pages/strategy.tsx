@@ -8,6 +8,7 @@ import { ReviewApply, receiptFromWrite, type ApplyReceipt } from "@/components/r
 import type { ReactNode } from "react";
 import type { Change, Choice, Controller, Setting } from "@/lib/types";
 import { formatVolume } from "@/lib/display-units";
+import { discardDrafts, draftSync, useDraft } from "@/lib/drafts";
 import { clock } from "@/lib/time";
 import {
   afternoon,
@@ -236,23 +237,20 @@ export function Strategy({
       Object.fromEntries(Object.entries(current).filter(([id]) => !result.applied.includes(id))),
     );
     const after = batch.filter((change) => result.applied.includes(change.entityId));
+    const was = before.filter((change) => result.applied.includes(change.entityId));
     // The Journal's record of these writes, for Undo on 3.18; Home Assistant's clock may run a
-    // little behind this browser's.
+    // little behind this browser's. The writes landed whatever the lookup does: a failed lookup
+    // keeps the receipt, and its Undo then refuses (no record).
     const found = await appliedEventIds(
       controller,
       controller.roomId,
       prefix,
       after,
+      was,
       started - 60_000,
-    );
+    ).catch(() => ({ backend: "3.18" as const, ids: [] }));
     receipt.eventIds = found.ids;
-    setLast({
-      at: receipt.at,
-      backend: found.backend,
-      eventIds: found.ids,
-      before: before.filter((change) => result.applied.includes(change.entityId)),
-      after,
-    });
+    setLast({ at: receipt.at, backend: found.backend, eventIds: found.ids, before: was, after });
     return receipt;
   }
   async function undo(receipt: ApplyReceipt) {
@@ -260,6 +258,37 @@ export function Strategy({
     await undoApply(last, { controller, states: controller.states, write: controller.write });
     setLast(null);
   }
+  // This zone's unapplied edits, kept per tab (sessionStorage) so a reload keeps them, and shared
+  // with this browser's other tabs. App's discard and room switch clear every stored copy.
+  const draftZone = (id: string) => id.match(/_zone_(\d+)_/)?.[1] ?? "room";
+  const zoneDrafts = Object.fromEntries(
+    Object.entries(drafts).filter(([id]) => draftZone(id) === zoneId),
+  );
+  const draftKey = `targets:${controller.roomId}:${zoneId}`;
+  const kept = useDraft<Drafts>(draftKey, {});
+  const localJson = JSON.stringify(zoneDrafts);
+  const keptJson = JSON.stringify(kept.draft);
+  const synced = useRef<{ key: string; local: string } | null>(null);
+  useEffect(() => {
+    const first = synced.current?.key !== draftKey;
+    const step = draftSync(first, localJson, first ? null : synced.current!.local, keptJson);
+    synced.current = { key: draftKey, local: localJson };
+    if (step === "store") kept.set(zoneDrafts);
+    else if (step === "restore") {
+      const known = Object.fromEntries(
+        Object.entries(kept.draft).filter(
+          ([id]) =>
+            allSettings.some((s) => s.entityId === id) ||
+            room.choices.some((c) => c.entityId === id),
+        ),
+      );
+      setDrafts((current) => ({
+        ...Object.fromEntries(Object.entries(current).filter(([id]) => draftZone(id) !== zoneId)),
+        ...known,
+      }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey, localJson, keptJson]);
   const zoneLabel = (id: number | undefined) =>
     id === undefined
       ? "Room settings"
@@ -448,7 +477,7 @@ export function Strategy({
           preview.draft,
           span.from,
           span.to,
-          { ...projection, lightsOnAt: span.lightsOnAt },
+          { ...projection, lightsOnAt: span.lightsOnAt, baseline: preview.saved },
         )
       : null;
   const edited = rows.length > 0 && JSON.stringify(preview.draft) !== JSON.stringify(preview.saved);
@@ -502,9 +531,13 @@ export function Strategy({
             : "Targets match the controller. Change a handle or the steering to start a new edit."
         }
         checks={errors.length ? errors.map((text) => ({ ok: false, text })) : undefined}
+        consequence={
+          rows.length && canEdit ? `These changes affect ${room.room.name} only.` : undefined
+        }
         apply={apply}
         onDiscard={() => {
           setDrafts({});
+          discardDrafts("targets:");
           setLoaded(null);
         }}
         undo={undo}

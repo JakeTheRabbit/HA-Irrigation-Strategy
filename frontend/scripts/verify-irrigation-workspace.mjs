@@ -1,5 +1,8 @@
-/** Isolated demo proof for the consolidated Irrigation editor, against frontend/dist (run after
- * `vite build`), or IRRIGATION_URL when given. No HA requests allowed. */
+/** Isolated demo proof for the consolidated Irrigation editor. No HA requests allowed.
+ *
+ * It serves frontend/dist/index.html itself, so build first (`node node_modules/vite/bin/vite.js
+ * build`): a stale or missing dist is what it tests. IRRIGATION_URL points it at a running server
+ * instead. */
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
 import { mkdir, readFile, writeFile } from "node:fs/promises";

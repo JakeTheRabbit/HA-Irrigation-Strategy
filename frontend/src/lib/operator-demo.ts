@@ -28,7 +28,12 @@ import { DISPLAY_DEFAULTS, displayEntityId, readDisplay, type DisplayOptions } f
 import type { DemoBackend } from "./demo";
 import { isParityAction } from "./parity-api";
 import { demoEnvelope, parityDemo } from "./parity-demo";
-import { demoTargetWrite, journalDemoTargetWrite, settleDemoTargetWrite } from "./parity-demo/targets";
+import {
+  demoTargetWrite,
+  journalDemoTargetWrite,
+  resetDemoTargetWrites,
+  settleDemoTargetWrite,
+} from "./parity-demo/targets";
 import { sameValue } from "./utils";
 
 const clone = <T>(value: T): T => structuredClone(value);
@@ -61,6 +66,8 @@ export class OperatorDemo {
     private backend: DemoBackend = "3.18",
   ) {
     this.stockDemo = new StockDemo(getStates, updateStates);
+    // The demo Journal's own setpoint writes belong to this demo and its backend only.
+    resetDemoTargetWrites();
     this.whatsNewSeen =
       whatsNew === "unknown"
         ? null

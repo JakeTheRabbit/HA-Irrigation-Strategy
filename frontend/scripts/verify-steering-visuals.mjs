@@ -367,6 +367,11 @@ try {
     await target.fill("999");
     assert.equal(await target.getAttribute("aria-invalid"), "true");
     await page.getByText("Fix the red check to apply", { exact: true }).waitFor();
+    assert.equal(
+      await page.getByRole("button", { name: /^Apply \d+ changes?$/ }).count(),
+      0,
+      "an invalid draft has no Apply",
+    );
     await page.getByRole("button", { name: "Discard edits", exact: true }).click();
   });
   await check(

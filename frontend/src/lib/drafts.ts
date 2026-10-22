@@ -32,10 +32,47 @@ export function draftStore(storage: () => Storage | null | undefined) {
         /* Nothing kept. */
       }
     },
+    /** Clears every draft whose key starts with `prefix`; returns the keys cleared. */
+    clearAll(prefix: string): string[] {
+      try {
+        const store = storage();
+        if (!store) return [];
+        const keys: string[] = [];
+        for (let i = 0; i < store.length; i++) {
+          const name = store.key(i);
+          if (name?.startsWith(DRAFT_PREFIX + prefix)) keys.push(name.slice(DRAFT_PREFIX.length));
+        }
+        for (const key of keys) store.removeItem(DRAFT_PREFIX + key);
+        return keys;
+      } catch {
+        return [];
+      }
+    },
   };
 }
 
 const session = draftStore(() => sessionStorage);
+
+/** Discards this tab's drafts under `prefix` (e.g. "targets:", every Current day zone) and tells
+ * the other tabs: the app's discard and room switch, so a reload never brings them back. */
+export function discardDrafts(prefix: string) {
+  for (const key of session.clearAll(prefix)) publishDraft(key, undefined);
+}
+
+/** How a page's own draft and the stored copy meet, from their JSON: `store` the page's edit,
+ * `restore` the stored one (a reload, or another tab's edit), or `none`. On the first run for a key
+ * (`lastLocal` null) the page's own draft wins over a stored copy; with none, the copy comes back. */
+export function draftSync(
+  first: boolean,
+  local: string,
+  lastLocal: string | null,
+  kept: string,
+): "store" | "restore" | "none" {
+  const empty = (json: string) => json === "{}";
+  if (first) return !empty(local) ? (local === kept ? "none" : "store") : empty(kept) ? "none" : "restore";
+  if (local !== lastLocal) return local === kept ? "none" : "store";
+  return kept === local ? "none" : "restore";
+}
 
 /** Tells this browser's other tabs the draft under `key` (undefined: discarded). */
 export function publishDraft(key: string, value: unknown) {

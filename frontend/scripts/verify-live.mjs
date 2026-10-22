@@ -348,6 +348,8 @@ try {
     await bar.getByRole("button", { name: "Apply 2 changes", exact: true }).click();
     // The refused row is named with what the controller still holds; the other was read back.
     await visible(bar.getByText(/^Controller still holds .+: written and read back\.$/));
+    // The refused row stays in the draft, by name; the applied one has gone.
+    assert.deepEqual(await bar.locator(".review-apply-label").allInnerTexts(), ["Re-water point"]);
     assert.equal(states["number.crop_steering_room_b_zone_1_p1_target_vwc"].state, "65");
     assert.equal(states["number.crop_steering_zone_1_p1_target_vwc"].state, "64");
     assert.equal(calls.length, 2);
@@ -370,7 +372,13 @@ try {
     await field("p1_target_vwc").fill("66");
     const bar = page.getByRole("region", { name: "Review and apply" });
     await bar.getByRole("button", { name: "Apply 1 change", exact: true }).click();
-    await visible(bar.getByText(/^Controller still holds .+\. Nothing else was changed\.$/));
+    // Not read back is not a refusal: nothing is claimed about what the controller holds.
+    await visible(
+      bar.getByText(
+        "The controller did not confirm the values. Reload and check before trying again.",
+        { exact: true },
+      ),
+    );
     assert.equal(states[ignoreWrite].state, "65");
     await bar.getByRole("button", { name: "Discard edits" }).click();
     ignoreWrite = "";

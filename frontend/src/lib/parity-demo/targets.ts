@@ -19,7 +19,8 @@ export function journalDemoTargetWrite(
   detail: string | null = null,
 ): string | null {
   const root = `number.crop_steering_${prefix}`;
-  if (!entityId.startsWith(root)) return null;
+  // Writing the value it already holds is no change: the integration journals none.
+  if (!entityId.startsWith(root) || old === value) return null;
   const rest = entityId.slice(root.length);
   const zone = rest.match(/^zone_(\d+)_/)?.[1];
   const id = demoId(now, `target:${entityId}:${value}:${writes.size}`);
@@ -42,6 +43,11 @@ export function journalDemoTargetWrite(
     entity_id: entityId,
   });
   return id;
+}
+
+/** Forgets every journalled write: a new demo (another backend) starts with none. */
+export function resetDemoTargetWrites() {
+  writes.clear();
 }
 
 /** The rooms' journalled writes, newest first. */

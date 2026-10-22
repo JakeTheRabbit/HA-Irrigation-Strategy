@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest";
-import { DRAFT_PREFIX, draftStore, isSameDraft, publishDraft, subscribeDrafts } from "./drafts";
+import {
+  DRAFT_PREFIX,
+  draftStore,
+  draftSync,
+  isSameDraft,
+  publishDraft,
+  subscribeDrafts,
+} from "./drafts";
 
 function memoryStorage() {
   const data = new Map<string, string>();
@@ -8,6 +15,10 @@ function memoryStorage() {
     getItem: (key: string) => data.get(key) ?? null,
     setItem: (key: string, value: string) => void data.set(key, value),
     removeItem: (key: string) => void data.delete(key),
+    key: (index: number) => [...data.keys()][index] ?? null,
+    get length() {
+      return data.size;
+    },
   } as unknown as Storage & { data: Map<string, string> };
 }
 
@@ -61,4 +72,38 @@ test("no BroadcastChannel: subscribing and publishing do nothing and do not thro
   } finally {
     globalThis.BroadcastChannel = original;
   }
+});
+
+describe("discard clears what a reload would restore", () => {
+  test("discard clears storage: every targets draft goes, other drafts stay", () => {
+    const storage = memoryStorage();
+    const store = draftStore(() => storage);
+    store.write("targets:room::1", { a: 1 });
+    store.write("targets:room::room", { b: 2 });
+    store.write("timers:room:", { c: 3 });
+    expect(store.clearAll("targets:")).toEqual(["targets:room::1", "targets:room::room"]);
+    expect(store.read("targets:room::1")).toBeUndefined();
+    expect(store.read("targets:room::room")).toBeUndefined();
+    expect(store.read("timers:room:")).toEqual({ c: 3 });
+    expect(draftStore(() => null).clearAll("targets:")).toEqual([]);
+  });
+  test("a room switch doesn't block navigation: a cleared store restores nothing on return", () => {
+    const storage = memoryStorage();
+    const store = draftStore(() => storage);
+    store.write("targets:room::1", { "number.x": { value: "66" } });
+    // App's room switch (or Discard and continue) clears the targets drafts.
+    store.clearAll("targets:");
+    const kept = JSON.stringify(store.read("targets:room::1") ?? {});
+    // Coming back: nothing local, nothing kept, so the page is not dirty and leaving it never asks.
+    expect(draftSync(true, "{}", null, kept)).toBe("none");
+  });
+  test("draftSync: a reload restores, a local edit is stored, another tab's edit comes in", () => {
+    const edit = JSON.stringify({ "number.x": { value: "66" } });
+    expect(draftSync(true, "{}", null, edit)).toBe("restore");
+    // Moving between zones in one session: the page's own draft wins over a stale copy.
+    expect(draftSync(true, edit, null, "{}")).toBe("store");
+    expect(draftSync(false, edit, "{}", "{}")).toBe("store");
+    expect(draftSync(false, "{}", "{}", edit)).toBe("restore");
+    expect(draftSync(false, edit, edit, edit)).toBe("none");
+  });
 });
