@@ -19,6 +19,7 @@ const READS = [
   ["get_events", { room_id: ROOM, since: "2026-10-22T00:00:00Z" }, "journal_query"],
   ["get_alert_rules", { room_id: ROOM }, "alert_rule_list"],
   ["get_supply", {}, "supply_get"],
+  ["get_timer_programs", { room_id: ROOM }, "timer_program_list"],
   ["get_system_status", {}, "system_status_get"],
 ];
 
@@ -173,4 +174,21 @@ test("an ok:false answer is a tool error with its code and message; a bad shape 
     await call(client, "get_timeline", { room_id: ROOM, start: "2026-10-22T00:00:00", end: "2026-10-23T00:00:00" }),
     /Unsupported Crop Steering timeline_get/,
   );
+});
+
+test("an events page over 256 KiB says to lower the limit; timer programs read with api 2", async (t) => {
+  const ha = await mockHa(t),
+    { client } = await stdio(t, ha);
+  ha.v2.journal_query = () => ({
+    events: Array.from({ length: 500 }, (_, n) => ({ id: String(n), note: "x".repeat(600) })),
+    cursor: "1:2",
+  });
+  error(
+    await call(client, "get_events", { room_id: ROOM, since: "2026-10-22T00:00:00Z", limit: 500 }),
+    /Lower limit and read the rest with the answered cursor/,
+  );
+  const timers = data(await call(client, "get_timer_programs", { room_id: ROOM }));
+  assert.equal(timers.revision, 3);
+  assert.equal(timers.programs[0].id, "t1");
+  assert.deepEqual(serviceCalls(ha, "timer_program_list")[0].body, { api: 2, room_id: ROOM });
 });

@@ -15,6 +15,13 @@ import {
   systemStatus,
   alertRules,
   actors,
+  timerProgram,
+  timerPrograms,
+  alertRule,
+  supplyChanges,
+  probeOffset,
+  sections,
+  source,
 } from "./schemas.js";
 import { Workspace } from "./workspace.js";
 
@@ -33,14 +40,15 @@ export function createServer(ha: HaClient) {
     idempotentHint: true,
     openWorldHint: false,
   };
-  async function result(action: () => Promise<unknown>) {
+  async function result(
+    action: () => Promise<unknown>,
+    smaller = "Request a smaller run page or inspect a large plan in the dashboard.",
+  ) {
     try {
       const value = await action();
       const text = ha.redact(JSON.stringify(value));
       if (Buffer.byteLength(text) > 256 * 1024)
-        throw new SafeError(
-          "Tool output exceeds 256 KiB. Request a smaller run page or inspect a large plan in the dashboard.",
-        );
+        throw new SafeError(`Tool output exceeds 256 KiB. ${smaller}`);
       return {
         content: [{ type: "text" as const, text }],
         structuredContent: JSON.parse(text),
@@ -238,8 +246,9 @@ export function createServer(ha: HaClient) {
       annotations: read,
     },
     ({ room_id, ...filters }) =>
-      result(() =>
-        v2("journal_query", { room_id, ...filters }, journalPage, room_id),
+      result(
+        () => v2("journal_query", { room_id, ...filters }, journalPage, room_id),
+        "Lower limit and read the rest with the answered cursor.",
       ),
   );
   server.registerTool(
@@ -280,6 +289,114 @@ export function createServer(ha: HaClient) {
     () => result(() => v2("system_status_get", {}, systemStatus)),
   );
   server.registerTool(
+    "get_timer_programs",
+    {
+      description:
+        "Read one room's timer programs (G7): each program's id, name, type, zones, duration, window and next shot, and the revision a timer save takes.",
+      inputSchema: z.strictObject({ room_id: roomId }),
+      annotations: read,
+    },
+    ({ room_id }) =>
+      result(() =>
+        v2("timer_program_list", { room_id }, timerPrograms, room_id, (value) =>
+          only(room_id)(value.programs),
+        ),
+      ),
+  );
+  const preview = { ...read, idempotentHint: false };
+  const hours = z.number().min(1).max(168).optional();
+  const targetZones = z
+    .array(z.number().int().min(1).max(64))
+    .min(1)
+    .max(64)
+    .optional();
+  const writesNote =
+    " Returns the complete diff, expected revision, HA's own dry-run answer as `preview`, and an expiring token; no HA write.";
+  server.registerTool(
+    "preview_timer_program",
+    {
+      description:
+        "Prepare a new timer program (no id) or a replacement of one (its id from get_timer_programs) for one room, checked by HA timer_program_preview over the next `hours` (default 24). A save replaces the whole program; left out, active is true and the window is all day." +
+        writesNote,
+      inputSchema: z.strictObject({
+        room_id: roomId,
+        program: timerProgram,
+        hours,
+      }),
+      annotations: preview,
+    },
+    ({ room_id, program, hours }) =>
+      result(() => workspace.previewTimer(room_id, program, hours)),
+  );
+  server.registerTool(
+    "preview_alert_rule",
+    {
+      description:
+        "Prepare a new threshold alert rule (no id) or a replacement of one (its id from get_alert_rules) for one room, replayed by HA alert_rule_preview over the last `hours` (default 24). Rules only notify." +
+        writesNote,
+      inputSchema: z.strictObject({ room_id: roomId, rule: alertRule, hours }),
+      annotations: preview,
+    },
+    ({ room_id, rule, hours }) =>
+      result(() => workspace.previewRule(room_id, rule, hours)),
+  );
+  server.registerTool(
+    "preview_preset_apply",
+    {
+      description:
+        "Prepare applying a saved preset to one room, or to listed zones of it, with HA preset_apply in preview. Writes the room's own numbers, never runs a pump. Refused when HA already says it cannot write a value." +
+        writesNote,
+      inputSchema: z.strictObject({
+        room_id: roomId,
+        preset_id: z.string().trim().min(1).max(100),
+        zones: targetZones,
+      }),
+      annotations: preview,
+    },
+    ({ room_id, preset_id, zones }) =>
+      result(() => workspace.previewPreset(room_id, preset_id, zones)),
+  );
+  server.registerTool(
+    "preview_copy_config",
+    {
+      description:
+        "Prepare copying settings sections (targets, phase_timing, water_limits, timers) from a room or zone to one room, or to listed zones of it, with HA copy_config in preview. Refused when HA already says it cannot write a value." +
+        writesNote,
+      inputSchema: z.strictObject({
+        room_id: roomId,
+        from: source,
+        zones: targetZones,
+        sections,
+      }),
+      annotations: preview,
+    },
+    ({ room_id, from, zones, sections }) =>
+      result(() => workspace.previewCopy(room_id, from, sections, zones)),
+  );
+  server.registerTool(
+    "preview_probe_offset",
+    {
+      description:
+        "Prepare one moisture probe's offset (percentage points), curve (or none), or the offset that makes it read a handheld meter (match_handheld), with HA probe_offset_set in preview. A handheld match is stored as the offset HA worked out." +
+        writesNote,
+      inputSchema: probeOffset,
+      annotations: preview,
+    },
+    ({ room_id, ...change }) =>
+      result(() => workspace.previewProbeOffset(room_id, change)),
+  );
+  server.registerTool(
+    "preview_supply",
+    {
+      description:
+        "Prepare the site's water supply (site-wide, no room): irrigation pumps with max_flow_lph and max_concurrent_zones, and optionally water sources, zone groups and zone flow meters ({room_id: {zone: value}}), with HA supply_save in preview and its capacity check. A section left out is kept." +
+        writesNote,
+      inputSchema: supplyChanges,
+      annotations: preview,
+    },
+    (changes) => result(() => workspace.previewSupply(changes)),
+  );
+  server.registerTool(
     "preview_setup",
     {
       description:
@@ -304,10 +421,10 @@ export function createServer(ha: HaClient) {
     "apply_proposal",
     {
       description:
-        "Apply only the exact server-stored proposal after the user has reviewed its complete diff and authorized it. Requires CROP_STEERING_ALLOW_WRITES=true, matching room/revision, unchanged configuration and unexpired single-use token. Reads back the result. No retry after an uncertain write; inspect HA and make a new proposal.",
+        "Apply only the exact server-stored proposal after the user has reviewed its complete diff and authorized it. Requires CROP_STEERING_ALLOW_WRITES=true, matching room/revision (no room_id for a supply proposal), unchanged configuration and unexpired single-use token. Reads back the result: a revisioned store must be at expected_revision + 1 with the reviewed values; a preset or copy must preview again with nothing left to change. No retry after an uncertain write; inspect HA and make a new proposal.",
       inputSchema: z.strictObject({
         proposal_token: z.string().regex(/^[a-f0-9]{64}$/),
-        room_id: roomId,
+        room_id: roomId.optional(),
         expected_revision: z.number().int().nonnegative(),
       }),
       annotations: {

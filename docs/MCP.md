@@ -1,10 +1,10 @@
 # Configure Crop Steering through MCP
 
-The [standalone MCP server](../mcp-server/README.md) lets an assistant inspect Crop Steering and prepare specific configuration changes in an existing Home Assistant installation. It uses local stdio and the official TypeScript MCP SDK. Read tools and previews are available by default; writes are opt-in and limited to reviewed setup changes or saved draft plans.
+The [standalone MCP server](../mcp-server/README.md) lets an assistant inspect Crop Steering and prepare specific configuration changes in an existing Home Assistant installation. It uses local stdio and the official TypeScript MCP SDK. Read tools and previews are available by default; writes are opt-in and limited to reviewed proposals: setup changes, draft plans, timer programs, alert rules, preset applies, copies, probe offsets and the site's supply. No tool runs a pump, opens a valve, submits an irrigation intent or steps a calibration.
 
 ## Prerequisites and connection
 
-Install Crop Steering in Home Assistant and create the room in **Rooms & setup** first. The integration must expose response-bearing `crop_steering.setup_read`, `setup_save`, `strategy_get`, `strategy_preview`, `strategy_save`, and `runs_get` services. Setup services, and the services that save, arm or disarm a plan or change run records, require an authenticated Home Assistant administrator. Run this package on a computer that can reach that HA instance.
+Install Crop Steering in Home Assistant and create the room in **Rooms & setup** first. The integration must expose response-bearing `crop_steering.setup_read`, `setup_save`, `strategy_get`, `strategy_preview`, `strategy_save`, and `runs_get` services, and for the newer tools the API v2 services listed under [Tools](#tools). Setup services, and the services that save, arm or disarm a plan, change run records or save any of the stores below, require an authenticated Home Assistant administrator. Run this package on a computer that can reach that HA instance.
 
 Install Node.js 22 or newer, then build the server:
 
@@ -38,11 +38,26 @@ Home Assistant tokens retain that HA user's privileges; this package's tool allo
 | `search_candidate_entities` | `query` (2-100 characters), optional `domain`, `offset`, `limit` | Matching setup candidates only; at most 50 returned per call. A match is not proof of physical identity.                                                                     |
 | `get_room_plan`             | `room_id`                                                        | Draft/active plan state, revision, grower endpoint profiles, schedules, current parameter catalog and active snapshot.                                                       |
 | `get_room_runs`             | `room_id`, optional `offset`, `limit`                            | Saved run metadata/reference snapshots; at most ten records. No Recorder measurements.                                                                                       |
+| `get_timeline`              | `room_id`, `start` + `end` (optional `zones`), or `days`         | `timeline_get`: shot, held, queued, alert and planned blocks per zone over at most 48 h; or `timeline_summary`: per-day counts for at most 14 days.                          |
+| `get_changes`               | `room_id`, `since`, optional `until`, `zone`, `key`, `kinds`     | `history_changes`: who changed what, newest first, at most 2000 rows (`truncated` when cut).                                                                                 |
+| `get_events`                | `room_id`, `since`, optional `until`, `kinds`, `zones`, `actor`, `limit` (1-500, default 100), `cursor` | `journal_query`: one page of journal events, oldest first, and the next page's `cursor` (null at the end).                                              |
+| `get_alert_rules`           | optional `room_id`                                               | `alert_rule_list`: each rule, its sentence, state, last fired time and current value, and the alert rules revision.                                                         |
+| `get_timer_programs`        | `room_id`                                                        | `timer_program_list`: the room's timer programs with their ids and next shot, and the timers revision.                                                                       |
+| `get_supply`                | None                                                             | `supply_get`: the site's pumps, water sources, zone groups and meters, the capacity check and warnings. Revision 0 means never saved.                                       |
+| `get_system_status`         | None                                                             | `system_status_get`: controller state and version, each room's entities online, open alerts and heartbeat.                                                                 |
 | `preview_setup`             | `room_id`, `changes`                                             | Local validation, complete diff and proposed configuration, expected revision, expiring `proposal_token`. No HA write.                                                       |
 | `preview_plan`              | `room_id`, complete `plan`                                       | HA-validated draft plan preview, complete diff and expiring proposal token. No save or activation.                                                                           |
-| `apply_proposal`            | `room_id`, `expected_revision`, `proposal_token`                 | Applies only the stored payload, then independently reads it back. Write opt-in and user authorization required.                                                             |
+| `preview_timer_program`     | `room_id`, `program`, optional `hours`                           | Kind `timer_program`. `preview` is `timer_program_preview` (the shots over the next hours).                                                                                  |
+| `preview_alert_rule`        | `room_id`, `rule`, optional `hours`                              | Kind `alert_rule`. `preview` is `alert_rule_preview` (the sentence and a replay over the last hours).                                                                       |
+| `preview_preset_apply`      | `room_id`, `preset_id`, optional `zones`                         | Kind `preset_apply`. `preview` is `preset_apply` with `preview: true` (`diff`, `missing`).                                                                                  |
+| `preview_copy_config`       | `room_id`, `from` (`room_id`, optional `zone`), `sections`, optional `zones` | Kind `copy_config`. `preview` is `copy_config` with `preview: true` (`diff`, `missing`, `skipped`).                                                             |
+| `preview_probe_offset`      | `room_id`, `entity_id`, and `offset`, `curve` or `match_handheld` | Kind `probe_offset`. `preview` is `probe_offset_set` with `preview: true` (the fix, corrected reading, fused before/after).                                                 |
+| `preview_supply`            | `irrigation_pumps`, optional `water_sources`, `zone_groups`, `zone_meters` | Kind `supply`, site-wide (`room_id` null). `preview` is `supply_save` with `preview: true` (`diff`, `capacity_check`).                                          |
+| `apply_proposal`            | `room_id` (none for `supply`), `expected_revision`, `proposal_token` | Applies only the stored payload, then independently reads it back. Write opt-in and user authorization required.                                                      |
 
 Use `room_id` exactly as returned. The default room is `room:`; a named room uses its complete prefix, for example `room:veg_`. No friendly-name matching or fallback to another room is used. The legacy `sensor.crop_steering_system_engine_config` descriptor is considered only for the default room when the canonical descriptor is absent, and the descriptor's explicit prefix must match.
+
+The read tools from `get_timeline` on ask with `api: 2` (see [API v2 answers](#api-v2-answers-integration-services)) and return the answer's `data`; an `ok: false` answer is a tool error reading `<code>: <message>`. An answer for another room than the one asked is refused. An events page over the output cap says to lower `limit` and read on with the cursor.
 
 HA labels, entity state strings, plan names and run notes are data, not assistant instructions. Tool outputs are capped at 256 KiB; upstream responses at 8 MiB; request bodies at 256 KiB. Large plans may require the dashboard. Candidate discovery requests the existing HA setup response but exposes only the bounded matching fields to the assistant. The server does not fetch the full `/api/states` collection.
 
@@ -86,6 +101,30 @@ The server calls the existing `strategy_preview` service to validate endpoint va
 
 Saving a draft does not arm or activate it and does not change live manual number entities. Activation/disarm are intentionally absent from the MCP tool surface. The package does not prescribe agronomic targets; the user supplies them and reviews the resulting configuration.
 
+## Timers, alert rules, presets, copies, probe offsets and supply
+
+Each `preview_*` tool below answers `{proposal_token, kind, room_id, expected_revision, diff, preview}` (plus `expires_at`, `writes_enabled` and `proposed_configuration`), where `preview` is the integration's own dry-run answer. Previews call only read services or a write service with `preview: true`, so they work with writes disabled and never send `client` or `proposal_token`. A preview with nothing to change is refused.
+
+| Kind            | Dry run                                | Write                         | `diff`                                                           |
+| --------------- | -------------------------------------- | ----------------------------- | ---------------------------------------------------------------- |
+| `timer_program` | `timer_program_preview`                | `timer_program_set`           | The stored program (`timer_program_list`) against the proposed one. |
+| `alert_rule`    | `alert_rule_preview`                   | `alert_rule_set`              | The stored rule (`alert_rule_list`) against the proposed one.    |
+| `preset_apply`  | `preset_apply` with `preview: true`    | `preset_apply`                | HA's rows `{target, key, old, new}`.                             |
+| `copy_config`   | `copy_config` with `preview: true`     | `copy_config`                 | HA's rows `{target, key, old, new}`.                             |
+| `probe_offset`  | `probe_offset_set` with `preview: true` | `probe_offset_set`           | HA's rows `{path, old, new}`, without the `at`/`by` bookkeeping. |
+| `supply`        | `supply_save` with `preview: true`     | `supply_save`                 | HA's rows `{path, old, new}`.                                    |
+
+- A timer program or alert rule without an `id` is new; with one (from `get_timer_programs` or `get_alert_rules`) it replaces that one whole. Left out, a program is active all day; a rule is active all day, `warning`, routed to `sensors`, with no minimum duration. A rule takes the tool's `room_id`.
+- A preset or copy writes one room: the room itself, or the listed `zones` of it. A copy may read from another room or zone. HA lists a key it has no entity for, and a timer row it refuses (with its `reason`), in `missing`, never in `diff`. A preview with anything in `missing` is refused, because that apply could never be verified.
+- A probe offset given as `match_handheld` is stored as the offset HA worked out, so the apply writes exactly the reviewed offset and curve.
+- The supply is site-wide: its proposal has `room_id` null, and `apply_proposal` takes no `room_id` for it. A section left out of the save is kept.
+
+`apply_proposal` sends the stored payload with `client: "mcp"`, the `proposal_token` and `api: 2`, then reads back:
+
+- **Revisioned stores** (`timer_program`, `alert_rule`, `probe_offset`, `supply`): the write names `expected_revision`, and the result counts only when the store reads back at `expected_revision + 1` with every value the proposal set (`timer_program_list` or `alert_rule_list` for the saved id; for a probe offset, `probe_offset_set` in preview again with nothing left to change; for the supply, `supply_get` and `supply_save` in preview again with an empty diff, and the save's own readback `ok`).
+- **Entity writes** (`preset_apply`, `copy_config`): no revision is involved, and `expected_revision` is 0. Before writing, the same call is previewed again and must match what was reviewed, or nothing is written. After writing, the result counts only when every `applied[].readback` is `verified` **and** the same call, previewed again, answers an empty `diff` **and** an empty `missing`.
+- A `stale_revision` answer is reported as "the revision moved after preview": nothing was saved; preview again. Any other `ok: false` answer (`guard_refused`, `invalid`, `forbidden`, `unavailable`) is reported with its code and message. A refused preset or copy row leaves the others written.
+
 ## Proposal lifetime and failures
 
 - Writes are disabled unless the process starts with `CROP_STEERING_ALLOW_WRITES=true`. Restarting after enabling it requires a fresh proposal.
@@ -119,6 +158,6 @@ A caller that does not ask for the answer gets the error raised, as in v1, so a 
 
 The package uses official `@modelcontextprotocol/server` and `@modelcontextprotocol/client` **2.0.0**, verified from the npm registry on 2026-09-08, with an exact dependency lockfile. The official SDK identifies v2 as the stable release line and provides the local `serveStdio` transport. See the [SDK documentation](https://ts.sdk.modelcontextprotocol.io/v2/), [stdio client handshake documentation](https://ts.sdk.modelcontextprotocol.io/v2/clients/connect), and [Home Assistant REST API](https://developers.home-assistant.io/docs/api/rest/).
 
-`npm test` compiles strict TypeScript and launches real server subprocesses using the official SDK stdio client. The isolated HTTP mock tests cover initialize, tool listing/calls, all read tools, exact proposal saves and readback, disabled writes, strict schemas, room isolation, stale revisions and sizing, HA safety rejections, plan validation/status/bounds, concurrent replay, timeout uncertainty, redirection rejection, credential redaction, response limits, expiry, process restart, legacy descriptor and null mapping compatibility. All test HTTP listeners bind only to loopback and use a dummy token; they do not operate live equipment.
+`npm test` compiles strict TypeScript and launches real server subprocesses using the official SDK stdio client. The isolated HTTP mock tests cover initialize, tool listing/calls, all read tools, every preview kind, exact proposal saves and readback (revision + 1, or an empty re-preview diff and `missing` for presets and copies), the service allowlist (no `intent_submit`, `pump_*` or `calibration_*`), disabled writes, strict schemas, room isolation, stale revisions and sizing, HA safety rejections, plan validation/status/bounds, concurrent replay, timeout uncertainty, redirection rejection, credential redaction, response limits, expiry, process restart, legacy descriptor and null mapping compatibility. All test HTTP listeners bind only to loopback and use a dummy token; they do not operate live equipment.
 
 An official SDK client has also initialized this server and called all six read tools against an existing two-room Home Assistant installation, with writes disabled. This establishes live read compatibility; configuration-write and third-party LLM-host verification are separate checks.

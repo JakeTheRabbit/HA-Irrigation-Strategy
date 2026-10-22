@@ -476,7 +476,24 @@ def test_list_carries_last_fired_firing_since_and_current_value():
     assert first["summary_sentence"] == "Tell when F2 tank level goes below 30%."
     assert second["id"] == quiet["id"] and second["state"] == "armed"
     assert (second["last_fired"], second["firing_since"]) == (None, None)
-    assert asyncio.run(evaluator.listing("room:veg_")) == {"rules": []}
+    assert asyncio.run(evaluator.listing("room:veg_")) == {"rules": [], "revision": 2}
+
+
+def test_the_listing_answers_the_alert_rules_revision_a_save_takes():
+    _hass, evaluator, site = rig()
+    assert asyncio.run(evaluator.listing())["revision"] == 0
+    save(
+        site,
+        {
+            "room_id": ROOM,
+            "source": "zone.vwc",
+            "zones": [1],
+            "op": "below",
+            "threshold": 30,
+        },
+    )
+    listed = asyncio.run(evaluator.listing(ROOM))
+    assert listed["revision"] == site.document["alert_rules_revision"] == 1
 
 
 def test_saves_take_the_revision_and_a_delete_takes_the_rule_away():

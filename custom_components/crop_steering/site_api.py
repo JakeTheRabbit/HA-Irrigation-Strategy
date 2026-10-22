@@ -986,7 +986,8 @@ class RuleEvaluator:
                     "unit": rule["unit"],
                 }
             )
-        return {"rules": out}
+        # The revision alert_rule_set takes as expected_revision (site-wide, whatever room is asked).
+        return {"rules": out, "revision": self.site.document["alert_rules_revision"]}
 
     async def history(self, rule, hours) -> list:
         """The rule's value over the last `hours` from the recorder: [(local time, value)]."""

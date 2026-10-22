@@ -173,6 +173,13 @@ def test_a_write_needs_the_current_revision_and_a_preview_does_not(journal):
     assert backing.saves == 0
 
 
+def test_a_preview_answers_the_revision_a_write_must_name(journal):
+    _hass, store, _backing = rig()
+    assert put(store, offset=1.0, preview=True)["revision"] == 0
+    put(store, offset=1.0)
+    assert put(store, offset=2.0, preview=True)["revision"] == 1
+
+
 def test_no_offsets_publishes_no_corrected_sensors(journal):
     hass, store, _backing = rig()
     store.sync_corrected()

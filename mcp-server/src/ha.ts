@@ -1,21 +1,17 @@
 import { v2Answer } from "./schemas.js";
 
-export class SafeError extends Error {}
-export type Service =
-  | "setup_read"
-  | "setup_save"
-  | "strategy_get"
-  | "strategy_preview"
-  | "strategy_save"
-  | "runs_get"
-  | "journal_query"
-  | "timeline_get"
-  | "timeline_summary"
-  | "history_changes"
-  | "supply_get"
-  | "system_status_get"
-  | "alert_rule_list";
-const services = new Set<Service>([
+// `code`: the API v2 error code of a refused answer (stale_revision, guard_refused, ...).
+export class SafeError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
+// Every Crop Steering service this process may call. Nothing that moves hardware (intent_submit,
+// pump_*, calibration_*) is here.
+export const SERVICES = [
   "setup_read",
   "setup_save",
   "strategy_get",
@@ -29,6 +25,29 @@ const services = new Set<Service>([
   "supply_get",
   "system_status_get",
   "alert_rule_list",
+  "timer_program_list",
+  "timer_program_preview",
+  "alert_rule_preview",
+  "timer_program_set",
+  "alert_rule_set",
+  "preset_apply",
+  "copy_config",
+  "probe_offset_set",
+  "supply_save",
+] as const;
+export type Service = (typeof SERVICES)[number];
+const services = new Set<Service>(SERVICES);
+// The writes, gated by CROP_STEERING_ALLOW_WRITES. The last four also dry-run with `preview: true`,
+// which is not gated.
+const writes = new Set<Service>([
+  "setup_save",
+  "strategy_save",
+  "timer_program_set",
+  "alert_rule_set",
+  "preset_apply",
+  "copy_config",
+  "probe_offset_set",
+  "supply_save",
 ]);
 export interface Config {
   url: string;
@@ -155,7 +174,7 @@ export class HaClient {
   ): Promise<unknown> {
     if (!services.has(service))
       throw new SafeError("Unsupported Crop Steering service.");
-    if (service.endsWith("_save") && !this.config.writes)
+    if (writes.has(service) && data.preview !== true && !this.config.writes)
       throw new SafeError(
         "Writes are disabled. Set CROP_STEERING_ALLOW_WRITES=true and restart to allow reviewed configuration saves.",
       );
@@ -192,6 +211,7 @@ export class HaClient {
         error
           ? `${error.code}: ${this.redact(error.message).slice(0, 600)}`
           : `Home Assistant refused ${service}.`,
+        error?.code,
       );
     }
     return answer.data.data;

@@ -710,7 +710,13 @@ class CalibrationStore:
             if curve is not None:
                 out["warning"] = CURVE_WARNING
             if preview:
-                return {**out, "preview": True, "diff": diff}
+                # The revision a write of this change must name as expected_revision.
+                return {
+                    **out,
+                    "preview": True,
+                    "diff": diff,
+                    "revision": self.document["revision"],
+                }
             document = {
                 **self.document,
                 "revision": self.document["revision"] + 1,
