@@ -143,7 +143,7 @@ export function PresetsPanel({
 
   const result = preview?.kind === "ok" ? preview.data : null;
   const rows = result && !copied ? diffRows(result.diff, words) : [];
-  const missing = result ? notCopiedLines(result.missing, words) : [];
+  const missing = result ? notCopiedLines(result.missing, words, result.skipped ?? []) : [];
   const toNames = targets.map(words.target).join(" and ");
   const cards = [
     { id: "room", title: planName, sub: `Running in ${roomName} · its live settings` },
@@ -228,7 +228,7 @@ export function PresetsPanel({
           className={saved.error ? "error-text" : "preset-saved"}
         >
           {saved.text}
-          {saved.skipped && <span className="preset-skipped">{saved.skipped}</span>}
+          {saved.skipped && <span className="preset-skipped">{` ${saved.skipped}`}</span>}
         </p>
       )}
 

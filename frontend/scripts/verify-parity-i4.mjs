@@ -14,9 +14,9 @@
  * - 3.18: Copy to room: the room tree picks (the sidebar on desktop, a bottom sheet on a phone),
  *   Room A is not offered; the preview lists 3 changes, old struck, and "Not copied: P2 dilute ratio
  *   (Room B has no such setting)"; "Copy 3 changes to Room B" writes, "Written and read back HH:MM"
- *   names the setting not copied; Undo puts every value back;
+ *   names the setting not copied and claims only the values written; Undo puts every value back;
  * - 3.18 desktop: from Room B to Room A, Room B has no timer programs: the receipt names the rows
- *   written and the timers not copied, and offers no Undo;
+ *   written and the timers not copied, and says Undo is not available here (History › Changes);
  * - 3.18: the browser recipe library sits under "On this browser";
  * - 3.17: the presets panel shows "Needs integration 3.18"; the grow plan and the browser recipes work.
  * Also writes full-page light and dark screenshots of each run beside the harness's own. */
@@ -150,6 +150,8 @@ await runParity({
     await receipt.waitFor();
     assert.match(await receipt.innerText(), /Written and read back 14:10/, `${label}: read back`);
     assert.match(await receipt.innerText(), /Not copied: P2 dilute ratio \(Room B has no such setting\)\./, `${label}: receipt names it`);
+    assert.match(await receipt.innerText(), /Controller confirmed every value written/, `${label}: no full-copy claim`);
+    assert.doesNotMatch(await receipt.innerText(), /Undo not available/, `${label}: Undo by event ids`);
     await shoot("copied");
     region("copy receipt");
     await receipt.getByRole("button", { name: "Undo: write back the previous values" }).click();
@@ -172,6 +174,8 @@ await runParity({
       await done.waitFor();
       assert.match(await done.innerText(), /Not copied: Timer programs \(source room has no timer programs\)\./);
       assert.equal(await done.getByRole("button", { name: /^Undo/ }).count(), 0, `${label}: nothing to undo by id`);
+      assert.match(await done.innerText(), /Undo not available here: put the written values back from History\./);
+      assert.equal(await done.getByRole("link", { name: "Open History › Changes" }).getAttribute("href"), "#/history/changes");
       await shoot("from-room-b");
       region("not copied receipt");
     }

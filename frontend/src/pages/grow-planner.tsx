@@ -14,7 +14,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { UiTip } from "@/components/info-tip";
+import { InfoTip, UiTip } from "@/components/info-tip";
 import {
   Dialog,
   DialogContent,
@@ -959,6 +959,10 @@ export function GrowPlanner({
                             <span className="eyebrow">
                               {exceptionInDraft ? "Exception · in draft" : "Exception"}
                             </span>
+                            <InfoTip
+                              label="Exception"
+                              copy={{ tooltip: "A one-day schedule block" }}
+                            />
                             <p>
                               Day {day}: {exception.bias}% generative,{" "}
                               {plan.profiles.find((p) => p.id === exception.profile_id)?.name ??

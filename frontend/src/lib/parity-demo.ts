@@ -8,7 +8,6 @@ import type {
   CsEvent,
   DashboardList,
   HistoryChange,
-  PresetDiff,
   SupplyDoc,
   SystemStatus,
   TimelineBlock,
@@ -193,13 +192,6 @@ const preview = (now: number): AlertPreview => ({
   sentence: "It wouldn't have fired in the last 24 h. Lowest was 46%.",
 });
 
-const presetDiff = (data: Record<string, unknown>): PresetDiff => {
-  const diff = [{ target: { room_id: "room:room_b_", zone: 1 }, key: "p1_target_vwc", old: 65, new: 66 }];
-  return data.preview === false || data.preview === undefined
-    ? { diff, applied: diff.map(({ target, key }) => ({ target, key, readback: "verified" as const })) }
-    : { diff };
-};
-
 const status = (now: number): SystemStatus => ({
   controller: "running", addon_version: "3.18.0", ha_version: "2026.10.1",
   ai: { model: "claude-haiku-4-5", calls_today: 42, daily_budget: 200, pct_used: 21 },
@@ -232,8 +224,12 @@ const DASHBOARDS: DashboardList = {
   ],
 };
 
-/** Task 3's answer for every parity action: plausible, deterministic for `now`. */
-const DEFAULTS: Record<ParityAction, (data: Record<string, unknown>, now: number) => unknown> = {
+/** The presets and copy_config: OperatorDemo answers them from the demo's own states
+ * (parity-demo/presets.ts). */
+type StatefulAction = "preset_list" | "preset_save" | "preset_apply" | "preset_delete" | "copy_config";
+const STATEFUL: readonly string[] = ["preset_list", "preset_save", "preset_apply", "preset_delete", "copy_config"];
+/** Task 3's answer for every other parity action: plausible, deterministic for `now`. */
+const DEFAULTS: Record<Exclude<ParityAction, StatefulAction>, (data: Record<string, unknown>, now: number) => unknown> = {
   // Never reached: parity-demo/journal.ts always answers journal_query (the record needs a key).
   journal_query: () => ({ events: [], cursor: null }),
   timeline_get: timeline,
@@ -271,11 +267,6 @@ const DEFAULTS: Record<ParityAction, (data: Record<string, unknown>, now: number
     return { preview, shots: preview.length, total_s: preview.length * 120 };
   },
   timer_skip: (d) => ({ skip: { zone: d.zone ?? null, at: d.at ?? null, until: typeof d.at === "string" ? iso(Date.parse(d.at) + 15 * 60_000) : null }, revision: 2 }),
-  preset_list: () => ({ presets: [{ id: "01JDEMOPRESETBULKWEEK5000", name: "Bulk week 5", scope: "targets", from: { room_id: "room:" } }], revision: 1 }),
-  preset_save: (d, now) => ({ id: demoId(now, `preset:${String(d.name)}`), name: d.name ?? "Preset", scope: d.scope ?? "targets", from: d.from ?? null, revision: 2 }),
-  preset_apply: presetDiff,
-  preset_delete: (d) => ({ id: d.id ?? null, revision: 2 }),
-  copy_config: presetDiff,
   dashboard_create: (d) => ({ url_path: `crop-steering-${String(d.template ?? "facility_wall")}-1`, title: d.title ?? "Crop Steering" }),
   dashboard_list: () => structuredClone(DASHBOARDS),
   system_status_get: (_d, now) => status(now),
@@ -291,6 +282,7 @@ export async function parityDemo(
 ): Promise<unknown> {
   if (backend === "3.17" || !(PARITY_ACTIONS as readonly string[]).includes(action)) throw missingServiceError(action);
   const handler = LANE_HANDLERS.find((h) => h.action === action && (!h.match || h.match(data)));
-  const answer = handler ? handler.answer(data, now) : DEFAULTS[action](data, now);
+  if (!handler && STATEFUL.includes(action)) throw new Error(`${action} needs the demo's states: OperatorDemo answers it.`);
+  const answer = handler ? handler.answer(data, now) : DEFAULTS[action as Exclude<ParityAction, StatefulAction>](data, now);
   return isRecord(answer) && answer.api === 2 ? answer : demoEnvelope(answer, now, data.room_id);
 }

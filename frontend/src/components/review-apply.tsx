@@ -28,12 +28,17 @@ export interface ApplyReceipt {
   at: number;
   ok: boolean;
   unconfirmed?: boolean;
-  failed: { id: string; holds: string }[];
+  /** `label`: the row's own words, for a receipt shown after its rows have gone. */
+  failed: { id: string; holds: string; label?: string }[];
   /** Rows written but not read back (a 3.17 write, row by row): they may have taken, so the
    * receipt names them without saying what the controller holds. */
   notConfirmed?: string[];
   /** What the apply left out on purpose, each with why (a copy's missing settings). */
   notCopied?: string[];
+  /** Values were written but no Journal events came back: Undo here cannot put them back. */
+  undoUnavailable?: boolean;
+  /** Rows the apply wrote that the reviewed rows did not show: the receipt then claims nothing. */
+  alsoWritten?: string[];
   summary: string;
   by?: string;
   eventIds: string[];
@@ -135,6 +140,13 @@ export type ApplyState =
   /** `reverted`: how many of the receipt's changes were put back before the undo stopped. */
   | { phase: "undo-failed"; receipt: ApplyReceipt; message: string; reverted: number };
 
+/** Where the Journal's changes are put back one by one. */
+const historyNote = (
+  <span className="review-apply-undo-note">
+    {"Undo not available here: put the written values back from History. "}
+    <a href="#/history/changes">Open History › Changes</a>
+  </span>
+);
 const notCopiedText = (r: ApplyReceipt) => (r.notCopied?.length ? `Not copied: ${r.notCopied.join("; ")}.` : "");
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const isReceipt = (r: ApplyReceipt | Refusal): r is ApplyReceipt => "ok" in r;
@@ -360,6 +372,13 @@ export function ReviewApplyView(
       );
     }
     if (!result.ok) {
+      if (result.unconfirmed && result.alsoWritten?.length)
+        return (
+          <div role="alert" className="review-apply-error">
+            <span>{`The copy changed more than the preview showed. Check History. Also written: ${result.alsoWritten.join(", ")}.`}</span>
+            <a href="#/history/changes">Open History › Changes</a>
+          </div>
+        );
       if (result.unconfirmed)
         return (
           <div role="alert" className="review-apply-error">
@@ -378,9 +397,9 @@ export function ReviewApplyView(
       const holds =
         result.failed.length === 0
           ? ""
-          : result.failed.length === 1
+          : result.failed.length === 1 && !result.failed[0].label
             ? `Controller still holds ${result.failed[0].holds}.`
-            : result.failed.map((f) => `${labelOf(f.id)} is still ${f.holds}.`).join(" ");
+            : result.failed.map((f) => `${f.label ?? labelOf(f.id)} is still ${f.holds}.`).join(" ");
       const unsure = result.notConfirmed?.length
         ? `The controller did not confirm: ${result.notConfirmed.map(labelOf).join(", ")}.`
         : "";
@@ -401,6 +420,7 @@ export function ReviewApplyView(
               .filter(Boolean)
               .join(" ")}
           </span>
+          {result.undoUnavailable && historyNote}
           {n ? (
             <Button variant="outline" size="sm" onClick={props.onApply} disabled={busy}>
               Try again
@@ -419,7 +439,8 @@ export function ReviewApplyView(
           <b>Written and read back {clock(result.at, timeZone)}</b>
           {result.summary && <span>{result.summary}</span>}
           {result.notCopied?.length ? <span className="review-apply-not-copied">{notCopiedText(result)}</span> : null}
-          <small>Controller confirmed every value{result.by ? ` · by ${result.by}` : ""}</small>
+          {result.undoUnavailable && historyNote}
+          <small>{`Controller confirmed every value${result.notCopied?.length ? " written" : ""}${result.by ? ` · by ${result.by}` : ""}`}</small>
         </span>
         {props.undo ? (
           <Button

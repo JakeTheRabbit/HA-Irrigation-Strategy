@@ -145,7 +145,9 @@ describe("copyReceipt", () => {
     if (!isReceipt(r)) return;
     expect(r.ok).toBe(false);
     expect(r.unconfirmed).toBeUndefined();
-    expect(r.failed).toEqual([{ id: "room:f1_|p2_vwc_threshold", holds: "63%" }]);
+    expect(r.failed).toEqual([
+      { id: "room:f1_|p2_vwc_threshold", holds: "63%", label: "Re-water point" },
+    ]);
     expect(r.summary).toBe("Peak moisture 66% → 70%");
     // The refusal envelope lists no events: nothing to undo by id.
     expect(r.eventIds).toEqual([]);
@@ -159,7 +161,7 @@ describe("copyReceipt", () => {
         state: { phase: "done", result: r },
       }),
     );
-    expect(html).toContain("Controller still holds 63%.");
+    expect(html).toContain("Re-water point is still 63%.");
     expect(html).toContain("Peak moisture 66% → 70%: written and read back.");
     expect(html).not.toContain("Written and read back");
   });
@@ -310,9 +312,16 @@ describe("demo copy (3.18)", () => {
   const sections = ["targets", "phase_timing", "water_limits", "timers"];
   test("Room A to Room B: real diffs, one setting Room B has no entity for, applied, read back and undone", async () => {
     const c = demoController("?demo=1");
-    const preview = await callV2<PresetResult>(c, "copy_config", { from: roomA, to: [roomB], sections, preview: true });
+    const preview = await callV2<PresetResult>(c, "copy_config", {
+      from: roomA,
+      to: [roomB],
+      sections,
+      preview: true,
+    });
     if (preview.kind !== "ok") throw new Error("not ok");
-    expect(preview.data.diff.map((d) => [d.key, d.old, Array.isArray(d.new) ? d.new.length : d.new])).toEqual([
+    expect(
+      preview.data.diff.map((d) => [d.key, d.old, Array.isArray(d.new) ? d.new.length : d.new]),
+    ).toEqual([
       ["p1_target_vwc", 66, 70],
       ["p2_vwc_threshold", 63, 60],
       ["timers", [], 2],
@@ -325,35 +334,176 @@ describe("demo copy (3.18)", () => {
       "Maintenance shot when below: 63% → 60%",
       "Timer programs: none → 2 programs",
     ]);
-    const applied = await callV2<PresetResult>(c, "copy_config", { from: roomA, to: [roomB], sections });
+    const applied = await callV2<PresetResult>(c, "copy_config", {
+      from: roomA,
+      to: [roomB],
+      sections,
+    });
     const receipt = copyReceipt(applied, rows, words, AT);
     if (!isReceipt(receipt)) throw new Error("no receipt");
     expect(receipt.ok).toBe(true);
     expect(receipt.eventIds).toHaveLength(3);
     expect(receipt.notCopied).toEqual(["P2 dilute ratio (Room B has no such setting)"]);
-    const again = await callV2<PresetResult>(c, "copy_config", { from: roomA, to: [roomB], sections, preview: true });
+    const again = await callV2<PresetResult>(c, "copy_config", {
+      from: roomA,
+      to: [roomB],
+      sections,
+      preview: true,
+    });
     expect(again.kind === "ok" && again.data.diff).toEqual([]);
     expect(await revertEvents(c, receipt.eventIds)).toHaveLength(3);
-    const back = await callV2<PresetResult>(c, "copy_config", { from: roomA, to: [roomB], sections, preview: true });
-    expect(back.kind === "ok" && back.data.diff.map((d) => d.key)).toEqual(["p1_target_vwc", "p2_vwc_threshold", "timers"]);
+    const back = await callV2<PresetResult>(c, "copy_config", {
+      from: roomA,
+      to: [roomB],
+      sections,
+      preview: true,
+    });
+    expect(back.kind === "ok" && back.data.diff.map((d) => d.key)).toEqual([
+      "p1_target_vwc",
+      "p2_vwc_threshold",
+      "timers",
+    ]);
   });
 
   test("Room B to Room A: no timer programs to copy, so the apply is refused for that row and the rest stands", async () => {
     const c = demoController("?demo=1");
     const words = presetWords(c.states, c.rooms);
-    const preview = await callV2<PresetResult>(c, "copy_config", { from: roomB, to: [roomA], sections, preview: true });
+    const preview = await callV2<PresetResult>(c, "copy_config", {
+      from: roomB,
+      to: [roomA],
+      sections,
+      preview: true,
+    });
     if (preview.kind !== "ok") throw new Error("not ok");
-    expect(preview.data.missing).toEqual([{ target: roomA, key: "timers", reason: "source room has no timer programs" }]);
+    expect(preview.data.missing).toEqual([
+      { target: roomA, key: "timers", reason: "source room has no timer programs" },
+    ]);
     const rows = diffRows(preview.data.diff, words);
-    const applied = await callV2<PresetResult>(c, "copy_config", { from: roomB, to: [roomA], sections });
+    const applied = await callV2<PresetResult>(c, "copy_config", {
+      from: roomB,
+      to: [roomA],
+      sections,
+    });
     expect(applied.kind === "error" && applied.code).toBe("guard_refused");
     const receipt = copyReceipt(applied, rows, words, AT);
     expect(isReceipt(receipt) && receipt.ok).toBe(true);
     expect(isReceipt(receipt) && receipt.eventIds).toEqual([]);
-    expect(isReceipt(receipt) && receipt.notCopied).toEqual(["Timer programs (source room has no timer programs)"]);
+    expect(isReceipt(receipt) && receipt.notCopied).toEqual([
+      "Timer programs (source room has no timer programs)",
+    ]);
   });
 
   test("3.17 has no presets", async () => {
-    expect((await callV2(demoController("?demo=1&backend=3.17"), "preset_list", {})).kind).toBe("missing");
+    expect((await callV2(demoController("?demo=1&backend=3.17"), "preset_list", {})).kind).toBe(
+      "missing",
+    );
+  });
+});
+
+describe("fix round 1: a copy never claims more than it did", () => {
+  const rows = diffRows(DIFF, WORDS);
+  const view = (r: ApplyReceipt) =>
+    renderToStaticMarkup(
+      createElement(ReviewApplyView, {
+        rows: [],
+        layout: "panel",
+        apply: () => Promise.resolve(r),
+        onDiscard: () => {},
+        timeZone: NZ,
+        state: { phase: "done", result: r },
+      }),
+    );
+  const verified = DIFF.map(({ target, key }) => ({
+    target,
+    key,
+    readback: "verified" as const,
+    error: null,
+  }));
+  const NO_UNDO = "Undo not available here: put the written values back from History";
+
+  test("written and read back but no event ids: Undo is explained, with a link to History › Changes", () => {
+    const r = copyReceipt(
+      ok({ diff: DIFF, missing: [], applied: verified }, []),
+      rows,
+      WORDS,
+      AT,
+    ) as ApplyReceipt;
+    expect(r.ok).toBe(true);
+    expect(r.undoUnavailable).toBe(true);
+    const html = view(r);
+    expect(html).toContain(NO_UNDO);
+    expect(html).toContain('href="#/history/changes"');
+    // With event ids the Undo button does the job: no note.
+    const undoable = copyReceipt(
+      ok({ diff: DIFF, missing: [], applied: verified }),
+      rows,
+      WORDS,
+      AT,
+    ) as ApplyReceipt;
+    expect(undoable.undoUnavailable).toBeUndefined();
+    expect(view(undoable)).not.toContain(NO_UNDO);
+  });
+
+  test("a partial copy names the refused setting by its words and explains Undo", () => {
+    const r = copyReceipt(
+      {
+        kind: "error",
+        code: "guard_refused",
+        message: "Not applied",
+        data: {
+          diff: DIFF,
+          missing: [],
+          applied: [verified[0], { ...verified[1], readback: "refused", error: "x" }],
+        },
+      },
+      rows,
+      WORDS,
+      AT,
+    ) as ApplyReceipt;
+    expect(r.ok).toBe(false);
+    expect(r.undoUnavailable).toBe(true);
+    const html = view(r);
+    expect(html).toContain("Re-water point is still 63%.");
+    expect(html).not.toContain("room:f1_|");
+    expect(html).toContain(NO_UNDO);
+  });
+
+  test("skipped source keys are not copied, in the preview and the receipt, and no full copy is claimed", () => {
+    expect(notCopiedLines([], WORDS, ["p1_target_vwc"])).toEqual(["Peak moisture (no reading)"]);
+    const r = copyReceipt(
+      ok({ diff: DIFF, missing: [], applied: verified, skipped: ["p1_target_vwc"] }),
+      rows,
+      WORDS,
+      AT,
+    ) as ApplyReceipt;
+    expect(r.notCopied).toEqual(["Peak moisture (no reading)"]);
+    const html = view(r);
+    expect(html).toContain("Not copied: Peak moisture (no reading).");
+    expect(html).toContain("Controller confirmed every value written");
+    expect(html).not.toContain("Controller confirmed every value</small>");
+  });
+
+  test("an apply that wrote a row the preview did not show names it and claims nothing", () => {
+    const r = copyReceipt(
+      ok({
+        diff: DIFF,
+        missing: [],
+        applied: [
+          ...verified,
+          { target: F1, key: "maximum_ec", readback: "verified", error: null },
+        ],
+      }),
+      rows,
+      WORDS,
+      AT,
+    ) as ApplyReceipt;
+    expect(r.ok).toBe(false);
+    expect(r.unconfirmed).toBe(true);
+    expect(r.alsoWritten).toEqual(["maximum_ec"]);
+    const html = view(r);
+    expect(html).toContain("The copy changed more than the preview showed. Check History.");
+    expect(html).toContain("Also written: maximum_ec.");
+    expect(html).toContain('href="#/history/changes"');
+    expect(html).not.toContain("Written and read back");
   });
 });

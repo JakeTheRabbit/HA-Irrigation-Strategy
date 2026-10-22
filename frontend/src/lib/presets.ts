@@ -95,10 +95,19 @@ export function diffRows(diff: PresetResult["diff"], words: PresetWords): Review
 }
 
 /** "Timer programs (source room has no timer programs)": each setting a copy leaves out, and why. */
-export function notCopiedLines(missing: PresetMissing[], words: PresetWords): string[] {
-  return missing.map(
-    (m) => `${words.label(m.key)} (${m.reason ?? `${words.target(m.target)} has no such setting`})`,
-  );
+export function notCopiedLines(
+  missing: PresetMissing[],
+  words: PresetWords,
+  skipped: string[] = [],
+): string[] {
+  return [
+    ...missing.map(
+      (m) =>
+        `${words.label(m.key)} (${m.reason ?? `${words.target(m.target)} has no such setting`})`,
+    ),
+    // The source's settings with no reading: copy_config left them out.
+    ...skipped.map((key) => `${words.label(key)} (no reading)`),
+  ];
 }
 
 /** The settings `preset_save` left out because the source had no reading of them. */
@@ -153,12 +162,47 @@ export function copyReceipt(
   // A written row the answer does not account for may or may not have taken.
   if (rows.some((row) => !applied.some((a) => a.key === row.key && a.target === row.target)))
     status = "unverified";
+  const notCopied = notCopiedLines(missing, words, data.skipped ?? []);
+  const left = notCopied.length ? { notCopied } : {};
+  // A write the reviewed rows did not show (the source changed since the preview): name it and
+  // claim nothing.
+  const many = new Set(applied.map((a) => a.target)).size > 1;
+  const extra = applied.filter(
+    (a) =>
+      a.readback === "verified" &&
+      !rows.some((row) => row.key === a.key && row.target === a.target),
+  );
+  if (extra.length)
+    return {
+      at: now,
+      ok: false,
+      unconfirmed: true,
+      failed: rows.map((row) => ({ id: row.id, holds: row.before, label: row.label })),
+      alsoWritten: extra.map((a) =>
+        many
+          ? `${words.target(parseTarget(a.target))} · ${words.label(a.key)}`
+          : words.label(a.key),
+      ),
+      summary: "",
+      eventIds,
+      ...left,
+    };
   const receipt = receiptFromV2(
     { kind: "ok", data: { applied }, revision: null, readback: { status, at: null }, eventIds },
     rows,
     now,
   );
-  return missing.length ? { ...receipt, notCopied: notCopiedLines(missing, words) } : receipt;
+  const labelled = {
+    ...receipt,
+    failed: receipt.failed.map((f) => ({
+      ...f,
+      label: rows.find((row) => row.id === f.id)?.label,
+    })),
+    ...left,
+  };
+  // Values were written, but without their Journal events Undo here cannot put them back.
+  const wrote = !receipt.unconfirmed && receipt.failed.length < rows.length;
+  return wrote && !eventIds.length ? { ...labelled, undoUnavailable: true } : labelled;
 }
 
 /** A preset's scope in words. */
