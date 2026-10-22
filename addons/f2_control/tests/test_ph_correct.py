@@ -411,3 +411,9 @@ def test_the_rules():
     assert ph_correct.verdict("up", 5.6, None, 5.8, 6.5, 0.1) == "not read"
     assert ph_correct.dose_ml(5, 11.06, 2000) == 55 and ph_correct.dose_ml(5, 11.06, 20) == 20
     assert ph_correct.setting(None, "dose_s") == 5 and ph_correct.setting(99, "max_tries") == 3
+
+
+def test_a_band_that_cant_be_read_doses_nothing(build):
+    r = build(**{"number.crop_steering_irrigation_ph_max": "unavailable"})
+    minutes(r, 15)
+    assert presses(r) == []

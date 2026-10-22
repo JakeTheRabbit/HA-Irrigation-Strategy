@@ -2113,6 +2113,22 @@ class Controller:
             self._note_setting(entity, value, attributes)
         return value
 
+    def _feed_band(self, room, quantity):
+        """The room's feed `quantity` ("ec" or "ph") band as (low, high, unreadable): a bound of 0 or less is no
+        bound, and so is a setting Home Assistant does not have (404), as before. `unreadable` names a setting
+        that can't be read (unavailable, unknown, not a number, no answer): the band can't be known, so the
+        source-water gate holds and the mix check waits. The gate, the gate list and dosing all read it here."""
+        band = []
+        for end in ("min", "max"):
+            entity = f"number.crop_steering_{room.prefix}irrigation_{quantity}_{end}"
+            value = self._num_or_none(entity)
+            if value is None or not math.isfinite(value):
+                if value is not None or ha_get_status(entity)[0] != 404:
+                    return 0.0, 0.0, entity
+                value = 0.0
+            band.append(value)
+        return band[0], band[1], None
+
     def _note_setting(self, entity, value, attributes):
         """A setting read with another value than at its last read: the log says who changed it and
         how. The first read after a start only notes it; the controller's own writes are said where
@@ -3571,8 +3587,9 @@ class Controller:
         # out of the box on installs without a reservoir probe.
         if room.feed_ec_sensor:
             feed = self._read_feed_ec(room)
-            lo = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_min", 0)
-            hi = self._num(f"number.crop_steering_{room.prefix}irrigation_ec_max", 0)
+            lo, hi, unread = self._feed_band(room, "ec")
+            if unread:
+                return f"source-water EC band unreadable ({unread}) — holding (fail-closed)"
             if lo > 0 or hi > 0:
                 if feed is None:
                     if not feed_grace_ok(
@@ -3593,8 +3610,9 @@ class Controller:
         # pH half of the source-water gate — bad-pH feed locks out nutrients / burns roots, so
         # gate it too, but only when a feed-pH sensor is configured.
         if room.feed_ph_sensor:
-            ph_lo = self._num(f"number.crop_steering_{room.prefix}irrigation_ph_min", 0)
-            ph_hi = self._num(f"number.crop_steering_{room.prefix}irrigation_ph_max", 0)
+            ph_lo, ph_hi, unread = self._feed_band(room, "ph")
+            if unread:
+                return f"source-water pH band unreadable ({unread}) — holding (fail-closed)"
             if ph_lo > 0 or ph_hi > 0:
                 ph = self._read_feed_ph(room)
                 if ph is None:

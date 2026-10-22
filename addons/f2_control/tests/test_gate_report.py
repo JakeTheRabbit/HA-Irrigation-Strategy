@@ -140,3 +140,27 @@ def test_dead_feed_gate_matches_the_shots_rescue_only_exception(kind, bypass, re
     assert gate_report.first_hold(gates) == c._blocked(room, 1, reason)
     fake.set_state(KILL, "off")
     assert gate_report.first_hold(gate_report.report(c, room, 1, reason)) == c._blocked(room, 1, reason)
+
+
+@pytest.mark.parametrize("band", ["unavailable", "unknown", "not a number", "absent"])
+@pytest.mark.parametrize("half", ["ec", "ph"])
+def test_an_unreadable_feed_band_holds_and_an_absent_one_is_no_band(band, half):
+    """A band setting that can't be read is not "no band": an out-of-band feed would pass. It holds, fail-closed,
+    and the gate list says the same. One Home Assistant does not have (404) is no band, as before."""
+    c, fake, room = _room()
+    probe = f"sensor.feed_{half}"
+    setattr(room, f"feed_{half}_sensor", probe)
+    fake.set_state(probe, "9.9", {"unit_of_measurement": "pH" if half == "ph" else "mS/cm"})
+    entity = f"number.crop_steering_irrigation_{half}_max"
+    fake.set_state(entity, "3.0")
+    out = c._blocked(room, 1)
+    assert out.startswith(f"source-water {half.upper() if half == 'ec' else 'pH'} 9.9")
+    if band == "absent":
+        del fake.states[entity]
+    else:
+        fake.set_state(entity, band)
+    held = c._blocked(room, 1)
+    name = "EC" if half == "ec" else "pH"
+    assert held == (None if band == "absent"
+                    else f"source-water {name} band unreadable ({entity}) — holding (fail-closed)")
+    assert gate_report.first_hold(gate_report.report(c, room, 1)) == held
