@@ -1267,13 +1267,25 @@ notify_save:
       required: false
       selector:
         object:
+# A recipients row may carry quiet_hours: {from: "HH:MM", to: "HH:MM"} (00:00 to 23:59, may cross midnight; from
+# and to must differ), or null for none (the default; a row saved before has none, a row sent without it keeps its
+# own). Inside the window, in Home Assistant's time zone, a push to that phone that is not critical waits in its
+# digest queue, even with digest off, and goes as one push when the window ends. The controller's non-critical
+# "not watering" warnings (NOT_WATERING_CODES, e.g. CS-206, CS-316) wait too: only critical codes break through.
+# notify_test takes `service` (one phone -> {sent, error}) or `services` (several -> {results: [{service, sent,
+# error}]}), not both.
 notify_test:
   fields:
     service:
-      required: true
+      required: false
       example: "notify.mobile_app_my_phone"
       selector:
         text:
+    services:
+      required: false
+      example: '["notify.mobile_app_my_phone", "notify.mobile_app_office_tablet"]'
+      selector:
+        object:
 notify:
   fields:
     key:

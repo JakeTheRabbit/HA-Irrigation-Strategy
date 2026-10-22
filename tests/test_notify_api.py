@@ -262,6 +262,7 @@ def test_saving_moves_the_revision_and_a_stale_or_invalid_save_changes_nothing()
         "rooms": [],
         "urgent_high_priority": True,
         "digest": False,
+        "quiet_hours": None,
     }
     assert (group["name"], group["rooms"], group["user_id"]) == (
         "Everyone",

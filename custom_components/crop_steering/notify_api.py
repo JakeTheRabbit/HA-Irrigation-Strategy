@@ -12,6 +12,13 @@ A row may take a digest instead (`digest`): what is not an emergency waits, and 
 every `digest_hours`, grouped by severity. A room can be muted until a time (`mutes`): nothing but an emergency
 is pushed for it meanwhile, and the sensor's `muted` attribute tells the controller so.
 
+A row may have quiet hours (`quiet_hours`, {from, to} as HH:MM in Home Assistant's own time zone; it may cross
+midnight): inside them a push to that phone that is not critical joins its digest queue, even when it takes no
+digest, and goes to it as one push when the window ends (the queue is checked every minute; it is held in memory,
+so a restart drops what waits, as for a digest). The controller's non-critical "not watering" warnings
+(NOT_WATERING_CODES, e.g. CS-206, CS-316) wait as well. Only a critical push breaks through: one marked urgent or
+with a critical code. A push whose code or event this version does not know is never held.
+
 Nothing here is needed for watering: a store that can't be read, a phone that fails, or no store at all only
 changes who gets a push.
 """
@@ -69,6 +76,10 @@ ISSUE_EVENT = "repairs_issue_registry_updated"  # issue_registry.EVENT_REPAIRS_I
 # line), as the controller app repeats an alert at most every 30 minutes.
 CARD_QUIET_S = 1800
 SERVICE_ID = re.compile(r"notify\.[a-z0-9_]+")
+# A quiet hours bound: 00:00 to 23:59.
+CLOCK = re.compile(r"([01][0-9]|2[0-3]):[0-5][0-9]")
+# Every code a kind lists: a push with another code is not known here, and quiet hours never hold it.
+KNOWN_CODES = frozenset(code for kind in notify_catalog.KINDS for code in kind["codes"])
 # A room prefix: "" (the default room) or "<slug>_".
 ROOM = re.compile(r"(?:[a-z0-9_]*_)?")
 UNNAMED = ("default", "crop steering", "crop steering system")
@@ -125,6 +136,39 @@ def _flag(value, where, name="urgent_high_priority", default=True) -> bool:
     return value
 
 
+def _quiet_hours(value, where) -> dict | None:
+    """A row's quiet hours: None, or {"from": "HH:MM", "to": "HH:MM"} with from and to different."""
+    if value is None:
+        return None
+    if (
+        not isinstance(value, dict)
+        or set(value) != {"from", "to"}
+        or not all(isinstance(v, str) and CLOCK.fullmatch(v) for v in value.values())
+    ):
+        raise NotifyError(
+            f"{where}: quiet_hours must be {{from, to}} as HH:MM, 00:00 to 23:59"
+        )
+    if value["from"] == value["to"]:
+        raise NotifyError(f"{where}: Quiet hours need a start and an end that differ")
+    return {"from": value["from"], "to": value["to"]}
+
+
+def _minutes(clock) -> int:
+    hours, minutes = clock.split(":")
+    return int(hours) * 60 + int(minutes)
+
+
+def is_quiet(window, minute) -> bool:
+    """Whether `minute` (of the local day) is inside `window` (a row's quiet_hours; None: never). The start is
+    in, the end is out; a window whose end comes before its start crosses midnight."""
+    if not window:
+        return False
+    start, end = _minutes(window["from"]), _minutes(window["to"])
+    if start < end:
+        return start <= minute < end
+    return minute >= start or minute < end
+
+
 def clean_recipient(raw, index=1, phones=None) -> dict:
     """One row as it is stored, or NotifyError. `phones` (service -> a phone notify_get lists) names a row
     saved without a name, and says whose phone it is when the row does not."""
@@ -149,6 +193,8 @@ def clean_recipient(raw, index=1, phones=None) -> dict:
         "rooms": _rooms(raw.get("rooms"), where),
         "urgent_high_priority": _flag(raw.get("urgent_high_priority"), where),
         "digest": _flag(raw.get("digest"), where, "digest", False),
+        # A row saved before quiet hours has none.
+        "quiet_hours": _quiet_hours(raw.get("quiet_hours"), where),
     }
 
 
@@ -218,8 +264,9 @@ def _now():
 
 
 def own_edit(stored, submitted, user_id) -> list[dict]:
-    """A non-administrator's save, applied to the stored rows: the kinds, rooms, high-priority flag and digest of
-    the rows whose user_id is theirs, and nothing else (a row sent without `digest` keeps its own). They cannot add or remove a row, rename one or change
+    """A non-administrator's save, applied to the stored rows: the kinds, rooms, high-priority flag, digest and
+    quiet hours of the rows whose user_id is theirs, and nothing else (a row sent without `digest` or
+    `quiet_hours` keeps its own). They cannot add or remove a row, rename one or change
     whose it is, and another person's row must come back as it was."""
     if not isinstance(submitted, list) or not all(
         isinstance(r, dict) for r in submitted
@@ -244,6 +291,9 @@ def own_edit(stored, submitted, user_id) -> list[dict]:
             "rooms": _rooms(raw.get("rooms"), where),
             "urgent_high_priority": _flag(raw.get("urgent_high_priority"), where),
             "digest": _flag(raw.get("digest"), where, "digest", row["digest"]),
+            "quiet_hours": _quiet_hours(
+                raw.get("quiet_hours", row["quiet_hours"]), where
+            ),
         }
         if not (row["user_id"] and row["user_id"] == user_id):
             if any(wanted[key] != row[key] for key in wanted):
@@ -435,7 +485,7 @@ class Notifier:
                 if user is None or user.is_admin:
                     phones = {phone["service"]: phone for phone in await self.phones()}
                     rows = clean_recipients(
-                        self._keep_digest(data.get("recipients")), phones
+                        self._keep_stored(data.get("recipients")), phones
                     )
                     self._exist(rows)
                     idle = clean_idle(data.get("idle_hours", self.data["idle_hours"]))
@@ -480,17 +530,19 @@ class Notifier:
             self.publish()
             return await self.response(user)
 
-    def _keep_digest(self, recipients):
-        """A row sent without `digest` (by a page from before it) keeps the stored row's."""
+    def _keep_stored(self, recipients):
+        """A row sent without `digest` or `quiet_hours` (by a page from before them) keeps the stored row's."""
         if not isinstance(recipients, list):
             return recipients
-        stored = {row["service"]: row["digest"] for row in self.data["recipients"]}
+        stored = {row["service"]: row for row in self.data["recipients"]}
         return [
             (
-                {**raw, "digest": stored[raw["service"]]}
-                if isinstance(raw, dict)
-                and "digest" not in raw
-                and raw.get("service") in stored
+                {
+                    "digest": stored[raw["service"]]["digest"],
+                    "quiet_hours": stored[raw["service"]]["quiet_hours"],
+                    **raw,
+                }
+                if isinstance(raw, dict) and raw.get("service") in stored
                 else raw
             )
             for raw in recipients
@@ -500,6 +552,13 @@ class Notifier:
         """Whether `room` (a prefix; None: no room in particular, never muted) is muted now."""
         until = self.data["mutes"].get(room) if room is not None else None
         return until is not None and datetime.fromisoformat(until) > self._now()
+
+    def _minute(self) -> int:
+        """The minute of the day now, in Home Assistant's own time zone (quiet hours are read in it)."""
+        from homeassistant.util import dt as dt_util
+
+        local = dt_util.as_local(self._now())
+        return local.hour * 60 + local.minute
 
     def _exist(self, rows):
         """A phone added now must be a notify service Home Assistant has; one saved before may be away (an
@@ -548,6 +607,12 @@ class Notifier:
         )
         return {"sent": error is None, "error": error}
 
+    async def test_many(self, services, user=None) -> dict:
+        """notify_test with `services`: one test push to each, at once -> {results: [{service, sent, error}]}."""
+        services = list(dict.fromkeys(services))
+        answers = await asyncio.gather(*(self.test(s, user) for s in services))
+        return {"results": [{"service": s, **a} for s, a in zip(services, answers)]}
+
     async def send(self, data) -> dict:
         """notify: one push to every row that ticks one of its kinds and covers its room, once per service ->
         {sent_to, error}. `error` names each phone that failed (the others still got it), or says why nothing
@@ -567,8 +632,21 @@ class Notifier:
         kinds = notify_catalog.kinds_for(data.get("code"), data.get("event"), urgent)
         rows = route(self.data["recipients"], kinds, data.get("room"))
         held = [] if urgent else [row["service"] for row in rows if row["digest"]]
+        # Quiet hours hold only a push known not to be critical: a critical code, or a code or event this
+        # version does not know, still goes.
+        code = data.get("code")
+        known = (
+            code in KNOWN_CODES and code not in notify_catalog.EMERGENCY
+            if code
+            else data.get("event") in notify_catalog.EVENTS
+        )
+        quiet = []
+        if not urgent and known and any(r["quiet_hours"] for r in rows):
+            minute = self._minute()
+            quiet = [r["service"] for r in rows if is_quiet(r["quiet_hours"], minute)]
+        held += [service for service in quiet if service not in held]
         for service in held:
-            self._hold(service, data)
+            self._hold(service, data, service in quiet)
         rows = [row for row in rows if row["service"] not in held]
         if urgent and not rows:
             # An emergency must reach someone: with no row covering its room, every phone that takes
@@ -611,8 +689,9 @@ class Notifier:
         return answer
 
     # ------------------------------------------------------------------ the digest
-    def _hold(self, service, data):
-        """Keep a push for `service`'s next digest; a repeat of the same key replaces the one waiting."""
+    def _hold(self, service, data, quiet=False):
+        """Keep a push for `service`'s next digest; a repeat of the same key replaces the one waiting. `quiet`:
+        held for the phone's quiet hours, so the digest goes as soon as they end."""
         code = data.get("code")
         if code:
             group = "info" if code in notify_catalog.INFO else "warning"
@@ -620,14 +699,28 @@ class Notifier:
             group = "event" if data.get("event") else "warning"
         box = self._held.setdefault(service, {"since": self._clock(), "items": {}})
         box["items"][data["key"]] = (group, data["title"])
+        if quiet:
+            box["quiet"] = True
 
     async def flush(self, everything=False):
-        """Send each digest that is due, `digest_hours` after the first push it holds (or every one)."""
+        """Send each digest that is due, `digest_hours` after the first push it holds or, when it holds a push
+        for the phone's quiet hours, as soon as they end (or every one). Never inside the phone's quiet hours.
+        """
         now, due = self._clock(), self.data["digest_hours"] * 3600
+        windows = {
+            r["service"]: r["quiet_hours"]
+            for r in self.data["recipients"]
+            if r["quiet_hours"] and r["service"] in self._held
+        }
+        minute = self._minute() if windows and not everything else 0
         services = [
             service
             for service, box in self._held.items()
-            if everything or now - box["since"] >= due
+            if everything
+            or (
+                not is_quiet(windows.get(service), minute)
+                and (box.get("quiet") or now - box["since"] >= due)
+            )
         ]
         boxes = [self._held.pop(service) for service in services]
         errors = await asyncio.gather(
@@ -826,7 +919,17 @@ async def async_setup_notify(hass, entry) -> None:
         try:
             if call.service == "notify_save":
                 return await notifier.save(call.data, user)
-            return await notifier.test(call.data["service"], user)
+            if ("service" in call.data) == ("services" in call.data):
+                raise HomeAssistantError(
+                    f"{DOMAIN}.notify_test needs either service or services"
+                )
+            if "service" in call.data:
+                return await notifier.test(call.data["service"], user)
+            if len(call.data["services"]) > MAX_RECIPIENTS:
+                raise HomeAssistantError(
+                    f"{DOMAIN}.notify_test tests at most {MAX_RECIPIENTS} phones"
+                )
+            return await notifier.test_many(call.data["services"], user)
         except OSError as error:
             raise HomeAssistantError(str(error)) from error
 
@@ -839,7 +942,8 @@ async def async_setup_notify(hass, entry) -> None:
             vol.Optional("digest_hours"): vol.Coerce(float),
             vol.Optional("mutes"): dict,
         },
-        "notify_test": {vol.Required("service"): str},
+        # One phone (`service`, as before) or several (`services`), not both.
+        "notify_test": {vol.Optional("service"): str, vol.Optional("services"): [str]},
         "notify": {
             vol.Required("key"): str,
             vol.Optional("code"): str,
