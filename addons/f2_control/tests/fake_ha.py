@@ -87,6 +87,17 @@ class FakeHA:
         self.set_state(entity, state, attributes)
 
 
+def status_from_get(controller):
+    """A ha_get_status for a rig that stubs only ha_get: it answers from whatever controller.ha_get is when
+    called, 200 with that read, or 404 when it reads no state. Such a rig never reaches the real HTTP API."""
+
+    def ha_get_status(entity, timeout=8):
+        read = controller.ha_get(entity)
+        return (404 if read[0] is None else 200), read
+
+    return ha_get_status
+
+
 def install(controller, fake: FakeHA, options: dict):
     """Point the controller module's IO functions at `fake` and its options at `options`.
 
