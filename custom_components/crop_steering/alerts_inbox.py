@@ -6,8 +6,10 @@ controller app's). A controller alert (actor other than system) also closes when
 persistent notification is gone, as the controller dismisses some notifications directly, with no
 alert.cleared. "Gone" means the Inbox saw it live since it started and it is absent now: Home
 Assistant keeps notifications in memory only, so after a restart an alert stays open (stale beats
-dropped) until its notification is seen again and then dismissed. Inbox publishes the fold for every loaded room on each stored alert.* event and every
-5 min (journal_api wires it). The sensor's state is the count; `alerts` lists them, newest first.
+dropped) until its notification is seen again and then dismissed; a new alert.raised for a key
+forgets it was seen, so the fresh raise stays open until its notification shows. Inbox publishes
+the fold for every loaded room on each stored alert.* event and every 5 min (journal_api wires
+it). The sensor's state is the count; `alerts` lists them, newest first.
 
 Nothing here touches irrigation: it only reads the journal and sets a state.
 """
@@ -44,7 +46,8 @@ def open_alerts(
 ) -> list[dict]:
     """The open alerts of `events` (one room's alert.* events, oldest first), newest first.
     `gone`: the ids of the persistent notifications seen live that are no longer shown. `entity_of`:
-    {rule id: the entity its source reads}. A raise repeated while the alert is open keeps the first.
+    {rule id: the entity its source reads}. A raise repeated while the alert is open keeps the
+    first.
     """
     raised: dict[tuple, dict] = {}
     for event in events:
@@ -126,7 +129,8 @@ async def read_open(hass, hub, room_id) -> list[dict]:
 
 
 def acknowledge_rule(hass, rule_id) -> None:
-    """A firing rule's live state becomes acknowledged (its binary sensor stays on until it clears)."""
+    """A firing rule's live state becomes acknowledged (its binary sensor stays on until it
+    clears)."""
     from homeassistant.helpers.dispatcher import async_dispatcher_send
 
     from .site_api import RULE_STATE
@@ -147,7 +151,7 @@ class Inbox:
         self._lock = asyncio.Lock()
         self._seen: set[str] = set()  # f2_* notifications seen live since the start
         self._no_getter = False
-        self._down = False
+        self._down: set[str] = set()  # rooms whose journal read failed (warned once)
 
     def gone(self) -> set[str]:
         """The f2_* notifications seen live since the start that are no longer shown. Nothing is
@@ -179,14 +183,14 @@ class Inbox:
             try:
                 alerts = await read_open(self.hass, self.hub, room_id)
             except Exception as error:  # the journal is down: say so, never raise
-                if not self._down:
-                    self._down = True
+                if room_id not in self._down:
+                    self._down.add(room_id)
                     _LOGGER.warning("Alerts inbox of %s not read: %s", room_id, error)
                 self.hass.states.async_set(
                     sensor_id(room_id), "unavailable", {"room_id": room_id}
                 )
                 return
-            self._down = False
+            self._down.discard(room_id)
             if room_id not in self.rooms:  # the room left while it was read
                 return
             self.hass.states.async_set(
@@ -213,15 +217,24 @@ class Inbox:
         @callback
         def stored(event):
             body = event.data
+            if body.get("kind") == "alert.raised":
+                key = (body.get("data") or {}).get("key")
+                if key:
+                    self._seen.discard(f"f2_{key}")
             if str(body.get("kind", "")).startswith("alert.") and (
                 body.get("room_id") in self.rooms
             ):
                 self.hass.async_create_task(self.publish(body["room_id"]))
 
-        return [
-            self.hass.bus.async_listen(EVENT_JOURNAL, stored),
-            async_track_time_interval(self.hass, self.publish_all, EVERY),
-        ]
+        unlisten = self.hass.bus.async_listen(EVENT_JOURNAL, stored)
+        try:
+            return [
+                unlisten,
+                async_track_time_interval(self.hass, self.publish_all, EVERY),
+            ]
+        except Exception:
+            unlisten()
+            raise
 
     def stop(self) -> None:
         for room_id in list(self.rooms):

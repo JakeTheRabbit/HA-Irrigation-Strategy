@@ -180,6 +180,24 @@ async def test_a_restart_that_wiped_the_notifications_keeps_the_alert_open(
     assert hass.states.get(INBOX).state == "0"
 
 
+async def test_a_re_raise_after_a_dismissal_is_open_until_its_notification_shows(
+    hass, hass_admin_user, freezer
+):
+    """A key seen live and dismissed is no longer "gone" once the controller raises it again."""
+    await _install(hass)
+    persistent_notification.async_create(hass, "Probe stale", "Zone 2", "f2_stale_z2")
+    await _controller_alert(hass, hass_admin_user)
+    persistent_notification.async_dismiss(hass, "f2_stale_z2")
+    await _tick(hass, freezer, 5 * 60 + 1)
+    assert hass.states.get(INBOX).state == "0"
+    again = {**RAISED, "id": "01JCCCCCCCCCCCCCCCCCCCCCCC", "ts": "2026-10-22T08:00:00+00:00"}
+    await _call(hass, hass_admin_user, "journal_append", room_id=ROOM, events=[again])
+    await hass.async_block_till_done()
+    assert hass.states.get(INBOX).state == "1"
+    await _tick(hass, freezer, 5 * 60 + 1)
+    assert hass.states.get(INBOX).state == "1"  # not seen live yet: still open
+
+
 async def test_without_the_notifications_helper_alerts_stay_open_and_ack_works(
     hass, hass_admin_user, freezer, monkeypatch, caplog
 ):
@@ -250,6 +268,13 @@ async def test_a_journal_outage_warns_once(hass, monkeypatch, caplog):
     monkeypatch.setattr(inbox.hub, "query", down)
     await inbox.publish_all()
     assert len(warnings()) == 2  # a new outage
+
+    # Per room: a second room warns once of its own in the same outage.
+    inbox.rooms.add("room:other_")
+    await inbox.publish_all()
+    await inbox.publish_all()
+    assert len(warnings()) == 3
+    inbox.leave("room:other_")
 
 
 async def test_the_last_room_unloading_takes_the_inbox_away(hass):
