@@ -64,7 +64,8 @@ export function startEventFeed(opts: {
   let stopPoll: (() => void) | undefined;
   let retry = false;
   let busy = false;
-  let again = false;
+  /** A read asked for while one ran: null, or whether it was a catch-up. */
+  let again: boolean | null = null;
   let noJournal = false;
   const end = (unsubscribe: (() => unknown) | undefined) =>
     void Promise.resolve()
@@ -78,9 +79,10 @@ export function startEventFeed(opts: {
     }
     if (events.length) onEvents(events);
   };
-  const pollRooms = async (): Promise<void> => {
-    if (stopped || noJournal || !visible()) return;
-    if (busy) return void (again = true);
+  /** `catchUp`: the one read after a subscribe, which runs hidden or not (a timer read waits). */
+  const pollRooms = async (catchUp = false): Promise<void> => {
+    if (stopped || noJournal || (!catchUp && !visible())) return;
+    if (busy) return void (again = !!again || catchUp);
     busy = true;
     try {
       for (const room of rooms) {
@@ -97,9 +99,10 @@ export function startEventFeed(opts: {
       }
     } finally {
       busy = false;
-      if (again) {
-        again = false;
-        void pollRooms();
+      if (again !== null) {
+        const next = again;
+        again = null;
+        void pollRooms(next);
       }
     }
   };
@@ -132,7 +135,7 @@ export function startEventFeed(opts: {
           retry = false;
           stopPoll?.();
           stopPoll = undefined;
-          void pollRooms();
+          void pollRooms(true);
         },
         (error: unknown) => {
           if (!current()) return;

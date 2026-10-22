@@ -143,6 +143,24 @@ describe("startEventFeed", () => {
     expect(live.ready.size).toBe(0);
   });
 
+  test("catches up after a reconnect while the tab is hidden", async () => {
+    const live = fakeConnection(() => Promise.resolve(vi.fn()));
+    const poll = vi.fn().mockResolvedValue([]);
+    const onEvents = vi.fn();
+    const stop = startEventFeed({ connection: live.connection, rooms: ["room:f2_", "room:f1_"], poll, onEvents, visible: () => false });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(poll).toHaveBeenCalledTimes(2);
+    poll.mockResolvedValueOnce([ev(3)]);
+    live.reconnect();
+    await vi.advanceTimersByTimeAsync(0);
+    // One read per room per ready, hidden or not; no timer reads while subscribed.
+    expect(poll).toHaveBeenCalledTimes(4);
+    expect(onEvents).toHaveBeenCalledWith([ev(3)]);
+    await vi.advanceTimersByTimeAsync(90_000);
+    expect(poll).toHaveBeenCalledTimes(4);
+    stop();
+  });
+
   test("a catch-up without journal_query keeps the subscription", async () => {
     const unsubscribe = vi.fn();
     const live = fakeConnection(() => Promise.resolve(unsubscribe));
