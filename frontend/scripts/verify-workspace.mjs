@@ -64,25 +64,34 @@ async function fresh(route) {
   target.hash = "/" + route;
   await page.goto(target.toString(), { waitUntil: "networkidle" });
 }
+/** Opens a page from the tree menu: its section opened first if it is closed. */
+async function tree(section, label, target = page) {
+  const nav = target.locator('.desktop-sidebar nav[aria-label="Main navigation"]');
+  const head = nav.locator(`button[data-nav-section="${section}"]`);
+  if ((await head.getAttribute("aria-expanded")) === "false") await head.click();
+  await nav.getByRole("link", { name: label, exact: true }).click();
+}
+/** A menu entry's own page, as the five-entry menu opened it before the tree. */
+const ENTRY_PAGES = {
+  Irrigation: ["plan", "Current day"],
+  Plan: ["plan", "Current day"],
+  Settings: ["settings", "Dashboards & display"],
+};
 async function navigate(label, target = page) {
   if (label === "Today") {
     await target.evaluate(() => (location.hash = "#/today"));
     return;
   }
-  label = label === "Plan" ? "Irrigation" : label;
-  await target
-    .locator(".desktop-sidebar")
-    .getByRole("button", { name: label, exact: true })
-    .click();
+  await tree(...ENTRY_PAGES[label], target);
 }
-/** A view under a menu entry: the entry, then its tab. */
+/** A page under a menu entry, by its name in the tree. */
+const VIEW_PAGES = { "Equipment/Setup": ["equipment", "Setup: pumps & valves"] };
 async function navigateTo(section, view, target = page) {
-  await navigate(section, target);
-  await target
-    .getByRole("navigation", { name: `${section} views` })
-    .getByRole("button", { name: view, exact: true })
-    .click();
+  await tree(...VIEW_PAGES[`${section}/${view}`], target);
 }
+/** The room page's heading: the room's name. */
+const roomHeading = (target = page) =>
+  target.getByRole("heading", { level: 1, name: /^Room [AB]$/ });
 /** Irrigation › Calendar keeps the steering balance, endpoint profiles and recipes together. */
 async function openPlanner(tab = "Steering balance", target = page) {
   const advanced = target.locator("details.plan-advanced");
@@ -95,11 +104,7 @@ async function openPlanner(tab = "Steering balance", target = page) {
   if (tab === "Steering balance") await visible(target.locator("#steering-balance"));
 }
 async function navigateSchedule(target = page) {
-  await navigate("Irrigation", target);
-  await target
-    .getByRole("navigation", { name: "Irrigation views" })
-    .getByRole("button", { name: /^Calendar/ })
-    .click();
+  await tree("plan", "Grow plan & presets", target);
   await openPlanner("Steering balance", target);
 }
 async function exported() {
@@ -463,19 +468,12 @@ try {
       await fresh("plan/schedule");
       await openPlanner();
       await setBalance(83);
-      await page
-        .getByRole("navigation", { name: "Irrigation views" })
-        .getByRole("button", { name: /^Current day/ })
-        .click();
-      assert.equal(
-        await page.getByRole("dialog").count(),
-        0,
-        "Views of one workspace preserve its draft without discarding",
-      );
-      await page
-        .getByRole("navigation", { name: "Irrigation views" })
-        .getByRole("button", { name: /^Calendar/ })
-        .click();
+      // Current day and Grow plan are pages of their own in the tree menu: leaving the plan with a
+      // draft asks first, and Keep editing stays on it with the draft.
+      await tree("plan", "Current day");
+      await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
+      await page.getByRole("button", { name: "Keep editing" }).click();
+      assert.equal(new URL(page.url()).hash, "#/plan/schedule");
       assert.equal(await page.locator("#steering-balance").inputValue(), "83");
       await navigate("Today");
       await visible(page.getByRole("heading", { name: "Discard unsaved workspace changes?" }));
@@ -494,7 +492,7 @@ try {
       );
       await navigate("Today");
       await page.getByRole("button", { name: "Discard and continue" }).click();
-      await visible(page.getByRole("heading", { level: 1, name: / today$/ }));
+      await visible(roomHeading());
       await navigateSchedule();
       assert.notEqual(await page.locator("#steering-balance").inputValue(), "83");
       // Use a clean history entry: prior refused hash changes restore their own entries.
@@ -743,7 +741,8 @@ try {
       await noOverflow();
       const stops = [
         ["Plan", "#/plan/targets"],
-        ["History", "#/history/timeline"],
+        // The tour's old History address lands on the Explorer.
+        ["History", "#/history/explorer"],
         ["Equipment", "#/equipment/probes"],
         ["Help", "#/help"],
       ];
@@ -1577,7 +1576,7 @@ try {
         await tp.goto(origin + "/workspace-theme-parent.html");
         const frame = tp.frames().find((f) => f !== tp.mainFrame());
         assert.ok(frame);
-        await visible(frame.getByRole("heading", { level: 1, name: / today$/ }));
+        await visible(roomHeading(frame));
         await frame.waitForFunction(
           () =>
             document.documentElement.dataset.themeSource === "home-assistant" &&
@@ -1623,7 +1622,7 @@ try {
           path: fileURLToPath(new URL("../../img/rooms-setup.png", import.meta.url)),
         });
         await navigate("Today", frame);
-        await visible(frame.getByRole("heading", { level: 1, name: / today$/ }));
+        await visible(roomHeading(frame));
         await tp.setViewportSize({ width: 390, height: 844 });
         await tp.screenshot({
           path: fileURLToPath(new URL("../../img/mobile-overview.png", import.meta.url)),

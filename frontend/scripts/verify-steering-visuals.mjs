@@ -467,9 +467,10 @@ try {
       }
       await records.getByRole("button", { name: "Add run", exact: true }).click();
       await page.getByLabel("Run name", { exact: true }).fill("Unsaved run draft");
+      // Status is a link in the tree menu.
       await page
         .locator(".desktop-sidebar")
-        .getByRole("button", { name: "Status", exact: true })
+        .getByRole("link", { name: "Status", exact: true })
         .click();
       await page.getByRole("heading", { name: "Discard unsaved workspace changes?" }).waitFor();
       await page.getByRole("button", { name: "Keep editing", exact: true }).click();
@@ -487,13 +488,12 @@ try {
       assert.equal(metadata.runs.length, 5); // Three sample records plus this workflow's two.
       assert.ok(metadata.runs.every((run) => run.zones.length === 3 && run.captured_at));
       // Compared on History, in the same visit.
+      // History › Compare runs, from the tree menu (its section opened first if it is closed).
+      const history = page.locator('.desktop-sidebar button[data-nav-section="history"]');
+      if ((await history.getAttribute("aria-expanded")) === "false") await history.click();
       await page
         .locator(".desktop-sidebar")
-        .getByRole("button", { name: "History", exact: true })
-        .click();
-      await page
-        .getByRole("navigation", { name: "History views" })
-        .getByRole("button", { name: "Compare runs", exact: true })
+        .getByRole("link", { name: "Compare runs", exact: true })
         .click();
       await page.getByRole("heading", { name: "Compare runs", exact: true }).waitFor();
       await page.getByRole("button", { name: "Overlay", exact: true }).click();

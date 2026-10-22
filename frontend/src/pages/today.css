@@ -466,6 +466,7 @@
 }
 .today-sensors li {
   display: flex;
+  min-width: 0;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
@@ -479,7 +480,10 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  /* A sensor named only by its entity id wraps inside its card. */
+  min-width: 0;
   font-weight: 600;
+  overflow-wrap: anywhere;
 }
 .today-sensor-name i {
   width: 8px;
