@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { allZones, allZonesChanges } from "./all-zones";
 import { createDemo } from "./demo";
 import { setDisplayUnits } from "./display-units";
-import { drinkLine, facilityView } from "./facility-view";
+import { drinkLine, facilityView, zoneHref } from "./facility-view";
 import { discoverRooms } from "./model";
 import { fakeController } from "./test-helpers";
 import type { States, Zone } from "./types";
@@ -75,6 +75,18 @@ describe("all rooms: queue, flow, grow day and problems in place", () => {
     });
     expect(a.growDay).toEqual({ day: 38, of: 63, daysLeft: 25, stage: "Flower bulk" });
   });
+  it("an open-ended plan shows its own day with no length, never the stage arc's day", () => {
+    const { a } = facility({
+      ...put("sensor.crop_steering_grow_day", "40"),
+      ...put("sensor.crop_steering_days_to_harvest", "unknown"),
+      ...put("sensor.crop_steering_stage", "Flower bulk"),
+    });
+    expect(a.growDay).toEqual({ day: 40, of: null, daysLeft: null, stage: "Flower bulk" });
+  });
+  it("zone links keep the page's query and name the zone's room", () => {
+    expect(zoneHref("?demo=1&room=room_b", "room:", 2)).toBe("?demo=1&room=room%3A#/zone/2");
+    expect(zoneHref("", "room:room_b_", 1)).toBe("?room=room%3Aroom_b_#/zone/1");
+  });
   it("falls back to computed day when grow entities absent", () => {
     // "unknown" (no active plan) reads as absent: the AI assistant's stage arc (day 37 of 56) stands in.
     const { a, b } = facility({
@@ -107,6 +119,11 @@ describe("all rooms: queue, flow, grow day and problems in place", () => {
     ]);
     expect(a.zones[1].lastShotText).toBe("Last shot: 1.9 of 2.4 L arrived (79%)");
     expect(a.zones[2].lastShotText).toBeNull();
+    // The litres keep the digits they came with.
+    const { a: two } = facility(
+      put("sensor.crop_steering_zone_2_flow_ratio", "0.79", { commanded_l: 1.21, metered_l: 0.96 }),
+    );
+    expect(two.zones[1].lastShotText).toBe("Last shot: 0.96 of 1.21 L arrived (79%)");
   });
   it("problem comes from openAlerts for that zone", () => {
     const { a, b } = facility({

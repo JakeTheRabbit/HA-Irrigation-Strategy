@@ -6,10 +6,11 @@ import { FeedTankDrawing, ZoneSlab } from "@/components/zone-slab";
 import { DrinkBar, MiniGauge, ShotDots } from "@/components/zone-gauges";
 import { StockBottle } from "@/components/stock-bottle";
 import { STOCK_STATES } from "@/lib/dosing";
-import { formatEc, formatTemp } from "@/lib/display-units";
+import { formatEc, formatTemp, formatVolume } from "@/lib/display-units";
 import {
   drinkLine,
   facilityView,
+  zoneHref,
   ZONE_MODE,
   type FacilityRoom,
   type FacilityZone,
@@ -18,7 +19,7 @@ import {
 import { plantAmount } from "@/lib/water-view";
 import type { AttentionLevel } from "@/lib/attention";
 import type { Controller } from "@/lib/types";
-import { routeHash, type Page } from "@/lib/routes";
+import type { Page } from "@/lib/routes";
 import { useNarrow } from "@/lib/use-narrow";
 import "./all-zones.css";
 import "@/components/zone-slab.css";
@@ -135,8 +136,11 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
             </span>
             {growDay && (
               <span className="facility-room-day">
-                Day <strong>{growDay.day}</strong> of {growDay.of}
-                <span className="muted"> · {growDay.daysLeft} days left</span>
+                Day <strong>{growDay.day}</strong>
+                {growDay.of !== null && ` of ${growDay.of}`}
+                {growDay.daysLeft !== null && (
+                  <span className="muted"> · {growDay.daysLeft} days left</span>
+                )}
               </span>
             )}
           </div>
@@ -202,7 +206,7 @@ function RoomCard({ r, offline, open }: { r: FacilityRoom; offline: boolean; ope
 /** The grow's run: done so far, a tick at today. */
 function RunBar({ r }: { r: FacilityRoom }) {
   const { growDay } = r;
-  if (!growDay || growDay.of <= 0) return null;
+  if (!growDay || growDay.of === null || growDay.of <= 0) return null;
   const at = `${Math.max(0, Math.min(100, (growDay.day / growDay.of) * 100))}%`;
   return (
     <div
@@ -245,7 +249,7 @@ function ZoneLink({
   return (
     <a
       className={className}
-      href={routeHash({ page: "zone", zone })}
+      href={zoneHref(window.location.search, r.room.id, zone)}
       onClick={(event) => {
         if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
           return;
@@ -428,38 +432,47 @@ function TankCard({ r, open }: { r: FacilityRoom; open: Open }) {
       className="facility-tank"
       data-held={held || undefined}
       onClick={() => open(r.room.id, "equipment/dosing")}
-      aria-label={`Open ${r.room.name} tank and feed`}
     >
-      <FeedTankDrawing
-        level={level}
-        minimum={reservoir.minimum}
-        full={tank.fill.on}
-        low={held}
-        label={level === null ? "Tank level unavailable" : `Tank ${number(level, 0)} % full`}
-      />
+      {/* The button's name is its text, so a screen reader hears the readings and the due flag. */}
+      <span className="sr-only">Open {r.room.name} tank and feed: </span>
+      <span aria-hidden="true">
+        <FeedTankDrawing
+          level={level}
+          minimum={reservoir.minimum}
+          full={tank.fill.on}
+          low={held}
+          label={level === null ? "Tank level unavailable" : `Tank ${number(level, 0)} % full`}
+        />
+      </span>
       <span className="facility-tank-facts">
         <span className="facility-tank-title">Feed tank</span>
         <span className="facility-tank-level">
           {level === null ? tank.level.issue : <strong>{number(level, 0)}%</strong>}
           {reservoir.aboveMinimumL !== null && (
-            <span className="muted"> · {number(reservoir.aboveMinimumL, 0)} L usable</span>
+            <span className="muted"> · {formatVolume(reservoir.aboveMinimumL, 0)} usable</span>
           )}
         </span>
         <span className="facility-tank-readings">
-          <span>
-            pH {tank.ph.value === null ? "—" : number(tank.ph.value, 2)}
-            {r.feedCalibrationDue && (
+          {/* Spaces between the parts: the line may wrap before any reading, never inside one. */}
+          <span>pH {tank.ph.value === null ? "—" : number(tank.ph.value, 2)}</span>
+          {r.feedCalibrationDue && (
+            <>
+              {" "}
               <span className="facility-due" data-facility-due>
                 Calibration due
               </span>
-            )}
+            </>
+          )}{" "}
+          <span>
+            <span aria-hidden="true">·</span> EC {tank.ec.value === null ? "—" : ec(tank.ec.value)}
           </span>
-          <span aria-hidden="true">·</span>
-          <span>EC {tank.ec.value === null ? "—" : ec(tank.ec.value)}</span>
           {tank.temperature.value !== null && (
             <>
-              <span aria-hidden="true">·</span>
-              <span>{formatTemp(tank.temperature.value, digitsOf(tank.temperature.value))}</span>
+              {" "}
+              <span>
+                <span aria-hidden="true">·</span>{" "}
+                {formatTemp(tank.temperature.value, digitsOf(tank.temperature.value))}
+              </span>
             </>
           )}
         </span>
@@ -531,7 +544,8 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
         </span>
         {growDay && (
           <span className="facility-room-day">
-            Day <strong>{growDay.day}</strong>/{growDay.of}
+            Day <strong>{growDay.day}</strong>
+            {growDay.of !== null && `/${growDay.of}`}
           </span>
         )}
       </div>
@@ -609,25 +623,38 @@ function PhoneRoom({ r, offline, open }: { r: FacilityRoom; offline: boolean; op
         type="button"
         className="facility-phone-feed"
         onClick={() => open(room.id, "equipment/dosing")}
-        aria-label={`Open ${room.name} tank and feed`}
       >
-        <FeedTankDrawing
-          level={level}
-          minimum={r.reservoir.minimum}
-          full={tank.fill.on}
-          low={r.reservoir.state === "held"}
-          label={level === null ? "Tank level unavailable" : `Tank ${number(level, 0)} % full`}
-        />
+        {/* The button's name is its text: the readings, the due flag and what is low. */}
+        <span className="sr-only">Open {room.name} tank and feed: </span>
+        <span aria-hidden="true">
+          <FeedTankDrawing
+            level={level}
+            minimum={r.reservoir.minimum}
+            full={tank.fill.on}
+            low={r.reservoir.state === "held"}
+            label={level === null ? "Tank level unavailable" : `Tank ${number(level, 0)} % full`}
+          />
+        </span>
         <span className="facility-phone-feed-text">
           <strong>Feed {level === null ? "—" : `${number(level, 0)}%`}</strong>
-          {r.reservoir.aboveMinimumL !== null && ` · ${number(r.reservoir.aboveMinimumL, 0)} L`}
-          {tank.ph.value !== null && ` · pH ${number(tank.ph.value, 2)}`}
+          {r.reservoir.aboveMinimumL !== null && ` · ${formatVolume(r.reservoir.aboveMinimumL, 0)}`}
+          {tank.ph.value !== null && (
+            <>
+              {" · "}
+              <span className="facility-nowrap">pH {number(tank.ph.value, 2)}</span>
+            </>
+          )}
           {r.feedCalibrationDue && (
             <span className="facility-due" data-facility-due>
               Calibration due
             </span>
           )}
-          {tank.ec.value !== null && ` · EC ${ec(tank.ec.value)}`}
+          {tank.ec.value !== null && (
+            <>
+              {" · "}
+              <span className="facility-nowrap">EC {ec(tank.ec.value)}</span>
+            </>
+          )}
         </span>
         {low.length > 0 && (
           <span className="facility-phone-low">

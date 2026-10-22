@@ -4,6 +4,7 @@ import { readJev, jevIds, parseJevSetpoints, type JevStage } from "./jev";
 import { buildRoom, numeric, readable, roomStatus } from "./model";
 import { newestFirst, openAlerts } from "./open-alerts";
 import { reservoirView, type ReservoirView } from "./reservoir";
+import { routeHash } from "./routes";
 import { buildSetpointPreview } from "./setpoint-preview";
 import { stockTanks, stockState, type StockState, type StockTankReading } from "./dosing";
 import { tankTelemetry } from "./tank-telemetry";
@@ -151,8 +152,9 @@ export interface FacilityRoom {
    * know their plant count. */
   waterL: number | null;
   litresPerPlant: number | null;
-  /** The grow plan's day (grow_day, days_to_harvest, stage), else the stage arc's. */
-  growDay: { day: number; of: number; daysLeft: number; stage: string } | null;
+  /** The grow plan's day (grow_day, days_to_harvest, stage), else the stage arc's. `of` and
+   * `daysLeft` are null for an open-ended plan. */
+  growDay: { day: number; of: number | null; daysLeft: number | null; stage: string } | null;
   /** binary_sensor.crop_steering_<prefix>calibration_due: a feed probe is due. */
   feedCalibrationDue: boolean;
 }
@@ -164,6 +166,16 @@ const numberOf = (state: string | null) => {
   const value = state === null || state.trim() === "" ? NaN : Number(state);
   return Number.isFinite(value) ? value : null;
 };
+
+const digitsOf = (value: number) => (String(value).split(".")[1] ?? "").length;
+
+/** A zone page's address that opens in the zone's own room: the page's query with `room` set, then
+ * the zone's hash, so a new tab or a copied link lands on the same zone. */
+export function zoneHref(search: string, roomId: string, zone: number): string {
+  const query = new URLSearchParams(search);
+  query.set("room", roomId);
+  return `?${query}${routeHash({ page: "zone", zone })}`;
+}
 
 /** The room's water today for its header: per plant (when known) and the room, in the display's
  * volume unit. */
@@ -185,10 +197,12 @@ function lastShot(entity: EntityState | undefined) {
     const commanded = finite(entity!.attributes.commanded_l);
     const metered = finite(entity!.attributes.metered_l);
     const pct = `${Math.round(ratio * 100)}%`;
-    text =
-      commanded !== null && metered !== null
-        ? `Last shot: ${formatVolume(metered, 1).replace(/\s\S+$/, "")} of ${formatVolume(commanded, 1)} arrived (${pct})`
-        : `Last shot: ${pct} arrived`;
+    if (commanded !== null && metered !== null) {
+      // Both litres at the digits the meter gave (at most 2), the unit once.
+      const digits = Math.min(2, Math.max(digitsOf(commanded), digitsOf(metered)));
+      const arrived = formatVolume(metered, digits).replace(/\s\S+$/, "");
+      text = `Last shot: ${arrived} of ${formatVolume(commanded, digits)} arrived (${pct})`;
+    } else text = `Last shot: ${pct} arrived`;
   }
   return { flowRatio: ratio, lastShotHollow: hollow, lastShotText: text };
 }
@@ -310,10 +324,12 @@ export function facilityView(
     const day = numberOf(known(states[`sensor.crop_steering_${prefix}grow_day`]));
     const left = numberOf(known(states[`sensor.crop_steering_${prefix}days_to_harvest`]));
     const growDay =
-      day !== null && left !== null
+      // An open-ended plan (days_to_harvest unknown) still has its day: shown alone, never swapped
+      // for the stage arc's.
+      day !== null
         ? {
             day,
-            of: day + left,
+            of: left === null ? null : day + left,
             daysLeft: left,
             stage: known(states[`sensor.crop_steering_${prefix}stage`]) ?? stage?.name ?? "",
           }

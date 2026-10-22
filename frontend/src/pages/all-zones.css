@@ -187,9 +187,11 @@
 .facility-tank[data-held] {
   border-color: var(--destructive);
 }
+.facility-tank > span[aria-hidden="true"] {
+  flex: none;
+}
 .facility-tank .feed-tank {
   width: 52px;
-  flex: none;
 }
 .facility-tank-facts {
   display: grid;
@@ -213,8 +215,8 @@
 .facility-tank-readings > span {
   white-space: nowrap;
 }
-.facility-tank-readings > span[aria-hidden="true"] {
-  margin: 0 6px;
+.facility-tank-readings .facility-due {
+  margin-left: 0;
 }
 
 /* Zones: one card each, its slab, its state, what it drank, its readings and its sensors. */
@@ -315,7 +317,7 @@
 /* The last shot came up short: its drop is drawn hollow. */
 .facility-zone[data-last-shot="hollow"] .shot-dot:has(+ :not(.shot-dot)) {
   background: none;
-  border: 1.5px solid #2f86c4;
+  border: 1.5px solid var(--primary);
 }
 /* Waiting for the pump, or how much of the last shot arrived: facts, not alarms. */
 .facility-line {
@@ -727,9 +729,14 @@
   text-align: left;
   cursor: pointer;
 }
+.facility-phone-feed > span[aria-hidden="true"] {
+  flex: none;
+}
 .facility-phone-feed .feed-tank {
   width: 28px;
-  flex: none;
+}
+.facility-nowrap {
+  white-space: nowrap;
 }
 .facility-phone-feed-text {
   flex: 1 1 160px;

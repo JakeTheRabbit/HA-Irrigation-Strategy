@@ -56,6 +56,7 @@ export function demoParityStatus(states: States, now: number): States {
         options: ["steering", "timer", "off"],
       });
   }
-  put("sensor.crop_steering_zone_2_flow_ratio", 0.79, { commanded_l: 2.4, metered_l: 1.9, shot_id: demoId(now - 600_000, "room::shot:2") });
+  // The Journal's shot size (1.21 L commanded); 0.96 L arrived.
+  put("sensor.crop_steering_zone_2_flow_ratio", 0.79, { commanded_l: 1.21, metered_l: 0.96, shot_id: demoId(now - 600_000, "room::shot:2") });
   return out;
 }
