@@ -9,6 +9,7 @@ try {
   const video = page.locator("video");
   await video.waitFor();
   const captions = page.locator(".lp-caption");
+  await captions.first().waitFor();
   assert.equal(await captions.count(), 1, "A separate caption area must exist below the video");
   await page.waitForFunction(() => document.querySelector("video track")?.readyState === 2);
   await video.evaluate(v => new Promise(resolve => {

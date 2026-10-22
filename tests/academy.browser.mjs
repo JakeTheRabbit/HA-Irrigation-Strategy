@@ -82,7 +82,7 @@ try {
     fullPage: true,
   });
   await page.getByRole("link", { name: "Course", exact: true }).click();
-  await page.locator("#learning-route").waitFor();
+  await page.locator(".course-lesson").first().waitFor();
   assert.equal(await page.locator(".course-lesson").count(), 24);
   for (const route of ["operator", "builder-pi", "builder-x86"]) {
     await page.locator("#learning-route").selectOption(route);
@@ -92,6 +92,7 @@ try {
       "learning-route",
     );
     assert.equal((await record()).route, route);
+    await page.locator(".course-lesson").first().waitFor();
     assert.equal(await page.locator(".course-lesson").count(), 24);
   }
   const transcriptLink = page.getByRole("link", {
@@ -249,6 +250,7 @@ try {
   await open("#/glossary");
   const term = course.glossary[0].term;
   await page.locator("#glossary-search").fill(term);
+  await page.locator(".glossary-list dt").first().waitFor();
   assert.ok(await page.locator(".glossary-list dt").count());
   await page.locator("#glossary-search").fill("<script>not a term</script>");
   assert.equal(await page.locator(".glossary-list dt").count(), 0);

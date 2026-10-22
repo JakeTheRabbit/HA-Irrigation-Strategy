@@ -416,7 +416,7 @@ jobs:
         run: |
           node frontend/node_modules/vite/bin/vite.js preview --outDir www --host 127.0.0.1 --port 8794 &
           trap 'kill $!' EXIT
-          for _ in $(seq 30); do curl -sf http://127.0.0.1:8794/learn/ >/dev/null && break; sleep 1; done
+          curl -sf --retry 30 --retry-delay 1 --retry-connrefused http://127.0.0.1:8794/learn/ >/dev/null \n            || { echo "::error::Academy preview server did not start"; exit 1; }
           node tests/academy.browser.mjs
           node tests/academy-navigation.browser.mjs
           node tests/academy-video.browser.mjs

@@ -41,7 +41,7 @@ try{
    await page.waitForFunction(t=>{const v=document.querySelector('video');return v.readyState>=2&&!v.seeking&&Math.abs(v.currentTime-t)<.2;},time);
   }
   const captionSelector=entry.kind==='lesson'?'.lp-caption':'.group-captions';
-  assert.equal(await page.locator(captionSelector).count(),1);
+  await page.locator(captionSelector).first().waitFor();assert.equal(await page.locator(captionSelector).count(),1);
   await video.screenshot({path:path.join(out,entry.kind+'-'+entry.id+'.png')});
   const mediaPath=metadata.src.split('?')[0].replace(/^media\//,'');const expected=manifest.files.find(f=>f.path===mediaPath);assert.ok(expected,mediaPath+' missing from inventory');
   let actualHash;
