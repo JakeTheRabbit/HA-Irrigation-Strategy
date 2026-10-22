@@ -742,6 +742,9 @@ TIMER_OWED_MIN = 15  # a timer slot a rescue went before is still given this lon
 # The integration's feed pH / EC corrected by the probe's applied calibration (calibration.py, Task 17): read only while
 # engine_config's feed_calibration applies one (Controller._feed_read, ruling R4).
 FEED_CORRECTED = "sensor.crop_steering_{}feed_{}_corrected"
+# The source-water gate's hold while a feed probe sits in its calibration buffer (room._feed_calibrating, set by the
+# dosing runner from dosing_config's `calibrating`): the same words as the dosing runner's (guards.CALIBRATING_PROBE).
+FEED_CALIBRATING = "feed probe calibration in progress"
 TEST_SHOT_S = 10  # how long a zone's Test Shot waters it
 # The site's supply (the integration's site store, G1): the pumps, their output and the zones' demand. With one saved,
 # the zones that fire in a pass take turns at their pump, rescues first (_pump_line); none saved, as before.
@@ -2572,6 +2575,8 @@ class Controller:
         - No calibration applied for `quantity` (room._feed_calibration): `raw`'s own read, as before.
         - Applied, and FEED_CORRECTED is a number for `raw` itself, applied and live (not a value restored after a
           restart): its number.
+        - Applied, but the corrected sensor for `raw` reads `applied: false` (a revert the cached descriptor has not
+          followed yet): `raw`'s own read, as the integration says.
         - Applied otherwise (the corrected sensor unavailable, missing, restored or for another probe): raw x gain + bias.
         A raw probe with no number is read as it is, whatever the corrected sensor shows: a dead probe stays dead. The
         number is in `raw`'s unit, so `raw`'s attributes (its unit) and its last_updated (the reading's age) go with
@@ -2585,11 +2590,26 @@ class Controller:
         number = _finite_number(read[0])
         if number is None:
             return raw, read
+        if attrs.get("applied") is False and attrs.get("source") == raw and state != "unavailable":
+            return raw, read  # the integration says none applies (a revert): before the descriptor follows
         live = _finite_number(state)
         if (live is not None and attrs.get("applied") is True and attrs.get("source") == raw
                 and not attrs.get("restored")):
             return corrected, (state, *read[1:3])
         return raw, (repr(number * fix["gain"] + fix["bias"]), *read[1:3])
+
+    @staticmethod
+    def _feed_calibrating(room, quantity):
+        """True while the room's feed `quantity` ("ph" or "ec") probe is in a calibration session (dosing_config's
+        `calibrating`, handed over by the dosing runner as room._feed_calibrating): it reads a buffer, not the feed.
+        A pump's session is not one; an entry that can't be read counts for both probes (fail-closed)."""
+        entry = getattr(room, "_feed_calibrating", None)
+        if not entry:
+            return False
+        if isinstance(entry, dict) and entry.get("pump"):
+            return False
+        probe = entry.get("probe") if isinstance(entry, dict) else None
+        return probe == f"feed_{quantity}" if probe in ("feed_ph", "feed_ec") else True
 
     def _feed_value(self, room, quantity):
         """The room's feed `quantity` ("ph" or "ec") now, in its canonical unit, and the entity it was read from
@@ -2626,7 +2646,7 @@ class Controller:
         self._save_state()
 
     def _read_feed_ec(self, room):
-        if not room.feed_ec_sensor:
+        if not room.feed_ec_sensor or self._feed_calibrating(room, "ec"):  # a buffer is no feed reading
             return None
         feed = self._feed_value(room, "ec")[0]
         if feed is not None:
@@ -2670,7 +2690,7 @@ class Controller:
             )
 
     def _read_feed_ph(self, room):
-        if not room.feed_ph_sensor:
+        if not room.feed_ph_sensor or self._feed_calibrating(room, "ph"):  # a buffer is no feed reading
             return None
         ph = self._feed_value(room, "ph")[0]
         if ph is not None:
@@ -3926,6 +3946,8 @@ class Controller:
             if unread:
                 return f"source-water EC band unreadable ({unread}) — holding (fail-closed)"
             if lo > 0 or hi > 0:
+                if self._feed_calibrating(room, "ec"):  # unreadable: held at once, no grace, no rescue
+                    return FEED_CALIBRATING
                 if feed is None:
                     if not feed_grace_ok(
                         datetime.now().timestamp(),
@@ -3951,6 +3973,8 @@ class Controller:
             if unread:
                 return f"source-water pH band unreadable ({unread}) — holding (fail-closed)"
             if ph_lo > 0 or ph_hi > 0:
+                if self._feed_calibrating(room, "ph"):  # unreadable: held at once, no grace, no rescue
+                    return FEED_CALIBRATING
                 ph = self._read_feed_ph(room)
                 if ph is None:
                     if not feed_grace_ok(

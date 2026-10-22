@@ -185,8 +185,80 @@ def test_a_corrected_sensor_for_another_probe_is_computed_not_trusted():
     _fixed(fake, "6.4", source="sensor.old_feed_ph")
     value, entity = c._feed_value(room, "ph")
     assert entity == FEED_PH and value == pytest.approx(5.6)
-    _fixed(fake, "6.4", applied=False)  # nor one that says nothing is applied
+    _fixed(fake, "6.4", source="sensor.old_feed_ph", applied=False)  # another probe's "not applied" says nothing
     assert c._feed_value(room, "ph")[0] == pytest.approx(5.6)
+
+
+def test_a_revert_reads_raw_on_the_next_pass_before_the_descriptor_follows():
+    """Fix round 1, ruling (1): the corrected sensor of the room's own probe reading `applied: false` wins over the
+    cached descriptor at once; a NEW calibration may still wait for the rediscovery."""
+    c, fake, room = _ph_room()
+    _describe(c, fake, feed_calibration={"ph": PH_FIX})
+    _fixed(fake, "5.6")
+    assert c._blocked(room, 1) is None
+    fake.set_state(PH_FIXED, "unknown", {"source": FEED_PH, "applied": False, "gain": None, "bias": None})
+    assert room._feed_calibration == {"ph": {"gain": 1.05, "bias": -0.07}}  # the descriptor not read again yet
+    assert c._feed_value(room, "ph") == (5.4, FEED_PH)
+    assert c._blocked(room, 1) == "source-water pH 5.40 out of [5.5,6.5]"
+    fake.set_state(PH_FIXED, "unavailable", {})  # an unavailable sensor is not a revert: computed, as before
+    assert c._feed_value(room, "ph")[0] == pytest.approx(5.6)
+
+
+# ------------------------------------------------------------------------------------------------- calibrating: gate
+CAL = "feed probe calibration in progress"
+
+
+def _ec_room(raw="1.2"):
+    c, fake, room = _room()
+    room.feed_ec_sensor = FEED_EC
+    fake.set_state(FEED_EC, raw)
+    fake.set_state("number.crop_steering_irrigation_ec_min", "1.0")
+    fake.set_state("number.crop_steering_irrigation_ec_max", "2.0")
+    return c, fake, room
+
+
+def test_the_gate_holds_its_ph_while_the_feed_ph_probe_is_calibrated():
+    """Fix round 1, ruling (5): the quantity being calibrated is unreadable: the gate holds at once (no grace, no
+    rescue), whatever the buffer reads; the other quantity and a pump's session change nothing."""
+    c, fake, room = _ph_room(raw="6.0")  # in band: a pH buffer could read anything
+    assert c._blocked(room, 1) is None
+    room._feed_calibrating = {"probe": "feed_ph", "session_id": "s", "until": "x"}
+    assert c._blocked(room, 1) == CAL
+    assert c._read_feed_ph(room) is None
+    room._feed_calibrating = {"probe": "feed_ec", "session_id": "s", "until": "x"}
+    assert c._blocked(room, 1) is None
+    room._feed_calibrating = {"pump": "balance", "session_id": "s", "until": "x"}
+    assert c._blocked(room, 1) is None
+    room._feed_calibrating = None
+    assert c._blocked(room, 1) is None
+
+
+def test_the_gate_holds_its_ec_while_the_feed_ec_probe_is_calibrated():
+    c, fake, room = _ec_room(raw="1.413")  # the EC buffer, inside the 1.0-2.0 band: never passes
+    assert c._blocked(room, 1) is None
+    room._feed_calibrating = {"probe": "feed_ec", "session_id": "s", "until": "x"}
+    assert c._blocked(room, 1) == CAL
+    import gate_report
+
+    assert gate_report.first_hold(gate_report.report(c, room, 1)) == CAL  # the gate list says the same
+    room._feed_calibrating = "something unreadable"  # an entry that can't be read holds both halves
+    assert c._blocked(room, 1) == CAL
+
+
+def test_the_runner_hands_the_calibrating_entry_to_the_gate(rig):
+    r = rig()
+    r.config()
+    room = r.c.rooms[0]
+    _calibrating(r, PROBE)
+    r.poll()
+    assert room._feed_calibrating == PROBE
+    state, attributes = r.fake.states[CONFIG][:2]
+    r.fake.set_state(CONFIG, "unavailable", {})  # can't be read: the last one stands (fail-closed)
+    r.poll()
+    assert room._feed_calibrating == PROBE
+    r.fake.set_state(CONFIG, state, {k: v for k, v in attributes.items() if k != "calibrating"})
+    r.poll()
+    assert room._feed_calibrating is None
 
 
 def test_the_ec_gate_reads_the_corrected_feed_ec():
@@ -344,6 +416,7 @@ def test_the_held_words_are_pinned():
 
     assert guards.CALIBRATING_PROBE == PROBE_HOLD
     assert guards.CALIBRATING_PUMP == PUMP_HOLD
+    assert controller.FEED_CALIBRATING == PROBE_HOLD  # the source-water gate's hold
     assert [(g.key, g.guard, g.code) for g in guards.CALIBRATING] == [("calibrating", "dosing_lockout", None)]
 
 

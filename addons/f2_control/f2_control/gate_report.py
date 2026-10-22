@@ -155,6 +155,8 @@ def _feed_ec(c, room, m, reason=None):
         return f"source-water EC band unreadable ({unread}) — holding (fail-closed)"
     if not (lo > 0 or hi > 0):
         return None
+    if c._feed_calibrating(room, "ec"):
+        return m.FEED_CALIBRATING
     feed = c._read_feed_ec(room)
     if feed is None:
         last = room._feed_last_good_time.timestamp() if room._feed_last_good_time else None
@@ -175,6 +177,8 @@ def _feed_ph(c, room, m, reason=None):
         return f"source-water pH band unreadable ({unread}) — holding (fail-closed)"
     if not (lo > 0 or hi > 0):
         return None
+    if c._feed_calibrating(room, "ph"):
+        return m.FEED_CALIBRATING
     ph = c._read_feed_ph(room)
     if ph is None:
         last = room._feed_ph_last_good_time.timestamp() if room._feed_ph_last_good_time else None
