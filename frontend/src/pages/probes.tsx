@@ -24,7 +24,7 @@ import {
 } from "@/lib/probes";
 import type { Controller, EntityState } from "@/lib/types";
 import { useRecentHistory } from "@/lib/use-recent-moisture";
-import { errorText } from "@/lib/utils";
+import { errorText, unreadableState } from "@/lib/utils";
 import "./probes.css";
 
 /** Hours of readings each sparkline draws. */
@@ -559,8 +559,7 @@ function ControllerInternals({ controller }: { controller: Controller }) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("all");
-  const rawAvailable = (state: string) =>
-    !["unavailable", "unknown", "none", ""].includes(state.toLowerCase());
+  const rawAvailable = (state: string) => !unreadableState(state);
   const unverifiedProbeIds = new Set(
     controller.room.zones
       .flatMap((zone) => [zone.vwc, zone.ec])

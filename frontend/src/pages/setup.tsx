@@ -50,7 +50,7 @@ import {
   plumbingUses,
   type PlumbingLayout,
 } from "@/lib/plumbing";
-import { errorText } from "@/lib/utils";
+import { errorText, unreadableState } from "@/lib/utils";
 import { needsWizard } from "@/lib/commissioning";
 import type {
   Commissioning,
@@ -88,11 +88,10 @@ export function MappingPicker({
   );
   const selected = values.filter(Boolean);
   // A mapped entity Home Assistant reports no state for is mapped, but not usable.
-  const silent = selected.filter((id) =>
-    ["unavailable", "unknown"].includes(
-      candidates.find((c) => c.entity_id === id)?.state.toLowerCase() ?? "",
-    ),
-  ).length;
+  const silent = selected.filter((id) => {
+    const candidate = candidates.find((c) => c.entity_id === id);
+    return !!candidate && unreadableState(candidate.state);
+  }).length;
   return (
     <div className="mapping-picker">
       <div className="mapping-head">

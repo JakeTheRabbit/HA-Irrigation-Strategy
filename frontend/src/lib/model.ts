@@ -19,6 +19,7 @@ import { growerWords } from "./words";
 import { roomDisplay } from "./display";
 import { numberLimits, registeredControl } from "./features";
 import { ageText, controllerZoneLabel, readHeartbeat, RESTING } from "./controller-health";
+import { unreadableState } from "./utils";
 
 const ROOT = "crop_steering_";
 export const ZONE_PARAMETERS = new Set([
@@ -74,13 +75,12 @@ export function roomDurationCapEntityId(
     .find((id) => !!states[id] || settings.some((field) => field.entityId === id));
 }
 export function numeric(entity?: EntityState): number | null {
-  if (!entity || !entity.state.trim() || ["unknown", "unavailable"].includes(entity.state))
-    return null;
+  if (!entity || unreadableState(entity.state)) return null;
   const value = Number(entity.state);
   return Number.isFinite(value) ? value : null;
 }
 export function readable(entity?: EntityState): boolean {
-  return !!entity && !!entity.state.trim() && !["unknown", "unavailable"].includes(entity.state);
+  return !!entity && !unreadableState(entity.state);
 }
 function boolean(entity?: EntityState): boolean | null {
   return entity?.state === "on" ? true : entity?.state === "off" ? false : null;

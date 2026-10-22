@@ -1,5 +1,6 @@
 import type { Room, States } from "./types";
 import { descriptor } from "./model";
+import { unreadableState } from "./utils";
 
 export interface TankReading {
   entityId: string | null;
@@ -21,7 +22,7 @@ export function fillTime(
     attributes?.has_date === true &&
     attributes?.has_time === true &&
     typeof attributes.timestamp === "number" &&
-    !["unknown", "unavailable", ""].includes(raw)
+    !unreadableState(raw)
       ? attributes.timestamp * 1000
       : /^\d{4}-\d{2}-\d{2}T.+(?:Z|[+-]\d{2}:\d{2})$/i.test(raw)
         ? Date.parse(raw)

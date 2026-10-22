@@ -40,3 +40,12 @@ export function errorText(e: unknown): string {
   }
   return String(e);
 }
+
+/** A Home Assistant state that holds no reading: missing, blank, "unknown", "unavailable" or
+ * "none", in any case. The integration's own test (`_DEAD` in health.py, stock.py and
+ * zone_status.py); every page asks this one, so an entity is never live on one page and missing on
+ * another. */
+export function unreadableState(state: string | null | undefined): boolean {
+  const text = state?.trim().toLowerCase() ?? "";
+  return !text || ["unknown", "unavailable", "none"].includes(text);
+}

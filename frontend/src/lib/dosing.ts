@@ -4,6 +4,7 @@ import { numeric } from "./model";
 import type { SetupCandidate } from "./operator-types";
 import { batchesLeft } from "./stock";
 import type { EntityState, States } from "./types";
+import { unreadableState } from "./utils";
 
 /** Batch-tank dosing (docs/DOSING.md): a room's dosing configuration as the integration publishes
  * it, the controller's live status, and what Equipment › Dosing works out from the two. Nothing
@@ -154,7 +155,6 @@ export const dosingStatusId = (prefix: string) => `sensor.crop_steering_${prefix
 // Reading what Home Assistant holds: anything missing or garbled falls back, never throws.
 type Raw = Record<string, unknown>;
 const ENTITY = /^[a-z_]+\.[a-z0-9_]+$/;
-const UNREADABLE = ["unknown", "unavailable", ""];
 const record = (value: unknown): Raw =>
   value && typeof value === "object" && !Array.isArray(value) ? (value as Raw) : {};
 const text = (value: unknown): string | null =>
@@ -256,7 +256,7 @@ export function parseConfig(value: unknown): DosingConfig | null {
 }
 /** The integration's `dosing_config` sensor: its state is the revision. */
 export function readConfig(entity: EntityState | undefined): DosingConfig | null {
-  if (!entity || UNREADABLE.includes(entity.state)) return null;
+  if (!entity || unreadableState(entity.state)) return null;
   return parseConfig({ ...entity.attributes, revision: entity.state });
 }
 /** The controller's `dosing` sensor; null when the controller has never posted it. */
@@ -369,7 +369,7 @@ export function controllerReach(
 /** The pump's own report: dosing, not dosing, or null when it reports nothing. */
 export function deviceDosing(pump: DosingPump, states: States): boolean | null {
   const entity = states[pump.dosing_entity];
-  if (!entity || UNREADABLE.includes(entity.state)) return null;
+  if (!entity || unreadableState(entity.state)) return null;
   return pump.dosing_entity.startsWith("binary_sensor.")
     ? entity.state === "on"
     : entity.state.startsWith(pump.dosing_prefix || "Dosing");

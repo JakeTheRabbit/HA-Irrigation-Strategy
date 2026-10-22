@@ -1,6 +1,7 @@
 import type { PillTone } from "@/components/mini-visuals";
 import type { SetupRoom } from "./operator-types";
 import type { EntityState, States, Zone } from "./types";
+import { unreadableState } from "./utils";
 
 /** Equipment › Probes: each probe behind a zone's moisture and pore EC, and whether to believe it.
  * The integration combines a zone's probes into one reading (calculations.py fuse_probes) and
@@ -61,8 +62,7 @@ export interface Probe {
   text: string;
 }
 
-const readable = (state: string | undefined) =>
-  !!state && !["unavailable", "unknown", "none", ""].includes(state.toLowerCase());
+const readable = (state: string | undefined) => !unreadableState(state);
 const stamp = (value: string | undefined) => {
   const time = value ? Date.parse(value) : NaN;
   return Number.isFinite(time) ? time : null;

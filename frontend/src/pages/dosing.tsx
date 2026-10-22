@@ -68,7 +68,7 @@ import {
 } from "@/lib/dosing";
 import { tankTelemetry, type TankReading } from "@/lib/tank-telemetry";
 import type { Controller } from "@/lib/types";
-import { dayWord, errorText } from "@/lib/utils";
+import { dayWord, errorText, unreadableState } from "@/lib/utils";
 import "./dosing.css";
 
 const mL = (value: number) =>
@@ -663,7 +663,7 @@ export function Dosing({
   const tank = tankTelemetry(states, room.room);
   const fullId = config?.batch.full_entity ?? null;
   const full = fullId
-    ? !states[fullId] || ["unknown", "unavailable"].includes(states[fullId].state)
+    ? unreadableState(states[fullId]?.state)
       ? "Unavailable"
       : states[fullId].state === config!.batch.full_state
         ? "Full"
