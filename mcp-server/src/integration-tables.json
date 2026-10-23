@@ -1,0 +1,120 @@
+{
+  "actuator_domains": [
+    "input_boolean",
+    "switch",
+    "valve"
+  ],
+  "hardware_domains": {
+    "pump_switch": [
+      "input_boolean",
+      "switch",
+      "valve"
+    ],
+    "main_line_switch": [
+      "input_boolean",
+      "switch",
+      "valve"
+    ],
+    "waste_switch": [
+      "switch"
+    ],
+    "light_entity": [
+      "light",
+      "switch"
+    ],
+    "feed_ec_sensor": [
+      "sensor"
+    ],
+    "feed_ph_sensor": [
+      "sensor"
+    ],
+    "temperature_sensor": [
+      "sensor"
+    ],
+    "humidity_sensor": [
+      "sensor"
+    ],
+    "vpd_sensor": [
+      "sensor"
+    ],
+    "leaf_temperature_sensor": [
+      "sensor"
+    ],
+    "water_level_sensor": [
+      "sensor"
+    ],
+    "tank_temperature_sensor": [
+      "sensor"
+    ],
+    "tank_ec_sensor": [
+      "sensor"
+    ],
+    "tank_ph_sensor": [
+      "sensor"
+    ],
+    "tank_last_fill_sensor": [
+      "input_datetime",
+      "sensor"
+    ],
+    "tank_fill_entity": [
+      "binary_sensor",
+      "switch"
+    ],
+    "tank_distance_sensor": [
+      "sensor"
+    ],
+    "tank_low_float": [
+      "binary_sensor"
+    ],
+    "camera_entity": [
+      "camera"
+    ],
+    "co2_sensor": [
+      "sensor"
+    ],
+    "ppfd_sensor": [
+      "sensor"
+    ],
+    "dli_sensor": [
+      "sensor"
+    ]
+  },
+  "sensor_kinds": {
+    "feed_ec_sensor": "ec",
+    "tank_ec_sensor": "ec",
+    "feed_ph_sensor": "ph",
+    "tank_ph_sensor": "ph",
+    "tank_temperature_sensor": "tank_temperature",
+    "tank_distance_sensor": "distance"
+  },
+  "units": {
+    "vwc": [
+      "%",
+      "m3/m3",
+      "m³/m³"
+    ],
+    "ec": [
+      "ds/m",
+      "ms/cm",
+      "us/cm",
+      "µs/cm",
+      "μs/cm"
+    ],
+    "ph": [
+      "",
+      "ph"
+    ],
+    "tank_temperature": [
+      "k",
+      "°c",
+      "°f"
+    ],
+    "distance": [
+      "cm",
+      "ft",
+      "in",
+      "m",
+      "mm"
+    ]
+  }
+}

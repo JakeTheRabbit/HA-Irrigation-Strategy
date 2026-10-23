@@ -1,4 +1,5 @@
 import * as z from "zod/v4";
+import tables from "./integration-tables.json" with { type: "json" };
 
 export const roomId = z
   .string()
@@ -10,23 +11,13 @@ export const entityId = z
   .max(255);
 const mapping = z.union([entityId, z.literal("")]);
 const name = z.string().trim().min(1).max(80);
-export const hardwareDomains: Record<string, string[]> = {
-  pump_switch: ["switch"],
-  main_line_switch: ["switch"],
-  waste_switch: ["switch"],
-  light_entity: ["light", "switch"],
-  feed_ec_sensor: ["sensor"],
-  feed_ph_sensor: ["sensor"],
-  temperature_sensor: ["sensor"],
-  humidity_sensor: ["sensor"],
-  vpd_sensor: ["sensor"],
-  water_level_sensor: ["sensor"],
-  tank_temperature_sensor: ["sensor"],
-  tank_ec_sensor: ["sensor"],
-  tank_ph_sensor: ["sensor"],
-  tank_last_fill_sensor: ["sensor", "input_datetime"],
-  tank_fill_entity: ["switch", "binary_sensor"],
-};
+// The mapping tables are the integration's own (setup_api.py), written to JSON by
+// scripts/render_mcp_tables.py; tests/test_mcp_tables.py fails when the JSON is stale.
+export const hardwareDomains: Record<string, string[]> =
+  tables.hardware_domains;
+export const actuatorDomains: string[] = tables.actuator_domains;
+export const sensorKinds: Record<string, string> = tables.sensor_kinds;
+export const probeUnits: Record<string, string[]> = tables.units;
 export const hardware = z.strictObject(
   Object.fromEntries(
     Object.keys(hardwareDomains).map((key) => [key, mapping.optional()]),
