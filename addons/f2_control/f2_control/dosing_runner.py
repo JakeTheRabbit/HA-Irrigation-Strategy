@@ -704,9 +704,15 @@ class DosingRunner:
                         "read off. The shots of this room are held, and the controller sends the off again each "
                         "2 s until it reads off. If the pump still runs, stop it by hand. Check the tank before "
                         "the next dose.", event)
-            self._hold_stuck(room, left, None, {room.slug}, "CS-801", "a dosing pump does not read off",
-                             f"A stop of {pump['name']} did not read its power off.",
-                             "Check the pump and the tank before the next dose.", event, alerted=True)
+            with self._lock:  # a latch the room has already (a batch's, another pump's) is added to, never replaced
+                live = self._stuck.get(room.slug)
+                if live is not None:
+                    live["entities"] = list(dict.fromkeys(live["entities"] + left))
+                    live["left"] = list(dict.fromkeys(live["left"] + left))
+                else:
+                    self._hold_stuck(room, left, None, {room.slug}, "CS-801", "a dosing pump does not read off",
+                                     f"A stop of {pump['name']} did not read its power off.",
+                                     "Check the pump and the tank before the next dose.", event, alerted=True)
         return "stopped" + (f"; {_does(left)} not read off" if left else "")
 
     # ------------------------------------------------------------------ a timed run (prime, calibrate)
@@ -2505,8 +2511,8 @@ class DosingRunner:
         return state, {
             "pumps": pumps,
             # the pumps whose setup can't be read: each refused, the others working (_config)
-            "unreadable_pumps": [p.get("id") if isinstance(p, dict) else None
-                                 for p in (config.get("unreadable") or () if config else ())],
+            "unreadable_pumps": [p["id"] for p in (config.get("unreadable") or () if config else ())
+                                 if isinstance(p, dict) and isinstance(p.get("id"), str) and p["id"]],
             "batch": batch,
             "handled": block["handled"],
             "handled_result": block["handled_result"],

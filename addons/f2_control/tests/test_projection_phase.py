@@ -1,7 +1,7 @@
 """Task BX item 4: each projection_app intent carries `phase`, the phase the engine expects the zone in at that
 time by its clock rules alone (controller._phase_at): lights off is P3, the timed P2 end is P3, a new day starts
 at P0 for its P0 wait, and the current phase holds until one of those moves it. A phase only moisture decides
-(P0 ending early, P1 -> P2) is None: never guessed. Old consumers ignore the new key."""
+(after the P0 wait, P1 -> P2) is None: never guessed. Old consumers ignore the new key."""
 import pytest
 
 import controller

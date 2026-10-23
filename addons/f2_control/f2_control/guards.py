@@ -576,6 +576,10 @@ def _ph_pump(r, room, zone, ctx):
     way = ctx["way"]
     ctx["pump"] = next((p for p in ctx["config"]["pumps"] if p.get("ph_role") == _m(r).ph_correct.ROLES[way]), None)
     if ctx["pump"] is None:
+        unreadable = next((p for p in ctx["config"].get("unreadable") or ()
+                           if isinstance(p, dict) and p.get("ph_role") == _m(r).ph_correct.ROLES[way]), None)
+        if unreadable is not None:
+            return f"the setup of pump {unreadable.get('id')} can't be read (Equipment > Dosing, Dosing setup)"
         return f"no dosing pump has the pH {way} role (Equipment > Dosing, Dosing setup)"
     return None
 

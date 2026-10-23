@@ -1206,8 +1206,10 @@ def _wall_clock(now):
 def _phase_at(clock, minutes):
     """The phase the engine expects a zone in `minutes` after its pass, by its clock rules only (decide()): lights
     off is P3, the timed P2 end (P1 or P2 that long before lights-off) is P3, a lights-on starts P0 for its full wait,
-    and the phase it is in holds until one of those moves it. None where moisture decides (P0 ending, P1 -> P2): the
-    projection never guesses a phase. `clock` (_publish_waiting_for): {phase, lights_on, to_on_h, to_off_h, p2_end_h,
+    and the phase it is in holds until one of those moves it. None where only moisture can say which phase it is
+    (after a P0 wait runs out, P1 -> P2). Not every moisture exit is foreseen: P0 is shown to its maximum wait though
+    the bypass, its dryback or a stall may end it sooner, and P2 is shown to lights-off with no timed P2 end though a
+    predictive P3 (core.decide, the last 3 h) may start sooner. It is a display lane only, never acted on. `clock` (_publish_waiting_for): {phase, lights_on, to_on_h, to_off_h, p2_end_h,
     p0_left_min, p0_wait_min}, or None when the zone had no snapshot."""
     if clock is None:
         return None

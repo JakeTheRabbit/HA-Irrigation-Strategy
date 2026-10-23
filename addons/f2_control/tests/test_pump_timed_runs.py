@@ -587,3 +587,70 @@ def test_a_setup_whose_pump_list_or_batch_cant_be_read_is_still_not_acted_on(rig
     r.fake.calls.clear()
     r.poll()
     assert r.status()[0] == "unavailable" and r.actions() == []
+
+
+# ------------------------------------------------------------------------------------------------- Task BX fix round 1
+def test_an_idle_stop_pump_that_does_not_read_off_keeps_a_batchs_latch_whole(rig):
+    r = rig()
+    _full_batch(r)
+    r.stuck["switch.tank_mixer"] = 99  # the batch leaves its mix pump on, and its hold on
+    r.ask("batch")
+    r.poll()
+    slug = r.c.rooms[0].slug
+    before = r.runner._stuck[slug]
+    held, hold = set(before["held"]), before["hold"]
+    assert hold == "input_boolean.tank_hold"
+    r.set(POWER, "on")
+    r.stuck[POWER] = 99
+    _timed(r, "stop_pump")
+    r.poll()
+    assert _report(r) == f"stopped; {POWER} does not read off"
+    entry = r.runner._stuck[slug]
+    # Merged, never replaced: the batch's hardware, its hold, its held rooms and its code stay.
+    assert {"switch.tank_mixer", POWER} <= set(entry["entities"])
+    assert (entry["hold"], entry["held"], entry["code"]) == (hold, held, before["code"])
+    assert r.runner._held[slug] == held
+    r.stuck[POWER] = 0  # the pump reads off; the mixer still does not
+    for _ in range(3):
+        r.clock.t += dosing_runner.POLL_S
+        r.poll()
+    assert r.runner.holds(r.c.rooms[0]) == "dosing hardware still on: switch.tank_mixer"
+    assert r.fake.states["input_boolean.tank_hold"][0] == "on"
+    r.stuck["switch.tank_mixer"] = 0
+    for _ in range(4):
+        r.clock.t += dosing_runner.POLL_S
+        r.poll()
+    assert r.fake.states["input_boolean.tank_hold"][0] == "off"
+    assert r.runner.holds(r.c.rooms[0]) is None
+
+
+def test_an_idle_stop_pump_that_does_not_read_off_keeps_another_pumps_latch(rig):
+    r = rig()
+    r.config(pumps=(BALANCE, BLOOM))
+    bloom = "switch.bloom_power"
+    r.set(POWER, "on")
+    r.stuck[POWER] = 99
+    _timed(r, "stop_pump")
+    r.poll()
+    r.set(bloom, "on")
+    r.stuck[bloom] = 99
+    _timed(r, "stop_pump", pump="bloom")
+    r.poll()
+    assert _report(r) == f"stopped; {bloom} does not read off"
+    r.stuck[bloom] = 0  # Bloom reads off; Balance still does not
+    for _ in range(3):
+        r.clock.t += dosing_runner.POLL_S
+        r.poll()
+    assert r.runner.holds(r.c.rooms[0]) == "dosing hardware still on: " + POWER
+    r.stuck[POWER] = 0
+    for _ in range(3):
+        r.clock.t += dosing_runner.POLL_S
+        r.poll()
+    assert r.runner.holds(r.c.rooms[0]) is None
+
+
+def test_unreadable_pumps_lists_only_pumps_it_can_name(rig):
+    r = rig()
+    r.config(pumps=(BALANCE, "not a pump", {"name": "no id"}, _unreadable(BLOOM)))
+    r.poll()
+    assert r.status()[1]["unreadable_pumps"] == ["bloom"]
