@@ -40,64 +40,64 @@ report with you, one line at a time, asking you before each save:
 
 ## What is new
 
-A short tour. These are design mockups of the new pages; the released dashboard may differ in
-small details.
+A short tour. These are screenshots of the 3.18 dashboard running on its built-in demo data (sample
+rooms, not a real facility); the phone view is in the dark theme.
 
 - **Status: all rooms.** Every room and every zone on one page: phase, moisture and water today.
 
-  ![Status, all rooms](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/02-S1-AllRooms.png)
+  ![Status, all rooms](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/status-all-rooms-desktop-light.png)
 
 - **Zone page.** One zone in full: moisture, EC, what it is waiting for and every shot today.
 
-  ![Zone page](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/04-S3-Zone.png)
+  ![Zone page](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/zone-desktop-light.png)
 
 - **Timeline.** The day's phases and shots for a room on one line, so you can see what happened when.
 
-  ![Irrigation timeline](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/05-I1-Timeline.png)
+  ![Irrigation timeline](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/irrigation-timeline-desktop-light.png)
 
 - **Timer programs.** Each zone can water by steering (as before), by timer programs, or be off.
 
-  ![Timer programs](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/07-I3-Timers.png)
+  ![Timer programs](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/timer-programs-desktop-light.png)
 
 - **Grow plan & presets.** Save a room's or a zone's targets, phase timing and limits, and copy them to other rooms or zones.
 
-  ![Grow plan and presets](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/08-I4-GrowPlan.png)
+  ![Grow plan and presets](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/grow-plan-presets-desktop-light.png)
 
 - **History: explorer.** Any reading, any room, any period, on one chart.
 
-  ![History explorer](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/09-H1-Explorer.png)
+  ![History explorer](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/history-explorer-desktop-light.png)
 
 - **History: changes.** Every setting change, who made it and when, including what the upgrade carried across.
 
-  ![History of changes](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/12-H4-Changes.png)
+  ![History of changes](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/history-changes-desktop-light.png)
 
 - **Feed & dosing.** Each dosing pump with its solution, its stock tank and its doses.
 
-  ![Feed and dosing](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/14-E2-Dosing.png)
+  ![Feed and dosing](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/feed-dosing-desktop-light.png)
 
 - **Feed pH/EC calibration.** A guided 2-point calibration at the tank; nothing changes until you commit it.
 
-  ![Feed probe calibration](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/16-E4-FeedCal.png)
+  ![Feed probe calibration](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/feed-calibration-desktop-light.png)
 
 - **Setup: pumps & valves.** Your pumps, main line and valves, and the new pump supply: real flow and zones at once.
 
-  ![Setup, pumps and valves](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/18-E6-Setup.png)
+  ![Setup, pumps and valves](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/setup-pumps-valves-desktop-light.png)
 
 - **Alert rules.** Your own notifications, with a preview of how often each would have fired.
 
-  ![Alert rules](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/19-T1-AlertRules.png)
+  ![Alert rules](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/alert-rules-desktop-light.png)
 
 - **System status.** The health of every part, and each room's Upgrade report.
 
-  ![System status](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/21-T3-System.png)
+  ![System status](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/system-status-desktop-light.png)
 
 - **AI assistant.** The exact instructions it works from, your room notes and what it costs.
 
-  ![AI assistant settings](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/22-T4-AI.png)
+  ![AI assistant settings](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/ai-assistant-desktop-light.png)
 
 - **On your phone.** Every page works on a phone in the grow room.
 
-  ![Phone view](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/upgrade/24-P1-AllRooms.png)
+  ![Phone view](https://raw.githubusercontent.com/JakeTheRabbit/HA-Irrigation-Strategy/main/docs/screens/status-all-rooms-phone-dark.png)
 
 # 3.17.0
 

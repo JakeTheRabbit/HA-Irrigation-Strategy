@@ -53,64 +53,64 @@ report with you, one line at a time, asking you before each save:
 
 ### 🌱 In plain English
 
-A short tour. These are design mockups of the new pages; the released dashboard may differ in
-small details.
+A short tour. These are screenshots of the 3.18 dashboard running on its built-in demo data (sample
+rooms, not a real facility); the phone view is in the dark theme.
 
 - **Status: all rooms.** Every room and every zone on one page: phase, moisture and water today.
 
-  ![Status, all rooms](docs/screens/upgrade/02-S1-AllRooms.png)
+  ![Status, all rooms](docs/screens/status-all-rooms-desktop-light.png)
 
 - **Zone page.** One zone in full: moisture, EC, what it is waiting for and every shot today.
 
-  ![Zone page](docs/screens/upgrade/04-S3-Zone.png)
+  ![Zone page](docs/screens/zone-desktop-light.png)
 
 - **Timeline.** The day's phases and shots for a room on one line, so you can see what happened when.
 
-  ![Irrigation timeline](docs/screens/upgrade/05-I1-Timeline.png)
+  ![Irrigation timeline](docs/screens/irrigation-timeline-desktop-light.png)
 
 - **Timer programs.** Each zone can water by steering (as before), by timer programs, or be off.
 
-  ![Timer programs](docs/screens/upgrade/07-I3-Timers.png)
+  ![Timer programs](docs/screens/timer-programs-desktop-light.png)
 
 - **Grow plan & presets.** Save a room's or a zone's targets, phase timing and limits, and copy them to other rooms or zones.
 
-  ![Grow plan and presets](docs/screens/upgrade/08-I4-GrowPlan.png)
+  ![Grow plan and presets](docs/screens/grow-plan-presets-desktop-light.png)
 
 - **History: explorer.** Any reading, any room, any period, on one chart.
 
-  ![History explorer](docs/screens/upgrade/09-H1-Explorer.png)
+  ![History explorer](docs/screens/history-explorer-desktop-light.png)
 
 - **History: changes.** Every setting change, who made it and when, including what the upgrade carried across.
 
-  ![History of changes](docs/screens/upgrade/12-H4-Changes.png)
+  ![History of changes](docs/screens/history-changes-desktop-light.png)
 
 - **Feed & dosing.** Each dosing pump with its solution, its stock tank and its doses.
 
-  ![Feed and dosing](docs/screens/upgrade/14-E2-Dosing.png)
+  ![Feed and dosing](docs/screens/feed-dosing-desktop-light.png)
 
 - **Feed pH/EC calibration.** A guided 2-point calibration at the tank; nothing changes until you commit it.
 
-  ![Feed probe calibration](docs/screens/upgrade/16-E4-FeedCal.png)
+  ![Feed probe calibration](docs/screens/feed-calibration-desktop-light.png)
 
 - **Setup: pumps & valves.** Your pumps, main line and valves, and the new pump supply: real flow and zones at once.
 
-  ![Setup, pumps and valves](docs/screens/upgrade/18-E6-Setup.png)
+  ![Setup, pumps and valves](docs/screens/setup-pumps-valves-desktop-light.png)
 
 - **Alert rules.** Your own notifications, with a preview of how often each would have fired.
 
-  ![Alert rules](docs/screens/upgrade/19-T1-AlertRules.png)
+  ![Alert rules](docs/screens/alert-rules-desktop-light.png)
 
 - **System status.** The health of every part, and each room's Upgrade report.
 
-  ![System status](docs/screens/upgrade/21-T3-System.png)
+  ![System status](docs/screens/system-status-desktop-light.png)
 
 - **AI assistant.** The exact instructions it works from, your room notes and what it costs.
 
-  ![AI assistant settings](docs/screens/upgrade/22-T4-AI.png)
+  ![AI assistant settings](docs/screens/ai-assistant-desktop-light.png)
 
 - **On your phone.** Every page works on a phone in the grow room.
 
-  ![Phone view](docs/screens/upgrade/24-P1-AllRooms.png)
+  ![Phone view](docs/screens/status-all-rooms-phone-dark.png)
 
 ### 🔧 Technical notes
 
@@ -119,8 +119,8 @@ small details.
   `config.changed` with actor `migration`; old stores are read only. The report is served by
   `crop_steering.migration_report` and raised as the Repairs issue `upgrade_report_3_18` (CS-616)
   while a room has a "Needs you" line. Row by row: [docs/UPGRADING.md](docs/UPGRADING.md).
-- The tour images in `docs/screens/upgrade/` are design mockups; they are replaced by real
-  screenshots when the dashboard bundle is rebuilt.
+- The tour images in `docs/screens/` are captured from the compiled demo with the clock pinned
+  (`node frontend/scripts/capture-screens.mjs`, then `python scripts/optimise_screens.py`).
 
 **3.18, the parity release (documentation).** This entry covers the documentation for the release; the
 code changes are recorded with the release itself. Read [Upgrading to 3.18](docs/UPGRADING-TO-PARITY.md)
